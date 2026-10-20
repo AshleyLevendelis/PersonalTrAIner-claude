@@ -41,7 +41,8 @@ export interface ProposalDiff {
   unchanged?: string[]
   implications?: { severity: 'info' | 'warn'; text: string }[]
   rationale?: string
-  editable?: { field: string; options: string[] }[]
+  /** `labels` names an option's button when the scope word is not one the card already knows ('today', 'permanent'). */
+  editable?: { field: string; options: string[]; labels?: Record<string, string> }[]
   /**
    * NEAREST THINGS THAT KEEP THE BAR, offered beside the change rather than
    * instead of it. Ashley's ruling, 12 Sep 2026: taking a food out of a meal

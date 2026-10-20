@@ -33,6 +33,7 @@ import { computeTargets } from '@/lib/nutrition-targets'
 import { removeExerciseFromSession } from '@/lib/session-edit'
 import { assessEdit } from '@/lib/edit-tradeoff'
 import { getPools } from '@/lib/meal-store'
+import { refreshGroceryDays } from '@/lib/grocery-store'
 import { computeMealMacros } from '@/lib/food-db'
 import { computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
 import { topUpPlan, topUpMealPlan, previewTopUpStart } from '@/lib/meal-top-up'
@@ -514,6 +515,9 @@ const TOPFIT = ['1', 'crowded'].includes(new URLSearchParams(location.search).ge
 // ?topfit=crowded: the same, with TEN dinners (two that fit), so the meal is
 // already at the size the app will not go past.
 const CROWDED = new URLSearchParams(location.search).get('topfit') === 'crowded'
+// ?listlong=1 (with topup=1) — THE LIST RUNS PAST THE DAY STRIP (M62, 20 Oct 2026): ten days shopped, so the new
+// meals would start after the seven days she can see, and the coach's offer adds "start them tomorrow".
+const LIST_LONG = new URLSearchParams(location.search).get('listlong') === '1'
 // ?daymove=1 — SWAPPING A MEAL WITH ANOTHER DAY'S, ASKED OF THE COACH (29 Sep
 // 2026). The same five-options-a-meal pools and shopping list the top-up run
 // uses, and the week served by the app's OWN useMealDays hook, whose plan and
@@ -562,7 +566,7 @@ const topUpSeed = (() => {
       })))
   // Today and tomorrow are already shopped for, so the app must start the
   // new meals the day after: a start the driver can name in advance.
-  const list = [0, 1].map(d => ({
+  const list = (LIST_LONG ? [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] : [0, 1]).map(d => ({
     id: `g${d}`, client_id: `g${d}`, profile_id: PROFILE_ID, source: 'generated', canonical_key: `oats${d}`, display_name: 'oats',
     quantity: 80, unit: 'g', category: 'dry_goods', checked: false, dismissed: false, needs_review: false, user_edited: false,
     created_at: '2026-09-27T00:00:00.000Z', meal_refs: [{ day: d, date: iso(d), slot: 'breakfast', mealName: 'x' }],
@@ -743,9 +747,15 @@ function Harness() {
               onMealKnockOn={mealDays.dayMove.knockOn}
               mealTopUp={TOPUP && macros ? { ...topUpPlan(pools as never, topUpSlots as never, macros), building: false } : null}
               onMealTopUpStart={TOPUP ? () => previewTopUpStart({ profileId: PROFILE_ID, today: isoOf(anchorDate()) }) : undefined}
-              onMealTopUpConfirm={TOPUP && macros ? async () => {
+              onMealTopUpConfirm={TOPUP && macros ? async (startTomorrow?: boolean) => {
                 const r = await topUpMealPlan({
                   profileId: PROFILE_ID, today: isoOf(anchorDate()), needs: topUpPlan(pools as never, topUpSlots as never, macros).needs,
+                  // As App.tsx: her sooner pick starts tomorrow and re-works the list's days through the app's own function.
+                  startTomorrow,
+                  refreshList: async () => refreshGroceryDays({
+                    profileId: PROFILE_ID, mealPools: await getPools(PROFILE_ID) as never, targets: macros, softLikedFoods: [],
+                    todaysPicks: {}, pinsByDate: {}, mealShape: { mealsPerDay: 3, includeSnacks: false }, today: isoOf(anchorDate()),
+                  }),
                   generation: { targets: macros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: 3, includeSnacks: false, ...(LIBRARY_OFF ? { library: false as const } : {}) },
                 })
                 if (r.added > 0) await reloadPools()

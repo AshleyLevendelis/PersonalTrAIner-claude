@@ -346,9 +346,10 @@ interface ChatAssistantProps {
    */
   mealTopUp?: (TopUpPlan & { building: boolean }) | null
   /** The day the new meals would start, read from the shopping list; null when the list cannot be read. */
-  onMealTopUpStart?: () => Promise<{ from: string; label: string } | null>
+  onMealTopUpStart?: () => Promise<{ from: string; label: string; beyondStrip: boolean } | null>
   /** The one run, shared with the Nutrition tab's own button. Null when it could not start. */
-  onMealTopUpConfirm?: () => Promise<TopUpOutcome | null>
+  /** `startTomorrow` is her pick of the sooner button (M62), offered only when the start is past the day strip. */
+  onMealTopUpConfirm?: (startTomorrow?: boolean) => Promise<TopUpOutcome | null>
   /**
    * START THE PLAN AGAIN FROM WEEK 1 after a very long break (layoff.ts) — App's one
    * function, the same one the Exercise tab's offer calls. A sentence on failure, null on success.
@@ -4240,9 +4241,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         rows: slots.map(slot => ({ field: REFIT_SLOT_LABEL[slot], ...MORE_MEALS.row(mealTopUp.fewFit[slot], mealTopUp.have[slot] ?? 0, mealTopUp.needs[slot] ?? 0) })),
         unchanged: [MORE_MEALS.unchanged],
         implications: [
-          { severity: 'info', text: MORE_MEALS.starts(start.label) },
+          { severity: 'info', text: start.beyondStrip ? MORE_MEALS.startsLate(start.label) : MORE_MEALS.starts(start.label) },
           { severity: 'info', text: MORE_MEALS.takesAMoment },
         ],
+        // M62, the coach's half of the Nutrition offer: a start past the day strip offers "start them tomorrow and
+        // update my shopping list" beside the plain yes, through the same run the screen's button calls.
+        ...(start.beyondStrip
+          ? { editable: [{ field: 'scope', options: ['as-planned', 'tomorrow'], labels: { 'as-planned': 'Apply', tomorrow: MORE_MEALS.sooner } }] }
+          : {}),
         rationale: typeof rawArgs.origin_verbatim_quote === 'string' ? rawArgs.origin_verbatim_quote : undefined,
         reversible: false,
       },
@@ -6516,7 +6522,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // cannot drift. It reads the shopping list and the pools as they stand
       // NOW, not as they stood when the card was built: the card promised
       // which days stay, and the run keeps that promise against the live list.
-      const outcome = onMealTopUpConfirm ? await onMealTopUpConfirm() : null
+      const outcome = onMealTopUpConfirm ? await onMealTopUpConfirm(editedScope === 'tomorrow') : null
       const ok = !!outcome && outcome.added > 0
       receipt = ok
         ? {
@@ -6536,6 +6542,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             .filter(([, n]) => n > 0)
             .map(([slot, n]) => ({ label: REFIT_SLOT_LABEL[slot], detail: `+${n} option${n === 1 ? '' : 's'}` })),
           { label: 'Starting', detail: outcome.startLabel.replace(/^on /, '') },
+          // Only on the sooner pick: the list's days changed (or could not), and the receipt says which.
+          ...(outcome.listUpdated === true ? [{ label: 'Shopping list', detail: 'Updated to match' }]
+            : outcome.listUpdated === false ? [{ label: 'Shopping list', detail: 'Not updated: rebuild it before you shop' }] : []),
         ]
         : []
       // NO UNDO, named: generating already cost a model call, and undoing
