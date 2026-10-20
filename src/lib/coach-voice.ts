@@ -691,6 +691,8 @@ export const COOK_ONCE = {
   dinner: 'Cook both portions together — tomorrow\'s lunch is this.',
   /** On the lunch that came out of last night's pan. */
   lunch: 'Last night\'s dinner.',
+  /** Above the batch rows (runs 7-10, H37): cook it all tonight, keep tomorrow's lunch aside. */
+  batchHeading: 'Cook it all tonight, then keep tomorrow\'s lunch aside:',
 } as const
 
 export const OUTSIDE_YOUR_STYLE = 'Outside your training style'

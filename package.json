@@ -406,6 +406,7 @@
     "test:meal-day-move": "tsx scripts/test-meal-day-move.ts",
     "test:meal-method": "tsx scripts/test-meal-method.ts",
     "verify:meal-method": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-method.mjs",
+    "test:cook-once": "tsx scripts/test-cook-once.ts",
     "test:leftovers": "tsx scripts/test-leftovers.ts",
     "verify:leftovers": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/leftovers.mjs",
     "test:meal-favourite": "tsx scripts/test-meal-favourite.ts",

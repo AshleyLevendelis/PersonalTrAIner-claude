@@ -31,6 +31,7 @@ import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrit
 // budget, which is the one thing that check exists to stop.
 import type { MealMoveContext, MealMoveUndo } from './nutrition/MealMoveSheet'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
+import { cookAndKeep } from '@/lib/cook-once'
 import { COOK_ONCE, didNotSave, aroundEatenLine, heldAroundLine, swapKnockOnLine } from '@/lib/coach-voice'
 import { dayAsShown, eatenMacrosBySlot, aroundEatenKeptKey, readAroundEatenKept } from '@/lib/day-as-shown'
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
@@ -1213,9 +1214,29 @@ function MealSlotRow({
           {option.leftoverFrom === 'dinner' && (
             <p className="text-[0.71875rem] text-muted-foreground" data-meal-leftover={option.name}>{COOK_ONCE.lunch}</p>
           )}
-          {option.reusedTomorrow === true && (
+          {/* The batch rows below say it line by line; this sentence stands only where they cannot be drawn. */}
+          {option.reusedTomorrow === true && !(option.keepForTomorrow && cookAndKeep(option.ingredients, option.keepForTomorrow)) && (
             <p className="text-[0.71875rem] text-muted-foreground" data-meal-cook-extra={option.name}>{COOK_ONCE.dinner}</p>
           )}
+          {/* COOK X, KEEP Y (runs 7-10, H37): the batch, line by line, so tomorrow's bigger lunch portion is a fact
+              tonight rather than a surprise tomorrow. Amounts in the kitchen's own steps, the card's own wording. */}
+          {option.reusedTomorrow === true && option.keepForTomorrow && (() => {
+            const rows = cookAndKeep(option.ingredients, option.keepForTomorrow)
+            if (!rows) return null
+            const amount = (q: number, unit: string) => `${formatKitchenQuantity(q, unit)}${unit === 'g' || unit === 'ml' ? unit : ` ${unit}`}`
+            return (
+              <div className="space-y-0.5 text-[0.71875rem] text-muted-foreground" data-meal-cook-keep={option.name} data-meal-cook-extra={option.name}>
+                <p>{COOK_ONCE.batchHeading}</p>
+                <ul className="space-y-0.5">
+                  {rows.map(r => (
+                    <li key={`${r.name}|${r.unit}`} data-cook-keep-row={r.name}>
+                      Cook {amount(r.cook, r.unit)} {r.name}{r.keep > 0 ? `, keep ${amount(r.keep, r.unit)}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
+          })()}
 
           {/* HOW TO COOK IT. The generator has always written a method and the
               app has always thrown it away — no field on the option, no column

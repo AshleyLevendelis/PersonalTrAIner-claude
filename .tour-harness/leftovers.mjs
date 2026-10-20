@@ -130,9 +130,32 @@ await openMeal2('Lunch')
 await wait(300)
 await openMeal2('Dinner')
 const promise = await cookExtraNote()
-check('2a. the dinner card says to cook both portions together', promise !== null && /both portions/i.test(promise), promise)
+// RE-ANCHORED 20 Oct 2026 (H37): the batch rows replaced "cook both portions together"; the property is the same.
+check('2a. the dinner card says to cook tomorrow\'s portion with it', promise !== null && /cook/i.test(promise) && /tonight|together/i.test(promise), promise)
 check('2b. ...and says which meal the second one is for', promise !== null && /tomorrow/i.test(promise), promise)
-await scrollTo('[data-meal-cook-extra]')
+// --- 2d. cook X, keep Y (runs 7-10, H37) ------------------------------------
+// The batch is written down line by line: what goes in the pan tonight, and what of it is tomorrow's lunch. Read
+// off the screen and checked against the dinner's own listed amounts, never against the code that drew the rows.
+const batch = await ev(`(() => {
+  const box = document.querySelector('[data-meal-cook-keep]')
+  if (!box) return null
+  const r = box.getBoundingClientRect()
+  const card = box.closest('[data-meal-card]') || box.parentElement?.parentElement
+  return {
+    heading: (box.querySelector('p')?.innerText || '').trim(),
+    rows: [...box.querySelectorAll('[data-cook-keep-row]')].map(li => li.innerText.trim()),
+    right: r.right, width: innerWidth,
+    card: card ? card.innerText : '',
+  }
+})()`)
+const parsed = (batch?.rows ?? []).map(t => t.match(/^Cook (\d+)g (.+?), keep (\d+)g$/)).filter(Boolean).map(m => ({ cook: +m[1], food: m[2], keep: +m[3] }))
+check('2d. the dinner card lists the batch, a row per food', (batch?.rows.length ?? 0) >= 2 && parsed.length === batch.rows.length, batch)
+check('2e. ...under a line saying to cook it all tonight and keep tomorrow\'s lunch aside', /cook it all tonight/i.test(batch?.heading ?? '') && /tomorrow/i.test(batch?.heading ?? ''), batch?.heading)
+check('2f. every row cooks more than it keeps, and keeps some', parsed.length > 0 && parsed.every(p => p.keep > 0 && p.cook > p.keep), parsed)
+const tonight = food => { const m = (batch?.card ?? '').match(new RegExp('(\\d+)g ' + food.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?!,)')); return m ? +m[1] : null }
+check('2g. cook minus keep is tonight\'s listed amount, within one kitchen step', parsed.length > 0 && parsed.every(p => tonight(p.food) !== null && Math.abs(p.cook - p.keep - tonight(p.food)) <= 10), parsed.map(p => ({ ...p, tonight: tonight(p.food) })))
+check('2h. the rows sit inside the screen at 390px', !!batch && batch.right <= batch.width + 1, batch && { right: batch.right, width: batch.width })
+await scrollTo('[data-meal-cook-keep]')
 await shoot('leftovers-dinner')
 
 // --- 2b. and it is not the same dish twice in one day ---------------------

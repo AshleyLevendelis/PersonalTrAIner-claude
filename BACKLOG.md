@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **Runs 7-10, H37: leftovers are ONE BATCH (20 Oct 2026).** The dinner that feeds tomorrow's lunch said "cook
+  both portions together" and listed only tonight's amounts; tomorrow's portion is bigger (lunch 0.40 of a three-meal
+  day, dinner 0.30), so the batch was written nowhere. And the shopping list counted the leftover on the LUNCH: today's
+  lunch was bought again (its dinner was cooked yesterday, before the list began) and the last list day's batch was
+  short (its lunch falls after the list ends). FIXED: the served dinner carries the lunch actually served tomorrow
+  (`keepForTomorrow`, replaced or dropped when a swap moves the promise), and the card draws "Cook it all tonight,
+  then keep tomorrow's lunch aside:" with a row per food ("Cook 278g chicken breast, keep 160g"), in place of the old
+  sentence. The list buys one batch once (`cook-once.ts` `shoppingLinesOf`): tomorrow's portion goes on with the
+  dinner, dated tomorrow's lunch when tomorrow is on the list, else tonight; a leftover lunch buys nothing when its
+  dinner is on the list or was cooked before the list began, and buys its own lines when its dinner is a day NOT on
+  the list (found by `test:meal-days` §3b going red on the first version, which bought nothing for that lunch). Decided
+  by me, mechanical (shopping arithmetic; the card's wording is the phrasebook's). `test:cook-once` (33 checks; 21
+  mutations across the batch rows, the served week, the swaps and the list rule, all caught, 3 only after the swap
+  cases were added), `verify:leftovers` §2d-2h (rows read off the screen: cook minus keep is tonight's listed amount),
+  `test:meal-days`, `verify:meal-top-up`. Frontend only. Not done: the grocery screen does not yet SAY a row includes
+  tomorrow's lunch beyond its meal line.
 - [x] **Live test 19 Oct, findings 6-7: the coach's dinner swap card said 466 kcal (the screen 222), its reason
   said "higher-calorie" over a smaller dish, and Apply shrank breakfast and the snack with nothing said, under "25%
   smaller" when they fell 24% and 35%.** TRACED: the card read the dish as SAVED, the screen the day as SERVED (resized

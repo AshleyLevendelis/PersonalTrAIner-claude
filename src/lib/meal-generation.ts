@@ -167,6 +167,13 @@ export interface PoolOption {
    */
   reusedTomorrow?: boolean
   /**
+   * WHAT TO KEEP FOR TOMORROW'S LUNCH, line by line (runs 7-10, H37, 20 Oct 2026): set beside `reusedTomorrow`, the
+   * leftover lunch's own ingredient lines, so the dinner card can say "cook X in all, keep Y" from one batch. The lunch
+   * takes the lunch's share of the day, so it can be bigger than the dinner; this makes that a fact on the card rather
+   * than a surprise the next day. Derived, never persisted.
+   */
+  keepForTomorrow?: PoolOption['ingredients']
+  /**
    * SET WHEN A SWAP HELD THIS DISH AND RE-SIZED IT (runs 3-4, M34): the factor
    * applied to the planned dish. Derived, never persisted. Read by today's
    * fit-around-what-was-eaten so the two re-sizes together stay inside her
