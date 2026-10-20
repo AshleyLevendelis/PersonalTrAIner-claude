@@ -159,8 +159,11 @@ const ozWhere = await ev(WHERE('Your portions, untouched'))
 await shoot('unit-ask-ounces')
 check('3a. a card comes up: she is not asked about what the app can read', oz.hasCard === true && oz.hasConfirm === true, oz.text.slice(-420))
 // 8 oz is 227 g; the old reader put "oz chicken breast" at 8 g.
-check('3b. the chicken is 227 g on the card (8 oz), not 8', /227g chicken breast/.test(ozWhere?.text ?? ''), ozWhere)
-check('3c. ...and the cup of rice is "1 cup" and the carrots are "2 carrots", said as a person would, nothing re-portioned', /1 cup white rice cooked/.test(ozWhere?.text ?? '') && /2 carrots?/.test(ozWhere?.text ?? '') && !/1cup|2whole/.test(ozWhere?.text ?? ''), ozWhere)
+// RE-ANCHORED 20 Oct 2026 to her 18 Oct ruling (H36, "Dry, plus cooked hint"): every line is shown raw or dry, so 8 oz
+// (227 g) of cooked chicken is its raw twin at the same protein, 315 g raw, and a cup of cooked rice is 55 g dry. The
+// check's point is unchanged: the ounces were read as 227 g, never as 8.
+check('3b. the chicken is 8 oz read as 227 g cooked, shown raw at the same protein (315 g), not 8', /315g raw chicken breast/.test(ozWhere?.text ?? '') && !/\b8g\b/.test(ozWhere?.text ?? ''), ozWhere)
+check('3c. ...the cup of cooked rice is read and shown dry (55 g), and the carrots stay "2 carrots", nothing re-portioned', /55g dry white rice/.test(ozWhere?.text ?? '') && /2 carrots?/.test(ozWhere?.text ?? '') && !/1cup|2whole/.test(ozWhere?.text ?? ''), ozWhere)
 const proteinAfter = Number((oz.text.match(/Protein\s*\d+(?:\.\d+)?g\s*budgeted\s*(\d+(?:\.\d+)?)g/i) ?? [])[1])
 check('3d. ...so the protein it shows is the real chicken, over 60 g, where the misread chicken gave under 10', proteinAfter > 60, { proteinAfter, tail: oz.text.slice(-420) })
 

@@ -36,7 +36,7 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   'lean meat': ['chicken breast', 'turkey breast', 'pork loin', 'venison', 'beef rump steak', 'beef steak sirloin', 'chicken drumstick', 'chicken breast raw', 'turkey breast raw', 'pork loin raw'],
   'richer meat': ['chicken thigh', 'duck breast', 'lamb chop', 'pork chop', 'beef brisket', 'pork belly', 'chicken thigh raw'],
   'mince': ['chicken mince', 'turkey mince', 'beef mince 5% fat', 'beef mince 20% fat', 'lamb mince', 'pork mince', 'soy mince', 'quorn mince', 'vegan mince'],
-  'cured meat and sausages': ['bacon', 'ham', 'gammon', 'chorizo', 'pepperoni', 'salami', 'pork sausage', 'vegan sausage'],
+  'cured meat and sausages': ['bacon', 'ham', 'smoked turkey breast', 'gammon', 'chorizo', 'pepperoni', 'salami', 'pork sausage', 'vegan sausage'],
   'white fish': ['cod', 'haddock', 'tilapia', 'sea bass', 'red snapper', 'tuna steak fresh', 'cod raw', 'haddock raw'],
   'oily fish': ['salmon', 'mackerel', 'trout'],
   'tinned and smoked fish': ['tuna canned in water', 'sardines canned', 'smoked salmon'],
@@ -46,7 +46,7 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   'tofu and meat-free pieces': ['tofu firm', 'tofu silken', 'tempeh', 'seitan', 'seitan strips', 'quorn fillet', 'falafel'],
   'beans and pulses': ['chickpeas', 'lentils red', 'lentils green', 'brown lentils', 'red lentils dry', 'green lentils dry', 'black beans', 'kidney beans', 'pinto beans', 'butter beans', 'cannellini beans', 'haricot beans', 'split peas', 'edamame'],
   // --- dairy and its stand-ins ---
-  'yoghurt': ['greek yoghurt 0%', 'greek yoghurt full fat', 'natural yoghurt', 'skyr', 'quark', 'cottage cheese', 'cottage cheese low fat', 'soy yoghurt', 'coconut yoghurt'],
+  'yoghurt': ['greek yoghurt 0%', 'greek yoghurt 2%', 'greek yoghurt full fat', 'natural yoghurt', 'skyr', 'quark', 'cottage cheese', 'cottage cheese low fat', 'soy yoghurt', 'coconut yoghurt'],
   'soft cheese': ['ricotta cheese', 'cream cheese', 'cream cheese light'],
   'cheese': ['cheddar cheese', 'mozzarella', 'mozzarella light', 'feta cheese', 'halloumi', 'parmesan', 'paneer', 'sulguni cheese'],
   'milk': ['milk whole', 'milk semi skimmed', 'milk skimmed', 'soy milk', 'almond milk', 'oat milk'],

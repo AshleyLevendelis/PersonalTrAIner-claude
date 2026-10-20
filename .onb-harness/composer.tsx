@@ -48,9 +48,12 @@ if (state === 'resolved') {
     {
       displayName: 'Ashley', fitnessGoal: 'fat_loss', trainingExperience: 'intermediate',
       activityLevel: 'moderate', equipment: 'bodyweight', injuries: [],
+      // A home kit choice has asked its kit ticks since 18 Oct 2026 (H34), so they are answered too, or the next
+      // open slot is the ticks and "Which days?" is the wrong expectation (re-anchored 20 Oct 2026).
+      kitTicks: ['pull_up_bar'],
       trainingStyle: 'bodybuilding',
     },
-    ['displayName', 'fitnessGoal', 'trainingExperience', 'activityLevel', 'equipment', 'injuries', 'trainingStyle'],
+    ['displayName', 'fitnessGoal', 'trainingExperience', 'activityLevel', 'equipment', 'injuries', 'kitTicks', 'trainingStyle'],
   )))
 }
 
