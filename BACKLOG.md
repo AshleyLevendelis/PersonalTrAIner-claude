@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **Live test 19 Oct, finding 3: Profile's Injuries row read "None" during a knee ease-off.** TRACED: the row
+  summary read only the lasting injuries; the running change was shown only inside the sheet behind it (the Equipment
+  row had the same blind spot for a temporary kit change). FIXED: both rows name every running change of their kind
+  from one helper (`activeChangeLines`, the sheet's own words), running changes first so they survive a truncated row;
+  the Equipment row reads "Bodyweight only until 19 Sep" while a kit change runs (the full sentence and the lasting
+  choice stay in the sheet). Read, never written: the profile is untouched. FOUND WHILE DRIVING IT: the longer row
+  pushed every row in its group 123px past the phone's edge, and the first width check (document and dialog scroll
+  widths) passed over it; the screenshot showed it. The check now measures every row's right edge, and the group is
+  `min-w-0`. `verify:profile-temporary` (9 checks; 7 mutations, all caught, one only after a lasting injury was added
+  to the fixture so a row is long enough for the overflow guard to bind). 41 derived gates and drivers green.
+  Frontend only.
+
 - [ ] **Live test 19 Oct 2026, fifteen findings (`docs/audits/live-test-2026-10-19-findings.md`): her five rulings of
   20 Oct, asked one at a time after "Build it".** (1) **Coach offers: "Text + small buttons always"** (from three:
   over text + buttons with the big card kept for multi-day changes, and over keeping the cards). Every change the coach

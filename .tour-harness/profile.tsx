@@ -89,6 +89,15 @@ const KEPT_CLASH = LIKES && new URLSearchParams(location.search).get('keptclash'
 // database; what this page reproduces is only App's "take the new plan and
 // re-read the facts" — which is all `onSaved` is.
 const KIT = new URLSearchParams(location.search).get('kit') === '1'
+// ?ease=1 — A TEMPORARY CHANGE RUNNING (live test, 19 Oct 2026): Profile's Injuries row read "None" during a knee
+// ease-off. A running knee ease-off, a running bodyweight-only week, and a shoulder ease-off that already ENDED, so
+// the driver can see the rows name the running two and not the finished one. Rows shaped as the store writes them.
+const EASE = new URLSearchParams(location.search).get('ease') === '1'
+const EASE_ROWS = EASE ? [
+  { id: 'ease-knee', kind: 'injury', status: 'active', injury_code: 'knees', equipment_override: null, starts_at: new Date(anchorNowMs() - 2 * 86400000).toISOString(), expires_at: new Date(anchorNowMs() + 6 * 86400000).toISOString() },
+  { id: 'ease-kit', kind: 'equipment', status: 'active', injury_code: null, equipment_override: 'bodyweight', starts_at: new Date(anchorNowMs() - 1 * 86400000).toISOString(), expires_at: new Date(anchorNowMs() + 3 * 86400000).toISOString() },
+  { id: 'ease-old', kind: 'injury', status: 'active', injury_code: 'shoulders', equipment_override: null, starts_at: new Date(anchorNowMs() - 20 * 86400000).toISOString(), expires_at: new Date(anchorNowMs() - 6 * 86400000).toISOString() },
+] : []
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const availableIdx = new Set([0, 1, 3, 4])
 
@@ -104,7 +113,8 @@ const baseProfile: UserProfile = {
   // value outside its own union is invisible until something reads it.
   fitness_goal: 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
   equipment_access: FULL_GYM ? 'full_gym' : KIT ? 'minimalist' : 'home_gym',
-  injuries: [], training_style: (STYLE ?? 'bodybuilding') as UserProfile['training_style'],
+  // ?ease=1 also has a LASTING injury on file, so the Injuries row carries both: the case a long row has to survive.
+  injuries: EASE ? ['lower_back'] : [], training_style: (STYLE ?? 'bodybuilding') as UserProfile['training_style'],
   training_experience: 'intermediate', session_duration_preference: '60-90',
   workout_split_preference: 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
@@ -267,6 +277,7 @@ function Harness() {
           onNewPlan={() => {}}
           backLabel="Home"
           calorieTarget={2350}
+          activeAdaptations={EASE_ROWS as never}
         />
       </div>
     </AppearanceProvider>

@@ -52,6 +52,8 @@ import {
 import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invalidation'
 import type { PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { ActiveAdaptationLines } from '@/components/exercise/ActiveAdaptationLines'
+import { activeChangeLines } from '@/lib/effective-constraints'
+import { getAppNow } from '@/lib/dev-clock'
 import { getShopDay, setShopDay, defaultShopDay, DAY_NAMES, type DayName } from '@/lib/shop-day-store'
 import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay, StartPreference, FitnessGoal } from '@/lib/types'
 import { describeActivity } from '@/lib/concurrent-activity'
@@ -183,7 +185,9 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
  */
 function ProfileGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-2" data-profile-group={label}>
+    // min-w-0: a row's summary is one line that truncates, and a long one (a running ease-off, 19 Oct 2026) must not
+    // widen the whole group past the phone's edge.
+    <section className="min-w-0 space-y-2" data-profile-group={label}>
       <h3 className="ds-label">{label}</h3>
       <div className="rounded-2xl px-3.5" style={{ background: 'var(--surface-raised)' }}>{children}</div>
     </section>
@@ -1835,12 +1839,12 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <ProfileGroup label="Body & goals">
               <SheetRow label="Height & weight" value={[profile.height_cm ? `${profile.height_cm} cm` : null, nowKg != null ? `${nowKg} kg` : null].filter(Boolean).join(' · ') || 'Not set'} onOpen={() => setSheet('body')} />
               <SheetRow label="Goal" value={[GOAL_OPTIONS.find(o => o.value === profile.fitness_goal)?.label, goalKg != null ? `${goalKg} kg` : null].filter(Boolean).join(' → ') || 'Not set'} onOpen={() => setSheet('goal')} />
-              <SheetRow label="Injuries" value={listOrNone([...injuryCodes.map(code => INJURY_OPTIONS.find(o => o.value === code)?.label ?? code), ...unrecognisedInjuries], 'None')} onOpen={() => setSheet('injuries')} />
+              <SheetRow label="Injuries" value={listOrNone([...activeChangeLines(activeAdaptations ?? [], 'injury', getAppNow(profileId)), ...injuryCodes.map(code => INJURY_OPTIONS.find(o => o.value === code)?.label ?? code), ...unrecognisedInjuries], 'None')} onOpen={() => setSheet('injuries')} />
             </ProfileGroup>
 
             <ProfileGroup label="Training">
               <SheetRow label="Schedule" value={availableDays.join(' ') || 'Not set'} onOpen={() => setSheet('schedule')} />
-              <SheetRow label="Equipment" value={EQUIPMENT_OPTIONS.find(o => o.value === profile.equipment_access)?.label ?? 'Not set'} onOpen={() => setSheet('equipment')} />
+              <SheetRow label="Equipment" value={activeChangeLines(activeAdaptations ?? [], 'equipment', getAppNow(profileId), tier => EQUIPMENT_OPTIONS.find(o => o.value === tier)?.label ?? tier.replace(/_/g, ' '))[0] ?? EQUIPMENT_OPTIONS.find(o => o.value === profile.equipment_access)?.label ?? 'Not set'} onOpen={() => setSheet('equipment')} />
               {/* Only where they were asked — the same rule as before. */}
               {(profile.skip_calibration_week || knownLiftsAnswered) && (
                 <SheetRow label="Known lifts" value={knownLift} onOpen={() => setSheet('lifts')} />

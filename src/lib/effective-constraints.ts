@@ -105,6 +105,25 @@ export function endsOn(expiresAt: string): string {
 }
 
 /**
+ * THE TEMPORARY CHANGES A PROFILE ROW MUST NAME (live test, 19 Oct 2026). Profile's Injuries row read "None" while
+ * "Easing off your knees until 22 Oct" ran: the row summary read only the profile's lasting injuries, and the
+ * temporary change was shown only inside the sheet behind it. The row now names every active change of its kind, in
+ * the same words the sheet uses. READ, NEVER WRITTEN: nothing here goes near the profile.
+ */
+export function activeChangeLines(
+  adaptations: ActiveAdaptationLike[],
+  kind: ActiveAdaptationLike['kind'],
+  now: Date,
+  equipmentLabel?: (tier: string) => string,
+): string[] {
+  return adaptations.filter(a => a.kind === kind && isAdaptationActive(a, now)).map(a => a.kind === 'equipment'
+    // The row's own width: "Training with bodyweight only until 19 Sep" beside the lasting choice did not fit one line
+    // at 390px; the sheet behind the row keeps the full sentence and the lasting choice.
+    ? `${equipmentLabel?.(a.equipment_override ?? '') ?? (a.equipment_override ?? '').replace(/_/g, ' ')} until ${endsOn(a.expires_at)}`
+    : describeActiveAdaptation(a, equipmentLabel))
+}
+
+/**
  * The line Profile and the Exercise tab both show while a temporary change is
  * running. One function, so the two screens cannot word it differently.
  */
