@@ -506,6 +506,16 @@ export async function getWeeklyDashboard(
 // Set WRITES live exclusively in set-log-store.ts (C0 Part 3) — the legacy
 // upsertWorkoutLog/getLogsForDate pair is gone with the workout_logs table.
 
+/** The first date of a look-back window, counted from the APP'S today (verify:history-streak, 20 Oct 2026). The window
+ *  was counted from the device's calendar while the streak was counted from the app's, so on any day the two differed
+ *  the streak read logs from the wrong fortnight. Pure, exported for the gate. */
+export function sinceDate(days: number, today?: string): string {
+  if (today) return addDays(today, -days)
+  const since = new Date()
+  since.setDate(since.getDate() - days)
+  return since.toISOString().split('T')[0]
+}
+
 /**
  * Recent WORKING-set history — the streak/PR/progression view.
  *
@@ -523,10 +533,10 @@ export async function getWeeklyDashboard(
 export async function getRecentLogs(
   userId: string,
   days: number = 14,
+  /** The app's today (YYYY-MM-DD). Omitted, the device's calendar is used. */
+  today?: string,
 ): Promise<ExerciseSetLog[]> {
-  const since = new Date()
-  since.setDate(since.getDate() - days)
-  const sinceStr = since.toISOString().split('T')[0]
+  const sinceStr = sinceDate(days, today)
 
   const { data, error } = await supabase
     .from('exercise_set_logs')
@@ -574,10 +584,10 @@ export async function getRecentLogs(
 export async function getRecentLogsWithWarmups(
   userId: string,
   days: number = 14,
+  /** The app's today (YYYY-MM-DD). Omitted, the device's calendar is used. */
+  today?: string,
 ): Promise<ExerciseSetLog[]> {
-  const since = new Date()
-  since.setDate(since.getDate() - days)
-  const sinceStr = since.toISOString().split('T')[0]
+  const sinceStr = sinceDate(days, today)
 
   const { data, error } = await supabase
     .from('exercise_set_logs')
@@ -676,10 +686,10 @@ export function formatLogsForAI(logs: ExerciseSetLog[]): string {
 export async function getRecentCardioLogs(
   userId: string,
   days: number = 14,
+  /** The app's today (YYYY-MM-DD). Omitted, the device's calendar is used. */
+  today?: string,
 ): Promise<CardioLog[]> {
-  const since = new Date()
-  since.setDate(since.getDate() - days)
-  const sinceStr = since.toISOString().split('T')[0]
+  const sinceStr = sinceDate(days, today)
 
   const { data, error } = await supabase
     .from('cardio_logs')

@@ -1548,7 +1548,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // logged on the Exercise tab is in the next message's context.
     void cardioHistoryForCoach(profile.id, getLocalDateString(getAppNow(profile.id)), 14).then(setCardioLogHistory)
     try {
-      setWorkoutLogHistory(formatLogsForAI(await getRecentLogsWithWarmups(profile.id, 14)))
+      setWorkoutLogHistory(formatLogsForAI(await getRecentLogsWithWarmups(profile.id, 14, activeSession.date)))
     } catch (err) {
       console.error('Failed to load workout logs:', err)
     }
