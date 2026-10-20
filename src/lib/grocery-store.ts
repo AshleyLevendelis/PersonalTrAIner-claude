@@ -1043,6 +1043,21 @@ export interface AddGroceryDaysInput extends Omit<GenerateGroceryListInput, 'day
   legacyStartDate?: string
 }
 
+/**
+ * RE-WORK THE DAYS ALREADY ON THE LIST from the meals as they are now (runs 7-10, M62, 20 Oct 2026). For "start the
+ * new meals tomorrow and update my shopping list": the covered days are planned again and reconciled exactly as Add
+ * and Remove do, so ticked and hand-added rows hold. Nothing is added or taken off the list's DAYS. Reads strictly:
+ * a list it cannot read is never rebuilt as if empty.
+ */
+export async function refreshGroceryDays(input: Omit<AddGroceryDaysInput, 'dates'>): Promise<AddGroceryDaysResult> {
+  const covered = await readGroceryCoverage(input.profileId, input.today, input.legacyStartDate, { strict: true })
+  if (covered.length === 0) return { added: 0, updated: 0, removed: 0, alreadyCovered: false, covered }
+  const pinsByDate = { ...(input.pinsByDate ?? {}), [input.today]: { ...(input.pinsByDate?.[input.today] ?? {}), ...(input.todaysPicks ?? {}) } }
+  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today, readKeptHeldSizes(input.profileId))
+  const result = await reconcileGenerated(input.profileId, planned, input.today)
+  return { ...result, alreadyCovered: false, covered }
+}
+
 export interface AddGroceryDaysResult extends GenerateGroceryListResult {
   /** Every requested date was already on the list: nothing was written. */
   alreadyCovered: boolean

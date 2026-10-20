@@ -31,7 +31,7 @@ import { fileURLToPath } from 'url'
 import { computeSlotBudgets, assembleDay, type AssembledDay, type PoolOption } from '../src/lib/meal-generation'
 import { buildRotation, assembleRotationDay, serveDates, addDays, datesFrom, poolsServedOn } from '../src/lib/meal-rotation'
 import { newFromDate, tagsNewFrom, isBookkeepingTag, displayTags, NEW_FROM_TAG_PREFIX } from '../src/lib/meal-new-from'
-import { topUpNeeds, topUpStartDate, topUpStartLabel, runMealTopUp, topUpOffer, topUpPlan, fittingCounts, isTopUpDismissed, dismissTopUp, MIN_FITTING, FITTING_GOAL, MAX_POOL, type TopUpPlan } from '../src/lib/meal-top-up'
+import { topUpNeeds, topUpStartDate, topUpStartLabel, topUpBeyondStrip, runMealTopUp, topUpOffer, topUpPlan, fittingCounts, isTopUpDismissed, dismissTopUp, MIN_FITTING, FITTING_GOAL, MAX_POOL, type TopUpPlan } from '../src/lib/meal-top-up'
 import { moreMealOptionsOffer, moreMealOptionsDone, moreMealOptionsWhy, MORE_MEALS } from '../src/lib/coach-voice'
 import type { MealSlotName } from '../src/lib/meal-store'
 import type { MacroTargets } from '../src/lib/types'
@@ -292,6 +292,23 @@ async function main() {
       },
     }).catch(() => null)
     check('one request failing keeps what the others added', r3 !== null && r3.added.breakfast === 2 && (r3.added.dinner ?? 0) === 0 && r3.reached, r3)
+
+    // M62 (Ashley, 20 Oct 2026, "Say it, and offer sooner"): her pick of "start them tomorrow" starts them tomorrow
+    // whatever the list holds; the list is still read first (a failed read still stops everything).
+    const soon: string[] = []
+    const r4 = await runMealTopUp({
+      needs: { dinner: 2 }, today: TODAY, startTomorrow: true,
+      readCoverage: async () => datesFrom(TODAY, 7),
+      generate: async (slots, count, from) => { soon.push(from); return { accepted: Object.fromEntries(slots.map(s => [s, Array.from({ length: count }, (_, i) => dish(`${s}${i}`))])), generatorReached: true } },
+    })
+    check('"start them tomorrow": the new meals start tomorrow even with a week on the list', soon.length === 1 && soon[0] === '2026-09-29' && r4.from === '2026-09-29', { soon, from: r4.from })
+    let asked5 = 0
+    const r5 = await runMealTopUp({ needs: { dinner: 2 }, today: TODAY, startTomorrow: true, readCoverage: async () => { throw new Error('offline') }, generate: async () => { asked5++; return { accepted: {}, generatorReached: true } } })
+    check('...and a list that cannot be read still stops it', asked5 === 0 && r5.listUnreadable, r5)
+    // THE STRIP is today and the next six days; a start on the seventh day after today is the first it cannot show.
+    check('a start inside the strip is not past it (the sixth day after today)', !topUpBeyondStrip(TODAY, '2026-10-04'))
+    check('...and the seventh day after today is', topUpBeyondStrip(TODAY, '2026-10-05'))
+    check('a list rebuilt for seven days puts the start past the strip (the live case)', topUpBeyondStrip(TODAY, topUpStartDate(TODAY, datesFrom(TODAY, 7))))
   }
 
   console.log('\n5. The meal generator stamps what it adds, and only then')
@@ -366,6 +383,31 @@ async function main() {
     check('the button adds what was short, first served the day after the last list day',
       done.added === 2 && bLunch.length === 7 && bLunch.filter(o => newFromDate(o) === '2026-09-30').length === 2, bLunch.map(o => o.tags))
     check('...and says so, with the day', !done.note.failed && /^Added 2 new meals\. They start on Wednesday;/.test(done.note.text), done.note)
+
+    // M62: the list is re-worked ONLY on her pick, and only once something landed; the receipt says what happened.
+    let refreshed = 0
+    const refreshList = async () => { refreshed++ }
+    await generateMealPools({ ...base, profileId: 'e', poolSize: 5 })
+    const plain = await topUpMealPlan({ profileId: 'e', today: TODAY, needs: { lunch: 2 }, generation, refreshList })
+    check('"Get more options" never touches the list, even with a refresh to hand', plain.added === 2 && refreshed === 0, { added: plain.added, refreshed })
+    // A LIST THAT HOLDS DAYS, or "tomorrow" and "after the list" are the same day and the pick cannot be seen.
+    db.grocery_items.push({
+      id: 'gf', profile_id: 'f', source: 'generated', canonical_key: 'oats', display_name: 'oats', quantity: 80, unit: 'g',
+      category: 'dry_goods', checked: false, dismissed: false, needs_review: false, user_edited: false, client_id: 'gf', created_at: '2026-09-27T00:00:00.000Z',
+      meal_refs: [{ day: 1, date: '2026-09-29', slot: 'lunch', mealName: 'y' }, { day: 3, date: '2026-10-01', slot: 'lunch', mealName: 'y' }],
+    })
+    await generateMealPools({ ...base, profileId: 'f', poolSize: 5 })
+    const sooner = await topUpMealPlan({ profileId: 'f', today: TODAY, needs: { lunch: 2 }, generation, refreshList, startTomorrow: true })
+    const fLunch = (await getPools('f')).lunch ?? []
+    check('"start them tomorrow": the new meals are stamped for tomorrow', sooner.added === 2 && fLunch.filter(o => newFromDate(o) === '2026-09-29').length === 2, fLunch.map(o => o.tags))
+    check('...the list is re-worked once', refreshed === 1, refreshed)
+    check('...and the receipt says they start tomorrow and the list is updated', /^Added 2 new meals\. They start tomorrow, and your shopping list is updated to match\.$/.test(sooner.note.text), sooner.note.text)
+    await generateMealPools({ ...base, profileId: 'h', poolSize: 5 })
+    const broken = await topUpMealPlan({ profileId: 'h', today: TODAY, needs: { lunch: 2 }, generation, startTomorrow: true, refreshList: async () => { throw new Error('offline') } })
+    check('a list that could not be re-worked is said, never passed off as updated', /couldn't update your shopping list/.test(broken.note.text) && !/updated to match/.test(broken.note.text), broken.note.text)
+    refreshed = 0
+    const none = await topUpMealPlan({ profileId: 'k', today: TODAY, needs: {}, generation, refreshList, startTomorrow: true })
+    check('nothing landed: the list is left alone', none.added === 0 && refreshed === 0, { added: none.added, refreshed })
 
     failTable = 'grocery_items'
     const before = requests
@@ -458,7 +500,18 @@ async function main() {
     check('...a partial landing is reported as partial, and a failure says what the run said',
       /failed: outcome\.added < outcome\.asked\s*\?/.test(confirm) && /outcome\?\.why/.test(confirm), confirm.slice(0, 300))
     check('the button and the coach go through ONE run in App',
-      (app.match(/await runMealTopUpNow\(\)/g) ?? []).length === 2 && /onMealTopUpConfirm=\{handleMealTopUpFromChat\}/.test(app))
+      (app.match(/await runMealTopUpNow\(/g) ?? []).length === 2 && /onMealTopUpConfirm=\{handleMealTopUpFromChat\}/.test(app))
+    // M62 wiring: her pick reaches the run, and the list is re-worked through the list's own refresh, with the pools
+    // read back after the top-up (the closure's pools are from before it).
+    check('M62: the button hands her pick to the run, and the run is told how to re-work the list',
+      /const r = await runMealTopUpNow\(startTomorrow\)/.test(app) && /startTomorrow,\s*\n\s*refreshList: async \(\) => refreshGroceryDays\(\{\s*\n\s*profileId, mealPools: await getPools\(profileId\)/.test(app))
+    const nd = read('src/components/NutritionDisplay.tsx')
+    check('M62: the offer names the start day before the tap, the late wording when it is past the strip',
+      /mealTopUpStart\.beyondStrip \? MORE_MEALS\.startsLate\(mealTopUpStart\.label\) : MORE_MEALS\.starts\(mealTopUpStart\.label\)/.test(nd))
+    check('M62: the sooner button is there only when the start is past the strip, and asks for tomorrow',
+      /\.\.\.\(mealTopUpStart\?\.beyondStrip \? \[\{ label: MORE_MEALS\.sooner, onClick: \(\) => onMealTopUp\?\.\(true\)/.test(nd) && /label: mealTopUpBusy \? 'Finding meals…' : 'Get more options', onClick: \(\) => onMealTopUp\?\.\(false\)/.test(nd))
+    check('M62: the start is read the strict way the run reads it, and judged against the strip',
+      /void previewTopUpStart\(\{ profileId, today: mealRotationDate/.test(app) && /const unsubscribe = subscribeGroceryStore\(read\)/.test(app) && /setMealTopUpStart\(p \? \{ label: p\.label, beyondStrip: topUpBeyondStrip\(mealRotationDate, p\.from\) \} : null\)/.test(app))
     check('...the coach is told the plan the app computes for the button, not its own', /mealTopUp=\{mealTopUpPlan \? \{ \.\.\.mealTopUpPlan, building: initialMealBuild \} : null\}/.test(app)
       && /const mealTopUpNeeds = mealTopUpPlan\?\.needs \?\? \{\}/.test(app))
     check('...and its receipt is in the chat, without setting the Nutrition tab\'s banner',

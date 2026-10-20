@@ -89,9 +89,9 @@ import { makeKitController } from '@/lib/kit-change'
 import { profileWithKit } from '@/lib/kit-list'
 import { planDaysInWindow } from '@/lib/plan-guard'
 import type { UserFactRow } from '@/lib/memory-store'
-import { getAllItems as getAllGroceryItems } from '@/lib/grocery-store'
+import { getAllItems as getAllGroceryItems, refreshGroceryDays, subscribeGroceryStore } from '@/lib/grocery-store'
 import { computeSlotBudgets } from '@/lib/meal-generation'
-import { topUpPlan, topUpOffer, topUpMealPlan, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
+import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, topUpBeyondStrip, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
 import { MEAL_LIBRARY } from '@/lib/meal-library-data'
 // The app's own root boundary, as main.tsx mounts it (verify:chunk-reload reads what it shows).
 import { AppErrorBoundary } from '@/components/AppErrorBoundary'
@@ -1433,12 +1433,32 @@ function Harness() {
     ? topUpOffer(topUpPlanNow, { count: isTopUpDismissed(PROFILE_ID, 'count'), fit: isTopUpDismissed(PROFILE_ID, 'fit', driftedMacros ?? undefined) })
     : null
   const topUpShown = topUpOfferNow?.text ?? null
-  const handleTopUp = async () => {
+  // M62, as App.tsx does it: while the offer shows, the start day is read the strict way the run reads it.
+  const [topUpStart, setTopUpStart] = useState<{ label: string; beyondStrip: boolean } | null>(null)
+  const topUpOfferShown = !!topUpShown && !topUpNote
+  useEffect(() => {
+    if (!topUpOfferShown) { setTopUpStart(null); return }
+    let cancelled = false
+    const read = () => {
+      void previewTopUpStart({ profileId: PROFILE_ID, today })
+        .then(p => { if (!cancelled) setTopUpStart(p ? { label: p.label, beyondStrip: topUpBeyondStrip(today, p.from) } : null) })
+    }
+    read()
+    const unsubscribe = subscribeGroceryStore(read)
+    return () => { cancelled = true; unsubscribe() }
+  }, [topUpOfferShown])
+  const handleTopUp = async (startTomorrow = false) => {
     if (!driftedMacros || topUpBusy) return
     setTopUpBusy(true)
     setTopUpNote(null)
+    const targets = driftedMacros
     const r = await topUpMealPlan({
       profileId: PROFILE_ID, today, needs: topUpNeedsNow,
+      startTomorrow,
+      refreshList: async () => refreshGroceryDays({
+        profileId: PROFILE_ID, mealPools: await getPools(PROFILE_ID), targets, softLikedFoods: [],
+        todaysPicks: mealDays.today?.day.chosen ?? {}, pinsByDate: mealDays.pinsByDate, mealShape, today,
+      }),
       generation: { targets: driftedMacros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: mealShape.mealsPerDay, includeSnacks: mealShape.includeSnacks, ...(LIBRARY_OFF ? { library: false as const } : {}) },
     })
     if (r.added > 0) setLivePools(await getPools(PROFILE_ID) as never)
@@ -1677,7 +1697,8 @@ function Harness() {
             // before 9 Oct 2026 was built on.
             onSwapMealSlot={REGEN ? mealActions.swap : noop} onRegenerateMealSlot={REGEN ? mealActions.regenerateSlot : noop} onRegenerateAllMeals={REGEN ? mealActions.regenerateAll : noop}
             mealTopUp={topUpShown} mealTopUpBusy={topUpBusy} mealTopUpNote={topUpNote}
-            onMealTopUp={() => { void handleTopUp() }}
+            onMealTopUp={(startTomorrow?: boolean) => { void handleTopUp(startTomorrow) }}
+            mealTopUpStart={topUpStart}
             onMealTopUpDecline={() => { if (topUpOfferNow) dismissTopUp(PROFILE_ID, topUpOfferNow.kind, driftedMacros ?? undefined); setTopUpDismissTick(t => t + 1) }}
             onDismissMealTopUpNote={() => setTopUpNote(null)}
             mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove}

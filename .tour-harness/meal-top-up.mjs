@@ -122,6 +122,7 @@ const load = async (qs, library = 'off') => {
   await wait(700)
 }
 const clearDismissal = () => ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('meal-top-up-dismissed')) localStorage.removeItem(k); return true })()`)
+const addDaysIso = (date, n) => { const t = new Date(`${date}T00:00:00Z`); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10) }
 const weekday = date => new Date(`${date}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })
 
 console.log('\n[1] A plan made at five options a meal is offered more')
@@ -322,6 +323,44 @@ await tapDay(days8[0])
 const listed8 = await ev(`window.__groceryRows().then(r => [...new Set(r.flatMap(x => x.meal_refs).map(m => m.date))].sort())`)
 check('the shopping list still covers exactly the days it did', JSON.stringify(listed8) === JSON.stringify(days8.slice(1, HELD)), listed8)
 await shoot('meal-top-up-library-done')
+
+console.log('\n[9] A list that runs past the strip: the offer says when, and offers sooner (M62)')
+// Ashley, 20 Oct 2026, "Say it, and offer sooner". The live case: the list rebuilt for the whole week, so the new
+// meals would start the day after the strip ends. Before the tap the offer names that day; a second button starts
+// them tomorrow and re-works the list.
+await clearDismissal()
+await load('')
+const days9 = await strip()
+for (const d of days9.slice(1)) {
+  await tapDay(d)
+  await ev(`document.querySelector('[data-testid="meal-day-add-grocery"]')?.click()`)
+  for (let i = 0; i < 30; i++) { if ((await ev(`document.querySelector('[data-testid="meal-day-grocery"]')?.dataset.state`)) === 'added') break; await wait(150) }
+}
+await tapDay(days9[0])
+for (let i = 0; i < 30; i++) { if (/after the days you can see/.test((await offerText()) ?? '')) break; await wait(150) }
+const late = await offerText()
+const lateDay = addDaysIso(days9[6], 1)
+check('the fixture is the case: the whole strip after today is on the list', JSON.stringify(await ev(`window.__groceryRows().then(r => [...new Set(r.flatMap(x => x.meal_refs).map(m => m.date))].sort())`)) === JSON.stringify(days9.slice(1)))
+check('before the tap the offer names the day they would start, past what she can see', new RegExp(`The new meals would start on ${weekday(lateDay)} \\d+ \\w+, after the days you can see here, because your shopping list runs until then\\.`).test(late ?? ''), late)
+check('...and offers to start them tomorrow, between the two buttons it had', await ev(`[...document.querySelectorAll('[data-testid="meal-top-up-offer"] button')].map(b => b.textContent.trim()).join('|')`) === 'Get more options|Start them tomorrow and update my shopping list|Not now')
+const offerBox = await ev(`(() => { const r = document.querySelector('[data-testid="meal-top-up-offer"]').getBoundingClientRect(); return { right: r.right, width: innerWidth } })()`)
+check('...inside the screen at 390px', offerBox && offerBox.right <= offerBox.width + 1, offerBox)
+await shoot('meal-top-up-late-offer')
+const before9 = await readWeek()
+await tapButton('Start them tomorrow and update my shopping list')
+for (let i = 0; i < 60; i++) { if (await has('[data-testid="meal-top-up-note"]')) break; await wait(150) }
+await wait(800)
+const done9 = await note()
+check('the receipt says they start tomorrow and the list is updated', done9?.text === 'Added 6 new meals. They start tomorrow, and your shopping list is updated to match.', done9)
+check('...marked as a success, where she can see it', done9?.failed === 'false' && done9?.onScreen === true, done9)
+await shoot('meal-top-up-sooner-done')
+const after9 = await readWeek()
+check('today is exactly as it was', after9[0]?.shown === before9[0]?.shown, { before: before9[0]?.shown, after: after9[0]?.shown })
+check('new meals are served from tomorrow, inside the strip', after9.slice(1).some(d => /Fresh /.test(d.shown)), after9.slice(1).map(d => d.shown))
+const list9 = await ev(`window.__groceryRows().then(r => Object.fromEntries(${JSON.stringify(days9.slice(1))}.map(d => [d, [...new Set(r.filter(x => x.source === 'generated' && !x.dismissed).flatMap(x => x.meal_refs).filter(m => m.date === d).map(m => m.mealName))].sort()])))`)
+const shown9 = Object.fromEntries(after9.slice(1).map(d => [d.date, Object.values(d.names).filter(Boolean).sort()]))
+check('the list now shops for exactly what each of those days serves, new meals included', JSON.stringify(list9) === JSON.stringify(shown9), { list9, shown9 })
+check('...and still covers exactly the same days', JSON.stringify(Object.keys(list9).filter(d => list9[d].length > 0)) === JSON.stringify(days9.slice(1)))
 
 const errs = await ev(`window.__errors ?? []`)
 check('no page errors', (errs ?? []).length === 0, errs)

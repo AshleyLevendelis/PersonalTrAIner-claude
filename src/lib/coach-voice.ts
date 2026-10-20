@@ -221,14 +221,19 @@ export function moreMealOptionsWhy(r: { reached: boolean; listUnreadable: boolea
   return r.reached ? "I couldn't find new meals that fit your targets" : "I couldn't reach the meal generator just then"
 }
 
-export function moreMealOptionsDone(r: { added: number; asked: number; reached: boolean; listUnreadable: boolean; startLabel: string }): string {
+export function moreMealOptionsDone(r: { added: number; asked: number; reached: boolean; listUnreadable: boolean; startLabel: string; listUpdated?: boolean | null }): string {
   if (r.added === 0) {
     // Every failure says nothing changed, and the two that are about a
     // connection say to try again; "no meal fits" would not get better.
     const retry = r.listUnreadable || !r.reached ? ' Try again in a moment.' : ''
     return `${moreMealOptionsWhy(r)}, so nothing has changed.${retry}`
   }
-  const lead = `Added ${r.added} new ${r.added === 1 ? 'meal' : 'meals'}. They start ${r.startLabel}; every day before then stays as it was.`
+  // STARTED TOMORROW ON HER PICK (M62): the days after today changed, so the receipt says what happened to the list.
+  const lead = r.listUpdated === true
+    ? `Added ${r.added} new ${r.added === 1 ? 'meal' : 'meals'}. They start ${r.startLabel}, and your shopping list is updated to match.`
+    : r.listUpdated === false
+      ? `Added ${r.added} new ${r.added === 1 ? 'meal' : 'meals'}. They start ${r.startLabel}, but I couldn't update your shopping list, so it still has the old meals on it. Rebuild it before you shop.`
+      : `Added ${r.added} new ${r.added === 1 ? 'meal' : 'meals'}. They start ${r.startLabel}; every day before then stays as it was.`
   // "There's room to try again" holds on both surfaces: the screen still
   // offers it, and the coach can be asked. Neither has to point at a control.
   return r.added < r.asked ? `${lead} That's fewer than I asked for, so there's room to try again.` : lead
@@ -251,6 +256,10 @@ export const MORE_MEALS = {
    */
   unchanged: 'Today and every day on your shopping list, and every option you already have — nothing is removed or resized.',
   starts: (startLabel: string) => `The new meals start ${startLabel}; every day before then stays as it was.`,
+  /** M62: the start is past the day strip, so the offer says so and offers sooner. */
+  startsLate: (startLabel: string) => `The new meals would start ${startLabel}, after the days you can see here, because your shopping list runs until then.`,
+  /** The second button when the start is past the strip. */
+  sooner: 'Start them tomorrow and update my shopping list',
   takesAMoment: 'Finding new meals takes a moment.',
   /** Completes "Do you want me to ..." when a meal has dishes but too few that fit. */
   leadFit: 'add meals that fit your targets, where too few of your dishes do',

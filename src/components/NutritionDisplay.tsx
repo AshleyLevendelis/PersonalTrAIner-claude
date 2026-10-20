@@ -9,7 +9,7 @@ import { MealPlan, SLOT_ORDER, SLOT_LABEL, type UpcomingMealDay } from '@/compon
 import { MealDayStrip } from '@/components/nutrition/MealDayStrip'
 import { MacroSplitCard } from '@/components/MacroSplitCard'
 import { TrainerNudge } from '@/components/TrainerNudge'
-import { mealsDrifted, kcalLeftOrOver } from '@/lib/coach-voice'
+import { mealsDrifted, kcalLeftOrOver, MORE_MEALS } from '@/lib/coach-voice'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot } from '@/lib/meal-store'
 import { getLogsForDate as getWaterLogsForDate, setWaterTargetMl, logWater, undoLog, type WaterLogRow } from '@/lib/water-store'
@@ -144,7 +144,9 @@ export interface NutritionDisplayProps {
   mealTopUpBusy?: boolean
   /** What happened after the tap, from the phrasebook; `failed` when nothing changed. */
   mealTopUpNote?: { text: string; failed: boolean } | null
-  onMealTopUp?: () => void
+  onMealTopUp?: (startTomorrow?: boolean) => void
+  /** When the new meals would start, read before the tap (M62); `beyondStrip` adds the sooner button. */
+  mealTopUpStart?: { label: string; beyondStrip: boolean } | null
   onMealTopUpDecline?: () => void
   onDismissMealTopUpNote?: () => void
 }
@@ -163,7 +165,7 @@ export function NutritionDisplay({
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
   onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
   mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
-  mealTopUp = null, mealTopUpBusy = false, mealTopUpNote = null, onMealTopUp, onMealTopUpDecline, onDismissMealTopUpNote,
+  mealTopUp = null, mealTopUpBusy = false, mealTopUpNote = null, onMealTopUp, onMealTopUpDecline, onDismissMealTopUpNote, mealTopUpStart = null,
   mealStrip, upcomingDay = null, dayMove, heldAround, onKeepHeldSizes,
 }: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
@@ -520,9 +522,12 @@ export function NutritionDisplay({
       {mealTopUp && !mealTopUpNote && (
         <div data-testid="meal-top-up-offer">
           <TrainerNudge
-            text={mealTopUp}
+            text={mealTopUpStart
+              ? `${mealTopUp} ${mealTopUpStart.beyondStrip ? MORE_MEALS.startsLate(mealTopUpStart.label) : MORE_MEALS.starts(mealTopUpStart.label)}`
+              : mealTopUp}
             actions={[
-              { label: mealTopUpBusy ? 'Finding meals…' : 'Get more options', onClick: () => onMealTopUp?.(), disabled: mealTopUpBusy },
+              { label: mealTopUpBusy ? 'Finding meals…' : 'Get more options', onClick: () => onMealTopUp?.(false), disabled: mealTopUpBusy },
+              ...(mealTopUpStart?.beyondStrip ? [{ label: MORE_MEALS.sooner, onClick: () => onMealTopUp?.(true), disabled: mealTopUpBusy, secondary: true }] : []),
               { label: 'Not now', onClick: () => onMealTopUpDecline?.(), disabled: mealTopUpBusy, secondary: true },
             ]}
           />

@@ -29,7 +29,7 @@ import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
-import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, isTopUpDismissed, dismissTopUp, type TopUpOutcome } from '@/lib/meal-top-up'
+import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, topUpBeyondStrip, isTopUpDismissed, dismissTopUp, type TopUpOutcome } from '@/lib/meal-top-up'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
 import { buildRotation, rotationIndexFor, pinsFromPicks, type MealShape } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
@@ -158,7 +158,7 @@ import { profileWithKit, kitStatementFact, describeKitStatement } from '@/lib/ki
 import { makeKitController, clearKitStatements, type KitController } from '@/lib/kit-change'
 import { favouritesStillAllowed } from '@/lib/meal-restriction-check'
 import { useServablePools } from '@/hooks/useServablePools'
-import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, type GroceryItemRow } from '@/lib/grocery-store'
+import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, refreshGroceryDays, subscribeGroceryStore, type GroceryItemRow } from '@/lib/grocery-store'
 import { flushPending as flushSetLogPending } from '@/lib/set-log-store'
 import { flushPending as flushWaterPending } from '@/lib/water-store'
 import { flushPending as flushCardioPending } from '@/lib/cardio-log-store'
@@ -1444,14 +1444,23 @@ function App() {
    * coach's confirm both call this, and only differ in where the receipt is
    * shown. The coach cannot top up something the button would refuse.
    */
-  const runMealTopUpNow = async (): Promise<TopUpOutcome | null> => {
+  const runMealTopUpNow = async (startTomorrow = false): Promise<TopUpOutcome | null> => {
     if (!profile?.id || !macros || initialMealBuild) return null
     const profileId = profile.id
+    const targets = macros
     const r = await topUpMealPlan({
       profileId,
       today: mealRotationDate,
       needs: mealTopUpNeeds,
       legacyStartDate: readGroceryBuildMemo(profileId)?.startDate,
+      // M62, her pick only: start tomorrow, then re-work the list's days from the meals as they now are (the new
+      // ones included, read back from the store, not the stale pools in this closure).
+      startTomorrow,
+      refreshList: async () => refreshGroceryDays({
+        profileId, mealPools: await getPools(profileId), targets, softLikedFoods: compiledSoftFoodPreferences,
+        todaysPicks: chosenMeals, pinsByDate: mealDays.pinsByDate, mealShape, today: mealRotationDate,
+        legacyStartDate: readGroceryBuildMemo(profileId)?.startDate,
+      }),
       generation: {
         targets: macros,
         dietaryPreferences: profile.dietary_preferences,
@@ -1471,12 +1480,12 @@ function App() {
     return r
   }
   /** The Nutrition tab's button: the receipt is the banner on that tab. */
-  const handleMealTopUp = async () => {
+  const handleMealTopUp = async (startTomorrow = false) => {
     if (mealTopUpBusy) return
     setMealTopUpBusy(true)
     setMealTopUpNote(null)
     try {
-      const r = await runMealTopUpNow()
+      const r = await runMealTopUpNow(startTomorrow)
       if (r) setMealTopUpNote(r.note)
     } finally {
       setMealTopUpBusy(false)
@@ -1492,6 +1501,24 @@ function App() {
       setMealTopUpBusy(false)
     }
   }
+  // SAID BEFORE THE TAP (runs 7-10, M62; Ashley, 20 Oct 2026, "Say it, and offer sooner"): while the offer shows,
+  // the day the new meals would start is read from the list the way the run reads it, and the offer names it. A
+  // start past the day strip adds the sooner button. A list that cannot be read leaves the offer as it was.
+  const [mealTopUpStart, setMealTopUpStart] = useState<{ label: string; beyondStrip: boolean } | null>(null)
+  const mealTopUpShown = !!mealTopUpOffer && !mealTopUpNote
+  useEffect(() => {
+    if (!mealTopUpShown || !profile?.id) { setMealTopUpStart(null); return }
+    let cancelled = false
+    const profileId = profile.id
+    // Read again whenever the list changes: adding a day to it moves the start, and the offer must say the new one.
+    const read = () => {
+      void previewTopUpStart({ profileId, today: mealRotationDate, legacyStartDate: readGroceryBuildMemo(profileId)?.startDate })
+        .then(p => { if (!cancelled) setMealTopUpStart(p ? { label: p.label, beyondStrip: topUpBeyondStrip(mealRotationDate, p.from) } : null) })
+    }
+    read()
+    const unsubscribe = subscribeGroceryStore(read)
+    return () => { cancelled = true; unsubscribe() }
+  }, [mealTopUpShown, profile?.id, mealRotationDate])
   /** The day the new meals would start, for the coach's card to state before the tap. */
   const previewMealTopUpStart = () => (
     profile?.id
@@ -3187,6 +3214,7 @@ function App() {
               mealTopUpBusy={mealTopUpBusy}
               mealTopUpNote={mealTopUpNote}
               onMealTopUp={handleMealTopUp}
+              mealTopUpStart={mealTopUpStart}
               onMealTopUpDecline={() => { if (profile?.id && mealTopUpOfferNow) dismissTopUp(profile.id, mealTopUpOfferNow.kind, macros ?? undefined); setMealTopUpDismissTick(t => t + 1) }}
               onDismissMealTopUpNote={() => setMealTopUpNote(null)}
               mealStrip={mealDays.strip}

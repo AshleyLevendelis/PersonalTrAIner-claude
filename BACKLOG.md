@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [x] **Runs 7-10, M62: new meals arrived a week late, past the strip (20 Oct 2026).** "Get more options" said
+  "They start on Sunday 25 October" because the list had just been rebuilt for seven days, and the strip ends on the
+  24th, so she could not even see them. Ashley's ruling, 20 Oct 2026, from three options: **"Say it, and offer
+  sooner"** (over "just say it before the tap" and "always start tomorrow"). BUILT, screen: while the offer shows, the
+  start day is read from the list the strict way the run reads it, again whenever the list changes (found by the
+  driver: the first version read it once, before days were added, and kept saying "tomorrow"), and the offer names
+  it; past the strip it says "The new meals would start on Wednesday 23 September, after the days you can see here,
+  because your shopping list runs until then." and adds "Start them tomorrow and update my shopping list". Only that
+  button starts them tomorrow and then re-works the covered days of the list from the meals as they now are
+  (`refreshGroceryDays`, the list's own reconcile, so ticked and hand-added rows hold); "Get more options" never
+  touches the list. The receipt says the list was updated, or that it could not be and still has the old meals.
+  `test:meal-top-up` (156 checks; 10 mutations, all caught, one only after the end-to-end profile was given a list
+  that holds days), `verify:meal-top-up` §9 (64 checks; 3 mutations caught). NOT DONE: the coach's card names the
+  start day already, but has no sooner choice yet; it waits for the bubble-offers rework of the card to land, then
+  gets the same option. Frontend only.
 - [x] **Runs 7-10, H37: leftovers are ONE BATCH (20 Oct 2026).** The dinner that feeds tomorrow's lunch said "cook
   both portions together" and listed only tonight's amounts; tomorrow's portion is bigger (lunch 0.40 of a three-meal
   day, dinner 0.30), so the batch was written nowhere. And the shopping list counted the leftover on the LUNCH: today's
