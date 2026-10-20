@@ -7456,6 +7456,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                               )}
                               {msg.clarification && msg.status !== 'failed' && (
                                 <ClarificationCard
+                                  // ONE CARD PER QUESTION. An answer can lead to a second
+                                  // question on the same message ("3x8" -> "What weight?"),
+                                  // and a card reused across them kept its answered state:
+                                  // the weight question rendered with no box and no taps,
+                                  // the loop again (found driving her "rdl", 20 Oct 2026).
+                                  key={msg.clarification.resolverId}
                                   contextLines={msg.clarification.contextLines}
                                   prompt={msg.clarification.prompt}
                                   options={msg.clarification.options}

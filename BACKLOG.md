@@ -2,6 +2,45 @@
 
 Newest first. One line each.
 
+- [x] **"rdl" MEANT A BODYWEIGHT SINGLE-LEG RDL (live test, 19 Oct 2026). Fixed 20 Oct 2026, on a worktree branch, not merged.**
+  She typed "Im doing my own workout. First exercise I did was rdl"; the coach asked "How many sets and reps for
+  Single-Leg RDL (Bodyweight)?".
+  - **Cause, measured:** the chat's name resolver fell through to the catalogue search, which matches letters ANYWHERE
+    in a name. "rdl" is inside exactly one ("Single-Leg RDL (Bodyweight)"; "Romanian Deadlifts" does not contain it),
+    and one hit was returned as CERTAIN. The follow-up asks only sets and reps, so the name could not be changed, and
+    a bodyweight entry skips the weight question: her loaded RDL would have logged at 0 kg. Same path, measured over
+    70 phrases: "row" was silently Rowing Machine; "ohp", "db rdl", "dumbbell rdl", "pull up", "chin up", "push up",
+    "back squat", "bss" were unknown (custom names, no history).
+  - **What changed (mechanical, decided in the brief):** (1) one alias table, `exercise-aliases.ts`, zero imports,
+    ~50 phrasings to live catalogue names, run BEFORE either substring tier; when the same words also match a
+    different exercise on today's plan, both are offered. (2) A catalogue hit is certain only when the query is
+    longer than 4 letters AND starts at a word in the name; anything else (a short query, letters mid-word) goes to
+    the existing "Which 'x' did you mean?" chooser. (3) A catalogue GUESS that lands on a bodyweight entry is
+    offered as a tap, never written, unless the words name the whole exercise ("burpee" -> Burpees). (4) Her
+    shorthand traces the model's expanded name to her message ("rdl" in her text, "Romanian Deadlifts" from the
+    model). (5) FOUND BY THE NEW DRIVER: the clarification card was reused across chained questions on one message,
+    so after answering "3x8" the "What weight?" question rendered with NO box and no taps (the endless-loop shape,
+    pre-existing for any loaded lift asked sets first). Keyed per question.
+  - **CSCS basis (mine):** "RDL" in ordinary gym use is the bilateral Romanian deadlift, barbell or dumbbells (the
+    catalogue's one entry covers both); the single-leg version is always said as such. "OHP" is the standing barbell
+    press, "bench" the barbell bench, "back squat" the barbell back squat. NOT mapped, on purpose: bare "squat(s)"
+    (barbell in a gym, air squat at home), "dips"/"curls"/"rows"/"press" (several real answers), and "stiff leg
+    deadlift"/"SLDL" (no catalogue entry, and it is not an RDL: bar from the floor, knees near locked; it stays a
+    custom name rather than borrowing another lift's history). Nothing any plan prescribes changes.
+  - **Callers that change behaviour:** chat logging (above); the coach's swap replacement and ban, and Profile's
+    "Exercises to avoid" (all through the same resolver): "rdl" now names Romanian Deadlifts (a ban on "rdl" had
+    targeted the bodyweight single-leg RDL), "row"/"hack" now ask instead of assuming. `fact-compiler`'s family
+    match (`resolveExerciseTarget`) calls the catalogue search directly and is unchanged.
+  - **Verified:** `test:exercise-aliases` (54 checks; 15 mutations, 15 caught, one only after its fixture was
+    changed to bind: "burpees" is the catalogue name itself, so it never reached the rule; "burpee" does).
+    `verify:exercise-shorthand` (17 checks, real chat at 390x844: "rdl" -> sets for Romanian Deadlifts -> weight ->
+    logged 3 x 8 @ 60kg; "sissy" -> chooser -> tap -> logged; 4 mutations, 3 caught; the 4th, the letters-anywhere
+    branch, is not on the driver's path and is held by the test gate). Every gate reading the touched files (85),
+    every chat-page driver, `test:bundle` (2374 of 2397 kB raw), `test:no-dead-code`, typecheck.
+  - **Not done:** the model copying a catalogue name she did not use (her "rdl", its "Single-Leg RDL (Bodyweight)")
+    still traces through the shared word "rdl" and resolves exactly; only her own words are checked against the
+    table. The sets/reps and weight questions name the lift but offer no way to change it. Frontend only; no edge
+    function or migration.
 - [x] **Live test 19 Oct, findings 1-2: a "Shoulders & Abs" day with leg work and "No overhead press fits your
   kit" while five presses fitted it** (`docs/plans/shoulders-day-honest.md`). TRACED (and run through the real code
   with Sam's profile): a plan made while his shoulder was flagged, never rebuilt when the flag came off; a knee
