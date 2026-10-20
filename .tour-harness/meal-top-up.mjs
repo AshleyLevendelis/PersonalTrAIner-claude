@@ -117,7 +117,8 @@ let loads = 0
 // the one that runs with it on.
 const load = async (qs, library = 'off') => {
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&topup=1&library=${library}&load=${++loads}&${qs}#/tab/nutrition` })
-  for (let i = 0; i < 60; i++) { if (await has('[data-meal-day]')) break; await wait(200) }
+  // The page re-reads the meals the way App does on load (real.tsx); read nothing before that has landed.
+  for (let i = 0; i < 60; i++) { if (await ev(`window.__poolsRead === true`) && await has('[data-meal-day]')) break; await wait(200) }
   await wait(700)
 }
 const clearDismissal = () => ev(`(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('meal-top-up-dismissed')) localStorage.removeItem(k); return true })()`)

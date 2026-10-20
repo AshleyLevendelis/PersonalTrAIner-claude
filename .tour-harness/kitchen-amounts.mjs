@@ -16,8 +16,19 @@ const d = await startDriver({ port: 9661, page: 'real.html', name: 'kitchen-amou
 const { ev, check, until, wait, go, clickAt, shoot, finish } = d
 
 const SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snack']
-/** The open meal's ingredient rows: the string the builders are handed, and the words she reads. */
-const rows = () => ev(`[...document.querySelectorAll('[data-ingredient-row]')].map(b => ({ data: b.getAttribute('data-ingredient-row'), shown: (b.querySelector('span')?.textContent || '').trim() }))`)
+/**
+ * The open meal's ingredient rows: the string the builders are handed, and the words she reads for the AMOUNT.
+ * The cooked hint ("(about 260g cooked)", her 18 Oct ruling) is its own element drawn beside a raw or dry line, never
+ * part of it, and verify:meal-costed holds what it says; it is read here as `hint` and kept out of `shown`, so 2g
+ * still asks whether the amount reads exactly as stored. Lines became raw or dry on 20 Oct (real.tsx), which is when
+ * a hint first appeared on this card.
+ */
+const rows = () => ev(`[...document.querySelectorAll('[data-ingredient-row]')].map(b => {
+  const span = b.querySelector('span')
+  const hintEl = span?.querySelector('[data-testid="ingredient-cooked-hint"]')
+  const words = span ? [...span.childNodes].filter(n => n !== hintEl).map(n => n.textContent).join('') : ''
+  return { data: b.getAttribute('data-ingredient-row'), shown: words.trim(), hint: hintEl?.textContent?.trim() ?? null }
+})`)
 const openMeal = async label => {
   const ok = await clickAt(`[...document.querySelectorAll('button')].find(b => new RegExp('^\\\\s*${label}', 'i').test(b.textContent || '') && !b.hasAttribute('data-ingredient-row'))`)
   if (!ok) return []
@@ -45,7 +56,9 @@ await shoot('kitchen-amounts-before')
 console.log('\n1. The day as stored, before any resize\n')
 const beforeLines = Object.values(before).flat()
 check('1a. all four meals opened and listed their ingredients', SLOTS.every(s => before[s].length >= 2), Object.fromEntries(SLOTS.map(s => [s, before[s].length])))
-check('1b. the dinner carries the spoon of oil the fixture gave it (so there is a spoon to resize)', before.Dinner.some(r => r.data === '1 tbsp olive oil'), before.Dinner)
+// The spoon is on the LUNCH since 20 Oct 2026 (real.tsx says why: on the dinner it put the day's fat 10% under after
+// any resize, so under M59's bands the app, rightly, offered none).
+check('1b. the lunch carries the spoon of oil the fixture gave it (so there is a spoon to resize)', before.Lunch.some(r => r.data === '1 tbsp olive oil'), before.Lunch)
 
 console.log('\n2. Resized by the app\n')
 const tapped = await clickAt(`[...document.querySelectorAll('button')].find(b => /^\\s*Resize them/.test(b.textContent || ''))`)
@@ -60,7 +73,7 @@ check('2b. the amounts really changed (a resize that changed nothing would pass 
   { before: beforeLines.map(r => r.data), after: afterLines.map(r => r.data) })
 const odd = afterLines.filter(r => !measurable(parse(r.data)))
 check('2c. every amount is one somebody can measure: grams and ml in fives (whole grams under 20), spoons in quarters, counts whole', odd.length === 0, odd.length ? odd : afterLines.map(r => r.data))
-const spoon = after.Dinner.find(r => / tbsp olive oil$/.test(r.data || ''))
+const spoon = after.Lunch.find(r => / tbsp olive oil$/.test(r.data || ''))
 const sp = parse(spoon?.data)
 check('2d. the spoon of oil was resized to a quarter-spoon amount that is not a whole spoon', !!sp && sp.q !== 1 && Number.isInteger(sp.q * 4) && !Number.isInteger(sp.q), spoon)
 check('2e. ...and she reads it with a fraction sign, not a decimal', !!spoon && /^\d*[¼½¾] tbsp olive oil$/.test(spoon.shown) && !/\d\.\d/.test(spoon.shown), spoon)

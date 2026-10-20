@@ -120,6 +120,27 @@ Newest first. One line each.
     still traces through the shared word "rdl" and resolves exactly; only her own words are checked against the
     table. The sets/reps and weight questions name the lift but offer no way to change it. Frontend only; no edge
     function or migration.
+- [x] **Three meal drivers red since M59 and H36 (`verify:kitchen-amounts`, `verify:meal-refit`, `verify:meal-top-up`):
+  all three were the HARNESS, not the app.** Bisected to 8f0b995e (10% bands) and 26e06e40 (raw/dry on read).
+  (1) `meal-top-up` (6 red) and `meal-refit` 3f (lunch promised 944, shown 930): the page started from its
+  in-memory dishes, written cooked with rounded macros, and after the tap re-read them through the real store, which
+  turns them raw or dry and re-costs them. Two reads of one meal, so "today stays exactly as it was" compared 956 kcal
+  with 927 and the day search re-picked. App holds `readPools`' pools from its first load and has one read; the
+  day-move page was given the same fix in M59 and the top-up page was missed. FIXED: `?topup=1` starts from the app's
+  read (the driver waits for it); the refit fixture is written as bought, at the weights the read itself gives (205g
+  raw breast, 55g dry rice, 285g raw potato). Putting the old page back reproduces exactly the six failures.
+  (2) `kitchen-amounts` (5 red): no offer ever appeared, because the fixture's spoon of oil sat on a dinner that was
+  37% of the day against a 27% share; the refit sizes each meal to its share, so the dinner grew 1.17x while the day
+  grew 1.6x and fat landed 10.2% under at every drift tried (0.8-1.7). Inside the old 25% band, outside the new 10%,
+  and the app rightly offers only a resize that lands. No real dish is that far off its share (each is made within
+  7%). Spoon moved to the lunch, where every meal sits near its share: the resize lands (fat 87 of 88 g) and the oil
+  reads "1¾ tbsp". The driver's amount check now reads the cooked hint as its own element (it appeared once the lines
+  became raw), so "grams read exactly as stored" still asks about the amount. Nothing in `src/` changed; no band and
+  no raw/dry rule loosened. Mutations: 10, all caught, each run counted the same checks as its baseline (kitchen 5,
+  refit 3, top-up 2; the fixture changes themselves among them). LEAD, older than both commits and measured at the old
+  bands too: on a pool of five options a meal, a 1.6x upward drift is resized onto target and still not OFFERED in 56
+  of 60 seeded pools, because the day search then picks other dishes and the card lists only same-name resizes.
+
 - [x] **Live test 19 Oct, findings 1-2: a "Shoulders & Abs" day with leg work and "No overhead press fits your
   kit" while five presses fitted it** (`docs/plans/shoulders-day-honest.md`). TRACED (and run through the real code
   with Sam's profile): a plan made while his shoulder was flagged, never rebuilt when the flag came off; a knee
