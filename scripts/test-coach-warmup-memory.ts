@@ -90,6 +90,10 @@ console.log('\n2. The two fetches stay separate, and neither borrows the other\'
     /getRecentLogsWithWarmups\(profile\.id/.test(chat))
   check('...and no longer imports the narrower one for that purpose',
     !/\bgetRecentLogs\b(?!WithWarmups)/.test(chat.replace(/getRecentLogsWithWarmups/g, '')))
+  // 20 Oct 2026: the look-back window is counted from the APP'S today, the streak's own clock (verify:history-streak
+  // drives the dashboard half on a real screen; the coach's half is held here).
+  check('the coach\'s fortnight is counted from the app\'s today, not the device\'s calendar',
+    /getRecentLogsWithWarmups\(profile\.id, 14, activeSession\.date\)/.test(chat))
 }
 
 console.log('\n3. The prompt teaches the labels and fences off the coaching directives\n')

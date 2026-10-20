@@ -107,7 +107,8 @@ let X = null
 for (const n of names) { await ensureOpen(n); if ((await ev(`${rowsExpr(n)}.length`)) >= 1) { X = n; break } }
 check('4a. a set of today\'s session is ticked', !!X && (await tick(X, 0)) === true, names)
 const s2 = await streak()
-check('4b. FIVE — it sat on the same number after a second day\'s training', s2 === '5 sessions in a row', s2)
+// Re-anchored 20 Oct 2026 to her 17 Oct pill ('N in a row'); 1b holds the words, this holds the NUMBER.
+check('4b. FIVE — it sat on the same number after a second day\'s training', s2 === '5 in a row', s2)
 const hist2 = (await openHistory()) ?? []
 const todays = hist2.find(h => h.title.includes(D.today))
 check('4c. today is in history, titled by its weekday, with "1 set"', todays?.kind === 'history-session' && /^Wednesday · /.test(todays.title) && /· 1 set( |$)/.test(todays.text), todays)

@@ -554,8 +554,8 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
 
   // ---- Streak + session-pace + protein-adherence window (shared reads) ---
   const [workingLogs, cardioLogs] = await Promise.all([
-    getRecentLogs(profileId, 35),
-    getRecentCardioLogs(profileId, 35),
+    getRecentLogs(profileId, 35, todayStr),
+    getRecentCardioLogs(profileId, 35, todayStr),
   ])
   const loggedDates = new Set<string>([...workingLogs.map(l => l.date), ...cardioLogs.map(c => c.date)])
 
