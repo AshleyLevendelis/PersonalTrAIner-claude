@@ -82,7 +82,7 @@ export interface OpenMealDay {
 }
 
 /** A day's planned totals: the sum of its chosen meals. */
-export function sumChosenMacros(chosen: Partial<Record<MealSlotName, PoolOption>>): MacroTargets {
+function sumChosenMacros(chosen: Partial<Record<MealSlotName, PoolOption>>): MacroTargets {
   return Object.values(chosen).reduce<MacroTargets>(
     (acc, o) => ({
       calories: acc.calories + (o?.macros.calories ?? 0),
