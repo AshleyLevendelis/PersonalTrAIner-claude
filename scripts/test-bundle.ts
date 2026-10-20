@@ -587,7 +587,13 @@ console.log('\n3. Nothing has crept back up')
   // deploy figure above for both ends. 2,360 is 25 above the 2,335 measured.
   // MOVED 12 Oct 2026: 2360 -> 2397, the merged release tree measured 2372 (see the deploy note).
   // MOVED 18 Oct 2026: 2397 -> 2422, measured 2397 (see the deploy note, runs 7-10 batch 1).
-  const TOTAL_BUDGET_KB = 2422
+  // MOVED 20 Oct 2026: 2422 -> 2447, moving calories between meals (her "Ask how much first";
+  // docs/plans/moving-calories-between-meals.md). MEASURED both ends through this gate the same hour, the
+  // base from `git archive 03934002`: before total 2412 app 1149 paint 492 deploy 336; after total 2429 app
+  // 1153 paint 493 deploy 337. +17 kB of real code, nearly all in lazy chunks: the builder and its reader
+  // of her words, the coach's arms, the Move sheet's section; +4 in the app chunk (the hook's controller,
+  // the phrasebook, the copy-is-the-same-dish rule). 2,447 is 18 above the 2,429 measured, on her 15 Sep ruling.
+  const TOTAL_BUDGET_KB = 2447
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

@@ -229,8 +229,11 @@ async function main() {
     const bare = core.match(/\breturn\s*(?:\n|\/\/|\}|$)/g) ?? []
     check('every way out of an undo names its outcome (no bare return)', core.length > 3000 && bare.length === 0, bare)
     // The detector, on something that should fail it, so it cannot go vacuous.
-    // 'handled' means "this branch wrote its own card": only the day swap does, plus the no-token guard (no button).
-    check('...and only the day swap, which writes its own card, ends as "handled" (plus the no-Undo guard)', (core.match(/return 'handled'/g) ?? []).length === 2 && /return \(!receipt\?\.undoToken \|\| !profile\.id\) return 'handled'|if \(!receipt\?\.undoToken \|\| !profile\.id\) return 'handled'/.test(core) && /setMessages\([\s\S]{0,900}\)\)\s*\n\s*return 'handled'/.test(core), (core.match(/return 'handled'/g) ?? []).length)
+    // 'handled' means "this branch wrote its own card": the day swap and (20 Oct 2026) the calorie move between two meals,
+    // which writes its put-back the same way, plus the no-token guard (no button). Each own-card arm is a setMessages
+    // straight before its return.
+    check('...and only the arms that write their own card (the day swap, the calorie move) end as "handled" (plus the no-Undo guard)', (core.match(/return 'handled'/g) ?? []).length === 3
+      && (core.match(/setMessages\([\s\S]{0,1200}?\)\)\s*\n\s*return 'handled'/g) ?? []).length === 2 && /return \(!receipt\?\.undoToken \|\| !profile\.id\) return 'handled'|if \(!receipt\?\.undoToken \|\| !profile\.id\) return 'handled'/.test(core) && /setMessages\([\s\S]{0,900}\)\)\s*\n\s*return 'handled'/.test(core), (core.match(/return 'handled'/g) ?? []).length)
     check('...the bare-return detector fires on a bare return', (/\breturn\s*(?:\n|\/\/|\}|$)/.test('if (x) return\n')))
     check('...a window that has passed is said, not swallowed', (core.match(/if \(!isWithinUndoWindow\([^)]*\)\) return \{ refused: RECEIPTS_UNDONE\.tooLate, keep: false \}/g) ?? []).length === 7)
     const wrapAt = chat.indexOf('const handleUndoReceipt = async')

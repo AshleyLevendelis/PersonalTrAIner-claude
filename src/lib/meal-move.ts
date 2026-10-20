@@ -149,6 +149,8 @@ export function movedOptionFor(
   toSlot: MealSlotName,
   budget: MacroTargets,
   rules: { dietaryPreferences: string[]; dislikedFoods?: string[] },
+  /** What the copy is called. A calorie move keeps the meal in its slot and names it "(smaller)" / "(bigger)". */
+  name: string = movedName(meal.name, toSlot),
 ): { option: PoolOption; beforeKcal: number; afterKcal: number } | { err: string } {
   const resized = resizeMealTo(meal, budget)
   if ('rejected' in resized) {
@@ -156,7 +158,7 @@ export function movedOptionFor(
   }
   const proposal: RawProposal = {
     slot: toSlot,
-    name: movedName(meal.name, toSlot),
+    name,
     ingredients: resized.ingredients,
     prep: '',
     cuisine: '',

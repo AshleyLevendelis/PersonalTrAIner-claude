@@ -2,6 +2,69 @@
 
 Newest first. One line each.
 
+- [x] **Live test 19 Oct, finding 5: "move some of lunch's calories to dinner" (both meals named) got "nothing to
+  resize — tell me which". BUILT, both surfaces, on a branch (`docs/plans/moving-calories-between-meals.md`).**
+  TRACED: nothing on either surface moved PART of one meal to another; the request reached the whole-day resize
+  (`propose_meal_refit`, no slot arguments), whose "already fits" refusal asked her to name what she had named.
+  HER RULING 20 Oct, "Ask how much first": with buttons, then both new sizes before Apply. BUILT: one pure builder
+  (`buildMealRebalanceProposal`, `src/lib/meal-rebalance.ts`) over the week as SERVED (the same object the strip, the
+  swap and the knock-on trials now share, `serving` in `useMealDays` — it had been one literal written out three times).
+  No amount: the APP asks ("Today's lunch is 1,209 kcal and dinner 873. How much should I move from lunch to
+  dinner?") with "100/200/300 kcal to dinner" buttons, only the amounts the meals can take. An amount: the SAME two
+  dishes, the served from-dish resized down and the to-dish up by the slot move's own resize and verification
+  (`movedOptionFor`, now taking a name) into "X (smaller)" / "Y (bigger)" copies, held until the strip ends and pinned
+  for that date only; the card is read off a trial: kcal AND protein before → after for both, the day's total, the
+  protein that moves, a leftover lunch said as a smaller portion of the leftovers, any other meal that changes, the
+  shopping list. Write and Undo are the day swap's own two-pick functions (both or neither; Undo only when both still
+  hold what was written, never a meal since eaten), the executor now carrying the caller's words so a failure never
+  says "the swap". Screen: the meal row's Move sheet, "Or move some of its calories to…" → meal → amount → "Move
+  them" → note with Undo, today and every strip day. Coach: `propose_meal_rebalance` (courier: two meals, at most a
+  number she said), routed in the prompt as a NINTH THING and away from the refit; a CODE backstop when the coach
+  still reaches for the refit and her words name two meals and a move (`rebalanceSaid`): the move runs, or "Which
+  way?" with both directions as buttons; the refit's "nothing to resize" never says "tell me which" to someone who
+  named two (`REBALANCE.refitFits`). One controller (`dayMove.rebalance`) handed by App to the sheet and the coach.
+  **CSCS / nutrition decisions (mine, her 18 Sep delegation):** the smaller meal keeps at least HALF of what it is
+  served (ISSN protein stand, Jäger 2017: ~20-40 g protein a meal; the app's main meals carry ~35-50 g, so half stays
+  a meal); the bigger at most DOUBLES (ISSN meal-frequency stand, La Bounty 2011: distribution barely matters at equal
+  daily energy and protein, so the ceiling is practical, well inside the scaler's 0.4-2.5x); smallest move 30 kcal;
+  asked for more, the most that fits, said as a warning. The day's total and every band and floor mean what they did.
+  The five: training effect none (daily energy and protein held); what it takes away is protein from the smaller
+  meal, named on the card; fundamentals survive; no floor redefined; population-level timing, in scope.
+  **A COPY IS THE SAME DISH, AND THE WEEK HAD TO BE TAUGHT IT.** Three places compared dinner → tomorrow's leftover
+  lunch BY NAME: a bigger dinner would have lost its "cook both portions" line and re-made tomorrow's lunch under the
+  copy's name. They now compare `resizedCopyBase` (only for user-requested copies, so a generated dish ending
+  "(bigger)" stays itself), dish identity's connectors take the new suffixes, and the "plan's own dish" test for her
+  10 Oct hold rule reads them (measured: read as HER dish, the day re-planned another meal in 58 of 252 moves).
+  **FOUND BY THE GATE ON ITS FIRST RUN:** a move between two DIFFERENT dishes shifts the day's carbs and fat, the
+  18 Oct bands can put the day just outside, and her 10 Oct hold rule ("Resize, else leave") then re-fits the day's
+  other meal (breakfast 361 → 296 on one fixture day). That is the app's rule for any pin, so it stays, and it is on
+  the card before the tap; the day line first blamed "rounding" for it and now says it is the re-fit. Also changed: a
+  copy carries its dish's labels, not the verifier's "own recipe".
+  `test:meal-rebalance` (105 checks; 31 mutations, all caught, two only after checks were added: the strip's LAST day,
+  whose "cook both" line nothing later rewrites, and a move whose day re-planned lunch when the copy read as hers),
+  `verify:meal-rebalance` (37 checks, 9 mutations, 8 caught; the 9th, the trial handed a week without today's pins, is
+  EQUIVALENT on that fixture (no pins) and is caught by the logic gate), `verify:chat-rebalance` (41 checks;
+  8 mutations, all caught), `test:meal-knock-on` §7 and `test:meal-day-move` §10 re-anchored on the one `serving` object (3
+  mutations; the first re-anchor's lazy regex matched a LATER call's `serving,`, then a spread's `...serving,` — both
+  MISSED until anchored on the shorthand line), exam case `meal-rebalance-not-refit` (3 turns, asked in words the
+  prompt never uses). Screenshots read: the ask, the card, the note, the rows after, the put-back (screen); the ask,
+  the card, the receipt, the put-back, the backstop (chat). NOT DONE, named: today's "fit around what was eaten" layer
+  can show other sizes than the card once something is logged on an off-target day (the swap card's limit too); a
+  held copy becomes an ordinary option after the strip ends (the day swap's copies too); the copy's row loses "Last
+  night's dinner" (the card says it); the "user-requested" tag shows as a chip on every added or copied meal (task
+  suggested). `coach-exam-fresh` was already red at the base (shared rules changed earlier) and the exam needs her
+  machine. Needs the `chat-gemini` deploy for the coach half; the screen and the backstop are frontend.
+  **GATES:** 175 derived logic gates run; five went red at correct code and were RE-ANCHORED on their property
+  (each re-anchor mutation-tested, all caught): `test:meal-variety`, `test:meal-days` (the week's one `serving` object,
+  where they pinned the literal it replaced — five gates pinned that one literal), `test:meal-refit` (its courier
+  window ran 900 characters into the calorie move's courier and read its `kcal`; now bounded at the next handler; and
+  the "already fits" sentence is now the phrasebook's, both variants required — the first re-anchor MISSED a mutation
+  because the two-meal variant also says it), `test:rebuild-honours` (own-card undo arms are now two). `test:bundle`
+  total budget 2422 → 2447, measured both ends (base 2412, after 2429; +17 kB, nearly all lazy chunks).
+  `test:no-dead-code`: two constants unexported. 54 browser drivers reading Nutrition, the chat or the strip: 50
+  green; `verify:kitchen-amounts`, `verify:meal-refit`, `verify:meal-top-up` and `verify:unit-ask` fail the SAME
+  checks with the same counts on the base commit (measured on a worktree of 03934002), so pre-existing, not this.
+
 - [x] **Live test 19 Oct, findings 6-7: the coach's dinner swap card said 466 kcal (the screen 222), its reason
   said "higher-calorie" over a smaller dish, and Apply shrank breakfast and the snack with nothing said, under "25%
   smaller" when they fell 24% and 35%.** TRACED: the card read the dish as SAVED, the screen the day as SERVED (resized

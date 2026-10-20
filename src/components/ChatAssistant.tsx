@@ -46,12 +46,13 @@ import { buildMealMoveProposal, type MealMovePayload } from '@/lib/meal-move'
 import type { MealRefit } from '@/lib/meal-refit'
 import type { TopUpOutcome, TopUpPlan } from '@/lib/meal-top-up'
 import type { MealDayMoveArgs, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
+import { rebalanceSaid, rebalanceAskText, mealsNamed, type MealRebalanceController, type MealRebalancePayload } from '@/lib/meal-rebalance'
 import { DEFAULT_POOL_SIZE } from '@/lib/meal-generation'
 import { executeMealMove, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal, swapDiffFromTrial } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, SCOPE, MORE_MEALS, DAY_MOVE, PLAN_RESTART, layoffCardLine } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine } from '@/lib/coach-voice'
 import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
 import { getLastWorkingSessionDate } from '@/lib/set-log-store'
@@ -363,6 +364,12 @@ interface ChatAssistantProps {
   onMealDayMoveConfirm?: (payload: MealDayMovePayload) => Promise<import('@/lib/pending-actions-store').PendingActionReceipt>
   /** Puts a confirmed swap back (the same function the Move sheet's Undo calls). */
   onMealDayMoveUndo?: (payload: MealDayMovePayload) => Promise<import('@/lib/pending-actions-store').PendingActionReceipt>
+  /**
+   * MOVING CALORIES FROM ONE MEAL TO ANOTHER (Ashley, 20 Oct 2026: "Ask how much first"). The very controller the Move
+   * sheet's "Or move some of its calories to…" calls (useMealDays' `rebalance`): the ask, its amounts, the card, the
+   * write and the Undo, so the coach cannot offer a move or an amount the sheet would not. Absent: no plan to work from.
+   */
+  onMealRebalance?: MealRebalanceController
   /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Nutrition tab never shows — exactly the incident this framework exists to prevent. */
   /** Returns whether the pick actually persisted — a receipt must never say "Swapped" for a write that didn't land. */
   onMealSwapApplied: (slot: MealSlotName, chosenName: string) => Promise<boolean>
@@ -469,7 +476,7 @@ const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan — 
 /** The cards that would put a food on her plate: a named food her restrictions keep out never gets one (H41). */
 const FOOD_OFFER_KINDS = new Set(['propose_meal_swap', 'propose_meal_addition', 'propose_custom_meal', 'propose_meal_food_add', 'propose_meal_food_replace'])
 
-export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealKnockOn, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onMealKnockOn, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -5543,6 +5550,35 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           const current = GOAL_OPTIONS.find(o => o.value === profile.fitness_goal)?.label ?? 'that'
           refusal = `You're already training for ${current.toLowerCase()} — nothing to change there. If you're weighing up a switch, tell me what you're after and I'll talk it through with you.`
         }
+      } else if (result.proposal.kind === 'propose_meal_rebalance' || (result.proposal.kind === 'propose_meal_refit' && rebalanceSaid(userSaid).kind !== 'none')) {
+        // MOVING CALORIES FROM ONE MEAL TO ANOTHER (20 Oct 2026). Nothing here decides anything: the ask, its amounts,
+        // the two new sizes and what else changes all come from the builder the Move sheet calls, over the live week.
+        //
+        // THE BACKSTOP (the 19 Oct defect): she named two meals and a direction — "move some of lunch's calories to
+        // dinner" — and the coach reached for the whole-day resize, which refused with "tell me which". When the refit
+        // tool arrives and her own words name two meals and a move, this runs instead; with no readable direction,
+        // the app asks which way, with both as buttons. Her words, not the tool's quote, as the kit backstop reads them.
+        const raw = result.proposal.rawArgs ?? {}
+        const said = rebalanceSaid(userSaid)
+        const fromModel = result.proposal.kind === 'propose_meal_rebalance'
+        const args = fromModel
+          ? { from_slot: raw.from_slot, to_slot: raw.to_slot, kcal: raw.kcal, date: raw.date }
+          : said.kind === 'ordered' ? { from_slot: said.from, to_slot: said.to, kcal: said.kcal ?? undefined } : null
+        if (!onMealRebalance) {
+          refusal = REBALANCE.refusals.noBody
+        } else if (!args && said.kind === 'unordered') {
+          const [a, b] = said.slots
+          refusal = `${REBALANCE.refusals.whichWay(a, b)}\n[QUICK_REPLIES: "${REBALANCE.refusals.whichWayChip(a, b)}" | "${REBALANCE.refusals.whichWayChip(b, a)}"]`
+        } else {
+          const moved = await onMealRebalance.plan(args ?? {})
+          if (moved.ok) {
+            built = { scopeKey: moved.scopeKey, preconditions: moved.preconditions, payload: moved.payload as unknown as Record<string, unknown>, diff: moved.diff }
+            kindOverride = 'propose_meal_rebalance'
+          } else {
+            // "HOW MUCH?" IS THE APP'S QUESTION, with the amounts as buttons whose words carry the amount and the meal.
+            refusal = moved.ask ? rebalanceAskText(moved.reason, moved.ask) : moved.reason
+          }
+        }
       } else if (result.proposal.kind === 'propose_meal_refit') {
         const refit = buildMealRefitProposal(result.proposal.rawArgs ?? {})
         if (refit) built = { scopeKey: refit.scopeKey, preconditions: refit.preconditions, payload: refit.payload, diff: refit.diff }
@@ -5558,7 +5594,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           // WHY is what stops the next message being the same request again.
           refusal = mealRefit
             ? "Resizing wouldn't fix these — they're the wrong shape for your numbers rather than the wrong size, so the portions can't get there. Want me to build you a new set of meals around your current targets instead?"
-            : "Your meals already add up to your targets, near enough — nothing to resize. If a particular meal feels off, tell me which and I'll look at that one."
+            // NEVER "TELL ME WHICH" WHEN SHE ALREADY DID (19 Oct 2026). Two meals named with a move reach the calorie
+            // move above; two named without one ("lunch and dinner are over") get the sentence that offers it.
+            : REBALANCE.refitFits(mealsNamed(userSaid).length >= 2)
         }
       } else if (result.proposal.kind === 'propose_circuit_log') {
         const circuit = buildCircuitLogProposal(result.proposal.rawArgs ?? {})
@@ -6463,6 +6501,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // what each day held before and what the swap wrote, which is the whole
       // record an undo needs, so the token is the row id like every other card.
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_meal_rebalance') {
+      // ONE WRITE FOR BOTH SURFACES: the Move sheet's "Move them" calls this same function. It re-plans against the live
+      // week and writes only the two sizes the card showed, both or neither.
+      const payload = row.payload as unknown as MealRebalancePayload
+      const today = getSessionDateContext(profile.id).date
+      receipt = onMealRebalance
+        ? await onMealRebalance.confirm(payload)
+        : { landed: [], failed: [{ op: 'propose_meal_rebalance', error: REBALANCE.why.saveFailed }] }
+      const ok = receipt.failed.length === 0
+      title = ok ? RECEIPTS['propose_meal_rebalance'].done : RECEIPTS['propose_meal_rebalance'].failed
+      rows = receipt.landed.length > 0
+        ? payload.legs.map(l => ({ label: DAY_MOVE.rowLabel(dayLabel(l.date, today), l.slot), detail: REBALANCE.became(Math.round(l.option?.macros.calories ?? 0)) }))
+        : []
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_injury_adaptation') {
       const payload = row.payload as unknown as InjuryAdaptationPayload
       const result = await executeInjuryAdaptation(profile, mesocycle, payload, await loadEditContext())
@@ -7115,6 +7167,22 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           if (i !== msgIndex || !m.receipt) return m
           return backOk
             ? { ...m, receipt: { ...m.receipt, title: 'Put back', rows: [{ label: 'Swap', detail: DAY_MOVE.undo.asTheyWere(payload.legs[0].slot, dayLabel(payload.legs[0].date, today), payload.legs[1].slot, dayLabel(payload.legs[1].date, today)) }], undoToken: undefined } }
+            : { ...m, receipt: { ...m.receipt, rows: [...m.receipt.rows.filter(r => r.label !== RECEIPTS_UNDONE.refusedLabel), { label: RECEIPTS_UNDONE.refusedLabel, detail: back.failed[0].error }] } }
+        }))
+        return 'handled'
+      } else if (row.kind === 'propose_meal_rebalance') {
+        // PUTTING BOTH MEALS BACK: the same function the Move sheet's Undo calls. It leaves both alone, and says why,
+        // when either has changed since or a meal of today's was eaten, so a refusal keeps the button.
+        const payload = row.payload as unknown as MealRebalancePayload
+        const today = getSessionDateContext(profile.id).date
+        const back = onMealRebalance
+          ? await onMealRebalance.undo(payload)
+          : { landed: [], failed: [{ op: 'propose_meal_rebalance', error: DAY_MOVE.undo.saveFailed }] }
+        const backOk = back.failed.length === 0
+        setMessages(prev => prev.map((m, i) => {
+          if (i !== msgIndex || !m.receipt) return m
+          return backOk
+            ? { ...m, receipt: { ...m.receipt, title: 'Put back', rows: [{ label: 'Meals', detail: REBALANCE.asTheyWere(dayLabel(payload.date, today), payload.from, payload.to) }], undoToken: undefined } }
             : { ...m, receipt: { ...m.receipt, rows: [...m.receipt.rows.filter(r => r.label !== RECEIPTS_UNDONE.refusedLabel), { label: RECEIPTS_UNDONE.refusedLabel, detail: back.failed[0].error }] } }
         }))
         return 'handled'

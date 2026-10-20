@@ -676,6 +676,8 @@ function Harness() {
       for (const d of mealDays.upcoming) out[d.date] = d.meals as Record<string, string>
       return Object.keys(out).length === 7 ? out : {}
     }
+    // Today's meals by kcal, as the app serves them: what the coach's question must quote (moving calories, 20 Oct).
+    w.__todayKcal = () => Object.fromEntries(Object.entries(mealDays.today?.day.chosen ?? {}).map(([s, o]) => [s, Math.round((o as PoolOption).macros.calories)]))
   })
   const topUpSlots = macros ? Object.keys(computeSlotBudgets(macros, 3, false)) : []
   useEffect(() => {
@@ -717,6 +719,7 @@ function Harness() {
               onMealDayMovePlan={DAYMOVE ? mealDays.dayMove.plan : undefined}
               onMealDayMoveConfirm={DAYMOVE ? mealDays.dayMove.confirm : undefined}
               onMealDayMoveUndo={DAYMOVE ? mealDays.dayMove.undo : undefined}
+              onMealRebalance={DAYMOVE ? mealDays.dayMove.rebalance : undefined}
               onMealKnockOn={mealDays.dayMove.knockOn}
               mealTopUp={TOPUP && macros ? { ...topUpPlan(pools as never, topUpSlots as never, macros), building: false } : null}
               onMealTopUpStart={TOPUP ? () => previewTopUpStart({ profileId: PROFILE_ID, today: isoOf(anchorDate()) }) : undefined}

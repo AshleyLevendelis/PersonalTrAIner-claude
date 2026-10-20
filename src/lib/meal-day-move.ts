@@ -105,6 +105,12 @@ export interface MealDayMoveController {
    * own trial runs over, and because this object already reaches both surfaces.
    */
   knockOn: (date: string, slot: MealSlotName, option: PoolOption) => Promise<import('./meal-knock-on').MealKnockOn>
+  /**
+   * Moving calories from one meal to another on one date (meal-rebalance.ts, 20 Oct 2026). On this controller for the
+   * reason `knockOn` is: it is planned over the same week and written by the same two-pick write as the swap, and this
+   * object already reaches the Move sheet and the coach.
+   */
+  rebalance?: import('./meal-rebalance').MealRebalanceController
 }
 
 export interface BuildMealDayMoveInput {
@@ -145,7 +151,7 @@ function normaliseSlot(value: unknown): MealSlotName | null {
  * seven days. Anything outside the strip is refused rather than written
  * somewhere nobody can see.
  */
-function resolveDay(value: unknown, today: string, dates: string[]): { date: string } | { error: 'missing' | 'outside' } {
+export function resolveDay(value: unknown, today: string, dates: string[]): { date: string } | { error: 'missing' | 'outside' } {
   const raw = String(value ?? '').trim()
   if (!raw) return { error: 'missing' }
   if (DATE.test(raw)) return dates.includes(raw) ? { date: raw } : { error: 'outside' }
@@ -179,7 +185,8 @@ export function isNoticeableResize(was: number, now: number): boolean {
   return change >= RESIZE_NOTICE_KCAL && change >= was * RESIZE_NOTICE_SHARE
 }
 
-const mealAsCurrent = (o: PoolOption): CurrentMealForSlot => ({
+/** A served dish as the slot move's resize reads a meal: its lines as text. Shared with the calorie move. */
+export const mealAsCurrent = (o: PoolOption): CurrentMealForSlot => ({
   name: o.name,
   ingredients: o.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`),
   macros: o.macros,

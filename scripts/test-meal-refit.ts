@@ -343,7 +343,10 @@ console.log('\n10. ONE verdict, read by both surfaces — parity by construction
     const fn = strip(read('supabase/functions/chat-gemini/index.ts'))
     const i = fn.indexOf('if (name === "propose_meal_refit")')
     if (i < 0) return false
-    const body = fn.slice(i, i + 900)
+    // Bounded at the next handler (20 Oct 2026): a fixed 900-character window ran into the calorie move's courier,
+    // which forwards an amount by design, and read its `kcal` as the refit's.
+    const next = fn.indexOf('if (name ===', i + 10)
+    const body = fn.slice(i, next > i ? next : i + 900)
     // No macro arithmetic, no slot names, no portions: the whole point is that
     // the model is told nothing it could get wrong.
     return /kind: "propose_meal_refit"/.test(body) && !/kcal|calories|breakfast/.test(body)
@@ -351,7 +354,11 @@ console.log('\n10. ONE verdict, read by both surfaces — parity by construction
   check('the client refuses to build a card when a resize would not help',
     /if \(!mealRefit \|\| !mealRefit\.needed/.test(chat))
   check('...and says why instead of going quiet',
-    /wrong shape for your numbers/.test(chat) && /already add up to your targets/.test(chat))
+    /wrong shape for your numbers/.test(chat)
+    // The "already fits" sentence moved to the phrasebook on 20 Oct 2026 (REBALANCE.refitFits), with a variant for two meals named.
+    && /REBALANCE\.refitFits\(/.test(chat)
+    // BOTH variants say why (one meal or none named; two named), not just one of them.
+    && ((/refitFits:[\s\S]*?\} as const/.exec(strip(read('src/lib/coach-voice.ts')))?.[0] ?? '').match(/already add up to your targets/g) ?? []).length === 2)
 }
 
 console.log('\n11. The write re-portions what is stored, and removes nothing')

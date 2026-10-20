@@ -550,9 +550,11 @@ async function main() {
   {
     const hook = read('src/hooks/useMealDays.ts')
     check('the hook plans over ITS OWN week: today\'s pins, the other days\' pins, the pools, the rotation',
-      /buildMealDayMoveProposal\(\{[\s\S]*?serving: \{ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes \}/.test(hook)
-      // ...and the screen's own week is served the same, Undo dates included (M34).
-      && /serveMealWeek\(\{ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes \}\)/.test(hook))
+      // Re-anchored 20 Oct 2026: the week's inputs are one object, and the builder is handed that very object.
+      /buildMealDayMoveProposal\(\{[^}]*?\n\s+serving,\n/.test(hook)
+      // ...and the screen's own week is served from it, Undo dates included (M34).
+      && /const serving: MealDayMoveServing = useMemo\(\s*\(\) => \(\{ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes \}\)/.test(hook)
+      && /serveMealWeek\(serving\)/.test(hook))
     check('...reading the ledger, and the shopping list STRICTLY, before it plans',
       /getTodayLedger\(profileId, today, targets\)/.test(hook) && /readGroceryCoverage\([\s\S]*?\{ strict: true \}\)/.test(hook))
     check('...and an unreadable one is passed on as unreadable, never as empty',

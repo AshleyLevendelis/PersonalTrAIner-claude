@@ -3,7 +3,8 @@ import { Loader2 } from 'lucide-react'
 import { buildMealMoveProposal } from '@/lib/meal-move'
 import { executeMealMove } from '@/lib/pending-action-executor'
 import type { MealDayMoveController, MealDayMoveResult } from '@/lib/meal-day-move'
-import { DAY_MOVE } from '@/lib/coach-voice'
+import { DAY_MOVE, REBALANCE } from '@/lib/coach-voice'
+import type { MealRebalanceResult } from '@/lib/meal-rebalance'
 import { weekdayLong, weekdayShort, dayLabel } from '@/lib/day-labels'
 import type { MealAdditionPayload } from '@/lib/meal-addition'
 import type { MealSlotName } from '@/lib/meal-store'
@@ -30,6 +31,12 @@ import type { ProposalDiff } from '@/lib/pending-actions-store'
 // places, nothing is resized). Both were Ashley's rulings and both end in the
 // same preview and the same confirm, so the sheet holds one destination at a
 // time and one preview.
+//
+// AND SOME OF ITS CALORIES TO ANOTHER MEAL (20 Oct 2026, her "Ask how much
+// first"): a meal, then how much, as buttons, then both new sizes before the
+// tap. The amounts, the card and the write are the coach's, through one
+// controller (the day swap's, `rebalance`), so the two cannot offer different
+// amounts or land different sizes.
 // ---------------------------------------------------------------------------
 
 export interface MealMoveContext {
@@ -74,6 +81,12 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
   // another; a different meal swaps places with this one and both are resized.
   const [toMeal, setToMeal] = useState<MealSlotName | null>(null)
   const [dayPlan, setDayPlan] = useState<MealDayMoveResult | null>(null)
+  // MOVING SOME CALORIES: to which meal, how much, the amounts it can take, and the card.
+  const [rbTo, setRbTo] = useState<MealSlotName | null>(null)
+  const [rbKcal, setRbKcal] = useState<number | null>(null)
+  const [rbAsk, setRbAsk] = useState<MealRebalanceResult | null>(null)
+  const [rbPlan, setRbPlan] = useState<MealRebalanceResult | null>(null)
+  const rebalance = dayMove?.controller.rebalance ?? null
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -120,7 +133,61 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [toDate, toMeal, dayDate, daySlot])
 
+  // THE AMOUNTS ARE THE BUILDER'S ANSWER, asked with no amount the way the coach asks: the question and the amounts
+  // these two meals can take, or why nothing can move.
+  useEffect(() => {
+    setRbAsk(null)
+    setRbKcal(null)
+    if (!rbTo || !rebalance || !dayMove) return
+    let live = true
+    rebalance.plan({ from_slot: dayMove.slot, to_slot: rbTo, date: dayMove.date })
+      .then(r => { if (live) setRbAsk(r) })
+      .catch(() => { if (live) setRbAsk({ ok: false, reason: REBALANCE.refusals.wouldNotHold }) })
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rbTo, dayDate, daySlot])
+  useEffect(() => {
+    setRbPlan(null)
+    if (!rbTo || rbKcal == null || !rebalance || !dayMove) return
+    let live = true
+    rebalance.plan({ from_slot: dayMove.slot, to_slot: rbTo, kcal: rbKcal, date: dayMove.date })
+      .then(r => { if (live) setRbPlan(r) })
+      .catch(() => { if (live) setRbPlan({ ok: false, reason: REBALANCE.refusals.wouldNotHold }) })
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rbTo, rbKcal, dayDate, daySlot])
+
   const preview: Preview | null = useMemo(() => {
+    if (rbTo) {
+      if (!rbAsk) return { kind: 'loading' }
+      if (!rbAsk.ok && !rbAsk.ask) return { kind: 'refused', reason: rbAsk.reason }
+      if (rbKcal == null) return null
+      if (!rbPlan) return { kind: 'loading' }
+      if (!rbPlan.ok) return { kind: 'refused', reason: rbPlan.reason }
+      const plan = rbPlan
+      return {
+        kind: 'ready',
+        diff: plan.diff,
+        confirmLabel: 'Move them',
+        run: async () => {
+          if (!rebalance || !dayMove) return null
+          const receipt = await rebalance.confirm(plan.payload)
+          if (receipt.failed.length > 0) return REBALANCE.failureLine(receipt.failed[0].error, receipt.landed.length > 0)
+          const day = dayLabel(plan.payload.date, dayMove.controller.today)
+          onDone(
+            REBALANCE.done(plan.payload.kcal, day, plan.payload.from, plan.payload.to),
+            // The same function the coach's Undo calls, handed the move it made.
+            async () => {
+              const back = await rebalance.undo(plan.payload)
+              return back.failed.length > 0
+                ? { ok: false, text: back.failed[0].error }
+                : { ok: true, text: REBALANCE.undoDone(day, plan.payload.from, plan.payload.to) }
+            },
+          )
+          return null
+        },
+      }
+    }
     if (toDate) {
       if (!dayPlan) return { kind: 'loading' }
       if (!dayPlan.ok) return { kind: 'refused', reason: dayPlan.reason }
@@ -170,7 +237,7 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
       }
     }
     return null
-  }, [toDate, dayPlan, slotProposal, ctx, dayMove, onPick, onDone])
+  }, [rbTo, rbAsk, rbKcal, rbPlan, rebalance, toDate, dayPlan, slotProposal, ctx, dayMove, onPick, onDone])
 
   // WHATEVER THE TAP PRODUCES IS BROUGHT INTO VIEW. The card, a refusal and a
   // failure all appear below the buttons that were tapped, and on a phone that
@@ -188,7 +255,7 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
     const r = el.getBoundingClientRect()
     if (r.height > floor - 8 || r.top < 0) window.scrollBy({ top: r.top - 8 })
     else if (r.bottom > floor) window.scrollBy({ top: r.bottom - floor })
-  }, [resultKind, toDate, toMeal, toSlot, error])
+  }, [resultKind, toDate, toMeal, toSlot, rbTo, rbKcal, error])
 
   const confirm = async () => {
     if (preview?.kind !== 'ready') return
@@ -199,7 +266,9 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
     if (failure) setError(failure)
   }
 
-  const nothingElse = destinations.length === 0 && otherDays.length === 0
+  // The day's OTHER meals, for moving some calories to one. Only meals this profile has; only with the controller.
+  const rbMeals = rebalance && dayMove ? dayMove.controller.slots.filter(m => m !== dayMove.slot) : []
+  const nothingElse = destinations.length === 0 && otherDays.length === 0 && rbMeals.length === 0
 
   return (
     <div className="mt-2 space-y-2 rounded-xl bg-[color:var(--surface-raised)] p-2.5" data-testid="meal-move-sheet">
@@ -217,7 +286,7 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
                   <button
                     key={s}
                     type="button"
-                    onClick={() => { setToDate(null); setToMeal(null); setToSlot(prev => (prev === s ? null : s)); setError(null) }}
+                    onClick={() => { setRbTo(null); setToDate(null); setToMeal(null); setToSlot(prev => (prev === s ? null : s)); setError(null) }}
                     className={`min-h-[44px] rounded-xl px-3.5 text-xs font-semibold ${
                       toSlot === s ? 'bg-primary text-primary-foreground' : 'bg-[color:var(--surface-base)] text-foreground'
                     }`}
@@ -239,7 +308,7 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
                   <button
                     key={d}
                     type="button"
-                    onClick={() => { setToSlot(null); setToMeal(null); setToDate(prev => (prev === d ? null : d)); setError(null) }}
+                    onClick={() => { setRbTo(null); setToSlot(null); setToMeal(null); setToDate(prev => (prev === d ? null : d)); setError(null) }}
                     aria-label={d === dayMove.controller.today ? 'Today' : weekdayLong(d)}
                     aria-pressed={toDate === d}
                     // px-2.5, not the meal buttons' px-3.5: six days have to
@@ -277,6 +346,49 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
                         </button>
                       )
                     })}
+                  </div>
+                </>
+              )}
+            </>
+          )}
+          {rbMeals.length > 0 && (
+            <>
+              <p className="text-[0.71875rem] text-muted-foreground">Or move some of its calories to…</p>
+              <div className="flex flex-wrap gap-2" data-testid="meal-rebalance-meals">
+                {rbMeals.map(m => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => { setToSlot(null); setToDate(null); setToMeal(null); setRbTo(prev => (prev === m ? null : m)); setError(null) }}
+                    aria-pressed={rbTo === m}
+                    className={`min-h-[44px] rounded-xl px-3.5 text-xs font-semibold ${
+                      rbTo === m ? 'bg-primary text-primary-foreground' : 'bg-[color:var(--surface-base)] text-foreground'
+                    }`}
+                    data-testid={`meal-rebalance-to-${m}`}
+                  >
+                    {SLOT_LABEL[m]}
+                  </button>
+                ))}
+              </div>
+              {/* HOW MUCH, ASKED FIRST (her ruling): the builder's own question and amounts, the coach's buttons. */}
+              {rbTo && rbAsk && !rbAsk.ok && rbAsk.ask && (
+                <>
+                  <p className="text-[0.71875rem] text-muted-foreground" data-testid="meal-rebalance-ask">{rbAsk.reason}</p>
+                  <div className="flex flex-wrap gap-2" data-testid="meal-rebalance-amounts">
+                    {rbAsk.ask.amounts.map(k => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => { setRbKcal(prev => (prev === k ? null : k)); setError(null) }}
+                        aria-pressed={rbKcal === k}
+                        className={`min-h-[44px] rounded-xl px-3.5 text-xs font-semibold ${
+                          rbKcal === k ? 'bg-primary text-primary-foreground' : 'bg-[color:var(--surface-base)] text-foreground'
+                        }`}
+                        data-testid={`meal-rebalance-kcal-${k}`}
+                      >
+                        {REBALANCE.chip(k, rbTo)}
+                      </button>
+                    ))}
                   </div>
                 </>
               )}

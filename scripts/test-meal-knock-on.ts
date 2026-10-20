@@ -306,8 +306,13 @@ async function main() {
     const hook = read('src/hooks/useMealDays.ts')
     // Re-anchored 10 Oct 2026: the week also carries the dates where Undo kept
     // a swap's planned sizes (M34), and the trial must be served the same.
-    const servingLiteral = /serving: \{ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes \}/g
-    check('the hook runs the trial over the SAME week it hands the day swap', (hook.match(servingLiteral) ?? []).length === 2 && /knockOnOfPin\(\{\s*serving: \{ today, dates/.test(hook), (hook.match(servingLiteral) ?? []).length)
+    // Re-anchored 20 Oct 2026 on the PROPERTY: the week's inputs are ONE object, the strip is served from it, and the
+    // trial is handed that very object (it had been the same literal written out per trial, counted here).
+    const servingLiteral = /\{ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes \}/g
+    check('the hook runs the trial over the SAME week it hands the day swap',
+      (hook.match(servingLiteral) ?? []).length === 1 && /const serving: MealDayMoveServing = useMemo\(\s*\(\) => \(\{ today, dates/.test(hook)
+      && /serveMealWeek\(serving\)/.test(hook) && /knockOnOfPin\(\{\s*serving,\n/.test(hook) && /buildMealDayMoveProposal\(\{[^}]*?\n\s+serving,\n/.test(hook),
+      (hook.match(servingLiteral) ?? []).length)
     check('...with the shopping list read strictly (unreadable is null, not empty)', /const knockOn = async[\s\S]{0,500}readGroceryCoverage\([\s\S]{0,120}?strict: true/.test(hook))
     check('...and hands it out on the one controller both surfaces already receive', /plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove, knockOn,/.test(hook))
     const mealPlan = read('src/components/MealPlan.tsx')
