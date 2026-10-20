@@ -87,7 +87,17 @@ console.log('\n2. Re-sized together, within about 25%, and the day lands')
   check('the day is on target after the re-size', !!swap?.withinTolerance && dayVerdict(swap.totals, targets).onTarget, swap?.totals)
   check('the totals are the sum of what is served', !!swap && Math.abs(swap.totals.calories - sum(swap.chosen).calories) < 1e-6)
   const line = h ? heldAroundLine(h) : null
-  check('one line says so, naming the meals and the size', line === `To fit around your swap, your breakfast, dinner and snack are ${Math.round(Math.abs(f - 1) * 100)}% ${f < 1 ? 'smaller' : 'bigger'}. Same dishes.`, line)
+  // RE-ANCHORED 20 Oct 2026 (live test, 19 Oct: "25% smaller" over a breakfast 24% and a snack 35% smaller): the line
+  // names what EACH meal really came to, read off the served day against the planned one, never the factor asked for.
+  const real = (['breakfast', 'dinner', 'snack'] as MealSlotName[]).map(s => {
+    const from = Math.round(planChosen[s as keyof typeof planChosen].macros.calories), to = Math.round(swap!.chosen[s]!.macros.calories)
+    const pct = Math.round(Math.abs(to / from - 1) * 100)
+    return pct === 0 ? `your ${s} is the same size` : `your ${s} is ${pct}% ${to < from ? 'smaller' : 'bigger'}`
+  })
+  check('one line says so, naming each meal and the size it REALLY came to',
+    line === `To fit around your swap, ${real[0]}, ${real[1]} and ${real[2]}. Same dishes.`, { line, real })
+  check('...which is not one rounded factor for all three on this fixture (the case the live test caught)',
+    new Set(real).size > 1, real)
 }
 
 console.log('\n3. Beyond 25%: left as planned, and the gap said')

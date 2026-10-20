@@ -20,6 +20,8 @@ import { containsPhrase } from './meal-ingredients'
 import { validateMealAgainstDiet } from './diet-rules'
 import type { PoolOption } from './meal-generation'
 import type { ProposalDiff } from './pending-actions-store'
+import type { MealKnockOn } from './meal-knock-on'
+import { withKnockOn } from './meal-food-add'
 
 const SLOTS: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -33,7 +35,9 @@ export interface MealSwapArgs {
 }
 
 export type MealSwapProposalResult =
-  | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: { slot: MealSlotName; currentName: string; chooseName: string; date?: string }; diff: ProposalDiff }
+  | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: { slot: MealSlotName; currentName: string; chooseName: string; date?: string }; diff: ProposalDiff
+    /** The dish chosen and the date it is for: what the card's trial pins (swapDiffFromTrial). */
+    chosen: PoolOption; date: string }
   /** `exhausted` marks the case Ashley's ruling covers: they have seen everything in the pool, so the honest next move is to OFFER to find new ones rather than to keep re-serving what they have already turned down. */
   | { ok: false; reason: string; exhausted?: { slot: MealSlotName; poolSize: number } }
 
@@ -219,8 +223,31 @@ export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<
         { field: 'Protein', before: `${Math.round(cm?.protein ?? 0)}g`, after: `${Math.round(nm.protein)}g` },
       ],
       implications: [],
-      rationale: typeof input.rawArgs.reason === 'string' && input.rawArgs.reason.trim() ? input.rawArgs.reason.trim() : undefined,
+      // NO MODEL SENTENCE ON THE CARD (live test, 19 Oct 2026). The coach's own "reason" was printed as the rationale,
+      // and it was written before the app had chosen the dish or knew a number: it said "higher-calorie" over a dish
+      // with fewer calories. The rows and the trial's lines say what the swap does, in the app's words.
       reversible: true,
     },
+    chosen,
+    date: upcomingDay ? upcomingDay.date : (input.today ?? ''),
   }
+}
+
+/**
+ * THE CARD'S NUMBERS ARE THE SCREEN'S (live test, 19 Oct 2026). The card read the dish as SAVED (466 kcal) while
+ * Nutrition showed the day as SERVED, resized to fit (222 kcal); applying the swap then served the new dish at its own
+ * size, so the real change was hidden behind "-7 kcal". The before row is the meal as served now, the after row the
+ * new dish as the trial serves it with the swap in, and every other meal the swap moves is listed before the tap
+ * (the trial's own lines: a different dish, or the same dish at a size she would notice). No trial: the saved numbers
+ * stay and the card says the rest could not be checked (withKnockOn).
+ */
+export function swapDiffFromTrial(diff: ProposalDiff, knockOn: MealKnockOn | null, date: string, slot: MealSlotName): ProposalDiff {
+  const was = knockOn?.before?.find(d => d.date === date)?.day.chosen[slot]
+  const now = knockOn?.after?.find(d => d.date === date)?.day.chosen[slot]
+  const rows = was && now
+    ? diff.rows.map(r => r.field === 'Calories' ? { ...r, before: `${Math.round(was.macros.calories)} kcal`, after: `${Math.round(now.macros.calories)} kcal` }
+      : r.field === 'Protein' ? { ...r, before: `${Math.round(was.macros.protein)}g`, after: `${Math.round(now.macros.protein)}g` }
+      : r)
+    : diff.rows
+  return withKnockOn({ ...diff, rows }, knockOn)
 }

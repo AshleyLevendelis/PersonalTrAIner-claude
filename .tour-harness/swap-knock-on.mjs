@@ -57,7 +57,9 @@ ws.addEventListener('message', e => { const m = JSON.parse(e.data); if (m.id && 
 const send = (method, params = {}) => new Promise(r => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method, params })) })
 const ev = async x => (await send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true })).result?.result?.value
 let failures = 0
+let ran = 0
 const check = (name, ok, detail) => {
+  ran++
   if (ok) console.log(`    ✓ ${name}`)
   else { failures++; console.error(`    ✗ ${name}${detail !== undefined ? ` — ${JSON.stringify(detail).slice(0, 400)}` : ''}`) }
 }
@@ -130,8 +132,17 @@ for (const date of (days ?? []).slice(1)) {
 console.log(`  ${swaps} swaps tried; ${found ? `${found.slot} on ${found.date} -> ${found.picked}; resized ${found.resized.join(', ')}` : 'none re-sized the others'}`)
 check('1a. EVERY swap left every other meal on its own dish, across many swaps and days', swaps >= 10 && dishMoved.length === 0, { swaps, moved: dishMoved.slice(0, 4) })
 check('1b. the fixture is under pressure: a swap re-sized the others', !!found, { swaps })
-check('1c. ...and one line says so, naming those meals and the size',
-  !!found && /^To fit around your swap, your .+ (is|are) \d+% (smaller|bigger)\. Same dish(es)?\.$/.test(found.held.text) && found.resized.every(k => found.held.text.includes(k)), found?.held)
+// RE-ANCHORED 20 Oct 2026 (live test, 19 Oct: "25% smaller" over a breakfast 24% and a snack 35% smaller): the line
+// names each re-sized meal with the change it REALLY shows on screen, read off the rows before and after the tap.
+const realLines = found ? found.resized.map(k => {
+  // The row prints its calories as text ("412 kcal"); the number is read out of it.
+  const n = t => Number(String(t).replace(/[^0-9.]/g, ''))
+  const from = n(found.before[k].kcal), to = n(found.after[k].kcal)
+  const pct = Math.round(Math.abs(to / from - 1) * 100)
+  return pct === 0 ? `your ${k} is the same size` : `your ${k} is ${pct}% ${to < from ? 'smaller' : 'bigger'}`
+}) : []
+check('1c. ...and one line says so, naming each meal with the size it REALLY came to on screen',
+  !!found && /^To fit around your swap, .+\. Same dish(es)?\.$/.test(found.held.text) && realLines.every(l => found.held.text.includes(l)), { line: found?.held?.text, real: realLines })
 if (found) await openDay(found.date)
 check('1d. the line is on screen with its Undo', !!found && await ev(`(() => { const u = document.querySelector('[data-testid="held-around-undo"]'); if (!u) return false; u.scrollIntoView({ block: 'center' }); const r = u.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight })()`))
 await shoot('swap-knock-on')
@@ -154,6 +165,7 @@ if (found) {
 }
 check('2d. "Fit around my swap" re-sizes them again, to the same sizes', !!found && refit?.held?.kind === 'resized' && found.resized.every(k => refit.meals[k]?.kcal === found.after[k].kcal), refit?.held)
 // The Undo is for that date only: today's meals are untouched by it.
+console.log(`\n${ran} checks ran.`)
 console.log(failures === 0 ? '\nA swap keeps the other dishes and says what it re-sized.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

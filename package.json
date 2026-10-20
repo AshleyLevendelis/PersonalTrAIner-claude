@@ -471,7 +471,8 @@
     "verify:profile-temporary": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-temporary.mjs",
     "test:shoulders-day": "tsx scripts/test-shoulders-day.ts",
     "test:coach-kit-names": "tsx scripts/test-coach-kit-names.ts",
-    "test:unidentified-food": "tsx scripts/test-unidentified-food.ts"
+    "test:unidentified-food": "tsx scripts/test-unidentified-food.ts",
+    "test:meal-swap-card": "tsx scripts/test-meal-swap-card.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

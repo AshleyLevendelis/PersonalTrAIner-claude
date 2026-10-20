@@ -50,7 +50,7 @@ import { DEFAULT_POOL_SIZE } from '@/lib/meal-generation'
 import { executeMealMove, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
-import { buildMealSwapProposal } from '@/lib/meal-swap-proposal'
+import { buildMealSwapProposal, swapDiffFromTrial } from '@/lib/meal-swap-proposal'
 import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, SCOPE, MORE_MEALS, DAY_MOVE, PLAN_RESTART, layoffCardLine } from '@/lib/coach-voice'
 import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
@@ -5221,7 +5221,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           upcomingDays: (upcomingMeals ?? []).map(d => ({ date: d.date, dayName: d.dayName })),
         })
         if (swap.ok) {
-          built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, diff: swap.diff }
+          // THE SCREEN'S NUMBERS AND THE KNOCK-ON, BEFORE THE TAP (live test, 19 Oct 2026): the card read the saved
+          // dish (466 kcal) while Nutrition showed it as served (222), and the meals the swap re-sized were said only
+          // after Apply. The same trial the screen's week runs, with this dish pinned as the screen's swap pins it.
+          let trial: Awaited<ReturnType<MealKnockOnFn>> | null = null
+          if (onMealKnockOn) {
+            try { trial = await onMealKnockOn(swap.date, swap.payload.slot, swap.chosen, true) }
+            catch (err) { console.error('chat: the swap trial failed', err) }
+          }
+          built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, diff: swapDiffFromTrial(swap.diff, trial, swap.date, swap.payload.slot) }
           noteMealOptionSeen(swap.payload.slot, swap.payload.chooseName)
           noteMealOptionSeen(swap.payload.slot, swap.payload.currentName)
         } else if (swap.exhausted) {

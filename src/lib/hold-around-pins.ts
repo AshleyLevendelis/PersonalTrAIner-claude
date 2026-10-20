@@ -113,6 +113,9 @@ export function holdAroundPins(input: {
   return {
     ...planned, chosen: next, totals,
     withinTolerance: dayVerdict(totals, targets).onTarget,
-    heldAround: { kind: 'resized', factor, slots: heldSlots, deltaKcal },
+    heldAround: {
+      kind: 'resized', factor, slots: heldSlots, deltaKcal,
+      sizes: heldSlots.map(s => ({ slot: s, fromKcal: Math.round(chosen[s]!.macros.calories), toKcal: Math.round(next![s]!.macros.calories) })),
+    },
   }
 }

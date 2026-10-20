@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **Live test 19 Oct, findings 6-7: the coach's dinner swap card said 466 kcal (the screen 222), its reason
+  said "higher-calorie" over a smaller dish, and Apply shrank breakfast and the snack with nothing said, under "25%
+  smaller" when they fell 24% and 35%.** TRACED: the card read the dish as SAVED, the screen the day as SERVED (resized
+  to fit); the reason line was the coach model's own free text, written before the app chose the dish; the swap card
+  never ran the knock-on trial the add-a-food card runs; the banner printed the one factor asked for while each meal
+  rounds per ingredient to a different size. FIXED: the swap card runs the same trial the screen's week runs, with the
+  dish pinned as the screen's swap pins it (`knockOnOfPin(..., existing: true)`: no copy, no tag), so BEFORE is the
+  meal as served now, AFTER the new dish as served with the swap in, and every other meal it moves is listed before
+  the tap (`swapDiffFromTrial`); no trial, and the card says the rest could not be checked. No model sentence on the
+  card. The banner names each meal's real change ("your breakfast is 1% smaller, your dinner is 4% smaller and your
+  snack is 4% smaller") from `sizes` carried out of `holdAroundPins`. `test:meal-swap-card` (12 checks, 6 mutations, 5
+  caught; the 6th, the after-row's protein from the saved dish, is EQUIVALENT: a pinned dish is always served at its
+  saved size), `test:hold-around-pins` §2 re-anchored (+1 check, 2 mutations caught), `verify:swap-knock-on` 1c
+  re-anchored to each meal's on-screen change and now prints its check count (1 mutation caught). 123 derived logic
+  gates green. Frontend only.
+
 - [x] **Live test 19 Oct, finding 10: Greek yoghurt and smoked turkey dishes blocked as "doesn't fit nut-free".**
   (`docs/plans/unidentified-food-wording.md`, allergen path.) TRACED AND CONFIRMED by running the real check: a line
   the food list cannot identify ("low fat greek yoghurt", "smoked turkey breast") is treated as breaking every
