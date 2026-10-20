@@ -123,7 +123,9 @@ const READ = String.raw`(() => {
   const text = document.body.innerText
   const btns = [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean)
   return { text, btns,
-    hasCard: /Proposed change/i.test(text) && btns.some(b => /^Apply/.test(b)) && btns.includes('Keep'),
+    // Offers are text with small buttons since 20 Oct: the newest offer, still open, with Apply and Not now.
+    hasCard: [...document.querySelectorAll('[data-testid="proposal-card"][data-offer="text"]')].pop()?.getAttribute('data-card-status') === 'pending' && btns.some(b => /^Apply/.test(b)) && btns.includes('Not now'),
+    card: [...document.querySelectorAll('[data-testid="proposal-card"]')].pop()?.innerText ?? '',
     hasUndo: btns.includes('Undo') }
 })()`
 const read = () => ev(READ)
@@ -163,9 +165,10 @@ console.log('\n[2] Tapping "200 kcal to dinner": both new sizes, before Apply')
 check('the button sends', await tapButton('200 kcal to dinner'))
 r = await answered(/Want me to move about 200 kcal from today's lunch to dinner\?/)
 check('a card, asking rather than announcing', r.hasCard === true && /Want me to move about 200 kcal from today's lunch to dinner\?/.test(r.text), r.text.slice(-700))
-const card = r.text.slice(r.text.toLowerCase().lastIndexOf('proposed change'))
+const card = r.card
 const lunchName = w0[TODAY].lunch, dinnerName = w0[TODAY].dinner
-const sizeRe = slot => new RegExp(`Today's ${slot} · [^\\n]+\\n+${fmt(k0[slot])} kcal · (\\d+) g protein\\n+([\\d,]+) kcal · (\\d+) g protein`)
+// One line per meal: "Today's lunch · Dish: 1,199 kcal · 90 g protein → 999 kcal · 75 g protein (down 200 kcal)".
+const sizeRe = slot => new RegExp(`Today's ${slot} · [^\\n]+?: ${fmt(k0[slot])} kcal · (\\d+) g protein → ([\\d,]+) kcal · (\\d+) g protein`)
 const lm = sizeRe('lunch').exec(card), dm = sizeRe('dinner').exec(card)
 const lAfter = lm ? Number(lm[2].replace(/,/g, '')) : NaN, dAfter = dm ? Number(dm[2].replace(/,/g, '')) : NaN
 check('it names today\'s lunch by its dish, as served now and after', card.includes(`Today's lunch · ${lunchName}`) && !!lm, card.slice(0, 500))

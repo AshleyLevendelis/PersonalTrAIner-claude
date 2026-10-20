@@ -59,7 +59,11 @@ function joinLabels(labels: string[]): string {
 export function offerChanges(rows: DiffRow[]): OfferChange[] {
   const groups: { rows: DiffRow[]; key: string }[] = []
   for (const row of rows) {
-    const key = JSON.stringify([row.before ?? '', row.after ?? '', row.note ?? ''])
+    // Only a CHANGE is said once for several labels: with nothing before it, a row is an item of a list (today's
+    // session, block by block), and two items with the same dose are still two things, in their own order.
+    const key = blank(row.before)
+      ? JSON.stringify(['item', groups.length])
+      : JSON.stringify([row.before ?? '', row.after ?? '', row.note ?? ''])
     const g = groups.find(x => x.key === key)
     if (g) g.rows.push(row)
     else groups.push({ key, rows: [row] })

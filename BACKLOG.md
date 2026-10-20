@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [x] **Pre-merge sweep, 20 Oct 2026: a list of exercises was read as one change repeated.** Full sweep at the
+  merged branch: 428 of 434 passed. Four are expected (three need a database, one needs the coach exam re-run on her
+  machine). Two coach drivers failed: `verify:chat-session-kind` and `verify:chat-rebalance` were written by the
+  agents against the old card layout and never re-run after offers became text (her 20 Oct "Text + small buttons
+  always"), so they read nothing. Re-anchored on the text lines. Re-anchoring then found a REAL defect: the text offer
+  says one change once for several labels, and a session list (nothing being replaced, each exercise and its dose)
+  matched that rule whenever two blocks shared a dose, so today's cardio read "Rowing Machine and Cycling Intervals: 6
+  rounds, 45s on, 40s off" then Elliptical: two blocks merged and the session order lost. Now only a CHANGE (something
+  before it) is grouped; list items always stay their own line in their order. `test:offer-text` (20 checks; the new
+  one fails with the fix removed), `verify:chat-session-kind` 28 checks, `verify:chat-rebalance` 41 checks, and every
+  driver that shows a coach offer re-run. Frontend only.
 - [x] **Runs 7-10, batch 3 screen items (20 Oct 2026).** **M55** ("Log it" left "Up next · Breakfast", easy to log
   twice): NOT REPRODUCED on Nutrition. The real card, tapped, moves up next on at once and the logged meal is under
   Eaten; nothing had ever tapped it, so `verify:upnext-log` now does (5 checks; 2 mutations, both caught: logs not

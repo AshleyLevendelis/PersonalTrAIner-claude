@@ -54,7 +54,8 @@ const say = async t => {
   return ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /send/i.test(x.getAttribute('aria-label') || '')); if (!b || b.disabled) return false; b.click(); return true })()`)
 }
 const lastCard = () => ev(`(() => { const c = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); if (!c) return null;
-  const rows = [...c.querySelectorAll(':scope > div:first-child > div')].map(r => [...r.querySelectorAll('span')].map(s => s.textContent.trim()))
+  // Offers are text since 20 Oct ("Text + small buttons always"): each exercise is one line, "Name: dose".
+  const rows = [...c.querySelectorAll('[data-offer-line="change"]')].map(l => { const t = l.textContent.trim(); const i = t.indexOf(': '); return i < 0 ? [t] : [t.slice(0, i), t.slice(i + 2)] })
   return { text: c.innerText.replace(/\\s+/g, ' '), rows, notes: [...c.querySelectorAll('[data-severity]')].map(n => ({ sev: n.getAttribute('data-severity'), text: n.innerText.trim() })), status: c.getAttribute('data-card-status') } })()`)
 const cardCount = () => ev(`document.querySelectorAll('[data-testid="proposal-card"]').length`)
 const body = () => ev('document.body.innerText')
@@ -96,7 +97,8 @@ const cardio = await until(lastCard, v => !!v && /cardio session instead/.test(v
 const cardioLead = await until(body, t => /Want me to make today a cardio session instead of/.test(t), 40)
 check('4b. a cardio card comes back', /Want me to make today a cardio session instead of/.test(cardioLead))
 check('4c. ...of conditioning blocks, in rounds or minutes', !!cardio && cardio.rows.filter(r => /rounds, \d+s on, \d+s off|min steady/.test(r[r.length - 1] ?? '')).length >= 2, cardio?.rows)
-check('4d. PARITY again, for cardio', JSON.stringify(await ev(`window.__kindPlan('cardio', [])`)) === JSON.stringify((cardio?.rows ?? []).map(r => r[0])))
+const cardioPlan = await ev(`window.__kindPlan('cardio', [])`)
+check('4d. PARITY again, for cardio', JSON.stringify(cardioPlan) === JSON.stringify((cardio?.rows ?? []).map(r => r[0])), { cardioPlan, rows: cardio?.rows })
 check('4e. "Not now" (Keep)', await button('/^(Keep|Not now)/'))
 await wait(800)
 check('4f. ...and today is untouched', JSON.stringify(await ev('window.__todayNames()')) === JSON.stringify(start))

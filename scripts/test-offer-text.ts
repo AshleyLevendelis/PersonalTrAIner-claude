@@ -60,6 +60,15 @@ console.log('\n§2 One change over many days is said once')
   const days = (n: number): DiffRow[] => Array.from({ length: n }, (_, i) => ({ field: `Mon (Week ${i + 1})`, before: 'Back Squat', after: 'Goblet Squat' }))
   check('four days are all named', lines(days(4))[0] === 'Mon (Week 1), Mon (Week 2), Mon (Week 3) and Mon (Week 4): Back Squat → Goblet Squat', lines(days(4)))
   // A literal on one side (CLAUDE.md: a check compared against the constant that drives it can only agree with itself).
+  // A LIST IS NOT A REPEATED CHANGE (found 20 Oct by verify:chat-session-kind): today's cardio session read "Rowing
+  // Machine and Cycling Intervals: 6 rounds…" then Elliptical — two blocks merged and the order lost.
+  const session: DiffRow[] = [
+    { field: 'Rowing Machine', before: '', after: '6 rounds, 45s on, 40s off' },
+    { field: 'Elliptical', before: '', after: '20 min steady' },
+    { field: 'Cycling Intervals', before: '', after: '6 rounds, 45s on, 40s off' },
+  ]
+  check('a list of items (nothing before them) keeps every item on its own line, in its order, whatever the doses',
+    JSON.stringify(lines(session)) === JSON.stringify(['Rowing Machine: 6 rounds, 45s on, 40s off', 'Elliptical: 20 min steady', 'Cycling Intervals: 6 rounds, 45s on, 40s off']), lines(session))
   check('five days: three named and the rest COUNTED, never dropped', OFFER_LABELS_NAMED === 3 && lines(days(5))[0] === 'Mon (Week 1), Mon (Week 2), Mon (Week 3) and 2 more: Back Squat → Goblet Squat', lines(days(5)))
 }
 
