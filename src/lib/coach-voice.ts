@@ -221,14 +221,19 @@ export function moreMealOptionsWhy(r: { reached: boolean; listUnreadable: boolea
   return r.reached ? "I couldn't find new meals that fit your targets" : "I couldn't reach the meal generator just then"
 }
 
-export function moreMealOptionsDone(r: { added: number; asked: number; reached: boolean; listUnreadable: boolean; startLabel: string }): string {
+export function moreMealOptionsDone(r: { added: number; asked: number; reached: boolean; listUnreadable: boolean; startLabel: string; listUpdated?: boolean | null }): string {
   if (r.added === 0) {
     // Every failure says nothing changed, and the two that are about a
     // connection say to try again; "no meal fits" would not get better.
     const retry = r.listUnreadable || !r.reached ? ' Try again in a moment.' : ''
     return `${moreMealOptionsWhy(r)}, so nothing has changed.${retry}`
   }
-  const lead = `Added ${r.added} new ${r.added === 1 ? 'meal' : 'meals'}. They start ${r.startLabel}; every day before then stays as it was.`
+  // STARTED TOMORROW ON HER PICK (M62): the days after today changed, so the receipt says what happened to the list.
+  const lead = r.listUpdated === true
+    ? `Added ${r.added} new ${r.added === 1 ? 'meal' : 'meals'}. They start ${r.startLabel}, and your shopping list is updated to match.`
+    : r.listUpdated === false
+      ? `Added ${r.added} new ${r.added === 1 ? 'meal' : 'meals'}. They start ${r.startLabel}, but I couldn't update your shopping list, so it still has the old meals on it. Rebuild it before you shop.`
+      : `Added ${r.added} new ${r.added === 1 ? 'meal' : 'meals'}. They start ${r.startLabel}; every day before then stays as it was.`
   // "There's room to try again" holds on both surfaces: the screen still
   // offers it, and the coach can be asked. Neither has to point at a control.
   return r.added < r.asked ? `${lead} That's fewer than I asked for, so there's room to try again.` : lead
@@ -251,6 +256,10 @@ export const MORE_MEALS = {
    */
   unchanged: 'Today and every day on your shopping list, and every option you already have — nothing is removed or resized.',
   starts: (startLabel: string) => `The new meals start ${startLabel}; every day before then stays as it was.`,
+  /** M62: the start is past the day strip, so the offer says so and offers sooner. */
+  startsLate: (startLabel: string) => `The new meals would start ${startLabel}, after the days you can see here, because your shopping list runs until then.`,
+  /** The second button when the start is past the strip. */
+  sooner: 'Start them tomorrow and update my shopping list',
   takesAMoment: 'Finding new meals takes a moment.',
   /** Completes "Do you want me to ..." when a meal has dishes but too few that fit. */
   leadFit: 'add meals that fit your targets, where too few of your dishes do',
@@ -547,7 +556,7 @@ export function aroundEatenLine(a:
  */
 export function heldAroundLine(h:
   | { kind: 'none'; slots: string[] }
-  | { kind: 'resized'; factor: number; slots: string[]; deltaKcal: number }
+  | { kind: 'resized'; factor: number; slots: string[]; deltaKcal: number; sizes?: { slot: string; fromKcal: number; toKcal: number }[] }
   | { kind: 'too_far'; slots: string[]; deltaKcal: number }
   | { kind: 'kept'; slots: string[]; deltaKcal: number }): string | null {
   const gap = (d: number) => `${Math.abs(d)} kcal ${d > 0 ? 'over' : 'under'} your target`
@@ -555,6 +564,16 @@ export function heldAroundLine(h:
   if (h.kind === 'none') return null
   if (h.kind === 'kept') return `Kept ${yours} as planned after your swap. The day is ${gap(h.deltaKcal)}.`
   if (h.kind === 'too_far') return `Kept ${yours} as planned: fitting ${h.slots.length === 1 ? 'it' : 'them'} around your swap would take more than a 25% change. The day is ${gap(h.deltaKcal)}.`
+  // WHAT EACH MEAL REALLY CAME TO (live test, 19 Oct 2026): one factor, rounded per ingredient, lands each meal
+  // differently, so the line names each meal's own change rather than the factor asked for.
+  if (h.sizes && h.sizes.length > 0) {
+    const each = h.sizes.map(z => {
+      const pct = z.fromKcal > 0 ? Math.round(Math.abs(z.toKcal / z.fromKcal - 1) * 100) : 0
+      return pct === 0 ? `your ${z.slot} is the same size` : `your ${z.slot} is ${pct}% ${z.toKcal < z.fromKcal ? 'smaller' : 'bigger'}`
+    })
+    const list = each.length === 1 ? each[0] : `${each.slice(0, -1).join(', ')} and ${each[each.length - 1]}`
+    return `To fit around your swap, ${list}. Same ${h.slots.length === 1 ? 'dish' : 'dishes'}.`
+  }
   const pct = Math.round(Math.abs(h.factor - 1) * 100)
   return `To fit around your swap, ${yours} ${h.slots.length === 1 ? 'is' : 'are'} ${pct}% ${h.factor < 1 ? 'smaller' : 'bigger'}. Same ${h.slots.length === 1 ? 'dish' : 'dishes'}.`
 }
@@ -681,6 +700,8 @@ export const COOK_ONCE = {
   dinner: 'Cook both portions together — tomorrow\'s lunch is this.',
   /** On the lunch that came out of last night's pan. */
   lunch: 'Last night\'s dinner.',
+  /** Above the batch rows (runs 7-10, H37): cook it all tonight, keep tomorrow's lunch aside. */
+  batchHeading: 'Cook it all tonight, then keep tomorrow\'s lunch aside:',
 } as const
 
 export const OUTSIDE_YOUR_STYLE = 'Outside your training style'

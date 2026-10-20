@@ -2,6 +2,53 @@
 
 Newest first. One line each.
 
+- [x] **Runs 7-10, M62: new meals arrived a week late, past the strip (20 Oct 2026).** "Get more options" said
+  "They start on Sunday 25 October" because the list had just been rebuilt for seven days, and the strip ends on the
+  24th, so she could not even see them. Ashley's ruling, 20 Oct 2026, from three options: **"Say it, and offer
+  sooner"** (over "just say it before the tap" and "always start tomorrow"). BUILT, screen: while the offer shows, the
+  start day is read from the list the strict way the run reads it, again whenever the list changes (found by the
+  driver: the first version read it once, before days were added, and kept saying "tomorrow"), and the offer names
+  it; past the strip it says "The new meals would start on Wednesday 23 September, after the days you can see here,
+  because your shopping list runs until then." and adds "Start them tomorrow and update my shopping list". Only that
+  button starts them tomorrow and then re-works the covered days of the list from the meals as they now are
+  (`refreshGroceryDays`, the list's own reconcile, so ticked and hand-added rows hold); "Get more options" never
+  touches the list. The receipt says the list was updated, or that it could not be and still has the old meals.
+  `test:meal-top-up` (156 checks; 10 mutations, all caught, one only after the end-to-end profile was given a list
+  that holds days), `verify:meal-top-up` §9 (64 checks; 3 mutations caught). NOT DONE: the coach's card names the
+  start day already, but has no sooner choice yet; it waits for the bubble-offers rework of the card to land, then
+  gets the same option. Frontend only.
+- [x] **Runs 7-10, H37: leftovers are ONE BATCH (20 Oct 2026).** The dinner that feeds tomorrow's lunch said "cook
+  both portions together" and listed only tonight's amounts; tomorrow's portion is bigger (lunch 0.40 of a three-meal
+  day, dinner 0.30), so the batch was written nowhere. And the shopping list counted the leftover on the LUNCH: today's
+  lunch was bought again (its dinner was cooked yesterday, before the list began) and the last list day's batch was
+  short (its lunch falls after the list ends). FIXED: the served dinner carries the lunch actually served tomorrow
+  (`keepForTomorrow`, replaced or dropped when a swap moves the promise), and the card draws "Cook it all tonight,
+  then keep tomorrow's lunch aside:" with a row per food ("Cook 278g chicken breast, keep 160g"), in place of the old
+  sentence. The list buys one batch once (`cook-once.ts` `shoppingLinesOf`): tomorrow's portion goes on with the
+  dinner, dated tomorrow's lunch when tomorrow is on the list, else tonight; a leftover lunch buys nothing when its
+  dinner is on the list or was cooked before the list began, and buys its own lines when its dinner is a day NOT on
+  the list (found by `test:meal-days` §3b going red on the first version, which bought nothing for that lunch). Decided
+  by me, mechanical (shopping arithmetic; the card's wording is the phrasebook's). `test:cook-once` (33 checks; 21
+  mutations across the batch rows, the served week, the swaps and the list rule, all caught, 3 only after the swap
+  cases were added), `verify:leftovers` §2d-2h (rows read off the screen: cook minus keep is tonight's listed amount),
+  `test:meal-days`, `verify:meal-top-up`. Frontend only. Not done: the grocery screen does not yet SAY a row includes
+  tomorrow's lunch beyond its meal line.
+- [x] **Live test 19 Oct, findings 6-7: the coach's dinner swap card said 466 kcal (the screen 222), its reason
+  said "higher-calorie" over a smaller dish, and Apply shrank breakfast and the snack with nothing said, under "25%
+  smaller" when they fell 24% and 35%.** TRACED: the card read the dish as SAVED, the screen the day as SERVED (resized
+  to fit); the reason line was the coach model's own free text, written before the app chose the dish; the swap card
+  never ran the knock-on trial the add-a-food card runs; the banner printed the one factor asked for while each meal
+  rounds per ingredient to a different size. FIXED: the swap card runs the same trial the screen's week runs, with the
+  dish pinned as the screen's swap pins it (`knockOnOfPin(..., existing: true)`: no copy, no tag), so BEFORE is the
+  meal as served now, AFTER the new dish as served with the swap in, and every other meal it moves is listed before
+  the tap (`swapDiffFromTrial`); no trial, and the card says the rest could not be checked. No model sentence on the
+  card. The banner names each meal's real change ("your breakfast is 1% smaller, your dinner is 4% smaller and your
+  snack is 4% smaller") from `sizes` carried out of `holdAroundPins`. `test:meal-swap-card` (12 checks, 6 mutations, 5
+  caught; the 6th, the after-row's protein from the saved dish, is EQUIVALENT: a pinned dish is always served at its
+  saved size), `test:hold-around-pins` §2 re-anchored (+1 check, 2 mutations caught), `verify:swap-knock-on` 1c
+  re-anchored to each meal's on-screen change and now prints its check count (1 mutation caught). 123 derived logic
+  gates green. Frontend only.
+
 - [x] **Live test 19 Oct, finding 10: Greek yoghurt and smoked turkey dishes blocked as "doesn't fit nut-free".**
   (`docs/plans/unidentified-food-wording.md`, allergen path.) TRACED AND CONFIRMED by running the real check: a line
   the food list cannot identify ("low fat greek yoghurt", "smoked turkey breast") is treated as breaking every
@@ -104,6 +151,27 @@ Newest first. One line each.
     still traces through the shared word "rdl" and resolves exactly; only her own words are checked against the
     table. The sets/reps and weight questions name the lift but offer no way to change it. Frontend only; no edge
     function or migration.
+- [x] **Three meal drivers red since M59 and H36 (`verify:kitchen-amounts`, `verify:meal-refit`, `verify:meal-top-up`):
+  all three were the HARNESS, not the app.** Bisected to 8f0b995e (10% bands) and 26e06e40 (raw/dry on read).
+  (1) `meal-top-up` (6 red) and `meal-refit` 3f (lunch promised 944, shown 930): the page started from its
+  in-memory dishes, written cooked with rounded macros, and after the tap re-read them through the real store, which
+  turns them raw or dry and re-costs them. Two reads of one meal, so "today stays exactly as it was" compared 956 kcal
+  with 927 and the day search re-picked. App holds `readPools`' pools from its first load and has one read; the
+  day-move page was given the same fix in M59 and the top-up page was missed. FIXED: `?topup=1` starts from the app's
+  read (the driver waits for it); the refit fixture is written as bought, at the weights the read itself gives (205g
+  raw breast, 55g dry rice, 285g raw potato). Putting the old page back reproduces exactly the six failures.
+  (2) `kitchen-amounts` (5 red): no offer ever appeared, because the fixture's spoon of oil sat on a dinner that was
+  37% of the day against a 27% share; the refit sizes each meal to its share, so the dinner grew 1.17x while the day
+  grew 1.6x and fat landed 10.2% under at every drift tried (0.8-1.7). Inside the old 25% band, outside the new 10%,
+  and the app rightly offers only a resize that lands. No real dish is that far off its share (each is made within
+  7%). Spoon moved to the lunch, where every meal sits near its share: the resize lands (fat 87 of 88 g) and the oil
+  reads "1¾ tbsp". The driver's amount check now reads the cooked hint as its own element (it appeared once the lines
+  became raw), so "grams read exactly as stored" still asks about the amount. Nothing in `src/` changed; no band and
+  no raw/dry rule loosened. Mutations: 10, all caught, each run counted the same checks as its baseline (kitchen 5,
+  refit 3, top-up 2; the fixture changes themselves among them). LEAD, older than both commits and measured at the old
+  bands too: on a pool of five options a meal, a 1.6x upward drift is resized onto target and still not OFFERED in 56
+  of 60 seeded pools, because the day search then picks other dishes and the card lists only same-name resizes.
+
 - [x] **Live test 19 Oct, findings 1-2: a "Shoulders & Abs" day with leg work and "No overhead press fits your
   kit" while five presses fitted it** (`docs/plans/shoulders-day-honest.md`). TRACED (and run through the real code
   with Sam's profile): a plan made while his shoulder was flagged, never rebuilt when the flag came off; a knee

@@ -167,6 +167,13 @@ export interface PoolOption {
    */
   reusedTomorrow?: boolean
   /**
+   * WHAT TO KEEP FOR TOMORROW'S LUNCH, line by line (runs 7-10, H37, 20 Oct 2026): set beside `reusedTomorrow`, the
+   * leftover lunch's own ingredient lines, so the dinner card can say "cook X in all, keep Y" from one batch. The lunch
+   * takes the lunch's share of the day, so it can be bigger than the dinner; this makes that a fact on the card rather
+   * than a surprise the next day. Derived, never persisted.
+   */
+  keepForTomorrow?: PoolOption['ingredients']
+  /**
    * SET WHEN A SWAP HELD THIS DISH AND RE-SIZED IT (runs 3-4, M34): the factor
    * applied to the planned dish. Derived, never persisted. Read by today's
    * fit-around-what-was-eaten so the two re-sizes together stay inside her
@@ -1323,8 +1330,12 @@ export interface AssembledDay {
 export type HeldAround =
   /** Held as planned and already on target: nothing to say. */
   | { kind: 'none'; slots: MealSlotName[] }
-  /** Held and re-sized together by `factor`; `deltaKcal` is how far the day was before. */
-  | { kind: 'resized'; factor: number; slots: MealSlotName[]; deltaKcal: number }
+  /**
+   * Held and re-sized together by `factor`; `deltaKcal` is how far the day was before. `sizes` is what each meal
+   * REALLY came to: every ingredient rounds to a kitchen step, so one factor lands each meal differently (live test,
+   * 19 Oct 2026: "25% smaller" printed over a breakfast 24% and a snack 35% smaller).
+   */
+  | { kind: 'resized'; factor: number; slots: MealSlotName[]; deltaKcal: number; sizes?: { slot: MealSlotName; fromKcal: number; toKcal: number }[] }
   /** Re-sizing would need more than about 25%: held as planned, the day is `deltaKcal` off. */
   | { kind: 'too_far'; slots: MealSlotName[]; deltaKcal: number }
   /** Undo was tapped for this date: held as planned, the day is `deltaKcal` off. */

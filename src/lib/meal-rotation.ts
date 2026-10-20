@@ -250,6 +250,7 @@ export function leftoverLunchFrom(
   // The dinner's own "cook both portions" line belongs to the dinner. A lunch
   // made from a dinner that carries it must not say it too.
   delete lunch.reusedTomorrow
+  delete lunch.keepForTomorrow
   return lunch
 }
 
@@ -460,7 +461,7 @@ export function assembleRotationDay(
   const tomorrowsLunch = rotation.leftoverFor(index + 1).lunch
   const dinner = day.chosen.dinner
   if (tomorrowsLunch && dinner && tomorrowsLunch.name === dinner.name) {
-    return { ...day, chosen: { ...day.chosen, dinner: { ...dinner, reusedTomorrow: true } } }
+    return { ...day, chosen: { ...day.chosen, dinner: { ...dinner, reusedTomorrow: true, keepForTomorrow: tomorrowsLunch.ingredients } } }
   }
   return day
 }
@@ -563,10 +564,14 @@ export function serveDates(input: {
     if (!dinner) continue
     const lunch = served[i + 1].day.chosen.lunch
     const reused = lunch?.leftoverFrom === 'dinner' && lunch.name === dinner.name
-    if ((dinner.reusedTomorrow === true) === reused) continue
+    // The keep lines are the lunch ACTUALLY served tomorrow (its portion, as the screen shows it), so they are set
+    // whenever the promise is, not only when the flag flips.
+    if (!reused && dinner.reusedTomorrow !== true && !dinner.keepForTomorrow) continue
+    if (reused && dinner.reusedTomorrow === true && dinner.keepForTomorrow === lunch!.ingredients) continue
     const plain: PoolOption = { ...dinner }
     delete plain.reusedTomorrow
-    served[i] = { ...served[i], day: { ...served[i].day, chosen: { ...served[i].day.chosen, dinner: reused ? { ...plain, reusedTomorrow: true } : plain } } }
+    delete plain.keepForTomorrow
+    served[i] = { ...served[i], day: { ...served[i].day, chosen: { ...served[i].day.chosen, dinner: reused ? { ...plain, reusedTomorrow: true, keepForTomorrow: lunch!.ingredients } : plain } } }
   }
   return served
 }

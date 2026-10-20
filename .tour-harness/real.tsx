@@ -89,9 +89,9 @@ import { makeKitController } from '@/lib/kit-change'
 import { profileWithKit } from '@/lib/kit-list'
 import { planDaysInWindow } from '@/lib/plan-guard'
 import type { UserFactRow } from '@/lib/memory-store'
-import { getAllItems as getAllGroceryItems } from '@/lib/grocery-store'
+import { getAllItems as getAllGroceryItems, refreshGroceryDays, subscribeGroceryStore } from '@/lib/grocery-store'
 import { computeSlotBudgets } from '@/lib/meal-generation'
-import { topUpPlan, topUpOffer, topUpMealPlan, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
+import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, topUpBeyondStrip, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
 import { MEAL_LIBRARY } from '@/lib/meal-library-data'
 // The app's own root boundary, as main.tsx mounts it (verify:chunk-reload reads what it shows).
 import { AppErrorBoundary } from '@/components/AppErrorBoundary'
@@ -758,14 +758,32 @@ const priced = (slot: string, name: string, ingredients: { name: string; quantit
     macros: { calories: Math.round(m.kcal), protein: Math.round(m.protein), carbs: Math.round(m.carbs), fat: Math.round(m.fat) },
   }
 }
+// WRITTEN AS BOUGHT, RAW OR DRY (20 Oct 2026). Since H36/M64 (18 Oct) every
+// stored meal is READ raw or dry: readPools turns "150g chicken breast"
+// (cooked) into "205g raw chicken breast", in kitchen steps, and re-costs it.
+// Written cooked, this fixture was a meal in a state no stored meal can be
+// read in any more: the refit's trial resized the cooked lines, the write went
+// through the real store, the re-read converted them, and the card's promise
+// (lunch 944 kcal) and the screen (930) were two reads of one meal. App never
+// sees that, because its pools come from readPools from the first load. These
+// are the weights the read itself gives for the old lines (205g raw breast,
+// 55g dry rice, 285g raw potato), so the day keeps its size; INPUT only.
 const refitChosen = {
   breakfast: priced('breakfast', 'Porridge with milk', [{ name: 'oats', quantity: 80, unit: 'g' }, { name: 'milk', quantity: 250, unit: 'ml' }]),
-  lunch: priced('lunch', 'Chicken and rice', [{ name: 'chicken breast', quantity: 150, unit: 'g' }, { name: 'white rice', quantity: 150, unit: 'g' }]),
-  // ?spoon=1 adds a spoon of oil to the dinner, so a resize has a spoon amount
-  // to round (verify:kitchen-amounts). Off by default: every other run of this
-  // fixture keeps the dinner, and therefore the targets, it always had.
-  dinner: priced('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'potato', quantity: 250, unit: 'g' },
+  // ?spoon=1 adds a spoon of oil, so a resize has a spoon amount to round
+  // (verify:kitchen-amounts). Off by default: every other run of this fixture
+  // keeps the meals, and therefore the targets, it always had.
+  // ON THE LUNCH, NOT THE DINNER (20 Oct 2026, M59's 10% bands), measured: the
+  // refit sizes each meal to its share of the day (27/36/27/10 for three meals
+  // and a snack), and with the oil the dinner was 37% of the day against a 27%
+  // share. It grew 1.17x while the day grew 1.6x, so the day's fat landed 10.2%
+  // under (78 of 88 g): inside the old 25% band, outside the new 10%, so the app
+  // honestly offered nothing. No real dish is that far off its share (each is
+  // made within 7% of it). On the lunch every meal sits near its share and the
+  // resize lands the day on target (2,829 kcal, fat 87 of 88 g).
+  lunch: priced('lunch', 'Chicken and rice', [{ name: 'raw chicken breast', quantity: 205, unit: 'g' }, { name: 'dry white rice', quantity: 55, unit: 'g' },
     ...(new URLSearchParams(location.search).get('spoon') === '1' ? [{ name: 'olive oil', quantity: 1, unit: 'tbsp' }] : [])]),
+  dinner: priced('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'raw potato', quantity: 285, unit: 'g' }]),
   snack: priced('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
 }
 const refitBase = (['breakfast', 'lunch', 'dinner', 'snack'] as const).reduce(
@@ -1336,8 +1354,12 @@ function Harness() {
   // lines). Starting from the in-memory dishes instead made the week before a swap
   // and the week after it two different reads of the same meals, and under the 10%
   // bands (runs 7-10, M59) that alone moved days nobody named. Input, not output.
+  // ?topup=1 too (20 Oct 2026): the same two-reads defect, one page over. "Today and the shopping-list days stay
+  // exactly as they are" was compared between the in-memory dishes (cooked lines, rounded macros) before the tap
+  // and the store's read (raw or dry lines, re-costed) after it, so today's breakfast moved 956 -> 927 kcal and the
+  // day search re-picked dishes nobody touched. App holds readPools' pools from its first load, so it has one read.
   useEffect(() => {
-    if (!DAYMOVE) return
+    if (!DAYMOVE && !TOPUP) return
     void getPools(PROFILE_ID).then(fresh => {
       setLivePools(fresh as never)
       ;(window as unknown as { __poolsRead: boolean }).__poolsRead = true
@@ -1411,12 +1433,32 @@ function Harness() {
     ? topUpOffer(topUpPlanNow, { count: isTopUpDismissed(PROFILE_ID, 'count'), fit: isTopUpDismissed(PROFILE_ID, 'fit', driftedMacros ?? undefined) })
     : null
   const topUpShown = topUpOfferNow?.text ?? null
-  const handleTopUp = async () => {
+  // M62, as App.tsx does it: while the offer shows, the start day is read the strict way the run reads it.
+  const [topUpStart, setTopUpStart] = useState<{ label: string; beyondStrip: boolean } | null>(null)
+  const topUpOfferShown = !!topUpShown && !topUpNote
+  useEffect(() => {
+    if (!topUpOfferShown) { setTopUpStart(null); return }
+    let cancelled = false
+    const read = () => {
+      void previewTopUpStart({ profileId: PROFILE_ID, today })
+        .then(p => { if (!cancelled) setTopUpStart(p ? { label: p.label, beyondStrip: topUpBeyondStrip(today, p.from) } : null) })
+    }
+    read()
+    const unsubscribe = subscribeGroceryStore(read)
+    return () => { cancelled = true; unsubscribe() }
+  }, [topUpOfferShown])
+  const handleTopUp = async (startTomorrow = false) => {
     if (!driftedMacros || topUpBusy) return
     setTopUpBusy(true)
     setTopUpNote(null)
+    const targets = driftedMacros
     const r = await topUpMealPlan({
       profileId: PROFILE_ID, today, needs: topUpNeedsNow,
+      startTomorrow,
+      refreshList: async () => refreshGroceryDays({
+        profileId: PROFILE_ID, mealPools: await getPools(PROFILE_ID), targets, softLikedFoods: [],
+        todaysPicks: mealDays.today?.day.chosen ?? {}, pinsByDate: mealDays.pinsByDate, mealShape, today,
+      }),
       generation: { targets: driftedMacros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: mealShape.mealsPerDay, includeSnacks: mealShape.includeSnacks, ...(LIBRARY_OFF ? { library: false as const } : {}) },
     })
     if (r.added > 0) setLivePools(await getPools(PROFILE_ID) as never)
@@ -1655,7 +1697,8 @@ function Harness() {
             // before 9 Oct 2026 was built on.
             onSwapMealSlot={REGEN ? mealActions.swap : noop} onRegenerateMealSlot={REGEN ? mealActions.regenerateSlot : noop} onRegenerateAllMeals={REGEN ? mealActions.regenerateAll : noop}
             mealTopUp={topUpShown} mealTopUpBusy={topUpBusy} mealTopUpNote={topUpNote}
-            onMealTopUp={() => { void handleTopUp() }}
+            onMealTopUp={(startTomorrow?: boolean) => { void handleTopUp(startTomorrow) }}
+            mealTopUpStart={topUpStart}
             onMealTopUpDecline={() => { if (topUpOfferNow) dismissTopUp(PROFILE_ID, topUpOfferNow.kind, driftedMacros ?? undefined); setTopUpDismissTick(t => t + 1) }}
             onDismissMealTopUpNote={() => setTopUpNote(null)}
             mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove}

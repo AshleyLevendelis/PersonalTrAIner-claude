@@ -406,6 +406,7 @@
     "test:meal-day-move": "tsx scripts/test-meal-day-move.ts",
     "test:meal-method": "tsx scripts/test-meal-method.ts",
     "verify:meal-method": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-method.mjs",
+    "test:cook-once": "tsx scripts/test-cook-once.ts",
     "test:leftovers": "tsx scripts/test-leftovers.ts",
     "verify:leftovers": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/leftovers.mjs",
     "test:meal-favourite": "tsx scripts/test-meal-favourite.ts",
@@ -471,7 +472,8 @@
     "verify:profile-temporary": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-temporary.mjs",
     "test:shoulders-day": "tsx scripts/test-shoulders-day.ts",
     "test:coach-kit-names": "tsx scripts/test-coach-kit-names.ts",
-    "test:unidentified-food": "tsx scripts/test-unidentified-food.ts"
+    "test:unidentified-food": "tsx scripts/test-unidentified-food.ts",
+    "test:meal-swap-card": "tsx scripts/test-meal-swap-card.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

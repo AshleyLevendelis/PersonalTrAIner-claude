@@ -57,9 +57,11 @@ export interface MealKnockOn {
   lines: NonNullable<ProposalDiff['implications']>
   /** The week as the trial served it with the edit in — what the screen should show after the tap. Absent when no trial could run. */
   after?: ServedDay[]
+  /** The week as the screen serves it now, before the edit. Absent when no trial could run. */
+  before?: ServedDay[]
 }
 
-export type MealKnockOnFn = (date: string, slot: MealSlotName, option: PoolOption) => Promise<MealKnockOn>
+export type MealKnockOnFn = (date: string, slot: MealSlotName, option: PoolOption, existing?: boolean) => Promise<MealKnockOn>
 
 export interface MealKnockOnInput {
   /** The week exactly as the screen serves it — the same object the day swap's trial is handed. */
@@ -70,10 +72,15 @@ export interface MealKnockOnInput {
   option: PoolOption
   /** Days on the shopping list; null when the list could not be read (said, never passed off as "none"). */
   listDates: string[] | null
+  /**
+   * The option is ALREADY one of the meal's options (a swap to another of her dishes, live test 19 Oct 2026): pinned as
+   * the screen's swap pins it, by itself, neither added to the options nor tagged as her own request.
+   */
+  existing?: boolean
 }
 
 export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
-  const { serving, date, slot, option, listDates } = input
+  const { serving, date, slot, option, listDates, existing } = input
   const { today, dates, targets, pools } = serving
   // No targets, or a day the strip does not serve: there is no week to try it
   // on. Said, not guessed.
@@ -83,8 +90,8 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
 
   // AS THE EXECUTOR WILL STORE IT (executeMealAddition): beside the meal's
   // other options, tagged as her own request, and pinned to this date.
-  const stored: PoolOption = { ...option, tags: [...(option.tags ?? []), USER_REQUESTED_TAG] }
-  const afterPools = { ...pools, [slot]: [...(pools[slot] ?? []), stored] }
+  const stored: PoolOption = existing ? option : { ...option, tags: [...(option.tags ?? []), USER_REQUESTED_TAG] }
+  const afterPools = existing ? pools : { ...pools, [slot]: [...(pools[slot] ?? []), stored] }
   const todaysPins = { ...serving.todaysPins }
   const pinsByDate = { ...serving.pinsByDate }
   if (date === today) todaysPins[slot] = stored
@@ -93,7 +100,7 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
   // options, and the week builds its own for any pool it was not built from
   // (serveDates checks `builtFrom`) — which is what the app does when it reads
   // the options back.
-  const after = serveMealWeek({ ...serving, pools: afterPools, todaysPins, pinsByDate, rotation: null })
+  const after = serveMealWeek({ ...serving, pools: afterPools, todaysPins, pinsByDate, rotation: existing ? serving.rotation : null })
 
   const changes: MealKnockOnChange[] = []
   for (const served of after) {
@@ -144,5 +151,5 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
     const onList = touched.filter(d => listDates.includes(d))
     if (onList.length > 0) lines.push({ severity: 'info', text: DAY_MOVE.listStale(onList.map(d => dayLabel(d, today))) })
   }
-  return { changes, lines, after }
+  return { changes, lines, after, before }
 }

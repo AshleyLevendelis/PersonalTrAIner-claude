@@ -288,7 +288,8 @@ console.log('\n4. The FOOD half — soft likes now bias which day gets assembled
     /assembleDates\(input\.mealPools, input\.targets, datesFrom\(input\.startDate, days\), input\.softLikedFoods/.test(grocery)
     // BOTH the add and its undo: one line each, and a check satisfied by
     // either would pass with the other one broken (it did, under mutation).
-    && (grocery.match(/assembleDates\(input\.mealPools, input\.targets, covered, input\.softLikedFoods/g) ?? []).length === 2)
+    // Add, its undo, and since 20 Oct 2026 M62's refresh of the covered days: one line each.
+    && (grocery.match(/assembleDates\(input\.mealPools, input\.targets, covered, input\.softLikedFoods/g) ?? []).length === 3)
   check('App gives the grocery tab the same value it gave assembleDay',
     /softLikedFoods=\{compiledSoftFoodPreferences\}/.test(app))
 }

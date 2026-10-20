@@ -254,7 +254,7 @@ export function useMealDays(input: MealDaysInput) {
    * same shopping-list read the day swap makes. Never throws: a trial that
    * cannot run comes back as the line saying it could not be checked.
    */
-  const knockOn = async (date: string, slot: MealSlotName, option: PoolOption): Promise<MealKnockOn> => {
+  const knockOn = async (date: string, slot: MealSlotName, option: PoolOption, existing?: boolean): Promise<MealKnockOn> => {
     const { knockOnOfPin } = await import('@/lib/meal-knock-on')
     let listDates: string[] | null = null
     if (profileId && targets) {
@@ -265,7 +265,7 @@ export function useMealDays(input: MealDaysInput) {
     try {
       return knockOnOfPin({
         serving: { today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes },
-        date, slot, option, listDates,
+        date, slot, option, listDates, existing,
       })
     } catch (err) {
       console.error('useMealDays: the knock-on trial failed', err)

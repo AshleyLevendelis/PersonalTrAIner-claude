@@ -87,7 +87,17 @@ console.log('\n2. Re-sized together, within about 25%, and the day lands')
   check('the day is on target after the re-size', !!swap?.withinTolerance && dayVerdict(swap.totals, targets).onTarget, swap?.totals)
   check('the totals are the sum of what is served', !!swap && Math.abs(swap.totals.calories - sum(swap.chosen).calories) < 1e-6)
   const line = h ? heldAroundLine(h) : null
-  check('one line says so, naming the meals and the size', line === `To fit around your swap, your breakfast, dinner and snack are ${Math.round(Math.abs(f - 1) * 100)}% ${f < 1 ? 'smaller' : 'bigger'}. Same dishes.`, line)
+  // RE-ANCHORED 20 Oct 2026 (live test, 19 Oct: "25% smaller" over a breakfast 24% and a snack 35% smaller): the line
+  // names what EACH meal really came to, read off the served day against the planned one, never the factor asked for.
+  const real = (['breakfast', 'dinner', 'snack'] as MealSlotName[]).map(s => {
+    const from = Math.round(planChosen[s as keyof typeof planChosen].macros.calories), to = Math.round(swap!.chosen[s]!.macros.calories)
+    const pct = Math.round(Math.abs(to / from - 1) * 100)
+    return pct === 0 ? `your ${s} is the same size` : `your ${s} is ${pct}% ${to < from ? 'smaller' : 'bigger'}`
+  })
+  check('one line says so, naming each meal and the size it REALLY came to',
+    line === `To fit around your swap, ${real[0]}, ${real[1]} and ${real[2]}. Same dishes.`, { line, real })
+  check('...which is not one rounded factor for all three on this fixture (the case the live test caught)',
+    new Set(real).size > 1, real)
 }
 
 console.log('\n3. Beyond 25%: left as planned, and the gap said')
@@ -227,7 +237,8 @@ console.log('\n9. The wiring')
   check('the day function holds only when no pin is her own (section 7 holds which pins are)', /!live\.some\(\(\[, o\]\) => isHerOwnDish\(o, pools\)\)/.test(rotation) && /holdAroundPins\(\{ planned: plannedDay, fixed, targets, keepSizes: opts\.keepHeldSizes \}\)/.test(rotation))
   check('...and serveDates passes each date\'s Undo through', /keepHeldSizes: kept\.has\(date\)/.test(rotation))
   const grocery = code('src/lib/grocery-store.ts')
-  check('the shopping list serves the same Undo dates as the screen', (grocery.match(/readKeptHeldSizes\(input\.profileId\)/g) ?? []).length === 3 && /serveDates\(\{[^}]*keepHeldSizes \}\)/.test(grocery))
+  // Four callers since 20 Oct 2026 (M62's refreshGroceryDays beside generate, add and remove).
+  check('the shopping list serves the same Undo dates as the screen', (grocery.match(/readKeptHeldSizes\(input\.profileId\)/g) ?? []).length === 4 && /serveDates\(\{[^}]*keepHeldSizes \}\)/.test(grocery))
   const hook = code('src/hooks/useMealDays.ts')
   check('the days hook serves its week with the Undo dates, and hands out the switch', /keepHeldSizes: keptHeldSizes \}\)/.test(hook) && /setKeptHeldSizes\(writeKeptHeldSize\(profileId, date, keep\)\)/.test(hook) && /\n\s+keepHeldSizes,\n/.test(hook))
   const mealPlan = code('src/components/MealPlan.tsx')

@@ -19,7 +19,7 @@
 
 import { DEFAULT_POOL_SIZE, assembleDay, generateMealPools, type PoolOption } from './meal-generation'
 import type { MacroTargets } from './types'
-import { addDays, epochDay } from './meal-rotation'
+import { addDays, epochDay, ROTATION_DAYS } from './meal-rotation'
 import { weekdayLong, longDate } from './day-labels'
 import { readGroceryCoverage } from './grocery-store'
 import { moreMealOptionsOffer, moreMealFitOffer, moreMealOptionsDone, moreMealOptionsWhy } from './coach-voice'
@@ -173,6 +173,8 @@ export async function runMealTopUp(deps: {
   today: string
   /** The dates on the shopping list from today on. Must THROW when it cannot read. */
   readCoverage: () => Promise<string[]>
+  /** Start the new meals TOMORROW rather than after the list (her M62 ruling: only when she picks it). */
+  startTomorrow?: boolean
   /** Appends `count` options to each of `slots`, first served on `servedFrom`. */
   generate: (slots: MealSlotName[], count: number, servedFrom: string) => Promise<{
     accepted: Partial<Record<MealSlotName, PoolOption[]>>
@@ -189,7 +191,7 @@ export async function runMealTopUp(deps: {
   } catch {
     return { added: {}, asked, from: null, reached: false, listUnreadable: true }
   }
-  const from = topUpStartDate(deps.today, covered)
+  const from = deps.startTomorrow ? addDays(deps.today, 1) : topUpStartDate(deps.today, covered)
 
   const byCount = new Map<number, MealSlotName[]>()
   for (const slot of slots) byCount.set(asked[slot]!, [...(byCount.get(asked[slot]!) ?? []), slot])
@@ -207,6 +209,15 @@ export async function runMealTopUp(deps: {
     }
   }
   return { added, asked, from, reached, listUnreadable: false }
+}
+
+/**
+ * THE NEW MEALS WOULD START PAST THE DAY STRIP (runs 7-10, M62): the strip shows today and the next six days, so a
+ * start after that is a day she cannot even look at. Ashley, 20 Oct 2026, "Say it, and offer sooner": the offer names
+ * the day before the tap, and only then offers to start them tomorrow and update the shopping list.
+ */
+export function topUpBeyondStrip(today: string, from: string): boolean {
+  return epochDay(from) - epochDay(today) >= ROTATION_DAYS
 }
 
 /** "tomorrow", "on Thursday" within the week, or "on Monday 6 October" beyond it. */
@@ -316,6 +327,10 @@ export async function topUpMealPlan(input: {
   /** The shopping list's older rows carry a day offset from this date (see coveredDates). */
   legacyStartDate?: string
   generation: TopUpGeneration
+  /** Her pick of "Start them tomorrow and update my shopping list": start tomorrow, then re-work the list's days. */
+  startTomorrow?: boolean
+  /** Re-works the days on the shopping list from the meals as they now are. Throws when it cannot. */
+  refreshList?: () => Promise<unknown>
 }): Promise<TopUpOutcome> {
   const unrecognised = new Set<string>()
   try {
@@ -323,6 +338,7 @@ export async function topUpMealPlan(input: {
       needs: input.needs,
       today: input.today,
       readCoverage: () => readGroceryCoverage(input.profileId, input.today, input.legacyStartDate, { strict: true }),
+      startTomorrow: input.startTomorrow,
       generate: async (slots, count, servedFrom) => {
         const r = await generateMealPools({
           ...input.generation,
@@ -339,6 +355,11 @@ export async function topUpMealPlan(input: {
     const added = Object.values(result.added).reduce((a, b) => a + (b ?? 0), 0)
     const asked = Object.values(result.asked).reduce((a, b) => a + (b ?? 0), 0)
     const startLabel = result.from ? topUpStartLabel(input.today, result.from) : ''
+    // The list follows ONLY on her pick, and only once something landed: an empty run changed no day.
+    let listUpdated: boolean | null = null
+    if (input.startTomorrow && added > 0 && input.refreshList) {
+      try { await input.refreshList(); listUpdated = true } catch { listUpdated = false }
+    }
     return {
       added,
       addedBy: result.added,
@@ -348,7 +369,7 @@ export async function topUpMealPlan(input: {
       unrecognised: [...unrecognised],
       note: {
         text: moreMealOptionsDone({
-          added, asked, reached: result.reached, listUnreadable: result.listUnreadable, startLabel,
+          added, asked, reached: result.reached, listUnreadable: result.listUnreadable, startLabel, listUpdated,
         }),
         failed: added === 0,
       },

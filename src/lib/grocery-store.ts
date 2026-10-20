@@ -19,6 +19,7 @@
 // partial-unique-client_id convention every other table uses.
 // ---------------------------------------------------------------------------
 
+import { shoppingLinesOf } from './cook-once'
 import { readKeptHeldSizes } from './held-sizes-kept'
 import { supabase } from './supabase'
 import { lookupIngredient, unitToGrams, type FoodCategory } from './food-db'
@@ -782,10 +783,8 @@ function assembleDates(
   const first = dates.reduce((a, b) => (b < a ? b : a), runFrom)
   const last = dates.reduce((a, b) => (b > a ? b : a))
   const run = datesFrom(first, epochDay(last) - epochDay(first) + 1)
-  // The rotation's own leftovers count as shopping too: a lunch that is last
-  // night's dinner is a real portion of food that has to be bought. Its
-  // ingredients are stored at LUNCH size, so summing dinner and lunch
-  // separately is already right and needs no special case here.
+  // The rotation's own leftovers count as shopping too, ON THE DINNER they are cooked from (reconcileGenerated): one
+  // batch, bought once, in the list that cooks it.
   const wanted = new Set(dates)
   return serveDates({ dates: run, pools, targets, softLikedFoods, shape, pinsByDate, keepHeldSizes })
     .filter(s => wanted.has(s.date))
@@ -880,10 +879,19 @@ async function reconcileGenerated(
   base: string,
 ): Promise<GenerateGroceryListResult> {
   const aggregate = new Map<string, AggregatedIngredient>()
+  const listed = new Set(planned.map(p => p.date))
   for (const { date, chosen } of planned) {
     const day = epochDay(date) - epochDay(base)
+    // Last night's dinner is shopped for when it is on the list, or was cooked before the list began.
+    const dinnerShopped = listed.has(addDays(date, -1)) || addDays(date, -1) < base
+    // Tomorrow's portion is said to be for tomorrow's lunch when that day is on the list; else it is the batch's,
+    // dated tonight, so a portion bought for the batch never makes the list claim a day it does not cover.
+    const tomorrowListed = listed.has(addDays(date, 1))
     for (const option of Object.values(chosen) as PoolOption[]) {
-      for (const ing of option.ingredients) {
+      // A LEFTOVER IS BOUGHT WITH THE DINNER IT IS COOKED FROM (runs 7-10, H37, 20 Oct 2026): one batch, cooked once
+      // (cook-once.ts). Counted on the lunch, the list bought today's lunch again (its dinner was cooked yesterday,
+      // before the list began) and missed the last day's batch (its lunch falls after the list ends).
+      for (const ing of shoppingLinesOf(option, dinnerShopped)) {
         // Fix 4.8 (ux-sweep): plain tap water used to cook/blend a meal
         // isn't something anyone shops for — it was aggregating into rows
         // like "~500g water". Nothing else in food-db is a zero-cost
@@ -892,7 +900,9 @@ async function reconcileGenerated(
         if (ing.name.trim().toLowerCase() === 'water') continue
         const target = resolveGroceryTarget(ing.name)
         const grams = target.toGrams(ing.quantity, ing.unit)
-        const ref: MealRef = { day, slot: option.slot, mealName: option.name, date }
+        const ref: MealRef = ing.forTomorrow && tomorrowListed
+          ? { day: day + 1, slot: 'lunch', mealName: option.name, date: addDays(date, 1) }
+          : { day, slot: option.slot, mealName: option.name, date }
         const existing = aggregate.get(target.canonicalKey)
         const row: AggregatedIngredient = existing ?? {
           canonicalKey: target.canonicalKey, displayName: target.displayName, category: target.category,
@@ -1031,6 +1041,21 @@ export interface AddGroceryDaysInput extends Omit<GenerateGroceryListInput, 'day
   today: string
   /** See coveredDates. */
   legacyStartDate?: string
+}
+
+/**
+ * RE-WORK THE DAYS ALREADY ON THE LIST from the meals as they are now (runs 7-10, M62, 20 Oct 2026). For "start the
+ * new meals tomorrow and update my shopping list": the covered days are planned again and reconciled exactly as Add
+ * and Remove do, so ticked and hand-added rows hold. Nothing is added or taken off the list's DAYS. Reads strictly:
+ * a list it cannot read is never rebuilt as if empty.
+ */
+export async function refreshGroceryDays(input: Omit<AddGroceryDaysInput, 'dates'>): Promise<AddGroceryDaysResult> {
+  const covered = await readGroceryCoverage(input.profileId, input.today, input.legacyStartDate, { strict: true })
+  if (covered.length === 0) return { added: 0, updated: 0, removed: 0, alreadyCovered: false, covered }
+  const pinsByDate = { ...(input.pinsByDate ?? {}), [input.today]: { ...(input.pinsByDate?.[input.today] ?? {}), ...(input.todaysPicks ?? {}) } }
+  const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today, readKeptHeldSizes(input.profileId))
+  const result = await reconcileGenerated(input.profileId, planned, input.today)
+  return { ...result, alreadyCovered: false, covered }
 }
 
 export interface AddGroceryDaysResult extends GenerateGroceryListResult {
