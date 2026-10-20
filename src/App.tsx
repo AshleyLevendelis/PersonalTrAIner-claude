@@ -3301,6 +3301,7 @@ function App() {
               onMealDayMovePlan={mealDays.dayMove.plan}
               onMealDayMoveConfirm={mealDays.dayMove.confirm}
               onMealDayMoveUndo={mealDays.dayMove.undo}
+              onMealRebalance={mealDays.dayMove.rebalance}
               onMealKnockOn={mealDays.dayMove.knockOn}
               mealTopUp={mealTopUpPlan ? { ...mealTopUpPlan, building: initialMealBuild } : null}
               onMealTopUpStart={previewMealTopUpStart}

@@ -1383,6 +1383,10 @@ menu" stays true when a copy is also left outside it.
 - **An ease-off on a non-leg day: "Work for that day instead."** A knee-loading move knocked out of a non-leg day is
   replaced by the day's own kind of work; no knee-rehab move is added to a non-leg day.
 - **"Move calories from lunch to dinner": "Ask how much first"**, with buttons, then both sizes before Apply.
+  BUILT on a branch, both surfaces: the APP asks (the coach never writes the question), the same two dishes one
+  smaller and one bigger, the smaller keeping at least half and the bigger at most doubling (CSCS, basis in BACKLOG),
+  Undo on both; a resized copy is the same dish to the week's leftovers chain. `test:meal-rebalance`,
+  `verify:meal-rebalance`, `verify:chat-rebalance`, `docs/plans/moving-calories-between-meals.md`. Needs `chat-gemini`
 - **A food the app cannot identify, against a restriction: "Can't confirm it's nut-free"** (allergen band). Still
   blocked; never worded as "contains".
 

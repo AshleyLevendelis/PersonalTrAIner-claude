@@ -1,0 +1,31 @@
+{
+  "name": "meal-rebalance-not-refit",
+  "why": "19 Oct 2026, the live test: 'move some of lunch's calories to dinner', with both meals named, reached propose_meal_refit (the whole-day resize, which names no meal) and was refused with 'nothing to resize \u2014 tell me which'. Ashley's ruling, 20 Oct 2026: 'Ask how much first' \u2014 the coach gets propose_meal_rebalance, called at once WITHOUT an amount so the APP asks how much with buttons, then again with the tapped amount. Turn one says her 19 Oct request in words the prompt never uses (her own words are in the prompt as the routing example, and an exam question in the prompt is an answer key); turn two says the same thing in other words ('a lighter lunch and a heavier dinner'), so a coach keying on 'move' or 'calories' cannot pass by accident; turn three is the tapped amount, which must reach the same tool with kcal, not a refit and not a whole-meal move. The nearest neighbours cost different things: propose_meal_move moves a WHOLE meal into another slot, propose_meal_refit resizes every meal onto the targets.",
+  "messages": [
+    "could some of what's in my lunch go over to my dinner instead",
+    "actually let's have a lighter lunch and a heavier dinner",
+    "100 kcal to dinner"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_meal_rebalance"
+        ]
+      },
+      {
+        "turn": 1,
+        "oneOf": [
+          "propose_meal_rebalance"
+        ]
+      },
+      {
+        "turn": 2,
+        "oneOf": [
+          "propose_meal_rebalance"
+        ]
+      }
+    ]
+  }
+}

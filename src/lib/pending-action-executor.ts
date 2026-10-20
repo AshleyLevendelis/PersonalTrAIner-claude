@@ -706,9 +706,14 @@ export interface MealDayMoveDeps {
    * the pick; called before `show`. Absent where the swap adds nothing.
    */
   reloadPools?: () => Promise<void>
+  /**
+   * Whose write this is, for the receipt: the calorie move between two meals (20 Oct 2026) writes the same two picks
+   * and copies through this function, and its failure must not say "the swap". Absent: the day swap's own words.
+   */
+  words?: { op: string; saveFailed: string; halfSaved: string }
 }
 
-const dayMoveFailed = (error: string): PendingActionReceipt => ({ landed: [], failed: [{ op: 'propose_meal_day_move', error }] })
+const dayMoveFailed = (error: string, op = 'propose_meal_day_move'): PendingActionReceipt => ({ landed: [], failed: [{ op, error }] })
 
 /**
  * TWO DAYS TRADE A MEAL — Ashley's ruling, 29 Sep 2026: "they swap places",
@@ -776,12 +781,12 @@ export async function executeMealDayMove(
       // not go back is left standing, SHOWN (the screen must match the store)
       // and named in the receipt as the half that landed.
       const stuck = await putBack()
-      if (stuck.length === 0) return dayMoveFailed(DAY_MOVE.why.saveFailed)
+      if (stuck.length === 0) return dayMoveFailed(deps.words?.saveFailed ?? DAY_MOVE.why.saveFailed, deps.words?.op)
       if (payload.legs.some(l => l.option)) await deps.reloadPools?.()
       deps.show(stuck.map(l => ({ date: l.date, slot: l.slot, name: l.name })))
       return {
         landed: stuck.map(l => `${l.date} ${l.slot}: ${l.name}`),
-        failed: [{ op: 'propose_meal_day_move', error: DAY_MOVE.why.halfSaved }],
+        failed: [{ op: deps.words?.op ?? 'propose_meal_day_move', error: deps.words?.halfSaved ?? DAY_MOVE.why.halfSaved }],
       }
     }
   }

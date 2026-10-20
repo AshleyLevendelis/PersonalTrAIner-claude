@@ -6,9 +6,10 @@ import { addGroceryDays, removeGroceryDays, readGroceryCoverage, type AddGrocery
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
 import { weekdayLong } from '@/lib/day-labels'
 import type { PoolOption } from '@/lib/meal-generation'
-import type { MealDayMoveArgs, MealDayMoveController, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
+import type { MealDayMoveArgs, MealDayMoveController, MealDayMovePayload, MealDayMoveResult, MealDayMoveServing } from '@/lib/meal-day-move'
 import type { PendingActionReceipt } from '@/lib/pending-actions-store'
-import { DAY_MOVE, KNOCK_ON } from '@/lib/coach-voice'
+import { DAY_MOVE, KNOCK_ON, REBALANCE } from '@/lib/coach-voice'
+import type { MealRebalanceArgs, MealRebalanceController, MealRebalancePayload, MealRebalanceResult } from '@/lib/meal-rebalance'
 import type { MealKnockOn } from '@/lib/meal-knock-on'
 import type { MacroTargets } from '@/lib/types'
 import { readKeptHeldSizes, writeKeptHeldSize } from '@/lib/held-sizes-kept'
@@ -136,10 +137,14 @@ export function useMealDays(input: MealDaysInput) {
    * shows. The same derivation as the open day, so the coach cannot describe
    * a Monday the screen would not serve.
    */
-  const week: ServedDay[] = useMemo(
-    () => serveMealWeek({ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes }),
+  // THE WEEK'S INPUTS, AS ONE OBJECT (20 Oct 2026). The strip serves it, and every trial is handed this very object —
+  // the day swap, the knock-on behind a food or custom meal, and the calorie move — so a card can never be read off a
+  // week the screen is not showing. It was the same literal written out three times.
+  const serving: MealDayMoveServing = useMemo(
+    () => ({ today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes }),
     [dates, pools, targets, softLikedFoods, mealShape, rotation, pinsByDate, today, todaysPins, keptHeldSizes],
   )
+  const week: ServedDay[] = useMemo(() => serveMealWeek(serving), [serving])
   const todaysChosen = useMemo(() => week[0]?.day.chosen ?? {}, [week])
 
   const upcoming = useMemo(
@@ -239,7 +244,7 @@ export function useMealDays(input: MealDaysInput) {
     return buildMealDayMoveProposal({
       profileId: profileId ?? '',
       rawArgs,
-      serving: { today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes },
+      serving,
       loggedTodaySlots,
       listDates,
       dietaryPreferences,
@@ -264,7 +269,7 @@ export function useMealDays(input: MealDaysInput) {
     }
     try {
       return knockOnOfPin({
-        serving: { today, dates, todaysPins, pinsByDate, pools, targets, softLikedFoods, shape: mealShape, rotation, keepHeldSizes: keptHeldSizes },
+        serving,
         date, slot, option, listDates, existing,
       })
     } catch (err) {
@@ -302,6 +307,55 @@ export function useMealDays(input: MealDaysInput) {
    */
   const undoDayMove = async (payload: MealDayMovePayload): Promise<PendingActionReceipt> => {
     if (!profileId) return { landed: [], failed: [{ op: 'propose_meal_day_move', error: DAY_MOVE.undo.saveFailed }] }
+    const { undoMealDayMove } = await import('@/lib/pending-action-executor')
+    return undoMealDayMove(profileId, payload, { show: showPicks, reloadPools, today, loggedTodaySlots: await readLoggedToday() })
+  }
+
+  /**
+   * MOVING CALORIES FROM ONE MEAL TO ANOTHER (Ashley, 20 Oct 2026: "Ask how much first"). The whole decision is
+   * buildMealRebalanceProposal over THIS hook's week, with the same ledger and list reads the day swap makes (null,
+   * never "nothing", when either cannot be read). The write and the Undo are the day swap's own two-pick functions:
+   * a calorie move is two resized copies pinned to one date.
+   */
+  const planRebalance = async (rawArgs: MealRebalanceArgs): Promise<MealRebalanceResult> => {
+    const { buildMealRebalanceProposal } = await import('@/lib/meal-rebalance')
+    const loggedTodaySlots = await readLoggedToday()
+    let listDates: string[] | null = null
+    if (profileId && targets) {
+      try {
+        listDates = await readGroceryCoverage(profileId, today, readGroceryBuildMemo(profileId)?.startDate, { strict: true })
+      } catch { /* stays null: the card says the list could not be checked */ }
+    }
+    return buildMealRebalanceProposal({
+      profileId: profileId ?? '',
+      rawArgs,
+      serving,
+      loggedTodaySlots,
+      listDates,
+      dietaryPreferences,
+      dislikedFoods: dislikedFoods?.(),
+    })
+  }
+
+  /** Re-plans against the live week and writes only the move the card showed: both copies and picks, or neither. */
+  const confirmRebalance = async (payload: MealRebalancePayload): Promise<PendingActionReceipt> => {
+    const failed = (error: string): PendingActionReceipt => ({ landed: [], failed: [{ op: 'propose_meal_rebalance', error }] })
+    if (!profileId) return failed(REBALANCE.why.saveFailed)
+    const [{ sameMealRebalance }, { executeMealDayMove }] = await Promise.all([
+      import('@/lib/meal-rebalance'),
+      import('@/lib/pending-action-executor'),
+    ])
+    const live = await planRebalance({ from_slot: payload.from, to_slot: payload.to, kcal: payload.kcal, date: payload.date })
+    if (!live.ok || !sameMealRebalance(live.payload, payload)) return failed(REBALANCE.why.changed)
+    return executeMealDayMove(profileId, live.payload, {
+      show: showPicks, reloadPools,
+      words: { op: 'propose_meal_rebalance', saveFailed: REBALANCE.why.saveFailed, halfSaved: REBALANCE.why.halfSaved },
+    })
+  }
+
+  /** Puts both meals back: only when both still hold what the move wrote, and never a meal of today's since eaten. */
+  const undoRebalance = async (payload: MealRebalancePayload): Promise<PendingActionReceipt> => {
+    if (!profileId) return { landed: [], failed: [{ op: 'propose_meal_rebalance', error: DAY_MOVE.undo.saveFailed }] }
     const { undoMealDayMove } = await import('@/lib/pending-action-executor')
     return undoMealDayMove(profileId, payload, { show: showPicks, reloadPools, today, loggedTodaySlots: await readLoggedToday() })
   }
@@ -376,6 +430,7 @@ export function useMealDays(input: MealDaysInput) {
       dates, today,
       slots: targets ? (Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks)) as MealSlotName[]) : [],
       plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove, knockOn,
+      rebalance: { plan: planRebalance, confirm: confirmRebalance, undo: undoRebalance } satisfies MealRebalanceController,
     } satisfies MealDayMoveController,
   }
 }

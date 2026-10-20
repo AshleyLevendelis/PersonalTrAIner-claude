@@ -31,8 +31,27 @@ import type { PoolOption } from './meal-generation'
 //     of "Salmon".
 // ---------------------------------------------------------------------------
 
+/**
+ * THE SUFFIX EVERY RESIZED COPY CARRIES: a slot move's "(as lunch)", and a calorie move's "(smaller)" / "(bigger)"
+ * (20 Oct 2026, moving calories between meals), with a number when that name was already taken. One pattern, read by
+ * dish identity, by the rotation's dinner-to-lunch chain, and by the "plan's own dish" test for her hold rule.
+ */
+export const RESIZED_COPY_SUFFIX = / \((?:as (?:breakfast|lunch|dinner|snack)|smaller|bigger)(?: \d+)?\)$/
+
 /** What follows the base's name in an edit's name. The builders' own words. */
-const EDIT_CONNECTOR = /^(?: \+ | without | with | \(as (?:breakfast|lunch|dinner|snack)\)$)/
+const EDIT_CONNECTOR = new RegExp(`^(?: \\+ | without | with |${RESIZED_COPY_SUFFIX.source})`)
+
+/**
+ * THE DISH A RESIZED COPY WAS MADE FROM, by name — its own name when it is not one. Only an option she asked for (tagged
+ * USER_REQUESTED_TAG, as every copy is when stored) is read as a copy, the rule dish identity keeps, so a generated dish
+ * whose name happens to end "(bigger)" stays itself. Used where the week compares a dinner with tomorrow's leftover lunch
+ * BY NAME: a dinner made bigger is still the dish whose leftovers the lunch is.
+ */
+export function resizedCopyBase(option: { name: string; tags?: string[] }): string {
+  if (!option.tags?.includes(USER_REQUESTED_TAG)) return option.name
+  const m = RESIZED_COPY_SUFFIX.exec(option.name)
+  return m ? option.name.slice(0, m.index) : option.name
+}
 
 /** name -> the name of the dish it is a copy of (itself, when it is not a copy). */
 export type DishKeys = Map<string, string>

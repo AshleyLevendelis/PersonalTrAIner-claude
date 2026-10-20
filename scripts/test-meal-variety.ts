@@ -492,7 +492,7 @@ console.log('\n5. One rotation, both surfaces')
   })()
   check('the Nutrition tab\'s day is the first day of the hook\'s run', /const assembledMeals = mealDays\.today\?\.day\b/.test(app), hookCall.slice(0, 160))
   const rotationSrc = read('src/lib/meal-rotation.ts')
-  check('...which serves its dates through the rotation, by the week function', /serveMealWeek\(\{ today, dates, todaysPins,/.test(hook) && /today: week\[0\]/.test(hook)
+  check('...which serves its dates through the rotation, by the week function', (/const serving: MealDayMoveServing = useMemo\(\s*\(\) => \(\{ today, dates, todaysPins,/.test(hook) && /serveMealWeek\(serving\)/.test(hook)) && /today: week\[0\]/.test(hook)
     && /export function serveMealWeek[\s\S]*?return serveDates\(\{/.test(rotationSrc))
   // READ OFF THE CALL'S OWN ARGUMENTS, not the file: "it is mentioned"
   // standing in for "it is used" is what let a literal date pass once.

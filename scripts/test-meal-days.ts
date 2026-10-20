@@ -173,7 +173,7 @@ async function main() {
     // by the very function the hook memoises.
     const week = serveMealWeek({ today, dates: days, todaysPins: todays, pinsByDate, pools, targets, softLikedFoods: [], shape, rotation })
     check('the tab\'s today honours today\'s own swap', week[0]?.day.chosen.breakfast?.name === todays.breakfast?.name, week[0]?.day.chosen.breakfast?.name)
-    check('...and the hook serves its week through that function, with today\'s swaps', /serveMealWeek\(\{ today, dates, todaysPins,/.test(read('src/hooks/useMealDays.ts')))
+    check('...and the hook serves its week through that function, with today\'s swaps', (() => { const h = read('src/hooks/useMealDays.ts'); return /const serving: MealDayMoveServing = useMemo\(\s*\(\) => \(\{ today, dates, todaysPins,/.test(h) && /serveMealWeek\(serving\)/.test(h) })())
     for (const [n, date] of days.entries()) {
       const strip = week[n].day
       const want = Object.values(strip.chosen).map(o => `${o!.slot}:${o!.name}`).sort()

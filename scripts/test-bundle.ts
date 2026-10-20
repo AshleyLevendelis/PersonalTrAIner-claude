@@ -595,7 +595,14 @@ console.log('\n3. Nothing has crept back up')
   // its sentence, from an import-free module, which is what kept the first-download figures within 2 kB — the
   // first, statically imported version put the app chunk at 1175 (over its 1166). 2,455 is 19 above the 2,436
   // measured, on her 15 Sep ruling ("raise it with room to grow").
-  const TOTAL_BUDGET_KB = 2455
+  // MOVED 20 Oct 2026: 2422 -> 2447, moving calories between meals (her "Ask how much first";
+  // docs/plans/moving-calories-between-meals.md). MEASURED both ends through this gate the same hour, the
+  // base from `git archive 03934002`: before total 2412 app 1149 paint 492 deploy 336; after total 2429 app
+  // 1153 paint 493 deploy 337. +17 kB of real code, nearly all in lazy chunks: the builder and its reader
+  // of her words, the coach's arms, the Move sheet's section; +4 in the app chunk (the hook's controller,
+  // the phrasebook, the copy-is-the-same-dish rule). 2,447 is 18 above the 2,429 measured, on her 15 Sep ruling.
+  // BOTH OF 20 Oct together (different-today + meal-rebalance): measured 2459 kB that day, 16 kB room.
+  const TOTAL_BUDGET_KB = 2475
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

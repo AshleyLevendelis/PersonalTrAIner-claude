@@ -727,7 +727,7 @@ const toolDeclarations = [
   {
     name: "propose_meal_refit",
     description:
-      "PROPOSES resizing TODAY'S MEALS so they add up to the user's current calorie and macro targets — this does NOT apply the change, they tap Confirm. The meals, their names and their foods all stay exactly as they are; only the AMOUNTS move. Call this when the user says their meals no longer match their numbers, asks why the day is over or under, or asks you to make their meals fit their targets ('my meals are 300 over', 'these don't add up to my calories any more', 'can you make my food match my targets'). The app decides whether a resize would actually help and refuses to show a card when it would not, so never promise a result: offer, and let the card answer. NOT for swapping a meal for a different dish (propose_meal_swap), NOT for changing one food inside a meal (propose_meal_food_resize), and NOT a regeneration — do not offer to rebuild their meals instead.",
+      "PROPOSES resizing TODAY'S MEALS so they add up to the user's current calorie and macro targets — this does NOT apply the change, they tap Confirm. The meals, their names and their foods all stay exactly as they are; only the AMOUNTS move. Call this when the user says their meals no longer match their numbers, asks why the day is over or under, or asks you to make their meals fit their targets ('my meals are 300 over', 'these don't add up to my calories any more', 'can you make my food match my targets'). The app decides whether a resize would actually help and refuses to show a card when it would not, so never promise a result: offer, and let the card answer. NOT for swapping a meal for a different dish (propose_meal_swap), NOT for changing one food inside a meal (propose_meal_food_resize), NOT for moving calories from one NAMED meal to another ('move some of lunch's calories to dinner', 'make lunch smaller and dinner bigger' — that is propose_meal_rebalance), and NOT a regeneration — do not offer to rebuild their meals instead.",
     parameters: {
       type: "object",
       properties: {
@@ -737,6 +737,37 @@ const toolDeclarations = [
         },
       },
       required: ["origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_meal_rebalance",
+    description:
+      "PROPOSES moving SOME of one meal's calories to another meal on the same day — the same two dishes, one made smaller and the other bigger by that amount, so the day's total stays where it was. This does NOT apply anything, they tap Apply. Call this for 'move some of lunch's calories to dinner', 'make lunch smaller and dinner bigger', 'can I have less at breakfast and more at dinner', 'shift 200 calories from my snack to lunch'. Ashley's ruling, 20 Oct 2026: ASK HOW MUCH FIRST — and the APP asks, not you: call this straight away with from_slot and to_slot and NO kcal unless they gave a number; the app replies with the question and amount buttons. When they answer with an amount ('200 kcal to dinner'), call it again with the same two meals and that kcal; the card then shows both new sizes. Never state calories, protein or sizes yourself. NOT the whole-day resize (propose_meal_refit — that is for meals that no longer add up to the targets, with no meal named), NOT moving a WHOLE meal into another slot (propose_meal_move), NOT a different dish (propose_meal_swap), and NOT one food's amount (propose_meal_food_resize). A meal already logged as eaten today stays as eaten; the app says so.",
+    parameters: {
+      type: "object",
+      properties: {
+        from_slot: {
+          type: "string",
+          description: "The meal that gets SMALLER: breakfast, lunch, dinner or snack.",
+        },
+        to_slot: {
+          type: "string",
+          description: "The meal that gets BIGGER: breakfast, lunch, dinner or snack. A different meal from from_slot.",
+        },
+        kcal: {
+          type: "number",
+          description: "ONLY when they said how much (a number of calories, or a tapped amount like '200 kcal to dinner'). Omit it otherwise: the app asks.",
+        },
+        date: {
+          type: "string",
+          description: "The day, as YYYY-MM-DD from UPCOMING MEALS, or 'today'. Omit for today.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["from_slot", "to_slot", "origin_verbatim_quote"],
     },
   },
   {
@@ -2423,7 +2454,7 @@ NOT THIS TOOL: a sport they do OUTSIDE the plan on a standing schedule is §3g. 
   - Feel/effort check-ins: "how did that feel?" / "how's the shoulder holding up?" -> "Easy" | "About right" | "Hard" (adapt wording to what was actually asked)
   - A named choice between two or more specific things you just mentioned (exercises, meals, days) — the options ARE the names, e.g. asking whether they meant Front Squat or Back Squat -> "Front Squat" | "Back Squat"
   - Scope questions: "just today, or the rest of the block?" -> "Today only" | "Rest of block"
-  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_session_rebuild, propose_schedule_change, propose_style_change, propose_goal_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_meal_day_move, propose_meal_refit, propose_meal_top_up, propose_plan_restart, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
+  Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_session_rebuild, propose_schedule_change, propose_style_change, propose_goal_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_meal_day_move, propose_meal_refit, propose_meal_rebalance, propose_meal_top_up, propose_plan_restart, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
 
 === FEW-SHOT EXAMPLES ===
 User: "Hey"
@@ -2579,6 +2610,7 @@ ${context.exercise_exclusions && context.exercise_exclusions.length > 0 ? `\nPER
 - MAKING THE WHOLE DAY ADD UP AGAIN IS A SIXTH THING, and it is the one to reach for when nothing is wrong with any INDIVIDUAL meal. A calorie target is worked out from bodyweight, activity, goal and macro split, so it moves on its own while the meals sit still; a few weeks into a cut the day genuinely no longer fits. "My meals are 300 over", "these don't add up to my calories any more", "can you make my food match my new targets" is propose_meal_refit. The meals, their names and their foods are untouched — only the AMOUNTS change, which is exactly why it is not a swap, not a food edit and not a regeneration. NEVER offer to regenerate their meals as the answer to a targets-drifted question: that costs them their picks, their meal names and a grocery list that still matches. THE APP DECIDES WHETHER IT WOULD HELP: some days are the wrong SHAPE rather than the wrong SIZE (a goal change moves calories and leaves protein alone, so resizing would drag protein further out than it started) and the card is refused in that case. So offer it, never promise it, and never state the new portions yourself.
 - MORE MEALS TO CHOOSE FROM IS A SEVENTH THING, and it is none of the six above. Each meal on their plan has a handful of saved options (seven, once topped up), and the week is drawn from those, so a plan with few options — or few that fit their current targets, which happens when the targets have moved since the meals were made — repeats. "Give me more meal options", "can you add more variety to my meals", "I want more to pick from" is propose_meal_top_up. It ADDS options to EVERY meal and removes nothing. TODAY AND EVERY DAY ALREADY ON THEIR SHOPPING LIST DO NOT CHANGE — the new options only start after those days, and the card names the day, so never tell them this week will look different. It is not a swap (that changes what is on one day), not an addition (that is one specific dish they name), and not a regeneration (that throws their options away) — never offer to regenerate. THE APP DECIDES whether there is anything to add: when nothing can be added there is no card, and you must not promise more variety from it. A COMPLAINT IS NOT AN ASK: "it's the same dinners every night" gets a plain-text reply that says you can add more options if they want them; call the tool only when they say so. Never state how many options will be added, and never name the meals — the card carries the app's own numbers.
 - MOVING A MEAL TO ANOTHER DAY IS AN EIGHTH THING, and it is a swap between two days, not a move that leaves a hole. "Move Monday's dinner to Wednesday", "swap tonight's dinner with tomorrow's", "can I have Thursday's lunch on Friday instead" is propose_meal_day_move, with the meal and both days (dates from UPCOMING MEALS, or today's). Ashley's ruling, 29 Sep 2026: THE TWO DAYS SWAP PLACES — Wednesday's dinner comes to Monday — so never describe it as one dinner disappearing or a day going without. It is the SAME meal on both days unless they name another one: "Monday's dinner to Wednesday's lunch" is two DIFFERENT meals, which is to_meal_slot (lunch) — the two swap places and each is resized to fit the meal it lands in, both sizes on the card, so never describe either as staying the same size. Two meals on the SAME day (dinner to the snack slot) is propose_meal_move, not this. The card carries the app's own account of which other meals that week the swap changes (a lunch that is the leftovers of a dinner follows it), whether either day drifts off target, and whether their shopping list needs rebuilding to match — never state any of that yourself. A meal they have already logged as eaten today cannot move; the app says so. It is not propose_meal_move (that is between meals on one day) and not propose_meal_swap (that picks a different dish for one day).
+- MOVING SOME CALORIES FROM ONE MEAL TO ANOTHER IS A NINTH THING. "Move some of lunch's calories to dinner", "make lunch smaller and dinner bigger", "less at breakfast, more at dinner" is propose_meal_rebalance with from_slot (the one that gets smaller) and to_slot (the one that gets bigger). It is NOT propose_meal_refit: the refit resizes the whole day onto the targets and names no meal, and on 19 Oct 2026 it answered exactly this request with "nothing to resize — tell me which", to someone who had named both. Ashley's ruling, 20 Oct 2026: ASK HOW MUCH FIRST, and the APP asks it — call the tool at once without kcal (unless they said a number) and do not write the question yourself; the app replies with the two meals' sizes and amount buttons. When the next message is an amount ("200 kcal to dinner"), call propose_meal_rebalance again with the same meals and that kcal. The card shows both new sizes and the protein that moves; never state them yourself.
 - CHANGING ONE FOOD ALREADY IN A MEAL IS A FOURTH THING, and there are three of them. The meal keeps its place on the plan and everything else in it keeps its exact amount; only the one food moves. "Take the chicken out of my lunch", "I don't want the olive oil in that" is propose_meal_food_remove. "Swap the rice for potato", "use turkey instead" is propose_meal_food_replace. "Make it 150g of rice", "halve the chicken" is propose_meal_food_resize. Say which food they mean in THEIR words — "the chicken", not "122g raw chicken breast" — and the app finds the line; if two things in the meal could match it will come back and ask, which is the right answer, not a failure.
 - WHICH OF THE FOUR. Joining = propose_meal_food_add. Leaving = remove. One for another = replace. Same food, different amount = resize. If they say "swap X for Y" they mean replace, NOT remove followed by add: two cards for one change is the app arguing with itself.
 - A REMOVAL COSTS SOMETHING AND THE CARD SAYS SO, so you must not. Never state what comes out in protein or calories, and never reassure them it "won't make much difference" — you cannot see the number and the card can. It also offers two or three specific swaps that would close the gap, already checked against their allergies and dislikes, so do not list alternatives of your own beside it. If they take none of them the day comes in lighter and that is a fine outcome; say so plainly if they ask, without talking them into a replacement.
@@ -3302,6 +3334,31 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_meal_refit",
               rawArgs: { origin_verbatim_quote: args.origin_verbatim_quote },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_meal_rebalance") {
+        // Forwarded, not decided. How much each meal can give or take, the
+        // question when no amount was said, the two new sizes and what else the
+        // week does all come from the client's builder over the live week — the
+        // same one the Move sheet calls — so the coach cannot offer an amount
+        // or a size the screen would not. The model supplies two meals and, at
+        // most, a number she said.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_meal_rebalance",
+              rawArgs: {
+                from_slot: args.from_slot,
+                to_slot: args.to_slot,
+                kcal: args.kcal,
+                date: args.date,
+                origin_verbatim_quote: args.origin_verbatim_quote,
+              },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -39,7 +39,7 @@ import { costStoredMeal } from './meal-costing'
 import { USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { holdAroundPins } from './hold-around-pins'
 import type { MacroTargets } from './types'
-import { sameDish } from './meal-dish-identity'
+import { sameDish, resizedCopyBase, RESIZED_COPY_SUFFIX } from './meal-dish-identity'
 
 /**
  * How many days the rotation runs before it comes round again. Seven because
@@ -393,9 +393,11 @@ export function assembleRotationDay(
   // fresh.
   const planned = rotation.leftoverFor(index)
   let leftover = planned
+  // A dinner made bigger or smaller (a calorie move, 20 Oct 2026) is still the dish the lunch is the leftovers of, so
+  // the lunch is not re-made under the copy's name: compared by the dish a copy was made from.
   const replanned = opts.previousDinner !== undefined
     && planned.lunch !== undefined
-    && planned.lunch.name !== opts.previousDinner?.name
+    && planned.lunch.name !== (opts.previousDinner ? resizedCopyBase(opts.previousDinner) : undefined)
   if (replanned) {
     const shape = rotation.builtFrom.shape
     const lunchBudget = batchCookingOn(shape) ? computeSlotBudgets(targets, shape.mealsPerDay, shape.includeSnacks).lunch : undefined
@@ -460,7 +462,7 @@ export function assembleRotationDay(
   // happened, rather than on nobody having tried.
   const tomorrowsLunch = rotation.leftoverFor(index + 1).lunch
   const dinner = day.chosen.dinner
-  if (tomorrowsLunch && dinner && tomorrowsLunch.name === dinner.name) {
+  if (tomorrowsLunch && dinner && tomorrowsLunch.name === resizedCopyBase(dinner)) {
     return { ...day, chosen: { ...day.chosen, dinner: { ...dinner, reusedTomorrow: true, keepForTomorrow: tomorrowsLunch.ingredients } } }
   }
   return day
@@ -469,14 +471,15 @@ export function assembleRotationDay(
 /**
  * Is this pinned dish one she asked for herself (by name, from the fridge, edited), which re-plans the rest of the
  * day (her 1 Sep ruling), rather than one of the plan's own, which the day holds around (her 10 Oct "Plan's own
- * dishes only")? A plan dish resized to another meal by a swap or a move ("X (as lunch)") is still the plan's own: it
+ * dishes only")? A plan dish resized to another meal by a swap or a move ("X (as lunch)"), or made bigger or smaller by a
+ * calorie move ("X (smaller)", 20 Oct 2026), is still the plan's own: it
  * is tagged as her request only so a regenerate keeps it. FIXED 18 Oct 2026 (runs 7-10, H36): the card's trial held
  * the day around the untagged copy and the saved, tagged copy re-planned it, so the meals around a swap came out at
  * other sizes than the card said (test:meal-day-move §13). The copy's dish is found by name, as dish identity does.
  */
 function isHerOwnDish(option: PoolOption, pools: Partial<Record<MealSlotName, PoolOption[]>>): boolean {
   if (!option.tags?.includes(USER_REQUESTED_TAG)) return false
-  const resized = / \(as (?:breakfast|lunch|dinner|snack)\)$/.exec(option.name)
+  const resized = RESIZED_COPY_SUFFIX.exec(option.name)
   if (!resized) return true
   const baseName = option.name.slice(0, resized.index)
   const base = Object.values(pools).flatMap(o => o ?? []).find(o => o.name === baseName)
@@ -563,7 +566,7 @@ export function serveDates(input: {
     const dinner = served[i].day.chosen.dinner
     if (!dinner) continue
     const lunch = served[i + 1].day.chosen.lunch
-    const reused = lunch?.leftoverFrom === 'dinner' && lunch.name === dinner.name
+    const reused = lunch?.leftoverFrom === 'dinner' && lunch.name === resizedCopyBase(dinner)
     // The keep lines are the lunch ACTUALLY served tomorrow (its portion, as the screen shows it), so they are set
     // whenever the promise is, not only when the flag flips.
     if (!reused && dinner.reusedTomorrow !== true && !dinner.keepForTomorrow) continue

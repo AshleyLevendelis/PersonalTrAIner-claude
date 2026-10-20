@@ -398,6 +398,83 @@ export const DAY_MOVE = {
 } as const
 
 /**
+ * MOVING CALORIES FROM ONE MEAL TO ANOTHER — Ashley's ruling, 20 Oct 2026: "Ask how much first", with buttons, then both
+ * new sizes before Apply (meal-rebalance.ts). One phrasebook for the Move sheet and the coach, because both are the same
+ * change through the same builder. `day` is a plain label ("today", "Wednesday"); nothing here states a number the
+ * builder's trial did not produce.
+ */
+export const REBALANCE = {
+  /** THE ASK, the app's and never the model's: the two meals as served now, then the question. */
+  ask: (day: string, from: string, fromKcal: number, to: string, toKcal: number) =>
+    `${cap(poss(day))} ${from} is ${grouped(fromKcal)} kcal and ${to} ${grouped(toKcal)}. How much should I move from ${from} to ${to}?`,
+  /** One amount button. Carries the amount AND the meal, so a tap is a whole answer on its own. */
+  chip: (kcal: number, to: string) => `${grouped(kcal)} kcal to ${to}`,
+  /** Completes "Want me to ...". */
+  lead: (kcal: number, day: string, from: string, to: string) => `move about ${grouped(kcal)} kcal from ${poss(day)} ${from} to ${to}`,
+  rowLabel: (day: string, slot: string, name: string) => `${cap(poss(day))} ${slot} · ${name}`,
+  size: (kcal: number, protein: number) => `${grouped(kcal)} kcal · ${grouped(protein)} g protein`,
+  note: (delta: number) => (Math.abs(delta) < 10 ? 'same size' : `${delta > 0 ? 'up' : 'down'} ${grouped(Math.abs(delta))} kcal`),
+  unchanged: "The foods in both meals, and your day's total — only how much of each of these two",
+  /** The day's total, read off the trial. Within rounding: said as held. */
+  dayHeld: (kcal: number) => `Your day stays at about ${grouped(kcal)} kcal: the same food, moved from one meal to the other.`,
+  /** The two meals' sum moved by more than rounding should. Said as what it is. */
+  dayMoved: (from: number, to: number) =>
+    `Rounding to amounts you can measure takes these two meals from ${grouped(from)} to ${grouped(to)} kcal together.`,
+  /** The day was off target, and its other meals are re-fitted around the two (her 10 Oct hold rule). */
+  dayRefit: (from: number, to: number) =>
+    `The rest of the day is re-fitted around these two towards your target, so your day goes from ${grouped(from)} to ${grouped(to)} kcal.`,
+  /** PROTEIN NAMED: it moves with the food, and the card says how much. */
+  protein: (from: string, lost: number, to: string, gained: number) =>
+    `${cap(from)} goes down about ${grouped(lost)} g of protein and ${to} up about ${grouped(gained)} g.`,
+  /** Asked for more than the meals can take: the most it can move, said. */
+  capped: (asked: number, most: number, from: string, to: string) =>
+    `${cap(from)} can only give ${to} about ${grouped(most)} kcal with both still a sensible meal, so this moves ${grouped(most)} rather than ${grouped(asked)}.`,
+  /** A lunch that is last night's dinner: what a different size means for it. */
+  leftover: (day: string, bigger: boolean) =>
+    `${cap(poss(day))} lunch is the leftovers of the dinner the night before, so it becomes a ${bigger ? 'bigger' : 'smaller'} portion of those.`,
+  done: (kcal: number, day: string, from: string, to: string) => `Moved about ${grouped(kcal)} kcal from ${poss(day)} ${from} to ${to}.`,
+  /** The claim alone, for a receipt whose title already says "Put back". */
+  asTheyWere: (day: string, from: string, to: string) => `${cap(poss(day))} ${from} and ${to} are as they were.`,
+  /** The sheet's note, which has no title to carry the words. */
+  undoDone: (day: string, from: string, to: string) => `Put back: ${REBALANCE.asTheyWere(day, from, to)}`,
+  /** The receipt's row detail. */
+  became: (kcal: number) => `now ${grouped(kcal)} kcal`,
+  /** No card, and why. None of these points at a control. */
+  refusals: {
+    noBody: "I need your height, weight, age and sex before I can resize your meals — you can add them in Profile.",
+    whichSlots: 'Which two meals — move calories from which one to which?',
+    /** Two meals named and no way to tell which way: asked, with both directions as buttons. */
+    whichWay: (a: string, b: string) => `Which way — from ${a} to ${b}, or from ${b} to ${a}?`,
+    whichWayChip: (from: string, to: string) => `From ${from} to ${to}`,
+    sameSlot: "That's the same meal, so there's nothing to move.",
+    noSuchMeal: (slot: string) => `Your plan doesn't have a ${slot} at the moment. You can change how many meals a day you eat in Profile.`,
+    nothingThere: (slot: string, day: string) => `There's no ${slot} planned for ${day}.`,
+    outOfRange: 'I can only change meals for today and the next six days — which day did you mean?',
+    eaten: (slot: string) => `You've already logged today's ${slot} as eaten, so it stays as you ate it.`,
+    ledgerUnreadable: "I couldn't check what you've eaten today just then, so I can't change today's meals. Try again in a moment.",
+    tooSmall: (kcal: number) => `${grouped(kcal)} kcal is too small to notice on the plate — that much is just the rounding.`,
+    noRoom: (from: string, to: string) => `There's no room to move calories from ${from} to ${to} without one of them stopping being a sensible meal.`,
+    wouldNotHold: "I can't make that change fit your plan.",
+  },
+  /** Why nothing changed, as a clause with no full stop. */
+  why: {
+    changed: 'your meals changed since I asked',
+    saveFailed: "the change didn't save",
+    halfSaved: 'only half of the change saved — try it again to finish it',
+  },
+  failureLine: (why: string, partial: boolean) =>
+    partial ? `${cap(why.replace(/[.!?]+$/, ''))}.` : `Nothing was moved — ${why.replace(/[.!?]+$/, '')}.`,
+  /**
+   * THE WHOLE-DAY RESIZE'S "NOTHING TO RESIZE" (19 Oct 2026): it said "tell me which" to somebody who had named two
+   * meals. With two named it offers the calorie move instead of asking for what she already said.
+   */
+  refitFits: (twoNamed: boolean) =>
+    twoNamed
+      ? "Your meals already add up to your targets, near enough, so there's nothing to resize as a whole. If you'd like some of one meal's calories moved to the other, tell me which way and I'll ask how much."
+      : "Your meals already add up to your targets, near enough — nothing to resize. If a particular meal feels off, tell me which and I'll look at that one.",
+} as const
+
+/**
  * WHAT A NOTIFICATION SAYS, and it is the coach saying it.
  *
  * Ashley chose notifications on 17 Sep 2026. These live here rather than beside
@@ -1113,6 +1190,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_meal_top_up: { done: 'Added', failed: "I couldn't add more meals" },
   propose_plan_restart: { done: 'Plan started again', failed: "I couldn't start your plan again" },
   propose_meal_day_move: { done: 'Swapped over', failed: "I couldn't swap those meals" },
+  propose_meal_rebalance: { done: 'Moved', failed: "I couldn't move those calories" },
   propose_circuit_log: { done: 'Logged', failed: "I couldn't log that workout" },
 }
 
