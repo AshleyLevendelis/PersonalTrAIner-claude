@@ -15,7 +15,7 @@
  * bare 70 means centimetres or inches would be the same offence one field
  * over, so it is asserted as a REFUSAL, not left to judgement.
  */
-import { parseHeight, parseWeight, measureParserFor } from '../src/lib/body-units'
+import { parseHeight, parseWeight, parseLiftWeight, measureParserFor } from '../src/lib/body-units'
 
 let failures = 0
 const check = (l: string, ok: boolean, extra?: unknown) => {
@@ -108,7 +108,24 @@ console.log('\n5. A parser is only ever paired with the slot it belongs to')
   check('weightKg gets the weight parser', measureParserFor('weightKg') === parseWeight)
   // age must NOT get one: "37" is a count, and 37lb or 5'37 are not ages.
   check('age gets none', measureParserFor('age') === null)
-  check('a lift weight gets none — that card is already labelled in kg', measureParserFor('knownSquatKg') === null)
+  // 19 Oct 2026: the lift boxes take pounds too, when the pounds are SAID.
+  for (const k of ['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg']) {
+    check(`${k} gets the lift parser`, measureParserFor(k) === parseLiftWeight)
+  }
+}
+
+console.log('\n6. A lift weight: kg, or pounds when they say pounds — never stone, never a guess')
+{
+  const lb = parseLiftWeight('225 lb')
+  check('"225 lb" is stored as 102.1 kg, with what she typed kept for the tick', lb?.value === 102.1 && lb?.from === '225lb', lb)
+  check('"225lbs" and "225 pounds" read the same', parseLiftWeight('225lbs')?.value === 102.1 && parseLiftWeight('225 pounds')?.value === 102.1,
+    [parseLiftWeight('225lbs'), parseLiftWeight('225 pounds')])
+  check('a 4-digit pound figure still parses (it is the bounds that refuse it, not the reader)', parseLiftWeight('1000lb')?.value === 453.6, parseLiftWeight('1000lb'))
+  check('a bare number stays kg, with nothing to read back', parseLiftWeight('100')?.value === 100 && parseLiftWeight('100')?.from === undefined, parseLiftWeight('100'))
+  check('"100kg" is kg', parseLiftWeight('100kg')?.value === 100, parseLiftWeight('100kg'))
+  for (const bad of ['13st', "5'10", 'heavy', '', '100 stone']) {
+    check(`"${bad}" is refused, not read as a lift`, parseLiftWeight(bad) === null, parseLiftWeight(bad))
+  }
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }

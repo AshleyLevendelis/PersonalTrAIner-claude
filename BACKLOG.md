@@ -2,6 +2,55 @@
 
 Newest first. One line each.
 
+- [~] **TWO SETUP BUGS FROM HER LIVE TEST, 19 Oct 2026: "I know my numbers" asked nothing; age/height/weight came with no boxes. FIXED on a worktree branch, not merged.**
+  - **Bug 1, what was wrong:** she tapped "I know my numbers"; the coach replied "Got those numbers down." and asked
+    about cardio. The three lift numbers were in `NEVER_BLOCKING_SLOTS`, so they were never in the coach's STILL UNKNOWN
+    list, were marked BONUS ("never raise one just because it is unanswered"), and nothing in the app put the boxes up
+    itself. `test:onboarding-slots`' "known-lift numbers never block" pinned that absence, and did it on fresh values
+    where the lifts do not even apply, so it never met the case it named. The stored `skip_calibration_week` was also
+    TRUE with no number behind it while the plan built a calibration week anyway (the engine's `canSkipCalibration`
+    already needs a known lift).
+  - **What changed:** (a) a tap on "I know my numbers" is answered by the APP with the three labelled lift boxes and
+    their Skip, with no trip to the coach (so no "got those down"); the same from the summary edit, where the boxes'
+    Save or Skip settles the edit and the summary returns with the number in it; and if she TYPES it
+    and the coach asks something else, the boxes are added after the coach's turn and the other card is taken off, so
+    there is one card on screen. Asked once (`liftBoxesDue`). (b) The lifts left `NEVER_BLOCKING_SLOTS`: they only
+    apply once she says she knows them, and now also only while the working-lifts question itself applies (a "yes"
+    left behind by a switch to bodyweight no longer keeps asking). A box left empty on Save is answered "not given",
+    so nothing is asked twice. (c) `skip_calibration_week` is stored true only with at least one lift number.
+    (d) The lift boxes take pounds when she types "lb" ("225 lb" → 102.1 kg, the tick says "from 225lb"); a bare
+    number stays kg; stone and feet are refused. Labels read "(kg or lb)", and the box shows no example number.
+  - **Bug 2, what was wrong:** "how old are you, how tall are you, and what do you weigh right now?" came with only the
+    typing box. The numeric card existed but the chooser only shows a card the coach asked for, and two prompt lines
+    told the coach a number question has no card ("Do not call it for … a number", "Numeric asks have no chips at all").
+  - **What changed:** the chooser now shows the age/height/weight card (or the three lift boxes) when the words plainly
+    ask for those numbers and no card was asked for. This is the ONE card the app shows unasked, and it is safe where
+    chips are not: a labelled box records only what she types. Load ceilings are excluded (never asked, her ruling);
+    chip questions still get nothing unasked (unchanged). The two stale prompt lines now ask for `present_slot("age")`.
+  - **Prompt (needs the `onboarding-chat` deploy):** the lift boxes come next after "I know my numbers" and the coach
+    asks nothing else that turn; a lift in pounds goes to `set_slot` with its unit; never say a number is noted or
+    recorded unless the `set_slot` is in the same turn. The client half works without the deploy.
+  - **Decided without asking (mechanical / CSCS):** making the lift boxes hold the summary until answered or skipped
+    (without it the review could open over them); the app's line above the boxes ("Fill in the ones you know — in kg,
+    or add lb. Leave a box empty if you're not sure of that one.") — wording is hers to change. **CSCS review:** no
+    prescription rule changed. Measured on 48 lifter profiles: storing the flag false instead of true with no numbers
+    changes 0 plans (and the same comparison sees a squat number change 48 of 48). More people will now give numbers,
+    which is what "I know my numbers" was always meant to do; the existing plausibility check and beginner rule still
+    decide whether a number may skip calibration. A bare "225" typed by a pounds lifter is still read as kg — the label
+    now says "(kg or lb)", and an implausible number already forces the calibration week.
+  - **A consequence to know:** Profile shows the "Known lifts" row only when the flag is true or a squat is stored, so
+    someone who says "I know my numbers" and then skips every box no longer gets three empty boxes there. That matches
+    the row's own rule ("only where they were asked" now means "where a number was given").
+  - **Verified:** `test:onboarding-slots`, `test:onboarding-chip-match` §8, `test:body-units` §5-6,
+    `test:onboarding-conversational` (re-anchored), `verify:onboarding-turns` §20-24 (tap, Skip, typed, summary edit,
+    the screenshot sentence), screenshots read at 390x844. Mutations on the logic and prompt gates: 21 tried,
+    20 caught; the 21st was a clause duplicating the boxes' own applicability, measured as doing nothing and DELETED
+    (a replacement mutation on the applicability itself was caught). One more first came back MISSED because its check
+    could not bind (three answers split three ways); strengthened, then caught. On the driver: 10 tried, 10 caught,
+    two of them only after a re-run — they first ran SHORT because a section threw instead of failing, so the driver
+    now runs every check whatever happens; the old tenth also changed the code (the summary edit now stays open so
+    the boxes settle it without a coach trip) and was replaced by a mutation of that. NOT proven live: the deployed coach obeying the new lines. `verify:setup-kit` named in
+    the brief does not exist on this branch.
 - [x] **"rdl" MEANT A BODYWEIGHT SINGLE-LEG RDL (live test, 19 Oct 2026). Fixed 20 Oct 2026, on a worktree branch, not merged.**
   She typed "Im doing my own workout. First exercise I did was rdl"; the coach asked "How many sets and reps for
   Single-Leg RDL (Bodyweight)?".

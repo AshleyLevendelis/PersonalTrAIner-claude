@@ -30,8 +30,22 @@ import {
 //   2. the model asked for chips for something else, and the message plainly
 //      asks exactly one other open question → show THAT question's card
 //      (the H14 turn gets the age / height / weight boxes);
-//   3. anything else → no card. The typing box still works. Missing chips
+//   3. the message plainly asks for NUMBERS the app has labelled boxes for
+//      (age / height / weight, or the three lifts) and no card was asked
+//      for → show those boxes (19 Oct 2026, below);
+//   4. anything else → no card. The typing box still works. Missing chips
 //      cost one typed answer; wrong chips record a wrong answer.
+//
+// RULE 3 IS THE ONE PLACE THE APP SHOWS A CARD NOBODY ASKED FOR, and it is
+// safe for a reason chips are not. Chips put a closed list of answers under
+// a sentence: under the wrong sentence a tap records a wrong answer. A box is
+// LABELLED ("Age (years)", "Height (cm or 5'10)") and takes only what she
+// types into it, so a box under a sentence that did not quite ask for it
+// cannot record anything she did not say. Seen in her live test, 19 Oct 2026:
+// "how old are you, how tall are you, and what do you weigh right now?" came
+// with no card at all, because the coach is told to call present_slot for a
+// set list and these have none, and the answer had to be typed as a sentence
+// with nothing checking its bounds.
 //
 // The patterns are deliberately question-shaped ("which days", "how long")
 // rather than topic words ("days", "time"): a coach reacts to the last answer
@@ -193,5 +207,18 @@ export function chooseCard(input: CardChoiceInput): SlotKey | undefined {
   for (const k of input.liveCards) {
     if (open(k) && hasCard(k) && questionAsksSlot(k, question)) stillLive.add(cardKeyFor(k))
   }
-  return stillLive.size === 1 ? [...stillLive][0] : undefined
+  if (stillLive.size === 1) return [...stillLive][0]
+  if (stillLive.size > 1) return undefined
+
+  // Rule 3: numbers asked for in words, with no card requested. Only the two
+  // GROUPED cards — the questions setup actually asks. A load ceiling is a
+  // numeric slot too, and is never asked (her ruling), so a sentence that
+  // happens to mention a dumbbell must not conjure its box.
+  const boxes = new Set<SlotKey>()
+  for (const s of ONBOARDING_SLOTS) {
+    if (s.control === 'numeric' && numericGroupFor(s.key).length > 1 && open(s.key) && asksOne(s.key, question)) {
+      boxes.add(cardKeyFor(s.key))
+    }
+  }
+  return boxes.size === 1 ? [...boxes][0] : undefined
 }

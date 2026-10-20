@@ -17,7 +17,10 @@ function Bubble({ children }: { children: React.ReactNode }) {
 }
 
 function Harness() {
-  const [values, setValues] = useState<any>({ knowsWorkingLifts: true })
+  // A lifter with a home barbell: since 19 Oct 2026 the lift boxes apply only
+  // while the working-lifts question does (barbell kit, not a beginner), and
+  // home_gym keeps the never-asked load ceilings applicable too.
+  const [values, setValues] = useState<any>({ equipment: 'home_gym', trainingExperience: 'intermediate', activityLevel: 'moderate', knowsWorkingLifts: true })
   const intro = buildOnboardingIntro()
   return (
     <div className="min-h-screen bg-background text-foreground">

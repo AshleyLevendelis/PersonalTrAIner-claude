@@ -593,9 +593,15 @@ const isNumberIn = (min: number, max: number) => (value: unknown) => {
   return value !== '' && value !== null && !Number.isNaN(n) && n >= min && n <= max
 }
 
-/** The three known-lift numbers only apply once someone says they know them. */
+/**
+ * The three known-lift numbers only apply once someone says they know them —
+ * AND while the question that asked is still one that applies to them. Since
+ * 19 Oct 2026 the boxes are asked and can hold the review, so a "yes" left
+ * behind by an equipment change to bodyweight must not keep asking for a
+ * barbell squat (nothing clears that answer when the tier changes).
+ */
 function knowsTheirLifts(values: OnboardingSlotValues): boolean {
-  return values.knowsWorkingLifts === true
+  return values.knowsWorkingLifts === true && willBeLiftingBarbells(values)
 }
 
 /**
@@ -1077,8 +1083,8 @@ export function offeredOptionsFor(def: SlotDef): readonly SlotOption[] | undefin
 
 /**
  * Slots that never gate completion, even on the "explicitly asked" bar:
- * includeSnacks carries a real default, and the three known-lift numbers are
- * optional-within-a-question (the form treats them the same).
+ * includeSnacks carries a real default. (The three known-lift numbers were
+ * here until 19 Oct 2026 — see the note inside the list.)
  */
 /**
  * Can the user refuse this question outright and still finish onboarding?
@@ -1106,7 +1112,17 @@ export function canDeclineSlot(def: SlotDef, values: OnboardingSlotValues): bool
 }
 
 export const NEVER_BLOCKING_SLOTS: SlotKey[] = [
-  'knownSquatKg', 'knownBenchKg', 'knownDeadliftKg', 'includeSnacks',
+  // THE THREE KNOWN LIFTS LEFT THIS LIST ON 19 OCT 2026 (Ashley's live test).
+  // She tapped "I know my numbers" and setup asked her nothing: the coach said
+  // "Got those numbers down." and moved on to cardio. Listed here, the boxes
+  // were never in STILL UNKNOWN, the coach saw them marked BONUS, and the
+  // review could open with them never offered. They need no entry here to
+  // stay out of everybody else's way: they only APPLY once she says she knows
+  // her numbers (requiredIf knowsTheirLifts), so "Not sure" never meets them.
+  // Once they apply they are asked ONCE, and Skip or a blank box answers them
+  // (see the lift card's Save) — so they can hold the review only until that
+  // one card is answered.
+  'includeSnacks',
   // Added when the ask set was trimmed to what shapes the first plan. Each
   // of these was measured to steer ONE sentence of a meal prompt or a chat
   // greeting — real, but not worth holding someone at the door for. They are
@@ -1275,7 +1291,11 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     // they told us when asked", and a value nobody was asked for would be an
     // answer the app invented. isStartingOut reads it that way.
     start_preference: data.startPreference ?? undefined,
-    skip_calibration_week: data.knowsWorkingLifts === true,
+    // TRUE ONLY WITH A NUMBER BEHIND IT (19 Oct 2026). "I know my numbers"
+    // and then no number used to store true, while the plan generator
+    // (canSkipCalibration, which needs a known lift) built the calibration
+    // week anyway: the stored flag said one thing and the plan did another.
+    skip_calibration_week: data.knowsWorkingLifts === true && hasAnyKnownLift(data),
     known_squat_kg: data.knowsWorkingLifts === true && data.knownSquatKg ? Number(data.knownSquatKg) : undefined,
     known_bench_kg: data.knowsWorkingLifts === true && data.knownBenchKg ? Number(data.knownBenchKg) : undefined,
     known_deadlift_kg: data.knowsWorkingLifts === true && data.knownDeadliftKg ? Number(data.knownDeadliftKg) : undefined,
@@ -1355,6 +1375,39 @@ const NUMERIC_GROUPS: SlotKey[][] = [
 
 export function numericGroupFor(key: SlotKey): SlotKey[] {
   return NUMERIC_GROUPS.find(g => g.includes(key)) ?? [key]
+}
+
+const KNOWN_LIFT_SLOTS: SlotKey[] = NUMERIC_GROUPS[1]
+
+/** At least one of the three lifts was given as a usable number. */
+function hasAnyKnownLift(data: OnboardingSlotValues): boolean {
+  return KNOWN_LIFT_SLOTS.some(k => numericOrUndefined(data[k]) !== undefined)
+}
+
+/** The three lift boxes, as one list — the card's own group. */
+export function isKnownLiftSlot(key: string): boolean {
+  return (KNOWN_LIFT_SLOTS as string[]).includes(key)
+}
+
+/**
+ * "I KNOW MY NUMBERS" IS FOLLOWED BY THE BOXES, by the app and not by the
+ * coach (Ashley's live test, 19 Oct 2026: she tapped it and was asked
+ * nothing). True when she has said she knows them, none of the three is
+ * answered or skipped yet, and the lift card has never been put in front of
+ * her — so the boxes are offered exactly once, whatever the coach does.
+ *
+ * @param cardedSoFar every slot a card has been shown for in this
+ *                    conversation, answered or not
+ */
+export function liftBoxesDue(
+  values: OnboardingSlotValues,
+  confirmed: ReadonlySet<string>,
+  cardedSoFar: readonly string[],
+): boolean {
+  // "She said she knows them" is the boxes APPLYING (knowsTheirLifts), so it
+  // is not asked twice here: a second copy measured as doing nothing.
+  return KNOWN_LIFT_SLOTS.every(k => isSlotApplicable(getSlotDef(k)!, values) && !confirmed.has(k))
+    && !cardedSoFar.some(isKnownLiftSlot)
 }
 
 export function buildSlotCatalog(values: OnboardingSlotValues = initialSlotValues()): SlotCatalogEntry[] {

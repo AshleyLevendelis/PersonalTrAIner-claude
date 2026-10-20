@@ -23,6 +23,8 @@ import {
   toggleValue,
   multiSelection,
   numericGroupFor,
+  liftBoxesDue,
+  isKnownLiftSlot,
   initialSlotValues,
   isStartingFromNothing,
   detectAllergenTags,
@@ -258,6 +260,16 @@ const LIFT_SLOT_WORDS: Partial<Record<SlotKey, RegExp>> = {
   knownBenchKg: /\bbench|\bpress\b/i,
   knownDeadliftKg: /\bdead\s?lift|\bdeads?\b/i,
 }
+
+/**
+ * The app's own line above the three lift boxes when she has just said she
+ * knows her numbers (19 Oct 2026, her live test: the coach said "Got those
+ * numbers down." and asked nothing). Leaving a box empty is an answer.
+ */
+const LIFT_BOXES_ASK = "Fill in the ones you know — in kg, or add lb. Leave a box empty if you're not sure of that one."
+
+/** Every slot a card has been put on screen for, answered or not. */
+const cardedSlots = (msgs: readonly { slotCard?: string }[]) => msgs.flatMap(m => (m.slotCard ? [m.slotCard] : []))
 
 /** True when this turn would write a lift weight the user never tied to that lift. */
 function isUnnamedLiftWrite(key: SlotKey, userText: string, liftWritesThisTurn: number): boolean {
@@ -1326,6 +1338,21 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       // the summary edit above (settled in code), or Profile later.
       const keptFoods = mergeFoodsToAvoid(splitFoodList(responseWs.values.dislikedFoods), splitFoodList(ws.values.dislikedFoods))
       if (keptFoods.added.length > 0) applySlot(responseWs, 'dislikedFoods', keptFoods.list.join(', '), responseWs.values, false)
+      // "I KNOW MY NUMBERS" TYPED RATHER THAN TAPPED: the boxes come next, by
+      // the app, whatever the coach wrote (a tap never gets here — it shows
+      // them itself, see handleResolveSingle). One card on screen: a card the
+      // coach put under another question this turn is taken off, and that
+      // question comes round again once the boxes are answered.
+      if (liftBoxesDue(responseWs.values, responseWs.confirmed, cardedSlots([...priorMessages, ...responseWs.newMessages]))) {
+        for (const m of responseWs.newMessages) {
+          if (m.slotCard) {
+            for (const k of numericGroupFor(m.slotCard as SlotKey)) responseWs.supersedeCards.delete(k)
+            m.slotCard = undefined
+          }
+        }
+        responseWs.newMessages.push({ role: 'assistant', content: LIFT_BOXES_ASK, slotCard: 'knownSquatKg' })
+        responseWs.openReview = false
+      }
       // NEVER A LIVE QUESTION BESIDE THE GENERATE BUTTON.
       //
       // Ashley photographed the coach asking "how much time do you want to
@@ -1537,6 +1564,19 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     // false: a tap is not a mapping — see applySlot's note.
     if (!applySlot(ws, key, coerceSlotValue(def, value), values, false)) return
     const label = def.options?.find(o => String(o.value) === value)?.label ?? value
+    // "I KNOW MY NUMBERS" IS ANSWERED WITH THE BOXES, here, with no trip to
+    // the coach (19 Oct 2026, her live test: the coach replied "Got those
+    // numbers down." and moved on, so nothing was ever asked). The coach hears
+    // about it on the next turn, with the numbers. From the summary too: an
+    // edit that says she knows them is not settled until the boxes are — the
+    // edit stays open, so their Save or Skip settles it here (settleEdit) and
+    // the summary comes back with the numbers in it.
+    if (key === 'knowsWorkingLifts' && liftBoxesDue(ws.values, ws.confirmed, cardedSlots(messages))) {
+      ws.newMessages.push({ role: 'user', content: label }, { role: 'assistant', content: LIFT_BOXES_ASK, slotCard: 'knownSquatKg' })
+      commitWorkingState(ws)
+      scrollToBottom(true)
+      return
+    }
     if (settleEdit(ws, label)) return
     void sendMessage(label, ws)
   }
@@ -1585,6 +1625,15 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     if (saved.length === 0) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'That didn’t look right — check the numbers and try again.' }])
       return
+    }
+    // A LIFT BOX LEFT EMPTY IS AN ANSWER: "fill in the ones you know". Without
+    // this the empty ones stayed open, and setup would keep asking for a
+    // bench she had just told it, by leaving it out, that she doesn't know.
+    if (entries.some(e => isKnownLiftSlot(e.key))) {
+      const blanks = ONBOARDING_SLOTS
+        .filter(d => isKnownLiftSlot(d.key) && isSlotApplicable(d, ws.values) && !ws.confirmed.has(d.key))
+        .map(d => d.key)
+      declineSlots(ws, blanks)
     }
     if (settleEdit(ws, saved.join(', '))) return
     void sendMessage(saved.join(', '), ws)

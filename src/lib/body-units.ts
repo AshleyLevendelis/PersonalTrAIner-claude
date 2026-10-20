@@ -105,9 +105,27 @@ export function parseWeight(raw: string): ParsedMeasure | null {
   return null
 }
 
+/**
+ * A working weight on the bar — kg, or pounds when they SAY pounds (19 Oct
+ * 2026: the lift boxes took kg only, and a lifter who thinks in pounds had no
+ * way to answer). Narrower than parseWeight on purpose: nobody's squat is in
+ * stone, so "13st" here is a typo and is refused rather than read as 82.6kg.
+ * A bare number stays kg, as it always has, and the box's label says so.
+ */
+export function parseLiftWeight(raw: string): ParsedMeasure | null {
+  const t = raw.trim().toLowerCase().replace(/\s+/g, ' ')
+  if (!t) return null
+  const pounds = /^(\d{1,4}(?:\.\d+)?)\s*(?:lb[s]?\b|pound[s]?\b)$/.exec(t)
+  if (pounds) return { value: roundKg(Number(pounds[1]) * KG_PER_LB), from: `${pounds[1]}lb` }
+  const kg = /^(\d{1,3}(?:\.\d+)?)\s*(?:kg\b|kgs\b|kilo[s]?\b|kilogram[s]?\b)?$/.exec(t)
+  if (kg) return { value: roundKg(Number(kg[1])) }
+  return null
+}
+
 /** Which parser a slot needs, or none. Keyed on the slot itself so a caller cannot pair the wrong one. */
 export function measureParserFor(slotKey: string): ((raw: string) => ParsedMeasure | null) | null {
   if (slotKey === 'heightCm') return parseHeight
   if (slotKey === 'weightKg') return parseWeight
+  if (slotKey === 'knownSquatKg' || slotKey === 'knownBenchKg' || slotKey === 'knownDeadliftKg') return parseLiftWeight
   return null
 }

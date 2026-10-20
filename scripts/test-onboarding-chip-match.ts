@@ -202,6 +202,37 @@ console.log('\n7. Only the asking part of a message is read')
   check('an empty message asks nothing', questionPartOf('') === '')
 }
 
+console.log('\n8. Numbers asked in words get their labelled boxes, asked for or not (19 Oct 2026)')
+{
+  // Her live test: this exact sentence came with no card at all, because the
+  // coach is told present_slot is for a set list. A box is labelled and takes
+  // only what she types, so showing one unasked cannot record a wrong answer.
+  const SCREENSHOT = 'how old are you, how tall are you, and what do you weigh right now?'
+  check('the sentence from her screenshot gets the age / height / weight card with nothing requested', pick(SCREENSHOT, []) === 'age', pick(SCREENSHOT, []))
+  check('...and with a reaction in front of it', pick(`That's a solid base. Now for the numbers: ${SCREENSHOT}`, []) === 'age')
+  check('"How old are you?" on its own gets the same card', pick('How old are you?', []) === 'age')
+  check('the card is keyed on what is still unanswered',
+    pick('And how tall are you, and what do you weigh?', [], { values: { ...SAM, age: '31' }, confirmed: new Set([...SAM_ANSWERED, 'age']) }) === 'heightCm')
+  check('the three lift boxes come for the lifts asked in words',
+    fresh("What are your current working weights for squat, bench and deadlift?", []) === 'knownSquatKg',
+    fresh("What are your current working weights for squat, bench and deadlift?", []))
+  check('numbers already given are not re-offered',
+    pick(SCREENSHOT, [], { values: { ...SAM, age: '31', heightCm: '178', weightKg: '82' }, confirmed: new Set([...SAM_ANSWERED, 'age', 'heightCm', 'weightKg']) }) === undefined)
+  // One answered and two not: a check where only the ANSWERED one is asked,
+  // so a re-offer cannot hide behind the other two being split three ways.
+  check('...nor is one already given, asked again on its own',
+    pick('How old are you?', [], { values: { ...SAM, age: '31' }, confirmed: new Set([...SAM_ANSWERED, 'age']) }) === undefined,
+    pick('How old are you?', [], { values: { ...SAM, age: '31' }, confirmed: new Set([...SAM_ANSWERED, 'age']) }))
+  check('a TARGET weight is not her weight today, so no box', pick('Got a goal weight in mind, or just lighter?', []) === undefined)
+  check('a load ceiling is never asked, so its box never comes unasked (Sam trains at home, where it would apply)',
+    pick('What are your heaviest dumbbells?', []) === undefined, pick('What are your heaviest dumbbells?', []))
+  // UNCHANGED: chips are never conjured from words alone.
+  check('a CHIP question asked with nothing requested still gets no chips', pick('How many meals a day suits you?', []) === undefined)
+  check('...nor does this one', pick('Which should I use for your calorie maths — male or female?', []) === undefined)
+  check('...and a question asking two numbered cards at once picks neither',
+    fresh('How old are you, and what do you squat?', []) === undefined, fresh('How old are you, and what do you squat?', []))
+}
+
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) {
   console.error(`${failures} check(s) failed`)

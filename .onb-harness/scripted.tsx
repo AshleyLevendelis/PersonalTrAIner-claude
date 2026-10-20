@@ -142,6 +142,43 @@ if (state === 'review' || state === 'review-card') {
   ))
 }
 
+// JO, a gym lifter at the working-lifts question — the state Ashley was in on
+// 19 Oct 2026 when "I know my numbers" asked her nothing. Barbell-capable and
+// not a beginner, so the question applies; its card is live.
+const JO_SO_FAR = {
+  displayName: 'Jo', fitnessGoal: 'hypertrophy', trainingExperience: 'intermediate',
+  activityLevel: 'moderate', equipment: 'full_gym', injuries: [],
+}
+if (state === 'lifts') {
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Jo' },
+      { role: 'assistant', content: 'Nothing to work around, good. Do you know your current working weights for squat, bench and deadlift?', slotCard: 'knowsWorkingLifts' },
+    ],
+    JO_SO_FAR,
+    Object.keys(JO_SO_FAR),
+  ))
+}
+if (state === 'review-lifter') {
+  // Everything answered, "Not sure" on the working lifts: the summary opens.
+  const all = {
+    ...JO_SO_FAR, knowsWorkingLifts: false, trainingDays: ['Mon', 'Wed', 'Fri'], sessionDuration: '45-60',
+    trainingStyle: 'functional', conditioningPreference: 'tolerate', recoveryCapacity: 'moderate',
+    age: '34', heightCm: '170', weightKg: '70', gender: 'female', mealsPerDay: 3,
+    dietaryPreferences: [], dislikedFoods: 'none',
+  }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Jo' },
+      { role: 'assistant', content: COMPLETE_MESSAGE },
+    ],
+    all,
+    Object.keys(all),
+  ))
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ConversationalOnboarding onComplete={p => { w.__onbCompleted = p }} />
