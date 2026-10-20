@@ -283,11 +283,12 @@ export async function previewTopUpStart(input: {
   profileId: string
   today: string
   legacyStartDate?: string
-}): Promise<{ from: string; label: string } | null> {
+}): Promise<{ from: string; label: string; beyondStrip: boolean } | null> {
   try {
     const covered = await readGroceryCoverage(input.profileId, input.today, input.legacyStartDate, { strict: true })
     const from = topUpStartDate(input.today, covered)
-    return { from, label: topUpStartLabel(input.today, from) }
+    // M62: past the day strip, both surfaces offer "start them tomorrow" beside the plain yes.
+    return { from, label: topUpStartLabel(input.today, from), beyondStrip: topUpBeyondStrip(input.today, from) }
   } catch {
     return null
   }
@@ -303,6 +304,8 @@ export interface TopUpOutcome {
   asked: number
   /** "tomorrow", "on Thursday", ... or '' when nothing was asked. */
   startLabel: string
+  /** On her "start tomorrow" pick only: true when the list's days were re-worked, false when that failed, else null. */
+  listUpdated: boolean | null
   note: { text: string; failed: boolean }
   /**
    * Why nothing landed, as a clause with no full stop ("I couldn't reach the
@@ -365,6 +368,7 @@ export async function topUpMealPlan(input: {
       addedBy: result.added,
       asked,
       startLabel,
+      listUpdated,
       why: added === 0 ? moreMealOptionsWhy({ reached: result.reached, listUnreadable: result.listUnreadable }) : null,
       unrecognised: [...unrecognised],
       note: {
@@ -380,6 +384,7 @@ export async function topUpMealPlan(input: {
       addedBy: {},
       asked: 0,
       startLabel: '',
+      listUpdated: null,
       why: moreMealOptionsWhy({ reached: false, listUnreadable: false }),
       unrecognised: [...unrecognised],
       note: { text: moreMealOptionsDone({ added: 0, asked: 0, reached: false, listUnreadable: false, startLabel: '' }), failed: true },

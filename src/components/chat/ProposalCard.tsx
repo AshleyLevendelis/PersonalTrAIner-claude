@@ -118,6 +118,8 @@ export function ProposalCard({
   }
 
   const scopeField = diff.editable?.find(e => e.field === 'scope')
+  // A builder's own item can end in a full stop; the line ends in exactly one ("resized.." was on every top-up offer).
+  const unchangedText = (items: string[]) => `${items.map(u => u.trim().replace(/[.\s]+$/, '')).join(', ')}.`
   const changes = offerChanges(diff.rows)
   const showAlternatives = !!(diff.alternatives && diff.alternatives.length > 0 && onAlternative && !isTerminal && !isStale)
 
@@ -135,7 +137,7 @@ export function ProposalCard({
         <p key={`c${i}`} data-offer-line="change">{offerChangeText(c)}</p>
       ))}
       {diff.unchanged && diff.unchanged.length > 0 && (
-        <p data-offer-line="unchanged" className="text-[0.84375rem] opacity-80">Unchanged: {diff.unchanged.join(', ')}.</p>
+        <p data-offer-line="unchanged" className="text-[0.84375rem] opacity-80">Unchanged: {unchangedText(diff.unchanged)}</p>
       )}
       {diff.implications?.map((imp, i) => (
         <p
@@ -221,7 +223,7 @@ export function ProposalCard({
                 <span className={pill(i === 0)}>
                   {busy === 'confirm' && scope === opt
                     ? 'Applying…'
-                    : opt === 'today' ? 'Apply today' : opt === 'block' ? 'Whole block' : opt === 'permanent' ? 'Rest of block' : opt}
+                    : scopeField.labels?.[opt] ?? (opt === 'today' ? 'Apply today' : opt === 'block' ? 'Whole block' : opt === 'permanent' ? 'Rest of block' : opt)}
                 </span>
               </button>
             ))

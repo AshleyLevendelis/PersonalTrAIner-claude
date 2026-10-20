@@ -91,7 +91,7 @@ import { planDaysInWindow } from '@/lib/plan-guard'
 import type { UserFactRow } from '@/lib/memory-store'
 import { getAllItems as getAllGroceryItems, refreshGroceryDays, subscribeGroceryStore } from '@/lib/grocery-store'
 import { computeSlotBudgets } from '@/lib/meal-generation'
-import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, topUpBeyondStrip, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
+import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, isTopUpDismissed, dismissTopUp } from '@/lib/meal-top-up'
 import { MEAL_LIBRARY } from '@/lib/meal-library-data'
 // The app's own root boundary, as main.tsx mounts it (verify:chunk-reload reads what it shows).
 import { AppErrorBoundary } from '@/components/AppErrorBoundary'
@@ -1441,7 +1441,7 @@ function Harness() {
     let cancelled = false
     const read = () => {
       void previewTopUpStart({ profileId: PROFILE_ID, today })
-        .then(p => { if (!cancelled) setTopUpStart(p ? { label: p.label, beyondStrip: topUpBeyondStrip(today, p.from) } : null) })
+        .then(p => { if (!cancelled) setTopUpStart(p ? { label: p.label, beyondStrip: p.beyondStrip } : null) })
     }
     read()
     const unsubscribe = subscribeGroceryStore(read)

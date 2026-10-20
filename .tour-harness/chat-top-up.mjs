@@ -156,11 +156,12 @@ check('...it asks rather than announcing', /Want me to add more options to each 
 check('...one row per meal, five to seven', ['Breakfast', 'Lunch', 'Dinner'].every(m => new RegExp(`${m}[\\s\\S]{0,20}5 options[\\s\\S]{0,20}7 options`).test(r.text)), r.text.slice(0, 500))
 check('...saying before the tap what it will not touch, as one clean line',
   /Unchanged: Today and every day on your shopping list, and every option you already have — nothing is removed or resized\./.test(r.text)
-  && !/\.,/.test(r.text), r.text.slice(0, 600))
+  && !/\.,/.test(r.text) && !/resized\.\./.test(r.text), r.text.slice(0, 600))
 const order = ['Breakfast', 'Lunch', 'Dinner'].map(m => r.text.indexOf(m))
 check('...the meals in the order of the day, not alphabetical', order.every(i => i >= 0) && order[0] < order[1] && order[1] < order[2], order)
 check('...and the day the new meals start, worked out from her list', r.text.includes(`The new meals start on ${STARTS_ON}; every day before then stays as it was.`), { want: STARTS_ON, text: r.text.slice(0, 600) })
 check('...with no Undo promised, and no number of dishes stated by the coach', !/Undo/.test(r.text) && !/\b\d+ new meals\b/.test(r.text), r.text.slice(0, 300))
+check('...and, with the start inside the days she can see, no "start them tomorrow" button', !r.btns.some(b => /Start them tomorrow/.test(b)), r.btns)
 await shoot('chat-top-up-card')
 
 console.log('\n[2] Nothing is made until she taps')
@@ -301,6 +302,52 @@ const libTargets = await ev(`window.__mealDay.targets`)
 const libDensity = libMacros.map(m => (m.protein / (m.kcal || m.calories)) / (libTargets.protein / libTargets.calories))
 check('...and each is fitted to her meal: no more than 1.3x the protein her targets ask of a calorie (as written they run 1.5-3x)', libDensity.length === 6 && libDensity.every(x => x <= 1.3), libDensity.map(x => Math.round(x * 100) / 100))
 await shoot('chat-top-up-library-receipt')
+
+console.log('\n[9] Her list runs past the days she can see: the offer says so, and offers to start tomorrow (M62)')
+check('a plan of five, with ten days on the shopping list', await load('listlong=1'))
+check('the sanity check: the list covers ten days', (await ev(`new Set(window.__fakeDb.grocery_items.flatMap(g => (g.meal_refs || []).map(m => m.date))).size`)) === 10)
+check('her sentence goes', await say('Can you give me more meal options please'))
+let late = await ev(READ)
+for (let i = 0; i < 60 && !(late.hasCard && /\?/.test(late.text)); i++) { await wait(500); late = await ev(READ) }
+const LATE = addDays(ANCHOR_ISO, 10)
+const lateLabel = new Date(`${LATE}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
+check('it asks first, as ever', late.hasCard === true, late.btns)
+check('...saying the meals would start after the days she can see, and why', late.text.includes(`The new meals would start on ${lateLabel}, after the days you can see here, because your shopping list runs until then.`), { want: lateLabel, text: late.text.slice(-600) })
+check('...with the plain Apply AND the sooner choice, and Not now', late.btns.includes('Apply') && late.btns.includes('Start them tomorrow and update my shopping list') && late.btns.includes('Not now'), late.btns)
+check('nothing is made before the tap', (await ev(`window.__generateCalls`)) === 0 && (await rowsOnPage()) === 15)
+await shoot('chat-top-up-late-card')
+const listBefore = await ev(`JSON.stringify(window.__fakeDb.grocery_items.map(g => [g.canonical_key, g.quantity]).sort())`)
+check('tap "Start them tomorrow and update my shopping list"', await ev(`(() => {
+  const b = [...document.querySelectorAll('button')].find(x => (x.textContent || '').trim() === 'Start them tomorrow and update my shopping list')
+  if (!b || b.disabled) return false
+  b.click(); return true
+})()`))
+let soon = await ev(READ)
+for (let i = 0; i < 80 && !/Shopping list/.test(soon.text); i++) { await wait(500); soon = await ev(READ) }
+await wait(600)
+soon = await ev(READ)
+const TOMORROW = addDays(ANCHOR_ISO, 1)
+check('a receipt says Added, starting tomorrow', /\bAdded\b/.test(soon.text) && /Starting[\s\S]{0,12}tomorrow/.test(soon.text), soon.text.slice(-400))
+check('...and that the shopping list was updated to match', /Shopping list[\s\S]{0,12}Updated to match/.test(soon.text), soon.text.slice(-400))
+check('the six new meals carry TOMORROW as their first day, not the day after the list', (await ev(`window.__fakeDb.meal_plan_slots.filter(r => (r.tags || []).some(t => t === 'new-from:${TOMORROW}')).length`)) === 6
+  && (await ev(`window.__fakeDb.meal_plan_slots.filter(r => (r.tags || []).some(t => t === 'new-from:${LATE}')).length`)) === 0)
+const listAfter = await ev(`JSON.stringify(window.__fakeDb.grocery_items.map(g => [g.canonical_key, g.quantity]).sort())`)
+check('...and the list itself was re-worked from the meals, not left as it was', listAfter !== listBefore && (await ev(`window.__fakeDb.grocery_items.some(g => /chicken/.test(g.display_name || g.canonical_key))`)) === true, [listBefore.slice(0, 200), listAfter.slice(0, 200)])
+check('...over the same ten days, none added or taken off', (await ev(`new Set(window.__fakeDb.grocery_items.flatMap(g => (g.meal_refs || []).map(m => m.date))).size`)) === 10)
+await shoot('chat-top-up-late-receipt')
+
+console.log('\n[10] The same long list, the plain Apply: the meals start after the list, and the list is left alone')
+check('a plan of five, with ten days on the shopping list', await load('listlong=1&plain=1'))
+check('her sentence goes', await say('Can you give me more meal options please'))
+let plain = await ev(READ)
+for (let i = 0; i < 60 && !(plain.hasCard && /\?/.test(plain.text)); i++) { await wait(500); plain = await ev(READ) }
+const plainListBefore = await ev(`JSON.stringify(window.__fakeDb.grocery_items)`)
+await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => (x.textContent || '').trim() === 'Apply'); b?.click() })()`)
+for (let i = 0; i < 80 && !/\bAdded\b/.test(plain.text); i++) { await wait(500); plain = await ev(READ) }
+await wait(600)
+plain = await ev(READ)
+check('Added, starting after the list', /\bAdded\b/.test(plain.text) && (await ev(`window.__fakeDb.meal_plan_slots.filter(r => (r.tags || []).some(t => t === 'new-from:${LATE}')).length`)) === 6, plain.text.slice(-300))
+check('...with no shopping-list line, and the list untouched', !/Shopping list/.test(plain.text.split('Added').pop() ?? '') && (await ev(`JSON.stringify(window.__fakeDb.grocery_items)`)) === plainListBefore, plain.text.slice(-300))
 
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)

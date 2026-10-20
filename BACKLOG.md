@@ -27,9 +27,15 @@ Newest first. One line each.
   (`refreshGroceryDays`, the list's own reconcile, so ticked and hand-added rows hold); "Get more options" never
   touches the list. The receipt says the list was updated, or that it could not be and still has the old meals.
   `test:meal-top-up` (156 checks; 10 mutations, all caught, one only after the end-to-end profile was given a list
-  that holds days), `verify:meal-top-up` §9 (64 checks; 3 mutations caught). NOT DONE: the coach's card names the
-  start day already, but has no sooner choice yet; it waits for the bubble-offers rework of the card to land, then
-  gets the same option. Frontend only.
+  that holds days), `verify:meal-top-up` §9 (64 checks; 3 mutations caught). **THE COACH'S HALF, the same day**,
+  once offers became text + small buttons: past the strip the coach's offer says the same late-start sentence and
+  shows "Start them tomorrow and update my shopping list" beside Apply and Not now; tapping it runs the same top-up
+  with her pick (App hands it on), and the receipt adds "Shopping list: Updated to match" (or "Not updated: rebuild it
+  before you shop"). Inside the strip, no extra button. The start preview now says whether it is past the strip, so the
+  screen and the coach read one answer. FOUND on the way, in the screenshot, app-wide: every offer's "Unchanged" line
+  ended in a doubled full stop when a builder's item already had one ("...resized.."); fixed where the line is drawn.
+  `test:meal-top-up` (161 checks; 6 more mutations, all caught), `verify:chat-top-up` §9-10 (87 checks; 8 mutations,
+  all caught). Frontend only.
 - [x] **Runs 7-10, M60: an 818 kcal lunch beside a 222 kcal dinner (20 Oct 2026).** TRACED (engine-tracer, then
   reproduced with real foods): the lunch was PINNED (a leftover, oversized by the H36 costing bug, already fixed on the
   branch), and the day's repair resized the largest FREE dish, the dinner, by 0.4-2.5x of itself to land the

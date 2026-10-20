@@ -29,7 +29,7 @@ import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
-import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, topUpBeyondStrip, isTopUpDismissed, dismissTopUp, type TopUpOutcome } from '@/lib/meal-top-up'
+import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, isTopUpDismissed, dismissTopUp, type TopUpOutcome } from '@/lib/meal-top-up'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
 import { buildRotation, rotationIndexFor, pinsFromPicks, type MealShape } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
@@ -1492,11 +1492,11 @@ function App() {
     }
   }
   /** The coach's confirm: same run, and the receipt is in the chat, not on the Nutrition tab. */
-  const handleMealTopUpFromChat = async (): Promise<TopUpOutcome | null> => {
+  const handleMealTopUpFromChat = async (startTomorrow = false): Promise<TopUpOutcome | null> => {
     if (mealTopUpBusy) return null
     setMealTopUpBusy(true)
     try {
-      return await runMealTopUpNow()
+      return await runMealTopUpNow(startTomorrow)
     } finally {
       setMealTopUpBusy(false)
     }
@@ -1513,7 +1513,7 @@ function App() {
     // Read again whenever the list changes: adding a day to it moves the start, and the offer must say the new one.
     const read = () => {
       void previewTopUpStart({ profileId, today: mealRotationDate, legacyStartDate: readGroceryBuildMemo(profileId)?.startDate })
-        .then(p => { if (!cancelled) setMealTopUpStart(p ? { label: p.label, beyondStrip: topUpBeyondStrip(mealRotationDate, p.from) } : null) })
+        .then(p => { if (!cancelled) setMealTopUpStart(p ? { label: p.label, beyondStrip: p.beyondStrip } : null) })
     }
     read()
     const unsubscribe = subscribeGroceryStore(read)

@@ -400,14 +400,14 @@ async function main() {
     const sooner = await topUpMealPlan({ profileId: 'f', today: TODAY, needs: { lunch: 2 }, generation, refreshList, startTomorrow: true })
     const fLunch = (await getPools('f')).lunch ?? []
     check('"start them tomorrow": the new meals are stamped for tomorrow', sooner.added === 2 && fLunch.filter(o => newFromDate(o) === '2026-09-29').length === 2, fLunch.map(o => o.tags))
-    check('...the list is re-worked once', refreshed === 1, refreshed)
+    check('...the list is re-worked once', refreshed === 1 && sooner.listUpdated === true, { refreshed, listUpdated: sooner.listUpdated })
     check('...and the receipt says they start tomorrow and the list is updated', /^Added 2 new meals\. They start tomorrow, and your shopping list is updated to match\.$/.test(sooner.note.text), sooner.note.text)
     await generateMealPools({ ...base, profileId: 'h', poolSize: 5 })
     const broken = await topUpMealPlan({ profileId: 'h', today: TODAY, needs: { lunch: 2 }, generation, startTomorrow: true, refreshList: async () => { throw new Error('offline') } })
-    check('a list that could not be re-worked is said, never passed off as updated', /couldn't update your shopping list/.test(broken.note.text) && !/updated to match/.test(broken.note.text), broken.note.text)
+    check('a list that could not be re-worked is said, never passed off as updated', /couldn't update your shopping list/.test(broken.note.text) && !/updated to match/.test(broken.note.text) && broken.listUpdated === false, broken.note.text)
     refreshed = 0
     const none = await topUpMealPlan({ profileId: 'k', today: TODAY, needs: {}, generation, refreshList, startTomorrow: true })
-    check('nothing landed: the list is left alone', none.added === 0 && refreshed === 0, { added: none.added, refreshed })
+    check('nothing landed: the list is left alone', none.added === 0 && refreshed === 0 && none.listUpdated === null, { added: none.added, refreshed })
 
     failTable = 'grocery_items'
     const before = requests
@@ -505,7 +505,15 @@ async function main() {
       /unchanged: \[MORE_MEALS\.unchanged\]/.test(builder) && /MORE_MEALS\.starts\(start\.label\)/.test(builder))
     check('...and lists the meals in the order of the day', /\['breakfast', 'lunch', 'dinner', 'snack'\] as MealSlotName\[\]\)\.filter/.test(builder))
     const confirm = chat.slice(chat.indexOf("row.kind === 'propose_meal_top_up'"), chat.indexOf("row.kind === 'propose_injury_adaptation'"))
-    check('confirming calls the ONE shared run, not a copy of it', /await onMealTopUpConfirm\(\)/.test(confirm))
+    check('confirming calls the ONE shared run, not a copy of it, with her sooner pick when she tapped it', /await onMealTopUpConfirm\(editedScope === 'tomorrow'\)/.test(confirm))
+    // M62, the coach's half: past the strip the offer says so and adds the sooner choice; inside it, neither.
+    check('M62 coach: past the strip the offer says the late start and offers "start them tomorrow"; inside it the plain start and no choice',
+      /text: start\.beyondStrip \? MORE_MEALS\.startsLate\(start\.label\) : MORE_MEALS\.starts\(start\.label\)/.test(builder)
+      && /\.\.\.\(start\.beyondStrip\s*\?\s*\{ editable: \[\{ field: 'scope', options: \['as-planned', 'tomorrow'\], labels: \{ 'as-planned': 'Apply', tomorrow: MORE_MEALS\.sooner \} \}\] \}\s*:\s*\{\}\)/.test(builder))
+    check('M62 coach: the receipt says whether the list was updated, only on her pick',
+      /outcome\.listUpdated === true \? \[\{ label: 'Shopping list', detail: 'Updated to match' \}\]/.test(confirm) && /outcome\.listUpdated === false \? \[\{ label: 'Shopping list'/.test(confirm))
+    check('M62 coach: App forwards the pick to the one run',
+      /const handleMealTopUpFromChat = async \(startTomorrow = false\)[\s\S]{0,200}return await runMealTopUpNow\(startTomorrow\)/.test(app))
     check('...a partial landing is reported as partial, and a failure says what the run said',
       /failed: outcome\.added < outcome\.asked\s*\?/.test(confirm) && /outcome\?\.why/.test(confirm), confirm.slice(0, 300))
     check('the button and the coach go through ONE run in App',
@@ -520,7 +528,7 @@ async function main() {
     check('M62: the sooner button is there only when the start is past the strip, and asks for tomorrow',
       /\.\.\.\(mealTopUpStart\?\.beyondStrip \? \[\{ label: MORE_MEALS\.sooner, onClick: \(\) => onMealTopUp\?\.\(true\)/.test(nd) && /label: mealTopUpBusy \? 'Finding meals…' : 'Get more options', onClick: \(\) => onMealTopUp\?\.\(false\)/.test(nd))
     check('M62: the start is read the strict way the run reads it, and judged against the strip',
-      /void previewTopUpStart\(\{ profileId, today: mealRotationDate/.test(app) && /const unsubscribe = subscribeGroceryStore\(read\)/.test(app) && /setMealTopUpStart\(p \? \{ label: p\.label, beyondStrip: topUpBeyondStrip\(mealRotationDate, p\.from\) \} : null\)/.test(app))
+      /void previewTopUpStart\(\{ profileId, today: mealRotationDate/.test(app) && /const unsubscribe = subscribeGroceryStore\(read\)/.test(app) && /setMealTopUpStart\(p \? \{ label: p\.label, beyondStrip: p\.beyondStrip \} : null\)/.test(app))
     check('...the coach is told the plan the app computes for the button, not its own', /mealTopUp=\{mealTopUpPlan \? \{ \.\.\.mealTopUpPlan, building: initialMealBuild \} : null\}/.test(app)
       && /const mealTopUpNeeds = mealTopUpPlan\?\.needs \?\? \{\}/.test(app))
     check('...and its receipt is in the chat, without setting the Nutrition tab\'s banner',
@@ -566,6 +574,10 @@ async function main() {
     setSupabaseClient(client as any)
     const ok = await previewTopUpStart({ profileId: 'pv', today: TODAY })
     check('the preview names the day after the last list day, and how the card says it', ok?.from === '2026-09-30' && ok.label === 'on Wednesday', ok)
+    check('...and that it is inside the day strip (no sooner choice)', ok?.beyondStrip === false, ok)
+    rows[0].meal_refs.push({ day: 8, date: '2026-10-06', slot: 'lunch', mealName: 'z' })
+    const late = await previewTopUpStart({ profileId: 'pv', today: TODAY })
+    check('...a list running past the strip is past it (the sooner choice)', late?.from === '2026-10-07' && late.beyondStrip === true, late)
     listFails = true
     check('...and is null when the list cannot be read (the card then refuses)', (await previewTopUpStart({ profileId: 'pv', today: TODAY })) === null)
   }
