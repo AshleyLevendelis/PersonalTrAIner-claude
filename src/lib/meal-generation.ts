@@ -1716,6 +1716,33 @@ function dayNearTolerance(totals: MacroTargets, targets: MacroTargets, slack: nu
  * no free dish or the resize is outside [minFactor, maxFactor] or absurd.
  * Does not judge the result — callers decide what an acceptable day is.
  */
+/**
+ * NO MEAL SERVED FAR FROM ITS SHARE OF THE DAY (runs 7-10, M60, 20 Oct 2026). Sam's day showed an 818 kcal lunch
+ * beside a 222 kcal dinner: the lunch was pinned (a leftover, oversized by the H36 costing bug), and the day's repair
+ * shrank the largest FREE dish, the dinner, to 0.48x of its share to land the calories. On a day with a pinned
+ * meal, a resize may now leave a meal only inside this band of its slot budget; one that would fall outside it is not
+ * made, and the day is served as the closest honest miss, its miss named. The basis (CSCS delegation, general performance nutrition): a main meal under
+ * about 60% of an even share is a snack-sized meal and its protein falls below a useful per-meal dose; over 150% is
+ * the same problem in another meal. Measured on modelled weeks before the change: 0 of 5,600 servings outside it, so
+ * it binds only where a meal is pinned far from its share (her own, a leftover, a moved copy). Pinned meals are
+ * never resized and never judged: their sizes are hers.
+ */
+export const MEAL_SHARE_BAND: Readonly<Record<'main' | 'snack', readonly [number, number]>> = { main: [0.6, 1.5], snack: [0.5, 2.0] }
+
+/** The day's slot budgets, from the slots it holds: no lunch is a two-meal day, a snack slot means snacks. */
+function shareBudgets(chosen: Partial<Record<MealSlotName, PoolOption>>, targets: MacroTargets): Partial<Record<MealSlotName, MacroTargets>> {
+  return computeSlotBudgets(targets, chosen.lunch ? 3 : 2, chosen.snack != null)
+}
+
+/** Is `kcal` inside the share band for `slot` on a day with these budgets? A slot with no budget is not judged. */
+export function withinMealShare(slot: MealSlotName, kcal: number, budgets: Partial<Record<MealSlotName, MacroTargets>>): boolean {
+  const budget = budgets[slot]?.calories
+  if (!budget || budget <= 0) return true
+  const [lo, hi] = MEAL_SHARE_BAND[slot === 'snack' ? 'snack' : 'main']
+  const share = kcal / budget
+  return share >= lo && share <= hi
+}
+
 function resizeLargestFreeSlot(
   chosen: Partial<Record<MealSlotName, PoolOption>>,
   pinned: Partial<Record<MealSlotName, PoolOption>>,
@@ -1734,6 +1761,14 @@ function resizeLargestFreeSlot(
   // Cheap first: the factor is known before a single ingredient is touched,
   // and most combinations in a real search fall outside the quiet range.
   const factor = largestOption.macros.calories > 0 ? neededKcal / largestOption.macros.calories : 1
+  // A resize that would take the largest free dish outside its share of the day spreads over the free dishes instead.
+  // ONLY ON A DAY WITH A PINNED MEAL (a pin is what pushes the rest of the day around, Sam's leftover lunch), and the
+  // answer is NO RESIZE: the day is served as it is and its miss is named (her 18 Oct "name the miss"), rather than
+  // one meal paying for the pin. Not spread over the other meals, and not applied on an unpinned day, because both
+  // move her 17 Sep refit ruling (what is absorbed quietly and what is offered): measured, a spread made a 60% drift
+  // fit silently and a band on unpinned days refused 15% drifts the ruling absorbs (test:meal-refit).
+  const anyPinned = Object.values(pinned).some(p => p != null)
+  if (anyPinned && !withinMealShare(largestSlot, largestOption.macros.calories * factor, shareBudgets(chosen, targets))) return null
   if (!(factor >= minFactor && factor <= maxFactor)) return null
   if (judgeFirst) {
     // Still cheap: a resize multiplies every ingredient by one factor, so the
