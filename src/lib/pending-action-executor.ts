@@ -22,6 +22,7 @@ import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor } from './session-edit'
 import { settleWeek } from './settle-week'
 import { rebuildDayAroundMainLift } from './session-rebuild'
+import type { SessionKindOffer } from './session-kind'
 import { shortenDayTo } from './exercise-plan'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, weeksTouchedByScope } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
@@ -1343,6 +1344,61 @@ export async function executeSessionRebuild(
   catch { failed.push({ op: 'save', error: didNotSave('That') }) }
 
   return { mesocycle: result.mesocycle, preImage, receipt: { landed, failed } }
+}
+
+export interface SessionKindTodayPayload {
+  weekNumber: number
+  dayName: string
+  /** The weekday shown, when it is not the plan row's own name. Only ever read to word a receipt. */
+  sayDay?: string
+  /** The offer the card showed — the confirm writes exactly this week, or nothing. */
+  offer: SessionKindOffer
+  reason?: string
+}
+
+/**
+ * "LET'S DO A CARDIO WORKOUT TODAY", from the coach — Ashley's ruling, 20 Oct
+ * 2026: "Drop it, today only." The mirror of TodayPanel's kindConfirm, through
+ * the same confirmSessionKindToday: the week the card listed is written, or,
+ * when today has changed since the card was built, nothing is.
+ */
+export async function executeSessionKindToday(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  payload: SessionKindTodayPayload,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  // Fetched when used: this file is in the first download (TodayPanel imports
+  // it), and the builder need not be (test:bundle, 20 Oct 2026).
+  const { confirmSessionKindToday } = await import('./session-kind')
+  const done = confirmSessionKindToday(mesocycle, payload.offer)
+  if (!done.ok) return { mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'session_kind', error: done.refusal }] } }
+  const landed = [`${payload.dayName}: ${payload.offer.label} session, ${payload.offer.session.length} exercises, about ${payload.offer.minutes} min`]
+  const failed: { op: string; error: string }[] = []
+  const week = done.mesocycle.find(w => w.week_number === payload.weekNumber)
+  try { if (profile.id && week) await saveMesocycleWeek(profile.id, week) }
+  catch { failed.push({ op: 'save', error: didNotSave('That') }) }
+  return { mesocycle: failed.length > 0 ? mesocycle : done.mesocycle, preImage, receipt: { landed: failed.length > 0 ? [] : landed, failed } }
+}
+
+/**
+ * PUT THE PLANNED SESSION BACK, from the coach's Undo — the same
+ * undoSessionKindToday the Exercise tab's button uses, so it is refused the
+ * same way once working sets are logged against the new session.
+ */
+export async function undoSessionKindTodayWrite(
+  profileId: string,
+  mesocycle: MesocycleWeek[],
+  weekNumber: number,
+  dayName: string,
+  loggedSets: number,
+): Promise<{ ok: true; mesocycle: MesocycleWeek[] } | { ok: false; refusal: string }> {
+  const { undoSessionKindToday } = await import('./session-kind')
+  const back = undoSessionKindToday(mesocycle, weekNumber, dayName, loggedSets)
+  if (!back.ok) return back
+  const week = back.mesocycle.find(w => w.week_number === weekNumber)
+  if (week) await saveMesocycleWeek(profileId, week)
+  return { ok: true, mesocycle: back.mesocycle }
 }
 
 export interface CardioSessionPayload {

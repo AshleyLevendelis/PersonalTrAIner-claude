@@ -601,6 +601,17 @@ export interface WorkoutDay {
    * is the full session again.
    */
   shortened_to_minutes?: number
+  /**
+   * Set when this ONE day was swapped for a different KIND of session —
+   * "let's do a cardio workout today", Ashley's live test 19 Oct 2026, and
+   * her ruling of 20 Oct: "Drop it, today only". See session-kind.ts.
+   *
+   * Rides in the week row's `days` jsonb like `shortened_to_minutes`, so it
+   * costs no migration. It carries the PLANNED day and any other day the
+   * week's balance pass touched, so "put my planned session back" restores
+   * the week exactly, after a reload too.
+   */
+  kind_today?: import('./session-kind-marker').KindTodayMarker
 }
 
 export interface ConstraintTraceEntry {

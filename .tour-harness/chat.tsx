@@ -56,6 +56,8 @@ import { planDaysInWindow } from '@/lib/plan-guard'
 import { profileWithKit } from '@/lib/kit-list'
 import { compileKitStatements, kitFactsIn } from '@/lib/fact-compiler'
 import type { UserFactRow } from '@/lib/memory-store'
+import { planSessionKindToday, type SessionKind } from '@/lib/session-kind'
+import { getActiveMesocycleWeek } from '@/lib/calculations'
 import '@/index.css'
 
 window.addEventListener('error', e => { (window as never as Record<string, unknown>).__err = String(e.message) })
@@ -601,6 +603,11 @@ function StartATimer() {
 // fake database, and the profile is derived from the remembered facts with
 // the app's own functions — App's two lines, reproduced, nothing else.
 const KIT = new URLSearchParams(location.search).get('kit') === '1'
+// ?kindtoday=1 — "let's do a cardio workout today" (Ashley, 19 Oct 2026). The plan
+// the chat writes is held here as App holds it, so the driver can read what today
+// became; and the app's OWN trial is exposed, so the driver can compare the card
+// with what the day menu would build (parity by construction, read off both).
+const KINDTODAY = new URLSearchParams(location.search).get('kindtoday') === '1'
 
 function Harness() {
   const [, setTick] = useState(0)
@@ -608,6 +615,19 @@ function Harness() {
   const readKitFacts = () => ((db.user_facts ?? []) as unknown as UserFactRow[]).filter(f => f.status === 'active')
   const [kitFacts, setKitFacts] = useState<UserFactRow[]>(readKitFacts)
   const [kitMeso, setKitMeso] = useState(mesocycle)
+  const [kindMeso, setKindMeso] = useState(mesocycle)
+  useEffect(() => {
+    if (!KINDTODAY) return
+    const w = window as unknown as Record<string, unknown>
+    const weekNumber = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+    const dayName = DAYS[todayIdx]
+    w.__todayNames = () => kindMeso.find(x => x.week_number === weekNumber)?.days.find(d => d.day === dayName)?.exercises.map(e => e.name) ?? []
+    w.__todayFocus2 = () => kindMeso.find(x => x.week_number === weekNumber)?.days.find(d => d.day === dayName)?.focus ?? null
+    w.__kindPlan = async (kind: SessionKind, moves: string[]) => {
+      const r = await planSessionKindToday({ mesocycle, profile, weekNumber, dayName, kind, moves, exclusions: [], loggedSets: 0 })
+      return r.ok ? r.offer.session.map(e => e.name) : r.refusal
+    }
+  })
   const kitProfile = KIT ? profileWithKit(profile, compileKitStatements(kitFacts)) : profile
   const kitController = KIT ? makeKitController({
     profile: kitProfile, mesocycle: kitMeso, planCreatedAt: profile.created_at, exclusions: [],
@@ -700,7 +720,7 @@ function Harness() {
               kitController={kitController}
               macros={macros}
               exercisePlan={livePlan}
-              mesocycle={KIT ? kitMeso : liveMeso}
+              mesocycle={KIT ? kitMeso : KINDTODAY ? kindMeso : liveMeso}
               planCreatedAt={profile.created_at}
               mealPlan={mealPlan}
               exerciseExclusions={[]}
@@ -708,7 +728,7 @@ function Harness() {
               onPlanUpdate={noop}
               onLogsUpdated={() => setTick(t => t + 1)}
               onWeightLogged={noop}
-              onMesocycleUpdated={noop}
+              onMesocycleUpdated={KINDTODAY ? setKindMeso : noop}
               onProfileChanged={noop}
               onMealSwapApplied={async () => true}
               onFindMoreMealOptions={async () => ({ added: [] })}

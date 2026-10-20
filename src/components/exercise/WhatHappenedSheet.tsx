@@ -35,6 +35,7 @@ import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 import type { WorkoutDay } from '@/lib/types'
 import { estimateDaySeconds } from '@/lib/session-duration'
 import { dayVerbs, type DayVerb } from '@/lib/day-verbs'
+import { buildSessionKindTodayProposal, type SessionKind, type SessionKindOption, type SessionKindOffer, type SessionKindPlan } from '@/lib/session-kind'
 
 export interface WhatHappenedTarget {
   date: string
@@ -42,7 +43,12 @@ export interface WhatHappenedTarget {
 }
 
 type Verb = DayVerb
-type Phase = 'menu' | 'did_elsewhere' | 'move' | 'something_else' | 'missed_recorded' | 'shorten' | 'rebuild'
+type Phase = 'menu' | 'did_elsewhere' | 'move' | 'something_else' | 'missed_recorded' | 'shorten' | 'rebuild' | 'kind' | 'kind_offer'
+
+/** "box jumps, sled push and burpees" -> three moves. Empty when nothing was typed. */
+function movesFrom(typed: string): string[] {
+  return typed.split(/,|\band\b|\+|\n/i).map(m => m.trim()).filter(Boolean)
+}
 
 /**
  * THE TIMES SOMEBODY ACTUALLY SAYS. "I've only got half an hour" — not a
@@ -76,6 +82,9 @@ export function WhatHappenedSheet({
   onShorten,
   onRebuild,
   onLighter,
+  kindOptions = [],
+  onKindPlan,
+  onKindConfirm,
 }: {
   target: WhatHappenedTarget | null
   onClose: () => void
@@ -106,6 +115,15 @@ export function WhatHappenedSheet({
   onRebuild?: () => Promise<string | null>
   /** Same contract: one step lighter, today only. */
   onLighter?: () => Promise<string | null>
+  /**
+   * A DIFFERENT KIND OF SESSION TODAY — Ashley's ruling, 20 Oct 2026: "Drop it,
+   * today only." The trial and the write are the caller's (session-kind.ts,
+   * the same two functions the coach's card uses); this sheet only asks which
+   * kind, shows the offer in the shared words, and confirms.
+   */
+  kindOptions?: SessionKindOption[]
+  onKindPlan?: (kind: SessionKind, moves: string[]) => Promise<SessionKindPlan>
+  onKindConfirm?: (offer: SessionKindOffer) => Promise<string | null>
 }) {
   const [phase, setPhase] = useState<Phase>('menu')
   const [busy, setBusy] = useState(false)
@@ -114,6 +132,8 @@ export function WhatHappenedSheet({
   const [minutes, setMinutes] = useState('')
   const [effort, setEffort] = useState<EffortKey | null>(null)
   const [rows, setRows] = useState<Record<number, { sets: string; reps: string; weight: string }>>({})
+  const [kindMoves, setKindMoves] = useState('')
+  const [kindOffer, setKindOffer] = useState<SessionKindOffer | null>(null)
 
   const date = target?.date ?? ''
   const dayName = target?.dayName ?? ''
@@ -142,7 +162,8 @@ export function WhatHappenedSheet({
     isDone, hasSession, movedAway: !!movedAway, beforePlan, isPast, isToday,
     declared: { missed: declared.missed, rest: declared.rest, swapped: !!declared.swapped },
     canShorten: !!onShorten, canLighter: !!onLighter, canRebuild: !!onRebuild,
-  }) : []), [target, isDone, hasSession, movedAway, beforePlan, isPast, isToday, declared.missed, declared.rest, declared.swapped, onShorten, onLighter, onRebuild])
+    canKind: !!onKindPlan && !!onKindConfirm && kindOptions.length > 0,
+  }) : []), [target, isDone, hasSession, movedAway, beforePlan, isPast, isToday, declared.missed, declared.rest, declared.swapped, onShorten, onLighter, onRebuild, onKindPlan, onKindConfirm, kindOptions.length])
 
   // Every day this week the resolver would accept as a destination — the
   // same function, the same rules (a free day, inside this mesocycle week,
@@ -163,7 +184,7 @@ export function WhatHappenedSheet({
     return r.ok ? { date: r.date, dayName: r.dayName, remapFrom: r.remapFrom } : null
   }, [target, date, today, plan, weekOf, moves])
 
-  const reset = () => { setPhase('menu'); setBusy(false); setError(null); setActivity(''); setMinutes(''); setEffort(null); setRows({}) }
+  const reset = () => { setPhase('menu'); setBusy(false); setError(null); setActivity(''); setMinutes(''); setEffort(null); setRows({}); setKindMoves(''); setKindOffer(null) }
   const close = () => { reset(); onClose() }
 
   /** Runs one write; a false lands as a sentence on screen, never as a silent tick. */
@@ -207,6 +228,18 @@ export function WhatHappenedSheet({
   const runShorten = (minutes: number) => runEdit(() => onShorten!(minutes))
   const runRebuild = () => runEdit(() => onRebuild!())
   const runLighter = () => runEdit(() => onLighter!())
+  /** The TRIAL: nothing is written, the offer is shown in the sheet first. */
+  const planKind = async (kind: SessionKind) => {
+    setBusy(true); setError(null)
+    let plan: SessionKindPlan
+    try { plan = await onKindPlan!(kind, movesFrom(kindMoves)) } catch (e) { console.error('[what-happened]', e); plan = { ok: false, refusal: "Couldn't build that — try again in a moment." } }
+    setBusy(false)
+    if (!plan.ok) { setError(plan.refusal); return }
+    setKindOffer(plan.offer)
+    setPhase('kind_offer')
+  }
+  const runKind = () => runEdit(() => onKindConfirm!(kindOffer!))
+  const kindWords = kindOffer ? buildSessionKindTodayProposal(kindOffer, 'today') : null
 
   /**
    * Only times genuinely shorter than the session in front of them, with a
@@ -387,6 +420,9 @@ export function WhatHappenedSheet({
             {verbs.includes('rebuild') && (
               <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => setPhase('rebuild')} data-verb="rebuild">Give me a different session</Button>
             )}
+            {verbs.includes('kind') && (
+              <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => setPhase('kind')} data-verb="kind">A different kind of session today</Button>
+            )}
             {verbs.includes('lighter') && (
               <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={runLighter} data-verb="lighter">Make it easier today</Button>
             )}
@@ -428,6 +464,43 @@ export function WhatHappenedSheet({
             <div className="flex flex-wrap gap-2">
               <Button size="sm" disabled={busy} onClick={runRebuild} data-testid="rebuild-confirm">Rebuild it</Button>
               <Button variant="ghost" size="sm" disabled={busy} onClick={() => setPhase('menu')}>Back</Button>
+            </div>
+          </div>
+        )}
+
+        {phase === 'kind' && (
+          <div className="space-y-2" data-testid="what-happened-kind">
+            <p className="text-sm">What kind of session?</p>
+            {/* WHAT CHANGES, BEFORE THE TAP — her 20 Oct ruling in her terms. */}
+            <p className="text-xs text-muted-foreground">
+              The whole session changes for today, main lift included. Your main lift is back the next time it&rsquo;s due,
+              and missing it today doesn&rsquo;t change its weight. Nothing changes until you&rsquo;ve seen the session.
+            </p>
+            <Input value={kindMoves} onChange={e => setKindMoves(e.target.value)} placeholder="Any moves you want in it? e.g. box jumps" aria-label="Moves you want in it" data-testid="kind-moves" />
+            <div className="grid gap-2">
+              {kindOptions.map(k => (
+                <Button key={k.kind} variant="outline" className="h-auto min-h-11 w-full flex-col items-start gap-0 py-2 text-left" disabled={busy} onClick={() => planKind(k.kind)} data-kind={k.kind}>
+                  <span>{k.label}</span>
+                  <span className="text-xs font-normal text-muted-foreground whitespace-normal">{k.blurb}</span>
+                </Button>
+              ))}
+            </div>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => setPhase('menu')}>Back</Button>
+          </div>
+        )}
+
+        {phase === 'kind_offer' && kindOffer && kindWords && (
+          <div className="space-y-2" data-testid="what-happened-kind-offer">
+            <p className="text-sm font-medium">{kindWords.lead}</p>
+            <ul className="space-y-1 text-sm" data-testid="kind-offer-session">
+              {kindWords.lines.map((line, i) => <li key={i}>{line}</li>)}
+            </ul>
+            <div className="space-y-1" data-testid="kind-offer-notes">
+              {kindWords.notes.map((note, i) => <p key={i} className="text-xs text-muted-foreground">{note}</p>)}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" className="min-h-11" disabled={busy} onClick={runKind} data-testid="kind-confirm">Use this session</Button>
+              <Button variant="ghost" size="sm" className="min-h-11" disabled={busy} onClick={() => { setKindOffer(null); setPhase('kind') }}>Back</Button>
             </div>
           </div>
         )}

@@ -130,6 +130,78 @@ Newest first. One line each.
     an offer turn, so nothing she sees changes; a wording pass needs the `chat-gemini` deploy). The non-question
     fallback leads ("I can take 200g salmon out — here's what goes with it:") were left as they are.
     Frontend only: no edge function, no migration.
+- [~] **Live test 19 Oct, finding 15: "let's do a cardio workout today" / "a functional workout today with sled push, box jumps". BUILT on a worktree branch, not merged.**
+  (`docs/plans/a-different-kind-of-session-today.md`.) WHAT WAS WRONG: nothing on either surface changed today's
+  session TYPE. Rebuild-today keeps the main lift and swaps like for like (her 16 Sep ruling); the activity swap
+  records, the cardio tool refuses a day with a session, the style change is lasting. HER RULING 20 Oct, "Drop it,
+  today only": a different KIND replaces the whole day, main lift included; the main lift is back next time it is due.
+  - **What changed:** one pure builder, `src/lib/session-kind.ts`: `planSessionKindToday` (the trial),
+    `buildSessionKindTodayProposal` (the words), `confirmSessionKindToday` (writes exactly the week the offer showed,
+    or nothing if today changed since), `undoSessionKindToday` (the planned day back from a marker stored on the day,
+    `kind_today` in the week row's jsonb, so it works after a reload; refused once working sets are logged). Kinds:
+    Cardio, Functional (athletic), Bodybuilding, Hybrid; her own style left out (that is the rebuild), combat never
+    (her August ruling). SCREEN: the day menu, "A different kind of session today", the kinds as buttons, an optional
+    "Any moves you want in it?" box, the offer shown in the sheet before "Use this session", and on the Exercise tab
+    a line saying what today is with "Put my planned session back". COACH: `propose_session_kind_today` (kind, moves,
+    reason), a courier; the client runs the same trial, words, confirm and Undo (parity by construction). Prompt §3d4
+    routes "cardio today" / "functional today with ..." here, apart from the rebuild (same kind) and the style change
+    (lasting); §3f's "a bodybuilding-style session today → answer in text" line now points here.
+  - **Why composed, not regenerated (measured):** one full-body day generated with `training_style: 'functional'` is a
+    lifting session (Deadlifts, presses, rows), and the generator's own "Conditioning & Core" day held ONE cardio
+    exercise in seven once the week's top-up and balance passes had run. So the session is built from generation's
+    parts: the constrained pool with the kind's style (kit list, injuries incl. running ease-offs, avoids, skill all
+    still remove), the app's ranker seeded per day and kind, the style's own set/rep/rest tables with the phase's
+    multipliers and shift (`repRangeForIncomingExercise`, `unbudgetedRestSeconds`), every weight through
+    `buildReplacementSlot` (her logged history, calibration caution, a deload at 70%), sized to her length, then the
+    shared tail (`settleWeek`) on the day.
+  - **CSCS decisions (her 18 Sep delegation), with the basis:** (1) Cardio: 2-6 conditioning blocks of different
+    modalities, machines first where her kit has them, at most one high-impact block, the catalogue's own work:rest,
+    rounds grown to the conditioning ceiling (8; 10 at 90+) to fill her time, core finisher; deload 3 rounds a block.
+    (2) Functional: explosive prep, power hinge (swing first), squat/single-leg, push, pull, loaded carry (the nearest
+    real thing to a sled), conditioning finisher, core; power before strength before conditioning (NSCA). (3) A
+    short session sheds the finisher/carry/core before the big patterns; REST IS NEVER CUT (her 18 Sep "protect the
+    rest, do less"). (4) A lift that carries weight goes first where her kit has weights (her 10 Sep rule). (5) This
+    week's other work is not repeated today where anything else fills the block, and the planned main lift is
+    excluded even when it is the only lift left for its block. (6) THE WEEK'S OTHER DAYS ARE NOT REBALANCED around a
+    one-off: run as an ordinary edit, the balance pass answered a cardio Monday by cutting Friday's presses 4→2 and
+    Wednesday's 3→2 — work she can still do, taken to square a ratio over a week that simply lost a session (a missed
+    day or an activity swap leaves the week alone for the same reason). (7) A named move she cannot have is stood in
+    for by its own kind (no box: broad jumps for box jumps), and the stand-in is kept on a short day like the move.
+  - **CSCS review, the five questions:** 1 effect: a real conditioning / athletic / style session priced by that
+    style's tables and this phase, not a token; the planned main lift loses one exposure, and its next prescription is
+    byte-identical. 2 takes away: today's planned work only; no other day changes; a box jump is prescribed at the
+    catalogue's prep dose (2 × light), not a working plyometric dose (named below). 3 fundamentals: the lifting kinds
+    cover hinge, squat, push and pull; progression untouched; deload halves; tomorrow's lifts are not done early.
+    4 floors: none redefined — rest from the style row plus the phase shift, role set ceilings, the session maximum
+    (passed only by moves she named, and the offer says so), the main-lift rest floor. 5 scope: injuries are the
+    existing filter; nothing here triages pain or prescribes rehab.
+  - **Words decided without asking (hers to change):** the kind labels and blurbs; "There's no sled push in the app's
+    exercise list, so Farmer's Walk does the loaded carrying."; "X needs a plyo box, which isn't in your kit, so Y takes
+    its place."; "Missing them today doesn't change the weight."; "Put my planned session back".
+  - **Verified:** `test:session-kind` (118 checks), `verify:session-kind` (screen, 40 checks), `verify:chat-session-kind`
+    (coach, model stubbed, 28 checks, incl. the card listing exactly what the day menu would build), screenshots read
+    at 390x844. Mutations: 25 on the logic gate, 24 caught, the 25th an equivalent mutant (below); 8 of 8 on the screen
+    driver; 7 of 7 on the chat driver (harness refuses a failing baseline and counts checks that ran). `test:coach-parity` derives the screen path (`buildSessionKindTodayProposal`
+    imported by WhatHappenedSheet). Coach exam case `kind-today-not-same-kind` (rebuild / kind-today / style change).
+    SWEEP of every gate reading a touched file plus every driver on the Exercise tab, the day menu and the chat (293
+    scripts, settled tree): 289 green; 4 red, all the same at the base commit (97139cdd, clean worktree, same check
+    counts): `test:meal-quality` (no database here), `test:food-swaps` (two foods with no swap group),
+    `verify:history-streak` (1a, 4b) and `verify:unit-ask` (3b, 3c). `test:coach-exam-fresh` goes stale by design
+    (the prompt changed): the exam needs a run on her machine.
+    FOUND BY A MUTATION: the knee fixture first used "knee", which the injury vocabulary does not know ("knees"), so the
+    injury filter was never exercised; the gate now asserts the fixture flags the knee.
+  - **Bundle:** the first, statically imported version put the app chunk at 1175 kB (over its 1166). The Exercise tab
+    now draws from an import-free module (`session-kind-marker.ts`: the kinds, the marker, its sentence) and fetches
+    the builder when it is used; measured both ends (base on a clean worktree of 97139cdd): app 1148→1153, first
+    paint 492→494, deploy 336→337, total 2411→2436. The total budget moved 2422→2455 on her 15 Sep ruling ("raise it
+    with room to grow"), the note in `test:bundle` beside it.
+  - **NOT DONE / NAMED:** a working-tier box jump (catalogue change with its own review); any sled exercise; interval
+    work renders with the generic set grid (a weight box beside a rower round, a steady block as "1 × 1200s"), which is
+    how every generated conditioning slot already renders; the coach's "text + small buttons" ruling (20 Oct) is its own
+    piece of work and this card follows whatever the other cards do; the cardio high-impact limit cannot bind with
+    today's catalogue (Burpees is the only high-impact cardio entry), an equivalent mutant, kept for future entries.
+    Whether the deployed coach CALLS this tool is the exam's to say (needs a run on her machine). Needs the frontend
+    and the `chat-gemini` deploy.
 
 - [x] **Live test 19 Oct, finding 10: Greek yoghurt and smoked turkey dishes blocked as "doesn't fit nut-free".**
   (`docs/plans/unidentified-food-wording.md`, allergen path.) TRACED AND CONFIRMED by running the real check: a line

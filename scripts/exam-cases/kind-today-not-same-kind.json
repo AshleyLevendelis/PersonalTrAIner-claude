@@ -1,0 +1,31 @@
+{
+  "name": "kind-today-not-same-kind",
+  "why": "Three requests a few words apart reach three different tools, and the wrong one costs something each time. 'Something different today' is propose_session_rebuild, which KEEPS the main lift (her 16 Sep ruling). 'Cardio today, no weights' is propose_session_kind_today, which replaces the WHOLE day for today only (her 20 Oct ruling, 'Drop it, today only'). 'Functional from now on' is propose_style_change, which rebuilds the rest of the plan. A coach that keys on 'different' or on a style word cannot pass all three: turn one names no kind, turn two names a kind and today, turn three names a kind and 'permanently'. Worded in words the coach's prompt does not contain, so the prompt cannot be the answer key. Getting turn two wrong either keeps the barbell she said she cannot use today or rewrites sixteen weeks because of one day.",
+  "messages": [
+    "today's plan looks dull to me, could you swap it for a fresh one?",
+    "scratch that, the weights area at my gym is shut for the day — can today be a cardio session instead?",
+    "and long term I want my programme built around athletic training rather than this, permanently please"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_session_rebuild"
+        ]
+      },
+      {
+        "turn": 1,
+        "oneOf": [
+          "propose_session_kind_today"
+        ]
+      },
+      {
+        "turn": 2,
+        "oneOf": [
+          "propose_style_change"
+        ]
+      }
+    ]
+  }
+}
