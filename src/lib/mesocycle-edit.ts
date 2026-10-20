@@ -315,7 +315,7 @@ export function pickDaysOwnWork(
   return chosen ? { exercise: chosen, kind: 'cross', note: DAYS_OWN_WORK_NOTE } : null
 }
 
-export const DAYS_OWN_WORK_NOTE = 'The day\'s own kind of work, in place of a leg movement.'
+const DAYS_OWN_WORK_NOTE = 'The day\'s own kind of work, in place of a leg movement.'
 
 function parseRepsHigh(reps: string): number | null {
   const range = reps.match(/(\d+)\s*-\s*(\d+)/)

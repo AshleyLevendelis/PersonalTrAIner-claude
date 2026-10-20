@@ -467,7 +467,8 @@
     "verify:named-food-clash": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/named-food-clash.mjs",
     "verify:chat-food-avoid": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-food-avoid.mjs",
     "verify:profile-temporary": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-temporary.mjs",
-    "test:shoulders-day": "tsx scripts/test-shoulders-day.ts"
+    "test:shoulders-day": "tsx scripts/test-shoulders-day.ts",
+    "test:coach-kit-names": "tsx scripts/test-coach-kit-names.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

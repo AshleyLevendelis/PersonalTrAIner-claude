@@ -20,6 +20,22 @@ import { getConstrainedPool, isEquipmentAllowed } from './exercise-plan'
  */
 const IMPLEMENT_WORDS = /^(dumbbells?|db|barbells?|bb|kettlebells?|kb|cables?|machines?|bands?|banded|smith|weighted|bodyweight|bw)$/i
 
+/**
+ * Position words the catalogue's names leave out ("Seated Dumbbell Overhead Press" is "Dumbbell Shoulder Press").
+ * Dropped to find a lookalike, like the implement words. Not "incline", "single-arm" or "close-grip": those name a
+ * different exercise, and the catalogue keeps them.
+ */
+const POSITION_WORDS = /^(seated|standing)$/i
+
+/** Words the catalogue uses for one movement under two names: each is searched for under the other too. */
+const SAME_MOVEMENT: [RegExp, string][] = [[/\boverhead\b/i, 'shoulder'], [/\bshoulder\b/i, 'overhead']]
+
+/** The implement a typed word names, as the catalogue's equipment lists spell it. */
+const IMPLEMENT_EQUIPMENT: [RegExp, string][] = [
+  [/^(dumbbells?|db)$/i, 'dumbbells'], [/^(kettlebells?|kb)$/i, 'kettlebell'], [/^(bands?|banded)$/i, 'resistance band'],
+  [/^(barbells?|bb)$/i, 'barbell'], [/^cables?$/i, 'cable machine'],
+]
+
 /** The tap that asks for the kit change (the coach's propose_kit_change card follows on the next turn). */
 export const KIT_CHIP = "That's not the kit I have"
 
@@ -46,12 +62,23 @@ export function swapNameFallback(input: {
   const allowedSet = new Set(allowed.map(n => n.toLowerCase()))
 
   // Lookalike names: the resolver's own candidates, then the words search with the implement words dropped.
-  const bare = typed.split(/\s+/).filter(w => w && !IMPLEMENT_WORDS.test(w)).join(' ')
+  const words = typed.split(/\s+/).filter(Boolean)
+  const bare = words.filter(w => !IMPLEMENT_WORDS.test(w) && !POSITION_WORDS.test(w)).join(' ')
+  // THE SAME MOVEMENT UNDER ITS OTHER NAME, and the implement she named first (live test, 19 Oct 2026). "Seated
+  // Dumbbell Overhead Press" found nothing: "seated" stayed in the search and "overhead" never met "shoulder", so
+  // Dumbbell Shoulder Press, the press she meant, was never offered.
+  const variants = [bare, ...SAME_MOVEMENT.filter(([re]) => re.test(bare)).map(([re, other]) => bare.replace(re, other))]
+  const namedKit = words.map(w => IMPLEMENT_EQUIPMENT.find(([re]) => re.test(w))?.[1]).filter((k): k is string => !!k)
+  const usesNamedKit = (name: string) => namedKit.length > 0 && namedKit.some(k => getExerciseEntry(name)?.equipment.includes(k) === true)
   const lookalikes = [
     ...(resolution.resolution === 'ambiguous' ? resolution.candidates.map(c => c.name) : []),
-    ...(bare ? searchExerciseCatalogByWords(bare, 10).map(e => e.name) : []),
+    ...variants.filter(Boolean).flatMap(v => searchExerciseCatalogByWords(v, 10).map(e => e.name)),
   ].filter((n, i, all) => all.findIndex(m => m.toLowerCase() === n.toLowerCase()) === i)
     .filter(n => n.toLowerCase() !== oldExercise.toLowerCase())
+    // Stable: the search's own order survives within each half.
+    .map((n, i) => ({ n, i, kit: usesNamedKit(n) ? 0 : 1 }))
+    .sort((a, b) => a.kit - b.kit || a.i - b.i)
+    .map(x => x.n)
 
   // A lookalike he CAN do is offered first even when it is a different movement: he asked for it by name, and the
   // swap card states what a cross-pattern swap costs the week before the tap (the swap path's own trade-off).
