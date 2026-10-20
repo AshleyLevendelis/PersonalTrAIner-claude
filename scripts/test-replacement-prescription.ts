@@ -295,7 +295,12 @@ async function main() {
   // AND THE CALIBRATION WEEK STAYS LIGHT. Every unverified weight generation
   // prints in week 1 starts deliberately under its estimate; a lift swapped in
   // that week is just as unverified and used to be written at the full figure.
-  check(`replaced, weighted slots in the calibration week were seen (${calibrationSeen})`, calibrationSeen >= 3, calibrationSeen)
+  // RE-ANCHORED 20 Oct 2026 (live test, 19 Oct; Ashley's "Work for that day instead"): one of the three was the
+  // knee ease-off's Heavy Kettlebell Swing on Sam's Saturday. A leg move on a non-leg day is now replaced by the day's
+  // own work, a plank here (his shoulder is flagged, so no press or raise fits), which carries no weight. Measured
+  // before and after on this fixture: 3 -> 2, both remaining from the ban and the swap paths, one each. The property
+  // (a calibration-week replacement starts under the week after) is unchanged; the floor still needs both paths.
+  check(`replaced, weighted slots in the calibration week were seen (${calibrationSeen})`, calibrationSeen >= 2, calibrationSeen)
   check('...and each starts lighter than the same lift the week after', heavyCalibration.length === 0, heavyCalibration.slice(0, 4))
 
   // -------------------------------------------------------------------------

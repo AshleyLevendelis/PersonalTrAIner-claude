@@ -219,7 +219,9 @@ function main() {
     !samWeek.days.some(d => /not a bug/i.test(noteOn(d, sam) ?? '')), samNote)
   check('Sam, Saturday: the note describes the day as it is — no overhead pressing, and what it is instead',
     satKeepsItsName
-      ? samNote === "No overhead pressing while your shoulder's flagged, so today is upper back and abs."
+      // RE-ANCHORED 20 Oct 2026: the note names legs when the day holds a leg movement (live test, 19 Oct: "so today
+      // is abs" over three leg exercises). Sam's Saturday carries its light leg accessory.
+      ? samNote === "No overhead pressing while your shoulder's flagged, so today is upper back, legs and abs."
       : samNote === null,
     { focus: samSat.focus, note: samNote })
   check('Sam, Saturday: the note does not send anyone to Profile',
