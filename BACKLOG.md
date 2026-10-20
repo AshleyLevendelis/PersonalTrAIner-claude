@@ -2,6 +2,35 @@
 
 Newest first. One line each.
 
+- [ ] **Sam live test, 20 Oct 2026: six reports TRACED, not built (her "report first, wait for build it").** Traced in
+  the live checkout (main, 12 Oct) and the branch; same behaviour in both unless said.
+  1. **Surprising weigh-in saved unasked (chat).** The ask exists on the chat path, server-side in `log_weight`
+     (`chat-gemini`), and in `WeighInCard` on Home. Measured on her numbers (80.6 then 84.2): the ask and the target
+     hold agree on every gap tried (both fire up to 9 days apart, neither from 10), so a held target with no question
+     means the deployed coach did not run the check: most likely the deployed `chat-gemini` predates N1; else its read
+     of earlier weigh-ins failed (swallowed, then saved) or the date was not sent. Settled by the function's log line
+     `weigh-in check ask=` for that turn (absent = old deploy). SECOND DEFECT: Home's trend and "+2.2 kg" read the raw
+     rows, held ones included (`dashboard-data` weight trend, `changeSinceStart`), so a held weigh-in still moves Home.
+     Profile's weight field compares with the setup weight, not the last weigh-in.
+  2. **Extra cardio by chat.** No coach tool ADDS a past cardio session to a lifting day: the swap tool always replaces
+     the day, `propose_cardio_session` is a plan edit and its client refuses a day with a lift ("...instead of that one,
+     or on a different day?", the reply she got), and `log_workout`'s cardio branch is a client regex that misses
+     "40 minute run" (needs "min"/"minutes"; measured). The prompt never tells the coach `log_workout` takes cardio and
+     its "plain statement is enough" rule pushes a tool call. `cardio_logs` has no distance column (a migration).
+     "Count it as today's workout" exists (`CircuitOffer`) and already fires on any cardio log on a due lifting day.
+  3. **Training days reverted.** Not explained by the code: the confirm writes the profile column and the plan, and the
+     receipt only lands if both saved. The only code paths that put BOTH back are the receipt's Undo (or a later
+     edit), or the app reading a different project/profile from the one written. Needs her database (select only):
+     the profile's training days, the 11 Oct schedule-change pending action and anything after it, and the plan weeks'
+     days. The receipt also overclaims: "Rebuilt 16 weeks" counts every week from the start, changed or not.
+  4. **PRs.** Two definitions: the finish card, the set badge and the exercise page count an estimated-1RM best
+     (18 kg x 13 over an earlier 18 kg x 10); Home's "Latest PR" and Tools' count need a heavier top weight. Her
+     17 Sep ruling ("Best set yet — 95kg x 8") already says an estimate best is shown as the set, so one rule exists.
+  5. **Knee ease-off and a hard run.** The coach is told about the ease-off; no cardio path or prompt rule links it to
+     a logged run. Nothing blocks or asks.
+  6. **Streak "2 in a row".** Correct under the coded rule (one forgiven miss per plan week; Sat 17 was that miss) if
+     Tue 13 was a second miss that week or the plan began after it. The branch's streak clock fix (counts from the
+     app's today) had no entry here until now; it does not change this case.
 - [x] **Pre-merge sweep, 20 Oct 2026: a list of exercises was read as one change repeated.** Full sweep at the
   merged branch: 428 of 434 passed. Four are expected (three need a database, one needs the coach exam re-run on her
   machine). Two coach drivers failed: `verify:chat-session-kind` and `verify:chat-rebalance` were written by the
