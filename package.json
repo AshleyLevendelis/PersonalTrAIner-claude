@@ -466,7 +466,8 @@
     "verify:one-calorie-target": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/one-calorie-target.mjs",
     "verify:named-food-clash": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/named-food-clash.mjs",
     "verify:chat-food-avoid": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-food-avoid.mjs",
-    "verify:profile-temporary": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-temporary.mjs"
+    "verify:profile-temporary": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-temporary.mjs",
+    "test:shoulders-day": "tsx scripts/test-shoulders-day.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

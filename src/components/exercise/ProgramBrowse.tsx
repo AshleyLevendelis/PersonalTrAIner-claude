@@ -15,7 +15,7 @@ import { prescriptionLine } from '@/lib/activity-day'
 import { shortPhaseLabel } from '@/lib/periodization'
 import { ReadOnlyDayList } from './ReadOnlyDayList'
 import { WarmupSection } from './WarmupSection'
-import type { MesocycleWeek, WorkoutDay } from '@/lib/types'
+import type { MesocycleWeek, UserProfile, WorkoutDay } from '@/lib/types'
 
 // ---------------------------------------------------------------------------
 // PROGRAM BROWSE — design handoff 5a "Index", 1 Sep 2026. Replaces the
@@ -56,6 +56,11 @@ interface ProgramBrowseProps {
   profileId?: string
   /** The person's current flags — the day's gap note is derived from them when the day is shown, never stored. */
   injuries?: string[]
+  /**
+   * The profile the pool is built from today (the saved one with any running ease-off or kit change laid over it).
+   * The gap note asks it whether a press fits the kit; without it the note never makes a kit claim.
+   */
+  poolProfile?: UserProfile
   /** From the route hash (`#/exercise/program/{n}`) — where paging starts. */
   initialWeek?: number
   /**
@@ -120,6 +125,7 @@ export function ProgramBrowse({
   mesocycle,
   profileId,
   injuries,
+  poolProfile,
   initialWeek,
   refreshToken,
   onOpenSwap,
@@ -580,7 +586,7 @@ export function ProgramBrowse({
                     <p className="text-xs text-muted-foreground">{workout.conditioning_note}</p>
                   )}
                   {(() => {
-                    const gap = describeDayGap(workout, { injuries: injuries ?? [] })
+                    const gap = describeDayGap(workout, poolProfile ?? { injuries: injuries ?? [] }, injuries ?? [])
                     return gap ? <p className="text-xs text-muted-foreground" data-testid="day-gap-note">{gap}</p> : null
                   })()}
                   {workout.block_size_note && (

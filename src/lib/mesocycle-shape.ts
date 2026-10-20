@@ -1,4 +1,5 @@
 import type { MesocycleWeek, WorkoutDay } from './types'
+import { tidyStoredHold } from './periodization'
 
 // Pure MesocycleWeek <-> mesocycle_weeks row shape conversion, deliberately
 // kept free of any Supabase import — mesocycle-persistence.ts (the actual IO
@@ -46,6 +47,30 @@ export function fromRow(row: MesocycleWeekRow): MesocycleWeek {
     is_deload: row.is_deload ?? undefined,
     isCalibrationWeek: row.is_calibration_week ?? undefined,
     label: row.label,
-    days: row.days,
+    days: tidyHolds(row.days),
   }
+}
+
+/**
+ * Stored holds read in 5-second steps (`tidyStoredHold`). The same array back when nothing needed tidying, so a read
+ * of a plan made since 9 Oct changes nothing, and nothing is ever written back from here.
+ */
+function tidyHolds(days: WorkoutDay[]): WorkoutDay[] {
+  if (!Array.isArray(days)) return days
+  let changed = false
+  const out = days.map(d => {
+    if (!Array.isArray(d?.exercises)) return d
+    let dayChanged = false
+    const exercises = d.exercises.map(e => {
+      if (typeof e?.reps !== 'string') return e
+      const reps = tidyStoredHold(e.reps)
+      if (reps === e.reps) return e
+      dayChanged = true
+      return { ...e, reps }
+    })
+    if (!dayChanged) return d
+    changed = true
+    return { ...d, exercises }
+  })
+  return changed ? out : days
 }

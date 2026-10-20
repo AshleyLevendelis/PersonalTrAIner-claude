@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [x] **Live test 19 Oct, findings 1-2: a "Shoulders & Abs" day with leg work and "No overhead press fits your
+  kit" while five presses fitted it** (`docs/plans/shoulders-day-honest.md`). TRACED (and run through the real code
+  with Sam's profile): a plan made while his shoulder was flagged, never rebuilt when the flag came off; a knee
+  ease-off that replaced each knee move with the same pattern (Spanish squat, heavy swing) on a shoulders day; a note
+  that blamed the kit for any cause but a lasting flag and never checked the kit, and had no word for legs; a swing
+  ranked as bodybuilding because the per-pattern floor let it into the bodybuilding pool; a "34-49s" plank stored by
+  the pre-9-Oct engine. FIXED: (1) the note asks the person's own pool: "Today's plan has no overhead press, though
+  one fits your kit now, so today is upper back, legs and abs." with an **Add one** button that opens the add sheet
+  (shoulder presses first); a running ease-off is said as one; the kit sentence only when no press truly fits; no kit
+  claim without a kit. (2) HER RULING 20 Oct, "Work for that day instead": a leg move knocked out of a non-leg day is
+  replaced by the day's own work (an Arnold press on Sam's day), leg days unchanged (`pickDaysOwnWork`). (3) MY CSCS
+  CALL: an automatic replacement takes a movement really tagged with the person's style before one only let in by the
+  per-pattern floor (Single-Leg Glute Bridge under a knee flag -> Romanian Deadlifts, not the heavy swing). BASIS:
+  for a bodybuilding trainee the hinge's job is hamstring and glute hypertrophy under control; a ballistic heavy swing
+  is a power/conditioning tool, and the floor exists to keep a pattern fillable, not to outrank a real match. The swap
+  LIST's order (her 18 Sep ruling) is untouched. (4) a stored hold reads in 5-second steps ("34-49s" -> "35-50s"),
+  read-only. CSCS REVIEW: effect, a shoulders day keeps shoulder stimulus while a knee settles instead of becoming a
+  knee-loading leg session 48 h after leg day; taken away, its one light leg accessory for the ease-off's length;
+  fundamentals, pattern coverage holds on leg day; no floor redefined; in scope (removes rehab-like prescription
+  from non-leg days). NOT DONE: Sam's stored plan itself (Add one, a rebuild or the next block fixes it); the stored
+  label. `test:shoulders-day` (21 checks, 10 mutations caught), `verify:day-length` §4 (31 checks; 3 mutations
+  caught), `test:day-length` re-anchored (its pinned "fits your kit" was the false sentence; "legs" was the missing
+  word). Frontend only.
+
 - [x] **Live test 19 Oct, finding 3: Profile's Injuries row read "None" during a knee ease-off.** TRACED: the row
   summary read only the lasting injuries; the running change was shown only inside the sheet behind it (the Equipment
   row had the same blind spot for a temporary kit change). FIXED: both rows name every running change of their kind

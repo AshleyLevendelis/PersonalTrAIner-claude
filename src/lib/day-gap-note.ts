@@ -25,7 +25,7 @@
 // ---------------------------------------------------------------------------
 
 import { EXERCISE_DATABASE, getExerciseEntry, isContraindicatedFor, type ExerciseEntry } from './exercise-db'
-import { getFlaggedJoints } from './exercise-plan'
+import { getFlaggedJoints, getConstrainedPool } from './exercise-plan'
 import type { UserProfile, WorkoutDay } from './types'
 
 /**
@@ -41,22 +41,34 @@ const FLAG_WORDS: [injury: string, word: string][] = [
   ['lower_back', 'lower back'],
 ]
 
-/** The first of this person's flags that rules an overhead press out, as the sentence says it. */
-function flagBehindTheGap(injuries: readonly string[]): string | null {
+/** The first of this person's flags that rules an overhead press out: the code, and the word the sentence uses. */
+function flagBehindTheGap(injuries: readonly string[]): { injury: string; word: string } | null {
   for (const [injury, word] of FLAG_WORDS) {
     if (!injuries.includes(injury)) continue
     const joints = getFlaggedJoints([injury])
     const removesAPress = EXERCISE_DATABASE.some(e =>
       !e.retired && e.movement_pattern === 'vertical_push' && isContraindicatedFor(e, joints))
-    if (removesAPress) return word
+    if (removesAPress) return { injury, word }
   }
   return null
+}
+
+/**
+ * Does any overhead press fit this person TODAY: their kit, their injuries, their running ease-offs, their style?
+ * Asked of the same pool every plan and swap is built from. null when the profile is too partial to ask (no kit known):
+ * the kit sentence is then never said, because it would be a claim nobody checked.
+ */
+function pressFits(profile: Partial<UserProfile>): boolean | null {
+  if (!profile.equipment_access) return null
+  return getConstrainedPool(profile as UserProfile).some(e => e.movement_pattern === 'vertical_push' && e.mechanics_tier !== 'primer')
 }
 
 function join(parts: string[]): string {
   if (parts.length <= 1) return parts.join('')
   return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
 }
+
+const LEG_PATTERNS = new Set(['knee_dominant', 'hip_hinge', 'single_leg', 'lunge', 'isolation_quad', 'isolation_hamstring', 'isolation_calf', 'isolation_glute'])
 
 /** What the day trains, in the order a person would say it. Read off the exercises, never off the label. */
 function whatTheDayIs(entries: ExerciseEntry[]): string {
@@ -66,6 +78,9 @@ function whatTheDayIs(entries: ExerciseEntry[]): string {
   if (upperBack) parts.push('upper back')
   if (has(e => e.movement_pattern === 'isolation_shoulder')) parts.push('shoulders')
   if (has(e => e.movement_pattern === 'isolation_bicep')) parts.push('arms')
+  // LEGS ARE LEGS (live test, 19 Oct 2026): "so today is abs" was printed over a Spanish squat, a heavy swing and a
+  // step-up, because no branch knew a leg movement.
+  if (has(e => LEG_PATTERNS.has(e.movement_pattern))) parts.push('legs')
   if (has(e => e.movement_pattern === 'core')) parts.push('abs')
   return join(parts)
 }
@@ -77,7 +92,19 @@ function whatTheDayIs(entries: ExerciseEntry[]): string {
  * "Shoulders & Abs" day with no overhead press on it. A day that has been
  * renamed says nothing; a day that holds its press says nothing.
  */
-export function describeDayGap(day: WorkoutDay, profile: Pick<UserProfile, 'injuries'>): string | null {
+export function describeDayGap(
+  day: WorkoutDay,
+  /**
+   * The profile the person's exercises are chosen from TODAY: the saved one with any running ease-off or kit change
+   * laid over it (the pool profile). Its injuries say which flags are in force; its kit says whether a press fits.
+   */
+  profile: Pick<UserProfile, 'injuries'> & Partial<UserProfile>,
+  /**
+   * The injuries saved on the profile, lasting ones only. A flag in force that is NOT among them is a running
+   * ease-off, and is said as one. Omitted: every flag in force is treated as lasting (the sentence before 20 Oct).
+   */
+  lastingInjuries?: readonly string[],
+): string | null {
   if (day.focus !== 'Shoulders & Abs' || day.exercises.length === 0) return null
   const entries = day.exercises
     .map(ex => getExerciseEntry(ex.name))
@@ -87,8 +114,26 @@ export function describeDayGap(day: WorkoutDay, profile: Pick<UserProfile, 'inju
   const instead = whatTheDayIs(entries)
   if (!instead) return null
 
+  // THE CAUSE, TOLD TRUE (live test, 19 Oct 2026). This said "fits your kit" for every cause that was not a lasting
+  // flag on the profile, and never looked at the kit: a plan made while a shoulder was flagged, with the flag since
+  // removed, read "No overhead press fits your kit" while five presses fitted it.
   const flag = flagBehindTheGap(profile.injuries ?? [])
-  return flag
-    ? `No overhead pressing while your ${flag}'s flagged, so today is ${instead}.`
-    : `No overhead press fits your kit, so today is ${instead}.`
+  if (flag) {
+    const easing = lastingInjuries !== undefined && !lastingInjuries.includes(flag.injury)
+    return easing
+      ? `No overhead pressing while you're easing off your ${flag.word}, so today is ${instead}.`
+      : `No overhead pressing while your ${flag.word}'s flagged, so today is ${instead}.`
+  }
+  const fits = pressFits(profile)
+  if (fits === false) return `No overhead press fits your kit, so today is ${instead}.`
+  if (fits === true) return `Today's plan has no overhead press, though one fits your kit now, so today is ${instead}.`
+  return `No overhead press on today's plan, so today is ${instead}.`
+}
+
+/**
+ * True when today's note is the "one fits your kit now" case: the screen offers to add one right there. Asked of the
+ * same function the sentence comes from, so the button can never appear beside a different sentence.
+ */
+export function dayGapCanAddPress(day: WorkoutDay, profile: Pick<UserProfile, 'injuries'> & Partial<UserProfile>, lastingInjuries?: readonly string[]): boolean {
+  return /one fits your kit now/.test(describeDayGap(day, profile, lastingInjuries) ?? '')
 }

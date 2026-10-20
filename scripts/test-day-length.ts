@@ -148,9 +148,14 @@ function main() {
   const flagged = { injuries: ['shoulders'] } as Pick<UserProfile, 'injuries'>
   const samDay = day('Shoulders & Abs', 'Band Dislocates', 'Backpack Row', 'Rear Delt Flyes', 'Dumbbell Shrugs', 'Bird Dog', 'Single-Leg Glute Bridge')
   check('a Shoulders day with no overhead press, under a shoulder flag: the sentence, exactly',
-    describeDayGap(samDay, flagged) === "No overhead pressing while your shoulder's flagged, so today is upper back and abs.", describeDayGap(samDay, flagged))
-  check('the same stored day once the flag is gone: no flag is named',
-    describeDayGap(samDay, { injuries: [] }) === 'No overhead press fits your kit, so today is upper back and abs.', describeDayGap(samDay, { injuries: [] }))
+    // RE-ANCHORED 20 Oct 2026 (live test, 19 Oct): the day holds a single-leg glute bridge, and "legs" was missing
+    // from the sentence because no branch knew a leg movement. That omission was the defect.
+    describeDayGap(samDay, flagged) === "No overhead pressing while your shoulder's flagged, so today is upper back, legs and abs.", describeDayGap(samDay, flagged))
+  // RE-ANCHORED 20 Oct 2026: this pinned "No overhead press fits your kit" for a profile that names NO kit, which is
+  // the sentence the live test caught being false (five presses fitted Sam's kit). With no kit to ask, no kit claim.
+  // The kit sentence, the "one fits your kit now" sentence and the running ease-off are held by test:shoulders-day.
+  check('the same stored day once the flag is gone: no flag is named, and no kit claim nobody checked',
+    describeDayGap(samDay, { injuries: [] }) === "No overhead press on today's plan, so today is upper back, legs and abs.", describeDayGap(samDay, { injuries: [] }))
   check('a flag that takes no overhead press away is not blamed (ankles)',
     !/flagged/.test(describeDayGap(samDay, { injuries: ['ankles'] }) ?? ''), describeDayGap(samDay, { injuries: ['ankles'] }))
   check('two flags: the shoulder is the one named',
@@ -161,7 +166,7 @@ function main() {
     describeDayGap(day('Upper Pull & Core', 'Towel Row', 'Backpack Curl', 'Plank'), flagged) === null &&
     describeDayGap(day('Chest & Triceps', 'Dumbbell Floor Press', 'Band Tricep Pushdown'), flagged) === null)
   check('it describes the day from what is ON it: delt isolation is "shoulders", a day of abs only is "abs"',
-    describeDayGap(day('Shoulders & Abs', 'Lateral Raises', 'Plank'), { injuries: [] }) === 'No overhead press fits your kit, so today is shoulders and abs.' &&
+    describeDayGap(day('Shoulders & Abs', 'Lateral Raises', 'Plank'), { injuries: [] }) === "No overhead press on today's plan, so today is shoulders and abs." &&
     describeDayGap(day('Shoulders & Abs', 'Plank', 'Hanging Leg Raises'), flagged) === "No overhead pressing while your shoulder's flagged, so today is abs.",
     [describeDayGap(day('Shoulders & Abs', 'Lateral Raises', 'Plank'), { injuries: [] }), describeDayGap(day('Shoulders & Abs', 'Plank', 'Hanging Leg Raises'), flagged)])
   const everyNote = [samDay, day('Shoulders & Abs', 'Lateral Raises', 'Plank')].flatMap(d => [[], ['shoulders'], ['wrists'], ['neck', 'elbows']].map(i => describeDayGap(d, { injuries: i }) ?? ''))

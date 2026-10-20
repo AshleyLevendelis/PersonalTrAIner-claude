@@ -11,9 +11,10 @@
 
 import type { MesocycleWeek, Exercise, UserProfile, EquipmentAccess, WorkoutDay } from './types'
 import { getExerciseEntry, isContraindicatedFor } from './exercise-db'
-import { getFlaggedJoints, isEquipmentAllowed } from './exercise-plan'
+import { getFlaggedJoints, isEquipmentAllowed, isLegPattern, isLegDay } from './exercise-plan'
 import {
   pickAutomaticReplacement,
+  pickDaysOwnWork,
   buildReplacementSlot,
   clearOrphanedSupersetLabels,
   isMainLiftSlot,
@@ -185,7 +186,13 @@ async function substituteSlots(
         const entry = getExerciseEntry(slot.name)
         if (!entry) { exercises.push(slot); continue }
 
-        const pick = pickAutomaticReplacement(slot.name, candidateProfile, exclusions, onDay, usedThisWeek)
+        // A NON-LEG DAY KEEPS ITS OWN WORK (Ashley, 20 Oct 2026, "Work for that day instead"). A leg movement knocked
+        // out of a day whose own work is not legs is replaced by that day's own kind of work, never by another leg
+        // move: the knee ease-off had put a Spanish squat and a heavy swing on a shoulders day (live test, 19 Oct). A
+        // leg day still gets a knee-friendly leg move through the ordinary pick below.
+        const pick = (isLegPattern(entry.movement_pattern) && !isLegDay(day.focus)
+          ? pickDaysOwnWork(day.focus, entry, candidateProfile, exclusions, onDay, usedThisWeek)
+          : pickAutomaticReplacement(slot.name, candidateProfile, exclusions, onDay, usedThisWeek))
         if (!pick) {
           // Dropping is the honest outcome — a session listing the same lift
           // twice, or a squat where a kickback was, is not an extra exercise.

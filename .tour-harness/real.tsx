@@ -298,6 +298,10 @@ const profile: UserProfile = {
 // label, no MAIN LIFT anywhere). Seeded so a re-run is comparable.
 setRandomSource(seededRngFromKey('tour-real-screens'))
 const generated0 = generateMesocycle(profile)
+// &cleared=1 (with sam=1) — THE LIVE TEST'S STALE DAY (19 Oct 2026). The plan is made while the shoulder is flagged,
+// then the flag is taken off and nothing rebuilds it: the Shoulders day keeps no press while presses now fit the kit.
+// The INPUT is chosen (when the flag came off); the plan is the generator's own.
+if (SAM && new URLSearchParams(location.search).get('cleared') === '1') profile.injuries = []
 // ?prep=1 — A PREP MOVE THAT NEEDS A BELL, which the generator does not pick.
 //
 // Ashley, 18 Sep 2026: her Kettlebell Swings sat in the prep slot with no

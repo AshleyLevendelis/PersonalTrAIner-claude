@@ -212,8 +212,29 @@ const gap = await ev(`(() => {
   const r = n?.getBoundingClientRect()
   return { text: n?.innerText ?? null, inView: !!r && r.top >= 0 && r.bottom <= window.innerHeight, page: document.body.innerText }
 })()`)
-check('4a. the note is on screen and describes the day', gap.text === "No overhead pressing while your shoulder's flagged, so today is upper back and abs." && gap.inView === true, { text: gap.text, inView: gap.inView })
+// RE-ANCHORED 20 Oct 2026: legs are named as legs when the day holds any (live test, 19 Oct).
+check('4a. the note is on screen and describes the day', /^No overhead pressing while your shoulder's flagged, so today is .*abs\.$/.test(gap.text ?? '') && gap.inView === true, { text: gap.text, inView: gap.inView })
 check('4b. "not a bug" is nowhere on the page, and the note sends nobody to Profile', !/not a bug/i.test(gap.page) && !/profile/i.test(gap.text ?? ''), gap.text)
+check('4b2. a note under a flag offers no Add button (no press fits while the shoulder is flagged)', (await ev(`document.querySelectorAll('[data-testid="day-gap-add"]').length`)) === 0)
+
+// THE LIVE TEST'S STALE DAY (19 Oct 2026): the same plan, the flag since removed. Presses fit Sam's kit now, so the
+// note must not blame the kit, must say one fits, and must offer to add one, which opens the add sheet.
+await go(`sam=1&cleared=1&today=${gapDay.date}`, '#/tab/exercise', 4200)
+const stale = await ev(`(() => {
+  const n = document.querySelector('[data-testid="day-gap-note"]')
+  n?.scrollIntoView({ block: 'center' })
+  const b = document.querySelector('[data-testid="day-gap-add"]')
+  const r = b?.getBoundingClientRect()
+  return { text: n?.innerText ?? null, button: b?.textContent ?? null, inView: !!r && r.top >= 0 && r.bottom <= window.innerHeight }
+})()`)
+check('4b3. flag gone, presses fit: the note says the plan has none though one fits now, and does not blame the kit',
+  /^Today's plan has no overhead press, though one fits your kit now, so today is .+\./.test((stale.text ?? '').replace(/\s*Add one$/, '')) && !/No overhead press fits your kit/.test(stale.text ?? ''), stale)
+check('4b4. ...with an Add one button on screen beside it', stale.button === 'Add one' && stale.inView === true, stale)
+await shot('day-gap-stale-note.png')
+await tap('[data-testid="day-gap-add"]')
+await wait(900)
+check('4b5. ...which opens the add-exercise sheet', await ev(`!!document.querySelector('[role="dialog"]') && /add/i.test(document.querySelector('[role="dialog"]')?.innerText ?? '')`))
+await shot('day-gap-stale.png')
 await shot('day-length-gap-note.png')
 await go(`sam=1&today=${walkDay.date}`, '#/tab/exercise', 4200)
 check('4c. a day that is what its name says carries no note', (await ev(`document.querySelectorAll('[data-testid="day-gap-note"]').length`)) === 0)

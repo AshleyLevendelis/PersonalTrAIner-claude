@@ -753,6 +753,17 @@ export function shiftReps(reps: string, delta: number, minReps: number): string 
 }
 
 /**
+ * A HOLD STORED BEFORE 9 OCT 2026, READ IN 5-SECOND STEPS (live test, 19 Oct 2026). Plans generated before holds
+ * were stepped in seconds carry durations like "34-49s", which nobody can count to and today's engine cannot produce.
+ * Read through the backstop shiftReps already applies (a zero shift, snapped), so a stored plan reads the way a new one
+ * is written. Anything that is not a hold comes back as the same string.
+ */
+export function tidyStoredHold(reps: string): string {
+  if (!/^\d+\s*(?:-\s*\d+\s*)?s$/.test(reps)) return reps
+  return shiftReps(reps, 0, 0)
+}
+
+/**
  * Per-week step for an interval exercise's work bout and rest period —
  * deliberately its own small constant rather than reusing PHASE_CONFIGS'
  * rep_shift, which is calibrated for rep-count magnitudes (~3-4) and

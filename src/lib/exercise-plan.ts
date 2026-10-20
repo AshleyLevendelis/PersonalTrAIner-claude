@@ -442,6 +442,33 @@ function isLegTrack(focus: TrackFocus): boolean {
   return TRACKS[focus].primary_patterns.some(p => p === 'knee_dominant' || p === 'hip_hinge' || p === 'single_leg')
 }
 
+/** The leg movement patterns: compound and isolation. */
+const LEG_MOVEMENT_PATTERNS: ReadonlySet<string> = new Set(['knee_dominant', 'hip_hinge', 'single_leg', 'lunge', 'isolation_quad', 'isolation_hamstring', 'isolation_calf', 'isolation_glute'])
+
+export function isLegPattern(pattern: string): boolean {
+  return LEG_MOVEMENT_PATTERNS.has(pattern)
+}
+
+/**
+ * Is this day ABOUT legs? A day whose name the engine does not know counts as one, so nothing is taken off a day
+ * nobody can describe (the cautious answer for an ease-off: the old same-pattern replacement).
+ */
+export function isLegDay(focus: string): boolean {
+  const track = TRACKS[focus as TrackFocus]
+  return !track || isLegTrack(focus as TrackFocus)
+}
+
+/**
+ * The day's OWN kind of work, in the order its name puts it: primary patterns, then secondary, never a leg pattern.
+ * Shoulders & Abs: an overhead press, a raise, core. Read by the ease-off (Ashley, 20 Oct 2026, "Work for that day
+ * instead") when a leg movement leaves a day that is not about legs.
+ */
+export function daysOwnPatterns(focus: string): MovementPattern[] {
+  const track = TRACKS[focus as TrackFocus]
+  if (!track) return []
+  return [...new Set([...track.primary_patterns, ...track.secondary_patterns])].filter(p => !isLegPattern(p))
+}
+
 /**
  * The same pattern set selectExercisesForTrack's primer filter matches
  * against, exported so quality-score.ts's primerFit dimension can check a

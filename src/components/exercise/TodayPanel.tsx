@@ -91,7 +91,7 @@ import { readSessionSummary, saveSessionSummary } from '@/lib/session-summary-st
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { CircuitOffer } from './CircuitOffer'
-import { describeDayGap } from '@/lib/day-gap-note'
+import { describeDayGap, dayGapCanAddPress } from '@/lib/day-gap-note'
 import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
 import type { LoadSource } from './LoadChip'
 
@@ -1475,8 +1475,25 @@ export function TodayPanel({
               to be stamped at generation and went on naming a flag nobody had.
               A plain note, not a warning: nothing is wrong with the day. */}
           {(() => {
-            const gap = describeDayGap(workout!, { injuries: profile?.injuries ?? [] })
-            return gap ? <p className="text-xs text-muted-foreground" data-testid="day-gap-note">{gap}</p> : null
+            // The pool profile says what is in force today (a running ease-off included) and what fits the kit; the
+            // stored injuries say which flags are lasting, so a running ease-off is said as one (live test, 19 Oct).
+            const pool = profile ?? { injuries: [] }
+            const gap = describeDayGap(workout!, pool, storedProfile?.injuries ?? profile?.injuries ?? [])
+            if (!gap) return null
+            const canAdd = !!profileId && !!mesocycle && dayGapCanAddPress(workout!, pool, storedProfile?.injuries ?? profile?.injuries ?? [])
+            return (
+              <p className="text-xs text-muted-foreground" data-testid="day-gap-note">
+                {gap}
+                {canAdd && (
+                  <>
+                    {' '}
+                    <button type="button" data-testid="day-gap-add" onClick={() => setAddOpen(true)} className="hit-slop-44 font-medium text-primary-text underline underline-offset-2">
+                      Add one
+                    </button>
+                  </>
+                )}
+              </p>
+            )
           })()}
           {workout!.block_size_note && (
             <div className="flex items-start gap-2">

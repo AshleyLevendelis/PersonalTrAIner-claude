@@ -1,7 +1,7 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import type { DayGuard } from './plan-guard'
 import { getSmartReplacements, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, getExerciseEntry} from './exercise-db'
-import { getConstrainedPool, getFlaggedJoints, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, isTempoEligible, repRangeForIncomingExercise, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer, POOL_WIDE_IMPLEMENT_TIERS } from './exercise-plan'
+import { getConstrainedPool, getFlaggedJoints, daysOwnPatterns, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, isTempoEligible, repRangeForIncomingExercise, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer, POOL_WIDE_IMPLEMENT_TIERS } from './exercise-plan'
 import { prescribeLoad, type LoadPrescription, isExternallyLoaded, DELOAD_LOAD_FRACTION } from './load-prescription'
 import { resolveLoadFields } from './warmup'
 import { PHASE_CONFIGS, getPhaseTempo, formatTempo, stepHoldSeconds } from './periodization'
@@ -262,9 +262,19 @@ export function pickAutomaticReplacement(
   const stageKind: AutomaticPick['kind'] = same.length > 0 ? 'same' : nearest.length > 0 ? 'nearest' : 'cross'
 
   // Stable: the ranker's order survives inside each band.
+  //
+  // A REAL STYLE MATCH BEFORE A FLOOR'S (live test, 19 Oct 2026; CSCS, basis in BACKLOG). The strict pool keeps four
+  // options per pattern even where the style has fewer, by letting other styles' movements in, and membership of the
+  // strict pool is what "on style" means here, so a heavy kettlebell swing let in for a bodybuilder ranked as a
+  // bodybuilding movement and beat Romanian Deadlifts. An automatic pick (nobody is choosing) now takes a movement
+  // actually tagged with the person's style first. The swap LIST's order is her 18 Sep ruling and is not touched.
+  const style = poolProfile.training_style
   const ordered = stage
-    .map((c, i) => ({ c, i, style: c.offStyle ? 1 : 0, repeat: usedThisWeek.has(c.exercise.name) ? 1 : 0 }))
-    .sort((a, b) => a.style - b.style || a.repeat - b.repeat || a.i - b.i)
+    .map((c, i) => ({
+      c, i, style: c.offStyle ? 1 : 0, tagged: style && !c.exercise.style_tags.includes(style) ? 1 : 0,
+      repeat: usedThisWeek.has(c.exercise.name) ? 1 : 0,
+    }))
+    .sort((a, b) => a.style - b.style || a.tagged - b.tagged || a.repeat - b.repeat || a.i - b.i)
   const chosen = ordered[0].c
   return {
     exercise: chosen.exercise,
@@ -273,6 +283,39 @@ export function pickAutomaticReplacement(
   }
 }
 
+
+/**
+ * THE DAY'S OWN WORK, for a leg movement leaving a day that is not about legs (Ashley, 20 Oct 2026, "Work for that day
+ * instead"). From the eased pool, in the order the day's name puts its patterns (a press, then a raise, then core on
+ * a shoulders day); a movement of the outgoing one's tier first, then one not already brought in this week; never one
+ * already on the day; a real style match before a floor's. Null when the day's own work has nothing left to offer,
+ * and the slot is then dropped, as any slot with no replacement is.
+ */
+export function pickDaysOwnWork(
+  focus: string,
+  outgoing: ExerciseEntry,
+  poolProfile: UserProfile,
+  exclusions: string[],
+  onDay: ReadonlySet<string>,
+  usedThisWeek: ReadonlySet<string> = new Set(),
+): AutomaticPick | null {
+  const patterns = daysOwnPatterns(focus)
+  if (patterns.length === 0) return null
+  const style = poolProfile.training_style
+  const ranked = getConstrainedPool(poolProfile, exclusions)
+    .map((e, i) => ({ e, i, p: patterns.indexOf(e.movement_pattern) }))
+    .filter(x => x.p >= 0 && x.e.mechanics_tier !== 'primer' && !onDay.has(x.e.name))
+    .sort((a, b) =>
+      a.p - b.p
+      || (a.e.mechanics_tier === outgoing.mechanics_tier ? 0 : 1) - (b.e.mechanics_tier === outgoing.mechanics_tier ? 0 : 1)
+      || (usedThisWeek.has(a.e.name) ? 1 : 0) - (usedThisWeek.has(b.e.name) ? 1 : 0)
+      || (style && !a.e.style_tags.includes(style) ? 1 : 0) - (style && !b.e.style_tags.includes(style) ? 1 : 0)
+      || a.i - b.i)
+  const chosen = ranked[0]?.e
+  return chosen ? { exercise: chosen, kind: 'cross', note: DAYS_OWN_WORK_NOTE } : null
+}
+
+export const DAYS_OWN_WORK_NOTE = 'The day\'s own kind of work, in place of a leg movement.'
 
 function parseRepsHigh(reps: string): number | null {
   const range = reps.match(/(\d+)\s*-\s*(\d+)/)
