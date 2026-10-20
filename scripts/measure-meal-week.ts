@@ -24,10 +24,10 @@ import { mulberry32, makeDish, missingFixtureFoods } from './meal-fixture'
 const PROFILES = 200
 const DATES = Array.from({ length: 7 }, (_, i) => new Date(Date.UTC(2026, 9, 16 + i)).toISOString().slice(0, 10))
 
-interface Row { label: string; profiles: number; distinct: number; lunches: number; dinners: number; maxOne: number; nextDay: number; sameDays: number; onTarget: number; days: number; worstMax: number }
+interface Row { label: string; profiles: number; distinct: number; lunches: number; dinners: number; maxOne: number; nextDay: number; sameDays: number; onTarget: number; days: number; worstMax: number; lopsided: number; servings: number; smallest: number }
 
-function run(label: string, drift: number, poolSize: number, topUp: 'none' | 'any' | 'fits' = 'none'): Row {
-  const row: Row = { label, profiles: 0, distinct: 0, lunches: 0, dinners: 0, maxOne: 0, nextDay: 0, sameDays: 0, onTarget: 0, days: 0, worstMax: 0 }
+function run(label: string, drift: number, poolSize: number, topUp: 'none' | 'any' | 'fits' = 'none', bigLunch = 0): Row {
+  const row: Row = { label, profiles: 0, distinct: 0, lunches: 0, dinners: 0, maxOne: 0, nextDay: 0, sameDays: 0, onTarget: 0, days: 0, worstMax: 0, lopsided: 0, servings: 0, smallest: Infinity }
   for (let p = 0; p < PROFILES; p++) {
     const rnd = mulberry32(9100 + p)
     const j = () => 0.95 + rnd() * 0.1
@@ -61,7 +61,15 @@ function run(label: string, drift: number, poolSize: number, topUp: 'none' | 'an
     }
     row.profiles++
     const rotation = buildRotation(pools, today, [], shape)
-    const week = serveDates({ dates: DATES, pools, targets: today, shape, rotation })
+    // HER OWN BIG LUNCH, pinned every day at `bigLunch` x its share (M60): the case a share band is for.
+    let pinsByDate: Record<string, Partial<Record<MealSlotName, PoolOption>>> = {}
+    if (bigLunch > 0) {
+      const lb = computeSlotBudgets(today, shape.mealsPerDay, shape.includeSnacks).lunch!
+      const own = makeDish(rnd, 'lunch', 900, { calories: Math.round(lb.calories * bigLunch), protein: Math.round(lb.protein * bigLunch), carbs: Math.round(lb.carbs * bigLunch), fat: Math.round(lb.fat * bigLunch) })
+      if (!own) continue
+      pinsByDate = Object.fromEntries(DATES.map(d => [d, { lunch: { ...own, name: 'Her own lunch' } }]))
+    }
+    const week = serveDates({ dates: DATES, pools, targets: today, shape, rotation, pinsByDate })
     const count = new Map<string, number>()
     const lunches = new Set<string>(), dinners = new Set<string>()
     const keys: string[] = []
@@ -75,6 +83,15 @@ function run(label: string, drift: number, poolSize: number, topUp: 'none' | 'an
       keys.push((Object.keys(chosen) as MealSlotName[]).sort().map(sl => chosen[sl]!.name).join('|'))
       row.days++
       if (s.day.withinTolerance) row.onTarget++
+      // LOPSIDED (runs 7-10, M60): a serving far from its meal's share of the day, against TODAY's budgets.
+      const budgets = computeSlotBudgets(today, shape.mealsPerDay, shape.includeSnacks)
+      for (const [slot, o] of Object.entries(chosen) as [MealSlotName, PoolOption][]) {
+        const share = o.macros.calories / Math.max(1, budgets[slot]?.calories ?? 1)
+        const [lo, hi] = slot === 'snack' ? [0.5, 2.0] : [0.6, 1.5]
+        row.servings++
+        if (share < lo || share > hi) row.lopsided++
+        if (slot !== 'snack') row.smallest = Math.min(row.smallest, share)
+      }
     })
     for (let a = 0; a < keys.length; a++) for (let b = a + 1; b < keys.length; b++) if (keys[a] === keys[b]) row.sameDays++
     const most = Math.max(...count.values())
@@ -95,15 +112,20 @@ function main(): void {
     run('3 dishes a meal, 10% drift', 0.9, 3),
     run('3, more options: any that pass', 0.9, 3, 'any'),
     run('3, more options: only if it fits', 0.9, 3, 'fits'),
+    run('her own lunch at 1.4x, pinned', 1.0, DEFAULT_POOL_SIZE, 'none', 1.4),
+    run('her own lunch at 1.6x, pinned', 1.0, DEFAULT_POOL_SIZE, 'none', 1.6),
   ]
   const per = (r: Row, n: number) => (n / Math.max(1, r.profiles)).toFixed(2)
   const pad = (s: string, n: number) => s.padEnd(n)
-  console.log(pad('', 30) + pad('dishes', 8) + pad('lunches', 9) + pad('dinners', 9) + pad('most of one', 13) + pad('worst', 7) + pad('day after', 11) + pad('same days', 11) + 'on target')
+  console.log(pad('', 30) + pad('dishes', 8) + pad('lunches', 9) + pad('dinners', 9) + pad('most of one', 13) + pad('worst', 7) + pad('day after', 11) + pad('same days', 11) + pad('on target', 11) + pad('lopsided', 16) + 'smallest meal')
   for (const r of rows) {
     console.log(pad(r.label, 30) + pad(per(r, r.distinct), 8) + pad(per(r, r.lunches), 9) + pad(per(r, r.dinners), 9) + pad(per(r, r.maxOne), 13)
-      + pad(String(r.worstMax), 7) + pad(per(r, r.nextDay), 11) + pad(per(r, r.sameDays), 11) + `${((100 * r.onTarget) / Math.max(1, r.days)).toFixed(1)}%`)
+      + pad(String(r.worstMax), 7) + pad(per(r, r.nextDay), 11) + pad(per(r, r.sameDays), 11) + pad(`${((100 * r.onTarget) / Math.max(1, r.days)).toFixed(1)}%`, 11)
+      + pad(`${r.lopsided} of ${r.servings}`, 16) + `${r.smallest.toFixed(2)}x its share`)
   }
   console.log('\nPer week, averaged. "most of one": the most servings of any single dish (any meal). "day after": servings that')
   console.log('repeat something from the day before. "same days": pairs of days identical meal for meal.')
+  console.log('"lopsided": servings outside 0.6-1.5x their meal\'s share of the day (0.5-2x for a snack), with the denominator.')
+  console.log('"smallest meal": the smallest main meal served in any week, as a share of its budget.')
 }
 main()

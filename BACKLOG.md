@@ -2,6 +2,27 @@
 
 Newest first. One line each.
 
+- [x] **Runs 7-10, M60: an 818 kcal lunch beside a 222 kcal dinner (20 Oct 2026).** TRACED (engine-tracer, then
+  reproduced with real foods): the lunch was PINNED (a leftover, oversized by the H36 costing bug, already fixed on the
+  branch), and the day's repair resized the largest FREE dish, the dinner, by 0.4-2.5x of itself to land the
+  calories; nothing anywhere bounded a meal against its share of the day. Reproduced: a pinned 939 kcal lunch took a
+  521 kcal dinner to 214 (0.47 of its share). FIXED, my call under the nutrition delegation (meal distribution at the
+  population level): **on a day with a pinned meal, a resize may leave a meal only inside 0.6-1.5x of its slot budget
+  (0.5-2x for a snack); one that would leave it is not made, and the day is the honest miss, named** (her 18 Oct
+  "name the miss"). Basis: a main meal under about 60% of an even share is snack-sized and its protein falls below a
+  useful per-meal dose; past 150% is the same problem in another meal. Pinned meals are never resized or judged
+  (hers). TWO ALTERNATIVES BUILT, MEASURED AND REMOVED, because each moved her 17 Sep refit ruling (what is absorbed
+  quietly and what is offered): spreading the cut over every free meal made a 60% drift fit silently and a pinned
+  25% drift stop offering; applying the band on unpinned days refused 15% drifts the ruling absorbs
+  (`test:meal-refit` went red each time). MEASURED (`measure:meal-week`, now with a "lopsided" column, denominator
+  printed): 0 of 5,600 modelled servings outside the band before and after, on every row, including a big lunch of
+  her own pinned every day at 1.4x and 1.6x (its only out-of-band servings are the pinned lunch itself). So the band
+  binds only on the narrow Sam shape. CSCS review: training effect n/a (nutrition); it takes away nothing on an
+  ordinary day and on the Sam day trades an on-target lopsided day for a named miss; the protein dose per meal is
+  what survives; it redefines no existing floor (the scaler's 0.4-2.5x and the quiet 0.75-1.35x are unchanged);
+  in scope. `test:meal-share` (14 checks; 7 mutations, all caught, one only by `test:meal-refit` and one only after a
+  two-meal case was added). Frontend only. NOT DONE: the swap hold's 0.75-1.25 on top of a resized dish, and a day
+  whose stored dish is already far from its share (made at old targets), are not judged.
 - [x] **Runs 7-10, H37: leftovers are ONE BATCH (20 Oct 2026).** The dinner that feeds tomorrow's lunch said "cook
   both portions together" and listed only tonight's amounts; tomorrow's portion is bigger (lunch 0.40 of a three-meal
   day, dinner 0.30), so the batch was written nowhere. And the shopping list counted the leftover on the LUNCH: today's
