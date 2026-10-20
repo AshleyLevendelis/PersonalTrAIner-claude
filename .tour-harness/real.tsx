@@ -282,7 +282,7 @@ const profile: UserProfile = {
   training_experience: WALKER || MOBILITY ? 'beginner' : 'intermediate', session_duration_preference: MOBILITY ? '90+' : SAM ? '30-45' : '45-60',
   workout_split_preference: LEG_CURL ? 'push_pull_legs' : SAM ? 'ai_recommendation' : 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
-  weekly_schedule: {}, dietary_preferences: new URLSearchParams(location.search).get('ate') === '1' ? ['nut-free'] : [], concurrent_activities: [],
+  weekly_schedule: {}, dietary_preferences: new URLSearchParams(location.search).get('ate') === '1' || new URLSearchParams(location.search).get('nutfree') === '1' ? ['nut-free'] : [], concurrent_activities: [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: DYNAMIC_MACROS ? 'DYNAMIC_CSCS' : 'STANDARD_STATIC',
   coaching_persona: 'supportive', recovery_capacity: MOBILITY ? 'high' : 'moderate', conditioning_preference: MOBILITY ? 'love' : FINISHER ? 'enjoy' : 'tolerate',
   // NINE DAYS OLD, not today: a plan created today has no elapsed
@@ -1220,6 +1220,16 @@ const leftoverPools = (() => {
         ]
         const m = computeMealMacros(ingredients)
         return { slot: 'dinner', name: 'Chicken and mushroom risotto', ingredients, macros: { calories: Math.round(m.kcal), protein: Math.round(m.protein), carbs: Math.round(m.carbs), fat: Math.round(m.fat) }, tags: ['favourite'], prep: '' }
+      })()] : []),
+      // &unknownfood=1 — A KEPT DINNER WITH A LINE THE FOOD LIST CANNOT IDENTIFY (live test, 19 Oct 2026: "Contains low
+      // fat greek yoghurt, which doesn't fit nut-free"). With &nutfree=1 the app must block it and say it can't confirm.
+      ...(new URLSearchParams(location.search).get('unknownfood') === '1' ? [(() => {
+        const ingredients = [
+          { name: 'chicken breast', quantity: 120, unit: 'g' }, { name: 'cooked basmati rice', quantity: 400, unit: 'g' },
+          { name: 'vanilla greek yoghurt', quantity: 100, unit: 'g' },
+        ]
+        const m = computeMealMacros(ingredients)
+        return { slot: 'dinner', name: 'Chicken rice and yoghurt bowl', ingredients, macros: { calories: Math.round(m.kcal) + 90, protein: Math.round(m.protein) + 9, carbs: Math.round(m.carbs) + 5, fat: Math.round(m.fat) + 2 }, tags: ['favourite'], prep: '' }
       })()] : [])],
   }
 })()

@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **Live test 19 Oct, finding 10: Greek yoghurt and smoked turkey dishes blocked as "doesn't fit nut-free".**
+  (`docs/plans/unidentified-food-wording.md`, allergen path.) TRACED AND CONFIRMED by running the real check: a line
+  the food list cannot identify ("low fat greek yoghurt", "smoked turkey breast") is treated as breaking every
+  restriction, which is right, and the sentence then said `Contains low fat greek yoghurt, which doesn't fit
+  "nut-free"`, which was false. HER RULING 20 Oct, "Can't confirm it's nut-free": still blocked, and said as "I can't
+  confirm vanilla greek yoghurt is nut-free, so this one's off for you." (one sentence naming every restriction the
+  line could not be confirmed against). The fact travels as a field (`unidentified`), never read out of a reason
+  sentence. Taught the food list two foods, never loosening the matcher: `greek yoghurt 2%` (USDA lowfat Greek, dairy)
+  and `smoked turkey breast` (a UK pre-sliced label figure, meat and processed meat, like ham); "sliced turkey" keeps
+  its old answer; flavoured yoghurts NOT added (sugar varies by brand), so they stay blocked with the true sentence.
+  The coach's copy of the food list regenerated (`sync:shared`). `test:unidentified-food` (22 checks, 8 mutations
+  caught), `verify:kept-meal` §2b (4 checks, 2 mutations caught; screenshot read). NOT CHECKED: her stored meals for
+  other unidentified lines (no database here). Needs the frontend, and `chat-gemini` for the coach's food list.
+
 - [~] **TWO SETUP BUGS FROM HER LIVE TEST, 19 Oct 2026: "I know my numbers" asked nothing; age/height/weight came with no boxes. FIXED on a worktree branch, not merged.**
   - **Bug 1, what was wrong:** she tapped "I know my numbers"; the coach replied "Got those numbers down." and asked
     about cardio. The three lift numbers were in `NEVER_BLOCKING_SLOTS`, so they were never in the coach's STILL UNKNOWN

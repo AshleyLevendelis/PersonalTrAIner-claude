@@ -144,6 +144,12 @@ export interface DietViolation {
   ingredient: string
   preference: DietaryPreference | 'kosher-meat-dairy-mix' | 'unrecognised-preference'
   reason: string
+  /**
+   * The line could not be identified, so it is treated as breaking every restriction (fail-closed). Carried as a fact,
+   * not left in `reason`, so the sentence a person reads never says the food CONTAINS something nobody found in it
+   * (live test, 19 Oct 2026: "Contains low fat greek yoghurt, which doesn't fit nut-free").
+   */
+  unidentified?: true
 }
 
 export interface DietValidationResult {
@@ -224,6 +230,7 @@ export function validateMealAgainstDiet(
           ingredient: line.name,
           preference: pref,
           reason: `"${line.name}" could not be resolved to a known ingredient — treated as unsafe for ${pref} rather than assumed compliant.`,
+          unidentified: true,
         })
       }
       continue

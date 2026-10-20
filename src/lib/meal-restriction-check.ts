@@ -35,6 +35,8 @@ export interface MealRestrictionIssue {
   restriction: string
   /** The ingredient that breaks it, when one can be named. */
   ingredient?: string
+  /** The app could not identify the ingredient, so it cannot confirm it fits; nothing says it contains anything. */
+  unidentified?: true
 }
 
 export interface MealRestrictionVerdict {
@@ -73,7 +75,7 @@ export function checkMealAgainstRestrictions(
   const diet = validateMealAgainstDiet(ingredients, dietaryPreferences)
   if (!diet.ok) {
     for (const v of diet.violations) {
-      issues.push({ kind: 'diet', restriction: v.preference, ingredient: v.ingredient })
+      issues.push({ kind: 'diet', restriction: v.preference, ingredient: v.ingredient, ...(v.unidentified ? { unidentified: true as const } : {}) })
     }
   }
 
@@ -131,6 +133,16 @@ function restrictionLabel(issue: MealRestrictionIssue): string {
 
 function describeIssues(issues: MealRestrictionIssue[]): string {
   const first = issues[0]
+  // A FOOD THE APP CANNOT IDENTIFY (Ashley, 20 Oct 2026, "Can't confirm it's nut-free"): still blocked, and said as
+  // what it is. One unknown line breaks every restriction at once, so all of that line's restrictions are named in
+  // one sentence, never as "(and N more)", which would read as a second food.
+  if (first.unidentified && first.ingredient) {
+    const same = issues.filter(i => i.unidentified && i.ingredient === first.ingredient)
+    const labels = [...new Set(same.map(restrictionLabel))]
+    const rest = issues.length - same.length
+    const named = labels.length <= 1 ? labels.join('') : `${labels.slice(0, -1).join(', ')} or ${labels[labels.length - 1]}`
+    return `I can't confirm ${first.ingredient} is ${named}, so this one's off for you${rest > 0 ? ` (and ${rest} more)` : ''}.`
+  }
   const named = first.ingredient ? `${first.ingredient}` : null
   const label = restrictionLabel(first)
   const extra = issues.length > 1 ? ` (and ${issues.length - 1} more)` : ''
