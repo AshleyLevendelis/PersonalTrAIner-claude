@@ -4,7 +4,7 @@
 // a gate can ask it; the sheet draws exactly what this returns.
 // ---------------------------------------------------------------------------
 
-export type DayVerb = 'did_elsewhere' | 'missed' | 'move' | 'rest' | 'something_else' | 'shorten' | 'lighter' | 'rebuild'
+export type DayVerb = 'did_elsewhere' | 'missed' | 'move' | 'rest' | 'something_else' | 'shorten' | 'lighter' | 'rebuild' | 'kind'
 
 export interface DayVerbInput {
   /** A logged day has nothing to explain. */
@@ -30,6 +30,8 @@ export interface DayVerbInput {
   canShorten: boolean
   canLighter: boolean
   canRebuild: boolean
+  /** A different KIND of session today (session-kind.ts) — her 20 Oct ruling, "Drop it, today only". */
+  canKind?: boolean
 }
 
 export function dayVerbs(d: DayVerbInput): DayVerb[] {
@@ -49,6 +51,7 @@ export function dayVerbs(d: DayVerbInput): DayVerb[] {
     if (d.canShorten) out.push('shorten')
     if (d.canLighter) out.push('lighter')
     if (d.canRebuild) out.push('rebuild')
+    if (d.canKind) out.push('kind')
   }
   return out
 }

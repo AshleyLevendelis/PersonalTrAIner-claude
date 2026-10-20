@@ -29,7 +29,8 @@ import { buildWeighInProposal, executeWeighIn, WEIGH_IN_RECEIPT_HOLD_DETAIL, typ
 import { getWeighInPicture } from '@/lib/nutrition-targets'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
-  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioSession, type CardioSessionPayload } from '@/lib/pending-action-executor'
+  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioSession, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload } from '@/lib/pending-action-executor'
+import { planSessionKindToday, sessionKindFrom, buildSessionKindTodayProposal, SESSION_KINDS } from '@/lib/session-kind'
 import { STYLE_OPTIONS, OFFERED_STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from '@/lib/onboarding-slots'
 import { getDurationBudgetSeconds } from '@/lib/session-duration'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
@@ -2236,6 +2237,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (pendingAction.kind === 'propose_cardio_session') return "Here's that session on your plan:"
     if (pendingAction.kind === 'propose_session_shorten') return "Here's that session cut down to fit:"
     if (pendingAction.kind === 'propose_session_rebuild') return "Here's a different session, with your main lift kept:"
+    if (pendingAction.kind === 'propose_session_kind_today') return "Here's today as a different kind of session:"
     if (pendingAction.kind === 'propose_schedule_change') return "Here's the new week:"
     if (pendingAction.kind === 'propose_session_length') return "Here's your plan at the new session length:"
     if (pendingAction.kind === 'propose_style_change') return "Here's your plan in the new style:"
@@ -3421,6 +3423,65 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         unchanged: trial.mainLift ? [`${trial.mainLift} — same weight, same sets`] : [],
         implications,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_session_kind_today's card — "let's do a cardio workout
+   * today", "give me a functional workout today with sled push and box jumps".
+   *
+   * Ashley's ruling, 20 Oct 2026: "Drop it, today only." The WHOLE day changes,
+   * main lift included. THE SAME TRIAL THE DAY MENU RUNS (planSessionKindToday)
+   * and the same words (buildSessionKindTodayProposal), so the card cannot
+   * offer a session the screen would not build or describe it differently.
+   * The payload carries the offer itself: the confirm writes exactly what the
+   * card listed, or nothing.
+   *
+   * TODAY ONLY, in code: a day that is not today is refused before any trial,
+   * because her ruling is about today and the tool says so.
+   */
+  const buildKindTodayCard = async (rawArgs: Record<string, unknown>): Promise<{
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: SessionKindTodayPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { refusal: string } | null> => {
+    if (mesocycle.length === 0) return null
+    const kind = sessionKindFrom(rawArgs.kind)
+    if (!kind) return { refusal: `Which kind of session — ${SESSION_KINDS.map(k => k.label.toLowerCase()).join(', ').replace(/, ([^,]*)$/, ' or $1')}?` }
+    const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
+    if (!week) return null
+    const asked = typeof rawArgs.day === 'string' ? rawArgs.day.trim() : ''
+    const todayName = new Date(`${activeSession.date}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long' })
+    if (asked && !/^today$/i.test(asked) && asked.toLowerCase() !== todayName.toLowerCase()) {
+      return { refusal: `I can only change today's session this way — it's a today-only swap. On ${asked} the plan is as written; ask me on the day.` }
+    }
+    const on = editDayFor('', week)
+    if (!on.ok) return { refusal: on.reason }
+    const moves = Array.isArray(rawArgs.moves) ? rawArgs.moves.map(m => String(m)).filter(Boolean) : []
+    const plan = await planSessionKindToday({
+      mesocycle, profile: poolProfile, weekNumber: activeSession.liveWeek, dayName: on.day.day, kind, moves,
+      exclusions: exerciseExclusions, loggedSets: activeSession.logs.filter(l => !l.is_warmup).length,
+    })
+    if (!plan.ok) return { refusal: on.say(plan.refusal) }
+    const words = buildSessionKindTodayProposal(plan.offer, 'today')
+    const reason = typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined
+    return {
+      scopeKey: `${profile.id}:propose_session_kind_today:${on.day.day}:${activeSession.liveWeek}`,
+      preconditions: { day: on.day.day, kind },
+      payload: { weekNumber: activeSession.liveWeek, dayName: on.day.day, sayDay: on.sayDay, offer: plan.offer, reason },
+      preImage: mesocycle,
+      diff: {
+        lead: on.say(words.lead),
+        rows: words.items.map(i => ({ field: i.name, before: '', after: i.dose })),
+        implications: words.notes.map(text => ({
+          severity: plan.offer.asked.some(a => a.reason === text) ? 'warn' as const : 'info' as const,
+          text: on.say(text),
+        })),
+        rationale: reason,
         reversible: true,
       },
     }
@@ -5482,6 +5543,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         if (rebuilt && 'refusal' in rebuilt) refusal = rebuilt.refusal
         else if (rebuilt) built = { scopeKey: rebuilt.scopeKey, preconditions: rebuilt.preconditions, payload: rebuilt.payload as unknown as Record<string, unknown>, preImage: rebuilt.preImage, diff: rebuilt.diff }
         else refusal = "I couldn't work out which session you meant — tell me the day."
+      } else if (result.proposal.kind === 'propose_session_kind_today' && result.proposal.rawArgs) {
+        const kindCard = await buildKindTodayCard(result.proposal.rawArgs)
+        if (kindCard && 'refusal' in kindCard) refusal = kindCard.refusal
+        else if (kindCard) built = { scopeKey: kindCard.scopeKey, preconditions: kindCard.preconditions, payload: kindCard.payload as unknown as Record<string, unknown>, preImage: kindCard.preImage, diff: kindCard.diff }
+        else refusal = "I can't see today's session just now, so nothing has changed."
       } else if (result.proposal.kind === 'propose_cardio_session' && result.proposal.rawArgs) {
         // userSaid, not the tool's quote: see buildCardioSessionProposal.
         const cardio = buildCardioSessionProposal(result.proposal.rawArgs, userSaid)
@@ -6577,6 +6643,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       title = ok ? RECEIPTS['propose_session_rebuild'].done : RECEIPTS['propose_session_rebuild'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_session_kind_today') {
+      const payload = row.payload as unknown as SessionKindTodayPayload
+      const result = await executeSessionKindToday(poolProfile, mesocycle, payload)
+      onMesocycleUpdated(result.mesocycle)
+      receipt = sayReceipt(result.receipt, payload)
+      const ok = receipt.failed.length === 0
+      title = ok ? RECEIPTS['propose_session_kind_today'].done : RECEIPTS['propose_session_kind_today'].failed
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_cardio_session') {
       const payload = row.payload as unknown as CardioSessionPayload
       const result = await executeCardioSession(profile, mesocycle, payload)
@@ -6987,6 +7062,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         if (!preImage || !planCreatedAt) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
+      } else if (row.kind === 'propose_session_kind_today') {
+        // THE SAME PUT-BACK THE EXERCISE TAB'S BUTTON USES: the planned day,
+        // from the marker the swap stored, and refused once working sets are
+        // logged against the new session.
+        const payload = row.payload as unknown as SessionKindTodayPayload
+        const back = await undoSessionKindTodayWrite(profile.id, mesocycle, payload.weekNumber, payload.dayName, activeSession.logs.filter(l => !l.is_warmup).length)
+        if (!back.ok) return { refused: back.refusal, keep: false }
+        onMesocycleUpdated(back.mesocycle)
       } else if (row.kind === 'propose_session_rebuild') {
         // ONE WEEK, same as shortening: a rebuild is today-only by definition.
         const payload = row.payload as unknown as SessionRebuildPayload

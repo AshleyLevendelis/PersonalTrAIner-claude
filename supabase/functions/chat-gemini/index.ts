@@ -1144,6 +1144,36 @@ const toolDeclarations = [
   },
 
   {
+    name: "propose_session_kind_today",
+    description:
+      "PROPOSES replacing TODAY'S WHOLE SESSION with a different KIND of session — cardio, functional, bodybuilding or hybrid — for today only. This does NOT apply anything: the app builds the session from their own kit, injuries and exercises to avoid, shows it, and the user taps Confirm. Use it when they want a different TYPE of workout today: 'let's do a cardio workout today', 'I can't do weights today', 'give me a functional workout today with sled push and box jumps', 'can I do a bodybuilding session today instead'. WHAT IT DOES, so you can say it plainly: the whole day changes, MAIN LIFT INCLUDED (Ashley's ruling), and the main lift is back the next time it is due — missing it today does not change its weight; the day is back to the planned session next week. IT IS NOT propose_session_rebuild: that one keeps the main lift and swaps the rest for more of the same kind ('give me something different today', 'I'm bored of this one'). IT IS NOT propose_style_change: that rebuilds the rest of their plan in a new style for good. IT IS NOT propose_cardio_session, which puts a cardio session on a day that has none. Pass the moves they NAMED in `moves`, in their words — never add moves they did not name; the app says which of them it cannot do with their kit (or does not have at all) and what it used instead.",
+    parameters: {
+      type: "object",
+      properties: {
+        kind: {
+          type: "string",
+          enum: ["cardio", "functional", "bodybuilding", "hybrid"],
+          description: "The kind of session they asked for. 'Cardio', 'conditioning', 'HIIT', 'no weights' mean cardio. 'Functional', 'athletic', 'circuit', 'CrossFit-style', sled pushes, box jumps, swings and carries mean functional.",
+        },
+        moves: {
+          type: "array",
+          items: { type: "string" },
+          description: "Exercises they named for it, in their own words (e.g. ['sled push', 'box jumps']). Empty or absent when they named none. Never invent one.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on why, in their terms (e.g. 'can't do weights today') — shown on the card as the rationale.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["kind", "origin_verbatim_quote"],
+    },
+  },
+
+  {
     name: "propose_cardio_session",
     description:
       "PROPOSES putting a CARDIO OR ACTIVITY SESSION on one day of their plan — a run, a ride, a swim, a rower, a walk — as part of the plan, not as a note. This does NOT apply anything: the app shows a card and the user taps Confirm. CALL IT ONLY AFTER THEY HAVE SAID YES. When somebody mentions doing something on a day ('Wednesday is my cardio day', 'I run on Tuesdays'), you ASK first, in plain words, with no tool call at all — see the section on offering to add a session. Only when they answer yes do you call this. YOU MUST CARRY THE DETAIL THE CONVERSATION ALREADY ESTABLISHED: if you have told them 30-40 minutes of zone 2 on a treadmill or bike, this card says 35 minutes at that effort, not 'cardio'. A card that throws away what you just prescribed is worse than no card. It is NOT propose_concurrent_activity, which is for a sport they do OUTSIDE this plan (a Muay Thai class, a football league) and which rebuilds their lifting around it — this one is a session the plan itself prescribes and shows on the day. It is NOT record_fact: remembering that Wednesday is their cardio day changes nothing on any screen.",
@@ -2314,7 +2344,14 @@ When the user says they're away or at a different gym for a period ("hotel gym f
 - Say what it will do, in their terms: their main lift stays exactly as it is, same weight and same sets, so this week's progression on it is untouched; everything else changes to something that fits their kit and their injuries; and the day is back to the planned session next week. NEVER name the exercises that will replace them — the app chooses those against their equipment, their injuries and what is already elsewhere in their week, and you cannot see the result until the card renders.
 - IF THE MAIN LIFT IS THE THING THEY DO NOT WANT — "I can't face squatting today", "anything but bench" — this is the WRONG tool, because it is the one exercise this one will not touch. Use propose_exercise_swap on that lift instead. Saying so plainly is better than handing them a card that keeps exactly what they asked to avoid.
 - It is not propose_session_shorten (that is about TIME) and not propose_volume_change (that is about how HARD, and it lasts beyond today).
+- A different KIND of session is not this tool — see 3d4.
 - Do not reach for propose_volume_change for a TIME problem. Fewer sets across the board is a different thing from a shorter session, and time is what they told you about.
+
+=== 3d4. A DIFFERENT KIND OF SESSION TODAY (propose_session_kind_today) ===
+- "Let's do a cardio workout today", "I can't do weights today", "give me a functional workout today with sled push and box jumps", "can I do a bodybuilding session today instead" — call propose_session_kind_today with the kind (cardio, functional, bodybuilding or hybrid) and, in moves, the exercises they named in their own words. They want a different TYPE of session, for today.
+- THE DISTINCTION, word for word: SAME KIND, different exercises ("something different today", "I'm bored of this one") is propose_session_rebuild, which keeps the main lift. A DIFFERENT KIND today (cardio, functional, a different style) is this tool, which replaces the whole day. A different kind FROM NOW ON ("switch me to functional for good") is propose_style_change. If you cannot tell whether they mean today or for good, ask.
+- Say what it will do, in their terms: the whole session changes for today, main lift included; the main lift is back the next time it is due and missing it today does not change its weight; the day is back to the planned session next week. NEVER list the exercises yourself and never promise a move they named — the app builds it from their kit and injuries, and the card says which named moves it could not include and what it used instead (there is no sled in the app at all, so never promise one).
+- Once a working set is logged today the app refuses: a session they have started is not redrawn. Say so plainly rather than calling it.
 
 === 3d. SESSION VOLUME (propose_volume_change) ===
 When the user wants a day's session to be more or less work ("Tuesdays are too much", "I only get 30 minutes on Wednesdays", "this feels easy now, give me more"):
@@ -2339,7 +2376,7 @@ When the user wants a LASTING change to how they train ("switch me to bodybuildi
 - It starts when they say (starts: "next_week", a date, or today when they said nothing), and the card lists what it changes. Days already trained, and a session they have started, are never touched.
 - A style change changes the EXERCISES and the REP RANGES, not just the name on the plan: combat runs heavy main lifts at 3-5, bodybuilding runs 6-8 and up. Say that honestly rather than implying the same sessions just get relabelled.
 - THIS TOOL IS FOR A LASTING CHANGE TO HOW THEY TRAIN, AND NOTHING ELSE. "Make today harder", "give me a bodybuilding-style session today", "I fancy something different this session", "I want a different workout" are NOT style changes — not one of them asks to retrain for the rest of the plan. The same lesson §3e learned live: a single day's wish is never a reason to rewrite sixteen weeks.
-- WHAT TO DO INSTEAD for a one-off: answer in text, or use propose_exercise_swap with scope "today" for the specific exercise they want different. If they say the current style isn't working for them at all, that is the moment to ask whether they want to change it for good.
+- WHAT TO DO INSTEAD for a one-off: a different KIND of session today ("give me a bodybuilding-style session today", "cardio today") is propose_session_kind_today (§3d4); one exercise they want different is propose_exercise_swap with scope "today". If they say the current style isn't working for them at all, that is the moment to ask whether they want to change it for good.
 - A tool that returns "that's already your style" was the wrong tool. If you call this and the card says nothing changes, you answered a question they did not ask — the fix is not to call it again.
 
 === 3f2. WHAT THEY'RE TRAINING FOR (propose_goal_change) ===
@@ -2595,7 +2632,7 @@ FAVORITE MEALS PRIORITIZATION:
 ${favoritesSection}
 
 FUNCTION CALL RULES (CRITICAL):
-- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_session_shorten", "propose_session_rebuild", "propose_schedule_change", "propose_style_change", "propose_goal_change", "propose_concurrent_activity", "propose_rest_day", "propose_cardio_session", "training_days", "training_style", "concurrent_activities", "lighter", "heavier", "ongoing") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
+- NEVER write tool names, parameter names, or enum values (like "propose_volume_change", "propose_session_shorten", "propose_session_rebuild", "propose_session_kind_today", "propose_schedule_change", "propose_style_change", "propose_goal_change", "propose_concurrent_activity", "propose_rest_day", "propose_cardio_session", "training_days", "training_style", "concurrent_activities", "lighter", "heavier", "ongoing") in your visible text response. These exist only for native tool invocations. Your text must read like a human personal trainer — no code, no parameter labels, no function syntax.
 - Trigger propose_meal_swap or propose_exercise_swap when the user gives a DIRECT COMMAND to modify their plan. Command verbs include: "replace", "swap", "change", "switch", "use X instead". Both ALWAYS require origin_verbatim_quote — the exact substring of the CURRENT message that is the command; if the request is a question, a hypothetical, or a statement with no imperative verb (e.g. "I didn't train today", "should I switch to dumbbells?"), do NOT call the tool — answer in text instead.
 - Trigger propose_injury_adaptation / propose_equipment_adaptation per §3a/§3b once you have the required fields (affected_area or equipment_tier, plus duration_days) AND an imperative origin_verbatim_quote — a mention alone ("my shoulder's a bit sore") is not yet enough; wait until the exchange has established it's manageable and plan-relevant (injury) or you know both what's available and for how long (equipment).
 - Neither propose_meal_swap nor propose_exercise_swap applies anything itself — both show the user a confirm card. Put your reasoning in the "reason" field, not in a preceding question; do not say "Shall I make this change?" or claim the swap happened.
@@ -4333,6 +4370,23 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_session_rebuild",
               rawArgs: { day: args.day, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_session_kind_today") {
+        // Courier shape, same as propose_session_rebuild above: no server
+        // write, raw args forwarded, the client builds the session and the
+        // card through planSessionKindToday — the catalogue, the pool filters,
+        // the ranker and the settling tail all live in src/lib, not here.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_session_kind_today",
+              rawArgs: { kind: args.kind, moves: args.moves, reason: args.reason },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

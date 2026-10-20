@@ -68,6 +68,10 @@ import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession,
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import { shortenDayTo, mapTier } from '@/lib/exercise-plan'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
+// The builder is FETCHED WHEN USED: only the marker and its sentence are drawn on
+// every render, and they live in an import-free module (test:bundle, 20 Oct 2026).
+import { describeKindToday, sessionKindsFor, kindTodayOf, type SessionKind } from '@/lib/session-kind-marker'
+import type { SessionKindOffer, SessionKindPlan } from '@/lib/session-kind'
 import { settleWeek } from '@/lib/settle-week'
 import { sessionRefFromCell, sessionRefForPlanDay, editTarget, sayDayIn, type SessionRef } from '@/lib/session-ref'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
@@ -540,6 +544,46 @@ export function TodayPanel({
       ? `Rebuilt today — ${result.replaced.length} exercise${result.replaced.length === 1 ? '' : 's'} changed.${main} Back to the planned session next week.`
       : `Rebuilt today — ${result.replaced.length} changed, ${kept} stayed because nothing else fits ${kept === 1 ? 'that slot' : 'those slots'} with your equipment and injuries.${main} Back to the planned session next week.`)
     return null
+  }
+
+  /**
+   * "A DIFFERENT KIND OF SESSION TODAY" — Ashley's live test, 19 Oct 2026, and
+   * her ruling of 20 Oct: "Drop it, today only." Cardio, functional or another
+   * style replaces the whole day, main lift included, and the main lift is
+   * back next time it is due. The SAME three functions the coach's card uses
+   * (session-kind.ts): the trial, the write, the put-back. Scope 'today'.
+   */
+  const loggedWorkingToday = logs.filter(l => !l.is_warmup).length
+  const kindPlan = async (kind: SessionKind, moves: string[]): Promise<SessionKindPlan> => {
+    if (!profile || !mesocycle) return { ok: false, refusal: 'No plan to edit.' }
+    const target = editTarget(todayRef)
+    if (!target.ok) return { ok: false, refusal: target.refusal }
+    const { planSessionKindToday } = await import('@/lib/session-kind')
+    const plan = await planSessionKindToday({
+      mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, kind, moves, exclusions, loggedSets: loggedWorkingToday,
+    })
+    return plan.ok ? plan : { ok: false, refusal: say(plan.refusal) ?? plan.refusal }
+  }
+  const kindConfirm = async (offer: SessionKindOffer): Promise<string | null> => {
+    if (!mesocycle) return 'No plan to edit.'
+    const { confirmSessionKindToday } = await import('@/lib/session-kind')
+    const done = confirmSessionKindToday(mesocycle, offer)
+    if (!done.ok) return done.refusal
+    return applySessionEdit({ mesocycle: done.mesocycle, changed: true }, 'today')
+  }
+  const [kindBusy, setKindBusy] = useState(false)
+  const [kindError, setKindError] = useState<string | null>(null)
+  const kindUndo = async () => {
+    if (!mesocycle) return
+    const target = editTarget(todayRef)
+    if (!target.ok) { setKindError(target.refusal); return }
+    const { undoSessionKindToday } = await import('@/lib/session-kind')
+    const back = undoSessionKindToday(mesocycle, liveWeek, target.planDayName, loggedWorkingToday)
+    if (!back.ok) { setKindError(say(back.refusal)); return }
+    setKindBusy(true); setKindError(null)
+    const failed = await applySessionEdit({ mesocycle: back.mesocycle, changed: true }, 'today')
+    setKindBusy(false)
+    if (failed) setKindError(failed)
   }
 
   /**
@@ -1156,6 +1200,9 @@ export function TodayPanel({
         onShorten={shortenToday}
         onLighter={lighterToday}
         onRebuild={rebuildToday}
+        kindOptions={profile ? sessionKindsFor(profile) : []}
+        onKindPlan={kindPlan}
+        onKindConfirm={kindConfirm}
       />
       </Suspense>
       <Suspense fallback={null}>
@@ -1382,6 +1429,15 @@ export function TodayPanel({
           )}
           {volumeError && <p className="text-xs text-destructive">{volumeError} Nothing has changed.</p>}
           {rebuildNote && <p className="text-xs text-muted-foreground" data-testid="rebuild-note">{rebuildNote}</p>}
+          {/* A DIFFERENT KIND TODAY, said where the session is, with the way
+              back. Read off the stored marker, so it survives a reload. */}
+          {kindTodayOf(workout) && mesocycle && (
+            <div className="space-y-1 rounded-lg border border-border/60 p-3" data-testid="kind-today-note">
+              <p className="text-xs text-muted-foreground">{describeKindToday(mesocycle, liveWeek, todayRef.planDayName)}</p>
+              <Button size="sm" variant="outline" className="min-h-11" disabled={kindBusy} onClick={kindUndo} data-testid="kind-today-undo">Put my planned session back</Button>
+            </div>
+          )}
+          {kindError && <p className="text-xs text-destructive" data-testid="kind-today-error">{kindError}</p>}
           {/* THE SESSION'S NAME MOVED INTO THE HERO above (one-page Exercise, 17 Oct 2026); the sets count
               is on "Today's lifts" below. What stays here belongs to running the session. */}
           <div>

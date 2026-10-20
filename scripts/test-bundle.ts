@@ -587,7 +587,15 @@ console.log('\n3. Nothing has crept back up')
   // deploy figure above for both ends. 2,360 is 25 above the 2,335 measured.
   // MOVED 12 Oct 2026: 2360 -> 2397, the merged release tree measured 2372 (see the deploy note).
   // MOVED 18 Oct 2026: 2397 -> 2422, measured 2397 (see the deploy note, runs 7-10 batch 1).
-  const TOTAL_BUDGET_KB = 2422
+  // MOVED 20 Oct 2026: 2422 -> 2455, "a different kind of session today" (her 20 Oct ruling, "Drop it, today
+  // only"; docs/plans/a-different-kind-of-session-today.md). MEASURED both ends through this gate the same hour,
+  // the base on a clean worktree of 97139cdd: before total 2411 app 1148 paint 492 deploy 336; after total 2436
+  // app 1153 paint 494 deploy 337. +25 kB of real code (the session builder, the day-menu sheet's two steps, the
+  // coach's card, confirm and Undo). The builder is FETCHED WHEN USED: the Exercise tab draws only the marker and
+  // its sentence, from an import-free module, which is what kept the first-download figures within 2 kB — the
+  // first, statically imported version put the app chunk at 1175 (over its 1166). 2,455 is 19 above the 2,436
+  // measured, on her 15 Sep ruling ("raise it with room to grow").
+  const TOTAL_BUDGET_KB = 2455
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
