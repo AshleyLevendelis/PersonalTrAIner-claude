@@ -1372,6 +1372,19 @@ menu" stays true when a copy is also left outside it.
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
 
+### Her rulings of 20 Oct 2026, from the 19 Oct live test (`docs/audits/live-test-2026-10-19-findings.md`)
+- **Coach offers: "Text + small buttons always."** Every change the coach offers is a chat bubble with small Apply /
+  Not now buttons; a rebuild's list goes into the text. REVERSES the 24 Sep line keeping Apply cards for asked
+  changes. Buttons keep the 44px tap floor.
+- **A different KIND of session today: "Drop it, today only."** Cardio or functional today replaces the whole day;
+  the main lift returns next time at the same weight. Her 16 Sep "keep the main lift" still holds for a different
+  session of the same kind.
+- **An ease-off on a non-leg day: "Work for that day instead."** A knee-loading move knocked out of a non-leg day is
+  replaced by the day's own kind of work; no knee-rehab move is added to a non-leg day.
+- **"Move calories from lunch to dinner": "Ask how much first"**, with buttons, then both sizes before Apply.
+- **A food the app cannot identify, against a restriction: "Can't confirm it's nut-free"** (allergen band). Still
+  blocked; never worded as "contains".
+
 ### Her rulings of 17 Oct 2026, the one-page Home, Nutrition and Exercise (`docs/plans/one-page-tabs.md`)
 - **"Build this one"**: design 5c·5 / 5c·6 / 5c·4, layout only, nothing removed. Rings live on Home only.
 - **Nutrition's day strip: "Keep it on top."** **The streak pill: "12 in a row"** (never "days": it counts

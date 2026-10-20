@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [ ] **Live test 19 Oct 2026, fifteen findings (`docs/audits/live-test-2026-10-19-findings.md`): her five rulings of
+  20 Oct, asked one at a time after "Build it".** (1) **Coach offers: "Text + small buttons always"** (from three:
+  over text + buttons with the big card kept for multi-day changes, and over keeping the cards). Every change the coach
+  offers is a chat bubble asking the question, with small Apply / Not now buttons under it; a rebuild's list of
+  changes goes into the message text. This REVERSES the part of her 24 Sep ruling that left the Apply cards for changes
+  she asks for as they were. Buttons stay finger-sized (44px tap floor). (2) **"Something different today": "Drop it,
+  today only"** (from three: over asking each time and over always keeping it). A request for a different KIND of
+  session (cardio, functional) replaces the whole day; the main lift comes back next time it is due at the same weight.
+  It narrows her 16 Sep "keep the main lift and rebuild around it", which still holds for "a different session" of the
+  same kind. (3) **Knee (or any) ease-off on a non-leg day: "Work for that day instead"** (from three: over leaving it
+  out and over keeping knee-friendly moves). A knee-loading exercise knocked out of a day that is not about legs is
+  replaced with that day's own kind of work (shoulder or core on a shoulders day); no knee-rehab move is added to a
+  non-leg day. On leg day, knee-friendly leg moves still replace the ones that hurt. Asked because prescribing rehab is
+  outside the CSCS delegation. (4) **"Move lunch's calories to dinner": "Ask how much first"** (from three: over moving
+  about 150 kcal by default and over swapping the meals whole). The coach asks how much with buttons, then shows both
+  new sizes before Apply. (5) **A food the app cannot identify, against a restriction: "Can't confirm it's nut-free"**
+  (allergen band; from three: over hiding such meals and over "Couldn't check this food"). The meal stays blocked; the
+  reason says "I can't confirm smoked turkey breast is nut-free", never that it CONTAINS something; and the common
+  missing foods (smoked turkey, low-fat Greek yoghurt) are taught to the food list with their parent's tags. BUILDING.
+
 - [x] **H36 / M64 (runs 7-10, 18 Oct 2026): every ingredient is counted, shown and shopped raw or dry.** Sam's
   Bolognese read 456 kcal at dinner and 818 as the next day's leftover lunch; his list bought "pasta cooked", "white
   rice cooked", "potato boiled" and "sweet potato baked 190g". TRACED: (1) a dinner whose lines today's table cannot
