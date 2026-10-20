@@ -766,7 +766,7 @@ async function main() {
     /buildKitChangeProposal\(result\.proposal\.rawArgs, userSaid\)/.test(chat))
   check('...priced and confirmed by the controller App hands both doors (never a second copy)',
     /kitController\.plan\(/.test(builder) && /row\.kind === 'propose_kit_change'[\s\S]{0,700}?kitController\.apply\(/.test(chat) && /kitController=\{kitController\}/.test(app) && /kit=\{kitController\}/.test(app))
-  check('the coach is told the kit the plan is built from', /kit_said:/.test(chat) && /Kit they've told you about: \$\{context\.profile\.kit_said/.test(fn))
+  check('the coach is told the kit the plan is built from', /kit_said:/.test(chat) && /Their kit: \$\{context\.profile\.kit_said/.test(fn))
 
   // 9c. Setup.
   const convo = read('src/components/onboarding/ConversationalOnboarding.tsx')

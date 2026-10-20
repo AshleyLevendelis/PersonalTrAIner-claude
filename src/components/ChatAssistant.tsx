@@ -56,13 +56,14 @@ import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
 import { getLastWorkingSessionDate } from '@/lib/set-log-store'
 import { isHedged } from '@/lib/definite-mention'
-import { KIT_ITEMS, KIT_ITEM_LABELS, isKitItem, kitStatementInUserWords, describeKitStatement, kitItemsFor, kitOf, kitLine, kitInWords, type KitStatement } from '@/lib/kit-list'
+import { KIT_ITEMS, KIT_ITEM_LABELS, isKitItem, kitStatementInUserWords, kitItemsSaidNotOwned, describeKitStatement, kitItemsFor, kitOf, kitLine, kitInWords, type KitStatement } from '@/lib/kit-list'
 import type { KitController } from '@/lib/kit-change'
 import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options'
 import { compileFoodDislikes } from '@/lib/fact-compiler'
 import { namedFoodClash, clashSentence, allergyRefusal } from '@/lib/named-food-clash'
 import { detectFoodExclusions, mergeFoodsToAvoid } from '@/lib/food-exclusions'
+import { exercisesThatFit } from '@/lib/exercise-shortlist'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { swapNameFallback } from '@/lib/swap-name-fallback'
 import { createPlanAdaptation, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
@@ -1771,12 +1772,24 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // been dead prompt text. See EQUIPMENT-QUALITY AWARENESS below.
         equipment_access: profile.equipment_access,
         equipment_access_described: describeEquipmentAccess(profile.equipment_access),
-        // WHAT THEY HAVE SAID ABOUT THEIR KIT (the kit list), so the coach
-        // describes the kit the plan is actually built from. Null when they
-        // have said nothing: the choice above is then the whole story.
-        kit_said: (profile.kit_statements ?? []).length > 0
-          ? `${kitLine(kitItemsFor(profile))}${kitOf(profile)?.exhaustive ? ' That is their whole kit: nothing else is planned for.' : ''}`
-          : null,
+        // THE KIT THE PLAN IS BUILT FROM, ALWAYS, AND WHAT IS NOT ON IT (live
+        // test, 19 Oct 2026). This was null until they had said something, so
+        // a Minimalist with no kit rows reached the coach as one sentence, a
+        // remembered "flat bench" from an old chat won, and the coach offered a
+        // seated press on a bench he does not have. Now the list is always
+        // sent, with the kit NOT on it named, and the prompt says it wins.
+        kit_said: (() => {
+          const have = kitItemsFor(profile)
+          const missing = KIT_ITEMS.filter(i => !have.includes(i))
+          const said = (profile.kit_statements ?? []).length > 0
+          return `${kitLine(have)}${said ? (kitOf(profile)?.exhaustive ? ' That is their whole kit: nothing else is planned for.' : '') : ' (from their equipment choice; they have not said more)'}${missing.length > 0 ? ` NOT on it: ${kitInWords(missing)}.` : ''}`
+        })(),
+        // REAL EXERCISE NAMES THAT FIT THEM (live test, 19 Oct 2026). The coach
+        // has no catalogue, so it named "Seated Dumbbell Overhead Press", which
+        // does not exist, and the swap failed. The names of the pool their plan
+        // and swaps are built from (kit, injuries, ease-offs, style), a few per
+        // movement, so a name it suggests is one the app can act on.
+        exercises_that_fit: exercisesThatFit(poolProfile ?? profile, exerciseExclusions),
         // Also never sent — same shape as equipment_access above. Absent on
         // an activity-only profile (the starting-out walking plan has no
         // lifting-experience tier), so the prompt says so rather than
@@ -5411,9 +5424,21 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           else refusal = custom.reason
         }
       } else if (result.proposal.kind === 'propose_exercise_swap' && result.proposal.rawArgs) {
-        const swap = await buildExerciseSwapProposal(result.proposal.rawArgs)
-        if (swap.ok) { built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }; advice = swap.advice }
-        else refusal = swap.reason
+        // "I DON'T HAVE BANDS" IS ABOUT THE KIT, NOT ONE EXERCISE (live test, 19 Oct 2026). The coach answered it with
+        // a swap of one exercise for today and every other band exercise stayed; its own rules (§3b2) say a kit
+        // statement takes the kit change. Nothing in code held that, so this does: when her message says she does not
+        // have something, the kit card is offered instead, priced across the whole plan. It still waits for her tap.
+        // If the kit card cannot be built (nothing on the plan needs that kit), the swap goes ahead as asked.
+        const notOwned = kitItemsSaidNotOwned(userSaid)
+        const kitCard = notOwned.length > 0 ? await buildKitChangeProposal({ mode: 'hasnt', items: notOwned }, userSaid) : null
+        if (kitCard && !('refusal' in kitCard)) {
+          built = { scopeKey: kitCard.scopeKey, preconditions: kitCard.preconditions, payload: kitCard.payload, diff: kitCard.diff }
+          kindOverride = 'propose_kit_change'
+        } else {
+          const swap = await buildExerciseSwapProposal(result.proposal.rawArgs)
+          if (swap.ok) { built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }; advice = swap.advice }
+          else refusal = swap.reason
+        }
       } else if (result.proposal.kind === 'propose_injury_adaptation' && result.proposal.rawArgs) {
         const adaptation = await buildInjuryAdaptationProposal(result.proposal.rawArgs)
         if (adaptation) built = { scopeKey: adaptation.scopeKey, preconditions: adaptation.preconditions, payload: adaptation.payload as unknown as Record<string, unknown>, preImage: adaptation.preImage, diff: adaptation.diff }
@@ -7431,6 +7456,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                               )}
                               {msg.clarification && msg.status !== 'failed' && (
                                 <ClarificationCard
+                                  // ONE CARD PER QUESTION. An answer can lead to a second
+                                  // question on the same message ("3x8" -> "What weight?"),
+                                  // and a card reused across them kept its answered state:
+                                  // the weight question rendered with no box and no taps,
+                                  // the loop again (found driving her "rdl", 20 Oct 2026).
+                                  key={msg.clarification.resolverId}
                                   contextLines={msg.clarification.contextLines}
                                   prompt={msg.clarification.prompt}
                                   options={msg.clarification.options}

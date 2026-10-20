@@ -128,6 +128,10 @@ export const FOOD_DB: FoodEntry[] = [
   f('chicken mince', ['ground chicken', 'minced chicken'], { kcal: 143, protein: 21.7, carbs: 0, fat: 6 }, 'protein', { contains_meat: true }),
   f('turkey breast', ['turkey breasts', 'sliced turkey'], { kcal: 135, protein: 29, carbs: 0, fat: 1.7 }, 'protein', { contains_meat: true }),
   f('turkey mince', ['ground turkey', 'minced turkey'], { kcal: 148, protein: 27, carbs: 0, fat: 4 }, 'protein', { contains_meat: true }),
+  // Live test, 19 Oct 2026: "smoked turkey breast" matched nothing, so meals holding it were blocked for every diet.
+  // A typical UK pre-sliced cooked turkey breast label (a label figure, not USDA). Meat and processed meat, like ham.
+  // "sliced turkey" stays on roast turkey breast above: an existing answer is not changed here.
+  f('smoked turkey breast', ['smoked turkey', 'deli turkey', 'turkey slices', 'sliced turkey breast', 'wafer thin turkey'], { kcal: 104, protein: 23, carbs: 1, fat: 1 }, 'protein', { contains_meat: true, is_processed_meat: true }),
   f('beef mince 5% fat', ['lean beef mince', 'extra lean beef mince', '5% beef mince', 'lean ground beef', 'lean minced beef'], { kcal: 137, protein: 22, carbs: 0, fat: 5 }, 'protein', { contains_meat: true }),
   f('beef mince 20% fat', ['beef mince', 'ground beef', '20% beef mince', 'regular beef mince'], { kcal: 254, protein: 17.2, carbs: 0, fat: 20 }, 'protein', { contains_meat: true }),
   f('beef steak sirloin', ['sirloin steak', 'beef steak', 'steak', 'lean beef sirloin', 'beef sirloin strips', 'beef eye round', 'thin beef eye round slices'], { kcal: 183, protein: 27, carbs: 0, fat: 7.7 }, 'protein', { contains_meat: true }),
@@ -164,6 +168,9 @@ export const FOOD_DB: FoodEntry[] = [
   f('egg white', ['egg whites', 'liquid egg whites', 'liquid egg white'], { kcal: 52, protein: 11, carbs: 0.7, fat: 0.2 }, 'protein', { contains_egg: true }, { medium: 33, large: 38 }),
   f('egg yolk', ['egg yolks'], { kcal: 322, protein: 16, carbs: 3.6, fat: 27 }, 'protein', { contains_egg: true }, { medium: 17, large: 20 }),
   f('greek yoghurt 0%', ['fat free greek yogurt', 'greek yoghurt fat free', '0% greek yogurt', 'greek yoghurt', 'fat free greek yoghurt', '0% greek yoghurt'], { kcal: 57, protein: 10, carbs: 3.6, fat: 0.2 }, 'dairy', { contains_dairy: true }),
+  // Live test, 19 Oct 2026: "low fat greek yoghurt" matched nothing. USDA "Yogurt, Greek, plain, lowfat". Dairy, like
+  // both Greek yoghurts beside it. Flavoured ones (vanilla) are NOT added: the sugar differs too much by brand.
+  f('greek yoghurt 2%', ['low fat greek yoghurt', 'low fat greek yogurt', '2% greek yoghurt', '2% greek yogurt', 'light greek yoghurt', 'light greek yogurt', 'lowfat greek yogurt', 'greek yogurt 2%'], { kcal: 73, protein: 9.95, carbs: 3.94, fat: 1.92 }, 'dairy', { contains_dairy: true }),
   f('greek yoghurt full fat', ['greek yogurt', 'full fat greek yoghurt', 'greek style yoghurt'], { kcal: 97, protein: 9, carbs: 4, fat: 5 }, 'dairy', { contains_dairy: true }),
   f('natural yoghurt', ['plain yoghurt', 'natural yogurt', 'low fat yogurt', 'low fat yoghurt'], { kcal: 61, protein: 4.3, carbs: 4.7, fat: 3.3 }, 'dairy', { contains_dairy: true }),
   f('cottage cheese', [], { kcal: 98, protein: 11, carbs: 3.4, fat: 4.3 }, 'dairy', { contains_dairy: true }),

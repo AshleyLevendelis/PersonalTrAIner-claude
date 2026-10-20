@@ -606,6 +606,145 @@ await section(19, 'H12 — changing Foods to avoid from the summary is saved in 
   check('the plan is built with TWO foods to avoid, not one that matches nothing', JSON.stringify(built?.disliked_foods) === JSON.stringify(['mushrooms', 'pork']), built?.disliked_foods)
 })
 
+// ---------------------------------------------------------------------------
+// 19 Oct 2026, Ashley's live test. (1) She tapped "I know my numbers" and the
+// coach said "Got those numbers down." and asked about cardio: no boxes, no
+// numbers. (2) "how old are you, how tall are you, and what do you weigh right
+// now?" came as a sentence with only the typing box under it.
+const LIFTS = ['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg']
+const liftBoxes = () => evj(`(() => {
+  const card = document.querySelector('[data-slot-card="knownSquatKg"]')
+  if (!card) return { shown: false, fields: [], inView: false, labels: [] }
+  const r = card.getBoundingClientRect()
+  const composer = document.querySelector('.ob-composer-fade input').getBoundingClientRect()
+  return {
+    shown: true,
+    fields: [...card.querySelectorAll('input')].map(i => i.id.replace('slot-', '')),
+    labels: [...card.querySelectorAll('label')].map(l => l.textContent.trim()),
+    inView: r.top >= 0 && r.bottom <= composer.top + 1,
+  }
+})()`)
+async function typeInto(id, text) {
+  await tapEl(`document.getElementById(${JSON.stringify(id)})`, `the ${id} box`)
+  await send('Input.insertText', { text })
+  await wait(120)
+}
+
+await section(20, '"I know my numbers" is answered with the three lift boxes, by the app', async () => {
+  await open('lifts')
+  const before = await ev(`window.__onbRequests.length`)
+  check('harness: the working-lifts question is on screen with its two options', (await evj(`__cards('knowsWorkingLifts')`)).length === 1)
+  await tapOption('knowsWorkingLifts', 'I know my numbers')
+  await wait(400)
+  const boxes = await liftBoxes()
+  check('the three lift boxes are on screen straight after the tap', boxes.shown && LIFTS.every(k => boxes.fields.includes(k)) && boxes.inView, boxes)
+  check('...each labelled with its lift and its units (kg or lb)',
+    boxes.labels.length === 3 && boxes.labels.every(l => /\(kg or lb\)/.test(l)) && /Squat/.test(boxes.labels[0]) && /Bench/.test(boxes.labels[1]) && /Deadlift/.test(boxes.labels[2]), boxes.labels)
+  check('...under the app\'s own line, not a coach sentence claiming numbers it was never given',
+    (await evj(`__cards('knownSquatKg')`)).some(c => /Fill in the ones you know/.test(c.under)) && !/Got those numbers/i.test(await ev(`__body()`)))
+  check('...with no trip to the coach for it', (await ev(`window.__onbRequests.length`)) === before, { before, after: await ev(`window.__onbRequests.length`) })
+  check('...her answer is in the conversation as her own words', !!(await evj(`__bubble('I know my numbers')`)))
+  check('...and Skip is offered, because every box can be left out', await ev(`!!document.querySelector('[data-onboarding-skip]')`))
+  await shot('lifts-after-tap')
+
+  // Squat in pounds, bench in kg, deadlift left empty.
+  await queue({ reply: 'That gives me something real to start you from. How do you feel about cardio?', actions: [{ name: 'present_slot', args: { slot_key: 'conditioningPreference' } }] })
+  // Only when the boxes are there to type into, so a broken tap fails the
+  // checks below rather than ending the section early (one count every run).
+  if (boxes.shown) {
+    await typeInto('slot-knownSquatKg', '225 lb')
+    await typeInto('slot-knownBenchKg', '80')
+    await tapEl(`[...document.querySelectorAll('[data-slot-card="knownSquatKg"] button')].find(b => b.textContent.trim() === 'Save')`, 'Save')
+    await wait(900)
+  }
+  const req = await lastRequest()
+  check('Save sends ONE turn to the coach', (await ev(`window.__onbRequests.length`)) === before + 1)
+  check('...with the squat converted from pounds to kg (225 lb is 102.1 kg)', /102\.1 kg/.test(req?.state?.filled?.knownSquatKg ?? ''), req?.state?.filled)
+  check('...the bench as typed, in kg', /^80 kg$/.test(req?.state?.filled?.knownBenchKg ?? ''), req?.state?.filled)
+  check('...and the empty deadlift box answered as "not given", never asked again',
+    /not given/.test(req?.state?.filled?.knownDeadliftKg ?? '') && !LIFTS.some(k => (req?.state?.remaining ?? []).includes(k)), { filled: req?.state?.filled?.knownDeadliftKg, remaining: req?.state?.remaining })
+  check('the tick shows what she typed beside what was stored', (await evj(`__ticks()`)).some(t => /Squat.*102\.1 kg.*from 225lb/.test(t)), await evj(`__ticks()`))
+  check('the lift boxes are gone once answered', !(await liftBoxes()).shown)
+  await shot('lifts-saved')
+})
+
+await section(21, '"I know my numbers", then Skip: nothing is asked again, and the coach is told', async () => {
+  await open('lifts')
+  await tapOption('knowsWorkingLifts', 'I know my numbers')
+  await wait(400)
+  await queue({ reply: 'No problem, the first week will find them. How do you feel about cardio?', actions: [{ name: 'present_slot', args: { slot_key: 'conditioningPreference' } }] })
+  if (await ev(`!!document.querySelector('[data-onboarding-skip]')`)) {
+    await tapEl(`document.querySelector('[data-onboarding-skip]')`, 'Skip')
+    await wait(900)
+  }
+  const req = await lastRequest()
+  check('a skip sends one turn saying so', /skip/i.test(req?.message ?? ''), req?.message)
+  check('...with the three lifts answered and out of the questions left', LIFTS.every(k => /not given/.test(req?.state?.filled?.[k] ?? '')) && !LIFTS.some(k => (req?.state?.remaining ?? []).includes(k)), req?.state)
+  check('...and no lift boxes come back', !(await liftBoxes()).shown && (await evj(`__cards('conditioningPreference')`)).length === 1)
+})
+
+await section(22, '"I know my numbers" TYPED, and the coach asks about cardio anyway: the boxes still come, and are the one card', async () => {
+  await open('lifts')
+  await queue({
+    reply: 'Got those numbers down. How do you feel about cardio?',
+    actions: [
+      { name: 'set_slot', args: { slot_key: 'knowsWorkingLifts', value: 'true' } },
+      { name: 'present_slot', args: { slot_key: 'conditioningPreference' } },
+    ],
+  })
+  await say('yeah I know them roughly')
+  const boxes = await liftBoxes()
+  check('the lift boxes are on screen after the coach\'s turn', boxes.shown && boxes.fields.length === 3 && boxes.inView, boxes)
+  check('...and the cardio chips are not stacked beside them', (await evj(`__cards('conditioningPreference')`)).length === 0, await evj(`__cards()`))
+})
+
+await section(23, 'An edit from the summary to "I know my numbers" asks for the numbers before the summary returns', async () => {
+  await open('review-lifter')
+  const start = await review()
+  check('harness: the summary is open', start.open, start.rows)
+  await tapRow('knowsWorkingLifts')
+  await tapOption('knowsWorkingLifts', 'I know my numbers')
+  await wait(400)
+  const now = await review()
+  const boxes = await liftBoxes()
+  check('the lift boxes are on screen', boxes.shown && boxes.fields.length === 3 && boxes.inView, boxes)
+  check('...and the summary waits for them', !now.open, now.rows)
+  await shot('lifts-from-summary')
+  // Answering the boxes settles the edit like any other: no trip to the
+  // coach, and the summary comes back with the number in it.
+  if (boxes.shown) {
+    await typeInto('slot-knownSquatKg', '100')
+    await tapEl(`[...document.querySelectorAll('[data-slot-card="knownSquatKg"] button')].find(b => b.textContent.trim() === 'Save')`, 'Save')
+    await wait(900)
+  }
+  const after = await review()
+  check('saving them brings the summary back, with the squat in its row', after.open && /100 kg/.test(after.rows.knownSquatKg ?? ''), after.rows)
+  check('...and "Working lifts" now reads "I know my numbers"', /I know my numbers/.test(after.rows.knowsWorkingLifts ?? ''), after.rows.knowsWorkingLifts)
+  check('...with no trip to the coach for any of it', after.requests === start.requests, { before: start.requests, after: after.requests })
+  check('...and Generate live', after.generate && after.generate.disabled === false, after.generate)
+})
+
+await section(24, 'Age, height and weight asked in words with no card requested: the boxes come anyway', async () => {
+  await open('h14')
+  // The exact sentence from her screenshot, and no present_slot.
+  await queue({
+    reply: "That's a solid base. Now for the numbers: how old are you, how tall are you, and what do you weigh right now?",
+    actions: [{ name: 'set_slot', args: { slot_key: 'recoveryCapacity', value: 'moderate' } }],
+  })
+  await say('sleep is fine, stress is low')
+  const age = await evj(`__cards('age')`)
+  check('the age / height / weight card is under that question', age.length === 1 && /how old are you/i.test(age[0].under), await evj(`__cards()`))
+  check('...on screen', age.length === 1 && age[0].inView, age)
+  check('...with all three boxes', await ev(`['age','heightCm','weightKg'].every(k => !!document.getElementById('slot-' + k))`))
+  await shot('body-card-unrequested')
+
+  // A CHIP question asked with no request still gets no chips — unchanged.
+  await open('h14')
+  await queue({ reply: 'Fair enough. How many meals a day suits you?', actions: [{ name: 'set_slot', args: { slot_key: 'recoveryCapacity', value: 'moderate' } }] })
+  await say('sleeping fine')
+  check('a chip question with no request still gets no chips', (await evj(`__cards()`)).length === 0, await evj(`__cards()`))
+})
+
 if (!isGone()) {
   try { check('harness: every request in this run was scripted', (await ev(`window.__onbUnscripted`)) === 0) } catch {}
 }

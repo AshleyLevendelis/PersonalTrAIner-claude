@@ -9,6 +9,7 @@
 import { getExerciseEntry, searchExerciseCatalog, slugifyExerciseName, type ExerciseEntry } from './exercise-db'
 import { isExternallyLoaded } from './load-prescription'
 import { effortFromWords, EFFORTS, type EffortKey } from './cardio-effort'
+import { exerciseAliasFor, normaliseAliasPhrase } from './exercise-aliases'
 
 export interface ParsedSet {
   setNumber: number
@@ -27,7 +28,15 @@ export interface ParsedSet {
 }
 
 export type ExerciseResolution =
-  | { resolution: 'resolved'; exerciseId: string; exerciseName: string }
+  | {
+      resolution: 'resolved'; exerciseId: string; exerciseName: string
+      /**
+       * HOW THE NAME WAS REACHED. 'exact' and 'alias' are her words read
+       * through the app's own tables; 'plan' is today's session; 'search' is
+       * the catalogue's best guess, which a caller may want confirmed.
+       */
+      via: 'exact' | 'alias' | 'plan' | 'search'
+    }
   | { resolution: 'ambiguous'; candidates: ExerciseEntry[] }
   | { resolution: 'unknown'; exerciseId: string; exerciseName: string }
 
@@ -294,6 +303,32 @@ const CARDIO_ACTIVITY: Record<string, string> = {
   swim: 'Swim', elliptical: 'Elliptical', cardio: 'Cardio', walk: 'Walk',
 }
 
+/**
+ * A QUERY THIS SHORT IS NEVER A CERTAIN MATCH. Three or four letters found
+ * inside a catalogue name are a coincidence as often as a meaning: "rdl" sits
+ * inside "Single-Leg RDL (Bodyweight)" and nowhere in "Romanian Deadlifts";
+ * "row" prefixes "Rowing Machine". Shorthand that does have one meaning is in
+ * the alias table, which runs first.
+ */
+const SHORT_QUERY_MAX_LETTERS = 4
+
+/** Letters and digits only, words split by single spaces. */
+function wordsOf(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+/**
+ * Is this catalogue hit one the words actually NAME, rather than letters found
+ * anywhere? The query must be long enough to mean something and must begin at
+ * the start of a word in the name ("lunges" in "Walking Lunges"; never "lift"
+ * inside "Deadlifts").
+ */
+function isCertainCatalogueMatch(query: string, name: string): boolean {
+  const q = wordsOf(query)
+  if (q.replace(/ /g, '').length <= SHORT_QUERY_MAX_LETTERS) return false
+  return ` ${wordsOf(name)}`.includes(` ${q}`)
+}
+
 export function resolveExerciseName(phrase: string, todaysPlanExerciseNames: string[]): ExerciseResolution {
   const trimmed = phrase.trim()
   // AN EMPTY PHRASE MATCHES NOTHING, and saying so here is not belt-and-braces.
@@ -304,26 +339,56 @@ export function resolveExerciseName(phrase: string, todaysPlanExerciseNames: str
 
   // Exact catalog match.
   const exact = getExerciseEntry(trimmed)
-  if (exact) return { resolution: 'resolved', exerciseId: exact.id, exerciseName: exact.name }
+  if (exact) return { resolution: 'resolved', exerciseId: exact.id, exerciseName: exact.name, via: 'exact' }
 
-  // Priority: substring match within today's plan.
   const lower = trimmed.toLowerCase()
   const inPlan = todaysPlanExerciseNames.filter(n => n.toLowerCase().includes(lower) || lower.includes(n.toLowerCase()))
-  if (inPlan.length === 1) {
-    const entry = getExerciseEntry(inPlan[0])
-    if (entry) return { resolution: 'resolved', exerciseId: entry.id, exerciseName: entry.name }
+
+  // GYM SHORTHAND, BEFORE EITHER SUBSTRING TIER. "rdl" means the Romanian
+  // deadlift. Ashley's live test, 19 Oct 2026: it had been resolved, as
+  // certain, to the only catalogue name containing those letters, a
+  // bodyweight single-leg variant, which then skipped the weight question.
+  // The table and its CSCS basis are in exercise-aliases.ts.
+  //
+  // TODAY'S PLAN IS STILL HEARD. When her words also match a DIFFERENT
+  // exercise on today's session ("bench" with Dumbbell Bench Press on the
+  // card), both are offered rather than either being assumed.
+  const aliasName = exerciseAliasFor(trimmed)
+  const aliasEntry = aliasName ? getExerciseEntry(aliasName) : undefined
+  if (aliasEntry) {
+    const planOthers = inPlan
+      .map(n => getExerciseEntry(n))
+      .filter((e): e is ExerciseEntry => !!e && e.name !== aliasEntry.name)
+    if (planOthers.length > 0) return { resolution: 'ambiguous', candidates: [aliasEntry, ...planOthers].slice(0, 4) }
+    return { resolution: 'resolved', exerciseId: aliasEntry.id, exerciseName: aliasEntry.name, via: 'alias' }
   }
 
-  // Global fuzzy search (prefix/substring).
+  // Priority: substring match within today's plan.
+  if (inPlan.length === 1) {
+    const entry = getExerciseEntry(inPlan[0])
+    if (entry) return { resolution: 'resolved', exerciseId: entry.id, exerciseName: entry.name, via: 'plan' }
+  }
+
+  // Global search (prefix/substring). A hit is CERTAIN only when the words
+  // name it (isCertainCatalogueMatch); anything else is OFFERED, never
+  // assumed. A short query, or letters found mid-word, is exactly the shape
+  // that put "rdl" on a bodyweight single-leg lift.
   const results = searchExerciseCatalog(trimmed, 6)
-  if (results.length === 1) return { resolution: 'resolved', exerciseId: results[0].id, exerciseName: results[0].name }
+  if (results.length === 1) {
+    if (isCertainCatalogueMatch(trimmed, results[0].name)) {
+      return { resolution: 'resolved', exerciseId: results[0].id, exerciseName: results[0].name, via: 'search' }
+    }
+    return { resolution: 'ambiguous', candidates: results }
+  }
   if (results.length > 1) {
-    // A single dominant prefix match still counts as resolved (e.g. "bench"
-    // uniquely prefixing "Bench Press" among several substring hits);
-    // otherwise genuinely ambiguous (e.g. "flyes" — Cable Flyes vs Rear
-    // Delt Flyes, neither a prefix of the other's full name).
+    // A single dominant prefix match still counts as resolved (e.g. "lateral
+    // raise" uniquely prefixing "Lateral Raises" among other hits); otherwise
+    // genuinely ambiguous (e.g. "flyes" — Cable Flyes vs Rear Delt Flyes,
+    // neither a prefix of the other's full name).
     const startsWithQuery = results.filter(r => r.name.toLowerCase().startsWith(lower))
-    if (startsWithQuery.length === 1) return { resolution: 'resolved', exerciseId: startsWithQuery[0].id, exerciseName: startsWithQuery[0].name }
+    if (startsWithQuery.length === 1 && isCertainCatalogueMatch(trimmed, startsWithQuery[0].name)) {
+      return { resolution: 'resolved', exerciseId: startsWithQuery[0].id, exerciseName: startsWithQuery[0].name, via: 'search' }
+    }
     return { resolution: 'ambiguous', candidates: results.slice(0, 4) }
   }
 
@@ -375,7 +440,30 @@ export function isNamedByTheUser(phrase: string, userSaid: string): boolean {
     const whole = normalizeForTracing(phrase)
     return whole.length > 0 && said.includes(whole)
   }
-  return words.some(w => said.includes(w))
+  if (words.some(w => said.includes(w))) return true
+  // HER SHORTHAND, READ THROUGH THE APP'S OWN TABLE. She typed "rdl" and the
+  // model wrote "Romanian Deadlifts": none of its words are in her message,
+  // yet the app's alias table says her word means exactly that lift. The
+  // model's word is still not trusted; the match is between her text and the
+  // table, and only to the one lift the table names.
+  const meant = getExerciseEntry(phrase.trim())?.name ?? exerciseAliasFor(phrase)
+  if (!meant) return false
+  const saidWords = said.split(' ')
+  for (let len = 1; len <= 4; len++) {
+    for (let i = 0; i + len <= saidWords.length; i++) {
+      if (exerciseAliasFor(saidWords.slice(i, i + len).join(' ')) === meant) return true
+    }
+  }
+  return false
+}
+
+/**
+ * Does the phrase name the whole exercise, give or take a plural and a
+ * bracketed qualifier? "burpee" names Burpees; "sissy" does not name Sissy
+ * Squat, it points at it.
+ */
+function namesTheWholeExercise(phrase: string, name: string): boolean {
+  return normaliseAliasPhrase(phrase) === normaliseAliasPhrase(name.replace(/\([^)]*\)/g, ' '))
 }
 
 // ---------------------------------------------------------------------------
@@ -491,6 +579,25 @@ export function parseWorkoutEntries(input: ParseWorkoutInput): ParseWorkoutResul
           .map(n => getExerciseEntry(n))
           .filter((e): e is ExerciseEntry => !!e),
         ambiguity: { field: 'exercise_name', message: 'Which exercise was that?' },
+      }
+    }
+
+    // A GUESSED NAME THAT WOULD SKIP THE WEIGHT QUESTION IS CONFIRMED FIRST.
+    // A bodyweight entry is never asked "what weight?", so a catalogue guess
+    // that lands on one writes 0 kg with nothing on screen to catch it: her
+    // loaded RDL, 19 Oct 2026, was one tap from history as a bodyweight
+    // single-leg RDL. A loaded guess still meets the weight question, which
+    // names it. Exact names, her shorthand and today's plan are not guesses.
+    if (nameRes.resolution === 'resolved' && nameRes.via === 'search') {
+      const guessed = getExerciseEntry(nameRes.exerciseName)
+      if (guessed && !isExternallyLoaded(guessed) && !namesTheWholeExercise(tracedPhrase, guessed.name)) {
+        return {
+          matchedRawPhrase: tracedPhrase,
+          resolution: 'ambiguous',
+          ambiguousCandidates: [guessed],
+          sets: [],
+          ambiguity: { field: 'exercise_name', message: `Which "${tracedPhrase}" did you mean?` },
+        }
       }
     }
 

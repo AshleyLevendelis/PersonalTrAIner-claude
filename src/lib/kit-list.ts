@@ -380,6 +380,15 @@ export function kitStatementInUserWords(statement: KitStatement, text: string): 
 }
 
 /**
+ * The kit items she says she does NOT have, in her own words ("I don't have bands", "no pull-up bar"): each item read
+ * by the same negation test the kit card itself demands, so a message this names is one the card will accept.
+ * Live test, 19 Oct 2026: "I don't have bands" got a one-exercise swap for today, and every other band exercise stayed.
+ */
+export function kitItemsSaidNotOwned(text: string): KitItem[] {
+  return KIT_ITEMS.filter(item => kitStatementInUserWords({ mode: 'hasnt', items: [item] }, text))
+}
+
+/**
  * SETUP'S `kitList` SLOT holds one statement as text, "only: dumbbells, bench"
  * — the shape the slot catalogue tells the model to write, and the shape this
  * reads back. Null for anything else, which the slot's validator refuses.

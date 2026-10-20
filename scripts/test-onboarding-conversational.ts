@@ -83,7 +83,13 @@ console.log('\n2. Options are offered on every closed-set question, first asking
   check('...and the old rescue-only wording is gone',
     !/RESCUE, not the way questions are asked/i.test(decl) && !/[Nn]ever call it on the first asking/.test(decl))
   check('...but text-only questions still get none — there is nothing to render',
-    /Do not call it for questions with no set list/i.test(decl))
+    /Do not call it for questions with no set list and no boxes \(a name, foods or exercises they dislike\)/i.test(decl))
+  // 19 Oct 2026: this said "(a name, a number, ...)", which told the coach a
+  // NUMBER question gets no card — and age/height/weight then came as a
+  // sentence with nothing under it to fill in (her live test).
+  check('...while a NUMBER question gets its boxes: present_slot("age"), present_slot("knownSquatKg")',
+    /A NUMBER question DOES get a card/.test(decl) && /present_slot\(\\"age\\"\)/.test(decl) && /present_slot\(\\"knownSquatKg\\"\)/.test(decl)
+    && !/no set list \(a name, a number/.test(decl))
 
   check('the SLOT MECHANICS rule asks AND offers',
     /ask it in your own words AND call present_slot/.test(fn))
@@ -102,7 +108,19 @@ console.log('\n3. The guard that made the reversal safe is untouched')
     /slot_key MUST be the exact question your sentence just asked/i.test(fn))
   check('...stated as worse than nothing', /worse than no chips/i.test(fn))
   check('one set of options per turn', /One present_slot per turn at most/i.test(fn))
-  check('numeric asks still have none', /Numeric asks \(age\/height\/weight\) have no chips at all/i.test(fn))
+  // RE-ANCHORED 19 Oct 2026. This pinned "Numeric asks (age/height/weight)
+  // have no chips at all", the line that steered the coach to ask them as a
+  // bare sentence. The property is the opposite: one card, asked for.
+  check('age, height and weight are asked as ONE card with present_slot("age")',
+    /Age, height and weight are ONE card of three labelled boxes: ask them together in one question and call present_slot\("age"\)/.test(fn)
+    && !/have no chips at all/.test(fn))
+  check('after "I know my numbers" the lift boxes come next and the coach asks nothing else that turn',
+    /RIGHT AFTER THEY SAY THEY KNOW THEIR NUMBERS \(knowsWorkingLifts = true\), THE LIFT BOXES COME NEXT/.test(fn)
+    && /asks nothing else; the next question waits until the boxes are filled in or skipped/.test(fn))
+  check('a lift in pounds goes to set_slot with its unit, and a bare number is kg',
+    /A lift given in pounds goes in set_slot WITH its unit \("225 lb"\)/.test(fn) && /a bare number is kg/.test(fn))
+  check('the coach may not claim a number is recorded without the set_slot in the same turn',
+    /NEVER SAY A NUMBER IS NOTED, RECORDED, LOGGED OR "GOT" UNLESS YOUR set_slot FOR THAT NUMBER IS IN THIS SAME TURN/.test(fn))
 }
 
 console.log('\n4. The client rescues a stuck user without needing the model')

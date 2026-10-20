@@ -29,6 +29,8 @@ import {
   isStartingFromNothing,
   isStuckMessage,
   detectAllergenTags,
+  openSlotsInOrder,
+  liftBoxesDue,
   type OnboardingSlotValues,
   type SlotKey,
 } from '../src/lib/onboarding-slots'
@@ -142,6 +144,16 @@ check('constants: persona', p.coaching_persona === 'supportive')
 check('known lifts flow when known', p.skip_calibration_week === true && p.known_squat_kg === 80 && p.known_bench_kg === undefined && p.known_deadlift_kg === 100)
 const noLifts = assembleProfile({ ...fullValues(), knowsWorkingLifts: false, knownSquatKg: '80' })
 check('known lifts gated off when not known', noLifts.skip_calibration_week === false && noLifts.known_squat_kg === undefined)
+// THE STORED FLAG IS TRUE ONLY WITH A NUMBER BEHIND IT (19 Oct 2026): "I know
+// my numbers" and then nothing given builds a calibration week (the engine's
+// canSkipCalibration needs a known lift), so storing "skips calibration" was
+// a flag that disagreed with the plan.
+const knowsButNone = assembleProfile({ ...fullValues(), knowsWorkingLifts: true, knownSquatKg: '', knownBenchKg: '', knownDeadliftKg: '' })
+check('"I know my numbers" with no number given does not store a skipped calibration week', knowsButNone.skip_calibration_week === false, String(knowsButNone.skip_calibration_week))
+const knowsButSkipped = assembleProfile({ ...fullValues(), knowsWorkingLifts: true, knownSquatKg: null, knownBenchKg: null, knownDeadliftKg: null } as unknown as OnboardingSlotValues)
+check('...nor when the boxes were skipped (declined, stored as null)', knowsButSkipped.skip_calibration_week === false, String(knowsButSkipped.skip_calibration_week))
+const knowsOne = assembleProfile({ ...fullValues(), knowsWorkingLifts: true, knownSquatKg: '', knownBenchKg: '70', knownDeadliftKg: '' })
+check('...and one number is enough (bench alone)', knowsOne.skip_calibration_week === true && knowsOne.known_bench_kg === 70, JSON.stringify([knowsOne.skip_calibration_week, knowsOne.known_bench_kg]))
 check('disliked foods split + trimmed', JSON.stringify(p.disliked_foods) === JSON.stringify(['mushrooms', 'olives']))
 check('injuries pass through verbatim', JSON.stringify(p.injuries) === JSON.stringify(['knees']))
 check('numerics converted', p.age === 31 && p.height_cm === 168 && p.weight_kg === 64)
@@ -163,7 +175,40 @@ check('full values: nothing missing', missingRequiredSlots(fullValues()).length 
 const unasked = unconfirmedOptionalSlots(new Set())
 check('injuries must be explicitly asked', unasked.includes('injuries'))
 check('dietaryPreferences must be explicitly asked', unasked.includes('dietaryPreferences'))
-check('known-lift numbers never block', !unasked.includes('knownSquatKg') && !unasked.includes('knownBenchKg') && !unasked.includes('knownDeadliftKg'))
+// RE-ANCHORED 19 Oct 2026 (Ashley's live test: "I know my numbers" asked
+// nothing). This line used to read "known-lift numbers never block" and held
+// it on FRESH values, where the lifts do not even apply — so it pinned the
+// absence that was the bug while never meeting the case it named. The
+// property is two-sided: asked once she says she knows them, never in the
+// way when she doesn't, and gone once answered or skipped.
+{
+  const LIFT_KEYS: SlotKey[] = ['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg']
+  const lifter = (knows: boolean | null): OnboardingSlotValues => ({
+    ...initialSlotValues(), equipment: 'full_gym', trainingExperience: 'intermediate', activityLevel: 'moderate', knowsWorkingLifts: knows,
+  })
+  const before = new Set(['equipment', 'trainingExperience', 'activityLevel', 'knowsWorkingLifts'])
+  check('known-lift numbers never block when she said "Not sure"',
+    !LIFT_KEYS.some(k => unconfirmedOptionalSlots(before, lifter(false)).includes(k) || openSlotsInOrder(before, lifter(false)).includes(k)))
+  check('...or before she has answered at all',
+    !LIFT_KEYS.some(k => openSlotsInOrder(new Set(['equipment', 'trainingExperience', 'activityLevel']), lifter(null)).includes(k)))
+  const open = openSlotsInOrder(before, lifter(true))
+  check('the three lift boxes ARE asked once she says she knows them', LIFT_KEYS.every(k => open.includes(k)), open.join(', '))
+  check('...together, in the app\'s own order, before the training days',
+    open.indexOf('knownBenchKg') === open.indexOf('knownSquatKg') + 1 && open.indexOf('knownDeadliftKg') === open.indexOf('knownSquatKg') + 2
+    && open.indexOf('knownSquatKg') < open.indexOf('trainingDays'), open.join(', '))
+  check('...and the coach is no longer told they are BONUS', LIFT_KEYS.every(k => buildSlotCatalog(lifter(true)).find(c => c.key === k)?.neverBlocks === false))
+  check('...and a skip (answered with no value) clears them',
+    !LIFT_KEYS.some(k => openSlotsInOrder(new Set([...before, ...LIFT_KEYS]), lifter(true)).includes(k)))
+
+  // liftBoxesDue: the app puts the boxes on screen itself, exactly once.
+  check('the boxes are due the moment she says she knows them', liftBoxesDue(lifter(true), before, ['knowsWorkingLifts']))
+  check('...not when she said "Not sure"', !liftBoxesDue(lifter(false), before, ['knowsWorkingLifts']))
+  check('...not twice: a lift card already shown, answered or not, is enough', !liftBoxesDue(lifter(true), before, ['knowsWorkingLifts', 'knownBenchKg']))
+  check('...not once any lift is answered', !liftBoxesDue({ ...lifter(true), knownSquatKg: '100' }, new Set([...before, 'knownSquatKg']), []))
+  check('...and not once the question stops applying (a "yes" left behind by a change to bodyweight training)',
+    !liftBoxesDue({ ...lifter(true), equipment: 'bodyweight' }, before, [])
+    && !LIFT_KEYS.some(k => openSlotsInOrder(before, { ...lifter(true), equipment: 'bodyweight' }).includes(k)))
+}
 check('all-confirmed clears the list', unconfirmedOptionalSlots(new Set(ONBOARDING_SLOTS.map(s => s.key))).length === 0)
 
 console.log('\n5b. Refusal: what a user is allowed to decline')
@@ -220,13 +265,17 @@ console.log('\n9. requiredIf — genuinely conditional questions')
 // questions that only mean something given another answer: the known-lift
 // numbers matter only once someone says they know their lifts.
 check('no planFormat slot exists (the fork was removed)', !getSlotDef('planFormat'))
-const knowsLifts = { ...initialSlotValues(), knowsWorkingLifts: true }
+// A barbell lifter: since 19 Oct 2026 the boxes apply only while the
+// working-lifts question itself does, so "true" alone is not enough.
+const knowsLifts = { ...initialSlotValues(), equipment: 'full_gym', trainingExperience: 'intermediate', activityLevel: 'moderate', knowsWorkingLifts: true } as OnboardingSlotValues
 const doesntKnow = { ...initialSlotValues(), knowsWorkingLifts: false }
 for (const key of ['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg'] as SlotKey[]) {
   const def = getSlotDef(key)!
   check(`${key}: applies once they say they know their numbers`, isSlotApplicable(def, knowsLifts))
   check(`${key}: does NOT apply when they said they don't`, !isSlotApplicable(def, doesntKnow))
-  check(`${key}: never blocks completion either way`, !isSlotRequired(def, knowsLifts) && !isSlotRequired(def, doesntKnow))
+  // Never REQUIRED: Skip (or an empty box) always answers it. Whether it is
+  // ASKED is §5's re-anchored check.
+  check(`${key}: never required either way — it can always be skipped`, !isSlotRequired(def, knowsLifts) && !isSlotRequired(def, doesntKnow) && canDeclineSlot(def, knowsLifts))
 }
 check(
   "a don't-know-my-lifts profile is never asked for a squat number, even as a skip",

@@ -120,6 +120,29 @@ const listed = await ev(`(() => {
 check('the risotto is still in the swap list, greyed, saying why', !!listed && listed.disabled && /mushroom/i.test(listed.reason), listed)
 await shoot('kept-meal-not-served')
 
+console.log('\n[2b] A food the app cannot identify, under nut-free: blocked, and said truthfully (live test, 19 Oct 2026)')
+const BOWL = 'Chicken rice and yoghurt bowl'
+await loadWeek('kept=1&unknownfood=1&nutfree=1')
+const nf = await readWeek()
+check('the bowl with the unidentified yoghurt is dinner on none of the seven days', nf.length === 7 && nf.every(d => d.dinner !== BOWL), nf.map(d => d.dinner))
+await ev(`document.querySelector('[data-meal-name="dinner"]').closest('button').click()`)
+await wait(400)
+await ev(`[...document.querySelector('[data-meal-name="dinner"]').closest('[data-meal-row]').querySelectorAll('button')].find(b => /^Swap/.test(b.textContent.trim()))?.click()`)
+await wait(400)
+const bowl = await ev(`(() => {
+  const row = document.querySelector('[data-meal-name="dinner"]').closest('[data-meal-row]')
+  const b = [...row.querySelectorAll('button')].find(x => (x.querySelector('p.line-clamp-2')?.textContent || '').trim() === ${JSON.stringify(BOWL)})
+  if (!b) return null
+  b.scrollIntoView({ block: 'center' })
+  const r = b.getBoundingClientRect()
+  return { disabled: b.disabled, reason: [...b.querySelectorAll('p')].map(p => p.textContent.trim()).join(' | '), onScreen: r.top >= 0 && r.bottom <= innerHeight }
+})()`)
+check('2b-a. it is in the swap list, greyed', !!bowl && bowl.disabled === true, bowl)
+check("2b-b. ...saying the app can't confirm the yoghurt is nut-free, her ruling's words", !!bowl && /I can't confirm vanilla greek yoghurt is nut-free, so this one's off for you\./.test(bowl.reason), bowl && bowl.reason)
+check('2b-c. ...and never that it CONTAINS anything', !!bowl && !/contains/i.test(bowl.reason), bowl && bowl.reason)
+check('2b-d. ...on screen where the tap was', bowl?.onScreen === true, bowl)
+await shoot('kept-meal-unknown-food')
+
 console.log('\n[3] Every saved option clashes: the day says so rather than going quiet')
 await loadWeek('avoid=chicken')
 const today = await meals()

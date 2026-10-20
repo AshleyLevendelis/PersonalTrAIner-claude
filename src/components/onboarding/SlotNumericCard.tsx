@@ -44,13 +44,14 @@ const UNIT: Record<string, string | undefined> = {
   age: 'years',
   heightCm: 'cm or 5\'10',
   weightKg: 'kg or 13st',
-  knownSquatKg: 'kg',
-  knownBenchKg: 'kg',
-  knownDeadliftKg: 'kg',
+  // kg, or pounds when they type "lb" (19 Oct 2026). A bare number is kg.
+  knownSquatKg: 'kg or lb',
+  knownBenchKg: 'kg or lb',
+  knownDeadliftKg: 'kg or lb',
 }
 
 /**
- * The two fields that accept another unit, and MUST therefore not be
+ * The fields that accept another unit, and MUST therefore not be
  * `type="number"`.
  *
  * A number input physically cannot hold `5'10"` or `13st` — the browser
@@ -60,15 +61,21 @@ const UNIT: Record<string, string | undefined> = {
  * every unit test passed while the field it feeds could not have received a
  * single one of those strings.
  *
- * These two get `type="text"` with a numeric-ish keypad hint. The app's own
+ * These get `type="text"` with a numeric-ish keypad hint. The app's own
  * bounds still apply after conversion, so nothing is loosened — only the
  * browser's character filter, which was the thing in the way.
  */
-const ACCEPTS_UNITS = new Set(['heightCm', 'weightKg'])
+const ACCEPTS_UNITS = new Set(['heightCm', 'weightKg', 'knownSquatKg', 'knownBenchKg', 'knownDeadliftKg'])
 
+// No example number on a lift box: a figure there is one somebody might copy
+// onto the bar, and these numbers set the starting weight.
+const LIFT_PLACEHOLDER = 'In kg, or add lb'
 const PLACEHOLDER: Record<string, string> = {
   heightCm: "178 or 5'10",
   weightKg: '87 or 13st 2',
+  knownSquatKg: LIFT_PLACEHOLDER,
+  knownBenchKg: LIFT_PLACEHOLDER,
+  knownDeadliftKg: LIFT_PLACEHOLDER,
 }
 
 export function SlotNumericCard({

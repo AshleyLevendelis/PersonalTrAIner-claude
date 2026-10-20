@@ -193,7 +193,7 @@ export function ProposalCard({
               >
                 {busy === 'confirm' && scope === opt
                   ? 'Applying…'
-                  : opt === 'today' ? 'Apply today' : opt === 'block' ? 'Whole block' : opt}
+                  : opt === 'today' ? 'Apply today' : opt === 'block' ? 'Whole block' : opt === 'permanent' ? 'Rest of block' : opt}
               </button>
             ))
           ) : (
