@@ -102,7 +102,7 @@ const say = async text => ev(`(() => {
 const READ = String.raw`(() => {
   const text = document.body.innerText
   const btns = [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean)
-  return { text, btns, hasCard: /Proposed change/i.test(text) && btns.some(b => /^Apply/.test(b)) }
+  return { text, btns, hasCard: !!document.querySelector('[data-testid="proposal-card"][data-offer="text"]') && btns.some(b => /^Apply/.test(b)) }
 })()`
 
 check('1. she asks for new days from next week', await say(`Can we change to ${NEW_DAYS.join(', ')} from next week?`))

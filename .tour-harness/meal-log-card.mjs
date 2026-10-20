@@ -194,7 +194,14 @@ check('1e. no figure under 300 kcal is anywhere in the conversation', kcals(t1.s
 check('1f. assumptions are written once: "Assumed: large eggs; white toast; 10 g butter."', /Assumed: large eggs; white toast; 10 g butter\./.test(t1), t1.slice(-400))
 check('1g. ...and never "Assuming assumed"', !/assum\w*\s+assum/i.test(t1), t1.slice(-400))
 // RUN 7, M51: "breakfast" was drawn struck through, as if the meal replaced it.
-check('1g2. the slot is not struck through: nothing on the card is crossed out', await ev(`[...document.querySelectorAll('[data-testid="proposal-card"] .line-through')].filter(e => (e.textContent || '').trim()).length`) === 0, await ev(`[...document.querySelectorAll('[data-testid="proposal-card"] .line-through')].map(e => e.textContent)`))
+// RE-ANCHORED 20 Oct 2026 (Ashley, "text + small buttons always"): the offer is text now, where "replaced" is said
+// with an arrow, so the property is read both ways — nothing crossed out, and no line saying the slot BECOMES the meal.
+const slotReplaced = `[...document.querySelectorAll('[data-testid="proposal-card"] [data-offer-line="change"]')].map(e => e.textContent).filter(t => /breakfast\\s*→/i.test(t))`
+check('1g2. the slot is not struck through: nothing on the offer is crossed out, and no line says breakfast → the meal',
+  await ev(`[...document.querySelectorAll('[data-testid="proposal-card"] .line-through')].filter(e => (e.textContent || '').trim()).length`) === 0
+    && (await ev(`document.querySelectorAll('[data-testid="proposal-card"] [data-offer-line="change"]').length`)) >= 1
+    && (await ev(slotReplaced)).length === 0,
+  { struck: await ev(`[...document.querySelectorAll('[data-testid="proposal-card"] .line-through')].map(e => e.textContent)`), lines: await ev(`[...document.querySelectorAll('[data-testid="proposal-card"] [data-offer-line="change"]')].map(e => e.textContent)`) })
 check('1h. nothing is written before the tap', (await logged()).length === 0, await logged())
 check('1i. one card is waiting for her tap', (await applyButtons()) === 1, await applyButtons())
 await shoot('meal-log-card-eggs')

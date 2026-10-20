@@ -10,6 +10,13 @@ import type { PendingActionReceipt } from '@/lib/pending-actions-store'
 // natural-language logging's receipt and for a confirmed swap's result.
 // ---------------------------------------------------------------------------
 
+// A RECEIPT IS A LINE IN THE CONVERSATION, NOT A CARD (Ashley, 20 Oct 2026,
+// "text + small buttons always", for the offer it answers): no rule down its
+// side, and its Undo and View buttons are the offer's small ones — a pill the
+// size of a word inside a 44px tap target.
+const SMALL = 'inline-flex min-h-[44px] items-center disabled:opacity-60'
+const PILL = 'inline-flex items-center rounded-full border border-[color:var(--hairline)] px-2.5 py-0.5 text-[0.75rem] leading-5 text-muted-foreground'
+
 export interface ReceiptRow {
   label: string
   detail: string
@@ -88,7 +95,7 @@ export function ReceiptCard({
       : <XCircle className="size-3.5 text-destructive shrink-0" />
 
   return (
-    <div className="mt-2 pl-3.5 border-l-2 border-[color:var(--hairline)] text-sm space-y-2">
+    <div data-testid="chat-receipt" className="mt-2 pl-0.5 text-sm space-y-1.5">
       <p className="flex items-center gap-1.5 text-xs font-medium">
         {icon}
         {title}
@@ -134,33 +141,33 @@ export function ReceiptCard({
         <p className="text-xs text-destructive">Nothing was applied — {(receipt?.failed[0]?.error ?? 'the write failed').replace(/[.!?]+$/, '')}.</p>
       )}
 
-      <div className="flex items-center justify-between pt-0.5">
+      <div className="flex flex-wrap items-center gap-x-2 pt-0.5">
         {summary && <p className="text-[0.625rem] text-muted-foreground">{summary}</p>}
-        <div className="flex items-center gap-1 ml-auto">
+        <div className="flex items-center gap-x-1.5">
           {onViewProfile && (
-            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" onClick={onViewProfile}>
-              View in profile
-            </Button>
+            <button type="button" className={SMALL} onClick={onViewProfile}>
+              <span className={PILL}>View in profile</span>
+            </button>
           )}
           {onViewGrocery && (
-            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" onClick={onViewGrocery}>
-              View list
-            </Button>
+            <button type="button" className={SMALL} onClick={onViewGrocery}>
+              <span className={PILL}>View list</span>
+            </button>
           )}
           {onViewDashboard && (
-            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" onClick={onViewDashboard}>
-              View
-            </Button>
+            <button type="button" className={SMALL} onClick={onViewDashboard}>
+              <span className={PILL}>View</span>
+            </button>
           )}
           {onViewExercise && (
-            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" onClick={onViewExercise}>
-              View
-            </Button>
+            <button type="button" className={SMALL} onClick={onViewExercise}>
+              <span className={PILL}>View</span>
+            </button>
           )}
           {undoAvailable && !undoExpired && onUndo && (
-            <Button size="sm" variant="ghost" className="h-6 text-[0.6875rem]" disabled={busy != null} onClick={handleUndo}>
-              {busy === 'undo' ? 'Undoing…' : 'Undo'}
-            </Button>
+            <button type="button" className={SMALL} disabled={busy != null} onClick={handleUndo}>
+              <span className={PILL}>{busy === 'undo' ? 'Undoing…' : 'Undo'}</span>
+            </button>
           )}
         </div>
       </div>

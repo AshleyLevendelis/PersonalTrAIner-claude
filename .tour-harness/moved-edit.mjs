@@ -342,7 +342,7 @@ const SWAP_SAID = 'swap the last one on today, the station is busy'
 check('7b. asking the coach to swap an exercise on it', await sayToCoach(SWAP_SAID))
 const swapReply = await settled(SWAP_SAID)
 check(`7c. it does NOT answer "${TODAY_NAME} is a rest day — there's nothing on it to swap."`, swapReply.length > 0 && !/is a rest day/i.test(swapReply), swapReply.slice(0, 260))
-check('7d. ...it offers the swap as a card, naming the exercise that is on the moved session', /Proposed change/i.test(swapReply) && swapReply.includes(movedNames[movedNames.length - 1] ?? 'NO-NAME') && await hasCardButtons(), swapReply.slice(0, 260))
+check('7d. ...it offers the swap (the offer itself on screen), naming the exercise that is on the moved session', (await ev(`!!document.querySelector('[data-testid="proposal-card"][data-offer="text"][data-card-status="pending"]')`)) && swapReply.includes(movedNames[movedNames.length - 1] ?? 'NO-NAME') && await hasCardButtons(), swapReply.slice(0, 260))
 check(`7e. ...and the card says ${TODAY_NAME}, never ${FROM_NAME}`, swapReply.includes(`${TODAY_NAME}'s other`) && !swapReply.includes(`${FROM_NAME}'s other`), swapReply.slice(0, 320))
 await shoot('moved-edit-7-coach-swap')
 check('7f. tapping Apply', await ev(`(() => { const b = [...document.querySelectorAll('button')].filter(x => /^Apply/.test((x.textContent || '').trim())).pop(); if (!b) return false; b.click(); return true })()`))
@@ -357,7 +357,7 @@ const shortReply = await settled(SHORT_SAID)
 check('8b. it does NOT answer "There\'s no session on … to shorten" or go quiet', shortReply.length > 0 && !/no session on/i.test(shortReply) && !/couldn.t work out which session/i.test(shortReply), shortReply.slice(0, 260))
 check(`8c. ...what it says is about ${TODAY_NAME}, never ${FROM_NAME}`, shortReply.includes(TODAY_NAME) && !shortReply.includes(FROM_NAME), shortReply.slice(0, 260))
 await shoot('moved-edit-8-coach-shorten')
-await ev(`(() => { const b = [...document.querySelectorAll('button')].filter(x => /^Keep/.test((x.textContent || '').trim())).pop(); if (b) b.click() })()`); await wait(700)
+await ev(`(() => { const b = [...document.querySelectorAll('button')].filter(x => /^Not now$/.test((x.textContent || '').trim())).pop(); if (b) b.click() })()`); await wait(700)
 
 // --- remove, naming the session's OLD weekday ------------------------------
 const TAKE_SAID = `take the second to last one out of my ${FROM_NAME} session`

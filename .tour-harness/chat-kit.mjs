@@ -55,18 +55,16 @@ const say = async text => {
   await wait(300)
   return ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /send/i.test(x.getAttribute('aria-label') || '')); if (!b || b.disabled) return false; b.click(); return true })()`)
 }
+// THE OFFER'S OWN TEXT (re-anchored 20 Oct 2026: Ashley's "text + small buttons always" removed the card heading
+// this used to climb from). The newest live offer's element, read whole: the coach's bubble with its facts.
 const CARD = String.raw`(() => {
-  const heads = [...document.querySelectorAll('*')].filter(e => /Proposed change/i.test(e.textContent || '') && e.children.length === 0)
-  const h = heads[heads.length - 1]
-  if (!h) return null
-  let p = h
-  for (let i = 0; i < 12 && p.parentElement; i++) {
-    p = p.parentElement
-    const b = [...p.querySelectorAll('button')].map(x => (x.textContent || '').trim())
-    if (b.some(t => /^Apply/.test(t)) && b.includes('Keep')) break
-  }
+  const p = [...document.querySelectorAll('[data-testid="proposal-card"][data-card-status="pending"]')].pop()
+  if (!p) return null
+  const b = [...p.querySelectorAll('button')].map(x => (x.textContent || '').trim())
+  if (!b.some(t => /^Apply/.test(t)) || !b.includes('Not now')) return null
   return p.textContent.replace(/\s+/g, ' ').trim()
 })()`
+const OFFERS = `document.querySelectorAll('[data-testid="proposal-card"]').length`
 
 // 1. THE HONEST CALL: a card, priced, nothing written.
 check('1a. she says it', await say("I don't have a barbell at the moment, it went back to my brother") === true)
@@ -90,11 +88,11 @@ check('2c. a receipt says it was saved', /Kit saved/.test(receipt))
 await shoot('chat-kit-saved')
 
 // 3. A MODEL THAT INVENTS KIT: no card, and nothing written.
-const cardsBefore = await ev(`(document.body.innerText.match(/Proposed change/gi) || []).length`)
+const cardsBefore = await ev(OFFERS)
 check('3a. she says something vaguer', await say('just some dumbbells at home really') === true)
 const refusal = await until(() => ev(`document.body.innerText`), v => /in your own words[^\n]*update it\./i.test(v), 60)
 check('3b. the coach asks her to say it in her own words instead of carding a guess', /in your own words/i.test(refusal))
-check('3c. ...no new card, and no new row', (await ev(`(document.body.innerText.match(/Proposed change/gi) || []).length`)) === cardsBefore
+check('3c. ...no new card, and no new row', (await ev(OFFERS)) === cardsBefore
   && (await ev(`window.__kitRows()`)).length === 1)
 await shoot('chat-kit-refused')
 // 5. THE KIT AND THE NAMES THE COACH IS SENT (live test, 19 Oct 2026): the kit list always, with what is NOT on it,

@@ -128,12 +128,13 @@ const READ = String.raw`(() => {
   const text = document.body.innerText
   return {
     deadEnd: text.indexOf("couldn't find that on your current plan") !== -1,
-    // The card's own heading, its Apply control (labelled with the scope, so
-    // "Apply today") and its decline — all client-authored, so matching them
-    // cannot be satisfied by model prose.
-    hasProposal: /Proposed change/i.test(text)
+    // The offer's own element (RE-ANCHORED 20 Oct 2026: Ashley's "text + small
+    // buttons always" removed the card heading), its Apply control (labelled
+    // with the scope, so "Apply today") and its "Not now" — all client-authored,
+    // so matching them cannot be satisfied by model prose.
+    hasProposal: !!document.querySelector('[data-testid="proposal-card"][data-offer="text"]')
       && [...document.querySelectorAll('button')].some(b => /^Apply/.test((b.textContent || '').trim()))
-      && [...document.querySelectorAll('button')].some(b => (b.textContent || '').trim() === 'Keep'),
+      && [...document.querySelectorAll('button')].some(b => (b.textContent || '').trim() === 'Not now'),
     mentionsTarget: text.indexOf(${JSON.stringify(TARGET_FULL)}) !== -1,
     mentionsLegPress: /Leg Press/i.test(text),
     buttons: [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean),
@@ -185,15 +186,9 @@ await shoot('swap-request-proposal')
 // in the Unchanged row satisfied "the cost names real set counts" even after
 // the words "pushing sets to" were deliberately deleted from the sentence.
 const READ_CARD = String.raw`(() => {
-  const all = [...document.querySelectorAll('*')].filter(e => /Proposed change/i.test(e.textContent || ''))
-  const heading = all[all.length - 1]
-  if (!heading) return null
-  let p = heading
-  for (let i = 0; i < 12 && p.parentElement; i++) {
-    p = p.parentElement
-    const btns = [...p.querySelectorAll('button')].map(b => (b.textContent || '').trim())
-    if (btns.some(t => /^Apply/.test(t)) && btns.includes('Keep')) break
-  }
+  // The newest offer's own element: the coach's bubble with its facts, and its buttons.
+  const p = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop()
+  if (!p) return null
   const lines = [...p.querySelectorAll('[data-severity]')]
   return {
     text: p.textContent.replace(/\s+/g, ' ').trim(),

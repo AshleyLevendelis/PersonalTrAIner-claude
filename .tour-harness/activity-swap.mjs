@@ -121,9 +121,9 @@ const READ = String.raw`(() => {
   const btns = [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean)
   return {
     // Client-authored furniture, so model prose can never satisfy it.
-    hasCard: /Proposed change/i.test(text)
+    hasCard: !!document.querySelector('[data-testid="proposal-card"][data-offer="text"]')
       && btns.some(b => /^Apply/.test(b))
-      && btns.includes('Keep'),
+      && btns.includes('Not now'),
     // RE-ANCHORED 15 Sep 2026. This pinned the literal "Shall I?", so Ashley's
     // change of card grammar that day ("Want me to X?") turned it red without
     // anything being wrong — and it would have stayed GREEN on a card that

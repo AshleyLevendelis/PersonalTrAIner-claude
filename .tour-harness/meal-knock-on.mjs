@@ -137,14 +137,17 @@ await until(() => ev(`window.__weekMeals ? Object.keys(window.__weekMeals()).len
 await ev(`(() => { const t = document.querySelector('textarea'); Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(t, 'add a banana to my lunch'); t.dispatchEvent(new Event('input', { bubbles: true })) })()`)
 await wait(300)
 check('4a. the request is sent', await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /send/i.test(x.getAttribute('aria-label') || '')); if (!b || b.disabled) return false; b.click(); return true })()`))
+// RE-ANCHORED 20 Oct 2026 (Ashley, "text + small buttons always"): there is no card heading to find any more, so the
+// page is read with a marker in front of it when a live offer is on screen — its own element, client-authored.
+const LIVE_OFFER_PAGE = `(document.querySelector('[data-testid="proposal-card"][data-card-status="pending"]') ? "LIVE OFFER\\n" : "") + document.body.innerText`
 // The app may first ask what the change costs (the trade-off question, its own
 // rule and its own driver). "Do it anyway" is one tap further, then the card.
-const first = await until(() => ev(`document.body.innerText`), t => (/Proposed change/i.test(t) && /Apply/.test(t)) || /Do it anyway/.test(t), 60)
-if (!/Proposed change/i.test(first ?? '')) {
+const first = await until(() => ev(LIVE_OFFER_PAGE), t => (/^LIVE OFFER\n/.test(t) && /Apply/.test(t)) || /Do it anyway/.test(t), 60)
+if (!/^LIVE OFFER\n/.test(first ?? '')) {
   await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => (x.textContent || '').trim() === 'Do it anyway'); if (b) b.click(); return !!b })()`)
 }
-const chat = await until(() => ev(`document.body.innerText`), t => /Proposed change/i.test(t) && /Apply/.test(t), 60)
-check('4b. a card comes back', /Proposed change/i.test(chat ?? ''), (chat ?? '').slice(-400))
+const chat = await until(() => ev(LIVE_OFFER_PAGE), t => /^LIVE OFFER\n/.test(t) && /Apply/.test(t), 60)
+check('4b. a card comes back', /^LIVE OFFER\n/.test(chat ?? ''), (chat ?? '').slice(-400))
 check('4c. ...that does not assert the day "re-fits around it"', !/re-?fits? around/i.test(chat ?? ''))
 check('4d. ...and says what the trial found: another meal named, or that none changes — never silence', /'s (breakfast|lunch|dinner|snack) (becomes|goes from) /.test(chat ?? '') || /No other meal on your plan changes\./.test(chat ?? ''), (chat ?? '').slice(-500))
 check('4e. ...and not "I couldn\'t check" (the coach was handed the app\'s own trial)', !/couldn't check what this does to your other meals/.test(chat ?? ''))

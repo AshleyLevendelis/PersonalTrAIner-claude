@@ -139,12 +139,12 @@ const READ = `(() => {
   const text = document.body.innerText
   const buttons = [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean)
   return {
-    hasCard: /Proposed change/i.test(text),
+    hasCard: !!document.querySelector('[data-testid="proposal-card"][data-offer="text"]'),
     // HOW MANY, not whether. The chat keeps every earlier turn on screen, so
     // a boolean answers "has this conversation ever produced a card" — which
     // is true from section 1 onwards and says nothing about THIS turn. Cost a
     // false failure on the reason ask before it was noticed.
-    cards: (text.match(/Proposed change/gi) || []).length,
+    cards: document.querySelectorAll('[data-testid="proposal-card"]').length,
     hasApply: buttons.some(t => /^Apply/.test(t)),
     chips: buttons.filter(t => t.length < 30),
     tail: text.replace(/\\s+/g, ' ').slice(-420),

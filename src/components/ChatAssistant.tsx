@@ -1,4 +1,4 @@
-import { Fragment, useState, useRef, useEffect, useCallback } from 'react'
+import { Fragment, useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
 import { blockShape } from '@/lib/timer-engine'
 import { circuitName } from '@/lib/circuit'
 import { rpeToStore, effortLabel, type EffortKey } from '@/lib/cardio-effort'
@@ -7310,10 +7310,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                 )
               }
               const isUserGroup = row.role === 'user'
-              // A turn that is only a card (the card does the talking) draws
-              // no bubble, so it does not count when corners are tucked.
+              // A turn that is only a card (a receipt, a question card) draws
+              // no bubble, so it does not count when corners are tucked. An
+              // OFFER always does: it is said in the coach's own bubble (her
+              // ruling of 20 Oct 2026, "text + small buttons always").
+              const offerOf = (m: ChatMessage) => (m.pendingAction && m.status !== 'failed' ? m.pendingAction : null)
               const drawsBubble = (m: ChatMessage) =>
-                m.role === 'user' || !!m.content || isInterrupted(m)
+                m.role === 'user' || !!m.content || isInterrupted(m) || !!offerOf(m)
               const positions = bubblePositions(row.items.map(({ message }) => drawsBubble(message)))
               const stamp = groupTimestamp(row.items)
               const tail = row.items[row.items.length - 1]
@@ -7393,9 +7396,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                         // + 8px gap, so the share is worked back out to the full
                         // column), yours 82%.
                         const widest = isUserGroup ? '82%' : 'calc((100% + 36px) * 0.88)'
-                        return (
-                          <Fragment key={msg.id || `msg-${i}`}>
-                            {position && (
+                        const offer = offerOf(msg)
+                        // An offer restored without its words still asks its question.
+                        const leadContent = offer && !msg.content && !isInterrupted(msg)
+                          ? <ReactMarkdown components={markdownComponents}>{describeProposalClientSide(offer)}</ReactMarkdown>
+                          : bodyContent
+                        const drawBubble = (inside?: ReactNode) => position && (
                               <div
                                 data-testid="chat-bubble"
                                 data-position={position}
@@ -7423,24 +7429,33 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                 // panel colour and its own text, with the hairline its
                                 // panels use, because in the light themes the panel
                                 // and the page are almost the same colour.
-                                style={{ maxWidth: widest, borderRadius: bubbleRadius(msg.role, position) }}
+                                style={{ maxWidth: offer ? '100%' : widest, borderRadius: bubbleRadius(msg.role, position) }}
                               >
-                                {bodyContent}
+                                {leadContent}
+                                {inside}
                               </div>
-                            )}
+                        )
+                        return (
+                          <Fragment key={msg.id || `msg-${i}`}>
+                            {/* AN OFFER IS SAID, NOT CARDED (Ashley, 20 Oct 2026,
+                                "text + small buttons always"): the question and
+                                its facts are this one bubble, its small buttons
+                                beneath it. */}
+                            {offer ? (
+                              <ProposalCard
+                                pendingAction={offer}
+                                onConfirm={scope => handleConfirmProposal(i, scope)}
+                                onReject={() => handleRejectProposal(i)}
+                                onAlternative={handleQuickReply}
+                                bubble={facts => drawBubble(facts)}
+                                maxWidth={widest}
+                              />
+                            ) : drawBubble()}
                             {/* The cards keep their own design; only the top
                                 margin each carries is dropped, so a card sits
                                 4px under its bubble like everything else in
                                 the group. */}
                             <div data-testid="chat-cards" className="w-full empty:hidden [&>*:first-child]:mt-0" style={{ maxWidth: widest }}>
-                              {msg.pendingAction && msg.status !== 'failed' && (
-                                <ProposalCard
-                                  pendingAction={msg.pendingAction}
-                                  onConfirm={scope => handleConfirmProposal(i, scope)}
-                                  onReject={() => handleRejectProposal(i)}
-                                  onAlternative={handleQuickReply}
-                                />
-                              )}
                               {msg.receipt && msg.status !== 'failed' && (
                                 <ReceiptCard
                                   title={msg.receipt.title}

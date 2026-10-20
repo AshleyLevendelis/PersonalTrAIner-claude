@@ -130,7 +130,7 @@ const WHERE = phrase => `(() => {
 const READ = `(() => {
   const text = document.body.innerText
   const buttons = [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean)
-  return { hasCard: /Proposed change|Your portions, untouched/i.test(text), hasConfirm: buttons.some(t => /^(Apply|Set as your meal|Confirm)/i.test(t)), text: text.replace(/\\s+/g, ' ') }
+  return { hasCard: !!document.querySelector('[data-testid="proposal-card"][data-offer="text"]') || /Your portions, untouched/i.test(text), hasConfirm: buttons.some(t => /^(Apply|Set as your meal|Confirm)/i.test(t)), text: text.replace(/\\s+/g, ' ') }
 })()`
 
 // --- 1. ONE UNREADABLE LINE ------------------------------------------------
@@ -164,11 +164,11 @@ check('3a. a card comes up: she is not asked about what the app can read', oz.ha
 // check's point is unchanged: the ounces were read as 227 g, never as 8.
 check('3b. the chicken is 8 oz read as 227 g cooked, shown raw at the same protein (315 g), not 8', /315g raw chicken breast/.test(ozWhere?.text ?? '') && !/\b8g\b/.test(ozWhere?.text ?? ''), ozWhere)
 check('3c. ...the cup of cooked rice is read and shown dry (55 g), and the carrots stay "2 carrots", nothing re-portioned', /55g dry white rice/.test(ozWhere?.text ?? '') && /2 carrots?/.test(ozWhere?.text ?? '') && !/1cup|2whole/.test(ozWhere?.text ?? ''), ozWhere)
-const proteinAfter = Number((oz.text.match(/Protein\s*\d+(?:\.\d+)?g\s*budgeted\s*(\d+(?:\.\d+)?)g/i) ?? [])[1])
+const proteinAfter = Number((oz.text.match(/Protein:?\s*\d+(?:\.\d+)?g\s*budgeted\s*(?:→\s*)?(\d+(?:\.\d+)?)g/i) ?? [])[1])
 check('3d. ...so the protein it shows is the real chicken, over 60 g, where the misread chicken gave under 10', proteinAfter > 60, { proteinAfter, tail: oz.text.slice(-420) })
 
 // A cup of cooked rice is 160 g (about 45 g of carbs); with the two carrots the meal is 57 g. The old cup of 240 g gave about 80.
-const carbsAfter = Number((oz.text.match(/Carbs\s*\d+(?:\.\d+)?g\s*budgeted\s*(\d+(?:\.\d+)?)g/i) ?? [])[1])
+const carbsAfter = Number((oz.text.match(/Carbs:?\s*\d+(?:\.\d+)?g\s*budgeted\s*(?:→\s*)?(\d+(?:\.\d+)?)g/i) ?? [])[1])
 check('3e. ...and the carbs are those of a 160 g cup of rice, not the old 240 g one', carbsAfter >= 50 && carbsAfter <= 66, { carbsAfter })
 
 const err = await ev('window.__err ?? null')
