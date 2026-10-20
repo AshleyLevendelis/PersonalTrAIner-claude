@@ -128,10 +128,12 @@ const READ = `(() => {
     // The chips are the buttons the chat renders under the newest bubble; the
     // card's own controls are Confirm / Not now.
     buttons,
-    // The card's own controls are Apply / Keep — NOT Confirm / Not now, which
-    // is what this driver looked for on its first run and never found, while
-    // both cards were on screen the whole time.
-    hasCard: /PROPOSED CHANGE/.test(text) && buttons.includes('Apply') && buttons.includes('Keep'),
+    // The offer's own controls are Apply / Not now (since 20 Oct 2026, Ashley's
+    // "text + small buttons always"; it was Apply / Keep under a "Proposed
+    // change" heading). Read off the offer's own element, never its words —
+    // this driver's first run looked for Confirm and never found it, while
+    // both offers were on screen the whole time.
+    hasCard: !!document.querySelector('[data-testid="proposal-card"][data-offer="text"]') && buttons.includes('Apply') && buttons.includes('Not now'),
     saysAlreadyClear: /already clear/i.test(text),
     sample: text.replace(/\\s+/g, ' ').slice(-320),
   }
@@ -185,9 +187,10 @@ check('9. ...whose sentence names the TRUE origin, not the day it was sitting on
 // day and yesterday is the day the session left. A row naming today was
 // describing a state that would never exist — found here, on the screen,
 // after the resolver's own gate was green.
-const rows = await ev(`(() => [...document.querySelectorAll('*')]
-  .filter(n => n.children.length === 0 && /^Moved to /.test(n.textContent.trim()))
-  .map(n => (n.parentElement?.parentElement?.textContent || '').trim()))()`)
+// RE-ANCHORED 20 Oct 2026 (Ashley, "text + small buttons always"): the row is a line of the offer's text now
+// ("<day>: <before> → Moved to …"), read off the offer's own change lines instead of a leaf's grandparent.
+const rows = await ev(`[...document.querySelectorAll('[data-testid="proposal-card"] [data-offer-line="change"]')]
+  .map(n => n.textContent.trim()).filter(t => /Moved to /.test(t))`)
 check('9b. ...and so does the row under it, and the promise beside it',
   Array.isArray(rows) && rows.some(t => t.includes(YESTERDAY_NAME)) && !rows.some(t => t.includes(TODAY_NAME)), rows)
 check('9c. the day that will not count as missed is the day it LEFT',

@@ -107,7 +107,7 @@ const READ = `(() => {
   const bs = [...document.querySelectorAll('[data-testid="chat-bubble"][data-role="assistant"]')]
   const b = bs[bs.length - 1]
   const chips = [...document.querySelectorAll('button')].map(x => (x.textContent || '').trim()).filter(t => /^Swap .+ for .+$/.test(t) || t === "That's not the kit I have")
-  return { text: b ? b.innerText.trim() : '', chips, card: /Proposed change/i.test(document.body.innerText), body: document.body.innerText.slice(-500) }
+  return { text: b ? b.innerText.trim() : '', chips, card: !!document.querySelector('[data-testid="proposal-card"]'), body: document.body.innerText.slice(-500) }
 })()`
 let s = await ev(READ)
 for (let i = 0; i < 30 && s.chips.length === 0; i++) { await wait(400); s = await ev(READ) }
@@ -128,9 +128,9 @@ check('2a. tapped the first alternative', await ev(`(() => {
   if (!b) return false
   b.click(); return true
 })()`))
-for (let i = 0; i < 30 && !(await ev(`/Proposed change/i.test(document.body.innerText)`)); i++) await wait(400)
+for (let i = 0; i < 30 && !(await ev(`!!document.querySelector('[data-testid="proposal-card"][data-offer="text"]')`)); i++) await wait(400)
 const after = await ev(`document.body.innerText`)
-check('2b. the tap became a real swap card', /Proposed change/i.test(after), after.slice(-400))
+check('2b. the tap became a real swap offer', (await ev(`!!document.querySelector('[data-testid="proposal-card"][data-offer="text"][data-card-status="pending"]')`)) === true, after.slice(-400))
 check('2c. ...for the name on the tap (a catalogue name the app resolves)', !!pickName && after.includes(pickName), { pickName, tail: after.slice(-400) })
 check('2d. the coach was asked twice (the request, then the tap)', (await ev(`window.__chatCalls`)) === 2, await ev(`window.__chatCalls`))
 await shoot('swap-unknown-name-card')

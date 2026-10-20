@@ -122,7 +122,7 @@ const READ = `(() => {
   const text = document.body.innerText
   const buttons = [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean)
   return {
-    hasCard: /Proposed change/i.test(text),
+    hasCard: !!document.querySelector('[data-testid="proposal-card"][data-offer="text"]'),
     hasApply: buttons.some(t => /^Apply/.test(t)),
     chips: buttons.filter(t => t.length < 34),
     tail: text.replace(/\\s+/g, ' ').slice(-460),

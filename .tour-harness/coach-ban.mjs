@@ -143,42 +143,31 @@ const READ = String.raw`(() => {
     // The card's own heading, its Apply control (labelled with the scope, so
     // "Apply today") and its decline — all client-authored, so matching them
     // cannot be satisfied by model prose.
-    hasProposal: /Proposed change/i.test(text)
+    // RE-ANCHORED 20 Oct 2026 (Ashley, "text + small buttons always"): there
+    // is no card heading any more. The offer's own element, its Apply control
+    // (labelled with the scope, so "Apply today") and its "Not now" — all
+    // client-authored, so model prose cannot satisfy it.
+    hasProposal: !!document.querySelector('[data-testid="proposal-card"][data-offer="text"]')
       && [...document.querySelectorAll('button')].some(b => /^Apply/.test((b.textContent || '').trim()))
-      && [...document.querySelectorAll('button')].some(b => (b.textContent || '').trim() === 'Keep'),
+      && [...document.querySelectorAll('button')].some(b => (b.textContent || '').trim() === 'Not now'),
     mentionsTarget: text.indexOf(${JSON.stringify(TARGET_FULL)}) !== -1,
     mentionsLegPress: /Leg Press/i.test(text),
     buttons: [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean),
-    // THE CARD'S OWN TEXT, not the last N characters of the page. The seeded
-    // conversation sits below the card and is longer than any window, so a tail
-    // slice reads the thread and never the thing under test.
+    // THE OFFER'S OWN TEXT, not the last N characters of the page. The seeded
+    // conversation sits below it and is longer than any window, so a tail
+    // slice reads the thread and never the thing under test. The offer is its
+    // own element (the coach's bubble with its facts, and its buttons), so it
+    // is read directly — no climbing from a heading, which is what 15 Sep's
+    // re-anchoring below had to repair.
+    //
+    // 15 Sep 2026: this used to climb until the container held the literal
+    // old lead, "I can stop giving you" — so when Ashley's grammar changed
+    // that day the loop never broke, the node climbed to <body>, and 2d-2f
+    // read an unrelated scroll fixture. Reading the offer's own element has
+    // no such failure.
     card: (() => {
-      const all = [...document.querySelectorAll('*')].filter(e => /Proposed change/i.test(e.textContent || ''))
-      const heading = all[all.length - 1]
-      if (!heading) return ''
-      // Up from the heading to the smallest ancestor that also holds the card's
-      // own controls — that is the card, and nothing above or below it.
-      let p = heading
-      for (let i = 0; i < 12 && p.parentElement; i++) {
-        p = p.parentElement
-        const btns = [...p.querySelectorAll('button')].map(b => (b.textContent || '').trim())
-        // RE-ANCHORED 15 Sep 2026. This used to climb until the container held
-        // the literal old lead, "I can stop giving you" — so when Ashley's
-        // grammar changed that day the loop never broke, the node climbed to
-        // <body>, and 2d-2f read an unrelated scroll fixture from elsewhere on
-        // the page. They reported the ban card as missing its blast-radius line
-        // while the card was correct, and 2a-2c passed throughout, which is
-        // what made it look like a content bug rather than a bad read.
-        //
-        // The lead requirement is GONE rather than re-worded: it was there so
-        // the captured text would include the line naming the exercise, and the
-        // only check that needs that (2c) reads mentionsTarget from the whole
-        // page, not from this slice. 2d-2f test the card's IMPLICATIONS, which
-        // are inside the card. So the innermost ancestor holding the controls
-        // is exactly right, and nothing here encodes a sentence we chose.
-        if (btns.some(t => /^Apply/.test(t)) && btns.includes('Keep')) break
-      }
-      return p.textContent.replace(/\s+/g, ' ').trim().slice(0, 1200)
+      const p = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop()
+      return p ? p.textContent.replace(/\s+/g, ' ').trim().slice(0, 1200) : ''
     })(),
     tail: text.replace(/\s+/g, ' ').slice(-600),
   }
@@ -214,7 +203,7 @@ const amb = await ev(`document.body.innerText.replace(/\\s+/g,' ')`)
 check('4. an ambiguous name asks which one, rather than banning a guess',
   /Did you mean .*\?/.test(amb || ''), (amb || '').slice(-200))
 check('...and does not produce a card off a guess',
-  ((amb || '').match(/Proposed change/gi) || []).length <= 1, ((amb || '').match(/Proposed change/gi) || []).length)
+  (await ev(`document.querySelectorAll('[data-testid="proposal-card"]').length`)) <= 1, await ev(`document.querySelectorAll('[data-testid="proposal-card"]').length`))
 
 const err = await ev('window.__err ?? null')
 check('3. no uncaught error on the page', err === null, err)

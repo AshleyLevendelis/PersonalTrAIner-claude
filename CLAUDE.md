@@ -1375,7 +1375,8 @@ menu" stays true when a copy is also left outside it.
 ### Her rulings of 20 Oct 2026, from the 19 Oct live test (`docs/audits/live-test-2026-10-19-findings.md`)
 - **Coach offers: "Text + small buttons always."** Every change the coach offers is a chat bubble with small Apply /
   Not now buttons; a rebuild's list goes into the text. REVERSES the 24 Sep line keeping Apply cards for asked
-  changes. Buttons keep the 44px tap floor.
+  changes. Buttons keep the 44px tap floor. The rows are said through one function (`offer-text.ts`), a change
+  repeated over days said once, naming them. `test:offer-text`, `verify:offer-text`
 - **A different KIND of session today: "Drop it, today only."** Cardio or functional today replaces the whole day;
   the main lift returns next time at the same weight. Her 16 Sep "keep the main lift" still holds for a different
   session of the same kind.

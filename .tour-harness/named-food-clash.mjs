@@ -117,7 +117,10 @@ const last = () => ev(`(() => {
   const bs = [...document.querySelectorAll('[data-testid="chat-bubble"][data-role="assistant"]')]
   const b = bs[bs.length - 1]
   const r = b ? b.getBoundingClientRect() : null
+  // Offers count too: since 20 Oct 2026 ("text + small buttons always") an offer is the coach's bubble with its
+  // buttons, outside the cards column, so the cards column alone would read zero with an offer on screen.
   const cards = [...document.querySelectorAll('[data-testid="chat-cards"]')].reduce((n, c) => n + c.children.length, 0)
+    + document.querySelectorAll('[data-testid="proposal-card"]').length
   return { text: b ? b.innerText.trim() : null, inView: !!r && r.top >= 0 && r.bottom <= 844, cards }
 })()`)
 

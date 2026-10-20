@@ -8,6 +8,12 @@ end up with a plan that doesn't help them meet their goal. Think about what
 currently happens when a user makes a change and how we could better manage
 these and speak to the user about the trade-offs."*
 
+> **20 Oct 2026 — "the card" below is now the coach's message.** Ashley's ruling, "Text + small buttons always":
+> every offer is the coach's own bubble — the question, then what changes, what stays and what it costs as lines of
+> text — with small buttons under it (each confirm under its scope label, and "Not now", which replaced "Keep").
+> There is no "Proposed change" card any more. Everything this document says the card says, the message still says,
+> before the tap (`src/lib/offer-text.ts`, `test:offer-text`, `verify:offer-text`).
+
 **Proposal only. Nothing built. Not yet approved.** Companion to
 `what-an-edit-does-to-the-plan.md`, which traced where each edit ripples; this
 one is about the *conversation* at the moment of the change.

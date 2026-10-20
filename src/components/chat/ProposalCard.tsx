@@ -1,15 +1,28 @@
-import { useEffect, useState } from 'react'
-import { ShieldAlert, Info } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { ShieldAlert } from 'lucide-react'
 import type { ChatPendingActionView } from '@/lib/types'
 import { pendingWindowPassed } from '@/lib/pending-actions-store'
+import { offerChanges, offerChangeText } from '@/lib/offer-text'
 
 // ---------------------------------------------------------------------------
 // VISION-ARCHITECTURE.md §2.4 — "rendering the effect, not prose." ONE
 // generic component renders `diff.rows` + `implications` for ANY domain
 // (exercise swap, meal swap) — no per-domain card. This is the structural
-// half of D1: the card is what actually renders on a plan_mutation turn;
+// half of D1: the offer is what actually renders on a plan_mutation turn;
 // the model's own text for that turn is discarded entirely by
 // ChatAssistant.tsx's processResponse, never reaching this component.
+//
+// TEXT + SMALL BUTTONS, ALWAYS — Ashley's ruling, 20 Oct 2026, from three
+// options: "A real trainer wouldn't immediately send a card. It should be
+// just a text question and then a smaller button to approve the swap." So
+// there is no card any more: the offer is the coach's own bubble — the
+// question (the lead) and, under it in the same bubble, what changes, what
+// stays and what it costs, as lines of text (`offer-text.ts`) — then small
+// buttons beneath it: each confirm under its own scope label, and "Not now".
+// Every fact the card showed is still said before the tap. The buttons LOOK
+// small and keep the 44px tap target (her gym-floor rule): the 44px is the
+// button, the pill drawn inside it is the size of a word.
+// It reverses her 24 Sep line that kept the Apply cards for asked changes.
 // ---------------------------------------------------------------------------
 
 export function ProposalCard({
@@ -17,6 +30,8 @@ export function ProposalCard({
   onConfirm,
   onReject,
   onAlternative,
+  bubble,
+  maxWidth,
 }: {
   pendingAction: ChatPendingActionView
   onConfirm: (editedScope?: string) => Promise<void>
@@ -24,22 +39,30 @@ export function ProposalCard({
   /**
    * Ask for one of the nearest things instead. Sends the alternative's own
    * wording as a message, so it comes back as an ordinary proposal with its
-   * own card and its own Confirm — a swap is a different change, not a
-   * variant of this one, and must not ride in on this card's tap.
+   * own offer and its own Confirm — a swap is a different change, not a
+   * variant of this one, and must not ride in on this offer's tap.
    */
   onAlternative?: (prompt: string) => void
+  /**
+   * The coach's bubble for this turn, drawn by the chat (its colours, corners
+   * and the lead it is already showing), with the offer's facts put inside it.
+   * The offer is part of the coach's message, not a thing under it.
+   */
+  bubble: (facts: ReactNode) => ReactNode
+  /** The coach's bubble width in this column, so the buttons line up under it. */
+  maxWidth?: string
 }) {
   const { diff } = pendingAction
-  // A CARD THAT HAS TIMED OUT LOOKS TIMED OUT, WITHOUT BEING TAPPED (L33,
+  // AN OFFER THAT HAS TIMED OUT LOOKS TIMED OUT, WITHOUT BEING TAPPED (L33,
   // 9 Oct 2026). An offer stops working after its window, and the only way
   // anyone found out was tapping Apply on a card that looked exactly as live
-  // as the day it was made. The card now knows when it stops working: it is
-  // checked the moment it is drawn (a card restored from an earlier visit)
-  // and once more when the time comes. On the REAL clock — a window about
-  // elapsed time is measured on the clock that elapses.
+  // as the day it was made. The offer now knows when it stops working: it is
+  // checked the moment it is drawn (one restored from an earlier visit) and
+  // once more when the time comes. On the REAL clock — a window about elapsed
+  // time is measured on the clock that elapses.
   //
   // Decided unprompted, reversible: nothing is said about the limit while the
-  // card is live. No countdown, no "good for ten minutes".
+  // offer is live. No countdown, no "good for ten minutes".
   const [timedOut, setTimedOut] = useState(() => pendingAction.status === 'pending' && pendingWindowPassed(pendingAction.expiresAt))
   useEffect(() => {
     if (pendingAction.status !== 'pending' || !pendingAction.expiresAt) return
@@ -57,7 +80,7 @@ export function ProposalCard({
   const isTerminal = status === 'done' || status === 'partial' || status === 'failed' || status === 'declined' || status === 'expired'
 
   /**
-   * A card that can no longer be acted on has to SAY so. Terminal statuses
+   * An offer that can no longer be acted on has to SAY so. Terminal statuses
    * used to render the rows and then nothing — the buttons simply vanished,
    * with no line explaining why, which reads as the app losing the thread.
    * The case that made this matter: proposals expire after ten minutes, and
@@ -95,122 +118,130 @@ export function ProposalCard({
   }
 
   const scopeField = diff.editable?.find(e => e.field === 'scope')
+  const changes = offerChanges(diff.rows)
+  const showAlternatives = !!(diff.alternatives && diff.alternatives.length > 0 && onAlternative && !isTerminal && !isStale)
 
-  // Turn 6: no card shell — this renders inline in the assistant's plain-text
-  // flow (ChatAssistant.tsx already applies the pl-9 avatar-offset to its
-  // parent), a left rule standing in for the removed border/background.
-  return (
-    <div
-      className={`mt-2 pl-3.5 border-l-2 border-[color:var(--role-ai-border)] text-sm space-y-2.5 ${status === 'expired' ? 'opacity-60' : ''}`}
-      data-testid="proposal-card"
-      data-card-status={status}
-    >
-      <div className="space-y-2">
-        <span className="block text-[0.59375rem] font-semibold uppercase tracking-[0.18em] text-[color:var(--role-ai)]">
-          Proposed change
-        </span>
-        {diff.rows.map((row, i) => (
-          <div key={i} className="flex flex-col gap-0.5">
-            <span className="text-[0.625rem] text-muted-foreground">{row.field}</span>
-            {row.before && <span className="text-[0.84375rem] line-through text-muted-foreground/70">{row.before}</span>}
-            <span className="text-[0.90625rem] font-semibold">{row.after}</span>
-            {row.note && <span className="text-[0.625rem] text-muted-foreground/80">{row.note}</span>}
-          </div>
-        ))}
-      </div>
-
+  // THE FACTS, AS LINES OF THE COACH'S MESSAGE. The same ink as the lead
+  // above them; what is said in passing (what stays, what happens next) is a
+  // step smaller. data-offer-line names what each line is, and data-severity
+  // is the builder's own classification of a cost, readable from outside: a
+  // driver that has to tell "what this costs you" from "what happens next" by
+  // matching the WORDS passes on any sentence with a number in it — which is
+  // how the swap card's first cost check came to be satisfied by
+  // "Sets × reps: 2×8" sitting in the Unchanged line.
+  const facts = (
+    <div data-testid="offer-facts" className="mt-2 space-y-1.5">
+      {changes.map((c, i) => (
+        <p key={`c${i}`} data-offer-line="change">{offerChangeText(c)}</p>
+      ))}
       {diff.unchanged && diff.unchanged.length > 0 && (
-        <p className="text-[0.625rem] text-muted-foreground/70">Unchanged: {diff.unchanged.join(', ')}</p>
+        <p data-offer-line="unchanged" className="text-[0.84375rem] opacity-80">Unchanged: {diff.unchanged.join(', ')}.</p>
       )}
-
-      {/* data-severity: the card's own classification of each line, readable
-          from outside. A driver that has to tell "what this costs you" from
-          "what happens next" by matching the WORDS is a driver that passes on
-          any sentence with a number in it — which is how the swap card's first
-          cost check came to be satisfied by "Sets × reps: 2×8" sitting in the
-          Unchanged row above. The severity is the app's own answer; read that. */}
       {diff.implications?.map((imp, i) => (
-        <p key={i} data-severity={imp.severity} className={`flex items-start gap-1.5 text-xs ${imp.severity === 'warn' ? 'text-[color:var(--role-warn)]' : 'text-muted-foreground'}`}>
-          {imp.severity === 'warn' ? <ShieldAlert className="size-3.5 mt-0.5 shrink-0" /> : <Info className="size-3.5 mt-0.5 shrink-0" />}
-          <span>{imp.text}</span>
+        <p
+          key={`i${i}`}
+          data-offer-line="implication"
+          data-severity={imp.severity}
+          className={imp.severity === 'warn' ? 'text-[0.90625rem] font-medium' : 'text-[0.84375rem] opacity-80'}
+        >
+          {imp.severity === 'warn' && <ShieldAlert aria-label="Worth knowing" className="mr-1 inline size-3.5 -translate-y-px text-[color:var(--role-warn)]" />}
+          {imp.text}
         </p>
       ))}
+      {diff.rationale && <p data-offer-line="rationale">{diff.rationale}</p>}
+    </div>
+  )
 
-      {diff.alternatives && diff.alternatives.length > 0 && onAlternative && !isTerminal && !isStale && (
-        /* THE NEAREST THINGS THAT KEEP THE BAR. Ashley's ruling, 12 Sep 2026:
-           taking a food out of a meal names two or three specific swaps
-           rather than inviting her to type one, because on a phone typing a
-           food name into a box is the thing that does not happen. Every entry
-           here has already been verified against her allergies and dislikes
-           by the builder that produced it.
-           Below the implications and above the buttons: it is an offer that
-           goes with the cost, and it must not look like the primary action —
-           declining is a perfectly good answer. */
-        <div className="flex flex-col gap-1.5 pt-0.5">
-          <span className="text-[0.59375rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Or put in instead</span>
-          {diff.alternatives.map(alt => (
+  // One look for every small button: the 44px is the button, the pill inside
+  // is the size of a word — light, outlined, no glow.
+  const pill = (primary: boolean) =>
+    `inline-flex items-center rounded-full border px-3 py-1 text-[0.8125rem] leading-5 ${
+      primary
+        ? 'border-[color:color-mix(in_oklab,var(--primary)_55%,transparent)] bg-[color:color-mix(in_oklab,var(--primary)_14%,transparent)] font-semibold text-foreground'
+        : 'border-[color:var(--hairline)] text-muted-foreground'
+    }`
+  const small = 'inline-flex min-h-[44px] items-center disabled:opacity-60'
+
+  return (
+    <div
+      className={`flex w-full flex-col items-start ${status === 'expired' ? 'opacity-60' : ''}`}
+      style={{ maxWidth }}
+      data-testid="proposal-card"
+      data-offer="text"
+      data-card-status={status}
+    >
+      {bubble(facts)}
+
+      {/* THE NEAREST THINGS THAT KEEP THE BAR. Ashley's ruling, 12 Sep 2026:
+          taking a food out of a meal names two or three specific swaps rather
+          than inviting her to type one, because on a phone typing a food name
+          into a box is the thing that does not happen. Every entry has already
+          been verified against her allergies and dislikes by the builder that
+          produced it. Small buttons like the rest, above the confirm — an offer
+          that goes with the cost, never the primary action: declining is a
+          perfectly good answer. */}
+      {showAlternatives && (
+        <div data-testid="offer-alternatives" className="flex flex-wrap gap-x-2">
+          {(diff.alternatives ?? []).map(alt => (
             <button
               key={alt.label}
               type="button"
-              className="flex min-h-[44px] items-center justify-between gap-3 rounded-xl bg-[color:var(--surface-raised)] px-3 text-left disabled:opacity-60"
-              onClick={() => onAlternative(alt.prompt)}
+              className={small}
+              onClick={() => onAlternative && onAlternative(alt.prompt)}
               disabled={busyOverall}
             >
-              <span className="text-[0.84375rem] font-medium">{alt.label}</span>
-              <span className="shrink-0 text-[0.625rem] text-muted-foreground">{alt.note}</span>
+              <span className={pill(false)}>
+                <span className="font-medium text-foreground">{alt.label}</span>
+                {alt.note && <span className="ml-1.5 text-[0.6875rem]">{alt.note}</span>}
+              </span>
             </button>
           ))}
         </div>
       )}
 
-      {diff.rationale && <p className="text-xs italic text-muted-foreground">"{diff.rationale}"</p>}
-
       {isStale ? (
-        <p className="text-xs text-[color:var(--role-warn)]">This changed since I proposed it — ask me again if you still want it.</p>
+        <p className="mt-1.5 text-xs text-[color:var(--role-warn)]">This changed since I proposed it — ask me again if you still want it.</p>
       ) : isTerminal ? (
-        terminalNote && <p className="text-xs text-muted-foreground" data-testid="proposal-terminal-note">{terminalNote}</p>
+        terminalNote && <p className="mt-1.5 text-xs text-muted-foreground" data-testid="proposal-terminal-note">{terminalNote}</p>
       ) : (
-        // Fix — confirmation-card stuck loop, Part 3: these stay the primary,
-        // unambiguous way to answer, sized to the same min-h-[44px] touch
-        // target as the model's own [QUICK_REPLIES] chips — tapping reads as
-        // obviously the intended action rather than typing "yes" (which free
-        // text still handles correctly, see confirmation-reply.ts, but
-        // shouldn't be the first thing reached for). Turn 6 collapses the old
-        // separate scope-toggle + confirm/reject groups into one pill row:
-        // each scope option becomes its own "apply with this scope" pill.
-        <div className="flex items-center gap-2 pt-0.5">
+        // These stay the primary, unambiguous way to answer — a typed "yes"
+        // or "no" works too (confirmation-reply.ts), but shouldn't be the
+        // first thing reached for. Each scope option is its own "apply with
+        // this scope" button; the first is the one the offer leads with.
+        <div data-testid="offer-buttons" className="flex flex-wrap items-center gap-x-2">
           {scopeField ? (
             scopeField.options.map((opt, i) => (
               <button
                 key={opt}
-                className={
-                  i === 0
-                    ? 'min-h-[44px] rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground glow-mint-box disabled:opacity-60'
-                    : 'min-h-[44px] rounded-xl bg-[color:var(--surface-raised)] px-4 text-sm text-foreground disabled:opacity-60'
-                }
+                type="button"
+                className={small}
                 onClick={() => void handleConfirm(opt)}
                 disabled={busyOverall}
               >
-                {busy === 'confirm' && scope === opt
-                  ? 'Applying…'
-                  : opt === 'today' ? 'Apply today' : opt === 'block' ? 'Whole block' : opt === 'permanent' ? 'Rest of block' : opt}
+                <span className={pill(i === 0)}>
+                  {busy === 'confirm' && scope === opt
+                    ? 'Applying…'
+                    : opt === 'today' ? 'Apply today' : opt === 'block' ? 'Whole block' : opt === 'permanent' ? 'Rest of block' : opt}
+                </span>
               </button>
             ))
           ) : (
             <button
-              className="min-h-[44px] rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground glow-mint-box disabled:opacity-60"
+              type="button"
+              className={small}
               onClick={() => void handleConfirm()}
               disabled={busyOverall}
             >
-              {busy === 'confirm' ? 'Applying…' : 'Apply'}
+              <span className={pill(true)}>{busy === 'confirm' ? 'Applying…' : 'Apply'}</span>
             </button>
           )}
           <button
-            className="min-h-[44px] px-3 text-sm text-muted-foreground disabled:opacity-60"
+            type="button"
+            className={small}
             onClick={handleReject}
             disabled={busyOverall}
           >
-            {busy === 'reject' ? 'Declining…' : 'Keep'}
+            <span className={pill(false)}>{busy === 'reject' ? 'Declining…' : 'Not now'}</span>
           </button>
         </div>
       )}

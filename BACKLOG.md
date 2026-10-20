@@ -2,6 +2,55 @@
 
 Newest first. One line each.
 
+- [x] **The coach's offers are a text with small buttons, not a card — her ruling 20 Oct 2026, "Text + small buttons
+  always."** (On a branch, not merged.) Her words: "I told it i dont have bands and it offered to swap but the cards
+  dont feel like a real trainer offering a swap. A real trainer wouldn't immediately send a card. It should be just a
+  text question and then a smaller button to approve the swap." From three options she chose text + small buttons for
+  EVERY offer, a rebuild included, whose list of changes goes into the message. It REVERSES her 24 Sep line that kept
+  the Apply cards for changes she asks for.
+  - **What changed (one component, every proposal kind):** the offer is now the coach's own bubble: the question (the
+    lead it already had) and, in the same bubble, what changes, what stays and what it costs as lines of text. Under it,
+    small buttons: each confirm under its own scope label ("Apply today", "Rest of block", "Apply") and "Not now", which
+    replaces "Keep". Gone: the "Proposed change" heading, the rule down the side, the struck-through rows and the big
+    glowing button. A meal edit's alternatives are small buttons too. The receipt after a tap is a line in the
+    conversation (no rule), its Undo and View the same small buttons. A typed "yes"/"no" works exactly as before.
+  - **Every fact the card showed is still said before the tap.** The rows are said through ONE function
+    (`src/lib/offer-text.ts`): "Mon: A → B (note)". A change repeated over many days (kit, injury) is said ONCE naming
+    the days ("Fri 18 Sep and Mon 21 Sep: Barbell Squats → Smith Machine Squat"); rows group only when the change AND
+    its note are identical; past four days a line names three and COUNTS the rest ("and 6 more"). The builders' own
+    caps stand ("…and 44 more days" on the kit offer). A dash is said in words ("adds Leg Press", "→ left out").
+  - **Small, but 44px.** Each button is 44px tall to tap (her gym-floor rule); the pill drawn inside is word-sized
+    (24-28px, 13px text, outline/tint, no glow). The Undo on receipts was 24px tall before; it is 44px to tap now.
+  - **Decided without asking (presentation, reversible):** "Not now" in place of "Keep" (the brief's word); no lead-in
+    sentence before the alternatives (the meal builder's own line already says "Tap one of the swaps below"); the
+    rationale is a plain line, no longer italic in quotes; warn lines keep a small amber shield. **CSCS review:**
+    nothing prescribed changes — same builders, same rows, same confirm path; layout and wording of the offer only.
+  - **Drivers re-anchored, coverage kept** (each had matched the "Proposed change" heading or a "Keep" button, both now
+    gone): `verify:activity-swap`, `chat-day-move`, `chat-kit`, `chat-top-up`, `coach-ban`, `meal-knock-on`,
+    `meal-log-card` (1g2 now also refuses a "breakfast →" line, since nothing is struck through any more),
+    `meal-tradeoff`, `moved-edit` (declines with "Not now"), `moved-session`, `named-food-clash` (its "no card" count
+    now includes offers, which left the cards column — it would otherwise read 0 with an offer on screen),
+    `rebuild-card`, `swap-request`, `swap-unknown-name`, `tradeoff`, `unit-ask`. Each now reads the offer's own element
+    (`data-testid="proposal-card"`, `data-offer="text"`, `data-card-status`) — client-authored, so model prose cannot
+    satisfy it.
+  - **Verified:** `test:offer-text` (19 checks; 16 mutations, 16 caught), `verify:offer-text` (40 checks: a swap, a
+    meal edit and a many-day kit change, each one bubble with the facts inside, small buttons ≥44px, nothing written
+    before the tap, "Not now" declines, a typed "yes" applies, Apply writes, receipts a light line with a 44px Undo;
+    11 mutations, 11 caught). The 16 re-anchored drivers: 24 mutations (each breaking what that driver's re-anchored
+    check holds — the decline back to "Keep", the offer unmarked, the costs or change lines not said, M51's struck slot
+    back, an allergen food offer built), 24 caught. The harness refuses a failing baseline, checks the file changed
+    and that the same number of checks ran. Screenshots read at 390x844: swap, kit (many days), meal, receipt. Gates:
+    the 110 `test:` gates reading the touched files plus `test:bundle` (headroom 5/6/18/10 kB, base 5/6/18/11) and
+    `test:no-dead-code`, all green except `test:coach-exam-fresh` (the coach changed since the exam ran; nothing here
+    touches the coach). All 31 chat drivers and `verify:tap-targets` green, except `verify:unit-ask` 3b/3c, which fail
+    identically on the base commit (the card shows "315g raw chicken breast" since the 18 Oct raw-weight ruling, the
+    check still asks for 227 g) — not caused here, NOT FIXED. `verify:correction-loop` failed once in the sweep and
+    passed alone, and passes on the base.
+  - **NOT done:** the coach's system prompt still calls an offer a "card" in places (the model's words are discarded on
+    an offer turn, so nothing she sees changes; a wording pass needs the `chat-gemini` deploy). The non-question
+    fallback leads ("I can take 200g salmon out — here's what goes with it:") were left as they are.
+    Frontend only: no edge function, no migration.
+
 - [x] **Live test 19 Oct, finding 10: Greek yoghurt and smoked turkey dishes blocked as "doesn't fit nut-free".**
   (`docs/plans/unidentified-food-wording.md`, allergen path.) TRACED AND CONFIRMED by running the real check: a line
   the food list cannot identify ("low fat greek yoghurt", "smoked turkey breast") is treated as breaking every
