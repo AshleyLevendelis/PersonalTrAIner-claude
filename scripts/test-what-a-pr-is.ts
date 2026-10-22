@@ -232,6 +232,38 @@ async function main() {
   const home = strip(read('src/components/Dashboard.tsx'))
   check('Home builds the line with that one function', (home.match(/leadLiftPhrase\(/g) ?? []).length >= 1 && !/\bkg\} ?kg|from \$\{[^}]*kg/.test(home) && !/\.kg\} kg/.test(home) && !/toLowerCase\(\)/.test(/glanceParts[\s\S]{0,1400}/.exec(home)?.[0] ?? ''))
 
+  // -------------------------------------------------------------------------
+  console.log('\n[7] ONE RULE FOR A BEST (Sam, 20 Oct 2026): the finish card, Home, Tools and the coach agree')
+  // Her finish card said "NEW PRS: Dumbbell Floor Press 18kg x 13"; Home said "none this week" and Tools "0 PRs".
+  const SAM2 = 'u-sam-2'
+  const MON1 = '2026-10-12', MON2 = '2026-10-19'
+  const r2 = (name: string, date: string, o: Record<string, unknown>) => ({ ...row(name, date, o), user_id: SAM2 })
+  db.exercise_set_logs.push(
+    r2('Dumbbell Floor Press', MON1, { weight_kg: 18, reps_completed: 10 }),
+    r2('Goblet Squats', MON1, { weight_kg: 20, reps_completed: 8 }),
+  )
+  await pr.refreshPRCacheFromDB(SAM2)
+  const samSets = [r2('Dumbbell Floor Press', MON2, { weight_kg: 18, reps_completed: 13 }), r2('Goblet Squats', MON2, { weight_kg: 22, reps_completed: 8 })]
+  const samCard = pr.computeSessionPRs(pr.getPRBaseline(SAM2, MON2), samSets.map(asLog)).map(h => h.exerciseName).sort()
+  check('the fixture is her case: the finish card lists the floor press (same weight, more reps) and the heavier squat', samCard.join() === 'Dumbbell Floor Press,Goblet Squats', samCard)
+  db.exercise_set_logs.push(...samSets)
+  await pr.refreshPRCacheFromDB(SAM2)
+  const samBeaten = pr.getRecordsBeaten(SAM2)
+  const press = samBeaten.find(b => b.exerciseName === 'Dumbbell Floor Press')
+  check('Tools counts BOTH (it said 0): the same records as the finish card', samBeaten.length === 2 && samBeaten.map(b => b.exerciseName).sort().join() === samCard.join(), samBeaten)
+  check('...the press carried as the whole set, 18kg x 13, beating a heaviest of 18kg', press?.metric === 'load' && press.value === 18 && press.setReps === 13 && press.previous === 18, press)
+  check('...the squat a plain heavier weight, no set attached', samBeaten.some(b => b.exerciseName === 'Goblet Squats' && b.value === 22 && b.setReps === undefined), samBeaten)
+  const samRecent = pickRecentPRs(samBeaten, MON2)
+  check('Home\'s week lists both (it said "none this week")', samRecent.length === 2 && samRecent.some(r => r.exerciseName === 'Dumbbell Floor Press' && r.setReps === 13), samRecent)
+  check('...and says the set, never a bare lighter weight', recordPhrase(samRecent.find(r => r.exerciseName === 'Dumbbell Floor Press') ?? { exerciseName: 'missing', metric: 'load', value: 0 }) === 'Dumbbell Floor Press at 18kg × 13', samRecent)
+  const homeSrc = strip(read('src/components/Dashboard.tsx'))
+  check('Home\'s two PR readings hand the set\'s reps through', /bestReadingOf\(latestPr\.metric, latestPr\.value, latestPr\.setReps\)/.test(homeSrc) && /bestReadingOf\(data\.prsToday\[0\]\.metric, data\.prsToday\[0\]\.value, data\.prsToday\[0\]\.setReps\)/.test(homeSrc))
+  // Repeating a set, or a heavier day that also moved the estimate, is not a second record.
+  db.exercise_set_logs.push(r2('Dumbbell Floor Press', '2026-10-21', { weight_kg: 18, reps_completed: 13 }), r2('Goblet Squats', '2026-10-21', { weight_kg: 24, reps_completed: 8 }))
+  await pr.refreshPRCacheFromDB(SAM2)
+  const later = pr.getRecordsBeaten(SAM2).filter(b => b.date === '2026-10-21')
+  check('repeating the same set is not a best; a heavier day is ONE record, not two', later.length === 1 && later[0].exerciseName === 'Goblet Squats' && later[0].setReps === undefined, later)
+
   console.log(`\n${ran} checks ran. ${failures === 0 ? 'All passed.' : `${failures} FAILED.`}`)
   if (failures > 0) process.exit(1)
 }

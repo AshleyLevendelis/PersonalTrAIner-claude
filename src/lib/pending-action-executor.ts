@@ -14,7 +14,7 @@
 
 import { didNotSave, DAY_MOVE } from './coach-voice'
 import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
-import { rebuildFromCurrentWeek } from './plan-invalidation'
+import { rebuildFromCurrentWeek, rebuiltLine } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
 import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, FitnessGoal, ConcurrentActivity, SessionDuration } from './types'
 import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
@@ -1565,7 +1565,7 @@ export async function executeScheduleChange(
     receipt: {
       landed: failed.length === 0
         ? [`Training days: ${payload.trainingDays.join(', ')}`,
-           `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
+           rebuiltLine(rebuild, payload.fromWeek)]
         : [],
       failed,
     },
@@ -1637,7 +1637,7 @@ export async function executeStyleChange(
     receipt: {
       landed: failed.length === 0
         ? [`Training style: ${STYLE_OPTIONS.find(o => o.value === payload.trainingStyle)?.label ?? payload.trainingStyle}`,
-           `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
+           rebuiltLine(rebuild, payload.fromWeek)]
         : [],
       failed,
     },
@@ -1734,7 +1734,7 @@ export async function executeGoalChange(
     receipt: {
       landed: failed.length === 0
         ? [`Goal: ${GOAL_OPTIONS.find(o => o.value === payload.fitnessGoal)?.label ?? payload.fitnessGoal}`,
-           `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
+           rebuiltLine(rebuild, payload.fromWeek)]
         : [],
       failed,
     },
@@ -1796,7 +1796,7 @@ export async function executeSessionLength(
     receipt: {
       landed: failed.length === 0
         ? [`Sessions: ${DURATION_OPTIONS.find(o => o.value === payload.sessionDuration)?.label ?? payload.sessionDuration}`,
-           `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`]
+           rebuiltLine(rebuild, payload.fromWeek)]
         : [],
       failed,
     },
@@ -2203,7 +2203,7 @@ export async function executeConcurrentActivity(
         ...volumeReceiptLine(profile, payload.activity),
         ...(wanted ? [`Training days: ${payload.trainingDays!.join(', ')}`] : []),
         ...(payload.gymTimeOfDay ? [`Gym sessions: ${payload.gymTimeOfDay}s`] : []),
-        `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`,
+        rebuiltLine(rebuild, payload.fromWeek),
       ]
     : []
 
@@ -2286,7 +2286,7 @@ export async function executeSecondSportVolume(
         payload.keepFullVolume
           ? `Lifting volume: full, despite ${names}`
           : `Lifting volume: one recovery notch down for ${names}`,
-        `Rebuilt ${rebuild.weeksRebuilt} week${rebuild.weeksRebuilt === 1 ? '' : 's'} from week ${payload.fromWeek} on`,
+        rebuiltLine(rebuild, payload.fromWeek),
       ]
     : []
 

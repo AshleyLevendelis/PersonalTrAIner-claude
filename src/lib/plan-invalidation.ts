@@ -312,6 +312,21 @@ export interface RebuildResult {
   error?: string
   /** How many weeks were regenerated, for telling the user what happened. */
   weeksRebuilt?: number
+  /** The weeks whose sessions actually CHANGED, oldest first: what a receipt may claim (Sam, 20 Oct 2026). */
+  weeksChanged?: number[]
+}
+
+/**
+ * THE RECEIPT'S LINE FOR A REBUILD, from what actually changed. Sam's receipt read "Rebuilt 16 weeks from week 1
+ * on" while trained days, protected days and days before the start she asked for were all left as they were: the
+ * count was every week from the start, changed or not. Now it names the weeks whose sessions differ and the first of
+ * them, and says so plainly when nothing needed to change.
+ */
+export function rebuiltLine(result: Pick<RebuildResult, 'weeksChanged' | 'weeksRebuilt'>, fromWeek: number): string {
+  const changed = result.weeksChanged
+  if (!changed) return `Rebuilt ${result.weeksRebuilt} week${result.weeksRebuilt === 1 ? '' : 's'} from week ${fromWeek} on`
+  if (changed.length === 0) return 'No session on your plan needed to change'
+  return `Changed ${changed.length} week${changed.length === 1 ? '' : 's'}, from week ${changed[0]} on`
 }
 
 /**
@@ -348,7 +363,9 @@ export async function rebuildFromCurrentWeek(
 
   try {
     const rebuilt = await rebuildAgainstProfile(profile, exclusions, mesocycle, forward, opts.fromDate ? { ...context, fromDate: opts.fromDate } : context, opts.seedKey)
-    return { ok: true, mesocycle: rebuilt, weeksRebuilt: forward.length }
+    const daysOf = (weeks: MesocycleWeek[], n: number) => JSON.stringify(weeks.find(w => w.week_number === n)?.days ?? null)
+    const weeksChanged = forward.filter(n => daysOf(mesocycle, n) !== daysOf(rebuilt, n)).sort((a, b) => a - b)
+    return { ok: true, mesocycle: rebuilt, weeksRebuilt: forward.length, weeksChanged }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }

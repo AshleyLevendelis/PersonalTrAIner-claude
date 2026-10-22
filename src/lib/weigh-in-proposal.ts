@@ -51,10 +51,24 @@ export function buildWeighInProposal(profileId: string, rawArgs: Record<string, 
       ? { differenceKg: num(rawArgs.difference_kg)!, againstKg: num(rawArgs.against_kg)!, daysSince: Math.max(0, num(rawArgs.days_since) ?? 0) }
       : null
   const question = weighInQuestion(weightKg, date, readings, picture.anchors) ?? fromServer
-  if (!question) return null
-
   const after = weighInStanding([...readings.filter(r => r.date !== date), { date, kg: weightKg }], picture.anchors)
   const willHold = heldWeighInOn(after, date) != null
+  // THE COACH COULD NOT CHECK IT (its read failed, or it had no date): never saved unasked. Asked against this read
+  // when that finds something to ask about, else one plain question. Only on a failed check, so it is rare.
+  if (!question && rawArgs.unchecked === true) {
+    return {
+      scopeKey: `${profileId}:propose_weigh_in:${date}`,
+      preconditions: { date },
+      payload: { date, weightKg },
+      diff: {
+        lead: `Want me to save ${weightKg} kg as your weigh-in for ${date === picture.today ? 'today' : date}?`,
+        rows: [{ field: 'Weigh-in', before: '—', after: `${weightKg} kg` }],
+        implications: willHold ? [{ severity: 'info', text: WEIGH_IN_CARD_HOLD_LINE }] : [],
+        reversible: false,
+      },
+    }
+  }
+  if (!question) return null
 
   return {
     scopeKey: `${profileId}:propose_weigh_in:${date}`,

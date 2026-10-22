@@ -550,6 +550,26 @@ async function main() {
     const pic2 = picture ? await picture(k.id!) : null
     const fix = wp && pic2 ? wp.buildWeighInProposal(k.id!, { weight_kg: 81.4, date: '2026-03-02', difference_kg: 19.4, against_kg: 62, days_since: 0 }, pic2 as never) : null
     check('a correction told to the coach is asked about, without the line about waiting', !!fix && /heavier than earlier today/.test(fix.diff.lead ?? '') && (fix.diff.implications ?? []).length === 0, fix?.diff)
+    // A CHECK THAT COULD NOT RUN IS NEVER A "NO" (Sam, 20 Oct 2026: 84.2 after 80.6 saved unasked by chat).
+    const u = sam('coach-unchecked')
+    await signUp(u, '2026-03-02')
+    await typeWeighIn(u, '2026-03-02', 81.2)
+    setDevClockOverride(u.id!, '2026-03-02')
+    const picU = picture ? await picture(u.id!) : null
+    const unchecked = wp && picU ? wp.buildWeighInProposal(u.id!, { weight_kg: 81.6, date: '2026-03-02', unchecked: true }, picU as never) : null
+    check('the coach could not check a believable weight: one plain question, nothing saved', unchecked?.diff.lead === 'Want me to save 81.6 kg as your weigh-in for today?' && (db.daily_metrics ?? []).find(r => r.profile_id === u.id)?.weight_kg === 81.2, unchecked?.diff)
+    const uncheckedFar = wp && picU ? wp.buildWeighInProposal(u.id!, { weight_kg: 95, date: '2026-03-02', unchecked: true }, picU as never) : null
+    check('...and a surprising one is asked against the app\'s own read, the box\'s question', /heavier than earlier today — is 95 kg right\?/.test(uncheckedFar?.diff.lead ?? ''), uncheckedFar?.diff.lead)
+    check('without the coach saying it was unchecked, a believable weight builds no card (it was the coach\'s to save)', wp && picU ? wp.buildWeighInProposal(u.id!, { weight_kg: 81.6, date: '2026-03-02' }, picU as never) === null : false)
+    {
+      const coachSrc = strip(raw('supabase/functions/chat-gemini/index.ts'))
+      const h = coachSrc.slice(coachSrc.indexOf('name === "log_weight"'), coachSrc.indexOf('name === "propose_session_activity_swap"'))
+      const unchk = h.search(/if \(weighInUnchecked && !weighInAsk\) \{[\s\S]{0,400}?unchecked: true/)
+      const write = h.indexOf('daily_metrics?on_conflict')
+      check('the coach hands an unchecked weigh-in to the app unsaved, before any write', unchk >= 0 && write > unchk, { unchk, write })
+      check('...and a failed read, a missing date and a thrown read each mark it unchecked (a failed read was "no weigh-ins")',
+        /if \(!metricsResp\.ok\) \{\s*weighInUnchecked = true/.test(h) && /if \(typeof today !== "string"\) weighInUnchecked = true/.test(h) && /catch \(err\) \{\s*weighInUnchecked = true/.test(h))
+    }
     const chatUi = strip(raw('src/components/ChatAssistant.tsx'))
     check('the chat builds that card for the coach\'s proposal', /kind === 'propose_weigh_in'[\s\S]{0,300}buildWeighInProposal\(/.test(chatUi))
     check('...confirms it through that executor, then refreshes the targets', /row\.kind === 'propose_weigh_in'[\s\S]{0,700}executeWeighIn\([\s\S]{0,500}onWeightLogged\?\.\(\)/.test(chatUi))

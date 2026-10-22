@@ -155,7 +155,10 @@ const memCache = new Map<string, Record<string, PRRecord>>()
  * before a date (getPRBaseline). The baseline is derived, never remembered:
  * two ways of starting a session cannot disagree about it.
  */
-type DayBest = Omit<PRRecord, 'date'>
+type DayBest = Omit<PRRecord, 'date'> & {
+  /** The set behind the day's best ESTIMATE, so a best the estimate found can be shown as the whole set. */
+  bestSet?: { weightKg: number; reps: number }
+}
 const dayCache = new Map<string, Record<string, Record<string, DayBest>>>()
 
 /** False until the first read of this person's sets has come back. An empty
@@ -214,6 +217,9 @@ export interface RecordBeaten {
   /** The new record, in the metric's own unit — kilograms, added kilograms, or reps. */
   value: number
   previous: number
+  /** Only on a best the ESTIMATE found (the same or less weight, more reps): the set's reps, shown with `value`
+   * as "18kg × 13" (her 17 Sep ruling). `previous` is then the heaviest weight before it. */
+  setReps?: number
   date: string
 }
 
@@ -225,24 +231,36 @@ export interface RecordBeaten {
  * number of exercises ever logged — "7 PRs" after two workouts) and Home took
  * every entry dated this week, which on a first week is every exercise.
  *
- * Only the top figure moving counts here (the bar, the belt, the reps). A best
- * the ESTIMATE found — less weight for more reps — is celebrated where it
- * happens, on the set and the finish card, as before.
+ * ONE RULE FOR A PERSONAL BEST (Sam's live test, 20 Oct 2026): the finish card
+ * said "NEW PRS: Dumbbell Floor Press 18kg × 13" while Home said "none this
+ * week" and Tools "0 PRs", because this counted only a heavier top figure. A
+ * best the ESTIMATE found (the same or less weight for more reps) is a record
+ * everywhere now, carried as the whole set (`setReps`), as her 17 Sep ruling
+ * says it is shown. The bar, the belt and the reps count as before.
  */
 export function getRecordsBeaten(userId: string): RecordBeaten[] {
   const out: RecordBeaten[] = []
   for (const [exerciseName, days] of Object.entries(dayCache.get(userId) ?? {})) {
     const best = { load: 0, added_load: 0, reps: 0 }
+    let bestE1RM = 0
     for (const date of Object.keys(days).sort()) {
-      const today = { load: days[date].maxWeight, added_load: days[date].maxAddedLoad, reps: days[date].maxReps }
+      const day = days[date]
+      const today = { load: day.maxWeight, added_load: day.maxAddedLoad, reps: day.maxReps }
+      let heavier = false
       for (const metric of ['load', 'added_load', 'reps'] as const) {
         // `best > 0` IS THE BASELINE RULE: the first figure ever logged has
         // nothing before it to beat.
         if (best[metric] > 0 && today[metric] > best[metric]) {
           out.push({ exerciseName, metric, value: today[metric], previous: best[metric], date })
+          if (metric === 'load') heavier = true
         }
         best[metric] = Math.max(best[metric], today[metric])
       }
+      // A best the estimate found, on a day the bar did not go up: the whole set is the record.
+      if (!heavier && bestE1RM > 0 && day.maxE1RM > bestE1RM && day.bestSet) {
+        out.push({ exerciseName, metric: 'load', value: day.bestSet.weightKg, previous: best.load, setReps: day.bestSet.reps, date })
+      }
+      bestE1RM = Math.max(bestE1RM, day.maxE1RM)
     }
   }
   return out.sort((a, b) => a.date.localeCompare(b.date))
@@ -337,7 +355,8 @@ export async function refreshPRCacheFromDB(userId: string): Promise<void> {
     const day = (days[date] ??= { maxWeight: 0, maxE1RM: 0, maxAddedLoad: 0, maxReps: 0 })
     if (metric === 'load') {
       day.maxWeight = Math.max(day.maxWeight, shape.weightKg)
-      day.maxE1RM = Math.max(day.maxE1RM, calculateE1RM(shape.weightKg, shape.reps))
+      const e1rm = calculateE1RM(shape.weightKg, shape.reps)
+      if (e1rm > day.maxE1RM) { day.maxE1RM = e1rm; day.bestSet = { weightKg: shape.weightKg, reps: shape.reps } }
     } else if (metric === 'added_load') {
       day.maxAddedLoad = Math.max(day.maxAddedLoad, Number(shape.addedLoadKg ?? 0))
     } else {

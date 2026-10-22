@@ -717,6 +717,20 @@ async function main() {
     const chatSrc = readFileSync('src/components/ChatAssistant.tsx', 'utf8')
     check('...and the coach is handed Home\'s own: changeSinceStart over the same start and series', /weight_change_since_start:[\s\S]{0,200}changeSinceStart\(proactiveData\.startingWeightKg, proactiveData\.weightSeries\)/.test(chatSrc))
     const fnSrc = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
+    // (g) SAM, 20 Oct 2026: one surprising weigh-in (80.6 -> 84.2), held from the target, turned Home and the coach to
+    // "trending up". A trend is a claim and is made from the weigh-ins the target trusts; the latest stays as weighed.
+    const held = fresh()
+    for (const [d, kg] of [['2026-10-06', 80.9], ['2026-10-08', 80.8], ['2026-10-10', 80.7], ['2026-10-13', 80.6], ['2026-10-15', 80.6], ['2026-10-17', 80.5], ['2026-10-20', 84.2]] as const)
+      db.daily_metrics.push({ id: crypto.randomUUID(), profile_id: held, date: d, weight_kg: kg })
+    const { weighInStanding } = await import('../src/lib/weigh-in-check')
+    const { computeWeightTrend } = await import('../src/lib/weight-trend')
+    const rows = db.daily_metrics.filter(r => r.profile_id === held).map(r => ({ date: String(r.date), kg: Number(r.weight_kg) }))
+    const rawRate = computeWeightTrend(rows.map(r => ({ date: r.date, weightKg: r.kg })), '2026-10-20', null)?.ratePerWeekKg ?? 0
+    check('the fixture is her case: 84.2 is held, and counting it would read as a gain', weighInStanding(rows).held.length === 1 && rawRate > 0.3, { held: weighInStanding(rows).held, rawRate })
+    const g = await load(held, '2026-09-21', '2026-10-20')
+    check('Home\'s trend is NOT "up" off the held weigh-in (it said up 1.3kg/week)', (g.weightTrend?.ratePerWeekKg ?? 0) <= 0.05, g.weightTrend)
+    check('...and no tip or coach line says trending up', !/trending up/i.test(g.coachTip ?? '') && !(g.coachTips ?? []).some(t => /trending up/i.test(t.text)), { tip: g.coachTip })
+    check('...while the latest weigh-in is still shown as weighed: 84.2', g.weightSeries[g.weightSeries.length - 1]?.kg === 84.2, g.weightSeries.slice(-2))
     check('...and told to say exactly that for any overall loss or gain, the trend being a rate', /WEIGHT SINCE THEY STARTED: \$\{context\.weight_change_since_start\}/.test(fnSrc) && /say exactly this one\. The trend above is a rate per week, never a total\./.test(fnSrc))
   }
 

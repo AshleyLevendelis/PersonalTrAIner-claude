@@ -1177,7 +1177,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const pr = proactiveData?.recentPRs[0]
     if (pr) {
       return {
-        text: `nice one on ${pr.exerciseName} — ${personalBest(bestReadingOf(pr.metric, pr.value))} is a best. How's it feeling?`,
+        text: `nice one on ${pr.exerciseName} — ${personalBest(bestReadingOf(pr.metric, pr.value, pr.setReps))} is a best. How's it feeling?`,
         chips: ['How am I doing so far?'],
       }
     }
@@ -1367,7 +1367,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const recentPR = proactiveData?.recentPRs[0]
       const detail = initialGreetingDetail()
       const scheduleLine = recentPR
-        ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${personalBest(bestReadingOf(recentPR.metric, recentPR.value))}. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
+        ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${personalBest(bestReadingOf(recentPR.metric, recentPR.value, recentPR.setReps))}. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
         : buildInitialGreeting()
       // Chat round 2, item 1 — a brand-new user meets someone, rather than
       // opening a tool. Several short messages instead of one block: who this

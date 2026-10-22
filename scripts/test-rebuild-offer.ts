@@ -21,7 +21,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { detectPlanInvalidation, rebuildFromCurrentWeek, PLAN_INVALIDATING_FIELDS } from '../src/lib/plan-invalidation'
+import { detectPlanInvalidation, rebuildFromCurrentWeek, rebuiltLine, PLAN_INVALIDATING_FIELDS } from '../src/lib/plan-invalidation'
 import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import type { UserProfile } from '../src/lib/types'
@@ -288,6 +288,16 @@ console.log('\n3. A rebuild changes the weeks ahead and NOT the weeks behind')
     result.weeksRebuilt === meso.filter(w => w.week_number >= CURRENT).length, result.weeksRebuilt)
 
   const after = result.mesocycle ?? []
+  // A RECEIPT CLAIMS ONLY WHAT CHANGED (Sam, 20 Oct 2026: "Rebuilt 16 weeks from week 1 on" over weeks left as they were).
+  const reallyChanged = meso.filter(w => w.week_number >= CURRENT)
+    .filter(w => JSON.stringify(w.days) !== JSON.stringify(after.find(a => a.week_number === w.week_number)?.days))
+    .map(w => w.week_number)
+  check('the result names exactly the weeks whose sessions differ, oldest first', JSON.stringify(result.weeksChanged) === JSON.stringify(reallyChanged) && reallyChanged.length > 0, { said: result.weeksChanged, really: reallyChanged })
+  check('...and the receipt line says that count and the first of them', rebuiltLine(result, CURRENT) === `Changed ${reallyChanged.length} week${reallyChanged.length === 1 ? '' : 's'}, from week ${reallyChanged[0]} on`, rebuiltLine(result, CURRENT))
+  check('the line names the first week that CHANGED, not the week it started looking from', rebuiltLine({ weeksChanged: [5, 6], weeksRebuilt: 14 }, 3) === 'Changed 2 weeks, from week 5 on', rebuiltLine({ weeksChanged: [5, 6], weeksRebuilt: 14 }, 3))
+  check('a rebuild that changed nothing says so, never "rebuilt N weeks"', rebuiltLine({ weeksChanged: [], weeksRebuilt: 14 }, 3) === 'No session on your plan needed to change')
+  const lateStart = await rebuildFromCurrentWeek(injured, [], meso, CURRENT, GATE_CONTEXT, { fromDate: '2099-01-01' })
+  check('a start after the whole plan changes no week, and the receipt says so (it said every week from the start)', lateStart.ok && (lateStart.weeksChanged ?? [1]).length === 0 && /No session/.test(rebuiltLine(lateStart, CURRENT)), { changed: lateStart.weeksChanged, line: rebuiltLine(lateStart, CURRENT) })
   check('week identity survives — nothing is renumbered',
     after.map(w => w.week_number).join(',') === meso.map(w => w.week_number).join(','))
 

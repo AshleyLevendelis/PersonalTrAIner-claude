@@ -14,7 +14,7 @@ import { getTodayLedger, getEatenProteinByDate, type MealMacros } from './meal-s
 import { getRecentLogs, getRecentCardioLogs } from './daily-tracking'
 import { effortForRpe, effortLabel } from './cardio-effort'
 import { getCardioLogsForDateMerged } from './cardio-log-store'
-import { getRecentWeighIns, getEarliestWeightKg } from './nutrition-targets'
+import { getWeighInPicture, getEarliestWeightKg } from './nutrition-targets'
 import { getTotalForDate as getWaterTotalForDate } from './water-store'
 import { getPRCache, getRecordsBeaten, refreshPRCacheFromDB, type PRMetric, type RecordBeaten } from './pr-engine'
 import { formatLoad, labelModeForEntry, isPerSideLoad, type LoadLabelMode } from './load-prescription'
@@ -190,6 +190,8 @@ export interface RecentPR {
   metric: PRMetric
   /** The number to show, in the metric's own units. */
   value: number
+  /** A best the estimate found: the reps of that set, shown with `value` as the whole set. */
+  setReps?: number
   date: string
 }
 
@@ -220,7 +222,7 @@ export function pickRecentPRs(beaten: RecordBeaten[], todayStr: string): RecentP
       Number(b.metric !== 'reps') - Number(a.metric !== 'reps')
       || gain(b) - gain(a)
       || b.date.localeCompare(a.date))
-    .map(r => ({ exerciseName: r.exerciseName, metric: r.metric, value: r.value, date: r.date }))
+    .map(r => ({ exerciseName: r.exerciseName, metric: r.metric, value: r.value, ...(r.setReps ? { setReps: r.setReps } : {}), date: r.date }))
 }
 
 export interface WeightSeriesPoint {
@@ -517,11 +519,15 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   const waterTargetMl = profile.water_target_ml ?? 2000
 
   // ---- Weight trend ---------------------------------------------------------
-  const weighIns = await getRecentWeighIns(profileId, 14)
+  // A TREND IS A CLAIM, SO IT IS MADE FROM THE WEIGH-INS THE TARGET TRUSTS (Sam, 20 Oct 2026). One surprising
+  // weigh-in, held until a second day agrees, turned Home and the coach to "trending up 1.3kg/week" on its own. The
+  // latest weigh-in and the change since she started are still shown as weighed: they are facts, not a trend.
+  const weighInPicture = await getWeighInPicture(profileId)
+  const weighIns = weighInPicture.recent
   const goals = await getActiveGoals(profileId)
   const weightGoal = goals.find(g => g.metric === 'body_weight_kg' && g.baseline_value != null && g.target_value != null)
   const weightTrend = computeWeightTrend(
-    weighIns.map(w => ({ date: w.date, weightKg: w.weight_kg })),
+    weighInPicture.standing.trusted.map(w => ({ date: w.date, weightKg: w.kg })),
     todayStr,
     weightGoal ? { targetKg: weightGoal.target_value!, baselineKg: weightGoal.baseline_value! } : null,
   )

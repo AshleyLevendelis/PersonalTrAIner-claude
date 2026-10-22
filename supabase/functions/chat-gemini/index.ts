@@ -3637,19 +3637,29 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // the app's (it re-derives it from the weigh-ins), not this function's.
         //
         // The reads are before any write on purpose: after one, "the last
-        // weigh-in" would be this one. If they fail, nothing can be compared
-        // and the weigh-in is saved as it always was — logged below so a
-        // failed read is not silent.
+        // weigh-in" would be this one.
+        //
+        // A CHECK THAT COULD NOT RUN IS NEVER A "NO" (Sam, 20 Oct 2026: 84.2 kg
+        // after 80.6 was saved unasked). A failed read used to count as "no
+        // earlier weigh-ins", a missing date skipped the check, and an error
+        // fell through to the write. Now any of them hands the weigh-in to the
+        // app unsaved (`unchecked`): it checks against its own read and asks.
         let weighInAsk: ReturnType<typeof weighInQuestion> = null;
+        let weighInUnchecked = false;
         try {
           const readHeaders = { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey };
           const [metricsResp, targetsResp] = await Promise.all([
             fetch(`${supabaseUrl}/rest/v1/daily_metrics?profile_id=eq.${profileId}&select=*&order=date.desc&limit=14`, { headers: readHeaders }),
             fetch(`${supabaseUrl}/rest/v1/daily_nutrition_targets?profile_id=eq.${profileId}&select=*&order=date.asc`, { headers: readHeaders }),
           ]);
+          if (!metricsResp.ok) {
+            weighInUnchecked = true;
+            console.error(`log_weight: could not read the earlier weigh-ins to check against: ${metricsResp.status}`);
+          }
           const metricRows = metricsResp.ok ? await metricsResp.json() : [];
           const targetRows = targetsResp.ok ? await targetsResp.json() : [];
           const today = context.current_local_date;
+          if (typeof today !== "string") weighInUnchecked = true;
           const readings = (Array.isArray(metricRows) ? metricRows : [])
             .filter((r: { date?: unknown; weight_kg?: unknown }) => typeof r.date === "string" && Number(r.weight_kg) > 0)
             .map((r: { date: string; weight_kg: unknown }) => ({ date: r.date, kg: Number(r.weight_kg) }));
@@ -3658,9 +3668,20 @@ Keep this context in mind to ensure your greetings and questions naturally align
             .map((r: { date: string; calculated_weight_kg: unknown }) => ({ date: r.date, kg: Number(r.calculated_weight_kg) }));
           if (typeof today === "string") weighInAsk = weighInQuestion(weightKg, today, readings, anchors);
         } catch (err) {
+          weighInUnchecked = true;
           console.error("log_weight: could not read the earlier weigh-ins to check against:", err);
         }
-        console.log(`weigh-in check ask=${weighInAsk ? "yes" : "no"}${weighInAsk ? ` difference_kg=${weighInAsk.differenceKg} against_kg=${weighInAsk.againstKg} days_since=${weighInAsk.daysSince}` : ""}`);
+        console.log(`weigh-in check ask=${weighInAsk ? "yes" : weighInUnchecked ? "unchecked" : "no"}${weighInAsk ? ` difference_kg=${weighInAsk.differenceKg} against_kg=${weighInAsk.againstKg} days_since=${weighInAsk.daysSince}` : ""}`);
+
+        if (weighInUnchecked && !weighInAsk) {
+          return new Response(
+            JSON.stringify({
+              reply: "",
+              proposal: { kind: "propose_weigh_in", rawArgs: { weight_kg: weightKg, date: context.current_local_date, unchecked: true } },
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
 
         if (weighInAsk) {
           // Proposal, not a write. The figures are this function's own reads

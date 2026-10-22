@@ -798,8 +798,10 @@ export const BEST_SET_QUALIFIER = 'best set'
  * 'best_set' branch here ON PURPOSE: a metric alone cannot express it, so a
  * caller holding only a metric must not be able to claim one.
  */
-export function bestReadingOf(metric: 'load' | 'added_load' | 'reps', value: number): BestReading {
+export function bestReadingOf(metric: 'load' | 'added_load' | 'reps', value: number, setReps?: number): BestReading {
   if (metric === 'reps') return { kind: 'reps', reps: value }
+  // A best the estimate found carries its set's reps: the whole set, never a bare lighter weight (17 Sep ruling).
+  if (metric === 'load' && setReps != null && setReps > 0) return { kind: 'best_set', weightKg: value, reps: setReps }
   if (metric === 'added_load') return { kind: 'added_load', addedKg: value }
   return { kind: 'load', weightKg: value }
 }
@@ -815,9 +817,9 @@ export function bestReadingOf(metric: 'load' | 'added_load' | 'reps', value: num
  * kind travels with the number now and none of them can drop it: the shape
  * they are handed has no `weightKg` to reach for.
  */
-export interface RecordFact { exerciseName: string; metric: 'load' | 'added_load' | 'reps'; value: number }
+export interface RecordFact { exerciseName: string; metric: 'load' | 'added_load' | 'reps'; value: number; setReps?: number }
 export function recordPhrase(pr: RecordFact): string {
-  return `${pr.exerciseName} at ${personalBest(bestReadingOf(pr.metric, pr.value))}`
+  return `${pr.exerciseName} at ${personalBest(bestReadingOf(pr.metric, pr.value, pr.setReps))}`
 }
 
 export function ask(verbPhrase: string): string {

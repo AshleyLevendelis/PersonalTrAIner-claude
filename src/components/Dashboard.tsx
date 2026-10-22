@@ -406,7 +406,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const prCount = card ? card.prs.length : (data.prsToday ?? []).length
   const topPr: string | null = card && card.prs.length > 0
     ? personalBest(readingFor(card.prs[0].result))
-    : (data.prsToday ?? []).length > 0 ? personalBest(bestReadingOf(data.prsToday[0].metric, data.prsToday[0].value)) : null
+    : (data.prsToday ?? []).length > 0 ? personalBest(bestReadingOf(data.prsToday[0].metric, data.prsToday[0].value, data.prsToday[0].setReps)) : null
   const topPrLift = card && card.prs.length > 0 ? card.prs[0].exerciseName : (data.prsToday ?? [])[0]?.exerciseName ?? null
   const minutes = card?.summary.durationMinutes ?? data.sessionMinutes ?? null
 
@@ -657,7 +657,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             sub={latestPr ? prDay(latestPr.date, data.today, true) : 'none this week'}
             right={latestPr && (
               // The unit comes with the number, from the phrasebook — a bodyweight best is reps, never "0 kg".
-              <span className="tabular-mono glow-mint text-[0.875rem] font-bold text-primary-text">{personalBest(bestReadingOf(latestPr.metric, latestPr.value))}</span>
+              <span className="tabular-mono glow-mint text-[0.875rem] font-bold text-primary-text">{personalBest(bestReadingOf(latestPr.metric, latestPr.value, latestPr.setReps))}</span>
             )}
           />
         </div>
