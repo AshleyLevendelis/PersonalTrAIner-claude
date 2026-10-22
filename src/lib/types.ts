@@ -1046,5 +1046,7 @@ export interface CardioLog {
   intensity_rpe: number
   avg_heart_rate?: number | null
   notes?: string | null
+  /** How far, in km, only when she gave it (Sam, 20 Oct 2026). Absent on a database without the column yet. */
+  distance_km?: number | null
   completed_at?: string
 }

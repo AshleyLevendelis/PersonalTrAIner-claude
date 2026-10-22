@@ -96,6 +96,13 @@ import { MEAL_LIBRARY } from '@/lib/meal-library-data'
 // The app's own root boundary, as main.tsx mounts it (verify:chunk-reload reads what it shows).
 import { AppErrorBoundary } from '@/components/AppErrorBoundary'
 
+const KNEE_EASE = new URLSearchParams(location.search).get('kneeease') === '1'
+const kneeEaseRow = (profileId: string) => {
+  const end = anchorDate(); end.setDate(end.getDate() + 2); end.setHours(12, 0, 0, 0)
+  const start = anchorDate(); start.setDate(start.getDate() - 12)
+  return { id: 'knee-ease', profile_id: profileId, kind: 'injury', status: 'active', injury_code: 'knees', equipment_override: null,
+    starts_at: start.toISOString(), expires_at: end.toISOString(), created_at: start.toISOString() }
+}
 const PROFILE_ID = '00000000-0000-4000-8000-00000000t0ur'.replace('t0ur', '0001')
 
 // PINNED BEFORE ANYTHING RENDERS — 14 Sep 2026. This is what makes a run
@@ -996,7 +1003,9 @@ const db: Db = {
     : [],
   meal_plan_picks: [], meal_plan_slots: [],
   favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
-  plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],
+  // ?kneeease=1 — A KNEE EASE-OFF RUNNING (Sam, 20 Oct 2026): the row a "knee's a bit off" answer leaves, ending in
+  // two days. INPUT only; whether a run asks about it is the app's answer (cardio-ease-off.ts).
+  plan_adaptations: KNEE_EASE ? [kneeEaseRow(PROFILE_ID)] : [], user_facts: [], user_context_facts: [], user_goals: [],
   chat_messages: [], exercise_plans: [], mesocycle_weeks: [],
   // ?anchor=1 / ?held=1: the target row every account has had since 9 Oct 2026
   // — what set the targets at sign-up (anchorTargetsAtSignUp), at the 80 kg

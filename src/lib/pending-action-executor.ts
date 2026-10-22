@@ -30,6 +30,7 @@ import { swapPoolMeal, clearMealPick, getMealPicksForDate, getMealPicksForDates,
 import { supabase } from './supabase'
 import { setSessionMove, setDeliberateRest, setMarkedMissed, setSwappedForActivity } from './daily-tracking'
 import { saveCardioLog, deleteCardioLogsMatching } from './cardio-log-store'
+import { cardioReadback } from './cardio-effort'
 import { alsoDoingIsLoggable, type AlsoDoing } from './session-move'
 import type { MealAdditionPayload } from './meal-addition'
 import type { MealMovePayload } from './meal-move'
@@ -1990,6 +1991,65 @@ export async function executeCircuitLog(
 export async function undoCircuitLog(profileId: string, payload: CircuitLogPayload): Promise<boolean> {
   const ok = await deleteCardioLogsMatching(profileId, payload.date, payload.blocks.map(b => ({ activityName: b.activityName, notes: b.shape })))
   if (payload.swapName) await setSwappedForActivity(profileId, payload.date, null)
+  return ok
+}
+
+/**
+ * ONE CARDIO ACTIVITY SHE ALREADY DID, LOGGED AS EXTRA (Sam live test, 20 Oct 2026). The coach's half of Exercise →
+ * Add unplanned work: the same one cardio row (her activity, minutes, effort and, when she gave it, distance), and
+ * the lift stays on the plan. When the card offered it and she chose "Count it as today's workout", the same day
+ * swap the screen's "Count it as today's workout" makes, named for the activity.
+ */
+export interface CardioLogPayload {
+  date: string
+  dayName: string
+  activityName: string
+  durationMinutes: number
+  intensityRpe: number
+  distanceKm: number | null
+  /** The day's lifting session when it was still due with nothing logged, so the card could offer to count it. */
+  countableFocus: string | null
+}
+
+export async function executeCardioLog(
+  profile: UserProfile,
+  payload: CardioLogPayload,
+  countAsWorkout: boolean,
+): Promise<{ receipt: PendingActionReceipt; counted: boolean }> {
+  if (!profile.id) return { receipt: { landed: [], failed: [{ op: 'save', error: 'No profile to save against' }] }, counted: false }
+  const view = saveCardioLog({
+    userId: profile.id,
+    date: payload.date,
+    activityName: payload.activityName,
+    durationMinutes: payload.durationMinutes,
+    intensityRpe: payload.intensityRpe,
+    distanceKm: payload.distanceKm,
+    notes: null,
+  })
+  if (!view) return { receipt: { landed: [], failed: [{ op: 'save', error: `Couldn't log the ${payload.activityName.toLowerCase()}` }] }, counted: false }
+  const landed = [`${payload.activityName}: ${cardioReadback({ activity: payload.activityName, minutes: payload.durationMinutes, rpe: payload.intensityRpe, distanceKm: payload.distanceKm }).replace(`${payload.activityName} · `, '')}`]
+  const failed: PendingActionReceipt['failed'] = []
+  let counted = false
+  if (countAsWorkout && payload.countableFocus) {
+    counted = await setSwappedForActivity(profile.id, payload.date, payload.activityName)
+    if (counted) landed.push(`${payload.dayName}: counted as your workout instead of ${payload.countableFocus}`)
+    else failed.push({ op: 'save', error: `Couldn't count it as ${payload.dayName}'s workout` })
+  }
+  return { receipt: { landed, failed }, counted }
+}
+
+/**
+ * Takes the activity off the day, and the swap with it when "Count it as today's workout" made one: the day is read,
+ * and a swap is cleared only when it names this activity (a swap made some other way is not this card's to undo).
+ */
+export async function undoCardioLog(profileId: string, payload: CardioLogPayload): Promise<boolean> {
+  const ok = await deleteCardioLogsMatching(profileId, payload.date, [{ activityName: payload.activityName, notes: null }])
+  if (payload.countableFocus) {
+    const { data } = await supabase.from('workout_sessions').select('*').eq('profile_id', profileId).eq('date', payload.date).maybeSingle()
+    if ((data as { swapped_for_activity?: string | null } | null)?.swapped_for_activity === payload.activityName) {
+      await setSwappedForActivity(profileId, payload.date, null)
+    }
+  }
   return ok
 }
 

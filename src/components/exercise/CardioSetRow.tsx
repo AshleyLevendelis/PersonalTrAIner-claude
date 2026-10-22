@@ -5,12 +5,17 @@ import { Check } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import {
   saveCardioLog, deleteCardioLog, isCardioLogUndoable, isPlausibleCardioDuration,
-  MAX_PLAUSIBLE_CARDIO_MINUTES, getCardioLogsForDateMerged, subscribeCardioLogStore,
+  MAX_PLAUSIBLE_CARDIO_MINUTES, isPlausibleDistanceKm, MAX_PLAUSIBLE_DISTANCE_KM, getCardioLogsForDateMerged, subscribeCardioLogStore,
   type CardioLogView,
 } from '@/lib/cardio-log-store'
 import { EFFORTS, effortForRpe, rpeToStore, cardioReadback, type EffortKey } from '@/lib/cardio-effort'
 import { splitActivity, unclaimedCardio } from '@/lib/cardio-lines'
 import { prescriptionLine } from '@/lib/activity-day'
+import { easeOffQuestion, type EaseOffQuestion } from '@/lib/cardio-ease-off'
+import { getActiveAdaptations } from '@/lib/plan-adaptations-store'
+import { getAppNow } from '@/lib/dev-clock'
+import { setChatPrefill } from '@/lib/chat-prefill-store'
+import { tabHash } from '@/lib/app-route'
 
 // ---------------------------------------------------------------------------
 // CARDIO, LOGGED LIKE A LIFTING SET.
@@ -136,6 +141,7 @@ export function CardioReadback({
     activity: displayName ?? splitActivity(log.activity_name).name,
     minutes: log.duration_minutes,
     rpe: log.intensity_rpe,
+    distanceKm: log.distance_km == null ? null : Number(log.distance_km),
   })
 
   const handleUndo = async () => {
@@ -447,6 +453,7 @@ export function UnplannedCardioEntry({
   onLogged,
   saveVerb = 'Log',
   defaultMinutes,
+  onEaseOffQuestion,
 }: {
   picks: readonly CardioPick[]
   /** Index into picks to start on, or null for nothing chosen. */
@@ -460,6 +467,11 @@ export function UnplannedCardioEntry({
    * the minutes the timer had just counted.
    */
   defaultMinutes?: number
+  /**
+   * Where the ease-off question goes when this row will not be on screen to ask it (Add unplanned work closes its
+   * panel on a save). Omitted, the row asks it itself.
+   */
+  onEaseOffQuestion?: (question: EaseOffQuestion) => void
 }) {
   const { profileId, date } = useActiveSession()
   const [pick, setPick] = useState<number | 'other' | null>(initialPick)
@@ -472,11 +484,16 @@ export function UnplannedCardioEntry({
   const [effort, setEffort] = useState<EffortKey | null>(chosen ? effortForRpe(chosen.rpe) : null)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // HOW FAR, only when she gives it (Sam, 20 Oct 2026, "a proper field"). Never pre-filled: the app cannot know it.
+  const [distance, setDistance] = useState('')
+  // THE ONE QUESTION AFTER A RUN while a knee, ankle or hip is being eased off (cardio-ease-off.ts). Asked, never blocking.
+  const [easeOff, setEaseOff] = useState<EaseOffQuestion | null>(null)
 
   const choose = (next: number | 'other') => {
     setPick(next)
     setError(null)
     setMinutes('')
+    setDistance('')
     setEffort(typeof next === 'number' ? effortForRpe(picks[next].rpe) : null)
   }
 
@@ -497,6 +514,8 @@ export function UnplannedCardioEntry({
       return
     }
     if (!effort) { setError('Pick how hard it felt.'); return }
+    const km = distance.trim() === '' ? null : Number(distance.trim().replace(',', '.'))
+    if (km != null && !isPlausibleDistanceKm(km)) { setError(`Enter a distance between 0 and ${MAX_PLAUSIBLE_DISTANCE_KM} km, or leave it empty.`); return }
     setError(null)
     setSaving(true)
     const view = saveCardioLog({
@@ -506,14 +525,27 @@ export function UnplannedCardioEntry({
       durationMinutes: mins,
       intensityRpe: rpeToStore(effort, chosen?.rpe),
       notes: notes ?? null,
+      distanceKm: km,
     })
     setSaving(false)
     if (!view) { setError("That didn't save — try again in a moment."); return }
     setPick(null)
     setOtherName('')
     setMinutes('')
+    setDistance('')
     setEffort(null)
     onLogged?.(view)
+    // Asked after the save, from the ease-offs running now: the log never waits on it.
+    const loggedName = activityName
+    setEaseOff(null)
+    void getActiveAdaptations(profileId)
+      .then(rows => {
+        const question = easeOffQuestion(loggedName, rows, getAppNow(profileId))
+        if (!question) return
+        if (onEaseOffQuestion) onEaseOffQuestion(question)
+        else setEaseOff(question)
+      })
+      .catch(() => {})
   }
 
   // THREE ACROSS WHEN THERE ARE MORE THAN THREE. Unplanned work carries four
@@ -592,7 +624,49 @@ export function UnplannedCardioEntry({
           subject={activityName || 'this activity'}
         />
       )}
+      {pick !== null && (
+        <div className="flex items-center gap-2 pl-2.5 pr-2">
+          <span className="text-xs font-medium text-muted-foreground">Distance</span>
+          <Input
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="0.1"
+            aria-label={`${activityName || 'this activity'} distance in km`}
+            data-field="distance"
+            placeholder="km, optional"
+            value={distance}
+            onChange={e => { setDistance(e.target.value); setError(null) }}
+            className={`h-11 w-28 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${error && /distance/i.test(error) ? 'ring-1 ring-destructive' : ''}`}
+          />
+        </div>
+      )}
       {error && <p className="text-[0.625rem] text-destructive px-1">{error}</p>}
+      {easeOff && <EaseOffAsk question={easeOff} onDone={() => setEaseOff(null)} />}
+    </div>
+  )
+}
+
+/**
+ * THE ONE QUESTION AFTER A RUN while a knee, ankle or hip is being eased off (cardio-ease-off.ts). "Felt fine" puts
+ * it away; "It hurt" opens the chat with her message ready to send, never sent for her, so the coach's pain rules
+ * triage it. Nothing here changes the plan.
+ */
+export function EaseOffAsk({ question, onDone }: { question: EaseOffQuestion; onDone: () => void }) {
+  const chip = 'min-h-[44px] rounded-full border border-[color:var(--hairline)] px-3 text-[0.8125rem]'
+  return (
+    <div data-testid="ease-off-question" className="space-y-1.5 rounded-xl bg-[color:var(--surface-raised)] px-3 py-2.5">
+      <p className="text-[0.8125rem] text-foreground">{question.text}</p>
+      <div className="flex gap-2">
+        <button type="button" className={chip} onClick={onDone}>{question.fine}</button>
+        <button
+          type="button"
+          className={chip}
+          onClick={() => { setChatPrefill(question.hurtMessage); onDone(); window.location.hash = tabHash('chat') }}
+        >
+          {question.hurt}
+        </button>
+      </div>
     </div>
   )
 }

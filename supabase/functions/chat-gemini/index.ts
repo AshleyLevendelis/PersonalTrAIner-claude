@@ -9,7 +9,7 @@ import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
 import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
 import { detectPlanClaim, planClaimFloorText } from "../_shared/plan-claim.ts";
 import type { GeminiLegResult, GeminiPart } from "../_shared/gemini-parts.ts";
-import { userNamedFood, isAdviceQuestion, isEvaluationQuestion, statedDurationsMinutes, eventTiming, statedDurationsSeconds, statedCount, statedEffort } from "../_shared/message-evidence.ts";
+import { userNamedFood, isAdviceQuestion, isEvaluationQuestion, statedDurationsMinutes, eventTiming, statedDurationsSeconds, statedCount, statedEffort, statedDistancesKm, statedMinutes } from "../_shared/message-evidence.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1207,7 +1207,7 @@ const toolDeclarations = [
   {
     name: "propose_cardio_session",
     description:
-      "PROPOSES putting a CARDIO OR ACTIVITY SESSION on one day of their plan — a run, a ride, a swim, a rower, a walk — as part of the plan, not as a note. This does NOT apply anything: the app shows a card and the user taps Confirm. CALL IT ONLY AFTER THEY HAVE SAID YES. When somebody mentions doing something on a day ('Wednesday is my cardio day', 'I run on Tuesdays'), you ASK first, in plain words, with no tool call at all — see the section on offering to add a session. Only when they answer yes do you call this. YOU MUST CARRY THE DETAIL THE CONVERSATION ALREADY ESTABLISHED: if you have told them 30-40 minutes of zone 2 on a treadmill or bike, this card says 35 minutes at that effort, not 'cardio'. A card that throws away what you just prescribed is worse than no card. It is NOT propose_concurrent_activity, which is for a sport they do OUTSIDE this plan (a Muay Thai class, a football league) and which rebuilds their lifting around it — this one is a session the plan itself prescribes and shows on the day. It is NOT record_fact: remembering that Wednesday is their cardio day changes nothing on any screen.",
+      "PROPOSES putting a CARDIO OR ACTIVITY SESSION on one day of their plan — a run, a ride, a swim, a rower, a walk — as part of the plan, not as a note. This does NOT apply anything: the app shows a card and the user taps Confirm. CALL IT ONLY AFTER THEY HAVE SAID YES. When somebody mentions doing something on a day ('Wednesday is my cardio day', 'I run on Tuesdays'), you ASK first, in plain words, with no tool call at all — see the section on offering to add a session. Only when they answer yes do you call this. YOU MUST CARRY THE DETAIL THE CONVERSATION ALREADY ESTABLISHED: if you have told them 30-40 minutes of zone 2 on a treadmill or bike, this card says 35 minutes at that effort, not 'cardio'. A card that throws away what you just prescribed is worse than no card. It is NOT for something they ALREADY DID: that is propose_cardio_log, logged on top of the day. It is NOT propose_concurrent_activity, which is for a sport they do OUTSIDE this plan (a Muay Thai class, a football league) and which rebuilds their lifting around it — this one is a session the plan itself prescribes and shows on the day. It is NOT record_fact: remembering that Wednesday is their cardio day changes nothing on any screen.",
     parameters: {
       type: "object",
       properties: {
@@ -1463,7 +1463,7 @@ const toolDeclarations = [
   {
     name: "propose_session_activity_swap",
     description:
-      "PROPOSES marking a day's prescribed lifting as swapped for something they are doing instead — this does NOT apply anything, the app shows a card and the user taps Confirm. Call when the user says they are NOT doing their prescribed lifting session on a given day and names what they are doing instead ('skipping weights today but I'm doing Muay Thai in the evening', 'no gym tonight, playing football', 'swapping legs for a long run'). The card marks that day as a deliberate swap rather than a missed session, and logs the activity towards their streak. NOT propose_missed_session (nothing replaced it), NOT propose_session_move (the session is still happening later this week), NOT log_workout (a workout they already did ALONGSIDE their lifting), and not for a hypothetical ('what if I skipped'). If they say they are skipping but name no activity, ask what they are doing instead before calling. A STATEMENT IS ENOUGH: 'I'm not going to hit that session, I'm doing Muay Thai instead' is exactly this tool. It needs no command verb and takes no origin_verbatim_quote — telling you what they are doing IS the request. Never say the day has been swapped in your own words: the card asks, and they answer it.",
+      "PROPOSES marking a day's prescribed lifting as swapped for something they are doing instead — this does NOT apply anything, the app shows a card and the user taps Confirm. Call when the user says they are NOT doing their prescribed lifting session on a given day and names what they are doing instead ('skipping weights today but I'm doing Muay Thai in the evening', 'no gym tonight, playing football', 'swapping legs for a long run'). The card marks that day as a deliberate swap rather than a missed session, and logs the activity towards their streak. NOT propose_missed_session (nothing replaced it), NOT propose_session_move (the session is still happening later this week), NOT propose_cardio_log (an activity they ALREADY DID, told in the past tense, which is logged on top of the lift: use this swap only when they say it was INSTEAD of the session), and not for a hypothetical ('what if I skipped'). If they say they are skipping but name no activity, ask what they are doing instead before calling. A STATEMENT IS ENOUGH: 'I'm not going to hit that session, I'm doing Muay Thai instead' is exactly this tool. It needs no command verb and takes no origin_verbatim_quote — telling you what they are doing IS the request. Never say the day has been swapped in your own words: the card asks, and they answer it.",
     parameters: {
       type: "object",
       properties: {
@@ -1521,6 +1521,26 @@ const toolDeclarations = [
         },
       },
       required: ["blocks", "origin_verbatim_quote"],
+    },
+  },
+  {
+    name: "propose_cardio_log",
+    description:
+      "PROPOSES logging ONE cardio activity they ALREADY DID — a run, a walk, a ride, a swim, a class, a hike — as EXTRA work on top of their plan. This does NOT apply anything: the app shows the offer and they tap. THIS IS THE DEFAULT for something done, told in the past tense ('I went for a 40 minute run at lunch, about 6km, pretty hard'), INCLUDING on a day with a lift planned: it is logged alongside the lift, which stays on the plan, and the app itself offers 'Count it as today's workout' when that session is still due. Duration, effort and distance are THEIRS: give only what they said; if they have not said how hard it was, ask 'How hard did that feel — easy, steady or hard?' and wait; never pick one. NOT propose_session_activity_swap (only when they say it was INSTEAD of the session), NOT propose_circuit_log (several timed blocks), NOT propose_cardio_session (planning one for later), NOT log_workout (sets and reps of lifts).",
+    parameters: {
+      type: "object",
+      properties: {
+        activity_name: { type: "string", description: "What they did, in their words: 'Run', 'Walk', 'Bike ride', 'Spin class'." },
+        duration_minutes: { type: "number", description: "How long, in minutes, as they stated it." },
+        effort: { type: "string", enum: ["easy", "steady", "hard"], description: "How hard, ONLY if they said. Omit and ask if not." },
+        distance_km: { type: "number", description: "How far, in km, ONLY if they gave a distance (miles converted). Omit otherwise." },
+        date: { type: "string", description: "ISO date (YYYY-MM-DD) they did it. Omit for today." },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message telling you what they did (or, when this turn only answers your effort question, the answer itself, e.g. 'hard'). Copy it verbatim.",
+        },
+      },
+      required: ["activity_name", "duration_minutes", "origin_verbatim_quote"],
     },
   },
   {
@@ -2865,6 +2885,7 @@ SESSION PLANNING RULES:
 NEVER CLAIM AN ACTION YOU DID NOT TAKE:
 1. Do not say a day has been marked, moved, rescheduled, skipped or set to rest unless you actually called a tool that does it. Saying "I'll make sure today is marked as a rest day" and then not calling one is a lie the user only discovers the next morning, when the day shows as missed.
 2. When the user says they are skipping their lifting for something else and names it, call propose_session_activity_swap. That is the tool for exactly this, and its card is the only thing that changes what the Exercise tab shows. A PLAIN STATEMENT IS ENOUGH TO CALL IT — "I'm not going to hit that session, I'm doing Muay Thai instead" needs no command verb and no please. The rule further down about not calling a tool for a sentence with no imperative verb is about propose_meal_swap and propose_exercise_swap, where the user is ordering a change to the plan's content; it does NOT apply to the four day tools, where telling you what is happening to their day IS the request. Answering that sentence in prose is the failure this rule exists to stop: measured live twice, 25 Aug and 15 Sep 2026, both times about Muay Thai, both times with the coach saying the day was sorted when nothing had been written.
+2a. SOMETHING ALREADY DONE IS LOGGED AS EXTRA, NEVER SWAPPED IN (Ashley, 20 Oct 2026): "I went for a 40 minute run at lunch, about 6km, pretty hard" on a day with a lift planned is propose_cardio_log, not propose_session_activity_swap and not propose_cardio_session. The lift stays on the plan; the app offers "Count it as today's workout" itself when the session is still due. Only "instead of", "skipped", "didn't do my session" makes it a swap. "No, it's extra, just log it" means propose_cardio_log, never a question about which day.
 2b. When what they did instead was a CIRCUIT OF TIMED BLOCKS — rounds of this, rounds of that ("5 rounds of 3 min skipping, 3x30s push-ups, 5x15s on the bike") — call propose_circuit_log, one block each, not propose_session_activity_swap with one name for the lot: Ashley's ruling, 8 Oct 2026, is that each block is recorded as itself. Every number is theirs; if they have not said how hard it felt overall, ask (easy, steady or hard) before calling.
 3. When they say they are resting a training day and name nothing in its place — "rest day today", "taking today off" — call propose_rest_day. That is the tool for exactly this, and it is the only thing that stops the day showing as missed tomorrow. It shows a card; the user confirms it. Until they do, nothing has happened, so do not say it has.
 3b. When they say a session did NOT happen and name nothing in its place and do not call it a rest — "I missed yesterday", "didn't train Monday", "mark it missed" — call propose_missed_session. A miss is not a rest: never answer a miss with propose_rest_day unless they say it was a rest. It shows a card; until they confirm, nothing has happened, so do not say it has.
@@ -3924,6 +3945,53 @@ Keep this context in mind to ensure your greetings and questions naturally align
                 blocks,
                 effort,
                 replaced_session: args.replaced_session === true,
+              },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_cardio_log") {
+        // ONE CARDIO ACTIVITY ALREADY DONE, LOGGED AS EXTRA (Sam live test, 20 Oct 2026: "I went for a 40 minute run
+        // at lunch, about 6km, pretty hard" was offered as a REPLACEMENT for Tuesday's lift). The circuit log's
+        // evidence rule: the minutes, the effort and the distance are each taken only from her own recent words;
+        // with no effort in them the coach asks, and a distance she did not give is never logged.
+        const recentUser = Array.isArray(history)
+          ? history.filter((t: { role?: string; content?: unknown }) => t && t.role !== "assistant" && typeof t.content === "string").slice(-3).map((t: { content: string }) => t.content)
+          : [];
+        const evidence = [...recentUser, message].join("\n");
+        const activity = typeof args.activity_name === "string" ? args.activity_name.trim() : "";
+        const minutesSaid = statedMinutes(evidence);
+        const asked = Math.round(Number(args.duration_minutes));
+        const minutes = Number.isFinite(asked) && minutesSaid.includes(asked) ? asked : minutesSaid.length === 1 ? minutesSaid[0] : null;
+        if (!activity || minutes == null || minutes < 1) {
+          return new Response(
+            JSON.stringify({ reply: activity ? `How long was the ${activity.toLowerCase()}?` : "What did you do, and for how long?" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const effort = statedEffort([...recentUser.slice(-1), message].join("\n"));
+        if (!effort) {
+          return new Response(
+            JSON.stringify({ reply: "Nice one. How hard did that feel — easy, steady or hard?" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const kmSaid = statedDistancesKm(evidence);
+        const kmAsked = Number(args.distance_km);
+        const distance = Number.isFinite(kmAsked) && kmSaid.some((k) => Math.abs(k - kmAsked) <= 0.05) ? kmAsked : kmSaid.length === 1 ? kmSaid[0] : null;
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_cardio_log",
+              rawArgs: {
+                activity_name: activity,
+                duration_minutes: minutes,
+                effort,
+                ...(distance != null ? { distance_km: distance } : {}),
+                date: typeof args.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(args.date) ? args.date : context.current_local_date,
               },
             },
           }),

@@ -173,8 +173,15 @@ console.log('\n1. The libraries are cached separately from the app')
   //     before   deploy 333 gz   paint 489 gz   app 1140 raw   total 2395 raw   (3, 3, 10 and 2 kB of room)
   //     after    deploy 333 gz   paint 490 gz   app 1141 raw   total 2397 raw   (total OVER by 0)
   // Her 15 Sep ruling, "raise it with room to grow": the same room as every move above, 8 kB gz, 25 kB raw.
-  headroom('a deploy re-downloads', appGzip, 341, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 341, appGzip)
+  // MOVED 22 Oct 2026, the Sam live test (the distance box and knee question on the cardio row, one PR rule on the
+  // finish card and Home, the honest rebuild receipt). MEASURED through this gate on a clean worktree of 7e1cdc2 and
+  // on the change:
+  //     before   deploy 340 gz   paint 496 gz   app 1163 raw   total 2459 raw   (1, 2, 3 and 16 kB of room)
+  //     after    deploy 342 gz   paint 498 gz   app 1168 raw   total 2467 raw   (deploy, paint and app OVER)
+  // The cardio row and the dashboard draw at first paint, so their growth is first-paint code by nature. Her 15 Sep
+  // ruling, "raise it with room to grow": the same room as every move above, 8 kB gz, 25 kB raw.
+  headroom('a deploy re-downloads', appGzip, 350, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 350, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -254,9 +261,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 10 Oct 2026: 461 -> 474, the layout pass — see the deploy figure above for both ends.
   // MOVED 11 Oct 2026: 474 -> 484, the allergy ruling — see the deploy figure above for both ends.
   // MOVED 18 Oct 2026: 492 -> 498, runs 7-10 batch 1 — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 498, 'kB gzipped')
+  // MOVED 22 Oct 2026: 498 -> 506, the Sam live test — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 506, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 498, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 506, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -362,7 +370,8 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 11 Oct 2026: 1,090 -> 1,131 raw, the allergy ruling — see the deploy figure above for both ends.
   // MOVED 12 Oct 2026: 1131 -> 1150, the merged release tree measured 1127 (see the deploy note).
   // MOVED 18 Oct 2026: 1150 -> 1166, runs 7-10 batch 1 — see the deploy figure above for both ends.
-  const APP_CHUNK_BUDGET_KB = 1166
+  // MOVED 22 Oct 2026: 1166 -> 1193, the Sam live test — see the deploy figure above for both ends.
+  const APP_CHUNK_BUDGET_KB = 1193
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -602,7 +611,8 @@ console.log('\n3. Nothing has crept back up')
   // of her words, the coach's arms, the Move sheet's section; +4 in the app chunk (the hook's controller,
   // the phrasebook, the copy-is-the-same-dish rule). 2,447 is 18 above the 2,429 measured, on her 15 Sep ruling.
   // BOTH OF 20 Oct together (different-today + meal-rebalance): measured 2459 kB that day, 16 kB room.
-  const TOTAL_BUDGET_KB = 2475
+  // MOVED 22 Oct 2026: 2475 -> 2492, the Sam live test (2467 measured, 25 raw of room).
+  const TOTAL_BUDGET_KB = 2492
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

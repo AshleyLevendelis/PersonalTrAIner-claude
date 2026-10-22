@@ -68,6 +68,9 @@ async function main() {
   check('...and a blocking question', bare.ambiguity?.field === 'effort' && bare.ambiguity.message === 'How hard was the walk?', bare.ambiguity)
   check('...whose answers are Easy, Steady and Hard, as taps',
     (bare.ambiguity?.options ?? []).map(o => `${o.label}=${o.value}`).join(',') === 'Easy=easy,Steady=steady,Hard=hard', bare.ambiguity?.options)
+  // SAM, 20 Oct 2026: "minute" (singular) was not read as minutes, so "a 40 minute run" was never cardio.
+  const sam = one('I went for a 40 minute run at lunch, pretty hard')
+  check('"a 40 minute run" is cardio: a Run of 40 minutes, hard', sam.routesToCardio === true && sam.cardioActivity === 'Run' && sam.cardioMinutes === 40 && sam.cardioRpe === 7, sam)
   const answered = one('did a 30 min walk easy')
   check('the tapped answer, added to the phrase, resolves it', answered.ambiguity === undefined && answered.cardioRpe === 3, answered)
 

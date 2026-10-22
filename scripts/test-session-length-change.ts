@@ -151,7 +151,7 @@ console.log('\n3. Confirming a lasting change REACHES the plan')
     beforeOver.length > 0, beforeOver.length)
 
   check('the receipt names how many weeks moved',
-    result.receipt.landed.some(l => /Rebuilt \d+ week/.test(l)), result.receipt.landed)
+    result.receipt.landed.some(l => /Changed \d+ weeks?, from week \d+/.test(l)), result.receipt.landed)
   check('...and names the new length in the user\'s words, not the raw value',
     result.receipt.landed.some(l => /Sessions: .*min/.test(l)), result.receipt.landed)
   check('the pre-image is kept, so undo has something to restore',

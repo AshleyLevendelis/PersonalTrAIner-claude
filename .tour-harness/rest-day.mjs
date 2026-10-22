@@ -274,10 +274,11 @@ const form = await ev(`(() => {
     lit: !!save && save.className.includes('glow-pulse'),
   }
 })()`)
-check('5a. it opens a name box above the same row', (form.inputs || []).join(',') === 'activity,minutes', form)
+// The optional distance box joined the same row on 22 Oct 2026 (Sam's run: "a proper field").
+check('5a. it opens a name box above the same row', (form.inputs || []).join(',') === 'activity,minutes,distance', form)
 // TWO ROWS MUST NOT SHARE ONE SPOKEN NAME: the What-happened sheet has its own
 // "Activity" and "Minutes" fields, so these say whose they are.
-check('5a2. ...each named for what it is, not a bare "Minutes"', !(form.labels || []).includes('Minutes') && !(form.labels || []).includes('Activity') && (form.labels || []).length === 2, form.labels)
+check('5a2. ...each named for what it is, not a bare "Minutes"', !(form.labels || []).includes('Minutes') && !(form.labels || []).includes('Activity') && !(form.labels || []).includes('Distance') && (form.labels || []).length === 3, form.labels)
 check('5b. ...with no effort chosen — the app cannot know how a class felt', (form.effort || []).every(v => v === 'false') && form.lit === false, form)
 const type = async (sel, value) => ev(`(() => {
   const n = document.querySelector(${JSON.stringify(sel)})

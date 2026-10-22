@@ -272,3 +272,32 @@ export function statedEffort(text: string): StatedEffort | null {
   }
   return best ? best.level : null;
 }
+
+/**
+ * Every distance she wrote, in kilometres: "6km", "about 6 k", "5.5 kilometres", "3 miles" (converted, the one
+ * conversion with one answer). "a 5k" / "parkrun" are not read as a figure unless written as one ("5k" is). Used
+ * so a logged distance is always one SHE gave (Sam live test, 20 Oct 2026), never the model's estimate.
+ */
+export function statedDistancesKm(text: string): number[] {
+  const m = (text || "").toLowerCase();
+  const out: number[] = [];
+  for (const hit of m.matchAll(/(\d+(?:[.,]\d+)?)\s*(km|kms|k\b|kilomet(?:er|re)s?|mi\b|miles?)/g)) {
+    const n = Number(hit[1].replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0) continue;
+    out.push(/^mi/.test(hit[2]) ? Math.round(n * 1.60934 * 100) / 100 : n);
+  }
+  return out;
+}
+
+/** Every duration she wrote, in whole minutes: minutes and seconds as statedDurationsSeconds reads them, plus hours. */
+export function statedMinutes(text: string): number[] {
+  const m = (text || "").toLowerCase();
+  const out = statedDurationsSeconds(m).map((s) => Math.round(s / 60)).filter((n) => n > 0);
+  for (const hit of m.matchAll(/(\d+(?:\.\d+)?)\s*(hours?|hrs?|h\b)/g)) {
+    const n = Number(hit[1]);
+    if (Number.isFinite(n) && n > 0) out.push(Math.round(n * 60));
+  }
+  if (/\bhalf an hour\b/.test(m)) out.push(30);
+  else if (/\ban hour\b/.test(m)) out.push(60);
+  return out;
+}

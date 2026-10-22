@@ -20,6 +20,7 @@ import { supabase } from './supabase'
 import { getAppNow } from './dev-clock'
 import { isConnectionFailure } from './connection-error'
 import type { CardioLog } from './types'
+import { isMissingColumnError } from './missing-column'
 
 const PENDING_KEY = 'fitplan_cardio_pending_v1'
 /** The server's cardio rows as this phone last saw them — see "THE PHONE'S OWN COPY" below. */
@@ -39,6 +40,8 @@ export interface CardioLogInput {
   intensityRpe: number
   avgHeartRate?: number | null
   notes?: string | null
+  /** Kilometres, only when she gave a distance. */
+  distanceKm?: number | null
 }
 
 interface PendingCardioLog extends CardioLogInput {
@@ -108,6 +111,7 @@ function pendingToView(p: PendingCardioLog): CardioLogView {
     intensity_rpe: p.intensityRpe,
     avg_heart_rate: p.avgHeartRate ?? null,
     notes: p.notes ?? null,
+    ...(p.distanceKm != null ? { distance_km: p.distanceKm } : {}),
     completed_at: p.completedAt,
     syncStatus: p.status,
   }
@@ -122,6 +126,14 @@ function pendingToView(p: PendingCardioLog): CardioLogView {
  * numbers until somebody notices. Same shape as MAX_PLAUSIBLE_DAILY_STEPS.
  */
 export const MAX_PLAUSIBLE_CARDIO_MINUTES = 24 * 60
+
+/** The longest distance one cardio entry may carry, in km: the database's own bound. */
+export const MAX_PLAUSIBLE_DISTANCE_KM = 500
+
+/** Is this a distance the app will store? */
+export function isPlausibleDistanceKm(km: number): boolean {
+  return Number.isFinite(km) && km > 0 && km <= MAX_PLAUSIBLE_DISTANCE_KM
+}
 
 /** Is this a duration the app will store for one cardio entry? */
 export function isPlausibleCardioDuration(minutes: number): boolean {
@@ -147,6 +159,9 @@ export function saveCardioLog(input: CardioLogInput): CardioLogView | null {
     console.error('Refusing to log an implausible cardio duration:', input.durationMinutes)
     return null
   }
+  // A distance that could not be true is dropped, never stored: the database's own bound, kept here as well so a
+  // typo cannot sit in the phone's queue failing for ever.
+  if (input.distanceKm != null && !isPlausibleDistanceKm(input.distanceKm)) return saveCardioLogUnchecked({ ...input, distanceKm: null })
   return saveCardioLogUnchecked(input)
 }
 
@@ -323,7 +338,7 @@ async function doFlush(): Promise<void> {
 async function syncPass(items: PendingCardioLog[]): Promise<void> {
   for (const item of items.filter(i => i.status === 'pending')) {
     try {
-      const { data, error } = await supabase.from('cardio_logs').insert({
+      const row: Record<string, unknown> = {
         user_id: item.userId,
         date: item.date,
         activity_name: item.activityName,
@@ -332,7 +347,15 @@ async function syncPass(items: PendingCardioLog[]): Promise<void> {
         avg_heart_rate: item.avgHeartRate || null,
         notes: item.notes || null,
         completed_at: item.completedAt,
-      }).select('id').single()
+      }
+      // THE DISTANCE IS NAMED ONLY WHEN THERE IS ONE, and a database that has not run its migration yet
+      // (20261022120000) is retried without it: the session saves, the distance is the one thing lost.
+      if (item.distanceKm != null) row.distance_km = item.distanceKm
+      let { data, error } = await supabase.from('cardio_logs').insert(row).select('id').single()
+      if (error && 'distance_km' in row && isMissingColumnError(error, 'distance_km')) {
+        delete row.distance_km
+        ;({ data, error } = await supabase.from('cardio_logs').insert(row).select('id').single())
+      }
       if (error) throw error
       const insertedId = (data as { id: string } | null)?.id
       const current = loadPending()
@@ -438,6 +461,7 @@ function serverShape(p: PendingCardioLog): CardioLog {
     intensity_rpe: p.intensityRpe,
     avg_heart_rate: p.avgHeartRate ?? null,
     notes: p.notes ?? null,
+    ...(p.distanceKm != null ? { distance_km: p.distanceKm } : {}),
     completed_at: p.completedAt,
   }
 }

@@ -106,7 +106,7 @@ export async function getEarliestWeightKg(profileId: string): Promise<number | n
 }
 
 /** Recent weigh-ins for the Nutrition tab's history list (newest first). */
-export async function getRecentWeighIns(profileId: string, limit = 7): Promise<{ date: string; weight_kg: number }[]> {
+async function getRecentWeighIns(profileId: string, limit = 7): Promise<{ date: string; weight_kg: number }[]> {
   const { data, error } = await supabase
     .from('daily_metrics')
     .select('date, weight_kg')

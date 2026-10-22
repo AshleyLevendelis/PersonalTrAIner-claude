@@ -295,7 +295,7 @@ export function parseSetsPhrase(phrase: string): SetsPhraseParse {
 // Exercise resolution (§3.2)
 // ---------------------------------------------------------------------------
 
-const CARDIO_RE = /(\d+)\s*(?:min|mins|minutes)\b.*\b(bike|run|jog|row|swim|elliptical|cycling|cardio|walk)/i
+const CARDIO_RE = /(\d+)\s*(?:mins?|minutes?)\b.*\b(bike|run|jog|row|swim|elliptical|cycling|cardio|walk)/i
 
 /** The word she used -> the activity the app reads back. The rest-day chip names where one exists. */
 const CARDIO_ACTIVITY: Record<string, string> = {

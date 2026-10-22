@@ -1,7 +1,8 @@
 import { Fragment, useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
 import { blockShape } from '@/lib/timer-engine'
 import { circuitName } from '@/lib/circuit'
-import { rpeToStore, effortLabel, type EffortKey } from '@/lib/cardio-effort'
+import { rpeToStore, effortLabel, cardioReadback, type EffortKey } from '@/lib/cardio-effort'
+import { easeOffQuestion } from '@/lib/cardio-ease-off'
 import ReactMarkdown from 'react-markdown'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
 import { buildCoachMealSummary, buildCoachUpcomingSummary, mealsContaining } from '@/lib/meal-ingredients'
@@ -29,7 +30,7 @@ import { buildWeighInProposal, executeWeighIn, WEIGH_IN_RECEIPT_HOLD_DETAIL, typ
 import { getWeighInPicture } from '@/lib/nutrition-targets'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
-  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioSession, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload } from '@/lib/pending-action-executor'
+  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioLog, undoCardioLog, type CardioLogPayload, executeCardioSession, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload } from '@/lib/pending-action-executor'
 import { planSessionKindToday, sessionKindFrom, buildSessionKindTodayProposal, SESSION_KINDS } from '@/lib/session-kind'
 import { STYLE_OPTIONS, OFFERED_STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from '@/lib/onboarding-slots'
 import { getDurationBudgetSeconds } from '@/lib/session-duration'
@@ -113,7 +114,7 @@ import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
 import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
 import { GROCERY_AISLE_LABEL, chatGroceryAmount } from '@/lib/grocery-display'
 import { logWater, undoLog as undoWaterLog, subscribeWaterStore } from '@/lib/water-store'
-import { subscribeCardioLogStore, deleteCardioLog } from '@/lib/cardio-log-store'
+import { subscribeCardioLogStore, deleteCardioLog, isPlausibleCardioDuration, isPlausibleDistanceKm } from '@/lib/cardio-log-store'
 import { subscribeMealStore } from '@/lib/meal-store'
 import { getStepsForDate, logStepsManual, restoreStepsForDate, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS } from '@/lib/steps-store'
 import { buildCoachStepsSummary } from '@/lib/steps-context'
@@ -2255,6 +2256,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (pendingAction.kind === 'propose_missed_session') return 'Want me to mark that session as missed?'
     if (pendingAction.kind === 'propose_session_activity_swap') return 'Want me to swap that day over?'
     if (pendingAction.kind === 'propose_circuit_log') return 'Want me to log this workout?'
+    if (pendingAction.kind === 'propose_cardio_log') return 'Want me to log that?'
     if (pendingAction.kind === 'propose_session_move') return 'Want me to move that session?'
     const intentVerb = INTENT_PROPOSAL_VERB[pendingAction.kind]
     if (intentVerb) return `Want me to ${intentVerb} **${rows[0].after}**?`
@@ -3705,6 +3707,56 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         lead: ask(`mark ${dayName} as ${activityName} instead of your lift`),
         rows: [{ field: dayName, before: session.focus, after: activityName }],
         implications,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * Builds propose_cardio_log's offer — ONE cardio activity she already did, logged as EXTRA (Sam live test,
+   * 20 Oct 2026: "I went for a 40 minute run at lunch, about 6km, pretty hard" was offered as a replacement for
+   * Tuesday's lift). The default keeps the lift. When that day's lifting session is still due with nothing logged,
+   * a second button counts it as the day's workout, the screen's own "Count it as today's workout". The server
+   * only sends minutes, effort and distance she said; nothing here fills a gap.
+   */
+  const buildCardioLogProposal = (rawArgs: Record<string, unknown>):
+    | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: CardioLogPayload; diff: import('@/lib/pending-actions-store').ProposalDiff }
+    | { ok: false; refusal: string } => {
+    const date = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date) ? rawArgs.date : activeSession.date
+    const delta = daysBetween(activeSession.date, date)
+    if (!Number.isFinite(delta) || delta > 0 || delta < -7) return { ok: false, refusal: "I can only log something you've already done, from the last week." }
+    const effort = (['easy', 'steady', 'hard'] as const).find(e => e === rawArgs.effort) as EffortKey | undefined
+    if (!effort) return { ok: false, refusal: 'How hard did that feel — easy, steady or hard?' }
+    const activityName = typeof rawArgs.activity_name === 'string' ? rawArgs.activity_name.trim().replace(/^\w/, c => c.toUpperCase()) : ''
+    const minutes = Math.round(Number(rawArgs.duration_minutes))
+    if (!activityName) return { ok: false, refusal: 'What did you do, and for how long?' }
+    if (!isPlausibleCardioDuration(minutes)) return { ok: false, refusal: `How long was the ${activityName.toLowerCase()}?` }
+    const km = Number(rawArgs.distance_km)
+    const distanceKm = Number.isFinite(km) && isPlausibleDistanceKm(km) ? km : null
+    const intensityRpe = rpeToStore(effort)
+    const dayName = dayNameOf(date)
+    const isToday = date === activeSession.date
+    const session = sessionForDate({ date, plan: exercisePlan, moves: trainingWeek.moves }).day
+    const dayState = trainingWeek.days.find(d => d.date === date)?.state
+    const countableFocus = session && session.exercises.length > 0 && dayState === 'due' ? session.focus : null
+    const line = cardioReadback({ activity: activityName, minutes, rpe: intensityRpe, distanceKm })
+    const dayWord = isToday ? 'today' : dayName
+    return {
+      ok: true,
+      scopeKey: `${profile.id}:propose_cardio_log:${date}:${activityName}:${minutes}`,
+      preconditions: { date },
+      payload: { date, dayName, activityName, durationMinutes: minutes, intensityRpe, distanceKm, countableFocus },
+      diff: {
+        lead: ask(`log your ${activityName.toLowerCase()} ${isToday ? 'for today' : `on ${dayName}`}`),
+        rows: [{ field: activityName, before: '', after: line.replace(`${activityName} · `, '') }],
+        implications: countableFocus
+          ? [{ severity: 'info', text: `${countableFocus} stays on ${isToday ? "today's" : `${dayName}'s`} plan, unless you count this as the workout.` }]
+          : [],
+        // THE DEFAULT IS EXTRA WORK; counting it as the day's workout is the second button, offered only while the
+        // session is still due (her 20 Oct words: "offer 'count it as today's workout' as the option").
+        ...(countableFocus
+          ? { editable: [{ field: 'scope', options: ['extra', 'instead'], labels: { extra: 'Log it', instead: `Count it as ${dayWord === 'today' ? "today's" : `${dayName}'s`} workout` } }] }
+          : {}),
         reversible: true,
       },
     }
@@ -5663,6 +5715,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             // move above; two named without one ("lunch and dinner are over") get the sentence that offers it.
             : REBALANCE.refitFits(mealsNamed(userSaid).length >= 2)
         }
+      } else if (result.proposal.kind === 'propose_cardio_log') {
+        const cardio = buildCardioLogProposal(result.proposal.rawArgs ?? {})
+        if (cardio.ok) built = { scopeKey: cardio.scopeKey, preconditions: cardio.preconditions, payload: cardio.payload as unknown as Record<string, unknown>, diff: cardio.diff }
+        else refusal = cardio.refusal
       } else if (result.proposal.kind === 'propose_circuit_log') {
         const circuit = buildCircuitLogProposal(result.proposal.rawArgs ?? {})
         if (circuit.ok) built = { scopeKey: circuit.scopeKey, preconditions: circuit.preconditions, payload: circuit.payload as unknown as Record<string, unknown>, diff: circuit.diff }
@@ -6326,6 +6382,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // title/rows reconstruction every other branch does. When present, the
     // tail below uses this verbatim instead of rebuilding it.
     let richReceipt: ChatReceiptView | undefined
+    // An app-written question that follows the receipt (the ease-off question after a run), saved before it is shown.
+    let followUp: { text: string; chips: string[] } | null = null
 
     if (row.kind === 'propose_exercise_swap') {
       const payload = row.payload as unknown as ExerciseSwapPayload
@@ -6496,6 +6554,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // payload is three numbers precisely so the write reads live state.
       // Asking again after a target move re-offers, which is the way back.
       undoToken = undefined
+    } else if (row.kind === 'propose_cardio_log') {
+      const payload = row.payload as unknown as CardioLogPayload
+      const result = await executeCardioLog(profile, payload, editedScope === 'instead')
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? RECEIPTS['propose_cardio_log'].done : RECEIPTS['propose_cardio_log'].failed
+      rows = receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } })
+      undoToken = receipt.landed.length > 0 ? row.id : undefined
+      onLogsUpdated?.()
+      // THE ONE QUESTION after a run while a knee, ankle or hip is being eased off: asked, never blocking.
+      if (receipt.landed.length > 0) {
+        const q = easeOffQuestion(payload.activityName, activeAdaptations, getAppNow(profile.id))
+        if (q) followUp = { text: q.text, chips: [q.fine, q.hurtMessage] }
+      }
     } else if (row.kind === 'propose_circuit_log') {
       const result = await executeCircuitLog(profile, row.payload as unknown as CircuitLogPayload)
       receipt = result.receipt
@@ -6973,6 +7045,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       ? { ...m, pendingAction: undefined, outcome: outcomeOfCard(status, false), receipt: richReceipt ?? { kind: row.kind as ChatReceiptView['kind'], title, rows, status, result: receipt, undoToken, resolvedAt: new Date().toISOString() } }
       : m
     ))
+    if (followUp) {
+      // Saved first, as the coach's own nudges are: a question that vanished on the next reload would be one she
+      // could never answer.
+      const ask = followUp
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert({ profile_id: profile.id, role: 'assistant', content: ask.text, status: 'complete' })
+        .select('id')
+        .maybeSingle()
+      if (!error && data?.id) {
+        setMessages(prev => [...prev, { id: data.id as string, role: 'assistant', content: ask.text, status: 'complete', quickReplies: ask.chips }])
+        setQuickRepliesDismissed(false)
+      } else console.error('ease-off question: not saved, so not shown', error)
+    }
   }
 
   const handleRejectProposal = async (msgIndex: number) => {
@@ -7218,6 +7304,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         }
       } else if (row.kind === 'propose_rest_day') {
         await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
+        onLogsUpdated?.()
+      } else if (row.kind === 'propose_cardio_log') {
+        await undoCardioLog(profile.id, row.payload as unknown as CardioLogPayload)
         onLogsUpdated?.()
       } else if (row.kind === 'propose_circuit_log') {
         await undoCircuitLog(profile.id, row.payload as unknown as CircuitLogPayload)

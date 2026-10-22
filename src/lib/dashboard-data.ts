@@ -4,7 +4,7 @@
 // from a source that already exists elsewhere: exercise_set_logs (via
 // useActiveSession's already-fetched today-logs + getRecentLogs/
 // getRecentCardioLogs for the streak window), meal_events (via
-// getTodayLedger), daily_metrics (via getRecentWeighIns), the mesocycle
+// getTodayLedger), daily_metrics (via getWeighInPicture), the mesocycle
 // (phase/today's/tomorrow's WorkoutDay), the memory store (goals), and the
 // PR cache (getPRCache). Nothing here writes; this module is read-only by
 // construction, matching §5.1's rule.
@@ -280,7 +280,7 @@ export interface DashboardData {
    */
   hasNutritionTargets: boolean
   weightTrend: WeightTrendResult | null
-  /** Oldest-first — for the Home trend chart (tab-restructure). Same source as weightTrend (getRecentWeighIns), just re-mapped/re-ordered for charting rather than averaging. */
+  /** Oldest-first — for the Home trend chart (tab-restructure). Same source as weightTrend (getWeighInPicture), just re-mapped/re-ordered for charting rather than averaging. */
   weightSeries: WeightSeriesPoint[]
   /** The active body_weight_kg goal's target, if one exists — drawn as a reference line on the Home trend chart. Null when no goal has been set (no UI existed to set one before this; chat's record_goal was the only path). */
   weightGoalKg: number | null
@@ -531,7 +531,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     todayStr,
     weightGoal ? { targetKg: weightGoal.target_value!, baselineKg: weightGoal.baseline_value! } : null,
   )
-  // getRecentWeighIns returns newest-first; the Home trend chart plots
+  // getWeighInPicture returns newest-first; the Home trend chart plots
   // left-to-right chronologically, so this is the one place that reverses it.
   const weightSeries: WeightSeriesPoint[] = [...weighIns].reverse().map(w => ({ date: w.date, kg: w.weight_kg }))
   const startingWeightKg = profile.weight_kg != null && profile.weight_kg > 0

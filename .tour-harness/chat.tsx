@@ -76,6 +76,14 @@ window.addEventListener('error', e => { (window as never as Record<string, unkno
 const ChatAssistant = lazy(() =>
   import('@/components/ChatAssistant').then(m => ({ default: m.ChatAssistant })))
 
+// ?kneeease=1 — a knee ease-off running, ending in two days (see real.tsx): in the table and as App's prop.
+const KNEE_EASE = new URLSearchParams(location.search).get('kneeease') === '1'
+const kneeEaseRow = (profileId: string) => {
+  const end = anchorDate(); end.setDate(end.getDate() + 2); end.setHours(12, 0, 0, 0)
+  const start = anchorDate(); start.setDate(start.getDate() - 12)
+  return { id: 'knee-ease', profile_id: profileId, kind: 'injury', status: 'active', injury_code: 'knees', equipment_override: null,
+    starts_at: start.toISOString(), expires_at: end.toISOString(), created_at: start.toISOString() }
+}
 const PROFILE_ID = '00000000-0000-4000-8000-000000000001'
 
 // PINNED BEFORE FIRST RENDER — see .tour-harness/anchor.mjs. One fixed
@@ -579,7 +587,7 @@ const db: Db = {
   daily_metrics: [], exercise_set_logs: [], workout_sessions: [...finishedSession, ...movedInSession, ...movedAwaySession], cardio_logs: [],
   daily_steps: [], meal_events: [], meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
   favorite_meals: [], grocery_items: topUpSeed.list, load_suggestions: [], pending_actions: [],
-  plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],
+  plan_adaptations: KNEE_EASE ? [kneeEaseRow(PROFILE_ID)] : [], user_facts: [], user_context_facts: [], user_goals: [],
   chat_messages: seededRows, exercise_plans: [], mesocycle_weeks: [],
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
 }
@@ -723,6 +731,7 @@ function Harness() {
             <Suspense fallback={<div>Loading the coach…</div>}>
             <ChatAssistant
               profile={kitProfile}
+              activeAdaptations={KNEE_EASE ? [kneeEaseRow(PROFILE_ID) as never] : []}
               kitController={kitController}
               macros={macros}
               exercisePlan={livePlan}

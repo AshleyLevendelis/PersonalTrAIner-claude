@@ -4,7 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from '@/components/ui/input'
 import { Plus, X, Dumbbell, Activity } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { UnplannedCardioEntry, type CardioPick } from './CardioSetRow'
+import { UnplannedCardioEntry, EaseOffAsk, type CardioPick } from './CardioSetRow'
+import type { EaseOffQuestion } from '@/lib/cardio-ease-off'
 import type { CardioLogView } from '@/lib/cardio-log-store'
 import { BLOCK_NAMES, blockChipLabel } from '@/lib/circuit'
 import { cardioPresetsFor } from '@/lib/cardio-presets'
@@ -94,6 +95,10 @@ export function AddUnplannedWork({
   const { declareOffPlan } = useActiveSession()
   const [mode, setMode] = useState<null | 'lift' | 'cardio'>(null)
   const [liftName, setLiftName] = useState('')
+  // HELD HERE, NOT IN THE ROW: the panel closes on a save, and the ease-off question asked after a run must still be
+  // on screen where the tap was (cardio-ease-off.ts).
+  const [easeOff, setEaseOff] = useState<EaseOffQuestion | null>(null)
+  const easeOffAsk = easeOff ? <EaseOffAsk question={easeOff} onDone={() => setEaseOff(null)} /> : null
 
   // Controlled mode: opening from outside (the day-level menu) needs a
   // default sub-tab, since nothing here set `mode` yet. A prefill says which
@@ -126,12 +131,15 @@ export function AddUnplannedWork({
   }
 
   if (!visible) {
-    if (hideTrigger) return null
+    if (hideTrigger) return easeOffAsk
     return (
-      <Button variant="outline" size="sm" className="w-full text-xs h-8" onClick={() => setMode('lift')}>
-        <Plus className="size-3 mr-1" />
-        Add unplanned work
-      </Button>
+      <>
+        {easeOffAsk}
+        <Button variant="outline" size="sm" className="w-full text-xs h-8" onClick={() => setMode('lift')}>
+          <Plus className="size-3 mr-1" />
+          Add unplanned work
+        </Button>
+      </>
     )
   }
 
@@ -195,6 +203,7 @@ export function AddUnplannedWork({
           // than a name and a minute count when she reads it back.
           notes={prefill?.notes ?? null}
           onLogged={view => { onCardioLogged?.(view); reset() }}
+          onEaseOffQuestion={setEaseOff}
         />
       )}
     </div>

@@ -2,7 +2,46 @@
 
 Newest first. One line each.
 
-- [ ] **Sam live test, 20 Oct 2026: six reports TRACED, not built (her "report first, wait for build it").** Traced in
+- [x] **Sam live test, BUILT 22 Oct 2026 (her "1, build it").** Items 1, 2, 4 and 5 built, item 3 waits on her
+  database, item 6 is correct by rule. Her ruling on distance, 22 Oct, from two options: **a proper field** (one
+  database change), over writing it into the note. Plan and CSCS review: `docs/plans/extra-cardio-and-distance.md`.
+  1. **Weigh-in.** The coach's `log_weight` now refuses to save unasked when it could not CHECK the number (earlier
+     weigh-ins unreadable, or no date sent): it offers a plain card, "Want me to save 84.2 kg as your weigh-in for
+     today?", instead of saving blind. Home's trend is now worked out from the weigh-ins the target trusts, so one
+     held reading no longer turns it to "trending up"; the latest weight and the change since the start still show
+     what was weighed. NOT PROVEN: which of the three causes hit her phone. The coach's log line now says
+     `ask=yes/unchecked/no`, so the next one is readable. `test:weigh-in-targets` (6 mutations), `test:dashboard` (g)
+     (1 mutation), all caught.
+  2. **Extra cardio by chat, with distance.** New coach tool `propose_cardio_log`: minutes, effort and distance only
+     from her own words (no effort said, it asks "easy, steady or hard?"). The offer's default button is **Log it**
+     (extra, the lift stays); **Count it as today's workout** appears only while that day's session is still due, and
+     makes the existing day swap. Undo removes the log and clears only a swap it made. Prompt rule 2a: something
+     already done is logged as extra, never swapped in. "40 minute run" is now read by the workout logger too.
+     Distance: an optional km box on Add unplanned work, and "Run · 40 min · Hard · 6 km" on every read-back and in
+     the coach's history. Writes retry without the column before the migration lands. KNOWN GAP until the
+     migration is pushed: the read-back shows the distance though the saved row drops it, so push the migration
+     before or with the frontend. `test:extra-cardio` (45 checks, 24 mutations), `verify:extra-cardio` (37 checks,
+     8 mutations), `test:chat-cardio` (1 mutation), all caught.
+  4. **One PR rule.** Home and Tools now use the finish card's rule: a best found by the estimate counts, and is
+     shown as the set ("Best set yet — 18 kg x 13", her 17 Sep ruling), never a bare lighter weight.
+     `test:what-a-pr-is` §7 (Sam's case, 6 mutations, all caught).
+  5. **Knee ease-off and a run.** After a run, jog, hike, skipping, jumping or field or court sport is logged on
+     either surface while a TEMPORARY knees, ankles or hips ease-off is running, the app asks once: "How did your
+     knees feel on the run? They're being eased off until 22 Oct." with Felt fine / It hurt. Nothing is blocked or
+     changed. In chat the question is saved like the coach's own messages, and "It hurt" goes to the coach's pain
+     triage. On the screen, "It hurt" opens the chat with the words ready, never sent for her. CSCS basis: running
+     and landing load the knee, ankle and hip on every stride, the load the ease-off takes out of the lifting. A coach
+     who had eased a knee off would ask after a hard run and would not stop it being logged. A lasting injury is not
+     asked about: the plan is already built around it, and asking forever would nag. The lower back is left out.
+  3 (part). **The rebuild receipt** said "Rebuilt 16 weeks" over weeks left as they were. It now counts only the weeks
+     that changed ("Changed 14 weeks, from week 3 on", or "No session on your plan needed to change").
+     `test:rebuild-offer` (4 mutations, caught), `test:session-length-change` re-anchored on the new words.
+  Also: `test:bundle` limits raised on her 15 Sep ruling, both ends measured (before 340/496 gz, 1163/2459 raw; after
+  342/498, 1168/2467); `verify:rest-day` re-anchored on the third (distance) box on the same row. Three helpers made
+  private for `test:no-dead-code`. Drivers re-run: see the commit. DEPLOYS: frontend on merge; `chat-gemini` (the
+  weigh-in check, `propose_cardio_log`, rule 2a); the migration `20261022120000_add_distance_to_cardio_logs` via
+  `db:push-both` on her machine, with her word. Not proven: the real model choosing the new tool (the coach exam).
+- [x] **Sam live test, 20 Oct 2026: six reports TRACED, not built (her "report first, wait for build it").** Traced in
   the live checkout (main, 12 Oct) and the branch; same behaviour in both unless said.
   1. **Surprising weigh-in saved unasked (chat).** The ask exists on the chat path, server-side in `log_weight`
      (`chat-gemini`), and in `WeighInCard` on Home. Measured on her numbers (80.6 then 84.2): the ask and the target

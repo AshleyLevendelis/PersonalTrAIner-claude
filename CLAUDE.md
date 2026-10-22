@@ -611,6 +611,12 @@ menu" stays true when a copy is also left outside it.
   for the blocks, only while the session is still due; the coach's `propose_circuit_log` is built
   only from rounds, times and an effort SHE stated. `circuit-log` (61 checks, 18 mutations),
   `verify:circuit-log`, `verify:round-presets` §26-33. Needs the `chat-gemini` deploy for chat
+- **Log extra cardio already done, as extra, with distance** — both surfaces since 22 Oct 2026 (Sam live test).
+  Her words: a past-tense run on a lifting day is logged as additional work with effort, and "count it as today's
+  workout" is the option, never the default. Distance is a real field (her ruling, 22 Oct, "a proper field"). A
+  run while a temporary knee, ankle or hip ease-off is running is ASKED about once, never blocked.
+  `extra-cardio` (45 checks, 24 mutations), `verify:extra-cardio` (37 checks, 8 mutations). Needs the `chat-gemini`
+  deploy and the `cardio_logs.distance_km` migration
 - Rebuild today's session as a whole, for today — **both surfaces since 16 Sep
   2026**. Her ruling that day, from three options: **keep the main lift and
   rebuild around it** — you still do today's main lift at the weight and sets

@@ -32,11 +32,11 @@ export function splitActivity(activity: string): { name: string; protocol: strin
   return m ? { name: m[1], protocol: m[2] } : { name: activity.trim(), protocol: null }
 }
 
-type Loggish = Pick<CardioLog, 'activity_name' | 'duration_minutes' | 'intensity_rpe'>
+type Loggish = Pick<CardioLog, 'activity_name' | 'duration_minutes' | 'intensity_rpe'> & Partial<Pick<CardioLog, 'distance_km'>>
 
 /** One log as its line. The short name: a protocol is an instruction for doing it, not a record of having done it. */
 export function cardioLine(log: Loggish): string {
-  return cardioReadback({ activity: splitActivity(log.activity_name).name, minutes: log.duration_minutes, rpe: log.intensity_rpe })
+  return cardioReadback({ activity: splitActivity(log.activity_name).name, minutes: log.duration_minutes, rpe: log.intensity_rpe, distanceKm: log.distance_km == null ? null : Number(log.distance_km) })
 }
 
 /**
