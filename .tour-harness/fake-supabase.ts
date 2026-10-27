@@ -167,7 +167,9 @@ export function makeFakeSupabase(db: Db) {
       // default, so every other run is unchanged. It is how a half-saved swap
       // is proved put back, which no happy path can show.
       const failWrite = (window as unknown as { __failWrite?: (t: string, o: string, r: Row) => boolean }).__failWrite
-      if (failWrite && (op === 'insert' || op === 'upsert' || op === 'delete') && (op === 'delete' ? failWrite(name, op, {}) : payload.some(r => failWrite(name, op, r)))) {
+      // UPDATES TOO (27 Oct 2026): every day flag (rest, missed, moved, swapped) is an update of an existing row, so a
+      // fake that could only fail inserts could never show an Undo that did not save.
+      if (failWrite && (op === 'insert' || op === 'upsert' || op === 'delete' || op === 'update') && (op === 'delete' ? failWrite(name, op, {}) : op === 'update' ? failWrite(name, op, updateObj) : payload.some(r => failWrite(name, op, r)))) {
         return { data: null, error: { code: '08006', message: 'simulated write failure' } }
       }
       // A DECIMAL IN A WHOLE-NUMBER COLUMN IS REFUSED, AS POSTGRES REFUSES IT

@@ -34,7 +34,7 @@ import { isExternallyLoaded } from '@/lib/load-prescription'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 import type { WorkoutDay } from '@/lib/types'
 import { estimateDaySeconds } from '@/lib/session-duration'
-import { dayVerbs, type DayVerb } from '@/lib/day-verbs'
+import { dayVerbs, dayHasSession, type DayVerb } from '@/lib/day-verbs'
 import { buildSessionKindTodayProposal, type SessionKind, type SessionKindOption, type SessionKindOffer, type SessionKindPlan } from '@/lib/session-kind'
 
 export interface WhatHappenedTarget {
@@ -140,7 +140,7 @@ export function WhatHappenedSheet({
   const cell = weekDays.find(d => d.date === date)
   const resolved = useMemo(() => (target ? sessionForDate({ date, plan, moves }) : null), [target, date, plan, moves])
   const session = resolved?.day ?? null
-  const hasSession = !!session && session.exercises.length > 0
+  const hasSession = dayHasSession(session)
   const isPast = date < today
   const isToday = date === today
   const isDone = cell?.state === 'done'
@@ -158,12 +158,15 @@ export function WhatHappenedSheet({
   // day before the plan began had nothing planned on it at all. The rule is
   // dayVerbs (src/lib/day-verbs.ts), so a gate can ask it.
   const beforePlan = cell?.state === 'before_plan'
+  const partlyLogged = (cell?.workingLogs?.length ?? 0) > 0
+  const activityOnly = hasSession && (session?.exercises.length ?? 0) === 0
   const verbs: Verb[] = useMemo(() => (target ? dayVerbs({
     isDone, hasSession, movedAway: !!movedAway, beforePlan, isPast, isToday,
     declared: { missed: declared.missed, rest: declared.rest, swapped: !!declared.swapped },
     canShorten: !!onShorten, canLighter: !!onLighter, canRebuild: !!onRebuild,
     canKind: !!onKindPlan && !!onKindConfirm && kindOptions.length > 0,
-  }) : []), [target, isDone, hasSession, movedAway, beforePlan, isPast, isToday, declared.missed, declared.rest, declared.swapped, onShorten, onLighter, onRebuild, onKindPlan, onKindConfirm, kindOptions.length])
+    partlyLogged, activityOnly,
+  }) : []), [target, isDone, hasSession, movedAway, beforePlan, isPast, isToday, declared.missed, declared.rest, declared.swapped, onShorten, onLighter, onRebuild, onKindPlan, onKindConfirm, kindOptions.length, partlyLogged, activityOnly])
 
   // Every day this week the resolver would accept as a destination — the
   // same function, the same rules (a free day, inside this mesocycle week,

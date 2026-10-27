@@ -485,7 +485,10 @@
     "test:unidentified-food": "tsx scripts/test-unidentified-food.ts",
     "test:meal-swap-card": "tsx scripts/test-meal-swap-card.ts",
     "test:extra-cardio": "tsx scripts/test-extra-cardio.ts",
-    "verify:extra-cardio": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/extra-cardio.mjs"
+    "test:workout-scenarios": "tsx scripts/test-workout-scenarios.ts",
+    "verify:extra-cardio": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/extra-cardio.mjs",
+    "verify:workout-scenarios": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/workout-scenarios.mjs",
+    "verify:workout-scenarios-chat": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/workout-scenarios-chat.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

@@ -19,6 +19,7 @@
 // gate can run and no surface can quietly grow its own version.
 // ---------------------------------------------------------------------------
 import type { WorkoutDay } from './types'
+import { dayHasSession } from './day-verbs'
 
 const DAY_MS = 86_400_000
 export const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -198,7 +199,7 @@ export function resolveMoveTarget(input: MoveTargetInput, depth = 0): MoveTarget
     }
   }
 
-  if (!resolved.day || resolved.day.exercises.length === 0) {
+  if (!dayHasSession(resolved.day)) {
     return {
       ok: false,
       reason: 'no_session',
@@ -217,7 +218,7 @@ export function resolveMoveTarget(input: MoveTargetInput, depth = 0): MoveTarget
     // exercises — the same distinction hasSessionOn made and the first version
     // of this rewrite dropped, which made every rest day look occupied and
     // refused an ordinary move outright. Caught by the probe, not by reading.
-    return (!r.day || r.day.exercises.length === 0)
+    return !dayHasSession(r.day)
       && !existing.some(m => m.toDate === date)
       && date !== fromDate
   }

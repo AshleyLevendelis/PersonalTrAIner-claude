@@ -700,6 +700,8 @@ export interface ChatPendingActionView {
    * cards cached before that date do not have it.
    */
   expiresAt?: string
+  /** A line under a still-live offer: why the last tap did nothing ("couldn't reach the server"). Never stored. */
+  notice?: string
 }
 
 export interface ChatReceiptView {

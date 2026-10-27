@@ -30,7 +30,7 @@ import { buildWeighInProposal, executeWeighIn, WEIGH_IN_RECEIPT_HOLD_DETAIL, typ
 import { getWeighInPicture } from '@/lib/nutrition-targets'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
-  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioLog, undoCardioLog, type CardioLogPayload, executeCardioSession, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload } from '@/lib/pending-action-executor'
+  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioLog, undoCardioLog, type CardioLogPayload, executeCardioSession, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload, planAsSaved } from '@/lib/pending-action-executor'
 import { planSessionKindToday, sessionKindFrom, buildSessionKindTodayProposal, SESSION_KINDS } from '@/lib/session-kind'
 import { STYLE_OPTIONS, OFFERED_STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from '@/lib/onboarding-slots'
 import { getDurationBudgetSeconds } from '@/lib/session-duration'
@@ -54,7 +54,7 @@ import { executeMealMove, profileAfterConcurrentActivity } from '@/lib/pending-a
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal, swapDiffFromTrial } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine } from '@/lib/coach-voice'
 import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
 import { getLastWorkingSessionDate } from '@/lib/set-log-store'
@@ -100,6 +100,8 @@ import { settleWeek } from '@/lib/settle-week'
 import { shortenDayTo } from '@/lib/exercise-plan'
 import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
 import { estimateDaySeconds } from '@/lib/session-duration'
+import { planDaysForDate } from '@/lib/plan-week'
+import { dayHasSession } from '@/lib/day-verbs'
 import { addDays, daysBetween, dayNameOf, sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
@@ -1024,6 +1026,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // the strip about that.
   const openerWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length > 0 ? mesocycle.length : 4)
   const liveWeekDays = mesocycle.find(w => w.week_number === openerWeek)?.days ?? exercisePlan
+  // A DATE'S OWN PLAN WEEK, as Home and the strip read it (27 Oct 2026). The coach's day cards looked a date up in
+  // `exercisePlan`, which is the plan's FIRST week: after a change of training days from week 3, "I missed
+  // Wednesday" found no session on a day the strip was calling missed, and a day the new week left free still
+  // offered its old session.
+  const planForDate = (date: string): WorkoutDay[] => planDaysForDate(date, activeSession.date, liveWeekDays, mesocycle, planCreatedAt ?? profile.created_at).days
   // HAS THE PLAN ARRIVED. Both sources empty means neither has loaded yet —
   // not that there is no plan, which cannot happen: App keeps a trainee
   // without one in onboarding, so anyone who reaches this screen has one.
@@ -3617,12 +3624,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // also the "drop it" half of Ashley's ruling — dropping a twice-missed
     // session is exactly marking the day it sits on as a rest she chose, so
     // neither day counts against her and the work is not owed anywhere.
-    const resolvedRest = sessionForDate({ date: raw, plan: exercisePlan, moves: trainingWeek.moves })
+    const resolvedRest = sessionForDate({ date: raw, plan: planForDate(raw), moves: trainingWeek.moves })
     const session = resolvedRest.day
     // Nothing prescribed, or a day that is already active recovery. Resting a
     // rest day is not a change, and a card offering one would be the app
     // inventing work so it can offer to cancel it.
-    if (!session || session.exercises.length === 0) return null
+    if (!dayHasSession(session)) return null
 
     const reason = typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined
     return {
@@ -3672,9 +3679,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (!Number.isFinite(delta) || delta < -7 || delta > 7) return null
 
     const dayName = new Date(`${raw}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
-    const resolved = sessionForDate({ date: raw, plan: exercisePlan, moves: trainingWeek.moves })
+    const resolved = sessionForDate({ date: raw, plan: planForDate(raw), moves: trainingWeek.moves })
     const session = resolved.day
-    if (!session || session.exercises.length === 0) return null
+    if (!dayHasSession(session)) return null
 
     // ONLY A FIGURE SHE ACTUALLY SAID. The server already refused the model's
     // invented numbers; this keeps the card honest about what it will log.
@@ -3736,7 +3743,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const intensityRpe = rpeToStore(effort)
     const dayName = dayNameOf(date)
     const isToday = date === activeSession.date
-    const session = sessionForDate({ date, plan: exercisePlan, moves: trainingWeek.moves }).day
+    const session = sessionForDate({ date, plan: planForDate(date), moves: trainingWeek.moves }).day
     const dayState = trainingWeek.days.find(d => d.date === date)?.state
     const countableFocus = session && session.exercises.length > 0 && dayState === 'due' ? session.focus : null
     const line = cardioReadback({ activity: activityName, minutes, rpe: intensityRpe, distanceKm })
@@ -3790,7 +3797,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     }
     if (blocks.length === 0) return { ok: false, refusal: 'What did each block look like — how many rounds, and how long each?' }
     const dayName = dayNameOf(date)
-    const session = sessionForDate({ date, plan: exercisePlan, moves: trainingWeek.moves }).day
+    const session = sessionForDate({ date, plan: planForDate(date), moves: trainingWeek.moves }).day
     const dayState = trainingWeek.days.find(d => d.date === date)?.state
     const replaces = rawArgs.replaced_session === true && !!session && session.exercises.length > 0 && dayState === 'due'
     const swapName = replaces ? circuitName(blocks.map(b => b.activityName)) : null
@@ -3835,9 +3842,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const delta = (new Date(`${raw}T00:00:00`).getTime() - new Date(`${activeSession.date}T00:00:00`).getTime()) / dayMs
     if (!Number.isFinite(delta) || delta < -7 || delta > 0) return null
     const dayName = new Date(`${raw}T00:00:00`).toLocaleDateString('en-US', { weekday: 'long' })
-    const resolvedDay = sessionForDate({ date: raw, plan: exercisePlan, moves: trainingWeek.moves })
+    const resolvedDay = sessionForDate({ date: raw, plan: planForDate(raw), moves: trainingWeek.moves })
     const session = resolvedDay.day
-    if (!session || session.exercises.length === 0) return null
+    if (!dayHasSession(session)) return null
     const reason = typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined
     return {
       scopeKey: `${profile.id}:propose_missed_session:${raw}`,
@@ -3884,7 +3891,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       fromDate,
       requestedDate,
       todayDate: activeSession.date,
-      plan: liveWeekDays,
+      // THE ORIGIN'S OWN PLAN WEEK (27 Oct 2026): a move stays inside its week, so that week's days decide it.
+      plan: planForDate(fromDate),
       // The mesocycle week a date falls in, from the same function every
       // other surface uses — so "the same week" means one thing in this app.
       weekOf: (d: string) => getActiveMesocycleWeek(
@@ -3944,9 +3952,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // `liveWeekDays.find(d => d.day === fromDayName)` could not — so the card
     // would still have refused, and would have named the work after the day it
     // landed on rather than the day it came from.
-    const originResolved = sessionForDate({ date: fromDate, plan: liveWeekDays, moves: trainingWeek.moves })
+    const originResolved = sessionForDate({ date: fromDate, plan: planForDate(fromDate), moves: trainingWeek.moves })
     const session = originResolved.day
-    if (!session || session.exercises.length === 0) {
+    if (!dayHasSession(session)) {
       return { ok: false, reason: `There's no session on ${fromDayName} to move.` }
     }
     // A re-move rewrites the ORIGINAL move rather than chaining a second one.
@@ -6354,6 +6362,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // reason — the row was resolved by some other tap and could have been
     // applied, declined or failed. Re-reading it costs one query on a rare
     // path and is the difference between showing what happened and guessing.
+    // NO CONNECTION: the offer is still good, so it stays live, says why nothing happened, and the same tap works later.
+    if (claimResult.outcome === 'unreachable') {
+      setMessages(prev => prev.map((m, i) =>
+        i === msgIndex && m.pendingAction
+          ? { ...m, pendingAction: { ...m.pendingAction, notice: OFFER_UNREACHABLE } }
+          : m
+      ))
+      return
+    }
     if (claimResult.outcome !== 'claimed') {
       let nextStatus: ChatPendingActionView['status'] =
         claimResult.outcome === 'stale' ? 'stale' : 'expired'
@@ -6389,7 +6406,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const payload = row.payload as unknown as ExerciseSwapPayload
       const scope: SwapScope = editedScope === 'permanent' ? 'permanent' : payload.scope
       const result = await executeExerciseSwap(profile, mesocycle, { ...payload, scope })
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       receipt = sayReceipt(result.receipt, payload)
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_exercise_swap'].done : RECEIPTS['propose_exercise_swap'].failed
@@ -6658,7 +6675,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_injury_adaptation') {
       const payload = row.payload as unknown as InjuryAdaptationPayload
       const result = await executeInjuryAdaptation(profile, mesocycle, payload, await loadEditContext())
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       receipt = result.receipt
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_injury_adaptation'].done : RECEIPTS['propose_injury_adaptation'].failed
@@ -6682,7 +6699,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_injury_as_lasting') {
       const payload = row.payload as unknown as LastingInjuryPayload
       const result = await executeLastingInjury(profile, mesocycle, payload, await loadEditContext())
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       // executeLastingInjury already wrote fitness_profiles.injuries — keep
       // App.tsx's profile state in lockstep, same reasoning onMesocycleUpdated
       // exists for: the executor is pure and returns what changed rather than
@@ -6741,7 +6758,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_equipment_adaptation') {
       const payload = row.payload as unknown as EquipmentAdaptationPayload
       const result = await executeEquipmentAdaptation(profile, mesocycle, payload, await loadEditContext())
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       receipt = result.receipt
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_equipment_adaptation'].done : RECEIPTS['propose_equipment_adaptation'].failed
@@ -6762,7 +6779,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_session_shorten') {
       const payload = row.payload as unknown as SessionShortenPayload
       const result = await executeSessionShorten(profile, mesocycle, payload)
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       receipt = sayReceipt(result.receipt, payload)
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_session_shorten'].done : RECEIPTS['propose_session_shorten'].failed
@@ -6771,7 +6788,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_session_rebuild') {
       const payload = row.payload as unknown as SessionRebuildPayload
       const result = await executeSessionRebuild(poolProfile, mesocycle, payload)
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       receipt = sayReceipt(result.receipt, payload)
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_session_rebuild'].done : RECEIPTS['propose_session_rebuild'].failed
@@ -6780,7 +6797,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_session_kind_today') {
       const payload = row.payload as unknown as SessionKindTodayPayload
       const result = await executeSessionKindToday(poolProfile, mesocycle, payload)
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       receipt = sayReceipt(result.receipt, payload)
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_session_kind_today'].done : RECEIPTS['propose_session_kind_today'].failed
@@ -6789,7 +6806,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_cardio_session') {
       const payload = row.payload as unknown as CardioSessionPayload
       const result = await executeCardioSession(profile, mesocycle, payload)
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       receipt = result.receipt
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_cardio_session'].done : RECEIPTS['propose_cardio_session'].failed
@@ -6798,7 +6815,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_volume_change') {
       const payload = row.payload as unknown as VolumeChangePayload
       const result = await executeVolumeChange(profile, mesocycle, payload)
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       receipt = sayReceipt(result.receipt, payload)
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_volume_change'].done : RECEIPTS['propose_volume_change'].failed
@@ -6810,7 +6827,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_schedule_change') {
       const payload = row.payload as unknown as ScheduleChangePayload
       const result = await executeScheduleChange(profile, mesocycle, exerciseExclusions, payload, await loadEditContext())
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       // executeScheduleChange writes fitness_profiles.training_days itself —
       // same lockstep reason executeLastingInjury's branch has: the executor
       // is pure and returns what changed rather than reaching into App.tsx.
@@ -6825,7 +6842,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_session_length') {
       const payload = row.payload as unknown as SessionLengthPayload
       const result = await executeSessionLength(profile, mesocycle, exerciseExclusions, payload, await loadEditContext())
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       // executeSessionLength writes the column itself; mirror it into App
       // state the same way the style branch does, so the Profile screen and
       // today's card agree without a reload.
@@ -6838,7 +6855,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_style_change') {
       const payload = row.payload as unknown as StyleChangePayload
       const result = await executeStyleChange(profile, mesocycle, exerciseExclusions, payload, await loadEditContext())
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       // executeStyleChange writes fitness_profiles.training_style itself;
       // mirror it into App state the same way the schedule branch does.
       if (result.receipt.failed.length === 0) onProfileChanged({ training_style: payload.trainingStyle })
@@ -6850,7 +6867,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_goal_change') {
       const payload = row.payload as unknown as GoalChangePayload
       const result = await executeGoalChange(profile, mesocycle, exerciseExclusions, payload, await loadEditContext())
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       // executeGoalChange writes fitness_profiles.fitness_goal itself; mirror
       // it into App state the same way the style branch does.
       //
@@ -6876,7 +6893,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } else if (row.kind === 'propose_concurrent_activity') {
       const payload = row.payload as unknown as ConcurrentActivityPayload
       const result = await executeConcurrentActivity(profile, mesocycle, exerciseExclusions, payload, await loadEditContext())
-      onMesocycleUpdated(result.mesocycle)
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       // The executor writes the profile itself; mirror what it wrote into
       // App state, same lockstep as the schedule and style branches.
       if (result.receipt.failed.length === 0) {
@@ -6948,7 +6965,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       rows = receipt.landed.map(line => ({ label: line, detail: '' }))
       undoToken = undefined // A ban is a preference, not a session edit — taken back in Profile, not here.
       if (ok) {
-        onMesocycleUpdated(result.mesocycle)
+        onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
         // The fact row is what makes it stick across regenerations, so the
         // memory the coach reads has to be refreshed or it will offer the
         // banned exercise back on the next swap.
@@ -7303,17 +7320,25 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           }
         }
       } else if (row.kind === 'propose_rest_day') {
-        await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
+        // AN UNDO IS A WRITE (27 Oct 2026): one that did not save says so and keeps its button, never "undone".
+        const undone = await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
         onLogsUpdated?.()
+        if (!undone) return { refused: RECEIPTS_UNDONE.failed, keep: true }
       } else if (row.kind === 'propose_cardio_log') {
-        await undoCardioLog(profile.id, row.payload as unknown as CardioLogPayload)
+        // AN UNDO IS A WRITE (27 Oct 2026): one that did not save says so and keeps its button, never "undone".
+        const undone = await undoCardioLog(profile.id, row.payload as unknown as CardioLogPayload)
         onLogsUpdated?.()
+        if (!undone) return { refused: RECEIPTS_UNDONE.failed, keep: true }
       } else if (row.kind === 'propose_circuit_log') {
-        await undoCircuitLog(profile.id, row.payload as unknown as CircuitLogPayload)
+        // AN UNDO IS A WRITE (27 Oct 2026): one that did not save says so and keeps its button, never "undone".
+        const undone = await undoCircuitLog(profile.id, row.payload as unknown as CircuitLogPayload)
         onLogsUpdated?.()
+        if (!undone) return { refused: RECEIPTS_UNDONE.failed, keep: true }
       } else if (row.kind === 'propose_session_activity_swap') {
-        await undoSwapForActivity(profile.id, row.payload as unknown as SwapForActivityPayload)
+        // AN UNDO IS A WRITE (27 Oct 2026): one that did not save says so and keeps its button, never "undone".
+        const undone = await undoSwapForActivity(profile.id, row.payload as unknown as SwapForActivityPayload)
         onLogsUpdated?.()
+        if (!undone) return { refused: RECEIPTS_UNDONE.failed, keep: true }
       } else if (row.kind === 'propose_exercise_add' || row.kind === 'propose_exercise_remove' || row.kind === 'propose_exercise_reorder') {
         const payload = row.payload as unknown as { weekNumber: number; scope: SwapScope }
         const preImage = row.pre_image as unknown as MesocycleWeek[] | null
@@ -7321,11 +7346,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         await undoSessionEdit(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt ?? profile.created_at ?? new Date().toISOString())
         onMesocycleUpdated(preImage)
       } else if (row.kind === 'propose_missed_session') {
-        await undoMissedSession(profile.id, row.payload as unknown as MissedSessionPayload)
+        // AN UNDO IS A WRITE (27 Oct 2026): one that did not save says so and keeps its button, never "undone".
+        const undone = await undoMissedSession(profile.id, row.payload as unknown as MissedSessionPayload)
         onLogsUpdated?.()
+        if (!undone) return { refused: RECEIPTS_UNDONE.failed, keep: true }
       } else if (row.kind === 'propose_session_move') {
-        await undoSessionMove(profile.id, row.payload as unknown as SessionMovePayload)
+        // AN UNDO IS A WRITE (27 Oct 2026): one that did not save says so and keeps its button, never "undone".
+        const undone = await undoSessionMove(profile.id, row.payload as unknown as SessionMovePayload)
         onLogsUpdated?.()
+        if (!undone) return { refused: RECEIPTS_UNDONE.failed, keep: true }
       } else if (row.kind === 'propose_meal_day_move') {
         // PUTTING A DAY SWAP BACK. The same function the Move sheet's Undo
         // calls. It leaves both days alone and says why when either has

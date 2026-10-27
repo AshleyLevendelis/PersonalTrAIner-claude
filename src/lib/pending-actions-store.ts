@@ -195,7 +195,7 @@ export async function getPendingAction(id: string): Promise<PendingActionRow | n
  * every other outcome fell through to a bare `return` and the card kept
  * offering a button that could never work. See test:proposal-expiry.
  */
-export type ClaimResult = { outcome: 'claimed'; row: PendingActionRow } | { outcome: 'stale' | 'not_found' | 'already_resolved' | 'expired' }
+export type ClaimResult = { outcome: 'claimed'; row: PendingActionRow } | { outcome: 'stale' | 'not_found' | 'already_resolved' | 'expired' | 'unreachable' }
 
 /**
  * The confirm-exactly-once gate. A double-tap or a retried confirm both
@@ -210,7 +210,11 @@ export async function claimPendingAction(
   id: string,
   checkPreconditions: (preconditions: Record<string, unknown>) => Promise<boolean>,
 ): Promise<ClaimResult> {
-  const row = await getPendingAction(id)
+  // A READ THAT COULD NOT REACH THE SERVER IS NOT A MISSING OFFER (27 Oct 2026). It was read as "not found", and the
+  // card said "This one's timed out" and lost its button, on a phone that had merely lost its connection.
+  const { data: found, error: readError } = await supabase.from('pending_actions').select('*').eq('id', id).maybeSingle()
+  if (readError) return { outcome: 'unreachable' }
+  const row = (found as PendingActionRow | null) ?? null
   if (!row) return { outcome: 'not_found' }
   if (row.status === 'expired' || (row.status === 'pending' && new Date(row.expires_at) < new Date())) {
     await supabase.from('pending_actions').update({ status: 'expired' }).eq('id', id).eq('status', 'pending')
@@ -232,7 +236,9 @@ export async function claimPendingAction(
     .select()
     .maybeSingle()
 
-  if (error || !data) return { outcome: 'already_resolved' }
+  // The same for the claim itself: a failed write is not somebody else's tap.
+  if (error) return { outcome: 'unreachable' }
+  if (!data) return { outcome: 'already_resolved' }
   return { outcome: 'claimed', row: data as PendingActionRow }
 }
 

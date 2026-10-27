@@ -110,6 +110,11 @@ export function computeStreak(days: StreakDayInput[]): StreakResult {
  *   - the day it landed on: a planned session, done or missed like any other;
  *   - a day swapped for another activity: transparent — the streak is kept,
  *     the planned session is not claimed as done. Unless she trained anyway;
+ *   - a rest she CHOSE (What happened? → rest, or the coach's rest card):
+ *     transparent the same way (27 Oct 2026, CSCS). Both cards say "it won't
+ *     count against your week", and the strip already leaves it out of the
+ *     count; the streak spent its make-up on one and broke on a second. A day
+ *     SAID missed stays a miss: that is her ruling of 10 Sep, not this one;
  *   - otherwise a planned day counts when anything was logged on it (sets, or
  *     the cardio that IS the session on an activity-shaped plan).
  *
@@ -128,6 +133,8 @@ export function buildStreakDays(input: {
   moves: SessionMove[]
   /** Dates marked "I did something else instead". */
   swappedDates: Set<string>
+  /** Dates marked as a rest she chose. Optional, so a caller that never had them reads as before. */
+  restDates?: Set<string>
   /** Dates with at least one logged set. */
   setDates: Set<string>
   /** Dates with at least one cardio log. */
@@ -149,6 +156,7 @@ export function buildStreakDays(input: {
     const scheduled = planned
       && (input.planStartStr == null || date >= input.planStartStr)
       && !(input.swappedDates.has(date) && !trained)
+      && !(input.restDates?.has(date) && !trained)
     const logged = trained || input.cardioDates.has(date)
     if (date === input.todayStr && scheduled && !logged) continue
     out.push({ date, scheduled, logged, planWeek: input.planWeekOf(date) })

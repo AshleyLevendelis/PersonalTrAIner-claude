@@ -24,7 +24,7 @@ import { settleWeek } from './settle-week'
 import { rebuildDayAroundMainLift } from './session-rebuild'
 import type { SessionKindOffer } from './session-kind'
 import { shortenDayTo } from './exercise-plan'
-import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, weeksTouchedByScope } from './mesocycle-persistence'
+import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, weeksTouchedByScope, restoreMesocycle } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, getMealPicksForDates, setMealPick, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { supabase } from './supabase'
@@ -39,6 +39,25 @@ import { STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from './onboarding-slot
 import { substituteForInjury, substituteForEquipment, rebuildForInjury, dayChangesBetween, type AdaptationRecord, type PlanEditContext } from './plan-adaptations'
 import { planDaysInWindow, type PlanDayOnDate } from './plan-guard'
 import type { PendingActionReceipt } from './pending-actions-store'
+
+/**
+ * THE PLAN TO DRAW AFTER A CONFIRM: the one that was SAVED, never the one that was attempted (27 Oct 2026).
+ *
+ * Nine executors hand back the edited plan whether or not the save landed, and the chat drew it: the receipt said
+ * "didn't save" over a screen showing the change, a reload quietly put it back, and the next edit of that week could
+ * save it without anyone choosing it. A multi-week change can also land some weeks and not others, so neither the
+ * attempt nor the pre-image is then the truth: the stored plan is read back. If that read fails too (the connection
+ * is gone), the plan as it was before the change is the last one known to be saved.
+ */
+export async function planAsSaved(
+  profileId: string | undefined,
+  result: { mesocycle: MesocycleWeek[]; preImage?: MesocycleWeek[]; receipt: { failed: unknown[] } },
+  before: MesocycleWeek[],
+): Promise<MesocycleWeek[]> {
+  if (result.receipt.failed.length === 0) return result.mesocycle
+  const stored = profileId ? await restoreMesocycle(profileId).catch(() => null) : null
+  return stored?.weeks ?? result.preImage ?? before
+}
 
 export interface ExerciseSwapPayload {
   weekNumber: number
@@ -1849,8 +1868,8 @@ export async function executeRestDay(
 }
 
 /** Clears the flag. The day goes back to whatever it was — due, or missed. */
-export async function undoRestDay(profileId: string, payload: RestDayPayload): Promise<void> {
-  await setDeliberateRest(profileId, payload.date, false)
+export async function undoRestDay(profileId: string, payload: RestDayPayload): Promise<boolean> {
+  return setDeliberateRest(profileId, payload.date, false)
 }
 
 // ---------------------------------------------------------------------------
@@ -1924,8 +1943,8 @@ export async function executeSwapForActivity(
 }
 
 /** Clears the swap. The day goes back to whatever it was — due, or missed. */
-export async function undoSwapForActivity(profileId: string, payload: SwapForActivityPayload): Promise<void> {
-  await setSwappedForActivity(profileId, payload.date, null)
+export async function undoSwapForActivity(profileId: string, payload: SwapForActivityPayload): Promise<boolean> {
+  return setSwappedForActivity(profileId, payload.date, null)
 }
 
 // ---------------------------------------------------------------------------
@@ -1990,8 +2009,9 @@ export async function executeCircuitLog(
 /** Takes the blocks off the day, and the swap with them when the card made one. */
 export async function undoCircuitLog(profileId: string, payload: CircuitLogPayload): Promise<boolean> {
   const ok = await deleteCardioLogsMatching(profileId, payload.date, payload.blocks.map(b => ({ activityName: b.activityName, notes: b.shape })))
-  if (payload.swapName) await setSwappedForActivity(profileId, payload.date, null)
-  return ok
+  // Both halves or it says so: a swap left on the day is not "undone" (27 Oct 2026).
+  const cleared = payload.swapName ? await setSwappedForActivity(profileId, payload.date, null) : true
+  return ok && cleared
 }
 
 /**
@@ -2047,7 +2067,7 @@ export async function undoCardioLog(profileId: string, payload: CardioLogPayload
   if (payload.countableFocus) {
     const { data } = await supabase.from('workout_sessions').select('*').eq('profile_id', profileId).eq('date', payload.date).maybeSingle()
     if ((data as { swapped_for_activity?: string | null } | null)?.swapped_for_activity === payload.activityName) {
-      await setSwappedForActivity(profileId, payload.date, null)
+      if (!(await setSwappedForActivity(profileId, payload.date, null))) return false
     }
   }
   return ok
@@ -2092,8 +2112,8 @@ export async function executeMissedSession(
   }
 }
 
-export async function undoMissedSession(profileId: string, payload: MissedSessionPayload): Promise<void> {
-  await setMarkedMissed(profileId, payload.date, false)
+export async function undoMissedSession(profileId: string, payload: MissedSessionPayload): Promise<boolean> {
+  return setMarkedMissed(profileId, payload.date, false)
 }
 
 export interface SessionMovePayload {
@@ -2165,8 +2185,8 @@ export async function executeSessionMove(
  * move was a plan, the activity happened, and undoing a plan must not erase a
  * fact. The activity has its own Undo on the Exercise tab.
  */
-export async function undoSessionMove(profileId: string, payload: SessionMovePayload): Promise<void> {
-  await setSessionMove(profileId, payload.fromDate, null)
+export async function undoSessionMove(profileId: string, payload: SessionMovePayload): Promise<boolean> {
+  return setSessionMove(profileId, payload.fromDate, null)
 }
 
 // ---------------------------------------------------------------------------

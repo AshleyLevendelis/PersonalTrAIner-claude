@@ -1149,6 +1149,12 @@ export const RECEIPTS_UNDONE = {
   failed: "That didn't undo, so nothing was changed. Try again in a moment.",
 } as const
 
+/**
+ * AN OFFER TAPPED WITH NO CONNECTION (27 Oct 2026). Said under the offer, whose buttons stay: nothing was changed, and
+ * the same tap works once she is back online. In the words the failed Undo already uses.
+ */
+export const OFFER_UNREACHABLE = "That didn't go through, so nothing was changed. Try again in a moment."
+
 export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_exercise_swap: { done: 'Swapped', failed: "I couldn't swap that" },
   propose_exercise_add: { done: 'Added', failed: "I couldn't add that" },

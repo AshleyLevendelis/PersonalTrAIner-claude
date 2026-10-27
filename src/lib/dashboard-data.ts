@@ -14,6 +14,7 @@ import { getTodayLedger, getEatenProteinByDate, type MealMacros } from './meal-s
 import { getRecentLogs, getRecentCardioLogs } from './daily-tracking'
 import { effortForRpe, effortLabel } from './cardio-effort'
 import { getCardioLogsForDateMerged } from './cardio-log-store'
+import { sessionSetCount } from './session-count'
 import { getWeighInPicture, getEarliestWeightKg } from './nutrition-targets'
 import { getTotalForDate as getWaterTotalForDate } from './water-store'
 import { getPRCache, getRecordsBeaten, refreshPRCacheFromDB, type PRMetric, type RecordBeaten } from './pr-engine'
@@ -466,7 +467,10 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     ? (() => {
         const names = [...new Set(nonWarmupToday.map(l => l.exercise_name))]
         const planned = borrowedDay ? borrowedDay.exercises.reduce((n, ex) => n + ex.sets, 0) : nonWarmupToday.length
-        const done = (explicitlyCompleted) || (!!borrowedDay && planned > 0 && nonWarmupToday.length >= planned)
+        // Every planned set, counted per exercise (sessionSetCount, the strip's and the coach's count): nine sets of
+        // one exercise is not a finished three-exercise session (27 Oct 2026).
+        const counted = borrowedDay ? sessionSetCount(borrowedDay, nonWarmupToday) : null
+        const done = (explicitlyCompleted) || (!!counted && counted.logged >= counted.planned)
         return {
           status: done ? 'done' as const : 'in_progress' as const,
           focus: borrowedDay?.focus ?? loggedSessionFocus(names),
@@ -490,7 +494,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
         movedFrom: todayResolved.movedFrom,
         // A completed flag only counts with a set behind it — the same rule
         // useTrainingWeek's classifyDay applies, for the same Thursday.
-        status: (explicitlyCompleted && nonWarmupToday.length > 0) || (setsPlanned > 0 && nonWarmupToday.length >= setsPlanned)
+        status: (explicitlyCompleted && nonWarmupToday.length > 0) || (setsPlanned > 0 && (sessionSetCount(todayWorkoutDay, nonWarmupToday)?.logged ?? 0) >= setsPlanned)
           ? 'done'
           : nonWarmupToday.length > 0 ? 'in_progress' : 'not_started',
         focus: todayWorkoutDay!.focus,
@@ -584,7 +588,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     .gte('date', addDays(windowStart, -35))
     .lte('date', addDays(todayStr, 35))
   if (noteError) console.error('The streak could not read moved and swapped days; counting from this week\'s moves only:', noteError)
-  const notes = (noteRows ?? []) as { date: string; moved_to_date?: string | null; swapped_for_activity?: string | null }[]
+  const notes = (noteRows ?? []) as { date: string; moved_to_date?: string | null; swapped_for_activity?: string | null; deliberate_rest?: boolean | null }[]
   // The window's moves read here, plus the ones this screen was handed (the same rows, read for this week by the
   // week hook): a move the hook already knows is never lost to a read that has not caught up.
   const readMoves: SessionMove[] = noteError
@@ -599,6 +603,7 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     planFor: date => planDaysForDate(date, todayStr, activeWeekDays, mesocycle, planCreatedAt).days,
     moves: windowMoves,
     swappedDates: new Set(notes.filter(r => !!r.swapped_for_activity).map(r => r.date)),
+    restDates: new Set(notes.filter(r => !!r.deliberate_rest).map(r => r.date)),
     setDates: new Set(workingLogs.map(l => l.date)),
     cardioDates: new Set(cardioLogs.map(c => c.date)),
     planStartStr: planStartForStreak,

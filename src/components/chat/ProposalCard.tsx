@@ -201,6 +201,9 @@ export function ProposalCard({
         </div>
       )}
 
+      {!isStale && !isTerminal && pendingAction.notice && (
+        <p className="mt-1.5 text-xs text-[color:var(--role-warn)]" data-testid="proposal-notice" role="status">{pendingAction.notice}</p>
+      )}
       {isStale ? (
         <p className="mt-1.5 text-xs text-[color:var(--role-warn)]">This changed since I proposed it — ask me again if you still want it.</p>
       ) : isTerminal ? (

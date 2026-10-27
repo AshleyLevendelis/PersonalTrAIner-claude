@@ -620,6 +620,19 @@ const KIT = new URLSearchParams(location.search).get('kit') === '1'
 // became; and the app's OWN trial is exposed, so the driver can compare the card
 // with what the day menu would build (parity by construction, read off both).
 const KINDTODAY = new URLSearchParams(location.search).get('kindtoday') === '1'
+// ?reschedule=1 — HER TRAINING DAYS CHANGED FROM WEEK 2 (27 Oct 2026, verify:workout-scenarios-chat). Every session
+// from week 2 on sits one weekday later than in week 1, the shape a "Monday, Wednesday, Friday instead" rebuild
+// leaves: the weeks it rewrote differ from week 1, which App still hands the chat as `exercisePlan`. INPUT only: the
+// days a stored plan would hold. Which weekdays train in each, for the driver to pick its days from.
+const RESCHEDULE = new URLSearchParams(location.search).get('reschedule') === '1'
+const rescheduledMeso = mesocycle.map(w => w.week_number < 2 ? w : {
+  ...w,
+  days: w.days.map(d => ({ ...d, day: DAYS[(DAYS.indexOf(d.day) + 1) % 7] })),
+})
+;(window as unknown as Record<string, unknown>).__reschedule = RESCHEDULE ? {
+  week1: mesocycle[0].days.filter(d => d.exercises.length > 0).map(d => d.day),
+  week2: rescheduledMeso[1].days.filter(d => d.exercises.length > 0).map(d => d.day),
+} : null
 
 function Harness() {
   const [, setTick] = useState(0)
@@ -735,7 +748,7 @@ function Harness() {
               kitController={kitController}
               macros={macros}
               exercisePlan={livePlan}
-              mesocycle={KIT ? kitMeso : KINDTODAY ? kindMeso : liveMeso}
+              mesocycle={KIT ? kitMeso : KINDTODAY ? kindMeso : RESCHEDULE && planArrived ? rescheduledMeso : liveMeso}
               planCreatedAt={profile.created_at}
               mealPlan={mealPlan}
               exerciseExclusions={[]}

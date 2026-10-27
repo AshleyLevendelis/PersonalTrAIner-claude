@@ -411,8 +411,10 @@ check('the lead rides on the diff, optional, so older rows still render', /lead\
 const exec = strip(src('src/lib/pending-action-executor.ts'))
 check('the write is reported honestly — a failed save is not a moved session',
   /if \(!ok\) \{[\s\S]{0,200}Couldn't move that session/.test(exec))
+// THE PROPERTY, not the `await`: since 27 Oct 2026 the undo RETURNS the write's result (an Undo that did not save
+// says so), so the call is `return setSessionMove(...)`. What this protects is that it clears the one column.
 check('undo clears the column rather than writing a second fact',
-  /await setSessionMove\(profileId, payload\.fromDate, null\)/.test(exec))
+  /(?:await|return) setSessionMove\(profileId, payload\.fromDate, null\)/.test(exec))
 
 // ---------------------------------------------------------------------------
 console.log('\n[12] Home, from the aggregator itself — a moved day is moved, not rest')
