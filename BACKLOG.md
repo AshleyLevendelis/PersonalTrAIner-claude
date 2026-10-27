@@ -2,6 +2,49 @@
 
 Newest first. One line each.
 
+- [x] **Workout changes tested in combination, 27 Oct 2026 (her "I need to do thorough testing on the app under
+  various different scenarios": typing a change, editing a workout, swapping, missing, changing a day; nothing
+  breaking when offline).** Baseline first: all 82 existing checks on these changes passed, so every SINGLE change
+  already worked. Two read-only traces then mapped what no check had tried (sequences, conditions, failed saves), and
+  the new gates chained them. Eight defects found and fixed, all mechanical or decided under the CSCS delegation:
+  1. **A chosen rest day broke the streak.** Both rest cards say "it won't count against your week" and the strip
+     agreed; the streak spent its make-up on the first and broke on a second in a week. Now transparent, like a swap.
+     CSCS basis: a rest chosen in advance is planned recovery, not non-adherence; a day SAID missed stays a miss (her
+     10 Sep ruling), and a rest she trained on counts as the session.
+  2. **A part-trained day offered missed, rest, move and "something else"**, all of which the strip ignores (logged
+     work outranks every note), so Home said "moved" while the strip said part-done. Also "Give me a different
+     session" redrew a session she had started. Now only shorter and lighter, the different-kind tool's own existing
+     rule ("a session you've started isn't one to redraw underneath you") applied to both.
+  3. **A walk day, or a cardio session the coach put on a day, could not be missed, rested or moved**: the menu said
+     "No session was planned" on a day the strip called missed, the move resolver said "no session to move" and treated
+     a walk's day as free to move onto. One rule now (`dayHasSession`); "I did it, not in the app" is not offered on
+     an activity (it asks for sets).
+  4. **Home called nine sets of one exercise a finished three-exercise session** while the strip said part-done. Home
+     now counts per exercise (`sessionSetCount`, the strip's and the coach's count).
+  5. **The coach's Undo of a rest day, missed day, moved session, activity swap, cardio or circuit log said "Put back"
+     when the save failed.** It now says "That didn't undo, so nothing was changed" and keeps the button.
+  6. **A coach change that did not save still showed on screen** (swap, shorten, rebuild, cardio session, volume,
+     schedule, style, goal, length, injury, kit, other sport). The receipt said "didn't save" over a screen
+     showing the change; a reload put it back; the next edit of that week could have saved it. Every confirm now
+     draws the plan as SAVED (`planAsSaved`: the stored plan read back, else the plan from before). The 15: swap,
+     ban, injury ease-off, lasting injury, kit, shorten, rebuild, different kind, cardio session, volume, schedule,
+     session length, style, goal, other sport.
+  7. **The coach's day cards read the plan's FIRST week.** After a change of training days, "I missed Tuesday" found no
+     session on a day she now trains, and a day the new schedule freed still offered its old session. They now read
+     the date's own plan week, as Home and the strip do.
+  8. **Apply tapped with no connection said "This one's timed out" and lost its button.** A read that could not
+     reach the server was taken as "no such offer". Now the offer stays live, says "That didn't go through, so
+     nothing was changed. Try again in a moment." (the failed Undo's own wording), and the same tap works back online.
+  Checks: `test:workout-scenarios` (52 checks; 18 mutations, all caught, two only after the gate gained the cases they
+  exposed), `verify:workout-scenarios` (17 checks; 3 mutations), `verify:workout-scenarios-chat` (22 checks; 6
+  mutations), all caught. `test:session-move` re-anchored on its property (the Undo now RETURNS the write instead of
+  awaiting it). The fake database can now fail an UPDATE (every day flag is one), opt-in. The 82 baseline gates, then 170 and 240
+  derived gates and drivers, re-run green after the fixes.
+  NOT FIXED, named (each needs a product call or is larger): a coach offer is not re-checked against the day at the
+  tap (offer "move Mon to Fri", rest Fri on screen, tap Apply); Undo of an older card after a later change restores
+  the whole older week over the newer change; move twice then Undo the first card; a multi-week save that half-lands
+  is now SHOWN truthfully but not rolled back; the coach's greeting still names today's session from week 1. NOT
+  PROVEN: the real model choosing these tools (the coach exam). Deploys: frontend only, no edge function, no migration.
 - [x] **Sam live test, BUILT 22 Oct 2026 (her "1, build it").** Items 1, 2, 4 and 5 built, item 3 waits on her
   database, item 6 is correct by rule. Her ruling on distance, 22 Oct, from two options: **a proper field** (one
   database change), over writing it into the note. Plan and CSCS review: `docs/plans/extra-cardio-and-distance.md`.

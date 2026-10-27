@@ -617,6 +617,14 @@ menu" stays true when a copy is also left outside it.
   run while a temporary knee, ankle or hip ease-off is running is ASKED about once, never blocked.
   `extra-cardio` (45 checks, 24 mutations), `verify:extra-cardio` (37 checks, 8 mutations). Needs the `chat-gemini`
   deploy and the `cardio_logs.distance_km` migration
+- **Changes in combination, and offline** — since 27 Oct 2026, on her "thorough testing ... under various
+  different scenarios". Single changes were all gated; their SEQUENCES, the walk/planned-cardio day, the
+  part-trained day and failed saves were not, and eight defects were there (BACKLOG). A chosen rest is transparent
+  to the streak; a started session is never redrawn; a walk is a session (`dayHasSession`); every coach confirm
+  draws the plan as SAVED (`planAsSaved`); an Undo or Apply that cannot save says so and keeps its button.
+  `workout-scenarios` (52 checks, 18 mutations), `verify:workout-scenarios` (17, 3),
+  `verify:workout-scenarios-chat` (22, 6). STILL OPEN, named in BACKLOG: an offer is not re-checked at the tap,
+  and an older card's Undo restores its whole week over a later change
 - Rebuild today's session as a whole, for today — **both surfaces since 16 Sep
   2026**. Her ruling that day, from three options: **keep the main lift and
   rebuild around it** — you still do today's main lift at the weight and sets
