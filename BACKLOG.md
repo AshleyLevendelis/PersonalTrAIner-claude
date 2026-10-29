@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [x] **A MEAL SHE ASKED FOR NO LONGER WEARS A "user-requested" LABEL (29 Oct 2026). Frontend only.**
+  - **What was wrong:** every meal she asked for, edited, moved between meals or days, or resized
+    carries the app's own "asked for" tag (it keeps the meal through a regenerate, her 3 Sep ruling).
+    The meal card's label filter hid the first-day tag and the old `slot_appropriate` marker but not
+    this one, so those cards printed a chip reading **user-requested**. Reported off the calorie-move
+    driver's screenshots (20 Oct, on an unmerged branch); the same chip was on `main` on every
+    slot-move and day-swap copy, and the day-move driver proves it (with the fix removed, its open
+    copy card shows it).
+  - **What changed:** the tag is now bookkeeping, like the first day: never drawn, still stored, so a
+    regenerate keeps the meal and the rotation and dish identity still read it. The card already drew
+    its labels only through that one function. Mechanical, no ruling needed; nothing prescribed
+    changes, so no CSCS review applies.
+  - **Verified:** `test:meal-top-up` 131 → 133 checks (the mark is hidden, sits FIRST so a missed
+    filter would also push a real label past the cap of two, and is still bookkeeping), 5 mutations,
+    5 caught, every run at 133. `verify:meal-day-move` 76 → 79 (the open card is the resized copy, the
+    store still carries the mark, nothing on screen prints it), 3 mutations, 3 caught (fix removed,
+    the card filtering by hand, the tag deleted from the store instead of hidden). Screenshot read:
+    the copy's card shows "own recipe" and nothing else. Derived readers: 34 `test:` gates green
+    plus `test:bundle`, `test:no-dead-code`, tsc, and 18 meal-screen drivers green.
+  - **Not this change, found on the way:** `test:dashboard` fails 4 checks (5 in New York) on the
+    untouched tree, and the count moves with the timezone, so it is a calendar-dependent gate
+    (session counts "this week" / "same day last week", 29 Oct, days after the UK clock change).
+    Not fixed here.
+
 - [x] **RELEASE SWEEP, 12 Oct 2026, on the merged tree (run 5, the allergy path, the kit list): 387 of 397, then the 6 drivers fixed.**
   Frozen copy of 50d8955a, every `test:` and `verify:` gate including `test:quality` and `test:audit`.
   - **Environmental, as always:** `test:meal-quality`, `test:schema-parity`, `verify:rls` (no database

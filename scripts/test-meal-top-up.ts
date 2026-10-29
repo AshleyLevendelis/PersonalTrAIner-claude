@@ -33,7 +33,7 @@ import { buildRotation, assembleRotationDay, serveDates, addDays, datesFrom, poo
 import { newFromDate, tagsNewFrom, isBookkeepingTag, displayTags, NEW_FROM_TAG_PREFIX } from '../src/lib/meal-new-from'
 import { topUpNeeds, topUpStartDate, topUpStartLabel, runMealTopUp, topUpOffer, topUpPlan, fittingCounts, isTopUpDismissed, dismissTopUp, MIN_FITTING, FITTING_GOAL, MAX_POOL, type TopUpPlan } from '../src/lib/meal-top-up'
 import { moreMealOptionsOffer, moreMealOptionsDone, moreMealOptionsWhy, MORE_MEALS } from '../src/lib/coach-voice'
-import type { MealSlotName } from '../src/lib/meal-store'
+import { USER_REQUESTED_TAG, type MealSlotName } from '../src/lib/meal-store'
 import type { MacroTargets } from '../src/lib/types'
 import { mulberry32, makeDish } from './meal-fixture'
 
@@ -410,6 +410,12 @@ async function main() {
     const shown = displayTags(['Italian', `${NEW_FROM_TAG_PREFIX}2026-10-01`, 'favourite'])
     check('the card\'s labels never include the first day, and stay at two', JSON.stringify(shown) === JSON.stringify(['Italian', 'favourite']), shown)
     check('...and the old internal marker stays hidden too', JSON.stringify(displayTags(['slot_appropriate', 'Thai'])) === JSON.stringify(['Thai']))
+    // 29 Oct 2026: every meal she asked for, edited, moved or resized carries
+    // USER_REQUESTED_TAG, and the card printed it as a chip. Placed FIRST so a
+    // filter that misses it would also push a real label past the cap of two.
+    const asked = displayTags([USER_REQUESTED_TAG, 'Italian', 'favourite'])
+    check('...and the "asked for" mark is never a label either, nor takes a real label\'s place', JSON.stringify(asked) === JSON.stringify(['Italian', 'favourite']), asked)
+    check('...while it is still bookkeeping, not a lost tag: the card hides it, the store keeps it', isBookkeepingTag(USER_REQUESTED_TAG) && USER_REQUESTED_TAG === 'user-requested')
     const mealPlan = read('src/components/MealPlan.tsx')
     check('...and the card draws its labels ONLY through that function', /displayTags\(option\.tags\)\.map\(/.test(mealPlan) && !/option\.tags\.(filter|slice|map)\(/.test(mealPlan))
     const nd = read('src/components/NutritionDisplay.tsx')

@@ -353,7 +353,17 @@ const undoBtn = await ev(`(() => { const b = document.querySelector('[data-testi
 check('an Undo sits beside the note, thumb-sized', !!undoBtn && undoBtn.text === 'Undo' && undoBtn.h >= 44 && undoBtn.w >= 44, undoBtn)
 check('...and is on screen where the swap was made', (await inView('[data-testid="meal-move-undo"]')) === true)
 check('...with the swap saved behind it (two picks, two resized copies)', (await ev(`window.__mealPicks()`)).length === 2 && (await ev(`window.__mealOptions()`)).length === backOptions0.length + 2)
+// 29 Oct 2026: a copy made by a swap is stored as one she asked for (so a
+// regenerate keeps it), and the open card printed that mark as a label reading
+// "user-requested". The card is open on the copy here, so read it.
+const copyName = `${back.breakfastB} (as dinner)`
+check('the open card is the resized copy', (await meals()).dinner === copyName && await has('[data-testid="meal-move-open"]'), await meals())
+check('...stored with the "asked for" mark, so a regenerate keeps it', ((await ev(`window.__mealOptionTags('dinner', ${JSON.stringify(copyName)})`)) ?? []).includes('user-requested'), await ev(`window.__mealOptionTags('dinner', ${JSON.stringify(copyName)})`))
+check('...and no card on the screen prints that mark as a label', !(await ev(`document.body.innerText.includes('user-requested')`)))
 await shoot('meal-day-move-across-done')
+await ev(`document.querySelector('[data-meal-name="dinner"]').scrollIntoView({ block: 'start' })`)
+await wait(200)
+await shoot('meal-day-move-across-copy-card')
 await ev(`document.querySelector('[data-testid="meal-move-undo"]').click()`)
 for (let i = 0; i < 40; i++) { if (/^Put back/.test(await text('[data-testid="meal-move-note"]') ?? '')) break; await wait(150) }
 await wait(500)

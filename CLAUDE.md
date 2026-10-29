@@ -329,7 +329,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   plan: her saved meals cannot be read from a cloud session, so the cause of
   HER week is the likeliest one, not a proven one. Needs the `chat-gemini`
   deploy for chat.
-  `meal-pool-size` (22 checks, 11 mutations), `meal-top-up` (131 checks, 30
+  `meal-pool-size` (22 checks, 11 mutations), `meal-top-up` (133 checks, 30
   mutations in section 8), `verify:meal-top-up` (44 checks, 7 mutations),
   `verify:chat-top-up` (55 checks, 7 mutations), `meal-days` §3b
 - **A library of our own meals behind "more options"** — both surfaces since
@@ -686,7 +686,7 @@ menu" stays true when a copy is also left outside it.
   stays on screen. Same controller for both (`plan`, `confirm`, `undo`).
   `docs/plans/moving-a-meal-to-another-day.md`. Needs the `chat-gemini` deploy.
   `test:meal-day-move` (169 checks; 44 mutations on the swap, 33 more on the
-  different-meal swap and Undo), `verify:meal-day-move` (76 checks; 17 + 13
+  different-meal swap and Undo), `verify:meal-day-move` (79 checks; 17 + 13 + 3
   mutations), `verify:chat-day-move` (69 checks; 8 + 6 mutations), all caught,
   one only after the driver gained a check for the option count an Undo left
   behind; `coach-parity`

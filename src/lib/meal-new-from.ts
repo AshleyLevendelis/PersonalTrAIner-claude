@@ -4,6 +4,8 @@
 // the rotation already imports the pool builder.
 // ---------------------------------------------------------------------------
 
+import { USER_REQUESTED_TAG } from './meal-store'
+
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
 
 /**
@@ -35,9 +37,14 @@ export function tagsNewFrom(tags: string[], date: string): string[] {
   return [...tags.filter(t => !t.startsWith(NEW_FROM_TAG_PREFIX)), `${NEW_FROM_TAG_PREFIX}${date}`]
 }
 
-/** Is this a tag the app keeps for itself, never one to show as a label? */
+/**
+ * Is this a tag the app keeps for itself, never one to show as a label? The
+ * first day, and the mark that a meal was asked for, edited, moved or resized
+ * (it keeps the meal through a regenerate; the card printed it as
+ * "user-requested" until 29 Oct 2026). Stored, read, never drawn.
+ */
 export function isBookkeepingTag(tag: string): boolean {
-  return tag.startsWith(NEW_FROM_TAG_PREFIX)
+  return tag.startsWith(NEW_FROM_TAG_PREFIX) || tag === USER_REQUESTED_TAG
 }
 
 /**

@@ -1354,6 +1354,8 @@ function Harness() {
   // The options each slot holds, by name, so a driver can see a resized copy added and taken away again.
   ;(window as unknown as { __libraryNames: string[] }).__libraryNames = MEAL_LIBRARY.map(d => d.name)
   ;(window as unknown as { __mealOptions: unknown }).__mealOptions = () => db.meal_plan_slots.map(r => ({ slot: r.slot, name: r.name }))
+  // One option's stored tags, so a driver can tell "hidden on the card" from "gone from the store".
+  ;(window as unknown as { __mealOptionTags: unknown }).__mealOptionTags = (slot: string, name: string) => (db.meal_plan_slots.find(r => r.slot === slot && r.name === name) as { tags?: string[] } | undefined)?.tags ?? null
   // The week as the app's hook serves it, by date and meal — for
   // verify:meal-knock-on to compare with what a card SAID would change.
   ;(window as unknown as { __weekMeals: unknown }).__weekMeals = () => {

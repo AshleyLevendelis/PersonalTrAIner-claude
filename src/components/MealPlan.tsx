@@ -1232,7 +1232,8 @@ function MealSlotRow({
               Defensive filter here too, so an already-onboarded profile
               stops seeing the leak immediately rather than waiting on its
               next regenerate. */}
-          {/* And never the app's own bookkeeping (a new meal's first day). */}
+          {/* And never the app's own bookkeeping (a new meal's first day, or the
+              mark that she asked for, edited, moved or resized it). */}
           {displayTags(option.tags).length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {displayTags(option.tags).map(t => (
