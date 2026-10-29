@@ -101,6 +101,8 @@ import { shortenDayTo } from '@/lib/exercise-plan'
 import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
 import { estimateDaySeconds } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
+import { restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { offerStillHolds, fingerprintWeeks, undoStillFits, weeksUndoWrites, dayStillAsWritten } from '@/lib/offer-still-holds'
 import { dayHasSession } from '@/lib/day-verbs'
 import { addDays, daysBetween, dayNameOf, sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
@@ -568,7 +570,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const now = getAppNow(profile.id)
     const hour = now.getHours()
     const dayName = now.toLocaleDateString('en-US', { weekday: 'long' })
-    const todaySession = exercisePlan.find(d => d.day === dayName)
+    // THE WEEK SHE IS IN, not the plan's first (29 Oct 2026): after a change of training days the greeting named
+    // week 1's session for today, or called a training day a rest day. Worked out from the props here, because this
+    // runs while the component is still being drawn, before the live-week lookup further down exists.
+    const greetWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, now, mesocycle.length > 0 ? mesocycle.length : 4)
+    const greetDays = mesocycle.find(w => w.week_number === greetWeek)?.days ?? exercisePlan
+    const todaySession = greetDays.find(d => d.day === dayName)
     const cutoff = sessionCutoffHour(profile.preferred_time)
 
     if (todaySession) {
@@ -6342,7 +6349,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const handleConfirmProposal = async (msgIndex: number, editedScope?: string) => {
     const msg = messages[msgIndex]
     if (!msg.pendingAction || !profile.id) return
-    const claimResult = await claimPendingAction(msg.pendingAction.id, async () => true)
+    // THE CARD IS CHECKED AGAINST THE DAY AND THE PLAN AS THEY ARE NOW (29 Oct 2026). It was `async () => true`: a card
+    // offered ten minutes ago wrote over whatever the day had become since (a session moved onto it, sets logged on
+    // it, the exercise it names swapped on the screen). One that no longer describes them turns "stale" and says so.
+    const claimResult = await claimPendingAction(msg.pendingAction.id, (_pre, pending) => offerStillHolds(pending.kind, pending.payload, {
+      profileId: profile.id ?? '',
+      today: activeSession.date,
+      planForDate,
+      weekOf: (d: string) => getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, new Date(`${d}T12:00:00`), mesocycle.length > 0 ? mesocycle.length : 4),
+      mesocycle,
+    }))
 
     // EVERY non-claimed outcome has to change the card. This used to handle
     // 'stale' alone and `return` on the rest, so a proposal older than the
@@ -6401,10 +6417,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     let richReceipt: ChatReceiptView | undefined
     // An app-written question that follows the receipt (the ease-off question after a run), saved before it is shown.
     let followUp: { text: string; chips: string[] } | null = null
+    // The scope the card was applied with, when she chose it with a button (today / rest of block). Kept on the
+    // receipt so Undo puts back what was written, not what was offered.
+    let appliedScope: string | undefined
 
     if (row.kind === 'propose_exercise_swap') {
       const payload = row.payload as unknown as ExerciseSwapPayload
       const scope: SwapScope = editedScope === 'permanent' ? 'permanent' : payload.scope
+      appliedScope = scope
       const result = await executeExerciseSwap(profile, mesocycle, { ...payload, scope })
       onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
       receipt = sayReceipt(result.receipt, payload)
@@ -6948,7 +6968,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // no pre_image, because the plan itself is untouched.
       onLogsUpdated?.()
     } else if (row.kind === 'propose_exercise_add') {
-      const result = await executeExerciseAdd(poolProfile, mesocycle, row.payload as unknown as ExerciseAddPayload, exerciseExclusions)
+      // THE BUTTON SHE TAPPED IS THE SCOPE (29 Oct 2026): "Rest of block" applied today only, from the offer's own scope.
+      const addPayload = { ...(row.payload as unknown as ExerciseAddPayload), ...(editedScope === 'permanent' || editedScope === 'today' ? { scope: editedScope as SwapScope } : {}) }
+      appliedScope = addPayload.scope
+      const result = await executeExerciseAdd(poolProfile, mesocycle, addPayload, exerciseExclusions)
       receipt = sayReceipt(result.receipt, row.payload as unknown as ExerciseAddPayload)
       const ok = receipt.failed.length === 0
       title = ok ? RECEIPTS['propose_exercise_add'].done : RECEIPTS['propose_exercise_add'].failed
@@ -6973,9 +6996,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       }
     } else if (row.kind === 'propose_exercise_remove' || row.kind === 'propose_exercise_reorder') {
       const isRemove = row.kind === 'propose_exercise_remove'
+      const tapped = editedScope === 'permanent' || editedScope === 'today' ? { scope: editedScope as SwapScope } : {}
+      const editPayload = { ...(row.payload as unknown as ExerciseRemovePayload & ExerciseReorderPayload), ...tapped }
+      appliedScope = editPayload.scope
       const result = isRemove
-        ? await executeExerciseRemove(profile, mesocycle, row.payload as unknown as ExerciseRemovePayload)
-        : await executeExerciseReorder(profile, mesocycle, row.payload as unknown as ExerciseReorderPayload)
+        ? await executeExerciseRemove(profile, mesocycle, editPayload as ExerciseRemovePayload)
+        : await executeExerciseReorder(profile, mesocycle, editPayload as ExerciseReorderPayload)
       receipt = sayReceipt(result.receipt, row.payload as unknown as ExerciseRemovePayload)
       const ok = receipt.failed.length === 0
       title = ok
@@ -7052,6 +7078,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     }
 
     const status: 'done' | 'partial' | 'failed' = receipt.failed.length === 0 ? 'done' : (receipt.landed.length > 0 ? 'partial' : 'failed')
+    // WHAT THE PLAN READ ONCE THIS LANDED, for any card whose Undo restores plan weeks: read back from the store, the
+    // same way Undo reads it, so a later change to those weeks can be told from this one (offer-still-holds.ts).
+    let planAfter: Record<string, string> | undefined
+    if (row.pre_image && status !== 'failed' && profile.id) {
+      const stored = await restoreMesocycle(profile.id).catch(() => null)
+      if (stored) planAfter = fingerprintWeeks(stored.weeks)
+    }
+    receipt = { ...receipt, ...(appliedScope ? { scope: appliedScope } : {}), ...(planAfter ? { planAfter } : {}) }
     await resolvePendingAction(row.id, status, receipt)
 
     setMessages(prev => prev.map((m, i) => i === msgIndex
@@ -7220,12 +7254,26 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const row = await getPendingAction(receipt.undoToken)
       if (!row) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
       if (!isWithinUndoWindow(row.resolved_at)) return { refused: RECEIPTS_UNDONE.tooLate, keep: false }
+      // PUT BACK ONLY WHAT IS STILL AS THIS CARD LEFT IT (29 Oct 2026). Undo writes whole weeks back, and a later change
+      // to them was wiped while its own card still said it had happened. The weeks this undo would write must read
+      // as they did when the card landed; a moved or swapped day must still hold this card's move or swap.
+      const undoWeeks = Array.isArray(row.pre_image) ? weeksUndoWrites(row.kind, row.payload, row.result?.scope, row.pre_image as MesocycleWeek[]) : null
+      if (undoWeeks && row.result?.planAfter && profile.id) {
+        const live = await restoreMesocycle(profile.id).catch(() => null)
+        if (!live) return { refused: RECEIPTS_UNDONE.failed, keep: true }
+        if (!undoStillFits(row.result.planAfter, live.weeks, undoWeeks)) return { refused: RECEIPTS_UNDONE.changedSince, keep: true }
+      }
+      const dayAsWritten = profile.id ? await dayStillAsWritten(row.kind, row.payload, profile.id) : true
+      if (dayAsWritten === null) return { refused: RECEIPTS_UNDONE.failed, keep: true }
+      if (dayAsWritten === false) return { refused: RECEIPTS_UNDONE.changedSince, keep: true }
 
       if (row.kind === 'propose_exercise_swap') {
         const payload = row.payload as unknown as ExerciseSwapPayload
         const preImage = row.pre_image as MesocycleWeek[] | null
         if (!preImage || !planCreatedAt) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
-        await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
+        // THE SCOPE IT WAS APPLIED WITH (the button she tapped), not the one it was offered with: a block-wide swap
+        // put back one week.
+        await undoExerciseSwap(profile.id, preImage, payload.weekNumber, (row.result?.scope as SwapScope | undefined) ?? payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
       } else if (row.kind === 'propose_session_kind_today') {
         // THE SAME PUT-BACK THE EXERCISE TAB'S BUTTON USES: the planned day,
@@ -7343,7 +7391,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const payload = row.payload as unknown as { weekNumber: number; scope: SwapScope }
         const preImage = row.pre_image as unknown as MesocycleWeek[] | null
         if (!preImage) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
-        await undoSessionEdit(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt ?? profile.created_at ?? new Date().toISOString())
+        await undoSessionEdit(profile.id, preImage, payload.weekNumber, (row.result?.scope as SwapScope | undefined) ?? payload.scope, planCreatedAt ?? profile.created_at ?? new Date().toISOString())
         onMesocycleUpdated(preImage)
       } else if (row.kind === 'propose_missed_session') {
         // AN UNDO IS A WRITE (27 Oct 2026): one that did not save says so and keeps its button, never "undone".

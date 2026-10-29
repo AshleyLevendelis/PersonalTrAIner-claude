@@ -69,6 +69,10 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
       const date = (said.match(/\\d{4}-\\d{2}-\\d{2}/) || [])[0]
       const proposal = /take today off/i.test(said)
         ? { kind: 'propose_rest_day', rawArgs: { date: ${J(TODAY)} } }
+        : /move today to/i.test(said) && date
+        ? { kind: 'propose_session_move', rawArgs: { from_date: ${J(TODAY)}, to_date: date } }
+        : /only got 25 minutes/i.test(said)
+        ? { kind: 'propose_session_shorten', rawArgs: { minutes: 25 } }
         : /missed/i.test(said) && date
         ? { kind: 'propose_missed_session', rawArgs: { date } }
         : undefined
@@ -158,6 +162,64 @@ await shoot('workout-scenarios-chat-offline')
 await ev(`window.__netDown = undefined`)
 check('C7. back online, the same Apply works', await clickLast('Apply') && !!(await until(`(window.__fakeDb?.workout_sessions ?? []).some(r => r.date === ${J(TODAY)} && r.deliberate_rest === true)`)), await restRow())
 
-console.log(`\n${ran} checks ran. ${failures === 0 ? 'A failed Undo says so; the coach reads the week she is in; an offer tapped offline stays live.' : `${failures} check(s) FAILED.`}\n`)
+// ---- D. An offer checked at the tap ---------------------------------------------------------------------------------
+console.log('\n  D. AN OFFER IS CHECKED AGAINST THE DAY WHEN SHE TAPS APPLY')
+check('D0. the chat is up', await boot('load=d') === true)
+await say('take today off')
+check('D1. the rest-day offer is up', !!(await until(`document.querySelectorAll('[data-testid="proposal-card"][data-offer="text"]').length > 0`)), await lastText())
+// Meanwhile, on the Exercise tab, she logs two sets of today's session.
+await ev(`(() => { const db = window.__fakeDb; db.workout_sessions = db.workout_sessions || []; db.exercise_set_logs = db.exercise_set_logs || [];
+  db.workout_sessions.push({ id: 'ws-d', profile_id: db.profiles?.[0]?.id ?? (window.__profileId || 'x'), date: ${J(TODAY)}, split_type: 'training', duration_minutes: 10, is_completed: false })
+  for (const n of [1, 2]) db.exercise_set_logs.push({ id: 'd-' + n, session_id: 'ws-d', user_id: 'x', date: ${J(TODAY)}, exercise_name: 'Anything', set_number: n, weight_kg: 10, reps_completed: 10, is_bodyweight: false, is_warmup: false, drop_index: 0, completed_at: ${J(TODAY)} + 'T09:0' + n + ':00', created_at: ${J(TODAY)} + 'T09:0' + n + ':00' }) })()`)
+// The seeded row must belong to the page's own profile, the one every read filters on.
+await ev(`(() => { const pid = (window.__fakeDb.pending_actions || []).slice(-1)[0]?.profile_id; for (const r of window.__fakeDb.workout_sessions) if (r.id === 'ws-d') r.profile_id = pid; for (const r of window.__fakeDb.exercise_set_logs) if (String(r.id).startsWith('d-')) r.user_id = pid })()`)
+check('D2. Apply is tapped', await clickLast('Apply'))
+await wait(1500)
+const stale = await ev(`(() => { const c = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); return c ? { status: c.getAttribute('data-card-status'), text: c.innerText.replace(/\\s+/g, ' ') } : null })()`)
+check('D3. THE CARD SAYS THE DAY CHANGED SINCE (it marked a trained day a rest)', !!stale && stale.status === 'stale' && /changed since/i.test(stale.text), stale)
+check('D4. ...and nothing was written', !(await ev(`(window.__fakeDb?.workout_sessions ?? []).some(r => r.date === ${J(TODAY)} && r.deliberate_rest === true)`)))
+await shoot('workout-scenarios-chat-stale')
+
+// ---- E. A moved session moved again, then the first card's Undo -----------------------------------------------------
+console.log('\n  E. A SESSION MOVED AGAIN: THE FIRST CARD\'S UNDO LEAVES IT')
+check('E0. the chat is up', await boot('load=e') === true)
+const TOMORROW = iso(1)
+await say(`move today to ${TOMORROW}`)
+check('E1. a move offer is up', !!(await until(`document.querySelectorAll('[data-testid="proposal-card"][data-offer="text"]').length > 0`)), await lastText())
+check('E2. Apply: today moves to tomorrow', await clickLast('Apply') && !!(await until(`(window.__fakeDb?.workout_sessions ?? []).some(r => r.date === ${J(TODAY)} && r.moved_to_date === ${J(TOMORROW)})`)),
+  await ev(`(window.__fakeDb?.workout_sessions ?? []).map(r => ({ d: r.date, to: r.moved_to_date }))`))
+await until(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo')`)
+// Later, on the screen, she moves the same session on again: the one record on today now names another day.
+const LATER = iso(2)
+await ev(`(() => { for (const r of window.__fakeDb.workout_sessions) if (r.date === ${J(TODAY)}) r.moved_to_date = ${J(LATER)} })()`)
+check('E3. the first card\'s Undo is tapped', await clickLast('Undo'))
+await wait(1500)
+check('E4. IT SAYS THE DAY CHANGED AGAIN SINCE (it cleared the newer move too)', /changed again since/i.test(await lastText()), await lastText())
+check('E5. ...and the newer move is still there', !!(await ev(`(window.__fakeDb?.workout_sessions ?? []).some(r => r.date === ${J(TODAY)} && r.moved_to_date === ${J(LATER)})`)),
+  await ev(`(window.__fakeDb?.workout_sessions ?? []).map(r => ({ d: r.date, to: r.moved_to_date }))`))
+await shoot('workout-scenarios-chat-undo-changed')
+
+// ---- F. A plan change, a later change to the same week, then the first card's Undo ---------------------------------
+console.log('\n  F. A WEEK CHANGED AGAIN: THE FIRST CARD\'S UNDO LEAVES IT')
+check('F0. the chat is up', await boot('load=f') === true)
+await say("I've only got 25 minutes today")
+check('F1. a shorter-session offer is up', !!(await until(`document.querySelectorAll('[data-testid="proposal-card"][data-offer="text"]').length > 0`)), await lastText())
+check('F2. Apply: the week is saved shortened', await clickLast('Apply') && !!(await until(`(window.__fakeDb?.mesocycle_weeks ?? []).length > 0`)), await ev(`(window.__fakeDb?.mesocycle_weeks ?? []).length`))
+await until(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo')`)
+// A later change to the same week (another card, or the screen): one session in it renamed.
+await ev(`(() => { for (const r of window.__fakeDb.mesocycle_weeks) r.days = r.days.map((d, i) => i === 0 ? { ...d, focus: d.focus + ' (changed later)' } : d) })()`)
+check('F3. the first card\'s Undo is tapped', await clickLast('Undo'))
+await wait(1500)
+check('F4. IT SAYS THE WEEK CHANGED AGAIN SINCE (it wiped the later change)', /changed again since/i.test(await lastText()), await lastText())
+check('F5. ...and the later change is still in the saved week', !!(await ev(`(window.__fakeDb?.mesocycle_weeks ?? []).some(r => (r.days || []).some(d => /changed later/.test(d.focus || '')))`)))
+// The control: with nothing changed since, the same Undo works.
+check('F6. (control) the chat is up again', await boot('load=f2') === true)
+await say("I've only got 25 minutes today")
+await until(`document.querySelectorAll('[data-testid="proposal-card"][data-offer="text"]').length > 0`)
+await clickLast('Apply')
+await until(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo')`)
+check('F7. with nothing changed since, Undo puts it back', await clickLast('Undo') && !!(await until(`/was taken back/i.test(document.body.innerText)`)), await lastText())
+
+console.log(`\n${ran} checks ran. ${failures === 0 ? 'A failed Undo says so; the coach reads the week she is in; offers and Undos are checked against what changed since.' : `${failures} check(s) FAILED.`}\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

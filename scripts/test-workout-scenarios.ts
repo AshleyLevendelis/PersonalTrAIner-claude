@@ -335,6 +335,85 @@ async function main() {
   const bare = chat.split('\n').filter(l => /onMesocycleUpdated\(result\.mesocycle\)/.test(l) && !/if \(ok\)/.test(l))
   check('NO CONFIRM IN THE CHAT DRAWS AN ATTEMPTED PLAN: every result goes through planAsSaved', bare.length === 0, bare.map(l => l.trim()))
   check('...and planAsSaved is called, not only imported', (chat.match(/planAsSaved\(profile\.id, result, mesocycle\)/g) ?? []).length >= 14)
+
+  // ---------------------------------------------------------------------------------------------------------------
+  console.log('\n[7] AN OFFER IS CHECKED AGAINST THE DAY AT THE TAP')
+  const holds = await import('../src/lib/offer-still-holds')
+  const ctx = (today: string) => ({ profileId: PID, today, planForDate: () => PLAN, weekOf: () => 2, mesocycle: meso(PLAN) })
+  // Rest Thursday: offered, then Thursday's sets are logged on the screen.
+  fresh()
+  check('a rest-day offer for a session still to do holds', await holds.offerStillHolds('propose_rest_day', { date: THU }, ctx(MON)) === true)
+  trained(THU, 2, false)
+  check('...AND NOT ONCE SETS ARE LOGGED ON THAT DAY (it would have marked a trained day a rest)', await holds.offerStillHolds('propose_rest_day', { date: THU }, ctx(THU)) === false)
+  // Missed Monday: offered, then Monday's session is moved to Wednesday on the screen.
+  fresh()
+  check('a missed-day offer holds while the session is there', await holds.offerStillHolds('propose_missed_session', { date: MON }, ctx(MON)) === true)
+  await track.setSessionMove(PID, MON, WED)
+  check('...AND NOT ONCE THE SESSION HAS BEEN MOVED AWAY', await holds.offerStillHolds('propose_missed_session', { date: MON }, ctx(MON)) === false)
+  // An activity swap offered, then the day swapped for something else on the screen.
+  fresh()
+  check('an activity-swap offer holds on an ordinary day', await holds.offerStillHolds('propose_session_activity_swap', { date: MON, activityName: 'Run' }, ctx(MON)) === true)
+  await track.setSwappedForActivity(PID, MON, 'Swim')
+  check('...and not once the day was swapped for something else', await holds.offerStillHolds('propose_session_activity_swap', { date: MON, activityName: 'Run' }, ctx(MON)) === false)
+  // Move Monday to Wednesday: offered, then Tuesday's session is moved onto Wednesday first.
+  fresh()
+  check('a move offer holds while the day it goes to is free', await holds.offerStillHolds('propose_session_move', { fromDate: MON, toDate: WED }, ctx(MON)) === true)
+  await track.setSessionMove(PID, TUE, WED)
+  check('...AND NOT ONCE ANOTHER SESSION HAS TAKEN THAT DAY', await holds.offerStillHolds('propose_session_move', { fromDate: MON, toDate: WED }, ctx(MON)) === false)
+  // A re-move: Monday's session already sits on Wednesday; the card moves it on to Friday and records Monday.
+  fresh()
+  await track.setSessionMove(PID, MON, WED)
+  check('a re-move offer (recorded from the session\'s first day) holds', await holds.offerStillHolds('propose_session_move', { fromDate: MON, toDate: FRI }, ctx(MON)) === true)
+  // An exercise swap offered, then the same slot swapped on the screen.
+  const realWeeks = meso(PLAN)
+  const changed = realWeeks.map(w => w.week_number !== 2 ? w : { ...w, days: w.days.map(d => d.day !== 'Monday' ? d : { ...d, exercises: [ex('Upper Z'), ...d.exercises.slice(1)] }) })
+  check('a swap offer holds while its slot still holds the exercise it names', await holds.offerStillHolds('propose_exercise_swap', { weekNumber: 2, dayName: 'Monday', exIndex: 0, oldExerciseName: 'Upper A' }, ctx(MON)) === true)
+  check('...AND NOT ONCE THAT SLOT WAS CHANGED (it would have swapped whatever was there now)',
+    await holds.offerStillHolds('propose_exercise_swap', { weekNumber: 2, dayName: 'Monday', exIndex: 0, oldExerciseName: 'Upper A' }, { ...ctx(MON), mesocycle: changed }) === false)
+  check('...and the same for a removal', await holds.offerStillHolds('propose_exercise_remove', { weekNumber: 2, dayName: 'Monday', exIndex: 0, exerciseName: 'Upper A' }, { ...ctx(MON), mesocycle: changed }) === false)
+  check('a card that touches no day always holds', await holds.offerStillHolds('propose_meal_swap', {}, ctx(MON)) === true)
+
+  // ---------------------------------------------------------------------------------------------------------------
+  console.log('\n[8] AN UNDO PUTS BACK ONLY WHAT IS STILL AS THE CARD LEFT IT')
+  fresh()
+  const { saveMesocycleWeek: saveWeek, restoreMesocycle } = await import('../src/lib/mesocycle-persistence')
+  for (const w of realWeeks) await saveWeek(PID, w)
+  const stored = await restoreMesocycle(PID)
+  const after = holds.fingerprintWeeks(realWeeks)
+  check('a plan read back from the store fingerprints the same as the one in memory (no false "changed since")',
+    !!stored && JSON.stringify(holds.fingerprintWeeks(stored.weeks)) === JSON.stringify(after))
+  // The real database stores a plan's fields in its OWN order (jsonb sorts keys), not the order the app wrote them.
+  const reorder = (v: unknown): unknown => Array.isArray(v) ? v.map(reorder) : v && typeof v === 'object'
+    ? Object.fromEntries(Object.entries(v as Record<string, unknown>).reverse().map(([k, x]) => [k, reorder(x)])) : v
+  check('...and so does one whose fields come back in another order, as the real database returns them',
+    JSON.stringify(holds.fingerprintWeeks(realWeeks.map(w => ({ ...w, days: reorder(w.days) as WorkoutDay[] })))) === JSON.stringify(after))
+  check('the plan as the card left it: Undo goes ahead', holds.undoStillFits(after, realWeeks, [2]) === true)
+  check('A LATER CHANGE TO A WEEK THE UNDO WOULD WRITE: it does not', holds.undoStillFits(after, changed, [2]) === false)
+  check('...while a change to a week it would NOT write is no reason to refuse', holds.undoStillFits(after, changed, [3]) === true)
+  check('a card that recorded nothing is undone as before', holds.undoStillFits(undefined, changed, [2]) === true)
+  check('a today-only swap writes back its one week', JSON.stringify(holds.weeksUndoWrites('propose_exercise_swap', { weekNumber: 2, scope: 'today' }, undefined, realWeeks)) === '[2]')
+  check('...ONE APPLIED WITH "REST OF BLOCK" WRITES BACK EVERY WEEK (it put back one)', JSON.stringify(holds.weeksUndoWrites('propose_exercise_swap', { weekNumber: 2, scope: 'today' }, 'permanent', realWeeks)) === '[1,2,3,4]')
+  check('a schedule change writes back its run of weeks', JSON.stringify(holds.weeksUndoWrites('propose_schedule_change', { fromWeek: 3 }, undefined, realWeeks)) === '[3,4]')
+  // A moved session moved again: the first card's Undo must not clear the second move.
+  fresh()
+  await track.setSessionMove(PID, MON, WED)
+  check('a move still as written can be undone', await holds.dayStillAsWritten('propose_session_move', { fromDate: MON, toDate: WED }, PID) === true)
+  await track.setSessionMove(PID, MON, FRI)
+  check('MOVED AGAIN SINCE: THE FIRST CARD\'S UNDO IS REFUSED (it cleared the second move too)', await holds.dayStillAsWritten('propose_session_move', { fromDate: MON, toDate: WED }, PID) === false)
+  check('...while the second card\'s is not', await holds.dayStillAsWritten('propose_session_move', { fromDate: MON, toDate: FRI }, PID) === true)
+  await track.setSwappedForActivity(PID, TUE, 'Swim')
+  check('an activity swap changed since is not undone either', await holds.dayStillAsWritten('propose_session_activity_swap', { date: TUE, activityName: 'Run' }, PID) === false)
+
+  // The chat asks all of it: the claim checks the offer, the undo checks the plan and the day (comments stripped).
+  check('THE CHAT CHECKS AN OFFER AT THE TAP (it passed async () => true)', /claimPendingAction\([^)]*,\s*\(_pre, pending\) => offerStillHolds\(/.test(chat) && !/claimPendingAction\([^,]+, async \(\) => true\)/.test(chat))
+  check('...and an Undo against the plan and the day', /undoStillFits\(row\.result\.planAfter/.test(chat) && /dayStillAsWritten\(row\.kind/.test(chat))
+  check('...and records what each card left, with the scope it was applied with', /fingerprintWeeks\(stored\.weeks\)/.test(chat) && /scope: appliedScope/.test(chat))
+  // SOURCE ONLY, and named so: the greeting is a placeholder the opener replaces within a second, so no driver can
+  // read it reliably. What this holds is that it looks today up in the live week, never week 1's flat plan.
+  check('the greeting names today from the week she is in, not week 1 (source check)',
+    /const todaySession = greetDays\.find\(/.test(chat) && /greetDays = mesocycle\.find\(w => w\.week_number === greetWeek\)/.test(chat) && !/const todaySession = exercisePlan\.find/.test(chat))
+  check('ADD AND REMOVE APPLY THE SCOPE SHE TAPPED ("Rest of block" applied today only)',
+    /addPayload = \{[^}]*\.\.\.\(editedScope === 'permanent'/.test(chat) && /executeExerciseRemove\(profile, mesocycle, editPayload/.test(chat))
 }
 
 main()

@@ -1147,6 +1147,9 @@ export const RECEIPTS_UNDONE = {
   tooLate: 'Undo only lasts 10 minutes, so nothing was changed.',
   cannot: "This one can't be undone from here, so nothing was changed.",
   failed: "That didn't undo, so nothing was changed. Try again in a moment.",
+  // IT WAS CHANGED AGAIN SINCE (29 Oct 2026): putting this card's version back would wipe the newer change. The
+  // button stays, because undoing the newer change first makes this one fit again.
+  changedSince: "It's been changed again since, so nothing was changed. Undo the newer change first.",
 } as const
 
 /**

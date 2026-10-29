@@ -84,6 +84,10 @@ export interface PendingActionRow {
 export interface PendingActionReceipt {
   landed: string[]
   failed: { op: string; error: string }[]
+  /** The scope the card was APPLIED with — the tapped button, which may differ from the offer's own (29 Oct 2026). */
+  scope?: string
+  /** What every plan week read once the card landed (offer-still-holds.ts), so Undo can tell a later change. */
+  planAfter?: Record<string, string>
 }
 
 const PENDING_WINDOW_MINUTES = 10
@@ -208,7 +212,7 @@ export type ClaimResult = { outcome: 'claimed'; row: PendingActionRow } | { outc
  */
 export async function claimPendingAction(
   id: string,
-  checkPreconditions: (preconditions: Record<string, unknown>) => Promise<boolean>,
+  checkPreconditions: (preconditions: Record<string, unknown>, row: PendingActionRow) => Promise<boolean>,
 ): Promise<ClaimResult> {
   // A READ THAT COULD NOT REACH THE SERVER IS NOT A MISSING OFFER (27 Oct 2026). It was read as "not found", and the
   // card said "This one's timed out" and lost its button, on a phone that had merely lost its connection.
@@ -222,7 +226,7 @@ export async function claimPendingAction(
   }
   if (row.status !== 'pending') return { outcome: 'already_resolved' }
 
-  const preconditionsOk = await checkPreconditions(row.preconditions)
+  const preconditionsOk = await checkPreconditions(row.preconditions, row)
   if (!preconditionsOk) {
     await supabase.from('pending_actions').update({ status: 'stale' }).eq('id', id).eq('status', 'pending')
     return { outcome: 'stale' }
