@@ -86,7 +86,9 @@ check('it returns the shared plan-unknown sentence on an empty plan',
 // ORDER IS THE WHOLE POINT: the guard has to come before the `find`, or the
 // rest-day fallback below it is reached exactly as before.
 const guardAt = detailFn.indexOf('PLAN_UNKNOWN_TEXT')
-const findAt = detailFn.indexOf('exercisePlan.find')
+// THE TODAY LOOKUP, whichever plan it searches: since 29 Oct 2026 it is the live week (`greetDays.find`), not
+// `exercisePlan.find`, and the property is the order, not the variable's name.
+const findAt = detailFn.search(/\w+\.find\(d => d\.day === dayName\)/)
 const restAt = detailFn.indexOf('rest day on your plan')
 check('the guard is reached BEFORE the plan is searched',
   guardAt >= 0 && findAt >= 0 && guardAt < findAt, { guardAt, findAt })

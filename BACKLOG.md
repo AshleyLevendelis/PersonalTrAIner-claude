@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [x] **The three left open by the workout-scenario testing, fixed, 29 Oct 2026 (her "fix them").**
+  1. **A coach offer is checked against the day and the plan at the tap.** The confirm passed `async () => true` to
+     the claim's precondition slot, so an offer from ten minutes earlier wrote over whatever the day had become: a
+     session moved onto it, sets logged on it, the exercise it names swapped on the screen. Now (`offerStillHolds`)
+     the day's moves, flags and logged sets are read again, a move's target is re-resolved (a re-move from the day
+     the session sits on), and a swap, removal or reorder checks its slot still holds the exercise it names. A card
+     that no longer fits turns stale with the card's existing words, "This changed since I proposed it — ask me again
+     if you still want it." Nothing is written.
+  2. **Undo puts back only what is still as the card left it.** It restored whole weeks over any later change. Now
+     the weeks a card wrote are fingerprinted when it lands (read back from the store, field-order proof) and Undo
+     refuses after a later change to the weeks it would write; a moved session moved again, or a day swapped for
+     something else since, is not cleared. "It's been changed again since, so nothing was changed. Undo the newer
+     change first." The button stays, since undoing the newer change makes this one fit again. Her 30 Sep rule for
+     the meal day-swap's Undo, applied to the plan; the wording follows the existing Undo refusals (hers to change).
+  3. **The placeholder greeting names today from the live week**, not week 1 (it shows for a moment before the
+     coach's real opener, and after Clear). Source check only, said so in the gate.
+  FOUND ON THE WAY, fixed: the coach's add and remove offers applied "today" whichever button was tapped ("Rest of
+  block" did nothing different), and Undo of a rest-of-block swap put back one week. Both now use the scope that was
+  tapped, recorded on the receipt. `test:plan-unknown` re-anchored on its property (the guard before the lookup).
+  Checks: `test:workout-scenarios` now 83 (16 more mutations: 15 caught, one equivalent, the redundant clause
+  deleted; the field-order one caught only after the gate gained a reordered-fields case), `verify:workout-scenarios-chat`
+  now 41 (4 more mutations, all caught). 242 related gates and drivers green. NOT PROVEN: the real model, and the
+  real database's field order (modelled, not measured). Frontend only; no migration (the new receipt fields ride in
+  the existing result column).
 - [x] **Workout changes tested in combination, 27 Oct 2026 (her "I need to do thorough testing on the app under
   various different scenarios": typing a change, editing a workout, swapping, missing, changing a day; nothing
   breaking when offline).** Baseline first: all 82 existing checks on these changes passed, so every SINGLE change
