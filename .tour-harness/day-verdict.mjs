@@ -76,16 +76,18 @@ await send('Page.enable'); await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 
 /** The header as it is on screen: the planned figure, the target, the words beside it, and each macro with whether it is lit. */
-const header = () => ev(`(() => {
-  const line = [...document.querySelectorAll('span')].find(e => /^target \\d/.test((e.textContent || '').trim()) && e.children.length === 0)
-  if (!line) return null
-  // RE-ANCHORED 10 Oct 2026 (design handoff 2b): the planned day is a compact
-  // panel now ("Planned 1633 kcal"), found by its own marker rather than by
-  // counting parents, and its figure by its testid rather than the big-number
-  // class it no longer wears.
-  const hero = line.closest('[data-planned-day]')
+// RE-ANCHORED 30 Oct 2026 ("less is more", her "Move things"): the planned day is ONE line ("Meals planned 1980 kcal ·
+// 1060 under"), and the planned macros and the target open under it on a tap. This opens it, then reads the same parts.
+const header = async () => {
+  await ev(`(() => { const b = document.querySelector('[data-planned-day] > button[aria-expanded]'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click() })()`)
+  await new Promise(r => setTimeout(r, 300))
+  return ev(`(() => {
+  const hero = document.querySelector('[data-planned-day]')
   if (!hero) return null
-  const text = (line.textContent || '').trim()
+  const verdict = hero.querySelector('[data-testid="day-verdict"]')
+  const target = [...hero.querySelectorAll('span')].find(e => /^target \\d/.test((e.textContent || '').trim()) && e.children.length === 0)
+  if (!verdict || !target) return null
+  const text = (target.textContent || '').trim() + ' · ' + (verdict.textContent || '').trim()
   const m = /^target (\\d+) · (.+)$/.exec(text)
   const planned = Number((hero.querySelector('[data-testid="day-kcal"]')?.textContent || '').replace(/[^\\d]/g, ''))
   const macros = {}
@@ -93,7 +95,7 @@ const header = () => ev(`(() => {
     const mm = /^(\\d+) \\/ (\\d+) ([PCF])$/.exec((span.textContent || '').trim())
     if (mm) macros[mm[3]] = { actual: Number(mm[1]), target: Number(mm[2]), lit: /text-primary-text/.test(span.className) }
   }
-  const r = line.getBoundingClientRect()
+  const r = verdict.getBoundingClientRect()
   return m && macros.P && macros.C && macros.F ? {
     text, label: m[2],
     totals: { calories: planned, protein: macros.P.actual, carbs: macros.C.actual, fat: macros.F.actual },
@@ -101,6 +103,7 @@ const header = () => ev(`(() => {
     proteinLit: macros.P.lit, onScreen: r.top >= 0 && r.bottom <= innerHeight,
   } : null
 })()`)
+}
 
 /** What the engine says about a set of totals — from the app's own module, in a child process. */
 const scriptPath = join(DIST, '__day-verdict.mts')

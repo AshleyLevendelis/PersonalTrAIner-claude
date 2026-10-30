@@ -2,6 +2,40 @@
 
 Newest first. One line each.
 
+- [x] **LESS IS MORE: HOME, NUTRITION AND EXERCISE DECLUTTERED, 30 Oct 2026.** Ashley, 29 Oct: *"I want to revamp
+  the entire app. Less is more. The pages are currently too cluttered."* Measured first at 390px: Home 1.4 screens and
+  17 controls, Nutrition 1.6 and 24, Exercise 2.4 and 40; Nutrition said the calorie target four times, Exercise said
+  "0 of 4 this week" twice, Home said today's progress three ways and had two Start buttons for one session. A mockup
+  (before beside after, on her phone) was put to her with one question, move behind a tap or remove for good; her
+  ruling, from two options: **"Move things"**. Nothing is removed from the app; every control is one tap away.
+  - **Home** (1.4 → 1.0 screens): the rings, the percentage and the key are one object side by side; the coach note
+    is one line (the tag kept for a screen reader, the dots gone, tapping the line moves to the next tip); the Start
+    button sits under the session it starts instead of docked over the page; the Tomorrow row went (the session's own
+    line already says "rest tomorrow" / "X tomorrow"); weight, latest PR and volume sit behind one Progress row.
+  - **Nutrition** (1.6 → 1.3): the calories left on one line, smaller; protein, carbs, fat and water one row of four
+    (water still logs here, her 17 Oct ruling); the planned-day panel is one line ("Meals planned 1980 kcal · 1060
+    under", her H24 verdict kept) with the planned macros behind a tap; the next meal's card is slimmer and the "Up
+    next" / "Later" labels are for screen readers only; the Targets row is a plain row; the allergy line is unchanged.
+  - **Exercise** (2.4 → 2.0): the week's two rings and two-row key became one line over the strip ("0 of 4 sessions ·
+    0/76 sets", the same counts); the coach note is one line; "Feeling tight?" sits on the warm-up row; the 01/02
+    numbers left the list; "Add an exercise" and "Add unplanned work" sit behind one "＋ Add"; the Program card left
+    the page ("Week N of M" at the top opens the programme, and Tools' "Your program" now carries its block and
+    deload line from the plan's own blocks, replacing a four-weeks-a-block guess).
+  - **The settings gear scrolls with the page** instead of floating over it, where it sat on top of a weight or a
+    set's numbers as you scrolled (a defect, found in the measuring screenshots).
+  REVERSES, by her ruling: the 17 Oct one-page layout calls "the coach note stays TrainerNudge, restyled nowhere"
+  (mine, not hers) and the docked Home button. Her 17 Oct rulings stand: day strip on top, "in a row", steps from
+  Home's key and water from Nutrition's water cell, rings on Home only.
+  Checks: 146 logic gates derived from the changed files (141 green first run; the 5 red were pins on the old layout,
+  re-anchored on the property: nutrition-layout, exercise-today, exercise-layout, layout-revamp, one-page);
+  `test:one-page` gains 18 checks for the new layout (19 mutations, all caught). 31 browser drivers that touch the three
+  pages: 22 green first run, 9 re-anchored (the Progress row is opened before reading the weight or a PR; the one-line
+  note is walked by tapping the line, which names "Tip 1 of 3"; the programme is reached through the week number;
+  the planned macros open before they are read) and all 31 green; 4 mutations on the re-written `verify:one-page`
+  checks, all caught. Five drivers open "＋ Add" first. `test:bundle`, `test:no-dead-code`, `test:app-tour`,
+  `verify:tour-real` green; typecheck clean. NOT run: the full sweep (before a merge). NOT DONE, named: Exercise is
+  still about two screens, because today's first exercise opens with its set boxes before the session starts; folding
+  that until Start is the next cut if she wants Exercise shorter. Deploys: frontend only.
 - [x] **The three left open by the workout-scenario testing, fixed, 29 Oct 2026 (her "fix them").**
   1. **A coach offer is checked against the day and the plan at the tap.** The confirm passed `async () => true` to
      the claim's precondition slot, so an offer from ten minutes earlier wrote over whatever the day had become: a

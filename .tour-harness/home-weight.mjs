@@ -71,7 +71,10 @@ const open = async query => {
   await wait(2500); await ev(`location.hash = '#/tab/dashboard'`); await wait(1500)
 }
 /** The weight panel's header (figure and change) and the whole panel's text. */
+// Behind one Progress row since 30 Oct 2026 ("less is more"): opened first, then read.
 const readTile = () => ev(`(() => {
+  const t = document.querySelector('[data-home-progress-toggle]')
+  if (t && t.getAttribute('aria-expanded') !== 'true') t.click()
   const box = document.querySelector('[data-home-weight]')
   const btn = box ? box.querySelector('button[aria-expanded]') : null
   return { figure: btn ? btn.textContent.replace(/\\s+/g, ' ').trim() : null, box: box ? box.innerText.replace(/\\s+/g, ' ').trim() : null }

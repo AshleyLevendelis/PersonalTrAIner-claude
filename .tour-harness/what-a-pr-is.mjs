@@ -84,7 +84,9 @@ await escape()
 const home1 = await homeGlance()
 // RE-ANCHORED 10 Oct 2026 (design handoff 2a): Home's "Recent PRs" list became
 // the Done panel's PR row and the weight panel's "latest PR" cell.
-const homePrs = () => ev(`({ row: document.querySelector('[data-home-pr]')?.innerText.replace(/\\s+/g, ' ').trim() ?? null, latest: document.querySelector('[data-home-latest-pr]')?.innerText.replace(/\\s+/g, ' ').trim() ?? null })`)
+// Weight, latest PR and volume sit behind one Progress row since 30 Oct 2026 ("less is more"): open it, then read.
+const openProgress = async () => { await ev(`(() => { const t = document.querySelector('[data-home-progress-toggle]'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click() })()`); await new Promise(r => setTimeout(r, 300)) }
+const homePrs = async () => (await openProgress(), ev(`({ row: document.querySelector('[data-home-pr]')?.innerText.replace(/\\s+/g, ' ').trim() ?? null, latest: document.querySelector('[data-home-latest-pr]')?.innerText.replace(/\\s+/g, ' ').trim() ?? null })`))
 const prs0 = await homePrs()
 check('1h. Home shows no PR: no row on the Done panel, and the latest-PR cell says none', prs0?.row === null && /none this week/.test(prs0?.latest ?? ''), prs0)
 check('1i. ...and no "New PR this week" tip', (await ev(`!/New PR this week/.test(document.body.innerText) && !/\\bat 0kg/.test(document.body.innerText)`)) === true)

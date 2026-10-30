@@ -7,8 +7,8 @@
 //      Nutrition's Up next card shows; the docked button names today's session and sits above the tab bar.
 //   B. Nutrition: the day strip is above the calories; no rings; the bar is eaten over target; the water
 //      cell opens the quick-add, +500 moves it by 0.5 L and Undo puts it back; Targets opens the sheet.
-//   C. Exercise: the meter's count is the key's; the Program row has one current block and opens the
-//      programme; the ⋯ menu still holds What happened?; "Start session" is docked.
+//   C. Exercise: the week line's count is the strip's; no rings, no Program card, the week number opens the
+//      programme; the ⋯ menu still holds What happened?; "Start session" is docked. (Re-anchored 30 Oct 2026.)
 //
 // WHAT THIS DOES NOT PROVE: App.tsx's wiring (no harness page boots it); real.tsx passes Home the meals
 // the way App does.
@@ -83,8 +83,9 @@ const expected = shares.length ? `${Math.round(shares.reduce((a, b) => a + b, 0)
 const soFar = await text('[data-testid="home-so-far"]')
 check('2. the headline is the mean of the rings drawn (a ring with no target left out)', soFar === expected && shares.length > 0, { soFar, expected, rings })
 check('3. the pill reads "N in a row", never "days"', /^\d+ in a row$/.test(await text('[data-testid="home-streak"]')), await text('[data-testid="home-streak"]'))
-const cta = await ev(`(() => { const n = document.querySelector('[data-home-cta] button'); if (!n) return null; const b = n.getBoundingClientRect(); return { text: n.innerText.trim(), bottom: b.bottom, top: b.top, h: innerHeight } })()`)
-check('4. the docked button names today\'s session and sits on screen above the tab bar', !!cta && /^Start \S/.test(cta.text) && cta.top > cta.h / 2 && cta.bottom <= cta.h - 64, cta)
+// RE-ANCHORED 30 Oct 2026 ("less is more"): not docked; directly under the session it starts, on the first screen.
+const cta = await ev(`(() => { const n = document.querySelector('[data-home-cta] button'); const row = document.querySelector('[data-home-hero]'); if (!n || !row) return null; const b = n.getBoundingClientRect(); return { text: n.innerText.trim(), bottom: b.bottom, top: b.top, rowBottom: row.getBoundingClientRect().bottom, h: innerHeight } })()`)
+check('4. the Start button names today\'s session, sits right under the session row, and is on the first screen above the tab bar', !!cta && /^Start \S/.test(cta.text) && cta.top >= cta.rowBottom - 1 && cta.top - cta.rowBottom < 24 && cta.bottom <= cta.h - 64, cta)
 const homeMeal = await ev(`(() => { const r = document.querySelector('[data-home-next-meal]'); return r ? { slot: r.dataset.homeNextMeal, text: r.innerText.replace(/\\s+/g, ' ').trim() } : null })()`)
 check('5. Up next carries the next meal', !!homeMeal, homeMeal)
 await shoot('one-page-home')
@@ -115,7 +116,7 @@ check('13. the water cell opens the quick-add', await ev(`!!document.querySelect
 await shoot('one-page-nutrition-water')
 await ev(`[...document.querySelectorAll('[data-water-quick-add] button')].find(b => b.innerText.trim() === '+500 ml')?.click()`)
 await wait(600)
-const litres = s => Number((String(s).match(/Water\s+([\d.]+)/) ?? [])[1])
+const litres = s => Number((String(s).match(/Water\s*\+?\s*([\d.]+)/) ?? [])[1])
 const waterAfter = await text('[data-ring-key-row="water"]')
 check('14. +500 ml moves the cell by 0.5 L', Math.abs(litres(waterAfter) - litres(waterBefore) - 0.5) < 0.001, { waterBefore, waterAfter })
 await ev(`document.querySelector('[data-water-undo]')?.click()`)
@@ -130,9 +131,11 @@ console.log('\nC. Exercise')
 await open('exercise')
 const meter = await text('[data-testid="week-meter-count"]')
 const key = await text('[data-testid="week-key"]')
-check('17. the meter\'s count is the key\'s Sessions figure', !!meter && key.replace(/\s/g, '').includes(`Sessions${meter}`), { meter, key })
-const phases = await ev(`[...document.querySelectorAll('[data-phase-bar] [data-phase]')].map(n => n.dataset.phase)`)
-check('18. the Program row draws the plan\'s blocks, exactly one current', (phases ?? []).length > 1 && phases.filter(p => p === 'current').length === 1, phases)
+// RE-ANCHORED 30 Oct 2026 ("less is more"): the rings and key became one line, "0 of 4 sessions · 0/76 sets", and
+// the Program card left the page. The count is the strip's: one "done" dot per session done.
+const done = await ev(`document.querySelectorAll('[data-exercise-strip] [data-dot="done"]').length`)
+check('17. the week line\'s session count is the strip\'s', !!meter && key.startsWith(`${meter} session`) && Number(meter.split(' of ')[0]) === done, { meter, key, done })
+check('18. no week rings and no Program card on the page', await ev(`!document.querySelector('main [data-ring]') && !document.querySelector('[data-program-row]')`))
 const start = await ev(`(() => { const b = [...document.querySelectorAll('button')].find(n => n.innerText.trim() === 'Start session'); if (!b) return null; const r = b.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, h: innerHeight } })()`)
 check('19. "Start session" is docked on screen above the tab bar', !!start && start.top > start.h / 2 && start.bottom <= start.h - 64, start)
 await shoot('one-page-exercise')
@@ -140,8 +143,8 @@ await ev(`document.querySelector('[aria-label="More options"]')?.dispatchEvent(n
 await wait(600)
 check('20. the ⋯ menu still holds What happened?', await ev(`!!document.querySelector('[data-testid="what-happened-item"]')`))
 await open('exercise')
-await tap('[data-program-row]')
-check('21. the Program row opens the programme', await ev(`/program/.test(location.hash)`), await ev('location.hash'))
+await tap('[data-testid="week-context-header"]')
+check('21. the week number opens the programme', await ev(`/program/.test(location.hash)`), await ev('location.hash'))
 
 console.log('\nD. With breakfast logged over its plan (the rest of the day re-sized around it)')
 // ateover=200: breakfast eaten 200 kcal over, so Nutrition fits lunch and dinner around it (her ruling A).

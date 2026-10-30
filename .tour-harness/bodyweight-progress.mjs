@@ -78,6 +78,9 @@ console.log('  HOME — the recent personal bests')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&bwpr=1#/tab/home` })
 await wait(5000)
 
+// Behind one Progress row since 30 Oct 2026 ("less is more"): open it first.
+await ev(`(() => { const t = document.querySelector('[data-home-progress-toggle]'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click() })()`)
+await new Promise(r => setTimeout(r, 400))
 const home = await ev('document.body.innerText')
 // RE-ANCHORED 10 Oct 2026 (design handoff 2a): Home's "Recent PRs" list became
 // ONE cell in the weight panel — the latest PR. In this fixture the latest is

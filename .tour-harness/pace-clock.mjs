@@ -97,12 +97,15 @@ let loads = 0
 // — and the page text checked below is the page plus every tip it holds.
 // The dots are ONE button since 10 Oct 2026 (two tap areas overlapped): each
 // tap moves to the next tip, so n taps visit all n.
+// RE-ANCHORED 30 Oct 2026 ("less is more"): the one-line note has no dots; the line itself is the button, and its
+// spoken name says how many tips there are ("Tip 1 of 3. Next tip"). Each tap still moves to the next one.
+const NEXT_TIP = `[...document.querySelectorAll('main [data-home-note] button')].find(b => /^Tip \\d+ of \\d+/.test(b.getAttribute('aria-label') || ''))`
 const homeTips = async () => {
-  const n = await ev(`document.querySelectorAll('main [data-nudge-dots] > span').length`)
+  const n = await ev(`(() => { const b = ${NEXT_TIP}; const m = b && /^Tip \\d+ of (\\d+)/.exec(b.getAttribute('aria-label')); return m ? Number(m[1]) : 0 })()`)
   if (!n) return [(await nudge()).text]
   const out = [(await nudge()).text]
   for (let i = 1; i < n; i++) {
-    await ev(`document.querySelector('main [data-nudge-dots]')?.click()`)
+    await ev(`${NEXT_TIP}?.click()`)
     await wait(450)
     out.push((await nudge()).text)
   }

@@ -46,3 +46,9 @@ Every gate that reads the six files (derived by grep) and every driver that name
 Exercise testid is re-run; pins on the old layout are re-anchored to the property. A new `test:one-page`
 asks the derived numbers (the hero %, the ring shares, the phase bar, the week meter) and a new
 `verify:one-page` drives the three screens at 390px, both mutation-tested.
+
+## 30 Oct 2026: less is more
+
+Her "Move things" (BACKLOG, the declutter entry) reverses three calls made here: the coach note is now the one-line
+`slim` TrainerNudge, Home's Start button sits under the session row instead of docked, and the Program row left
+Exercise (its block and deload line moved onto Tools' "Your program"). The week's two rings became one line.

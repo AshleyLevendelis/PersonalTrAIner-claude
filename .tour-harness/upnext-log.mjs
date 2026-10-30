@@ -53,7 +53,8 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, devi
 // ---------------------------------------------------------------------------
 const upNext = () => ev(`(() => { const a = document.querySelector('[data-upnext-actions]'); const row = a?.closest('[data-meal-row]'); return row ? row.getAttribute('data-meal-row') : null })()`)
 // The Eaten section is drawn without row markers: read the slot labels between "EATEN" and the next section.
-const eatenRows = () => ev(`(() => { const rows = document.body.innerText.split(String.fromCharCode(10)).map(x => x.trim()); const i = rows.indexOf('EATEN'); if (i < 0) return []; const out = []; for (const r of rows.slice(i + 1)) { if (/^(UP NEXT|LATER|STILL TO EAT|Log something else)$/i.test(r)) break; if (/^(BREAKFAST|LUNCH|DINNER|SNACK)$/.test(r)) out.push(r.toLowerCase()) } return out })()`)
+// RE-ANCHORED 30 Oct 2026: read off the rows' own markers, not the slot labels' letter case (no longer capitals).
+const eatenRows = () => ev(`[...document.querySelectorAll('[data-meal-row][data-variant="eaten"]')].map(n => n.getAttribute('data-meal-row'))`)
 const logButtons = () => ev(`document.querySelectorAll('[data-upnext-log]').length`)
 
 console.log('\nLOG IT MOVES UP NEXT ON\n')

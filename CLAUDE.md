@@ -1388,6 +1388,12 @@ menu" stays true when a copy is also left outside it.
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
 
+### Her ruling of 30 Oct 2026, "less is more" (BACKLOG, the declutter entry)
+- **"Move things"**, over removing them for good: Home, Nutrition and Exercise say each thing once, the coach note is
+  one line, and secondary parts sit one tap away (Progress on Home, the planned macros on Nutrition, "＋ Add" on
+  Exercise). Nothing the app can do was removed. The settings gear scrolls with the page. `test:one-page` §6,
+  `verify:one-page`
+
 ### Her rulings of 20 Oct 2026, from the 19 Oct live test (`docs/audits/live-test-2026-10-19-findings.md`)
 - **Coach offers: "Text + small buttons always."** Every change the coach offers is a chat bubble with small Apply /
   Not now buttons; a rebuild's list goes into the text. REVERSES the 24 Sep line keeping Apply cards for asked
