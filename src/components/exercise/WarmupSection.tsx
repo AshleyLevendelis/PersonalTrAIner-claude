@@ -1,3 +1,4 @@
+import type * as React from 'react'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import { ChevronDown, Thermometer } from 'lucide-react'
 import { normalizeWarmup, warmupBadgeText } from '@/lib/session-derive'
@@ -21,6 +22,7 @@ export function WarmupSection({
   extra = [],
   extraNote,
   extraCaveat,
+  trailing,
 }: {
   warmup: WorkoutDay['warmup']
   open: boolean
@@ -36,6 +38,8 @@ export function WarmupSection({
   extraNote?: string | null
   /** What it could NOT do, said out loud rather than swallowed. */
   extraCaveat?: string | null
+  /** On the row itself, beside the trigger (30 Oct 2026): "Feeling tight?", which changes this warm-up. */
+  trailing?: React.ReactNode
 }) {
   // Defensive against legacy/partial warmup shapes (a mesocycle_weeks row
   // written before a WarmupBlock field existed, or hand-edited data) — see
@@ -65,14 +69,17 @@ export function WarmupSection({
     // "done" tick: nothing records a warm-up as done, and a tick the app
     // cannot back would claim something it does not know.
     <Collapsible open={open} onOpenChange={onToggle} className="rounded-[14px]" style={{ background: 'var(--surface-raised)' }}>
-      <CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between gap-2 px-3.5 text-left">
+      <div className="flex items-center">
+      <CollapsibleTrigger className="flex min-h-12 min-w-0 flex-1 items-center justify-between gap-2 px-3.5 text-left">
         <span className="flex min-w-0 items-center gap-2 text-[0.875rem] font-medium text-foreground">
           <Thermometer className="size-4 shrink-0 text-primary-text" aria-hidden />
-          Warm-up
+          <span className="shrink-0 whitespace-nowrap">Warm-up</span>
           <span className="truncate text-[0.8125rem] font-normal text-muted-foreground" data-testid="warmup-badge">· {warmupBadgeText(planMoves, totalMinutes, extra.length, extraMinutes)}</span>
         </span>
         <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </CollapsibleTrigger>
+      {trailing && <div className="shrink-0 border-l border-[color:var(--hairline)] pr-1">{trailing}</div>}
+      </div>
       <CollapsibleContent className="px-3 pb-3 space-y-3">
         {/* FIRST, because its own line says "do these first" and the feature puts them at the
             front of today's warm-up; it was drawn third, after General and Mobility (user test #24). */}

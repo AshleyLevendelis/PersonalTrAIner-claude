@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { HeldAround } from '@/lib/meal-generation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calculator, Layers, ShoppingBasket, Beef, Wheat, Droplet, Droplets, SlidersHorizontal, ChevronRight } from 'lucide-react'
+import { Calculator, Layers, ShoppingBasket, SlidersHorizontal, ChevronRight } from 'lucide-react'
 import type * as React from 'react'
 import { groceryHash } from '@/lib/app-route'
 import { MealPlan, SLOT_ORDER, SLOT_LABEL, type UpcomingMealDay } from '@/components/MealPlan'
@@ -396,19 +396,18 @@ export function NutritionDisplay({
             return (
               <>
                 <div className="flex items-end justify-between gap-3">
-                  <div>
-                    <p className="ds-num-mega tabular-mono glow-mint-lg text-[3.75rem] font-bold leading-[.88] tracking-[-.045em]" style={{ color: 'var(--num-hero)' }} data-testid="kcal-left-number">
+                  {/* LESS IS MORE (30 Oct 2026): the number and its words on one line, smaller. */}
+                  <p className="flex items-baseline gap-2">
+                    <span className="ds-num-mega tabular-mono glow-mint-lg text-[2.5rem] font-bold leading-none tracking-[-.04em]" style={{ color: 'var(--num-hero)' }} data-testid="kcal-left-number">
                       {Number(amount).toLocaleString()}
-                    </p>
-                    <p className="mt-2 text-[0.75rem] font-semibold uppercase tracking-[.14em]" style={{ color: 'var(--role-ai-text)' }}>
-                      <span data-testid="kcal-left">kcal {word}</span>
-                    </p>
-                  </div>
+                    </span>
+                    <span className="text-[0.875rem] text-muted-foreground" data-testid="kcal-left">kcal {word}</span>
+                  </p>
                   <p className="pb-0.5 text-[0.75rem] text-muted-foreground">
                     <span className="tabular-mono text-foreground" data-testid="kcal-eaten">{Math.round(eaten.kcal).toLocaleString()}</span> of <span className="tabular-mono text-foreground" data-testid="kcal-target">{Math.round(macros.calories).toLocaleString()}</span>
                   </p>
                 </div>
-                <MacroBar share={ringShare(eaten.kcal, macros.calories)} color="var(--primary)" height={6} glow className="mt-3.5" testid="kcal-bar" />
+                <MacroBar share={ringShare(eaten.kcal, macros.calories)} color="var(--primary)" height={6} glow className="mt-3" testid="kcal-bar" />
               </>
             )
           })() : (
@@ -421,14 +420,14 @@ export function NutritionDisplay({
           )}
         </div>
 
-        {/* THE MACRO GRID: hairlines top and bottom and on the inner edges. Water's cell is the water log
+        {/* THE MACROS, ONE ROW OF FOUR (30 Oct 2026, was a 2×2 grid with icons). Water's cell is the water log
             (her 17 Oct ruling): tapping it opens the quick-add that used to sit on Home. */}
-        <div className="grid grid-cols-2 border-y border-[color:var(--hairline)]" data-ring-key>
-          <MacroCell k="protein" col={0} row={0} icon={Beef} label="Protein" color="var(--chart-2)" value={String(Math.round(eaten.protein))} target={macros?.protein} unit="g" share={ringShare(eaten.protein, macros?.protein)} />
-          <MacroCell k="carbs" col={1} row={0} icon={Wheat} label="Carbs" color="var(--chart-4)" value={String(Math.round(eaten.carbs))} target={macros?.carbs} unit="g" share={ringShare(eaten.carbs, macros?.carbs)} />
-          <MacroCell k="fat" col={0} row={1} icon={Droplet} label="Fat" color="var(--text-tertiary)" value={String(Math.round(eaten.fat))} target={macros?.fat} unit="g" share={ringShare(eaten.fat, macros?.fat)} />
+        <div className="grid grid-cols-4 gap-3" data-ring-key>
+          <MacroCell k="protein" label="Protein" color="var(--chart-2)" value={String(Math.round(eaten.protein))} target={macros?.protein} unit="g" share={ringShare(eaten.protein, macros?.protein)} />
+          <MacroCell k="carbs" label="Carbs" color="var(--chart-4)" value={String(Math.round(eaten.carbs))} target={macros?.carbs} unit="g" share={ringShare(eaten.carbs, macros?.carbs)} />
+          <MacroCell k="fat" label="Fat" color="var(--text-tertiary)" value={String(Math.round(eaten.fat))} target={macros?.fat} unit="g" share={ringShare(eaten.fat, macros?.fat)} />
           <MacroCell
-            k="water" col={1} row={1} icon={Droplets} label="Water" color="var(--chart-3)"
+            k="water" label="Water" color="var(--chart-3)"
             value={(todayWaterMl / 1000).toFixed(1)} target={waterTarget / 1000} unit="L" fixed={1}
             share={ringShare(todayWaterMl, waterTarget)}
             onClick={() => setWaterOpen(o => !o)}
@@ -438,7 +437,7 @@ export function NutritionDisplay({
           />
         </div>
         {waterOpen && (
-          <div className="-mt-2 flex flex-wrap items-center gap-2" data-water-quick-add>
+          <div className="flex flex-wrap items-center gap-2" data-water-quick-add>
             {[250, 500].map(ml => (
               <button
                 key={ml}
@@ -475,7 +474,7 @@ export function NutritionDisplay({
       {/* THE TRAINER'S LINE. One sentence about the macro furthest behind,
           and only when something is. Derived here from the same eaten/target
           pairs the rings are drawn from — no second source, no new call. */}
-      {macroNudge && !mealRefit && !(mealTopUp && !mealTopUpNote) && <TrainerNudge text={macroNudge} tag="Nutrition" openChat askPrefill={`Tell me more about this: "${macroNudge}"`} />}
+      {macroNudge && !mealRefit && !(mealTopUp && !mealTopUpNote) && <TrainerNudge slim text={macroNudge} tag="Nutrition" openChat askPrefill={`Tell me more about this: "${macroNudge}"`} />}
 
       {/* THE DRIFT OFFER. Ashley's ruling, 17 Sep 2026: tell her, and offer to
           refit. It sits ABOVE the meal list because it is about that list, and
@@ -620,8 +619,7 @@ export function NutritionDisplay({
         <button
           type="button"
           onClick={() => setHowItsSetOpen(true)}
-          className="flex h-[52px] w-full items-center gap-3 rounded-[14px] px-4 text-left"
-          style={{ background: 'var(--surface-raised)' }}
+          className="flex min-h-[52px] w-full items-center gap-3 border-y border-[color:var(--hairline)] text-left"
           data-targets-row
         >
           <SlidersHorizontal aria-hidden className="size-4 shrink-0 text-text-tertiary" />
@@ -839,11 +837,8 @@ function MacroBar({ share, color, height = 4, glow, className, testid }: { share
  * Inner edges carry the hairlines; the outer edge has no padding. A button only where it does something
  * (water), so nothing else looks tappable.
  */
-function MacroCell({ k, col, row, icon: Icon, label, color, value, target, unit, fixed = 0, share, onClick, ariaLabel, expanded, celebrate }: {
+function MacroCell({ k, label, color, value, target, unit, fixed = 0, share, onClick, ariaLabel, expanded, celebrate }: {
   k: string
-  col: 0 | 1
-  row: 0 | 1
-  icon: typeof Beef
   label: string
   color: string
   value: string
@@ -856,25 +851,15 @@ function MacroCell({ k, col, row, icon: Icon, label, color, value, target, unit,
   expanded?: boolean
   celebrate?: boolean
 }) {
-  const style: React.CSSProperties = {
-    paddingTop: 12, paddingBottom: 12,
-    paddingLeft: col === 1 ? 14 : 0, paddingRight: col === 0 ? 14 : 0,
-    borderRight: col === 0 ? '1px solid var(--hairline)' : undefined,
-    borderBottom: row === 0 ? '1px solid var(--hairline)' : undefined,
-  }
+  const style: React.CSSProperties = { minHeight: 44 }
   const body = (
     <>
-      <span className="flex items-center gap-2 text-[0.75rem] text-text-tertiary">
-        <span aria-hidden className="flex size-[22px] shrink-0 items-center justify-center rounded-full" style={{ background: `color-mix(in srgb, ${color} 15%, transparent)`, color }}>
-          <Icon className="size-3" />
-        </span>
-        {label}
-      </span>
-      <span className="mt-2 block tabular-mono text-[1.25rem] font-bold leading-none">
+      <span className="block text-[0.6875rem] text-muted-foreground">{label}{onClick ? ' +' : ''}</span>
+      <span className="mt-1 block tabular-mono text-[0.875rem] font-semibold leading-none">
         {value}
-        <span className="ml-1 text-[0.6875rem] font-medium text-muted-foreground">/ {target != null && target > 0 ? target.toFixed(fixed) : '—'} {unit}</span>
+        <span className="text-[0.6875rem] font-medium text-muted-foreground">/{target != null && target > 0 ? target.toFixed(fixed) : '—'}{unit}</span>
       </span>
-      <span className="relative mt-2.5 block">
+      <span className="relative mt-2 block">
         <MacroBar share={share} color={color} />
         {celebrate && (
           <svg aria-hidden width="48" height="16" viewBox="0 0 48 16" className="pointer-events-none absolute -top-3 right-0 overflow-visible">

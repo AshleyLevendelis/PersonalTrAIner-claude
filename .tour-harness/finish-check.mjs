@@ -16,6 +16,13 @@ import { boot } from './session-driver-lib.mjs'
 
 const b = await boot({ debugPort: 9606, passed: 'Finish asks when sets are left and only then; the card counts planned sets, training time and both hands.' })
 const { ev, check, finish, tapExpr, q, byText, until, wait, load, tick, exerciseNames, shoot, ensureOpen, rowsExpr, cardExpr, escape, beforeLoad, J, typeText } = b
+/** "＋ Add" first (30 Oct 2026, "less is more"): the two ways to add sit behind it. */
+const openAddChoice = async label => {
+  if (!(await ev(`!!document.querySelector('[data-testid="add-open"][aria-expanded="true"]')`))) {
+    if (!(await tapExpr(q('[data-testid="add-open"]')))) return false
+  }
+  return tapExpr(byText(label))
+}
 
 const sheet = () => ev(`(() => { const d = ${q('[data-testid="finish-check"]')}; if (!d) return null; return { title: d.querySelector('h2')?.textContent ?? '', left: [...d.querySelectorAll('[data-testid="finish-check-left"] p')].slice(1).map(p => p.innerText.replace(/\\s+/g, ' ').trim()), buttons: [...d.querySelectorAll('button')].map(x => x.textContent.trim()).filter(t => t && t !== 'Close') } })()`)
 const summary = () => ev(`(() => { const d = [...document.querySelectorAll('[role="dialog"]')].find(x => /^(Session (complete|saved)|Nothing logged|No sets logged)$/.test(x.querySelector('h2')?.textContent ?? '')); if (!d) return null; return { title: d.querySelector('h2').textContent, sets: d.querySelector('[data-testid="summary-sets"]')?.textContent ?? null, setsLabel: d.querySelector('[data-testid="summary-sets-label"]')?.textContent ?? null, extra: d.querySelector('[data-testid="summary-sets-extra"]')?.textContent ?? null, tiles: [...d.querySelectorAll('.grid.grid-cols-3 > div')].map(t => t.innerText.replace(/\\s+/g, ' ').trim()), text: d.innerText.replace(/\\s+/g, ' ').trim() } })()`)
@@ -163,7 +170,7 @@ await load(FLAGS)
 await ready()
 check('4a. Start workout is tapped (nothing is logged, so there is no session otherwise)', await tapExpr(byText('Start session')))
 await wait(500)
-await tapExpr(byText('＋ Add unplanned work'))
+await openAddChoice('Add unplanned work')
 await tapExpr(byText('Cardio'))
 await tapExpr(q('[data-testid="quick-log-other"]'))
 await tapExpr(q('[data-testid="cardio-unplanned"] input[data-field="activity"]')); await typeText('skipping rope')

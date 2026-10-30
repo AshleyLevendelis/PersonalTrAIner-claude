@@ -32,7 +32,6 @@ export function ExerciseLine({
   allSetsLogged = false,
   loggedSummary,
   trailing,
-  index,
   setsDone,
   progressing,
 }: {
@@ -101,9 +100,7 @@ export function ExerciseLine({
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleExpanded() } }}
         className="hit-slop-44 flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-left"
       >
-        {index != null && (
-          <span className="w-4 shrink-0 font-mono text-[0.6875rem] text-muted-foreground" aria-hidden>{String(index).padStart(2, '0')}</span>
-        )}
+        {/* NO 01 / 02 NUMBERS (30 Oct 2026, "less is more"): the list's order already says it. */}
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             {supersetLabel && <span className="shrink-0 font-mono text-[0.625rem] font-semibold text-primary-text glow-mint">{supersetLabel}</span>}

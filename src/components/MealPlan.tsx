@@ -11,7 +11,7 @@ import {
   ShieldAlert,
   Plus,
   Heart,
-  Repeat, ChefHat,
+  Repeat, ChefHat, ChevronDown,
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { FitnessGoal, MacroTargets } from '@/lib/types'
@@ -563,13 +563,13 @@ export function MealPlan({
             one plain list. */}
         {!upcoming && upNextSlot && (
           <section className="mb-[18px]" data-meal-section="upnext">
-            <p className="ds-label mb-2">Up next</p>
+            <p className="sr-only">Up next</p>
             {rowFor(upNextSlot, 'upnext')}
           </section>
         )}
         {laterSlots.length > 0 && (
           <section className="mb-[18px]" data-meal-section="later">
-            {!upcoming && <p className="ds-label">{upNextSlot ? 'Later' : 'Still to eat'}</p>}
+            {!upcoming && <p className={upNextSlot ? 'sr-only' : 'ds-label'}>{upNextSlot ? 'Later' : 'Still to eat'}</p>}
             {laterSlots.map(slot => rowFor(slot, 'later'))}
           </section>
         )}
@@ -737,7 +737,6 @@ function EmptySlotRow({ slot, isGenerating, onRegenerate }: { slot: MealSlotName
 
 /** One hero number (today's planned calories) + a 2px progress line + a quiet tabular-mono macro row — replaces the old dual progress-bar TotalsBar. */
 function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroTargets }) {
-  const calPct = targets.calories > 0 ? Math.min(100, (totals.calories / targets.calories) * 100) : 0
   // THE ENGINE'S VERDICT, NOT A SECOND OPINION. This component had its own
   // rule for "on the number" (calories within 30 kcal, protein and carbs
   // within 10%, fat not looked at) beside the meal engine's bands for a
@@ -754,24 +753,30 @@ function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroT
   // COMPACT SINCE 2b (10 Oct 2026): the kcal LEFT is the hero now, so the
   // planned day is one quiet panel under it — still the engine's own verdict
   // (her 10 Oct "one calculation" ruling), never a second big number.
+  // ONE LINE SINCE 30 OCT 2026 ("less is more"): the planned total and the verdict, no panel and no second
+  // copy of the target (the hero above says it). Tapping it shows the planned protein, carbs and fat.
+  const [open, setOpen] = useState(false)
   return (
-    <div className="rounded-[14px] px-3.5 py-3" style={{ background: 'var(--surface-raised)' }} data-planned-day>
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="text-[0.75rem] text-text-tertiary">
-          Planned <span className="tabular-mono font-semibold text-foreground" data-testid="day-kcal">{Math.round(totals.calories)}</span> kcal
+    <div data-planned-day>
+      <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left">
+        <span className="text-[0.8125rem] text-muted-foreground">
+          Meals planned <span className="tabular-mono font-semibold text-foreground" data-testid="day-kcal">{Math.round(totals.calories)}</span> kcal
         </span>
-        <span className="ds-label-compact">target {targets.calories} · {deltaLabel}</span>
-      </div>
-      <div className="mt-2 h-[2px] rounded-full" style={{ background: 'var(--surface-sunken)' }}>
-        <div className="h-[2px] rounded-full bg-primary" style={{ width: `${calPct}%` }} />
-      </div>
-      <div className="mt-2 flex items-baseline gap-4 tabular-mono text-[0.6875rem]">
-        <span className={proteinAchieved ? 'text-primary-text glow-mint' : 'text-muted-foreground'}>
-          {Math.round(totals.protein)} / {targets.protein} P
+        <span className="flex items-center gap-1 text-[0.75rem] text-muted-foreground">
+          <span data-testid="day-verdict">{deltaLabel}</span>
+          <ChevronDown aria-hidden className={`size-3.5 transition-transform ${open ? 'rotate-180' : ''}`} />
         </span>
-        <span className="text-muted-foreground">{Math.round(totals.carbs)} / {targets.carbs} C</span>
-        <span className="text-muted-foreground">{Math.round(totals.fat)} / {targets.fat} F</span>
-      </div>
+      </button>
+      {open && (
+        <div className="flex items-baseline gap-4 pb-1 tabular-mono text-[0.6875rem]" data-planned-macros>
+          <span className={proteinAchieved ? 'text-primary-text glow-mint' : 'text-muted-foreground'}>
+            {Math.round(totals.protein)} / {targets.protein} P
+          </span>
+          <span className="text-muted-foreground">{Math.round(totals.carbs)} / {targets.carbs} C</span>
+          <span className="text-muted-foreground">{Math.round(totals.fat)} / {targets.fat} F</span>
+          <span className="text-muted-foreground">target {targets.calories}</span>
+        </div>
+      )}
     </div>
   )
 }
@@ -1031,7 +1036,7 @@ function MealSlotRow({
     <div
       data-meal-row={slot}
       data-variant={variant}
-      className={variant === 'upnext' ? 'rounded-[18px] p-4' : 'py-1'}
+      className={variant === 'upnext' ? 'rounded-[16px] px-3.5 py-3' : 'py-1'}
       style={variant === 'upnext'
         ? { background: 'var(--surface-raised)', boxShadow: 'inset 0 0 0 1px rgba(var(--glow-rgb), .35)' }
         : { borderBottom: '1px solid var(--hairline)' }}
@@ -1039,11 +1044,11 @@ function MealSlotRow({
       {variant === 'upnext' ? (
         <button type="button" onClick={onToggle} disabled={!option} className="flex w-full flex-col gap-1.5 text-left disabled:cursor-default">
           <span className="flex items-baseline justify-between gap-3">
-            <span className="glow-mint text-[0.65625rem] font-semibold uppercase tracking-[.2em] text-primary-text">{SLOT_LABEL[slot]}{expanded ? ' · open' : ''}</span>
+            <span className="text-[0.75rem] font-semibold text-primary-text">{SLOT_LABEL[slot]} · next{expanded ? ' · open' : ''}</span>
             {option && kcalText}
           </span>
           {option ? (
-            <span data-meal-name={slot} className="min-w-0 text-[1.1875rem] font-bold tracking-[-.02em]">{displayName}</span>
+            <span data-meal-name={slot} className="min-w-0 text-[1rem] font-semibold">{displayName}</span>
           ) : (
             <span className="text-sm text-muted-foreground" data-testid="meal-slot-all-clash-note">
               {alternatives.length > 0 && alternatives.every(a => a.breaksRestriction) ? 'Nothing saved fits what you avoid' : 'No option generated'}
@@ -1058,7 +1063,7 @@ function MealSlotRow({
             </span>
           )}
           <span className="min-w-0 flex-1">
-            <span className={`block text-[0.625rem] uppercase tracking-[.12em] ${expanded ? 'text-primary-text' : 'text-muted-foreground'}`}>
+            <span className={`block text-[0.71875rem] ${expanded ? 'text-primary-text' : 'text-muted-foreground'}`}>
               {SLOT_LABEL[slot]}{expanded ? ' · open' : ''}
             </span>
             {option ? (

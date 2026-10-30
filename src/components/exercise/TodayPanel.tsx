@@ -36,7 +36,7 @@ import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { ceilingToAskFor, saveStatedCeiling, declineStatedCeilings } from '@/lib/load-ceiling-prompt'
 import { LoadCeilingPrompt } from './LoadCeilingPrompt'
-import { WeekContextRow, ProgramRow } from './WeekContextRow'
+import { WeekContextRow } from './WeekContextRow'
 import { SectionLabel as PageSectionLabel, PRIMARY_CTA_CLASS, PRIMARY_CTA_STYLE } from '@/components/OnePage'
 import { PeekPanel, PeekWhatYouDid } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
@@ -239,6 +239,7 @@ export function TodayPanel({
   // to the day-level "⋮" menu (WeekContextRow) — this is that controlled
   // open state.
   const [unplannedWorkOpen, setUnplannedWorkOpen] = useState(false)
+  const [addChoicesOpen, setAddChoicesOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [summaryData, setSummaryData] = useState<SessionSummaryData | null>(null)
@@ -1484,8 +1485,8 @@ export function TodayPanel({
             todayNudge.source === 'week-note'
               // Clamped, so its chevron must open the REST OF THIS SENTENCE
               // (the week disclosure above), never the chat tab.
-              ? <TrainerNudge text={todayNudge.text} tag="Training" clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
-              : <TrainerNudge text={todayNudge.text} tag="Training" openChat askPrefill={`Tell me more about this: "${todayNudge.text}"`} />
+              ? <TrainerNudge slim={!weekNotesOpen} text={todayNudge.text} tag="Training" clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
+              : <TrainerNudge slim text={todayNudge.text} tag="Training" openChat askPrefill={`Tell me more about this: "${todayNudge.text}"`} />
           )}
           <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} savedCardio={summarySavedCardio} />
           {finishCheck && (
@@ -1564,22 +1565,22 @@ export function TodayPanel({
             extra={tightness.items}
             extraNote={tightness.note}
             extraCaveat={uncoveredNote(tightness)}
+            trailing={
+              // ON THE WARM-UP ROW (30 Oct 2026): the question changes this warm-up, so it sits on it
+              // rather than as a row of its own. Before the session, beside what it changes.
+              <Button
+                variant="ghost"
+                size="sm"
+                className="min-h-[44px] px-3 text-xs text-text-tertiary"
+                data-testid="tightness-open"
+                onClick={() => setTightOpen(true)}
+              >
+                {tightAreas.length > 0
+                  ? `Tight: ${tightness.items.length > 0 ? 'updated' : 'noted'}`
+                  : 'Feeling tight?'}
+              </Button>
+            }
           />
-          {/* BEFORE THE SESSION, BESIDE THE WARM-UP IT CHANGES. Not on the
-              session dock: this is a question you answer while you are still
-              deciding what the next hour looks like, and it has nothing to say
-              once you are three sets in. */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start min-h-[44px] text-xs"
-            data-testid="tightness-open"
-            onClick={() => setTightOpen(true)}
-          >
-            {tightAreas.length > 0
-              ? `Tight: ${tightness.items.length > 0 ? 'warm-up updated' : 'noted'} — change it`
-              : 'Anything feeling tight?'}
-          </Button>
           {tightOpen && (
             <Suspense fallback={null}>
               <TightnessSheet
@@ -1648,24 +1649,38 @@ export function TodayPanel({
               the screen read "＋ Add an exercise＋ Add unplanned work" as one
               run-on string with abutting tap targets. Found by reading a
               screenshot at 390px on 13 Sep 2026 — every check was green. */}
+          {/* ONE "＋ ADD" (30 Oct 2026, "less is more"): the two ways to add sit behind it, still a column
+              when open, so the two never run together on one line (13 Sep). */}
           <div className="flex flex-col items-start gap-1" data-testid="session-foot-actions">
+            <button
+              type="button"
+              data-testid="add-open"
+              aria-expanded={addChoicesOpen}
+              onClick={() => setAddChoicesOpen(o => !o)}
+              className="hit-slop-44 text-left text-[0.8125rem] text-text-tertiary"
+            >
+              ＋ Add
+            </button>
+            {addChoicesOpen && (<>
             {profileId && mesocycle && (
               <button
                 type="button"
                 data-testid="add-exercise"
                 onClick={() => setAddOpen(true)}
-                className="hit-slop-44 text-left text-[0.8125rem] text-text-tertiary"
+                className="hit-slop-44 pl-4 text-left text-[0.8125rem] text-text-tertiary"
               >
-                ＋ Add an exercise
+                Add an exercise
               </button>
             )}
             <button
               type="button"
+              data-testid="add-unplanned"
               onClick={() => setUnplannedWorkOpen(true)}
-              className="hit-slop-44 text-left text-[0.8125rem] text-text-tertiary"
+              className="hit-slop-44 pl-4 text-left text-[0.8125rem] text-text-tertiary"
             >
-              ＋ Add unplanned work
+              Add unplanned work
             </button>
+            </>)}
           </div>
           <AddUnplannedWork
             open={unplannedWorkOpen}
@@ -1676,11 +1691,8 @@ export function TodayPanel({
         </div>
       )}
 
-      {/* THE PROGRAM ROW (5c·4) — the whole programme one tap away, with the plan's own blocks as a bar.
-          Replaces "See the whole program ›" under the strip. On every day, not only a training day. */}
-      {mesocycle && mesocycle.length > 0 && (
-        <ProgramRow mesocycle={mesocycle} liveWeek={liveWeek} onOpenProgram={onOpenProgram} />
-      )}
+      {/* THE PROGRAM ROW LEFT THIS PAGE on 30 Oct 2026 ("less is more"): "Week N of M" at the top of this
+          page opens the whole programme, and Tools has "Your program". */}
       {/* Clears the fixed CTA bar below, so the last row is never sitting
           underneath it. Matches the bar's own height plus its fade. */}
       {showsTodaysSession && (status === 'idle' || status === 'running' || status === 'finished') && <div aria-hidden className="h-[100px]" />}

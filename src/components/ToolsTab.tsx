@@ -1,3 +1,4 @@
+import { programSummary } from '@/lib/one-page'
 import { useEffect, useState, Suspense } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { Disc, History, BookOpen, Timer, ChevronRight, List, TimerReset, ArrowLeft } from 'lucide-react'
@@ -175,9 +176,11 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
     return () => { cancelled = true; unsubscribe() }
   }, [profileId])
 
-  const blockOf = (week: number) => Math.floor((week - 1) / 4) + 1
-  const programSub = mesocycle && mesocycle.length > 0
-    ? `${mesocycle.length} weeks · block ${blockOf(liveWeek ?? 1)} of ${Math.max(1, Math.ceil(mesocycle.length / 4))}`
+  // THE PROGRAM ROW'S LINE MOVED HERE (30 Oct 2026, "less is more", when the Program card left Exercise):
+  // the block she is in and when its deload is, from the plan's own blocks (programSummary).
+  const summary = mesocycle && mesocycle.length > 0 ? programSummary(mesocycle, liveWeek ?? 1) : null
+  const programSub = summary
+    ? [summary.title, summary.deload].filter(Boolean).join(' · ') || `${mesocycle!.length} weeks`
     : 'Your whole plan, week by week'
 
   // STARTED AND NOT RESET — the condition the running card renders on. Paused

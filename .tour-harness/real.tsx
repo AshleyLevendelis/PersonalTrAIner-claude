@@ -1667,7 +1667,7 @@ function Harness() {
     <BottomDockHeightProvider>
     <div className="min-h-[100dvh] bg-background text-foreground">
       {/* App.tsx's own settings wrapper, reproduced — see the header note. */}
-      <div data-tour="settings" className="fixed right-3 z-40" style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}>
+      <div data-tour="settings" className="absolute right-3 z-40" style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}>
         <ProfileMenu onOpenProfile={noop} onNewPlan={noop} />
       </div>
 

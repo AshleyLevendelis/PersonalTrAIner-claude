@@ -72,10 +72,10 @@ export interface KeyItem {
   ariaLabel?: string
 }
 
-/** Two columns, gaps 10 by 22: a 9px swatch, the label, the mono value with its target muted. */
-export function RingKey({ items, ...rest }: { items: KeyItem[]; 'data-testid'?: string }) {
+/** Two columns (or one, beside the rings), gaps 10 by 22: a 9px swatch, the label, the mono value with its target muted. */
+export function RingKey({ items, columns = 2, ...rest }: { items: KeyItem[]; columns?: 1 | 2; 'data-testid'?: string }) {
   return (
-    <div className="grid grid-cols-2 gap-x-[22px] gap-y-2.5" data-testid={rest['data-testid']}>
+    <div className={cn('grid gap-x-[22px] gap-y-2.5', columns === 1 ? 'grid-cols-1' : 'grid-cols-2')} data-testid={rest['data-testid']}>
       {items.map(it => {
         const inner = (
           <>

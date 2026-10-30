@@ -59,7 +59,8 @@ check('no Card survives on this tab', !/<Card[ >]/.test(nutrition))
 // "Targets & plan settings", with the day's calorie target on it.
 check('the Target row is in the scroll', /data-targets-row/.test(scroll) && /Targets &amp; plan settings/.test(scroll))
 check('...with the link that opens the sheet', /setHowItsSetOpen\(true\)/.test(scroll))
-check('...on a 44px target (the row is 52px tall)', /className="flex h-\[52px\] w-full items-center[^"]*"[\s\S]{0,120}data-targets-row/.test(scroll))
+// RE-ANCHORED 30 Oct 2026 ("less is more"): a plain hairline row now, still at least 52px tall.
+check('...on a 44px target (the row is 52px tall)', /className="flex (min-)?h-\[52px\] w-full items-center[^"]*"[\s\S]{0,120}data-targets-row/.test(scroll))
 // THE OTHER HALF. Each of these left the scroll; none of them may have left
 // the app. A "cleaner tab" that dropped the method picker would be a feature
 // deletion wearing a design change's clothes.
@@ -194,7 +195,8 @@ console.log('\n3. The legend is four rows in two columns, beside the rings')
 // RE-ANCHORED 17 Oct 2026 (one-page Nutrition, 5c·6): NO RINGS on this screen. The calories are a bar
 // under the number left, and the four macros sit in a 2x2 grid, each with its own bar — fat included, so
 // fat has its own cell again rather than a muted line.
-check('a 2-column grid holds it', /grid grid-cols-2 border-y border-\[color:var\(--hairline\)\]" data-ring-key/.test(nutrition))
+// RE-ANCHORED 30 Oct 2026 ("less is more", her "Move things"): the four sit in ONE row of four, no icons.
+check('a one-row grid of four holds it', /grid grid-cols-4[^"]*" data-ring-key/.test(nutrition))
 for (const label of ['label="Protein"', 'label="Carbs"', 'label="Fat"', 'label="Water"']) {
   check(`the grid carries ${label}`, nutrition.includes(label))
 }

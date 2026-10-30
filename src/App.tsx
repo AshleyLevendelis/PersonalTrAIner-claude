@@ -3096,7 +3096,9 @@ function App() {
         // gear would otherwise show twice.
         // Hidden on the grocery screen for the same reason (design 3a): its
         // top bar carries the menu too.
-        className={`fixed right-3 z-40 ${activeTab === 'chat' || groceryFullScreen ? 'hidden' : ''}`}
+        // ABSOLUTE, NOT FIXED (30 Oct 2026, "less is more"): it sits at the top of the page and scrolls
+        // away with it. Fixed, it floated over whatever scrolled under it (a weight, a set's numbers).
+        className={`absolute right-3 z-40 ${activeTab === 'chat' || groceryFullScreen ? 'hidden' : ''}`}
         style={{ top: 'calc(0.625rem + env(safe-area-inset-top))' }}
       >
         {/* NEW PLAN LEFT THIS MENU on 6 Sep 2026 — it is Profile's

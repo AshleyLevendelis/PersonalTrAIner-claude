@@ -52,6 +52,9 @@ const NEEDS_KIT = /treadmill|incline|bike|cycl|assault|bag|row(er|ing)|ellipt|ro
 
 /** Open "Add unplanned work", switch to Cardio, and read the chips as drawn. */
 const readChips = async () => {
+  // "＋ Add" first (30 Oct 2026, "less is more"): the two ways to add sit behind it.
+  await ev(`(() => { const more = document.querySelector('[data-testid="add-open"]'); if (more && more.getAttribute('aria-expanded') !== 'true') more.click() })()`)
+  await wait(300)
   const opened = await ev(`(() => {
     const b = [...document.querySelectorAll('button')].find(n => /Add unplanned work/.test(n.textContent || ''))
     if (!b) return false

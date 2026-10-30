@@ -228,8 +228,9 @@ check('...and TodayPanel tells it, from the source that actually won',
 // populate" — that fix is not allowed to regress into "only behind a chevron".
 check('...so the note is never only behind the chevron',
   /\{!expanded && coachNote && !coachNoteShownBelow && \(/.test(contextRow))
+// RE-ANCHORED 30 Oct 2026: closed, the note is the slim one-line note (two rows at most); opened, the full one.
 check('a long week note is capped rather than pushing the session off screen',
-  /<TrainerNudge text=\{todayNudge\.text\}[^>]*clamp=\{!weekNotesOpen\}/.test(today) && /clamp && 'line-clamp-3'/.test(nudgeComponent))
+  /<TrainerNudge slim=\{!weekNotesOpen\} text=\{todayNudge\.text\}[^>]*clamp=\{!weekNotesOpen\}/.test(today) && /clamp && 'line-clamp-3'/.test(nudgeComponent) && /if \(slim\)[\s\S]{0,300}line-clamp-2/.test(nudgeComponent))
 // ...and uncapped once it is opened, in place, rather than reprinted above.
 check('...and expanding unclamps it rather than printing it twice',
   /clamp=\{!weekNotesOpen\}/.test(today)
@@ -250,8 +251,9 @@ check('the chevron only ever has one destination',
   /\{openChat && \(/.test(nudgeComponent) && /\{!openChat && onOpen && \(/.test(nudgeComponent)
   && /const ask = \(\) => \{[\s\S]{0,120}window\.location\.hash = tabHash\('chat'\)/.test(nudgeComponent))
 
-check('"Add unplanned work" is a visible control again', /＋ Add unplanned work/.test(today))
-check('...on a 44px target', /hit-slop-44[\s\S]{0,200}＋ Add unplanned work/.test(today))
+// RE-ANCHORED 30 Oct 2026 ("less is more", her "Move things"): the two ways to add sit behind one "＋ Add".
+check('"Add unplanned work" is one tap away, behind "＋ Add"', /data-testid="add-open"[\s\S]{0,400}＋ Add[\s\S]{0,1200}Add unplanned work/.test(today))
+check('...on a 44px target', /hit-slop-44[^"]*"\s*>\s*Add unplanned work/.test(today))
 check('...and is GONE from the overflow menu, not duplicated',
   !/Add unplanned work/.test(contextRowCode) && !/ListPlus/.test(contextRowCode))
 check('...while session history stays in it', /Session history/.test(contextRow))
@@ -269,7 +271,12 @@ check('...and so is the rounded panel it sat in', !/rounded-2xl/.test(contextRow
 // One-page Exercise (5c·4, 17 Oct 2026): the page is titled "Exercise"; the plan position is the quiet line.
 check('the plan position is a quiet line, not foreground', /className="hit-slop-44 min-w-0 truncate text-\[0\.75rem\] text-muted-foreground"[\s\S]{0,120}data-testid="week-context-header"/.test(contextRow))
 check('the tour anchor survived the restyle', /data-tour="extoday"/.test(contextRow))
-check('the strip sits 18px under the key, seven equal columns (5c·4)', /className="mt-\[18px\] grid grid-cols-7 gap-1" data-exercise-strip/.test(contextRow))
+// RE-ANCHORED 30 Oct 2026: the week's rings and key became one line, and the strip sits under it.
+{
+  const line = contextRow.indexOf('data-testid="week-meter"')
+  const strip = contextRow.indexOf('className="mt-2 grid grid-cols-7 gap-1" data-exercise-strip')
+  check('the strip sits under the week line, seven equal columns', line !== -1 && strip !== -1 && line < strip, { line, strip })
+}
 // The assistant has one name in UI text.
 check('nothing on this screen calls it "Coach"',
   !/Coach:/.test(contextRowCode) && !/Coach:/.test(todayCode), 'Coach: found')

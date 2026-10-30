@@ -41,7 +41,7 @@ console.log('\n1. Home\'s coach note')
   check('it moves on every 6 seconds', /window\.setTimeout\(\(\) => go\(i \+ 1\), 6000\)/.test(note))
   check('...but never under reduced motion — the user can stop it (WCAG 2.2.2)', /prefers-reduced-motion: reduce/.test(note) && /if \([^)]*reduced[^)]*\) return/.test(note), note.slice(0, 600))
   check('...and it holds while touched or focused', /onFocusCapture=\{\(\) => setHeld\(true\)\}/.test(note) && /onPointerDown=\{\(\) => setHeld\(true\)\}/.test(note) && /if \([^)]*held[^)]*\) return/.test(note))
-  check('an adaptation nudge with its actions is shown alone, never rotated away', /\? <TrainerNudge \{\.\.\.trainerNudge\} \/>\s*: plainTips\.length > 0 && <HomeCoachNote tips=\{plainTips\} \/>/.test(dash))
+  check('an adaptation nudge with its actions is shown alone, never rotated away', /\? <TrainerNudge \{\.\.\.trainerNudge\}( slim)? \/>\s*: plainTips\.length > 0 && <HomeCoachNote tips=\{plainTips\} \/>/.test(dash))
   // The order the brief gives: the day's pick, then what's left, then the rest.
   // A day where several tips are true at once, so their ORDER is a question.
   const ctx: Parameters<typeof eligibleCoachTips>[0] = {

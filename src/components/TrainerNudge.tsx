@@ -74,6 +74,12 @@ export interface TrainerNudgeProps {
   onTextTap?: () => void
   /** Fading between two lines (Home's rotation). */
   fading?: boolean
+  /**
+   * ONE LINE, "less is more" (her 30 Oct 2026 ruling, "Move things"): the sparkle, the line (two rows at
+   * most) and one chevron to the chat. The tag stays for a screen reader; the dots go, and tapping the
+   * line (a real button) moves to the next tip. Actions, when there are any, still sit under the line.
+   */
+  slim?: boolean
 }
 
 /**
@@ -81,10 +87,72 @@ export interface TrainerNudgeProps {
  * "Ask ↗" and the dots on one row, the line under it at 13.5px. One
  * component for Home, Nutrition and Exercise, so the three cannot drift.
  */
-export function TrainerNudge({ text, actions, openChat, onOpen, compact, clamp, className, tag, askPrefill, pager, onTextTap, fading, ...rest }: TrainerNudgeProps) {
+export function TrainerNudge({ text, actions, openChat, onOpen, compact, clamp, className, tag, askPrefill, pager, onTextTap, fading, slim, ...rest }: TrainerNudgeProps) {
   const ask = () => {
     if (askPrefill) setChatPrefill(askPrefill)
     window.location.hash = tabHash('chat')
+  }
+  if (slim) {
+    const go = openChat ? ask : onOpen
+    const line = (
+      <span className="line-clamp-2 transition-opacity duration-[250ms]" style={{ opacity: fading ? 0 : 1 }} data-nudge-text>{text}</span>
+    )
+    return (
+      <div
+        role="note"
+        aria-label="Personal TrAIner says"
+        data-testid={rest['data-testid'] ?? 'trainer-nudge'}
+        data-nudge-slim
+        className={cn('flex flex-col gap-1.5 rounded-[14px]', className)}
+        style={{ padding: '10px 12px 10px 14px', background: 'var(--role-ai-bg)' }}
+      >
+        <div className="flex items-center gap-2.5">
+          <Sparkles aria-hidden className="size-[15px] shrink-0" style={{ color: 'var(--role-ai-accent)' }} />
+          <span className="sr-only" data-nudge-tag>{tag ? `Trainer · ${tag}` : 'Trainer'}</span>
+          {onTextTap ? (
+            <button
+              type="button"
+              onClick={onTextTap}
+              aria-label={pager && pager.count > 1 ? `Tip ${pager.index + 1} of ${pager.count}. Next tip` : undefined}
+              className="min-w-0 flex-1 bg-transparent p-0 text-left text-[0.875rem] leading-[1.4]"
+              style={{ color: 'var(--role-ai-text)' }}
+            >
+              {line}
+            </button>
+          ) : (
+            <div className="min-w-0 flex-1 text-[0.875rem] leading-[1.4]" style={{ color: 'var(--role-ai-text)' }}>{line}</div>
+          )}
+          {go && (
+            <button
+              type="button"
+              onClick={go}
+              aria-label={openChat ? 'Ask the Personal TrAIner about this' : 'Read the rest of this'}
+              className="hit-slop-44 flex size-6 shrink-0 items-center justify-center bg-transparent p-0"
+              style={{ color: 'var(--muted-foreground)' }}
+              data-nudge-ask={openChat ? '' : undefined}
+            >
+              <ChevronRight size={16} aria-hidden />
+            </button>
+          )}
+        </div>
+        {actions && actions.length > 0 && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pl-[25px]">
+            {actions.map(a => (
+              <button
+                key={a.label}
+                type="button"
+                disabled={a.disabled}
+                onClick={() => { void a.onClick() }}
+                className="hit-slop-44 bg-transparent p-0 text-[0.78125rem] font-semibold disabled:opacity-50"
+                style={{ color: a.secondary ? 'var(--muted-foreground)' : 'var(--primary)' }}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
   }
   return (
     <div

@@ -19,7 +19,7 @@ import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
 import { stepsTargetFor } from '@/lib/steps-target'
 import { getStepsForDate, logStepsManual, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, type DailyStepsRow } from '@/lib/steps-store'
 import { getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
-import { Trophy, Moon, Dumbbell, UtensilsCrossed, Activity } from 'lucide-react'
+import { Trophy, Moon, Dumbbell, UtensilsCrossed, Activity, ChevronDown } from 'lucide-react'
 import { WeighInCard } from '@/components/WeighInCard'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
@@ -30,7 +30,6 @@ import { dayAsShown, eatenMacrosBySlot, aroundEatenKeptKey, readAroundEatenKept 
 import { mealSections } from '@/lib/meal-sections'
 import { SLOT_ORDER, SLOT_LABEL } from '@/components/MealPlan'
 import type { PoolOption } from '@/lib/meal-generation'
-import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { TrainerNudge, type TrainerNudgeProps } from '@/components/TrainerNudge'
 import { sessionSetCount } from '@/lib/session-count'
 import { readSessionSummary } from '@/lib/session-summary-store'
@@ -301,6 +300,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const [stepsOpen, setStepsOpen] = useState(false)
   const [stepsError, setStepsError] = useState<string | null>(null)
   const [weighInOpen, setWeighInOpen] = useState(false)
+  const [progressOpen, setProgressOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
 
   /**
@@ -474,7 +474,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   return (
     // ONE PAGE (design 5c·5, 17 Oct 2026): the hero, its key, one coach note, then Up next and Progress
     // as hairline rows. Room at the foot for the docked button. docs/plans/one-page-tabs.md.
-    <div className={`relative flex flex-col gap-[18px] ${showCta ? 'pb-24' : ''}`} data-home-page>
+    <div className="relative flex flex-col gap-[18px]" data-home-page>
       {/* 1. WHO AND WHEN */}
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -497,16 +497,12 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
       {/* 2. TODAY SO FAR — the rings open Nutrition; Steps, in the key, opens the steps entry (her ruling). */}
       <div data-tour="tiles" className="flex flex-col gap-[18px]">
-        <div className="grid grid-cols-2 items-center gap-x-[22px]" data-home-today>
-          <div className="min-w-0">
-            <p className="glow-mint text-[0.65625rem] font-semibold uppercase tracking-[.2em] text-primary-text">Today so far</p>
-            <p className="tabular-mono glow-mint-lg mt-2 text-[3.5rem] font-bold leading-[.9] tracking-[-.04em]" style={{ color: 'var(--num-hero)' }} data-testid="home-so-far">
-              {soFar == null ? '—' : `${soFar}%`}
-            </p>
-            <p className="mt-2 text-[0.75rem] text-muted-foreground">of today&apos;s targets</p>
-          </div>
-          <button type="button" onClick={toNutrition} className="justify-self-end" aria-label="Open Nutrition" data-home-rings>
+        {/* LESS IS MORE (30 Oct 2026): the rings, the percentage and the key are one object, side by side,
+            instead of a headline, a ring and a two-column key stacked three deep. */}
+        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-5" data-home-today>
+          <button type="button" onClick={toNutrition} aria-label="Open Nutrition" data-home-rings>
             <RingMeter
+              size={128}
               label={`Calories ${pct(calShare)}, protein ${pct(proteinShare)}, water ${pct(waterShare)}, steps ${pct(stepsShare)}`}
               rings={[
                 { key: 'calories', share: calShare, color: 'var(--primary)', glow: true },
@@ -516,16 +512,25 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               ]}
             />
           </button>
+          <div className="flex min-w-0 flex-col gap-2.5">
+            <p className="flex items-baseline gap-1.5">
+              <span className="tabular-mono glow-mint-lg text-[2rem] font-bold leading-none tracking-[-.03em]" style={{ color: 'var(--num-hero)' }} data-testid="home-so-far">
+                {soFar == null ? '—' : `${soFar}%`}
+              </span>
+              <span className="text-[0.75rem] text-muted-foreground">of today&apos;s targets</span>
+            </p>
+            <RingKey
+              columns={1}
+              data-testid="home-ring-key"
+              items={[
+                { key: 'calories', label: 'Calories', color: 'var(--primary)', glow: true, value: Math.round(data.caloriesEaten).toLocaleString(), target: data.hasNutritionTargets ? `/${Math.round(data.caloriesTarget).toLocaleString()}` : undefined, onClick: toNutrition, ariaLabel: 'Calories — open Nutrition' },
+                { key: 'protein', label: 'Protein', color: 'var(--chart-2)', value: String(Math.round(data.proteinEaten)), target: data.hasNutritionTargets ? `/${Math.round(data.proteinTarget)}g` : 'g', onClick: toNutrition, ariaLabel: 'Protein — open Nutrition' },
+                { key: 'water', label: 'Water', color: 'var(--chart-3)', value: (data.waterMl / 1000).toFixed(1), target: `/${(data.waterTargetMl / 1000).toFixed(1)}L`, onClick: toNutrition, ariaLabel: 'Water — open Nutrition to log it' },
+                { key: 'steps', label: 'Steps', color: 'var(--chart-4)', value: compactCount(stepsToday), target: `/${compactCount(stepsTarget)}`, onClick: () => setStepsOpen(o => !o), ariaLabel: `Steps: ${stepsToday.toLocaleString()} of ${stepsTarget.toLocaleString()}. Tap to log today's steps.` },
+              ]}
+            />
+          </div>
         </div>
-        <RingKey
-          data-testid="home-ring-key"
-          items={[
-            { key: 'calories', label: 'Calories', color: 'var(--primary)', glow: true, value: Math.round(data.caloriesEaten).toLocaleString(), target: data.hasNutritionTargets ? `/${Math.round(data.caloriesTarget).toLocaleString()}` : undefined, onClick: toNutrition, ariaLabel: 'Calories — open Nutrition' },
-            { key: 'protein', label: 'Protein', color: 'var(--chart-2)', value: String(Math.round(data.proteinEaten)), target: data.hasNutritionTargets ? `/${Math.round(data.proteinTarget)}g` : 'g', onClick: toNutrition, ariaLabel: 'Protein — open Nutrition' },
-            { key: 'water', label: 'Water', color: 'var(--chart-3)', value: (data.waterMl / 1000).toFixed(1), target: `/${(data.waterTargetMl / 1000).toFixed(1)}L`, onClick: toNutrition, ariaLabel: 'Water — open Nutrition to log it' },
-            { key: 'steps', label: 'Steps', color: 'var(--chart-4)', value: compactCount(stepsToday), target: `/${compactCount(stepsTarget)}`, onClick: () => setStepsOpen(o => !o), ariaLabel: `Steps: ${stepsToday.toLocaleString()} of ${stepsTarget.toLocaleString()}. Tap to log today's steps.` },
-          ]}
-        />
         {stepsOpen && (
           <div className="flex flex-col gap-1.5" data-home-steps-entry>
             <span className="flex items-center gap-2">
@@ -554,7 +559,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
       {/* 3. THE TRAINER'S NOTE — one per screen. */}
       {trainerNudge
-        ? <TrainerNudge {...trainerNudge} />
+        ? <TrainerNudge {...trainerNudge} slim />
         : plainTips.length > 0 && <HomeCoachNote tips={plainTips} />}
 
       {/* SHOPPING, ON THE DAY SHE SHOPS. */}
@@ -585,6 +590,20 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             topPr={prCount > 0 && topPr ? `${topPrLift ?? ''} ${topPr}`.trim() : null}
             onSummary={card ? () => setSummaryOpen(true) : undefined}
           />
+        {/* THE START BUTTON (30 Oct 2026): under the session it starts, not docked over the page as a
+            second copy of the row above it. Gone on a rest day, a moved day, an unknown plan and once done. */}
+        {showCta && (
+          <div className="border-b border-[color:var(--hairline)] pb-3" data-home-cta>
+            <Button
+              size="cta"
+              className={`glow-bloom-once ${PRIMARY_CTA_CLASS}`}
+              style={PRIMARY_CTA_STYLE}
+              onClick={() => { window.location.hash = tabHash('exercise') }}
+            >
+              {status === 'not_started' ? (data.session.focus ? `Start ${data.session.focus}` : 'Start session') : 'Continue session'}
+            </Button>
+          </div>
+        )}
           {nextMeal && nextMealSlot && (
             <PageRow
               icon={<UtensilsCrossed className="size-4" />}
@@ -595,14 +614,6 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               data-home-next-meal={nextMealSlot}
             />
           )}
-          {tomorrow && (
-            <PageRow
-              icon={<Moon className="size-4" />}
-              title={tomorrow.rest ? 'Tomorrow · Rest day' : <>Tomorrow · {tomorrow.focus}</>}
-              sub={!tomorrow.rest && data.tomorrowLabel ? data.tomorrowLabel.split(' · ').slice(1).join(' · ') || undefined : undefined}
-              data-home-tomorrow
-            />
-          )}
         </RowList>
         {cardioLines && <div className="pt-2">{cardioLines}</div>}
         <HomeWeekBoundaryNote days={week.days} todayDate={activeSession.date} />
@@ -610,8 +621,28 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
       {/* 5. PROGRESS — the weight (its header is the door to the weigh-in), the latest PR, the volume. */}
       <section>
-        <SectionLabel rightMono={false} right={data.phase ? `${data.phase.phaseLabel ? `${data.phase.phaseLabel} · ` : ''}week ${data.phase.weekNumber} of ${data.phase.totalWeeks}` : undefined}>Progress</SectionLabel>
-        <div className="border-y border-[color:var(--hairline)] py-3" data-home-weight>
+        <button
+          type="button"
+          onClick={() => setProgressOpen(o => !o)}
+          aria-expanded={progressOpen}
+          className="flex min-h-[56px] w-full items-center gap-3 border-b border-[color:var(--hairline)] py-2 text-left"
+          data-home-progress-toggle
+        >
+          <span className="min-w-0 flex-1">
+            <span className="block text-[0.71875rem] text-muted-foreground">Progress</span>
+            <span className="block truncate text-[0.90625rem]">
+              {lastWeighIn ? `${lastWeighIn.kg.toFixed(1)} kg` : 'No weigh-in yet'} · {latestPr ? `${shortLiftName(latestPr.exerciseName)} new PR` : 'no new PR this week'}
+            </span>
+          </span>
+          <ChevronDown aria-hidden className={`size-4 shrink-0 transition-transform ${progressOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--text-dim)' }} />
+        </button>
+        {progressOpen && (<>
+        {data.phase && (
+          <p className="pt-2 text-[0.71875rem] text-muted-foreground" data-home-phase>
+            {data.phase.phaseLabel ? `${data.phase.phaseLabel} · ` : ''}week {data.phase.weekNumber} of {data.phase.totalWeeks}
+          </p>
+        )}
+        <div className="border-b border-[color:var(--hairline)] py-3" data-home-weight>
           <button
             type="button"
             onClick={() => setWeighInOpen(o => !o)}
@@ -678,25 +709,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             )}
           />
         </div>
+        </>)}
       </section>
 
-      {/* 6. THE DOCKED BUTTON — today's session by name; gone on a rest day and once it is done. */}
-      {showCta && (
-        <div
-          className="fixed inset-x-0 z-40 px-[22px] pb-3 pt-3.5"
-          style={{ bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom))`, background: 'linear-gradient(to top, var(--background) 70%, transparent)' }}
-          data-home-cta
-        >
-          <Button
-            size="cta"
-            className={`glow-bloom-once ${PRIMARY_CTA_CLASS}`}
-            style={PRIMARY_CTA_STYLE}
-            onClick={() => { window.location.hash = tabHash('exercise') }}
-          >
-            {status === 'not_started' ? (data.session.focus ? `Start ${data.session.focus}` : 'Start session') : 'Continue session'}
-          </Button>
-        </div>
-      )}
       {card && (
         <Suspense fallback={null}>
           <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={card} />
@@ -881,6 +896,7 @@ export function HomeCoachNote({ tips }: { tips: HomeTip[] }) {
       onPointerLeave={() => setHeld(false)}
     >
       <TrainerNudge
+        slim
         text={tip.text}
         tag={tip.tag}
         openChat

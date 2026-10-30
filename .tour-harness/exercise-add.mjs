@@ -74,11 +74,14 @@ const before = await headerMinutes()
 check('0b. the header states a length', Number.isFinite(before.mins), before)
 
 // --- the entry point ------------------------------------------------------
-check('1a. "Add an exercise" is at the foot of the list', await has('[data-testid="add-exercise"]'))
+// RE-ANCHORED 30 Oct 2026 ("less is more", her "Move things"): the two ways to add sit behind one "＋ Add".
+check('1a. "＋ Add" is at the foot of the list, and "Add an exercise" is one tap behind it',
+  (await has('[data-testid="add-open"]')) && !(await has('[data-testid="add-exercise"]'))
+  && (await tap('[data-testid="add-open"]')) && (await until(() => has('[data-testid="add-exercise"]'), v => v)))
 // HER 6 SEP RULE, still holding: one entry point per dialog. The plan edit and
 // the logging affordance are both there and are different buttons with
 // different words, so neither can be mistaken for the other.
-const feet = await ev(`[...document.querySelectorAll('button')].map(b => b.textContent.trim()).filter(t => t.startsWith('＋'))`)
+const feet = await ev(`[...document.querySelectorAll('[data-testid="session-foot-actions"] button')].map(b => b.textContent.trim())`)
 check('1b. ...beside, and distinct from, "Add unplanned work"',
   feet.filter(t => /add an exercise/i.test(t)).length === 1 && feet.some(t => /unplanned/i.test(t)), feet)
 
@@ -88,9 +91,9 @@ check('1b. ...beside, and distinct from, "Add unplanned work"',
 // tap targets, on a screen meant to be used one-handed in a gym. Every check
 // was green; a screenshot found it. Compared by top edge rather than by any
 // class name, so a different layout that still stacks them passes.
-const footTops = await ev(`[...document.querySelectorAll('[data-testid="session-foot-actions"] button')].map(b => Math.round(b.getBoundingClientRect().top))`)
+const footTops = await ev(`['add-exercise', 'add-unplanned'].map(id => { const n = document.querySelector('[data-testid="' + id + '"]'); return n ? Math.round(n.getBoundingClientRect().top) : null })`)
 check('1c. ...on its own line, not run together with it',
-  Array.isArray(footTops) && footTops.length === 2 && footTops[1] - footTops[0] >= 16, footTops)
+  Array.isArray(footTops) && footTops.every(t => t != null) && footTops[1] - footTops[0] >= 16, footTops)
 
 check('2a. tapping it opens the sheet', (await tap('[data-testid="add-exercise"]')) && (await until(() => has('[data-testid="add-exercise-sheet"]'), v => v)))
 await shoot('exercise-add-1-suggestions')

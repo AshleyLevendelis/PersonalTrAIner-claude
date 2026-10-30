@@ -65,7 +65,6 @@ async function main() {
     w(9, 3, 'Maximal Strength'), w(10, 3, 'Maximal Strength'), w(11, 3, 'Maximal Strength'), w(12, 3, 'Maximal Strength'),
     w(13, 4, 'Power'), w(14, 4, 'Deload', true),
   ]
-  const { ProgramRow: ProgramRowEarly } = await import('../src/components/exercise/WeekContextRow')
   const p6 = programSummary(meso, 6)
   check('one segment per block, in order', p6.segments.map(s => s.block).join(',') === '1,2,3,4', p6.segments)
   check('each named by its own phase (the non-deload week\'s), never Base/Build/Peak', p6.segments.map(s => s.label).join('|') === 'Anatomical adaptation|Hypertrophy|Maximal strength|Power', p6.segments.map(s => s.label))
@@ -79,14 +78,13 @@ async function main() {
   const p8 = programSummary(meso, 8)
   check('the last week of a block is still that block, filled to the end — not done', p8.segments[1].state === 'current' && p8.segments[1].fill === 1, p8.segments[1])
   check('a calibration week says so in the title', programSummary(meso, 1).title === 'Calibration week', programSummary(meso, 1).title)
-  const cal = renderToStaticMarkup(React.createElement(ProgramRowEarly, { mesocycle: meso, liveWeek: 1 }))
-  check('...and the row says "Calibration week" first, over the deload ahead (week 1 has one in 3 weeks)', /data-testid="program-row-sub"[^>]*>Calibration week</.test(cal) && programSummary(meso, 1).deload === 'deload in 3 wks', cal.slice(0, 400))
+  // RE-ANCHORED 30 Oct 2026 ("less is more", her "Move things"): the Program card left Exercise and its line moved
+  // onto Tools' "Your program" row, built from the same summary, title first.
+  const tools = read('src/components/ToolsTab.tsx')
+  check('...and Tools\' "Your program" line says it, title first, then the deload', /programSummary\(mesocycle, liveWeek \?\? 1\)/.test(tools) && /\[summary\.title, summary\.deload\]\.filter\(Boolean\)\.join\(' · '\)/.test(tools) && /label: 'Your program', sub: programSub/.test(tools))
+  check('...which for week 1 reads "Calibration week · deload in 3 wks"', [programSummary(meso, 1).title, programSummary(meso, 1).deload].filter(Boolean).join(' · ') === 'Calibration week · deload in 3 wks')
   check('no plan, no segments (the row draws nothing)', programSummary([], 3).segments.length === 0)
 
-  const { ProgramRow } = await import('../src/components/exercise/WeekContextRow')
-  const html = renderToStaticMarkup(React.createElement(ProgramRow, { mesocycle: meso, liveWeek: 6 }))
-  check('the rendered bar carries the three states in order', (html.match(/data-phase="(\w+)"/g) ?? []).join(',') === 'data-phase="done",data-phase="current",data-phase="future",data-phase="future"', html.match(/data-phase="(\w+)"/g))
-  check('...and says the deload beside "Program"', /data-testid="program-row-sub"[^>]*>deload in 2 wks</.test(html), html.slice(0, 600))
 
   const { RingMeter } = await import('../src/components/OnePage')
   const rings = renderToStaticMarkup(React.createElement(RingMeter, { label: 'x', rings: [{ key: 'a', share: 0.25, color: 'red', glow: true }, { key: 'b', share: null, color: 'blue' }] }))
@@ -128,17 +126,67 @@ async function main() {
   console.log('\n5. Nothing the old screens carried is gone')
   check('Home: the weigh-in still opens from the weight', /onClick=\{\(\) => setWeighInOpen\(o => !o\)\}/.test(home) && /<WeighInCard /.test(home))
   check('Home: a finished session still opens its summary', /onSummary=\{card \? \(\) => setSummaryOpen\(true\) : undefined\}/.test(home) && /<SessionSummaryDialog /.test(home))
-  check('Home: the docked button starts or continues, and only then', /const showCta = status === 'not_started' \|\| status === 'in_progress'/.test(home) && /\{showCta && \(/.test(home))
+  check('Home: the Start button starts or continues, and only then', /const showCta = status === 'not_started' \|\| status === 'in_progress'/.test(home) && /\{showCta && \(/.test(home))
   check('Nutrition: the targets sheet opens from the Targets row', /onClick=\{\(\) => setHowItsSetOpen\(true\)\}[\s\S]{0,200}data-targets-row/.test(nut))
   check('Nutrition: the resize and top-up offers still render', /data-testid="meal-refit-offer"/.test(nut) && /data-testid="meal-top-up-offer"/.test(nut))
   const row = read('src/components/exercise/WeekContextRow.tsx')
   check('Exercise: the ⋯ menu keeps What happened? and Session history', /data-testid="what-happened-item"/.test(row) && /Session history/.test(row))
   check('Exercise: the week number still opens the programme', /onClick=\{onOpenProgram\}\s*data-testid="week-context-header"/.test(row))
   check('Exercise: the meter counts the strip\'s days (tallyWeek, weekSetCount)', /tallyWeek\(days,/.test(row) && /weekSetCount\(days\)/.test(row))
-  check('Exercise: the Program row replaced the old link', /export function ProgramRow/.test(row) && !/See the whole program/.test(row))
+  check('Exercise: the old "See the whole program" link has not come back', !/See the whole program/.test(row))
   const panel = read('src/components/exercise/TodayPanel.tsx')
-  check('Exercise: the Program row is on the page', /<ProgramRow mesocycle=\{mesocycle\} liveWeek=\{liveWeek\} onOpenProgram=\{onOpenProgram\} \/>/.test(panel))
+  check('Exercise: the programme is still one tap away (the week number), and Tools still opens it', /onClick=\{onOpenProgram\}\s*data-testid="week-context-header"/.test(row) && /label: 'Your program'[^\n]*programHash\(\)/.test(tools))
   check('Exercise: today\'s lifts carry the shared set count', /<PageSectionLabel right=\{heroCount \? <span data-testid="hero-sets">/.test(panel))
+
+  console.log('\n6. Less is more (her "Move things", 30 Oct 2026): said once, the rest one tap away')
+  const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '')
+  const homeCode = strip(home)
+  {
+    const sessionAt = homeCode.indexOf('<SessionRow')
+    const ctaAt = homeCode.indexOf('data-home-cta')
+    const mealAt = homeCode.indexOf('data-home-next-meal')
+    check('Home: the Start button sits under the session row it starts, before the next meal', sessionAt !== -1 && ctaAt > sessionAt && mealAt > ctaAt, { sessionAt, ctaAt, mealAt })
+    check('...and is not docked over the page', !/fixed inset-x-0[^"]*"[\s\S]{0,300}data-home-cta/.test(homeCode))
+    check('Home: no Tomorrow row (the session line already says tomorrow)', !/data-home-tomorrow/.test(homeCode) && /glanceParts\.push\(tomorrow\.rest \? 'rest tomorrow'/.test(homeCode))
+    const toggleAt = homeCode.indexOf('data-home-progress-toggle')
+    const openAt = homeCode.indexOf('{progressOpen && (')
+    const weightAt = homeCode.indexOf('data-home-weight')
+    const prAt = homeCode.indexOf('data-home-latest-pr')
+    const volAt = homeCode.indexOf('data-home-volume')
+    check('Home: weight, latest PR and volume sit behind one Progress row', toggleAt !== -1 && openAt > toggleAt && weightAt > openAt && prAt > openAt && volAt > openAt, { toggleAt, openAt, weightAt, prAt, volAt })
+    check('...which says the weight and the PR state while closed', /lastWeighIn \? `\$\{lastWeighIn\.kg\.toFixed\(1\)\} kg`/.test(homeCode.slice(toggleAt - 600, openAt)))
+    check('Home: the key is one column beside the rings', /<RingKey\s+columns=\{1\}/.test(homeCode))
+  }
+  const nudge = read('src/components/TrainerNudge.tsx')
+  {
+    const slimAt = nudge.indexOf('if (slim) {')
+    const slim = slimAt < 0 ? '' : nudge.slice(slimAt, nudge.indexOf('\n  return (\n    <div', slimAt + 20))
+    check('the one-line note keeps its tag for a screen reader', /className="sr-only" data-nudge-tag/.test(slim))
+    check('...caps the line at two rows', /line-clamp-2/.test(slim))
+    check('...keeps an adaptation\'s actions', /actions\.map\(a =>/.test(slim))
+    check('...and moving to the next tip is a real button', /\{onTextTap \? \(\s*<button/.test(slim))
+    check('Home, Nutrition and Exercise all use it', /<TrainerNudge \{\.\.\.trainerNudge\} slim \/>/.test(home) && /<TrainerNudge\s+slim\s+text=\{tip\.text\}/.test(home)
+      && /<TrainerNudge slim text=\{macroNudge\}/.test(nut) && /<TrainerNudge slim text=\{todayNudge\.text\}/.test(panel))
+  }
+  check('Nutrition: the macros are one row of four', /grid grid-cols-4[^"]*" data-ring-key/.test(nut))
+  const mealPlan = read('src/components/MealPlan.tsx')
+  {
+    const heroAt = mealPlan.indexOf('function TotalsHero')
+    const hero = heroAt < 0 ? '' : mealPlan.slice(heroAt, mealPlan.indexOf('\n}\n', heroAt))
+    check('Nutrition: the planned day is one line with the engine\'s verdict, macros behind a tap', /data-testid="day-kcal"/.test(hero) && /\{deltaLabel\}/.test(hero) && /\{open && \(/.test(hero) && hero.indexOf('{open && (') < hero.indexOf('{targets.protein} P'))
+  }
+  check('Nutrition: the allergy line is still under the list', /Ingredients are filtered, not verified\. Check labels if you have an allergy\./.test(mealPlan))
+  check('Exercise: no week rings on the page', !/<RingMeter/.test(strip(row)) && /data-testid="week-meter-count">\{tally\.sessionsDone\} of \{tally\.sessionsPlanned\}/.test(row))
+  check('Exercise: "Feeling tight?" is on the warm-up row', /trailing=\{[\s\S]{0,600}data-testid="tightness-open"/.test(panel))
+  {
+    const openAt = panel.indexOf('data-testid="add-open"')
+    const gateAt = panel.indexOf('{addChoicesOpen && (')
+    const exAt = panel.indexOf('data-testid="add-exercise"')
+    const unAt = panel.indexOf('data-testid="add-unplanned"')
+    check('Exercise: both ways to add sit behind one "＋ Add"', openAt !== -1 && gateAt > openAt && exAt > gateAt && unAt > gateAt, { openAt, gateAt, exAt, unAt })
+  }
+  const app = read('src/App.tsx')
+  check('the settings gear scrolls with the page, never floats over it', /className=\{`absolute right-3 z-40 \$\{activeTab === 'chat'/.test(app) && !/className=\{`fixed right-3 z-40 \$\{activeTab === 'chat'/.test(app))
 
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.log(`${failures} FAILED`); process.exit(1) }
