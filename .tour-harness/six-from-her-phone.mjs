@@ -174,8 +174,12 @@ console.log('\n5. HOME — last known numbers, not a grey line, on a tab switch\
   const onReturn = await ev(`document.body.innerText.replace(/\\s+/g, ' ').slice(0, 300)`)
   check('coming back paints straight away, with no "Loading your day"',
     !/Loading your day/.test(onReturn), onReturn.slice(0, 200))
+  // RE-ANCHORED 31 Oct 2026 (Home 2c): the words this looked for moved below the first 300 characters (the rings
+  // now sit under the session card). The property is the same: the session card holds a real session name and the
+  // four rings are drawn, read off the elements rather than off a slice of the page's text.
+  const painted = await ev(`({ hero: document.querySelector('[data-home-hero]')?.getAttribute('data-home-hero') ?? null, title: document.querySelector('[data-home-title]')?.textContent?.trim() ?? '', rings: document.querySelectorAll('[data-home-rings] [aria-label]').length })`)
   check('...and what it paints is the real screen, not an empty card',
-    /Today so far|kcal|Calories|Tomorrow/i.test(onReturn), onReturn.slice(0, 200))
+    painted.hero !== null && painted.hero !== 'unknown' && painted.title.length > 0 && painted.rings === 4, painted)
   await shoot('six-home-on-return')
 
   // And it is still not stale: the re-read runs and swaps in.

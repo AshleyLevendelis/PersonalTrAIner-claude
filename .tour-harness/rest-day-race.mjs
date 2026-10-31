@@ -76,7 +76,10 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, devi
 // which can land between documents, where `document.body` is null — the driver
 // crashed on the full sweep that day (2 checks ran of 20) and passed on the
 // re-run. A page with no body yet has no text yet; the poll simply goes round.
-const read = () => ev(`({ text: document.body ? document.body.innerText : '', thread: document.querySelector('[data-testid="chat-thread"]')?.innerText ?? null, planArrived: window.__planArrived === true })`)
+// RE-ANCHORED 31 Oct 2026 (Home 2c): the session card no longer sits under an "UP NEXT" heading; it is the one glowing
+// card ([data-home-hero], its status in the attribute) with the name in [data-home-title], and the four rings say
+// their names only to a screen reader ("Calories: 0 of 2,400. Open Nutrition"). Read those, null-safe.
+const read = () => ev(`({ text: document.body ? document.body.innerText : '', thread: document.querySelector('[data-testid="chat-thread"]')?.innerText ?? null, planArrived: window.__planArrived === true, hero: document.querySelector('[data-home-hero]')?.getAttribute('data-home-hero') ?? null, title: document.querySelector('[data-home-title]')?.textContent?.trim() ?? null, tomorrow: document.querySelector('[data-home-tomorrow] .font-bold')?.textContent?.trim() ?? null, rings: [...document.querySelectorAll('[data-home-rings] [aria-label]')].map(e => e.getAttribute('aria-label').split(':')[0]) })`)
 const text = async () => (await read()).text
 // UNDER the 2.5s opener ceiling on purpose: the runs that recovered on their
 // own were the SLOW ones, where the plan missed the deadline and the timer
@@ -132,30 +135,37 @@ console.log('\n  HOME — the session block, same window')
 // ---------------------------------------------------------------------------
 page = '/.tour-harness/real.html'
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?planDelay=${PLAN_DELAY}` })
-// One-page Home (17 Oct 2026): the session is the first row under UP NEXT.
-const homeFirst = await firstPaintOf(/UP NEXT/)
+// Home 2c (31 Oct 2026): the session is the glowing card; wait for it to be drawn at all.
+const firstPaintOfHero = async () => {
+  for (let i = 0; i < 60; i++) { const r = await read(); if (r.hero) return r; await wait(100) }
+  return await read()
+}
+const homeFirst = await firstPaintOfHero()
 const homeEarly = homeFirst.text
 check('Home draws its session block before the plan is in',
-  /UP NEXT/.test(homeEarly) && homeFirst.planArrived === false, { planArrived: homeFirst.planArrived })
+  homeFirst.hero !== null && homeFirst.planArrived === false, { hero: homeFirst.hero, planArrived: homeFirst.planArrived })
 check('Home says it is still checking, in Ashley\'s words',
-  /Checking your plan…/.test(homeEarly), homeEarly.slice(0, 200))
+  homeFirst.hero === 'unknown' && homeFirst.title === 'Checking your plan…', { hero: homeFirst.hero, title: homeFirst.title })
 check('and it does NOT say rest day', !/Rest day/.test(homeEarly), homeEarly.slice(0, 200))
 // One-page Home (17 Oct 2026): the docked button names the session, "Start Upper Pull & Core".
 check('no Start button over a session it cannot name',
   !/(^|\n)Start \S/.test(homeEarly) && !/Continue session/.test(homeEarly), homeEarly.slice(0, 200))
+// Home 2c: tomorrow is a fixed tile, labelled "Tomorrow" whatever it holds. The property is unchanged: it guesses
+// nothing from the empty plan, so it holds a dash, never a session name or "Rest day".
 check('no Tomorrow row guessed from the same empty plan',
-  !/\nTomorrow\n/.test(homeEarly), homeEarly.slice(0, 400))
+  homeFirst.tomorrow === '—', homeFirst.tomorrow)
 check('the rest of Home is still on screen — this is a block waiting, not a blank page',
   // 2a dropped the "Today so far" heading; the panel itself is the evidence.
-  /Calories/.test(homeEarly) && /Protein/.test(homeEarly) && /Water/.test(homeEarly) && /Steps/.test(homeEarly), homeEarly.slice(0, 200))
+  ['Calories', 'Protein', 'Water', 'Steps'].every(n => homeFirst.rings.includes(n)), homeFirst.rings)
 await shoot('rest-day-race-home-waiting')
 
 await wait(5000)
-const homeLate = await text()
+const homeLateR = await read()
+const homeLate = homeLateR.text
 // Same property, same reason as the chat check above: a named session with a
 // real exercise count where "Checking your plan…" was, whichever day it is.
 check('the block fills in once the plan arrives',
-  !/Checking your plan/.test(homeLate) && /UP NEXT[\s\S]{0,200}\d+ exercises/.test(homeLate), homeLate.slice(0, 240))
+  !/Checking your plan/.test(homeLate) && homeLateR.hero !== 'unknown' && /^TODAY[^\n]*\n[\s\S]{0,200}\d+ exercises/m.test(homeLate), { hero: homeLateR.hero, text: homeLate.slice(0, 240) })
 // EACH SURFACE AGREES WITH THE PLAN IT IS RENDERING.
 //
 // This used to say "the coach named the same session Home shows", comparing
@@ -170,7 +180,7 @@ check('the block fills in once the plan arrives',
 // The promise underneath is "the coach never contradicts the app's numbers",
 // which is a claim WITHIN one universe. So each page publishes the focus its
 // own plan holds for today, and each surface is held to its own.
-const homeFocus = /UP NEXT\s+([^\n]+)/.exec(homeLate)?.[1]?.trim() ?? null
+const homeFocus = homeLateR.title
 const homePlanFocus = await ev(`window.__todayFocus`)
 check('...and Home named the session its own plan holds for today',
   !!homeFocus && homeFocus === homePlanFocus, { homeFocus, homePlanFocus })

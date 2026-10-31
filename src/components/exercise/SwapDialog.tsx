@@ -18,7 +18,7 @@ import type { UserProfile } from '@/lib/types'
 // ---------------------------------------------------------------------------
 // Shared swap confirm dialog for the today view and the peek (LAYOUT-
 // DESIGN.md §4.2) — one dialog, not duplicated per surface. Scope-bearing
-// (Today only / Rest of block), so it always ends in a confirm per D3's
+// (Just today / Whole block), so it always ends in a confirm per D3's
 // mechanical rule (scope beyond the tap = confirm). The legacy program
 // stand-in (ExercisePlan.tsx) keeps its own copy of this same flow — kept
 // separate deliberately, since that file is deleted whole in P4 rather than

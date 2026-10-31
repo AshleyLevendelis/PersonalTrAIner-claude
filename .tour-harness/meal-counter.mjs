@@ -97,8 +97,11 @@ const tapMealButton = () => ev(`(() => {
   if (!b) return false
   b.click(); return true
 })()`)
+// RE-ANCHORED 31 Oct 2026 (Home 2c): the number sits on the calories ring, under "kcal", and says its name only
+// to a screen reader: "Calories: 480 of 2,400. Open Nutrition". Read that, the same reading verify:weigh-in uses.
 const homeCalories = () => ev(`(() => {
-  const m = document.body.innerText.match(/Calories\\s*([\\d,]+)/)
+  const el = document.querySelector('[data-home-rings] [aria-label^="Calories:"]')
+  const m = el && /^Calories: ([\\d,]+)/.exec(el.getAttribute('aria-label'))
   return m ? m[1].replace(/,/g, '') : null
 })()`)
 

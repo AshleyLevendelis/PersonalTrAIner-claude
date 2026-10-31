@@ -9,8 +9,8 @@
 // side effect is that swapping — which people did not always realise was
 // there — becomes discoverable from the act of wanting something gone.
 //
-// The scope words are SwapDialog's, to the letter ("Today only" / "Rest of
-// block"), because a second vocabulary for the same idea is how two screens
+// The scope words are SwapDialog's and the coach's, to the letter ("Just today" /
+// "Whole block", her "Match the coach", 31 Oct 2026), because a second vocabulary for the same idea is how two screens
 // come to mean different things.
 // ---------------------------------------------------------------------------
 import { useState } from 'react'
