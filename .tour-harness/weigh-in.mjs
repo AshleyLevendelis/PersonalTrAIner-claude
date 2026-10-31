@@ -97,7 +97,9 @@ const bodyText = () => ev(`document.body.innerText`)
 const metrics = () => ev(`(window.__fakeDb?.daily_metrics ?? []).map(r => r.date + ':' + r.weight_kg).sort()`)
 const card = () => ev(`(() => { const c = document.querySelector('[data-testid="weigh-in-card"]'); return c ? { check: c.getAttribute('data-weigh-in-check'), difference: c.getAttribute('data-weigh-in-difference'), heldKg: c.getAttribute('data-weigh-in-held'), line: (c.querySelector('[data-testid="weigh-in-average"]')?.textContent ?? '').trim(), question: (c.querySelector('[data-testid="weigh-in-question"] p')?.textContent ?? '').trim() || null, held: (c.querySelector('[data-testid="weigh-in-held"]')?.textContent ?? '').trim() || null, buttons: [...c.querySelectorAll('[data-testid="weigh-in-question"] button')].map(b => (b.textContent || '').trim()), text: c.innerText } : null })()`)
 // The calorie target Home is showing: the "/ 1,946" beside what has been eaten.
-const homeTarget = () => ev(`(() => { const m = document.body.innerText.match(/\\/\\s*(\\d[\\d,]{2,})/); return m ? Number(m[1].replace(/,/g, '')) : null })()`)
+// RE-ANCHORED 31 Oct 2026 (Home 2c): the calories ring draws the target as its fill and SAYS it in its label
+// ("Calories: 0 of 3,040. Open Nutrition"); no "/ 3,040" is printed any more. Read where Home states it.
+const homeTarget = () => ev(`(() => { const b = [...document.querySelectorAll('[aria-label^="Calories:"]')][0]; const m = b && (b.getAttribute('aria-label') || '').match(/ of (\\d[\\d,]{2,})/); return m ? Number(m[1].replace(/,/g, '')) : null })()`)
 const tap = id => ev(`(() => { const b = document.querySelector('[data-testid="' + ${JSON.stringify(id)} + '"]'); if (!b || b.disabled) return false; b.click(); return true })()`)
 const seen = sel => ev(`(() => { const n = document.querySelector(${JSON.stringify(sel)}); if (!n) return null; n.scrollIntoView({ block: 'center' }); const r = n.getBoundingClientRect(); const at = document.elementFromPoint(r.left + 12, r.top + r.height / 2); return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight, height: Math.round(r.height), onTop: !!at && (at === n || n.contains(at) || at.contains(n)) } })()`)
 const typeWeight = async kg => {
@@ -116,7 +118,9 @@ const typeWeight = async kg => {
 }
 
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/.tour-harness/real.html?run=1&anchor=1` })
-const up = await until(() => ev(`/Weight/.test(document.body.innerText) && !!document.querySelector('[aria-expanded]')`), v => v === true)
+// RE-ANCHORED 31 Oct 2026 (Home 2c, and 30 Oct before it): the weight lives behind Home's Progress row, so it is
+// opened first, the way she would, and Home is "up" once the weight figure is there to tap.
+const up = await until(() => ev(`(() => { const t = document.querySelector('[data-home-progress-toggle]'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return /Weight/.test(document.body.innerText) && !!document.querySelector('[data-home-weight] button[aria-expanded]') })()`), v => v === true)
 check('0. Home is up', up === true)
 // The harness page opens with the app tour over it. Skipped, so the screen
 // under test is the one being read (and the screenshots show it).
@@ -138,7 +142,7 @@ console.log('\n1. Home measures the change from where she started\n')
 
 console.log('\n2. The line under the box says what the targets follow\n')
 {
-  const opened = await ev(`(() => { const b = [...document.querySelectorAll('button[aria-expanded]')].find(x => /kg/.test(x.textContent || '') && x.closest('div')?.parentElement?.textContent?.includes('Weight')); if (!b) return false; if (b.getAttribute('aria-expanded') !== 'true') b.click(); return true })()`)
+  const opened = await ev(`(() => { const b = document.querySelector('[data-home-weight] > button[aria-expanded]'); if (!b) return false; if (b.getAttribute('aria-expanded') !== 'true') b.click(); return true })()`)
   check('2a. the weigh-in box opens from the Weight figure', opened === true)
   const c = await until(card, v => !!v && v.line.length > 0)
   check('2b. it states the rule: "Targets follow your 7-day average"', !!c && c.line.startsWith('Targets follow your 7-day average'), c?.line)
@@ -249,13 +253,13 @@ console.log('\n4. The Profile weight field asks the same check\n')
 console.log('\n5. The second day agrees: the target follows\n')
 {
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/.tour-harness/real.html?run=3&held=1` })
-  await until(() => ev(`/Weight/.test(document.body.innerText) && !!document.querySelector('[aria-expanded]')`), v => v === true)
+  await until(() => ev(`(() => { const t = document.querySelector('[data-home-progress-toggle]'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return /Weight/.test(document.body.innerText) && !!document.querySelector('[data-home-weight] button[aria-expanded]') })()`), v => v === true)
   await ev(`(() => { const b = [...document.querySelectorAll('button, a')].find(x => (x.textContent || '').trim() === 'Skip'); if (b) b.click(); return !!b })()`)
   await wait(500)
   const rows = await metrics()
   check('5a. the fixture: 80.6 kg in August, a surprising 62 kg yesterday, nothing today', rows.length === 2 && rows.some(m => m.endsWith(':62')) && rows.some(m => m.endsWith(':80.6')), rows)
   const before = await homeTarget()
-  await ev(`(() => { const b = [...document.querySelectorAll('button[aria-expanded]')].find(x => /kg/.test(x.textContent || '') && x.closest('div')?.parentElement?.textContent?.includes('Weight')); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); return !!b })()`)
+  await ev(`(() => { const b = document.querySelector('[data-home-weight] > button[aria-expanded]'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); return !!b })()`)
   const c0 = await until(card, v => !!v && !!v.held)
   check('5b. a day later the card still says yesterday\'s 62 kg is waiting (worked out from the weigh-ins, not remembered)', /^62 kg is saved\./.test(c0?.held ?? ''), c0?.held)
   check('5c. typing 62.4 today and saving', await typeWeight(62.4))
