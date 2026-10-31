@@ -1388,6 +1388,14 @@ menu" stays true when a copy is also left outside it.
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
 
+### Her rulings of 31 Oct 2026, the five-tab polish (`docs/plans/tab-polish-oct31.md`)
+- **"Build, keep my rulings"**: the handoff (Home 2c, Nutrition 3a+3b, Exercise 2a, Tools 2a, Chat 2b) as drawn, except where
+  an earlier ruling of hers says otherwise; the plan lists each. Layout only, nothing removed. `test:home-2c`,
+  `test:nutrition-3a`, `test:exercise-2a`, `test:tools-2a`, `test:chat-2b` and their `verify:` drivers
+- **Voice: "Option 1, add a listen button"**, over voice-note bubbles and over not now: each coach bubble reads aloud with
+  the phone's own voice, one at a time, a second tap stops it, never drawn where the phone cannot speak. No voice
+  notes. `test:chat-2b`, `verify:chat-2b` (the voice is stubbed; never heard on a device)
+
 ### Opening the app (31 Oct 2026, her "make it load quicker, and not show that loading")
 - **A re-open draws the app from the copy kept on the phone** (`boot-cache.ts`) and swaps the server's answers in
   behind it, only where the screen still shows the kept value. **A failed read is never "no profile"**: the stored

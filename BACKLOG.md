@@ -2,6 +2,58 @@
 
 Newest first. One line each.
 
+- [x] **FIVE TABS REDRAWN FROM HER DESIGN HANDOFF, 31 Oct 2026, AND A LISTEN BUTTON ON THE COACH.** Ashley uploaded the
+  tab-polish handoff (Home 2c, Nutrition 3a+3b, Exercise 2a, Tools 2a, Chat 2b) and, asked whether to build it as
+  drawn or keep her earlier rulings where they clash, said **"build, keep my rulings"**. Layout only; nothing the app
+  can do was removed. Plan and the kept rulings: `docs/plans/tab-polish-oct31.md`; the design files are in
+  `design_handoff_tab_polish/`, the rendered designs and the built screens at 390px in `docs/design/tab-polish-oct31/`.
+  - **Voice: "Option 1, add a listen button"** (her answer, 31 Oct, from three options: a listen button, voice-note
+    bubbles, not now). Each coach bubble has a speaker that reads that message aloud with the phone's own voice
+    (`read-aloud.ts`, `ListenButton.tsx`): one at a time, a second tap stops it, it stops when she leaves the chat,
+    and nothing is drawn where the phone cannot speak. No voice notes, no network.
+  - **What each tab became.** Home: one glowing session card (session N of M, the set bar once started, Start
+    inside it, the week strip under a hairline), the coach line with "What changed?" / "Adjust today" chips, a row of
+    four rings (calories, protein, water, steps), one card of latest PR | Tomorrow with weight, PRs and volume one tap
+    away. Nutrition: the day strip on top, a legend with a bar per number (no rings), meal rows with status circles,
+    and a recipe sheet (Recipe / Swap tabs, "I ate this") holding every control the expanded row had. Exercise: a hero
+    card with progress and Finish, a one-sentence coach line built from the plan's own numbers, the ramp folded into
+    one row that still logs each set, a plate button in each weight box, an inline rest row read off the one rest
+    engine, "Add exercise" and "I also did...". Tools: three timer tiles that open their timer in one tap, the last
+    round with Start, a plate card with a stepper and the plates per side (the one greedy pass, extracted), live
+    program, history and grocery rows. Chat: header with "Sees today's session, meals and logs", a context strip
+    (today's session sets, kcal left, from the numbers Home and Nutrition show), restyled bubbles, offers as the
+    coach's sentence, a one-line preview and reply pills on the same scopes, receipts on one line with Undo, the mic as
+    the main button while the field is empty.
+  - **Her rulings kept over the design**: "Trainer", never "Coach"; "N in a row"; no sleep ring (the app records no
+    sleep); rings on Home only; the day strip on top; soft-tint coach bubbles and plain own bubbles; text + small
+    buttons, and the existing button words; every change to an exercise in the ⋮; a box for every set; the "last
+    time" marker; the coach line never says "probe" outside a calibration week nor "moved well"; the Start button
+    names its countdown; plate labels in dark ink (white measured 3.9:1 on red and blue); the stepper 44px not 40px.
+    Nothing the app does not have is drawn: no "+2.5 kg" PR delta, no dish times, no off-plan "Extra" rows, no weight
+    in the swap preview.
+  - **Defects found by the drivers and fixed on the way**: a hook below the Tools tab's full-screen return crashed the
+    tab on Full screen; a meal's move card, "how much?" question and Undo drew below the sheet's footer, off screen;
+    adding a warm-up to a lift with no ramp folded the new row shut; tomorrow's minutes crashed two Home fixtures
+    unguarded.
+  - **Checks.** New: `test:home-2c` (45), `test:nutrition-3a` (45), `test:exercise-2a` (50), `test:tools-2a` (45),
+    `test:chat-2b` (40), and drivers `verify:nutrition-3a` (27), `verify:exercise-2a` (35), `verify:tools-2a` (44),
+    `verify:chat-2b` (31, with the phone's voice stubbed: Listen speaks the bubble's text, a second tap cancels, no
+    button without a voice). Mutations: Home 43/43, Nutrition 58/58 source and 32/33 browser (the miss was correct:
+    the moved size was still on screen; a stronger mutation was caught), Exercise 17/17 + 22/22 re-anchors + 17/17
+    browser, Tools 23/23 + 12/12 browser, Chat 37/37 + 25/25 browser (two misses fixed first) + 14/14 bubble-contrast.
+    Re-anchored on their property (each mutation-tested): about 25 gates and 35 drivers across the five tabs, listed in
+    each tab's commit. At the merge, two re-anchors collided (`test:one-page` §6, `test:tab-ownership`) and were
+    resolved on the property, each mutation-tested (2/2 caught). `test:bundle`: all four budgets went over (353/509/
+    1208/2517 against 350/506/1193/2492) and were raised on her 15 Sep "room to grow" to 361/517/1233/2542, measured.
+    Chat bubbles: all 81 theme x accent pairs still reach 4.5:1; the Listen icon's lowest is 5.05:1.
+  - **Open questions of hers (wording)**: the offer buttons ("Apply today / Rest of block / Not now" kept, or the
+    design's "Yeah, do it / Whole block / Keep RDLs"); the chat's session pill ("2 of 20 sets" done, or "set 3 of 20");
+    the coach group label "Trainer" under a header that reads "Coach"; the first reply pill is now filled mint where
+    her 20 Oct "small buttons" were outlines; the Tools tour line "All three timers live behind here".
+  - NOT PROVEN: a real phone (the voice has never been heard on a device), and App.tsx's wiring around the Exercise
+    dock. Not done: "go to the current set" from the chat pill; the carbs letter is faint on Daylight. Leftover:
+    `RingKey` and `RingMeter` in `OnePage.tsx` have no screen any more (tree-shaken, so no size cost).
+  - Deploys: frontend, plus **chat-gemini and onboarding-chat** (the coach's description of the Tools tab changed).
 - [x] **THE APP OPENS STRAIGHT ONTO HOME, 31 Oct 2026.** Ashley, with two screenshots ("Loading your plan..." then
   "Loading your day..."): *"When I first open the app, it takes a few seconds to load ... make it load quicker, and not
   show that loading as soon as you open it."* Mechanical (speed, and a data-loss defect found on the way); no ruling.
