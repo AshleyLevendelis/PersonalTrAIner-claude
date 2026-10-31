@@ -452,6 +452,7 @@
     "measure:meal-library": "tsx scripts/measure-meal-library.ts",
     "test:layout-revamp": "tsx scripts/test-layout-revamp.ts",
     "test:one-page": "tsx scripts/test-one-page.ts",
+    "test:home-2c": "tsx scripts/test-home-2c.ts",
     "test:one-calorie-target": "tsx scripts/test-one-calorie-target.ts",
     "test:setup-kit-ticks": "tsx scripts/test-setup-kit-ticks.ts",
     "test:swap-name-fallback": "tsx scripts/test-swap-name-fallback.ts",

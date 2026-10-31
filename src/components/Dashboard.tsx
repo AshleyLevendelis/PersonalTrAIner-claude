@@ -19,12 +19,12 @@ import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
 import { stepsTargetFor } from '@/lib/steps-target'
 import { getStepsForDate, logStepsManual, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, type DailyStepsRow } from '@/lib/steps-store'
 import { getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
-import { Trophy, Moon, Dumbbell, UtensilsCrossed, Activity, ChevronDown } from 'lucide-react'
+import { Trophy, UtensilsCrossed, Activity, ChevronDown, Flame, Drumstick, Droplet, Footprints, CalendarDays, Play } from 'lucide-react'
 import { WeighInCard } from '@/components/WeighInCard'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
-import { HomeWeekDots, HomeWeekBoundaryNote } from '@/components/HomeWeekStrip'
-import { RingMeter, RingKey, SectionLabel, RowList, PageRow, PRIMARY_CTA_CLASS, PRIMARY_CTA_STYLE } from '@/components/OnePage'
+import { HomeWeekStrip, HomeWeekBoundaryNote, sessionOrdinal } from '@/components/HomeWeekStrip'
+import { PageRow, PRIMARY_CTA_STYLE } from '@/components/OnePage'
 import { ringShare, todaySoFarPercent, compactCount } from '@/lib/one-page'
 import { dayAsShown, eatenMacrosBySlot, aroundEatenKeptKey, readAroundEatenKept } from '@/lib/day-as-shown'
 import { mealSections } from '@/lib/meal-sections'
@@ -432,23 +432,22 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const topPrLift = card && card.prs.length > 0 ? card.prs[0].exerciseName : (data.prsToday ?? [])[0]?.exerciseName ?? null
   const minutes = card?.summary.durationMinutes ?? data.sessionMinutes ?? null
 
-  // THE GLANCE LINE — what is in it, the lead lift, and tomorrow (the old
-  // Tomorrow row moved in here, 2a). Each part is dropped when unknown.
+  // THE GLANCE LINE — what is in it and the lead lift. Each part is dropped when unknown. Tomorrow left it on
+  // 31 Oct 2026 (tab polish 2c): it has its own half of the highlights card again, and is said once.
   const glanceParts: string[] = []
   if (data.session.activity) {
     // An activity session reads like one: "20 min · Easy", not "0 exercises" (the walking plan, user test 8 Oct 2026).
     glanceParts.push(`${data.session.activity.minutes} min`)
     if (data.session.activity.effort) glanceParts.push(data.session.activity.effort)
-  } else {
-    if (status === 'in_progress' && data.session.minutesLeft != null) glanceParts.push(`~${data.session.minutesLeft} min left`)
-    if (status !== 'in_progress') glanceParts.push(`${data.session.exerciseCount} exercise${data.session.exerciseCount === 1 ? '' : 's'}`)
+  } else if (status !== 'in_progress') {
+    // In progress, the minutes left are the card's right-hand status instead (said once).
+    glanceParts.push(`${data.session.exerciseCount} exercise${data.session.exerciseCount === 1 ? '' : 's'}`)
   }
   // DELIBERATE DEVIATION FROM THE HANDOFF, kept: no "next" — the app knows the
   // heaviest lift, not the running order.
   const lift = data.session.leadLift && !data.session.activity ? leadLiftPhrase(data.session.leadLift, status) : null
   if (lift) glanceParts.push(lift)
   const tomorrow = data.tomorrow ?? null
-  if (tomorrow) glanceParts.push(tomorrow.rest ? 'rest tomorrow' : `${tomorrow.focus} tomorrow`)
   const sessionGlance = glanceParts.join(' · ')
 
   // THE LATEST PR for the weight panel's footer — the newest, not the biggest.
@@ -493,68 +492,94 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const toNutrition = () => { window.location.hash = tabHash('nutrition') }
   const showCta = status === 'not_started' || status === 'in_progress'
 
+  const recentCount = data.recentPRs.length
+  const tomorrowSub = tomorrow && !tomorrow.rest && tomorrow.minutes != null ? `Tomorrow · ~${tomorrow.minutes} min` : 'Tomorrow'
+
   return (
-    // ONE PAGE (design 5c·5, 17 Oct 2026): the hero, its key, one coach note, then Up next and Progress
-    // as hairline rows. Room at the foot for the docked button. docs/plans/one-page-tabs.md.
-    <div className="relative flex flex-col gap-[18px]" data-home-page>
+    // TAB POLISH, DESIGN 2c (31 Oct 2026, her "build, keep my rulings"): two boxes only, the session card and the
+    // highlights card; the coach line and the rings sit on the page. docs/plans/tab-polish-oct31.md.
+    <div className="relative flex flex-col gap-6" data-home-page>
       {/* 1. WHO AND WHEN */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
           <p className="ds-label">{dateLabel}</p>
           <h2 className="mt-1 text-[1.75rem] font-bold leading-[1.1] tracking-[-.03em]">{greeting}</h2>
         </div>
         <span
-          className="mt-1 inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full px-2.5"
-          style={{ background: 'var(--surface-raised)' }}
+          className="mb-0.5 inline-flex h-[30px] shrink-0 items-center gap-[5px] rounded-full border px-[11px]"
+          style={data.streak > 0
+            ? { background: 'rgba(var(--glow-rgb), .12)', borderColor: 'rgba(var(--glow-rgb), .3)', color: 'var(--primary-text)' }
+            : { background: 'var(--surface-raised)', borderColor: 'transparent', color: 'var(--muted-foreground)' }}
           data-testid="home-streak"
           role="img"
           aria-label={`${data.streak} ${streakLabel(data.streak)}`}
         >
-          <span aria-hidden className={`inline-block size-[5px] rounded-full ${data.streak > 0 ? 'bg-primary glow-mint-box' : 'bg-[color:var(--text-dim)]'}`} />
-          <span className="tabular-mono text-[0.8125rem] font-semibold">{data.streak}</span>
+          <Flame aria-hidden className="size-[13px]" />
+          <span className="tabular-mono text-[0.75rem] font-semibold">{data.streak}</span>
           {/* "in a row", her 17 Oct ruling over the handoff's "days": the streak counts sessions. */}
-          <span className="text-[0.6875rem] text-muted-foreground" data-testid="home-streak-label">{STREAK_PILL_WORDS}</span>
+          <span className="text-[0.75rem] font-semibold" data-testid="home-streak-label">{STREAK_PILL_WORDS}</span>
         </span>
       </div>
 
-      {/* 2. TODAY SO FAR — the rings open Nutrition; Steps, in the key, opens the steps entry (her ruling). */}
-      <div data-tour="tiles" className="flex flex-col gap-[18px]">
-        {/* LESS IS MORE (30 Oct 2026): the rings, the percentage and the key are one object, side by side,
-            instead of a headline, a ring and a two-column key stacked three deep. */}
-        <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-5" data-home-today>
-          <button type="button" onClick={toNutrition} aria-label="Open Nutrition" data-home-rings>
-            <RingMeter
-              size={128}
-              label={`Calories ${pct(calShare)}, protein ${pct(proteinShare)}, water ${pct(waterShare)}, steps ${pct(stepsShare)}`}
-              rings={[
-                { key: 'calories', share: calShare, color: 'var(--primary)', glow: true },
-                { key: 'protein', share: proteinShare, color: 'var(--chart-2)' },
-                { key: 'water', share: waterShare, color: 'var(--chart-3)' },
-                { key: 'steps', share: stepsShare, color: 'var(--chart-4)' },
-              ]}
-            />
-          </button>
-          <div className="flex min-w-0 flex-col gap-2.5">
-            <p className="flex items-baseline gap-1.5">
-              <span className="tabular-mono glow-mint-lg text-[2rem] font-bold leading-none tracking-[-.03em]" style={{ color: 'var(--num-hero)' }} data-testid="home-so-far">
-                {soFar == null ? '—' : `${soFar}%`}
-              </span>
-              <span className="text-[0.75rem] text-muted-foreground">of today&apos;s targets</span>
-            </p>
-            <RingKey
-              columns={1}
-              data-testid="home-ring-key"
-              items={[
-                { key: 'calories', label: 'Calories', color: 'var(--primary)', glow: true, value: Math.round(data.caloriesEaten).toLocaleString(), target: data.hasNutritionTargets ? `/${Math.round(data.caloriesTarget).toLocaleString()}` : undefined, onClick: toNutrition, ariaLabel: 'Calories — open Nutrition' },
-                { key: 'protein', label: 'Protein', color: 'var(--chart-2)', value: String(Math.round(data.proteinEaten)), target: data.hasNutritionTargets ? `/${Math.round(data.proteinTarget)}g` : 'g', onClick: toNutrition, ariaLabel: 'Protein — open Nutrition' },
-                { key: 'water', label: 'Water', color: 'var(--chart-3)', value: (data.waterMl / 1000).toFixed(1), target: `/${(data.waterTargetMl / 1000).toFixed(1)}L`, onClick: toNutrition, ariaLabel: 'Water — open Nutrition to log it' },
-                { key: 'steps', label: 'Steps', color: 'var(--chart-4)', value: compactCount(stepsToday), target: `/${compactCount(stepsTarget)}`, onClick: () => setStepsOpen(o => !o), ariaLabel: `Steps: ${stepsToday.toLocaleString()} of ${stepsTarget.toLocaleString()}. Tap to log today's steps.` },
-              ]}
-            />
+      {/* 2. TODAY'S SESSION — the one glowing card. */}
+      <SessionHero
+        status={status}
+        data={data}
+        week={week}
+        sessionGlance={sessionGlance}
+        done={done}
+        minutes={minutes}
+        setsLogged={setsLogged}
+        setsPlanned={setsPlanned}
+        prCount={prCount}
+        topPr={prCount > 0 && topPr ? `${topPrLift ?? ''} ${topPr}`.trim() : null}
+        onSummary={card ? () => setSummaryOpen(true) : undefined}
+        cta={showCta && (
+          // THE START BUTTON: inside the card it starts. Gone on a rest day, a moved day, an unknown plan and once done.
+          <div className="mt-3.5" data-home-cta>
+            <Button
+              size="cta"
+              className="glow-bloom-once glow-mint-box h-[54px] w-full gap-2 rounded-[16px] text-base font-bold"
+              style={PRIMARY_CTA_STYLE}
+              onClick={() => { window.location.hash = tabHash('exercise') }}
+            >
+              <Play aria-hidden className="size-4" fill="currentColor" strokeWidth={0} />
+              {status === 'not_started' ? (data.session.focus ? `Start ${data.session.focus}` : 'Start session') : 'Continue session'}
+            </Button>
           </div>
+        )}
+        footer={<>
+          {cardioLines && <div className="pt-2">{cardioLines}</div>}
+          <HomeWeekBoundaryNote days={week.days} todayDate={activeSession.date} />
+        </>}
+      />
+
+      {/* 3. THE TRAINER'S LINE — one per screen, no box. An adaptation message is shown alone, never rotated away. */}
+      {trainerNudge
+        ? <TrainerNudge {...trainerNudge} line className="px-1" />
+        : plainTips.length > 0 && <HomeCoachNote tips={plainTips} />}
+
+      {/* 4. TODAY'S RINGS — calories, protein, water, steps (no sleep: the app records none). Steps opens the steps
+          entry here (her "Tap the steps ring"); the other three open Nutrition, where water is logged. */}
+      <section className="px-1" data-tour="tiles">
+        <div className="flex items-baseline justify-between">
+          <span className="ds-label">Today</span>
+          <span className="text-[0.6875rem] text-muted-foreground">
+            <span className="tabular-mono font-semibold text-foreground" data-testid="home-so-far">{soFar == null ? '—' : `${soFar}%`}</span> of targets
+          </span>
+        </div>
+        <div className="mt-3 grid grid-cols-4 gap-1" data-home-today data-home-rings>
+          <RingCell k="calories" share={calShare} color="var(--primary)" glow icon={<Flame />} value={Math.round(data.caloriesEaten).toLocaleString()} label="kcal"
+            onClick={toNutrition} ariaLabel={`Calories: ${Math.round(data.caloriesEaten).toLocaleString()}${data.hasNutritionTargets ? ` of ${Math.round(data.caloriesTarget).toLocaleString()}` : ''}. Open Nutrition`} />
+          <RingCell k="protein" share={proteinShare} color="var(--chart-2)" icon={<Drumstick />} value={`${Math.round(data.proteinEaten)}g`} label="protein"
+            onClick={toNutrition} ariaLabel={`Protein: ${Math.round(data.proteinEaten)}${data.hasNutritionTargets ? ` of ${Math.round(data.proteinTarget)}` : ''} grams. Open Nutrition`} />
+          <RingCell k="water" share={waterShare} color="var(--chart-3)" icon={<Droplet />} value={`${(data.waterMl / 1000).toFixed(1)} L`} label="water"
+            onClick={toNutrition} ariaLabel={`Water: ${(data.waterMl / 1000).toFixed(1)} of ${(data.waterTargetMl / 1000).toFixed(1)} litres. Open Nutrition to log it`} />
+          <RingCell k="steps" share={stepsShare} color="var(--chart-4)" icon={<Footprints />} value={compactCount(stepsToday)} label="steps"
+            onClick={() => setStepsOpen(o => !o)} ariaLabel={`Steps: ${stepsToday.toLocaleString()} of ${stepsTarget.toLocaleString()}. Tap to log today's steps.`} />
         </div>
         {stepsOpen && (
-          <div className="flex flex-col gap-1.5" data-home-steps-entry>
+          <div className="mt-3 flex flex-col gap-1.5" data-home-steps-entry>
             <span className="flex items-center gap-2">
               <input
                 type="number"
@@ -565,111 +590,86 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 onKeyDown={e => { if (e.key === 'Enter') void handleLogSteps() }}
                 placeholder={String(stepsToday || '')}
                 aria-label="Steps today"
-                className="h-10 w-28 rounded-[10px] px-3 text-[0.875rem] tabular-mono"
+                className="h-11 w-28 rounded-[10px] px-3 text-[0.875rem] tabular-mono"
                 style={{ background: 'var(--surface-sunken)' }}
               />
-              <Button size="sm" className="h-10" onClick={() => void handleLogSteps()}>Log steps</Button>
+              <Button size="sm" className="h-11" onClick={() => void handleLogSteps()}>Log steps</Button>
             </span>
             {/* WHERE THE TARGET COMES FROM — shown while the input is open. */}
             <span className="text-[0.6875rem] leading-[1.35] text-muted-foreground/80">
-              Target from the activity level your calorie target uses — override it in your profile.
+              Target {stepsTarget.toLocaleString()}, from the activity level your calorie target uses — override it in your profile.
             </span>
           </div>
         )}
-        {stepsError && <span className="text-[0.6875rem] text-[color:var(--role-warn-text)]">{stepsError}</span>}
-      </div>
-
-      {/* 3. THE TRAINER'S NOTE — one per screen. */}
-      {trainerNudge
-        ? <TrainerNudge {...trainerNudge} slim />
-        : plainTips.length > 0 && <HomeCoachNote tips={plainTips} />}
-
-      {/* SHOPPING, ON THE DAY SHE SHOPS. */}
-      <Suspense fallback={null}>
-        <ShopDayCard
-          profileId={profile.id}
-          exercisePlan={exercisePlan}
-          todayName={activeSession.dayName}
-          today={activeSession.date}
-          nowMs={Date.now()}
-        />
-      </Suspense>
-
-      {/* 4. UP NEXT — the session, the next meal, tomorrow. */}
-      <section>
-        <SectionLabel>Up next</SectionLabel>
-        <RowList>
-          <SessionRow
-            status={status}
-            data={data}
-            week={week}
-            sessionGlance={sessionGlance}
-            done={done}
-            minutes={minutes}
-            setsLogged={setsLogged}
-            setsPlanned={setsPlanned}
-            prCount={prCount}
-            topPr={prCount > 0 && topPr ? `${topPrLift ?? ''} ${topPr}`.trim() : null}
-            onSummary={card ? () => setSummaryOpen(true) : undefined}
-          />
-        {/* THE START BUTTON (30 Oct 2026): under the session it starts, not docked over the page as a
-            second copy of the row above it. Gone on a rest day, a moved day, an unknown plan and once done. */}
-        {showCta && (
-          <div className="border-b border-[color:var(--hairline)] pb-3" data-home-cta>
-            <Button
-              size="cta"
-              className={`glow-bloom-once ${PRIMARY_CTA_CLASS}`}
-              style={PRIMARY_CTA_STYLE}
-              onClick={() => { window.location.hash = tabHash('exercise') }}
-            >
-              {status === 'not_started' ? (data.session.focus ? `Start ${data.session.focus}` : 'Start session') : 'Continue session'}
-            </Button>
-          </div>
-        )}
-          {nextMeal && nextMealSlot && (
-            <PageRow
-              icon={<UtensilsCrossed className="size-4" />}
-              title={<>{SLOT_LABEL[nextMealSlot]} · {nextMeal.name}</>}
-              sub={`${Math.round(nextMeal.macros.calories)} kcal · ${Math.round(nextMeal.macros.protein)}g P`}
-              right={<span className="tabular-mono text-[0.78125rem] text-text-tertiary">{Math.round(nextMeal.macros.calories)}</span>}
-              onClick={toNutrition}
-              data-home-next-meal={nextMealSlot}
-            />
-          )}
-        </RowList>
-        {cardioLines && <div className="pt-2">{cardioLines}</div>}
-        <HomeWeekBoundaryNote days={week.days} todayDate={activeSession.date} />
+        {stepsError && <span className="mt-1.5 block text-[0.6875rem] text-[color:var(--role-warn-text)]">{stepsError}</span>}
       </section>
 
-      {/* 5. PROGRESS — the weight (its header is the door to the weigh-in), the latest PR, the volume. */}
-      <section>
+      {/* 5. ONE CARD, TWO HALVES: the latest PR and tomorrow. Under them, one tap away, the rest of progress:
+          recent PRs, the weight (its header is the door to the weigh-in) and the training volume. */}
+      <section className="overflow-hidden rounded-[20px]" style={{ background: 'var(--surface-raised)' }} data-home-highlights>
+        <div className="grid grid-cols-2">
+          <div className="flex min-w-0 items-center gap-2.5 border-r border-[color:var(--hairline)] px-3.5 py-4" data-home-latest-pr>
+            <span aria-hidden className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px]" style={latestPr ? { background: 'rgba(var(--glow-rgb), .14)', color: 'var(--primary-text)' } : { background: 'var(--surface-raised)', color: 'var(--muted-foreground)' }}>
+              <Trophy className="size-4" />
+            </span>
+            {latestPr ? (
+              <span className="flex min-w-0 flex-col">
+                {/* The unit comes with the number, from the phrasebook — a bodyweight best is reps, never "0 kg". */}
+                <span className="tabular-mono glow-mint whitespace-nowrap text-[1.125rem] font-bold leading-none text-primary-text">{personalBest(bestReadingOf(latestPr.metric, latestPr.value, latestPr.setReps))}</span>
+                <span className="mt-1 line-clamp-2 text-[0.6875rem] leading-[1.3] text-muted-foreground">{shortLiftName(latestPr.exerciseName)} · new PR · {prDay(latestPr.date, data.today)}</span>
+              </span>
+            ) : (
+              <span className="flex min-w-0 flex-col">
+                <span className="text-[0.9375rem] font-bold leading-[1.1]">Latest PR</span>
+                <span className="mt-1 line-clamp-2 text-[0.6875rem] text-muted-foreground">none this week</span>
+              </span>
+            )}
+          </div>
+          <div className="flex min-w-0 items-center gap-2.5 px-3.5 py-4" data-home-tomorrow>
+            <span aria-hidden className="flex size-[34px] shrink-0 items-center justify-center rounded-[11px]" style={{ background: 'color-mix(in srgb, var(--chart-2) 16%, transparent)', color: 'var(--role-ai-label, var(--chart-2))' }}>
+              <CalendarDays className="size-4" />
+            </span>
+            <span className="flex min-w-0 flex-col">
+              <span className="line-clamp-2 text-[0.9375rem] font-bold leading-[1.1]">{tomorrow ? (tomorrow.rest ? 'Rest day' : tomorrow.focus) : '—'}</span>
+              <span className="mt-1 line-clamp-2 text-[0.6875rem] leading-[1.3] text-muted-foreground">{tomorrowSub}</span>
+            </span>
+          </div>
+        </div>
         <button
           type="button"
           onClick={() => setProgressOpen(o => !o)}
           aria-expanded={progressOpen}
-          className="flex min-h-[56px] w-full items-center gap-3 border-b border-[color:var(--hairline)] py-2 text-left"
+          className="flex min-h-[48px] w-full items-center gap-2 border-t border-[color:var(--hairline)] px-4 text-left"
           data-home-progress-toggle
         >
-          <span className="min-w-0 flex-1">
-            <span className="block text-[0.71875rem] text-muted-foreground">Progress</span>
-            <span className="block truncate text-[0.90625rem]">
-              {lastWeighIn ? `${lastWeighIn.kg.toFixed(1)} kg` : 'No weigh-in yet'} · {latestPr ? `${shortLiftName(latestPr.exerciseName)} new PR` : 'no new PR this week'}
-            </span>
+          <span className="min-w-0 flex-1 truncate text-[0.78125rem] text-muted-foreground">
+            <span className="font-semibold text-foreground">Progress</span> · {lastWeighIn ? `${lastWeighIn.kg.toFixed(1)} kg` : 'no weigh-in yet'} · {recentCount > 0 ? `${recentCount} PR${recentCount === 1 ? '' : 's'} this week` : 'no new PR this week'}
           </span>
-          <ChevronDown aria-hidden className={`size-4 shrink-0 transition-transform ${progressOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--text-dim)' }} />
+          <span className="shrink-0 text-[0.6875rem] text-muted-foreground">{progressOpen ? 'Hide' : 'Show'}</span>
+          <ChevronDown aria-hidden className={`size-4 shrink-0 transition-transform ${progressOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--muted-foreground)' }} />
         </button>
-        {progressOpen && (<>
+        {progressOpen && (<div className="px-4 pb-2">
         {data.phase && (
-          <p className="pt-2 text-[0.71875rem] text-muted-foreground" data-home-phase>
+          <p className="pt-1 text-[0.71875rem] text-muted-foreground" data-home-phase>
             {data.phase.phaseLabel ? `${data.phase.phaseLabel} · ` : ''}week {data.phase.weekNumber} of {data.phase.totalWeeks}
           </p>
+        )}
+        {recentCount > 0 && (
+          <ul className="border-b border-[color:var(--hairline)] py-2" data-home-recent-prs>
+            {data.recentPRs.map(p => (
+              <li key={`${p.exerciseName}-${p.date}`} className="flex items-baseline justify-between gap-3 py-1 text-[0.8125rem]">
+                <span className="min-w-0 truncate">{shortLiftName(p.exerciseName)} <span className="text-muted-foreground">· {prDay(p.date, data.today)}</span></span>
+                <span className="tabular-mono shrink-0 font-semibold text-primary-text">{personalBest(bestReadingOf(p.metric, p.value, p.setReps))}</span>
+              </li>
+            ))}
+          </ul>
         )}
         <div className="border-b border-[color:var(--hairline)] py-3" data-home-weight>
           <button
             type="button"
             onClick={() => setWeighInOpen(o => !o)}
             aria-expanded={weighInOpen}
-            className="flex w-full items-baseline justify-between gap-3 text-left"
+            className="flex min-h-[44px] w-full items-baseline justify-between gap-3 text-left"
           >
             <span className="text-[0.90625rem]">Weight</span>
             <span className="flex items-baseline gap-2">
@@ -701,21 +701,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             </div>
           )}
         </div>
-        <div data-home-latest-pr>
-          <PageRow
-            className="border-t-0"
-            icon={<Trophy className="size-4" />}
-            iconTone={latestPr ? 'accent' : 'plain'}
-            title={latestPr ? `${shortLiftName(latestPr.exerciseName)} · new PR` : 'Latest PR'}
-            sub={latestPr ? prDay(latestPr.date, data.today, true) : 'none this week'}
-            right={latestPr && (
-              // The unit comes with the number, from the phrasebook — a bodyweight best is reps, never "0 kg".
-              <span className="tabular-mono glow-mint text-[0.875rem] font-bold text-primary-text">{personalBest(bestReadingOf(latestPr.metric, latestPr.value, latestPr.setReps))}</span>
-            )}
-          />
-        </div>
         <div data-home-volume>
           <PageRow
+            className="border-t-0 border-b-0"
             icon={<Activity className="size-4" />}
             title="Training volume"
             sub="This week vs last"
@@ -731,8 +719,31 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             )}
           />
         </div>
-        </>)}
+        </div>)}
       </section>
+
+      {/* 6. THE NEXT MEAL, a quiet hairline row (17 Oct: Home's next meal is Nutrition's). */}
+      {nextMeal && nextMealSlot && (
+        <PageRow
+          className="border-t-0"
+          icon={<UtensilsCrossed className="size-4" />}
+          title={<>{SLOT_LABEL[nextMealSlot]} · {nextMeal.name}</>}
+          sub={`${Math.round(nextMeal.macros.calories)} kcal · ${Math.round(nextMeal.macros.protein)}g P`}
+          onClick={toNutrition}
+          data-home-next-meal={nextMealSlot}
+        />
+      )}
+
+      {/* SHOPPING, ON THE DAY SHE SHOPS. */}
+      <Suspense fallback={null}>
+        <ShopDayCard
+          profileId={profile.id}
+          exercisePlan={exercisePlan}
+          todayName={activeSession.dayName}
+          today={activeSession.date}
+          nowMs={Date.now()}
+        />
+      </Suspense>
 
       {card && (
         <Suspense fallback={null}>
@@ -747,34 +758,59 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 function HomeFilling({ dayName, greeting }: { dayName: string; greeting: string }) {
   const block = (h: number, extra = '') => <div className={`rounded-[14px] ${extra}`} style={{ height: h, background: 'var(--surface-raised)', opacity: 0.55 }} />
   return (
-    <div className="flex flex-col gap-[18px]" data-home-filling aria-busy="true">
+    <div className="flex flex-col gap-6" data-home-filling aria-busy="true">
       <span className="sr-only">Loading your day</span>
       <div className="min-w-0">
         <p className="ds-label">{dayName}</p>
         <h2 className="mt-1 text-[1.75rem] font-bold leading-[1.1] tracking-[-.03em]">{greeting}</h2>
       </div>
-      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-5">
-        <div className="rounded-full" style={{ width: 128, height: 128, background: 'var(--surface-raised)', opacity: 0.55 }} />
-        <div className="flex flex-col gap-2.5">{block(28, 'w-24')}{block(14)}{block(14)}{block(14)}{block(14)}</div>
-      </div>
-      {block(48)}
+      {block(250, 'rounded-[24px]')}
       {block(64)}
-      {block(52)}
+      <div className="grid grid-cols-4 gap-1">
+        {[0, 1, 2, 3].map(i => <div key={i} className="rounded-full" style={{ width: 36, height: 36, background: 'var(--surface-raised)', opacity: 0.55 }} />)}
+      </div>
+      {block(72, 'rounded-[20px]')}
     </div>
   )
 }
 
-/** "62%" for a share, "no target" without one — the ring meter's spoken label. */
-function pct(share: number | null): string {
-  return share == null ? 'no target' : `${Math.round(share * 100)}%`
+/**
+ * ONE RING OF THE ROW (design 2c's ring row): a 36px ring with its icon, the value and a small label beside it.
+ * A ring with no target is an empty track, marked so (data-share="none"), never a full or empty verdict.
+ */
+export function RingCell({ k, share, color, glow, icon, value, label, onClick, ariaLabel }: {
+  k: string; share: number | null; color: string; glow?: boolean; icon: React.ReactElement; value: string; label: string; onClick: () => void; ariaLabel: string
+}) {
+  const r = 20
+  const circ = 2 * Math.PI * r
+  const s = share ?? 0
+  return (
+    <button type="button" onClick={onClick} aria-label={ariaLabel} className="flex min-h-[44px] min-w-0 items-center gap-1.5 text-left" data-key-row={k}>
+      <span aria-hidden className="relative block size-9 shrink-0">
+        <svg viewBox="0 0 48 48" className="block size-9 -rotate-90">
+          <circle cx="24" cy="24" r={r} fill="none" stroke="var(--hairline)" strokeWidth="5" />
+          <circle cx="24" cy="24" r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
+            strokeDasharray={`${circ * s} ${circ}`} opacity={s > 0 ? 1 : 0} className={glow ? 'glow-icon' : undefined}
+            data-ring={k} data-share={share == null ? 'none' : s.toFixed(3)} style={{ transition: 'stroke-dasharray 400ms ease' }} />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center [&>svg]:size-3" style={{ color }}>{icon}</span>
+      </span>
+      <span className="min-w-0">
+        <span className="tabular-mono block truncate text-[0.8125rem] font-bold leading-none">{value}</span>
+        <span className="mt-[3px] block truncate text-[0.625rem] text-muted-foreground">{label}</span>
+      </span>
+    </button>
+  )
 }
 
+
 /**
- * TODAY'S SESSION AS A ROW (5c·5): the dumbbell tile, the session's name, the glance line, and the week's
- * seven dots. Every state the old hero had is here: not yet planned, moved, rest, done (with its count,
- * PRs and the summary), and the session itself. data-tour and data-home-hero keep their names.
+ * TODAY'S SESSION, THE ONE GLOWING CARD (design 2c): "Today · Session N of M" and the right-hand status, the
+ * session's name with its last word in mint, the glance line, the set bar once started, the Start button, and
+ * the week under a hairline. Every state the old row had is here: not yet planned, moved, rest, done (with its
+ * time, PRs and the summary), and the session itself. data-tour and data-home-hero keep their names.
  */
-function SessionRow({ status, data, week, sessionGlance, done, minutes, setsLogged, setsPlanned, prCount, topPr, onSummary }: {
+export function SessionHero({ status, data, week, sessionGlance, done, minutes, setsLogged, setsPlanned, prCount, topPr, onSummary, cta, footer }: {
   status: DashboardData['session']['status']
   data: DashboardData
   week: ReturnType<typeof useTrainingWeek>
@@ -786,66 +822,104 @@ function SessionRow({ status, data, week, sessionGlance, done, minutes, setsLogg
   prCount: number
   topPr: string | null
   onSummary?: () => void
+  cta?: React.ReactNode
+  footer?: React.ReactNode
 }) {
-  const dots = week.days.length > 0
-    ? <HomeWeekDots days={week.days} todayName={data.dayName} done={week.sessionsDone} planned={week.sessionsPlanned} />
-    : null
   const weekCount = `${week.sessionsDone} of ${week.sessionsPlanned} session${week.sessionsPlanned === 1 ? '' : 's'} done`
-  let title: React.ReactNode
+  const ordinal = sessionOrdinal(week.days, data.today)
+  const started = status === 'in_progress' || done
+  let title: string
   let sub: React.ReactNode = null
+  let right: React.ReactNode = null
   if (status === 'unknown') {
     // THE PLAN IS NOT HERE YET — and it is not a rest day (her 8 Sep ruling). No button: nothing to start.
     title = 'Checking your plan…'
   } else if (status === 'moved' && data.session.movedTo) {
     title = `Moved to ${data.session.movedTo.dayName}`
-    sub = `${data.session.focus ?? "Today's session"} is waiting for you on ${data.session.movedTo.dayName} · ${weekCount}`
+    sub = `${data.session.focus ?? "Today's session"} is waiting for you on ${data.session.movedTo.dayName}`
+    right = weekCount
   } else if (status === 'rest') {
     title = 'Rest day'
-    sub = `Recovery is part of the program · ${weekCount}`
-  } else if (done) {
-    title = `Done · ${data.session.focus}`
-    sub = <span data-testid="home-session-glance">{sessionGlance}</span>
+    sub = 'Recovery is part of the program'
+    right = weekCount
   } else {
-    title = data.session.focus
+    title = data.session.focus ?? "Today's session"
     sub = (
       <>
-        {/* The length only before a session starts (never while the plan is unknown: that branch is above). */}
-        {status === 'not_started' && data.session.sessionLength && <><span data-testid="home-session-length">{data.session.sessionLength}</span> · </>}
         <span data-testid="home-session-glance">{sessionGlance}</span>
         {data.session.movedFrom && <> · {data.session.movedFrom.dayName}&apos;s session, moved here</>}
       </>
     )
+    // The length only before a session starts (never while the plan is unknown: that branch is above).
+    right = done
+      ? <span className="font-semibold text-primary-text">Done ✓</span>
+      : status === 'not_started'
+        ? data.session.sessionLength && <span data-testid="home-session-length">{data.session.sessionLength}</span>
+        : data.session.minutesLeft != null && `~${data.session.minutesLeft} min left`
   }
+  // The name with its last word in glowing mint, as drawn.
+  const cut = title.lastIndexOf(' ')
+  const head = cut > 0 ? title.slice(0, cut + 1) : ''
+  const tail = cut > 0 ? title.slice(cut + 1) : title
+  const glowTail = status !== 'unknown'
+  const pctDone = setsPlanned > 0 ? Math.min(100, Math.round((setsLogged / setsPlanned) * 100)) : 0
   return (
-    <div className="border-b border-[color:var(--hairline)] py-2" data-tour="hero" data-home-hero={done ? 'done' : status}>
-      <div className="flex min-h-[44px] items-center gap-3">
-        <span aria-hidden className="flex size-8 shrink-0 items-center justify-center rounded-[10px]" style={{ background: 'var(--surface-raised)', color: 'var(--primary-text)' }}>
-          {status === 'rest' ? <Moon className="size-4" /> : <Dumbbell className="size-4" />}
+    <section
+      className="rounded-[24px] border p-5"
+      style={{
+        background: 'radial-gradient(120% 90% at 100% 0%, rgba(var(--glow-rgb), .20), transparent 55%), var(--card)',
+        borderColor: 'rgba(var(--glow-rgb), .30)',
+        boxShadow: '0 10px 30px rgba(0, 0, 0, .35)',
+      }}
+      data-tour="hero"
+      data-home-hero={done ? 'done' : status}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[.12em] text-primary-text" data-home-eyebrow>
+          Today{ordinal ? ` · Session ${ordinal.n} of ${ordinal.of}` : ''}
         </span>
-        <button
-          type="button"
-          className="min-w-0 flex-1 text-left"
-          onClick={() => { window.location.hash = tabHash('exercise') }}
-          aria-label={`${typeof title === 'string' ? title : data.session.focus ?? 'Today'} — open Exercise`}
-        >
-          <span className="block truncate text-[0.90625rem]">{title}</span>
-          {sub && <span className="block truncate text-[0.71875rem] text-muted-foreground">{sub}</span>}
-          {status === 'in_progress' && (
-            <span className="tabular-mono block text-[0.71875rem] text-muted-foreground">{setsLogged} of {setsPlanned} sets</span>
-          )}
-        </button>
-        {done && onSummary ? (
-          <button type="button" onClick={onSummary} className="hit-slop-44 shrink-0 text-[0.6875rem] font-semibold text-text-tertiary" data-home-summary>
-            Summary ›
-          </button>
-        ) : dots}
+        {right && <span className="min-w-0 truncate text-[0.6875rem] text-text-tertiary">{right}</span>}
       </div>
-      {done && (
-        <p className="tabular-mono mt-1 pl-11 text-[0.71875rem] text-muted-foreground" data-home-done-stats>
-          {minutes != null ? `${minutes} min` : '—'} · {setsLogged}/{setsPlanned} sets · <span className={prCount > 0 ? 'glow-mint text-primary-text' : ''} data-home-pr={prCount > 0 ? '' : undefined}>{prCount} PR{prCount === 1 ? '' : 's'}{topPr ? ` · ${topPr}` : ''}</span>
-        </p>
+      <button
+        type="button"
+        className="mt-2 block w-full text-left"
+        onClick={() => { window.location.hash = tabHash('exercise') }}
+        aria-label={`${title} — open Exercise`}
+      >
+        <span className="block text-[2rem] font-bold leading-[1.05] tracking-[-.03em]" data-home-title>
+          {head}<span className={glowTail ? 'text-primary-text' : undefined} style={glowTail ? { textShadow: '0 0 18px rgba(var(--glow-rgb), .8)' } : undefined}>{tail}</span>
+        </span>
+        {sub && <span className="mt-2 block text-[0.78125rem] text-text-tertiary">{sub}</span>}
+      </button>
+      {started && (
+        <div className="mt-4" data-home-set-progress>
+          <div className="h-1 overflow-hidden rounded-full" style={{ background: 'var(--hairline)' }}>
+            <div className="h-1 rounded-full" style={{ width: `${pctDone}%`, background: 'var(--primary)', boxShadow: '0 0 8px rgba(var(--glow-rgb), .8)' }} />
+          </div>
+          {/* Done says its count once, on the stats line below; the bar alone stays. */}
+          {!done && <p className="mt-1.5 text-[0.6875rem] tabular-nums text-muted-foreground" data-home-sets-label>{setsLogged} of {setsPlanned} sets</p>}
+        </div>
       )}
-    </div>
+      {done && (
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <p className="min-w-0 tabular-nums text-[0.71875rem] text-muted-foreground" data-home-done-stats>
+            {minutes != null ? `${minutes} min` : '—'} · {setsLogged}/{setsPlanned} sets · <span className={prCount > 0 ? 'glow-mint text-primary-text' : ''} data-home-pr={prCount > 0 ? '' : undefined}>{prCount} PR{prCount === 1 ? '' : 's'}{topPr ? ` · ${topPr}` : ''}</span>
+          </p>
+          {onSummary && (
+            <button type="button" onClick={onSummary} className="hit-slop-44 shrink-0 text-[0.6875rem] font-semibold text-text-tertiary" data-home-summary>
+              Summary ›
+            </button>
+          )}
+        </div>
+      )}
+      {cta}
+      {week.days.length > 0 && (
+        <div className="mt-4 border-t border-[color:var(--hairline)] pt-3.5">
+          <HomeWeekStrip days={week.days} todayName={data.dayName} done={week.sessionsDone} planned={week.sessionsPlanned} />
+        </div>
+      )}
+      {footer}
+    </section>
   )
 }
 
@@ -896,6 +970,12 @@ function tipPrefill(key: string, text: string): string {
   return TIP_PREFILL[key] ?? `Tell me more about this: "${text}"`
 }
 
+/** The coach line's two chips (design 2c): each types a question into the chat, never sends it for her. */
+const HOME_PROMPTS = [
+  { label: 'What changed?', prefill: 'What has changed in my plan lately, and why?' },
+  { label: 'Adjust today', prefill: "Can you adjust today's session for me?" },
+]
+
 /**
  * THE ROTATING NOTE — 2a. Every 6s the next tip, with a quarter-second fade.
  * Tapping the line moves on and a dot jumps; either restarts the 6s.
@@ -939,7 +1019,9 @@ export function HomeCoachNote({ tips }: { tips: HomeTip[] }) {
       onPointerLeave={() => setHeld(false)}
     >
       <TrainerNudge
-        slim
+        line
+        className="px-1"
+        prompts={HOME_PROMPTS}
         text={tip.text}
         tag={tip.tag}
         openChat
