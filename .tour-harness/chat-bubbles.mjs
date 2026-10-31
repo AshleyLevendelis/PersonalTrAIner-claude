@@ -15,6 +15,15 @@
 // 82%; the composer is the page's last row, sitting straight on the tab bar,
 // and the tab bar's chat button lies flat so it cannot cover it.
 //
+// DESIGN 2b, 31 Oct 2026 (her "build, keep my rulings"): RE-ANCHORED on the same
+// properties where the layout moved — the avatar opens each coach group (22px,
+// with the name "Trainer" and the time) instead of sitting beside its last
+// bubble, so the coach's bubbles run from the column's edge; corners 20px with a
+// 6px tail; the coach's line height 1.5; the header gains a 36px avatar and the
+// live line, and the context strip sits inside it; the composer pill is 52px
+// (radius 26); reply chips 15px sides. Colours unchanged (the kept rulings). And
+// her same-day listen button: its icon must read against the page in every pair.
+//
 // The thread is ?seed=groups in chat.tsx, timed off the harness anchor, so
 // every rule has at least TWO candidates on screen (a check on which of N
 // things something attaches to needs N > 1). The typing dots are caught by
@@ -168,6 +177,9 @@ function readPage() {
     scrollbar: cs(scroller)?.scrollbarWidth ?? null,
     composerBg: cs(composer)?.backgroundColor ?? null, composerBorderTop: px(cs(composer)?.borderTopWidth ?? '0'),
     pillRadius: pill ? px(cs(pill).borderTopLeftRadius) : null,
+    pillH: pill ? pill.getBoundingClientRect().height : null,
+    strip: box(q('[data-testid="chat-context-strip"]')),
+    live: q('[data-testid="chat-header-live"]')?.textContent.trim() ?? null,
     lastGroupBottom: groups.length ? groups[groups.length - 1].getBoundingClientRect().bottom : null,
     tokens: { deep: probe('backgroundColor', '--surface-deep'), muted: probe('color', '--muted-foreground') },
   }
@@ -196,11 +208,13 @@ console.log('\n[3] Alignment, width, type and colour')
 const all = R.groups.flatMap(g => g.bubbles)
 const users = all.filter(b => b.role === 'user'), coach = all.filter(b => b.role === 'assistant')
 check('user bubbles sit against the right edge', users.length >= 4 && users.every(b => near(b.box.right, R.thread.right)), users.map(b => [b.box.right, R.thread.right]))
-check('coach bubbles sit to the right of the avatar column (28px + 8px)', coach.length >= 5 && coach.every(b => near(b.box.left, R.thread.left + 36)), coach.map(b => b.box.left - R.thread.left))
+// RE-ANCHORED 31 Oct 2026 (2b): the avatar is in the group's header row now, so the bubbles start at the column's edge.
+check('coach bubbles sit against the left edge, under their group\'s header row', coach.length >= 5 && coach.every(b => near(b.box.left, R.thread.left)), coach.map(b => b.box.left - R.thread.left))
 const pct = b => Math.round(b.box.width / R.thread.width * 100)
 check('no bubble passes its cap: yours 82% of the chat column, the coach\'s 88%', users.every(b => b.box.width <= R.thread.width * 0.82 + 1) && coach.every(b => b.box.width <= R.thread.width * 0.88 + 1), all.map(b => `${b.role[0]}${pct(b)}`))
 check('...and a long one of EACH reaches its cap, so the cap is what stopped it', users.some(b => b.box.width >= R.thread.width * 0.80) && coach.some(b => b.box.width >= R.thread.width * 0.86), all.map(b => `${b.role[0]}${pct(b)}`))
-check('body text 15px on a ~1.45 line', all.every(b => b.fontSize === 15 && near(b.lineHeight, 21.75, 0.5)), all.map(b => [b.fontSize, b.lineHeight]))
+// 2b: yours 15px on 1.45, the coach's 15px on 1.5.
+check('body text 15px — yours on a 1.45 line, the coach\'s on 1.5', all.every(b => b.fontSize === 15 && near(b.lineHeight, b.role === 'user' ? 21.75 : 22.5, 0.5)), all.map(b => [b.role, b.fontSize, b.lineHeight]))
 check('padding 10px 14px', all.every(b => b.pad.join() === '10,14,10,14'), all.map(b => b.pad))
 // YOURS IS PLAIN (Ashley, 28 Sep 2026, from three options, once both bubbles
 // were the same mint): the app's panel colour, its own text, and the hairline
@@ -220,10 +234,10 @@ const coachLinks = coach.flatMap(b => b.links), coachRetry = coach.flatMap(b => 
 check('a link inside a coach bubble is the accent text, underlined', coachLinks.length >= 1 && coachLinks.every(l => l.color === R.tokens.primaryText && /underline/.test(l.underline)), coachLinks)
 check('a "tap to retry" inside a coach bubble is the accent text, not amber', coachRetry.length >= 1 && coachRetry.every(r => r.color === R.tokens.primaryText && Number(r.weight) >= 500), coachRetry)
 
-console.log('\n[4] Corners: 18px all round, one 4px tail on the sender side of the last bubble')
+console.log('\n[4] Corners (2b): 20px all round, one 6px tail on the sender side of the last bubble')
 const expectRadius = (role, pos) => {
-  const tail = pos === 'last' || pos === 'single' ? 4 : 18
-  return role === 'user' ? [18, 18, tail, 18] : [18, 18, 18, tail]
+  const tail = pos === 'last' || pos === 'single' ? 6 : 20
+  return role === 'user' ? [20, 20, tail, 20] : [20, 20, 20, tail]
 }
 const wrong = all.filter(b => b.radius.join() !== expectRadius(b.role, b.position).join())
 check('every bubble\'s corners match its place in the group', all.length >= 9 && wrong.length === 0, wrong.map(b => [b.role, b.position, b.radius]))
@@ -234,10 +248,12 @@ check('a card between two coach bubbles does not count as a bubble: they are fir
 
 console.log('\n[5] The avatar and the time — once per group; the header names the coach')
 const coachGroups = R.groups.filter(g => g.role === 'assistant'), userGroups = R.groups.filter(g => g.role === 'user')
-check('no group carries a name label any more — the header says who this is', coachGroups.length >= 4 && R.groups.every(g => g.names.length === 0), R.groups.map(g => g.names.length))
-check('every coach group has one 28px avatar, level with the bottom of its last bubble or card', coachGroups.every(g => g.avatars.length === 1 && near(g.avatars[0].width, 28) && near(g.avatars[0].bottom, g.items[g.items.length - 1]?.box.bottom, 2)), coachGroups.map(g => [g.avatars.length, g.avatars[0]?.width, g.avatars[0]?.bottom, g.items[g.items.length - 1]?.box.bottom]))
+// RE-ANCHORED 31 Oct 2026 (2b): a coach group OPENS with its avatar, name and time; still once per group. The
+// name is "Trainer" (her 10 Oct ruling keeps the handoff's "COACH" off the screen); your groups carry none.
+check('every coach group carries its name once, "Trainer"; your groups none', coachGroups.length >= 4 && coachGroups.every(g => g.names.length === 1 && /^trainer$/i.test(g.names[0].text)) && userGroups.every(g => g.names.length === 0), R.groups.map(g => g.names.map(n => n.text)))
+check('every coach group has one 22px avatar, in the header row ABOVE its first bubble or card', coachGroups.every(g => g.avatars.length === 1 && near(g.avatars[0].width, 22) && g.avatars[0].bottom <= (g.items[0]?.box.top ?? -1)), coachGroups.map(g => [g.avatars.length, g.avatars[0]?.width, g.avatars[0]?.bottom, g.items[0]?.box.top]))
 check('no user group has an avatar', userGroups.every(g => g.avatars.length === 0))
-check('every group shows its time once, under its last bubble', R.groups.slice(0, 7).every(g => g.times.length === 1 && g.times[0].box.top >= g.items[g.items.length - 1]?.box.bottom), R.groups.map(g => g.times.length))
+check('every group shows its time once: the coach\'s in its header row, yours under your last bubble', R.groups.slice(0, 7).every(g => g.times.length === 1 && (g.role === 'user' ? g.times[0].box.top >= g.items[g.items.length - 1]?.box.bottom : g.times[0].box.bottom <= (g.items[0]?.box.top ?? -1) && near(g.times[0].box.top + g.times[0].box.height / 2, g.avatars[0].top + g.avatars[0].height / 2, 3))), R.groups.map(g => [g.role, g.times.length]))
 check('...small and muted (11-12px, the muted colour), and it reads as a time', R.groups.slice(0, 7).every(g => g.times[0] && g.times[0].fontSize >= 11 && g.times[0].fontSize <= 12 && g.times[0].color === R.tokens.muted && /^\d{1,2}:\d{2}\s?(AM|PM)$/.test(g.times[0].text)), R.groups.map(g => g.times[0]))
 
 console.log('\n[6] A card belongs to the coach\'s group')
@@ -250,15 +266,19 @@ console.log('\n[6b] The chat is the page (design 2a)')
 await call(() => { const s = document.querySelector('[data-testid="chat-scroller"]'); if (s) s.scrollTop = s.scrollHeight; return true })
 await wait(400)
 const P = await call(readPage)
-check('a 56px header runs across the top of the screen', !!P.header && near(P.header.top, 0) && near(P.header.height, 56) && near(P.header.width, P.viewport.w), P.header)
-check('...with a 32px glowing avatar, "Coach" (15px, semibold) over "Personal TrAIner" (11px, muted)',
-  near(P.avatar?.width, 32) && /rgba?\(/.test(P.avatarGlow) && P.title?.text === 'Coach' && P.title?.size === 15 && Number(P.title?.weight) >= 600 && P.sub?.text === 'Personal TrAIner' && P.sub?.size === 11 && P.sub?.color === P.tokens.muted,
+// RE-ANCHORED 31 Oct 2026 (2b): the header's top row is 64px (a 36px avatar, the names, the live line); the
+// context strip, when it has a pill, sits inside the header under that row, so the header is the row plus the strip.
+check('the header runs across the top of the screen: a 64px top row, plus the context strip when there is one', !!P.header && near(P.header.top, 0) && near(P.header.width, P.viewport.w) && near(P.header.height, 64 + (P.strip?.height ?? 0)), { header: P.header, strip: P.strip })
+check('...with a 36px glowing avatar, "Coach" (17px, bold) beside "Personal TrAIner" (11px, muted) — the names kept',
+  near(P.avatar?.width, 36) && /rgba?\(/.test(P.avatarGlow) && P.title?.text === 'Coach' && P.title?.size === 17 && Number(P.title?.weight) >= 700 && P.sub?.text === 'Personal TrAIner' && P.sub?.size === 11 && P.sub?.color === P.tokens.muted,
   { avatar: P.avatar?.width, glow: P.avatarGlow, title: P.title, sub: P.sub })
+check('...and the live line under them', P.live === "Sees today's session, meals and logs", P.live)
 check('...then the 40px clear button, then the settings gear, both in the header', !!P.clear && !!P.gear && near(P.clear.width, 40) && P.gear.left >= P.clear.right && P.clear.top >= P.header.top && P.gear.bottom <= P.header.bottom, { clear: P.clear, gear: P.gear })
 check('the thread fills everything between the header and the composer', !!P.scroller && near(P.scroller.top, P.header?.bottom) && near(P.scroller.bottom, P.composer?.top), { header: P.header?.bottom, scroller: P.scroller, composer: P.composer?.top })
 check('...with no scrollbar showing', P.scrollbar === 'none', P.scrollbar)
 check('the composer sits straight on the tab bar — no gap, no overlap', !!P.composer && !!P.nav && near(P.composer.bottom, P.nav.top) && near(P.screen?.bottom, P.nav.top), { composer: P.composer?.bottom, nav: P.nav?.top, screen: P.screen?.bottom })
-check('...on the dark bottom surface, with a hairline above it and the 22px pill inside', P.composerBg === P.tokens.deep && P.composerBorderTop === 1 && P.pillRadius === 22, { bg: P.composerBg, deep: P.tokens.deep, border: P.composerBorderTop, pill: P.pillRadius })
+// 2b: the pill is 52px with a 26px radius (was 22).
+check('...on the dark bottom surface, with a hairline above it and the 52px pill (26px radius) inside', P.composerBg === P.tokens.deep && P.composerBorderTop === 1 && P.pillRadius === 26 && near(P.pillH, 52), { bg: P.composerBg, deep: P.tokens.deep, border: P.composerBorderTop, pill: P.pillRadius, h: P.pillH })
 check('the tab bar\'s chat button lies flat (44px, inside the bar) and covers none of the composer', !!P.disc && near(P.disc.width, 44) && P.disc.top >= P.nav.top - 0.5 && P.disc.top >= P.composer.bottom - 0.5, { disc: P.disc, nav: P.nav?.top, composer: P.composer?.bottom })
 check('the newest message sits above the composer', P.lastGroupBottom !== null && P.lastGroupBottom <= P.composer.top + 0.5, { last: P.lastGroupBottom, composer: P.composer?.top })
 
@@ -312,7 +332,7 @@ for (let i = 0; i < 20 && !typing; i++) {
 await call(() => { const s = document.querySelector('[data-testid="chat-thread"]')?.parentElement; if (s) s.scrollTop = s.scrollHeight; return true })
 await wait(200)
 await shoot('chat-bubbles-typing')
-check('while the coach is typing, the dots are a bubble in a COACH group with its avatar', typing?.role === 'assistant' && typing?.names === 0 && typing?.avatars === 1, typing)
+check('while the coach is typing, the dots are a bubble in a COACH group with its avatar and name', typing?.role === 'assistant' && typing?.names === 1 && typing?.avatars === 1, typing)
 check('...and the group shows no time until the reply lands', typing?.times === 0, typing)
 check('the typing bubble is the soft tint too, its dots and "Thinking" in the quiet text colour', !!typing && typing.bubbleImage === 'none' && typing.bubbleBg === typing.want.primary && typing.dot === typing.want.dot && typing.label === typing.want.label, typing && { image: typing.bubbleImage?.slice(0, 50), bg: typing.bubbleBg, dot: typing.dot, label: typing.label, want: typing.want })
 check('...and what she just sent is in the user group before it', typing?.prevRole === 'user', typing)
@@ -356,9 +376,10 @@ let chips = []
 for (let i = 0; i < 20 && chips.length < 2; i++) {
   await wait(250)
   chips = await call(() => [...document.querySelectorAll('button')].filter(b => /^(Sounds good|What weight\?)$/.test((b.textContent || '').trim()))
-    .map(b => { const s = getComputedStyle(b); return { h: b.getBoundingClientRect().height, minH: parseFloat(s.minHeight), padL: parseFloat(s.paddingLeft) } }))
+    .map(b => { const s = getComputedStyle(b); return { h: b.getBoundingClientRect().height, minH: parseFloat(s.minHeight), padL: parseFloat(s.paddingLeft), border: parseFloat(s.borderTopWidth), nowrap: s.whiteSpace === 'nowrap' } }))
 }
-check('the reply\'s tap-to-answer chips are 40px tall with 14px sides', chips.length === 2 && chips.every(c => c.minH === 40 && c.h >= 40 && c.padL === 14), chips)
+// 2b: 15px sides, a violet hairline, one line each.
+check('the reply\'s tap-to-answer chips are 40px tall with 15px sides, a 1px hairline, never wrapped', chips.length === 2 && chips.every(c => c.minH === 40 && c.h >= 40 && c.padL === 15 && c.border === 1 && c.nowrap), chips)
 // FOUND HERE, 26 Sep 2026, NOT FIXED: tap "Jump to latest" while a reply is
 // still arriving and the thread stops short when the reply's chips appear —
 // the jump scrolls SMOOTHLY, the scroll handler reads "not near the bottom"
@@ -460,7 +481,9 @@ function readCoachInk(theme, accent, light) {
   const bubble = document.querySelector('[data-testid="chat-bubble"][data-role="assistant"]')
   const mine = document.querySelector('[data-testid="chat-bubble"][data-role="user"]')
   const page = document.querySelector('[data-testid="chat-screen"]')
-  if (!bubble || !mine || !page) return { theme, accent, top: 0, bottom: 0, pageTop: 0, pageBottom: 0, flat: false, sameAsYours: false, mine: 0, mineBg: '', mineInk: '', apart: 0, edge: 0, panel: 0 }
+  if (!bubble || !mine || !page) return { theme, accent, top: 0, bottom: 0, pageTop: 0, pageBottom: 0, flat: false, sameAsYours: false, mine: 0, mineBg: '', mineInk: '', apart: 0, edge: 0, panel: 0, listen: 0 }
+  const listenBtn = bubble.querySelector('[data-listen]')
+  const over = (css, under) => { const c = document.createElement('canvas'); c.width = c.height = 1; const x = c.getContext('2d'); x.fillStyle = under; x.fillRect(0, 0, 1, 1); x.fillStyle = css; x.fillRect(0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3) }
   const cs = getComputedStyle(bubble)
   const ink = toRGB(cs.color), bg = toRGB(getComputedStyle(page).backgroundColor)
   const image = cs.backgroundImage
@@ -487,6 +510,9 @@ function readCoachInk(theme, accent, light) {
     edgesApart: ratio(toRGB(cs.borderTopColor), toRGB(getComputedStyle(mine).borderTopColor)),
     edge: ratio(toRGB(getComputedStyle(mine).borderTopColor), bg),
     panel: ratio(toRGB(getComputedStyle(mine).backgroundColor), bg),
+    // THE LISTEN ICON (31 Oct 2026) sits on the page beside the bubble: its ink against the page, BLENDED onto the
+    // page first — a see-through ink read on its own reports its full colour (found by a MISSED mutation).
+    listen: listenBtn ? ratio(over(getComputedStyle(listenBtn).color, getComputedStyle(page).backgroundColor), bg) : 0,
   }
 }
 // The canvas conversion is itself checked first, on colours whose answer is
@@ -532,6 +558,10 @@ const EDGE_FLOOR = 1.3
 check('your text reads at 4.5:1 or better in every theme with every accent', everyPair.length >= 81 && everyPair.every(x => x.mine >= 4.5), everyPair.filter(x => x.mine < 4.5).map(x => `${x.theme}/${x.accent} ${x.mine}`))
 check('...and the accent does not touch your bubble: one fill and one ink per theme', themeNames.every(t => new Set(everyPair.filter(x => x.theme === t).map(x => `${x.mineBg}|${x.mineInk}`)).size === 1), themeNames.map(t => [t, new Set(everyPair.filter(x => x.theme === t).map(x => x.mineBg)).size]))
 check(`...your bubble and the coach's are never the same fill, ${APART_FLOOR}:1 apart or more in every pair`, everyPair.length >= 81 && everyPair.every(x => x.apart >= APART_FLOOR), everyPair.filter(x => x.apart < APART_FLOOR).map(x => `${x.theme}/${x.accent} ${x.apart}`))
+// LISTEN (her 31 Oct 2026 ruling): an icon is a non-text control, so WCAG asks 3:1 against what it sits on. Measured
+// in every pair; a missing button reads 0 and fails.
+console.log(`      listen icon against the page across all ${everyPair.length} pairs: lowest ${Math.min(...everyPair.map(x => x.listen))}:1`)
+check('the coach bubble\'s Listen icon reads at 3:1 or better against the page in every theme with every accent', everyPair.length >= 81 && everyPair.every(x => x.listen >= 3), everyPair.filter(x => x.listen < 3).map(x => `${x.theme}/${x.accent} ${x.listen}`))
 check(`...and its hairline stands off the page, ${EDGE_FLOOR}:1 or more, in every theme`, ownAccent.length >= 9 && ownAccent.every(x => x.edge >= EDGE_FLOOR), ownAccent.map(x => [x.theme, x.edge]))
 await call(() => { const el = document.documentElement; el.setAttribute('data-theme', 'nightshift'); el.setAttribute('data-accent', 'theme'); el.removeAttribute('data-canvas'); return true })
 

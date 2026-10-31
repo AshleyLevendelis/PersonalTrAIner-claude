@@ -76,7 +76,7 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, devi
 // which can land between documents, where `document.body` is null — the driver
 // crashed on the full sweep that day (2 checks ran of 20) and passed on the
 // re-run. A page with no body yet has no text yet; the poll simply goes round.
-const read = () => ev(`({ text: document.body ? document.body.innerText : '', planArrived: window.__planArrived === true })`)
+const read = () => ev(`({ text: document.body ? document.body.innerText : '', thread: document.querySelector('[data-testid="chat-thread"]')?.innerText ?? null, planArrived: window.__planArrived === true })`)
 const text = async () => (await read()).text
 // UNDER the 2.5s opener ceiling on purpose: the runs that recovered on their
 // own were the SLOW ones, where the plan missed the deadline and the timer
@@ -104,7 +104,10 @@ const chatEarly = chatFirst.text
 check('the opener is on screen before the plan is',
   /Hey/.test(chatEarly) && chatFirst.planArrived === false, { planArrived: chatFirst.planArrived, text: chatEarly.slice(0, 120) })
 check('and it does NOT announce a rest day', !/rest day/i.test(chatEarly), chatEarly.slice(0, 160))
-check('nor any other claim about today', !/today'?s |today was|recovery going/i.test(chatEarly), chatEarly.slice(0, 160))
+// RE-ANCHORED 31 Oct 2026 (chat 2b): the header now carries a fixed line, "Sees today's session, meals and logs",
+// which is about what the coach is SENT, not a claim about today. The claim this guards is the opener's, so it is
+// read off the conversation itself (null-safe: no thread fails the check).
+check('nor any other claim about today', chatFirst.thread != null && /Hey/.test(chatFirst.thread) && !/today'?s |today was|recovery going/i.test(chatFirst.thread), (chatFirst.thread ?? 'NO THREAD').slice(0, 160))
 await shoot('rest-day-race-chat-waiting')
 
 // The plan lands at 1.2s — INSIDE the 2.5s ceiling, which is the case that

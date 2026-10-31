@@ -74,15 +74,15 @@ check('a bubble after a card-only turn with nothing else is single', JSON.string
 check('two bubbles then a card: the second bubble is still the last one', JSON.stringify(bubblePositions([true, true, false])) === '["first","last",null]', bubblePositions([true, true, false]))
 check('a card then two bubbles: the first bubble is still the first one', JSON.stringify(bubblePositions([false, true, true])) === '[null,"first","last"]', bubblePositions([false, true, true]))
 
-console.log('\n[5] Corners (design 2a): 18px all round, one 4px tail on the sender side of the last bubble')
-check('your single bubble: the tail at bottom-right, everything else round', bubbleRadius('user', 'single') === '18px 18px 4px 18px', bubbleRadius('user', 'single'))
-check('your last bubble of several: the same tail', bubbleRadius('user', 'last') === '18px 18px 4px 18px', bubbleRadius('user', 'last'))
-check('your first and middle bubbles are round all the way round', bubbleRadius('user', 'first') === '18px 18px 18px 18px' && bubbleRadius('user', 'middle') === '18px 18px 18px 18px', [bubbleRadius('user', 'first'), bubbleRadius('user', 'middle')])
-check('the coach\'s single and last bubbles: the tail at bottom-left', bubbleRadius('assistant', 'single') === '18px 18px 18px 4px' && bubbleRadius('assistant', 'last') === '18px 18px 18px 4px', [bubbleRadius('assistant', 'single'), bubbleRadius('assistant', 'last')])
-check('the coach\'s first and middle bubbles are round all the way round', bubbleRadius('assistant', 'first') === '18px 18px 18px 18px' && bubbleRadius('assistant', 'middle') === '18px 18px 18px 18px')
+console.log('\n[5] Corners (design 2b, 31 Oct 2026; was 2a\'s 18/4): 20px all round, one 6px tail on the sender side of the last bubble')
+check('your single bubble: the tail at bottom-right, everything else round', bubbleRadius('user', 'single') === '20px 20px 6px 20px', bubbleRadius('user', 'single'))
+check('your last bubble of several: the same tail', bubbleRadius('user', 'last') === '20px 20px 6px 20px', bubbleRadius('user', 'last'))
+check('your first and middle bubbles are round all the way round', bubbleRadius('user', 'first') === '20px 20px 20px 20px' && bubbleRadius('user', 'middle') === '20px 20px 20px 20px', [bubbleRadius('user', 'first'), bubbleRadius('user', 'middle')])
+check('the coach\'s single and last bubbles: the tail at bottom-left', bubbleRadius('assistant', 'single') === '20px 20px 20px 6px' && bubbleRadius('assistant', 'last') === '20px 20px 20px 6px', [bubbleRadius('assistant', 'single'), bubbleRadius('assistant', 'last')])
+check('the coach\'s first and middle bubbles are round all the way round', bubbleRadius('assistant', 'first') === '20px 20px 20px 20px' && bubbleRadius('assistant', 'middle') === '20px 20px 20px 20px')
 check('only the sender-side BOTTOM corner is ever tucked — never the top, never the far side', ['single', 'first', 'middle', 'last'].every(p => {
   const u = bubbleRadius('user', p as never).split(' '), c = bubbleRadius('assistant', p as never).split(' ')
-  return u[0] === '18px' && u[1] === '18px' && u[3] === '18px' && c[0] === '18px' && c[1] === '18px' && c[2] === '18px'
+  return u[0] === '20px' && u[1] === '20px' && u[3] === '20px' && c[0] === '20px' && c[1] === '20px' && c[2] === '20px'
 }))
 
 console.log('\n[6] One time per group')

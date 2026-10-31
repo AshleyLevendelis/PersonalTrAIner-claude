@@ -108,7 +108,13 @@ console.log('\n§4 The offer is the coach\'s bubble, with nothing of the card')
   check('no "Proposed change" heading and no "Keep" button anywhere it can print', !printed.some(t => /Proposed change/i.test(t) || t === 'Keep'), printed.filter(t => /Proposed change|^Keep$/i.test(t)))
   check('..."Not now" in its place', printed.includes('Not now'), printed.filter(t => /now/i.test(t)))
   check('the facts are said through the shared lines, and handed to the bubble', /offerChanges\(diff\.rows\)/.test(card) && /offerChangeText\(c\)/.test(card) && /\{bubble\(facts\)\}/.test(card))
-  check('no big glowing button: no glow, no solid main-colour block', !/glow-mint-box/.test(card) && !/\bbg-primary\b/.test(card))
+  // RE-ANCHORED 31 Oct 2026 (design 2b, which her tab-polish plan says fits this ruling): the offer's FIRST answer is
+  // a filled main-colour pill. What this guards is unchanged — no glowing button, and no solid main-colour BLOCK —
+  // so: no glow anywhere, the fill appears once, on the primary weight only, and that pill is word-sized (36px, h-9).
+  const fills = card.match(/\bbg-primary\b/g) ?? []
+  const pillFn = (card.match(/const pill = \(weight[\s\S]*?\n {2}const small/) || [''])[0]
+  check('no big glowing button: no glow; the main colour fills ONE word-sized pill, the primary answer, and nothing else', !/glow-mint-box/.test(card) && fills.length === 1
+    && /weight === 'primary'\s*\?\s*'bg-primary /.test(pillFn) && /inline-flex h-9 items-center/.test(pillFn), { fills: fills.length, pillFn: pillFn.slice(0, 200) })
   check('every button keeps the 44px tap target', (card.match(/<button/g) ?? []).length >= 3 && !/<button[^>]*className="(?![^"]*min-h-\[44px\])/.test(card) && /const small = '[^']*min-h-\[44px\]/.test(card))
   const site = chat.indexOf('<ProposalCard')
   const cards = chat.indexOf('data-testid="chat-cards"')

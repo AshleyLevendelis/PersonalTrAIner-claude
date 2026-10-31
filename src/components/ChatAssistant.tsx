@@ -10,7 +10,14 @@ import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { weekdayLong, dayLabel } from '@/lib/day-labels'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle } from 'lucide-react'
+import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, Activity, ChevronRight, Check } from 'lucide-react'
+import { chatContextPills } from '@/lib/chat-context-strip'
+import { sessionSetCount } from '@/lib/session-count'
+import { readSessionSummary } from '@/lib/session-summary-store'
+import { getLedgerSnapshot } from '@/lib/meal-store'
+import { tabHash } from '@/lib/app-route'
+import { readAloud } from '@/lib/read-aloud'
+import { ListenButton } from '@/components/chat/ListenButton'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
 import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
@@ -7516,6 +7523,34 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
   const { dockHeightPx } = useBottomDockHeight()
 
+  // READING ALOUD STOPS WHEN SHE LEAVES (her 31 Oct 2026 listen button): on
+  // another tab, or when the chat goes away, the phone stops talking.
+  useEffect(() => { if (!chatVisible) readAloud.stop() }, [chatVisible])
+  useEffect(() => () => readAloud.stop(), [])
+
+  // THE CONTEXT STRIP (design 2b) — Home's and Nutrition's own readings, never
+  // a second calculation: the session status and minutes off the same
+  // aggregator Home draws (proactiveData is loadDashboardData), the set count
+  // off the same week cell (sessionSetCount), the finish card's minutes first
+  // as Home does, and the calories eaten off the meal ledger's snapshot as
+  // Home's withMealSnapshot does, against the target Nutrition's hero uses.
+  const [ledgerTick, setLedgerTick] = useState(0)
+  useEffect(() => subscribeMealStore(() => setLedgerTick(t => t + 1)), [])
+  void ledgerTick
+  const stripCell = trainingWeek.days.find(d => d.date === activeSession.date)
+  const stripEaten = profile.id ? getLedgerSnapshot(profile.id, activeSession.date)?.eaten.kcal ?? proactiveData?.caloriesEaten ?? null : null
+  const contextPills = chatContextPills({
+    session: proactiveData ? { status: proactiveData.session.status, focus: proactiveData.session.focus } : null,
+    running: activeSession.status === 'running',
+    count: sessionSetCount(stripCell?.session, stripCell?.workingLogs),
+    minutes: readSessionSummary(profile.id, activeSession.date)?.summary.durationMinutes ?? proactiveData?.sessionMinutes ?? null,
+    kcal: macros && stripEaten != null ? { target: macros.calories, eaten: stripEaten } : null,
+  })
+  const openStripLink = (to: 'exercise' | 'nutrition') => {
+    if (to === 'exercise') { if (onOpenExercise) onOpenExercise(); else window.location.hash = tabHash('exercise') }
+    else window.location.hash = tabHash('nutrition')
+  }
+
   // FULL-PAGE CHAT (design 2a, 26 Sep 2026). The chat is no longer a card
   // inside the page with a composer floating over it: it IS the page, from
   // the top of the screen down to whatever is below it, and the composer is
@@ -7527,6 +7562,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   //     covers the input, the defect reported from a real gym session.
   // The old measured "clearance" padding is gone with the overlay it paid
   // for: a composer in the flow cannot sit on the thread.
+  // The composer's main button (design 2b): the mic while the field is empty and the phone can listen, else send.
+  const micLeads = speech.isSupported && !input.trim()
   const dockOffsetPx = dockHeightPx > 0 ? dockHeightPx + (composerKeyboardOpen ? 16 : 12) : 0
   const chatScreenBottom = composerKeyboardOpen
     ? `${composerInsetPx + dockOffsetPx}px`
@@ -7548,18 +7585,29 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       style={{ bottom: chatScreenBottom }}
     >
       <header data-testid="chat-header" className="shrink-0 border-b border-[color:var(--hairline)]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
-        <div className="flex h-14 items-center gap-2.5 pl-3.5 pr-1.5">
+        {/* DESIGN 2b (31 Oct 2026): a 36px avatar, the 26 Sep names kept as
+            they were ("Coach" over "Personal TrAIner" — her rulings keep the
+            names), and a live line saying what the coach is sent. True by
+            construction: buildContext sends today's session (the exercise
+            summary's today), the day's meals and the logs, every turn. */}
+        <div className="flex min-h-16 items-center gap-3 py-2.5 pl-4 pr-1.5">
           <span
             aria-hidden
             data-testid="chat-header-avatar"
-            className="flex size-8 shrink-0 items-center justify-center rounded-full text-primary-foreground"
+            className="flex size-9 shrink-0 items-center justify-center rounded-full text-primary-foreground"
             style={{ background: COACH_GRADIENT, boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
           >
-            <MessageCircle className="size-4" strokeWidth={2.4} />
+            <MessageCircle className="size-[18px]" strokeWidth={2.4} />
           </span>
           <div className="min-w-0 flex-1">
-            <h2 className="text-[0.9375rem] font-semibold leading-tight text-foreground">Coach</h2>
-            <p className="text-[0.6875rem] leading-tight text-muted-foreground">Personal TrAIner</p>
+            <div className="flex min-w-0 items-baseline gap-1.5">
+              <h2 className="text-[1.0625rem] font-bold leading-tight tracking-[-.01em] text-foreground">Coach</h2>
+              <p className="truncate text-[0.6875rem] leading-tight text-muted-foreground">Personal TrAIner</p>
+            </div>
+            <p data-testid="chat-header-live" className="mt-0.5 flex items-center gap-1.5 truncate text-[0.71875rem] leading-tight text-muted-foreground">
+              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" style={{ boxShadow: '0 0 6px var(--primary)' }} />
+              Sees today&apos;s session, meals and logs
+            </p>
           </div>
           <Button
             variant={clearArmed ? 'destructive' : 'ghost'}
@@ -7573,6 +7621,37 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           </Button>
           {headerAction}
         </div>
+        {/* THE CONTEXT STRIP (design 2b): where today stands, in pills, and
+            gone entirely when there is nothing to say. */}
+        {contextPills.length > 0 && (
+          <div data-testid="chat-context-strip" className="flex gap-2 overflow-x-auto border-t border-[color:var(--hairline)] px-4 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {contextPills.map(p => p.kind === 'done' ? (
+              <span key={p.kind} data-context-pill={p.kind} className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[color:var(--hairline)] px-[11px] text-[0.71875rem] text-[color:var(--text-tertiary)]" style={{ background: 'var(--surface-raised)' }}>
+                <span aria-hidden className="flex size-3.5 items-center justify-center rounded-full text-primary-text" style={{ background: 'color-mix(in oklab, var(--primary) 20%, transparent)' }}>
+                  <Check className="size-[9px]" strokeWidth={3.2} />
+                </span>
+                {p.text}
+              </span>
+            ) : (
+              <button
+                key={p.kind}
+                type="button"
+                data-context-pill={p.kind}
+                onClick={() => openStripLink(p.to)}
+                aria-label={`${p.text} — open ${p.to === 'exercise' ? 'Exercise' : 'Nutrition'}`}
+                className={cn(
+                  'hit-slop-44 flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full pl-[11px] pr-[9px] text-[0.71875rem] text-foreground',
+                  p.kind === 'session' && 'border border-[color:color-mix(in_oklab,var(--primary)_30%,transparent)]',
+                )}
+                style={{ background: p.kind === 'session' ? 'color-mix(in oklab, var(--primary) 10%, transparent)' : 'var(--surface-raised)' }}
+              >
+                {p.kind === 'session' && <Activity aria-hidden className="size-3 text-primary-text" />}
+                {p.text}
+                <ChevronRight aria-hidden className={cn('-ml-0.5 size-[11px]', p.kind === 'session' ? 'text-primary-text' : 'text-muted-foreground')} strokeWidth={2.4} />
+              </button>
+            ))}
+          </div>
+        )}
       </header>
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div
@@ -7656,17 +7735,31 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                   data-testid="chat-group"
                   data-role={row.role}
                 >
-                  <div className="flex items-end gap-2">
-                    {!isUserGroup && (
+                  {/* DESIGN 2b (31 Oct 2026): a coach group OPENS with a small
+                      header — the 22px avatar, the name and the time — and its
+                      bubbles run the full column under it. Once per group, as
+                      the 26 Sep grouping has it. The name is "Trainer", the
+                      coach line's own label: her 10 Oct ruling keeps the
+                      handoff's "COACH" off the screen. */}
+                  {!isUserGroup && (
+                    <div data-testid="chat-group-head" className="mb-2 flex items-center gap-2">
                       <span
                         aria-hidden
                         data-testid="chat-avatar"
-                        className="mb-px flex size-7 shrink-0 items-center justify-center rounded-full text-primary-foreground"
-                        style={{ background: COACH_GRADIENT, boxShadow: '0 0 18px rgba(var(--glow-rgb),.45)' }}
+                        className="flex size-[22px] shrink-0 items-center justify-center rounded-full text-primary-foreground"
+                        style={{ background: COACH_GRADIENT }}
                       >
-                        <MessageCircle className="size-3.5" strokeWidth={2.4} />
+                        <MessageCircle className="size-[11px]" strokeWidth={2.4} />
                       </span>
-                    )}
+                      <span data-testid="chat-group-name" className="text-[0.625rem] font-semibold uppercase tracking-[.12em]" style={{ color: 'var(--role-ai-label)' }}>Trainer</span>
+                      {stamp && (
+                        <time dateTime={stamp} data-testid="chat-group-time" className="text-[0.6875rem] leading-none text-muted-foreground">
+                          {timeLabel(stamp)}
+                        </time>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex">
                     <div className={`flex min-w-0 flex-1 flex-col gap-1.5 ${isUserGroup ? 'items-end' : 'items-start'}`}>
                       {row.items.map(({ message: msg, index: i }, k) => {
                         const bodyContent = msg.role === 'user' ? (
@@ -7710,11 +7803,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                           />
                         )
                         const position = positions[k]
-                        // Design 2a: the coach's bubbles get ~88% of the CHAT
-                        // column (its own column is narrowed by the avatar, 28px
-                        // + 8px gap, so the share is worked back out to the full
-                        // column), yours 82%.
-                        const widest = isUserGroup ? '82%' : 'calc((100% + 36px) * 0.88)'
+                        // Design 2b: the coach's bubbles get 88% of the chat
+                        // column (the avatar sits in the group's header now, so
+                        // the column is the full width), yours 82%.
+                        const widest = isUserGroup ? '82%' : '88%'
                         const offer = offerOf(msg)
                         // An offer restored without its words still asks its question.
                         const leadContent = offer && !msg.content && !isInterrupted(msg)
@@ -7725,10 +7817,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                 data-testid="chat-bubble"
                                 data-position={position}
                                 data-role={msg.role}
-                                className={`min-w-0 px-3.5 py-2.5 text-[0.9375rem] leading-[1.45] [overflow-wrap:anywhere] ${
+                                className={`relative min-w-0 px-3.5 py-2.5 text-[0.9375rem] [overflow-wrap:anywhere] ${
                                   msg.role === 'user'
-                                    ? 'whitespace-pre-wrap border border-border bg-card text-card-foreground'
-                                    : 'border border-[color:color-mix(in_oklab,var(--primary)_40%,var(--card))] bg-[color:color-mix(in_oklab,var(--primary)_14%,var(--card))] text-card-foreground'
+                                    ? 'whitespace-pre-wrap border border-border bg-card leading-[1.45] text-card-foreground'
+                                    : 'border border-[color:color-mix(in_oklab,var(--primary)_40%,var(--card))] bg-[color:color-mix(in_oklab,var(--primary)_14%,var(--card))] leading-[1.5] text-card-foreground'
                                 }`}
                                 // A SOFT TINT, NOT THE BRIGHT MINT (Ashley, 16 Oct 2026, "the chat
                                 // bubbles colour is too bright"; from three options, "soft tint" over a
@@ -7752,6 +7844,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                               >
                                 {leadContent}
                                 {inside}
+                                {/* LISTEN (her 31 Oct 2026 ruling): one per coach bubble, once its words are all in. */}
+                                {msg.role === 'assistant' && !isInterrupted(msg) && !(msg.id != null && msg.id === animatingMessageId) && (
+                                  <ListenButton messageKey={msg.id || `msg-${i}`} />
+                                )}
                               </div>
                         )
                         return (
@@ -7794,6 +7890,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                   onViewGrocery={msg.receipt.kind === 'grocery_item_added' || msg.receipt.kind === 'grocery_day_added' ? onOpenGrocery : undefined}
                                   onViewDashboard={msg.receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
                                   onViewExercise={msg.receipt.kind === 'steps_logged' ? onOpenExercise : undefined}
+                                  tone={msg.receipt.kind === 'water_logged' ? 'water' : undefined}
                                 />
                               )}
                               {msg.clarification && msg.status !== 'failed' && (
@@ -7830,23 +7927,26 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                       })}
                     </div>
                   </div>
-                  {stamp && (
+                  {/* Your group's time stays under its last bubble; the coach's is in its header (2b). */}
+                  {isUserGroup && stamp && (
                     <time
                       dateTime={stamp}
                       data-testid="chat-group-time"
-                      className={`mt-1 text-[0.6875rem] leading-none text-muted-foreground ${isUserGroup ? 'self-end' : 'pl-9'}`}
+                      className="mt-1 self-end text-[0.6875rem] leading-none text-muted-foreground"
                     >
                       {timeLabel(stamp)}
                     </time>
                   )}
                   {quickReplies.length > 0 && (
-                    <div className={`flex flex-wrap gap-2 mt-2 ${isUserGroup ? '' : 'pl-9'}`}>
+                    // Design 2b: 40px pills on one line each, a violet hairline, no fill.
+                    <div data-testid="chat-quick-replies" className="mt-2 flex flex-wrap gap-2">
                       {quickReplies.map(option => (
                         <button
                           key={option}
                           type="button"
                           onClick={() => handleQuickReply(option)}
-                          className="hit-slop-44 rounded-full bg-[color:var(--surface-raised)] px-3.5 py-2 text-xs font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80 min-h-[40px]"
+                          className="hit-slop-44 min-h-[40px] shrink-0 whitespace-nowrap rounded-full border px-[15px] text-[0.8125rem] font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80"
+                          style={{ borderColor: 'color-mix(in oklab, var(--role-ai-accent) 45%, transparent)' }}
                         >
                           {option}
                         </button>
@@ -7898,23 +7998,43 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         data-testid="chat-composer"
         className="shrink-0 border-t border-[color:var(--hairline)] bg-[color:var(--surface-deep)] px-2.5 py-2"
       >
-      <div className="flex items-end gap-2.5 rounded-[22px] bg-[color:var(--surface-raised)] py-1.5 pl-4 pr-1.5">
+      {/* DESIGN 2b (31 Oct 2026): a 52px pill. While it is empty and the phone
+          can listen, the MIC is the main button; once there is text, SEND is.
+          Only one of them is ever the filled main colour. */}
+      <div data-testid="chat-composer-pill" className="flex min-h-[52px] items-end gap-1.5 rounded-[26px] border border-[color:var(--hairline)] bg-[color:var(--surface-raised)] py-[3px] pl-4 pr-[3px]">
         <Textarea
           ref={composerRef}
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={speech.isListening ? 'Listening…' : 'Ask about your plan or request changes...'}
-          className="min-h-[40px] max-h-[88px] flex-1 resize-none border-0 bg-transparent px-0 py-2 shadow-none focus-visible:ring-0"
+          placeholder={speech.isListening ? 'Listening…' : speech.isSupported ? 'Tap the mic, or type…' : 'Ask about your plan or request changes...'}
+          className="min-h-[44px] max-h-[88px] flex-1 resize-none border-0 bg-transparent px-0 py-2.5 text-[0.875rem] shadow-none focus-visible:ring-0"
           rows={1}
         />
+        {/* keepsComposerFocus: tapping send used to leave focus on <body> —
+            measured on the onboarding composer, identical shape here — which
+            is a phone putting the keyboard away between every message. */}
+        <Button
+          data-chat-send
+          data-composer-lead={micLeads ? undefined : ''}
+          {...keepsComposerFocus}
+          onClick={() => { sendMessage(); refocusComposer(composerRef.current) }}
+          disabled={!input.trim() || isLoading}
+          size="icon"
+          variant={micLeads ? 'ghost' : 'default'}
+          className={cn('hit-slop-44 size-11 shrink-0 rounded-full', micLeads ? 'bg-[color:var(--hairline)] text-muted-foreground' : 'glow-mint-box')}
+          aria-label="Send message"
+        >
+          <Send className="size-[17px]" />
+        </Button>
         {speech.isSupported && (
           <Button
             type="button"
-            variant={speech.isListening ? 'destructive' : 'ghost'}
+            variant={speech.isListening ? 'destructive' : micLeads ? 'default' : 'ghost'}
             size="icon"
             {...keepsComposerFocus}
             onClick={handleMicClick}
+            data-composer-lead={micLeads ? '' : undefined}
             onPointerDown={() => {
               // Long-press (700ms) toggles the on-screen voice-debug trace —
               // see the TEMPORARY diagnostic comment above voiceDebugOn.
@@ -7934,17 +8054,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             onPointerLeave={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
             aria-label={speech.isListening ? 'Stop voice input' : 'Start voice input'}
             title={speech.isListening ? 'Stop voice input' : 'Start voice input (hold to toggle debug trace)'}
-            className={cn('hit-slop-44 shrink-0 rounded-full', speech.isListening && 'animate-pulse')}
+            className={cn('hit-slop-44 size-11 shrink-0 rounded-full', micLeads ? 'glow-mint-box' : 'text-muted-foreground', speech.isListening && 'animate-pulse')}
           >
-            <Mic className="size-4" />
+            <Mic className="size-[17px]" />
           </Button>
         )}
-        {/* keepsComposerFocus: tapping send used to leave focus on <body> —
-            measured on the onboarding composer, identical shape here — which
-            is a phone putting the keyboard away between every message. */}
-        <Button data-chat-send {...keepsComposerFocus} onClick={() => { sendMessage(); refocusComposer(composerRef.current) }} disabled={!input.trim() || isLoading} size="icon" className="hit-slop-44 shrink-0 rounded-full glow-mint-box" aria-label="Send message">
-          <Send className="size-4" />
-        </Button>
       </div>
       {speech.permissionError && (
         <p className="mt-1.5 text-[0.6875rem] text-muted-foreground">{speech.permissionError}</p>
