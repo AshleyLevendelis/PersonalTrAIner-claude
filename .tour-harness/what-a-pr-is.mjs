@@ -125,8 +125,10 @@ await escape()
 await goto('home')
 await until(`!!document.querySelector('[data-home-pr]')`, 8000)
 const recent = await homePrs()
+// RE-ANCHORED 31 Oct 2026 (tab polish 2c): the latest PR is a half of the highlights card, the figure first
+// ("25kg") and then "<lift> · new PR · <day>" under it, so the lift line is found, not read from the start.
 check('2h. Home shows that lift and its weight — on the Done panel and as the latest PR',
-  (recent?.row ?? '').includes(X) && /25kg/.test(recent?.row ?? '') && (recent?.latest ?? '').startsWith(`${X} · new PR`) && /25kg/.test(recent?.latest ?? ''), recent)
+  (recent?.row ?? '').includes(X) && /25kg/.test(recent?.row ?? '') && (recent?.latest ?? '').includes(`${X} · new PR`) && /25kg/.test(recent?.latest ?? ''), recent)
 check('2i. ...and not the warm-up move', !(recent?.row ?? '').includes(P) && !(recent?.latest ?? '').includes(P), recent)
 await ev(`document.querySelector('[data-home-pr]')?.scrollIntoView({ block: 'center' })`); await wait(300)
 await shoot('what-a-pr-is-home')

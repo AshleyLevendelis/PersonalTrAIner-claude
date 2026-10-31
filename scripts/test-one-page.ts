@@ -96,14 +96,20 @@ async function main() {
 
   console.log('\n4. Her rulings, wired')
   const home = read('src/components/Dashboard.tsx')
-  const keyAt = home.indexOf("key: 'steps', label: 'Steps'")
-  const stepsRow = keyAt < 0 ? '' : home.slice(keyAt, home.indexOf('\n', keyAt))
-  check('"Tap the steps ring": the Steps row of the key opens the steps entry', /onClick: \(\) => setStepsOpen\(/.test(stepsRow), stepsRow)
-  check('...the other three key rows open Nutrition', ['calories', 'protein', 'water'].every(k => {
-    const at = home.indexOf(`key: '${k}', label:`)
-    return at >= 0 && /onClick: toNutrition/.test(home.slice(at, home.indexOf('\n', at)))
-  }))
-  check('...and so do the rings', /<button type="button" onClick=\{toNutrition\}[^>]*data-home-rings/.test(home))
+  // RE-ANCHORED 31 Oct 2026 (tab polish, design 2c): the key and the rings became one row of four ring cells,
+  // each its own button. The property is the same: steps opens the entry here, the other three open Nutrition.
+  const ringCell = (k: string) => {
+    const at = home.indexOf(`<RingCell k="${k}"`)
+    return at < 0 ? '' : home.slice(at, home.indexOf(' />\n', at))
+  }
+  check('"Tap the steps ring": the steps ring opens the steps entry', /onClick=\{\(\) => setStepsOpen\(/.test(ringCell('steps')), ringCell('steps'))
+  check('...the other three rings open Nutrition', ['calories', 'protein', 'water'].every(k => /onClick=\{toNutrition\}/.test(ringCell(k))))
+  {
+    // ...and the ring IS the button: the drawn ring sits inside the control that takes the tap.
+    const at = home.indexOf('function RingCell(')
+    const fn = at < 0 ? '' : home.slice(at, home.indexOf('\n}\n', at))
+    check('...and the ring itself is the control (its circle is inside the button)', /<button type="button" onClick=\{onClick\}[\s\S]*data-ring=\{k\}[\s\S]*<\/button>/.test(fn), fn.slice(0, 300))
+  }
   check('the steps entry still writes through the plausibility guard', /handleLogSteps/.test(home) && /isPlausibleStepCount\(rounded\)/.test(home))
   check('Home no longer logs water (it moved to Nutrition\'s water cell)', !/logWater\(/.test(home))
   const voice = readFileSync('src/lib/coach-voice.ts', 'utf8')
@@ -142,20 +148,30 @@ async function main() {
   const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '')
   const homeCode = strip(home)
   {
-    const sessionAt = homeCode.indexOf('<SessionRow')
+    // RE-ANCHORED 31 Oct 2026 (tab polish, design 2c, her "build, keep my rulings"): the session is one card and
+    // the Start button is inside it, under the session's name and above the week; the next meal comes after.
+    const heroAt = homeCode.indexOf('<SessionHero')
+    const ctaPropAt = homeCode.indexOf('cta={showCta && (')
     const ctaAt = homeCode.indexOf('data-home-cta')
     const mealAt = homeCode.indexOf('data-home-next-meal')
-    check('Home: the Start button sits under the session row it starts, before the next meal', sessionAt !== -1 && ctaAt > sessionAt && mealAt > ctaAt, { sessionAt, ctaAt, mealAt })
+    const fnAt = homeCode.indexOf('function SessionHero(')
+    const fn = fnAt < 0 ? '' : homeCode.slice(fnAt, homeCode.indexOf('\n}\n', fnAt))
+    const inCard = fn.indexOf('data-home-title') > 0 && fn.indexOf('{cta}') > fn.indexOf('data-home-title') && fn.indexOf('<HomeWeekStrip') > fn.indexOf('{cta}')
+    check('Home: the Start button sits inside the session card it starts, above the week, before the next meal', heroAt !== -1 && ctaPropAt > heroAt && ctaAt > ctaPropAt && mealAt > ctaAt && inCard, { heroAt, ctaPropAt, ctaAt, mealAt, inCard })
     check('...and is not docked over the page', !/fixed inset-x-0[^"]*"[\s\S]{0,300}data-home-cta/.test(homeCode))
-    check('Home: no Tomorrow row (the session line already says tomorrow)', !/data-home-tomorrow/.test(homeCode) && /glanceParts\.push\(tomorrow\.rest \? 'rest tomorrow'/.test(homeCode))
+    // "Said once" (30 Oct): tomorrow left the glance line when it got its half of the highlights card back (2c).
+    check('Home: tomorrow is said once — its half of the card, never the glance line too', (homeCode.match(/data-home-tomorrow/g) ?? []).length === 1 && !/glanceParts\.push\([^)]*tomorrow/.test(homeCode))
+    const cardAt = homeCode.indexOf('data-home-highlights')
     const toggleAt = homeCode.indexOf('data-home-progress-toggle')
     const openAt = homeCode.indexOf('{progressOpen && (')
     const weightAt = homeCode.indexOf('data-home-weight')
     const prAt = homeCode.indexOf('data-home-latest-pr')
+    const recentAt = homeCode.indexOf('data-home-recent-prs')
     const volAt = homeCode.indexOf('data-home-volume')
-    check('Home: weight, latest PR and volume sit behind one Progress row', toggleAt !== -1 && openAt > toggleAt && weightAt > openAt && prAt > openAt && volAt > openAt, { toggleAt, openAt, weightAt, prAt, volAt })
-    check('...which says the weight and the PR state while closed', /lastWeighIn \? `\$\{lastWeighIn\.kg\.toFixed\(1\)\} kg`/.test(homeCode.slice(toggleAt - 600, openAt)))
-    check('Home: the key is one column beside the rings', /<RingKey\s+columns=\{1\}/.test(homeCode))
+    check('Home: the latest PR is on the card\'s face; the weight, recent PRs and volume sit behind its Progress row', cardAt !== -1 && prAt > cardAt && toggleAt > prAt && openAt > toggleAt && weightAt > openAt && recentAt > openAt && volAt > openAt, { cardAt, prAt, toggleAt, openAt, weightAt, recentAt, volAt })
+    check('...which says the weight and the PR state while closed', /lastWeighIn \? `\$\{lastWeighIn\.kg\.toFixed\(1\)\} kg`/.test(homeCode.slice(toggleAt, openAt)))
+    const rings = [...homeCode.matchAll(/<RingCell k="(\w+)"/g)].map(m => m[1])
+    check('Home: the rings are one row of four (calories, protein, water, steps), and no sleep ring: the app records none', /grid grid-cols-4[^"]*" data-home-today data-home-rings/.test(homeCode) && rings.join(',') === 'calories,protein,water,steps' && !/sleep/i.test(homeCode), rings)
   }
   const nudge = read('src/components/TrainerNudge.tsx')
   {
@@ -165,8 +181,10 @@ async function main() {
     check('...caps the line at two rows', /line-clamp-2/.test(slim))
     check('...keeps an adaptation\'s actions', /actions\.map\(a =>/.test(slim))
     check('...and moving to the next tip is a real button', /\{onTextTap \? \(\s*<button/.test(slim))
-    check('Home, Nutrition and Exercise all use it', /<TrainerNudge \{\.\.\.trainerNudge\} slim \/>/.test(home) && /<TrainerNudge\s+slim\s+text=\{tip\.text\}/.test(home)
-      && /<TrainerNudge slim text=\{macroNudge\}/.test(nut) && /<TrainerNudge slim text=\{todayNudge\.text\}/.test(panel))
+    // RE-ANCHORED 31 Oct 2026 (tab polish 2c): Home's note became the boxless coach line, on both of its paths.
+    check('Nutrition and Exercise use it', /<TrainerNudge slim text=\{macroNudge\}/.test(nut) && /<TrainerNudge slim text=\{todayNudge\.text\}/.test(panel))
+    check('Home uses the coach line on both paths (an adaptation and the rotating tips), with its two chips', /<TrainerNudge \{\.\.\.trainerNudge\} line\b/.test(home) && /<TrainerNudge\s+line\b[\s\S]{0,80}prompts=\{HOME_PROMPTS\}/.test(home)
+      && /label: 'What changed\?'/.test(home) && /label: 'Adjust today'/.test(home))
   }
   check('Nutrition: the macros are one row of four', /grid grid-cols-4[^"]*" data-ring-key/.test(nut))
   const mealPlan = read('src/components/MealPlan.tsx')

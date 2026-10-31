@@ -84,8 +84,9 @@ const soFar = await text('[data-testid="home-so-far"]')
 check('2. the headline is the mean of the rings drawn (a ring with no target left out)', soFar === expected && shares.length > 0, { soFar, expected, rings })
 check('3. the pill reads "N in a row", never "days"', /^\d+ in a row$/.test(await text('[data-testid="home-streak"]')), await text('[data-testid="home-streak"]'))
 // RE-ANCHORED 30 Oct 2026 ("less is more"): not docked; directly under the session it starts, on the first screen.
-const cta = await ev(`(() => { const n = document.querySelector('[data-home-cta] button'); const row = document.querySelector('[data-home-hero]'); if (!n || !row) return null; const b = n.getBoundingClientRect(); return { text: n.innerText.trim(), bottom: b.bottom, top: b.top, rowBottom: row.getBoundingClientRect().bottom, h: innerHeight } })()`)
-check('4. the Start button names today\'s session, sits right under the session row, and is on the first screen above the tab bar', !!cta && /^Start \S/.test(cta.text) && cta.top >= cta.rowBottom - 1 && cta.top - cta.rowBottom < 24 && cta.bottom <= cta.h - 64, cta)
+// RE-ANCHORED 31 Oct 2026 (tab polish 2c): inside the session card, under the session's name and above the week.
+const cta = await ev(`(() => { const n = document.querySelector('[data-home-cta] button'); const card = document.querySelector('[data-home-hero]'); const name = document.querySelector('[data-home-title]'); const week = document.querySelector('[data-home-hero] [data-home-week]'); if (!n || !card || !name || !week) return null; const b = n.getBoundingClientRect(); return { text: n.innerText.trim(), inCard: card.contains(n), top: b.top, bottom: b.bottom, nameBottom: name.getBoundingClientRect().bottom, weekTop: week.getBoundingClientRect().top, h: innerHeight } })()`)
+check('4. the Start button names today\'s session, sits inside its card under the name and above the week, and is on the first screen above the tab bar', !!cta && /^Start \S/.test(cta.text) && cta.inCard && cta.top >= cta.nameBottom && cta.bottom <= cta.weekTop && cta.bottom <= cta.h - 64, cta)
 const homeMeal = await ev(`(() => { const r = document.querySelector('[data-home-next-meal]'); return r ? { slot: r.dataset.homeNextMeal, text: r.innerText.replace(/\\s+/g, ' ').trim() } : null })()`)
 check('5. Up next carries the next meal', !!homeMeal, homeMeal)
 await shoot('one-page-home')
@@ -95,8 +96,10 @@ await shoot('one-page-home-steps')
 await tap('[data-key-row="water"]')
 check('7. ...Water in the key opens Nutrition', await ev(`location.hash.includes('nutrition')`), await ev('location.hash'))
 await open('dashboard')
-await tap('[data-home-rings]')
-check('8. ...and so do the rings', await ev(`location.hash.includes('nutrition')`), await ev('location.hash'))
+// RE-ANCHORED 31 Oct 2026 (tab polish 2c): the key and the rings became one row of ring buttons, so the tap is on
+// the calorie ring itself (the row's centre is the gap between two of them).
+await tap('[data-key-row="calories"]')
+check('8. ...and so does the calorie ring', await ev(`location.hash.includes('nutrition')`), await ev('location.hash'))
 
 console.log('\nB. Nutrition')
 await open('nutrition')

@@ -86,7 +86,10 @@ check('...and no longer draws a step ring of its own', !/STEP_RING/.test(nutriti
     && /onKeyDown=\{e => \{ if \(e\.key === 'Enter'\) void handleLogSteps\(\) \}\}/.test(home)
   check('Home does not merely import the writer — a control calls it', callsIt)
   // Since 17 Oct 2026 (one-page Home, her ruling) the Steps row of the key toggles the entry open.
-  check('...from an input the user can actually reach', /key: 'steps'[^\n]*onClick: \(\) => setStepsOpen\(o => !o\)/.test(home) && /type="number"/.test(home))
+  // RE-ANCHORED 31 Oct 2026 (tab polish 2c): the key row became the steps ring itself, one button.
+  const stepsAt = home.indexOf('<RingCell k="steps"')
+  const stepsCell = stepsAt < 0 ? '' : home.slice(stepsAt, home.indexOf(' />\n', stepsAt))
+  check('...from an input the user can actually reach', /onClick=\{\(\) => setStepsOpen\(o => !o\)\}/.test(stepsCell) && /type="number"/.test(home))
 }
 
 console.log('\n3. One glyph vocabulary, two strips\n')
@@ -100,7 +103,8 @@ check("Exercise's strip IS interactive", /onClick/.test(exStrip) && /<button/.te
 // RE-ANCHORED 10 Oct 2026 (design handoff 2a): Home's cells are 26px CIRCLES
 // now (size-[26px]); the point is unchanged — the record is small, the
 // navigator is not.
-check('Home cells are 26px, Exercise is not', /size-\[26px\]/.test(homeStrip) && !/(size|h)-\[26px\]/.test(exStrip))
+// RE-ANCHORED 31 Oct 2026 (tab polish 2c): 26px-tall rounded cells inside the session card (h-[26px]).
+check('Home cells are 26px, Exercise is not', /(size|h)-\[26px\]/.test(homeStrip) && !/(size|h)-\[26px\]/.test(exStrip))
 // RE-ANCHORED 9 Oct 2026 (M14). This asserted that Exercise's strip contains
 // the text `STATE_LABEL[d.state]` — the mechanism. Both strips now take their
 // sentence from one function in the shared vocabulary (dayLabel), which is what

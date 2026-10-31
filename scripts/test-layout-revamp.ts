@@ -41,7 +41,8 @@ console.log('\n1. Home\'s coach note')
   check('it moves on every 6 seconds', /window\.setTimeout\(\(\) => go\(i \+ 1\), 6000\)/.test(note))
   check('...but never under reduced motion — the user can stop it (WCAG 2.2.2)', /prefers-reduced-motion: reduce/.test(note) && /if \([^)]*reduced[^)]*\) return/.test(note), note.slice(0, 600))
   check('...and it holds while touched or focused', /onFocusCapture=\{\(\) => setHeld\(true\)\}/.test(note) && /onPointerDown=\{\(\) => setHeld\(true\)\}/.test(note) && /if \([^)]*held[^)]*\) return/.test(note))
-  check('an adaptation nudge with its actions is shown alone, never rotated away', /\? <TrainerNudge \{\.\.\.trainerNudge\}( slim)? \/>\s*: plainTips\.length > 0 && <HomeCoachNote tips=\{plainTips\} \/>/.test(dash))
+  // RE-ANCHORED 31 Oct 2026 (tab polish 2c): the nudge is the boxless coach line (`line`) and may carry a class.
+  check('an adaptation nudge with its actions is shown alone, never rotated away', /\? <TrainerNudge \{\.\.\.trainerNudge\}(?: (?:slim|line|className="[^"]*"))* \/>\s*: plainTips\.length > 0 && <HomeCoachNote tips=\{plainTips\} \/>/.test(dash))
   // The order the brief gives: the day's pick, then what's left, then the rest.
   // A day where several tips are true at once, so their ORDER is a question.
   const ctx: Parameters<typeof eligibleCoachTips>[0] = {
@@ -87,12 +88,20 @@ console.log('\n3. Home\'s finished day')
   const dash = code('src/components/Dashboard.tsx')
   // RE-ANCHORED 17 Oct 2026 (one-page Home, 5c·5): the session is a row; its done branch keeps the lift
   // line and the summary, which is offered only when the finish card exists.
-  const doneAt = dash.indexOf('} else if (done) {')
-  // Up to the next branch, so the not-yet-done branch's own glance line cannot answer for it.
-  const done = doneAt >= 0 ? dash.slice(doneAt, dash.indexOf('} else {', doneAt + 1)) : ''
-  check('the Done panel keeps the lift line (L9: what she lifted, today)', /<span data-testid="home-session-glance">\{sessionGlance\}<\/span>/.test(done))
+  // RE-ANCHORED 31 Oct 2026 (tab polish 2c): the session is one card, and a finished session shares the
+  // session's own branch (its name, its glance line), with "Done ✓" on the right. So the property is read off
+  // the branch chain: no branch BEFORE the session's own catches a finished day, and that branch draws the glance.
+  const heroAt = dash.indexOf('function SessionHero(')
+  const hero = heroAt >= 0 ? dash.slice(heroAt, dash.indexOf('\n}\n', heroAt)) : ''
+  const lastElse = hero.indexOf('} else {')
+  const before = lastElse >= 0 ? hero.slice(0, lastElse) : ''
+  const own = lastElse >= 0 ? hero.slice(lastElse, hero.indexOf('// The name with its last word', lastElse)) : ''
+  const branches = [...before.matchAll(/if \((.*?)\) \{/g)].map(m => m[1])
+  check('the Done panel keeps the lift line (L9: what she lifted, today)',
+    /<span data-testid="home-session-glance">\{sessionGlance\}<\/span>/.test(own) && /right = done\s*\?/.test(own)
+    && branches.length === 3 && branches.every(b => !/\bdone\b/.test(b)), { branches })
   check('...and offers the summary only when there is one',
-    /onSummary=\{card \? \(\) => setSummaryOpen\(true\) : undefined\}/.test(dash) && /\{done && onSummary \? \([\s\S]{0,200}data-home-summary/.test(dash))
+    /onSummary=\{card \? \(\) => setSummaryOpen\(true\) : undefined\}/.test(dash) && /\{onSummary && \([\s\S]{0,200}data-home-summary/.test(hero) && /\{done && \([\s\S]{0,900}\{onSummary && \(/.test(hero))
   const store = new Map<string, string>()
   ;(globalThis as unknown as { localStorage: Storage }).localStorage = {
     getItem: k => store.get(k) ?? null, setItem: (k, v) => { store.set(k, String(v)) }, removeItem: k => { store.delete(k) },

@@ -207,10 +207,13 @@ check('...with no Start button under it — there is nothing to start yet',
 // before a session starts (so never while unknown), and "Tomorrow" moved from
 // its own row into the glance line, read from data.tomorrow — which the loader
 // leaves null while the plan is unknown.
-check('the estimate chip is withheld too', /\{status === 'not_started' && data\.session\.sessionLength && </.test(homeCode)
+// RE-ANCHORED 31 Oct 2026 (tab polish 2c): the length is the session card's right-hand status, still drawn only
+// before a session starts; and Tomorrow has its half of the highlights card again, which reads data.tomorrow and
+// says nothing ("—") when the loader left it null, rather than guessing a rest day.
+check('the estimate chip is withheld too', /: status === 'not_started'\s*\?\s*data\.session\.sessionLength && <span data-testid="home-session-length">/.test(homeCode)
   && /const showCta = status === 'not_started' \|\| status === 'in_progress'/.test(homeCode))
 check('the Tomorrow line is dropped rather than guessed',
-  /const tomorrow = data\.tomorrow \?\? null\s*if \(tomorrow\)/.test(homeCode)
+  /const tomorrow = data\.tomorrow \?\? null/.test(homeCode) && /\{tomorrow \? \(tomorrow\.rest \? 'Rest day' : tomorrow\.focus\) : '—'\}/.test(homeCode)
   && /tomorrow: !planKnown \? null/.test(stripComments(readFileSync('src/lib/dashboard-data.ts', 'utf8'))))
 check('an unknown day is never written to the cache the next cold open reads',
   /if \(fresh\.session\.status !== 'unknown'\) saveDashboardCache/.test(homeCode))

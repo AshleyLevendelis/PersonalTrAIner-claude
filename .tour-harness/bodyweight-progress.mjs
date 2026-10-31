@@ -91,7 +91,8 @@ check('1a. the PR cell is on screen at all', await ev(`!!document.querySelector(
 const prBlock = await ev(`document.querySelector('[data-home-latest-pr]')?.innerText ?? ''`)
 check('1b. the bodyweight exercise reached it', /Pull-Ups/i.test(prBlock), prBlock)
 check('1c. the PR block was found, so the checks below are not vacuous', prBlock.length > 0, prBlock)
-check('1d. the bodyweight best reads in REPS', /Pull-Ups[\s\S]*?\b14 reps\b/.test(prBlock), prBlock)
+// RE-ANCHORED 31 Oct 2026 (tab polish 2c): the PR half shows the figure first, then "Pull-Ups · new PR".
+check('1d. the bodyweight best reads in REPS', /\b14 reps\b/.test(prBlock) && /Pull-Ups/.test(prBlock), prBlock)
 // THE DEFECT THIS EXISTS FOR: `${value} kg` with no branch printed "0 kg"
 // for a bodyweight record and would have printed "14 kg" for a reps one.
 check('1e. ...and NOT as kilograms', !/\b14 ?kg\b/.test(prBlock), prBlock)

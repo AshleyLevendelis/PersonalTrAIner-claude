@@ -242,7 +242,7 @@ export interface DashboardData {
    * 2a moved "Tomorrow" from its own row into that line). Null while the plan
    * is unknown, for the same reason tomorrowLabel is.
    */
-  tomorrow: { rest: true } | { rest: false; focus: string } | null
+  tomorrow: { rest: true } | { rest: false; focus: string; /** Work minutes, the estimator today's length uses. Absent on a cached day from before 31 Oct. */ minutes?: number | null } | null
   /** Every coach tip true today, the day's pick first — the Home note rotates through them (2a). */
   coachTips: SelectedCoachTip[]
   /** Records beaten TODAY, ranked like recentPRs — the "Done" panel's PR row and count (2a). */
@@ -785,7 +785,10 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     session,
     tomorrowLabel,
     tomorrow: !planKnown ? null
-      : tomorrowWorkoutDay && tomorrowWorkoutDay.exercises.length > 0 ? { rest: false, focus: tomorrowWorkoutDay.focus } : { rest: true },
+      : tomorrowWorkoutDay && tomorrowWorkoutDay.exercises.length > 0
+        // Its length off the same estimator as today's (dayLengthParts), for Home's Tomorrow half (tab polish 2c).
+        // A day the estimator cannot read gives no minutes, never a Home that fails to load.
+        ? { rest: false, focus: tomorrowWorkoutDay.focus, minutes: (() => { try { return dayLengthParts(tomorrowWorkoutDay).workMinutes } catch { return null } })() } : { rest: true },
     coachTips,
     prsToday,
     sessionMinutes,
