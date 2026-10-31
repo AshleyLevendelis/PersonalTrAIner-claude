@@ -180,8 +180,14 @@ console.log('\n1. The libraries are cached separately from the app')
   //     after    deploy 342 gz   paint 498 gz   app 1168 raw   total 2467 raw   (deploy, paint and app OVER)
   // The cardio row and the dashboard draw at first paint, so their growth is first-paint code by nature. Her 15 Sep
   // ruling, "raise it with room to grow": the same room as every move above, 8 kB gz, 25 kB raw.
-  headroom('a deploy re-downloads', appGzip, 350, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 350, appGzip)
+  // MOVED 31 Oct 2026, the five-tab polish (Home 2c, Nutrition 3a+3b, Exercise 2a, Tools 2a, Chat 2b with the Listen
+  // button; her "build, keep my rulings"). MEASURED through this gate: base ebd9f25 (each tab's build ran it there)
+  //     before   deploy 343 gz   paint 499 gz   app 1175 raw   total 2477 raw
+  //     after    deploy 353 gz   paint 509 gz   app 1208 raw   total 2517 raw   (all four OVER, by 3, 3, 15 and 25)
+  // Five screens drawn again at first paint, so their growth is first-paint code by nature. Her 15 Sep ruling,
+  // "raise it with room to grow": the same room as every move above, 8 kB gz, 25 kB raw.
+  headroom('a deploy re-downloads', appGzip, 361, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 361, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -262,9 +268,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 11 Oct 2026: 474 -> 484, the allergy ruling — see the deploy figure above for both ends.
   // MOVED 18 Oct 2026: 492 -> 498, runs 7-10 batch 1 — see the deploy figure above for both ends.
   // MOVED 22 Oct 2026: 498 -> 506, the Sam live test — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 506, 'kB gzipped')
+  // MOVED 31 Oct 2026: 506 -> 517, the five-tab polish — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 517, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 506, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 517, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -371,7 +378,8 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 12 Oct 2026: 1131 -> 1150, the merged release tree measured 1127 (see the deploy note).
   // MOVED 18 Oct 2026: 1150 -> 1166, runs 7-10 batch 1 — see the deploy figure above for both ends.
   // MOVED 22 Oct 2026: 1166 -> 1193, the Sam live test — see the deploy figure above for both ends.
-  const APP_CHUNK_BUDGET_KB = 1193
+  // MOVED 31 Oct 2026: 1193 -> 1233, the five-tab polish — see the deploy figure above for both ends.
+  const APP_CHUNK_BUDGET_KB = 1233
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -612,7 +620,8 @@ console.log('\n3. Nothing has crept back up')
   // the phrasebook, the copy-is-the-same-dish rule). 2,447 is 18 above the 2,429 measured, on her 15 Sep ruling.
   // BOTH OF 20 Oct together (different-today + meal-rebalance): measured 2459 kB that day, 16 kB room.
   // MOVED 22 Oct 2026: 2475 -> 2492, the Sam live test (2467 measured, 25 raw of room).
-  const TOTAL_BUDGET_KB = 2492
+  // MOVED 31 Oct 2026: 2492 -> 2542, the five-tab polish (2517 measured, 25 raw of room).
+  const TOTAL_BUDGET_KB = 2542
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
