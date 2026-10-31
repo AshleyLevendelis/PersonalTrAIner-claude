@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#0b0919; font-family:"Space Grotesk", ui-sans-serif, system-ui, sans-serif; }
+  a { color:#5BE9C2; text-decoration:none; }
+  a:hover { color:#3ED3AA; }
+</style>
+</helmet>
+
+<section style="padding:48px 40px 24px; display:flex; flex-direction:column; gap:28px; background:#0b0919; color:#F5F3FF;">
+  <div style="display:flex; flex-direction:column; gap:6px; max-width:880px;">
+    <span style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#9A93C9;">Turn 3 · Refining 2b</span>
+    <h1 style="margin:0; font-size:26px; font-weight:600; letter-spacing:-.02em;">2b with your four tweaks</h1>
+    <p style="margin:0; font-size:14px; line-height:1.5; color:#C2BCE8; text-wrap:pretty;">One change from your notes: later meals are softened with a lighter ink colour rather than lower opacity, so their text stays readable (opacity would drop it below contrast on this background). Compare with <a href="#2b-closed">2b, closed</a> below.</p>
+  </div>
+  <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start;">
+    <div id="3a" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">3a</span>
+        <span style="font-size:14px; font-weight:600;">2b, refined</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">Your four tweaks on 2b: a thin bar under each macro in the legend, Grocery list as a pill with a cart icon, the next meal (Lunch) marked and later meals in softer ink, and a P · C · F line under each meal’s calories.</p>
+      <div style="position:relative; width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Training day</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Nutrition</span>
+          </div>
+          <span style="width:44px; height:44px; margin:0 -12px -6px 0; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+        </div>
+        <div style="padding:16px 16px 24px; display:flex; flex-direction:column; gap:24px;">
+          <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, rgba(91,233,194,.20), rgba(91,233,194,0) 55%), #221C48; border:1px solid rgba(91,233,194,.30); box-shadow:0 10px 30px rgba(0,0,0,.35);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Today · {{ mealsCount }}</span>
+              <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">{{ kcalLeft }} kcal left</span>
+            </div>
+            <div style="margin-top:14px; display:flex; align-items:center; gap:18px;">
+              <svg width="120" height="120" viewBox="0 0 120 120" style="display:block; flex-shrink:0; transform:rotate(-90deg);">
+                <circle cx="60" cy="60" r="56" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="4"></circle>
+                <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="9"></circle>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="27" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="19" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="56" fill="none" stroke="#6FB7FF" stroke-width="4" stroke-linecap="round" stroke-dasharray="{{ ringW }}"></circle>
+                <circle cx="60" cy="60" r="46" fill="none" stroke="#5BE9C2" stroke-width="9" stroke-linecap="round" stroke-dasharray="{{ ringCal }}" style="filter:drop-shadow(0 0 5px rgba(91,233,194,.8));"></circle>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="#8B7BFF" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringP }}"></circle>
+                <circle cx="60" cy="60" r="27" fill="none" stroke="#FFB454" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringC }}"></circle>
+                <circle cx="60" cy="60" r="19" fill="none" stroke="#9A93C9" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringF }}"></circle>
+              </svg>
+              <div style="flex:1; min-width:0;">
+                <div style="font-family:ui-monospace,Menlo,monospace; font-size:34px; font-weight:700; letter-spacing:-.03em; line-height:1; color:#5BE9C2; text-shadow:0 0 18px rgba(91,233,194,.7);">{{ kcal }}</div>
+                <div style="margin-top:3px; font-size:11.5px; color:#C2BCE8;">of 2,150 kcal</div>
+                <div style="margin-top:10px; display:flex; flex-direction:column; gap:7px; font-size:12px;">
+                  <span style="display:flex; flex-direction:column; gap:3px;"><span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#8B7BFF;"></span><span style="flex:1; color:#C2BCE8;">Protein</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ p }}<span style="color:#9A93C9;">/150g</span></span></span><span style="height:3px; margin-left:16px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; height:3px; border-radius:999px; background:#8B7BFF; width:{{ pPct }};"></span></span></span>
+                  <span style="display:flex; flex-direction:column; gap:3px;"><span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#FFB454;"></span><span style="flex:1; color:#C2BCE8;">Carbs</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ c }}<span style="color:#9A93C9;">/230g</span></span></span><span style="height:3px; margin-left:16px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; height:3px; border-radius:999px; background:#FFB454; width:{{ cPct }};"></span></span></span>
+                  <span style="display:flex; flex-direction:column; gap:3px;"><span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#9A93C9;"></span><span style="flex:1; color:#C2BCE8;">Fat</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ f }}<span style="color:#9A93C9;">/70g</span></span></span><span style="height:3px; margin-left:16px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; height:3px; border-radius:999px; background:#9A93C9; width:{{ fPct }};"></span></span></span>
+                  <span style="display:flex; flex-direction:column; gap:3px;"><span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#6FB7FF;"></span><span style="flex:1; color:#C2BCE8;">Water</span><span style="font-family:ui-monospace,Menlo,monospace;">0.75<span style="color:#9A93C9;">/2.5L</span></span></span><span style="height:3px; margin-left:16px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; height:3px; border-radius:999px; background:#6FB7FF; width:30%;"></span></span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:0 4px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:28px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Today's meals</span>
+              <span style="display:flex; align-items:center; gap:14px;"><span style="display:flex; align-items:center; gap:5px; height:32px; padding:0 11px; border-radius:999px; background:rgba(91,233,194,.12); border:1px solid rgba(91,233,194,.3); color:#5BE9C2; font-size:11.5px; font-weight:600; white-space:nowrap;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg>Grocery list</span><span style="width:36px; height:36px; margin:-4px -4px -4px 0; border-radius:999px; background:rgba(91,233,194,.14); border:1px solid rgba(91,233,194,.35); color:#5BE9C2; display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span></span>
+            </div>
+            <div style="margin-top:8px;">
+              <div style="display:flex; align-items:center; gap:12px; min-height:62px; padding:6px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Breakfast</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; color:#F5F3FF;">Greek yogurt, oats &amp; berries</div>
+                  <div style="margin-top:5px; display:flex; align-items:baseline; gap:12px;"><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#B4A9FF;">P</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">34g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#FFB454;">C</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">62g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#C2BCE8;">F</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">14g</span></span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0; min-width:44px;">
+                  <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; letter-spacing:-.02em; line-height:1; color:#5BE9C2;">520</span>
+                  <span style="margin-top:4px; font-size:9px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">kcal</span>
+                </div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:62px; padding:6px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; box-sizing:border-box; border:2px solid #5BE9C2; box-shadow:0 0 10px rgba(91,233,194,.45);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; font-weight:600;">Lunch · next</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; color:#F5F3FF;">Chicken, rice &amp; greens</div>
+                  <div style="margin-top:5px; display:flex; align-items:baseline; gap:12px;"><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#B4A9FF;">P</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">42g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#FFB454;">C</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">72g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#C2BCE8;">F</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">18g</span></span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0; min-width:44px;">
+                  <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; letter-spacing:-.02em; line-height:1; color:#F5F3FF;">640</span>
+                  <span style="margin-top:4px; font-size:9px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">kcal</span>
+                </div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:62px; padding:6px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.18);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Dinner</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; color:#C2BCE8;">Salmon with new potatoes</div>
+                  <div style="margin-top:5px; display:flex; align-items:baseline; gap:12px;"><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#B4A9FF;">P</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">46g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#FFB454;">C</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">64g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#C2BCE8;">F</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">28g</span></span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0; min-width:44px;">
+                  <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; letter-spacing:-.02em; line-height:1; color:#C2BCE8;">720</span>
+                  <span style="margin-top:4px; font-size:9px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">kcal</span>
+                </div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:62px; padding:6px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.18);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Snack</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; color:#C2BCE8;">Cottage cheese &amp; apple</div>
+                  <div style="margin-top:5px; display:flex; align-items:baseline; gap:12px;"><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#B4A9FF;">P</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">28g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#FFB454;">C</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">32g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#C2BCE8;">F</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">10g</span></span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0; min-width:44px;">
+                  <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; letter-spacing:-.02em; line-height:1; color:#C2BCE8;">270</span>
+                  <span style="margin-top:4px; font-size:9px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">kcal</span>
+                </div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:62px; padding:6px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; background:rgba(111,183,255,.18); color:#6FB7FF; display:flex; align-items:center; justify-content:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Extra · 10:40</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; color:#F5F3FF;">Banana</div>
+                  <div style="margin-top:5px; display:flex; align-items:baseline; gap:12px;"><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#B4A9FF;">P</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">1g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#FFB454;">C</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">27g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#C2BCE8;">F</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">0g</span></span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0; min-width:44px;">
+                  <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; letter-spacing:-.02em; line-height:1; color:#F5F3FF;">105</span>
+                  <span style="margin-top:4px; font-size:9px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">kcal</span>
+                </div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+    <div id="3b" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">3b</span>
+        <span style="font-size:14px; font-weight:600;">3a, recipe open</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">Tapping Lunch in 3a. The sheet uses the same calorie and P · C · F styling as the rows, with Recipe and Swap tabs and "I ate this" at the bottom.</p>
+      <div style="position:relative; width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Training day</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Nutrition</span>
+          </div>
+          <span style="width:44px; height:44px; margin:0 -12px -6px 0; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+        </div>
+        <div style="padding:16px 16px 24px; display:flex; flex-direction:column; gap:24px;">
+          <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, rgba(91,233,194,.20), rgba(91,233,194,0) 55%), #221C48; border:1px solid rgba(91,233,194,.30); box-shadow:0 10px 30px rgba(0,0,0,.35);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Today · {{ mealsCount }}</span>
+              <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">{{ kcalLeft }} kcal left</span>
+            </div>
+            <div style="margin-top:14px; display:flex; align-items:center; gap:18px;">
+              <svg width="120" height="120" viewBox="0 0 120 120" style="display:block; flex-shrink:0; transform:rotate(-90deg);">
+                <circle cx="60" cy="60" r="56" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="4"></circle>
+                <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="9"></circle>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="27" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="19" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="56" fill="none" stroke="#6FB7FF" stroke-width="4" stroke-linecap="round" stroke-dasharray="{{ ringW }}"></circle>
+                <circle cx="60" cy="60" r="46" fill="none" stroke="#5BE9C2" stroke-width="9" stroke-linecap="round" stroke-dasharray="{{ ringCal }}" style="filter:drop-shadow(0 0 5px rgba(91,233,194,.8));"></circle>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="#8B7BFF" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringP }}"></circle>
+                <circle cx="60" cy="60" r="27" fill="none" stroke="#FFB454" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringC }}"></circle>
+                <circle cx="60" cy="60" r="19" fill="none" stroke="#9A93C9" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringF }}"></circle>
+              </svg>
+              <div style="flex:1; min-width:0;">
+                <div style="font-family:ui-monospace,Menlo,monospace; font-size:34px; font-weight:700; letter-spacing:-.03em; line-height:1; color:#5BE9C2; text-shadow:0 0 18px rgba(91,233,194,.7);">{{ kcal }}</div>
+                <div style="margin-top:3px; font-size:11.5px; color:#C2BCE8;">of 2,150 kcal</div>
+                <div style="margin-top:10px; display:flex; flex-direction:column; gap:7px; font-size:12px;">
+                  <span style="display:flex; flex-direction:column; gap:3px;"><span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#8B7BFF;"></span><span style="flex:1; color:#C2BCE8;">Protein</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ p }}<span style="color:#9A93C9;">/150g</span></span></span><span style="height:3px; margin-left:16px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; height:3px; border-radius:999px; background:#8B7BFF; width:{{ pPct }};"></span></span></span>
+                  <span style="display:flex; flex-direction:column; gap:3px;"><span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#FFB454;"></span><span style="flex:1; color:#C2BCE8;">Carbs</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ c }}<span style="color:#9A93C9;">/230g</span></span></span><span style="height:3px; margin-left:16px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; height:3px; border-radius:999px; background:#FFB454; width:{{ cPct }};"></span></span></span>
+                  <span style="display:flex; flex-direction:column; gap:3px;"><span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#9A93C9;"></span><span style="flex:1; color:#C2BCE8;">Fat</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ f }}<span style="color:#9A93C9;">/70g</span></span></span><span style="height:3px; margin-left:16px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; height:3px; border-radius:999px; background:#9A93C9; width:{{ fPct }};"></span></span></span>
+                  <span style="display:flex; flex-direction:column; gap:3px;"><span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#6FB7FF;"></span><span style="flex:1; color:#C2BCE8;">Water</span><span style="font-family:ui-monospace,Menlo,monospace;">0.75<span style="color:#9A93C9;">/2.5L</span></span></span><span style="height:3px; margin-left:16px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; height:3px; border-radius:999px; background:#6FB7FF; width:30%;"></span></span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:0 4px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:28px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Today's meals</span>
+              <span style="display:flex; align-items:center; gap:14px;"><span style="display:flex; align-items:center; gap:5px; height:32px; padding:0 11px; border-radius:999px; background:rgba(91,233,194,.12); border:1px solid rgba(91,233,194,.3); color:#5BE9C2; font-size:11.5px; font-weight:600; white-space:nowrap;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg>Grocery list</span><span style="width:36px; height:36px; margin:-4px -4px -4px 0; border-radius:999px; background:rgba(91,233,194,.14); border:1px solid rgba(91,233,194,.35); color:#5BE9C2; display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span></span>
+            </div>
+            <div style="margin-top:8px;">
+              <div style="display:flex; align-items:center; gap:12px; min-height:62px; padding:6px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Breakfast</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; color:#F5F3FF;">Greek yogurt, oats &amp; berries</div>
+                  <div style="margin-top:5px; display:flex; align-items:baseline; gap:12px;"><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#B4A9FF;">P</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">34g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#FFB454;">C</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">62g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#C2BCE8;">F</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">14g</span></span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0; min-width:44px;">
+                  <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; letter-spacing:-.02em; line-height:1; color:#5BE9C2;">520</span>
+                  <span style="margin-top:4px; font-size:9px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">kcal</span>
+                </div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:62px; padding:6px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; box-sizing:border-box; border:2px solid #5BE9C2; box-shadow:0 0 10px rgba(91,233,194,.45);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; font-weight:600;">Lunch · next</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; color:#F5F3FF;">Chicken, rice &amp; greens</div>
+                  <div style="margin-top:5px; display:flex; align-items:baseline; gap:12px;"><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#B4A9FF;">P</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">42g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#FFB454;">C</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">72g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#C2BCE8;">F</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">18g</span></span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0; min-width:44px;">
+                  <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; letter-spacing:-.02em; line-height:1; color:#F5F3FF;">640</span>
+                  <span style="margin-top:4px; font-size:9px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">kcal</span>
+                </div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:62px; padding:6px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.18);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Dinner</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; color:#C2BCE8;">Salmon with new potatoes</div>
+                  <div style="margin-top:5px; display:flex; align-items:baseline; gap:12px;"><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#B4A9FF;">P</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">46g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#FFB454;">C</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">64g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#C2BCE8;">F</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">28g</span></span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0; min-width:44px;">
+                  <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; letter-spacing:-.02em; line-height:1; color:#C2BCE8;">720</span>
+                  <span style="margin-top:4px; font-size:9px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">kcal</span>
+                </div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:62px; padding:6px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.18);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Snack</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; color:#C2BCE8;">Cottage cheese &amp; apple</div>
+                  <div style="margin-top:5px; display:flex; align-items:baseline; gap:12px;"><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#B4A9FF;">P</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">28g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#FFB454;">C</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">32g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#C2BCE8;">F</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">10g</span></span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0; min-width:44px;">
+                  <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; letter-spacing:-.02em; line-height:1; color:#C2BCE8;">270</span>
+                  <span style="margin-top:4px; font-size:9px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">kcal</span>
+                </div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:62px; padding:6px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; background:rgba(111,183,255,.18); color:#6FB7FF; display:flex; align-items:center; justify-content:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Extra · 10:40</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; color:#F5F3FF;">Banana</div>
+                  <div style="margin-top:5px; display:flex; align-items:baseline; gap:12px;"><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#B4A9FF;">P</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">1g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#FFB454;">C</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">27g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#C2BCE8;">F</span><span style="font-size:12px; font-weight:500; letter-spacing:-.01em; font-variant-numeric:tabular-nums; color:#DAD5FA;">0g</span></span></div>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; flex-shrink:0; min-width:44px;">
+                  <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; letter-spacing:-.02em; line-height:1; color:#F5F3FF;">105</span>
+                  <span style="margin-top:4px; font-size:9px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">kcal</span>
+                </div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+        <div style="position:absolute; inset:0; background:rgba(8,6,20,.62);"></div>
+        <div style="position:absolute; left:0; right:0; bottom:0; max-height:78%; overflow:auto; box-sizing:border-box; border-radius:26px 26px 0 0; background:#1A1636; border-top:1px solid rgba(245,243,255,.12); box-shadow:0 -20px 40px rgba(0,0,0,.45); padding:10px 20px 24px; display:flex; flex-direction:column; gap:16px;">
+          <span style="flex-shrink:0; align-self:center; width:40px; height:4px; border-radius:999px; background:rgba(245,243,255,.22);"></span>
+          <div style="flex-shrink:0; display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Lunch · planned</div>
+              <div style="margin-top:4px; font-size:22px; font-weight:700; letter-spacing:-.02em;">Chicken, rice &amp; greens</div>
+              <div style="margin-top:6px; display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px;"><span style="display:flex; align-items:baseline; gap:3px; white-space:nowrap;"><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px; font-weight:700; letter-spacing:-.02em;">640</span><span style="font-size:10.5px; color:#9A93C9;">kcal</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#B4A9FF;">P</span><span style="font-size:12px; font-weight:500; font-variant-numeric:tabular-nums; color:#DAD5FA;">42g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#FFB454;">C</span><span style="font-size:12px; font-weight:500; font-variant-numeric:tabular-nums; color:#DAD5FA;">72g</span></span><span style="display:flex; align-items:baseline; gap:4px; white-space:nowrap;"><span style="font-size:10.5px; font-weight:600; letter-spacing:.04em; color:#C2BCE8;">F</span><span style="font-size:12px; font-weight:500; font-variant-numeric:tabular-nums; color:#DAD5FA;">18g</span></span><span style="display:flex; align-items:center; gap:4px; font-size:11.5px; color:#9A93C9; white-space:nowrap;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>25 min</span></div>
+            </div>
+            <span style="width:36px; height:36px; flex-shrink:0; border-radius:999px; background:rgba(245,243,255,.07); color:#C2BCE8; display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></span>
+          </div>
+          <div style="flex-shrink:0; display:flex; border-radius:12px; background:rgba(69,60,142,.28); padding:3px;">
+            <span style="flex:1; height:34px; border-radius:10px; background:#2E2662; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:600;">Recipe</span>
+            <span style="flex:1; height:34px; display:flex; align-items:center; justify-content:center; font-size:12.5px; color:#9A93C9;">Swap · 3</span>
+          </div>
+          <div><div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap; margin-bottom:8px;">Ingredients</div><div style="display:flex; flex-direction:column; gap:6px;"><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>180 g chicken breast</span><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>75 g basmati rice, dry</span><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>80 g tenderstem broccoli</span><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>60 g spinach</span><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>1 tsp olive oil · lemon · salt</span></div></div>
+          <div><div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap; margin-bottom:8px;">Method</div><div style="display:flex; flex-direction:column; gap:8px;"><div style="display:flex; gap:10px; font-size:12.5px; line-height:1.45; color:#F5F3FF;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">1</span><span style="text-wrap:pretty;">Rinse the rice and simmer in 150 ml water, lid on, 12 min.</span></div><div style="display:flex; gap:10px; font-size:12.5px; line-height:1.45; color:#F5F3FF;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">2</span><span style="text-wrap:pretty;">Season the chicken, pan-fry in the oil 6 min a side until it reaches 74°C.</span></div><div style="display:flex; gap:10px; font-size:12.5px; line-height:1.45; color:#F5F3FF;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">3</span><span style="text-wrap:pretty;">Steam the broccoli 4 min; wilt the spinach in the hot pan.</span></div><div style="display:flex; gap:10px; font-size:12.5px; line-height:1.45; color:#F5F3FF;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">4</span><span style="text-wrap:pretty;">Slice the chicken over the rice and greens, finish with lemon.</span></div></div></div>
+          <span style="flex-shrink:0; height:50px; border-radius:14px; display:flex; align-items:center; justify-content:center; gap:6px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; font-size:14px; font-weight:700;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg>I ate this</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:48px 40px 24px; display:flex; flex-direction:column; gap:28px; background:#0b0919; color:#F5F3FF;">
+  <div style="display:flex; flex-direction:column; gap:6px; max-width:880px;">
+    <span style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#9A93C9;">Turn 2 · Off-plan food &amp; recipes</span>
+    <h1 style="margin:0; font-size:26px; font-weight:600; letter-spacing:-.02em;">Logging extras and reading recipes, no big button</h1>
+    <p style="margin:0; font-size:14px; line-height:1.5; color:#C2BCE8; text-wrap:pretty;">All three start from <a href="#1c">1c</a> with the hero button removed, so the rings are the whole card. They differ in where off-plan food goes in and how a recipe opens. Two things from the code: the meal row already expands to show ingredients and a <strong style="font-weight:600;">Method</strong> section, so recipes exist today; and the only food search is <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px;">MealFoodAddSheet</span>, which searches the app's food list to add to a planned meal. Off-plan logging would reuse that search and write a standalone entry, shown here as an "Extra" row. Recipe steps and cook times are placeholder copy.</p>
+  </div>
+  <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start;">
+    <div id="2a" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">2a</span>
+        <span style="font-size:14px; font-weight:600;">Inline: expand the row, add at the end</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">Closest to the current app. Tapping a meal opens it in place with ingredients, numbered steps and an "I ate this" button. Off-plan food is the last row of the list, "Add food not on your plan", so it sits where you’d look after scanning your meals.</p>
+      <div style="position:relative; width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Training day</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Nutrition</span>
+          </div>
+          <span style="width:44px; height:44px; margin:0 -12px -6px 0; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+        </div>
+        <div style="padding:16px 16px 24px; display:flex; flex-direction:column; gap:24px;">
+          <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, rgba(91,233,194,.20), rgba(91,233,194,0) 55%), #221C48; border:1px solid rgba(91,233,194,.30); box-shadow:0 10px 30px rgba(0,0,0,.35);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Today · {{ mealsCount }}</span>
+              <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">{{ kcalLeft }} kcal left</span>
+            </div>
+            <div style="margin-top:14px; display:flex; align-items:center; gap:18px;">
+              <svg width="120" height="120" viewBox="0 0 120 120" style="display:block; flex-shrink:0; transform:rotate(-90deg);">
+                <circle cx="60" cy="60" r="56" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="4"></circle>
+                <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="9"></circle>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="27" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="19" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="56" fill="none" stroke="#6FB7FF" stroke-width="4" stroke-linecap="round" stroke-dasharray="{{ ringW }}"></circle>
+                <circle cx="60" cy="60" r="46" fill="none" stroke="#5BE9C2" stroke-width="9" stroke-linecap="round" stroke-dasharray="{{ ringCal }}" style="filter:drop-shadow(0 0 5px rgba(91,233,194,.8));"></circle>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="#8B7BFF" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringP }}"></circle>
+                <circle cx="60" cy="60" r="27" fill="none" stroke="#FFB454" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringC }}"></circle>
+                <circle cx="60" cy="60" r="19" fill="none" stroke="#9A93C9" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringF }}"></circle>
+              </svg>
+              <div style="flex:1; min-width:0;">
+                <div style="font-family:ui-monospace,Menlo,monospace; font-size:34px; font-weight:700; letter-spacing:-.03em; line-height:1; color:#5BE9C2; text-shadow:0 0 18px rgba(91,233,194,.7);">{{ kcal }}</div>
+                <div style="margin-top:3px; font-size:11.5px; color:#C2BCE8;">of 2,150 kcal</div>
+                <div style="margin-top:12px; display:flex; flex-direction:column; gap:6px; font-size:12px;">
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#8B7BFF;"></span><span style="flex:1; color:#C2BCE8;">Protein</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ p }}<span style="color:#9A93C9;">/150g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#FFB454;"></span><span style="flex:1; color:#C2BCE8;">Carbs</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ c }}<span style="color:#9A93C9;">/230g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#9A93C9;"></span><span style="flex:1; color:#C2BCE8;">Fat</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ f }}<span style="color:#9A93C9;">/70g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#6FB7FF;"></span><span style="flex:1; color:#C2BCE8;">Water</span><span style="font-family:ui-monospace,Menlo,monospace;">0.75<span style="color:#9A93C9;">/2.5L</span></span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:0 4px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:28px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Today's meals</span>
+              <span style="font-size:11.5px; font-weight:600; color:#5BE9C2; white-space:nowrap;">Grocery list ›</span>
+            </div>
+            <div style="margin-top:8px;">
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Breakfast</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Greek yogurt, oats &amp; berries</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#5BE9C2;">520 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="border-bottom:1px solid rgba(245,243,255,.10); padding-bottom:16px;">
+                <div style="display:flex; align-items:center; gap:12px; min-height:60px;">
+                  <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.22);"></span>
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Lunch</div>
+                    <div style="margin-top:2px; font-size:17px; font-weight:600; letter-spacing:-.01em;">Chicken, rice &amp; greens</div>
+                  </div>
+                  <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m18 15-6-6-6 6"></path></svg></span>
+                </div>
+                <div style="padding-left:38px; display:flex; flex-direction:column; gap:14px;">
+                  <div style="display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px;"><span style="font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:#9A93C9; white-space:nowrap;">640 kcal · P 42 · C 72 · F 18</span><span style="display:flex; align-items:center; gap:4px; font-size:11.5px; color:#9A93C9; white-space:nowrap;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>25 min</span></div>
+                  <div><div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap; margin-bottom:8px;">Ingredients</div><div style="display:flex; flex-direction:column; gap:6px;"><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>180 g chicken breast</span><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>75 g basmati rice, dry</span><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>80 g tenderstem broccoli</span><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>60 g spinach</span><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>1 tsp olive oil · lemon · salt</span></div></div>
+                  <div><div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap; margin-bottom:8px;">Method</div><div style="display:flex; flex-direction:column; gap:8px;"><div style="display:flex; gap:10px; font-size:12.5px; line-height:1.45; color:#F5F3FF;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">1</span><span style="text-wrap:pretty;">Rinse the rice and simmer in 150 ml water, lid on, 12 min.</span></div><div style="display:flex; gap:10px; font-size:12.5px; line-height:1.45; color:#F5F3FF;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">2</span><span style="text-wrap:pretty;">Season the chicken, pan-fry in the oil 6 min a side until it reaches 74°C.</span></div><div style="display:flex; gap:10px; font-size:12.5px; line-height:1.45; color:#F5F3FF;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">3</span><span style="text-wrap:pretty;">Steam the broccoli 4 min; wilt the spinach in the hot pan.</span></div><div style="display:flex; gap:10px; font-size:12.5px; line-height:1.45; color:#F5F3FF;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">4</span><span style="text-wrap:pretty;">Slice the chicken over the rice and greens, finish with lemon.</span></div></div></div>
+                  <div style="display:flex; gap:8px;">
+                    <span style="flex:1; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; gap:6px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; font-size:13px; font-weight:700;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg>I ate this</span>
+                    <span style="height:44px; padding:0 16px; border-radius:12px; display:flex; align-items:center; background:rgba(245,243,255,.07); font-size:13px; font-weight:600;">Swap</span>
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.22);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Dinner</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Salmon with new potatoes</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#9A93C9;">720 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.22);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Snack</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cottage cheese &amp; apple</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#9A93C9;">270 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:56px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; box-sizing:border-box; border:1.5px dashed rgba(91,233,194,.55); color:#5BE9C2; display:flex; align-items:center; justify-content:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span>
+                <span style="flex:1; font-size:14px; font-weight:600; color:#5BE9C2;">Add food not on your plan</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+
+      </div>
+    </div>
+    <div id="2b" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">2b</span>
+        <span style="font-size:14px; font-weight:600;">Sheet: + in the header, recipe slides up</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">The list stays compact: every row is one line and opens a sheet with Recipe and Swap tabs (drawn open on Lunch). Off-plan food is a small + beside the meals heading; once logged it appears in the list as a blue "Extra" row with its time.</p>
+      <div style="position:relative; width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Training day</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Nutrition</span>
+          </div>
+          <span style="width:44px; height:44px; margin:0 -12px -6px 0; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+        </div>
+        <div style="padding:16px 16px 24px; display:flex; flex-direction:column; gap:24px;">
+          <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, rgba(91,233,194,.20), rgba(91,233,194,0) 55%), #221C48; border:1px solid rgba(91,233,194,.30); box-shadow:0 10px 30px rgba(0,0,0,.35);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Today · {{ mealsCount }}</span>
+              <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">{{ kcalLeft }} kcal left</span>
+            </div>
+            <div style="margin-top:14px; display:flex; align-items:center; gap:18px;">
+              <svg width="120" height="120" viewBox="0 0 120 120" style="display:block; flex-shrink:0; transform:rotate(-90deg);">
+                <circle cx="60" cy="60" r="56" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="4"></circle>
+                <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="9"></circle>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="27" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="19" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="56" fill="none" stroke="#6FB7FF" stroke-width="4" stroke-linecap="round" stroke-dasharray="{{ ringW }}"></circle>
+                <circle cx="60" cy="60" r="46" fill="none" stroke="#5BE9C2" stroke-width="9" stroke-linecap="round" stroke-dasharray="{{ ringCal }}" style="filter:drop-shadow(0 0 5px rgba(91,233,194,.8));"></circle>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="#8B7BFF" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringP }}"></circle>
+                <circle cx="60" cy="60" r="27" fill="none" stroke="#FFB454" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringC }}"></circle>
+                <circle cx="60" cy="60" r="19" fill="none" stroke="#9A93C9" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringF }}"></circle>
+              </svg>
+              <div style="flex:1; min-width:0;">
+                <div style="font-family:ui-monospace,Menlo,monospace; font-size:34px; font-weight:700; letter-spacing:-.03em; line-height:1; color:#5BE9C2; text-shadow:0 0 18px rgba(91,233,194,.7);">{{ kcal }}</div>
+                <div style="margin-top:3px; font-size:11.5px; color:#C2BCE8;">of 2,150 kcal</div>
+                <div style="margin-top:12px; display:flex; flex-direction:column; gap:6px; font-size:12px;">
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#8B7BFF;"></span><span style="flex:1; color:#C2BCE8;">Protein</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ p }}<span style="color:#9A93C9;">/150g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#FFB454;"></span><span style="flex:1; color:#C2BCE8;">Carbs</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ c }}<span style="color:#9A93C9;">/230g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#9A93C9;"></span><span style="flex:1; color:#C2BCE8;">Fat</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ f }}<span style="color:#9A93C9;">/70g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#6FB7FF;"></span><span style="flex:1; color:#C2BCE8;">Water</span><span style="font-family:ui-monospace,Menlo,monospace;">0.75<span style="color:#9A93C9;">/2.5L</span></span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:0 4px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:28px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Today's meals</span>
+              <span style="display:flex; align-items:center; gap:14px;"><span style="font-size:11.5px; font-weight:600; color:#5BE9C2; white-space:nowrap;">Grocery list ›</span><span style="width:36px; height:36px; margin:-4px -4px -4px 0; border-radius:999px; background:rgba(91,233,194,.14); border:1px solid rgba(91,233,194,.35); color:#5BE9C2; display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span></span>
+            </div>
+            <div style="margin-top:8px;">
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Breakfast</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Greek yogurt, oats &amp; berries</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#5BE9C2;">520 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.22);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Lunch</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Chicken, rice &amp; greens</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#9A93C9;">640 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.22);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Dinner</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Salmon with new potatoes</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#9A93C9;">720 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.22);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Snack</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cottage cheese &amp; apple</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#9A93C9;">270 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; background:rgba(111,183,255,.18); color:#6FB7FF; display:flex; align-items:center; justify-content:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Extra · 10:40</div><div style="margin-top:2px; font-size:14.5px; font-weight:500;">Banana</div></div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#9A93C9;">105 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+        <div style="position:absolute; inset:0; background:rgba(8,6,20,.62);"></div>
+        <div style="position:absolute; left:0; right:0; bottom:0; max-height:78%; overflow:auto; box-sizing:border-box; border-radius:26px 26px 0 0; background:#1A1636; border-top:1px solid rgba(245,243,255,.12); box-shadow:0 -20px 40px rgba(0,0,0,.45); padding:10px 20px 24px; display:flex; flex-direction:column; gap:16px;">
+          <span style="flex-shrink:0; align-self:center; width:40px; height:4px; border-radius:999px; background:rgba(245,243,255,.22);"></span>
+          <div style="flex-shrink:0; display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+            <div style="min-width:0;">
+              <div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Lunch · planned</div>
+              <div style="margin-top:4px; font-size:22px; font-weight:700; letter-spacing:-.02em;">Chicken, rice &amp; greens</div>
+              <div style="margin-top:6px; display:flex; flex-wrap:wrap; align-items:center; gap:4px 12px;"><span style="font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:#9A93C9; white-space:nowrap;">640 kcal · P 42 · C 72 · F 18</span><span style="display:flex; align-items:center; gap:4px; font-size:11.5px; color:#9A93C9; white-space:nowrap;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>25 min</span></div>
+            </div>
+            <span style="width:36px; height:36px; flex-shrink:0; border-radius:999px; background:rgba(245,243,255,.07); color:#C2BCE8; display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></span>
+          </div>
+          <div style="flex-shrink:0; display:flex; border-radius:12px; background:rgba(69,60,142,.28); padding:3px;">
+            <span style="flex:1; height:34px; border-radius:10px; background:#2E2662; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:600;">Recipe</span>
+            <span style="flex:1; height:34px; display:flex; align-items:center; justify-content:center; font-size:12.5px; color:#9A93C9;">Swap · 3</span>
+          </div>
+          <div><div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap; margin-bottom:8px;">Ingredients</div><div style="display:flex; flex-direction:column; gap:6px;"><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>180 g chicken breast</span><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>75 g basmati rice, dry</span><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>80 g tenderstem broccoli</span><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>60 g spinach</span><span style="display:flex; align-items:baseline; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:4px; height:4px; border-radius:999px; background:#9A93C9; flex-shrink:0; transform:translateY(-2px);"></span>1 tsp olive oil · lemon · salt</span></div></div>
+          <div><div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap; margin-bottom:8px;">Method</div><div style="display:flex; flex-direction:column; gap:8px;"><div style="display:flex; gap:10px; font-size:12.5px; line-height:1.45; color:#F5F3FF;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">1</span><span style="text-wrap:pretty;">Rinse the rice and simmer in 150 ml water, lid on, 12 min.</span></div><div style="display:flex; gap:10px; font-size:12.5px; line-height:1.45; color:#F5F3FF;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">2</span><span style="text-wrap:pretty;">Season the chicken, pan-fry in the oil 6 min a side until it reaches 74°C.</span></div><div style="display:flex; gap:10px; font-size:12.5px; line-height:1.45; color:#F5F3FF;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">3</span><span style="text-wrap:pretty;">Steam the broccoli 4 min; wilt the spinach in the hot pan.</span></div><div style="display:flex; gap:10px; font-size:12.5px; line-height:1.45; color:#F5F3FF;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; font-family:ui-monospace,Menlo,monospace; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center;">4</span><span style="text-wrap:pretty;">Slice the chicken over the rice and greens, finish with lemon.</span></div></div></div>
+          <span style="flex-shrink:0; height:50px; border-radius:14px; display:flex; align-items:center; justify-content:center; gap:6px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; font-size:14px; font-weight:700;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg>I ate this</span>
+        </div>
+      </div>
+    </div>
+    <div id="2b-closed" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">2b</span>
+        <span style="font-size:14px; font-weight:600;">2b, closed</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">The same screen with nothing open: rings card, one line per meal with its calories, the + beside the heading for off-plan food, and a logged extra in the list. Tap any meal to open the sheet shown in 2b.</p>
+      <div style="position:relative; width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Training day</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Nutrition</span>
+          </div>
+          <span style="width:44px; height:44px; margin:0 -12px -6px 0; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+        </div>
+        <div style="padding:16px 16px 24px; display:flex; flex-direction:column; gap:24px;">
+          <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, rgba(91,233,194,.20), rgba(91,233,194,0) 55%), #221C48; border:1px solid rgba(91,233,194,.30); box-shadow:0 10px 30px rgba(0,0,0,.35);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Today · {{ mealsCount }}</span>
+              <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">{{ kcalLeft }} kcal left</span>
+            </div>
+            <div style="margin-top:14px; display:flex; align-items:center; gap:18px;">
+              <svg width="120" height="120" viewBox="0 0 120 120" style="display:block; flex-shrink:0; transform:rotate(-90deg);">
+                <circle cx="60" cy="60" r="56" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="4"></circle>
+                <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="9"></circle>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="27" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="19" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="56" fill="none" stroke="#6FB7FF" stroke-width="4" stroke-linecap="round" stroke-dasharray="{{ ringW }}"></circle>
+                <circle cx="60" cy="60" r="46" fill="none" stroke="#5BE9C2" stroke-width="9" stroke-linecap="round" stroke-dasharray="{{ ringCal }}" style="filter:drop-shadow(0 0 5px rgba(91,233,194,.8));"></circle>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="#8B7BFF" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringP }}"></circle>
+                <circle cx="60" cy="60" r="27" fill="none" stroke="#FFB454" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringC }}"></circle>
+                <circle cx="60" cy="60" r="19" fill="none" stroke="#9A93C9" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringF }}"></circle>
+              </svg>
+              <div style="flex:1; min-width:0;">
+                <div style="font-family:ui-monospace,Menlo,monospace; font-size:34px; font-weight:700; letter-spacing:-.03em; line-height:1; color:#5BE9C2; text-shadow:0 0 18px rgba(91,233,194,.7);">{{ kcal }}</div>
+                <div style="margin-top:3px; font-size:11.5px; color:#C2BCE8;">of 2,150 kcal</div>
+                <div style="margin-top:12px; display:flex; flex-direction:column; gap:6px; font-size:12px;">
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#8B7BFF;"></span><span style="flex:1; color:#C2BCE8;">Protein</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ p }}<span style="color:#9A93C9;">/150g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#FFB454;"></span><span style="flex:1; color:#C2BCE8;">Carbs</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ c }}<span style="color:#9A93C9;">/230g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#9A93C9;"></span><span style="flex:1; color:#C2BCE8;">Fat</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ f }}<span style="color:#9A93C9;">/70g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#6FB7FF;"></span><span style="flex:1; color:#C2BCE8;">Water</span><span style="font-family:ui-monospace,Menlo,monospace;">0.75<span style="color:#9A93C9;">/2.5L</span></span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:0 4px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:28px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Today's meals</span>
+              <span style="display:flex; align-items:center; gap:14px;"><span style="font-size:11.5px; font-weight:600; color:#5BE9C2; white-space:nowrap;">Grocery list ›</span><span style="width:36px; height:36px; margin:-4px -4px -4px 0; border-radius:999px; background:rgba(91,233,194,.14); border:1px solid rgba(91,233,194,.35); color:#5BE9C2; display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span></span>
+            </div>
+            <div style="margin-top:8px;">
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Breakfast</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Greek yogurt, oats &amp; berries</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#5BE9C2;">520 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.22);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Lunch</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Chicken, rice &amp; greens</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#9A93C9;">640 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.22);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Dinner</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Salmon with new potatoes</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#9A93C9;">720 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.22);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Snack</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Cottage cheese &amp; apple</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#9A93C9;">270 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; background:rgba(111,183,255,.18); color:#6FB7FF; display:flex; align-items:center; justify-content:center;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Extra · 10:40</div><div style="margin-top:2px; font-size:14.5px; font-weight:500;">Banana</div></div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; color:#9A93C9;">105 kcal</span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+    <div id="2c" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">2c</span>
+        <span style="font-size:14px; font-weight:600;">Search first, Recipe chips</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">A search field sits above the meals, so logging a banana is type-and-tap with no extra screen (drawn mid-search). Each meal carries a "Recipe" chip that opens the full recipe page; tapping elsewhere on the row still expands it.</p>
+      <div style="position:relative; width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Training day</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Nutrition</span>
+          </div>
+          <span style="width:44px; height:44px; margin:0 -12px -6px 0; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+        </div>
+        <div style="padding:16px 16px 24px; display:flex; flex-direction:column; gap:24px;">
+          <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, rgba(91,233,194,.20), rgba(91,233,194,0) 55%), #221C48; border:1px solid rgba(91,233,194,.30); box-shadow:0 10px 30px rgba(0,0,0,.35);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Today · {{ mealsCount }}</span>
+              <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">{{ kcalLeft }} kcal left</span>
+            </div>
+            <div style="margin-top:14px; display:flex; align-items:center; gap:18px;">
+              <svg width="120" height="120" viewBox="0 0 120 120" style="display:block; flex-shrink:0; transform:rotate(-90deg);">
+                <circle cx="60" cy="60" r="56" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="4"></circle>
+                <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="9"></circle>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="27" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="19" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                <circle cx="60" cy="60" r="56" fill="none" stroke="#6FB7FF" stroke-width="4" stroke-linecap="round" stroke-dasharray="{{ ringW }}"></circle>
+                <circle cx="60" cy="60" r="46" fill="none" stroke="#5BE9C2" stroke-width="9" stroke-linecap="round" stroke-dasharray="{{ ringCal }}" style="filter:drop-shadow(0 0 5px rgba(91,233,194,.8));"></circle>
+                <circle cx="60" cy="60" r="35" fill="none" stroke="#8B7BFF" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringP }}"></circle>
+                <circle cx="60" cy="60" r="27" fill="none" stroke="#FFB454" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringC }}"></circle>
+                <circle cx="60" cy="60" r="19" fill="none" stroke="#9A93C9" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringF }}"></circle>
+              </svg>
+              <div style="flex:1; min-width:0;">
+                <div style="font-family:ui-monospace,Menlo,monospace; font-size:34px; font-weight:700; letter-spacing:-.03em; line-height:1; color:#5BE9C2; text-shadow:0 0 18px rgba(91,233,194,.7);">{{ kcal }}</div>
+                <div style="margin-top:3px; font-size:11.5px; color:#C2BCE8;">of 2,150 kcal</div>
+                <div style="margin-top:12px; display:flex; flex-direction:column; gap:6px; font-size:12px;">
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#8B7BFF;"></span><span style="flex:1; color:#C2BCE8;">Protein</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ p }}<span style="color:#9A93C9;">/150g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#FFB454;"></span><span style="flex:1; color:#C2BCE8;">Carbs</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ c }}<span style="color:#9A93C9;">/230g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#9A93C9;"></span><span style="flex:1; color:#C2BCE8;">Fat</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ f }}<span style="color:#9A93C9;">/70g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#6FB7FF;"></span><span style="flex:1; color:#C2BCE8;">Water</span><span style="font-family:ui-monospace,Menlo,monospace;">0.75<span style="color:#9A93C9;">/2.5L</span></span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div style="padding:0 4px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:28px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Today's meals</span>
+              <span style="font-size:11.5px; font-weight:600; color:#5BE9C2; white-space:nowrap;">Grocery list ›</span>
+            </div>
+            <div style="margin-top:10px; display:flex; align-items:center; gap:10px; height:46px; padding:0 14px; border-radius:14px; background:rgba(69,60,142,.28); border:1px solid rgba(91,233,194,.35);">
+              <span style="color:#5BE9C2;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg></span>
+              <span style="flex:1; font-size:14px;">banana<span style="display:inline-block; width:1.5px; height:16px; background:#5BE9C2; vertical-align:-3px; margin-left:1px;"></span></span>
+              <span style="color:#9A93C9;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></span>
+            </div>
+            <div style="margin-top:6px; border-radius:14px; background:#1A1636; border:1px solid rgba(245,243,255,.10); overflow:hidden;">
+              <div style="display:flex; align-items:center; gap:10px; min-height:48px; padding:0 12px; border-bottom:1px solid rgba(245,243,255,.08);"><span style="flex:1; font-size:13.5px;">Banana <span style="color:#9A93C9;">· 1 medium</span></span><span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; color:#9A93C9;">105 kcal</span><span style="width:30px; height:30px; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span></div>
+              <div style="display:flex; align-items:center; gap:10px; min-height:48px; padding:0 12px;"><span style="flex:1; font-size:13.5px;">Banana <span style="color:#9A93C9;">· 100 g</span></span><span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; color:#9A93C9;">89 kcal</span><span style="width:30px; height:30px; border-radius:999px; background:rgba(91,233,194,.14); color:#5BE9C2; display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span></div>
+            </div>
+            <div style="margin-top:8px;">
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; padding:8px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Breakfast</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">Greek yogurt, oats &amp; berries</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#5BE9C2;">520 kcal</span>
+                <span style="display:flex; align-items:center; gap:4px; height:30px; padding:0 10px; border-radius:999px; background:rgba(245,243,255,.07); color:#C2BCE8; font-size:11.5px; font-weight:600;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg>Recipe</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; padding:8px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.22);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Lunch</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">Chicken, rice &amp; greens</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#9A93C9;">640 kcal</span>
+                <span style="display:flex; align-items:center; gap:4px; height:30px; padding:0 10px; border-radius:999px; background:rgba(245,243,255,.07); color:#C2BCE8; font-size:11.5px; font-weight:600;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg>Recipe</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; padding:8px 0; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; border:1.5px solid rgba(245,243,255,.22);"></span>
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Dinner</div>
+                  <div style="margin-top:2px; font-size:14.5px; font-weight:500; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">Salmon with new potatoes</div>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:#9A93C9;">720 kcal</span>
+                <span style="display:flex; align-items:center; gap:4px; height:30px; padding:0 10px; border-radius:999px; background:rgba(245,243,255,.07); color:#C2BCE8; font-size:11.5px; font-weight:600;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg>Recipe</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:24px 40px 80px; display:flex; flex-direction:column; gap:28px; background:#0b0919; color:#F5F3FF;">
+  <div style="display:flex; flex-direction:column; gap:6px; max-width:880px;">
+    <span style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#9A93C9;">Turn 1 · Nutrition</span>
+    <h1 style="margin:0; font-size:26px; font-weight:600; letter-spacing:-.02em;">Nutrition in Home 2c's style</h1>
+    <p style="margin:0; font-size:14px; line-height:1.5; color:#C2BCE8; text-wrap:pretty;"><a href="#1a">1a</a> is today's tab rebuilt from <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px;">NutritionDisplay.tsx</span> and <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px;">MealPlan.tsx</span>. Both options carry over 2c's rules: one glowing hero card that owns the main action, the coach as an unboxed line, plain hairline rows, and one split card at the end. Since Ashley moved calories and water off Home, <strong style="font-weight:600;">water logging comes back here</strong> — today the tab can only show water, not add it. The hero's button logs the next unlogged meal. <a href="#1b">1b</a> uses bars; <a href="#1c">1c</a> keeps the app's ring meter inside the hero. Use the <strong style="font-weight:600;">Meals logged</strong> tweak.</p>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start;">
+
+    <!-- ================= 1a CURRENT ================= -->
+    <div id="1a" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">1a</span>
+        <span style="font-size:14px; font-weight:600;">Today — as built</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:52px; text-wrap:pretty;">Five concentric rings with a tiny 2×2 legend, two headers fighting for the top of the meal list, a disclaimer, a second totals block, then the rows. No way to add water.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:14px 20px 0; display:flex; justify-content:flex-end; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></div>
+        <div style="padding:8px 20px 24px; display:flex; flex-direction:column; gap:24px;">
+          <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px;">
+            <div style="min-height:48px; border-radius:10px; background:rgba(91,233,194,.14); border:1px solid rgba(91,233,194,.45); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; font-weight:600; color:#5BE9C2;">Today</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:15px; font-weight:600; color:#5BE9C2;">2</span></div>
+            <div style="min-height:48px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Tue</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:15px;">3</span></div>
+            <div style="min-height:48px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Wed</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:15px;">4</span></div>
+            <div style="min-height:48px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Thu</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:15px;">5</span></div>
+            <div style="min-height:48px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Fri</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:15px;">6</span></div>
+            <div style="min-height:48px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Sat</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:15px;">7</span></div>
+            <div style="min-height:48px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Sun</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:15px;">8</span></div>
+          </div>
+
+          <div>
+            <div style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Nutrition · Monday</div>
+            <div style="margin-top:14px; display:flex; align-items:center; gap:18px;">
+              <svg width="112" height="112" viewBox="0 0 112 112" style="display:block; flex-shrink:0;">
+                <circle cx="56" cy="56" r="50" fill="none" stroke="rgba(69,60,142,.28)" stroke-width="3"></circle>
+                <circle cx="56" cy="56" r="40" fill="none" stroke="rgba(69,60,142,.28)" stroke-width="8"></circle>
+                <circle cx="56" cy="56" r="30" fill="none" stroke="rgba(69,60,142,.28)" stroke-width="5"></circle>
+                <circle cx="56" cy="56" r="22" fill="none" stroke="rgba(69,60,142,.28)" stroke-width="5"></circle>
+                <circle cx="56" cy="56" r="14" fill="none" stroke="rgba(69,60,142,.28)" stroke-width="5"></circle>
+                <circle cx="56" cy="56" r="50" fill="none" stroke="#6FB7FF" stroke-width="3" stroke-linecap="round" stroke-dasharray="94.2 314.2" transform="rotate(-90 56 56)"></circle>
+                <circle cx="56" cy="56" r="40" fill="none" stroke="#5BE9C2" stroke-width="8" stroke-linecap="round" stroke-dasharray="60.8 251.3" transform="rotate(-90 56 56)" style="filter:drop-shadow(0 0 4px rgba(91,233,194,.8));"></circle>
+                <circle cx="56" cy="56" r="30" fill="none" stroke="#8B7BFF" stroke-width="5" stroke-linecap="round" stroke-dasharray="42.8 188.5" transform="rotate(-90 56 56)"></circle>
+                <circle cx="56" cy="56" r="22" fill="none" stroke="#FFB454" stroke-width="5" stroke-linecap="round" stroke-dasharray="37.3 138.2" transform="rotate(-90 56 56)"></circle>
+                <circle cx="56" cy="56" r="14" fill="none" stroke="#9A93C9" stroke-width="5" stroke-linecap="round" stroke-dasharray="17.6 88" transform="rotate(-90 56 56)"></circle>
+              </svg>
+              <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:12px;">
+                <div>
+                  <div style="font-family:ui-monospace,Menlo,monospace; font-size:34px; font-weight:700; letter-spacing:-.03em; line-height:1; color:#E4FCF4; text-shadow:0 0 16px rgba(91,233,194,.6);">520</div>
+                  <div style="margin-top:4px; font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">kcal · 1630 left</div>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; font-size:11px;">
+                  <span style="display:flex; align-items:baseline; gap:6px; white-space:nowrap;"><span style="width:8px; height:8px; border-radius:2px; background:#8B7BFF;"></span><span style="color:#9A93C9;">P</span><span style="font-family:ui-monospace,Menlo,monospace;">34<span style="color:#9A93C9;">/150g</span></span></span>
+                  <span style="display:flex; align-items:baseline; gap:6px; white-space:nowrap;"><span style="width:8px; height:8px; border-radius:2px; background:#FFB454;"></span><span style="color:#9A93C9;">C</span><span style="font-family:ui-monospace,Menlo,monospace;">62<span style="color:#9A93C9;">/230g</span></span></span>
+                  <span style="display:flex; align-items:baseline; gap:6px; white-space:nowrap;"><span style="width:8px; height:8px; border-radius:2px; background:#9A93C9;"></span><span style="color:#9A93C9;">F</span><span style="font-family:ui-monospace,Menlo,monospace;">14<span style="color:#9A93C9;">/70g</span></span></span>
+                  <span style="display:flex; align-items:baseline; gap:6px; white-space:nowrap;"><span style="width:8px; height:8px; border-radius:2px; background:#6FB7FF;"></span><span style="color:#9A93C9;">H₂O</span><span style="font-family:ui-monospace,Menlo,monospace;">750<span style="color:#9A93C9;">/2500ml</span></span></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:flex-start; gap:10px; border-radius:14px; padding:12px 14px; background:rgba(139,123,255,.10); border:1px solid rgba(139,123,255,.25);">
+            <span style="width:22px; height:22px; flex-shrink:0; margin-top:2px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span>
+            <div style="flex:1; font-size:13px; line-height:1.5; color:#DAD5FA;">Protein is furthest behind — lunch covers 42 g of the 116 g left.</div>
+          </div>
+
+          <div>
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <span style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Today's meals</span>
+              <span style="display:flex; align-items:center; gap:12px; font-size:11px; font-weight:600; white-space:nowrap;"><span style="color:#9A93C9;">↻ Regenerate all</span><span style="color:#5BE9C2;">Grocery list ›</span></span>
+            </div>
+            <p style="margin:6px 0 0; font-size:12px; color:rgba(154,147,201,.7);">Ingredients are filtered, not verified. Check labels if you have an allergy.</p>
+            <div style="margin-top:12px; display:flex; align-items:baseline; justify-content:space-between;">
+              <span style="font-family:ui-monospace,Menlo,monospace; font-size:20px; font-weight:700;">2,150 <span style="font-family:'Space Grotesk',sans-serif; font-size:11px; font-weight:500; color:#9A93C9;">kcal planned</span></span>
+              <span style="font-size:9.5px; letter-spacing:.1em; text-transform:uppercase; color:#9A93C9;">target 2150 · on target</span>
+            </div>
+            <div style="margin-top:10px; border-top:1px solid rgba(245,243,255,.11);">
+              <div style="padding:12px 0; border-bottom:1px solid rgba(245,243,255,.11);"><div style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Breakfast</div><div style="margin-top:4px; display:flex; justify-content:space-between; gap:10px;"><span style="font-size:16px; font-weight:500;">Greek yogurt, oats &amp; berries</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#5BE9C2; white-space:nowrap;">520 kcal ✓ ›</span></div></div>
+              <div style="padding:12px 0; border-bottom:1px solid rgba(245,243,255,.11);"><div style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Lunch</div><div style="margin-top:4px; display:flex; justify-content:space-between; gap:10px;"><span style="font-size:16px; font-weight:500;">Chicken, rice &amp; greens</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#9A93C9; white-space:nowrap;">640 kcal ›</span></div></div>
+              <div style="padding:12px 0; border-bottom:1px solid rgba(245,243,255,.11);"><div style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Dinner</div><div style="margin-top:4px; display:flex; justify-content:space-between; gap:10px;"><span style="font-size:16px; font-weight:500;">Salmon with new potatoes</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:13px; color:#9A93C9; white-space:nowrap;">720 kcal ›</span></div></div>
+            </div>
+          </div>
+
+          <div style="border-top:1px solid rgba(245,243,255,.11); padding-top:12px;">
+            <div style="display:flex; justify-content:space-between;"><span style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Target</span><span style="font-size:11px; font-weight:600; color:#5BE9C2;">How it's set ›</span></div>
+            <p style="margin:4px 0 0; font-size:13px;"><span style="font-family:ui-monospace,Menlo,monospace;">2150</span> kcal · <span style="color:#9A93C9;">TDEE <span style="font-family:ui-monospace,Menlo,monospace;">2450</span> −300 · lean cut</span></p>
+          </div>
+        </div>
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 1b BARS ================= -->
+    <div id="1b" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">1b</span>
+        <span style="font-size:14px; font-weight:600;">2c style · bars</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:52px; text-wrap:pretty;">Calories lead in the hero card with one bar; protein, carbs and fat sit under it as three labelled bars you can actually read. The button logs the next meal. Meals are plain rows; water and the target share the closing card.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Training day</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Nutrition</span>
+          </div>
+          <span style="width:44px; height:44px; margin:0 -12px -6px 0; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+        </div>
+
+        <div style="padding:16px 16px 24px; display:flex; flex-direction:column; gap:24px;">
+          <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px;">
+            <div style="min-height:44px; border-radius:10px; background:rgba(91,233,194,.14); border:1px solid rgba(91,233,194,.45); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; font-weight:600; color:#5BE9C2;">Today</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px; font-weight:600; color:#5BE9C2;">2</span></div>
+            <div style="min-height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Tue</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">3</span></div>
+            <div style="min-height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Wed</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">4</span></div>
+            <div style="min-height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Thu</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">5</span></div>
+            <div style="min-height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Fri</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">6</span></div>
+            <div style="min-height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Sat</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">7</span></div>
+            <div style="min-height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Sun</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">8</span></div>
+          </div>
+
+          <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, rgba(91,233,194,.20), rgba(91,233,194,0) 55%), #221C48; border:1px solid rgba(91,233,194,.30); box-shadow:0 10px 30px rgba(0,0,0,.35);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Today · {{ mealsCount }}</span>
+              <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">{{ kcalLeft }} kcal left</span>
+            </div>
+            <div style="margin-top:8px; display:flex; align-items:baseline; gap:8px;">
+              <span style="font-family:ui-monospace,Menlo,monospace; font-size:40px; font-weight:700; letter-spacing:-.03em; line-height:1; color:#5BE9C2; text-shadow:0 0 18px rgba(91,233,194,.7);">{{ kcal }}</span>
+              <span style="font-size:13px; color:#C2BCE8;">of 2,150 kcal</span>
+            </div>
+            <div style="margin-top:12px; height:6px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><div style="height:6px; border-radius:999px; background:#5BE9C2; box-shadow:0 0 8px rgba(91,233,194,.8); width:{{ kcalPct }};"></div></div>
+
+            <div style="margin-top:16px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px;">
+              <div>
+                <div style="display:flex; justify-content:space-between; font-size:11px;"><span style="color:#B4A9FF;">Protein</span><span style="font-family:ui-monospace,Menlo,monospace; color:#C2BCE8;">{{ p }}g</span></div>
+                <div style="margin-top:5px; height:4px; border-radius:999px; background:rgba(245,243,255,.10);"><div style="height:4px; border-radius:999px; background:#8B7BFF; width:{{ pPct }};"></div></div>
+                <div style="margin-top:4px; font-size:10px; color:#9A93C9;">of 150g</div>
+              </div>
+              <div>
+                <div style="display:flex; justify-content:space-between; font-size:11px;"><span style="color:#FFB454;">Carbs</span><span style="font-family:ui-monospace,Menlo,monospace; color:#C2BCE8;">{{ c }}g</span></div>
+                <div style="margin-top:5px; height:4px; border-radius:999px; background:rgba(245,243,255,.10);"><div style="height:4px; border-radius:999px; background:#FFB454; width:{{ cPct }};"></div></div>
+                <div style="margin-top:4px; font-size:10px; color:#9A93C9;">of 230g</div>
+              </div>
+              <div>
+                <div style="display:flex; justify-content:space-between; font-size:11px;"><span style="color:#C2BCE8;">Fat</span><span style="font-family:ui-monospace,Menlo,monospace; color:#C2BCE8;">{{ f }}g</span></div>
+                <div style="margin-top:5px; height:4px; border-radius:999px; background:rgba(245,243,255,.10);"><div style="height:4px; border-radius:999px; background:#9A93C9; width:{{ fPct }};"></div></div>
+                <div style="margin-top:4px; font-size:10px; color:#9A93C9;">of 70g</div>
+              </div>
+            </div>
+
+            <sc-if value="{{ hasNext }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top:18px; height:54px; border-radius:16px; display:flex; align-items:center; justify-content:center; gap:8px; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); box-shadow:0 0 22px rgba(91,233,194,.45); color:#08281F; font-size:16px; font-weight:700;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M20 6 9 17l-5-5"></path></svg>{{ ctaLabel }}</div>
+            </sc-if>
+          </div>
+
+          <div style="display:flex; align-items:flex-start; gap:12px; padding:0 4px;">
+            <span style="width:32px; height:32px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span>
+            <div style="flex:1; min-width:0;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF;">Coach</span>
+              <p style="margin:4px 0 0; font-size:14px; line-height:1.5; color:#F5F3FF; text-wrap:pretty;">{{ nudge }}</p>
+            </div>
+          </div>
+
+          <div style="padding:0 4px;">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Today's meals</span>
+              <span style="font-size:11.5px; font-weight:600; color:#5BE9C2; white-space:nowrap;">Grocery list ›</span>
+            </div>
+            <div style="margin-top:8px;">
+              <sc-for list="{{ meals }}" as="m" hint-placeholder-count="4">
+                <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                  <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; background:{{ m.dotBg }}; border:{{ m.dotBorder }}; color:#08281F;">
+                    <sc-if value="{{ m.done }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+                  </span>
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">{{ m.slot }}</div>
+                    <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ m.name }}</div>
+                  </div>
+                  <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:{{ m.kcalColor }};">{{ m.kcal }}</span>
+                  <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="m9 18 6-6-6-6"></path></svg></span>
+                </div>
+              </sc-for>
+            </div>
+            <p style="margin:10px 0 0; font-size:11px; color:#9A93C9;">Ingredients are filtered, not verified — check labels if you have an allergy.</p>
+          </div>
+
+          <div style="border-radius:20px; background:rgba(69,60,142,.24); display:grid; grid-template-columns:repeat(2,minmax(0,1fr));">
+            <div style="padding:14px 14px 14px 16px; display:flex; flex-direction:column; gap:10px; border-right:1px solid rgba(245,243,255,.10); min-width:0;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
+                  <svg width="36" height="36" viewBox="0 0 48 48" style="display:block; transform:rotate(-90deg);"><circle cx="24" cy="24" r="20" fill="none" stroke="rgba(245,243,255,.10)" stroke-width="5"></circle><circle cx="24" cy="24" r="20" fill="none" stroke="#6FB7FF" stroke-width="5" stroke-linecap="round" stroke-dasharray="37.7 125.7"></circle></svg>
+                  <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#6FB7FF;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"></path></svg></span>
+                </div>
+                <div style="min-width:0;"><div style="font-family:ui-monospace,Menlo,monospace; font-size:15px; font-weight:700; line-height:1;">0.75 L</div><div style="margin-top:3px; font-size:10.5px; color:#9A93C9; white-space:nowrap;">of 2.5 L water</div></div>
+              </div>
+              <div style="display:flex; gap:6px;">
+                <span style="flex:1; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:rgba(111,183,255,.15); color:#6FB7FF; font-size:12px; font-weight:600;">+250</span>
+                <span style="flex:1; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; background:rgba(111,183,255,.15); color:#6FB7FF; font-size:12px; font-weight:600;">+500</span>
+              </div>
+            </div>
+            <div style="padding:14px 16px 14px 14px; display:flex; flex-direction:column; justify-content:space-between; gap:10px; min-width:0;">
+              <div>
+                <div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Target</div>
+                <div style="margin-top:4px; font-family:ui-monospace,Menlo,monospace; font-size:15px; font-weight:700;">2,150 kcal</div>
+                <div style="margin-top:3px; font-size:10.5px; color:#9A93C9; white-space:nowrap;">TDEE 2,450 · lean cut</div>
+              </div>
+              <span style="font-size:11.5px; font-weight:600; color:#5BE9C2; white-space:nowrap;">How it's set ›</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= 1c RINGS IN HERO ================= -->
+    <div id="1c" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">1c</span>
+        <span style="font-size:14px; font-weight:600;">2c style · keep the rings</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:52px; text-wrap:pretty;">The ring meter is the tab's signature, so it stays — inside the hero card, with water as the thin outer ring. The legend becomes four readable rows. Same meals list below, and nothing after it — water and the target row are cut (Ashley).</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Training day</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Nutrition</span>
+          </div>
+          <span style="width:44px; height:44px; margin:0 -12px -6px 0; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+        </div>
+
+        <div style="padding:16px 16px 24px; display:flex; flex-direction:column; gap:24px;">
+          <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px;">
+            <div style="min-height:44px; border-radius:10px; background:rgba(91,233,194,.14); border:1px solid rgba(91,233,194,.45); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; font-weight:600; color:#5BE9C2;">Today</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px; font-weight:600; color:#5BE9C2;">2</span></div>
+            <div style="min-height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Tue</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">3</span></div>
+            <div style="min-height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Wed</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">4</span></div>
+            <div style="min-height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Thu</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">5</span></div>
+            <div style="min-height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Fri</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">6</span></div>
+            <div style="min-height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Sat</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">7</span></div>
+            <div style="min-height:44px; border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;"><span style="font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Sun</span><span style="font-family:ui-monospace,Menlo,monospace; font-size:14px;">8</span></div>
+          </div>
+
+          <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, rgba(91,233,194,.20), rgba(91,233,194,0) 55%), #221C48; border:1px solid rgba(91,233,194,.30); box-shadow:0 10px 30px rgba(0,0,0,.35);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Today · {{ mealsCount }}</span>
+              <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">{{ kcalLeft }} kcal left</span>
+            </div>
+            <div style="margin-top:14px; display:flex; align-items:center; gap:18px;">
+              <div style="position:relative; width:120px; height:120px; flex-shrink:0;">
+                <svg width="120" height="120" viewBox="0 0 120 120" style="display:block; transform:rotate(-90deg);">
+                  <circle cx="60" cy="60" r="56" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="4"></circle>
+                  <circle cx="60" cy="60" r="46" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="9"></circle>
+                  <circle cx="60" cy="60" r="35" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                  <circle cx="60" cy="60" r="27" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                  <circle cx="60" cy="60" r="19" fill="none" stroke="rgba(245,243,255,.08)" stroke-width="6"></circle>
+                  <circle cx="60" cy="60" r="56" fill="none" stroke="#6FB7FF" stroke-width="4" stroke-linecap="round" stroke-dasharray="{{ ringW }}"></circle>
+                  <circle cx="60" cy="60" r="46" fill="none" stroke="#5BE9C2" stroke-width="9" stroke-linecap="round" stroke-dasharray="{{ ringCal }}" style="filter:drop-shadow(0 0 5px rgba(91,233,194,.8));"></circle>
+                  <circle cx="60" cy="60" r="35" fill="none" stroke="#8B7BFF" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringP }}"></circle>
+                  <circle cx="60" cy="60" r="27" fill="none" stroke="#FFB454" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringC }}"></circle>
+                  <circle cx="60" cy="60" r="19" fill="none" stroke="#9A93C9" stroke-width="6" stroke-linecap="round" stroke-dasharray="{{ ringF }}"></circle>
+                </svg>
+              </div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-family:ui-monospace,Menlo,monospace; font-size:34px; font-weight:700; letter-spacing:-.03em; line-height:1; color:#5BE9C2; text-shadow:0 0 18px rgba(91,233,194,.7);">{{ kcal }}</div>
+                <div style="margin-top:3px; font-size:11.5px; color:#C2BCE8;">of 2,150 kcal</div>
+                <div style="margin-top:12px; display:flex; flex-direction:column; gap:6px; font-size:12px;">
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#8B7BFF;"></span><span style="flex:1; color:#C2BCE8;">Protein</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ p }}<span style="color:#9A93C9;">/150g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#FFB454;"></span><span style="flex:1; color:#C2BCE8;">Carbs</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ c }}<span style="color:#9A93C9;">/230g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#9A93C9;"></span><span style="flex:1; color:#C2BCE8;">Fat</span><span style="font-family:ui-monospace,Menlo,monospace;">{{ f }}<span style="color:#9A93C9;">/70g</span></span></span>
+                  <span style="display:flex; align-items:center; gap:8px;"><span style="width:8px; height:8px; border-radius:2px; background:#6FB7FF;"></span><span style="flex:1; color:#C2BCE8;">Water</span><span style="font-family:ui-monospace,Menlo,monospace;">0.75<span style="color:#9A93C9;">/2.5L</span></span></span>
+                </div>
+              </div>
+            </div>
+            <sc-if value="{{ hasNext }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top:18px; height:54px; border-radius:16px; display:flex; align-items:center; justify-content:center; gap:8px; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); box-shadow:0 0 22px rgba(91,233,194,.45); color:#08281F; font-size:16px; font-weight:700;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M20 6 9 17l-5-5"></path></svg>{{ ctaLabel }}</div>
+            </sc-if>
+          </div>
+
+          <div style="display:flex; align-items:flex-start; gap:12px; padding:0 4px;">
+            <span style="width:32px; height:32px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span>
+            <div style="flex:1; min-width:0;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF;">Coach</span>
+              <p style="margin:4px 0 0; font-size:14px; line-height:1.5; color:#F5F3FF; text-wrap:pretty;">{{ nudge }}</p>
+            </div>
+          </div>
+
+          <div style="padding:0 4px;">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Today's meals</span>
+              <span style="font-size:11.5px; font-weight:600; color:#5BE9C2; white-space:nowrap;">Grocery list ›</span>
+            </div>
+            <div style="margin-top:8px;">
+              <sc-for list="{{ meals }}" as="m" hint-placeholder-count="4">
+                <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                  <span style="width:26px; height:26px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; box-sizing:border-box; background:{{ m.dotBg }}; border:{{ m.dotBorder }}; color:#08281F;">
+                    <sc-if value="{{ m.done }}" hint-placeholder-val="{{ false }}"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M20 6 9 17l-5-5"></path></svg></sc-if>
+                  </span>
+                  <div style="flex:1; min-width:0;">
+                    <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">{{ m.slot }}</div>
+                    <div style="margin-top:2px; font-size:14.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{ m.name }}</div>
+                  </div>
+                  <span style="font-family:ui-monospace,Menlo,monospace; font-size:12.5px; white-space:nowrap; color:{{ m.kcalColor }};">{{ m.kcal }}</span>
+                  <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="m9 18 6-6-6-6"></path></svg></span>
+                </div>
+              </sc-for>
+            </div>
+            <p style="margin:10px 0 0; font-size:11px; color:#9A93C9;">Ingredients are filtered, not verified — check labels if you have an allergy.</p>
+          </div>
+        </div>
+
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;mealsLogged&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:1,&quot;min&quot;:0,&quot;max&quot;:4,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;State&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const n = Math.max(0, Math.min(4, this.props.mealsLogged ?? 1));
+    const meals = [
+      { slot: 'Breakfast', name: 'Greek yogurt, oats & berries', kcal: 520, p: 34, c: 62, f: 14 },
+      { slot: 'Lunch', name: 'Chicken, rice & greens', kcal: 640, p: 42, c: 72, f: 18 },
+      { slot: 'Dinner', name: 'Salmon with new potatoes', kcal: 720, p: 46, c: 64, f: 28 },
+      { slot: 'Snack', name: 'Cottage cheese & apple', kcal: 270, p: 28, c: 32, f: 10 },
+    ];
+    const eaten = meals.slice(0, n).reduce((a, m) => ({ kcal: a.kcal + m.kcal, p: a.p + m.p, c: a.c + m.c, f: a.f + m.f }), { kcal: 0, p: 0, c: 0, f: 0 });
+    const T = { kcal: 2150, p: 150, c: 230, f: 70 };
+    const pct = (v, t) => `${Math.min(100, Math.round((v / t) * 100))}%`;
+    const dash = (v, t, r) => { const circ = 2 * Math.PI * r; return `${(circ * Math.min(1, v / t)).toFixed(1)} ${circ.toFixed(1)}`; };
+    const next = meals[n];
+    const pLeft = T.p - eaten.p;
+    const nudge = !next
+      ? 'Every meal is logged — you finished on target.'
+      : pLeft > 0
+        ? `Protein is furthest behind — ${next.slot.toLowerCase()} covers ${next.p} g of the ${pLeft} g left.`
+        : `You're on track. ${next.slot} is next.`;
+    return {
+      kcal: eaten.kcal.toLocaleString(),
+      kcalLeft: Math.max(0, T.kcal - eaten.kcal).toLocaleString(),
+      kcalPct: pct(eaten.kcal, T.kcal),
+      p: eaten.p, c: eaten.c, f: eaten.f,
+      pPct: pct(eaten.p, T.p), cPct: pct(eaten.c, T.c), fPct: pct(eaten.f, T.f),
+      ringCal: dash(eaten.kcal, T.kcal, 46), ringP: dash(eaten.p, T.p, 35), ringC: dash(eaten.c, T.c, 27), ringF: dash(eaten.f, T.f, 19), ringW: dash(750, 2500, 56),
+      mealsCount: `${n} of 4 meals`,
+      hasNext: !!next,
+      ctaLabel: next ? `Log ${next.slot.toLowerCase()} · ${next.kcal} kcal` : '',
+      nudge,
+      meals: meals.map((m, i) => {
+        const done = i < n;
+        return {
+          ...m,
+          kcal: `${m.kcal} kcal`,
+          done,
+          dotBg: done ? 'linear-gradient(180deg,#7BEECE,#3ED3AA)' : 'transparent',
+          dotBorder: done ? 'none' : '1.5px solid rgba(245,243,255,.22)',
+          kcalColor: done ? '#5BE9C2' : '#9A93C9',
+        };
+      }),
+    };
+  }
+}
+</script>
+</body>
+</html>

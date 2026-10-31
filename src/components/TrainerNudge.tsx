@@ -1,5 +1,5 @@
 import type * as React from 'react'
-import { ArrowUpRight, ChevronRight, Sparkles } from 'lucide-react'
+import { ArrowUpRight, ChevronRight, MessageCircle, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { tabHash } from '@/lib/app-route'
 import { setChatPrefill } from '@/lib/chat-prefill-store'
@@ -80,6 +80,14 @@ export interface TrainerNudgeProps {
    * line (a real button) moves to the next tip. Actions, when there are any, still sit under the line.
    */
   slim?: boolean
+  /**
+   * THE COACH LINE (tab polish handoff, 31 Oct 2026, Home 2c and Exercise 2a): no box. A mint chat avatar, the
+   * "TRAINER" label (her 10 Oct ruling keeps the name on screen; the handoff's "COACH" is not used), the line, then
+   * small outline chips under it. Rotation, Ask and actions behave exactly as in `slim`.
+   */
+  line?: boolean
+  /** Chips under a `line` note that send a prompt to the chat ("What changed?", "Adjust today"). */
+  prompts?: { label: string; prefill: string }[]
 }
 
 /**
@@ -87,10 +95,61 @@ export interface TrainerNudgeProps {
  * "Ask ↗" and the dots on one row, the line under it at 13.5px. One
  * component for Home, Nutrition and Exercise, so the three cannot drift.
  */
-export function TrainerNudge({ text, actions, openChat, onOpen, compact, clamp, className, tag, askPrefill, pager, onTextTap, fading, slim, ...rest }: TrainerNudgeProps) {
+export function TrainerNudge({ text, actions, openChat, onOpen, compact, clamp, className, tag, askPrefill, pager, onTextTap, fading, slim, line, prompts, ...rest }: TrainerNudgeProps) {
   const ask = () => {
     if (askPrefill) setChatPrefill(askPrefill)
     window.location.hash = tabHash('chat')
+  }
+  if (line) {
+    const go = openChat ? ask : onOpen
+    const send = (prefill: string) => { setChatPrefill(prefill); window.location.hash = tabHash('chat') }
+    const lineText = <span className="transition-opacity duration-[250ms]" style={{ opacity: fading ? 0 : 1 }} data-nudge-text>{text}</span>
+    return (
+      <div role="note" aria-label="Personal TrAIner says" data-testid={rest['data-testid'] ?? 'trainer-nudge'} data-nudge-line className={cn('flex gap-3', className)}>
+        <span aria-hidden className="glow-mint-box flex size-9 shrink-0 items-center justify-center rounded-full" style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))', color: 'var(--primary-foreground)' }}>
+          <MessageCircle className="size-[18px]" />
+        </span>
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            <span className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-primary-text" data-nudge-tag>
+              Trainer<span className="sr-only">{tag ? ` · ${tag}` : ''}</span>
+            </span>
+            {go && (
+              <button type="button" onClick={go} aria-label={openChat ? 'Ask the Personal TrAIner about this' : 'Read the rest of this'}
+                className="hit-slop-44 ml-auto flex size-6 shrink-0 items-center justify-center bg-transparent p-0 text-muted-foreground" data-nudge-ask={openChat ? '' : undefined}>
+                <ChevronRight size={16} aria-hidden />
+              </button>
+            )}
+          </div>
+          {onTextTap ? (
+            <button type="button" onClick={onTextTap}
+              aria-label={pager && pager.count > 1 ? `Tip ${pager.index + 1} of ${pager.count}. Next tip` : undefined}
+              className={cn('bg-transparent p-0 text-left text-[0.9375rem] leading-[1.45] text-foreground', clamp && 'line-clamp-3')}>
+              {lineText}
+            </button>
+          ) : (
+            <div className={cn('text-[0.9375rem] leading-[1.45] text-foreground', clamp && 'line-clamp-3')}>{lineText}</div>
+          )}
+          {((actions && actions.length > 0) || (prompts && prompts.length > 0)) && (
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {actions?.map(a => (
+                <button key={a.label} type="button" disabled={a.disabled} onClick={() => { void a.onClick() }}
+                  className="min-h-[44px] rounded-full border px-4 text-[0.8125rem] font-semibold disabled:opacity-50"
+                  style={{ borderColor: a.secondary ? 'var(--hairline)' : 'rgba(var(--glow-rgb), .45)', color: a.secondary ? 'var(--muted-foreground)' : 'var(--primary-text)' }}>
+                  {a.label}
+                </button>
+              ))}
+              {prompts?.map(p => (
+                <button key={p.label} type="button" onClick={() => send(p.prefill)}
+                  className="min-h-[44px] rounded-full border border-[color:var(--hairline)] px-4 text-[0.8125rem] font-medium text-foreground" data-nudge-prompt>
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
   if (slim) {
     const go = openChat ? ask : onOpen

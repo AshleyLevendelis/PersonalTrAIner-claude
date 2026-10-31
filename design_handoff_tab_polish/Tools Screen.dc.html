@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#0b0919; font-family:"Space Grotesk", ui-sans-serif, system-ui, sans-serif; }
+  a { color:#5BE9C2; text-decoration:none; }
+  a:hover { color:#3ED3AA; }
+</style>
+</helmet>
+
+<section style="padding:48px 40px 24px; display:flex; flex-direction:column; gap:28px; background:#0b0919; color:#F5F3FF;">
+  <div style="display:flex; flex-direction:column; gap:6px; max-width:880px;">
+    <span style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#9A93C9;">Turn 2 · Tools</span>
+    <h1 style="margin:0; font-size:26px; font-weight:600; letter-spacing:-.02em;">1a, grouped, with a live plate card</h1>
+    <p style="margin:0; font-size:14px; line-height:1.5; color:#C2BCE8; text-wrap:pretty;">The Round timer tweak still works here. Compare with <a href="#1a">1a</a> below.</p>
+  </div>
+  <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start;">
+    <div id="2a" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">2a</span>
+        <span style="font-size:14px; font-weight:600;">1a, grouped</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">1a with your notes. The plate card has − / + steppers (2.5 kg) and live plate maths, with plates in competition colours and sized by weight. Rounded Plan and Shop groups, mint bars, a glowing PR pill, and a stronger active-tab marker. Tap − / + to try it.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Week 2 of 16 · B1</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Tools</span>
+          </div>
+          <span style="width:44px; height:44px; margin:0 -12px -7px 0; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+        </div>
+
+        <div style="padding:20px 16px 24px; display:flex; flex-direction:column; gap:20px;">
+          <sc-if value="{{ idle }}" hint-placeholder-val="{{ true }}">
+            <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, rgba(91,233,194,.20), rgba(91,233,194,0) 55%), #221C48; border:1px solid rgba(91,233,194,.30); box-shadow:0 10px 30px rgba(0,0,0,.35);">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Timers</span>
+                <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">Set rest runs in your session</span>
+              </div>
+              <div style="margin-top:14px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px;">
+                <div style="min-height:88px; border-radius:16px; padding:12px 10px; box-sizing:border-box; background:rgba(16,13,36,.55); border:1px solid rgba(91,233,194,.35); display:flex; flex-direction:column; justify-content:flex-start; gap:12px;">
+                  <span style="color:#5BE9C2;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M10 2h4"></path><path d="M12 14v-4"></path><path d="M4 13a8 8 0 0 1 8-7 8 8 0 1 1-5.3 14L4 17.6"></path><path d="M9 17H4v5"></path></svg></span>
+                  <span style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">Round</span><span style="font-size:10.5px; line-height:1.3; color:#9A93C9;">Tabata, EMOM, intervals</span></span>
+                </div>
+                <div style="min-height:88px; border-radius:16px; padding:12px 10px; box-sizing:border-box; background:rgba(16,13,36,.55); border:1px solid rgba(245,243,255,.10); display:flex; flex-direction:column; justify-content:flex-start; gap:12px;">
+                  <span style="color:#B4A9FF;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><line x1="10" x2="14" y1="2" y2="2"></line><line x1="12" x2="15" y1="14" y2="11"></line><circle cx="12" cy="14" r="8"></circle></svg></span>
+                  <span style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">Stopwatch</span><span style="font-size:10.5px; line-height:1.3; color:#9A93C9;">Counts up</span></span>
+                </div>
+                <div style="min-height:88px; border-radius:16px; padding:12px 10px; box-sizing:border-box; background:rgba(16,13,36,.55); border:1px solid rgba(245,243,255,.10); display:flex; flex-direction:column; justify-content:flex-start; gap:12px;">
+                  <span style="color:#B4A9FF;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"></path></svg></span>
+                  <span style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">Lap</span><span style="font-size:10.5px; line-height:1.3; color:#9A93C9;">Records each lap</span></span>
+                </div>
+              </div>
+              <div style="margin-top:14px; padding-top:12px; border-top:1px solid rgba(245,243,255,.10); display:flex; align-items:center; gap:12px;">
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Last round</div>
+                  <div style="margin-top:3px; font-size:14px; font-weight:500;">Tabata <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; color:#C2BCE8;">8 × 20s / 10s · 4:00</span></div>
+                </div>
+                <span style="height:44px; padding:0 16px; border-radius:14px; display:flex; align-items:center; gap:6px; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); box-shadow:0 0 18px rgba(91,233,194,.4); color:#08281F; font-size:14px; font-weight:700; white-space:nowrap; flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:block;"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"></path></svg>Start</span>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ running }}" hint-placeholder-val="{{ false }}">
+            <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, {{ phaseGlow }}, rgba(0,0,0,0) 60%), #221C48; border:1px solid {{ phaseColor }}; box-shadow:0 0 24px {{ phaseGlow }}, 0 10px 30px rgba(0,0,0,.35);">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:{{ phaseColor }}; white-space:nowrap;">Round timer · {{ phaseLabel }}</span>
+                <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">Tabata · 8 × 20s / 10s</span>
+              </div>
+              <div style="margin-top:10px; display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:56px; font-weight:700; letter-spacing:-.04em; line-height:1; color:{{ clockInk }};">{{ clock }}</span>
+                <span style="font-size:13px; color:#C2BCE8; white-space:nowrap;">{{ roundLabel }}</span>
+              </div>
+              <div style="margin-top:14px; display:flex; gap:4px;">
+                <sc-for list="{{ pips }}" as="p" hint-placeholder-count="8"><span style="flex:1; height:5px; border-radius:3px; background:{{ p.bg }};"></span></sc-for>
+              </div>
+              <div style="margin-top:16px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px;">
+                <span style="height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; gap:6px; border:1px solid rgba(245,243,255,.22); font-size:14px; font-weight:600;"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:block;"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>Pause</span>
+                <span style="height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; gap:6px; background:rgba(69,60,142,.45); font-size:14px; font-weight:600;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M15 3h6v6"></path><path d="M9 21H3v-6"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>Full screen</span>
+              </div>
+              <div style="margin-top:12px; font-size:11.5px; color:#9A93C9;">Stopwatch and lap open once this round ends or is reset.</div>
+            </div>
+          </sc-if>
+
+          <div style="border-radius:20px; padding:14px; background:rgba(69,60,142,.18); border:1px solid rgba(245,243,255,.06);">
+            <div style="display:flex; align-items:center; gap:12px;">
+              <span style="width:36px; height:36px; flex-shrink:0; border-radius:12px; display:flex; align-items:center; justify-content:center; background:rgba(139,123,255,.14); color:#B4A9FF;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.5"></circle></svg></span>
+              <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Plate calculator</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">Deadlifts · ± 2.5 kg</div></div>
+              <span style="height:44px; border-radius:12px; display:flex; align-items:center; flex-shrink:0; background:rgba(16,13,36,.6); border:1px solid rgba(139,123,255,.35);"><span onClick="{{ plateMinus }}" style="cursor:pointer; width:40px; height:44px; display:flex; align-items:center; justify-content:center; color:#DAD5FA;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M5 12h14"></path></svg></span><span style="min-width:56px; display:flex; align-items:baseline; justify-content:center; gap:3px; border-left:1px solid rgba(245,243,255,.08); border-right:1px solid rgba(245,243,255,.08); height:44px; line-height:44px;"><span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700;">{{ plateKg }}</span><span style="font-size:11px; color:#9A93C9;">kg</span></span><span onClick="{{ platePlus }}" style="cursor:pointer; width:40px; height:44px; display:flex; align-items:center; justify-content:center; color:#DAD5FA;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg></span></span>
+            </div>
+            <div style="margin-top:12px; padding-top:12px; border-top:1px solid rgba(245,243,255,.08); display:flex; align-items:center; gap:8px;">
+              <span style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Each side</span>
+              <span style="display:flex; align-items:center; gap:4px; min-height:40px;"><sc-for list="{{ plates }}" as="pl" hint-placeholder-count="2"><span style="height:{{ pl.h }}; min-width:{{ pl.w }}; padding:0 6px; box-sizing:border-box; border-radius:7px; display:flex; align-items:center; justify-content:center; font-family:ui-monospace,Menlo,monospace; font-size:{{ pl.fs }}; font-weight:700; color:{{ pl.ink }}; background:{{ pl.bg }}; border:{{ pl.border }};">{{ pl.label }}</span></sc-for><sc-if value="{{ plateEmpty }}" hint-placeholder-val="{{ false }}"><span style="font-size:12px; color:#C2BCE8;">Bar only</span></sc-if></span>
+              <span style="flex:1;"></span>
+              <span style="font-size:11.5px; color:#9A93C9; white-space:nowrap;">20 kg bar</span>
+              <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+            </div>
+          </div>
+          <div>
+            <div style="padding:0 4px; font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Plan</div>
+            <div style="margin-top:8px; border-radius:20px; background:rgba(69,60,142,.18); border:1px solid rgba(245,243,255,.06); overflow:hidden;">
+                <div style="display:flex; align-items:center; gap:12px; min-height:64px; padding:0 14px;">
+                  <span style="width:36px; height:36px; flex-shrink:0; border-radius:12px; display:flex; align-items:center; justify-content:center; background:rgba(139,123,255,.14); color:#B4A9FF;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg></span>
+                  <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Your program</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">16 weeks · block 1 of 4</div></div>
+                  <span style="width:48px; height:4px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; width:12%; height:4px; border-radius:999px; background:#5BE9C2; box-shadow:0 0 8px rgba(91,233,194,.8);"></span></span>
+                  <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px; min-height:64px; padding:0 14px; border-top:1px solid rgba(245,243,255,.08);">
+                  <span style="width:36px; height:36px; flex-shrink:0; border-radius:12px; display:flex; align-items:center; justify-content:center; background:rgba(139,123,255,.14); color:#B4A9FF;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg></span>
+                  <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Session history</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">5 sessions logged</div></div>
+                  <span style="height:24px; padding:0 9px; border-radius:999px; display:flex; align-items:center; gap:4px; background:rgba(91,233,194,.14); border:1px solid rgba(91,233,194,.45); box-shadow:0 0 12px rgba(91,233,194,.35); color:#5BE9C2; font-size:11px; font-weight:700; white-space:nowrap;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="m22 7-8.5 8.5-5-5L2 17"></path><path d="M16 7h6v6"></path></svg>3 PRs</span>
+                  <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+                </div>
+            </div>
+          </div>
+          <div>
+            <div style="padding:0 4px; font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Shop</div>
+            <div style="margin-top:8px; border-radius:20px; background:rgba(69,60,142,.18); border:1px solid rgba(245,243,255,.06); overflow:hidden;">
+                <div style="display:flex; align-items:center; gap:12px; min-height:64px; padding:0 14px;">
+                  <span style="width:36px; height:36px; flex-shrink:0; border-radius:12px; display:flex; align-items:center; justify-content:center; background:rgba(139,123,255,.14); color:#B4A9FF;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg></span>
+                  <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Grocery list</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">14 items · 6 checked</div></div>
+                  <span style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;"><span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; color:#C2BCE8;">6/14</span><span style="width:48px; height:4px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; width:43%; height:4px; border-radius:999px; background:#5BE9C2; box-shadow:0 0 8px rgba(91,233,194,.8);"></span></span></span>
+                  <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+                </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.930 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; position:relative; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:700; text-shadow:0 0 10px rgba(91,233,194,.7);"><span style="position:absolute; top:-9px; width:18px; height:3px; border-radius:999px; background:#5BE9C2; box-shadow:0 0 8px rgba(91,233,194,.9);"></span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.770-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<section style="padding:48px 40px 80px; display:flex; flex-direction:column; gap:28px; background:#0b0919; color:#F5F3FF;">
+  <div style="display:flex; flex-direction:column; gap:6px; max-width:880px;">
+    <span style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#9A93C9;">Turn 1 · Tools</span>
+    <h1 style="margin:0; font-size:26px; font-weight:600; letter-spacing:-.02em;">Tools in the Home 2c style</h1>
+    <p style="margin:0; font-size:14px; line-height:1.5; color:#C2BCE8; text-wrap:pretty;">Same five things the shipped tab has: Timers, Grocery list, Plate calculator, Session history, Your program. No round timer at rest (Ashley’s 14 Sep ruling), and no sheet just to choose a timer. Flip the <strong style="font-weight:600;">Round timer</strong> tweak to see a live round.</p>
+  </div>
+  <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start;">
+
+    <div id="1a" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">1a</span>
+        <span style="font-size:14px; font-weight:600;">Timer hero</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">One glowing card holds the timers: three tiles that open each timer directly, plus your last round as a one-tap restart. When a round runs, the same card becomes the live clock. Everything else is hairline rows with live counts.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Week 2 of 16 · B1</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Tools</span>
+          </div>
+          <span style="width:44px; height:44px; margin:0 -12px -7px 0; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+        </div>
+
+        <div style="padding:20px 16px 24px; display:flex; flex-direction:column; gap:24px;">
+          <sc-if value="{{ idle }}" hint-placeholder-val="{{ true }}">
+            <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, rgba(91,233,194,.20), rgba(91,233,194,0) 55%), #221C48; border:1px solid rgba(91,233,194,.30); box-shadow:0 10px 30px rgba(0,0,0,.35);">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Timers</span>
+                <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">Set rest runs in your session</span>
+              </div>
+              <div style="margin-top:14px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px;">
+                <div style="min-height:88px; border-radius:16px; padding:12px 10px; box-sizing:border-box; background:rgba(16,13,36,.55); border:1px solid rgba(91,233,194,.35); display:flex; flex-direction:column; justify-content:flex-start; gap:12px;">
+                  <span style="color:#5BE9C2;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M10 2h4"></path><path d="M12 14v-4"></path><path d="M4 13a8 8 0 0 1 8-7 8 8 0 1 1-5.3 14L4 17.6"></path><path d="M9 17H4v5"></path></svg></span>
+                  <span style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">Round</span><span style="font-size:10.5px; line-height:1.3; color:#9A93C9;">Tabata, EMOM, intervals</span></span>
+                </div>
+                <div style="min-height:88px; border-radius:16px; padding:12px 10px; box-sizing:border-box; background:rgba(16,13,36,.55); border:1px solid rgba(245,243,255,.10); display:flex; flex-direction:column; justify-content:flex-start; gap:12px;">
+                  <span style="color:#B4A9FF;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><line x1="10" x2="14" y1="2" y2="2"></line><line x1="12" x2="15" y1="14" y2="11"></line><circle cx="12" cy="14" r="8"></circle></svg></span>
+                  <span style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">Stopwatch</span><span style="font-size:10.5px; line-height:1.3; color:#9A93C9;">Counts up</span></span>
+                </div>
+                <div style="min-height:88px; border-radius:16px; padding:12px 10px; box-sizing:border-box; background:rgba(16,13,36,.55); border:1px solid rgba(245,243,255,.10); display:flex; flex-direction:column; justify-content:flex-start; gap:12px;">
+                  <span style="color:#B4A9FF;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M4 22V4a1 1 0 0 1 .4-.8A6 6 0 0 1 8 2c3 0 5 2 7.333 2q2 0 3.067-.8A1 1 0 0 1 20 4v10a1 1 0 0 1-.4.8A6 6 0 0 1 16 16c-3 0-5-2-8-2a6 6 0 0 0-4 1.528"></path></svg></span>
+                  <span style="display:flex; flex-direction:column; gap:2px;"><span style="font-size:14px; font-weight:600;">Lap</span><span style="font-size:10.5px; line-height:1.3; color:#9A93C9;">Records each lap</span></span>
+                </div>
+              </div>
+              <div style="margin-top:14px; padding-top:12px; border-top:1px solid rgba(245,243,255,.10); display:flex; align-items:center; gap:12px;">
+                <div style="flex:1; min-width:0;">
+                  <div style="font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Last round</div>
+                  <div style="margin-top:3px; font-size:14px; font-weight:500;">Tabata <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; color:#C2BCE8;">8 × 20s / 10s · 4:00</span></div>
+                </div>
+                <span style="height:44px; padding:0 16px; border-radius:14px; display:flex; align-items:center; gap:6px; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); box-shadow:0 0 18px rgba(91,233,194,.4); color:#08281F; font-size:14px; font-weight:700; white-space:nowrap; flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:block;"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"></path></svg>Start</span>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ running }}" hint-placeholder-val="{{ false }}">
+            <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, {{ phaseGlow }}, rgba(0,0,0,0) 60%), #221C48; border:1px solid {{ phaseColor }}; box-shadow:0 0 24px {{ phaseGlow }}, 0 10px 30px rgba(0,0,0,.35);">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:{{ phaseColor }}; white-space:nowrap;">Round timer · {{ phaseLabel }}</span>
+                <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">Tabata · 8 × 20s / 10s</span>
+              </div>
+              <div style="margin-top:10px; display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:56px; font-weight:700; letter-spacing:-.04em; line-height:1; color:{{ clockInk }};">{{ clock }}</span>
+                <span style="font-size:13px; color:#C2BCE8; white-space:nowrap;">{{ roundLabel }}</span>
+              </div>
+              <div style="margin-top:14px; display:flex; gap:4px;">
+                <sc-for list="{{ pips }}" as="p" hint-placeholder-count="8"><span style="flex:1; height:5px; border-radius:3px; background:{{ p.bg }};"></span></sc-for>
+              </div>
+              <div style="margin-top:16px; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:8px;">
+                <span style="height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; gap:6px; border:1px solid rgba(245,243,255,.22); font-size:14px; font-weight:600;"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:block;"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg>Pause</span>
+                <span style="height:48px; border-radius:14px; display:flex; align-items:center; justify-content:center; gap:6px; background:rgba(69,60,142,.45); font-size:14px; font-weight:600;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M15 3h6v6"></path><path d="M9 21H3v-6"></path><path d="M21 3l-7 7"></path><path d="M3 21l7-7"></path></svg>Full screen</span>
+              </div>
+              <div style="margin-top:12px; font-size:11.5px; color:#9A93C9;">Stopwatch and lap open once this round ends or is reset.</div>
+            </div>
+          </sc-if>
+
+          <div style="padding:0 4px;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Everything here</div>
+            <div style="margin-top:6px; border-top:1px solid rgba(245,243,255,.10);">
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="color:#B4A9FF;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Grocery list</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">This week’s shopping</div></div>
+                <span style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;"><span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; color:#C2BCE8;">6/14</span><span style="width:44px; height:3px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; width:43%; height:3px; border-radius:999px; background:#5BE9C2;"></span></span></span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="color:#B4A9FF;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.5"></circle></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Plate calculator</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">Options for any weight</div></div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="color:#B4A9FF;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Session history</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">Everything you have logged</div></div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; color:#C2BCE8; white-space:nowrap;">5 · <span style="color:#5BE9C2;">3 PRs</span></span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="color:#B4A9FF;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Your program</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">16 weeks · block 1 of 4</div></div>
+                <span style="width:44px; height:3px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; width:12%; height:3px; border-radius:999px; background:#B4A9FF;"></span></span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.930 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.770-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="1b" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">1b</span>
+        <span style="font-size:14px; font-weight:600;">Grouped list</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">Closest to the list Ashley chose. Rows are grouped by job (Train, Plan, Shop) and Timers opens in place to its three timers, so there’s no sheet to choose one. A running round pins a slim live strip to the top. Tap Timers to fold it.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Week 2 of 16 · B1</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Tools</span>
+          </div>
+          <span style="width:44px; height:44px; margin:0 -12px -7px 0; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+        </div>
+
+        <div style="padding:20px 16px 24px; display:flex; flex-direction:column; gap:22px;">
+          <sc-if value="{{ running }}" hint-placeholder-val="{{ false }}">
+            <div style="border-radius:18px; padding:12px 12px 12px 14px; background:#221C48; border:1px solid {{ phaseColor }}; box-shadow:0 0 18px {{ phaseGlow }}; display:flex; align-items:center; gap:12px;">
+              <span style="width:8px; height:8px; flex-shrink:0; border-radius:999px; background:{{ phaseColor }}; box-shadow:0 0 8px {{ phaseColor }};"></span>
+              <div style="flex:1; min-width:0;">
+                <div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:{{ phaseColor }}; white-space:nowrap;">Tabata · {{ phaseLabel }}</div>
+                <div style="margin-top:2px; font-size:12px; color:#C2BCE8; white-space:nowrap;">{{ roundLabel }}</div>
+              </div>
+              <span style="font-family:ui-monospace,Menlo,monospace; font-size:28px; font-weight:700; letter-spacing:-.03em; color:{{ clockInk }};">{{ clock }}</span>
+              <span style="width:44px; height:44px; flex-shrink:0; border-radius:14px; display:flex; align-items:center; justify-content:center; background:rgba(69,60,142,.45);"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:block;"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg></span>
+            </div>
+          </sc-if>
+
+          <div style="padding:0 4px;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Train</div>
+            <div style="margin-top:6px; border-top:1px solid rgba(245,243,255,.10);">
+              <div onClick="{{ toggleTimers }}" style="cursor:pointer; display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="color:#5BE9C2;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M10 2h4"></path><path d="M12 14v-4"></path><path d="M4 13a8 8 0 0 1 8-7 8 8 0 1 1-5.3 14L4 17.6"></path><path d="M9 17H4v5"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Timers</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">{{ timersSub }}</div></div>
+                <span style="color:#9A93C9; transform:{{ timersChev }};"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m6 9 6 6 6-6"></path></svg></span>
+              </div>
+              <sc-if value="{{ timersOpen }}" hint-placeholder-val="{{ true }}">
+                <div style="padding:6px 0 10px 30px; display:flex; flex-direction:column; border-bottom:1px solid rgba(245,243,255,.10);">
+                  <div style="display:flex; align-items:center; gap:10px; min-height:48px;">
+                    <div style="flex:1; min-width:0;"><div style="font-size:14px; font-weight:500;">Round timer</div><div style="font-size:11px; color:#9A93C9;">Last: Tabata · 8 × 20s / 10s</div></div>
+                    <span style="height:36px; padding:0 14px; border-radius:12px; display:flex; align-items:center; gap:5px; background:rgba(91,233,194,.12); border:1px solid rgba(91,233,194,.35); color:#5BE9C2; font-size:12.5px; font-weight:600; white-space:nowrap;"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:block;"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"></path></svg>Start</span>
+                    <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:10px; min-height:48px; color:{{ otherInk }};">
+                    <div style="flex:1; min-width:0;"><div style="font-size:14px; font-weight:500;">Stopwatch</div><div style="font-size:11px; color:#9A93C9;">{{ otherSub }}</div></div>
+                    <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+                  </div>
+                  <div style="display:flex; align-items:center; gap:10px; min-height:48px; color:{{ otherInk }};">
+                    <div style="flex:1; min-width:0;"><div style="font-size:14px; font-weight:500;">Lap timer</div><div style="font-size:11px; color:#9A93C9;">{{ lapSub }}</div></div>
+                    <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+                  </div>
+                </div>
+              </sc-if>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="color:#B4A9FF;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="2.5"></circle></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Plate calculator</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">Options for any weight</div></div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:0 4px;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF; white-space:nowrap;">Plan</div>
+            <div style="margin-top:6px; border-top:1px solid rgba(245,243,255,.10);">
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="color:#B4A9FF;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12 7v14"></path><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Your program</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">16 weeks · block 1 of 4</div></div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="color:#B4A9FF;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M12 7v5l4 2"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Session history</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">5 sessions · 3 PRs</div></div>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:0 4px;">
+            <div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#FFB454; white-space:nowrap;">Shop</div>
+            <div style="margin-top:6px; border-top:1px solid rgba(245,243,255,.10);">
+              <div style="display:flex; align-items:center; gap:12px; min-height:60px; border-bottom:1px solid rgba(245,243,255,.10);">
+                <span style="color:#B4A9FF;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="8" cy="21" r="1"></circle><circle cx="19" cy="21" r="1"></circle><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:500;">Grocery list</div><div style="margin-top:2px; font-size:11.5px; color:#9A93C9;">14 items · 6 checked</div></div>
+                <span style="width:44px; height:3px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><span style="display:block; width:43%; height:3px; border-radius:999px; background:#5BE9C2;"></span></span>
+                <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;roundTimer&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Idle&quot;,&quot;Running&quot;],&quot;default&quot;:&quot;Idle&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;State&quot;}}">
+class Component extends DCLogic {
+  state = { t0: Date.now(), now: Date.now(), timersOpen: true, plateKg: 72.5 };
+  componentDidMount() { this._t = setInterval(() => this.setState({ now: Date.now() }), 250); }
+  componentWillUnmount() { clearInterval(this._t); }
+  renderVals() {
+    const running = (this.props.roundTimer ?? 'Idle') === 'Running';
+    const e = ((this.state.now - this.state.t0) / 1000 + 66) % 240;
+    const r = Math.floor(e / 30) + 1, inC = e % 30, work = inC < 20;
+    const rem = Math.ceil(work ? 20 - inC : 30 - inC);
+    const MINT = '#5BE9C2', AMBER = '#FFB454';
+    const phaseColor = work ? MINT : AMBER;
+    const PL = [[25,'#E5484D','#fff','40px'],[20,'#3E7BFA','#fff','38px'],[15,'#F5C542','#2A2108','36px'],[10,'#3DBE6E','#06240F','34px'],[5,'#F5F3FF','#15122B','30px'],[2.5,'#E5484D','#fff','26px'],[1.25,'#C9CBD3','#15122B','24px']];
+    let side = Math.max(0, (this.state.plateKg - 20) / 2); const plates = [];
+    for (const [w, bg, ink, h] of PL) while (side >= w - 1e-9) { side -= w; plates.push({ label: String(w), bg, ink, h, w: w >= 10 ? '34px' : '28px', fs: w >= 5 ? '12px' : '10.5px', border: w === 5 ? 'none' : 'none' }); }
+    const stepKg = d => this.setState(st => ({ plateKg: Math.min(300, Math.max(20, st.plateKg + d)) }));
+    return {
+      plates, plateEmpty: plates.length === 0, plateKg: String(this.state.plateKg),
+      plateMinus: () => stepKg(-2.5), platePlus: () => stepKg(2.5),
+      running, idle: !running,
+      phaseColor, phaseGlow: work ? 'rgba(91,233,194,.28)' : 'rgba(255,180,84,.28)',
+      phaseLabel: work ? 'Work' : 'Rest', clockInk: work ? '#F5F3FF' : '#FFE2B8',
+      clock: '0:' + String(rem).padStart(2, '0'), roundLabel: 'Round ' + r + ' of 8',
+      pips: Array.from({ length: 8 }, (_, i) => ({ bg: i < r - 1 ? 'rgba(91,233,194,.8)' : i === r - 1 ? phaseColor : 'rgba(245,243,255,.12)' })),
+      timersOpen: this.state.timersOpen,
+      toggleTimers: () => this.setState(s => ({ timersOpen: !s.timersOpen })),
+      timersChev: this.state.timersOpen ? 'rotate(180deg)' : 'none',
+      timersSub: running ? 'A round is running' : 'Round, stopwatch, lap',
+      otherInk: running ? '#9A93C9' : '#F5F3FF',
+      otherSub: running ? 'Finish or reset your round first' : 'Counts up, nothing else',
+      lapSub: running ? 'Finish or reset your round first' : 'Counts up and records each lap',
+    };
+  }
+}
+</script>
+</body>
+</html>

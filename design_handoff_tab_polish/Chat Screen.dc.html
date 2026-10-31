@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#0b0919; font-family:"Space Grotesk", ui-sans-serif, system-ui, sans-serif; }
+  a { color:#5BE9C2; text-decoration:none; }
+  a:hover { color:#3ED3AA; }
+</style>
+</helmet>
+
+<section style="padding:48px 40px 24px; display:flex; flex-direction:column; gap:28px; background:#0b0919; color:#F5F3FF;">
+  <div style="display:flex; flex-direction:column; gap:6px; max-width:880px;">
+    <span style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#9A93C9;">Turn 2 · Chat</span>
+    <h1 style="margin:0; font-size:26px; font-weight:600; letter-spacing:-.02em;">1b, closer to a real coach</h1>
+    <p style="margin:0; font-size:14px; line-height:1.5; color:#C2BCE8; text-wrap:pretty;">Use the <strong style="font-weight:600;">Day state</strong> tweak to see the context strip mid-session, after the session (a static summary, no arrow), and on a rest day (the workout pill is gone). One product question before this ships: the coach is AI, so a voice note means text-to-speech of its own message, not a recording. The transcript always shows, so it works in a loud gym. Compare with <a href="#1b">1b</a> below.</p>
+  </div>
+  <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start;">
+    <div id="2a" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">2a</span>
+        <span style="font-size:14px; font-weight:600;">Two purples (recommended)</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">A back-and-forth chat: coach messages sit in left bubbles, yours on the right. The voice note and its transcript share one bubble. Actions (swap preview, reply pills, water receipt) stay outside the bubbles so they read as things to tap. Try play and the swap pills.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:16px 14px 14px 18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid rgba(245,243,255,.08);">
+          <span style="width:36px; height:36px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:17px; font-weight:700; letter-spacing:-.01em;">Coach</div>
+            <div style="margin-top:2px; display:flex; align-items:center; gap:6px; font-size:11.5px; color:#9A93C9; white-space:nowrap; overflow:hidden;"><span style="width:6px; height:6px; border-radius:999px; background:#5BE9C2; box-shadow:0 0 6px #5BE9C2;"></span>Sees today’s session, meals and logs</div>
+          </div>
+          <span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#9A93C9;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg></span>
+        </div>
+        <div style="padding:10px 16px; display:flex; gap:8px; overflow:hidden; border-bottom:1px solid rgba(245,243,255,.06);">
+          <sc-if value="{{ D.active }}" hint-placeholder-val="{{ true }}"><span style="cursor:pointer; height:32px; padding:0 9px 0 11px; border-radius:999px; display:flex; align-items:center; gap:6px; background:rgba(91,233,194,.10); border:1px solid rgba(91,233,194,.3); font-size:11.5px; color:#DAD5FA; white-space:nowrap;"><span style="color:#5BE9C2;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg></span>Full Body Power · set 2 of 12<span style="color:#5BE9C2; margin-left:-2px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span></span></sc-if>
+          <sc-if value="{{ D.post }}" hint-placeholder-val="{{ false }}"><span style="height:32px; padding:0 11px; border-radius:999px; display:flex; align-items:center; gap:6px; background:rgba(69,60,142,.18); border:1px solid rgba(245,243,255,.08); font-size:11.5px; color:#C2BCE8; white-space:nowrap;"><span style="width:14px; height:14px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(91,233,194,.2); color:#5BE9C2;"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M20 6 9 17l-5-5"></path></svg></span>Session done · 45 min</span></sc-if>
+          <span style="cursor:pointer; height:32px; padding:0 9px 0 11px; border-radius:999px; display:flex; align-items:center; gap:6px; background:rgba(69,60,142,.3); font-size:11.5px; color:#DAD5FA; white-space:nowrap;">1,410 kcal left<span style="color:#9A93C9; margin-left:-2px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span></span>
+        </div>
+          <div style="padding:18px 18px 20px; display:flex; flex-direction:column; gap:18px;">
+            <div style="display:flex; justify-content:center;"><span style="padding:4px 12px; border-radius:999px; background:rgba(69,60,142,.3); font-size:11px; font-weight:500; color:#C2BCE8;">Today</span></div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; align-items:center; gap:8px;"><span style="width:22px; height:22px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span><span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF;">Coach</span><span style="font-size:10.5px; color:#9A93C9;">7:42 · voice note</span></div>
+              <div style="align-self:flex-start; width:88%; box-sizing:border-box; padding:6px 10px 12px 6px; border-radius:20px 20px 20px 6px; background:#2A2352; display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; align-items:center; gap:12px; padding:0 4px 0 0;">
+                <span style="width:46px; height:46px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; background:conic-gradient(#5BE9C2 {{ V.ring }}, rgba(245,243,255,.14) 0);"><span onClick="{{ V.toggle }}" style="cursor:pointer; width:40px; height:40px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.45); color:#08281F;">
+                  <sc-if value="{{ V.paused }}" hint-placeholder-val="{{ true }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:block; margin-left:2px;"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"></path></svg></sc-if>
+                  <sc-if value="{{ V.playing }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:block;"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg></sc-if>
+                </span></span>
+                <div style="flex:1; min-width:0; display:flex; align-items:center; gap:2px; height:28px;">
+                  <sc-for list="{{ V.bars }}" as="v" hint-placeholder-count="30"><span style="flex:1; height:{{ v.h }}; border-radius:2px; background:{{ v.bg }};"></span></sc-for>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:{{ V.timeInk }}; flex-shrink:0; white-space:nowrap;">{{ V.time }}</span>
+              </div>
+                <p style="margin:0; padding:0 4px 0 6px; font-size:14px; line-height:1.5; color:#DAD5FA; text-wrap:pretty;">“Morning Sam. Deadlifts are calibrating today, so set 1 is a probe. Stop with three or four reps in the tank.”</p>
+              </div>
+              <div style="display:flex; flex-wrap:wrap; gap:8px;"><span style="cursor:pointer; white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 15px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; font-size:13px; font-weight:500; border:1px solid rgba(139,123,255,.4); color:#DAD5FA;">What’s a probe set?</span><span style="cursor:pointer; white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 15px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; font-size:13px; font-weight:500; border:1px solid rgba(139,123,255,.4); color:#DAD5FA;">Log 500 ml water</span></div>
+            </div>
+            <div style="display:flex; justify-content:flex-end;"><div style="max-width:82%; padding:10px 14px; border-radius:20px 20px 6px 20px; background:#453C8E; font-size:15px; line-height:1.45;">Log 500 ml water</div></div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(111,183,255,.2); color:#6FB7FF;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span><span style="flex:1; min-width:0;"><span style="color:#F5F3FF; font-weight:600;">500 ml water logged</span> · 1.25 of 2.5 L</span><span style="height:36px; display:flex; align-items:center; font-weight:600; color:#B4A9FF;">Undo</span></div>
+            <div style="display:flex; flex-direction:column; gap:4px;"><div style="display:flex; justify-content:flex-end;"><div style="max-width:82%; padding:10px 14px; border-radius:20px 20px 6px 20px; background:#453C8E; font-size:15px; line-height:1.45;">My lower back feels a bit tight. Can I swap the RDLs?</div></div><div style="font-size:10.5px; color:#9A93C9; text-align:right;">8:05</div></div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; align-items:center; gap:8px;"><span style="width:22px; height:22px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span><span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF;">Coach</span><span style="font-size:10.5px; color:#9A93C9;">8:05</span></div>
+              <div style="align-self:flex-start; max-width:88%; padding:10px 14px; border-radius:20px 20px 20px 6px; background:#2A2352; font-size:15px; line-height:1.5; text-wrap:pretty;">Since your lower back is tight, let’s swap RDLs for <span style="font-weight:600;">Hip Thrusts</span> today. Same glute and hamstring work, but it takes the pressure off your spine. Want me to update today’s session?</div>
+              <sc-if value="{{ C.pending }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                  <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:16px; background:rgba(69,60,142,.22);">
+                    <span style="font-size:13px; color:#9A93C9; text-decoration:line-through; white-space:nowrap;">RDL</span>
+                    <span style="color:#5BE9C2;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></span>
+                    <span style="flex:1; min-width:0; font-size:14px; font-weight:600; white-space:nowrap;">Hip Thrust</span>
+                    <span style="font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:#C2BCE8; white-space:nowrap;">3 × 10 · 60 kg</span>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px;"><span onClick="{{ C.apply }}" style="cursor:pointer; white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 15px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; font-size:13px; font-weight:700; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); color:#08281F; box-shadow:0 0 14px rgba(91,233,194,.35);">Yeah, do it</span><span onClick="{{ C.block }}" style="cursor:pointer; white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 15px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; font-size:13px; font-weight:600; border:1px solid rgba(91,233,194,.45); color:#5BE9C2;">Whole block</span><span onClick="{{ C.keep }}" style="cursor:pointer; white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 15px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; font-size:13px; font-weight:500; border:1px solid rgba(245,243,255,.12); color:#9A93C9;">Keep RDLs</span></div>
+                  <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;"><span style="font-size:11.5px; color:#9A93C9; margin-right:2px;">Or swap in</span><span style="cursor:pointer; white-space:nowrap; min-height:36px; padding:0 12px; box-sizing:border-box; border-radius:10px; display:flex; align-items:center; gap:5px; background:rgba(69,60,142,.32); font-size:12px; font-weight:500; color:#DAD5FA;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;color:#B4A9FF;"><path d="m16 3 4 4-4 4"></path><path d="M20 7H4"></path><path d="m8 21-4-4 4-4"></path><path d="M4 17h16"></path></svg>Glute bridge</span><span style="cursor:pointer; white-space:nowrap; min-height:36px; padding:0 12px; box-sizing:border-box; border-radius:10px; display:flex; align-items:center; gap:5px; background:rgba(69,60,142,.32); font-size:12px; font-weight:500; color:#DAD5FA;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;color:#B4A9FF;"><path d="m16 3 4 4-4 4"></path><path d="M20 7H4"></path><path d="m8 21-4-4 4-4"></path><path d="M4 17h16"></path></svg>Cable pull-through</span></div>
+                </div>
+              </sc-if>
+            </div>
+            <sc-if value="{{ C.done }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; flex-direction:column; gap:4px;"><div style="display:flex; justify-content:flex-end;"><div style="max-width:82%; padding:10px 14px; border-radius:20px 20px 6px 20px; background:#453C8E; font-size:15px; line-height:1.45;">{{ C.said }}</div></div></div>
+                <div style="display:flex; align-items:center; gap:8px;"><span style="width:22px; height:22px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span><span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF;">Coach</span><span style="font-size:10.5px; color:#9A93C9;">8:06</span></div>
+                <div style="align-self:flex-start; max-width:88%; padding:10px 14px; border-radius:20px 20px 20px 6px; background:#2A2352; font-size:15px; line-height:1.5; text-wrap:pretty;">{{ C.reply }}</div>
+                <span onClick="{{ C.undo }}" style="cursor:pointer; align-self:flex-start; min-height:36px; display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:#B4A9FF;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M9 14 4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"></path></svg>Undo</span>
+              </div>
+            </sc-if>
+          </div>
+        <div style="padding:10px 12px 14px; border-top:1px solid rgba(245,243,255,.08); background:#0d0a1f;">
+          <div style="display:flex; align-items:center; gap:6px; min-height:52px; padding:4px 4px 4px 16px; box-sizing:border-box; border-radius:26px; background:rgba(69,60,142,.32); border:1px solid rgba(245,243,255,.08);">
+            <span style="flex:1; min-width:0; font-size:14px; color:#9A93C9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Tap the mic, or type…</span>
+            <span style="width:44px; height:44px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(245,243,255,.06); color:#6E679C;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"></path><path d="m21.854 2.147-10.94 10.939"></path></svg></span>
+            <span style="width:44px; height:44px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 14px rgba(91,233,194,.5); color:#08281F;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="2b" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">2b</span>
+        <span style="font-size:14px; font-weight:600;">2a, mint coach bubble</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">Same as 2a, but the coach bubble is a solid dark teal (#173B3D) that echoes the coach’s mint avatar. Who’s speaking is clearer, at the cost of a second hue in the thread. White text is well over 4.5:1 on both bubbles.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:16px 14px 14px 18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid rgba(245,243,255,.08);">
+          <span style="width:36px; height:36px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:17px; font-weight:700; letter-spacing:-.01em;">Coach</div>
+            <div style="margin-top:2px; display:flex; align-items:center; gap:6px; font-size:11.5px; color:#9A93C9; white-space:nowrap; overflow:hidden;"><span style="width:6px; height:6px; border-radius:999px; background:#5BE9C2; box-shadow:0 0 6px #5BE9C2;"></span>Sees today’s session, meals and logs</div>
+          </div>
+          <span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#9A93C9;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg></span>
+        </div>
+        <div style="padding:10px 16px; display:flex; gap:8px; overflow:hidden; border-bottom:1px solid rgba(245,243,255,.06);">
+          <sc-if value="{{ D.active }}" hint-placeholder-val="{{ true }}"><span style="cursor:pointer; height:32px; padding:0 9px 0 11px; border-radius:999px; display:flex; align-items:center; gap:6px; background:rgba(91,233,194,.10); border:1px solid rgba(91,233,194,.3); font-size:11.5px; color:#DAD5FA; white-space:nowrap;"><span style="color:#5BE9C2;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg></span>Full Body Power · set 2 of 12<span style="color:#5BE9C2; margin-left:-2px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span></span></sc-if>
+          <sc-if value="{{ D.post }}" hint-placeholder-val="{{ false }}"><span style="height:32px; padding:0 11px; border-radius:999px; display:flex; align-items:center; gap:6px; background:rgba(69,60,142,.18); border:1px solid rgba(245,243,255,.08); font-size:11.5px; color:#C2BCE8; white-space:nowrap;"><span style="width:14px; height:14px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(91,233,194,.2); color:#5BE9C2;"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M20 6 9 17l-5-5"></path></svg></span>Session done · 45 min</span></sc-if>
+          <span style="cursor:pointer; height:32px; padding:0 9px 0 11px; border-radius:999px; display:flex; align-items:center; gap:6px; background:rgba(69,60,142,.3); font-size:11.5px; color:#DAD5FA; white-space:nowrap;">1,410 kcal left<span style="color:#9A93C9; margin-left:-2px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span></span>
+        </div>
+          <div style="padding:18px 18px 20px; display:flex; flex-direction:column; gap:18px;">
+            <div style="display:flex; justify-content:center;"><span style="padding:4px 12px; border-radius:999px; background:rgba(69,60,142,.3); font-size:11px; font-weight:500; color:#C2BCE8;">Today</span></div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; align-items:center; gap:8px;"><span style="width:22px; height:22px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span><span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF;">Coach</span><span style="font-size:10.5px; color:#9A93C9;">7:42 · voice note</span></div>
+              <div style="align-self:flex-start; width:88%; box-sizing:border-box; padding:6px 10px 12px 6px; border-radius:20px 20px 20px 6px; background:#173B3D; display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; align-items:center; gap:12px; padding:0 4px 0 0;">
+                <span style="width:46px; height:46px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; background:conic-gradient(#5BE9C2 {{ V.ring }}, rgba(245,243,255,.14) 0);"><span onClick="{{ V.toggle }}" style="cursor:pointer; width:40px; height:40px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.45); color:#08281F;">
+                  <sc-if value="{{ V.paused }}" hint-placeholder-val="{{ true }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:block; margin-left:2px;"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"></path></svg></sc-if>
+                  <sc-if value="{{ V.playing }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:block;"><rect x="6" y="4" width="4" height="16" rx="1"></rect><rect x="14" y="4" width="4" height="16" rx="1"></rect></svg></sc-if>
+                </span></span>
+                <div style="flex:1; min-width:0; display:flex; align-items:center; gap:2px; height:28px;">
+                  <sc-for list="{{ V.bars }}" as="v" hint-placeholder-count="30"><span style="flex:1; height:{{ v.h }}; border-radius:2px; background:{{ v.bg }};"></span></sc-for>
+                </div>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:{{ V.timeInk }}; flex-shrink:0; white-space:nowrap;">{{ V.time }}</span>
+              </div>
+                <p style="margin:0; padding:0 4px 0 6px; font-size:14px; line-height:1.5; color:#DAD5FA; text-wrap:pretty;">“Morning Sam. Deadlifts are calibrating today, so set 1 is a probe. Stop with three or four reps in the tank.”</p>
+              </div>
+              <div style="display:flex; flex-wrap:wrap; gap:8px;"><span style="cursor:pointer; white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 15px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; font-size:13px; font-weight:500; border:1px solid rgba(139,123,255,.4); color:#DAD5FA;">What’s a probe set?</span><span style="cursor:pointer; white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 15px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; font-size:13px; font-weight:500; border:1px solid rgba(139,123,255,.4); color:#DAD5FA;">Log 500 ml water</span></div>
+            </div>
+            <div style="display:flex; justify-content:flex-end;"><div style="max-width:82%; padding:10px 14px; border-radius:20px 20px 6px 20px; background:#453C8E; font-size:15px; line-height:1.45;">Log 500 ml water</div></div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:12.5px; color:#C2BCE8;"><span style="width:20px; height:20px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(111,183,255,.2); color:#6FB7FF;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span><span style="flex:1; min-width:0;"><span style="color:#F5F3FF; font-weight:600;">500 ml water logged</span> · 1.25 of 2.5 L</span><span style="height:36px; display:flex; align-items:center; font-weight:600; color:#B4A9FF;">Undo</span></div>
+            <div style="display:flex; flex-direction:column; gap:4px;"><div style="display:flex; justify-content:flex-end;"><div style="max-width:82%; padding:10px 14px; border-radius:20px 20px 6px 20px; background:#453C8E; font-size:15px; line-height:1.45;">My lower back feels a bit tight. Can I swap the RDLs?</div></div><div style="font-size:10.5px; color:#9A93C9; text-align:right;">8:05</div></div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; align-items:center; gap:8px;"><span style="width:22px; height:22px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span><span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF;">Coach</span><span style="font-size:10.5px; color:#9A93C9;">8:05</span></div>
+              <div style="align-self:flex-start; max-width:88%; padding:10px 14px; border-radius:20px 20px 20px 6px; background:#173B3D; font-size:15px; line-height:1.5; text-wrap:pretty;">Since your lower back is tight, let’s swap RDLs for <span style="font-weight:600;">Hip Thrusts</span> today. Same glute and hamstring work, but it takes the pressure off your spine. Want me to update today’s session?</div>
+              <sc-if value="{{ E.pending }}" hint-placeholder-val="{{ true }}">
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                  <div style="display:flex; align-items:center; gap:10px; padding:10px 14px; border-radius:16px; background:rgba(69,60,142,.22);">
+                    <span style="font-size:13px; color:#9A93C9; text-decoration:line-through; white-space:nowrap;">RDL</span>
+                    <span style="color:#5BE9C2;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></span>
+                    <span style="flex:1; min-width:0; font-size:14px; font-weight:600; white-space:nowrap;">Hip Thrust</span>
+                    <span style="font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:#C2BCE8; white-space:nowrap;">3 × 10 · 60 kg</span>
+                  </div>
+                  <div style="display:flex; flex-wrap:wrap; gap:8px;"><span onClick="{{ E.apply }}" style="cursor:pointer; white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 15px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; font-size:13px; font-weight:700; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); color:#08281F; box-shadow:0 0 14px rgba(91,233,194,.35);">Yeah, do it</span><span onClick="{{ E.block }}" style="cursor:pointer; white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 15px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; font-size:13px; font-weight:600; border:1px solid rgba(91,233,194,.45); color:#5BE9C2;">Whole block</span><span onClick="{{ E.keep }}" style="cursor:pointer; white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 15px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; font-size:13px; font-weight:500; border:1px solid rgba(245,243,255,.12); color:#9A93C9;">Keep RDLs</span></div>
+                  <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px;"><span style="font-size:11.5px; color:#9A93C9; margin-right:2px;">Or swap in</span><span style="cursor:pointer; white-space:nowrap; min-height:36px; padding:0 12px; box-sizing:border-box; border-radius:10px; display:flex; align-items:center; gap:5px; background:rgba(69,60,142,.32); font-size:12px; font-weight:500; color:#DAD5FA;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;color:#B4A9FF;"><path d="m16 3 4 4-4 4"></path><path d="M20 7H4"></path><path d="m8 21-4-4 4-4"></path><path d="M4 17h16"></path></svg>Glute bridge</span><span style="cursor:pointer; white-space:nowrap; min-height:36px; padding:0 12px; box-sizing:border-box; border-radius:10px; display:flex; align-items:center; gap:5px; background:rgba(69,60,142,.32); font-size:12px; font-weight:500; color:#DAD5FA;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:block;color:#B4A9FF;"><path d="m16 3 4 4-4 4"></path><path d="M20 7H4"></path><path d="m8 21-4-4 4-4"></path><path d="M4 17h16"></path></svg>Cable pull-through</span></div>
+                </div>
+              </sc-if>
+            </div>
+            <sc-if value="{{ E.done }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex; flex-direction:column; gap:8px;">
+                <div style="display:flex; flex-direction:column; gap:4px;"><div style="display:flex; justify-content:flex-end;"><div style="max-width:82%; padding:10px 14px; border-radius:20px 20px 6px 20px; background:#453C8E; font-size:15px; line-height:1.45;">{{ E.said }}</div></div></div>
+                <div style="display:flex; align-items:center; gap:8px;"><span style="width:22px; height:22px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span><span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF;">Coach</span><span style="font-size:10.5px; color:#9A93C9;">8:06</span></div>
+                <div style="align-self:flex-start; max-width:88%; padding:10px 14px; border-radius:20px 20px 20px 6px; background:#173B3D; font-size:15px; line-height:1.5; text-wrap:pretty;">{{ E.reply }}</div>
+                <span onClick="{{ E.undo }}" style="cursor:pointer; align-self:flex-start; min-height:36px; display:flex; align-items:center; gap:6px; font-size:12.5px; font-weight:600; color:#B4A9FF;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M9 14 4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11"></path></svg>Undo</span>
+              </div>
+            </sc-if>
+          </div>
+        <div style="padding:10px 12px 14px; border-top:1px solid rgba(245,243,255,.08); background:#0d0a1f;">
+          <div style="display:flex; align-items:center; gap:6px; min-height:52px; padding:4px 4px 4px 16px; box-sizing:border-box; border-radius:26px; background:rgba(69,60,142,.32); border:1px solid rgba(245,243,255,.08);">
+            <span style="flex:1; min-width:0; font-size:14px; color:#9A93C9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Tap the mic, or type…</span>
+            <span style="width:44px; height:44px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(245,243,255,.06); color:#6E679C;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"></path><path d="m21.854 2.147-10.94 10.939"></path></svg></span>
+            <span style="width:44px; height:44px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 14px rgba(91,233,194,.5); color:#08281F;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:48px 40px 80px; display:flex; flex-direction:column; gap:28px; background:#0b0919; color:#F5F3FF;">
+  <div style="display:flex; flex-direction:column; gap:6px; max-width:880px;">
+    <span style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#9A93C9;">Turn 1 · Chat</span>
+    <h1 style="margin:0; font-size:26px; font-weight:600; letter-spacing:-.02em;">Chat in the Home 2c style</h1>
+    <p style="margin:0; font-size:14px; line-height:1.5; color:#C2BCE8; text-wrap:pretty;">Same conversation in both: an opener with reply chips, a water log, and an exercise swap. Changes from the shipped tab: a context strip under the header showing what the coach can see, proposals and receipts as real cards instead of left-rule blocks, alternatives as tap targets, and a mint send button. Tap Apply, Whole block, Keep and Undo to try the card.</p>
+  </div>
+  <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start;">
+    <div id="1a" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">1a</span>
+        <span style="font-size:14px; font-weight:600;">Solid bubbles</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">Keeps Ashley’s 27 Sep ruling: both sides use the same solid main colour, readable in every theme, and the side says who spoke. Coach bubbles carry the mint avatar; cards sit under the bubble at the same indent.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:16px 14px 14px 18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid rgba(245,243,255,.08);">
+          <span style="width:36px; height:36px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:17px; font-weight:700; letter-spacing:-.01em;">Coach</div>
+            <div style="margin-top:2px; display:flex; align-items:center; gap:6px; font-size:11.5px; color:#9A93C9; white-space:nowrap; overflow:hidden;"><span style="width:6px; height:6px; border-radius:999px; background:#5BE9C2; box-shadow:0 0 6px #5BE9C2;"></span>Sees today’s session, meals and logs</div>
+          </div>
+          <span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#9A93C9;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg></span>
+        </div>
+        <div style="padding:10px 16px; display:flex; gap:8px; overflow:hidden; border-bottom:1px solid rgba(245,243,255,.06);">
+          <span style="height:30px; padding:0 11px; border-radius:999px; display:flex; align-items:center; gap:6px; background:rgba(91,233,194,.10); border:1px solid rgba(91,233,194,.3); font-size:11.5px; color:#DAD5FA; white-space:nowrap;"><span style="color:#5BE9C2;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg></span>Full Body Power · set 2 of 12</span>
+          <span style="height:30px; padding:0 11px; border-radius:999px; display:flex; align-items:center; gap:6px; background:rgba(69,60,142,.3); font-size:11.5px; color:#DAD5FA; white-space:nowrap;">1,410 kcal left</span>
+        </div>
+          <div style="padding:18px 14px 20px; display:flex; flex-direction:column; gap:14px;">
+            <div style="display:flex; justify-content:center;"><span style="padding:4px 12px; border-radius:999px; background:rgba(69,60,142,.3); font-size:11px; font-weight:500; color:#C2BCE8;">Today</span></div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; align-items:flex-end; gap:8px;"><span style="width:28px; height:28px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span><div style="max-width:84%; padding:10px 14px; border-radius:20px 20px 20px 6px; background:#453C8E; font-size:15px; line-height:1.45; text-wrap:pretty;">Morning Sam. Deadlifts are calibrating today, so set 1 is a probe: stop with 3-4 reps in reserve.</div></div>
+              <div style="font-size:10.5px; color:#9A93C9; padding-left:36px;">7:42</div>
+              <div style="display:flex; flex-wrap:wrap; gap:8px; padding-left:36px;"><span style="white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 14px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; border:1px solid rgba(139,123,255,.4); font-size:12.5px; font-weight:500; color:#DAD5FA;">What’s a probe set?</span><span style="white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 14px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; border:1px solid rgba(139,123,255,.4); font-size:12.5px; font-weight:500; color:#DAD5FA;">Log 500 ml water</span></div>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:6px;"><div style="display:flex; justify-content:flex-end;"><div style="max-width:82%; padding:10px 14px; border-radius:20px 20px 6px 20px; background:#453C8E; font-size:15px; line-height:1.45;">Log 500 ml water</div></div></div>
+            <div style="display:flex; gap:8px;"><span style="width:28px; flex-shrink:0;"></span><div style="flex:1; min-width:0;"><div style="border-radius:16px; padding:12px 12px 12px 14px; background:rgba(69,60,142,.18); display:flex; align-items:center; gap:10px;">
+                <span style="width:24px; height:24px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(111,183,255,.2); color:#6FB7FF;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:13.5px; font-weight:600;">Water logged · 500 ml</div><div style="font-size:11.5px; color:#9A93C9;">1.25 of 2.5 L today</div></div>
+                <span style="height:44px; padding:0 4px; display:flex; align-items:center; font-size:12.5px; font-weight:600; color:#B4A9FF;">Undo</span>
+                <span style="height:44px; padding:0 4px 0 6px; display:flex; align-items:center; gap:2px; font-size:12.5px; font-weight:600; color:#5BE9C2;">Home<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div></div></div>
+            <div style="display:flex; flex-direction:column; gap:6px;"><div style="display:flex; justify-content:flex-end;"><div style="max-width:82%; padding:10px 14px; border-radius:20px 20px 6px 20px; background:#453C8E; font-size:15px; line-height:1.45;">My lower back feels a bit tight. Can I swap the RDLs?</div></div><div style="font-size:10.5px; color:#9A93C9; text-align:right;">8:05</div></div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="display:flex; align-items:flex-end; gap:8px;"><span style="width:28px; height:28px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span><div style="max-width:84%; padding:10px 14px; border-radius:20px 20px 20px 6px; background:#453C8E; font-size:15px; line-height:1.45; text-wrap:pretty;">Yes. This keeps the hinge pattern but takes the load off your spine.</div></div>
+              <div style="display:flex; gap:8px;"><span style="width:28px; flex-shrink:0;"></span><div style="flex:1; min-width:0;">
+            <sc-if value="{{ A.pending }}" hint-placeholder-val="{{ true }}">
+              <div style="border-radius:20px; padding:14px; background:rgba(69,60,142,.18); border:1px solid rgba(91,233,194,.25);">
+                <div style="display:flex; align-items:center; justify-content:space-between;"><span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2;">Proposed swap</span><span style="font-size:10.5px; color:#9A93C9; white-space:nowrap;">Exercise 3 of 4</span></div>
+                <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+                  <div style="display:flex; align-items:center; gap:10px;"><span style="width:44px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Now</span><div style="flex:1; min-width:0;"><div style="font-size:14px; color:#C2BCE8; text-decoration:line-through; text-decoration-color:rgba(194,188,232,.5);">Romanian Deadlift</div><div style="font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:#9A93C9;">3 × 8-10 · ~24 kg per hand</div></div></div>
+                  <div style="display:flex; align-items:center; gap:10px;"><span style="width:44px; font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:#5BE9C2;">New</span><div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:600;">Hip Thrust</div><div style="font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:#C2BCE8;">3 × 10 · 60 kg</div></div></div>
+                </div>
+                <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(245,243,255,.08); display:flex; align-items:flex-start; gap:8px; font-size:12px; line-height:1.4; color:#C2BCE8;"><span style="color:#9A93C9; margin-top:1px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>Same glutes and hamstrings, far less load through your lower back.</div>
+                <div style="margin-top:12px; display:flex; align-items:center; gap:8px;">
+                  <span onClick="{{ A.apply }}" style="cursor:pointer; height:44px; padding:0 16px; border-radius:14px; display:flex; align-items:center; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); box-shadow:0 0 16px rgba(91,233,194,.4); color:#08281F; font-size:13.5px; font-weight:700; white-space:nowrap;">Apply today</span>
+                  <span onClick="{{ A.applyBlock }}" style="cursor:pointer; height:44px; padding:0 14px; border-radius:14px; box-sizing:border-box; display:flex; align-items:center; border:1px solid rgba(91,233,194,.4); color:#5BE9C2; font-size:13.5px; font-weight:600; white-space:nowrap;">Whole block</span>
+                  <span style="flex:1;"></span>
+                  <span onClick="{{ A.keep }}" style="cursor:pointer; height:44px; padding:0 6px; display:flex; align-items:center; color:#9A93C9; font-size:13.5px; font-weight:500;">Keep</span>
+                </div>
+                <div style="margin-top:12px; font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Or put in instead</div>
+                <div style="margin-top:6px; display:flex; gap:8px;">
+                  <span style="flex:1; min-height:44px; padding:6px 12px; box-sizing:border-box; border-radius:12px; background:rgba(69,60,142,.3); display:flex; flex-direction:column; justify-content:center;"><span style="font-size:13px; font-weight:500;">Glute bridge</span><span style="font-size:10.5px; color:#9A93C9;">no equipment</span></span>
+                  <span style="flex:1; min-height:44px; padding:6px 12px; box-sizing:border-box; border-radius:12px; background:rgba(69,60,142,.3); display:flex; flex-direction:column; justify-content:center;"><span style="font-size:13px; font-weight:500;">Cable pull-through</span><span style="font-size:10.5px; color:#9A93C9;">cable station</span></span>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ A.done }}" hint-placeholder-val="{{ false }}">
+              <div style="border-radius:16px; padding:12px 12px 12px 14px; background:rgba(69,60,142,.18); display:flex; align-items:center; gap:10px;">
+                <span style="width:24px; height:24px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; background:{{ A.tickBg }}; color:#08281F;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:13.5px; font-weight:600;">{{ A.doneTitle }}</div><div style="font-size:11.5px; color:#9A93C9;">{{ A.doneSub }}</div></div>
+                <span onClick="{{ A.undo }}" style="cursor:pointer; height:44px; padding:0 8px; display:flex; align-items:center; font-size:12.5px; font-weight:600; color:#B4A9FF;">Undo</span>
+              </div>
+            </sc-if>
+              </div></div>
+            </div>
+          </div>
+        <div style="padding:10px 12px 14px; border-top:1px solid rgba(245,243,255,.08); background:#0d0a1f;">
+          <div style="display:flex; align-items:center; gap:6px; min-height:52px; padding:4px 4px 4px 16px; box-sizing:border-box; border-radius:26px; background:rgba(69,60,142,.32); border:1px solid rgba(245,243,255,.08);">
+            <span style="flex:1; min-width:0; font-size:14px; color:#9A93C9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Ask or request a change…</span>
+            <span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></span>
+            <span style="width:44px; height:44px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 14px rgba(91,233,194,.5); color:#08281F;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"></path><path d="m21.854 2.147-10.94 10.939"></path></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="1b" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">1b</span>
+        <span style="font-size:14px; font-weight:600;">Coach as text</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:68px; text-wrap:pretty;">Coach replies are plain text under a small “Coach · time” label; only your messages are bubbles. Context pills jump to that spot in Exercise or Nutrition. Keep is a muted ghost button. The mic is the mint primary while the field is empty (send lights up once you type).</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:16px 14px 14px 18px; display:flex; align-items:center; gap:12px; border-bottom:1px solid rgba(245,243,255,.08);">
+          <span style="width:36px; height:36px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span>
+          <div style="flex:1; min-width:0;">
+            <div style="font-size:17px; font-weight:700; letter-spacing:-.01em;">Coach</div>
+            <div style="margin-top:2px; display:flex; align-items:center; gap:6px; font-size:11.5px; color:#9A93C9; white-space:nowrap; overflow:hidden;"><span style="width:6px; height:6px; border-radius:999px; background:#5BE9C2; box-shadow:0 0 6px #5BE9C2;"></span>Sees today’s session, meals and logs</div>
+          </div>
+          <span style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#9A93C9;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg></span>
+        </div>
+        <div style="padding:10px 16px; display:flex; gap:8px; overflow:hidden; border-bottom:1px solid rgba(245,243,255,.06);">
+          <span style="cursor:pointer; height:32px; padding:0 9px 0 11px; border-radius:999px; display:flex; align-items:center; gap:6px; background:rgba(91,233,194,.10); border:1px solid rgba(91,233,194,.3); font-size:11.5px; color:#DAD5FA; white-space:nowrap;"><span style="color:#5BE9C2;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg></span>Full Body Power · set 2 of 12<span style="color:#5BE9C2; margin-left:-2px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span></span>
+          <span style="cursor:pointer; height:32px; padding:0 9px 0 11px; border-radius:999px; display:flex; align-items:center; gap:6px; background:rgba(69,60,142,.3); font-size:11.5px; color:#DAD5FA; white-space:nowrap;">1,410 kcal left<span style="color:#9A93C9; margin-left:-2px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span></span>
+        </div>
+          <div style="padding:18px 18px 20px; display:flex; flex-direction:column; gap:18px;">
+            <div style="display:flex; justify-content:center;"><span style="padding:4px 12px; border-radius:999px; background:rgba(69,60,142,.3); font-size:11px; font-weight:500; color:#C2BCE8;">Today</span></div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; align-items:center; gap:8px;"><span style="width:22px; height:22px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span><span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF;">Coach</span><span style="font-size:10.5px; color:#9A93C9;">7:42</span></div>
+              <p style="margin:0; font-size:15px; line-height:1.55; text-wrap:pretty;">Morning Sam. Deadlifts are calibrating today, so set 1 is a probe: stop with <span style="color:#5BE9C2; font-weight:600;">3-4 reps in reserve</span>.</p>
+              <div style="display:flex; flex-wrap:wrap; gap:8px; padding-left:0px;"><span style="white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 14px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; border:1px solid rgba(139,123,255,.4); font-size:12.5px; font-weight:500; color:#DAD5FA;">What’s a probe set?</span><span style="white-space:nowrap; flex-shrink:0; min-height:40px; padding:0 14px; box-sizing:border-box; border-radius:999px; display:flex; align-items:center; border:1px solid rgba(139,123,255,.4); font-size:12.5px; font-weight:500; color:#DAD5FA;">Log 500 ml water</span></div>
+            </div>
+            <div style="display:flex; justify-content:flex-end;"><div style="max-width:82%; padding:10px 14px; border-radius:20px 20px 6px 20px; background:#453C8E; font-size:15px; line-height:1.45;">Log 500 ml water</div></div>
+            <div style="border-radius:16px; padding:12px 12px 12px 14px; background:rgba(69,60,142,.18); display:flex; align-items:center; gap:10px;">
+                <span style="width:24px; height:24px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(111,183,255,.2); color:#6FB7FF;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:13.5px; font-weight:600;">Water logged · 500 ml</div><div style="font-size:11.5px; color:#9A93C9;">1.25 of 2.5 L today</div></div>
+                <span style="height:44px; padding:0 4px; display:flex; align-items:center; font-size:12.5px; font-weight:600; color:#B4A9FF;">Undo</span>
+                <span style="height:44px; padding:0 4px 0 6px; display:flex; align-items:center; gap:2px; font-size:12.5px; font-weight:600; color:#5BE9C2;">Home<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+            <div style="display:flex; flex-direction:column; gap:4px;"><div style="display:flex; justify-content:flex-end;"><div style="max-width:82%; padding:10px 14px; border-radius:20px 20px 6px 20px; background:#453C8E; font-size:15px; line-height:1.45;">My lower back feels a bit tight. Can I swap the RDLs?</div></div><div style="font-size:10.5px; color:#9A93C9; text-align:right;">8:05</div></div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <div style="display:flex; align-items:center; gap:8px;"><span style="width:22px; height:22px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:2.4;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span><span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF;">Coach</span><span style="font-size:10.5px; color:#9A93C9;">8:05</span></div>
+              <p style="margin:0; font-size:15px; line-height:1.55; text-wrap:pretty;">Yes. This keeps the hinge pattern but takes the load off your spine.</p>
+            <sc-if value="{{ B.pending }}" hint-placeholder-val="{{ true }}">
+              <div style="border-radius:20px; padding:14px; background:rgba(69,60,142,.18); border:1px solid rgba(91,233,194,.25);">
+                <div style="display:flex; align-items:center; justify-content:space-between;"><span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2;">Proposed swap</span><span style="font-size:10.5px; color:#9A93C9; white-space:nowrap;">Exercise 3 of 4</span></div>
+                <div style="margin-top:10px; display:flex; flex-direction:column; gap:8px;">
+                  <div style="display:flex; align-items:center; gap:10px;"><span style="width:44px; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:#9A93C9;">Now</span><div style="flex:1; min-width:0;"><div style="font-size:14px; color:#C2BCE8; text-decoration:line-through; text-decoration-color:rgba(194,188,232,.5);">Romanian Deadlift</div><div style="font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:#9A93C9;">3 × 8-10 · ~24 kg per hand</div></div></div>
+                  <div style="display:flex; align-items:center; gap:10px;"><span style="width:44px; font-size:10px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:#5BE9C2;">New</span><div style="flex:1; min-width:0;"><div style="font-size:15px; font-weight:600;">Hip Thrust</div><div style="font-family:ui-monospace,Menlo,monospace; font-size:11.5px; color:#C2BCE8;">3 × 10 · 60 kg</div></div></div>
+                </div>
+                <div style="margin-top:12px; padding-top:10px; border-top:1px solid rgba(245,243,255,.08); display:flex; align-items:flex-start; gap:8px; font-size:12px; line-height:1.4; color:#C2BCE8;"><span style="color:#9A93C9; margin-top:1px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg></span>Same glutes and hamstrings, far less load through your lower back.</div>
+                <div style="margin-top:12px; display:flex; align-items:center; gap:8px;">
+                  <span onClick="{{ B.apply }}" style="cursor:pointer; height:44px; padding:0 16px; border-radius:14px; display:flex; align-items:center; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); box-shadow:0 0 16px rgba(91,233,194,.4); color:#08281F; font-size:13.5px; font-weight:700; white-space:nowrap;">Apply today</span>
+                  <span onClick="{{ B.applyBlock }}" style="cursor:pointer; height:44px; padding:0 14px; border-radius:14px; box-sizing:border-box; display:flex; align-items:center; border:1px solid rgba(91,233,194,.4); color:#5BE9C2; font-size:13.5px; font-weight:600; white-space:nowrap;">Whole block</span>
+                  <span style="flex:1;"></span>
+                  <span onClick="{{ B.keep }}" style="cursor:pointer; height:44px; padding:0 14px; box-sizing:border-box; border-radius:14px; display:flex; align-items:center; border:1px solid rgba(245,243,255,.12); color:#9A93C9; font-size:13.5px; font-weight:500;">Keep</span>
+                </div>
+                <div style="margin-top:12px; font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Or put in instead</div>
+                <div style="margin-top:6px; display:flex; gap:8px;">
+                  <span style="flex:1; min-height:44px; padding:6px 12px; box-sizing:border-box; border-radius:12px; background:rgba(69,60,142,.3); display:flex; flex-direction:column; justify-content:center;"><span style="font-size:13px; font-weight:500;">Glute bridge</span><span style="font-size:10.5px; color:#9A93C9;">no equipment</span></span>
+                  <span style="flex:1; min-height:44px; padding:6px 12px; box-sizing:border-box; border-radius:12px; background:rgba(69,60,142,.3); display:flex; flex-direction:column; justify-content:center;"><span style="font-size:13px; font-weight:500;">Cable pull-through</span><span style="font-size:10.5px; color:#9A93C9;">cable station</span></span>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ B.done }}" hint-placeholder-val="{{ false }}">
+              <div style="border-radius:16px; padding:12px 12px 12px 14px; background:rgba(69,60,142,.18); display:flex; align-items:center; gap:10px;">
+                <span style="width:24px; height:24px; flex-shrink:0; border-radius:999px; display:flex; align-items:center; justify-content:center; background:{{ B.tickBg }}; color:#08281F;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;stroke-width:3;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+                <div style="flex:1; min-width:0;"><div style="font-size:13.5px; font-weight:600;">{{ B.doneTitle }}</div><div style="font-size:11.5px; color:#9A93C9;">{{ B.doneSub }}</div></div>
+                <span onClick="{{ B.undo }}" style="cursor:pointer; height:44px; padding:0 8px; display:flex; align-items:center; font-size:12.5px; font-weight:600; color:#B4A9FF;">Undo</span>
+              </div>
+            </sc-if>
+            </div>
+          </div>
+        <div style="padding:10px 12px 14px; border-top:1px solid rgba(245,243,255,.08); background:#0d0a1f;">
+          <div style="display:flex; align-items:center; gap:6px; min-height:52px; padding:4px 4px 4px 16px; box-sizing:border-box; border-radius:26px; background:rgba(69,60,142,.32); border:1px solid rgba(245,243,255,.08);">
+            <span style="flex:1; min-width:0; font-size:14px; color:#9A93C9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Tap the mic, or type…</span>
+            <span style="width:44px; height:44px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:rgba(245,243,255,.06); color:#6E679C;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"></path><path d="m21.854 2.147-10.94 10.939"></path></svg></span>
+            <span style="width:44px; height:44px; border-radius:999px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 14px rgba(91,233,194,.5); color:#08281F;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;dayState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Mid-session&quot;,&quot;Session done&quot;,&quot;Rest day&quot;],&quot;default&quot;:&quot;Mid-session&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;State&quot;}}">
+class Component extends DCLogic {
+  state = { A: 'pending', B: 'pending', C: 'pending', vAt: 0, vStart: null, now: Date.now() };
+  componentDidMount() { this._t = setInterval(() => { if (this.state.vStart) { const at = this.state.vAt + (Date.now() - this.state.vStart); if (at >= 24000) this.setState({ vStart: null, vAt: 0 }); else this.setState({ now: Date.now() }); } }, 150); }
+  componentWillUnmount() { clearInterval(this._t); }
+  side(K) {
+    const s = this.state[K], set = v => this.setState({ [K]: v });
+    return { pending: s === 'pending', done: s !== 'pending',
+      doneTitle: s === 'kept' ? 'Kept Romanian Deadlift' : 'Swapped to Hip Thrust',
+      doneSub: s === 'today' ? 'Today only · Thursday stays as planned' : s === 'block' ? 'Every session this block' : 'Nothing changed',
+      tickBg: s === 'kept' ? '#9A93C9' : 'linear-gradient(180deg,#7BEECE,#3ED3AA)',
+      apply: () => set('today'), applyBlock: () => set('block'), keep: () => set('kept'), undo: () => set('pending') };
+  }
+  renderVals() {
+    const st = this.state, at = st.vStart ? st.vAt + (Date.now() - st.vStart) : st.vAt, pr = at / 24000;
+    const H = [8,14,20,12,24,18,10,22,26,16,12,20,28,18,10,14,24,20,12,8,16,22,18,12,20,14,10,18,12,8];
+    const sec = Math.floor(at / 1000);
+    const V = { playing: !!st.vStart, paused: !st.vStart,
+      toggle: () => this.setState(s => s.vStart ? { vAt: s.vAt + (Date.now() - s.vStart), vStart: null } : { vStart: Date.now() }),
+      bars: H.map((h, i) => ({ h: h + 'px', bg: i / H.length < pr ? '#5BE9C2' : 'rgba(245,243,255,.28)' })),
+      time: (st.vStart || st.vAt) ? '0:' + String(sec).padStart(2, '0') + ' / 0:24' : '0:24',
+      timeInk: st.vStart ? '#5BE9C2' : '#C2BCE8', ring: Math.round(pr * 100) + '%' };
+    const c = st.C, setC = v => this.setState({ C: v });
+    const C = { pending: c === 'pending', done: c !== 'pending',
+      said: c === 'kept' ? 'Keep RDLs' : c === 'block' ? 'Whole block' : 'Yeah, do it',
+      reply: c === 'kept' ? 'No problem, RDLs stay. Go light on the first set and stop if it pinches.' : c === 'block' ? 'Done. Hip Thrust replaces RDLs for the rest of this block, 3 × 10 at 60 kg.' : 'Done. Hip Thrust is in for today, 3 × 10 at 60 kg. Thursday stays as planned.',
+      apply: () => setC('today'), keep: () => setC('kept'), block: () => setC('block'), undo: () => setC('pending') };
+    const ds = this.props.dayState ?? 'Mid-session';
+    const D = { active: ds === 'Mid-session', post: ds === 'Session done' };
+    const ec = st.E || 'pending', setE = v => this.setState({ E: v });
+    const E = { ...C, pending: ec === 'pending', done: ec !== 'pending',
+      said: ec === 'kept' ? 'Keep RDLs' : ec === 'block' ? 'Whole block' : 'Yeah, do it',
+      reply: ec === 'kept' ? 'No problem, RDLs stay. Go light on the first set and stop if it pinches.' : ec === 'block' ? 'Done. Hip Thrust replaces RDLs for the rest of this block, 3 × 10 at 60 kg.' : 'Done. Hip Thrust is in for today, 3 × 10 at 60 kg. Thursday stays as planned.',
+      apply: () => setE('today'), keep: () => setE('kept'), block: () => setE('block'), undo: () => setE('pending') };
+    return { A: this.side('A'), B: this.side('B'), C, E, V, D };
+  }
+}
+</script>
+</body>
+</html>

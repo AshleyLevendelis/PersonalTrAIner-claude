@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  body { margin:0; background:#0b0919; font-family:"Space Grotesk", ui-sans-serif, system-ui, sans-serif; }
+  a { color:#5BE9C2; text-decoration:none; }
+  a:hover { color:#3ED3AA; }
+</style>
+</helmet>
+
+<section style="padding:48px 40px 24px; display:flex; flex-direction:column; gap:28px; background:#0b0919; color:#F5F3FF;">
+  <div style="display:flex; flex-direction:column; gap:6px; max-width:880px;">
+    <span style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#9A93C9;">Turn 2 · Card-based Home</span>
+    <h1 style="margin:0; font-size:26px; font-weight:600; letter-spacing:-.02em;">Session first, then coach, recovery, highlights</h1>
+    <p style="margin:0; font-size:14px; line-height:1.5; color:#C2BCE8; text-wrap:pretty;">Built from your brief, in its order: an elevated session card that owns the CTA, the coach insight with its two actions inside it, a three-card recovery row, and PRs and Tomorrow side by side. One conflict to decide: the brief brings <strong style="font-weight:600;">hydration</strong> back, which Ashley removed from <a href="#1a">1a</a> because it lives on Nutrition. Sleep is also new to Home.</p>
+  </div>
+  <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start;">
+    <div id="2a" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">2a</span>
+        <span style="font-size:14px; font-weight:600;">Card-based Home</span>
+      </div>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:16px 20px 0; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+            <span style="font-size:24px; font-weight:700; letter-spacing:-.03em; line-height:1.15;">Morning, Ashley</span>
+            <span style="font-size:11.5px; color:#9A93C9; white-space:nowrap;">Monday · Week 2 of 16 · 6 day streak</span>
+          </div>
+          <span style="color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span>
+        </div>
+
+        <div style="padding:16px 16px 22px; display:flex; flex-direction:column; gap:14px;">
+          <div style="border-radius:20px; padding:18px; background:rgba(69,60,142,.32); border:1px solid rgba(91,233,194,.28); box-shadow:0 0 24px rgba(91,233,194,.10);">
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Today's session</span>
+              <span style="font-size:11px; color:#9A93C9; white-space:nowrap;">{{ statusRight }}</span>
+            </div>
+            <div style="margin-top:6px; font-size:30px; font-weight:700; letter-spacing:-.025em; line-height:1.1; color:#5BE9C2; text-shadow:0 0 18px rgba(91,233,194,.85);">Full Body Power</div>
+            <sc-if value="{{ showCta }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top:16px; height:54px; border-radius:15px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); box-shadow:0 0 18px rgba(91,233,194,.45); color:#08281F; font-size:16px; font-weight:700;">{{ ctaLabel }}</div>
+            </sc-if>
+            <div style="margin-top:12px; display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12px; color:#9A93C9;">
+              <span style="white-space:nowrap;">4 exercises</span><span style="white-space:nowrap;">~45 min</span><span style="white-space:nowrap;">Deadlift from 72.5 kg</span>
+            </div>
+          </div>
+
+          <div style="border-radius:18px; padding:14px; background:rgba(139,123,255,.10); border:1px solid rgba(139,123,255,.25);">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="width:22px; height:22px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span>
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF; white-space:nowrap;">Coach insight · Bench progression</span>
+            </div>
+            <p style="margin:10px 0 0; font-size:13.5px; line-height:1.5; color:#DAD5FA; text-wrap:pretty;">Your bench moved from 60 to 62.5 kg in two weeks — the higher-rep block is doing its job.</p>
+            <div style="margin-top:12px; display:flex; gap:8px;">
+              <span style="flex:1; min-height:44px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#2E2662; font-size:13px; font-weight:600;">What changed?</span>
+              <span style="flex:1; min-height:44px; display:flex; align-items:center; justify-content:center; border-radius:12px; background:#2E2662; font-size:13px; font-weight:600;">Adjust today</span>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:baseline; justify-content:space-between; padding:6px 2px 0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Recovery hub</span>
+            <span style="font-size:11px; color:#9A93C9; white-space:nowrap;">3 key metrics</span>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:-6px;">
+            <div style="border-radius:14px; padding:12px; background:rgba(69,60,142,.28); display:flex; flex-direction:column; gap:6px;">
+              <span style="color:#5BE9C2;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"></path><path d="M20 20v-2.38c0-1.12 1.03-2.120 1-4.62-.03-2.72-1.49-6-4.5-6C14.63 7 14 8.8 14 10.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"></path><path d="M16 17h4"></path><path d="M4 13h4"></path></svg></span>
+              <span style="font-family:ui-monospace,Menlo,monospace; font-size:18px; font-weight:700; line-height:1;">2,140</span>
+              <span style="font-size:10.5px; color:#9A93C9; white-space:nowrap;">of 8,000 steps</span>
+              <div style="height:3px; border-radius:999px; background:rgba(245,243,255,.11);"><div style="width:27%; height:3px; border-radius:999px; background:#5BE9C2;"></div></div>
+            </div>
+            <div style="border-radius:14px; padding:12px; background:rgba(69,60,142,.28); display:flex; flex-direction:column; gap:6px;">
+              <span style="color:#B4A9FF;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></span>
+              <span style="font-family:ui-monospace,Menlo,monospace; font-size:18px; font-weight:700; line-height:1;">6h 40</span>
+              <span style="font-size:10.5px; color:#9A93C9; white-space:nowrap;">sleep · goal 7h</span>
+              <div style="height:3px; border-radius:999px; background:rgba(245,243,255,.11);"><div style="width:95%; height:3px; border-radius:999px; background:#8B7BFF;"></div></div>
+            </div>
+            <div style="border-radius:14px; padding:12px; background:rgba(69,60,142,.28); display:flex; flex-direction:column; gap:6px;">
+              <span style="color:#6FB7FF;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7.29 6.75 7 5.3c-.29 1.45-1.14 2.84-2.29 3.76S3 11.1 3 12.25c0 2.22 1.8 4.05 4 4.05z"></path><path d="M12.56 6.6A10.97 10.97 0 0 0 14 3.02c.5 2.5 2 4.9 4 6.5s3 3.5 3 5.5a6.98 6.98 0 0 1-11.91 4.97"></path></svg></span>
+              <span style="font-family:ui-monospace,Menlo,monospace; font-size:18px; font-weight:700; line-height:1;">0.75 L</span>
+              <span style="font-size:10.5px; color:#9A93C9; white-space:nowrap;">of 2.5 L water</span>
+              <div style="height:3px; border-radius:999px; background:rgba(245,243,255,.11);"><div style="width:30%; height:3px; border-radius:999px; background:#6FB7FF;"></div></div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;">
+            <div style="border-radius:16px; padding:14px; background:rgba(69,60,142,.28); display:flex; flex-direction:column; gap:6px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Highlights · 3 PRs</span>
+              <span style="font-family:ui-monospace,Menlo,monospace; font-size:20px; font-weight:700; line-height:1.1; color:#5BE9C2; white-space:nowrap;">60 → 62.5</span>
+              <span style="font-size:11.5px; color:#9A93C9;">Bench press, kg</span>
+            </div>
+            <div style="border-radius:16px; padding:14px; background:rgba(69,60,142,.28); display:flex; flex-direction:column; gap:6px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Plan ahead · Tue</span>
+              <span style="font-size:16px; font-weight:700; line-height:1.2;">Pull Day</span>
+              <span style="font-size:11.5px; color:#9A93C9;">Hinge-focused</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+    <div id="2b" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">2b</span>
+        <span style="font-size:14px; font-weight:600;">2a, polished</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; text-wrap:pretty;">Same content and order. In 2a every card has the same purple fill, so nothing leads. Here the session card is the only one that glows, the coach card is a lighter violet, recovery uses progress rings instead of bars, and each highlight card gets an icon and one big number. Spacing follows one 8/16/24 rhythm.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Week 2 of 16</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Morning, Ashley</span>
+          </div>
+          <span style="display:flex; align-items:center; gap:12px; margin-bottom:2px;"><span style="display:flex; align-items:center; gap:5px; height:30px; padding:0 11px; border-radius:999px; background:rgba(91,233,194,.12); border:1px solid rgba(91,233,194,.3); color:#5BE9C2; font-size:12px; font-weight:600; white-space:nowrap;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>6 days</span><span style="width:44px; height:44px; margin:-7px -12px -7px -4px; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span></span>
+        </div>
+
+        <div style="padding:20px 16px 24px; display:flex; flex-direction:column; gap:16px;">
+          <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, rgba(91,233,194,.20), rgba(91,233,194,0) 55%), #221C48; border:1px solid rgba(91,233,194,.30); box-shadow:0 10px 30px rgba(0,0,0,.35);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Today · Session 1 of 3</span>
+              <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">{{ statusRight }}</span>
+            </div>
+            <div style="margin-top:8px; font-size:32px; font-weight:700; letter-spacing:-.03em; line-height:1.05; color:#F5F3FF;">Full Body <span style="color:#5BE9C2; text-shadow:0 0 18px rgba(91,233,194,.8);">Power</span></div>
+            <sc-if value="{{ showCta }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top:18px; height:54px; border-radius:16px; display:flex; align-items:center; justify-content:center; gap:8px; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); box-shadow:0 0 22px rgba(91,233,194,.45); color:#08281F; font-size:16px; font-weight:700;"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:block;"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"></path></svg>{{ ctaLabel }}</div>
+            </sc-if>
+            <div style="margin-top:14px; display:flex; flex-wrap:wrap; gap:6px;">
+              <span style="display:flex; align-items:center; gap:5px; height:28px; padding:0 10px; border-radius:999px; background:rgba(245,243,255,.06); font-size:11.5px; color:#C2BCE8; white-space:nowrap;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M17.596 12.768a2 2 0 1 0 2.829-2.829l-1.768-1.767a2 2 0 0 0 2.828-2.829l-2.828-2.828a2 2 0 0 0-2.829 2.828l-1.767-1.768a2 2 0 1 0-2.829 2.829z"></path><path d="m2.5 21.5 1.4-1.4"></path><path d="m20.1 3.9 1.4-1.4"></path><path d="M5.343 21.485a2 2 0 1 0 2.829-2.828l1.767 1.768a2 2 0 1 0 2.829-2.829l-6.364-6.364a2 2 0 1 0-2.829 2.829l1.768 1.767a2 2 0 0 0-2.828 2.829z"></path><path d="m9.6 14.4 4.8-4.8"></path></svg>4 exercises</span>
+              <span style="display:flex; align-items:center; gap:5px; height:28px; padding:0 10px; border-radius:999px; background:rgba(245,243,255,.06); font-size:11.5px; color:#C2BCE8; white-space:nowrap;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>~45 min</span>
+              <span style="display:flex; align-items:center; height:28px; padding:0 10px; border-radius:999px; background:rgba(245,243,255,.06); font-size:11.5px; color:#C2BCE8; white-space:nowrap;">Deadlift from 72.5 kg</span>
+            </div>
+          </div>
+
+          <div style="border-radius:20px; padding:16px; background:rgba(139,123,255,.10); border:1px solid rgba(139,123,255,.22);">
+            <div style="display:flex; align-items:flex-start; gap:12px;">
+              <span style="width:32px; height:32px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span>
+              <div style="flex:1; min-width:0;">
+                <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF; white-space:nowrap;">Coach insight</span>
+                <p style="margin:4px 0 0; font-size:14px; line-height:1.5; color:#F5F3FF; text-wrap:pretty;">Your bench moved from <strong style="font-weight:700; color:#5BE9C2;">60 to 62.5 kg</strong> in two weeks — the higher-rep block is doing its job.</p>
+              </div>
+            </div>
+            <div style="margin-top:14px; display:flex; gap:8px; padding-left:44px;">
+              <span style="min-height:40px; display:flex; align-items:center; padding:0 14px; border-radius:999px; background:rgba(139,123,255,.18); color:#DAD5FA; font-size:12.5px; font-weight:600; white-space:nowrap;">What changed?</span>
+              <span style="min-height:40px; display:flex; align-items:center; padding:0 14px; border-radius:999px; background:rgba(139,123,255,.18); color:#DAD5FA; font-size:12.5px; font-weight:600; white-space:nowrap;">Adjust today</span>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:baseline; justify-content:space-between; padding:8px 4px 0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Recovery hub</span>
+            <span style="font-size:11px; color:#9A93C9; white-space:nowrap;">today</span>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:-8px;">
+            <div style="border-radius:18px; padding:14px 8px 12px; background:rgba(69,60,142,.24); display:flex; flex-direction:column; align-items:center; gap:8px;">
+              <div style="position:relative; width:48px; height:48px;">
+                <svg width="48" height="48" viewBox="0 0 48 48" style="display:block; transform:rotate(-90deg);"><circle cx="24" cy="24" r="20" fill="none" stroke="rgba(245,243,255,.10)" stroke-width="4"></circle><circle cx="24" cy="24" r="20" fill="none" stroke="#5BE9C2" stroke-width="4" stroke-linecap="round" stroke-dasharray="33.9 125.7"></circle></svg>
+                <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#5BE9C2;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.370 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"></path><path d="M20 20v-2.38c0-1.12 1.03-2.12 1-4.62-.03-2.72-1.49-6-4.5-6C14.63 7 14 8.8 14 10.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"></path></svg></span>
+              </div>
+              <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; line-height:1;">2,140</span>
+              <span style="font-size:10.5px; color:#9A93C9; white-space:nowrap;">of 8k steps</span>
+            </div>
+            <div style="border-radius:18px; padding:14px 8px 12px; background:rgba(69,60,142,.24); display:flex; flex-direction:column; align-items:center; gap:8px;">
+              <div style="position:relative; width:48px; height:48px;">
+                <svg width="48" height="48" viewBox="0 0 48 48" style="display:block; transform:rotate(-90deg);"><circle cx="24" cy="24" r="20" fill="none" stroke="rgba(245,243,255,.10)" stroke-width="4"></circle><circle cx="24" cy="24" r="20" fill="none" stroke="#8B7BFF" stroke-width="4" stroke-linecap="round" stroke-dasharray="119.4 125.7"></circle></svg>
+                <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#B4A9FF;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></span>
+              </div>
+              <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; line-height:1;">6h 40</span>
+              <span style="font-size:10.5px; color:#9A93C9; white-space:nowrap;">of 7h sleep</span>
+            </div>
+            <div style="border-radius:18px; padding:14px 8px 12px; background:rgba(69,60,142,.24); display:flex; flex-direction:column; align-items:center; gap:8px;">
+              <div style="position:relative; width:48px; height:48px;">
+                <svg width="48" height="48" viewBox="0 0 48 48" style="display:block; transform:rotate(-90deg);"><circle cx="24" cy="24" r="20" fill="none" stroke="rgba(245,243,255,.10)" stroke-width="4"></circle><circle cx="24" cy="24" r="20" fill="none" stroke="#6FB7FF" stroke-width="4" stroke-linecap="round" stroke-dasharray="37.7 125.7"></circle></svg>
+                <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#6FB7FF;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"></path></svg></span>
+              </div>
+              <span style="font-family:ui-monospace,Menlo,monospace; font-size:16px; font-weight:700; line-height:1;">0.75 L</span>
+              <span style="font-size:10.5px; color:#9A93C9; white-space:nowrap;">of 2.5 L water</span>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;">
+            <div style="border-radius:20px; padding:16px; background:rgba(69,60,142,.24); display:flex; flex-direction:column; gap:10px;">
+              <span style="width:32px; height:32px; border-radius:10px; background:rgba(91,233,194,.14); color:#5BE9C2; display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg></span>
+              <div>
+                <div style="font-family:ui-monospace,Menlo,monospace; font-size:24px; font-weight:700; line-height:1; color:#5BE9C2;">+2.5<span style="font-family:'Space Grotesk',sans-serif; font-size:12px; font-weight:600; margin-left:3px;">kg</span></div>
+                <div style="margin-top:6px; font-size:12px; color:#C2BCE8;">Bench PR · 62.5 kg</div>
+                <div style="margin-top:2px; font-size:11px; color:#9A93C9;">3 PRs this month</div>
+              </div>
+            </div>
+            <div style="border-radius:20px; padding:16px; background:rgba(69,60,142,.24); display:flex; flex-direction:column; gap:10px;">
+              <span style="width:32px; height:32px; border-radius:10px; background:rgba(139,123,255,.16); color:#B4A9FF; display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path></svg></span>
+              <div>
+                <div style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9;">Tomorrow</div>
+                <div style="margin-top:4px; font-size:17px; font-weight:700; line-height:1.15;">Pull Day</div>
+                <div style="margin-top:2px; font-size:11px; color:#9A93C9;">Hinge focus · ~50 min</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+    <div id="2c" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">2c</span>
+        <span style="font-size:14px; font-weight:600;">2b, with fewer boxes</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; text-wrap:pretty;">2b still has seven boxes. Here there are two: the session card and one card for highlights and tomorrow. The coach and the rings sit on the page with no fill. The session card also shows where you are in the week and, once you've started, how many sets are done — the bar is hidden until then. Try the <strong style="font-weight:600;">Session state</strong> tweak.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:18px 20px 0; display:flex; align-items:flex-end; justify-content:space-between; gap:12px;">
+          <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+            <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Week 2 of 16</span>
+            <span style="font-size:28px; font-weight:700; letter-spacing:-.03em; line-height:1.1;">Morning, Ashley</span>
+          </div>
+          <span style="display:flex; align-items:center; gap:12px; margin-bottom:2px;"><span style="display:flex; align-items:center; gap:5px; height:30px; padding:0 11px; border-radius:999px; background:rgba(91,233,194,.12); border:1px solid rgba(91,233,194,.3); color:#5BE9C2; font-size:12px; font-weight:600; white-space:nowrap;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"></path></svg>6 days</span><span style="width:44px; height:44px; margin:-7px -12px -7px -4px; display:flex; align-items:center; justify-content:center; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></span></span>
+        </div>
+
+        <div style="padding:20px 16px 24px; display:flex; flex-direction:column; gap:24px;">
+          <div style="border-radius:24px; padding:20px; background:radial-gradient(120% 90% at 100% 0%, rgba(91,233,194,.20), rgba(91,233,194,0) 55%), #221C48; border:1px solid rgba(91,233,194,.30); box-shadow:0 10px 30px rgba(0,0,0,.35);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#5BE9C2; white-space:nowrap;">Today · Session 1 of 3</span>
+              <span style="font-size:11px; color:#C2BCE8; white-space:nowrap;">{{ statusRight }}</span>
+            </div>
+            <div style="margin-top:8px; font-size:32px; font-weight:700; letter-spacing:-.03em; line-height:1.05; color:#F5F3FF;">Full Body <span style="color:#5BE9C2; text-shadow:0 0 18px rgba(91,233,194,.8);">Power</span></div>
+            <div style="margin-top:8px; font-size:12.5px; color:#C2BCE8;">4 exercises · ~45 min · Deadlift from 72.5 kg</div>
+
+            <sc-if value="{{ started }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:16px;">
+              <div style="height:4px; border-radius:999px; background:rgba(245,243,255,.10); overflow:hidden;"><div style="height:4px; border-radius:999px; background:#5BE9C2; box-shadow:0 0 8px rgba(91,233,194,.8); width:{{ setPct }};"></div></div>
+              <div style="margin-top:6px; font-size:11px; color:#9A93C9;">{{ setsLabel }}</div>
+            </div>
+            </sc-if>
+
+            <sc-if value="{{ showCta }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top:14px; height:54px; border-radius:16px; display:flex; align-items:center; justify-content:center; gap:8px; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); box-shadow:0 0 22px rgba(91,233,194,.45); color:#08281F; font-size:16px; font-weight:700;"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" stroke="none" style="display:block;"><path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5Z"></path></svg>{{ ctaLabel }}</div>
+            </sc-if>
+
+            <div style="margin-top:16px; padding-top:14px; border-top:1px solid rgba(245,243,255,.10);">
+              <div style="display:grid; grid-template-columns:repeat(7,1fr); gap:4px;">
+              <div style="height:26px; border-radius:8px; border:1px solid rgba(91,233,194,.45); background:rgba(91,233,194,.10); display:flex; align-items:center; justify-content:center;"><span style="width:6px; height:6px; border-radius:999px; background:#5BE9C2;"></span></div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">–</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">●</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">–</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">●</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">–</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">–</div>
+              </div>
+              <div style="margin-top:4px; display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center; font-size:10px; color:#9A93C9;"><span style="color:#5BE9C2; font-weight:600;">M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:flex-start; gap:12px; padding:0 4px;">
+            <span style="width:32px; height:32px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span>
+            <div style="flex:1; min-width:0;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#B4A9FF; white-space:nowrap;">Coach</span>
+              <p style="margin:4px 0 0; font-size:14px; line-height:1.5; color:#F5F3FF; text-wrap:pretty;">Your bench moved from <strong style="font-weight:700; color:#5BE9C2;">60 to 62.5 kg</strong> in two weeks — the higher-rep block is doing its job.</p>
+              <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
+                <span style="min-height:40px; display:flex; align-items:center; padding:0 14px; border-radius:999px; border:1px solid rgba(139,123,255,.35); color:#DAD5FA; font-size:12.5px; font-weight:600; white-space:nowrap;">What changed?</span>
+                <span style="min-height:40px; display:flex; align-items:center; padding:0 14px; border-radius:999px; border:1px solid rgba(139,123,255,.35); color:#DAD5FA; font-size:12.5px; font-weight:600; white-space:nowrap;">Adjust today</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="padding:0 4px;">
+            <div style="display:flex; align-items:baseline; justify-content:space-between;">
+              <span style="font-size:10px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:#C2BCE8; white-space:nowrap;">Recovery</span>
+              <span style="font-size:11px; color:#9A93C9; white-space:nowrap;">today</span>
+            </div>
+            <div style="margin-top:14px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="position:relative; width:40px; height:40px; flex-shrink:0;">
+                  <svg width="40" height="40" viewBox="0 0 48 48" style="display:block; transform:rotate(-90deg);"><circle cx="24" cy="24" r="20" fill="none" stroke="rgba(245,243,255,.10)" stroke-width="5"></circle><circle cx="24" cy="24" r="20" fill="none" stroke="#5BE9C2" stroke-width="5" stroke-linecap="round" stroke-dasharray="33.9 125.7"></circle></svg>
+                  <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#5BE9C2;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"></path><path d="M20 20v-2.38c0-1.12 1.03-2.12 1-4.62-.03-2.72-1.49-6-4.5-6C14.63 7 14 8.8 14 10.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"></path></svg></span>
+                </div>
+                <div style="min-width:0;"><div style="font-family:ui-monospace,Menlo,monospace; font-size:14px; font-weight:700; line-height:1;">2,140</div><div style="margin-top:3px; font-size:10.5px; color:#9A93C9; white-space:nowrap;">steps</div></div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="position:relative; width:40px; height:40px; flex-shrink:0;">
+                  <svg width="40" height="40" viewBox="0 0 48 48" style="display:block; transform:rotate(-90deg);"><circle cx="24" cy="24" r="20" fill="none" stroke="rgba(245,243,255,.10)" stroke-width="5"></circle><circle cx="24" cy="24" r="20" fill="none" stroke="#8B7BFF" stroke-width="5" stroke-linecap="round" stroke-dasharray="119.4 125.7"></circle></svg>
+                  <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#B4A9FF;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg></span>
+                </div>
+                <div style="min-width:0;"><div style="font-family:ui-monospace,Menlo,monospace; font-size:14px; font-weight:700; line-height:1;">6h 40</div><div style="margin-top:3px; font-size:10.5px; color:#9A93C9; white-space:nowrap;">sleep</div></div>
+              </div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div style="position:relative; width:40px; height:40px; flex-shrink:0;">
+                  <svg width="40" height="40" viewBox="0 0 48 48" style="display:block; transform:rotate(-90deg);"><circle cx="24" cy="24" r="20" fill="none" stroke="rgba(245,243,255,.10)" stroke-width="5"></circle><circle cx="24" cy="24" r="20" fill="none" stroke="#6FB7FF" stroke-width="5" stroke-linecap="round" stroke-dasharray="37.7 125.7"></circle></svg>
+                  <span style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:#6FB7FF;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"></path></svg></span>
+                </div>
+                <div style="min-width:0;"><div style="font-family:ui-monospace,Menlo,monospace; font-size:14px; font-weight:700; line-height:1;">0.75 L</div><div style="margin-top:3px; font-size:10.5px; color:#9A93C9; white-space:nowrap;">water</div></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="border-radius:20px; background:rgba(69,60,142,.24); display:grid; grid-template-columns:repeat(2,minmax(0,1fr));">
+            <div style="padding:16px; display:flex; align-items:center; gap:12px; border-right:1px solid rgba(245,243,255,.10); min-width:0;">
+              <span style="width:34px; height:34px; flex-shrink:0; border-radius:11px; background:rgba(91,233,194,.14); color:#5BE9C2; display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg></span>
+              <div style="min-width:0;">
+                <div style="font-family:ui-monospace,Menlo,monospace; font-size:18px; font-weight:700; line-height:1; color:#5BE9C2;">+2.5 kg</div>
+                <div style="margin-top:4px; font-size:11px; color:#9A93C9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Bench PR · 62.5 kg</div>
+              </div>
+            </div>
+            <div style="padding:16px; display:flex; align-items:center; gap:12px; min-width:0;">
+              <span style="width:34px; height:34px; flex-shrink:0; border-radius:11px; background:rgba(139,123,255,.16); color:#B4A9FF; display:flex; align-items:center; justify-content:center;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M8 2v4"></path><path d="M16 2v4"></path><rect width="18" height="18" x="3" y="4" rx="2"></rect><path d="M3 10h18"></path></svg></span>
+              <div style="min-width:0;">
+                <div style="font-size:15px; font-weight:700; line-height:1.1; white-space:nowrap;">Pull Day</div>
+                <div style="margin-top:4px; font-size:11px; color:#9A93C9; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Tomorrow · ~50 min</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="padding:24px 40px 80px; display:flex; flex-direction:column; gap:28px; background:#0b0919; color:#F5F3FF;">
+  <div style="display:flex; flex-direction:column; gap:6px; max-width:880px;">
+    <span style="font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#9A93C9;">Turn 1 · Home</span>
+    <h1 style="margin:0; font-size:26px; font-weight:600; letter-spacing:-.02em;">Home, with less on it</h1>
+    <p style="margin:0; font-size:14px; line-height:1.5; color:#C2BCE8; text-wrap:pretty;"><a href="#1a">1a</a> is today's Home from <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px;">Dashboard.tsx</span> with Ashley's edits applied: calories and water removed (they live on Nutrition) and Recent PRs collapsed to one line. Steps and weight are the only logging left. Every option keeps the same three things at the top (who/when, the coach's line, today's session) and differs in how much of the rest survives. What leaves Home isn't deleted — it moves to a <strong style="font-weight:600;">proposed new Progress screen</strong> (the app has none today), reached from one link. Use the <strong style="font-weight:600;">Session state</strong> tweak to see each one before, during and after training.</p>
+  </div>
+
+  <div style="display:flex; flex-wrap:wrap; gap:32px; align-items:flex-start;">
+
+    <!-- ===================== 1a CURRENT ===================== -->
+    <div id="1a" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">1a</span>
+        <span style="font-size:14px; font-weight:600;">Today, trimmed</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:52px;">Seven sections at a 26px rhythm, all with the same visual weight, so nothing reads as more important. Calories and water are cut (they live on Nutrition), Recent PRs collapses to one line, and the chart, PRs and Tomorrow row push the page well past one screen.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:14px 20px 0; display:flex; justify-content:flex-end; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></div>
+        <div style="padding:8px 20px 24px; display:flex; flex-direction:column; gap:26px;">
+
+          <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px;">
+            <div>
+              <div style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Week 2 of 16</div>
+              <div style="margin-top:4px; font-size:28px; font-weight:700; line-height:1.1; letter-spacing:-.03em;">Morning, Ashley</div>
+            </div>
+            <span style="margin-top:4px; display:flex; align-items:center; gap:6px; border-radius:999px; padding:4px 10px; background:rgba(69,60,142,.28); white-space:nowrap;">
+              <span style="width:5px; height:5px; border-radius:999px; background:#5BE9C2;"></span>
+              <span style="font-family:ui-monospace,Menlo,monospace; font-size:13px; font-weight:600;">6</span>
+              <span style="font-size:11px; color:#9A93C9;">days streak</span>
+            </span>
+          </div>
+
+          <div>
+            <div style="display:flex; align-items:flex-start; gap:10px; border-radius:14px; padding:12px 14px; background:rgba(139,123,255,.10); border:1px solid rgba(139,123,255,.25);">
+              <span style="width:22px; height:22px; flex-shrink:0; margin-top:2px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span>
+              <div style="flex:1; min-width:0; font-size:13px; line-height:1.5; color:#DAD5FA;">Your bench moved from 60 to 62.5 kg in two weeks — the higher-rep block is doing its job.</div>
+              <span style="width:20px; height:20px; margin-top:1px; display:flex; align-items:center; justify-content:center; color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m9 18 6-6-6-6"></path></svg></span>
+            </div>
+            <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
+              <span style="min-height:34px; display:flex; align-items:center; padding:0 12px; border-radius:999px; background:#2E2662; font-size:12px;">What changed?</span>
+              <span style="min-height:34px; display:flex; align-items:center; padding:0 12px; border-radius:999px; background:#2E2662; font-size:12px;">Adjust today</span>
+            </div>
+          </div>
+
+          <div>
+            <div style="display:flex; align-items:baseline; justify-content:space-between;">
+              <span style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Today's session</span>
+              <span style="font-size:11px; color:#9A93C9;">~45 min</span>
+            </div>
+            <div style="margin-top:6px; display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+              <span style="font-size:25px; font-weight:700; letter-spacing:-.02em; color:#5BE9C2; text-shadow:0 0 16px rgba(91,233,194,.85);">Full Body Power</span>
+              <span style="font-size:11px; color:#9A93C9; white-space:nowrap;">{{ statusRight1a }}</span>
+            </div>
+            <div style="margin-top:6px; font-size:12.5px; color:#9A93C9;">{{ glance }}</div>
+            <sc-if value="{{ showCta }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top:14px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); color:#08281F; font-size:15px; font-weight:600;">{{ ctaLabel }}</div>
+            </sc-if>
+            <div style="margin-top:14px; display:grid; grid-template-columns:repeat(7,1fr); gap:4px;">
+              <div style="height:26px; border-radius:8px; border:1px solid rgba(91,233,194,.45); background:rgba(91,233,194,.10); display:flex; align-items:center; justify-content:center;"><span style="width:6px; height:6px; border-radius:999px; background:#5BE9C2;"></span></div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">–</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">●</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">–</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">●</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">–</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">–</div>
+            </div>
+            <div style="margin-top:4px; display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center; font-size:10px; color:#9A93C9;"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+          </div>
+
+          <div>
+            <div style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Today so far</div>
+            <div style="margin-top:6px; display:flex; align-items:center; gap:12px; min-height:52px; border-top:1px solid rgba(245,243,255,.11);">
+              <span style="display:flex; align-items:center; gap:6px; flex:1; font-size:11px; color:#9A93C9;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"></path><path d="M20 20v-2.38c0-1.12 1.03-2.12 1-4.62-.03-2.72-1.49-6-4.5-6C14.63 7 14 8.8 14 10.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"></path><path d="M16 17h4"></path><path d="M4 13h4"></path></svg>Steps</span>
+              <span style="font-family:ui-monospace,Menlo,monospace; font-size:18px; font-weight:700;">2,140<span style="margin-left:4px; font-family:'Space Grotesk',sans-serif; font-size:11px; font-weight:500; color:#9A93C9;">/ 8,000</span></span>
+              <span style="font-size:11px; font-weight:600; color:#5BE9C2;">Log ›</span>
+            </div>
+            <div style="border-top:1px solid rgba(245,243,255,.11); padding-top:14px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+                <span style="display:flex; align-items:center; gap:6px; font-size:11px; color:#9A93C9;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;flex-shrink:0;"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"></path><path d="M7 21h10"></path><path d="M12 3v18"></path><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"></path></svg>Weight</span>
+                <span style="font-size:11px; color:#9A93C9; white-space:nowrap;">goal 68 kg</span>
+              </div>
+              <div style="margin-top:6px; display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:22px; font-weight:700; line-height:1;">71.4<span style="margin-left:4px; font-family:'Space Grotesk',sans-serif; font-size:11px; font-weight:500; color:#9A93C9;">kg · today ✓</span></span>
+                <span style="font-size:11px; font-weight:600; color:#5BE9C2; white-space:nowrap;">−0.8 kg since week 1</span>
+              </div>
+              <svg viewBox="0 0 320 60" width="100%" height="60" preserveAspectRatio="none" style="display:block; margin-top:12px;">
+              <polygon points="0,60 0,8 45.7,9.9 91.4,9 137.1,11.8 182.9,10.9 228.6,13.7 274.3,14.7 320,15.6 320,60" fill="rgba(91,233,194,.10)"></polygon>
+              <line x1="0" y1="48" x2="320" y2="48" stroke="#FFB454" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke" opacity="0.7"></line>
+              <text x="320" y="45" text-anchor="end" font-size="8" fill="#FFB454" opacity="0.85">goal</text>
+              <polyline points="0,8 45.7,9.9 91.4,9 137.1,11.8 182.9,10.9 228.6,13.7 274.3,14.7 320,15.6" fill="none" stroke="#5BE9C2" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" style="filter:drop-shadow(0 0 6px rgba(91,233,194,.7));"></polyline>
+              <circle cx="320" cy="15.6" r="3.5" fill="#5BE9C2"></circle>
+            </svg>
+            </div>
+          </div>
+
+          <div>
+            <div onClick="{{ togglePrs }}" style="display:flex; align-items:center; justify-content:space-between; gap:12px; min-height:44px; margin:-12px 0 -6px; cursor:pointer;">
+              <span style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Recent PRs</span>
+              <span style="display:flex; align-items:center; gap:6px; font-size:11px; color:#9A93C9; white-space:nowrap;">{{ prSummary }}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block; transition:transform .2s; transform:rotate({{ prRot }}deg);"><path d="m6 9 6 6 6-6"></path></svg></span>
+            </div>
+            <sc-if value="{{ prsOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="margin-top:6px; border-top:1px solid rgba(245,243,255,.11);">
+              <div style="display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid rgba(245,243,255,.11); font-size:13px;"><span>Bench Press</span><span style="font-family:ui-monospace,Menlo,monospace; font-weight:600; color:#5BE9C2;">62.5 kg</span></div>
+              <div style="display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid rgba(245,243,255,.11); font-size:13px;"><span>Goblet Squat</span><span style="font-family:ui-monospace,Menlo,monospace; font-weight:600; color:#5BE9C2;">28 kg</span></div>
+              <div style="display:flex; justify-content:space-between; padding:12px 0; border-bottom:1px solid rgba(245,243,255,.11); font-size:13px;"><span>Push-up</span><span style="font-family:ui-monospace,Menlo,monospace; font-weight:600; color:#5BE9C2;">18 reps</span></div>
+            </div>
+            </sc-if>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; border-radius:14px; padding:12px 14px; background:rgba(69,60,142,.28);">
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:11px; color:#9A93C9;">Tomorrow</div>
+              <div style="margin-top:2px; font-size:13.5px; font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Rest day</div>
+            </div>
+            <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="m9 18 6-6-6-6"></path></svg></span>
+          </div>
+        </div>
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== 1b SESSION FIRST ===================== -->
+    <div id="1b" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">1b</span>
+        <span style="font-size:14px; font-weight:600;">Three blocks</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:52px;">Who, today's session, and today's numbers in one row. The coach shrinks to a single tappable line; reply chips move into chat. Trend, PRs and tomorrow leave for Progress. Fits one screen.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:14px 20px 0; display:flex; justify-content:flex-end; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></div>
+        <div style="padding:8px 20px 28px; display:flex; flex-direction:column; gap:32px;">
+
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px;">
+              <span style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Week 2 of 16</span>
+              <span style="display:flex; align-items:center; gap:5px; font-size:11px; color:#9A93C9; white-space:nowrap;"><span style="width:5px; height:5px; border-radius:999px; background:#5BE9C2;"></span><span style="font-family:ui-monospace,Menlo,monospace; font-weight:600; color:#F5F3FF;">6</span> day streak</span>
+            </div>
+            <div style="font-size:30px; font-weight:700; line-height:1.1; letter-spacing:-.03em;">Morning, Ashley</div>
+            <div style="display:flex; align-items:center; gap:8px; min-height:44px;">
+              <span style="width:22px; height:22px; flex-shrink:0; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); color:#08281F; display:flex; align-items:center; justify-content:center;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></span>
+              <span style="flex:1; min-width:0; font-size:13px; color:#DAD5FA; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Bench moved 60 → 62.5 kg in two weeks.</span>
+              <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="m9 18 6-6-6-6"></path></svg></span>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Today</div>
+            <div style="margin-top:6px; display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+              <span style="font-size:25px; font-weight:700; letter-spacing:-.02em; color:#5BE9C2; text-shadow:0 0 16px rgba(91,233,194,.85);">Full Body Power</span>
+              <span style="font-size:11px; color:#9A93C9; white-space:nowrap;">{{ statusRight }}</span>
+            </div>
+            <div style="margin-top:6px; font-size:12.5px; color:#9A93C9;">{{ glance }}</div>
+            <sc-if value="{{ showCta }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top:16px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); color:#08281F; font-size:15px; font-weight:600;">{{ ctaLabel }}</div>
+            </sc-if>
+            <div style="margin-top:16px; display:grid; grid-template-columns:repeat(7,1fr); gap:4px;">
+              <div style="height:26px; border-radius:8px; border:1px solid rgba(91,233,194,.45); background:rgba(91,233,194,.10); display:flex; align-items:center; justify-content:center;"><span style="width:6px; height:6px; border-radius:999px; background:#5BE9C2;"></span></div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">–</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">●</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">–</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">●</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">–</div>
+              <div style="height:26px; border-radius:8px; border:1px solid transparent; display:flex; align-items:center; justify-content:center; font-size:11px; line-height:1; color:#9A93C9;">–</div>
+            </div>
+            <div style="margin-top:4px; display:grid; grid-template-columns:repeat(7,1fr); gap:4px; text-align:center; font-size:10px; color:#9A93C9;"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+          </div>
+
+          <div>
+            <div style="display:flex; align-items:baseline; justify-content:space-between;">
+              <span style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">So far</span>
+              <span style="font-size:11px; color:#9A93C9;">tap to log</span>
+            </div>
+            <div style="margin-top:10px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px;">
+              <div>
+                <div style="font-family:ui-monospace,Menlo,monospace; font-size:20px; font-weight:700; line-height:1;">640</div>
+                <div style="margin-top:4px; font-size:11px; color:#9A93C9;">of 2,150 kcal</div>
+                <div style="margin-top:8px; height:3px; border-radius:999px; background:rgba(245,243,255,.11);"><div style="width:30%; height:3px; border-radius:999px; background:#5BE9C2;"></div></div>
+              </div>
+              <div>
+                <div style="font-family:ui-monospace,Menlo,monospace; font-size:20px; font-weight:700; line-height:1;">0.75</div>
+                <div style="margin-top:4px; font-size:11px; color:#9A93C9;">of 2.5 L water</div>
+                <div style="margin-top:8px; height:3px; border-radius:999px; background:rgba(245,243,255,.11);"><div style="width:30%; height:3px; border-radius:999px; background:#6FB7FF;"></div></div>
+              </div>
+              <div>
+                <div style="font-family:ui-monospace,Menlo,monospace; font-size:20px; font-weight:700; line-height:1;">2,140</div>
+                <div style="margin-top:4px; font-size:11px; color:#9A93C9;">of 8,000 steps</div>
+                <div style="margin-top:8px; height:3px; border-radius:999px; background:rgba(245,243,255,.11);"><div style="width:27%; height:3px; border-radius:999px; background:#5BE9C2;"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:space-between; min-height:44px; border-top:1px solid rgba(245,243,255,.11); padding-top:6px;">
+            <span style="font-size:13px; color:#C2BCE8;">Progress · weight, PRs, trends</span>
+            <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="m9 18 6-6-6-6"></path></svg></span>
+          </div>
+        </div>
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== 1c LIST ===================== -->
+    <div id="1c" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">1c</span>
+        <span style="font-size:14px; font-weight:600;">Read it like a list</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:52px;">Everything below the session is one hairline list: label left, number right, a single action at the edge. Four "today" rows, then one "lately" row that summarises the trend and newest PR in a sentence.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:14px 20px 0; display:flex; justify-content:flex-end; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></div>
+        <div style="padding:8px 20px 28px; display:flex; flex-direction:column; gap:28px;">
+
+          <div>
+            <div style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Week 2 of 16</div>
+            <div style="margin-top:4px; font-size:28px; font-weight:700; line-height:1.1; letter-spacing:-.03em;">Morning, Ashley</div>
+            <div style="margin-top:10px; font-size:13px; line-height:1.5; color:#DAD5FA; text-wrap:pretty;">Your bench moved from 60 to 62.5 kg in two weeks — the higher-rep block is doing its job. <span style="color:#5BE9C2; font-weight:600; white-space:nowrap;">Reply ›</span></div>
+          </div>
+
+          <div style="border-radius:18px; padding:16px; background:rgba(69,60,142,.28);">
+            <div style="display:flex; align-items:baseline; justify-content:space-between;">
+              <span style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Today's session</span>
+              <span style="font-size:11px; color:#9A93C9; white-space:nowrap;">{{ statusRight }}</span>
+            </div>
+            <div style="margin-top:6px; font-size:24px; font-weight:700; letter-spacing:-.02em; color:#5BE9C2; text-shadow:0 0 16px rgba(91,233,194,.85);">Full Body Power</div>
+            <div style="margin-top:6px; font-size:12.5px; color:#9A93C9;">{{ glance }}</div>
+            <sc-if value="{{ showCta }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top:14px; height:50px; border-radius:13px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); color:#08281F; font-size:15px; font-weight:600;">{{ ctaLabel }}</div>
+            </sc-if>
+          </div>
+
+          <div>
+            <div style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Today</div>
+            <div style="margin-top:4px;">
+              <div style="display:flex; align-items:center; gap:12px; min-height:52px; border-bottom:1px solid rgba(245,243,255,.11);">
+                <span style="flex:1; font-size:14px;">Calories</span>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:14px; font-weight:600;">640<span style="color:#9A93C9; font-weight:400;"> / 2,150</span></span>
+                <span style="width:52px; display:flex; justify-content:flex-end; color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="m9 18 6-6-6-6"></path></svg></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:52px; border-bottom:1px solid rgba(245,243,255,.11);">
+                <span style="flex:1; font-size:14px;">Water</span>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:14px; font-weight:600;">750<span style="color:#9A93C9; font-weight:400;"> / 2,500 ml</span></span>
+                <span style="width:52px; display:flex; justify-content:flex-end;"><span style="height:30px; padding:0 10px; border-radius:999px; display:flex; align-items:center; background:rgba(111,183,255,.15); color:#6FB7FF; font-size:12px; font-weight:600;">+250</span></span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:52px; border-bottom:1px solid rgba(245,243,255,.11);">
+                <span style="flex:1; font-size:14px;">Steps</span>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:14px; font-weight:600;">2,140<span style="color:#9A93C9; font-weight:400;"> / 8,000</span></span>
+                <span style="width:52px; display:flex; justify-content:flex-end; font-size:12px; font-weight:600; color:#5BE9C2;">Log</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:12px; min-height:52px; border-bottom:1px solid rgba(245,243,255,.11);">
+                <span style="flex:1; font-size:14px;">Weight</span>
+                <span style="font-family:ui-monospace,Menlo,monospace; font-size:14px; font-weight:600;">71.4<span style="color:#9A93C9; font-weight:400;"> kg</span></span>
+                <span style="width:52px; display:flex; justify-content:flex-end; color:#5BE9C2;"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M20 6 9 17l-5-5"></path></svg></span>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Lately</div>
+            <div style="margin-top:4px; display:flex; align-items:center; gap:12px; min-height:52px; border-bottom:1px solid rgba(245,243,255,.11);">
+              <span style="flex:1; font-size:13.5px; line-height:1.45; color:#C2BCE8; text-wrap:pretty;"><span style="color:#5BE9C2; font-weight:600;">−0.8 kg</span> since week 1, and a new bench best of <span style="color:#5BE9C2; font-weight:600;">62.5 kg</span>.</span>
+              <span style="color:#9A93C9;"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="m9 18 6-6-6-6"></path></svg></span>
+            </div>
+          </div>
+        </div>
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== 1d JUST TODAY ===================== -->
+    <div id="1d" style="display:flex; flex-direction:column; gap:10px; width:412px;">
+      <div style="display:flex; align-items:baseline; gap:10px;">
+        <span style="font-family:ui-monospace,Menlo,monospace; font-size:12px; font-weight:600; color:#08281F; background:#5BE9C2; border-radius:6px; padding:2px 7px;">1d</span>
+        <span style="font-size:14px; font-weight:600;">Just today</span>
+      </div>
+      <p style="margin:0; font-size:12px; line-height:1.45; color:#9A93C9; min-height:52px;">The most reduced. The coach's line becomes the subtitle under the greeting, the session is the one thing on the page, and logging is three buttons. No numbers you can't act on.</p>
+      <div style="width:412px; box-sizing:border-box; background:#100d24; border-radius:26px; border:1px solid rgba(245,243,255,.08); overflow:hidden;">
+        <div style="padding:14px 20px 0; display:flex; justify-content:flex-end; color:#C2BCE8;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path><circle cx="12" cy="12" r="3"></circle></svg></div>
+        <div style="padding:20px 20px 28px; display:flex; flex-direction:column; gap:36px;">
+
+          <div>
+            <div style="font-size:32px; font-weight:700; line-height:1.1; letter-spacing:-.03em;">Morning, Ashley</div>
+            <div style="margin-top:10px; font-size:14px; line-height:1.5; color:#DAD5FA; text-wrap:pretty;">Your bench moved from 60 to 62.5 kg in two weeks.</div>
+          </div>
+
+          <div>
+            <div style="display:flex; align-items:baseline; justify-content:space-between;">
+              <span style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Monday · Session 1 of 3</span>
+              <span style="font-size:11px; color:#9A93C9; white-space:nowrap;">{{ statusRight }}</span>
+            </div>
+            <div style="margin-top:8px; font-size:30px; font-weight:700; letter-spacing:-.025em; line-height:1.1; color:#5BE9C2; text-shadow:0 0 16px rgba(91,233,194,.85);">Full Body Power</div>
+            <div style="margin-top:8px; font-size:13px; color:#9A93C9;">{{ glance }}</div>
+            <sc-if value="{{ showCta }}" hint-placeholder-val="{{ true }}">
+              <div style="margin-top:18px; height:56px; border-radius:16px; display:flex; align-items:center; justify-content:center; background:linear-gradient(180deg,#7BEECE,#5BE9C2 55%,#3ED3AA); color:#08281F; font-size:16px; font-weight:600;">{{ ctaLabel }}</div>
+            </sc-if>
+          </div>
+
+          <div>
+            <div style="font-size:9.5px; letter-spacing:.12em; text-transform:uppercase; color:#9A93C9; white-space:nowrap;">Quick log</div>
+            <div style="margin-top:10px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px;">
+              <div style="height:68px; border-radius:14px; background:rgba(69,60,142,.28); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;">
+                <span style="font-size:13px; font-weight:600; color:#6FB7FF;">+250 ml</span>
+                <span style="font-size:10.5px; color:#9A93C9; white-space:nowrap;">750 ml so far</span>
+              </div>
+              <div style="height:68px; border-radius:14px; background:rgba(69,60,142,.28); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;">
+                <span style="font-size:13px; font-weight:600;">Steps</span>
+                <span style="font-size:10.5px; color:#9A93C9;">2,140 so far</span>
+              </div>
+              <div style="height:68px; border-radius:14px; background:rgba(69,60,142,.28); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;">
+                <span style="font-size:13px; font-weight:600;">Weigh in</span>
+                <span style="font-size:10.5px; color:#9A93C9;">71.4 · today ✓</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; align-items:center; justify-content:center; gap:6px; min-height:44px; font-size:12.5px; font-weight:600; color:#5BE9C2;">See your week and progress<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="m9 18 6-6-6-6"></path></svg></div>
+        </div>
+        <div style="height:64px; background:linear-gradient(180deg, rgba(0,0,0,0) 0%, #221C48 45%); display:flex; align-items:center; padding:0 8px;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#5BE9C2; font-size:10px; font-weight:500; text-shadow:0 0 16px rgba(91,233,194,.85);"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;filter:drop-shadow(0 0 8px rgba(91,233,194,.9));"><rect width="7" height="9" x="3" y="3" rx="1"></rect><rect width="7" height="5" x="14" y="3" rx="1"></rect><rect width="7" height="9" x="14" y="12" rx="1"></rect><rect width="7" height="5" x="3" y="16" rx="1"></rect></svg>Home</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"></path><path d="M21.21 15.89A10 10 0 1 1 8 2.83"></path></svg>Nutrition</div>
+          <div style="flex:1; display:flex; align-items:center; justify-content:center;"><div style="width:56px; height:56px; margin-top:-24px; border-radius:999px; background:linear-gradient(180deg,#7BEECE,#3ED3AA); box-shadow:0 0 12px rgba(91,233,194,.9), 0 0 24px rgba(91,233,194,.45); display:flex; align-items:center; justify-content:center; color:#08281F;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path></svg></div></div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"></path></svg>Exercise</div>
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; gap:2px; color:#9A93C9; font-size:10px; font-weight:500;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg>Tools</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;sessionState&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Not started&quot;,&quot;In progress&quot;,&quot;Done&quot;],&quot;default&quot;:&quot;Not started&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;State&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.sessionState ?? 'Not started';
+    const map = {
+      'Not started': { ctaLabel: 'Start session', glance: '4 exercises · ~45 min · Deadlift from 72.5 kg', statusRight: '~45 min', showCta: true },
+      'In progress': { ctaLabel: 'Continue session', glance: '~25 min left · Deadlift 72.5 kg', statusRight: '7 of 12 sets', showCta: true },
+      'Done': { ctaLabel: '', glance: '4 exercises · 12 sets · 46 min', statusRight: 'Done ✓', showCta: false },
+    };
+    const v = map[s] || map['Not started'];
+    const open = !!this.state?.prsOpen;
+    return {
+      ...v,
+      statusRight1a: s === 'Not started' ? '' : v.statusRight,
+      prsOpen: open,
+      started: s !== 'Not started',
+      setPct: s === 'Done' ? '100%' : s === 'In progress' ? '58%' : '0%',
+      setsLabel: s === 'Done' ? '12 of 12 sets' : s === 'In progress' ? '7 of 12 sets' : '12 sets',
+      prRot: open ? 180 : 0,
+      prSummary: open ? 'Hide' : '3 this month',
+      togglePrs: () => this.setState({ prsOpen: !open }),
+    };
+  }
+}
+</script>
+</body>
+</html>
