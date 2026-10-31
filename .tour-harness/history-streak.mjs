@@ -95,7 +95,9 @@ await escape()
 
 console.log('\n  3. TOOLS')
 await goto('tools')
-const tools = await until(`(document.body.innerText.match(/\\d+ sessions? · \\d+ PRs?/) ?? [null])[0]`, 6000)
+// RE-ANCHORED 31 Oct 2026 (Tools 2a): the row now reads "N sessions logged" with the PRs in a pill beside it;
+// both numbers are read off that row and put back in the old "N sessions · M PRs" form the checks below compare.
+const tools = await until(`(() => { const t = document.querySelector('[data-testid="history-row"]')?.innerText?.replace(/\\s+/g, ' ') ?? ''; const m = t.match(/(\\d+ sessions?) logged (\\d+ PRs?)/); return m ? m[1] + ' · ' + m[2] : null })()`, 6000)
 check('3a. "4 sessions" — workouts, not rows (eight) and not rows plus activity days (ten)', /^4 sessions · /.test(tools ?? ''), tools)
 
 console.log('\n  4. TODAY\'S SESSION IS DONE — the streak moves')

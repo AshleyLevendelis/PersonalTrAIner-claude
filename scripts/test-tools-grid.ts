@@ -160,10 +160,18 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   // the `disabled` prop and in the subtitle beside it. Caught by mutation, not
   // by reading. A disabled button is the visual half; the early return is what
   // actually stops the mode switch if the button is reached any other way.
-  check('...and a live round cannot be silently wiped: the button is disabled',
-    /disabled=\{roundLive && choice\.mode !== 'round'\}/.test(tools))
+  // RE-ANCHORED 31 Oct 2026 (Tools 2a): the chooser rows became three tiles on
+  // the tab, and while a round is live the timers card IS the running round,
+  // so the stopwatch and lap tiles are not drawn at all rather than drawn
+  // grey. Same two halves of the same property: nothing on screen offers the
+  // wipe, and the handler refuses if it is reached any other way.
+  const idleAt = bare.indexOf('{!roundLive && (')
+  const tilesAt = bare.indexOf('TIMER_CHOICES.map(')
+  const liveAt = bare.indexOf('{roundLive && (', idleAt + 1)
+  check('...and a live round cannot be silently wiped: the tiles are drawn only when no round is live',
+    idleAt >= 0 && tilesAt > idleAt && liveAt > tilesAt, { idleAt, tilesAt, liveAt })
   check('...nor by the handler if it is reached anyway',
-    /if \(roundLive && choice\.mode !== 'round'\) return/.test(tools))
+    /if \(roundLive && mode !== 'round'\) return/.test(bare) && /onClick=\{\(\) => openTimer\(choice\.mode\)\}/.test(bare))
 
   // GROCERY IS BACK ON TOOLS — hers, 14 Sep. Pinned on the route helper, the
   // same property `chat-app-reality` reads to decide whether the coach may
@@ -185,13 +193,33 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   // cannot drift apart.
   check(`${labels.length} rows: ${labels.join(', ')}`, labels.length === handlers, { labels, handlers })
   check('...no handler is an empty body', !/onClick: \(\) => \{\s*\}/.test(alsoBlock))
-  for (const want of ['Timers', 'Grocery list', 'Plate calculator', 'Session history', 'Your program']) {
+  // RE-ANCHORED 31 Oct 2026 (Tools 2a): Timers and Plate calculator left the
+  // row list for the two cards above it. The property was always "every tool
+  // is reachable from Tools", so the three that are still rows are read here
+  // and the other two are read off the cards that now carry them.
+  for (const want of ['Grocery list', 'Session history', 'Your program']) {
     check(`"${want}" is reachable`, labels.includes(want), labels)
   }
+  const openTimerBody = bare.slice(bare.indexOf('const openTimer ='), bare.indexOf('const openTimer =') + 400)
+  check('"Timers" is reachable: each tile opens its own timer in the sheet, with no chooser between',
+    /onClick=\{\(\) => openTimer\(choice\.mode\)\}/.test(bare) && /setTimerPick\(mode\)/.test(openTimerBody) && /setTimersOpen\(true\)/.test(openTimerBody)
+    && !/data-testid="timer-choices"/.test(bare), openTimerBody.slice(0, 200))
+  const plateCard = read('src/components/PlateCard.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  check('"Plate calculator" is reachable: the plate card opens the full calculator',
+    /<PlateCard[\s\S]{0,200}onOpen=\{kg => \{ setPlateStartKg\(kg\); setPlateOpen\(true\) \}\}/.test(bare)
+    && (plateCard.match(/onClick=\{\(\) => onOpen\(kg\)\}/g) ?? []).length >= 1, bare.match(/<PlateCard[\s\S]{0,160}/)?.[0])
   // THE TOUR POINTS AT SOMETHING THAT EXISTS. Its target was the round card,
   // which is no longer on the tab at rest — a spotlight on an absent element
   // is the tour bug this repo has already shipped once.
-  check('the tour target is on a row that is always rendered', /tour: 'toolstimer'/.test(alsoBlock))
+  // RE-ANCHORED 31 Oct 2026 (Tools 2a): the target is the timers card's
+  // wrapper, which holds the idle card AND the running round, so it is drawn
+  // in both states. Read as: the wrapper opens before both branches and the
+  // plate card (the next thing on the page) comes after them.
+  const tourAt = bare.indexOf('data-tour="toolstimer"')
+  const plateAt = bare.indexOf('<PlateCard')
+  check('the tour target is on an element that is always rendered',
+    tourAt >= 0 && idleAt > tourAt && liveAt > idleAt && plateAt > liveAt
+    && !/\{(!?)roundLive && \(\s*<div data-tour/.test(bare), { tourAt, idleAt, liveAt, plateAt })
   check('the plate calculator is really mounted', /<PlateCalculator open=\{plateOpen\}/.test(tools))
   check('the session history dialog is really mounted', /<SessionHistoryDialog open=\{historyOpen\}/.test(tools))
   check('the program row uses the route helper, not a hand-typed hash', /window\.location\.hash = programHash\(\)/.test(tools))

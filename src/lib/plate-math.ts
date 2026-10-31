@@ -54,6 +54,49 @@ export type PlateCombination = {
   perSideKg: number
 }
 
+/**
+ * Whole 1.25kg units to load on ONE side, or 0 when the question has no plates
+ * in its answer (bar at or over the target, a nonsense number, past the ceiling).
+ * Floor, not round: loading OVER the asked-for weight is a different lift. The
+ * epsilon is for the 0.5kg steps the inputs allow, where /2 lands on things
+ * like 22.499999999999996.
+ */
+function sideUnits(targetKg: number, barKg: number): number {
+  if (!Number.isFinite(targetKg) || !Number.isFinite(barKg)) return 0
+  if (targetKg > MAX_BARBELL_TARGET_KG || barKg > MAX_BARBELL_TARGET_KG) return 0
+  const remainder = targetKg - barKg
+  if (remainder <= 0) return 0
+  return Math.max(0, Math.floor(remainder / 2 / UNIT_KG + 1e-9))
+}
+
+/** Heaviest-first, bounded by the per-side plate ceiling. Whole units of 1.25kg in, plates (kg) out. */
+function greedyUnits(units: number): { plates: number[]; leftUnits: number } {
+  let rem = units
+  let greedyCount = 0
+  const plates: number[] = []
+  for (let i = 0; i < PLATE_UNITS.length; i++) {
+    while (rem >= PLATE_UNITS[i] && greedyCount < MAX_PLATES_PER_SIDE) {
+      rem -= PLATE_UNITS[i]
+      plates.push(STANDARD_PLATES[i])
+      greedyCount++
+    }
+  }
+  return { plates, leftUnits: rem }
+}
+
+/**
+ * ONE side of the bar, loaded heaviest-first — what the Tools tab's plate card
+ * draws as chips (design handoff 2a, 31 Oct 2026). The same greedy pass
+ * plateCombinations sizes its search with, not a second copy of it, and the
+ * same floor: never loads more than was asked for. [] means bar only (or a
+ * target the bar alone already exceeds). The full calculator, one tap away,
+ * still offers every other way to make the same weight.
+ */
+export function greedyPlatesPerSide(targetKg: number, barKg: number): number[] {
+  const units = sideUnits(targetKg, barKg)
+  return units > 0 ? greedyUnits(units).plates : []
+}
+
 function distinctCount(plates: number[]): number {
   return new Set(plates).size
 }
@@ -72,32 +115,15 @@ function distinctCount(plates: number[]): number {
  * says "bar only", which is a different sentence from "no answer".
  */
 export function plateCombinations(targetKg: number, barKg: number, limit = 4): PlateCombination[] {
-  if (!Number.isFinite(targetKg) || !Number.isFinite(barKg)) return []
-  if (targetKg > MAX_BARBELL_TARGET_KG || barKg > MAX_BARBELL_TARGET_KG) return []
-
-  const remainder = targetKg - barKg
-  if (remainder <= 0) return []
-
-  // Floor, not round: loading OVER the asked-for weight is a different lift.
-  // The epsilon is for the 0.5kg steps the inputs allow, where /2 lands on
-  // things like 22.499999999999996.
-  const units = Math.floor(remainder / 2 / UNIT_KG + 1e-9)
+  const units = sideUnits(targetKg, barKg)
   if (units <= 0) return []
   const perSideKg = units * UNIT_KG
 
   // The greedy loading, used only for its SIZE: it fixes how much bigger an
   // alternative is allowed to be. Without a cap the search offers 18x 1.25kg
   // as a serious suggestion.
-  let rem = units
-  let greedyCount = 0
-  const greedy: number[] = []
-  for (let i = 0; i < PLATE_UNITS.length; i++) {
-    while (rem >= PLATE_UNITS[i] && greedyCount < MAX_PLATES_PER_SIDE) {
-      rem -= PLATE_UNITS[i]
-      greedy.push(STANDARD_PLATES[i])
-      greedyCount++
-    }
-  }
+  const { plates: greedy, leftUnits: rem } = greedyUnits(units)
+  const greedyCount = greedy.length
   // Only reachable if the plate ceiling bit before the weight was made up, in
   // which case there is exactly one answer and it is this one.
   if (rem > 0) return [{ plates: greedy, perSideKg: (units - rem) * UNIT_KG }]

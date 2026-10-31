@@ -1,4 +1,5 @@
-import { Maximize2, ArrowRight } from 'lucide-react'
+import type { ReactNode } from 'react'
+import { Maximize2, ArrowRight, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTimers, ROUND_LEAD_IN_SECONDS } from '@/hooks/useTimers'
 import { FIELD, roundPhaseOf, formatRemaining } from '@/components/timers/RoundField'
@@ -46,7 +47,7 @@ const CLOCK_TINT: Record<string, string> = {
 /** The idle edge — present but quiet, so the card reads as waiting rather than off. */
 const IDLE_EDGE = 'rgba(var(--glow-rgb), .45)'
 
-export function RoundCard({ live, idleConfig, onLogSession }: {
+export function RoundCard({ live, idleConfig, onLogSession, hero = false, onOpenSetup, note }: {
   /**
    * Whether a round is actually running. OWNED BY THE TAB, not re-derived
    * here: ToolsTab needs the same answer to decide between this card and the
@@ -58,6 +59,17 @@ export function RoundCard({ live, idleConfig, onLogSession }: {
   idleConfig?: RoundConfig | null
   /** Same contract as the field's: absent means the finished button stops offering to log. */
   onLogSession?: (summary: RoundLogSummary) => void
+  /**
+   * THE TOOLS TAB'S HERO, design handoff 2a (31 Oct 2026): the same card,
+   * drawn as the page's one glowing card while a round runs — edged and lit in
+   * the phase colour, a 56px clock. Restyle only: the eyebrow, clock, pips and
+   * buttons are the same ones, from the same phase map.
+   */
+  hero?: boolean
+  /** Opens the round timer's sheet (presets, queue a switch). The protocol name becomes that button. */
+  onOpenSetup?: () => void
+  /** A line under the buttons — the tab says why the stopwatch and lap are not offered right now. */
+  note?: ReactNode
 }) {
   const timers = useTimers()
   const config = live ? timers.roundConfig : (idleConfig ?? timers.selectedRoundConfig)
@@ -130,7 +142,17 @@ export function RoundCard({ live, idleConfig, onLogSession }: {
         : `${eyebrow}. ${formatRemaining(remainingMs)} remaining.`}
       data-round-card
       data-round-phase={phase}
-      style={{
+      data-round-card-hero={hero || undefined}
+      style={hero ? {
+        // THE PHASE IS THE WHOLE EDGE on the hero, and its glow: mint at work,
+        // amber at rest (--role-warn), the field's own colours.
+        background: `radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, ${phaseColour} 22%, transparent), transparent 60%), var(--card)`,
+        borderRadius: 24,
+        padding: 20,
+        boxSizing: 'border-box',
+        border: `1px solid ${phaseColour}`,
+        boxShadow: `0 0 calc(24px * var(--glow-strength, 1)) color-mix(in srgb, ${phaseColour} 28%, transparent), 0 10px 30px rgba(0,0,0,.35)`,
+      } : {
         background: 'var(--card)',
         borderRadius: 18,
         padding: 16,
@@ -152,25 +174,43 @@ export function RoundCard({ live, idleConfig, onLogSession }: {
         >
           {eyebrow}
         </span>
-        <span
-          data-round-card-protocol
-          className="shrink-0 text-[0.6875rem]"
-          style={{ color: preset ? 'var(--muted-foreground)' : 'var(--primary-text)' }}
-          title={preset ? describeRoundPreset(preset) : undefined}
-        >
-          {protocolNameOf(config)}
-        </span>
+        {onOpenSetup ? (
+          // THE WAY BACK INTO THE ROUND'S SETTINGS while it runs (switch
+          // protocol at the next round, the sound) — the Round tile is not on
+          // the tab while a round is live, so the protocol's own name opens it.
+          <button
+            type="button"
+            data-round-card-protocol
+            data-timer-choice="round"
+            onClick={onOpenSetup}
+            aria-label={`${protocolNameOf(config)} — round timer settings`}
+            className="hit-slop-44 -my-1 flex shrink-0 items-center gap-0.5 text-[0.6875rem]"
+            style={{ color: 'var(--text-tertiary)' }}
+          >
+            {protocolNameOf(config)}
+            <ChevronRight className="size-3.5" aria-hidden />
+          </button>
+        ) : (
+          <span
+            data-round-card-protocol
+            className="shrink-0 text-[0.6875rem]"
+            style={{ color: preset ? 'var(--muted-foreground)' : 'var(--primary-text)' }}
+            title={preset ? describeRoundPreset(preset) : undefined}
+          >
+            {protocolNameOf(config)}
+          </span>
+        )}
       </div>
 
-      <div className="mt-1.5 flex items-baseline gap-2.5">
+      <div className={hero ? 'mt-2.5 flex items-baseline justify-between gap-2.5' : 'mt-1.5 flex items-baseline gap-2.5'}>
         <span
           data-round-card-clock
           className="tabular-mono"
-          style={{ fontSize: '2.5rem', fontWeight: 700, lineHeight: 1, letterSpacing: '-.03em', color: CLOCK_TINT[phase] ?? 'var(--num-hero)' }}
+          style={{ fontSize: hero ? '3.5rem' : '2.5rem', fontWeight: 700, lineHeight: 1, letterSpacing: hero ? '-.04em' : '-.03em', color: CLOCK_TINT[phase] ?? 'var(--num-hero)' }}
         >
           {clock}
         </span>
-        <span className="text-[0.78125rem]" style={{ color: 'var(--text-tertiary)' }}>
+        <span className={hero ? 'text-right text-[0.8125rem]' : 'text-[0.78125rem]'} style={{ color: 'var(--text-tertiary)' }}>
           {phase === 'idle' ? secondsPhrase(config) : roundSubline(config, phase, timers.currentRound)}
         </span>
       </div>
@@ -178,7 +218,7 @@ export function RoundCard({ live, idleConfig, onLogSession }: {
       {/* One pip per round of the SESSION, filled to where she is. Overall
           progress; the clock above carries the current phase, so neither
           repeats the other. */}
-      <div aria-hidden className="mt-3 flex gap-[5px]" data-round-pips={totalRounds}>
+      <div aria-hidden className={hero ? 'mt-3.5 flex gap-1' : 'mt-3 flex gap-[5px]'} data-round-pips={totalRounds}>
         {Array.from({ length: totalRounds }, (_, i) => {
           const here = sessionRoundNumber(config, timers.currentRound)
           const done = phase !== 'idle' && phase !== 'ready' && (phase === 'done' || i + 1 < here)
@@ -187,7 +227,13 @@ export function RoundCard({ live, idleConfig, onLogSession }: {
             <span
               key={i}
               className="flex-1 rounded-[2px]"
-              style={{
+              style={hero ? {
+                // The hero's pips: rounds behind her mint, the one she is in
+                // the phase colour; a finished round keeps its finish colour.
+                height: 5,
+                background: current ? phaseColour
+                  : done ? (phase === 'done' ? phaseColour : 'var(--primary)') : pipDim,
+              } : {
                 height: 4,
                 background: current
                   ? `color-mix(in srgb, ${phaseColour} 55%, transparent)`
@@ -220,7 +266,7 @@ export function RoundCard({ live, idleConfig, onLogSession }: {
         </div>
       )}
 
-      <div className="mt-3.5 flex gap-2">
+      <div className={hero ? 'mt-4 flex gap-2' : 'mt-3.5 flex gap-2'}>
         {phase === 'idle' ? (
           <Button
             data-round-card-start
@@ -269,6 +315,7 @@ export function RoundCard({ live, idleConfig, onLogSession }: {
           Full screen
         </button>
       </div>
+      {note && <p data-round-card-note className="mt-3 text-[0.71875rem] leading-[1.4] text-muted-foreground">{note}</p>}
     </div>
   )
 }
