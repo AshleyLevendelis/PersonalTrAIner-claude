@@ -1,12 +1,16 @@
-import { useEffect, useMemo, useState, Suspense } from 'react'
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { sessionSetCount, shortOfPlan } from '@/lib/session-count'
-import { Clock } from 'lucide-react'
+import { ChevronRight, Clock, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useTimers } from '@/hooks/useTimers'
+import { useDeadlineTick } from '@/hooks/useDeadlineTick'
+import { exerciseCoachLine } from '@/lib/exercise-coach-line'
+import { carriedWeightFor } from '@/lib/set-row'
+import { isExternallyLoaded, splitLoadDisplay } from '@/lib/load-prescription'
 import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
 import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, normalizeWarmup, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
@@ -30,14 +34,14 @@ import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exe
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { executeSecondSportVolume } from '@/lib/pending-action-executor'
 import { loadPlanEditContext } from '@/lib/plan-edit-context'
-import { getLocalDateString } from '@/lib/dev-clock'
+import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { tabHash } from '@/lib/app-route'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { ceilingToAskFor, saveStatedCeiling, declineStatedCeilings } from '@/lib/load-ceiling-prompt'
 import { LoadCeilingPrompt } from './LoadCeilingPrompt'
 import { WeekContextRow } from './WeekContextRow'
-import { SectionLabel as PageSectionLabel, PRIMARY_CTA_CLASS, PRIMARY_CTA_STYLE } from '@/components/OnePage'
+import { PRIMARY_CTA_CLASS, PRIMARY_CTA_STYLE } from '@/components/OnePage'
 import { PeekPanel, PeekWhatYouDid } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
 import { WarmupSection } from './WarmupSection'
@@ -181,7 +185,7 @@ export function TodayPanel({
   /** The kit, for good, from the remove sheet's "I haven't got the kit" (H34). */
   kit?: import('./EditReasonStep').EditReasonKit
 }) {
-  const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession, tightAreas, setTightAreas, loadState, setsKnown } = useActiveSession()
+  const { date: today, dayName: todayName, liveWeek, startRest, setsFor, logs, status, startSession, finishSession, tightAreas, setTightAreas, loadState, setsKnown, startedAtIso, restLabel } = useActiveSession()
 
   // Audit §6.4 — hold the screen awake for as long as the session is
   // actually running, and no longer. Before this the phone dimmed and locked
@@ -239,7 +243,6 @@ export function TodayPanel({
   // to the day-level "⋮" menu (WeekContextRow) — this is that controlled
   // open state.
   const [unplannedWorkOpen, setUnplannedWorkOpen] = useState(false)
-  const [addChoicesOpen, setAddChoicesOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [summaryData, setSummaryData] = useState<SessionSummaryData | null>(null)
@@ -1046,6 +1049,10 @@ export function TodayPanel({
   const totalSetsLogged = workout && !isRestDay && !isActiveRecovery
     ? workout.exercises.reduce((s, ex) => s + setsFor(ex.id ?? getExerciseId(ex.name), ex.name).length, 0)
     : 0
+  // Exercises with every working set in — the list's own "done" (2a), the same test its rows use.
+  const exercisesDone = workout && !isRestDay && !isActiveRecovery
+    ? workout.exercises.filter(ex => setsFor(ex.id ?? getExerciseId(ex.name), ex.name).length >= ex.sets).length
+    : 0
 
   // How long today actually is, and whether that is materially less than the
   // length this person asked for (audit §6.5). `estimatedMinutes` was already
@@ -1129,38 +1136,167 @@ export function TodayPanel({
     })
   })()
 
-  // TODAY'S SESSION, IN THE HERO'S LEFT HALF (one-page Exercise, 5c·4) — only on the day's own session;
-  // a peek, a rest day, a moved day or recovery has its own card below, and the hero then says the week.
+  // TODAY'S SESSION, IN THE GLOWING CARD (tab polish, Exercise 2a, 31 Oct 2026) — only on the day's own session;
+  // a peek, a rest day, a moved day or recovery has its own card below, and the card then says the week.
   const showsTodaysSession = !peekDay && !(isMovedAway && movedAwayTo) && !isRestDay && !isActiveRecovery && !!workout
+  // "18 min in" while it runs, off the session's own start and the app's clock (a minute is plenty).
+  const minuteTick = useDeadlineTick(status === 'running', 30_000)
+  const minutesIn = status === 'running' && startedAtIso
+    ? (void minuteTick, Math.max(0, Math.floor((getAppNow(profileId).getTime() - new Date(startedAtIso).getTime()) / 60_000)))
+    : null
+  // START LIVES IN THE CARD (2a) — and the bar above the tab bar comes back
+  // the moment the card has scrolled away, so Start is never off screen (the
+  // reason it was docked on 6 Sep). Watched, never guessed.
+  const heroStartRef = useRef<HTMLButtonElement | null>(null)
+  const [heroStartInView, setHeroStartInView] = useState(true)
+  useEffect(() => {
+    const el = heroStartRef.current
+    if (!el || typeof IntersectionObserver === 'undefined') { setHeroStartInView(true); return }
+    const io = new IntersectionObserver(([e]) => setHeroStartInView(e.isIntersecting))
+    io.observe(el)
+    return () => io.disconnect()
+  }, [showsTodaysSession, status])
+  const focusWords = workout?.focus?.trim().split(/\s+/) ?? []
   const heroLeft = showsTodaysSession ? (
     <div>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[0.65625rem] uppercase tracking-[.2em] text-primary-text glow-mint">
-          {/* TODAY IS TODAY'S NAME even when another day's session is borrowed onto it (user
-              test 8 Oct 2026, finding 16). */}
-          Today · {todayName}
-        </span>
-        {devOverrideDay && (
-          <span className="text-[0.625rem] font-mono px-1.5 py-0.5 rounded border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)]">
-            DEV · {devOverrideDay}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[.12em] text-primary-text">
+            {/* TODAY IS TODAY'S NAME even when another day's session is borrowed onto it (user
+                test 8 Oct 2026, finding 16). */}
+            Today · {todayName}
+          </span>
+          {devOverrideDay && (
+            <span className="text-[0.625rem] font-mono px-1.5 py-0.5 rounded border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)]">
+              DEV · {devOverrideDay}
+            </span>
+          )}
+          {borrowedDayName && (
+            <span className="text-[0.625rem] text-muted-foreground italic" data-testid="borrowed-from">{borrowedDayName}&apos;s session</span>
+          )}
+        </div>
+        {(minutesIn != null || status === 'finished') && (
+          <span className="shrink-0 whitespace-nowrap text-[0.6875rem] text-text-tertiary" data-testid="hero-status">
+            {status === 'finished' ? 'Done' : `${minutesIn} min in`}
           </span>
         )}
-        {borrowedDayName && (
-          <span className="text-[0.625rem] text-muted-foreground italic" data-testid="borrowed-from">{borrowedDayName}&apos;s session</span>
-        )}
       </div>
-      <p className="mt-1.5 break-words text-[1.875rem] font-bold leading-[1.02] tracking-[-.035em] glow-text" data-testid="hero-focus">{workout!.focus}</p>
-      {/* THE META LINE: what is in it and how long. */}
-      <p className="mt-2 text-[0.75rem] text-muted-foreground" data-testid="hero-meta">
-        {workout!.exercises.length} exercise{workout!.exercises.length === 1 ? '' : 's'}{sessionEstimate.length ? ` · ${sessionEstimate.length}` : ''}
+      {/* THE NAME, ITS LAST WORD LIT (2a). */}
+      <p className="mt-2 break-words text-[2rem] font-bold leading-[1.05] tracking-[-.03em]" data-testid="hero-focus">
+        {focusWords.slice(0, -1).join(' ')}{focusWords.length > 1 ? ' ' : ''}
+        <span className="text-primary-text glow-text">{focusWords[focusWords.length - 1]}</span>
+      </p>
+      {/* THE META LINE: what is in it, how long, and the working sets — the SHARED capped count (her M39 "one count"). */}
+      <p className="mt-2 text-[0.78125rem] text-text-tertiary" data-testid="hero-meta">
+        {workout!.exercises.length} exercise{workout!.exercises.length === 1 ? '' : 's'}{sessionEstimate.length ? ` · ${sessionEstimate.length}` : ''}{heroCount ? ` · ${heroCount.planned} working sets` : ''}
       </p>
       {/* THE REASON BESIDE THE NUMBER (audit §6.5): "why is it shorter than I asked for", always visible,
           never behind an expander, under the length it explains. */}
       {sessionEstimate.note && (
         <p className="mt-1 text-xs leading-[1.5] text-muted-foreground" data-testid="session-length-note">{sessionEstimate.note}</p>
       )}
+      {/* HOW FAR THROUGH, once it has begun — the same count as the strip, Home and the coach. */}
+      {heroCount && (status !== 'idle' || heroCount.logged > 0) && (
+        <div className="mt-4">
+          <div className="h-1 overflow-hidden rounded-full" style={{ background: 'var(--hairline)' }}>
+            <div className="h-1 rounded-full" style={{ width: `${heroCount.planned > 0 ? Math.min(100, (heroCount.logged / heroCount.planned) * 100) : 0}%`, background: 'var(--primary)', boxShadow: '0 0 8px rgba(var(--glow-rgb), .8)' }} />
+          </div>
+          <p className="mt-1.5 text-[0.6875rem] text-muted-foreground" data-testid="hero-sets">{heroCount.logged} of {heroCount.planned} working sets</p>
+        </div>
+      )}
+      {status === 'idle' && (
+        // A swapped day keeps the way in and loses the pretence: "Start" on a
+        // session she has already replaced is the app telling her it did not hear.
+        <Button
+          ref={heroStartRef}
+          className={swappedToday ? 'mt-4 h-[52px] w-full text-[0.9375rem] font-semibold' : `mt-4 ${PRIMARY_CTA_CLASS}`}
+          style={swappedToday ? undefined : PRIMARY_CTA_STYLE}
+          variant={swappedToday ? 'outline' : 'default'}
+          onClick={startSession}
+          data-testid="hero-start"
+        >
+          {swappedToday ? 'Train it anyway' : 'Start session'}
+        </Button>
+      )}
+      {status === 'running' && (
+        <>
+          <button
+            type="button"
+            className="mt-3.5 flex h-12 w-full items-center justify-center rounded-[14px] text-[0.875rem] font-semibold text-primary-text"
+            style={{ border: '1px solid rgba(var(--glow-rgb), .45)' }}
+            onClick={requestFinish}>Finish session</button>
+          {/* The line between a look and a workout, said before Finish is
+              tapped: with nothing logged, Finish closes the screen and counts
+              nothing. Only when the app KNOWS nothing is logged (H20). */}
+          {totalSetsLogged === 0 && setsKnown && (
+            <p className="mt-2 text-xs leading-[1.5] text-muted-foreground">
+              Nothing logged yet — finishing now closes this screen without counting a workout. Log a set and it counts.
+            </p>
+          )}
+        </>
+      )}
+      {/* A FINISHED SESSION LOOKS FINISHED (runs 3-4, LOW): it says so, with
+          the count when it closed short (Ashley, 10 Oct 2026), and opens the
+          summary when there is one to open. */}
+      {status === 'finished' && (
+        <button
+          type="button"
+          className="mt-3.5 flex min-h-11 w-full items-center justify-between gap-2 text-left text-[0.8125rem] font-semibold text-primary-text disabled:text-muted-foreground"
+          data-testid="session-finished"
+          disabled={!summaryData}
+          onClick={() => setSummaryOpen(true)}
+        >
+          {`✓ ${finishedShort ? `Done · ${finishedShort}` : 'Session finished'}${summaryData ? ' · View summary' : ''}`}
+          {summaryData && <ChevronRight className="size-3.5 shrink-0" aria-hidden />}
+        </button>
+      )}
+      {/* THE READ FAILED, AND THE SCREEN SAYS SO — H20. The sets drawn below
+          are the phone's own copy; the sentence is chosen by what is TRUE. */}
+      {loadState === 'failed' && (
+        <p role="status" data-testid="sets-reconnecting" className="mt-2 text-xs leading-[1.5] text-[color:var(--role-warn-text)]">
+          {reconnectingLine(setsKnown || logs.length > 0)}
+        </p>
+      )}
     </div>
   ) : undefined
+
+  // THE COACH LINE, BY LOGGED SET (2a): one sentence about the exercise she is
+  // on, built from the plan's own numbers and what she logged
+  // (exercise-coach-line.ts) — and the tab's own line when the sets give
+  // nothing to say. "Probe" only in a calibration week, on the lift the
+  // calibration cue is attached to.
+  const coachLine = (() => {
+    if (!showsTodaysSession || !workout) return null
+    const exs = workout.exercises
+    const groups = groupExercises(exs)
+    const inSuperset = new Set(groups.flatMap(g => (g.kind === 'superset' ? g.members.map(m => m.exIndex) : [])))
+    const rows = exs.map(ex => liveRowExercise(ex, { progressedLoads, progressedAddedLoads, layoff, profile }).rowEx)
+    const anchor = currentMesoWeekObj?.isCalibrationWeek ? resolveCalibrationAnchorIndex(exs) : null
+    const anchorEntry = anchor != null ? getExerciseEntry(rows[anchor].name) : null
+    const probeIndex = anchor != null && rows[anchor].suggested_load_kg != null && !!anchorEntry && isExternallyLoaded(anchorEntry) ? anchor : null
+    return exerciseCoachLine({
+      exercises: rows.map((ex, i) => ({
+        name: ex.name,
+        sets: ex.sets,
+        reps: ex.reps,
+        loadKg: ex.suggested_load_kg ?? null,
+        unit: (ex.suggested_load ? splitLoadDisplay(ex.suggested_load)?.unit : null) ?? 'kg',
+        perSetLoadKg: ex.per_set_load?.map(s => s.load_kg),
+        addedLoadKg: ex.suggested_added_load_kg ?? null,
+        assistanceKg: ex.suggested_assistance_kg ?? null,
+        inSuperset: inSuperset.has(i),
+      })),
+      logged: exs.map(ex => setsFor(ex.id ?? getExerciseId(ex.name), ex.name)),
+      probeIndex,
+      // The rest starts after every working set, so its label is the lift logged last.
+      recentIndex: restLabel ? exs.findIndex(ex => ex.name === restLabel) : null,
+      probeAtLimit: probeIndex != null && rows[probeIndex].load_hold === 'stated_limit',
+      fallback: todayNudge?.text ?? null,
+      carry: carriedWeightFor,
+    })
+  })()
+  /** The line on screen is the week's note — so the week row must not print it again, and its chevron opens the rest. */
+  const lineIsWeekNote = coachLine?.source === 'fallback' && todayNudge?.source === 'week-note'
 
   return (
     <div className="space-y-3">
@@ -1181,7 +1317,7 @@ export function TodayPanel({
         onOpenProgram={onOpenProgram}
         onOpenSessionHistory={onOpenSessionHistory}
         onOpenWhatHappened={profileId ? openWhatHappened : undefined}
-        coachNoteShownBelow={todayNudge?.source === 'week-note'}
+        coachNoteShownBelow={lineIsWeekNote}
         expanded={weekNotesOpen}
         onToggleExpanded={setWeekNotesOpen}
         hero={heroLeft}
@@ -1439,54 +1575,17 @@ export function TodayPanel({
             </div>
           )}
           {kindError && <p className="text-xs text-destructive" data-testid="kind-today-error">{kindError}</p>}
-          {/* THE SESSION'S NAME MOVED INTO THE HERO above (one-page Exercise, 17 Oct 2026); the sets count
-              is on "Today's lifts" below. What stays here belongs to running the session. */}
-          <div>
-            {/* START MOVED OUT OF THE HERO on 6 Sep 2026 — it is the fixed
-                bar above the tab bar now (see the end of this branch), where
-                it stays reachable after scrolling into the list. FINISH did
-                not move: it belongs beside the thing it ends, and the dock
-                already declines to carry a second entry point for it. */}
-            {status === 'running' && (
-              <>
-                <Button size="sm" onClick={requestFinish}>Finish session</Button>
-                {/* The line between a look and a workout, said before Finish
-                    is tapped rather than after: with nothing logged, Finish
-                    closes the screen and counts nothing (useActiveSession).
-                    Gone the moment a set lands. */}
-                {/* ...and only when the app KNOWS nothing is logged. On a
-                    reload with no connection and nothing remembered, zero is
-                    not a count (H20). */}
-                {totalSetsLogged === 0 && setsKnown && (
-                  <p className="mt-2 text-xs leading-[1.5] text-muted-foreground">
-                    Nothing logged yet — finishing now closes this screen without counting a workout. Log a set and it counts.
-                  </p>
-                )}
-              </>
-            )}
-            {/* THE READ FAILED, AND THE SCREEN SAYS SO — H20, 9 Oct 2026. The
-                sets drawn below are the phone's own copy, so nothing has gone
-                blank; this is the one line that explains why a set might read
-                "waiting to send". Quiet on purpose: nothing is wrong with the
-                workout. The sentence it shows is chosen by what is TRUE — see
-                reconnectingLine — and it goes the moment a read lands. */}
-            {loadState === 'failed' && (
-              <p role="status" data-testid="sets-reconnecting" className="mt-2 text-xs leading-[1.5] text-[color:var(--role-warn-text)]">
-                {reconnectingLine(setsKnown || logs.length > 0)}
-              </p>
-            )}
-          </div>
-
-          {/* THE TRAINER'S LINE, under the hero and above the list it is
-              about — the progression note for today's main lift, the
-              calibration instruction, or the week's note, whichever is the
-              most specific thing true today (src/lib/session-nudge.ts). */}
-          {todayNudge && (
-            todayNudge.source === 'week-note'
-              // Clamped, so its chevron must open the REST OF THIS SENTENCE
-              // (the week disclosure above), never the chat tab.
-              ? <TrainerNudge slim={!weekNotesOpen} text={todayNudge.text} tag="Training" clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
-              : <TrainerNudge slim text={todayNudge.text} tag="Training" openChat askPrefill={`Tell me more about this: "${todayNudge.text}"`} />
+          {/* START, FINISH AND THE SUMMARY ARE IN THE GLOWING CARD above (2a), beside the
+              session they belong to; the reconnecting line went with them. */}
+          {/* THE TRAINER'S LINE (2a): no box, the mint avatar and one sentence
+              about the set she is on — or the tab's own line (progression
+              note, calibration cue, week note) when the sets give nothing to
+              say. A clamped week note's chevron opens the REST OF THAT
+              SENTENCE (the week disclosure in the card), never the chat tab. */}
+          {coachLine && (
+            lineIsWeekNote
+              ? <TrainerNudge line text={coachLine.text} tag="Training" clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
+              : <TrainerNudge line text={coachLine.text} tag="Training" openChat askPrefill={`Tell me more about this: "${coachLine.text}"`} data-testid="exercise-coach-line" />
           )}
           <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} savedCardio={summarySavedCardio} />
           {finishCheck && (
@@ -1566,19 +1665,18 @@ export function TodayPanel({
             extraNote={tightness.note}
             extraCaveat={uncoveredNote(tightness)}
             trailing={
-              // ON THE WARM-UP ROW (30 Oct 2026): the question changes this warm-up, so it sits on it
-              // rather than as a row of its own. Before the session, beside what it changes.
-              <Button
-                variant="ghost"
-                size="sm"
-                className="min-h-[44px] px-3 text-xs text-text-tertiary"
+              // ON THE WARM-UP ROW (30 Oct 2026): the question changes this warm-up, so it sits on it.
+              <button
+                type="button"
+                className="hit-slop-44 flex h-[30px] items-center whitespace-nowrap rounded-full px-[11px] text-[0.71875rem] font-semibold"
+                style={{ border: '1px solid color-mix(in srgb, var(--role-ai) 35%, transparent)', color: 'var(--role-ai-text)' }}
                 data-testid="tightness-open"
                 onClick={() => setTightOpen(true)}
               >
                 {tightAreas.length > 0
                   ? `Tight: ${tightness.items.length > 0 ? 'updated' : 'noted'}`
                   : 'Feeling tight?'}
-              </Button>
+              </button>
             }
           />
           {tightOpen && (
@@ -1592,9 +1690,12 @@ export function TodayPanel({
             </Suspense>
           )}
           {moveError && <p className="text-xs text-destructive">{moveError} The order hasn’t changed.</p>}
-          {/* TODAY'S LIFTS (5c·4), with the session's sets — the SHARED capped count (her M39 "one
-              count"), so this, Home and the finished bar cannot say different fractions. */}
-          <PageSectionLabel right={heroCount ? <span data-testid="hero-sets">{heroCount.logged}/{heroCount.planned} sets</span> : undefined}>Today&apos;s lifts</PageSectionLabel>
+          {/* EXERCISES (2a), and how many of them are done. The working-set
+              count is in the card above — the SHARED capped one (her M39). */}
+          <p className="flex items-baseline justify-between px-1 pt-2" data-testid="exercises-heading">
+            <span className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-text-tertiary">Exercises</span>
+            <span className="text-[0.6875rem] text-muted-foreground" data-testid="exercises-done">{exercisesDone} of {workout!.exercises.length} done</span>
+          </p>
           <div ref={setListEl} data-today-exercises>
           <ExerciseList
             workout={workout!}
@@ -1632,55 +1733,37 @@ export function TodayPanel({
             profile={profile}
             onOpenPlateCalc={onOpenPlateCalc}
           />
-          {/* VISIBLE AGAIN, and the "⋮" menu no longer carries it. Turn 5 put
-              it behind that menu; the polish handoff puts it back at the foot
-              of the list, which is where someone finishing a session looks
-              for "I also did…". One entry point either way. */}
-          {/* PUT ONE IN THE PLAN — beside "I also did…", and above it, because
-              this one changes the session and the other only records what
-              happened outside it. ONE entry point, deliberately: the day
-              header's menu lost "Add unplanned work" on 6 Sep for exactly the
-              reason written there — two ways into one dialog is how they
-              drift apart. Only shown where an edit can actually be saved,
-              the same gate onRemove and onMove use. */}
-          {/* A COLUMN, NOT TWO BUTTONS LEFT TO FLOW. A <button> is inline, and
-              while there was only one of these at the foot of the list that
-              never showed; the second landed beside it on the same line, so
-              the screen read "＋ Add an exercise＋ Add unplanned work" as one
-              run-on string with abutting tap targets. Found by reading a
-              screenshot at 390px on 13 Sep 2026 — every check was green. */}
-          {/* ONE "＋ ADD" (30 Oct 2026, "less is more"): the two ways to add sit behind it, still a column
-              when open, so the two never run together on one line (13 Sep). */}
-          <div className="flex flex-col items-start gap-1" data-testid="session-foot-actions">
-            <button
-              type="button"
-              data-testid="add-open"
-              aria-expanded={addChoicesOpen}
-              onClick={() => setAddChoicesOpen(o => !o)}
-              className="hit-slop-44 text-left text-[0.8125rem] text-text-tertiary"
-            >
-              ＋ Add
-            </button>
-            {addChoicesOpen && (<>
+          {/* THE TWO WAYS TO ADD (2a), each said once and never on one line
+              (13 Sep): "Add exercise" puts one IN THE PLAN — the one button —
+              and "I also did…" records work done outside it, as a quiet line
+              under it. This replaces the 30 Oct "＋ Add" disclosure. "Add
+              exercise" only where an edit can be saved (the gate onRemove and
+              onMove use). */}
+          <div className="flex flex-col items-center gap-0.5 pt-2" data-testid="session-foot-actions">
             {profileId && mesocycle && (
               <button
                 type="button"
                 data-testid="add-exercise"
                 onClick={() => setAddOpen(true)}
-                className="hit-slop-44 pl-4 text-left text-[0.8125rem] text-text-tertiary"
+                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-2xl text-[0.875rem] font-semibold text-primary-text"
+                style={{ background: 'rgba(var(--glow-rgb), .12)', border: '1px solid rgba(var(--glow-rgb), .35)' }}
               >
-                Add an exercise
+                <Plus className="size-4" aria-hidden />
+                Add exercise
               </button>
             )}
-            <button
-              type="button"
-              data-testid="add-unplanned"
-              onClick={() => setUnplannedWorkOpen(true)}
-              className="hit-slop-44 pl-4 text-left text-[0.8125rem] text-text-tertiary"
-            >
-              Add unplanned work
-            </button>
-            </>)}
+            <p className="flex min-h-11 items-center gap-1.5 whitespace-nowrap text-[0.78125rem] text-muted-foreground">
+              Did something off-plan?
+              <button
+                type="button"
+                data-testid="add-unplanned"
+                onClick={() => setUnplannedWorkOpen(true)}
+                className="hit-slop-44 shrink-0 whitespace-nowrap font-semibold"
+                style={{ color: 'var(--ramp-label)' }}
+              >
+                I also did…
+              </button>
+            </p>
           </div>
           <AddUnplannedWork
             open={unplannedWorkOpen}
@@ -1691,64 +1774,26 @@ export function TodayPanel({
         </div>
       )}
 
-      {/* THE PROGRAM ROW LEFT THIS PAGE on 30 Oct 2026 ("less is more"): "Week N of M" at the top of this
-          page opens the whole programme, and Tools has "Your program". */}
-      {/* Clears the fixed CTA bar below, so the last row is never sitting
-          underneath it. Matches the bar's own height plus its fade. */}
-      {showsTodaysSession && (status === 'idle' || status === 'running' || status === 'finished') && <div aria-hidden className="h-[100px]" />}
+      {/* THE PROGRAM ROW LEFT THIS PAGE on 30 Oct 2026 ("less is more"): "Program ›" and the week line at
+          the top of this page open the whole programme, and Tools has "Your program". */}
+      {/* Clears the fixed bar below, so the last row is never sitting underneath it. */}
+      {showsTodaysSession && (status === 'idle' || status === 'running') && <div aria-hidden className="h-[100px]" />}
 
-      {/* THE PRIMARY ACTION, fixed above the tab bar. It used to be a small
-          button in the hero, which scrolled away the moment anyone read past
-          the first exercise — on a phone, the one control the screen exists
-          for was off-screen for most of the screen. Rides above BottomDock
-          when a timer is up, using the height the dock already publishes for
-          the chat composer (useBottomDockHeight) rather than a second guess
-          at how tall it is. */}
-      {/* ONLY WHEN THERE IS A WORKOUT TO START. This read `status !== 'running'`
-          until 7 Sep 2026, and status has THREE values — so the moment a
-          session was finished it fell back through to here and offered
-          "Start workout" again, on a screen where every exercise was struck
-          through and ticked. Ashley: "the home tab is still showing start
-          workout for todays workout even though I have already logged todays
-          workout."
-          A finished day gets no primary action: the work is done, and the
-          summary it produced is the thing to look at. `idle` is the only
-          state that means "not started". */}
-      {/* A FINISHED SESSION LOOKS FINISHED (runs 3-4, LOW): after Finish the
-          card was the plan with its bar gone and nothing saying so. The same
-          place Start sat says it is done, and opens the summary when there is
-          one to open. */}
-      {!peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'finished' && (
+      {/* START, WHEN THE CARD HAS SCROLLED AWAY (2a). Start is in the glowing
+          card; this compact bar above the tab bar exists only while that
+          button is off screen, so the one control the screen is for is never
+          out of reach (why it was docked on 6 Sep). Rides above BottomDock
+          using the height the dock publishes. ONLY BEFORE THE SESSION STARTS:
+          status has three values, and a finished day gets no Start (7 Sep). */}
+      {!heroStartInView && !peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'idle' && (
         <div
           className="fixed inset-x-0 z-40 px-[22px] pb-3 pt-2.5"
           style={{
             bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockHeightPx > 0 ? dockHeightPx + 12 : 0}px)`,
             background: 'linear-gradient(to top, var(--background) 70%, transparent)',
           }}
+          data-testid="start-bar"
         >
-          <Button
-            className="h-[52px] w-full text-[0.9375rem] font-semibold"
-            variant="outline"
-            data-testid="session-finished"
-            disabled={!summaryData}
-            onClick={() => setSummaryOpen(true)}
-          >
-            {/* DONE, WITH THE COUNT when it closed short (Ashley, 10 Oct 2026). */}
-            {`✓ ${finishedShort ? `Done · ${finishedShort}` : 'Session finished'}${summaryData ? ' · View summary' : ''}`}
-          </Button>
-        </div>
-      )}
-      {!peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'idle' && (
-        <div
-          className="fixed inset-x-0 z-40 px-[22px] pb-3 pt-2.5"
-          style={{
-            bottom: `calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockHeightPx > 0 ? dockHeightPx + 12 : 0}px)`,
-            background: 'linear-gradient(to top, var(--background) 70%, transparent)',
-          }}
-        >
-          {/* A swapped day keeps the escape hatch and loses the pretence:
-              "Start workout" on a session she has already replaced is the
-              app telling her it did not hear. Same handler, honest label. */}
           <Button
             className={swappedToday ? 'h-[52px] w-full text-[0.9375rem] font-semibold' : PRIMARY_CTA_CLASS}
             style={swappedToday ? undefined : PRIMARY_CTA_STYLE}
@@ -1826,7 +1871,7 @@ function ExerciseList({
   onBan: (name: string) => void
   onSetCompleted: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
 }) {
-  const { setsFor } = useActiveSession()
+  const { setsFor, restLabel } = useActiveSession()
   // User overrides only — the default expanded state (which exercise is
   // "current") is recomputed fresh every render from live logs below, so a
   // completed exercise's row auto-advances to the next incomplete one
@@ -1861,35 +1906,23 @@ function ExerciseList({
   }
   const flatComplete = new Map(groups.flatMap(g => g.kind === 'single' ? [[g.exIndex, isExerciseComplete(g.ex)] as const] : g.members.map(m => [m.exIndex, isExerciseComplete(m.ex)] as const)))
   const firstIncompleteExIndex = flatExIndexes.find(i => !flatComplete.get(i))
+  // THE LIFT SHE IS ON ("· now", 2a): the one logged last while it has sets
+  // to do (the rest engine's label), else any part-way through, else the
+  // first with sets to do — the coach line's own rule (exercise-coach-line.ts).
+  const partway = (i: number) => {
+    const ex = workout.exercises[i]
+    const n = setsFor(ex.id ?? getExerciseId(ex.name), ex.name).length
+    return n > 0 && n < ex.sets
+  }
+  const recentExIndex = restLabel ? workout.exercises.findIndex(ex => ex.name === restLabel) : -1
+  const currentExIndex = recentExIndex >= 0 && partway(recentExIndex)
+    ? recentExIndex
+    : flatExIndexes.find(partway) ?? firstIncompleteExIndex
 
   const rowProps = (ex: WorkoutDay['exercises'][number], exIndex: number) => {
     const defaultExpanded = exIndex === firstIncompleteExIndex
     const expanded = exIndex in expandOverrides ? expandOverrides[exIndex] : defaultExpanded
-    // The progressed added weight REPLACES the plan's figure on the row, so a
-    // trainee who hit their reps last week actually sees +17.5kg rather than
-    // the plan's +15kg with a note about it. Substituted here, on a copy,
-    // rather than mutating the plan — the peek and program-browse surfaces
-    // deliberately show plan-derived numbers only.
-    // AFTER A BREAK, A LIFT WITH NO HISTORY IS EASED TOO. Its number is the plan's
-    // printed one, and the plan's weekly ramp kept climbing while the person did not.
-    const easePrinted = easesWeights(layoff)
-    const progressedAdded = progressedAddedLoads[ex.name]
-      ?? (easePrinted && ex.suggested_added_load_kg != null ? easeAddedKg(ex.suggested_added_load_kg, layoff) : undefined)
-    const withAdded = progressedAdded != null && ex.suggested_added_load_kg != null
-      ? { ...ex, suggested_added_load_kg: progressedAdded }
-      : ex
-    // AND THE ORDINARY WEIGHT, for the same reason and on the same copy. The
-    // chip above already said "from your last session" and the note below
-    // already said "Held at 35kg" — the figure between them was still the
-    // plan's. withWorkingLoadKg moves all three views of it together and
-    // scales the ramp rather than flattening it; see its own note.
-    const printedEasedFrom = progressedLoads[ex.name] == null && easePrinted && ex.suggested_load_kg != null
-      ? ex.suggested_load_kg : null
-    const progressedLoad = progressedLoads[ex.name]
-      ?? (printedEasedFrom != null ? easeWeightKg(printedEasedFrom, layoff, getExerciseEntry(ex.name)) : undefined)
-    const rowEx = progressedLoad != null
-      ? withWorkingLoadKg(withAdded, progressedLoad, profile)
-      : withAdded
+    const { rowEx, printedEasedFrom, progressedLoad } = liveRowExercise(ex, { progressedLoads, progressedAddedLoads, layoff, profile })
     return {
       ex: rowEx,
       dayName,
@@ -1927,6 +1960,8 @@ function ExerciseList({
       onToggleExpanded: () => setExpandOverrides(prev => ({ ...prev, [exIndex]: !expanded })),
       // "01", "02" in the order the session is done, supersets included.
       index: flatExIndexes.indexOf(exIndex) + 1,
+      // The first exercise with sets still to do: "· now" on its card (2a).
+      isCurrent: exIndex === currentExIndex,
     }
   }
 
@@ -1939,34 +1974,74 @@ function ExerciseList({
       ? rowProps(g.ex, g.exIndex).expanded
       : g.members.some(m => rowProps(m.ex, m.exIndex).expanded)
 
-  // Tab-restructure handoff — meal-slot idiom: hairline-separated rows in
-  // one column, not gap-separated cards. The section label picks up "· open"
-  // + primary colour whenever a row inside its group is expanded, matching
-  // MealPlan's slot-label treatment.
+  // 2a: closed exercises are hairline rows; the open one is its own mint-edged
+  // card. A single row carries its label itself ("Main lift · now" on the card,
+  // a small "Primer" over a closed row); a superset keeps the label over the
+  // pair, because it names the pair.
   return (
     <div className="flex flex-col">
       {groups.map((g, i) => {
         const expanded = isGroupExpanded(g)
+        const label = sectionLabelFor(g, i === firstMainLiftGroupIndex)
         return (
           <div
             key={i}
-            className={`flex flex-col gap-2.5 py-3 ${i > 0 ? '' : 'pb-3'}`}
-            style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
+            className={g.kind === 'single' && expanded ? 'my-2.5' : 'flex flex-col gap-2.5'}
+            style={g.kind === 'single' && expanded ? undefined : { borderBottom: '1px solid var(--hairline)' }}
           >
-            <SectionLabel text={sectionLabelFor(g, i === firstMainLiftGroupIndex)} expanded={expanded} />
             {g.kind === 'single' ? (
-              <ExerciseRow {...rowProps(g.ex, g.exIndex)} />
+              <ExerciseRow {...rowProps(g.ex, g.exIndex)} sectionLabel={label} />
             ) : (
-              <SupersetGroup
-                label={g.label}
-                members={g.members.map(m => ({ props: rowProps(m.ex, m.exIndex) }))}
-              />
+              <div className="flex flex-col gap-2.5 py-3">
+                <SectionLabel text={label} expanded={expanded} />
+                <SupersetGroup
+                  label={g.label}
+                  members={g.members.map(m => ({ props: rowProps(m.ex, m.exIndex) }))}
+                />
+              </div>
             )}
           </div>
         )
       })}
     </div>
   )
+}
+
+/**
+ * TODAY'S ROW OF ONE EXERCISE — the plan's slot with today's progressed or
+ * eased weight put in. One function, read by the list and by the coach line,
+ * so the line can never name a weight the card does not show.
+ */
+function liveRowExercise(
+  ex: Exercise,
+  { progressedLoads, progressedAddedLoads, layoff, profile }: { progressedLoads: Record<string, number>; progressedAddedLoads: Record<string, number>; layoff: LayoffStatus; profile?: UserProfile },
+): { rowEx: Exercise; printedEasedFrom: number | null; progressedLoad: number | undefined } {
+  // The progressed added weight REPLACES the plan's figure on the row, so a
+  // trainee who hit their reps last week actually sees +17.5kg rather than
+  // the plan's +15kg with a note about it. Substituted here, on a copy,
+  // rather than mutating the plan — the peek and program-browse surfaces
+  // deliberately show plan-derived numbers only.
+  // AFTER A BREAK, A LIFT WITH NO HISTORY IS EASED TOO. Its number is the plan's
+  // printed one, and the plan's weekly ramp kept climbing while the person did not.
+  const easePrinted = easesWeights(layoff)
+  const progressedAdded = progressedAddedLoads[ex.name]
+    ?? (easePrinted && ex.suggested_added_load_kg != null ? easeAddedKg(ex.suggested_added_load_kg, layoff) : undefined)
+  const withAdded = progressedAdded != null && ex.suggested_added_load_kg != null
+    ? { ...ex, suggested_added_load_kg: progressedAdded }
+    : ex
+  // AND THE ORDINARY WEIGHT, for the same reason and on the same copy. The
+  // chip above already said "from your last session" and the note below
+  // already said "Held at 35kg" — the figure between them was still the
+  // plan's. withWorkingLoadKg moves all three views of it together and
+  // scales the ramp rather than flattening it; see its own note.
+  const printedEasedFrom = progressedLoads[ex.name] == null && easePrinted && ex.suggested_load_kg != null
+    ? ex.suggested_load_kg : null
+  const progressedLoad = progressedLoads[ex.name]
+    ?? (printedEasedFrom != null ? easeWeightKg(printedEasedFrom, layoff, getExerciseEntry(ex.name)) : undefined)
+  const rowEx = progressedLoad != null
+    ? withWorkingLoadKg(withAdded, progressedLoad, profile)
+    : withAdded
+  return { rowEx, printedEasedFrom, progressedLoad }
 }
 
 /**

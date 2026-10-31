@@ -102,6 +102,7 @@ const readCard = async name => ev(`(() => {
     work: [...card.querySelectorAll('[data-testid="working-row"]')].map(readRow),
     warmCaption: card.querySelector('[data-testid="warmup-caption"]')?.textContent?.trim() ?? null,
     workCaption: card.querySelector('[data-testid="working-caption"]')?.textContent?.trim() ?? null,
+    meta: card.querySelector('[data-testid="exercise-meta"]')?.textContent?.trim() ?? null,
     addWarmup: !!card.querySelector('[data-testid="add-warmup-set"]'),
     head: (card.innerText || '').split('\\n').slice(0, 3).join(' | '),
   }
@@ -191,11 +192,14 @@ check('the group header names the build-up',
   /ramp/i.test(loaded.warmCaption ?? ''), loaded.warmCaption)
 check('...and says it does not count',
   /not counted/i.test(loaded.warmCaption ?? ''), loaded.warmCaption)
+// RE-ANCHORED 31 Oct 2026 (Exercise 2a): the prescription is the card's own meta line ("3 × 9-11 · 47.5 kg · rest
+// 120s") right above, and the group's right half is the count that is KEPT ("0 logged") in place of the design's
+// "saved", which a set waiting to send would make untrue.
 check('the working group names the prescription it is working toward',
-  /working sets/i.test(loaded.workCaption ?? '') && /\d/.test(loaded.workCaption ?? ''),
-  loaded.workCaption)
+  /working sets/i.test(loaded.workCaption ?? '') && /^\d+ × \S+/.test(loaded.meta ?? ''),
+  { caption: loaded.workCaption, meta: loaded.meta })
 check('...and says these are the ones that are kept',
-  /saved/i.test(loaded.workCaption ?? ''), loaded.workCaption)
+  /\d+ logged$/i.test(loaded.workCaption ?? ''), loaded.workCaption)
 
 // ---- 2. The working sets, without pressing anything ----------------------
 console.log('\n  2. THE WORKING SETS — HER ACTUAL REPORT')

@@ -75,15 +75,17 @@ check('0b. the header states a length', Number.isFinite(before.mins), before)
 
 // --- the entry point ------------------------------------------------------
 // RE-ANCHORED 30 Oct 2026 ("less is more", her "Move things"): the two ways to add sit behind one "＋ Add".
-check('1a. "＋ Add" is at the foot of the list, and "Add an exercise" is one tap behind it',
-  (await has('[data-testid="add-open"]')) && !(await has('[data-testid="add-exercise"]'))
-  && (await tap('[data-testid="add-open"]')) && (await until(() => has('[data-testid="add-exercise"]'), v => v)))
+// RE-ANCHORED 31 Oct 2026 (Exercise 2a): the "＋ Add" disclosure gave way to the design's foot — "Add exercise" is
+// the one button there, in view without a tap first, and the old disclosure is gone.
+check('1a. "Add exercise" is at the foot of the list, one tap, with no "＋ Add" in front of it',
+  (await has('[data-testid="add-exercise"]')) && !(await has('[data-testid="add-open"]'))
+  && (await ev(`/^Add exercise$/.test(document.querySelector('[data-testid="add-exercise"]')?.textContent.trim() ?? '')`)))
 // HER 6 SEP RULE, still holding: one entry point per dialog. The plan edit and
 // the logging affordance are both there and are different buttons with
 // different words, so neither can be mistaken for the other.
 const feet = await ev(`[...document.querySelectorAll('[data-testid="session-foot-actions"] button')].map(b => b.textContent.trim())`)
-check('1b. ...beside, and distinct from, "Add unplanned work"',
-  feet.filter(t => /add an exercise/i.test(t)).length === 1 && feet.some(t => /unplanned/i.test(t)), feet)
+check('1b. ...beside, and distinct from, "I also did…" (unplanned work)',
+  feet.filter(t => /^add exercise$/i.test(t)).length === 1 && feet.some(t => /^I also did…$/.test(t)), feet)
 
 // STACKED, NOT SIDE BY SIDE. Both are plain <button>s, which are inline, so
 // the second one landed on the same line as the first and the screen read

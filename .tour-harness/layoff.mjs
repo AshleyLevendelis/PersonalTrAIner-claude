@@ -79,7 +79,7 @@ const readLift = name => ev(`(() => {
   let card = leaf
   for (let i = 0; i < 12 && card.parentElement; i++) { card = card.parentElement; if (card.querySelector('input') && /kg/i.test(card.innerText)) break }
   const text = card.innerText
-  const headline = [...card.querySelectorAll('.ds-num-lg')].map(n => parseFloat((n.textContent || '').replace(/[^\\d.]/g, ''))).filter(n => Number.isFinite(n) && n > 0)
+  const headline = [...card.querySelectorAll('[data-testid="exercise-load"]') /* 2a: the weight in the card's meta line (was .ds-num-lg) */].map(n => parseFloat((n.textContent || '').replace(/[^\\d.]/g, ''))).filter(n => Number.isFinite(n) && n > 0)
   const chips = [...card.querySelectorAll('span')].map(n => (n.textContent || '').trim()).map(s => /^S(\\d+):\\s*([\\d.]+)kg$/.exec(s)).filter(Boolean).map(m => parseFloat(m[2]))
   const prefills = [...card.querySelectorAll('input')].filter(i => /^setgrid-weight-/.test(i.id)).map(i => parseFloat(String(i.value || i.placeholder).replace(/[^\\d.]/g, ''))).filter(n => Number.isFinite(n) && n > 0)
   return { found: true, headline, chips, prefills, lastTime: /last time/i.test(text), text: text.replace(/\\s+/g, ' ').slice(0, 500) }

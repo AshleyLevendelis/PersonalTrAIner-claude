@@ -17,11 +17,12 @@ import { useEffect, useState } from 'react'
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Check, Dumbbell, Plus, RotateCcw, Trophy, Trash2 } from 'lucide-react'
+import { Check, ChevronDown, Disc, Dumbbell, Plus, RotateCcw, Trophy, Trash2 } from 'lucide-react'
+import { InlineRest, restBelongsToSet } from './InlineRest'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropSets, rowKey, setLabel, setLabelLong, type SetRef } from '@/lib/session-derive'
-import { lastTime, sameAsSet, setReading, loggedSetReading, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE } from '@/lib/coach-voice'
+import { lastTime, sameAsSet, setReading, loggedSetReading, loggedCountLabel, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE } from '@/lib/coach-voice'
 import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, nextSetRungsKg } from '@/lib/load-prescription'
@@ -133,6 +134,15 @@ export interface SetGridProps {
   profile?: UserProfile | null
   onSetCompleted?: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
   onOpenPlateCalc?: (weight: number) => void
+  /**
+   * THE RAMP FOLDS INTO ONE ROW (tab polish, Exercise 2a, 31 Oct 2026). With a
+   * toggle, the build-up rows sit behind a 44px "Ramp up" row; open, they are
+   * the SAME loggable rows as ever (her 17 Sep "a box for every set,
+   * labelled"), never counted. Without one (Additional Work) nothing folds.
+   */
+  /** Her choice for this lift this session; undefined = the default (open while a build-up row is still to do). */
+  rampOpen?: boolean
+  onToggleRamp?: (open: boolean) => void
   // REMOVED 5 Sep 2026: onFirstEverLog. It was declared here, forwarded by
   // ExerciseRow, and fired on the right condition — and no parent anywhere in
   // the app ever passed one, so the "one-time celebration" its doc comment
@@ -161,11 +171,15 @@ export function SetGrid({
   profile,
   onSetCompleted,
   onOpenPlateCalc,
+  rampOpen: rampChoice,
+  onToggleRamp,
 }: SetGridProps) {
   const {
     profileId, date: today, dayName, liveWeek, logs, setsFor, ghosts, loadGhosts, logSet, deleteSet, retrySet, refresh,
     setDraft, saveSetDraft, clearSetDrafts, extraSetsFor, setExtraSets,
+    restEndsAt, restLabel, restTargetSetNumber, dismissRest, setsKnown, loadState,
   } = useActiveSession()
+  const rest = { restEndsAt, restLabel, restTargetSetNumber }
 
   useEffect(() => {
     loadGhosts(exerciseId)
@@ -794,6 +808,9 @@ export function SetGrid({
     // the wrong set — which is what every caller of this function did until
     // the parameter was made required.
     deleteSet({ userId: profileId, date: today, exerciseId, setNumber: ref.setNumber, isWarmup: isWarm(ref), dropIndex: ref.dropIndex ?? 0 })
+    // UNTICKING A SET CANCELS ITS REST (Exercise 2a): the rest under set 2 is
+    // the wait before set 3, and with set 2 gone there is nothing to wait for.
+    if (!isWarm(ref) && !isDrop(ref) && restBelongsToSet(rest, exerciseName, ref.setNumber)) dismissRest()
     // deleteSet is the raw store function — refresh() is what makes the row
     // (and every other surface reading activeSession.logs) actually update.
     refresh()
@@ -831,22 +848,81 @@ export function SetGrid({
     ? getRepsColumnLabel(prescribedReps ?? '', prescriptionType)
     : 'Reps'
 
+  // THE FOLDED RAMP (Exercise 2a): one row says how far the build-up is, and
+  // tapping it shows the build-up rows themselves. Its summary reads the same
+  // logs and the same prescription the rows do.
+  const hasFold = !!onToggleRamp && warmupRowNumbers.length > 0
+  const rampDone = warmupRowNumbers.filter(n => warmupLogs.some(l => l.set_number === n)).length
+  // OPEN WHILE A BUILD-UP ROW IS STILL TO DO, folded once every one is in, and
+  // her own choice after that. Counted off THIS grid's rows, so a warm-up she
+  // has just added (and not logged) opens the fold rather than vanishing in it.
+  const rampOpen = rampChoice ?? rampDone < warmupRowNumbers.length
+  const showWarm = !hasFold || rampOpen
+  const rampKgs = (rampSets ?? []).map(r => r.kg).filter((kg): kg is number => kg != null)
+  const rampSummary = rampDone >= warmupRowNumbers.length
+    ? `${warmupRowNumbers.length} of ${warmupRowNumbers.length} done`
+    : `${rampDone} of ${warmupRowNumbers.length}${rampKgs.length > 1 && rampKind === 'kg' ? ` · ${rampKgs[0]} → ${rampKgs[rampKgs.length - 1]} kg` : ''}`
+  /** The set to do next — the one row whose tick glows. Drops are offered from their parent, never as "next". */
+  const activeRow = rowRefs.find(r => (showWarm || !isWarm(r)) && !isDrop(r) && !loggedRowFor(r))
+  /** The last row belonging to working set n (its drops included): where its rest sits. */
+  const lastRowOfSet = (n: number) => rowRefs.reduce((last, r, i) => (r.kind === 'working' && r.setNumber === n ? i : last), -1)
+  // THE COLUMN LABELS ONLY WHERE THEY SAY SOMETHING THE BOXES DO NOT (2a draws
+  // none): a weight that is per hand or one side, or a column that logs
+  // seconds or metres rather than reps. A number never reaches a screen
+  // without its unit.
+  const unitQualifier = loadUnitLabel && loadUnitLabel !== 'kg' ? loadUnitLabel.replace(/^kg\s*/, '') : null
+  const showColumnLabels = !!unitQualifier || logColumnLabel !== 'Reps'
+  const GRID = 'grid grid-cols-[24px_minmax(80px,1fr)_28px_56px_auto] gap-1.5 items-center'
+  const addWarmupButton = (
+    <button
+      type="button"
+      className="hit-slop-44 mt-0.5 flex min-h-8 items-center gap-1.5 px-0.5 text-[0.75rem] text-[color:var(--ramp-label)]"
+      onClick={handleAddWarmupSet}
+      data-testid="add-warmup-set"
+    >
+      <Plus className="size-3" aria-hidden />
+      Add warm-up
+    </button>
+  )
+
   return (
-    <div className="pb-3 pt-1 space-y-1">
-      <div className="grid grid-cols-[auto_minmax(6rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center text-xs text-muted-foreground font-medium px-1">
-        <span className="w-7">#</span>
-        <span>
-          {loadIsEstimate ? 'Log weight' : 'Weight'}
-          {loadUnitLabel && loadUnitLabel !== 'kg' && (
-            <span className="text-muted-foreground/70"> · {loadUnitLabel.replace(/^kg\s*/, '')}</span>
-          )}
-        </span>
-        <span className="w-7"></span>
-        <span className="w-7"></span>
-        <span className="w-8"></span>
-        <span>{logColumnLabel}</span>
-        <span className="w-8"></span>
-      </div>
+    <div className="pb-1 space-y-1">
+      {hasFold && (
+        <button
+          type="button"
+          onClick={() => onToggleRamp?.(!rampOpen)}
+          aria-expanded={rampOpen}
+          data-testid="warmup-caption"
+          data-ramp-toggle={rampOpen ? 'open' : 'closed'}
+          className="flex min-h-11 w-full items-center gap-2 border-b border-[color:var(--hairline)] px-0.5 text-left"
+        >
+          <span
+            aria-hidden
+            className="flex size-5 shrink-0 items-center justify-center rounded-full"
+            style={rampDone >= warmupRowNumbers.length
+              ? { background: 'var(--ramp-button)', color: 'var(--ramp-on)' }
+              : { boxShadow: 'inset 0 0 0 1.5px var(--ramp-rail)', color: 'var(--ramp-label)' }}
+          >
+            <Check className="size-[11px]" strokeWidth={3} />
+          </span>
+          <span className="whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[.12em] text-[color:var(--ramp-label)]">Ramp up</span>
+          <span className="min-w-0 flex-1 truncate text-[0.71875rem] text-text-tertiary" data-testid="ramp-summary">{rampSummary}</span>
+          <span className="whitespace-nowrap text-[0.625rem] text-muted-foreground">not counted</span>
+          <ChevronDown aria-hidden className={`size-[13px] shrink-0 text-muted-foreground transition-transform duration-150 ${rampOpen ? 'rotate-180' : ''}`} />
+        </button>
+      )}
+      {showColumnLabels && (
+        <div className={`${GRID} px-0.5 text-[0.625rem] text-muted-foreground`} data-testid="set-columns">
+          <span />
+          <span>
+            {loadIsEstimate ? 'Log weight' : 'Weight'}
+            {unitQualifier && <span className="text-muted-foreground/70"> · {unitQualifier}</span>}
+          </span>
+          <span />
+          <span>{logColumnLabel}</span>
+          <span />
+        </div>
+      )}
       {rowRefs.map((ref, rowIndex) => {
         const setNumber = ref.setNumber
         const k = rowKey(ref)
@@ -876,30 +952,45 @@ export function SetGrid({
         // It sits above the first row of each block rather than wrapping it,
         // so both blocks stay inside one grid and the weight column runs
         // unbroken down the card — the layout half of her 17 Sep ruling.
-        const railed = !insideSuperset
-        const startsWorking = warm === false && !drop && rowIndex > 0 && rowRefs[rowIndex - 1].kind === 'warmup'
-        const groupHead = rowIndex === 0 && warm
+        // NO RAIL ON TODAY'S CARD (Exercise 2a): the ramp has its own folded row
+        // there, so the colour of the label and the tick says what a row counts
+        // as. Additional Work keeps the rails it has.
+        const railed = !insideSuperset && !onToggleRamp
+        const startsWorking = warm === false && !drop && (onToggleRamp
+          ? !rowRefs.slice(0, rowIndex).some(r => r.kind === 'working')
+          : rowIndex > 0 && rowRefs[rowIndex - 1].kind === 'warmup')
+        const groupHead = rowIndex === 0 && warm && !hasFold
           ? { left: 'Ramp up', right: 'not counted' }
           : startsWorking
-            ? { left: `Working sets · ${totalSets} × ${prescribedReps ?? ''}`.trim().replace(/ ×\s*$/, ''), right: restTime ? `saved · rest ${restTime}` : 'saved' }
+            ? (onToggleRamp
+              // The card's own header already says "3 × 6 · 72.5 kg · rest 120s".
+              // THE RIGHT HALF IS THE COUNT, NOT "saved" (2a draws "saved"): a set
+              // can be waiting to send, and on a dead connection the app may not
+              // know what is logged at all (H20) — loggedCountLabel says which.
+              ? { left: 'Working sets', right: loggedCountLabel(existingLogs.length, { known: setsKnown, loading: loadState === 'loading' }) }
+              : { left: `Working sets · ${totalSets} × ${prescribedReps ?? ''}`.trim().replace(/ ×\s*$/, ''), right: restTime ? `saved · rest ${restTime}` : 'saved' })
             : null
         // THE DROP HEADER, above the FIRST drop of a set only — a second one
         // between 3·1 and 3·2 would be announcing the same thing twice about
         // one continuous effort. "No rest" is not decoration: it is the whole
-        // difference between a drop and another set, and this row is the only
-        // place on the card where the rest figure in the working header above
-        // does not apply.
+        // difference between a drop and another set.
         const startsDrops = drop && rowIndex > 0 && !isDrop(rowRefs[rowIndex - 1])
         // The one "add a drop" link: under the last row of the last logged
-        // set, and only once that row is actually saved. Offering it under an
-        // empty box would be asking for a continuation of a set that has not
-        // happened.
-        // AND ONLY ON A SET COUNTED IN REPS (M42): a drop is a lighter
-        // continuation of a lift, and a plank or a carry has none.
+        // set, and only once that row is actually saved. AND ONLY ON A SET
+        // COUNTED IN REPS (M42): a plank or a carry has no drop.
         const showAddDrop = rowIndex === lastRowIndexOfLastLoggedSet && isSaved && (prescriptionType ?? 'reps') === 'reps'
         const padClass = railed
           ? (drop ? 'pl-5 pr-1' : 'pl-2 pr-1')
-          : (drop ? 'pl-4 pr-1 rounded-l-[8px]' : 'px-1 rounded-l-[8px]')
+          : (drop ? 'pl-4 pr-0.5' : 'px-0.5')
+        const isActive = !!activeRow && rowKey(activeRow) === k
+        // THE REST SITS UNDER THE SET IT FOLLOWS (Exercise 2a) — after that
+        // set's drops, never after the last set. One engine, read here.
+        const restHere = !warm && rowIndex === lastRowOfSet(setNumber) && restBelongsToSet(rest, exerciseName, setNumber)
+        // THE PLATE BUTTON SITS IN THE BOX (2a): it works out the plates for
+        // whatever this row would log. Not on a cable — the pin is the weight
+        // (takesPlateCalculator) — and not where no handler is threaded.
+        const plateButton = !!onOpenPlateCalc && takesPlateCalculator(catalogEntry)
+        if (warm && !showWarm) return null
 
         return (
           <React.Fragment key={k}>
@@ -912,13 +1003,13 @@ export function SetGrid({
           )}
           {groupHead && (
             <div
-              className={`flex items-baseline justify-between gap-2 pl-2.5 pr-1 ${rowIndex === 0 ? '' : 'pt-3'}`}
+              className={`flex items-baseline justify-between gap-2 ${onToggleRamp ? 'px-0.5' : 'pl-2.5 pr-1'} ${rowIndex === 0 ? '' : 'pt-3'}`}
               data-testid={warm ? 'warmup-caption' : 'working-caption'}
             >
-              <span className={`text-[0.625rem] uppercase tracking-[.12em] whitespace-nowrap ${warm ? 'text-[color:var(--ramp-label)]' : 'text-primary-text'}`}>
+              <span className={`text-[0.625rem] font-semibold uppercase tracking-[.12em] whitespace-nowrap ${warm ? 'text-[color:var(--ramp-label)]' : 'text-primary-text glow-mint'}`}>
                 {groupHead.left}
               </span>
-              <span className="text-[0.625rem] text-muted-foreground whitespace-nowrap">{groupHead.right}</span>
+              <span className="text-[0.625rem] text-muted-foreground whitespace-nowrap" data-testid={onToggleRamp && !warm ? 'logged-count' : undefined}>{groupHead.right}</span>
             </div>
           )}
           <div
@@ -930,31 +1021,17 @@ export function SetGrid({
             // type. See offersNoWeight; the ✓ below carries it otherwise.
             data-tour={!isSaved && offersNoWeight(ref) ? 'setrow' : undefined}
             data-needs-weight={!isSaved && offersNoWeight(ref) ? 'true' : undefined}
-            // A RAIL MEANS GROUPING, A COLOUR MEANS WHAT A SET COUNTS AS —
-            // the rule the whole handoff rests on. The rail is drawn per row
-            // rather than as a wrapper because both groups share one grid, so
-            // wrapping either would break the weight column that runs down
-            // the card. Adjacent rows with no gap read as one continuous bar.
-            //
-            // INSIDE A SUPERSET IT IS DROPPED: that rail already means
-            // grouping, and two rails would fight. There the ramp is signalled
-            // by the violet label and save button alone.
-            //
-            // A DROP KEEPS THE WORKING RAIL, and that follows from her rule
-            // rather than from taste: the rail says what belongs with what,
-            // and a drop belongs with the working sets. Its own subordination
-            // is carried by the indent and the tether below — position, not
-            // colour, because colour here already means "this counts as
-            // working volume", which a drop does.
+            // A RAIL MEANS GROUPING, A COLOUR MEANS WHAT A SET COUNTS AS. Off
+            // the card (Additional Work) the rail is still drawn per row; a drop
+            // keeps the working rail, because it belongs with the working sets.
             style={railed ? { borderLeft: `2px solid ${warm ? 'var(--ramp-rail)' : 'color-mix(in srgb, var(--primary) 55%, transparent)'}` } : undefined}
-            className={`grid grid-cols-[auto_minmax(6rem,1fr)_auto_auto_auto_1fr_auto] gap-1.5 items-center rounded-r-[8px] py-0.5 transition-colors ${drop ? 'relative' : ''} ${padClass} ${
-              isSaved ? (didNotSave ? 'bg-[color:var(--role-warn-bg)]' : warm ? 'bg-[color:var(--ramp)]/10' : 'bg-primary/10') : ''
+            className={`${GRID} rounded-r-[8px] py-0.5 transition-colors ${drop ? 'relative' : ''} ${padClass} ${
+              isSaved ? (didNotSave ? 'bg-[color:var(--role-warn-bg)]' : railed ? (warm ? 'bg-[color:var(--ramp)]/10' : 'bg-primary/10') : '') : ''
             }`}
           >
             {/* The tether — an elbow from the row above into this one, so a
-                drop reads as hanging off its set rather than sitting beside
-                it. Decorative and hidden from a screen reader, which gets the
-                same fact from the row's spoken name ("Set 3, drop 1"). */}
+                drop reads as hanging off its set. Decorative; a screen reader
+                gets the same fact from the row's spoken name. */}
             {drop && (
               <span
                 aria-hidden
@@ -962,63 +1039,47 @@ export function SetGrid({
                 style={{ borderColor: 'color-mix(in srgb, var(--primary) 30%, transparent)' }}
               />
             )}
-            {/* THE KIND IS IN THE LABEL, NOT ONLY IN THE DATA. A caption
-                scrolls off the top of a phone; the row prefix does not. W1
-                or 1, and no third case. */}
-            {/* R1 on screen, "Warm-up 1" out loud — see setLabel/setLabelLong.
-                The violet says what the row COUNTS AS and is the only colour
-                carrying that meaning; the rail beside it only says these rows
-                belong together. */}
-            <span className={`w-7 font-mono text-xs font-medium text-center ${warm ? 'text-[color:var(--ramp-label)]' : (isSaved ? 'text-primary-text' : 'text-muted-foreground')}`}>
+            {/* THE KIND IS IN THE LABEL, NOT ONLY IN THE DATA: R1 on screen,
+                "Warm-up 1" out loud (setLabel/setLabelLong). Violet says what
+                the row COUNTS AS; mint marks the set to do next. */}
+            <span className={`font-mono text-[0.6875rem] font-medium ${warm ? 'text-[color:var(--ramp-label)]' : (isActive || (isSaved && railed) ? 'text-primary-text' : 'text-muted-foreground')}`}>
               {setLabel(ref)}
             </span>
-            {/* `max` is a hint the browser does not enforce (see
-                saveCardioLog's comment on the same trap) — the rule is
-                checkLoggedSetWeight in handleSaveSet, and the absolute half
-                of it again in the store. */}
-              {/* h-11 is 44px, the comfortable tap minimum. These two are
-                  used mid-workout and at 28px were the smallest real targets
-                  in the app. A text field cannot carry the invisible hit-slop
-                  the buttons use — there is no ::after on an <input> — so the
-                  only honest fix is real height. Ashley chose it on 9 Sep
-                  2026 from three options, having seen the before and after:
-                  the page grows about 60px and the boxes stop being missable. */}
-            <Input
-              id={`setgrid-weight-${exerciseId}-${k}`}
-              type="number"
-              min="0"
-              max={MAX_LOGGABLE_SET_KG}
-              step="0.5"
-              placeholder={isBW ? 'BW' : weightPlaceholderFor(ref)}
-              value={isBW ? '' : input.weight}
-              onChange={e => updateInput(ref, 'weight', e.target.value)}
-              onFocus={scrollRowIntoView}
-              className={`h-11 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[k] ? 'ring-1 ring-destructive' : rowWarnings[k] ? 'ring-1 ring-amber-500' : ''}`}
-              disabled={isBW}
-            />
-            {/* The `?.` used to make this button silently inert wherever the
-                prop was absent, which is how Additional Work came to have a
-                dead one. The handler is threaded there now — and the button
-                only renders where one exists, so the same gap cannot draw a
-                dead control again. */}
-            {/* AND NOT ON A CABLE, since 19 Sep 2026. The pin IS the weight
-                there, so a button offering to work out the plates describes a
-                machine that is not in front of her — see
-                takesPlateCalculator, which has the measurement for why this
-                is cable rather than every stack. */}
-            {onOpenPlateCalc && takesPlateCalculator(catalogEntry) && (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="size-7 text-muted-foreground hover:text-foreground"
-                onClick={() => onOpenPlateCalc(parseFloat(input.weight || defaultWeightFor(ref)) || 0)}
+            {/* h-11 is 44px, Ashley's 9 Sep ruling. `max` is a hint the browser
+                does not enforce — checkLoggedSetWeight in handleSaveSet is the
+                rule. The plate button sits inside the box on its right. */}
+            <div className="relative min-w-0">
+              <Input
+                id={`setgrid-weight-${exerciseId}-${k}`}
+                type="number"
+                min="0"
+                max={MAX_LOGGABLE_SET_KG}
+                step="0.5"
+                placeholder={isBW ? 'BW' : weightPlaceholderFor(ref)}
+                value={isBW ? '' : input.weight}
+                onChange={e => updateInput(ref, 'weight', e.target.value)}
+                onFocus={scrollRowIntoView}
+                className={`h-11 rounded-[8px] border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${plateButton ? 'pr-10' : ''} ${isSaved ? 'text-foreground' : 'text-[color:var(--role-ai-text)]'} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[k] ? 'ring-1 ring-destructive' : rowWarnings[k] ? 'ring-1 ring-amber-500' : ''}`}
                 disabled={isBW}
-                aria-label="Plate calculator"
-              >
-                <Dumbbell className="size-3.5" />
-              </Button>
-            )}
-            {isBodyweightCapable && (
+              />
+              {onOpenPlateCalc && plateButton && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1 h-9 w-8 rounded-[8px] p-0 disabled:opacity-40"
+                  style={{ background: 'color-mix(in srgb, var(--role-ai) 12%, transparent)', color: 'var(--ramp-label)' }}
+                  onClick={() => onOpenPlateCalc(parseFloat(input.weight || defaultWeightFor(ref)) || 0)}
+                  disabled={isBW}
+                  aria-label="Plate calculator"
+                  data-testid="row-plate-calc"
+                >
+                  <Disc className="size-[15px]" aria-hidden />
+                </Button>
+              )}
+            </div>
+            {/* The implement's mark, or the bodyweight switch where the
+                movement can be done without load. */}
+            {isBodyweightCapable ? (
               <Button
                 variant={isBW ? 'default' : 'outline'}
                 size="sm"
@@ -1028,6 +1089,8 @@ export function SetGrid({
               >
                 BW
               </Button>
+            ) : (
+              <span aria-hidden className="flex justify-center text-muted-foreground"><Dumbbell className="size-3.5" /></span>
             )}
             <Input
               type="number"
@@ -1040,42 +1103,37 @@ export function SetGrid({
               value={input.reps}
               onChange={e => updateInput(ref, 'reps', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-11 border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-primary-text' : ''} ${rowErrors[k] ? 'ring-1 ring-destructive' : ''}`}
+              className={`h-11 rounded-[8px] border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-foreground' : 'text-[color:var(--role-ai-text)]'} ${rowErrors[k] ? 'ring-1 ring-destructive' : ''}`}
             />
-            <div className="flex items-center gap-1">
+            <div className="flex items-center justify-end gap-1">
               {isPRSet && prBadgeSet?.result && (
                 <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[0.625rem] font-medium bg-primary/15 text-primary-text glow-mint whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
                   <Trophy className="size-2.5" />
                   PR
                 </span>
               )}
-              {/* 3b: the outstanding set's save control is the lit mint square —
-                  the one thing on the row asking to be tapped. Once saved it
-                  recedes to a quiet mint tick. */}
-              {/* data-tour ONLY while the row is still open, and that is the
-                  whole mechanism behind the tour's set stop rather than a
-                  detail. The tour waits for this element to DISAPPEAR, which
-                  happens precisely when saveSet returns and isSaved flips —
-                  so a save that fails validation leaves the row open, leaves
-                  this attribute in place, and correctly leaves the tour
-                  waiting instead of congratulating the user for a set that
-                  was never logged. See AppTour.tsx's measure loop. */}
+              {/* 2a: a logged set's tick is filled (mint, violet on a ramp row);
+                  one still to do is an outline, and the set to do NEXT glows.
+                  data-tour ONLY while the row is still open: the tour waits for
+                  it to DISAPPEAR, which happens precisely when the save lands
+                  (see AppTour's measure loop). */}
               <Button
                 data-tour={isSaved || offersNoWeight(ref) ? undefined : 'setrow'}
                 variant="ghost"
                 size="icon"
-                className={`size-7 shrink-0 ${isSaved ? (warm ? 'text-[color:var(--ramp-label)]' : 'text-primary-text') : 'glow-pulse'}`}
-                style={isSaved ? undefined : {
+                className={`hit-slop-44 size-[30px] shrink-0 rounded-[10px] ${isActive ? 'glow-pulse' : ''}`}
+                style={isSaved ? {
                   background: warm ? 'var(--ramp-button)' : 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))',
                   color: warm ? 'var(--ramp-on)' : 'var(--primary-foreground)',
+                } : {
+                  boxShadow: `inset 0 0 0 1.5px ${warm ? 'var(--ramp-rail)' : 'color-mix(in srgb, var(--primary) 55%, transparent)'}${isActive ? `, 0 0 14px ${warm ? 'color-mix(in srgb, var(--role-ai) 60%, transparent)' : 'rgba(var(--glow-rgb), .6)'}` : ''}`,
+                  color: warm ? 'var(--ramp-label)' : 'var(--primary-text)',
                 }}
                 onClick={() => handleSaveSet(ref)}
                 // WHAT THIS TICK WOULD SAVE, said on the tick itself, for the
-                // Exercise tab's "Log set 3 · Bench 80 kg × 6" button (design
-                // handoff 2c, 10 Oct 2026). The same expressions the two boxes
-                // show, so the button can only ever describe what this tick
-                // saves — and it presses this tick. Drop rows are left out:
-                // a drop is offered from its parent, never as "next".
+                // Exercise tab's "Log set 3 · Bench 80 kg × 6" button. The same
+                // expressions the two boxes show, so the button can only ever
+                // describe what this tick saves — and it presses this tick.
                 data-next-set={!isSaved && !drop ? setLabelLong(ref) : undefined}
                 // EMPTY when there is no weight to take: the button then
                 // opens the box instead of pressing a tick that would refuse.
@@ -1083,11 +1141,8 @@ export function SetGrid({
                 data-next-unit={!isSaved && !drop ? (loadUnitLabel ?? 'kg') : undefined}
                 data-next-weight-box={!isSaved && !drop ? `setgrid-weight-${exerciseId}-${rowKey(ref)}` : undefined}
                 data-next-reps={!isSaved && !drop ? (input.reps || (ghost ? String(ghost.reps_completed) : defaultRepsFor(ref))) : undefined}
-                // THE KIND IS IN THE SPOKEN LABEL TOO. Warm-up 2 and working
-                // set 2 both read "Save set 2" until 17 Sep 2026, so a screen
-                // reader — and every driver — could not tell the two tick
-                // buttons apart. setLabelLong was imported for this and never
-                // wired, which is the declared-but-not-rendered shape again.
+                // THE KIND IS IN THE SPOKEN LABEL TOO: warm-up 2 and working set
+                // 2 are two different ticks.
                 aria-label={!isSaved
                   ? `Save ${setLabelLong(ref).toLowerCase()}`
                   : didNotSave
@@ -1311,40 +1366,26 @@ export function SetGrid({
               {lastTime(loggedSetReading(ghost))}
             </p>
           )}
+          {restHere && <InlineRest />}
+          {/* "+ Add warm-up" sits with the build-up it adds to, inside the open ramp. */}
+          {hasFold && showWarmupControls && warm && rowIndex === rowRefs.reduce((last, r, i) => (r.kind === 'warmup' ? i : last), -1) && addWarmupButton}
           </React.Fragment>
         )
       })}
-      {/* ONE "Add Set", NOT TWO. The build-up gets its own control because it
+      {/* ONE "Add set", NOT TWO. The build-up has its own control because it
           is a different question — a fourth ramp step is not a fourth working
-          set — but a second generic "Add Set" between the blocks would be the
-          exact thing Ashley's ruling is against: a button offering to record
-          work the app itself asked for. */}
-      {/* VIOLET, NOT AMBER, SINCE 19 Sep 2026 — this button adds a RAMP row, so
-          it wears the ramp colour like everything else that means "ramp". The
-          amber it used to wear is the app's caution colour and meant nothing
-          here; the only amber left on this screen is the weight warning below,
-          which genuinely is a caution and would be a lie in violet. */}
-      {showWarmupControls && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="w-full text-xs text-[color:var(--ramp-label)] h-6 mt-0.5"
-          onClick={handleAddWarmupSet}
-          data-testid="add-warmup-set"
-        >
-          <Plus className="size-3 mr-1" />
-          Add warm-up
-        </Button>
-      )}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="w-full text-xs text-muted-foreground h-6 mt-0.5"
+          set. On today's card it sits inside the open ramp (2a); with nothing
+          to fold it stays here. VIOLET, because it adds a RAMP row. */}
+      {!hasFold && showWarmupControls && addWarmupButton}
+      <button
+        type="button"
+        className="hit-slop-44 mt-1 flex min-h-9 items-center gap-1.5 px-0.5 text-[0.75rem] text-muted-foreground"
         onClick={handleAddExtraSet}
+        data-testid="add-set"
       >
-        <Plus className="size-3 mr-1" />
-        Add Set
-      </Button>
+        <Plus className="size-3" aria-hidden />
+        Add set
+      </button>
     </div>
   )
 }

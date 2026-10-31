@@ -287,11 +287,13 @@ console.log('\nRAMP — the build-up has a box per set, and what is logged survi
   // counter say zero" — the first version pinned one row's exact wording and
   // came back empty when that row was collapsed, which is a check that cannot
   // fail for the wrong reason and cannot pass for the right one either.
-  const counters = await ev(`JSON.stringify(document.body.innerText.match(/\\d+ working sets · \\d+ logged/g) || [])`)
+  // RE-ANCHORED 31 Oct 2026 (Exercise 2a): each open card states its count beside "Working sets" ("0 logged"), and
+  // its track says "Working n/N" to a screen reader; both are read, for every open card.
+  const counters = await ev(`JSON.stringify([...document.querySelectorAll('[data-exercise-name]')].flatMap(c => [c.querySelector('[data-testid="logged-count"]')?.textContent?.trim(), c.querySelector('[data-testid="working-counter"]')?.textContent?.trim()]).filter(Boolean))`)
   const rows = JSON.parse(counters)
   check('the working-set counters are on screen (sanity check on this check)', rows.length > 0, rows)
   check('ticking a warm-up logs nothing — every counter still reads 0 logged',
-    rows.length > 0 && rows.every(r => / 0 logged$/.test(r)), rows)
+    rows.length > 0 && rows.every(r => /^0 logged$|^Working 0\//.test(r)), rows)
 }
 
 console.log('\nCHAT BUTTON — one unread indicator at a time, in both glow settings\n')

@@ -1,4 +1,4 @@
-import { ArrowUp } from 'lucide-react'
+import { ArrowUp, Check } from 'lucide-react'
 import { isUnverifiedLoadSource } from '@/lib/load-prescription'
 import { describeExerciseTempo } from '@/lib/periodization'
 import type { LoadSource } from './LoadChip'
@@ -34,6 +34,7 @@ export function ExerciseLine({
   trailing,
   setsDone,
   progressing,
+  eyebrow,
 }: {
   ex: Exercise
   supersetLabel?: string
@@ -44,22 +45,23 @@ export function ExerciseLine({
   allSetsLogged?: boolean
   /** Today only — replaces the sets×reps summary once every set is in. */
   loggedSummary?: string
-  /** Right-hand controls that sit outside the tap target (the `⋯` menu). */
+  /** Right-hand controls that sit outside the tap target (the `⋮` menu). */
   trailing?: React.ReactNode
   /** Its place in the day, "01" (design handoff 2c). */
   index?: number
-  /** Today only: working sets logged — the filled dots. Absent on a peek, which draws none. */
+  /** Today only: working sets logged — the status circle. Absent on a peek, which draws none. */
   setsDone?: number
   /** Today only: the load went up from last session (the row's own progression note). */
   progressing?: boolean
+  /** "Main lift", "Primer" — the small label over a collapsed row (2a), where it says something. */
+  eyebrow?: string
 }) {
   const loadIsUnverified = loadSource != null && isUnverifiedLoadSource(loadSource)
 
-  // THE CHIP (2c) carries the load as the plan wrote it — ex.suggested_load,
-  // NOT a re-formatted suggested_load_kg. The string is written by formatLoad
-  // and already carries the unit: "~14kg per hand" for a dumbbell pair,
-  // "~42.5kg" for a barbell. A chip printing `${kg} kg` would put a per-hand
-  // number in the same format as a total (1126 of 2356 prescriptions did once).
+  // THE LOAD carries the plan's own string — ex.suggested_load, NOT a
+  // re-formatted suggested_load_kg. formatLoad wrote it with its unit: "~14kg
+  // per hand" for a dumbbell pair, "~42.5kg" for a barbell. Printing
+  // `${kg} kg` would put a per-hand number in the same format as a total.
   const chip = ex.suggested_load_kg != null
     ? (ex.suggested_load ?? `~${ex.suggested_load_kg}kg`)
     : ex.suggested_assistance_kg != null
@@ -71,86 +73,97 @@ export function ExerciseLine({
 
   if (expanded) {
     return (
-      <div className="flex items-baseline justify-between gap-2.5">
-        <div
-          role="button"
-          tabIndex={0}
-          onClick={onToggleExpanded}
-          onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleExpanded() } }}
-          className="hit-slop-44 flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
-        >
-          {supersetLabel && <span className="shrink-0 font-mono text-[0.625rem] font-semibold text-primary-text glow-mint">{supersetLabel}</span>}
-          <span className={`text-[1.1875rem] font-semibold ${allSetsLogged ? 'line-through text-muted-foreground' : ''}`}>{ex.name}</span>
-        </div>
-        {trailing}
-      </div>
-    )
-  }
-
-  return (
-    <div className="flex min-h-[62px] items-center gap-2.5">
-      {/* A plain div, not a <button> — the expanded body below can contain
-          its own buttons (LoadChip's "why this weight"), and a button may not
-          legally contain another. role="button" + tabIndex + Enter/Space
-          keeps this a real, keyboard-operable control. */}
       <div
         role="button"
         tabIndex={0}
         onClick={onToggleExpanded}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleExpanded() } }}
-        className="hit-slop-44 flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 text-left"
+        className="hit-slop-44 mt-[3px] flex min-w-0 cursor-pointer items-center gap-2 text-left"
       >
+        {supersetLabel && <span className="shrink-0 font-mono text-[0.625rem] font-semibold text-primary-text glow-mint">{supersetLabel}</span>}
+        <span className={`text-[1.1875rem] font-semibold tracking-[-.01em] ${allSetsLogged ? 'line-through text-muted-foreground' : ''}`}>{ex.name}</span>
+      </div>
+    )
+  }
+
+  // A HAIRLINE ROW (2a): status circle, the name, and one mono line of what is
+  // prescribed — or, once every set is in, what was done.
+  return (
+    <div className="flex min-h-[60px] items-center gap-3">
+      {/* A plain div, not a <button> — a button may not legally contain the
+          buttons a row can grow. role="button" + tabIndex + Enter/Space keeps
+          this a real, keyboard-operable control. */}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={onToggleExpanded}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleExpanded() } }}
+        className="hit-slop-44 flex min-w-0 flex-1 cursor-pointer items-center gap-3 py-2 text-left"
+      >
+        {setsDone != null && <StatusCircle done={done} sets={ex.sets} />}
         {/* NO 01 / 02 NUMBERS (30 Oct 2026, "less is more"): the list's order already says it. */}
         <span className="min-w-0 flex-1">
+          {eyebrow && <span className="block text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground" data-testid="exercise-eyebrow">{eyebrow}</span>}
           <span className="flex items-center gap-2">
             {supersetLabel && <span className="shrink-0 font-mono text-[0.625rem] font-semibold text-primary-text glow-mint">{supersetLabel}</span>}
             {/* TWO LINES, NOT ONE HARD CUT — "you can't see the exercises until
                 you click into it" (Ashley, from a phone): a name is the row. */}
             <span
-              className={`line-clamp-2 text-[0.90625rem] font-medium ${allSetsLogged ? 'line-through text-muted-foreground' : ''} ${loadIsUnverified ? 'border-b border-dotted border-muted-foreground/50' : ''}`}
+              className={`line-clamp-2 text-[0.9375rem] font-medium ${allSetsLogged ? 'text-muted-foreground' : ''} ${loadIsUnverified ? 'border-b border-dotted border-muted-foreground/50' : ''}`}
             >
               {ex.name}
             </span>
           </span>
-          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-            {setsDone != null && (
-              <span className="flex items-center gap-1" aria-label={`${done} of ${ex.sets} sets logged`} data-set-dots>
-                {Array.from({ length: ex.sets }, (_, i) => (
-                  <span
-                    key={i}
-                    aria-hidden
-                    className="size-[7px] rounded-full"
-                    style={i < done
-                      ? { background: 'var(--primary)', boxShadow: '0 0 calc(6px * var(--glow-strength, 1)) rgba(var(--glow-rgb), .6)' }
-                      : { boxShadow: 'inset 0 0 0 1px var(--text-dim)' }}
-                  />
-                ))}
-              </span>
-            )}
+          <span className="mt-0.5 block font-mono text-[0.75rem] text-muted-foreground">
             {allSetsLogged && loggedSummary ? (
-              <span className="tabular-mono text-[0.6875rem] text-primary-text glow-mint">✓ {loggedSummary}</span>
+              <span className="text-primary-text glow-mint">✓ {loggedSummary}</span>
             ) : (
-              <span className="tabular-mono text-[0.6875rem] text-muted-foreground">
+              <>
                 {ex.sets} × {ex.reps}{tempo ? ` · ${tempo}` : ''}
-              </span>
+                {chip && (
+                  // Accent with an up-arrow only when the load progressed.
+                  <span className={progressing ? 'text-primary-text' : undefined} data-load-chip={progressing ? 'up' : 'hold'}>
+                    {' · '}
+                    {progressing && <ArrowUp className="inline size-3 align-[-2px]" aria-label="up from last session" />}
+                    {chip}
+                  </span>
+                )}
+              </>
             )}
           </span>
         </span>
-        {chip && (
-          <span
-            className="flex h-7 shrink-0 items-center gap-1 rounded-full px-2.5 tabular-mono text-[0.75rem] font-semibold"
-            style={progressing
-              ? { background: 'rgba(var(--glow-rgb), .12)', color: 'var(--primary-text)' }
-              : { background: 'var(--surface-raised)', color: 'var(--foreground)' }}
-            data-load-chip={progressing ? 'up' : 'hold'}
-          >
-            {progressing && <ArrowUp className="size-3" aria-label="up from last session" />}
-            {chip}
-          </span>
-        )}
       </div>
-      {trailing}
+      {trailing && <div className="shrink-0 pr-2">{trailing}</div>}
     </div>
+  )
+}
+
+/**
+ * The status circle (2a): a faint ring with nothing done, a mint arc filling
+ * as working sets land, filled with a tick when they all have; the set to do
+ * now wears a glowing ring. Its spoken label says the count.
+ */
+export function StatusCircle({ done, sets, current = false }: { done: number; sets: number; current?: boolean }) {
+  const d = Math.max(0, Math.min(done, sets))
+  const complete = sets > 0 && d >= sets
+  const share = sets > 0 ? d / sets : 0
+  return (
+    <span
+      role="img"
+      aria-label={`${d} of ${sets} sets logged`}
+      data-set-dots
+      data-status={complete ? 'done' : d > 0 ? 'part' : current ? 'now' : 'none'}
+      className="mt-px flex size-[26px] shrink-0 items-center justify-center rounded-full"
+      style={complete
+        ? { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))', color: 'var(--primary-foreground)' }
+        : d > 0
+          ? { background: `conic-gradient(var(--primary) ${share * 360}deg, color-mix(in srgb, var(--foreground) 22%, transparent) 0)`, WebkitMask: 'radial-gradient(circle, transparent 10px, #000 10.5px)', mask: 'radial-gradient(circle, transparent 10px, #000 10.5px)' }
+          : current
+            ? { boxShadow: 'inset 0 0 0 2px var(--primary), 0 0 10px rgba(var(--glow-rgb), .5)' }
+            : { boxShadow: 'inset 0 0 0 1.5px color-mix(in srgb, var(--foreground) 22%, transparent)' }}
+    >
+      {complete && <Check className="size-3.5" strokeWidth={3} aria-hidden />}
+    </span>
   )
 }
 

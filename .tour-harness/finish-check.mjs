@@ -16,13 +16,9 @@ import { boot } from './session-driver-lib.mjs'
 
 const b = await boot({ debugPort: 9606, passed: 'Finish asks when sets are left and only then; the card counts planned sets, training time and both hands.' })
 const { ev, check, finish, tapExpr, q, byText, until, wait, load, tick, exerciseNames, shoot, ensureOpen, rowsExpr, cardExpr, escape, beforeLoad, J, typeText } = b
-/** "＋ Add" first (30 Oct 2026, "less is more"): the two ways to add sit behind it. */
-const openAddChoice = async label => {
-  if (!(await ev(`!!document.querySelector('[data-testid="add-open"][aria-expanded="true"]')`))) {
-    if (!(await tapExpr(q('[data-testid="add-open"]')))) return false
-  }
-  return tapExpr(byText(label))
-}
+/** RE-ANCHORED 31 Oct 2026 (Exercise 2a): the two ways to add are at the foot, each one tap — "Add exercise", and
+ *  "I also did…" for work off the plan. Asked for by what they do, never by their words. */
+const openAddChoice = async label => tapExpr(q(/unplanned/i.test(label) ? '[data-testid="add-unplanned"]' : '[data-testid="add-exercise"]'))
 
 const sheet = () => ev(`(() => { const d = ${q('[data-testid="finish-check"]')}; if (!d) return null; return { title: d.querySelector('h2')?.textContent ?? '', left: [...d.querySelectorAll('[data-testid="finish-check-left"] p')].slice(1).map(p => p.innerText.replace(/\\s+/g, ' ').trim()), buttons: [...d.querySelectorAll('button')].map(x => x.textContent.trim()).filter(t => t && t !== 'Close') } })()`)
 const summary = () => ev(`(() => { const d = [...document.querySelectorAll('[role="dialog"]')].find(x => /^(Session (complete|saved)|Nothing logged|No sets logged)$/.test(x.querySelector('h2')?.textContent ?? '')); if (!d) return null; return { title: d.querySelector('h2').textContent, sets: d.querySelector('[data-testid="summary-sets"]')?.textContent ?? null, setsLabel: d.querySelector('[data-testid="summary-sets-label"]')?.textContent ?? null, extra: d.querySelector('[data-testid="summary-sets-extra"]')?.textContent ?? null, tiles: [...d.querySelectorAll('.grid.grid-cols-3 > div')].map(t => t.innerText.replace(/\\s+/g, ' ').trim()), text: d.innerText.replace(/\\s+/g, ' ').trim() } })()`)
@@ -84,7 +80,7 @@ await ensureOpen(H.name)
 let logged = 2
 for (let i = 2; i < H.sets; i++) { if (await tick(H.name, i, { weight: 30, reps: 8 })) logged++ }
 check(`2a. the lift's ${H.sets} planned sets are all logged`, logged === H.sets, logged)
-await tapExpr(`[...(${cardExpr(H.name)}?.querySelectorAll('button') ?? [])].find(x => x.textContent.trim() === 'Add Set')`)
+await tapExpr(`[...(${cardExpr(H.name)}?.querySelectorAll('button') ?? [])].find(x => /^add set$/i.test(x.textContent.trim()))`)
 await wait(500)
 check('2b. one more is added by hand and logged', (await ev(`${rowsExpr(H.name)}.length`)) === H.sets + 1 && (await tick(H.name, H.sets, { weight: 30, reps: 8 })) === true)
 check('2c. Finish session, and this time "Finish"', (await tapFinish()) && (await tapExpr(q('[data-testid="finish-anyway"]'))))

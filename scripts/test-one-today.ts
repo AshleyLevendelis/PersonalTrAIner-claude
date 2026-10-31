@@ -45,9 +45,13 @@ console.log('\n1. A finished session is not offered a start button\n')
 {
   // THE THREE-STATE TRAP. `!== 'running'` reads as "not in progress" and means
   // "idle OR finished". Only one of those wants a Start button.
-  const cta = panel.slice(panel.indexOf('!peekWorkout && !isRestDay'), panel.indexOf('Start session') + 40)
+  // RE-ANCHORED 31 Oct 2026 (Exercise 2a): Start is drawn twice in the source — in the card, and in the bar while
+  // the card has scrolled away — so each block is located by its own testid, and BOTH must be idle-only.
+  const barAt = panel.indexOf('data-testid="start-bar"')
+  const heroAt = panel.indexOf('data-testid="hero-start"')
+  const cta = barAt < 0 || heroAt < 0 ? '' : panel.slice(panel.lastIndexOf('{!heroStartInView', barAt), barAt + 40) + '\n' + panel.slice(panel.lastIndexOf('{status === ', heroAt), heroAt + 40)
   check('the Start-workout block was located (sanity check on this check)', cta.length > 80, cta.length)
-  check('it is offered only from idle', /status === 'idle'/.test(cta), cta.slice(0, 200))
+  check('it is offered only from idle', (cta.match(/status === 'idle'/g) ?? []).length === 2, cta.slice(0, 200))
   check('...and never merely because a session is not running',
     !/status !== 'running'/.test(cta), cta.slice(0, 200))
   // The spacer that reserves room for a fixed bottom bar has to agree with the
@@ -61,8 +65,11 @@ console.log('\n1. A finished session is not offered a start button\n')
   // there in all three states — each because its own bar is drawn.
   const barStates = ['idle', 'finished', 'running'].filter(st =>
     new RegExp(`status === '${st}' && \\(\\s*(\\{\\/\\*[\\s\\S]*?\\*\\/\\}\\s*)?<(div\\s+className="fixed|NextSetButton)`).test(panel))
+  // RE-ANCHORED 31 Oct 2026 (Exercise 2a): a FINISHED day draws no fixed bar any more — "✓ Session finished · View
+  // summary" moved into the glowing card — so the spacer is for idle (Start's bar) and running (Log set) alone.
   check('the spacer under the list follows the bars: one for each state that draws a fixed bar, and only those',
-    barStates.length === 3 && barStates.every(st => spacerCond.includes(`status === '${st}'`)),
+    barStates.length === 2 && barStates.every(st => spacerCond.includes(`status === '${st}'`))
+      && ['idle', 'finished', 'running'].filter(st => spacerCond.includes(`status === '${st}'`)).every(st => barStates.includes(st)),
     { spacerCond, barStates })
   // Nothing anywhere in this screen may treat the three states as two.
   const looseTests = panel.match(/status !== 'running'/g) ?? []

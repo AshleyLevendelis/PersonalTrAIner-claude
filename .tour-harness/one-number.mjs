@@ -99,7 +99,7 @@ const READ = `(() => {
   }
   const text = card.innerText
   // The headline figure: the large tabular number beside the chip.
-  const headline = [...card.querySelectorAll('.ds-num-lg')]
+  const headline = [...card.querySelectorAll('[data-testid="exercise-load"]') /* 2a: the weight in the card's meta line (was .ds-num-lg) */]
     .map(n => parseFloat((n.textContent || '').replace(/[^\\d.]/g, '')))
     .filter(n => Number.isFinite(n) && n > 0)
   // The S1/S2/... per-set chips.
@@ -441,13 +441,16 @@ const rows = await ev(`(() => {
   // second exercise, stop. Without that bound a bodyweight primer, which
   // renders no chips of its own, climbs until it finds the NEXT lift's chips
   // and reports them as its own: measured, and it read as a real defect.
-  const countsIn = el => [...el.querySelectorAll('*')].filter(x => x.children.length === 0 && /^\\d+ working sets/.test((x.textContent||'').trim())).length
+  // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the "N working sets · M logged" line left the card; the set count is the
+  // first number of the card's meta line ("3 × 9-11 · 47.5 kg · rest 120s"), and the card is its own element, so
+  // it is bounded by [data-exercise-name] rather than by walking up from the line.
   const out = []
-  const leaves = [...document.querySelectorAll('*')].filter(x => x.children.length === 0 && /^\\d+ working sets/.test((x.textContent||'').trim()))
-  for (const leaf of leaves) {
-    const sets = Number(/^(\\d+) working sets/.exec(leaf.textContent.trim())[1])
-    let card = leaf
-    while (card.parentElement && countsIn(card.parentElement) === 1) card = card.parentElement
+  const cards = [...document.querySelectorAll('[data-exercise-name][data-exercise-open]')]
+  for (const card of cards) {
+    const meta = card.querySelector('[data-testid="exercise-meta"]')
+    const m = /^(\\d+) ×/.exec((meta?.textContent || '').trim())
+    if (!m) continue
+    const sets = Number(m[1])
     const chips = [...card.querySelectorAll('span')]
       .map(n => (n.textContent||'').trim())
       .filter(t => /^S\\d+:\\s*[\\d.]+kg$/.test(t))

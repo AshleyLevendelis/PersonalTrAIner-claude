@@ -87,8 +87,12 @@ check('the bar only exists before the session starts', /status === 'idle' && \(/
 // stays singly owned in the hero, and two Finish buttons is how a session gets
 // closed by accident.
 check('Finish stays in the hero, one of it', (today.match(/Finish session/g) ?? []).length === 1)
-check('...and the hero no longer carries a Start button too',
-  !/>Start session</.test(todayCode))
+// RE-ANCHORED 31 Oct 2026 (tab polish, Exercise 2a): Start went BACK into the glowing card, and the fixed bar is
+// drawn only while that button has scrolled off screen — so there is never a second Start in view, and Start is
+// never out of reach, which is why it was docked on 6 Sep.
+check('...and the card carries Start, the bar only while the card\'s button is out of view',
+  /data-testid="hero-start"/.test(todayCode) && /new IntersectionObserver\(\(\[e\]\) => setHeroStartInView\(e\.isIntersecting\)\)/.test(todayCode)
+  && /\{!heroStartInView && !peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'idle' && \(/.test(todayCode))
 
 // ---------------------------------------------------------------------------
 console.log('\n2. The coaching line: the most specific true thing, or nothing')
@@ -120,8 +124,10 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
   check('...and a day with no main lift still speaks', noLift?.text === 'goes to 62.5 kg', noLift)
 
   check('TodayPanel uses the rule rather than an inline chain', /sessionNudge\(\{/.test(today))
+  // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the line on screen is the coach line by logged set, whose fallback IS
+  // this rule's line (test:exercise-2a holds that); it is still drawn only through the shared nudge.
   check('...and renders it through the shared nudge, never bare text',
-    /\{todayNudge && \(/.test(today) && (today.match(/<TrainerNudge/g) ?? []).length === 2)
+    /\{coachLine && \(/.test(today) && /fallback: todayNudge\?\.text \?\? null/.test(today) && (today.match(/<TrainerNudge/g) ?? []).length === 2)
   // The cue is ONE string with two renderers, not two copies that drift.
   check('the calibration copy has a single source', /export function calibrationCueText/.test(cue))
   check('...and the row renders that, not its own copy',
@@ -221,16 +227,19 @@ check('the context row can be told the nudge is carrying the note',
   /coachNoteShownBelow/.test(contextRow))
 check('...and suppresses its own copy when it is',
   /!expanded && coachNote && !coachNoteShownBelow/.test(contextRow))
+// RE-ANCHORED 31 Oct 2026 (Exercise 2a): the line on screen is the week note only when the coach line fell back AND
+// the fallback was the week note — a per-set line leaves the note to the week row.
 check('...and TodayPanel tells it, from the source that actually won',
-  /coachNoteShownBelow=\{todayNudge\?\.source === 'week-note'\}/.test(today))
+  /const lineIsWeekNote = coachLine\?\.source === 'fallback' && todayNudge\?\.source === 'week-note'/.test(today) && /coachNoteShownBelow=\{lineIsWeekNote\}/.test(today))
 // The other direction: with the nudge saying something else, the note must
 // still be on screen untapped. Ashley, 3 Sep 2026: "the notes section doesn't
 // populate" — that fix is not allowed to regress into "only behind a chevron".
 check('...so the note is never only behind the chevron',
   /\{!expanded && coachNote && !coachNoteShownBelow && \(/.test(contextRow))
 // RE-ANCHORED 30 Oct 2026: closed, the note is the slim one-line note (two rows at most); opened, the full one.
+// RE-ANCHORED 31 Oct 2026 (Exercise 2a): the coach line (`line`), clamped to three rows while the note is shut.
 check('a long week note is capped rather than pushing the session off screen',
-  /<TrainerNudge slim=\{!weekNotesOpen\} text=\{todayNudge\.text\}[^>]*clamp=\{!weekNotesOpen\}/.test(today) && /clamp && 'line-clamp-3'/.test(nudgeComponent) && /if \(slim\)[\s\S]{0,300}line-clamp-2/.test(nudgeComponent))
+  /<TrainerNudge line text=\{coachLine\.text\}[^>]*clamp=\{!weekNotesOpen\}/.test(today) && /clamp && 'line-clamp-3'/.test(nudgeComponent) && /if \(line\)[\s\S]{0,3000}clamp && 'line-clamp-3'/.test(nudgeComponent))
 // ...and uncapped once it is opened, in place, rather than reprinted above.
 check('...and expanding unclamps it rather than printing it twice',
   /clamp=\{!weekNotesOpen\}/.test(today)
@@ -252,8 +261,10 @@ check('the chevron only ever has one destination',
   && /const ask = \(\) => \{[\s\S]{0,120}window\.location\.hash = tabHash\('chat'\)/.test(nudgeComponent))
 
 // RE-ANCHORED 30 Oct 2026 ("less is more", her "Move things"): the two ways to add sit behind one "＋ Add".
-check('"Add unplanned work" is one tap away, behind "＋ Add"', /data-testid="add-open"[\s\S]{0,400}＋ Add[\s\S]{0,1200}Add unplanned work/.test(today))
-check('...on a 44px target', /hit-slop-44[^"]*"\s*>\s*Add unplanned work/.test(today))
+// RE-ANCHORED 31 Oct 2026 (Exercise 2a): the "＋ Add" disclosure gave way to the design's foot — "Add exercise" and,
+// under it, "Did something off-plan? I also did…". Still one tap, still one entry point.
+check('"Add unplanned work" is one tap away: "I also did…" at the foot of the list', /Did something off-plan\?\s*<button[\s\S]{0,120}data-testid="add-unplanned"\s*onClick=\{\(\) => setUnplannedWorkOpen\(true\)\}[\s\S]{0,300}I also did…/.test(today))
+check('...on a 44px target', /className="hit-slop-44[^"]*"[^>]*>\s*I also did…/.test(today))
 check('...and is GONE from the overflow menu, not duplicated',
   !/Add unplanned work/.test(contextRowCode) && !/ListPlus/.test(contextRowCode))
 check('...while session history stays in it', /Session history/.test(contextRow))
@@ -269,7 +280,8 @@ check('the --surface-raised box is gone — the fill is only the selected day\'s
   (rowOnly.match(/var\(--surface-raised\)/g) ?? []).length === 1 && /isSelected \? \{ background: 'var\(--surface-raised\)'/.test(rowOnly))
 check('...and so is the rounded panel it sat in', !/rounded-2xl/.test(contextRowCode))
 // One-page Exercise (5c·4, 17 Oct 2026): the page is titled "Exercise"; the plan position is the quiet line.
-check('the plan position is a quiet line, not foreground', /className="hit-slop-44 min-w-0 truncate text-\[0\.75rem\] text-muted-foreground"[\s\S]{0,120}data-testid="week-context-header"/.test(contextRow))
+// RE-ANCHORED 31 Oct 2026 (Exercise 2a): the plan position is the small muted eyebrow over "Exercise".
+check('the plan position is a quiet line, not foreground', /className="hit-slop-44 min-w-0 text-\[0\.625rem\][^"]*text-muted-foreground"[\s\S]{0,120}data-testid="week-context-header"/.test(contextRow))
 check('the tour anchor survived the restyle', /data-tour="extoday"/.test(contextRow))
 // RE-ANCHORED 30 Oct 2026: the week's rings and key became one line, and the strip sits under it.
 {

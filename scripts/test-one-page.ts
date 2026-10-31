@@ -142,7 +142,8 @@ async function main() {
   check('Exercise: the old "See the whole program" link has not come back', !/See the whole program/.test(row))
   const panel = read('src/components/exercise/TodayPanel.tsx')
   check('Exercise: the programme is still one tap away (the week number), and Tools still opens it', /onClick=\{onOpenProgram\}\s*data-testid="week-context-header"/.test(row) && /label: 'Your program'[^\n]*programHash\(\)/.test(tools))
-  check('Exercise: today\'s lifts carry the shared set count', /<PageSectionLabel right=\{heroCount \? <span data-testid="hero-sets">/.test(panel))
+  // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the shared count moved into the glowing card, as "N of M working sets".
+  check('Exercise: today\'s lifts carry the shared set count', /data-testid="hero-sets">\{heroCount\.logged\} of \{heroCount\.planned\} working sets/.test(panel) && /const heroCount = [^\n]*sessionSetCount\(workout, logs\)/.test(panel))
 
   console.log('\n6. Less is more (her "Move things", 30 Oct 2026): said once, the rest one tap away')
   const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '')
@@ -181,8 +182,9 @@ async function main() {
     check('...caps the line at two rows', /line-clamp-2/.test(slim))
     check('...keeps an adaptation\'s actions', /actions\.map\(a =>/.test(slim))
     check('...and moving to the next tip is a real button', /\{onTextTap \? \(\s*<button/.test(slim))
-    // RE-ANCHORED 31 Oct 2026 (tab polish 2c): Home's note became the boxless coach line, on both of its paths.
-    check('Nutrition and Exercise use it', /<TrainerNudge slim text=\{macroNudge\}/.test(nut) && /<TrainerNudge slim text=\{todayNudge\.text\}/.test(panel))
+    // RE-ANCHORED 31 Oct 2026 (tab polish): Home's note became the boxless coach line on both of its paths (2c), and
+    // Exercise's the 2a coach line; Nutrition keeps the slim note.
+    check('Nutrition uses the slim note, Exercise the coach line', /<TrainerNudge slim text=\{macroNudge\}/.test(nut) && /<TrainerNudge line text=\{coachLine\.text\}/.test(panel))
     check('Home uses the coach line on both paths (an adaptation and the rotating tips), with its two chips', /<TrainerNudge \{\.\.\.trainerNudge\} line\b/.test(home) && /<TrainerNudge\s+line\b[\s\S]{0,80}prompts=\{HOME_PROMPTS\}/.test(home)
       && /label: 'What changed\?'/.test(home) && /label: 'Adjust today'/.test(home))
   }
@@ -197,12 +199,13 @@ async function main() {
   check('Nutrition: the allergy line is still under the list', /Ingredients are filtered, not verified\. Check labels if you have an allergy\./.test(mealPlan))
   check('Exercise: no week rings on the page', !/<RingMeter/.test(strip(row)) && /data-testid="week-meter-count">\{tally\.sessionsDone\} of \{tally\.sessionsPlanned\}/.test(row))
   check('Exercise: "Feeling tight?" is on the warm-up row', /trailing=\{[\s\S]{0,600}data-testid="tightness-open"/.test(panel))
+  // RE-ANCHORED 31 Oct 2026 (Exercise 2a): "Add exercise" is the one button and "I also did…" the quiet line under it;
+  // both ways to add are still there, once each, and nothing else at the foot.
   {
-    const openAt = panel.indexOf('data-testid="add-open"')
-    const gateAt = panel.indexOf('{addChoicesOpen && (')
+    const footAt = panel.indexOf('data-testid="session-foot-actions"')
     const exAt = panel.indexOf('data-testid="add-exercise"')
     const unAt = panel.indexOf('data-testid="add-unplanned"')
-    check('Exercise: both ways to add sit behind one "＋ Add"', openAt !== -1 && gateAt > openAt && exAt > gateAt && unAt > gateAt, { openAt, gateAt, exAt, unAt })
+    check('Exercise: both ways to add sit at the foot, "Add exercise" over "I also did…"', footAt !== -1 && exAt > footAt && unAt > exAt && (panel.match(/data-testid="add-(exercise|unplanned)"/g) ?? []).length === 2, { footAt, exAt, unAt })
   }
   const app = read('src/App.tsx')
   check('the settings gear scrolls with the page, never floats over it', /className=\{`absolute right-3 z-40 \$\{activeTab === 'chat'/.test(app) && !/className=\{`fixed right-3 z-40 \$\{activeTab === 'chat'/.test(app))

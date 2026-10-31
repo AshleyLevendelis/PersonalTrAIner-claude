@@ -59,9 +59,8 @@ const headerText = () => ev(`document.querySelector('[data-testid="week-context-
 // The section label is a direct child span of the group div that holds the
 // row, so the row is found through the label rather than by index.
 const MAIN_LIFT_JS = `(() => {
-  const label = [...document.querySelectorAll('span')].find(s => /^Main lift\\b/.test(s.textContent.trim()))
-  if (!label) return null
-  const row = label.parentElement?.querySelector('[data-exercise-name]')
+  // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the label is inside the exercise's own row now.
+  const row = [...document.querySelectorAll('[data-exercise-name]')].find(c => /^Main lift\\b/.test(c.querySelector('[data-testid="exercise-eyebrow"]')?.textContent.trim() ?? ''))
   if (!row) return null
   return { name: row.getAttribute('data-exercise-name'), text: row.innerText.replace(/\\s+/g, ' ').trim() }
 })()`

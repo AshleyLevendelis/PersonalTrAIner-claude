@@ -468,6 +468,8 @@
     "test:boot-cache": "tsx scripts/test-boot-cache.ts",
     "verify:app-boot": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/app-boot.mjs",
     "test:exercise-layout": "tsx scripts/test-exercise-layout.ts",
+    "test:exercise-2a": "tsx scripts/test-exercise-2a.ts",
+    "verify:exercise-2a": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/exercise-2a.mjs",
     "test:round-setup": "tsx scripts/test-round-setup.ts",
     "test:rebuild-honours": "tsx scripts/test-rebuild-honours.ts",
     "verify:missed-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/missed-day.mjs",

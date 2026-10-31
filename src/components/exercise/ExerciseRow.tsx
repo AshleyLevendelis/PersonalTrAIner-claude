@@ -5,10 +5,9 @@ import { ArrowDown, ArrowRightLeft, ArrowUp, Ban, BookOpen, History, Info, MoreV
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, formatCompletedSummary, setProgress } from '@/lib/session-derive'
-import { loggedCountLabel } from '@/lib/coach-voice'
 import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChip'
-import { ExerciseLine } from './ExerciseLine'
-import { isExternallyLoaded, isUnverifiedLoadSource, splitLoadDisplay, unloadedLoadLabel, takesPlateCalculator } from '@/lib/load-prescription'
+import { ExerciseLine, StatusCircle } from './ExerciseLine'
+import { isExternallyLoaded, isUnverifiedLoadSource, splitLoadDisplay, unloadedLoadLabel } from '@/lib/load-prescription'
 import { AssistanceChip } from './AssistanceChip'
 import { AddedLoadChip } from './AddedLoadChip'
 import { CalibrationCue } from './CalibrationCue'
@@ -64,6 +63,10 @@ export interface ExerciseRowProps {
   profile?: SetGridProps['profile']
   /** Its place in today's session, printed "01" on the collapsed line (design handoff 2c). */
   index?: number
+  /** "Main lift", "Primer", "Finisher", "Accessory" — the open card's eyebrow and the collapsed line's (2a). */
+  sectionLabel?: string
+  /** The first exercise with sets still to do: the open card says "now" and its circle glows. */
+  isCurrent?: boolean
 }
 
 export function ExerciseRow({
@@ -90,8 +93,10 @@ export function ExerciseRow({
   canMoveDown,
   profile,
   index,
+  sectionLabel,
+  isCurrent = false,
 }: ExerciseRowProps) {
-  const { logs, setsFor, requestedSetFocus, clearSetFocusRequest, setsKnown, loadState } = useActiveSession()
+  const { logs, setsFor, requestedSetFocus, clearSetFocusRequest, date } = useActiveSession()
   const exerciseId = ex.id ?? getExerciseId(ex.name)
   const loggedSets = setsFor(exerciseId, ex.name)
   const completedSets = loggedSets.length
@@ -144,338 +149,278 @@ export function ExerciseRow({
 
 
 
-  // Density pass 3b "Borderless": the active (expanded) exercise is no longer
-  // a bordered card — it separates by a swept mint hairline along its top edge
-  // plus its own type scale. Collapsed rows are bare lines on the canvas, so
-  // the list reads as a rhythm of names rather than a stack of boxes. That is
-  // where the ~10% row-width gain comes from: no border, no card padding.
+  // THE RAMP'S FOLD, remembered per exercise for the session (2a): her own
+  // choice, once she has made one (the grid opens it while a build-up row is
+  // still to do). Kept outside the component, because the Exercise tab is not
+  // kept mounted across a trip to Home.
+  const rampKey = `${date}:${exerciseId}`
+  const [rampChoice, setRampChoice] = useState<boolean | undefined>(() => rampFoldChoice.get(rampKey))
+  useEffect(() => { setRampChoice(rampFoldChoice.get(rampKey)) }, [rampKey])
+  const toggleRamp = (open: boolean) => { rampFoldChoice.set(rampKey, open); setRampChoice(open) }
+
+  const menu = (
+    <ExerciseMenu
+      ex={ex}
+      onOpenDetail={onOpenDetail}
+      onOpenHistory={onOpenHistory ? () => onOpenHistory(exerciseId, ex.name) : undefined}
+      onSwap={onSwap}
+      onMove={onMove}
+      canMoveUp={canMoveUp}
+      canMoveDown={canMoveDown}
+      onRemove={onRemove}
+      onBan={onBan}
+      banBusy={banBusy}
+    />
+  )
+
+  // THE LOAD, IN THE PLAN'S OWN UNIT ("72.5 kg", "14 kg per hand"): the string
+  // formatLoad wrote, split rather than re-derived, so a per-hand number never
+  // reads as a total. Bodyweight says so rather than saying nothing.
+  const loadParts = ex.suggested_load ? splitLoadDisplay(ex.suggested_load) : null
+  const loadText = ex.suggested_load_kg != null
+    ? `${loadParts?.value ?? ex.suggested_load_kg} ${loadParts?.unit ?? 'kg'}`
+    : ex.suggested_assistance_kg != null ? `${ex.suggested_assistance_kg} kg assist`
+    : ex.suggested_added_load_kg != null ? `+${ex.suggested_added_load_kg} kg` : null
+
+  if (!expanded) {
+    // Collapsed: the shared line (also the peek's), a status circle, and the
+    // same ⋮ as the open card — every change to an exercise lives in it (her
+    // 14 Sep ruling), so it is on every row, not only the open one.
+    return (
+      <div data-exercise-name={ex.name} className={allSetsLogged ? 'opacity-80' : undefined}>
+        <ExerciseLine
+          ex={ex}
+          supersetLabel={supersetLabel}
+          loadSource={loadSource}
+          expanded={false}
+          onToggleExpanded={onToggleExpanded}
+          allSetsLogged={allSetsLogged}
+          loggedSummary={formatCompletedSummary(loggedSets)}
+          index={index}
+          // WORKING sets, the same count as the track: a ramp set logged is
+          // not a set of the exercise done.
+          setsDone={rampProgress.workingDone}
+          progressing={progressionNote?.didProgress}
+          eyebrow={sectionLabel && sectionLabel !== 'Accessory' ? sectionLabel : undefined}
+          trailing={menu}
+        />
+      </div>
+    )
+  }
+
+  // THE OPEN CARD (tab polish, Exercise 2a, 31 Oct 2026): a mint-edged card,
+  // its header saying what the lift is and what is prescribed, one continuous
+  // track (violet build-up, a gap, mint work), the folded ramp, the sets, and
+  // "+ Add set". overflow-CLIP, not hidden (L27): a clipped box cannot be
+  // scrolled sideways by the ⋮'s 44px tap area.
+  const eyebrow = sectionLabel && sectionLabel !== 'Accessory' ? sectionLabel : null
+  const state = allSetsLogged ? 'done' : isCurrent ? 'now' : null
   return (
     <div
-      // The row's identity in the DOM, so the order on screen can be read as
-      // an order — the browser gate for moving an exercise asserts the
-      // rendered sequence changed, which is unprovable from a name buried in
-      // a truncated span.
       data-exercise-name={ex.name}
-      className={
-        expanded
-          // overflow-CLIP, NOT overflow-hidden (tester's L27, 9 Oct 2026).
-          // `hidden` still makes a SCROLLABLE box, and the "⋮" button's
-          // invisible 44px tap area reached 8px past the card's right edge —
-          // so the card was 8px wider inside than out, could be scrolled
-          // sideways by anything that centres an element horizontally, and
-          // never scrolled back: the title read "3and Tricep Kickback".
-          // `clip` trims the same pixels without making a scroll box, and the
-          // header below keeps the tap area inside the card (its pr-2), so
-          // there is nothing left over to scroll to. verify:tap-targets asks
-          // every card both questions.
-          ? 'relative overflow-clip rounded-[18px] pt-4 space-y-2.5'
-          : `rounded-[10px] space-y-2 ${allSetsLogged ? 'opacity-70' : ''}`
-      }
+      data-exercise-open
+      className="relative overflow-clip rounded-[20px] px-3 pb-2 pt-3.5"
+      style={{ background: 'var(--surface-raised)', border: '1px solid rgba(var(--glow-rgb), .22)' }}
     >
-      {/* THE SWEEP HAIRLINE IS GONE, 19 Sep 2026. An animated mint line across
-          the top of every expanded row competed with the progress track below
-          it and with the two group rails — three moving or coloured things
-          saying "look here" on one card. The handoff removes it by name; the
-          `.glow-sweep` keyframes stay in index.css for the surfaces that still
-          use them. */}
-      {/* A plain div, not a <button> — LoadChip renders its own interactive
-          "why this weight" button below, and a button can't legally contain
-          another button (the browser silently splits/corrupts the DOM when
-          it tries, which reads as "nothing ever expands"). role="button" +
-          tabIndex + Enter/Space keeps this a real, keyboard-operable control. */}
-      {/* The collapsed line is shared with the upcoming-day peek (see
-          ExerciseLine) so the two surfaces cannot drift apart again. Today's
-          session-derived extras — the logged-set count while part-way
-          through — hang off it here rather than inside it. */}
-      <ExerciseLine
-        ex={ex}
-        supersetLabel={supersetLabel}
-        loadSource={loadSource}
-        expanded={expanded}
-        onToggleExpanded={onToggleExpanded}
-        allSetsLogged={allSetsLogged}
-        loggedSummary={formatCompletedSummary(loggedSets)}
-        index={index}
-        // WORKING sets, the same count as the track's "Working n/N": a ramp
-        // set logged is not a set of the exercise done.
-        setsDone={rampProgress.workingDone}
-        progressing={progressionNote?.didProgress}
-      />
-      {/* ONE CONTINUOUS TRACK, RAMP THEN WORKING — the handoff's progress row.
-          It replaces a bare "2/3 sets" that counted working sets only, so a
-          lifter three ramp steps into a session saw no progress at all.
-          A rail means grouping and a colour means what a set counts as: the
-          violet segments are the build-up, the mint ones are the work, and the
-          gap between them is the only separator needed. */}
-      {expanded && (rampProgress.rampTotal > 0 || rampProgress.workingTotal > 0) && (
-        <div data-testid="set-progress-track">
-          <div className="flex items-center gap-[3px]">
+      <div className="flex items-start gap-2.5">
+        <StatusCircle done={completedSets} sets={ex.sets} current={isCurrent} />
+        <div className="min-w-0 flex-1">
+          {(eyebrow || state) && (
+            <p className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-primary-text" data-testid="exercise-eyebrow">
+              {[eyebrow, state].filter(Boolean).join(' · ')}
+            </p>
+          )}
+          <ExerciseLine
+            ex={ex}
+            supersetLabel={supersetLabel}
+            loadSource={loadSource}
+            expanded
+            onToggleExpanded={onToggleExpanded}
+            allSetsLogged={allSetsLogged}
+          />
+          {/* WHAT IS PRESCRIBED, ONE MONO LINE: sets × reps · load · rest. Rest
+              as visible TEXT, not only a prop into the grid (one-day-one-look
+              §4b): it is what she reads before she has trained. */}
+          <p className="mt-0.5 font-mono text-[0.75rem] text-muted-foreground" data-testid="exercise-meta">
+            {ex.sets} × {ex.reps}
+            {loadText && <> · <span data-testid="exercise-load">{loadText}</span></>}
+            {unloadedLabel && <> · <span data-testid="bodyweight-load">{unloadedLabel}</span></>}
+            {ex.rest && <> · rest <span className="tabular-mono">{ex.rest === 'alternate' ? 'alternate — no rest between' : ex.rest}</span></>}
+          </p>
+        </div>
+        <div className="-mr-1 shrink-0">{menu}</div>
+      </div>
+
+      {/* ONE CONTINUOUS TRACK, RAMP THEN WORKING. Violet is the build-up, mint
+          the work, the gap between them the only separator needed. The
+          counts are said for a screen reader; the segments say them to the eye. */}
+      {(rampProgress.rampTotal > 0 || rampProgress.workingTotal > 0) && (
+        <div className="mt-3" data-testid="set-progress-track">
+          <div className="flex items-center gap-[3px]" aria-hidden>
             {Array.from({ length: rampProgress.rampTotal }, (_, i) => (
-              <span
-                key={`r${i}`}
-                className="h-1 flex-1 rounded-full"
-                style={{ background: i < rampProgress.rampDone ? 'var(--ramp-track-done)' : 'var(--ramp-track-pending)' }}
-              />
+              <span key={`r${i}`} className="h-1 flex-1 rounded-[2px]"
+                style={{ background: i < rampProgress.rampDone ? 'var(--ramp-track-done)' : 'var(--ramp-track-pending)' }} />
             ))}
-            {rampProgress.rampTotal > 0 && rampProgress.workingTotal > 0 && <span className="w-2.5 shrink-0" />}
+            {rampProgress.rampTotal > 0 && rampProgress.workingTotal > 0 && <span className="w-[4px] shrink-0" />}
             {Array.from({ length: rampProgress.workingTotal }, (_, i) => (
-              <span
-                key={`w${i}`}
-                className="h-1 flex-1 rounded-full"
-                style={{ background: i < rampProgress.workingDone ? 'var(--working-track-done)' : 'var(--working-track-pending)' }}
-              />
+              <span key={`w${i}`} className="h-1 flex-1 rounded-[2px]"
+                style={{ background: i < rampProgress.workingDone ? 'var(--working-track-done)' : 'var(--working-track-pending)' }} />
             ))}
           </div>
-          <div className="mt-1 flex items-center justify-between">
-            {rampProgress.rampTotal > 0 ? (
-              <span className="ds-label-compact whitespace-nowrap text-[color:var(--ramp-label)]" data-testid="ramp-counter">
-                Ramp {rampProgress.rampDone}/{rampProgress.rampTotal}
-              </span>
-            ) : <span />}
-            <span className="ds-label-compact whitespace-nowrap text-muted-foreground" data-testid="working-counter">
-              Working {rampProgress.workingDone}/{rampProgress.workingTotal}
-            </span>
-          </div>
+          <span className="sr-only">
+            {rampProgress.rampTotal > 0 && <span data-testid="ramp-counter">Ramp {rampProgress.rampDone}/{rampProgress.rampTotal} </span>}
+            <span data-testid="working-counter">Working {rampProgress.workingDone}/{rampProgress.workingTotal}</span>
+          </span>
         </div>
       )}
 
-      {expanded && (
-        <>
-          <div className="flex items-start justify-between gap-2 pr-2">
-            <div className="min-w-0 flex-1">
-              {/* THE STRIP IS GONE FROM TODAY'S CARD, 17 Sep 2026, and the
-                  grid below has the build-up as real rows instead — Ashley's
-                  ruling from three options, reversing her 7 Sep "tick them
-                  off, don't record them". Ticking was not enough once she was
-                  standing there with a bar in front of her: the strip also
-                  DISAPPEARED the moment the first working set was logged
-                  (`completedSets === 0`), so a build-up half done left her
-                  looking at a grid with no rows and no instruction.
-                  RampStrip itself survives, read-only, on browse and peek —
-                  a tick there would mark a set on a day that is not today. */}
-              {/* The unit comes from the plan's own formatted string, split
-                  into parts so the number can stay large and the unit small.
-                  Hard-coding "kg" here printed a per-hand number as though it
-                  were a total on half of all prescriptions. */}
-              {ex.suggested_load_kg != null && (() => {
-                const parts = ex.suggested_load ? splitLoadDisplay(ex.suggested_load) : null
-                return (
-                  <div className="flex items-end gap-2">
-                    <span className="tabular-mono ds-num-lg leading-none">{parts?.value ?? ex.suggested_load_kg}</span>
-                    <span className="text-xs text-text-tertiary pb-0.5">{parts?.unit ?? 'kg'}</span>
-                  </div>
-                )
-              })()}
-              {ex.suggested_assistance_kg != null && (
-                <div className="flex items-end gap-2">
-                  <span className="tabular-mono ds-num-lg leading-none">{ex.suggested_assistance_kg}</span>
-                  <span className="text-xs text-text-tertiary pb-0.5">kg assist</span>
-                </div>
-              )}
-              {/* "BODYWEIGHT" IS A PRESCRIPTION, AND ABSENCE IS NOT.
-                  Ashley, 17 Sep 2026: she swapped a loaded leg curl for a
-                  slider curl mid-session, and where every other card on the
-                  page carried a weight this one carried nothing — so the right
-                  answer looked like a failed one, and she reported it as a bug.
-                  The standing rule is that the KIND travels with the value and
-                  the renderer has no default branch (the personalBest union,
-                  same week); a card that states sets and rest but withholds the
-                  load statement for one class of movement is that defect one
-                  step further on — the kind is "no external load" and the
-                  screen was rendering it as silence.
-                  ProgramBrowse already prints "· bodyweight" off exactly this
-                  data, so this is the today card catching up with its sibling. */}
-              {unloadedLabel && (
-                <div className="flex items-end gap-2" data-testid="bodyweight-load">
-                  <span className="ds-num-lg leading-none">{unloadedLabel}</span>
-                </div>
-              )}
-              {ex.suggested_load_kg != null && loadSourceLabel(loadSource, isCalibrationWeek) && (
-                <p className="text-[0.625rem] uppercase tracking-[.1em] text-muted-foreground">{loadSourceLabel(loadSource, isCalibrationWeek)}</p>
-              )}
-              <div className="mt-1.5">
-                {/* A lift with no weight renders no LoadChip at all (see its
-                    header). Tempo takes that slot when there is one — it is
-                    what the trainee is actually meant to progress. */}
-                <TempoChip ex={ex} />
-                {ex.suggested_added_load_kg != null ? (
-                  <AddedLoadChip ex={ex} />
-                ) : ex.suggested_assistance_kg != null ? (
-                  <AssistanceChip ex={ex} />
-                ) : (
-                  <LoadChip
-                    ex={ex}
-                    source={loadSource}
-                    explained={explainedLoadChip}
-                    onToggleExplain={() => setExplainedLoadChip(v => !v)}
-                    progressionNote={progressionNote}
-                    calibration={isCalibrationWeek}
-                  />
-                )}
-              </div>
-              {showCalibrationCue && <CalibrationCue hasLoad={ex.suggested_load_kg != null} atStatedLimit={ex.load_hold === 'stated_limit'} />}
-              {/* ONE TEXT NODE, deliberately — verify:one-number finds this line
-                  as a leaf. The second half is only a number when the phone
-                  has something to count from (H20; see loggedCountLabel). */}
-              <p className="mt-2 text-xs text-text-tertiary" data-testid="logged-count">
-                {`${ex.sets} working sets · ${loggedCountLabel(completedSets, { known: setsKnown, loading: loadState === 'loading' })}`}
-              </p>
-              {/* REST, as a number you can read before you have trained.
-                  Until now ex.rest reached this component only as
-                  restTime={ex.rest}
-            insideSuperset={!!supersetLabel} into SetGrid, where its one job is to
-                  start the timer AFTER a set is logged — so the prescription
-                  itself was on no screen anywhere in the app. Ashley's 3 Sep
-                  2026 ruling (two minutes on a loaded main lift, conditioning
-                  keeps 90s) could not be read before doing the work.
-                  Same line, same words, same place as the browse row in
-                  ReadOnlyDayList — test:one-day-one-look §4b now holds the
-                  two together, and requires a TEXT node here rather than a
-                  prop, because the prop is exactly what was already true
-                  while the number stayed invisible. */}
-              {ex.rest && (
-                <p className="text-[0.625rem] text-muted-foreground">
-                  Rest <span className="tabular-mono">{ex.rest === 'alternate' ? 'alternate — no rest between' : ex.rest}</span>
-                </p>
-              )}
-              {ex.selection_note && (
-                <div className="mt-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setExplainedPick(v => !v)}
-                    aria-label="Why this exercise"
-                    className="inline-flex items-center gap-1 text-muted-foreground/60 hover:text-muted-foreground"
-                  >
-                    <Info className="size-2.5" />
-                    <span className="text-[0.5625rem] italic">why this exercise</span>
-                  </button>
-                  {explainedPick && (
-                    <p className="mt-0.5 text-[0.625rem] text-muted-foreground/80 italic max-w-xs">{ex.selection_note}</p>
-                  )}
-                </div>
-              )}
-              {/* ONE PLACE FOR EVERY CHANGE TO AN EXERCISE — Ashley's ruling,
-                  14 Sep 2026, from three options, after reporting the split:
-                  "Swap exercise is an inline link above the sets table, while
-                  the rest of the actions are inside the 3-dot overflow menu."
-                  She chose all of them behind the ⋮ over making them all
-                  inline, and over keeping Swap in both places, so there is
-                  nothing to remember about which control lives where.
-
-                  PLATE CALCULATOR STAYS. It is the one thing on this row that
-                  does not change the plan — it is a tool you reach for with a
-                  bar in front of you, mid-set, and burying it behind a menu
-                  would cost taps in exactly the moment that matters. The line
-                  the ruling draws is "changes to the plan go in the menu", not
-                  "links go in the menu". */}
-              {/* AND NO PLATE CALCULATOR FOR A MOVEMENT WITH NO PLATES.
-                  It sat on the slider-curl card beside a weight box showing 0,
-                  which is the row quietly promising a kind of work this
-                  exercise does not involve. It stays wherever a weight is
-                  genuinely in play — including a bodyweight movement she is
-                  adding load to, which is why this reads the load statement
-                  rather than the catalogue alone. */}
-              {/* ONE RULE, BOTH PLACES. The row's own calculator button obeys
-                  takesPlateCalculator too; a link here that a cable row's
-                  button no longer offers would be the same claim made twice
-                  and answered differently. */}
-              {(carriesExternalLoad || hasLoadStatement) && takesPlateCalculator(catalogEntry) && (
-                <div className="mt-1.5 flex items-center gap-3.5">
-                  <button
-                    type="button"
-                    className="hit-slop-44 text-xs text-muted-foreground"
-                    onClick={() => onOpenPlateCalc(ex.suggested_load_kg ?? 0)}
-                  >
-                    Plate calculator
-                  </button>
-                </div>
-              )}
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="size-7 shrink-0" aria-label="Exercise options">
-                  <MoreVertical className="size-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {/* FIRST in the menu, above History. Someone opening this is
-                    more often asking "how does this go?" mid-set than "what
-                    did I lift last time?" — and until now the app had no
-                    answer to the first question at all. */}
-                {onOpenDetail && (
-                  <DropdownMenuItem onClick={() => onOpenDetail(ex.name)}>
-                    <BookOpen className="size-3.5" />
-                    How to do it
-                  </DropdownMenuItem>
-                )}
-                {onOpenHistory && (
-                  <DropdownMenuItem onClick={() => onOpenHistory(exerciseId, ex.name)}>
-                    <History className="size-3.5" />
-                    History
-                  </DropdownMenuItem>
-                )}
-                {/* SWAP, THEN ORDER, THEN REMOVAL, THEN THE BAN. The menu runs
-                    cheap to expensive — swapping keeps the slot and the work,
-                    moving keeps everything, taking out loses the slot today,
-                    and the ban rewrites every week of every block — so only the
-                    ban is styled destructive. Swap leads because it is the
-                    change people make most, which is also why it used to sit
-                    outside the menu. */}
-                <DropdownMenuItem onClick={onSwap} data-testid="swap-exercise">
-                  <ArrowRightLeft className="size-3.5" />
-                  Swap exercise
-                </DropdownMenuItem>
-                {onMove && (
-                  <DropdownMenuItem disabled={!canMoveUp} onClick={() => onMove(-1)} data-testid="move-up">
-                    <ArrowUp className="size-3.5" />
-                    Move earlier
-                  </DropdownMenuItem>
-                )}
-                {onMove && (
-                  <DropdownMenuItem disabled={!canMoveDown} onClick={() => onMove(1)} data-testid="move-down">
-                    <ArrowDown className="size-3.5" />
-                    Move later
-                  </DropdownMenuItem>
-                )}
-                {onRemove && (
-                  <DropdownMenuItem onClick={onRemove} data-testid="remove-exercise">
-                    <Trash2 className="size-3.5" />
-                    Take out of this session
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuItem variant="destructive" disabled={banBusy} onClick={onBan} data-testid="ban-exercise">
-                  <Ban className="size-3.5" />
-                  {banBusy ? 'Banning…' : 'Ban exercise'}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+      {/* WHY THIS NUMBER, AND WHERE IT CAME FROM — the chips that explain the
+          load (start here / from your last session / per side), the tempo,
+          the calibration cue and "why this exercise". Kept, quiet, under the
+          track: the design draws none, and none of them may be lost. */}
+      <div className="mt-2 space-y-1">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {ex.suggested_load_kg != null && loadSourceLabel(loadSource, isCalibrationWeek) && (
+            <span className="text-[0.625rem] uppercase tracking-[.1em] text-muted-foreground">{loadSourceLabel(loadSource, isCalibrationWeek)}</span>
+          )}
+          <TempoChip ex={ex} />
+          {ex.suggested_added_load_kg != null ? (
+            <AddedLoadChip ex={ex} />
+          ) : ex.suggested_assistance_kg != null ? (
+            <AssistanceChip ex={ex} />
+          ) : (
+            <LoadChip
+              ex={ex}
+              source={loadSource}
+              explained={explainedLoadChip}
+              onToggleExplain={() => setExplainedLoadChip(v => !v)}
+              progressionNote={progressionNote}
+              calibration={isCalibrationWeek}
+            />
+          )}
+        </div>
+        {showCalibrationCue && <CalibrationCue hasLoad={ex.suggested_load_kg != null} atStatedLimit={ex.load_hold === 'stated_limit'} />}
+        {ex.selection_note && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setExplainedPick(v => !v)}
+              aria-label="Why this exercise"
+              className="inline-flex items-center gap-1 text-muted-foreground/60 hover:text-muted-foreground"
+            >
+              <Info className="size-2.5" />
+              <span className="text-[0.5625rem] italic">why this exercise</span>
+            </button>
+            {explainedPick && (
+              <p className="mt-0.5 text-[0.625rem] text-muted-foreground/80 italic max-w-xs">{ex.selection_note}</p>
+            )}
           </div>
-          <SetGrid
-            exerciseName={ex.name}
-            exerciseId={exerciseId}
-            totalSets={ex.sets}
-            prescribedReps={ex.reps}
-            prescriptionType={ex.prescription_type}
-            restTime={ex.rest}
-            tier={ex.tier}
-            suggestedLoadKg={ex.suggested_load_kg}
-            loadUnitLabel={(ex.suggested_load ? splitLoadDisplay(ex.suggested_load) : null)?.unit}
-            perSetLoadKg={ex.per_set_load?.map(s => s.load_kg)}
-            loadIsEstimate={loadIsUnverified}
-            // Derived ONCE, above, and passed down: formatRampSets is the one
-            // place percentages become kilos, and it re-derives off the CURRENT
-            // working weight every render. A second copy inside the grid is
-            // where two numbers start to disagree.
-            rampSets={ramp && ramp.kind !== 'stale' ? ramp.sets.map(r => ({ setNumber: r.setNumber, kg: 'kg' in r ? r.kg : undefined, reps: r.reps })) : undefined}
-            rampKind={ramp?.kind}
-            calibration={isCalibrationWeek}
-            ignoreLastTime={easedForBreak}
-            profile={profile}
-            onOpenPlateCalc={onOpenPlateCalc}
-            onSetCompleted={onSetCompleted}
-          />
-        </>
-      )}
+        )}
+      </div>
+
+      <div className="mt-1">
+        <SetGrid
+          exerciseName={ex.name}
+          exerciseId={exerciseId}
+          totalSets={ex.sets}
+          prescribedReps={ex.reps}
+          prescriptionType={ex.prescription_type}
+          restTime={ex.rest}
+          insideSuperset={!!supersetLabel}
+          tier={ex.tier}
+          suggestedLoadKg={ex.suggested_load_kg}
+          loadUnitLabel={loadParts?.unit}
+          perSetLoadKg={ex.per_set_load?.map(s => s.load_kg)}
+          loadIsEstimate={loadIsUnverified}
+          // Derived ONCE, above, and passed down: formatRampSets is the one
+          // place percentages become kilos.
+          rampSets={ramp && ramp.kind !== 'stale' ? ramp.sets.map(r => ({ setNumber: r.setNumber, kg: 'kg' in r ? r.kg : undefined, reps: r.reps })) : undefined}
+          rampKind={ramp?.kind}
+          calibration={isCalibrationWeek}
+          ignoreLastTime={easedForBreak}
+          profile={profile}
+          // THE PLATE BUTTON LIVES IN EACH WEIGHT BOX (2a), and only on a
+          // movement with plates: the "Plate calculator" link left the footer.
+          onOpenPlateCalc={(carriesExternalLoad || hasLoadStatement) ? onOpenPlateCalc : undefined}
+          onSetCompleted={onSetCompleted}
+          rampOpen={rampChoice}
+          onToggleRamp={toggleRamp}
+        />
+      </div>
     </div>
+  )
+}
+
+/** Which exercises had their ramp folded or opened by hand, this session. */
+const rampFoldChoice = new Map<string, boolean>()
+
+/**
+ * EVERY CHANGE TO AN EXERCISE LIVES IN ONE MENU — Ashley's ruling, 14 Sep
+ * 2026, from three options: all of them behind the ⋮, over making them all
+ * inline and over keeping Swap in both places. Runs cheap to expensive: swap
+ * keeps the slot, moving keeps everything, taking out loses the slot today,
+ * and the ban rewrites every week — so only the ban is styled destructive.
+ * "How to do it" leads: mid-set, "how does this go?" is the commoner question.
+ */
+function ExerciseMenu({ ex, onOpenDetail, onOpenHistory, onSwap, onMove, canMoveUp, canMoveDown, onRemove, onBan, banBusy }: {
+  ex: Exercise
+  onOpenDetail?: (exerciseName: string) => void
+  onOpenHistory?: () => void
+  onSwap: () => void
+  onMove?: (direction: -1 | 1) => void
+  canMoveUp?: boolean
+  canMoveDown?: boolean
+  onRemove?: () => void
+  onBan: () => void | Promise<void>
+  banBusy: boolean
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" className="hit-slop-44 size-7 shrink-0" aria-label="Exercise options">
+          <MoreVertical className="size-3.5" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {onOpenDetail && (
+          <DropdownMenuItem onClick={() => onOpenDetail(ex.name)}>
+            <BookOpen className="size-3.5" />
+            How to do it
+          </DropdownMenuItem>
+        )}
+        {onOpenHistory && (
+          <DropdownMenuItem onClick={onOpenHistory}>
+            <History className="size-3.5" />
+            History
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem onClick={onSwap} data-testid="swap-exercise">
+          <ArrowRightLeft className="size-3.5" />
+          Swap exercise
+        </DropdownMenuItem>
+        {onMove && (
+          <DropdownMenuItem disabled={!canMoveUp} onClick={() => onMove(-1)} data-testid="move-up">
+            <ArrowUp className="size-3.5" />
+            Move earlier
+          </DropdownMenuItem>
+        )}
+        {onMove && (
+          <DropdownMenuItem disabled={!canMoveDown} onClick={() => onMove(1)} data-testid="move-down">
+            <ArrowDown className="size-3.5" />
+            Move later
+          </DropdownMenuItem>
+        )}
+        {onRemove && (
+          <DropdownMenuItem onClick={onRemove} data-testid="remove-exercise">
+            <Trash2 className="size-3.5" />
+            Take out of this session
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem variant="destructive" disabled={banBusy} onClick={onBan} data-testid="ban-exercise">
+          <Ban className="size-3.5" />
+          {banBusy ? 'Banning…' : 'Ban exercise'}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

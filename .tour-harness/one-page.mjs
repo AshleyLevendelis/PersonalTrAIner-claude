@@ -142,7 +142,10 @@ const done = await ev(`document.querySelectorAll('[data-exercise-strip] [data-do
 check('17. the week line\'s session count is the strip\'s', !!meter && key.startsWith(`${meter} session`) && Number(meter.split(' of ')[0]) === done, { meter, key, done })
 check('18. no week rings and no Program card on the page', await ev(`!document.querySelector('main [data-ring]') && !document.querySelector('[data-program-row]')`))
 const start = await ev(`(() => { const b = [...document.querySelectorAll('button')].find(n => n.innerText.trim() === 'Start session'); if (!b) return null; const r = b.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, h: innerHeight } })()`)
-check('19. "Start session" is docked on screen above the tab bar', !!start && start.top > start.h / 2 && start.bottom <= start.h - 64, start)
+// RE-ANCHORED 31 Oct 2026 (Exercise 2a): Start is in the glowing card at the top, on screen and clear of the tab bar;
+// the docked bar returns only once the card has scrolled away (verify:exercise-2a A3/A7).
+check('19. "Start session" is on screen in the glowing card, clear of the tab bar', !!start && start.top >= 0 && start.bottom <= start.h - 64
+  && (await ev(`!!document.querySelector('[data-exercise-hero] [data-testid="hero-start"]')`)), start)
 await shoot('one-page-exercise')
 await ev(`document.querySelector('[aria-label="More options"]')?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' }))`)
 await wait(600)
