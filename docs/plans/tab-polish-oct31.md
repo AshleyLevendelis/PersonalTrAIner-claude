@@ -24,7 +24,10 @@ colour to the existing CSS tokens (`--primary`, `--primary-2`, `--glow-rgb`, `--
 - **Chat bubbles**: yours plain (28 Sep), the coach's the soft tint (16 Oct), not the design's solid teal.
 - **Coach offers are text + small buttons** (20 Oct): the design's bubble + one-line preview + reply pills fits it.
   Buttons keep the 44px tap floor.
-- **No voice notes** until she answers that question.
+- **Voice: "Option 1, add a listen button"** (her answer, 31 Oct 2026, from three options: a listen button, voice-note
+  bubbles, not now). Every coach bubble gets a small Listen button that reads that message aloud with the phone's own
+  voice (on the device, no new service); a second tap stops it; one message at a time; drawn only where the phone can
+  speak. No voice-note bubbles or waveform.
 - **Every change to an exercise lives in the ⋮ menu** (14 Sep); the plate calculator, which changes nothing, may sit in
   the weight box as drawn.
 - **A box for every set, labelled** (17 Sep): the ramp-up rows stay loggable inside the folded ramp row.
