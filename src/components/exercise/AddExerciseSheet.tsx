@@ -259,7 +259,7 @@ export function AddExerciseSheet({
               data-scope="today"
               onClick={() => applyScope('today')}
             >
-              <p className="font-medium text-sm">Today only</p>
+              <p className="font-medium text-sm">Just today</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Only this session gains it. Next time this day comes around it's back to the planned session.
               </p>
@@ -270,7 +270,7 @@ export function AddExerciseSheet({
               data-scope="permanent"
               onClick={() => applyScope('permanent')}
             >
-              <p className="font-medium text-sm">Rest of block</p>
+              <p className="font-medium text-sm">Whole block</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Adds it to this day for the rest of this training block; later blocks re-plan from your base program.
                 {' '}It starts at a conservative weight so you can find your working number, then ramps from there.

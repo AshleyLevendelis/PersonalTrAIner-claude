@@ -149,11 +149,11 @@ await clickSel('[data-testid="swap-dialog"] [data-testid="swap-option"]'); await
 // "REST OF BLOCK" SAYS WHEN IT ENDS, and "never" is offered beside it (runs
 // 3-4, M40b; her 10 Oct ruling "Keep to the block, say it").
 const blockUntil = await ev(`document.querySelector('[data-testid="swap-dialog"] [data-testid="swap-block-until"]')?.textContent?.trim() ?? null`)
-check('2d2. "Rest of block" says the day it ends and why', !!blockUntil && /^Swaps it until (Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)( \d{4})?, when your next block starts and your plan changes exercises\.( |$)/.test(blockUntil), blockUntil)
+check('2d2. "Whole block" says the day it ends and why', !!blockUntil && /^Swaps it until (Mon|Tue|Wed|Thu|Fri|Sat|Sun) \d{1,2} (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)( \d{4})?, when your next block starts and your plan changes exercises\.( |$)/.test(blockUntil), blockUntil)
 const never = await ev(`document.querySelector('[data-testid="swap-dialog"] [data-testid="swap-never-again"]')?.textContent?.trim() ?? null`)
 check('2d3. ...with "never give me this one" beside it, naming the exercise', never === `Never give me ${swapVictim} again`, never)
 await shoot('moved-edit-2-scope')
-check('2e. "Today only" is offered and tapped', await clickText('[data-testid="swap-dialog"]', '/^Today only/'))
+check('2e. "Just today" is offered and tapped', await clickText('[data-testid="swap-dialog"]', '/^Just today/'))
 await untilGone('[data-testid="swap-dialog"]'); await wait(900)
 const afterSwap = (await until(async () => { const o = await order(); return o && !o.includes(swapVictim) ? o : null })) || (await order()) || []
 check('2f. THE SWAP HAPPENED: the old exercise is gone from the card', start.length > 0 && afterSwap.length > 0 && !afterSwap.includes(swapVictim), { swapVictim, afterSwap })
@@ -245,8 +245,8 @@ check('5f. the take-out sheet reaches its scope step', (await openRowMenu(manner
   && !!(await until(() => has('[data-testid="remove-exercise-sheet"]'))) && await clickSel('[data-testid="reason-skip"]') && (await wait(450), await clickSel('[data-verb="drop"]')) && (await wait(450), await has('[data-testid="remove-scope"]')))
 const scopeQuestion = await ev(`document.querySelector('[data-testid="remove-scope-question"]')?.innerText || ''`)
 const scopeButtons = (await ev(`[...document.querySelectorAll('[data-testid="remove-scope"] [data-scope]')].map(b => b.textContent.trim())`)) || []
-check('5g. the question and its buttons use the same words: "Just today, or the rest of the block?" over "Today only" / "Rest of block"',
-  scopeQuestion === 'Just today, or the rest of the block?' && scopeButtons.join('|') === 'Today only|Rest of block', { scopeQuestion, scopeButtons })
+check('5g. the question and its buttons use the same words: "Just today, or the rest of the block?" over "Just today" / "Whole block" (her 31 Oct words)',
+  scopeQuestion === 'Just today, or the rest of the block?' && scopeButtons.join('|') === 'Just today|Whole block', { scopeQuestion, scopeButtons })
 await clickSel('[data-scope="today"]'); await wait(1100)
 check('5h. the refusal shows on the step that produced it', /fewer than 3/.test(await ev(`document.querySelector('[data-testid="remove-error"]')?.innerText || ''`)))
 check('5i. "Back" takes the red line away with it', await clickSel('[data-testid="remove-scope-back"]') && (await wait(450), !(await has('[data-testid="remove-error"]'))) && await has('[data-verb="drop"]'),
@@ -257,7 +257,7 @@ await escape()
 check('5j. the take-out sheet offers "I don\'t like it"', (await openRowMenu(mannersVictim)) === 'open' && await tap('[data-testid="remove-exercise"]')
   && !!(await until(() => has('[data-testid="remove-exercise-sheet"] [data-reason="dislike"]'))))
 await clickSel('[data-testid="remove-exercise-sheet"] [data-reason="dislike"]'); await wait(900)
-check('5k. tapping it opens the for-good confirm, NOT "Today only / Rest of block"', !!(await until(() => has('[data-testid="ban-confirm"]'))) && !(await has('[data-testid="remove-scope"]')),
+check('5k. tapping it opens the for-good confirm, NOT "Just today / Whole block"', !!(await until(() => has('[data-testid="ban-confirm"]'))) && !(await has('[data-testid="remove-scope"]')),
   await ev(`document.body.innerText.slice(-300)`))
 check('5l. ...naming the exercise and how much of the plan it touches', await ev(`(() => { const t = document.querySelector('[data-testid="ban-exercise-sheet"]')?.innerText || ''; return t.includes(${JSON.stringify(mannersVictim)}) && /every week of your plan|isn.t on this plan anywhere/.test(t) })()`),
   await ev(`(document.querySelector('[data-testid="ban-exercise-sheet"]')?.innerText || '').slice(0, 300)`))

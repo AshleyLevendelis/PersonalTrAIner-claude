@@ -120,8 +120,8 @@ check('3b. the card states the session\'s new length BEFORE the tap', /\d+ min/.
 check('3c. ...and says nothing else is taken out to make room',
   /nothing else is taken out|still inside the session length/i.test(lengthLine), lengthLine)
 check('3d. the scope words are the ones the other sheets use',
-  (await text('[data-scope="today"]')).startsWith('Today only')
-  && (await text('[data-scope="permanent"]')).startsWith('Rest of block'))
+  (await text('[data-scope="today"]')).startsWith('Just today')
+  && (await text('[data-scope="permanent"]')).startsWith('Whole block'))
 await shoot('exercise-add-2-confirm')
 
 // The number on the card is the SAME estimator the header uses, so the two

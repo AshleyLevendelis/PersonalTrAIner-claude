@@ -133,8 +133,10 @@ const READ = String.raw`(() => {
     // with the scope, so "Apply today") and its "Not now" — all client-authored,
     // so matching them cannot be satisfied by model prose.
     hasProposal: !!document.querySelector('[data-testid="proposal-card"][data-offer="text"]')
-      && [...document.querySelectorAll('button')].some(b => /^Apply/.test((b.textContent || '').trim()))
-      && [...document.querySelectorAll('button')].some(b => (b.textContent || '').trim() === 'Not now'),
+      // RE-ANCHORED 31 Oct 2026 (her "Mix": a swap's buttons read "Just today" / "Whole block" / "Keep <lift>"): the
+      // offer's own confirm and decline, by the weights the card stamps on them, still client-authored.
+      && !!document.querySelector('[data-testid="proposal-card"] [data-offer-weight="primary"]')
+      && !!document.querySelector('[data-testid="proposal-card"] [data-offer-weight="reject"]'),
     mentionsTarget: text.indexOf(${JSON.stringify(TARGET_FULL)}) !== -1,
     mentionsLegPress: /Leg Press/i.test(text),
     buttons: [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean),

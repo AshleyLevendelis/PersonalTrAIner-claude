@@ -110,14 +110,15 @@ const settle = async () => {
     await wait(300)
   }
 }
-const looksLikeText = (tag, o, confirmLabel) => {
+const looksLikeText = (tag, o, confirmLabel, declineLabel = 'Not now') => {
   check(`${tag}: the offer is on screen, live`, o?.status === 'pending' && o?.offerAttr === 'text', o && { status: o.status, attr: o.offerAttr })
   check(`${tag}: its lead and its facts are ONE coach bubble, in the coach's group`,
     o?.bubbleRole === 'assistant' && o?.groupRole === 'assistant' && o?.factsInBubble === true && o?.leadInBubble === true, o && { bubble: o.bubbleRole, group: o.groupRole, facts: o.factsInBubble, lead: o.leadInBubble })
   check(`${tag}: no card chrome — no "Proposed change", no rule down the side, no "Keep"`, !!o && o.cardHeading === false && o.ruled === false && o.keepButton === false, o && { heading: o.cardHeading, ruled: o.ruled, keep: o.keepButton })
   const btns = o?.buttons ?? []
-  check(`${tag}: the buttons are "${confirmLabel}" and "Not now", under the bubble`,
-    btns.some(b => b.inConfirmRow && b.label === confirmLabel) && btns.some(b => b.inConfirmRow && b.label === 'Not now') && o?.buttonsBelowBubble === true, btns.map(b => b.label))
+  // RE-ANCHORED 31 Oct 2026, her "Mix": a scoped exercise offer's decline names what she keeps ("Keep <lift>").
+  check(`${tag}: the buttons are "${confirmLabel}" and "${declineLabel}", under the bubble`,
+    btns.some(b => b.inConfirmRow && b.label === confirmLabel) && btns.some(b => b.inConfirmRow && b.label === declineLabel) && o?.buttonsBelowBubble === true, btns.map(b => b.label))
   check(`${tag}: every button is at least 44px to tap`, btns.length >= 2 && btns.every(b => b.h >= 44 && b.w >= 44), btns.map(b => [b.label, Math.round(b.h), Math.round(b.w)]))
   // RE-ANCHORED 31 Oct 2026 (design 2b, which her plan says fits this ruling): the reply pills are drawn 36px, inside
   // the 44px button — no taller than the reply chips (40px), still word-sized, still no glow.
@@ -130,14 +131,14 @@ check('1. she asks for a swap', await say('swap this exercise, the rack is busy'
 await until(() => offer(), v => !!v, 60)
 await settle()
 const swap = await offer()
-looksLikeText('1a swap', swap, 'Apply today')
+looksLikeText('1a swap', swap, 'Just today', `Keep ${target?.full ?? 'NO-NAME'}`)
 check('1b swap: the facts say what changes before the tap — the lift on her plan → Leg Press',
   (swap?.changeLines ?? []).some(l => l.includes(target?.full ?? 'NO-NAME') && /→\s*Leg Press/i.test(l)), swap?.changeLines)
-check('1c swap: both scopes are offered, each under its own label', (swap?.buttons ?? []).some(b => b.label === 'Rest of block'), swap?.buttons?.map(b => b.label))
+check('1c swap: both scopes are offered, each under its own label', (swap?.buttons ?? []).some(b => b.label === 'Whole block'), swap?.buttons?.map(b => b.label))
 await shoot('offer-text-swap')
-await ev(`(() => { const b = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop()?.querySelectorAll('button'); const n = b && [...b].find(x => x.textContent.trim() === 'Not now'); if (n) n.click() })()`)
+await ev(`(() => { const b = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop()?.querySelectorAll('button'); const n = b && [...b].find(x => x.textContent.trim().startsWith('Keep ')); if (n) n.click() })()`)
 const declined = await until(() => offer(), v => v?.status === 'declined', 40)
-check('1d swap: "Not now" declines it, and the offer says so in words', declined?.status === 'declined' && (await ev(`[...document.querySelectorAll('[data-testid="proposal-terminal-note"]')].pop()?.textContent ?? ''`)) === 'Left as it was.', declined?.status)
+check('1d swap: "Keep <lift>" declines it, and the offer says so in words', declined?.status === 'declined' && (await ev(`[...document.querySelectorAll('[data-testid="proposal-terminal-note"]')].pop()?.textContent ?? ''`)) === 'Left as it was.', declined?.status)
 
 // 2. A MEAL EDIT: a cost and its alternatives. Asked first (it works against
 // the goal), then offered on the second ask — the house rule, unchanged.

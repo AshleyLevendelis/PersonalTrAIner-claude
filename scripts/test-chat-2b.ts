@@ -77,7 +77,8 @@ check('...and the words come from the phrasebook (kcalLeftOrOver), never a secon
 check('the strip re-reads when a meal is logged', /subscribeMealStore\(\(\) => setLedgerTick/.test(chat))
 
 console.log('\n[3] The offer: the same scopes, the preview, every state')
-check('scope labels are the ones the card always had', scopeLabel('today') === 'Apply today' && scopeLabel('permanent') === 'Rest of block' && scopeLabel('block') === 'Whole block' && scopeLabel('extra', { extra: 'Log it' }) === 'Log it' && scopeLabel('x') === 'x')
+// RE-ANCHORED 31 Oct 2026, her "Mix": "Just today" / "Whole block" / "Keep <the exercise>".
+check('scope labels are her 31 Oct words', scopeLabel('today') === 'Just today' && scopeLabel('permanent') === 'Whole block' && scopeLabel('block') === 'Whole block' && scopeLabel('extra', { extra: 'Log it' }) === 'Log it' && scopeLabel('x') === 'x')
 const scopeMap = (cardSrc.match(/scopeField\.options\.map\(\(opt, i\) => \(([\s\S]*?)\)\)\s*\)\s*:/) || [])[1] ?? ''
 check('each scope pill confirms with ITS scope, the first is the primary', /onClick=\{\(\) => void handleConfirm\(opt\)\}/.test(scopeMap) && /data-offer-weight=\{i === 0 \? 'primary' : 'scope'\}/.test(scopeMap) && /scopeLabel\(opt, scopeField\.labels\)/.test(scopeMap), scopeMap.slice(0, 300))
 check('"Not now" rejects', /onClick=\{handleReject\}[\s\S]{0,80}data-offer-weight="reject"/.test(cardSrc))
@@ -91,7 +92,7 @@ const view = (status: string, extra: Record<string, unknown> = {}) => renderToSt
   onConfirm: async () => {}, onReject: async () => {}, onAlternative: () => {}, bubble: f => React.createElement('div', { 'data-testid': 'chat-bubble' }, f),
 }))
 const pending = view('pending')
-check('pending: the preview, "Apply today", "Rest of block", "Not now" and the alternatives', /data-testid="offer-preview"/.test(pending) && />Apply today</.test(pending) && />Rest of block</.test(pending) && />Not now</.test(pending) && /Or swap in/.test(pending) && /Glute bridge/.test(pending))
+check('pending: the preview, "Just today", "Whole block", "Keep RDL" and the alternatives', /data-testid="offer-preview"/.test(pending) && />Just today</.test(pending) && />Whole block</.test(pending) && />Keep RDL</.test(pending) && /Or swap in/.test(pending) && /Glute bridge/.test(pending))
 check('...the preview is a change line whose words are the offer\'s own row', /data-offer-line="change"/.test(pending) && /Exercise: <\/span>.*RDL.*→.*Hip Thrust/.test(pending))
 const states: [string, RegExp][] = [
   ['claimed', /disabled=""/], ['done', /Already applied\./], ['partial', /Already applied\./], ['declined', /Left as it was\./],

@@ -106,7 +106,17 @@ console.log('\n§4 The offer is the coach\'s bubble, with nothing of the card')
   // Strings only: what the component can PRINT.
   const printed = [...card.matchAll(/(['"`>])([^'"`<>{}]*?)(['"`<])/g)].map(m => m[2].trim()).filter(Boolean)
   check('no "Proposed change" heading and no "Keep" button anywhere it can print', !printed.some(t => /Proposed change/i.test(t) || t === 'Keep'), printed.filter(t => /Proposed change|^Keep$/i.test(t)))
-  check('..."Not now" in its place', printed.includes('Not now'), printed.filter(t => /now/i.test(t)))
+  // RE-ANCHORED 31 Oct 2026, her "Mix": the decline is said by rejectLabel, which names what she keeps on a scoped
+  // exercise offer ("Keep RDL") and is "Not now" everywhere else. Still never a bare "Keep".
+  {
+    const { rejectLabel, offerChanges: oc } = await import('../src/lib/offer-text')
+    const swapOne = oc([{ field: 'Exercise', before: 'RDL', after: 'Hip Thrust' }])
+    check('...the decline names what she keeps on a scoped swap or removal, "Not now" otherwise',
+      rejectLabel(swapOne, true) === 'Keep RDL' && rejectLabel(swapOne, false) === 'Not now'
+      && rejectLabel(oc([{ field: 'Mon', before: '—', after: 'Face Pulls' }]), true) === 'Not now'
+      && rejectLabel(oc([{ field: 'Mon', before: 'A', after: 'B' }, { field: 'Tue', before: 'C', after: 'D' }]), true) === 'Not now'
+      && /rejectLabel\(changes, !!scopeField && scopeField\.options\.includes\('today'\) && scopeField\.options\.includes\('permanent'\)\)/.test(card))
+  }
   check('the facts are said through the shared lines, and handed to the bubble', /offerChanges\(diff\.rows\)/.test(card) && /offerChangeText\(c\)/.test(card) && /\{bubble\(facts\)\}/.test(card))
   // RE-ANCHORED 31 Oct 2026 (design 2b, which her tab-polish plan says fits this ruling): the offer's FIRST answer is
   // a filled main-colour pill. What this guards is unchanged — no glowing button, and no solid main-colour BLOCK —

@@ -416,7 +416,7 @@ export function SwapDialog({
               disabled={busy}
               onClick={() => applyScope('today')}
             >
-              <p className="font-medium text-sm">Today only</p>
+              <p className="font-medium text-sm">Just today</p>
               <p className="text-xs text-muted-foreground mt-0.5">
                 Only this session changes. Next time this day comes around it reverts, and your original lift's progression keeps going from its last logged session.
               </p>
@@ -426,7 +426,7 @@ export function SwapDialog({
               disabled={busy}
               onClick={() => applyScope('permanent')}
             >
-              <p className="font-medium text-sm">Rest of block</p>
+              <p className="font-medium text-sm">Whole block</p>
               <p className="text-xs text-muted-foreground mt-0.5" data-testid="swap-block-until">
                 {blockEndsOn !== undefined ? blockSwapLine(blockEndsOn ? shortDate(blockEndsOn, today) : null) : 'Swaps it for the rest of this training block; later blocks re-plan from your base program.'}
                 {currentEntry?.mechanics_tier === 'tier1_compound'

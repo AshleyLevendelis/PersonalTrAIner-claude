@@ -163,8 +163,9 @@ const o = await ev(OFFER)
 check('4e. the change is a soft line under the bubble, not inside it', o?.previewOutsideBubble === true && o?.previewIsChangeLine === true && o?.bubbleChanges === 0, o && { out: o.previewOutsideBubble, line: o.previewIsChangeLine, inBubble: o.bubbleChanges })
 check('4f. ...what goes struck through, an arrow, and what comes in', !!target && (o?.struck ?? []).join() === target.full && new RegExp(`${target.full} → Leg Press`, 'i').test(o?.previewText ?? ''), { struck: o?.struck, text: o?.previewText })
 const [b0, b1, b2] = o?.btns ?? []
-check('4g. the reply pills are the existing scopes, in order: "Apply today" (primary), "Rest of block", then "Not now"',
-  b0?.label === 'Apply today' && b0?.weight === 'primary' && b1?.label === 'Rest of block' && b1?.weight === 'scope' && b2?.label === 'Not now' && b2?.weight === 'reject' && (o?.btns ?? []).length === 3, o?.btns?.map(b => [b.label, b.weight]))
+// RE-ANCHORED 31 Oct 2026, her "Mix": "Just today" / "Whole block" / "Keep <the lift>".
+check('4g. the reply pills are the scopes in her words, in order: "Just today" (primary), "Whole block", then "Keep <the lift>"',
+  b0?.label === 'Just today' && b0?.weight === 'primary' && b1?.label === 'Whole block' && b1?.weight === 'scope' && !!target && b2?.label === `Keep ${target.full}` && b2?.weight === 'reject' && (o?.btns ?? []).length === 3, o?.btns?.map(b => [b.label, b.weight]))
 check('4h. the primary is the filled main colour; the others are outlines', b0?.bg === o?.primary && b1?.bg !== o?.primary && b2?.bg !== o?.primary && b1?.border === '1px' && b2?.border === '1px', o?.btns?.map(b => [b.label, b.bg, b.border]))
 check('4i. every pill keeps the 44px tap target, draws no taller than 40px, and has no glow', (o?.btns ?? []).length === 3 && o.btns.every(b => b.h >= 44 && b.w >= 44 && b.pillH <= 40 && b.shadow === 'none' && b.buttonShadow === 'none'), o?.btns?.map(b => [b.label, b.h, b.pillH, b.shadow, b.buttonShadow]))
 await ev(`[...document.querySelectorAll('[data-testid="proposal-card"]')].pop()?.scrollIntoView({ block: 'end' })`)

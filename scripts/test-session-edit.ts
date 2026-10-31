@@ -465,7 +465,7 @@ console.log('\n6. One saver, two surfaces — and the coach on the proposal rail
     /data-verb="drop"/.test(sheet) && /data-verb="swap-instead"/.test(sheet))
   check('...and the balance cost is shown before the tap', /data-testid="remove-balance-cost"/.test(sheet))
   check('...with the same scope words the swap dialog uses',
-    /Today only/.test(sheet) && /Rest of block/.test(sheet))
+    /Just today/.test(sheet) && /Whole block/.test(sheet)) // her 31 Oct words, the coach's too
 
   const chat = read('supabase/functions/chat-gemini/index.ts')
   for (const tool of ['propose_exercise_remove', 'propose_exercise_reorder']) {

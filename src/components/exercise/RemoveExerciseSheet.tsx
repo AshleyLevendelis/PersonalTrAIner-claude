@@ -159,8 +159,8 @@ export function RemoveExerciseSheet({
                 week" over a button reading "Today only"; the buttons are the
                 swap dialog's, to the letter, so the question follows them. */}
             <p className="text-sm" data-testid="remove-scope-question">Just today, or the rest of the block?</p>
-            <Button className="w-full" disabled={busy} onClick={() => drop('today')} data-scope="today">Today only</Button>
-            <Button variant="outline" className="w-full" disabled={busy} onClick={() => drop('permanent')} data-scope="permanent">Rest of block</Button>
+            <Button className="w-full" disabled={busy} onClick={() => drop('today')} data-scope="today">Just today</Button>
+            <Button variant="outline" className="w-full" disabled={busy} onClick={() => drop('permanent')} data-scope="permanent">Whole block</Button>
             {blockImpact?.cost && <p className="text-xs text-[color:var(--role-warn-text)]" data-testid="remove-block-cost">For the block: {blockImpact.cost}</p>}
             <Button variant="ghost" size="sm" disabled={busy} onClick={() => { setError(null); setChoosing(false) }} data-testid="remove-scope-back">Back</Button>
           </div>

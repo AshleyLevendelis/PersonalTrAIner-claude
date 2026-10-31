@@ -46,8 +46,17 @@ Newest first. One line each.
     resolved on the property, each mutation-tested (2/2 caught). `test:bundle`: all four budgets went over (353/509/
     1208/2517 against 350/506/1193/2492) and were raised on her 15 Sep "room to grow" to 361/517/1233/2542, measured.
     Chat bubbles: all 81 theme x accent pairs still reach 4.5:1; the Listen icon's lowest is 5.05:1.
-  - **Open questions of hers (wording)**: the offer buttons ("Apply today / Rest of block / Not now" kept, or the
-    design's "Yeah, do it / Whole block / Keep RDLs"); the chat's session pill ("2 of 20 sets" done, or "set 3 of 20");
+  - **Offer words: "Mix"** (her answer, 31 Oct, from three options: keep "Apply today / Rest of block / Not now", the
+    design's "Yeah, do it / Whole block / Keep RDLs", or a mix): **"Just today" / "Whole block" / "Keep <the
+    exercise>"**. The decline names what she keeps only on an exercise offer that would take one thing away (a swap or
+    a removal); everywhere else it is still "Not now" (`rejectLabel`). Then, asked whether the Exercise screen's own
+    swap, add and remove sheets ("Today only" / "Rest of block") should match: **"Match the coach"**, so the same
+    choice reads the same on both surfaces. Re-anchored on the new words, the logic checks mutation-tested (7 mutations, 6 caught;
+    the miss was a redundant "is it an addition" test that could never decide anything, deleted): `test:offer-text`,
+    `test:chat-2b`, `test:coach-kit-names`, `test:session-edit`, `test:sheet-manners`; drivers `offer-text`, `chat-2b`,
+    `swap-request` and `coach-ban` (now find the offer's confirm and decline by the weights the card stamps, not by
+    their words), `exercise-add`, `moved-edit`, `session-edit`. 24 derived logic gates green.
+  - **Open questions of hers (wording)**: the chat's session pill ("2 of 20 sets" done, or "set 3 of 20");
     the coach group label "Trainer" under a header that reads "Coach"; the first reply pill is now filled mint where
     her 20 Oct "small buttons" were outlines; the Tools tour line "All three timers live behind here".
   - NOT PROVEN: a real phone (the voice has never been heard on a device), and App.tsx's wiring around the Exercise

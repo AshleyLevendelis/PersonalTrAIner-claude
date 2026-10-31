@@ -90,7 +90,8 @@ console.log('\n§5 The swap card names its scope')
   const card = strip(read('src/components/chat/ProposalCard.tsx'))
   // RE-ANCHORED 31 Oct 2026 (chat 2b): the label lives in offer-text's scopeLabel now. The property is the WORDS on the
   // button, so the label is asked for, and the card must draw its buttons through it.
-  check('"permanent" reads "Rest of block", the swap sheet\'s own words', scopeLabel('permanent') === 'Rest of block' && /scopeLabel\(opt, scopeField\.labels\)/.test(card))
+  // RE-ANCHORED 31 Oct 2026, her "Mix" and "Match the coach": the card and the swap sheet both say "Whole block".
+  check('"permanent" reads "Whole block", the swap sheet\'s own words', scopeLabel('permanent') === 'Whole block' && />Whole block</.test(readFileSync('src/components/exercise/SwapDialog.tsx', 'utf8')) && /scopeLabel\(opt, scopeField\.labels\)/.test(card))
 }
 
 console.log(`\n${ran} checks ran`)

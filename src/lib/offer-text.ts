@@ -95,9 +95,28 @@ export function offerChangeText(c: OfferChange): string {
   return c.note ? `${head} (${c.note})` : head
 }
 
-/** A scope's button label: the builder's own word for it, else the card's known ones. Unchanged from 20 Oct. */
+/**
+ * A scope's button label: the builder's own word for it, else the card's known ones.
+ * HER RULING, 31 Oct 2026, from three options ("Apply today / Rest of block / Not now", the design's "Yeah, do it /
+ * Whole block / Keep RDLs", or a mix): **"Mix"** — "Just today" / "Whole block" / "Keep <the exercise>". Friendly, and
+ * still says how long. "Whole block" is the scope that runs to the end of this block (her 10 Oct ruling: the swap
+ * says the day the next block starts, in the bubble), the same scope "Rest of block" named.
+ */
 export function scopeLabel(opt: string, labels?: Record<string, string>): string {
-  return labels?.[opt] ?? (opt === 'today' ? 'Apply today' : opt === 'block' ? 'Whole block' : opt === 'permanent' ? 'Rest of block' : opt)
+  return labels?.[opt] ?? (opt === 'today' ? 'Just today' : opt === 'block' || opt === 'permanent' ? 'Whole block' : opt)
+}
+
+/**
+ * The decline button (her 31 Oct "Mix"): on an exercise offer that would take ONE thing away (a swap or a removal,
+ * the offers that ask "today or the whole block"), it names what she keeps: "Keep Romanian Deadlifts". Anything
+ * else, where nothing she has goes, still says "Not now".
+ */
+export function rejectLabel(changes: OfferChange[], scoped: boolean): string {
+  if (!scoped || changes.length !== 1) return 'Not now'
+  const c = changes[0]
+  // An addition has no "from" (its before is a dash), so it says "Not now" by this test alone; a separate `added`
+  // test said the same thing and a mutation showed it could never decide anything.
+  return c.from ? `Keep ${c.from}` : 'Not now'
 }
 
 /**

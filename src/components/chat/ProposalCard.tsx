@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { ArrowLeftRight, ShieldAlert } from 'lucide-react'
 import type { ChatPendingActionView } from '@/lib/types'
 import { pendingWindowPassed } from '@/lib/pending-actions-store'
-import { offerChanges, offerChangeText, previewChange, scopeLabel } from '@/lib/offer-text'
+import { offerChanges, offerChangeText, previewChange, rejectLabel, scopeLabel } from '@/lib/offer-text'
 
 // ---------------------------------------------------------------------------
 // VISION-ARCHITECTURE.md §2.4 — "rendering the effect, not prose." ONE
@@ -249,7 +249,7 @@ export function ProposalCard({
             disabled={busyOverall}
             data-offer-weight="reject"
           >
-            <span className={pill('reject')}>{busy === 'reject' ? 'Declining…' : 'Not now'}</span>
+            <span className={`${pill('reject')} max-w-[15rem]`}><span className="truncate">{busy === 'reject' ? 'Declining…' : rejectLabel(changes, !!scopeField && scopeField.options.includes('today') && scopeField.options.includes('permanent'))}</span></span>
           </button>
         </div>
       )}
