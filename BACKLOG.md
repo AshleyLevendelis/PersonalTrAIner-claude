@@ -21,6 +21,10 @@ Newest first. One line each.
   its first round read every catch as a short run; fixed before any result was used. Deploys: frontend on the merge;
   `chat-gemini`, `generate-meals`, `onboarding-chat` and migration `20261022120000` on her machine (prompt handed over).
   `macro-calibration` and `coach-reach-out` unchanged.
+  **SERVER HALF DONE, 31 Oct 2026, RELAYED NOT MEASURED**: Ashley reports "done, all four deployed" (the migration
+  `20261022120000` via `db:push-both`, and `chat-gemini`, `generate-meals`, `onboarding-chat`). This session cannot
+  reach either database or the functions, so it is her word, not a check. Every "Needs the `chat-gemini` / `generate-meals`
+  / `onboarding-chat` deploy" note dated before this is satisfied by it. The coach exam is still stale (not re-run).
 - [x] **FIVE TABS REDRAWN FROM HER DESIGN HANDOFF, 31 Oct 2026, AND A LISTEN BUTTON ON THE COACH.** Ashley uploaded the
   tab-polish handoff (Home 2c, Nutrition 3a+3b, Exercise 2a, Tools 2a, Chat 2b) and, asked whether to build it as
   drawn or keep her earlier rulings where they clash, said **"build, keep my rulings"**. Layout only; nothing the app
