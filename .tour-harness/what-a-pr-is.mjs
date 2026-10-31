@@ -30,7 +30,9 @@ const finishSession = async () => {
 }
 const summaryPRs = () => ev(`(() => { const d = [...document.querySelectorAll('[role="dialog"]')].find(x => /^Session (complete|saved)$/.test(x.querySelector('h2')?.textContent ?? '')); if (!d) return null; return [...d.querySelectorAll('[data-testid="summary-prs"] p')].slice(1).map(p => p.innerText.replace(/\\s+/g, ' ').trim()) })()`)
 const goto = async tab => { await ev(`window.location.hash = '#/tab/${tab}'`); await wait(1500) }
-const toolsCount = async () => { await goto('tools'); return until(`(document.body.innerText.match(/\\d+ sessions? · \\d+ PRs?/) ?? [null])[0]`, 6000) }
+// RE-ANCHORED 31 Oct 2026 (Tools 2a): the row now reads "N sessions logged" with the PRs in a pill beside it;
+// both numbers are read off that row and put back in the old "N sessions · M PRs" form the checks below compare.
+const toolsCount = async () => { await goto('tools'); return until(`(() => { const t = document.querySelector('[data-testid="history-row"]')?.innerText?.replace(/\\s+/g, ' ') ?? ''; const m = t.match(/(\\d+ sessions?) logged (\\d+ PRs?)/); return m ? m[1] + ' · ' + m[2] : null })()`, 6000) }
 const homeGlance = async () => { await goto('home'); await until(`!!${q('[data-testid="home-session-glance"]')}`, 8000); return ev(`${q('[data-testid="home-session-glance"]')}?.textContent.trim() ?? null`) }
 
 console.log('\nWHAT A PERSONAL BEST IS\n')

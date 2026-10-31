@@ -54,8 +54,15 @@ console.log('\n2. A finished round does not say it is running')
 // ---------------------------------------------------------------------------
 {
   const tools = code('src/components/ToolsTab.tsx')
-  const sub = /sub: roundLive \? ([^\n]+)/.exec(tools)?.[1] ?? ''
-  check('the Timers tile asks whether the round is complete', /timers\.isRoundComplete \? 'Round finished — log it' : 'A round is running'/.test(sub), sub)
+  // RE-ANCHORED 31 Oct 2026 (Tools 2a): the "Timers" row and its subtitle are
+  // gone — the running round IS the timers card now, and the line under it
+  // says why the stopwatch and lap are not offered. The property is the same:
+  // the line asks whether the round is complete, and the finished wording says
+  // finished rather than describing a round still under way.
+  const m = /note=\{timers\.isRoundComplete \? '([^']*)' : '([^']*)'\}/.exec(tools)
+  const [done, running] = [m?.[1] ?? '', m?.[2] ?? '']
+  check('the running-round line asks whether the round is complete',
+    /finished/i.test(done) && !/running|ends|under way/i.test(done) && /ends|running/i.test(running) && done !== running, { done, running })
 }
 
 // ---------------------------------------------------------------------------

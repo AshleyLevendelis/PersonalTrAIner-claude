@@ -201,7 +201,12 @@ await openRoundTimer()
 const released = await ev(`(() => {
   const idleCard = !!document.querySelector('[data-round-preview]')
   const t = document.body.innerText
-  return idleCard && /Everything here/i.test(t) && /Round timer, stopwatch, lap timer/i.test(t) && !/A round is running/i.test(t)
+  // RE-ANCHORED 31 Oct 2026 (Tools 2a): the plain list became the TIMERS
+  // card. Released means that card is back — all three tiles, the stopwatch
+  // among them — and no running round is drawn on the tab.
+  const tilesBack = !!document.querySelector('[data-timers-card] [data-timer-choice="stopwatch"]')
+  const liveCard = !!document.querySelector('[data-tour="toolstimer"] [data-round-card]')
+  return idleCard && tilesBack && !liveCard && !/Stopwatch and lap open once this round ends/i.test(t)
 })()`)
 check('20b. the round released the tab, so the idle card and the list are back', released === true,
   (await ev(`document.body.innerText`)).slice(0, 120))

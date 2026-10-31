@@ -96,6 +96,10 @@ const openRoundTimer = async () => {
   await ev(`(() => { const b = document.querySelector('[data-timer-choice="round"]'); if (b) b.click(); return !!b })()`)
   await wait(700)
 }
+// THE TAB AT REST, read BEFORE the sheet opens (Tools 2a, 31 Oct 2026).
+const atRest = await text()
+const tilesAtRest = await ev(`[...document.querySelectorAll('[data-timers-card] [data-timer-choice]')].map(b => b.getAttribute('data-timer-choice'))`)
+const roundCardAtRest = await seen('[data-round-card]')
 await openRoundTimer()
 
 // --- 1. the settled tab -----------------------------------------------------
@@ -104,17 +108,24 @@ const settled = await text()
 // with the LIST, and there is no idle card on the tab at all. The idle card
 // still exists — it is inside the timers sheet, which `openRoundTimer` above
 // has already opened by this point, so 1b reads it there.
-check('1a. Tools leads with the list, not a timer',
-  /Everything here/i.test(settled || '') && /Timers\s*\n?\s*Round timer, stopwatch, lap timer/i.test(settled || ''),
-  (settled || '').slice(0, 200))
+// RE-ANCHORED 31 Oct 2026 (Tools 2a): the "Timers" row became the TIMERS card
+// with the three timers as tiles. Her 14 Sep ruling is the property and it is
+// unchanged: at rest no round card sits on the tab, and all three timers are
+// one tap away.
+check('1a. at rest Tools leads with the three timers, and no round card',
+  JSON.stringify(tilesAtRest) === '["round","stopwatch","lap"]' && !roundCardAtRest && /^TIMERS\b|\bTIMERS\b/i.test(atRest || ''),
+  { tilesAtRest, roundCardAtRest, text: (atRest || '').slice(0, 200) })
 // 4c (10 Oct 2026): THE IDLE CARD BECAME THE SHEET'S PREVIEW. The sheet is
 // full screen with its own top bar, cards, steppers and a docked Start.
 check('1b. ...and the round-timer sheet is open, one tap in', await seen('[data-round-sheet] [data-round-preview]'))
 check('1c. ...and the truth about the rest timer', /runs itself in the session dock/.test(settled || ''))
 check('1d. the six-tile grid is gone', !/Rest timer/.test(settled || ''), (settled || '').slice(0, 300))
-check('1e. the list carries every tool, timers included',
-  /Everything here/i.test(settled || '') && /Timers/.test(settled || ''), (settled || '').slice(0, 300))
-check('1f. ...and the grocery list is one of them again', /Grocery list/i.test(settled || ''), (settled || '').slice(0, 400))
+// RE-ANCHORED (2a): every tool is still on the tab — the timers card, the
+// plate card and the Plan rows.
+check('1e. the tab carries every tool, timers included',
+  /Timers/i.test(atRest || '') && /Plate calculator/.test(atRest || '') && /Session history/.test(atRest || '') && /Your program/.test(atRest || ''),
+  (atRest || '').slice(0, 300))
+check('1f. ...and the grocery list is one of them again', /Grocery list/i.test(atRest || ''), (atRest || '').slice(0, 400))
 check('1g. there is no row to a second screen any more', !(await seen('[data-change-intervals]')))
 const chipTexts = await ev(`[...document.querySelectorAll('[data-protocol]')].map(b => b.innerText.trim())`)
 check('1h. the protocols are preset cards', Array.isArray(chipTexts) && chipTexts.length >= 7, chipTexts)
@@ -196,7 +207,8 @@ check('4a2. ...counting down from the 5s she set, not the old 10s', Number.isFin
 // STILL THE POINT OF THIS CHECK: a running round is a card on the tab, not a
 // takeover — the list is still under it. Re-anchored off the heading text,
 // which 4b renamed.
-check('4b. ...and does NOT take the whole tab', /Everything here/i.test((await text()) || ''), (await text() || '').slice(0, 300))
+// RE-ANCHORED (2a): the rest of the tab is still under it — the plate card and the rows.
+check('4b. ...and does NOT take the whole tab', await seen('[data-plate-card]') && /Grocery list/.test((await text()) || ''), (await text() || '').slice(0, 300))
 const readySample = await cardPrimary()
 check('4c. the card offers Pause while it runs', readySample?.label === 'Pause' || readySample?.label === 'Resume', readySample)
 // THE STOPWATCH IS BLOCKED WHILE A ROUND IS LIVE, and says why — switching
@@ -204,22 +216,21 @@ check('4c. the card offers Pause while it runs', readySample?.label === 'Pause' 
 // round on the way to a stopwatch. Under 4b the choice lives in the timers
 // sheet, so the sheet has to be open to read it; everything the check asserts
 // about it is unchanged.
-await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Timers/.test((x.innerText || '').trim())); if (b) b.click(); return !!b })()`)
-await wait(700)
-// WHILE A ROUND IS LIVE the row opens straight onto the round view — the
-// running clock is what you almost certainly wanted — so the chooser is one
-// Back away. That the way back EXISTS is part of what this checks: a sheet
-// that opened onto the round with no exit would strand the other two timers.
-check('4c2. ...and the sheet offers a way back to the other timers',
-  await ev(`!!document.querySelector('[aria-label="Back to the timer list"]')`))
+// RE-ANCHORED 31 Oct 2026 (Tools 2a). While a round is live the timers card
+// IS the running round, and its protocol name opens the round's sheet; the
+// sheet's back returns to the tab. The stopwatch and lap tiles are not drawn
+// while it runs (rather than drawn grey), and the card says why.
+await openRoundTimer()
+check('4c2. ...the running card opens the round sheet, and the sheet offers a way back',
+  await ev(`!!document.querySelector('[data-round-sheet] [aria-label="Back to the timer list"]')`))
 await ev(`(() => { const b = document.querySelector('[aria-label="Back to the timer list"]'); if (b) b.click(); return !!b })()`)
 await wait(500)
 const swRow = await ev(`(() => {
-  const b = document.querySelector('[data-timer-choice="stopwatch"]')
-  return b ? { disabled: b.disabled, text: b.textContent.trim() } : null
+  const b = document.querySelector('[data-timer-choice="stopwatch"], [data-timer-choice="lap"]')
+  return { offered: !!b && !b.disabled, note: document.querySelector('[data-round-card-note]')?.textContent?.trim() ?? '' }
 })()`)
-check('4d. the stopwatch cannot silently wipe the running round', swRow?.disabled === true, swRow)
-check('4e. ...and says why rather than just going grey', /Finish or reset your round first/.test(swRow?.text || ''), swRow)
+check('4d. the stopwatch cannot silently wipe the running round', swRow?.offered === false, swRow)
+check('4e. ...and says why rather than just going away', /Stopwatch and lap open once this round ends or is reset/.test(swRow?.note || ''), swRow)
 await shoot('tools-timer-card-ready')
 
 // --- 5. full screen is opt-in, and leaving it works -------------------------
