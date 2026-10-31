@@ -145,7 +145,15 @@ const rejectAsPostgres = (tableName: string, v: { column: string; value: number 
   return { data: null, error: { code: '22P02', message: `invalid input syntax for type integer: "${v.value}"`, details: null, hint: null } }
 }
 
-export function makeFakeSupabase(db: Db) {
+/**
+ * `opts` is for app-boot.tsx (31 Oct 2026), the one page that boots the whole App: a signed-in session for
+ * ensureSignedIn, and a per-client delay so the fixture can be laid down with none and then read with ?slow.
+ * Every other page passes nothing and gets exactly what it always got.
+ */
+export function makeFakeSupabase(db: Db, opts: { session?: { user: { id: string; email: string | null } }; slowMs?: number; alwaysUp?: boolean } = {}) {
+  const down = () => !opts.alwaysUp && netDown()
+  const slowMs = opts.slowMs ?? SLOW_MS
+  const wait = () => (slowMs > 0 ? new Promise<void>(r => setTimeout(r, slowMs)) : Promise.resolve())
   const table = (name: string) => (db[name] ??= [])
 
   const from = (name: string) => {
@@ -160,7 +168,7 @@ export function makeFakeSupabase(db: Db) {
     const orders: [string, boolean][] = []
 
     const exec = () => {
-      if (netDown()) return DEAD()
+      if (down()) return DEAD()
       const rows0 = table(name)
       // A WRITE A DRIVER WANTS TO FAIL. Opt-in: a driver sets window.__failWrite
       // to a predicate over (table, operation, row); nothing sets it by
@@ -301,10 +309,7 @@ export function makeFakeSupabase(db: Db) {
       maybeSingle: () => { single = true; return api },
       single: () => { single = true; return api },
       then: (resolve: (v: unknown) => void, reject?: (e: unknown) => void) =>
-        (SLOW_MS > 0
-          ? new Promise<void>(r => setTimeout(r, SLOW_MS))
-          : Promise.resolve()
-        ).then(() => resolve(exec()), reject),
+        wait().then(() => resolve(exec()), reject),
     }
     return api
   }
@@ -313,7 +318,14 @@ export function makeFakeSupabase(db: Db) {
     from,
     // Nothing in the tour path uses these, but a component reaching for one
     // should get a shape rather than a crash that reads like a tour bug.
-    auth: { getUser: async () => ({ data: { user: null }, error: null }) },
+    auth: {
+      getUser: async () => ({ data: { user: opts.session?.user ?? null }, error: null }),
+      // Read from the phone, no round trip, as the real client does while its token is fresh.
+      getSession: async () => ({ data: { session: opts.session ?? null }, error: null }),
+      signInAnonymously: async () => (await wait(), { data: { user: opts.session?.user ?? null }, error: null }),
+    },
+    // claim_profile and friends: one round trip, "yes".
+    rpc: async () => (await wait(), down() ? DEAD() : { data: true, error: null }),
     functions: { invoke: async () => ({ data: null, error: null }) },
     channel: () => ({ on: () => ({ subscribe: () => ({}) }), subscribe: () => ({}) }),
     removeChannel: () => {},

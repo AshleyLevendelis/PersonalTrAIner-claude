@@ -88,7 +88,8 @@ console.log('\n1. Which surfaces never get a fresh mount\n')
   // is loaded, held, and never shown — the cache would exist and the screen
   // would still be blank, which is the bug wearing a fix's clothes.
   check('...and a re-read in flight no longer blanks a screen that has numbers',
-    /if \(!activeSession\.ready \|\| !data\) \{/.test(home) && !/loading \|\| !data/.test(home))
+    // RE-ANCHORED 31 Oct 2026 (app start): the guard no longer waits for the sets read either; data alone decides.
+    /if \(!data\) \{/.test(home) && !/loading \|\| !data/.test(home))
   // THE PROPERTY. loadDashboardData is called with no cache test in front of
   // it — no `if (!cached)`, no early return, no ternary choosing between them.
   const loadCall = home.slice(home.indexOf('loadDashboardData({') - 400, home.indexOf('loadDashboardData({'))

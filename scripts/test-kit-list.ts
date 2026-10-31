@@ -713,10 +713,12 @@ async function main() {
   const app = read('src/App.tsx')
   check('App attaches the kit in one derivation: the profile every tab receives is the stored one plus the compiled statements',
     /const profile = useMemo\(\s*\(\) => \(?storedProfile \? profileWithKit\(storedProfile, compileKitStatements\(memoryFacts\)\)/.test(app)
-    && /const \[storedProfile, setProfile\] = useState<UserProfile \| null>\(null\)/.test(app))
+    // RE-ANCHORED 31 Oct 2026: it may start from the copy kept on the phone (boot-cache.ts), still the stored row.
+    && /const \[storedProfile, setProfile\] = useState<UserProfile \| null>\((?:null|\(\) => boot\?\.profile \?\? null)\)/.test(app))
   check('...the cold-load chain compiles it with the same two functions from its own read, and sets both together',
     (app.match(/profileWithKit\(/g) ?? []).length === 2 && (app.match(/compileKitStatements\(/g) ?? []).length === 2
-    && /setMemoryFacts\(restoredFacts\)\s*\n\s*setProfile\(savedProfile\)/.test(app))
+    // RE-ANCHORED 31 Oct 2026: each through the kept-copy guard, still together, facts first.
+    && /setMemoryFacts\((?:restoredFacts|cur => \(stillAsKept\(cur, boot\?\.facts\) \? restoredFacts : cur\))\)\s*\n\s*setProfile\((?:savedProfile|cur => \(stillAsKept\(cur, boot\?\.profile\) \? savedProfile : cur\))\)/.test(app))
   check('App builds ONE kit controller from kit-change.ts and hands it to Profile',
     /const kitController: KitController \| null =/.test(app) && /makeKitController\(\{/.test(app) && /kit=\{kitController\}/.test(app))
   const profileScreen = read('src/components/ProfileScreen.tsx')

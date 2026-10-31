@@ -200,8 +200,10 @@ export interface WeighInPicture {
 
 export async function getWeighInPicture(profileId: string): Promise<WeighInPicture> {
   const today = targetsToday(profileId)
+  // Both at once (31 Oct 2026, app start): neither read needs the other. A failed weigh-in read still throws, as before.
+  const targetRowsP = getNutritionTargets(profileId, '1970-01-01', today).catch(() => [])
   const recent = await getRecentWeighIns(profileId, 14)
-  const targetRows = await getNutritionTargets(profileId, '1970-01-01', today).catch(() => [])
+  const targetRows = await targetRowsP
   const anchors = targetRows
     .filter(r => r.calculated_weight_kg != null && Number(r.calculated_weight_kg) > 0)
     .map(r => ({ date: r.date, kg: Number(r.calculated_weight_kg) }))
@@ -210,10 +212,14 @@ export async function getWeighInPicture(profileId: string): Promise<WeighInPictu
   return { today, recent, anchors, lastAnchorKg, standing, heldLatest: recent.length > 0 ? heldWeighInOn(standing, recent[0].date) : null }
 }
 
-/** fallbackWeightKg may be undefined when the user never gave a weight; callers then get whatever the weigh-in series holds, or nothing. */
+/**
+ * fallbackWeightKg may be undefined when the user never gave a weight; callers then get whatever the weigh-in series holds, or nothing.
+ * It may also be a PROMISE of that figure (31 Oct 2026, app start): the start reads the latest weigh-in at the same time
+ * as this, rather than before it, and the fallback is only awaited on the one branch that uses it.
+ */
 export async function getEffectiveTargetWeightKg(
   profileId: string,
-  fallbackWeightKg?: number,
+  fallbackWeightKg?: number | Promise<number | undefined>,
 ): Promise<EffectiveTargetWeight> {
   const todayStr = targetsToday(profileId)
   const picture = await getWeighInPicture(profileId)
@@ -234,7 +240,7 @@ export async function getEffectiveTargetWeightKg(
     // the target stays on what last set it — or, with no record of that, on
     // the newest weigh-in it does trust. (Something can only be held AGAINST
     // one of those, so one of them exists.)
-    if (picture.standing.held.length === 0) return { weightKg: fallbackWeightKg }
+    if (picture.standing.held.length === 0) return { weightKg: await fallbackWeightKg }
     const lastTrusted = picture.standing.trusted[picture.standing.trusted.length - 1]
     const lastRecorded = picture.anchors[picture.anchors.length - 1]
     return { weightKg: lastAnchorKg ?? lastTrusted?.kg ?? lastRecorded?.kg }

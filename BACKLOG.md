@@ -2,6 +2,47 @@
 
 Newest first. One line each.
 
+- [x] **THE APP OPENS STRAIGHT ONTO HOME, 31 Oct 2026.** Ashley, with two screenshots ("Loading your plan..." then
+  "Loading your day..."): *"When I first open the app, it takes a few seconds to load ... make it load quicker, and not
+  show that loading as soon as you open it."* Mechanical (speed, and a data-loss defect found on the way); no ruling.
+  - **Measured first, on a new page that boots the WHOLE app** (`app-boot.html`; until now no harness page had ever run
+    App.tsx's own start), every database answer delayed 300 ms like a phone on 4G: first open 5.5 s to Home (plan
+    1.8 s, then day 3.3 s), re-open 2.4 s, both loading screens every time. Cause: the start asked the server one
+    question at a time (sign-in, claim, profile, then the plan batch, then the latest weigh-in, then the weight
+    average), and Home's own load awaited ten reads in a row, then waited for the day's sets before drawing a day it
+    already had saved.
+  - **Fixed, in four parts.** (1) The start asks everything at once (profile, plan, meals, facts, both weight reads),
+    the claim runs once per phone, and the weigh-in picture reads its two tables together. (2) Home starts its
+    independent reads together, draws its saved day without waiting for the sets read, starts at once on a new day,
+    and draws the early answer instead of throwing it away when the sets read lands (newest wins). (3) **The app is
+    kept on the phone** (`boot-cache.ts`: profile, plan, meals, targets, weigh-ins) and a re-open draws it on the first
+    frame, then swaps the server's answers in behind it, but only where the screen still shows the kept value, so an
+    edit made in that second survives; a plan or meals that come back empty while the copy had them are a failed read
+    and the copy stays. Never read for a profile the phone is not holding; New Plan clears it; too big (over 1.5 M
+    characters) or a full phone means "not kept", never an error. (4) On the first open of a day, before today's
+    numbers exist, Home shows its own layout with grey blocks where numbers go, never the "Loading your day" box and
+    never a made-up number.
+  - **After (300 ms per answer):** re-open 0.25 s, no loading screen; first open of a day 0.8 s, Home's layout filling
+    for about 0.6 s; very first open on a phone 1.6 s (it still says "Loading your plan" for about 0.6 s, because the
+    phone has nothing yet).
+  - **DEFECT FOUND ON THE WAY, worse than the wait: opening the app with no signal sent her to setup and forgot whose
+    profile the phone held.** A failed profile read was treated as "no profile": the stored id was deleted, so even
+    back online the phone no longer knew her plan. Now: with a kept copy, she sees her plan and the start retries the
+    moment the phone is back online; with none, one line ("I couldn't reach your plan just now. Nothing is lost.
+    Check your connection and try again.") and Try again. The stored id is never removed on a failed read. That
+    sentence is new copy; hers to change.
+  - Checks: `verify:app-boot` (13 checks: five opens, first, re-open, new day, no signal with and without a copy; 6
+    mutations, all caught), `test:boot-cache` (53 checks; 24 mutations, all caught, two only after the gate was fixed:
+    a duplicate guard in the copy found by a MISSED mutation was deleted, and a check that crashed instead of failing
+    was made to catch). Re-anchored on their property: `test:kit-list`, `test:onboarding-handover`,
+    `test:reset-clears-draft` (the copy is a classified key, cleared on New Plan), `test:stale-after-write`, each
+    mutation-tested. 121 derived logic gates, `test:bundle`, `test:no-dead-code` and 17 browser drivers that open Home
+    re-run. The fake database gained a signed-in session, `rpc`, a per-client delay and an always-up client for laying
+    down a fixture, all opt-in.
+  - NOT PROVEN: her real phone and server. 300 ms is a modelled round trip; on her phone the start also waits for the
+    app's files to download (not changed here) and, after an hour away, for the sign-in token to refresh (one more
+    round trip before the first read; the kept copy covers it on a re-open). NOT DONE: the very first open on a new
+    phone still shows "Loading your plan" briefly. Deploys: frontend only.
 - [x] **LESS IS MORE: HOME, NUTRITION AND EXERCISE DECLUTTERED, 30 Oct 2026.** Ashley, 29 Oct: *"I want to revamp
   the entire app. Less is more. The pages are currently too cluttered."* Measured first at 390px: Home 1.4 screens and
   17 controls, Nutrition 1.6 and 24, Exercise 2.4 and 40; Nutrition said the calorie target four times, Exercise said

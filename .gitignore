@@ -30,6 +30,7 @@ meal-quality-report.txt
 volume-report.txt
 .tour-harness/dist/
 .tour-harness/*.png
+.tour-harness/app-boot-timings.json
 .onb-harness/dist/
 .onb-harness/*.png
 .tw-harness/dist/

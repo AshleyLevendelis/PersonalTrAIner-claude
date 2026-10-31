@@ -55,7 +55,8 @@ import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOf
 import { checkForBeatTargetOffer, confirmBeatTargetOffer, declineBeatTargetOffer } from '@/lib/beat-target-offer'
 import { applyCalibrationAnchors, calibrationAnchorMessage } from '@/lib/calibration-anchor'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
-import { ensureSignedIn, claimProfile, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
+import { readBootSnapshot, saveBootSnapshot, clearBootSnapshot, type BootSnapshot } from '@/lib/boot-cache'
+import { ensureSignedIn, claimProfile, hasClaimedOnThisPhone, markClaimedOnThisPhone, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
 import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
 import { SignInScreen } from '@/components/SignInScreen'
 
@@ -166,6 +167,8 @@ import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, MesocycleWeek }
 import type { ExerciseEntry } from '@/lib/exercise-db'
 
 const STORAGE_KEY = 'fitplan_profile_id'
+/** The start could not reach the server and had nothing kept on the phone to show. Nothing is lost: the row is untouched. */
+const START_UNREACHABLE = "I couldn't reach your plan just now. Nothing is lost. Check your connection and try again."
 const LAST_TAB_KEY = 'fitplan_last_tab'
 
 
@@ -184,7 +187,13 @@ function App() {
   // functions turn these into the exact arguments generateExercisePlan/
   // generateMealPools already accept; nothing here writes plan state.
   // (Declared up here because the profile below is derived from them.)
-  const [memoryFacts, setMemoryFacts] = useState<UserFactRow[]>([])
+  // THE APP AS IT WAS LAST OPEN (31 Oct 2026, boot-cache.ts): read once, before any state below is created, so a
+  // phone that has opened the app before draws it on the very first frame instead of "Loading your plan...".
+  // restoreSession still runs and swaps the server's answers in behind it.
+  const [boot] = useState<BootSnapshot | null>(() => {
+    try { return readBootSnapshot(localStorage.getItem(STORAGE_KEY)) } catch { return null }
+  })
+  const [memoryFacts, setMemoryFacts] = useState<UserFactRow[]>(() => boot?.facts ?? [])
   /**
    * THE PROFILE AS SAVED, and beside it THE PROFILE EVERYTHING IS HANDED.
    *
@@ -200,7 +209,7 @@ function App() {
    * spread is overwritten (or cleared) from the facts on the next pass. With
    * no kit rows `profileWithKit` returns the very object it was given.
    */
-  const [storedProfile, setProfile] = useState<UserProfile | null>(null)
+  const [storedProfile, setProfile] = useState<UserProfile | null>(() => boot?.profile ?? null)
   const profile = useMemo(
     () => (storedProfile ? profileWithKit(storedProfile, compileKitStatements(memoryFacts)) : null),
     [storedProfile, memoryFacts],
@@ -217,12 +226,12 @@ function App() {
     const t = setTimeout(warm, 2500)
     return () => clearTimeout(t)
   }, [profile?.id])
-  const [macros, setMacros] = useState<MacroTargets | null>(null)
+  const [macros, setMacros] = useState<MacroTargets | null>(() => boot?.macros ?? null)
   /** Latest daily_metrics weigh-in — DISPLAY only ("your current weight is X"). Null until the user first weighs in. Target computation uses targetWeightAnchorKg instead (see its own doc comment) — the two intentionally diverge: this always shows the real latest reading, the anchor only moves once that reading's 7-day average has shifted enough to matter. */
-  const [latestWeightKg, setLatestWeightKg] = useState<number | null>(null)
+  const [latestWeightKg, setLatestWeightKg] = useState<number | null>(() => boot?.latestWeightKg ?? null)
   /** The weight that actually drives computeTargets — a threshold-gated 7-day average (getEffectiveTargetWeightKg), not the raw latest reading. Kept separate from latestWeightKg so a noisy day-to-day swing never retunes calories on its own; only a real trend move does. Null until the first target computation resolves it. */
-  const [targetWeightAnchorKg, setTargetWeightAnchorKg] = useState<number | null>(null)
-  const [exercisePlan, setExercisePlan] = useState<WorkoutDay[]>([])
+  const [targetWeightAnchorKg, setTargetWeightAnchorKg] = useState<number | null>(() => boot?.targetWeightAnchorKg ?? null)
+  const [exercisePlan, setExercisePlan] = useState<WorkoutDay[]>(() => boot?.exercisePlan ?? [])
   // The ring on the chat button. ChatAssistant (force-mounted, so live
   // before the tab is ever opened) reports whether the coach has something
   // that wants an answer — an unreviewed session, a missed day, or a reply
@@ -249,7 +258,7 @@ function App() {
   // the bundler do not check hook order and nothing in the suite renders
   // App. test:coach-opener §7 asserts no hook call appears after that
   // return, over the whole file rather than over any one hook.
-  const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>([])
+  const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>(() => boot?.mesocycle ?? [])
   // Client-authored dismissible notices — never model prose, same
   // convention as every other receipt in this app. Four sources feed this
   // one list: an auto-reverted injury/equipment adaptation
@@ -290,14 +299,14 @@ function App() {
   /** Which load_suggestions row a Confirm/Decline tap is currently in flight for — disables both buttons on that one banner only. */
   const [loadSuggestionBusy, setLoadSuggestionBusy] = useState<string | null>(null)
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */
-  const [mesocycleCreatedAt, setMesocycleCreatedAt] = useState<string | null>(null)
+  const [mesocycleCreatedAt, setMesocycleCreatedAt] = useState<string | null>(() => boot?.mesocycleCreatedAt ?? null)
   // Meal pools (M1): every generated option per slot, keyed by slot — the
   // single source of truth for meals. Replaces the old day-of-week
   // WeeklyMealPlan entirely (pool options aren't day-specific; any option is
   // valid for its slot any day, per the M0 architecture decision).
   // THE POOLS AS STORED. Everything that assembles a day reads `mealPools`
   // below, which is this with restriction breakers marked.
-  const [storedMealPools, setMealPools] = useState<Partial<Record<MealSlotName, PoolOption[]>>>({})
+  const [storedMealPools, setMealPools] = useState<Partial<Record<MealSlotName, PoolOption[]>>>(() => boot?.pools ?? {})
   const [isGeneratingMeals, setIsGeneratingMeals] = useState(false)
   /** True while the resize is being written. The card's button says so rather than looking dead. */
   const [mealRefitBusy, setMealRefitBusy] = useState(false)
@@ -600,7 +609,7 @@ function App() {
   const mealTopUpOffer = mealTopUpOfferNow?.text ?? null
 
   const mealPlan = chosenToMealPlanDays(chosenMeals)
-  const [isRestoring, setIsRestoring] = useState(true)
+  const [isRestoring, setIsRestoring] = useState(() => !boot)
   const [isGenerating, setIsGenerating] = useState(false)
   const [setupError, setSetupError] = useState<string | null>(null)
   /**
@@ -633,6 +642,8 @@ function App() {
   // with row-level security on, a client that failed to sign in reads nothing
   // and every screen goes blank with no explanation at all.
   const [authError, setAuthError] = useState<string | null>(null)
+  /** The start could not read the profile and there was no kept copy to show instead (31 Oct 2026). */
+  const [startError, setStartError] = useState<string | null>(null)
   const [askForEmail, setAskForEmail] = useState(false)
   /**
    * A Profile edit that leaves the plan wrong (audit §2.1). Held as state
@@ -650,7 +661,7 @@ function App() {
    */
   const [signInOpen, setSignInOpen] = useState(false)
   const [generatingStatus, setGeneratingStatus] = useState('')
-  const [exerciseExclusions, setExerciseExclusions] = useState<string[]>([])
+  const [exerciseExclusions, setExerciseExclusions] = useState<string[]>(() => boot?.exclusions ?? [])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
   const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | 'dietary' | undefined>(undefined)
   const [newPlanConfirmOpen, setNewPlanConfirmOpen] = useState(false)
@@ -802,6 +813,19 @@ function App() {
     window.location.hash = tabHash('dashboard')
   }, [isRestoring, profile?.id, hash])
 
+  // KEEP THE APP AS IT IS NOW, FOR THE NEXT OPEN (31 Oct 2026, boot-cache.ts). After the start has settled, and
+  // again after anything it draws from changes, half a second after the last change.
+  useEffect(() => {
+    if (isRestoring || !storedProfile?.id) return
+    const t = setTimeout(() => {
+      saveBootSnapshot({
+        profile: storedProfile, facts: memoryFacts, exclusions: exerciseExclusions, macros,
+        latestWeightKg, targetWeightAnchorKg, exercisePlan, mesocycle, mesocycleCreatedAt, pools: storedMealPools,
+      })
+    }, 500)
+    return () => clearTimeout(t)
+  }, [isRestoring, storedProfile, memoryFacts, exerciseExclusions, macros, latestWeightKg, targetWeightAnchorKg, exercisePlan, mesocycle, mesocycleCreatedAt, storedMealPools])
+
   // MACROS FOLLOW THE BODY THEY WERE CALCULATED FROM — audit §2.1.
   //
   // Editing weight, age, height, sex, activity or goal on the Profile screen
@@ -897,6 +921,20 @@ function App() {
     } catch { /* ignore */ }
   }, [route])
 
+  // THE START, WITH A KEPT COPY ON SCREEN (31 Oct 2026, boot-cache.ts). With none, every one of these answers
+  // "behave as before": swap everything in, show the wall on a failure.
+  /** Is this value still the one drawn from the kept copy? With no copy, always (the server's answer goes in). */
+  const stillAsKept = <T,>(cur: T, kept: T | undefined): boolean => !boot || Object.is(cur, kept)
+  const keptOnScreen = () => !!boot
+  const startRetryArmedRef = useRef(false)
+  /** A start that could not reach the server, with the copy on screen: ask again the moment the phone is online. */
+  const retryStartWhenOnline = () => {
+    console.error('The start could not reach the server; showing the copy kept on this phone and trying again when back online.')
+    if (startRetryArmedRef.current) return
+    startRetryArmedRef.current = true
+    window.addEventListener('online', () => { startRetryArmedRef.current = false; void restoreSession() }, { once: true })
+  }
+
   const restoreSession = async () => {
     // SIGN IN BEFORE READING ANYTHING. Every table is scoped to auth.uid()
     // now, so a client with no session reads zero rows — indistinguishable,
@@ -904,6 +942,9 @@ function App() {
     // order wrong would silently send returning users back through onboarding.
     const signIn = await ensureSignedIn()
     if (signIn.error) {
+      // WITH THE KEPT COPY ON SCREEN, A FAILED START IS NOT A WALL (31 Oct 2026): she can read her plan with no
+      // signal. The server is asked again the moment the phone is back online.
+      if (keptOnScreen()) { retryStartWhenOnline(); return }
       setAuthError(signIn.error)
       setIsRestoring(false)
       return
@@ -915,7 +956,10 @@ function App() {
     // owner, and an unowned row is readable by nobody — including the person
     // whose row it is. claim_profile only touches rows still unowned, so this
     // is a no-op for everyone else and safe to run on every load.
-    if (storedId) await claimProfile(storedId)
+    //
+    // ONCE PER PHONE (31 Oct 2026, app start): it was a round trip on every open, before anything else could be
+    // read. Once this phone has read its profile back, the row is owned and the claim can only answer "no change".
+    if (storedId && !hasClaimedOnThisPhone(storedId)) await claimProfile(storedId)
 
     // Ask the database who this account owns rather than trusting
     // localStorage alone: someone who signed in with an email on a new device
@@ -937,14 +981,50 @@ function App() {
     }
     if (ownedId !== storedId) localStorage.setItem(STORAGE_KEY, ownedId)
 
-    const { data: profileRow } = await supabase
-      .from('fitness_profiles')
-      .select('*')
-      .eq('id', ownedId)
-      .maybeSingle()
+    // EVERYTHING THE START NEEDS, ASKED FOR AT ONCE (31 Oct 2026, Ashley: "When I first open the app, it takes a few
+    // seconds to load"). The profile, the plan, the meals, what she has said, the latest weigh-in and the target's
+    // weight were six answers in a row, about 1.8 s on a phone where each takes 300 ms (verify:app-boot). They all
+    // key on the profile id alone, so they go together; each is used exactly as before. The latest weigh-in feeds
+    // the target's weight only as its fallback, so it is handed over as a promise and awaited only there.
+    const quiet = <T,>(p: PromiseLike<T>): Promise<T> => { const q = Promise.resolve(p); q.catch(() => {}); return q }
+    const profileP = quiet(supabase.from('fitness_profiles').select('*').eq('id', ownedId).maybeSingle())
+    const startReadsP = quiet(Promise.all([
+      readPools(ownedId),
+      supabase.from('exercise_plans').select('*').eq('profile_id', ownedId),
+      restoreMesocycle(ownedId),
+      // What the person has said, read WITH the plan rather than after it:
+      // the block checks further down can rebuild weeks, and they run before
+      // React has any state to derive a kit from. A failed read falls back to
+      // the tier alone, as before any of this existed, and says so.
+      getActiveFacts(ownedId).catch(err => {
+        console.error('Could not read what you have told the app, so your kit is being read from your equipment setting alone:', err)
+        return [] as UserFactRow[]
+      }),
+    ]))
+    const latestWeightP = quiet(getLatestWeightKg(ownedId).catch(() => null))
+    // The fallback is the profile's own weight when there is no weigh-in, as it always was. Started before the
+    // profile has answered (its fallback waits on both), so it is not a second round trip after it.
+    const effectiveTargetWeightP = quiet(getEffectiveTargetWeightKg(
+      ownedId,
+      Promise.all([latestWeightP, profileP]).then(([w, { data: row }]) => w ?? (row?.weight_kg == null ? undefined : Number(row.weight_kg))),
+    ))
+    const { data: profileRow, error: profileError } = await profileP
 
+    // A READ THAT FAILED IS NOT "NO PROFILE" (31 Oct 2026). It was treated as one: opening the app with no signal
+    // wiped the stored profile id and sent her to setup, after which the phone no longer knew whose plan it held.
+    // Now the kept copy stays on screen, or, with none, she is told the truth and offered Try again.
+    if (profileError) {
+      console.error('Reading the profile at start failed:', profileError)
+      if (keptOnScreen()) { retryStartWhenOnline(); return }
+      setStartError(START_UNREACHABLE)
+      setIsRestoring(false)
+      return
+    }
+    if (profileRow) markClaimedOnThisPhone(ownedId)
     if (!profileRow) {
       localStorage.removeItem(STORAGE_KEY)
+      // The row is genuinely gone (the read worked and found nothing): the kept copy is not hers to show either.
+      if (boot) setProfile(null)
       setIsRestoring(false)
       return
     }
@@ -1044,19 +1124,7 @@ function App() {
     const restoredExclusions: string[] = profileRow.exercise_exclusions || []
     setExerciseExclusions(restoredExclusions)
 
-    const [restoredPools, { data: exerciseRows }, fullMesocycle, restoredFacts] = await Promise.all([
-      readPools(ownedId),
-      supabase.from('exercise_plans').select('*').eq('profile_id', ownedId),
-      restoreMesocycle(ownedId),
-      // What the person has said, read WITH the plan rather than after it:
-      // the block checks further down can rebuild weeks, and they run before
-      // React has any state to derive a kit from. A failed read falls back to
-      // the tier alone, as before any of this existed, and says so.
-      getActiveFacts(ownedId).catch(err => {
-        console.error('Could not read what you have told the app, so your kit is being read from your equipment setting alone:', err)
-        return [] as UserFactRow[]
-      }),
-    ])
+    const [restoredPools, { data: exerciseRows }, fullMesocycle, restoredFacts] = await startReadsP
     // The same two functions as the derivation at the top of this component,
     // so the cold-load chain and every tab read the same kit.
     const restoredProfile: UserProfile = profileWithKit(savedProfile, compileKitStatements(restoredFacts))
@@ -1072,7 +1140,7 @@ function App() {
       // Live-week detection anchors to the PLAN's creation, not the profile's
       // (C0 Part 6) — a profile created months before its current plan would
       // otherwise open weeks deep into (or past) a cycle it just started.
-      setMesocycleCreatedAt(fullMesocycle.createdAt)
+      setMesocycleCreatedAt(cur => (stillAsKept(cur, boot?.mesocycleCreatedAt) ? fullMesocycle.createdAt : cur))
       const week1 = restoredMesocycle.find(w => w.week_number === 1)
       if (week1) restoredExercises = week1.days
     } else if (exerciseRows) {
@@ -1154,7 +1222,7 @@ function App() {
     // Living targets (M0): computed on read from the profile + the latest
     // weigh-in, never from the frozen fitness_profiles macro columns (still
     // written at onboarding for back-compat; nothing reads them anymore).
-    let restoredWeight = await getLatestWeightKg(restoredProfile.id!).catch(() => null)
+    let restoredWeight = await latestWeightP
     // Fix 1c (ux-sweep), existing-profile half: a profile from before the
     // onboarding-seed fix above still has zero daily_metrics rows. Lazy
     // check-on-load backfill (matches this app's existing convention, e.g.
@@ -1176,30 +1244,40 @@ function App() {
     // number — a threshold-gated 7-day average, so a single noisy reading
     // doesn't retune calories on its own. See getEffectiveTargetWeightKg's
     // doc comment.
-    const effectiveTargetWeight = await getEffectiveTargetWeightKg(
-      restoredProfile.id!,
-      restoredWeight ?? restoredProfile.weight_kg,
-    )
+    // Read at the top, with the rest. Its fallback is the same figure this line used to pass (the latest
+    // weigh-in, else the profile's weight). The one difference is the rare backfill above: its row is now written
+    // after the read rather than before, and the figure it writes IS that fallback, so the answer is the same.
+    const effectiveTargetWeight = await effectiveTargetWeightP
     const liveTargets = computeTargets(restoredProfile, {
       latestWeightKg: effectiveTargetWeight.weightKg,
       exercisePlan: restoredExercises,
     })
 
     // Both in one batch, so no render sees the saved profile without its kit.
-    setMemoryFacts(restoredFacts)
-    setProfile(savedProfile)
-    setLatestWeightKg(restoredWeight)
-    setTargetWeightAnchorKg(effectiveTargetWeight.weightKg ?? null)
-    setMacros(liveTargets)
-    setMealPools(restoredPools.pools)
+    //
+    // OVER THE KEPT COPY, ONLY WHERE NOTHING CHANGED (31 Oct 2026, boot-cache.ts). With the app drawn from the
+    // phone's copy, she may already have changed something before these answers landed; each value is swapped for
+    // the server's only while the one on screen is still the one drawn from the copy. And a plan or meals that
+    // come back EMPTY while the copy had them is a read that failed, not a deleted plan (New Plan clears the stored
+    // id, so it never gets here): the copy stays.
+    const keptMeso = boot?.mesocycle ?? []
+    const freshMesoMissing = restoredMesocycle.length === 0 && keptMeso.length > 0
+    setMemoryFacts(cur => (stillAsKept(cur, boot?.facts) ? restoredFacts : cur))
+    setProfile(cur => (stillAsKept(cur, boot?.profile) ? savedProfile : cur))
+    setLatestWeightKg(cur => (stillAsKept(cur, boot?.latestWeightKg) ? restoredWeight : cur))
+    setTargetWeightAnchorKg(cur => (stillAsKept(cur, boot?.targetWeightAnchorKg) ? effectiveTargetWeight.weightKg ?? null : cur))
+    setMacros(cur => (stillAsKept(cur, boot?.macros) ? liveTargets : cur))
+    if (!(restoredPools.failed && boot)) setMealPools(cur => (stillAsKept(cur, boot?.pools) ? restoredPools.pools : cur))
     // A read that FAILED must not render as "No meal plan generated yet" — that
     // sends someone whose meals exist to regenerate them, and the button they
     // are pointed at deletes and rewrites the plan they still had.
-    if (restoredPools.failed) {
+    if (restoredPools.failed && !boot) {
       setMealRegenerateError("I couldn't load your meals just then — that's a connection problem, not a missing plan. Pull down to refresh before regenerating anything.")
     }
-    setExercisePlan(restoredExercises)
-    setMesocycle(restoredMesocycle)
+    if (!freshMesoMissing) {
+      setExercisePlan(cur => (stillAsKept(cur, boot?.exercisePlan) ? restoredExercises : cur))
+      setMesocycle(cur => (stillAsKept(cur, boot?.mesocycle) ? restoredMesocycle : cur))
+    }
     setIsRestoring(false)
 
     // Goal-proximity nudge (ask-first, never auto-changes anything — see
@@ -2755,6 +2833,9 @@ function App() {
       // Found by that same audit: the tab the OLD profile was last on would
       // otherwise greet the new one after onboarding.
       localStorage.removeItem(LAST_TAB_KEY)
+      // The copy of the OLD plan kept for a fast open (boot-cache.ts). It is filed under the old profile and never
+      // read for another, so this is tidiness, not safety: the next open starts from the server either way.
+      clearBootSnapshot()
       localStorage.removeItem(STORAGE_KEY)
       localStorage.removeItem('active_session_cache')
       localStorage.removeItem('offline_log_queue')
@@ -2922,6 +3003,19 @@ function App() {
   // so the alternative is a fully-populated-looking app that is empty
   // everywhere and never says why. Nothing has been lost — the data is in the
   // database, this browser just could not prove who it is.
+  if (startError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-md w-full space-y-4 text-center">
+          <p className="text-sm text-muted-foreground break-words" data-testid="start-error">{startError}</p>
+          <Button className="w-full" onClick={() => { setStartError(null); setIsRestoring(true); void restoreSession() }}>
+            Try again
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
   if (authError) {
     const signInFailure = describeSignInFailure(authError)
     return (

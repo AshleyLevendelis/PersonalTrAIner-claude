@@ -42,6 +42,7 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   // Added 9 Oct 2026, and this gate is what asked the question: a question
   // the setup coach parked is handed to the FIRST chat after that setup. Left
   // behind by a reset, it could greet a later plan's first chat instead.
+  fitplan_boot_v1: { clear: true, why: "the old plan's copy kept for a fast open (31 Oct 2026); filed under the old profile, so tidiness" },
   fitplan_parked_questions: { clear: true, why: "a question parked during the old plan's setup is not owed to the new one's first chat" },
 
   fitplan_appearance_v1: { clear: false, why: 'a theme choice is not plan data; resetting it would be a surprise' },
@@ -154,6 +155,8 @@ console.log('\n2. handleReset clears exactly the keys marked clear:true')
   // The draft has its own module-level clearer rather than a removeItem call.
   const cleared = new Set(clearedLiterals)
   if (/\bclearOnboardingDraft\(\)/.test(body)) cleared.add('fitplan_onboarding_draft')
+  // And the kept copy for a fast open has its own (boot-cache.ts, 31 Oct 2026).
+  if (/\bclearBootSnapshot\(\)/.test(body)) cleared.add('fitplan_boot_v1')
 
   for (const [key, { clear, why }] of Object.entries(KEYS)) {
     if (clear) check(`clears ${key} — ${why}`, cleared.has(key), [...cleared])

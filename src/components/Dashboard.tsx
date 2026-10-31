@@ -6,7 +6,7 @@
 // ---------------------------------------------------------------------------
 
 import type * as React from 'react'
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { Button } from '@/components/ui/button'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -178,6 +178,13 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     () => withMealSnapshot(loadDashboardCache(profile.id, activeSession.date), profile.id, activeSession.date),
   )
   const [loading, setLoading] = useState(true)
+  const hasDataRef = useRef(data != null)
+  hasDataRef.current = data != null
+  /** Home's loads in the order they started, and the latest one drawn (see the load effect). */
+  const loadSeqRef = useRef(0)
+  const drawnSeqRef = useRef(0)
+  const dayKeyRef = useRef('')
+  dayKeyRef.current = `${profile.id}|${activeSession.date}`
 
   const [steps, setSteps] = useState<DailyStepsRow | null>(null)
 
@@ -212,8 +219,18 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     // also made the weigh-in card unreachable, which is the one thing that
     // would have given us their weight. Nothing else on this screen needs a
     // calorie target; see hasNutritionTargets for the part that does.
-    if (!activeSession.ready || !profile.id) return
-    let cancelled = false
+    // WITH NO SNAPSHOT OF TODAY, IT DOES NOT WAIT FOR TODAY'S SETS EITHER (31 Oct 2026, app start). The first open
+    // of a day has nothing to draw until this lands, and waiting for the sets read first cost a whole round trip.
+    // It runs at once on the sets this phone already holds, and again when the read lands (ready is a dependency).
+    // With a snapshot on screen it waits, as before: there is no blank to fill, so no reason to load twice.
+    if (!profile.id || (!activeSession.ready && hasDataRef.current)) return
+    // NEWEST WINS, RATHER THAN LAST STARTED ONLY (31 Oct 2026, app start). Every re-run used to throw away the run
+    // before it, so the first open of a day loaded once on the phone's sets, threw that away the moment the sets
+    // read landed, and loaded again: the early answer never reached the screen. Now an answer is drawn unless a
+    // LATER-started run has already been drawn, and only for the profile and day still on screen.
+    const seq = ++loadSeqRef.current
+    const forDay = `${profile.id}|${activeSession.date}`
+    const stale = () => seq < drawnSeqRef.current || dayKeyRef.current !== forDay
     setLoading(true)
     loadDashboardData({
       profile, macros, exercisePlan, mesocycle, planCreatedAt, moves: week.moves,
@@ -222,7 +239,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
       now: getAppNow(profile.id),
     })
       .then(d => {
-        if (cancelled) return
+        if (stale()) return
+        drawnSeqRef.current = seq
         // Through the snapshot as well: this promise was started before any
         // meal logged while it was in flight, so its ledger half can already
         // be out of date by the time it resolves.
@@ -254,10 +272,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
       // restarted, with the failure visible only in a console nobody opens.
       .catch(err => {
         console.error('Loading the dashboard failed:', err)
-        if (!cancelled) setLoadError(true)
+        if (!stale() && seq === loadSeqRef.current) setLoadError(true)
       })
-      .finally(() => { if (!cancelled) setLoading(false) })
-    return () => { cancelled = true }
+      .finally(() => { if (seq === loadSeqRef.current) setLoading(false) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // exercisePlan AND mesocycle ARE DEPENDENCIES. They were not, and that is
     // what made the wrong answer permanent rather than momentary: the effect
@@ -359,10 +376,15 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // last-known snapshot could never be shown — the cache would exist and the
   // screen would still be blank. What decides whether there is something to
   // draw is whether there is data, from wherever it came.
-  if (!activeSession.ready || !data) {
-    return (
-      <div className="rounded-xl bg-card py-12 text-center text-sm text-muted-foreground">Loading your day…</div>
-    )
+  // NOT GATED ON THE DAY'S SETS ANY MORE (31 Oct 2026, app start). With a snapshot of today in hand there is
+  // something true to draw, and waiting for the sets read cost a round trip on every open with "Loading your
+  // day..." over a screen that already had its numbers. The load effect above still waits for it, and swaps
+  // the fresh day in when it lands, as the snapshot's own comment promises.
+  if (!data) {
+    // HOME'S OWN SHAPE WHILE TODAY FILLS IN (31 Oct 2026, Ashley: "not show that loading as soon as you open it").
+    // Only on the first open of a day, the one time there is no snapshot of today to draw; it is about half a
+    // second on a phone where each answer takes 300 ms (verify:app-boot). No number is drawn until it is known.
+    return <HomeFilling dayName={activeSession.dayName} greeting={homeGreeting(getAppNow(profile.id).getHours(), (profile.display_name ?? '').trim().split(/\s+/)[0])} />
   }
 
   // THE TRAINER'S NOTE — design handoff 2a. An adaptation message wants an
@@ -717,6 +739,27 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={card} />
         </Suspense>
       )}
+    </div>
+  )
+}
+
+/** Home's layout with no numbers in it: the header she knows, then quiet blocks where the day's numbers will go. */
+function HomeFilling({ dayName, greeting }: { dayName: string; greeting: string }) {
+  const block = (h: number, extra = '') => <div className={`rounded-[14px] ${extra}`} style={{ height: h, background: 'var(--surface-raised)', opacity: 0.55 }} />
+  return (
+    <div className="flex flex-col gap-[18px]" data-home-filling aria-busy="true">
+      <span className="sr-only">Loading your day</span>
+      <div className="min-w-0">
+        <p className="ds-label">{dayName}</p>
+        <h2 className="mt-1 text-[1.75rem] font-bold leading-[1.1] tracking-[-.03em]">{greeting}</h2>
+      </div>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-5">
+        <div className="rounded-full" style={{ width: 128, height: 128, background: 'var(--surface-raised)', opacity: 0.55 }} />
+        <div className="flex flex-col gap-2.5">{block(28, 'w-24')}{block(14)}{block(14)}{block(14)}{block(14)}</div>
+      </div>
+      {block(48)}
+      {block(64)}
+      {block(52)}
     </div>
   )
 }

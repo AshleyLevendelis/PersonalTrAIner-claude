@@ -153,6 +153,18 @@ export async function claimProfile(profileId: string): Promise<boolean> {
   }
 }
 
+/**
+ * HAS THIS PHONE ALREADY READ THIS PROFILE BACK? (31 Oct 2026, app start.) A row can only be read once it is owned
+ * (row-level security), so after one successful read the claim above can only ever answer "nothing to do", and it was
+ * a round trip on every open, ahead of every other read. Storage that fails answers "no", which just claims again.
+ */
+export function hasClaimedOnThisPhone(profileId: string): boolean {
+  try { return localStorage.getItem(`fitplan_claimed:${profileId}`) === '1' } catch { return false }
+}
+export function markClaimedOnThisPhone(profileId: string): void {
+  try { localStorage.setItem(`fitplan_claimed:${profileId}`, '1') } catch { /* claims again next time, as before */ }
+}
+
 /** True when the signed-in account is still anonymous — no email, so nothing to recover it with. */
 export async function needsEmail(): Promise<boolean> {
   try {

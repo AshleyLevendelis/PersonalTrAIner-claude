@@ -1388,6 +1388,14 @@ menu" stays true when a copy is also left outside it.
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
 
+### Opening the app (31 Oct 2026, her "make it load quicker, and not show that loading")
+- **A re-open draws the app from the copy kept on the phone** (`boot-cache.ts`) and swaps the server's answers in
+  behind it, only where the screen still shows the kept value. **A failed read is never "no profile"**: the stored
+  profile id is never removed on one (it was: opening with no signal sent her to setup). The start asks everything at
+  once; Home draws its saved day at once and its layout, never a "Loading" box, on the first open of a day.
+  `verify:app-boot` (the only page that boots the WHOLE app, with a delay on every answer), `test:boot-cache`.
+  **When reading anything the start does, run `verify:app-boot`: no other harness page runs App.tsx's start.**
+
 ### Her ruling of 30 Oct 2026, "less is more" (BACKLOG, the declutter entry)
 - **"Move things"**, over removing them for good: Home, Nutrition and Exercise say each thing once, the coach note is
   one line, and secondary parts sit one tap away (Progress on Home, the planned macros on Nutrition, "＋ Add" on

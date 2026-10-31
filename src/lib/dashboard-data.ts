@@ -357,6 +357,30 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // cold-load window, not a trainee without a plan.
   const planKnown = mesocycle.length > 0 || exercisePlan.length > 0
 
+  // EVERY READ THAT DEPENDS ON NOTHING ELSE STARTS NOW, TOGETHER (31 Oct 2026, Ashley: "When I first open the app,
+  // it takes a few seconds to load"). They were awaited one after another, ten answers in a row, about 3.3 s on a
+  // phone where each answer takes 300 ms (measured, verify:app-boot). Each is still awaited exactly where it was
+  // used, so what the screen gets is unchanged; only the waiting overlaps. `.catch(() => {})` on the side marks a
+  // failure as handled while it waits: awaiting the promise itself below still throws, as before.
+  const early = <T,>(p: Promise<T>): Promise<T> => { p.catch(() => {}); return p }
+  const NO_TARGETS_EARLY: MacroTargets = { calories: 0, protein: 0, carbs: 0, fat: 0 }
+  const ledgerP = early(getTodayLedger(profileId, todayStr, macros ?? NO_TARGETS_EARLY))
+  const waterP = early(getWaterTotalForDate(profileId, todayStr))
+  const weighInP = early(getWeighInPicture(profileId))
+  const goalsP = early(getActiveGoals(profileId))
+  const prRefreshP = refreshPRCacheFromDB(profileId).catch(() => {})
+  const recentP = early(Promise.all([getRecentLogs(profileId, 35, todayStr), getRecentCardioLogs(profileId, 35, todayStr)]))
+  const notesP = early(Promise.resolve(supabase
+    .from('workout_sessions')
+    .select('*')
+    .eq('profile_id', profileId)
+    // An arrival inside the window can come from an origin before it.
+    .gte('date', addDays(addDays(todayStr, -34), -35))
+    .lte('date', addDays(todayStr, 35))))
+  const proteinDates: string[] = []
+  for (let i = 1; i <= 14; i++) proteinDates.push(addDays(todayStr, -i))
+  const proteinP = (macros?.protein ?? 0) > 0 ? getEatenProteinByDate(profileId, proteinDates).catch(() => null) : Promise.resolve(null)
+
   // STEPPED BY THE CALENDAR, NOT BY 86,400,000 MILLISECONDS. A day is 23 or
   // 25 hours long when the clocks move, so adding a fixed day to a time near
   // midnight lands back on the same date, or skips one. addDays reads at
@@ -513,22 +537,21 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
       }
 
   // ---- Nutrition ----------------------------------------------------------
-  // A zeroed target shape when we have no body metrics: getTodayLedger needs
+  // A zeroed target shape when we have no body metrics (NO_TARGETS_EARLY, at the top): getTodayLedger needs
   // one to compute what was EATEN, which is real either way. The targets it
   // returns in that case are not, which is what hasNutritionTargets marks.
-  const NO_TARGETS: MacroTargets = { calories: 0, protein: 0, carbs: 0, fat: 0 }
   const hasNutritionTargets = macros != null
-  const ledger = await getTodayLedger(profileId, todayStr, macros ?? NO_TARGETS)
-  const waterMl = await getWaterTotalForDate(profileId, todayStr)
+  const ledger = await ledgerP
+  const waterMl = await waterP
   const waterTargetMl = profile.water_target_ml ?? 2000
 
   // ---- Weight trend ---------------------------------------------------------
   // A TREND IS A CLAIM, SO IT IS MADE FROM THE WEIGH-INS THE TARGET TRUSTS (Sam, 20 Oct 2026). One surprising
   // weigh-in, held until a second day agrees, turned Home and the coach to "trending up 1.3kg/week" on its own. The
   // latest weigh-in and the change since she started are still shown as weighed: they are facts, not a trend.
-  const weighInPicture = await getWeighInPicture(profileId)
+  const weighInPicture = await weighInP
   const weighIns = weighInPicture.recent
-  const goals = await getActiveGoals(profileId)
+  const goals = await goalsP
   const weightGoal = goals.find(g => g.metric === 'body_weight_kg' && g.baseline_value != null && g.target_value != null)
   const weightTrend = computeWeightTrend(
     weighInPicture.standing.trusted.map(w => ({ date: w.date, weightKg: w.kg })),
@@ -556,17 +579,14 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // the server, so they run one set behind, and the set left out is the last
   // one of the session: the likeliest to be the best. Found by a driver that
   // beat a record on its final set and saw no "Recent PRs" on Home.
-  await refreshPRCacheFromDB(profileId).catch(() => {})
+  await prRefreshP
   const beatenAll = getRecordsBeaten(profileId)
   const recentPRs = pickRecentPRs(beatenAll, todayStr)
   const prsToday = pickRecentPRs(beatenAll.filter(r => r.date === todayStr), todayStr)
   const prCache = getPRCache(profileId)
 
   // ---- Streak + session-pace + protein-adherence window (shared reads) ---
-  const [workingLogs, cardioLogs] = await Promise.all([
-    getRecentLogs(profileId, 35, todayStr),
-    getRecentCardioLogs(profileId, 35, todayStr),
-  ])
+  const [workingLogs, cardioLogs] = await recentP
   const loggedDates = new Set<string>([...workingLogs.map(l => l.date), ...cardioLogs.map(c => c.date)])
 
   // THE STREAK COUNTS PLANNED SESSIONS ON THE DATE THEY RAN (streak.ts's
@@ -579,14 +599,8 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // note columns still answers. A FAILED READ IS NOT "NO NOTES" — it falls
   // back to the moves this screen was handed and says so, rather than
   // silently scoring every moved session as a miss.
-  const windowStart = addDays(todayStr, -34)
-  const { data: noteRows, error: noteError } = await supabase
-    .from('workout_sessions')
-    .select('*')
-    .eq('profile_id', profileId)
-    // An arrival inside the window can come from an origin before it.
-    .gte('date', addDays(windowStart, -35))
-    .lte('date', addDays(todayStr, 35))
+  // (Read with the others at the top: the window starts 35 days before windowStart, and ends 35 days after today.)
+  const { data: noteRows, error: noteError } = await notesP
   if (noteError) console.error('The streak could not read moved and swapped days; counting from this week\'s moves only:', noteError)
   const notes = (noteRows ?? []) as { date: string; moved_to_date?: string | null; swapped_for_activity?: string | null; deliberate_rest?: boolean | null }[]
   // The window's moves read here, plus the ones this screen was handed (the same rows, read for this week by the
@@ -673,12 +687,9 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // were hit, which an early exit cannot say.
   const proteinDays: { date: string; hit: boolean }[] = []
   if (proteinTarget > 0) {
-    const dates: string[] = []
-    // Third and last fixed-millisecond walk in this file. A repeated date here
-    // would ask the database for the same day twice and count it twice toward
-    // the protein streak; a skipped one would break a streak that held.
-    for (let i = 1; i <= 14; i++) dates.push(addDays(todayStr, -i))
-    const eatenByDate = await getEatenProteinByDate(profileId, dates).catch(() => null)
+    // The fourteen days before today, stepped by date (addDays), read with the others at the top.
+    const dates = proteinDates
+    const eatenByDate = await proteinP
     if (eatenByDate) {
       for (const dateStr of dates) {
         proteinDays.push({ date: dateStr, hit: (eatenByDate[dateStr] ?? 0) >= proteinTarget * 0.95 })

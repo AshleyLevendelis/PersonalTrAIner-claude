@@ -458,6 +458,8 @@
     "test:named-food-clash": "tsx scripts/test-named-food-clash.ts",
     "test:offer-text": "tsx scripts/test-offer-text.ts",
     "verify:one-page": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/one-page.mjs",
+    "test:boot-cache": "tsx scripts/test-boot-cache.ts",
+    "verify:app-boot": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/app-boot.mjs",
     "test:exercise-layout": "tsx scripts/test-exercise-layout.ts",
     "test:round-setup": "tsx scripts/test-round-setup.ts",
     "test:rebuild-honours": "tsx scripts/test-rebuild-honours.ts",

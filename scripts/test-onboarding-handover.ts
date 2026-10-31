@@ -236,7 +236,9 @@ console.log('\n7. A failed read of the meals does not masquerade as an empty one
   const appCode = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   check('the restore path uses the reporting read', /readPools\(ownedId\)/.test(appCode))
-  check('...and tells the user when it failed', /if \(restoredPools\.failed\)/.test(appCode))
+  // RE-ANCHORED 31 Oct 2026: with the kept copy's meals on screen (boot-cache.ts) a failed read leaves them there and
+  // says nothing; with none, it says so, as before.
+  check('...and tells the user when it failed', /if \(restoredPools\.failed(?: && !boot)?\) \{\s*setMealRegenerateError\(/.test(appCode))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
