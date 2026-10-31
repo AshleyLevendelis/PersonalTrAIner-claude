@@ -186,7 +186,8 @@ async function main() {
     check('Home uses the coach line on both paths (an adaptation and the rotating tips), with its two chips', /<TrainerNudge \{\.\.\.trainerNudge\} line\b/.test(home) && /<TrainerNudge\s+line\b[\s\S]{0,80}prompts=\{HOME_PROMPTS\}/.test(home)
       && /label: 'What changed\?'/.test(home) && /label: 'Adjust today'/.test(home))
   }
-  check('Nutrition: the macros are one row of four', /grid grid-cols-4[^"]*" data-ring-key/.test(nut))
+  // RE-ANCHORED 31 Oct 2026 (design 3a): the legend of the top card, one row each, the rings still left out.
+  check('Nutrition: the macros and water are the legend\'s rows, one each, no rings', /flex flex-col[^"]*" data-ring-key>/.test(nut) && (nut.match(/<LegendRow\b/g) ?? []).length === 4 && !/<RingMeter/.test(nut))
   const mealPlan = read('src/components/MealPlan.tsx')
   {
     const heroAt = mealPlan.indexOf('function TotalsHero')

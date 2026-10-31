@@ -110,9 +110,11 @@ const bar = await ev(`(() => { const b = document.querySelector('[data-testid="k
 const num = s => Number(String(s).replace(/,/g, ''))
 const kcalTarget = bar ? num((bar.of.match(/of\s+([\d,]+)/) ?? [])[1]) : NaN
 check('11. the calorie bar is eaten over target', !!bar && Math.abs(Number(bar.share) - Math.min(1, num(bar.eaten) / kcalTarget)) < 0.002, { bar, kcalTarget })
-const upnextKcal = await ev(`(() => { const s = document.querySelector('[data-meal-section="upnext"]'); return s ? s.innerText.replace(/\\s+/g, ' ') : null })()`)
+// RE-ANCHORED 31 Oct 2026 (design 3a): one list, the next meal is the row marked next; its kcal is the row's own number.
+const nextRow = () => ev(`(() => { const r = document.querySelector('[data-meal-row][data-variant="upnext"]'); return r ? { slot: r.dataset.mealRow, kcal: r.querySelector('[data-testid="meal-row-kcal"]')?.textContent.trim() } : null })()`)
+const upnextKcal = await nextRow()
 const mealKcal = homeMeal ? (homeMeal.text.match(/(\d[\d,]*) kcal/) ?? [])[1] : null
-check('12. Home\'s next meal is the dish and the kcal on Nutrition\'s Up next card', !!upnextKcal && !!mealKcal && upnextKcal.includes(`${mealKcal} kcal`) && upnextKcal.toUpperCase().includes(homeMeal.slot.toUpperCase()), { upnextKcal, homeMeal })
+check('12. Home\'s next meal is the dish and the kcal on Nutrition\'s Up next card', !!upnextKcal && !!mealKcal && upnextKcal.kcal === mealKcal && upnextKcal.slot === homeMeal.slot, { upnextKcal, homeMeal })
 const waterBefore = await text('[data-ring-key-row="water"]')
 await tap('[data-ring-key-row="water"]')
 check('13. the water cell opens the quick-add', await ev(`!!document.querySelector('[data-water-quick-add]')`))
@@ -154,7 +156,7 @@ console.log('\nD. With breakfast logged over its plan (the rest of the day re-si
 // Home's next meal must carry the RE-SIZED kcal, not the stored dish's.
 await open('nutrition', 'refit=1&drift=1&ateover=200')
 const resized = await ev(`document.querySelector('[data-testid="around-eaten"]')?.dataset.kind ?? null`)
-const nUp = await ev(`(() => { const s = document.querySelector('[data-meal-section="upnext"]'); return s ? s.innerText.replace(/\\s+/g, ' ') : null })()`)
+const nUp = await nextRow()
 const bar2 = await ev(`Number(document.querySelector('[data-testid="kcal-bar"]')?.dataset.share ?? 'NaN')`)
 const hero2 = await text('[data-nutrition-hero]')
 const eaten2 = num(await text('[data-testid="kcal-eaten"]'))
@@ -168,7 +170,7 @@ const plain = await readHomeMeal()
 await open('dashboard', 'refit=1&drift=1&ateover=200')
 const hm2 = await readHomeMeal()
 const k2 = kcalOf(hm2)
-check('24. Home\'s next meal carries the re-sized kcal Nutrition shows', !!nUp && !!k2 && nUp.includes(`${k2} kcal`) && nUp.toUpperCase().includes(hm2.slot.toUpperCase()), { nUp, hm2 })
+check('24. Home\'s next meal carries the re-sized kcal Nutrition shows', !!nUp && !!k2 && nUp.kcal === k2 && nUp.slot === hm2.slot, { nUp, hm2 })
 check('25. ...which is not the stored dish\'s kcal (the same dish with nothing eaten)', !!plain && plain.slot === hm2?.slot && kcalOf(plain) !== k2, { plain, hm2 })
 
 const err = await ev('window.__err ?? null')

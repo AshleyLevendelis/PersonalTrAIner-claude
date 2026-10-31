@@ -198,8 +198,10 @@ console.log('\n4. What she reads')
   check('the line handed to the edit builders keeps two decimals (1.25, not 1.3)', /\* 100\) \/ 100/.test(dataForm) && !/formatKitchenQuantity/.test(dataForm), dataForm.slice(0, 200))
   check('...and that string reads back as the same amount', parseIngredientLine('1.25 tsp olive oil').quantity === 1.25 && parseIngredientLine('0.75 tbsp soy sauce').quantity === 0.75)
   // The cooked hint (18 Oct 2026, H36) is drawn after the line inside the same span, never inside the line itself.
-  const rows = meal.match(/<span className="tabular-mono text-xs[^>]*>\{([^}]*)\}(?:<CookedHint ing=\{ing\} \/>)?<\/span>/g) ?? []
-  check('both ingredient spans on the meal card show the display form', rows.length === 2 && rows.every(r => /displayIngredient\(ing\)/.test(r)), rows)
+  // RE-ANCHORED 31 Oct 2026 (design 3b): the recipe sheet draws one ingredient span, shared by the editable and
+  // the read-only line. The property is unchanged: every span that draws an ingredient draws the display form.
+  const rows = meal.match(/<span[^>]*>\{([^}]*\(ing\))\}(?:<CookedHint ing=\{ing\} \/>)?<\/span>/g) ?? []
+  check('every ingredient span on the meal card shows the display form', rows.length >= 1 && rows.every(r => /displayIngredient\(ing\)/.test(r)), rows)
 }
 
 console.log(`\n${ran} checks ran.`)

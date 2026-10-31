@@ -10,6 +10,7 @@ import type { MealAdditionPayload } from '@/lib/meal-addition'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { MacroTargets } from '@/lib/types'
 import type { CurrentMealForSlot } from '@/lib/meal-food-add'
+import { revealBelowTap } from './reveal'
 import type { ProposalDiff } from '@/lib/pending-actions-store'
 
 // ---------------------------------------------------------------------------
@@ -241,21 +242,19 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
 
   // WHATEVER THE TAP PRODUCES IS BROUGHT INTO VIEW. The card, a refusal and a
   // failure all appear below the buttons that were tapped, and on a phone that
-  // can be under the fold or under the fixed tab bar: a message is only shown
-  // if it is on screen where the tap was. Worked out by hand rather than with
-  // scrollIntoView and a scroll margin, because measured in Chromium that call
-  // left the card's Swap button half behind the tab bar.
+  // can be under the fold, under the fixed tab bar or under the recipe sheet's
+  // footer: a message is only shown if it is on screen where the tap was.
+  // revealBelowTap says how, for the page and for the sheet.
   const resultRef = useRef<HTMLDivElement>(null)
   const resultKind = preview?.kind
   useEffect(() => {
-    const el = resultRef.current
-    if (!el || !resultKind || resultKind === 'loading') return
-    const bar = document.querySelector('nav[aria-label="Primary"]')
-    const floor = (bar ? bar.getBoundingClientRect().top : window.innerHeight) - 8
-    const r = el.getBoundingClientRect()
-    if (r.height > floor - 8 || r.top < 0) window.scrollBy({ top: r.top - 8 })
-    else if (r.bottom > floor) window.scrollBy({ top: r.bottom - floor })
+    if (!resultKind || resultKind === 'loading') return
+    revealBelowTap(resultRef.current)
   }, [resultKind, toDate, toMeal, toSlot, rbTo, rbKcal, error])
+  // The "how much?" question is what a tap on a meal produces before any card, so it is brought into view the same way.
+  const askRef = useRef<HTMLDivElement>(null)
+  const asking = !!(rbTo && rbAsk && !rbAsk.ok && rbAsk.ask)
+  useEffect(() => { if (asking) revealBelowTap(askRef.current) }, [asking, rbTo])
 
   const confirm = async () => {
     if (preview?.kind !== 'ready') return
@@ -374,7 +373,7 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
               {rbTo && rbAsk && !rbAsk.ok && rbAsk.ask && (
                 <>
                   <p className="text-[0.71875rem] text-muted-foreground" data-testid="meal-rebalance-ask">{rbAsk.reason}</p>
-                  <div className="flex flex-wrap gap-2" data-testid="meal-rebalance-amounts">
+                  <div ref={askRef} className="flex flex-wrap gap-2" data-testid="meal-rebalance-amounts">
                     {rbAsk.ask.amounts.map(k => (
                       <button
                         key={k}

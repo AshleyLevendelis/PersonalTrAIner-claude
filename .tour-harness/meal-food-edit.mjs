@@ -85,11 +85,11 @@ const timeUntil = async (read, want, budgetMs) => {
   return null
 }
 const mealButton = () => ev(`(() => {
-  const b = [...document.querySelectorAll('button')].find(x => /^(Log this meal|Logged)$/.test((x.textContent||'').trim()))
+  const b = [...document.querySelectorAll('button')].find(x => /^(I ate this|Logged)$/.test((x.textContent||'').trim()))
   return b ? (x => x)(b.textContent.trim()) : null
 })()`)
 const tapMealButton = () => ev(`(() => {
-  const b = [...document.querySelectorAll('button')].find(x => /^(Log this meal|Logged)$/.test((x.textContent||'').trim()))
+  const b = [...document.querySelectorAll('button')].find(x => /^(I ate this|Logged)$/.test((x.textContent||'').trim()))
   if (!b) return false
   b.click(); return true
 })()`)
@@ -127,7 +127,8 @@ const tapApply = () => ev(`(() => { const b = document.querySelector('[data-edit
 // that moves, moves by what the card promised.
 // The tab's big figures: kcal left, and the planned day's total (2b moved it off .ds-num-mega).
 const bigNumbers = () => ev(`[...document.querySelectorAll('.ds-num-mega, [data-testid="day-kcal"]')].map(el => el.textContent.trim().replace(/,/g, ''))`)
-const mealCalories = () => ev(`(() => { const el = document.querySelector('.ds-num-lg'); return el ? el.textContent.trim() : null })()`)
+// RE-ANCHORED 31 Oct 2026 (design 3b): the open meal is the recipe sheet; its calories are the bold figure in its header.
+const mealCalories = () => ev(`(() => { const el = document.querySelector('[data-meal-sheet] [data-testid="meal-sheet-kcal"] .tabular-mono'); return el ? el.textContent.trim() : null })()`)
 
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/nutrition` })
 check('0a. the Nutrition tab loads', (await timeUntil(hero, '0', 40000)) !== null, await hero())

@@ -196,14 +196,20 @@ console.log('\n3. The legend is four rows in two columns, beside the rings')
 // under the number left, and the four macros sit in a 2x2 grid, each with its own bar — fat included, so
 // fat has its own cell again rather than a muted line.
 // RE-ANCHORED 30 Oct 2026 ("less is more", her "Move things"): the four sit in ONE row of four, no icons.
-check('a one-row grid of four holds it', /grid grid-cols-4[^"]*" data-ring-key/.test(nutrition))
+// RE-ANCHORED 31 Oct 2026 (design 3a, her "build, keep my rulings"): the top card is the design's legend with the
+// rings left out — one row per macro and water, in a column, each with its own bar.
+check('a column of legend rows holds it, one per macro and water', /flex flex-col[^"]*" data-ring-key>/.test(nutrition) && (nutrition.match(/<LegendRow\b/g) ?? []).length === 4)
 for (const label of ['label="Protein"', 'label="Carbs"', 'label="Fat"', 'label="Water"']) {
   check(`the grid carries ${label}`, nutrition.includes(label))
 }
 check('the cells are those four, in that order (protein, carbs / fat, water)',
   /k="protein"[\s\S]{0,400}k="carbs"[\s\S]{0,400}k="fat"[\s\S]{0,400}k="water"/.test(nutrition))
 check('the calories are a bar, not a ring', /testid="kcal-bar"/.test(nutrition) && !/<circle/.test(nutrition))
-check('the hero is what is LEFT (2b), the eaten figure under it', /data-testid="kcal-left-number"/.test(nutrition) && /data-testid="kcal-eaten"/.test(nutrition) && /ds-num-mega/.test(nutrition))
+// RE-ANCHORED 31 Oct 2026 (design 3a): the big number is what has been EATEN, "of N kcal" under it, and what is
+// LEFT moved to the card's header line — both still on the card, the left figure still through the phrasebook.
+check('the hero is what is EATEN of the target (3a), and what is left is on the card\'s header line',
+  /className="[^"]*text-\[2\.125rem\][^"]*" data-testid="kcal-eaten"/.test(nutrition) && /data-testid="kcal-target"/.test(nutrition)
+  && nutrition.indexOf('data-testid="kcal-left-number"') > -1 && nutrition.indexOf('data-testid="kcal-left-number"') < nutrition.indexOf('data-testid="kcal-eaten"'))
 check('the caption says left or over, from the phrasebook', /kcalLeftOrOver\(macros\.calories - eaten\.kcal\)/.test(nutrition) && /data-testid="kcal-left">kcal \{word\}/.test(nutrition))
 
 // ---------------------------------------------------------------------------
@@ -213,7 +219,17 @@ console.log('\n4. The meal list points at the list it fills')
 // Nutrition header now, there even before any meals are; the day-added row's
 // "Open list ›" in MealPlan still goes to the same route.
 // 17 Oct 2026 (5c·6): a 40px round basket button, named for a screen reader.
-check('the header links to the grocery list', /aria-label="Grocery list"\s*data-grocery-pill/.test(nutrition) && /<ShoppingBasket /.test(nutrition))
+// 31 Oct 2026 (3a): the pill with a cart on the "Today's meals" row, which NutritionDisplay draws whether or not
+// there are meals yet (so the door is there before any are) and on an upcoming day too.
+{
+  const rowAt = scroll.indexOf('data-meals-header')
+  const rowEnd = rowAt < 0 ? -1 : scroll.indexOf('{upcomingDay ? (', rowAt)
+  const row = rowAt < 0 || rowEnd < 0 ? '' : scroll.slice(rowAt, rowEnd)
+  check('the "Today\'s meals" row links to the grocery list, with a cart', /aria-label="Grocery list"\s*data-grocery-pill/.test(row) && /<ShoppingCart /.test(row) && /groceryHash\(\)/.test(row), { rowAt, rowEnd })
+  // Outside the today-only block (`{!upcomingDay && (<> … </>)}`) and not under a condition of its own.
+  const todayOnlyEnd = scroll.indexOf('</>)}')
+  check('...and is drawn on every day, not only today', rowAt > -1 && todayOnlyEnd > -1 && todayOnlyEnd < rowAt && !/\{[^{}]*&&\s*\(\s*<div[^>]*data-meals-header/.test(scroll), { todayOnlyEnd, rowAt })
+}
 // THE LIST MOVED OFF TOOLS, 12 Sep 2026 (design handoff 2b ›). It has a
 // screen of its own under Nutrition — where it is built from — so the link
 // goes there and the sanity check follows it. The property is unchanged: the
@@ -228,7 +244,8 @@ check('a collapsed row ends in a chevron', /<ChevronRight className="size-3\.5/.
 // number is what was LOGGED (the meal actually eaten), not the plan's dish.
 check('...and a logged meal shows what was logged, with its tick',
   /const kcalShown = Math\.round\(isLogged \? loggedKcal : \(option\?\.macros\.calories \?\? 0\)\)/.test(meals)
-  && /variant === 'eaten' && \([\s\S]{0,400}<Check /.test(meals))
+  // RE-ANCHORED 31 Oct 2026 (3a): the tick is the row's 26px status circle, filled, for an eaten meal.
+  && /function MealStatus[\s\S]{0,200}if \(variant === 'eaten'\) \{[\s\S]{0,400}<Check /.test(meals) && /<MealStatus variant=/.test(meals))
 
 // ---------------------------------------------------------------------------
 console.log('\n5. Every file this gate speaks for is actually mounted')

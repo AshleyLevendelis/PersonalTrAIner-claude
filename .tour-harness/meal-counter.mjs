@@ -87,12 +87,13 @@ const timeUntil = async (read, want, budgetMs) => {
   }
   return null
 }
+// RE-ANCHORED 31 Oct 2026 (design 3b): the log is the recipe sheet footer, "I ate this" (still "Logged" once logged).
 const mealButton = () => ev(`(() => {
-  const b = [...document.querySelectorAll('button')].find(x => /^(Log this meal|Logged)$/.test((x.textContent||'').trim()))
+  const b = [...document.querySelectorAll('button')].find(x => /^(I ate this|Logged)$/.test((x.textContent||'').trim()))
   return b ? (x => x)(b.textContent.trim()) : null
 })()`)
 const tapMealButton = () => ev(`(() => {
-  const b = [...document.querySelectorAll('button')].find(x => /^(Log this meal|Logged)$/.test((x.textContent||'').trim()))
+  const b = [...document.querySelectorAll('button')].find(x => /^(I ate this|Logged)$/.test((x.textContent||'').trim()))
   if (!b) return false
   b.click(); return true
 })()`)
@@ -114,10 +115,10 @@ await ev(`location.hash = '#/tab/nutrition'`); await wait(SLOW_MS + 5000)
 check('0b. the Nutrition counter agrees', (await timeUntil(hero, '0', 20000)) !== null, await hero())
 await ev(`(() => { const r = [...document.querySelectorAll('button')].filter(b => /Breakfast/i.test(b.textContent||'')); if (r[0]) r[0].click() })()`)
 await wait(1000)
-check('0c. a meal with a Log button is on screen', (await mealButton()) === 'Log this meal', await mealButton())
+check('0c. a meal with a Log button is on screen', (await mealButton()) === 'I ate this', await mealButton())
 
 // --- the tap ---------------------------------------------------------------
-check('1a. tapping Log this meal', await tapMealButton())
+check('1a. tapping I ate this (the log, renamed by design 3b)', await tapMealButton())
 const tapToCounter = await timeUntil(hero, '480', SLOW_MS * 4)
 check(`1b. the counter moved (in ${tapToCounter}ms)`, tapToCounter !== null, await hero())
 check(`1c. ...without waiting for the ${SLOW_MS}ms request`, tapToCounter !== null && tapToCounter < INSTANT_BUDGET_MS, tapToCounter)

@@ -232,8 +232,10 @@ console.log('\n5. It reaches the screen, and only when there is one')
   check('the meal card renders the method',
     // Since 11 Oct 2026 the card renders ONE value, worked out once per row by
     // methodToShow (the amount rule, then the restriction and truth check).
-    /data-meal-method=/.test(card) && (card.match(/\{method\}/g) ?? []).length === (card.match(/data-meal-method=/g) ?? []).length
-    && !/\{option\.prep\}/.test(card)
+    // RE-ANCHORED 31 Oct 2026 (design 3b): drawn as numbered steps, methodSteps(method), which splits that one
+    // value and adds nothing to it (test:nutrition-3a holds that no word is lost).
+    /data-meal-method=/.test(card) && (card.match(/\{method\}|methodSteps\(method\)/g) ?? []).length === (card.match(/data-meal-method=/g) ?? []).length
+    && !/\{option\.prep\}/.test(card) && !/methodSteps\(option\.prep/.test(card)
     && /const method = option \? methodToShow\(option\.prep, option\.ingredients, methodRules\) : ''/.test(card))
   check('...only when the meal actually has one',
     /const hasMethod = method\.length > 0/.test(card) && /\{hasMethod && \(/.test(card))
@@ -257,9 +259,15 @@ console.log('\n5. It reaches the screen, and only when there is one')
   // drawn while the row is closed — no ingredients on screen to be below.
   const iIngredients = card.indexOf('option.ingredients.length > 0 && (')
   const iMethod = card.lastIndexOf('data-meal-method=')
-  check('the card\'s method shows only with the row closed, and only when there is one',
-    /variant === 'upnext' && option && !expanded && methodOpen && hasMethod && \(/.test(card)
-    && /const hasMethod = method\.length > 0/.test(card))
+  // RE-ANCHORED 31 Oct 2026 (design 3b): the Up next card and its chef-hat panel are gone; the method is in the
+  // recipe sheet's Recipe tab, once, and only when there is one.
+  const iRecipe = card.indexOf("{tab === 'recipe' && (")
+  const iSwap = card.indexOf("{tab === 'swap' && canSwap && (")
+  check('the card\'s method shows in the recipe tab, once, and only when there is one',
+    iRecipe >= 0 && iSwap > iRecipe && iMethod > iRecipe && iMethod < iSwap
+    && (card.match(/data-meal-method=/g) ?? []).length === 1
+    && /\{hasMethod && \(\s*<div[^>]*data-meal-method=/.test(card)
+    && /const hasMethod = method\.length > 0/.test(card), { iRecipe, iMethod, iSwap })
   check('...and below the ingredients, which are where the amounts live',
     iIngredients >= 0 && iMethod >= 0 && iIngredients < iMethod, { iIngredients, iMethod })
   check('the legacy chat shape stops hardcoding an empty method',

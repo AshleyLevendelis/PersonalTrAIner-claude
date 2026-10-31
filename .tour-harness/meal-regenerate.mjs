@@ -76,6 +76,10 @@ const w1 = await until(week, v => v && /\+ 100g banana$/.test(v[today]?.lunch ??
 const edited = w1?.[today]?.lunch
 check('1b. today\'s lunch is now her edited one', /\+ 100g banana$/.test(edited ?? ''), edited)
 check('1c. ...saved as today\'s pick', (await picks()).includes(`${today}|lunch|${edited}`), await picks())
+// RE-ANCHORED 31 Oct 2026 (design 3b): the lunch was edited in its recipe sheet, which sits over the list until it
+// is closed, as she would close it before tapping anything on the list.
+await ev(`document.querySelector('[data-meal-sheet-close]')?.click()`)
+await wait(300)
 const optionsBefore = await options()
 const dinnerBefore = w1?.[today]?.dinner
 const callsBefore = await ev(`window.__generatorCalls`)

@@ -96,7 +96,11 @@ const readWeek = async days => {
   return w
 }
 // ON SCREEN means above the fixed tab bar, not merely above the window's edge.
-const inView = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const bar = document.querySelector('nav[aria-label="Primary"]'); const floor = bar ? bar.getBoundingClientRect().top : window.innerHeight; const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= floor && r.height > 0 })()`)
+// RE-ANCHORED 31 Oct 2026 (design 3b): "on screen" is asked the way an eye asks it — inside the viewport, and
+// nothing drawn over its top or bottom edge. On the page that is still the tab bar; inside the recipe sheet, which
+// sits over the tab bar, it is the sheet's own footer (or nothing). The tab bar's top was the floor only while
+// nothing could be drawn over the tab bar.
+const inView = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); if (!(r.top >= 0 && r.bottom <= innerHeight && r.height > 0)) return false; const x = r.left + Math.min(r.width / 2, 12); return [r.top + 1, r.bottom - 1].every(y => { const h = document.elementFromPoint(x, y); return !!h && (h === e || e.contains(h) || h.contains(e)) }) })()`)
 /** What a person does before tapping a button: scroll it into view. */
 const reach = sel => ev(`document.querySelector(${JSON.stringify(sel)}).scrollIntoView({ block: 'center' })`)
 const long = d => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })
@@ -200,7 +204,8 @@ check('...and the other day holds today\'s old dinner', (await meals()).dinner =
 console.log('\n[6] A meal already eaten cannot move')
 await tapDay(today)
 await openSlot('breakfast')
-await ev(`[...document.querySelectorAll('button')].find(b => /Log this meal/.test(b.textContent)).click()`)
+// RE-ANCHORED 31 Oct 2026 (design 3b): the log is the recipe sheet's "I ate this".
+await ev(`document.querySelector('[data-meal-log]').click()`)
 await wait(900)
 await openMove('breakfast')
 const eatenTarget = days.find(d => d.date !== today && d.date !== dA)
@@ -338,7 +343,8 @@ console.log('\n[9b] Undo puts it all back')
 const back = await acrossSetup()
 const backOptions0 = await ev(`window.__mealOptions()`)
 // The count the open row prints beside Swap ("Swap · 4 options"): it reads the options the SCREEN holds, so it moves when a copy is added and must move back when one is taken away.
-const swapCount = () => ev(`(document.body.innerText.match(/Swap\\s*·\\s*(\\d+) options?/) || [])[1] ?? null`)
+// RE-ANCHORED 31 Oct 2026 (design 3b): the count is on the recipe sheet's Swap tab, "Swap · 3".
+const swapCount = () => ev(`(document.querySelector('[data-meal-sheet-tab="swap"]')?.textContent.match(/Swap\\s*·\\s*(\\d+)/) || [])[1] ?? null`)
 const countBefore = await swapCount()
 await reach(`[data-testid="meal-move-day-${back.bDate}"]`)
 await ev(`document.querySelector('[data-testid="meal-move-day-${back.bDate}"]').click()`)

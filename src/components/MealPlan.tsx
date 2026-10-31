@@ -1,4 +1,4 @@
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useRef, useState, Suspense } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import type { HeldAround } from '@/lib/meal-generation'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,7 @@ import {
   ShieldAlert,
   Plus,
   Heart,
-  Repeat, ChefHat, ChevronDown,
+  ChevronDown, X, ArrowLeftRight,
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { FitnessGoal, MacroTargets } from '@/lib/types'
@@ -21,8 +21,7 @@ import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestr
 import { methodToShow, dayVerdictLabel, macroOnTarget, type PoolOption } from '@/lib/meal-generation'
 import type { MethodRules } from '@/lib/meal-method-check'
 import { formatKitchenQuantity } from '@/lib/portion-scaler'
-import { groceryHash, tabHash } from '@/lib/app-route'
-import { setChatPrefill } from '@/lib/chat-prefill-store'
+import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
 // DEFERRED, NOT BUNDLED. Both sheets only exist once somebody taps Move or
 // Add food, so paying for them on first paint is paying for a screen most
@@ -38,6 +37,8 @@ import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { watchFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
 import { displayTags } from '@/lib/meal-new-from'
 import { cookedHint } from '@/lib/as-weighed'
+import { methodSteps } from '@/lib/method-steps'
+import { revealBelowTap } from '@/components/nutrition/reveal'
 const MealMoveSheet = lazyWithReload(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
 const MealFoodAddSheet = lazyWithReload(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
 
@@ -472,7 +473,7 @@ export function MealPlan({
   )
   // Which meal is up next: the first of today, in slot order, not yet logged
   // and with a dish to serve. Logged meals are "Eaten"; the rest are "Later".
-  const { eaten: eatenSlots, upNext: upNextSlot, later: laterSlots } = mealSections({
+  const { eaten: eatenSlots, upNext: upNextSlot } = mealSections({
     slots: activeSlots,
     eaten: sl => (loggedBySlot[sl] ?? []).length > 0,
     hasDish: sl => !!shownOption(sl),
@@ -556,42 +557,13 @@ export function MealPlan({
         inert={regeneratingAll}
         className={regeneratingAll ? 'pointer-events-none opacity-45 transition-opacity' : 'transition-opacity'}
       >
-        {/* DESIGN HANDOFF 2b: Up next (the first meal of today not yet
-            logged, as a card), then the rest still to eat, then what was
-            eaten. Nothing the old list showed is gone: every row opens to
-            the same full meal with every control it had. An upcoming day is
-            one plain list. */}
-        {!upcoming && upNextSlot && (
-          <section className="mb-[18px]" data-meal-section="upnext">
-            <p className="sr-only">Up next</p>
-            {rowFor(upNextSlot, 'upnext')}
-          </section>
-        )}
-        {laterSlots.length > 0 && (
-          <section className="mb-[18px]" data-meal-section="later">
-            {!upcoming && <p className={upNextSlot ? 'sr-only' : 'ds-label'}>{upNextSlot ? 'Later' : 'Still to eat'}</p>}
-            {laterSlots.map(slot => rowFor(slot, 'later'))}
-          </section>
-        )}
-        {!upcoming && (
-          <section className="mb-[18px]" data-meal-section="eaten">
-            {/* THE EATEN TOTAL IN KCAL (5c·6), summed off the same day-as-shown rows the header reads. */}
-            <p className="ds-label flex items-baseline justify-between">
-              Eaten <span className="tabular-mono normal-case tracking-normal" data-testid="eaten-kcal">{Math.round(shown.slots.reduce((sum, r) => sum + (r.eaten ? r.eaten.kcal : 0), 0)).toLocaleString()} kcal</span>
-            </p>
-            {eatenSlots.map(slot => rowFor(slot, 'eaten'))}
-            {/* SOMETHING OFF THE PLAN goes through the coach, which costs it and asks before a food it
-                cannot count (her M51 rule). The screen has no free-text food log of its own. */}
-            <button
-              type="button"
-              onClick={() => { setChatPrefill('I also ate '); window.location.hash = tabHash('chat') }}
-              className="flex min-h-[50px] w-full items-center gap-3 border-b border-[color:var(--hairline)] text-left text-[0.875rem] text-muted-foreground"
-              data-log-something-else
-            >
-              <Plus aria-hidden className="size-4" /> Log something else
-            </button>
-          </section>
-        )}
+        {/* DESIGN 3a (31 Oct 2026): ONE LIST IN THE DAY'S ORDER, each row carrying its own state in a status
+            circle: eaten (a filled tick), next (the first of today not eaten, a glowing ring and "· next"), later (a
+            faint ring, softer ink). The three groups are the same mealSections call the sections used. Nothing the
+            old list showed is gone: every row opens the recipe sheet (3b) with every control it had. "Log something
+            else" is the round + on the "Today's meals" row above (NutritionDisplay). An upcoming day is one plain
+            list. */}
+        {activeSlots.map(slot => rowFor(slot, eatenSlots.includes(slot) ? 'eaten' : slot === upNextSlot ? 'upnext' : 'later'))}
         {/* Surfacing round — a per-slot Retry is a dead end while a
             restriction is unrecognised (every retry fails identically), and
             showing four of them would restate the false promise the top
@@ -897,8 +869,6 @@ function MealSlotRow({
   // nobody reads (M21) — and it had never once saved. The heart still does
   // not move on a failed write; now a line under the row says why not.
   const [favouriteError, setFavouriteError] = useState<string | null>(null)
-  const [swapOpen, setSwapOpen] = useState(false)
-  const [methodOpen, setMethodOpen] = useState(false)
   const [moveOpen, setMoveOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
   const [addNote, setAddNote] = useState<string | null>(null)
@@ -942,7 +912,8 @@ function MealSlotRow({
         ? await dayMove.knockOn(date, slot, picked).catch(() => null)
         : null
       await onSwap(slot, name)
-      setSwapOpen(false)
+      // Back to the recipe, where the knock-on line and the new dish are.
+      setTab('recipe')
       const sameDay = trial?.changes.filter(c => c.date === date && c.slot !== slot && c.kind === 'dish') ?? []
       setSwapNote(sameDay.length > 0 ? sameDay.map(swapKnockOnLine) : null)
     } finally {
@@ -1025,532 +996,625 @@ function MealSlotRow({
   const hasMethod = method.length > 0
   const canSwap = otherOptions.length > 0 || !!onFindMore
   const kcalShown = Math.round(isLogged ? loggedKcal : (option?.macros.calories ?? 0))
-  const kcalText = (
-    <span data-testid="meal-row-kcal" data-slot={slot} className={`tabular-mono text-[0.78125rem] ${duplicated ? 'text-[color:var(--role-warn-text)]' : 'text-text-tertiary'}`}>
-      {kcalShown}{variant === 'upnext' ? ` kcal · ${Math.round(option?.macros.protein ?? 0)}g P` : ' kcal'}
-      {duplicated ? ` ·×${loggedEvents.length}` : ''}
-    </span>
-  )
+  // THE ROW'S P · C · F (3a) is what its kcal is: what was logged when it was, the plan's dish when not.
+  const rowMacros = isLogged
+    ? loggedEvents.reduce((sum, e) => ({ protein: sum.protein + (e.macros?.protein ?? 0), carbs: sum.carbs + (e.macros?.carbs ?? 0), fat: sum.fat + (e.macros?.fat ?? 0) }), { protein: 0, carbs: 0, fat: 0 })
+    : { protein: option?.macros.protein ?? 0, carbs: option?.macros.carbs ?? 0, fat: option?.macros.fat ?? 0 }
+  // LATER MEALS ARE SOFTER INK, NEVER LOWER OPACITY (3a): --text-tertiary is a theme colour that keeps its contrast
+  // on every canvas, where an opacity would fade the words under 4.5:1. An upcoming day has no "later" — nothing
+  // on it has happened — so its names stay in full ink.
+  const soft = variant === 'later' && !upcoming
+  const kcalColor = duplicated ? 'var(--role-warn-text)' : variant === 'eaten' ? 'var(--primary-text)' : soft ? 'var(--text-tertiary)' : 'var(--foreground)'
+
+  // THE RECIPE SHEET (3b) opens over a dimmed list and is the expanded meal: everything the open row had. Which
+  // half it shows, Recipe or Swap, is the sheet's own state, back on Recipe each time it opens.
+  const [tab, setTab] = useState<'recipe' | 'swap'>('recipe')
+  const sheetOpen = expanded && !!option
+  const sheetRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!sheetOpen) return
+    setTab('recipe')
+    // The page under a sheet does not scroll, Escape closes it, and focus goes into it (without jumping the page).
+    const before = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    sheetRef.current?.focus({ preventScroll: true })
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onToggle() }
+    window.addEventListener('keydown', onKey)
+    return () => { document.body.style.overflow = before; window.removeEventListener('keydown', onKey) }
+  // onToggle is a fresh closure every render; the sheet only cares about opening and closing.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheetOpen])
+  // A move's receipt and its Undo are on screen where the move was made (revealBelowTap: the sheet's own body).
+  const moveNoteRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => { if (moveNote) revealBelowTap(moveNoteRef.current) }, [moveNote])
 
   return (
     <div
       data-meal-row={slot}
       data-variant={variant}
-      className={variant === 'upnext' ? 'rounded-[16px] px-3.5 py-3' : 'py-1'}
-      style={variant === 'upnext'
-        ? { background: 'var(--surface-raised)', boxShadow: 'inset 0 0 0 1px rgba(var(--glow-rgb), .35)' }
-        : { borderBottom: '1px solid var(--hairline)' }}
+      style={{ borderBottom: '1px solid var(--hairline)' }}
     >
-      {variant === 'upnext' ? (
-        <button type="button" onClick={onToggle} disabled={!option} className="flex w-full flex-col gap-1.5 text-left disabled:cursor-default">
-          <span className="flex items-baseline justify-between gap-3">
-            <span className="text-[0.75rem] font-semibold text-primary-text">{SLOT_LABEL[slot]} · next{expanded ? ' · open' : ''}</span>
-            {option && kcalText}
+      <button
+        type="button"
+        onClick={onToggle}
+        disabled={!option}
+        aria-haspopup="dialog"
+        aria-expanded={sheetOpen}
+        className="flex min-h-[62px] w-full items-center gap-3 py-1.5 text-left disabled:cursor-default"
+      >
+        <MealStatus variant={upcoming ? 'later' : variant} />
+        <span className="min-w-0 flex-1">
+          <span className={`block text-[0.625rem] uppercase tracking-[.12em] ${variant === 'upnext' ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
+            {SLOT_LABEL[slot]}{variant === 'upnext' ? ' · next' : ''}{expanded ? ' · open' : ''}
           </span>
           {option ? (
-            <span data-meal-name={slot} className="min-w-0 text-[1rem] font-semibold">{displayName}</span>
+            /* NOT a hard one-line cut: Ashley, 3 Sep 2026, could not read a
+               long meal name. Two lines on the row, all of it in the sheet. */
+            <span data-meal-name={slot} className="mt-0.5 block line-clamp-2 text-[0.90625rem] font-medium leading-[1.3]" style={{ color: soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
+              {displayName}
+            </span>
           ) : (
-            <span className="text-sm text-muted-foreground" data-testid="meal-slot-all-clash-note">
+            <span className="mt-0.5 block text-sm text-muted-foreground" data-testid="meal-slot-all-clash-note">
               {alternatives.length > 0 && alternatives.every(a => a.breaksRestriction) ? 'Nothing saved fits what you avoid' : 'No option generated'}
             </span>
           )}
-        </button>
-      ) : (
-        <button type="button" onClick={onToggle} disabled={!option} className="flex min-h-[52px] w-full items-center gap-3 text-left disabled:cursor-default">
-          {variant === 'eaten' && (
-            <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full" style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }} aria-hidden>
-              <Check className="size-3.5" strokeWidth={3} />
-            </span>
-          )}
-          <span className="min-w-0 flex-1">
-            <span className={`block text-[0.71875rem] ${expanded ? 'text-primary-text' : 'text-muted-foreground'}`}>
-              {SLOT_LABEL[slot]}{expanded ? ' · open' : ''}
-            </span>
-            {option ? (
-              /* NOT a hard one-line cut: Ashley, 3 Sep 2026, could not read a
-                 long meal name. Two lines collapsed, all of it when open. */
-              <span data-meal-name={slot} className={expanded ? 'block text-[1.0625rem] font-semibold tracking-[-.01em]' : 'block line-clamp-2 text-[0.875rem]'}>
-                {displayName}
+          {option && <MacroLine protein={rowMacros.protein} carbs={rowMacros.carbs} fat={rowMacros.fat} className="mt-[5px]" />}
+        </span>
+        {option && (
+          <span className="flex shrink-0 items-center gap-1.5">
+            <span className="flex min-w-[44px] flex-col items-end">
+              <span data-testid="meal-row-kcal" data-slot={slot} className="tabular-mono text-[1rem] font-bold leading-none tracking-[-.02em]" style={{ color: kcalColor }}>
+                {kcalShown}{duplicated ? ` ×${loggedEvents.length}` : ''}
               </span>
-            ) : (
-              <span className="block text-sm text-muted-foreground" data-testid="meal-slot-all-clash-note">
-                {alternatives.length > 0 && alternatives.every(a => a.breaksRestriction) ? 'Nothing saved fits what you avoid' : 'No option generated'}
-              </span>
-            )}
+              <span className="mt-1 text-[0.5625rem] font-semibold uppercase leading-none tracking-[.12em] text-muted-foreground">kcal</span>
+            </span>
+            <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
           </span>
-          {option && !expanded && <span className="flex shrink-0 items-center gap-1">{kcalText}<ChevronRight className="size-3.5 text-muted-foreground" /></span>}
-        </button>
-      )}
-
-      {/* THE CARD'S OWN THREE (2b): Log it, Swap, and the method. Each is the
-          row's own handler, so the card and the full row cannot disagree. */}
-      {variant === 'upnext' && option && !expanded && (
-        <div className="mt-3 flex items-center gap-2" data-upnext-actions>
-          <button
-            type="button"
-            onClick={() => void handleLogToggle()}
-            disabled={busy || blocked}
-            className="glow-mint-box flex h-11 flex-1 items-center justify-center rounded-xl text-[0.875rem] font-bold disabled:opacity-50"
-            style={{ background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white) 0%, var(--primary) 55%, var(--primary-2) 100%)', color: 'var(--primary-foreground)' }}
-            data-upnext-log
-          >
-            Log it
-          </button>
-          {canSwap && (
-            <button
-              type="button"
-              onClick={() => { if (!expanded) onToggle(); setSwapOpen(true) }}
-              className="flex h-11 items-center gap-1.5 rounded-xl px-3.5 text-[0.8125rem] font-medium"
-              style={{ background: 'color-mix(in srgb, var(--surface-raised) 60%, var(--text-dim))' }}
-              data-upnext-swap
-            >
-              <Repeat className="size-4" aria-hidden /> Swap
-            </button>
-          )}
-          {hasMethod && (
-            <button
-              type="button"
-              onClick={() => setMethodOpen(o => !o)}
-              aria-expanded={methodOpen}
-              aria-label="How to cook it"
-              className="flex size-11 items-center justify-center rounded-xl"
-              style={{ background: 'color-mix(in srgb, var(--surface-raised) 60%, var(--text-dim))' }}
-              data-upnext-method
-            >
-              <ChefHat className="size-[18px]" aria-hidden />
-            </button>
-          )}
-        </div>
-      )}
-      {variant === 'upnext' && option && !expanded && methodOpen && hasMethod && (
-        <p className="mt-3 whitespace-pre-line text-xs leading-relaxed text-[color:var(--text-tertiary)]" data-meal-method={option.name}>
-          {method}
-        </p>
-      )}
+        )}
+      </button>
 
       {eatenNote && (
         /* QUIET, AND NOT AN INSTRUCTION — Ashley's ruling, 9 Sep 2026. Muted
            rather than warn-coloured, no icon, no "swap it": the meal is eaten
            and there is nothing left to do about it.
-           ON THE ROW, NOT INSIDE THE EXPANDED DETAIL. The first build put it
-           behind a tap, which the browser driver caught: someone who has just
-           added an allergen tag is exactly the person who should not have to
-           go looking for the sentence that says this morning's meal contained
-           it. Collapsed and expanded both show it. */
-        <p className="mt-1.5 text-[0.71875rem] leading-snug text-muted-foreground">
+           ON THE ROW, NOT ONLY IN THE SHEET. The first build put it behind a
+           tap, which the browser driver caught: someone who has just added an
+           allergen tag is exactly the person who should not have to go looking
+           for the sentence that says this morning's meal contained it. */
+        <p className="-mt-1 pb-2 pl-[38px] text-[0.71875rem] leading-snug text-muted-foreground">
           {eatenNote}
         </p>
       )}
 
       {!option && !upcoming && (
-        <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="mt-2 h-7 px-2 text-xs">
+        <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="mb-2 ml-[30px] h-7 px-2 text-xs">
           {busy ? <Loader2 className="size-3.5 animate-spin" /> : 'Generate'}
         </Button>
       )}
 
-      {expanded && option && (
-        <div className="mt-4 flex flex-col gap-4">
-          <div className="flex items-end gap-3">
-            <span className="tabular-mono ds-num-lg">{Math.round(option.macros.calories)}</span>
-            <div className="flex flex-col gap-0.5 pb-0.5">
-              <span className="text-xs text-foreground">kcal</span>
-              <span className="tabular-mono ds-label-compact">
-                {Math.round(option.macros.protein)} P · {Math.round(option.macros.carbs)} C · {Math.round(option.macros.fat)} F
-              </span>
-            </div>
-          </div>
+      {sheetOpen && option && (
+        /* THE SHEET (3b). Fixed over the page and drawn INSIDE its row, so the row still holds every control
+           it opens (the tour, the drivers and a screen reader all find them where they were). */
+        <div className="fixed inset-0 z-50" data-meal-sheet-root>
+          <div aria-hidden className="absolute inset-0" style={{ background: 'rgba(8, 6, 20, .62)' }} onClick={onToggle} data-meal-sheet-scrim />
+          <div
+            ref={sheetRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${SLOT_LABEL[slot]}: ${displayName}`}
+            tabIndex={-1}
+            data-meal-sheet={slot}
+            className="absolute inset-x-0 bottom-0 mx-auto flex max-h-[86dvh] max-w-md flex-col rounded-t-[26px] outline-none"
+            style={{ background: 'var(--surface-deep)', borderTop: '1px solid var(--hairline)', boxShadow: '0 -20px 40px rgba(0, 0, 0, .45)' }}
+          >
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain px-5 pb-4 pt-2.5" data-meal-sheet-scroll>
+              <span aria-hidden className="h-1 w-10 shrink-0 self-center rounded-full" style={{ background: 'color-mix(in srgb, var(--foreground) 22%, transparent)' }} />
 
-          {option.ingredients.length > 0 && (
-            /* EVERY LINE IS A CONTROL, not a readout. Until 12 Sep 2026 the
-               coach could take a food out of a meal, swap it or resize it and
-               this screen could not — one of the parity gaps CLAUDE.md counts.
-               Tapping a line opens the same three verbs the coach has, built
-               by the same builders and applied through the same executor.
-               The lines are re-rendered from formatIngredient so the string
-               handed to the builder is exactly the one on screen. */
-            <div className="flex flex-col gap-2">
-              <span className="ds-label-compact">{option.ingredients.length} ingredients</span>
-              <div className="flex flex-col gap-1.5">
-                {option.ingredients.map((ing, i) => {
-                  const line = formatIngredient(ing)
-                  const editable = editContextFor(option) !== null
-                  return (
-                    <div key={i}>
-                      {editable ? (
+              {/* HEADER: what this is, its calories in bold and the same P · C · F the rows use. The heart and the
+                  close sit at its right. */}
+              <div className="flex shrink-0 items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground">
+                    {SLOT_LABEL[slot]} · {isLogged ? 'eaten' : 'planned'}
+                  </p>
+                  <h3 className="mt-1 text-[1.375rem] font-bold leading-[1.15] tracking-[-.02em]">{displayName}</h3>
+                  <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="flex items-baseline gap-1" data-testid="meal-sheet-kcal">
+                      <span className="tabular-mono text-[0.9375rem] font-bold">{Math.round(option.macros.calories)}</span>
+                      <span className="text-[0.6875rem] text-muted-foreground">kcal</span>
+                    </span>
+                    <MacroLine protein={option.macros.protein} carbs={option.macros.carbs} fat={option.macros.fat} />
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center">
+                  {/* THE HEART — Ashley, 19 Sep 2026, from four options. The app never
+                      asks whether a meal was any good; she says so when she wants to.
+                      She rejected asking after every meal, asking once a day, and
+                      inferring it from what got logged.
+
+                      IT IS NOT A BOOKMARK. A hearted meal is kept when everything
+                      else is regenerated, the same protection a meal the coach was
+                      asked for by name already gets — so the tap has a consequence
+                      on the next screen rather than only in a table. It also reaches
+                      the coach, which the favourites list has always done and the
+                      screen has never been able to add to. */}
+                  {profileId && (
+                    <button
+                      type="button"
+                      onClick={() => void handleFavouriteToggle()}
+                      disabled={favouriteBusy}
+                      aria-pressed={isFavourite}
+                      aria-label={isFavourite ? `Remove ${option.name} from your favourites` : `Save ${option.name} as a favourite`}
+                      title={isFavourite ? 'A favourite — kept when you regenerate' : 'Save as a favourite'}
+                      className="flex size-11 items-center justify-center"
+                      data-meal-favourite={option.name}
+                      data-meal-favourite-on={isFavourite ? 'yes' : 'no'}
+                    >
+                      <Heart className={`size-[18px] ${isFavourite ? 'fill-current text-primary' : 'text-muted-foreground'}`} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={onToggle}
+                    aria-label="Close"
+                    className="hit-slop-44 flex size-9 items-center justify-center rounded-full"
+                    style={{ background: 'var(--surface-raised)' }}
+                    data-meal-sheet-close
+                  >
+                    <X className="size-4" aria-hidden />
+                  </button>
+                </div>
+              </div>
+              {favouriteError && (
+                <p role="status" className="-mt-2 text-[0.71875rem] text-[color:var(--role-warn-text)]" data-testid="meal-favourite-error">{favouriteError}</p>
+              )}
+
+              {/* RECIPE / SWAP. The swap tab is there whenever the open row had a swap (other dishes, or "More
+                  options" to find some). */}
+              {canSwap && (
+                <div role="tablist" className="flex shrink-0 rounded-xl p-[3px]" style={{ background: 'var(--surface-raised)' }}>
+                  {(['recipe', 'swap'] as const).map(t => (
+                    <button
+                      key={t}
+                      type="button"
+                      role="tab"
+                      aria-selected={tab === t}
+                      onClick={() => setTab(t)}
+                      className="hit-slop-44 h-[38px] flex-1 rounded-[10px] text-[0.78125rem]"
+                      style={tab === t ? { background: 'var(--secondary)', color: 'var(--foreground)', fontWeight: 600 } : { color: 'var(--muted-foreground)' }}
+                      data-meal-sheet-tab={t}
+                    >
+                      {t === 'recipe' ? 'Recipe' : otherOptions.length > 0 ? `Swap · ${otherOptions.length}` : 'Swap'}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {swapNote && (
+                <p className="text-[0.71875rem] text-muted-foreground" data-testid="swap-knock-on">{swapNote.join(' ')}</p>
+              )}
+
+              {tab === 'recipe' && (
+                <>
+                  {option.ingredients.length > 0 && (
+                    /* EVERY LINE IS A CONTROL, not a readout. Until 12 Sep 2026 the
+                       coach could take a food out of a meal, swap it or resize it and
+                       this screen could not — one of the parity gaps CLAUDE.md counts.
+                       Tapping a line opens the same three verbs the coach has, built
+                       by the same builders and applied through the same executor.
+                       The lines are re-rendered from formatIngredient so the string
+                       handed to the builder is exactly the one on screen. */
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground">Ingredients</span>
+                      <div className="flex flex-col">
+                        {option.ingredients.map((ing, i) => {
+                          const line = formatIngredient(ing)
+                          const editable = editContextFor(option) !== null
+                          const text = (
+                            <span className="flex min-w-0 items-baseline gap-2 text-[0.78125rem] text-[color:var(--text-tertiary)]">
+                              <span aria-hidden className="size-1 shrink-0 -translate-y-0.5 rounded-full" style={{ background: 'var(--muted-foreground)' }} />
+                              <span className="min-w-0" data-ingredient-text>{displayIngredient(ing)}<CookedHint ing={ing} /></span>
+                            </span>
+                          )
+                          return (
+                            <div key={i}>
+                              {editable ? (
+                                <button
+                                  type="button"
+                                  className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left"
+                                  data-ingredient-row={line}
+                                  aria-expanded={editingLine === i}
+                                  onClick={() => { setEditNote(null); setEditingLine(prev => (prev === i ? null : i)) }}
+                                >
+                                  {text}
+                                  <span className="shrink-0 text-[0.625rem] text-muted-foreground">Change</span>
+                                </button>
+                              ) : (
+                                <div className="py-1">{text}</div>
+                              )}
+                              {editingLine === i && (() => {
+                                const ctx = editContextFor(option)
+                                if (!ctx || !onMealPickApplied) return null
+                                return (
+                                  <MealFoodEditSheet
+                                    ctx={ctx}
+                                    line={line}
+                                    onPick={onMealPickApplied}
+                                    onDone={summary => { setEditingLine(null); setEditNote(summary) }}
+                                    onCancel={() => setEditingLine(null)}
+                                  />
+                                )
+                              })()}
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {editNote && <p className="text-[0.71875rem] text-muted-foreground">{editNote}.</p>}
+                    </div>
+                  )}
+
+                  {/* ADD A FOOD — the last thing on this row the coach could do and
+                      the screen could not. Same builder, same verifier, same
+                      executor as the coach's path; the only difference is that the
+                      screen picks from the food list rather than taking free text,
+                      which is strictly more honest — a food the app cannot cost is
+                      never offered rather than typed and then refused. */}
+                  {editContextFor(option) && onMealPickApplied && (
+                    <button
+                      type="button"
+                      onClick={() => { setAddOpen(prev => !prev); setAddNote(null) }}
+                      className="-mt-2 flex min-h-[44px] items-center gap-1.5 self-start text-[0.75rem] font-semibold text-primary-text"
+                      data-testid="meal-food-add-open"
+                    >
+                      <Plus className="size-3.5" aria-hidden /> Add food
+                    </button>
+                  )}
+                  {addOpen && onMealPickApplied && (() => {
+                    const ctx = editContextFor(option)
+                    if (!ctx) return null
+                    return (
+                      <Suspense fallback={null}><MealFoodAddSheet
+                        ctx={{
+                          profileId: ctx.profileId, date: ctx.date, slot: ctx.slot, targets: ctx.targets,
+                          mealsPerDay: ctx.mealsPerDay, includeSnacks: ctx.includeSnacks,
+                          dietaryPreferences: ctx.dietaryPreferences, dislikedFoods: ctx.dislikedFoods,
+                          meal: ctx.meal,
+                        }}
+                        knockOn={dayMove?.knockOn}
+                        onPick={onMealPickApplied}
+                        onDone={summary => { setAddOpen(false); setAddNote(summary) }}
+                        onCancel={() => setAddOpen(false)}
+                      /></Suspense>
+                    )
+                  })()}
+                  {addNote && <p className="text-[0.71875rem] text-muted-foreground">{addNote}. The rest of the meal is unchanged.</p>}
+
+                  {/* COOK ONCE, EAT TWICE — both halves of the pair, from the shared
+                      phrasebook. The lunch line is the important one: without it a
+                      repeated dish is indistinguishable from the day-to-day repeat
+                      defect fixed the same morning, and the app would look broken to
+                      exactly the person most likely to notice. */}
+                  {option.leftoverFrom === 'dinner' && (
+                    <p className="text-[0.71875rem] text-muted-foreground" data-meal-leftover={option.name}>{COOK_ONCE.lunch}</p>
+                  )}
+                  {/* The batch rows below say it line by line; this sentence stands only where they cannot be drawn. */}
+                  {option.reusedTomorrow === true && !(option.keepForTomorrow && cookAndKeep(option.ingredients, option.keepForTomorrow)) && (
+                    <p className="text-[0.71875rem] text-muted-foreground" data-meal-cook-extra={option.name}>{COOK_ONCE.dinner}</p>
+                  )}
+                  {/* COOK X, KEEP Y (runs 7-10, H37): the batch, line by line, so tomorrow's bigger lunch portion is a fact
+                      tonight rather than a surprise tomorrow. Amounts in the kitchen's own steps, the card's own wording. */}
+                  {option.reusedTomorrow === true && option.keepForTomorrow && (() => {
+                    const rows = cookAndKeep(option.ingredients, option.keepForTomorrow)
+                    if (!rows) return null
+                    const amount = (q: number, unit: string) => `${formatKitchenQuantity(q, unit)}${unit === 'g' || unit === 'ml' ? unit : ` ${unit}`}`
+                    return (
+                      <div className="space-y-0.5 text-[0.71875rem] text-muted-foreground" data-meal-cook-keep={option.name} data-meal-cook-extra={option.name}>
+                        <p>{COOK_ONCE.batchHeading}</p>
+                        <ul className="space-y-0.5">
+                          {rows.map(r => (
+                            <li key={`${r.name}|${r.unit}`} data-cook-keep-row={r.name}>
+                              Cook {amount(r.cook, r.unit)} {r.name}{r.keep > 0 ? `, keep ${amount(r.keep, r.unit)}` : ''}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )
+                  })()}
+
+                  {/* HOW TO COOK IT, AS NUMBERED STEPS (3b). The generator has always
+                      written a method and the app has always thrown it away — no field
+                      on the option, no column in the table — so a meal arrived as a
+                      name and a list of weighed ingredients with no instructions.
+                      Rendered UNDER the ingredients on purpose: the amounts are the
+                      ingredients' job, and the method never carries any.
+
+                      RE-CHECKED ON DISPLAY, not only at generation: `method` is
+                      methodToShow's answer (the amount rule, then the restriction and
+                      truth check), so a method naming a food she must not eat is not
+                      drawn at all. methodSteps only splits that one text into steps
+                      and loses no word of it. Absent on every pool generated before
+                      the column existed, and on custom meals and edited meals, which
+                      genuinely have no method. */}
+                  {hasMethod && (
+                    <div className="flex flex-col gap-2" data-meal-method={option.name}>
+                      <span className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground">Method</span>
+                      <ol className="flex flex-col gap-2">
+                        {methodSteps(method).map((step, i) => (
+                          <li key={i} className="flex gap-2.5 text-[0.78125rem] leading-[1.45] text-foreground" data-method-step={i + 1}>
+                            <span
+                              aria-hidden
+                              className="tabular-mono flex size-5 shrink-0 items-center justify-center rounded-full text-[0.6875rem] font-bold"
+                              style={{ background: 'rgba(var(--glow-rgb), .14)', color: 'var(--primary-text)' }}
+                            >
+                              {i + 1}
+                            </span>
+                            <span className="min-w-0">{step}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+
+                  {/* Fix 4.5 (ux-sweep) — generateMealPools now only ever writes
+                      [cuisine, prepBand] going forward, but a pool persisted before
+                      that fix can still carry the old internal 'slot_appropriate'
+                      marker and a raw ingredient name as if they were display tags.
+                      Defensive filter here too, so an already-onboarded profile
+                      stops seeing the leak immediately rather than waiting on its
+                      next regenerate. */}
+                  {/* And never the app's own bookkeeping (a new meal's first day). */}
+                  {displayTags(option.tags).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {displayTags(option.tags).map(t => (
+                        <span key={t} className="rounded-full bg-[color:var(--surface-raised)] px-2 py-0.5 text-[0.625rem] text-muted-foreground">{t}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {planMovedOn && (
+                    /* The heading above is what was EATEN; everything in this block —
+                       calories, ingredients, tags — is the slot's CURRENT option.
+                       Without this line the two silently disagree. */
+                    <p className="text-[0.71875rem] leading-snug text-muted-foreground">
+                      Your plan now shows {option.name} here. The details below are that meal, not the one you logged.
+                    </p>
+                  )}
+
+                  {/* MOVE and REGENERATE, the two changes to the whole meal that are not a swap. Move is hidden
+                      when the screen cannot finish the job (no profile, no targets, no pick path), on the same rule
+                      the food edits follow: a control that cannot finish is worse than no control. */}
+                  {(((moveContext && onMealPickApplied) || dayMove) || !upcoming) && (
+                    <div className="flex flex-wrap items-center gap-2" data-meal-sheet-actions>
+                      {((moveContext && onMealPickApplied) || dayMove) && (
                         <button
                           type="button"
-                          className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left"
-                          data-ingredient-row={line}
-                          aria-expanded={editingLine === i}
-                          onClick={() => { setEditNote(null); setEditingLine(prev => (prev === i ? null : i)) }}
+                          onClick={() => { setMoveOpen(prev => !prev); setMoveNote(null) }}
+                          className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-3.5 text-[0.75rem] font-medium"
+                          style={{ background: 'var(--surface-raised)' }}
+                          data-testid="meal-move-open"
                         >
-                          <span className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{displayIngredient(ing)}<CookedHint ing={ing} /></span>
-                          <span className="shrink-0 text-[0.625rem] text-muted-foreground">Change</span>
+                          <ArrowLeftRight className="size-3.5" aria-hidden /> Move
                         </button>
-                      ) : (
-                        <span className="tabular-mono text-xs text-[color:var(--text-tertiary)]">{displayIngredient(ing)}<CookedHint ing={ing} /></span>
                       )}
-                      {editingLine === i && (() => {
-                        const ctx = editContextFor(option)
-                        if (!ctx || !onMealPickApplied) return null
-                        return (
-                          <MealFoodEditSheet
-                            ctx={ctx}
-                            line={line}
-                            onPick={onMealPickApplied}
-                            onDone={summary => { setEditingLine(null); setEditNote(summary) }}
-                            onCancel={() => setEditingLine(null)}
-                          />
-                        )
-                      })()}
+                      {!upcoming && (
+                        <button
+                          type="button"
+                          onClick={handleRegenerate}
+                          disabled={busy}
+                          className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-3.5 text-[0.75rem] font-medium disabled:opacity-50"
+                          style={{ background: 'var(--surface-raised)' }}
+                          title="Regenerate this slot's pool"
+                          data-meal-regenerate
+                        >
+                          {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} Regenerate
+                        </button>
+                      )}
                     </div>
-                  )
-                })}
-              </div>
-              {editNote && <p className="text-[0.71875rem] text-muted-foreground">{editNote}.</p>}
+                  )}
+                  {moveOpen && ((moveContext && onMealPickApplied) || dayMove) && (
+                    <Suspense fallback={null}>
+                      <MealMoveSheet
+                        ctx={moveContext && onMealPickApplied ? moveContext : null}
+                        dayMove={dayMove ? { controller: dayMove, date, slot } : null}
+                        onPick={onMealPickApplied}
+                        // `() => undo ?? null`, not `undo ?? null`: a function handed
+                        // straight to a state setter is CALLED as an updater, which ran
+                        // the Undo the instant the swap was written (found by the
+                        // driver: nothing saved, and the note still said it had).
+                        onDone={(summary, undo) => { setMoveOpen(false); setMoveNote(summary); setMoveUndo(() => undo ?? null) }}
+                        onCancel={() => setMoveOpen(false)}
+                      />
+                    </Suspense>
+                  )}
+                  {moveNote && (
+                    <div ref={moveNoteRef} className="flex items-center gap-2" data-testid="meal-move-note-row">
+                      <p className="min-w-0 flex-1 text-[0.71875rem] text-muted-foreground" data-testid="meal-move-note">{moveNote}</p>
+                      {moveUndo && (
+                        <button
+                          type="button"
+                          disabled={undoBusy}
+                          onClick={async () => {
+                            setUndoBusy(true)
+                            try {
+                              const back = await moveUndo()
+                              setMoveNote(back.text)
+                              // Put back: nothing left to undo. Refused: the button
+                              // stays, and the note says why nothing changed.
+                              if (back.ok) setMoveUndo(null)
+                            } finally {
+                              setUndoBusy(false)
+                            }
+                          }}
+                          className="min-h-[44px] shrink-0 px-2 text-xs font-semibold text-primary"
+                          data-testid="meal-move-undo"
+                        >
+                          {undoBusy ? 'Putting back…' : 'Undo'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {tab === 'swap' && canSwap && (
+                <div className="flex flex-col gap-1" data-meal-swap-list>
+                  {otherOptions.map(alt => {
+                    const calDelta = Math.round(alt.macros.calories - option.macros.calories)
+                    const proteinDelta = Math.round(alt.macros.protein - option.macros.protein)
+                    // A MEAL THE DAY'S PICK WILL NOT SERVE CANNOT BE CHOSEN HERE
+                    // EITHER (breaksRestriction, set by the same check), so the two
+                    // can never disagree; the reason still comes from the check.
+                    const checked = checkAlternative(alt)
+                    const verdict = !checked.ok || !alt.breaksRestriction ? checked : { ...checked, ok: false }
+                    return (
+                      <button
+                        key={alt.name}
+                        type="button"
+                        onClick={() => handleChoose(alt.name)}
+                        disabled={busy || !verdict.ok}
+                        className={`flex min-h-[44px] items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${verdict.ok ? 'hover:bg-[color:var(--surface-raised)]' : 'opacity-60'}`}
+                      >
+                        <div className="min-w-0">
+                          {/* Same fix as the slot name above: two lines, not one
+                              clipped one. An alternative you cannot read is one
+                              you cannot choose. */}
+                          <p className="line-clamp-2 text-xs font-medium">{alt.name}</p>
+                          {verdict.ok ? (
+                            <p className="tabular-mono text-[0.65625rem] text-muted-foreground">{Math.round(alt.macros.calories)} kcal · P {Math.round(alt.macros.protein)}g</p>
+                          ) : (
+                            <p className="text-[0.65625rem] text-[color:var(--role-warn)]">{verdict.message ?? "Clashes with what you've said you avoid"}</p>
+                          )}
+                        </div>
+                        {verdict.ok && (
+                          <span className={`tabular-mono shrink-0 text-[0.65625rem] ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary-text'}`}>
+                            {calDelta > 0 ? '+' : ''}{calDelta} kcal, {proteinDelta > 0 ? '+' : ''}{proteinDelta}g P
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                  {onFindMore && (
+                    <button
+                      type="button"
+                      disabled={findingMore}
+                      onClick={async () => {
+                        setFindingMore(true)
+                        setFindMoreNote(null)
+                        try {
+                          const result = await onFindMore(slot)
+                          setFindMoreNote(result.error ?? (result.added.length > 0
+                            ? `Added ${result.added.length} new option${result.added.length === 1 ? '' : 's'}.`
+                            : 'Nothing new fitted your targets.'))
+                        } finally {
+                          setFindingMore(false)
+                        }
+                      }}
+                      className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-[color:var(--hairline)] px-3 text-xs text-muted-foreground"
+                    >
+                      {findingMore ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+                      {findingMore ? 'Finding more options…' : 'More options'}
+                    </button>
+                  )}
+                  {findMoreNote && <p className="px-1 text-[0.65625rem] text-muted-foreground">{findMoreNote}</p>}
+                </div>
+              )}
+
+              {blocked && !isLogged && restriction?.message && (
+                /* Above the button, not below: it explains why the one under it
+                   is greyed out, and a reason that arrives after the action
+                   has already been refused is not an explanation.
+                   NOT for an eaten meal (item 9) — that gets eatenNote on the row. */
+                <p className="flex items-start gap-1.5 rounded-xl bg-[color:var(--role-warn-bg)] px-3 py-2 text-[0.71875rem] leading-snug text-[color:var(--role-warn-text)]">
+                  <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+                  <span>
+                    {restriction.message} {upcoming ? 'Swap it for that day.' : 'Swap it, or regenerate this meal.'}
+                  </span>
+                </p>
+              )}
+
+              {duplicated && (
+                /* SAID OUT LOUD, in the number that is wrong. The totals at
+                   the top of this screen have been counting this meal more than
+                   once; until this said so, the only visible symptom was a day's
+                   calories that didn't add up and no row admitting why. Sits
+                   above the button, like the restriction banner, because it
+                   explains what that button is about to do. */
+                <p className="flex items-start gap-1.5 rounded-xl bg-[color:var(--role-warn-bg)] px-3 py-2 text-[0.71875rem] leading-snug text-[color:var(--role-warn-text)]">
+                  <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+                  <span>
+                    Logged {loggedEvents.length} times, so today&apos;s totals are counting {Math.round(loggedKcal)} kcal
+                    for it instead of {Math.round(option.macros.calories)}.
+                    {' '}Clear {loggedEvents.length === 2 ? 'both' : 'them'} below, then log it once.
+                  </span>
+                </p>
+              )}
             </div>
-          )}
 
-          {/* COOK ONCE, EAT TWICE — both halves of the pair, from the shared
-              phrasebook. The lunch line is the important one: without it a
-              repeated dish is indistinguishable from the day-to-day repeat
-              defect fixed the same morning, and the app would look broken to
-              exactly the person most likely to notice. */}
-          {option.leftoverFrom === 'dinner' && (
-            <p className="text-[0.71875rem] text-muted-foreground" data-meal-leftover={option.name}>{COOK_ONCE.lunch}</p>
-          )}
-          {/* The batch rows below say it line by line; this sentence stands only where they cannot be drawn. */}
-          {option.reusedTomorrow === true && !(option.keepForTomorrow && cookAndKeep(option.ingredients, option.keepForTomorrow)) && (
-            <p className="text-[0.71875rem] text-muted-foreground" data-meal-cook-extra={option.name}>{COOK_ONCE.dinner}</p>
-          )}
-          {/* COOK X, KEEP Y (runs 7-10, H37): the batch, line by line, so tomorrow's bigger lunch portion is a fact
-              tonight rather than a surprise tomorrow. Amounts in the kitchen's own steps, the card's own wording. */}
-          {option.reusedTomorrow === true && option.keepForTomorrow && (() => {
-            const rows = cookAndKeep(option.ingredients, option.keepForTomorrow)
-            if (!rows) return null
-            const amount = (q: number, unit: string) => `${formatKitchenQuantity(q, unit)}${unit === 'g' || unit === 'ml' ? unit : ` ${unit}`}`
-            return (
-              <div className="space-y-0.5 text-[0.71875rem] text-muted-foreground" data-meal-cook-keep={option.name} data-meal-cook-extra={option.name}>
-                <p>{COOK_ONCE.batchHeading}</p>
-                <ul className="space-y-0.5">
-                  {rows.map(r => (
-                    <li key={`${r.name}|${r.unit}`} data-cook-keep-row={r.name}>
-                      Cook {amount(r.cook, r.unit)} {r.name}{r.keep > 0 ? `, keep ${amount(r.keep, r.unit)}` : ''}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )
-          })()}
-
-          {/* HOW TO COOK IT. The generator has always written a method and the
-              app has always thrown it away — no field on the option, no column
-              in the table — so a meal arrived as a name and a list of weighed
-              ingredients with no instructions. Rendered UNDER the ingredients
-              on purpose: the amounts are the ingredients' job, and the method
-              never carries any.
-
-              RE-CHECKED ON DISPLAY, not only at generation. Verification is
-              where a method naming an amount is supposed to be dropped, but
-              that is a check at the write boundary and this is the surface
-              where being wrong actually costs something — the same reason the
-              dietary re-check runs here rather than trusting what was stored.
-              A row written by any future path, or by hand, cannot put an
-              unverified number on the screen.
-              Absent on every pool generated before the column existed, and on
-              custom meals and edited meals, which genuinely have no method. */}
-          {hasMethod && (
-            <div className="flex flex-col gap-1.5" data-meal-method={option.name}>
-              <span className="ds-label-compact">Method</span>
-              <p className="whitespace-pre-line text-xs leading-relaxed text-[color:var(--text-tertiary)]">
-                {method}
-              </p>
-            </div>
-          )}
-
-          {/* Fix 4.5 (ux-sweep) — generateMealPools now only ever writes
-              [cuisine, prepBand] going forward, but a pool persisted before
-              that fix can still carry the old internal 'slot_appropriate'
-              marker and a raw ingredient name as if they were display tags.
-              Defensive filter here too, so an already-onboarded profile
-              stops seeing the leak immediately rather than waiting on its
-              next regenerate. */}
-          {/* And never the app's own bookkeeping (a new meal's first day). */}
-          {displayTags(option.tags).length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {displayTags(option.tags).map(t => (
-                <span key={t} className="rounded-full bg-[color:var(--surface-raised)] px-2 py-0.5 text-[0.625rem] text-muted-foreground">{t}</span>
-              ))}
-            </div>
-          )}
-
-          {planMovedOn && (
-            /* The heading above is what was EATEN; everything in this block —
-               calories, ingredients, tags — is the slot's CURRENT option.
-               Without this line the two silently disagree. */
-            <p className="text-[0.71875rem] leading-snug text-muted-foreground">
-              Your plan now shows {option.name} here. The details below are that meal, not the one you logged.
-            </p>
-          )}
-
-          {blocked && !isLogged && restriction?.message && (
-            /* Above the buttons, not below: it explains why the one beside
-               it is greyed out, and a reason that arrives after the action
-               has already been refused is not an explanation.
-               NOT for an eaten meal (item 9) — that gets eatenNote above. */
-            <p className="flex items-start gap-1.5 rounded-xl bg-[color:var(--role-warn-bg)] px-3 py-2 text-[0.71875rem] leading-snug text-[color:var(--role-warn-text)]">
-              <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
-              <span>
-                {restriction.message} {upcoming ? 'Swap it for that day.' : 'Swap it, or regenerate this meal.'}
-              </span>
-            </p>
-          )}
-
-          {duplicated && (
-            /* SAID OUT LOUD, in the number that is wrong. The totals ring at
-               the top of this screen has been counting this meal more than
-               once; until this said so, the only visible symptom was a day's
-               calories that didn't add up and no row admitting why. Sits
-               above the button, like the restriction banner, because it
-               explains what that button is about to do. */
-            <p className="flex items-start gap-1.5 rounded-xl bg-[color:var(--role-warn-bg)] px-3 py-2 text-[0.71875rem] leading-snug text-[color:var(--role-warn-text)]">
-              <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
-              <span>
-                Logged {loggedEvents.length} times, so today&apos;s totals are counting {Math.round(loggedKcal)} kcal
-                for it instead of {Math.round(option.macros.calories)}.
-                {' '}Clear {loggedEvents.length === 2 ? 'both' : 'them'} below, then log it once.
-              </span>
-            </p>
-          )}
-
-          <div className="flex items-center gap-2">
+            {/* THE FOOTER (3b): "I ate this", the row's own log. Logged, it says so and a tap takes it back; a
+                meal that clashes with a restriction cannot be logged (the reason is above it). An upcoming day
+                has nothing to log. */}
             {!upcoming && (
-            <button
-              type="button"
-              onClick={handleLogToggle}
-              disabled={busy || (blocked && !isLogged)}
-              className={
-                isLogged
-                  ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary/15 px-3.5 text-xs font-semibold text-primary-text'
-                  : blocked
-                    ? 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-[color:var(--surface-raised)] px-3.5 text-xs font-semibold text-muted-foreground'
-                    : 'flex min-h-[44px] items-center gap-1.5 rounded-xl bg-primary px-3.5 text-xs font-semibold text-primary-foreground glow-mint-box'
-              }
-            >
-              {isLogged
-                ? <><Check className="size-3.5" /> {duplicated ? `Clear ${loggedEvents.length} logs` : 'Logged'}</>
-                : 'Log this meal'}
-            </button>
-            )}
-            {/* THE HEART — Ashley, 19 Sep 2026, from four options. The app never
-                asks whether a meal was any good; she says so when she wants to.
-                She rejected asking after every meal, asking once a day, and
-                inferring it from what got logged.
-
-                IT IS NOT A BOOKMARK. A hearted meal is kept when everything
-                else is regenerated, the same protection a meal the coach was
-                asked for by name already gets — so the tap has a consequence
-                on the next screen rather than only in a table. It also reaches
-                the coach, which the favourites list has always done and the
-                screen has never been able to add to. */}
-            {profileId && (
-              <button
-                type="button"
-                onClick={() => void handleFavouriteToggle()}
-                disabled={favouriteBusy}
-                aria-pressed={isFavourite}
-                aria-label={isFavourite ? `Remove ${option.name} from your favourites` : `Save ${option.name} as a favourite`}
-                title={isFavourite ? 'A favourite — kept when you regenerate' : 'Save as a favourite'}
-                className="flex min-h-[44px] items-center px-1.5"
-                data-meal-favourite={option.name}
-                data-meal-favourite-on={isFavourite ? 'yes' : 'no'}
-              >
-                <Heart className={`size-4 ${isFavourite ? 'fill-current text-primary' : 'text-muted-foreground'}`} />
-              </button>
-            )}
-            {!upcoming && (
-              <Button variant="ghost" size="sm" onClick={handleRegenerate} disabled={busy} className="h-8 px-2.5 text-xs" title="Regenerate this slot's pool">
-                {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-              </Button>
-            )}
-            {/* MOVE — beside Swap because they are the same kind of change to
-                the same meal, and because this is where she is already
-                looking when she decides she wants dinner as a snack. Hidden
-                when the screen cannot finish the job (no profile, no targets,
-                no pick path), on the same rule the food edits follow: a
-                control that cannot finish is worse than no control. */}
-            {((moveContext && onMealPickApplied) || dayMove) && (
-              <button
-                type="button"
-                onClick={() => { setMoveOpen(prev => !prev); setMoveNote(null) }}
-                className="text-xs text-muted-foreground"
-                data-testid="meal-move-open"
-              >
-                Move
-              </button>
-            )}
-            {/* ADD A FOOD — the last thing on this row the coach could do and
-                the screen could not. Same builder, same verifier, same
-                executor as the coach's path; the only difference is that the
-                screen picks from the food list rather than taking free text,
-                which is strictly more honest — a food the app cannot cost is
-                never offered rather than typed and then refused. */}
-            {editContextFor(option) && onMealPickApplied && (
-              <button
-                type="button"
-                onClick={() => { setAddOpen(prev => !prev); setAddNote(null) }}
-                className="text-xs text-muted-foreground"
-                data-testid="meal-food-add-open"
-              >
-                Add food
-              </button>
-            )}
-            {(otherOptions.length > 0 || onFindMore) && (
-              <button
-                type="button"
-                onClick={() => setSwapOpen(prev => !prev)}
-                className="text-xs text-muted-foreground"
-              >
-                {otherOptions.length > 0
-                  ? `Swap · ${otherOptions.length} option${otherOptions.length === 1 ? '' : 's'}`
-                  : 'More options'}
-              </button>
+              <div className="shrink-0 px-5 pb-[max(20px,env(safe-area-inset-bottom))] pt-3" style={{ borderTop: '1px solid var(--hairline)' }}>
+                <button
+                  type="button"
+                  onClick={handleLogToggle}
+                  disabled={busy || (blocked && !isLogged)}
+                  className={`flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-[0.9375rem] font-bold disabled:opacity-60 ${!isLogged && !blocked ? 'glow-mint-box' : ''}`}
+                  style={isLogged
+                    ? { background: 'rgba(var(--glow-rgb), .15)', color: 'var(--primary-text)' }
+                    : blocked
+                      ? { background: 'var(--surface-raised)', color: 'var(--muted-foreground)' }
+                      : { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white) 0%, var(--primary) 55%, var(--primary-2) 100%)', color: 'var(--primary-foreground)' }}
+                  data-meal-log
+                >
+                  <Check className="size-4" strokeWidth={3} aria-hidden />
+                  {isLogged ? (duplicated ? `Clear ${loggedEvents.length} logs` : 'Logged') : 'I ate this'}
+                </button>
+              </div>
             )}
           </div>
-          {favouriteError && (
-            <p role="status" className="text-[0.71875rem] text-[color:var(--role-warn-text)]" data-testid="meal-favourite-error">{favouriteError}</p>
-          )}
-
-          {addOpen && onMealPickApplied && (() => {
-            const ctx = editContextFor(option)
-            if (!ctx) return null
-            return (
-              <Suspense fallback={null}><MealFoodAddSheet
-                ctx={{
-                  profileId: ctx.profileId, date: ctx.date, slot: ctx.slot, targets: ctx.targets,
-                  mealsPerDay: ctx.mealsPerDay, includeSnacks: ctx.includeSnacks,
-                  dietaryPreferences: ctx.dietaryPreferences, dislikedFoods: ctx.dislikedFoods,
-                  meal: ctx.meal,
-                }}
-                knockOn={dayMove?.knockOn}
-                onPick={onMealPickApplied}
-                onDone={summary => { setAddOpen(false); setAddNote(summary) }}
-                onCancel={() => setAddOpen(false)}
-              /></Suspense>
-            )
-          })()}
-          {addNote && <p className="text-[0.71875rem] text-muted-foreground">{addNote}. The rest of the meal is unchanged.</p>}
-          {swapNote && (
-            <p className="text-[0.71875rem] text-muted-foreground" data-testid="swap-knock-on">{swapNote.join(' ')}</p>
-          )}
-
-          {moveOpen && ((moveContext && onMealPickApplied) || dayMove) && (
-            <Suspense fallback={null}>
-              <MealMoveSheet
-                ctx={moveContext && onMealPickApplied ? moveContext : null}
-                dayMove={dayMove ? { controller: dayMove, date, slot } : null}
-                onPick={onMealPickApplied}
-                // `() => undo ?? null`, not `undo ?? null`: a function handed
-                // straight to a state setter is CALLED as an updater, which ran
-                // the Undo the instant the swap was written (found by the
-                // driver: nothing saved, and the note still said it had).
-                onDone={(summary, undo) => { setMoveOpen(false); setMoveNote(summary); setMoveUndo(() => undo ?? null) }}
-                onCancel={() => setMoveOpen(false)}
-              />
-            </Suspense>
-          )}
-          {moveNote && (
-            <div className="flex items-center gap-2" data-testid="meal-move-note-row">
-              <p className="min-w-0 flex-1 text-[0.71875rem] text-muted-foreground" data-testid="meal-move-note">{moveNote}</p>
-              {moveUndo && (
-                <button
-                  type="button"
-                  disabled={undoBusy}
-                  onClick={async () => {
-                    setUndoBusy(true)
-                    try {
-                      const back = await moveUndo()
-                      setMoveNote(back.text)
-                      // Put back: nothing left to undo. Refused: the button
-                      // stays, and the note says why nothing changed.
-                      if (back.ok) setMoveUndo(null)
-                    } finally {
-                      setUndoBusy(false)
-                    }
-                  }}
-                  className="min-h-[44px] shrink-0 px-2 text-xs font-semibold text-primary"
-                  data-testid="meal-move-undo"
-                >
-                  {undoBusy ? 'Putting back…' : 'Undo'}
-                </button>
-              )}
-            </div>
-          )}
-
-          {swapOpen && (
-            <div className="flex flex-col gap-1">
-              {otherOptions.map(alt => {
-                const calDelta = Math.round(alt.macros.calories - option.macros.calories)
-                const proteinDelta = Math.round(alt.macros.protein - option.macros.protein)
-                // A MEAL THE DAY'S PICK WILL NOT SERVE CANNOT BE CHOSEN HERE
-                // EITHER (breaksRestriction, set by the same check), so the two
-                // can never disagree; the reason still comes from the check.
-                const checked = checkAlternative(alt)
-                const verdict = !checked.ok || !alt.breaksRestriction ? checked : { ...checked, ok: false }
-                return (
-                  <button
-                    key={alt.name}
-                    type="button"
-                    onClick={() => handleChoose(alt.name)}
-                    disabled={busy || !verdict.ok}
-                    className={`flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${verdict.ok ? 'hover:bg-[color:var(--surface-raised)]' : 'opacity-60'}`}
-                  >
-                    <div className="min-w-0">
-                      {/* Same fix as the slot name above: two lines, not one
-                          clipped one. An alternative you cannot read is one
-                          you cannot choose. */}
-                      <p className="line-clamp-2 text-xs font-medium">{alt.name}</p>
-                      {verdict.ok ? (
-                        <p className="tabular-mono text-[0.65625rem] text-muted-foreground">{Math.round(alt.macros.calories)} kcal · P {Math.round(alt.macros.protein)}g</p>
-                      ) : (
-                        <p className="text-[0.65625rem] text-[color:var(--role-warn)]">{verdict.message ?? "Clashes with what you've said you avoid"}</p>
-                      )}
-                    </div>
-                    {verdict.ok && (
-                      <span className={`tabular-mono shrink-0 text-[0.65625rem] ${Math.abs(calDelta) < 20 ? 'text-muted-foreground' : calDelta > 0 ? 'text-[color:var(--role-warn)]' : 'text-primary-text'}`}>
-                        {calDelta > 0 ? '+' : ''}{calDelta} kcal, {proteinDelta > 0 ? '+' : ''}{proteinDelta}g P
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-              {onFindMore && (
-                <button
-                  type="button"
-                  disabled={findingMore}
-                  onClick={async () => {
-                    setFindingMore(true)
-                    setFindMoreNote(null)
-                    try {
-                      const result = await onFindMore(slot)
-                      setFindMoreNote(result.error ?? (result.added.length > 0
-                        ? `Added ${result.added.length} new option${result.added.length === 1 ? '' : 's'}.`
-                        : 'Nothing new fitted your targets.'))
-                    } finally {
-                      setFindingMore(false)
-                    }
-                  }}
-                  className="flex min-h-[40px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-[color:var(--hairline)] px-3 text-xs text-muted-foreground"
-                >
-                  {findingMore ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-                  {findingMore ? 'Finding more options…' : 'More options'}
-                </button>
-              )}
-              {findMoreNote && <p className="px-1 text-[0.65625rem] text-muted-foreground">{findMoreNote}</p>}
-            </div>
-          )}
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * THE STATUS CIRCLE (3a), 26px: eaten is a filled tick, next a glowing ring, later a faint ring. A shape and a
+ * fill, never an opacity, so it reads the same on every theme.
+ */
+function MealStatus({ variant }: { variant: 'upnext' | 'later' | 'eaten' }) {
+  if (variant === 'eaten') {
+    return (
+      <span aria-hidden data-meal-status="eaten" className="flex size-[26px] shrink-0 items-center justify-center rounded-full" style={{ background: 'var(--primary)', color: 'var(--primary-foreground)' }}>
+        <Check className="size-3.5" strokeWidth={3} />
+      </span>
+    )
+  }
+  return variant === 'upnext'
+    ? <span aria-hidden data-meal-status="upnext" className="size-[26px] shrink-0 rounded-full" style={{ border: '2px solid var(--primary)', boxShadow: '0 0 calc(10px * var(--glow-strength, 1)) rgba(var(--glow-rgb), .45)' }} />
+    : <span aria-hidden data-meal-status="later" className="size-[26px] shrink-0 rounded-full" style={{ border: '1.5px solid color-mix(in srgb, var(--foreground) 18%, transparent)' }} />
+}
+
+/**
+ * "P 42g  C 72g  F 18g" (3a): each letter in its macro's colour, the numbers in one soft ink, tabular. Used by the
+ * rows and by the sheet's header, so the two say a meal's macros one way.
+ */
+function MacroLine({ protein, carbs, fat, className }: { protein: number; carbs: number; fat: number; className?: string }) {
+  const parts: [string, number, string][] = [
+    ['P', protein, 'color-mix(in srgb, var(--chart-2) 65%, var(--foreground))'],
+    // Carbs' amber is mixed with the ink further than protein's violet: on a light canvas the bare amber is too faint
+    // to read as a letter, and on a dark one this still reads amber.
+    ['C', carbs, 'color-mix(in srgb, var(--chart-4) 70%, var(--foreground))'],
+    ['F', fat, 'var(--text-tertiary)'],
+  ]
+  return (
+    <span className={`flex items-baseline gap-3 ${className ?? ''}`} data-meal-macros>
+      {parts.map(([letter, grams, color]) => (
+        <span key={letter} className="flex items-baseline gap-1 whitespace-nowrap">
+          <span className="text-[0.65625rem] font-semibold tracking-[.04em]" style={{ color }}>{letter}</span>
+          <span className="text-[0.75rem] font-medium tabular-nums tracking-[-.01em]" style={{ color: 'color-mix(in srgb, var(--foreground) 60%, var(--text-tertiary))' }}>{Math.round(grams)}g</span>
+        </span>
+      ))}
+    </span>
   )
 }

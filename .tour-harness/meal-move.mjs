@@ -227,7 +227,8 @@ check('3f. ...with no error reported', err === null, err)
 await shoot('meal-move-3-after')
 
 // --- 4. the numbers on screen are the numbers the card promised -----------
-const landedKcal = await ev(`(() => [...document.body.innerText.matchAll(/(\\d+) kcal/g)].map(m => Number(m[1])))()`)
+// RE-ANCHORED 31 Oct 2026 (design 3a): a row draws its unit in capitals ("KCAL"), so the unit is read case-blind.
+const landedKcal = await ev(`(() => [...document.body.innerText.matchAll(/(\\d+)\\s*kcal/gi)].map(m => Number(m[1])))()`)
 check('4a. the promised sizes are real numbers (sanity check on this check)',
   Array.isArray(promised) && promised.length >= 3, promised)
 if (Array.isArray(promised) && promised.length >= 3) {

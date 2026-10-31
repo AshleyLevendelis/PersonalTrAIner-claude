@@ -91,9 +91,12 @@ check('...and the eaten note takes its place, from the shared helper',
 // WHERE it renders is the point. The first build put it inside the expanded
 // detail, so an allergen note sat behind a tap — caught by the browser driver,
 // pinned here so it cannot slide back in.
+// RE-ANCHORED 31 Oct 2026 (design 3b): what was "the expanded detail" is the recipe sheet now, so the note must
+// sit before the sheet opens — both anchors must exist before they are compared.
 check('...and it sits on the row itself, not behind a tap',
-  meal.indexOf('{eatenNote && (') < meal.indexOf('{expanded && option && ('), {
-    note: meal.indexOf('{eatenNote && ('), expanded: meal.indexOf('{expanded && option && ('),
+  meal.indexOf('{eatenNote && (') > -1 && meal.indexOf('{sheetOpen && option && (') > -1
+  && meal.indexOf('{eatenNote && (') < meal.indexOf('{sheetOpen && option && ('), {
+    note: meal.indexOf('{eatenNote && ('), sheet: meal.indexOf('{sheetOpen && option && ('),
   })
 check('the note is only claimed when the eaten meal IS still this slot\'s option',
   /const eatenNote = isLogged && !planMovedOn && restriction && !restriction\.ok/.test(meal))

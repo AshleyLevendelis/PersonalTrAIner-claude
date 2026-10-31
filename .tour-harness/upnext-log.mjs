@@ -51,24 +51,28 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, devi
 // "Up next · Breakfast · Log it", so it was easy to log twice. This taps the real card on the real MealPlan
 // (real.tsx; App.tsx is not booted, so Home's row is not proven here) and reads what the screen says next.
 // ---------------------------------------------------------------------------
-const upNext = () => ev(`(() => { const a = document.querySelector('[data-upnext-actions]'); const row = a?.closest('[data-meal-row]'); return row ? row.getAttribute('data-meal-row') : null })()`)
-// The Eaten section is drawn without row markers: read the slot labels between "EATEN" and the next section.
-// RE-ANCHORED 30 Oct 2026: read off the rows' own markers, not the slot labels' letter case (no longer capitals).
+// RE-ANCHORED 31 Oct 2026 (design 3a/3b): there is no Up next card any more. The next meal is the row marked next
+// (a glowing ring, "· next"), and its log is "I ate this" at the foot of the recipe sheet a tap on the row opens. The
+// property is the same: after the log, next moves on, the meal is eaten, and nothing offers to log it again.
+const upNext = () => ev(`document.querySelector('[data-meal-row][data-variant="upnext"]')?.getAttribute('data-meal-row') ?? null`)
 const eatenRows = () => ev(`[...document.querySelectorAll('[data-meal-row][data-variant="eaten"]')].map(n => n.getAttribute('data-meal-row'))`)
-const logButtons = () => ev(`document.querySelectorAll('[data-upnext-log]').length`)
+const openRow = slot => ev(`(() => { const b = document.querySelector('[data-meal-row="${slot}"] button'); if (b) b.click(); return !!b })()`)
+const footer = slot => ev(`document.querySelector('[data-meal-row="${slot}"] [data-meal-log]')?.textContent.trim() ?? null`)
 
 console.log('\nLOG IT MOVES UP NEXT ON\n')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&leftovers=1#/tab/nutrition` })
 for (let i = 0; i < 80; i++) { if (await upNext()) break; await wait(250) }
 const first = await upNext()
-check('0. Nutrition shows an up-next meal with Log it', !!first && (await logButtons()) === 1, { first })
+await openRow(first)
+await wait(400)
+check('0. Nutrition shows a next meal whose sheet offers "I ate this"', !!first && (await footer(first)) === 'I ate this', { first, footer: await footer(first) })
 await shoot('upnext-before')
-await ev(`document.querySelector('[data-upnext-log]')?.click()`)
+await ev(`document.querySelector('[data-meal-sheet] [data-meal-log]')?.click()`)
 let next = first
 for (let i = 0; i < 40; i++) { next = await upNext(); if (next !== first) break; await wait(100) }
 check('1. straight after the tap, up next is a different meal', !!first && next !== first, { first, next })
-check('2. ...the logged meal is under Eaten', (await eatenRows()).includes(first), await eatenRows())
-check('3. ...and its card has no Log it left to tap twice', !(await ev(`!!document.querySelector('[data-meal-row="${first}"] [data-upnext-log]')`)))
+check('2. ...the logged meal is eaten', (await eatenRows()).includes(first), await eatenRows())
+check('3. ...and its sheet has no "I ate this" left to tap twice (it says Logged)', (await footer(first)) === 'Logged', await footer(first))
 await wait(800)
 check('4. it stays moved on once the saved log is read back', (await upNext()) === next && (await eatenRows()).includes(first), { upNext: await upNext(), eaten: await eatenRows() })
 await shoot('upnext-after')

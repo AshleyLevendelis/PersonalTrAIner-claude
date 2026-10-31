@@ -107,7 +107,9 @@ async function main() {
   check('the hint and the conversion agree: a converted line hints at the weight it was written as, to 10 g', cases.every(([l]) => Math.abs(parseInt((cookedHint(asWeighed(l)) ?? '').replace(/\D+/g, ''), 10) - l.quantity) <= 10), cases.map(([l]) => [l.quantity, cookedHint(asWeighed(l))]))
   check('no hint on a food with no cooked twin, or still written cooked', [g('olive oil', 10), g('blueberries', 100), g('white rice', 200), g('beef mince 5%', 153)].every(l => cookedHint(l) === null))
   const card = strip(readFileSync('src/components/MealPlan.tsx', 'utf8'))
-  check('the card draws the hint beside the line, never in the line handed to the edit builders', /\{displayIngredient\(ing\)\}<CookedHint ing=\{ing\} \/>/.test(card) && (card.match(/<CookedHint ing=\{ing\} \/>/g) ?? []).length === 2 && !/function formatIngredient[^}]*cookedHint/.test(card) && /data-ingredient-row=\{line\}/.test(card))
+  // RE-ANCHORED 31 Oct 2026 (design 3b): one shared ingredient span in the recipe sheet, so one hint; the property
+  // is that EVERY hint sits right after the display line, and none anywhere else.
+  check('the card draws the hint beside the line, never in the line handed to the edit builders', (card.match(/\{displayIngredient\(ing\)\}<CookedHint ing=\{ing\} \/>/g) ?? []).length >= 1 && (card.match(/\{displayIngredient\(ing\)\}<CookedHint ing=\{ing\} \/>/g) ?? []).length === (card.match(/<CookedHint ing=\{ing\} \/>/g) ?? []).length &&!/function formatIngredient[^}]*cookedHint/.test(card) && /data-ingredient-row=\{line\}/.test(card))
 
   console.log('\n4. A stored meal reads back raw and dry, at the same energy')
   const cookedLines = [g('chicken breast', 150), g('white rice cooked', 200), g('broccoli', 100), g('olive oil', 10)]

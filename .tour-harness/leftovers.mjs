@@ -181,7 +181,9 @@ check('2c. no dish appears twice in the same day', new Set(names).size === names
 console.log('\n  3. The day still adds up')
 const text = await ev(`document.body.innerText`)
 // RE-ANCHORED 10 Oct 2026 (design handoff 2b): the planned day reads "Planned N kcal".
-const planned = (text || '').match(/Planned\s*([\d,]+)\s*kcal/)
+// RE-ANCHORED AGAIN 31 Oct 2026: it has read "Meals planned N kcal" since 30 Oct (her "Move things"), and this
+// case-sensitive "Planned" had been red at the base commit since then. Case aside, the property is the same.
+const planned = (text || '').match(/planned\s*([\d,]+)\s*kcal/i)
 check('3a. the day states a planned calorie total', planned !== null, (text || '').slice(0, 120))
 check('3b. ...and it is a real number, not zero — nothing was double counted into nonsense',
   planned !== null && Number(planned[1].replace(/,/g, '')) > 500 && Number(planned[1].replace(/,/g, '')) < 6000,

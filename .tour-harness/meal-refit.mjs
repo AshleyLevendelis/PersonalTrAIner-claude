@@ -165,12 +165,13 @@ for (const line of promised ?? []) {
   const m = line.match(/^(\w+)\s*·\s*(.+?)\s+\d+\s*→\s*(\d+) kcal$/)
   if (m) promisedBySlot[m[1].toLowerCase()] = Number(m[3])
 }
+// RE-ANCHORED 31 Oct 2026 (design 3a): a row draws its unit in capitals ("KCAL"), so the unit is read case-blind.
 const shownBySlot = await ev(`(() => {
   const out = {}
   for (const n of document.querySelectorAll('[data-meal-name]')) {
     const slot = n.getAttribute('data-meal-name')
     const row = n.closest('button') ?? n.parentElement
-    const m = (row?.innerText ?? '').match(/([\\d,]+)\\s*kcal/)
+    const m = (row?.innerText ?? '').match(/([\\d,]+)\\s*kcal/i)
     if (m) out[slot] = Number(m[1].replace(/,/g, ''))
   }
   return out
