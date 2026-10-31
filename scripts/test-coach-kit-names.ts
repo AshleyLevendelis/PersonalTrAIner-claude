@@ -17,6 +17,7 @@ import { swapNameFallback } from '../src/lib/swap-name-fallback'
 import { resolveExerciseName } from '../src/lib/set-parse'
 import { getExerciseEntry } from '../src/lib/exercise-db'
 import type { UserProfile } from '../src/lib/types'
+import { scopeLabel } from '../src/lib/offer-text'
 
 let failures = 0
 let ran = 0
@@ -87,7 +88,9 @@ console.log('\n§4 "I don\'t have bands" goes to the kit change')
 console.log('\n§5 The swap card names its scope')
 {
   const card = strip(read('src/components/chat/ProposalCard.tsx'))
-  check('"permanent" reads "Rest of block", the swap sheet\'s own words', /opt === 'permanent' \? 'Rest of block'/.test(card))
+  // RE-ANCHORED 31 Oct 2026 (chat 2b): the label lives in offer-text's scopeLabel now. The property is the WORDS on the
+  // button, so the label is asked for, and the card must draw its buttons through it.
+  check('"permanent" reads "Rest of block", the swap sheet\'s own words', scopeLabel('permanent') === 'Rest of block' && /scopeLabel\(opt, scopeField\.labels\)/.test(card))
 }
 
 console.log(`\n${ran} checks ran`)

@@ -69,7 +69,10 @@ const READ = String.raw`((n) => {
   const group = o.closest('[data-testid="chat-group"]')
   const cs = e => e ? getComputedStyle(e) : null
   const confirmRow = [...o.querySelectorAll('[data-testid="offer-buttons"] button')]
-  const buttons = [...o.querySelectorAll('button')].map(b => {
+  // The offer's own answers. Not the Listen icon on the coach's bubble (her 31 Oct 2026 ruling): it reads the
+  // message aloud and answers nothing, and it is checked by verify:chat-2b and verify:chat-bubbles.
+  const answers = [...o.querySelectorAll('button')].filter(b => !b.hasAttribute('data-listen'))
+  const buttons = answers.map(b => {
     const r = b.getBoundingClientRect(), pill = b.firstElementChild, pr = pill ? pill.getBoundingClientRect() : null, ps = cs(pill)
     return { label: (b.textContent || '').trim(), h: r.height, w: r.width, pillH: pr ? pr.height : 999, pillFont: ps ? parseFloat(ps.fontSize) : 99, pillShadow: ps ? ps.boxShadow : '?', shadow: cs(b).boxShadow, inConfirmRow: confirmRow.includes(b) }
   })
@@ -83,12 +86,14 @@ const READ = String.raw`((n) => {
     // The lead is the bubble's own words ABOVE the facts: the question, said first.
     leadInBubble: !!(bubble && facts && (bubble.textContent || '').replace(facts.textContent || '', '').trim().length > 8 && bubble.firstElementChild !== facts),
     bubbleText: bubble ? bubble.innerText.replace(/\s+/g, ' ').trim() : '',
-    changeLines: facts ? [...facts.querySelectorAll('[data-offer-line="change"]')].map(e => e.textContent.trim()) : [],
+    // RE-ANCHORED 31 Oct 2026 (design 2b): a single replacement is said on its own soft line under the bubble (the
+    // preview), a list stays in the bubble. Either way it is a change line OF THIS OFFER, said before the tap.
+    changeLines: [...o.querySelectorAll('[data-offer-line="change"]')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
     factLines: facts ? [...facts.children].map(e => e.textContent.replace(/\s+/g, ' ').trim()) : [],
     warns: facts ? [...facts.querySelectorAll('[data-severity="warn"]')].map(e => e.textContent.trim()) : [],
     ruled: [o, facts, bubble].filter(Boolean).some(e => parseFloat(cs(e).borderLeftWidth) > 1),
     buttons,
-    buttonsBelowBubble: !!bubbleTop && buttons.length > 0 && [...o.querySelectorAll('button')].every(b => b.getBoundingClientRect().top >= bubbleTop.bottom - 0.5),
+    buttonsBelowBubble: !!bubbleTop && buttons.length > 0 && answers.every(b => b.getBoundingClientRect().top >= bubbleTop.bottom - 0.5),
     // The whole page, for the old chrome anywhere at all.
     cardHeading: /Proposed change/i.test(document.body.innerText),
     keepButton: [...document.querySelectorAll('button')].some(b => (b.textContent || '').trim() === 'Keep'),
@@ -114,8 +119,10 @@ const looksLikeText = (tag, o, confirmLabel) => {
   check(`${tag}: the buttons are "${confirmLabel}" and "Not now", under the bubble`,
     btns.some(b => b.inConfirmRow && b.label === confirmLabel) && btns.some(b => b.inConfirmRow && b.label === 'Not now') && o?.buttonsBelowBubble === true, btns.map(b => b.label))
   check(`${tag}: every button is at least 44px to tap`, btns.length >= 2 && btns.every(b => b.h >= 44 && b.w >= 44), btns.map(b => [b.label, Math.round(b.h), Math.round(b.w)]))
-  check(`${tag}: ...and LOOKS small: a word-sized pill (no taller than 32px, text no bigger than 14px), no glow`,
-    btns.length >= 2 && btns.every(b => b.pillH <= 32 && b.pillFont <= 14 && b.pillShadow === 'none' && b.shadow === 'none'), btns.map(b => [b.label, Math.round(b.pillH), b.pillFont, b.pillShadow]))
+  // RE-ANCHORED 31 Oct 2026 (design 2b, which her plan says fits this ruling): the reply pills are drawn 36px, inside
+  // the 44px button — no taller than the reply chips (40px), still word-sized, still no glow.
+  check(`${tag}: ...and LOOKS small: a word-sized pill (no taller than 40px, text no bigger than 14px), no glow`,
+    btns.length >= 2 && btns.every(b => b.pillH <= 40 && b.pillFont <= 14 && b.pillShadow === 'none' && b.shadow === 'none'), btns.map(b => [b.label, Math.round(b.pillH), b.pillFont, b.pillShadow]))
 }
 
 // 1. AN EXERCISE SWAP: one change, two scopes.

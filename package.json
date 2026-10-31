@@ -443,6 +443,8 @@
     "test:meal-regenerate": "tsx scripts/test-meal-regenerate.ts",
     "verify:meal-regenerate": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-regenerate.mjs",
     "verify:chat-bubbles": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-bubbles.mjs",
+    "verify:chat-2b": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-2b.mjs",
+    "test:chat-2b": "tsx scripts/test-chat-2b.ts",
     "test:chat-groups": "tsx scripts/test-chat-groups.ts",
     "test:grocery-display": "tsx scripts/test-grocery-display.ts",
     "test:grocery-screen": "tsx scripts/test-grocery-screen.ts",

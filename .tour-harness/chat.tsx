@@ -27,7 +27,7 @@ import { createRoot } from 'react-dom/client'
 import { setSupabaseClient } from '@/lib/supabase'
 import { makeFakeSupabase, type Db } from './fake-supabase'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
-import { EXERCISE_DATABASE } from '@/lib/exercise-db'
+import { EXERCISE_DATABASE, getExerciseId } from '@/lib/exercise-db'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeTargets } from '@/lib/nutrition-targets'
 import { removeExerciseFromSession } from '@/lib/session-edit'
@@ -106,8 +106,15 @@ const MOVED_IN = new URLSearchParams(location.search).get('movedin') === '1'
 // (TODAY) row with the full session on it while the header said the session
 // had left.
 const MOVED_AWAY = new URLSearchParams(location.search).get('movedaway') === '1'
+// ?day=mid|done|rest — THE CONTEXT STRIP'S THREE STATES (design 2b, 31 Oct 2026). INPUT only: some of today's sets
+// logged, every set logged and the session closed (52 minutes; 45 is the column's placeholder, which Home ignores), or today not a training day. What the strip says is
+// the app's own reading of it. ?ate=1 adds one eaten breakfast, so the calories left are not just the target.
+const DAY_STATE = new URLSearchParams(location.search).get('day')
+const ATE = new URLSearchParams(location.search).get('ate') === '1'
 const availableIdx = new Set(MOVED_IN
   ? [(todayIdx + 6) % 7, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7]
+  : DAY_STATE === 'rest'
+  ? [(todayIdx + 1) % 7, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7]
   : [todayIdx, (todayIdx + 2) % 7, (todayIdx + 4) % 7, (todayIdx + 5) % 7])
 const iso = (offsetDays: number) => {
   const d = anchorDate(); d.setDate(d.getDate() + offsetDays)
@@ -582,10 +589,37 @@ const topUpSeed = (() => {
   return { slots, list }
 })()
 
+const dayStateSeed = (() => {
+  const none = { sets: [] as Record<string, unknown>[], sessions: [] as Record<string, unknown>[], meals: [] as Record<string, unknown>[] }
+  const meals = ATE ? [{ id: 'me-ate', profile_id: PROFILE_ID, date: isoOf(anchorDate()), slot: 'breakfast', event_type: 'confirmed',
+    meal_name: 'Greek yoghurt and oats', macros: { kcal: 630, protein: 40, carbs: 80, fat: 14 },
+    source: 'manual', client_id: 'seed-ate', created_at: anchorDate().toISOString() }] : []
+  if (DAY_STATE !== 'mid' && DAY_STATE !== 'done') return { ...none, meals }
+  const liveWeekNo = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const day = mesocycle.find(w => w.week_number === liveWeekNo)?.days.find(d => d.day === DAYS[todayIdx])
+  if (!day || day.exercises.length === 0) return { ...none, meals }
+  const at = (min: number) => new Date(anchorNowMs() + 9 * 3600000 + min * 60000).toISOString()
+  const work = DAY_STATE === 'mid' ? day.exercises.slice(0, 1).map(ex => ({ ex, n: Math.min(2, ex.sets) })) : day.exercises.map(ex => ({ ex, n: ex.sets }))
+  const sets = work.flatMap(({ ex, n }, k) => Array.from({ length: n }, (_, i) => ({
+    id: `ds-${ex.id}-${i}`, user_id: PROFILE_ID, session_id: 'sess-today',
+    exercise_id: getExerciseId(ex.name) ?? ex.id, exercise_name: ex.name, set_number: i + 1,
+    weight_kg: ex.suggested_load_kg ?? 0, reps_completed: 8, is_bodyweight: !(ex.suggested_load_kg ?? 0), is_warmup: false,
+    completed_at: at(k * 6 + i * 2), date: isoOf(anchorDate()),
+  })))
+  // The day's session row the sets hang off (today's sets are read through it): open mid-session, closed when done.
+  const sessions = DAY_STATE === 'done'
+    ? [{ id: 'sess-today', profile_id: PROFILE_ID, date: isoOf(anchorDate()), day: day.focus, is_completed: true,
+        started_at: at(0), finished_at: at(52), duration_minutes: 52 }]
+    : [{ id: 'sess-today', profile_id: PROFILE_ID, date: isoOf(anchorDate()), day: day.focus, is_completed: false,
+        started_at: at(0), finished_at: null, duration_minutes: 0 }]
+  return { sets, sessions, meals }
+})()
+;(window as unknown as Record<string, unknown>).__dayState = { state: DAY_STATE, target: macros?.calories ?? null, eaten: ATE ? 630 : 0 }
+
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
-  daily_metrics: [], exercise_set_logs: [], workout_sessions: [...finishedSession, ...movedInSession, ...movedAwaySession], cardio_logs: [],
-  daily_steps: [], meal_events: [], meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
+  daily_metrics: [], exercise_set_logs: dayStateSeed.sets, workout_sessions: [...finishedSession, ...movedInSession, ...movedAwaySession, ...dayStateSeed.sessions], cardio_logs: [],
+  daily_steps: [], meal_events: dayStateSeed.meals, meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
   favorite_meals: [], grocery_items: topUpSeed.list, load_suggestions: [], pending_actions: [],
   plan_adaptations: KNEE_EASE ? [kneeEaseRow(PROFILE_ID)] : [], user_facts: [], user_context_facts: [], user_goals: [],
   chat_messages: seededRows, exercise_plans: [], mesocycle_weeks: [],

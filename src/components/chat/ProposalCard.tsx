@@ -1,8 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
-import { ShieldAlert } from 'lucide-react'
+import { ArrowLeftRight, ShieldAlert } from 'lucide-react'
 import type { ChatPendingActionView } from '@/lib/types'
 import { pendingWindowPassed } from '@/lib/pending-actions-store'
-import { offerChanges, offerChangeText } from '@/lib/offer-text'
+import { offerChanges, offerChangeText, previewChange, scopeLabel } from '@/lib/offer-text'
 
 // ---------------------------------------------------------------------------
 // VISION-ARCHITECTURE.md §2.4 — "rendering the effect, not prose." ONE
@@ -121,6 +121,8 @@ export function ProposalCard({
   // A builder's own item can end in a full stop; the line ends in exactly one ("resized.." was on every top-up offer).
   const unchangedText = (items: string[]) => `${items.map(u => u.trim().replace(/[.\s]+$/, '')).join(', ')}.`
   const changes = offerChanges(diff.rows)
+  const preview = previewChange(changes)
+  const saidChanges = preview ? changes.filter(c => c !== preview) : changes
   const showAlternatives = !!(diff.alternatives && diff.alternatives.length > 0 && onAlternative && !isTerminal && !isStale)
 
   // THE FACTS, AS LINES OF THE COACH'S MESSAGE. The same ink as the lead
@@ -132,8 +134,8 @@ export function ProposalCard({
   // how the swap card's first cost check came to be satisfied by
   // "Sets × reps: 2×8" sitting in the Unchanged line.
   const facts = (
-    <div data-testid="offer-facts" className="mt-2 space-y-1.5">
-      {changes.map((c, i) => (
+    <div data-testid="offer-facts" className="mt-2 space-y-1.5 empty:hidden">
+      {saidChanges.map((c, i) => (
         <p key={`c${i}`} data-offer-line="change">{offerChangeText(c)}</p>
       ))}
       {diff.unchanged && diff.unchanged.length > 0 && (
@@ -154,13 +156,17 @@ export function ProposalCard({
     </div>
   )
 
-  // One look for every small button: the 44px is the button, the pill inside
-  // is the size of a word — light, outlined, no glow.
-  const pill = (primary: boolean) =>
-    `inline-flex items-center rounded-full border px-3 py-1 text-[0.8125rem] leading-5 ${
-      primary
-        ? 'border-[color:color-mix(in_oklab,var(--primary)_55%,transparent)] bg-[color:color-mix(in_oklab,var(--primary)_14%,transparent)] font-semibold text-foreground'
-        : 'border-[color:var(--hairline)] text-muted-foreground'
+  // REPLY PILLS, WEIGHTED (design 2b, 31 Oct 2026, inside her 20 Oct "text +
+  // small buttons always"): the offer's first answer is the filled main colour,
+  // the other scopes an outline in it, "Not now" a quiet grey outline. Still a
+  // word-sized pill inside a 44px button, and no glow: small buttons, not a card.
+  const pill = (weight: 'primary' | 'scope' | 'reject') =>
+    `inline-flex h-9 items-center whitespace-nowrap rounded-full px-[15px] text-[0.8125rem] leading-5 ${
+      weight === 'primary'
+        ? 'bg-primary font-bold text-primary-foreground'
+        : weight === 'scope'
+          ? 'border border-[color:color-mix(in_oklab,var(--primary)_55%,transparent)] font-semibold text-primary-text'
+          : 'border border-[color:var(--hairline)] font-medium text-muted-foreground'
     }`
   const small = 'inline-flex min-h-[44px] items-center disabled:opacity-60'
 
@@ -174,31 +180,25 @@ export function ProposalCard({
     >
       {bubble(facts)}
 
-      {/* THE NEAREST THINGS THAT KEEP THE BAR. Ashley's ruling, 12 Sep 2026:
-          taking a food out of a meal names two or three specific swaps rather
-          than inviting her to type one, because on a phone typing a food name
-          into a box is the thing that does not happen. Every entry has already
-          been verified against her allergies and dislikes by the builder that
-          produced it. Small buttons like the rest, above the confirm — an offer
-          that goes with the cost, never the primary action: declining is a
-          perfectly good answer. */}
-      {showAlternatives && (
-        <div data-testid="offer-alternatives" className="flex flex-wrap gap-x-2">
-          {(diff.alternatives ?? []).map(alt => (
-            <button
-              key={alt.label}
-              type="button"
-              className={small}
-              onClick={() => onAlternative && onAlternative(alt.prompt)}
-              disabled={busyOverall}
-            >
-              <span className={pill(false)}>
-                <span className="font-medium text-foreground">{alt.label}</span>
-                {alt.note && <span className="ml-1.5 text-[0.6875rem]">{alt.note}</span>}
-              </span>
-            </button>
-          ))}
-        </div>
+      {/* THE ONE CHANGE, PREVIEWED (design 2b): a soft line under the coach's
+          sentence — what goes, struck through, an arrow, and what comes in,
+          with the row's own note on the right. Only for an offer that is ONE
+          replacement; a list of changes stays in the text (her 20 Oct ruling,
+          "a rebuild's list goes into the text"). It is the offer's own row,
+          worded as before; the label is there for a screen reader. */}
+      {preview && (
+        <p
+          data-testid="offer-preview"
+          data-offer-line="change"
+          className="mt-1.5 flex w-full min-w-0 items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-[0.875rem]"
+          style={{ background: 'var(--surface-raised)' }}
+        >
+          {preview.label && <span className="sr-only">{preview.label}: </span>}
+          <span className="min-w-0 truncate text-[0.8125rem] text-muted-foreground line-through">{preview.from}</span>
+          <span className="shrink-0 text-primary-text">{' → '}</span>
+          <span className="min-w-0 flex-1 truncate font-semibold text-foreground">{preview.to}</span>
+          {preview.note && <span className="shrink-0 font-mono text-[0.71875rem] text-[color:var(--text-tertiary)]">{' ('}{preview.note}{')'}</span>}
+        </p>
       )}
 
       {!isStale && !isTerminal && pendingAction.notice && (
@@ -213,7 +213,7 @@ export function ProposalCard({
         // or "no" works too (confirmation-reply.ts), but shouldn't be the
         // first thing reached for. Each scope option is its own "apply with
         // this scope" button; the first is the one the offer leads with.
-        <div data-testid="offer-buttons" className="flex flex-wrap items-center gap-x-2">
+        <div data-testid="offer-buttons" className="mt-0.5 flex flex-wrap items-center gap-x-2">
           {scopeField ? (
             scopeField.options.map((opt, i) => (
               <button
@@ -222,11 +222,12 @@ export function ProposalCard({
                 className={small}
                 onClick={() => void handleConfirm(opt)}
                 disabled={busyOverall}
+                data-offer-weight={i === 0 ? 'primary' : 'scope'}
               >
-                <span className={pill(i === 0)}>
+                <span className={pill(i === 0 ? 'primary' : 'scope')}>
                   {busy === 'confirm' && scope === opt
                     ? 'Applying…'
-                    : scopeField.labels?.[opt] ?? (opt === 'today' ? 'Apply today' : opt === 'block' ? 'Whole block' : opt === 'permanent' ? 'Rest of block' : opt)}
+                    : scopeLabel(opt, scopeField.labels)}
                 </span>
               </button>
             ))
@@ -236,8 +237,9 @@ export function ProposalCard({
               className={small}
               onClick={() => void handleConfirm()}
               disabled={busyOverall}
+              data-offer-weight="primary"
             >
-              <span className={pill(true)}>{busy === 'confirm' ? 'Applying…' : 'Apply'}</span>
+              <span className={pill('primary')}>{busy === 'confirm' ? 'Applying…' : 'Apply'}</span>
             </button>
           )}
           <button
@@ -245,9 +247,40 @@ export function ProposalCard({
             className={small}
             onClick={handleReject}
             disabled={busyOverall}
+            data-offer-weight="reject"
           >
-            <span className={pill(false)}>{busy === 'reject' ? 'Declining…' : 'Not now'}</span>
+            <span className={pill('reject')}>{busy === 'reject' ? 'Declining…' : 'Not now'}</span>
           </button>
+        </div>
+      )}
+
+      {/* THE NEAREST THINGS THAT KEEP THE BAR. Ashley's ruling, 12 Sep 2026:
+          taking a food out of a meal names two or three specific swaps rather
+          than inviting her to type one, because on a phone typing a food name
+          into a box is the thing that does not happen. Every entry has already
+          been verified against her allergies and dislikes by the builder that
+          produced it. Design 2b puts them under the answers as small tags after
+          "Or swap in": an offer that goes with the cost, never the primary
+          action — declining is a perfectly good answer. Each sends its own
+          prompt, so it comes back as its own offer. */}
+      {showAlternatives && (
+        <div data-testid="offer-alternatives" className="flex flex-wrap items-center gap-x-1.5">
+          <span className="mr-0.5 text-[0.71875rem] text-muted-foreground">Or swap in</span>
+          {(diff.alternatives ?? []).map(alt => (
+            <button
+              key={alt.label}
+              type="button"
+              className={small}
+              onClick={() => onAlternative && onAlternative(alt.prompt)}
+              disabled={busyOverall}
+            >
+              <span className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3 text-[0.75rem] font-medium text-foreground" style={{ background: 'var(--surface-raised)' }}>
+                <ArrowLeftRight aria-hidden className="size-[11px] text-[color:var(--role-ai-label)]" strokeWidth={2.2} />
+                {alt.label}
+                {alt.note && <span className="ml-0.5 text-[0.6875rem] text-muted-foreground">{alt.note}</span>}
+              </span>
+            </button>
+          ))}
         </div>
       )}
     </div>

@@ -94,3 +94,20 @@ export function offerChangeText(c: OfferChange): string {
   const head = c.label ? `${c.label}: ${what}` : what
   return c.note ? `${head} (${c.note})` : head
 }
+
+/** A scope's button label: the builder's own word for it, else the card's known ones. Unchanged from 20 Oct. */
+export function scopeLabel(opt: string, labels?: Record<string, string>): string {
+  return labels?.[opt] ?? (opt === 'today' ? 'Apply today' : opt === 'block' ? 'Whole block' : opt === 'permanent' ? 'Rest of block' : opt)
+}
+
+/**
+ * The one change an offer previews on its own line (design 2b), or null: only
+ * an offer that is exactly ONE replacement — something goes and something
+ * comes in. A list, an addition or a removal with nothing named after it is
+ * said in the text, as before.
+ */
+export function previewChange(changes: OfferChange[]): OfferChange | null {
+  if (changes.length !== 1) return null
+  const c = changes[0]
+  return c.from && c.to && !c.added ? c : null
+}

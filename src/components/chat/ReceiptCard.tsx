@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { CheckCircle2, AlertTriangle, XCircle } from 'lucide-react'
+import { Check, AlertTriangle, XCircle } from 'lucide-react'
 import type { PendingActionReceipt } from '@/lib/pending-actions-store'
 
 // ---------------------------------------------------------------------------
@@ -16,6 +16,8 @@ import type { PendingActionReceipt } from '@/lib/pending-actions-store'
 // size of a word inside a 44px tap target.
 const SMALL = 'inline-flex min-h-[44px] items-center disabled:opacity-60'
 const PILL = 'inline-flex items-center rounded-full border border-[color:var(--hairline)] px-2.5 py-0.5 text-[0.75rem] leading-5 text-muted-foreground'
+// Design 2b: Undo is a word in the violet label colour, bold, no outline.
+const UNDO = 'inline-flex items-center px-1 text-[0.78125rem] font-semibold leading-5 text-[color:var(--role-ai-label)]'
 
 export interface ReceiptRow {
   label: string
@@ -37,6 +39,7 @@ export function ReceiptCard({
   onViewGrocery,
   onViewDashboard,
   onViewExercise,
+  tone,
 }: {
   title: string
   rows: ReceiptRow[]
@@ -56,6 +59,8 @@ export function ReceiptCard({
   onViewDashboard?: () => void
   /** Present only for steps_logged receipts. Steps live on the EXERCISE tab (§5.1a, 5 Sep 2026) — sending them to the Dashboard would be pointing at the tile rather than the number. */
   onViewExercise?: () => void
+  /** 'water' draws the tick in the water colour (design 2b). */
+  tone?: 'water'
 }) {
   const [busy, setBusy] = useState<'undo' | string | null>(null)
   const [undoExpired, setUndoExpired] = useState(false)
@@ -88,21 +93,67 @@ export function ReceiptCard({
     }
   }
 
+  // DESIGN 2b (31 Oct 2026): a command is not a bubble. A receipt is ONE LINE —
+  // a tick in a small disc, the title in bold, its one detail after a dot, and
+  // the small buttons on the right ("Water logged · 500ml added to today  Undo").
+  // A receipt with several rows keeps its rows under that line; nothing it said
+  // before is dropped. Water's tick is the water colour, as on Home's ring.
+  const tint = tone === 'water' ? 'var(--chart-3)' : 'var(--primary)'
   const icon = status === 'done'
-    ? <CheckCircle2 className="size-3.5 text-primary-text shrink-0" />
+    ? (
+      <span aria-hidden className="flex size-5 shrink-0 items-center justify-center rounded-full" style={{ background: `color-mix(in oklab, ${tint} 22%, transparent)`, color: tone === 'water' ? tint : 'var(--primary-text)' }}>
+        <Check className="size-[11px]" strokeWidth={3} />
+      </span>
+    )
     : status === 'partial'
-      ? <AlertTriangle className="size-3.5 text-[color:var(--role-warn)] shrink-0" />
-      : <XCircle className="size-3.5 text-destructive shrink-0" />
+      ? <AlertTriangle className="size-4 text-[color:var(--role-warn)] shrink-0" />
+      : <XCircle className="size-4 text-destructive shrink-0" />
+  // One row is said on the title's line; more stay a list beneath it.
+  const inline = rows.length === 1 && !rows[0].note ? rows[0] : null
+
+  const buttons = (
+    <div className="flex shrink-0 items-center gap-x-1.5">
+      {onViewProfile && (
+        <button type="button" className={SMALL} onClick={onViewProfile}>
+          <span className={PILL}>View in profile</span>
+        </button>
+      )}
+      {onViewGrocery && (
+        <button type="button" className={SMALL} onClick={onViewGrocery}>
+          <span className={PILL}>View list</span>
+        </button>
+      )}
+      {onViewDashboard && (
+        <button type="button" className={SMALL} onClick={onViewDashboard}>
+          <span className={PILL}>View</span>
+        </button>
+      )}
+      {onViewExercise && (
+        <button type="button" className={SMALL} onClick={onViewExercise}>
+          <span className={PILL}>View</span>
+        </button>
+      )}
+      {undoAvailable && !undoExpired && onUndo && (
+        <button type="button" className={`${SMALL} min-w-[44px] justify-center`} disabled={busy != null} onClick={handleUndo} data-receipt-undo>
+          <span className={UNDO}>{busy === 'undo' ? 'Undoing…' : 'Undo'}</span>
+        </button>
+      )}
+    </div>
+  )
 
   return (
-    <div data-testid="chat-receipt" className="mt-2 pl-0.5 text-sm space-y-1.5">
-      <p className="flex items-center gap-1.5 text-xs font-medium">
+    <div data-testid="chat-receipt" className="mt-2 pl-0.5 text-sm space-y-1">
+      <div className="flex items-center gap-2" data-receipt-line>
         {icon}
-        {title}
-      </p>
+        <p className="min-w-0 flex-1 text-[0.78125rem] leading-snug text-[color:var(--text-tertiary)]">
+          <span className="font-semibold text-foreground">{title}</span>
+          {inline && <span data-receipt-detail>{` · ${inline.label} ${inline.detail}`}</span>}
+        </p>
+        {buttons}
+      </div>
 
-      {rows.length > 0 && (
-        <div className="space-y-1">
+      {!inline && rows.length > 0 && (
+        <div className="space-y-1 pl-7">
           {rows.map((row, i) => (
             <div key={i} className="text-xs">
               <div className="flex items-baseline justify-between gap-2">
@@ -141,36 +192,7 @@ export function ReceiptCard({
         <p className="text-xs text-destructive">Nothing was applied — {(receipt?.failed[0]?.error ?? 'the write failed').replace(/[.!?]+$/, '')}.</p>
       )}
 
-      <div className="flex flex-wrap items-center gap-x-2 pt-0.5">
-        {summary && <p className="text-[0.625rem] text-muted-foreground">{summary}</p>}
-        <div className="flex items-center gap-x-1.5">
-          {onViewProfile && (
-            <button type="button" className={SMALL} onClick={onViewProfile}>
-              <span className={PILL}>View in profile</span>
-            </button>
-          )}
-          {onViewGrocery && (
-            <button type="button" className={SMALL} onClick={onViewGrocery}>
-              <span className={PILL}>View list</span>
-            </button>
-          )}
-          {onViewDashboard && (
-            <button type="button" className={SMALL} onClick={onViewDashboard}>
-              <span className={PILL}>View</span>
-            </button>
-          )}
-          {onViewExercise && (
-            <button type="button" className={SMALL} onClick={onViewExercise}>
-              <span className={PILL}>View</span>
-            </button>
-          )}
-          {undoAvailable && !undoExpired && onUndo && (
-            <button type="button" className={SMALL} disabled={busy != null} onClick={handleUndo}>
-              <span className={PILL}>{busy === 'undo' ? 'Undoing…' : 'Undo'}</span>
-            </button>
-          )}
-        </div>
-      </div>
+      {summary && <p className="pl-7 text-[0.625rem] text-muted-foreground">{summary}</p>}
     </div>
   )
 }

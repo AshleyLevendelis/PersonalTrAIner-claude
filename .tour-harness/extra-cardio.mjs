@@ -157,8 +157,10 @@ const loadChat = async () => {
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?page=chat&kneeease=1&n=${++loads}` })
   return until(`!!document.querySelector('textarea')`, 15000)
 }
+// RE-ANCHORED 31 Oct 2026: the offer's ANSWERS. The Listen icon on the coach's bubble (her 31 Oct ruling) reads the
+// message aloud and answers nothing; verify:chat-2b holds it.
 const offer = () => ev(`(() => { const c = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); if (!c) return null;
-  return { status: c.getAttribute('data-card-status'), text: c.innerText.replace(/\\s+/g, ' '), btns: [...c.querySelectorAll('button')].map(b => (b.textContent || '').trim()) } })()`)
+  return { status: c.getAttribute('data-card-status'), text: c.innerText.replace(/\\s+/g, ' '), btns: [...c.querySelectorAll('button:not([data-listen])')].map(b => (b.textContent || '').trim()) } })()`)
 const db = expr => ev(`(() => { const d = window.__fakeDb; return ${expr} })()`)
 
 check('B0. the chat is up', !!(await loadChat()))
