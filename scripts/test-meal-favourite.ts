@@ -125,7 +125,12 @@ console.log('\n4. The control itself')
     /aria-pressed=\{isFavourite\}/.test(card) && /data-meal-favourite-on=/.test(card))
   check('...and is labelled with the meal it belongs to, so two rows are never one spoken name',
     /aria-label=\{isFavourite \? `Remove \$\{option\.name\}/.test(card))
-  check('it meets the phone tap floor', /data-meal-favourite[\s\S]{0,400}min-h-\[44px\]|min-h-\[44px\][\s\S]{0,400}data-meal-favourite/.test(card))
+  // RE-ANCHORED 31 Oct 2026 (design 3b): the heart is a 44px square in the recipe sheet's header (size-11).
+  {
+    const at = card.indexOf('data-meal-favourite={')
+    const btn = at < 0 ? '' : card.slice(card.lastIndexOf('<button', at), card.indexOf('>', at))
+    check('it meets the phone tap floor', /className="[^"]*(min-h-\[44px\]|size-11)[^"]*"/.test(btn), btn.slice(0, 300))
+  }
   check('it cannot be double-tapped into two writes', /disabled=\{favouriteBusy\}/.test(card))
   // Sliced rather than matched with a bounded gap: the button carries enough
   // attributes that a character budget is a guess about formatting, and a

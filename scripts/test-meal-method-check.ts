@@ -124,7 +124,12 @@ console.log('\n6. The check is wired where the method is written and where it is
   check('methodToShow runs the amount rule and then checkMethod', /export function methodToShow[\s\S]{0,400}methodSafeToShow\(prep\)[\s\S]{0,200}checkMethod\(/.test(gen))
   const plan = code('src/components/MealPlan.tsx')
   check('the meal card computes the method with methodToShow and her rules, once', /methodToShow\(option\.prep,\s*option\.ingredients,\s*methodRules\)/.test(plan) && (plan.match(/methodToShow\(/g) ?? []).length === 1)
-  check('...draws only that ({method}), never the raw prep', (plan.match(/\{method\}/g) ?? []).length === 2 && !/\{option\.prep\}/.test(plan) && !/methodSafeToShow/.test(plan))
+  // RE-ANCHORED 31 Oct 2026 (design 3b): the sheet draws `method` as numbered steps (methodSteps(method)); every
+  // method block draws that one value, and nothing draws the raw prep.
+  {
+    const sites = (plan.match(/\{method\}|methodSteps\(method\)/g) ?? []).length
+    check('...draws only that (method), never the raw prep', sites >= 1 && sites === (plan.match(/data-meal-method=/g) ?? []).length && !/\{option\.prep\}/.test(plan) && !/methodSteps\(option\.prep/.test(plan) && !/methodSafeToShow/.test(plan), { sites })
+  }
   check('...with her rules being the same two lists the restriction re-check reads', /const methodRules: MethodRules = \{\s*dietaryPreferences,\s*avoidFoods\s*\}/.test(plan) && /methodRules=\{methodRules\}/.test(plan))
   const slots = code('src/lib/onboarding-slots.ts')
   check('setup\'s allergy backstop reads the same word list (allergen-words.ts), with no copy of its own',

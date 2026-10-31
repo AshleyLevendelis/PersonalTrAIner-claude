@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from 'react'
 import type { HeldAround } from '@/lib/meal-generation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Calculator, Layers, ShoppingBasket, SlidersHorizontal, ChevronRight } from 'lucide-react'
+import { Calculator, Layers, ShoppingCart, SlidersHorizontal, ChevronRight, Plus } from 'lucide-react'
 import type * as React from 'react'
-import { groceryHash } from '@/lib/app-route'
+import { groceryHash, tabHash } from '@/lib/app-route'
+import { setChatPrefill } from '@/lib/chat-prefill-store'
 import { MealPlan, SLOT_ORDER, SLOT_LABEL, type UpcomingMealDay } from '@/components/MealPlan'
 import { MealDayStrip } from '@/components/nutrition/MealDayStrip'
 import { MacroSplitCard } from '@/components/MacroSplitCard'
@@ -350,6 +351,12 @@ export function NutritionDisplay({
     clock: paceClock(getAppNow(profile.id), [profile.created_at, planCreatedAt]),
   })
 
+  // "TODAY · 1 OF 4 MEALS" (3a): the meals on today's plan, and how many of them the ledger says were eaten — the
+  // same logged-by-slot read the shortfall line uses, so the count and the list underneath agree.
+  const plannedSlots = SLOT_ORDER.filter(slot => chosen[slot] || loggedSlots.includes(slot))
+  const mealsPlanned = plannedSlots.length
+  const mealsLogged = plannedSlots.filter(slot => loggedSlots.includes(slot)).length
+
   const ringValues: Record<string, { eaten: number; target: number }> = {
     water: { eaten: todayWaterMl, target: waterTarget },
     calories: { eaten: eaten.kcal, target: macros?.calories ?? 0 },
@@ -360,22 +367,11 @@ export function NutritionDisplay({
 
   return (
     <div className="space-y-[18px]">
-      {/* HEADER (5c·6): the day over "Nutrition", and the shopping list one round tap away. */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="ds-label" data-testid="meal-day-heading">{upcomingDay?.dayName ?? dayName}</p>
-          <h2 className="mt-1 text-[1.75rem] font-bold leading-[1.1] tracking-[-.03em]">Nutrition</h2>
-        </div>
-        <button
-          type="button"
-          onClick={() => { window.location.hash = groceryHash() }}
-          className="mt-1 flex size-10 shrink-0 items-center justify-center rounded-full"
-          style={{ background: 'var(--surface-raised)' }}
-          aria-label="Grocery list"
-          data-grocery-pill
-        >
-          <ShoppingBasket className="size-[18px]" aria-hidden />
-        </button>
+      {/* HEADER (3a): the day over "Nutrition". The shopping list moved to the "Today's meals" row below (a
+          pill with a cart), where the design draws it; it is still one tap from this screen, meals or none. */}
+      <div className="min-w-0">
+        <p className="ds-label" data-testid="meal-day-heading">{upcomingDay?.dayName ?? dayName}</p>
+        <h2 className="mt-1 text-[1.75rem] font-bold leading-[1.1] tracking-[-.03em]">Nutrition</h2>
       </div>
       {/* THE DAY STRIP STAYS ON TOP — her 17 Oct ruling, over the one-page design, which had none. */}
       {mealStrip && (
@@ -386,58 +382,69 @@ export function NutritionDisplay({
           so with another day open they step aside rather than sit above a
           list they do not describe. */}
       {!upcomingDay && (<>
-      {/* CALORIES, THEN THE FOUR MACROS (5c·6): no rings on this screen. The tour spotlights the block. */}
+      {/* THE TOP CARD (design 3a), RINGS LEFT OUT: her 17 Oct ruling keeps rings on Home only, so this is the
+          design's legend on its own — what has been eaten of the day's calories, then one row per macro and water,
+          each with its own 3px bar. The tour spotlights the card. */}
       <div data-tour="rings" className="flex flex-col gap-[18px]">
-        <div data-nutrition-hero>
-          {macros ? (() => {
-            // THE PHRASEBOOK DECIDES left or over (and the rounding), so the hero
-            // and every other "left" in the app say it one way. OVER IS SAID AS OVER (M33).
-            const [amount, word] = kcalLeftOrOver(macros.calories - eaten.kcal).split(' ')
-            return (
+        <div
+          data-nutrition-hero
+          className="rounded-[24px] p-5"
+          style={{
+            background: 'radial-gradient(120% 90% at 100% 0%, rgba(var(--glow-rgb), .20), rgba(var(--glow-rgb), 0) 55%), var(--surface-deep)',
+            border: '1px solid rgba(var(--glow-rgb), .30)',
+            boxShadow: '0 10px 30px rgba(0, 0, 0, .35)',
+          }}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <span className="whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[.12em] text-primary-text" data-testid="meals-count">
+              Today{mealsPlanned > 0 ? ` · ${mealsLogged} of ${mealsPlanned} meal${mealsPlanned === 1 ? '' : 's'}` : ''}
+            </span>
+            {macros && (() => {
+              // THE PHRASEBOOK DECIDES left or over (and the rounding), so this line and every other "left" in the
+              // app say it one way. OVER IS SAID AS OVER (M33).
+              const [amount, word] = kcalLeftOrOver(macros.calories - eaten.kcal).split(' ')
+              return (
+                <span className="whitespace-nowrap text-[0.6875rem] text-text-tertiary">
+                  <span className="tabular-mono" data-testid="kcal-left-number">{Number(amount).toLocaleString()}</span>{' '}
+                  <span data-testid="kcal-left">kcal {word}</span>
+                </span>
+              )
+            })()}
+          </div>
+          <div className="mt-3.5">
+            <p className="tabular-mono glow-mint-lg text-[2.125rem] font-bold leading-none tracking-[-.03em] text-primary-text" data-testid="kcal-eaten">
+              {Math.round(eaten.kcal).toLocaleString()}
+            </p>
+            {macros ? (
               <>
-                <div className="flex items-end justify-between gap-3">
-                  {/* LESS IS MORE (30 Oct 2026): the number and its words on one line, smaller. */}
-                  <p className="flex items-baseline gap-2">
-                    <span className="ds-num-mega tabular-mono glow-mint-lg text-[2.5rem] font-bold leading-none tracking-[-.04em]" style={{ color: 'var(--num-hero)' }} data-testid="kcal-left-number">
-                      {Number(amount).toLocaleString()}
-                    </span>
-                    <span className="text-[0.875rem] text-muted-foreground" data-testid="kcal-left">kcal {word}</span>
-                  </p>
-                  <p className="pb-0.5 text-[0.75rem] text-muted-foreground">
-                    <span className="tabular-mono text-foreground" data-testid="kcal-eaten">{Math.round(eaten.kcal).toLocaleString()}</span> of <span className="tabular-mono text-foreground" data-testid="kcal-target">{Math.round(macros.calories).toLocaleString()}</span>
-                  </p>
-                </div>
-                <MacroBar share={ringShare(eaten.kcal, macros.calories)} color="var(--primary)" height={6} glow className="mt-3" testid="kcal-bar" />
+                <p className="mt-[3px] text-[0.71875rem] text-text-tertiary">
+                  of <span className="tabular-mono" data-testid="kcal-target">{Math.round(macros.calories).toLocaleString()}</span> kcal
+                </p>
+                <MacroBar share={ringShare(eaten.kcal, macros.calories)} color="var(--primary)" height={3} glow className="mt-2" testid="kcal-bar" />
               </>
-            )
-          })() : (
-            <>
-              <p className="ds-num-mega tabular-mono text-[3.75rem] leading-[.88]" style={{ color: 'var(--num-hero)' }}>—</p>
-              <p className="mt-2 text-[0.75rem] text-text-tertiary">
-                <span className="tabular-mono" data-testid="kcal-eaten">{Math.round(eaten.kcal).toLocaleString()}</span> kcal eaten · add your weight for a target
-              </p>
-            </>
-          )}
-        </div>
+            ) : (
+              <p className="mt-[3px] text-[0.71875rem] text-text-tertiary">kcal eaten · add your weight for a target</p>
+            )}
 
-        {/* THE MACROS, ONE ROW OF FOUR (30 Oct 2026, was a 2×2 grid with icons). Water's cell is the water log
-            (her 17 Oct ruling): tapping it opens the quick-add that used to sit on Home. */}
-        <div className="grid grid-cols-4 gap-3" data-ring-key>
-          <MacroCell k="protein" label="Protein" color="var(--chart-2)" value={String(Math.round(eaten.protein))} target={macros?.protein} unit="g" share={ringShare(eaten.protein, macros?.protein)} />
-          <MacroCell k="carbs" label="Carbs" color="var(--chart-4)" value={String(Math.round(eaten.carbs))} target={macros?.carbs} unit="g" share={ringShare(eaten.carbs, macros?.carbs)} />
-          <MacroCell k="fat" label="Fat" color="var(--text-tertiary)" value={String(Math.round(eaten.fat))} target={macros?.fat} unit="g" share={ringShare(eaten.fat, macros?.fat)} />
-          <MacroCell
-            k="water" label="Water" color="var(--chart-3)"
-            value={(todayWaterMl / 1000).toFixed(1)} target={waterTarget / 1000} unit="L" fixed={1}
-            share={ringShare(todayWaterMl, waterTarget)}
-            onClick={() => setWaterOpen(o => !o)}
-            ariaLabel={`Water: ${(todayWaterMl / 1000).toFixed(1)} of ${(waterTarget / 1000).toFixed(1)} litres. Tap to log water.`}
-            expanded={waterOpen}
-            celebrate={waterJustCompleted}
-          />
-        </div>
+            {/* ONE ROW PER MACRO, AND WATER (3a's legend): swatch, name, eaten/target in mono, a 3px bar in its own
+                colour. The water row is the water log (her 17 Oct ruling): tapping it opens the quick-add. */}
+            <div className="mt-2.5 flex flex-col gap-[7px] text-[0.75rem]" data-ring-key>
+              <LegendRow k="protein" label="Protein" color="var(--chart-2)" value={String(Math.round(eaten.protein))} target={macros?.protein} unit="g" share={ringShare(eaten.protein, macros?.protein)} />
+              <LegendRow k="carbs" label="Carbs" color="var(--chart-4)" value={String(Math.round(eaten.carbs))} target={macros?.carbs} unit="g" share={ringShare(eaten.carbs, macros?.carbs)} />
+              <LegendRow k="fat" label="Fat" color="var(--muted-foreground)" value={String(Math.round(eaten.fat))} target={macros?.fat} unit="g" share={ringShare(eaten.fat, macros?.fat)} />
+              <LegendRow
+                k="water" label="Water" color="var(--chart-3)"
+                value={litres(todayWaterMl)} target={waterTarget > 0 ? litres(waterTarget) : null} unit="L"
+                share={ringShare(todayWaterMl, waterTarget)}
+                onClick={() => setWaterOpen(o => !o)}
+                ariaLabel={`Water: ${litres(todayWaterMl)} of ${litres(waterTarget)} litres. Tap to log water.`}
+                expanded={waterOpen}
+                celebrate={waterJustCompleted}
+              />
+            </div>
+          </div>
         {waterOpen && (
-          <div className="flex flex-wrap items-center gap-2" data-water-quick-add>
+          <div className="mt-3 flex flex-wrap items-center gap-2" data-water-quick-add>
             {[250, 500].map(ml => (
               <button
                 key={ml}
@@ -456,6 +463,7 @@ export function NutritionDisplay({
             )}
           </div>
         )}
+        </div>
 
         {entryError && (
           <InsightBanner tone="warning" className="items-start justify-between">
@@ -545,6 +553,40 @@ export function NutritionDisplay({
         </InsightBanner>
       )}
       </>)}
+
+      {/* "TODAY'S MEALS" (3a): the section label, the shopping list as a pill with a cart (the Nutrition door
+          to it; Tools has the other), and a round + for something off the plan. The + is what "Log something
+          else" was: off-plan food goes through the coach, which costs it and asks before a food it cannot count
+          (her M51 rule). The screen has no free-text food log of its own. An upcoming day has nothing to log. */}
+      <div className="-mb-2 flex min-h-[44px] items-center justify-between gap-3 px-1" data-meals-header>
+        <span className="whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[.12em] text-text-tertiary">
+          {upcomingDay ? `${upcomingDay.dayName}'s meals` : "Today's meals"}
+        </span>
+        <span className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => { window.location.hash = groceryHash() }}
+            className="hit-slop-44 inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[0.75rem] font-semibold"
+            style={{ background: 'rgba(var(--glow-rgb), .12)', border: '1px solid rgba(var(--glow-rgb), .30)', color: 'var(--primary-text)' }}
+            aria-label="Grocery list"
+            data-grocery-pill
+          >
+            <ShoppingCart className="size-3.5" aria-hidden /> Grocery list
+          </button>
+          {!upcomingDay && (
+            <button
+              type="button"
+              onClick={() => { setChatPrefill('I also ate '); window.location.hash = tabHash('chat') }}
+              className="hit-slop-44 flex size-9 items-center justify-center rounded-full"
+              style={{ background: 'rgba(var(--glow-rgb), .12)', border: '1px solid rgba(var(--glow-rgb), .30)', color: 'var(--primary-text)' }}
+              aria-label="Log something else"
+              data-log-something-else
+            >
+              <Plus className="size-[18px]" aria-hidden />
+            </button>
+          )}
+        </span>
+      </div>
 
       {upcomingDay ? (
         <MealPlan
@@ -832,35 +874,41 @@ function MacroBar({ share, color, height = 4, glow, className, testid }: { share
   )
 }
 
+/** Litres as she reads them: 250 ml steps are exact to two places, and no trailing zeros ("0.75", "2.5", "0"). */
+function litres(ml: number): string {
+  return String(Number((ml / 1000).toFixed(2)))
+}
+
 /**
- * One cell of the 2×2 grid: a 22px icon circle and the label, the value in mono with its target, the bar.
- * Inner edges carry the hairlines; the outer edge has no padding. A button only where it does something
- * (water), so nothing else looks tappable.
+ * One row of the top card's legend (design 3a): an 8px swatch, the name, eaten/target in mono, and a 3px bar in the
+ * row's colour under it. A button only where it does something (water), so nothing else looks tappable; the water
+ * row keeps its compact height and carries a 44px tap area (hit-slop-44).
  */
-function MacroCell({ k, label, color, value, target, unit, fixed = 0, share, onClick, ariaLabel, expanded, celebrate }: {
+function LegendRow({ k, label, color, value, target, unit, share, onClick, ariaLabel, expanded, celebrate }: {
   k: string
   label: string
   color: string
   value: string
-  target: number | null | undefined
+  target: number | string | null | undefined
   unit: string
-  fixed?: number
   share: number | null
   onClick?: () => void
   ariaLabel?: string
   expanded?: boolean
   celebrate?: boolean
 }) {
-  const style: React.CSSProperties = { minHeight: 44 }
+  const shown = typeof target === 'string' ? target : target != null && target > 0 ? String(Math.round(target)) : '—'
   const body = (
     <>
-      <span className="block text-[0.6875rem] text-muted-foreground">{label}{onClick ? ' +' : ''}</span>
-      <span className="mt-1 block tabular-mono text-[0.875rem] font-semibold leading-none">
-        {value}
-        <span className="text-[0.6875rem] font-medium text-muted-foreground">/{target != null && target > 0 ? target.toFixed(fixed) : '—'}{unit}</span>
+      <span className="flex items-center gap-2">
+        <span aria-hidden className="size-2 shrink-0 rounded-[2px]" style={{ background: color }} />
+        <span className="flex-1 text-text-tertiary">{label}{onClick ? ' +' : ''}</span>
+        <span className="tabular-mono text-foreground">
+          {value}<span className="text-muted-foreground">/{shown}{unit}</span>
+        </span>
       </span>
-      <span className="relative mt-2 block">
-        <MacroBar share={share} color={color} />
+      <span className="relative ml-4 block">
+        <MacroBar share={share} color={color} height={3} />
         {celebrate && (
           <svg aria-hidden width="48" height="16" viewBox="0 0 48 16" className="pointer-events-none absolute -top-3 right-0 overflow-visible">
             {SPARKLES.map(sp => (
@@ -873,6 +921,6 @@ function MacroCell({ k, label, color, value, target, unit, fixed = 0, share, onC
     </>
   )
   return onClick
-    ? <button type="button" onClick={onClick} aria-label={ariaLabel} aria-expanded={expanded} className="block text-left" style={style} data-ring-key-row={k}>{body}</button>
-    : <div style={style} data-ring-key-row={k}>{body}</div>
+    ? <button type="button" onClick={onClick} aria-label={ariaLabel} aria-expanded={expanded} className="hit-slop-44 flex flex-col gap-[3px] text-left" data-ring-key-row={k}>{body}</button>
+    : <div className="flex flex-col gap-[3px]" data-ring-key-row={k}>{body}</div>
 }

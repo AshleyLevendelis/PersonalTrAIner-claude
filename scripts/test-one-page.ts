@@ -168,7 +168,8 @@ async function main() {
     check('Home, Nutrition and Exercise all use it', /<TrainerNudge \{\.\.\.trainerNudge\} slim \/>/.test(home) && /<TrainerNudge\s+slim\s+text=\{tip\.text\}/.test(home)
       && /<TrainerNudge slim text=\{macroNudge\}/.test(nut) && /<TrainerNudge slim text=\{todayNudge\.text\}/.test(panel))
   }
-  check('Nutrition: the macros are one row of four', /grid grid-cols-4[^"]*" data-ring-key/.test(nut))
+  // RE-ANCHORED 31 Oct 2026 (design 3a): the legend of the top card, one row each, the rings still left out.
+  check('Nutrition: the macros and water are the legend\'s rows, one each, no rings', /flex flex-col[^"]*" data-ring-key>/.test(nut) && (nut.match(/<LegendRow\b/g) ?? []).length === 4 && !/<RingMeter/.test(nut))
   const mealPlan = read('src/components/MealPlan.tsx')
   {
     const heroAt = mealPlan.indexOf('function TotalsHero')

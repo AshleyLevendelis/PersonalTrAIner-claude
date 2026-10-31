@@ -24,12 +24,17 @@ const SLOTS = ['Breakfast', 'Lunch', 'Dinner', 'Snack']
  * a hint first appeared on this card.
  */
 const rows = () => ev(`[...document.querySelectorAll('[data-ingredient-row]')].map(b => {
-  const span = b.querySelector('span')
+  // RE-ANCHORED 31 Oct 2026 (design 3b): the line's own words sit in [data-ingredient-text] beside a bullet.
+  const span = b.querySelector('[data-ingredient-text]') ?? b.querySelector('span')
   const hintEl = span?.querySelector('[data-testid="ingredient-cooked-hint"]')
   const words = span ? [...span.childNodes].filter(n => n !== hintEl).map(n => n.textContent).join('') : ''
   return { data: b.getAttribute('data-ingredient-row'), shown: words.trim(), hint: hintEl?.textContent?.trim() ?? null }
 })`)
+// RE-ANCHORED 31 Oct 2026 (design 3b): a meal opens as a sheet over the list, so the open one is closed before the
+// next row is tapped (a tap on the dimmed list closes it rather than opening another).
+const closeSheet = () => ev(`(() => { const c = document.querySelector('[data-meal-sheet-close]'); if (c) c.click(); return !!c })()`)
 const openMeal = async label => {
+  if (await closeSheet()) await wait(250)
   const ok = await clickAt(`[...document.querySelectorAll('button')].find(b => new RegExp('^\\\\s*${label}', 'i').test(b.textContent || '') && !b.hasAttribute('data-ingredient-row'))`)
   if (!ok) return []
   return until(rows, v => Array.isArray(v) && v.length > 0, 16)
@@ -37,6 +42,7 @@ const openMeal = async label => {
 const readDay = async () => {
   const day = {}
   for (const s of SLOTS) { day[s] = await openMeal(s); await wait(150) }
+  await closeSheet(); await wait(250)
   return day
 }
 const parse = line => {

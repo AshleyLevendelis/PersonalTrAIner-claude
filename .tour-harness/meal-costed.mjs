@@ -88,14 +88,16 @@ await shoot('meal-costed-day')
 // Open the dinner card (the row's own button).
 await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /Greek Chicken Souvlaki/.test(x.textContent || '')); if (b) { b.scrollIntoView({ block: 'center' }); b.click() } return !!b })()`)
 await wait(700)
+// RE-ANCHORED 31 Oct 2026 (design 3b): the open meal is the recipe sheet; its header carries the kcal in bold and the
+// same "P 51g C 52g F 14g" line the rows use.
 const card = await ev(`(() => {
-  const big = [...document.querySelectorAll('.ds-num-lg')].map(e => e.closest('div.mt-4')).find(Boolean)
-  if (!big) return null
-  return { kcal: big.querySelector('.ds-num-lg')?.textContent?.trim(), split: big.querySelector('.ds-label-compact')?.textContent?.trim(), text: big.innerText }
+  const sheet = document.querySelector('[data-meal-sheet]')
+  if (!sheet) return null
+  return { kcal: sheet.querySelector('[data-testid="meal-sheet-kcal"] .tabular-mono')?.textContent?.trim(), split: sheet.querySelector('[data-meal-macros]')?.textContent?.replace(/\\s+/g, ' ').trim(), text: sheet.innerText }
 })()`)
 check('1a. the dinner card shows 543 kcal, its lines costed in the state they name', card?.kcal === '543', card)
-check('1b. ...with 51 P · 52 C · 14 F (raw chicken is less protein a gram; dry couscous is more carbs)', /51 P · 52 C · 14 F/.test(card?.split ?? ''), card?.split)
-check('1c. the stored 482 / 61 / 23 / 15 is nowhere on the card', !!card && !/\b482\b/.test(card.text) && !/61 P/.test(card.text) && !/23 C/.test(card.text), card?.text?.slice(0, 200))
+check('1b. ...with 51 P · 52 C · 14 F (raw chicken is less protein a gram; dry couscous is more carbs)', /P\s*51g\s*C\s*52g\s*F\s*14g/.test(card?.split ?? ''), card?.split)
+check('1c. the stored 482 / 61 / 23 / 15 is nowhere on the card', !!card && !/\b482\b/.test(card.text) && !/P\s*61g/.test(card.text) && !/C\s*23g/.test(card.text), card?.text?.slice(0, 200))
 check('1d. the card still tells her to weigh it raw and dry', !!card && /raw chicken breast/i.test(card.text) && /dry couscous/i.test(card.text), card?.text?.slice(0, 300))
 const dinnerRow = (rows ?? []).find(r => r.slot === 'dinner')
 check('1e. the dinner row in the day list says the same 543', dinnerRow?.kcal === 543, rows)
@@ -103,7 +105,7 @@ const sum = (rows ?? []).reduce((a, r) => a + (r.kcal || 0), 0)
 check('2. the day\'s planned total is the sum of the meals on screen (one calculation)', Array.isArray(rows) && rows.length >= 3 && day === sum, { day, sum, rows })
 const w = await ev(`({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth })`)
 check('3. nothing pushes the page sideways at 390px', !!w && w.scroll <= w.client + 1, w)
-await ev(`(() => { const e = document.querySelector('.ds-num-lg'); if (e) e.scrollIntoView({ block: 'start' }) })()`)
+await ev(`(() => { const e = document.querySelector('[data-meal-sheet]'); if (e) e.scrollIntoView({ block: 'start' }) })()`)
 await wait(300)
 await shoot('meal-costed-dinner')
 

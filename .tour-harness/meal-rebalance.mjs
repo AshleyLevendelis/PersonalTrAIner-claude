@@ -95,7 +95,11 @@ const openMove = async slot => {
 const reach = sel => ev(`document.querySelector(${JSON.stringify(sel)}).scrollIntoView({ block: 'center' })`)
 const tap = async sel => { await reach(sel); await wait(150); await ev(`document.querySelector(${JSON.stringify(sel)}).click()`); await wait(200) }
 const until = async (fn, n = 40) => { for (let i = 0; i < n; i++) { if (await fn()) return true; await wait(150) } return false }
-const inView = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const bar = document.querySelector('nav[aria-label="Primary"]'); const floor = bar ? bar.getBoundingClientRect().top : window.innerHeight; const r = e.getBoundingClientRect(); return r.top >= 0 && r.bottom <= floor && r.height > 0 })()`)
+// RE-ANCHORED 31 Oct 2026 (design 3b): "on screen" is asked the way an eye asks it — inside the viewport, and
+// nothing drawn over its top or bottom edge. On the page that is still the tab bar; inside the recipe sheet, which
+// sits over the tab bar, it is the sheet's own footer (or nothing). The tab bar's top was the floor only while
+// nothing could be drawn over the tab bar.
+const inView = sel => ev(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; const r = e.getBoundingClientRect(); if (!(r.top >= 0 && r.bottom <= innerHeight && r.height > 0)) return false; const x = r.left + Math.min(r.width / 2, 12); return [r.top + 1, r.bottom - 1].every(y => { const h = document.elementFromPoint(x, y); return !!h && (h === e || e.contains(h) || h.contains(e)) }) })()`)
 const sizes = sel => ev(`[...document.querySelectorAll(${JSON.stringify(sel)})].map(b => ({ t: b.textContent.trim(), w: Math.round(b.getBoundingClientRect().width), h: Math.round(b.getBoundingClientRect().height) }))`)
 const picks = () => ev(`window.__mealPicks()`)
 const copies = () => ev(`window.__fakeDb.meal_plan_slots.filter(r => /\\((smaller|bigger)( \\d+)?\\)$/.test(r.name)).map(r => r.name)`)

@@ -122,7 +122,7 @@ check('the day has an add-to-list button, in its own words',
   await ev(`document.querySelector('[data-testid="meal-day-add-grocery"]')?.textContent.trim()`))
 await openSlot('dinner')
 const controls = await buttonTexts()
-check('an upcoming meal offers no logging', !controls.some(t => /Log this meal/.test(t)), controls)
+check('an upcoming meal offers no logging', !controls.some(t => /I ate this|Log this meal/.test(t)), controls)
 // RE-ANCHORED 29 Sep 2026: this said "no moving", true until Ashley's ruling
 // that a meal can be swapped with another day's. What is still true, and is
 // what this check now holds, is that an upcoming meal offers no move to
@@ -212,7 +212,7 @@ await tapDay(days[0].date)
 check('the heading is today\'s again', (await heading()) === todayName, await heading())
 check('...the rings are back', await has('[data-tour="rings"]'))
 await openSlot('breakfast')
-check('...and today\'s meals can be logged, as before', (await buttonTexts()).some(t => /Log this meal/.test(t)))
+check('...and today\'s meals can be logged, as before', (await buttonTexts()).some(t => /I ate this/.test(t)))
 
 const errs = await ev(`window.__errors ?? []`)
 check('no page errors', (errs ?? []).length === 0, errs)
