@@ -23,8 +23,10 @@ const order = () => ev(`[...document.querySelectorAll('[data-exercise-name]')].m
 const has = sel => ev(`!!document.querySelector(${JSON.stringify(sel)})`)
 const text = sel => ev(`document.querySelector(${JSON.stringify(sel)})?.innerText?.replace(/\\s+/g, ' ').trim() || ''`)
 const MAIN_LIFT = `(() => {
-  const label = [...document.querySelectorAll('span')].find(s => /^Main lift\\b/.test(s.textContent.trim()))
-  return label?.parentElement?.querySelector('[data-exercise-name]')?.getAttribute('data-exercise-name') ?? null
+  // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the label is inside the exercise's own row now ("Main lift", or
+  // "Main lift · now" on the open card), not a heading above it.
+  const card = [...document.querySelectorAll('[data-exercise-name]')].find(c => /^Main lift\\b/.test(c.querySelector('[data-testid="exercise-eyebrow"]')?.textContent.trim() ?? ''))
+  return card?.getAttribute('data-exercise-name') ?? null
 })()`
 const escape = async () => { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await wait(450) }
 const openSheet = async () => {

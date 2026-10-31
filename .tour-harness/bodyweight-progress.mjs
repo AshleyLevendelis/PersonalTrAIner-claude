@@ -260,7 +260,8 @@ const bw = await ev(`(() => {
     loadWord: card.querySelector('[data-testid="bodyweight-load"]')?.textContent?.trim() || '',
     equipment: (first.getAttribute('data-exercise-equipment') || ''),
     keepsEffortTarget: !!card.querySelector('[data-testid="effort-only"]'),
-    offersPlateCalc: /Plate calculator/i.test(txt),
+    // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the plate calculator is the button in each weight box, named by its label.
+    offersPlateCalc: !!card.querySelector('[aria-label="Plate calculator"]'),
     printsABareKg: /(^|[^a-z])0\s*kg/i.test(txt),
   }
 })()`)
@@ -305,7 +306,7 @@ const loaded = await ev(`(() => {
     expanded: /working sets/i.test(txt),
     showsAWeight: /[\\d.]+\\s*kg/i.test(txt),
     saysBodyweight: !!row.querySelector('[data-testid="bodyweight-load"]'),
-    offersPlateCalc: /Plate calculator/i.test(txt),
+    offersPlateCalc: !!row.querySelector('[aria-label="Plate calculator"]'),
   }
 })()`)
 check('3f. a loaded card opened, so 3b-3e are not vacuous',

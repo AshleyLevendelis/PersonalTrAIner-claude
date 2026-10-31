@@ -290,7 +290,9 @@ console.log('\nO. WHAT STANDS WHERE THE WEIGHT WOULD GO, WHEN THERE IS NONE')
   const row = read('src/components/exercise/ExerciseRow.tsx')
   check('the set grid asks it before drawing the button',
     /onOpenPlateCalc && takesPlateCalculator\(/.test(grid), grid.match(/.{0,60}takesPlateCalculator.{0,40}/)?.[0])
-  check('...and so does the header link', /takesPlateCalculator\(catalogEntry\) && \(/.test(row))
+  // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the card's "Plate calculator" link left; the button in each weight box is
+  // the one plate control, so the claim is made once. The card hands the grid a handler only where a weight is in play.
+  check('...and no second plate control is left on the card to answer differently', !/>\s*Plate calculator\s*</.test(row) && /onOpenPlateCalc=\{\(carriesExternalLoad \|\| hasLoadStatement\) \? onOpenPlateCalc : undefined\}/.test(row))
 }
 
 console.log(failures === 0 ? '\nAll load-display checks passed.\n' : `\n${failures} FAILED\n`)

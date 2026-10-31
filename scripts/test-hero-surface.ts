@@ -67,8 +67,15 @@ console.log('\n1. A glow is never clipped by its own box')
   // clamp; the handoff drops the clamp and keeps the glow, so a long name
   // wraps instead of being cut. §1's generic scan above is what now protects
   // it: glow + clip on one element still fails.
-  check('the session name glows and does NOT clip it',
-    /className="[^"]*glow-text"[^>]*>\{workout!\.focus\}/.test(panel) && !/className="[^"]*(truncate|line-clamp)[^"]*glow-text[^"]*"[^>]*>\{workout!\.focus\}/.test(panel))
+  // RE-ANCHORED 31 Oct 2026 (tab polish, Exercise 2a): the name's LAST WORD is lit, so the glow sits on that word
+  // inside the name; the name itself still wraps rather than clipping.
+  {
+    const at = panel.indexOf('data-testid="hero-focus"')
+    const open = panel.lastIndexOf('<p ', at)
+    const name = at < 0 ? '' : panel.slice(open, panel.indexOf('</p>', at))
+    check('the session name glows and does NOT clip it',
+      /<span className="[^"]*glow-text">\{focusWords\[focusWords\.length - 1\]\}<\/span>/.test(name) && !/truncate|line-clamp/.test(name) && /break-words/.test(name), name.slice(0, 200))
+  }
 }
 
 console.log('\n2. The ambient surface is gone with the cards')

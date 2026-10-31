@@ -137,7 +137,8 @@ console.log('\n4. The two rows say the same things about an exercise')
   for (const [label, src] of SURFACES) {
     const children = stripProps(src)
     check(`${label} renders rest outside of any prop`, /ex\.rest/.test(children))
-    check(`${label} labels it "Rest" as visible text`, />\s*Rest\s/.test(src))
+    // RE-ANCHORED 31 Oct 2026 (Exercise 2a): today's card says it in its meta line, "· rest 120s", lower case.
+    check(`${label} labels it "Rest" as visible text`, />[^<{]*\b[Rr]est\s/.test(src))
   }
 
   // --- 4c. backstop: no field drifts onto one surface only ----------------

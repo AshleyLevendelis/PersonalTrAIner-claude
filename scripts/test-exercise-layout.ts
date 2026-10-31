@@ -16,6 +16,9 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { nextSetLabel, readNextSet, needsWeight, type NextSet } from '../src/lib/next-set-label'
 import { stripDot } from '../src/components/exercise/WeekContextRow'
+import { StatusCircle } from '../src/components/exercise/ExerciseLine'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 
 const ROOT = join(import.meta.dirname, '..')
 let failures = 0
@@ -100,8 +103,14 @@ console.log('\n4. The collapsed row')
   const line = code('src/components/exercise/ExerciseLine.tsx')
   check('the chip is the plan\'s own load string, which carries "per hand"', /ex\.suggested_load \?\? `~\$\{ex\.suggested_load_kg\}kg`/.test(line))
   check('it is accent with an up-arrow only when the load progressed', /progressing && <ArrowUp/.test(line) && /data-load-chip=\{progressing \? 'up' : 'hold'\}/.test(line))
-  check('set dots only when today passes a count — a peeked day draws none', /setsDone != null && \(/.test(line))
-  check('a dot per planned set, filled up to the sets done', /length: ex\.sets/.test(line) && /i < done/.test(line))
+  // RE-ANCHORED 31 Oct 2026 (tab polish, Exercise 2a): the dots became ONE status circle that fills as working sets
+  // land. The property is unchanged: today's count only, nothing on a peek, done-of-planned and nothing else.
+  check('the status circle only when today passes a count — a peeked day draws none', /setsDone != null && <StatusCircle done=\{done\} sets=\{ex\.sets\} \/>/.test(line))
+  // RUN, not read: drawn at 0, 2 and 3 of 3 working sets.
+  const circle = (done: number) => renderToStaticMarkup(createElement(StatusCircle, { done, sets: 3 }))
+  check('it fills to the sets done out of the sets planned, ticked only when all are in',
+    /data-status="none"/.test(circle(0)) && /data-status="part"/.test(circle(2)) && /aria-label="2 of 3 sets logged"/.test(circle(2)) && /data-status="done"/.test(circle(3)) && /<svg/.test(circle(3)) && !/<svg/.test(circle(2)),
+    [circle(2).slice(0, 120), circle(3).slice(0, 120)])
   // REVERSED 30 Oct 2026 ("less is more", her "Move things"): no 01 / 02 numbers; the list's order says it.
   check('no "01" row numbers', !/padStart\(2, '0'\)/.test(line.replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, '')))
   check('only "Accessory" loses its label', /if \(text === 'Accessory'\) return null/.test(line) && !/'(Main lift|Primer|Finisher)'\) return null/.test(line))

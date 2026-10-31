@@ -102,7 +102,8 @@ console.log('\n[3] The two strips use the one rule for today')
   // is plain — the accent belongs to the day being looked at, never to "due".
   // RUN 7 (M52): a tapped MISSED day keeps its warning dot rather than the ring, so the ring is now "unless missed".
   check('src/components/exercise/WeekContextRow.tsx gives the accent dot only to the day on screen (unless it was missed), and a due day a plain one',
-    /\{isSelected \? \(\s*<span aria-hidden className="size-\[5px\] rounded-full"[^>]*style=\{dot === 'missed' \? DOT_STYLE\.missed! : \{ boxShadow: 'inset 0 0 0 1px var\(--primary\)' \}\}/.test(ex)
+    // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the day on screen is a boxed cell with a FILLED accent dot (the design's).
+    /\{isSelected \? \(\s*<span className="size-1\.5 rounded-full"[^>]*style=\{dot === 'missed' \? DOT_STYLE\.missed! : \{ background: 'var\(--primary\)' \}\}/.test(ex)
     && /due: \{ background: 'var\(--text-dim\)' \}/.test(ex))
   check('...and never the bare today test the old Home strip had', !/\{isToday \? \(/.test(ex))
 }

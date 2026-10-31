@@ -62,13 +62,9 @@ const centreOf = expr => ev(`(() => { const n = ${expr}; if (!n) return null; n.
 const tapExpr = async expr => { const at = await centreOf(expr); if (!at) return false; await wait(150); const again = await centreOf(expr); await pointAt(again ?? at); await wait(500); return true }
 const q = sel => `document.querySelector(${J(sel)})`
 const byText = (text, tag = 'button') => `[...document.querySelectorAll(${J(tag)})].reverse().find(b => (b.textContent || '').replace(/\\s+/g, ' ').trim() === ${J(text)})`
-/** "＋ Add" first (30 Oct 2026, "less is more"): the two ways to add sit behind it. */
-const openAddChoice = async label => {
-  if (!(await ev(`!!document.querySelector('[data-testid="add-open"][aria-expanded="true"]')`))) {
-    if (!(await tapExpr(q('[data-testid="add-open"]')))) return false
-  }
-  return tapExpr(byText(label))
-}
+/** RE-ANCHORED 31 Oct 2026 (Exercise 2a): the two ways to add are at the foot, each one tap — "Add exercise", and
+ *  "I also did…" for work off the plan. Asked for by what they do, never by their words. */
+const openAddChoice = async label => tapExpr(q(/unplanned/i.test(label) ? '[data-testid="add-unplanned"]' : '[data-testid="add-exercise"]'))
 const until = async (expr, ms = 8000) => { const t0 = Date.now(); let v = await ev(expr); while (!v && Date.now() - t0 < ms) { await wait(200); v = await ev(expr) } return v }
 const typeText = async text => { for (const ch of String(text)) { await send('Input.dispatchKeyEvent', { type: 'keyDown', text: ch, key: ch }); await send('Input.dispatchKeyEvent', { type: 'keyUp', key: ch }) } await wait(250) }
 const texts = sel => ev(`[...document.querySelectorAll(${J(sel)})].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`)
@@ -79,7 +75,7 @@ const KNEE_Q = `How did your knees feel on the run? They're being eased off unti
 let loads = 0
 const loadExercise = async qs => {
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&n=${++loads}&${qs}#/tab/exercise` })
-  return until(`document.querySelectorAll('[data-exercise-name]').length > 0 && !!document.querySelector('[data-testid="add-open"]')`, 15000)
+  return until(`document.querySelectorAll('[data-exercise-name]').length > 0 && !!document.querySelector('[data-testid="add-unplanned"]')`, 15000)
 }
 /** "Add unplanned work → Cardio → Other → <name>, <minutes>, <effort>, <km> → tick". */
 const logUnplanned = async (name, minutes, effort, km) => {

@@ -1,6 +1,6 @@
 import type * as React from 'react'
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
-import { ChevronDown, Thermometer } from 'lucide-react'
+import { ChevronRight, Flame } from 'lucide-react'
 import { normalizeWarmup, warmupBadgeText } from '@/lib/session-derive'
 import type { WorkoutDay } from '@/lib/types'
 import type { WarmupItem } from '@/lib/warmup'
@@ -64,23 +64,23 @@ export function WarmupSection({
   const extraMinutes = Math.round(extra.reduce((n, e) => n + e.duration_seconds, 0) / 60)
 
   return (
-    // ONE ROW, CLOSED (design handoff 2c, 10 Oct 2026): 48px on the raised
-    // fill, "Warm-up · what's in it", and the chevron opens all of it. No
-    // "done" tick: nothing records a warm-up as done, and a tick the app
-    // cannot back would claim something it does not know.
-    <Collapsible open={open} onOpenChange={onToggle} className="rounded-[14px]" style={{ background: 'var(--surface-raised)' }}>
-      <div className="flex items-center">
-      <CollapsibleTrigger className="flex min-h-12 min-w-0 flex-1 items-center justify-between gap-2 px-3.5 text-left">
-        <span className="flex min-w-0 items-center gap-2 text-[0.875rem] font-medium text-foreground">
-          <Thermometer className="size-4 shrink-0 text-primary-text" aria-hidden />
-          <span className="shrink-0 whitespace-nowrap">Warm-up</span>
-          <span className="truncate text-[0.8125rem] font-normal text-muted-foreground" data-testid="warmup-badge">· {warmupBadgeText(planMoves, totalMinutes, extra.length, extraMinutes)}</span>
+    // ONE HAIRLINE ROW (tab polish, Exercise 2a, 31 Oct 2026): a flame, "Warm-up"
+    // over what is in it, "Feeling tight?" on the row it changes, and a
+    // chevron. No "done" tick: nothing records a warm-up as done, and a tick
+    // the app cannot back would claim something it does not know.
+    <Collapsible open={open} onOpenChange={onToggle} className="border-y border-[color:var(--hairline)]" data-testid="warmup-section">
+      <div className="flex min-h-[52px] items-center gap-3 px-1">
+      <CollapsibleTrigger className="flex min-h-[52px] min-w-0 flex-1 items-center gap-3 text-left">
+        <Flame className="size-4 shrink-0 text-text-tertiary" aria-hidden />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[0.875rem] font-medium text-foreground">Warm-up</span>
+          <span className="block truncate text-[0.71875rem] text-muted-foreground" data-testid="warmup-badge">{warmupBadgeText(planMoves, totalMinutes, extra.length, extraMinutes)}</span>
         </span>
-        <ChevronDown className={`size-4 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
       </CollapsibleTrigger>
-      {trailing && <div className="shrink-0 border-l border-[color:var(--hairline)] pr-1">{trailing}</div>}
+      {trailing && <div className="shrink-0">{trailing}</div>}
+      <ChevronRight aria-hidden onClick={onToggle} className={`size-3.5 shrink-0 cursor-pointer text-muted-foreground transition-transform duration-150 ${open ? 'rotate-90' : ''}`} />
       </div>
-      <CollapsibleContent className="px-3 pb-3 space-y-3">
+      <CollapsibleContent className="px-1 pb-3 space-y-3">
         {/* FIRST, because its own line says "do these first" and the feature puts them at the
             front of today's warm-up; it was drawn third, after General and Mobility (user test #24). */}
         {extra.length > 0 && (

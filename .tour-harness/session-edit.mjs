@@ -124,7 +124,7 @@ check('1i. ...while the plate calculator, which changes nothing, stays one tap a
   (await ev(`(() => {
     const r = [...document.querySelectorAll('[data-exercise-name]')].find(x => x.getAttribute('data-exercise-name') === ${JSON.stringify(loadedName)})
     if (!r) return 'row gone'
-    return [...r.querySelectorAll('button')].some(b => /plate calculator/i.test(b.textContent || ''))
+    return [...r.querySelectorAll('button')].some(b => /plate calculator/i.test(b.getAttribute('aria-label') || b.textContent || '') /* 2a: the button in the weight box, named by its label */)
   })()`)) === true)
 // AND NOT ON A ROW WITH NOTHING TO LOAD. A band warm-up offering to work out
 // your plates is the app claiming something it cannot do — the same class as
@@ -147,7 +147,7 @@ const unloadedCalc = await ev(`(() => {
     const want = ${JSON.stringify(unloadedTarget?.name ?? null)}
     const r = [...document.querySelectorAll('[data-exercise-name]')].find(x => x.getAttribute('data-exercise-name') === want)
     if (!r) return 'no unloaded exercise on today to ask about: ' + want
-    return [...r.querySelectorAll('button')].some(b => /plate calculator/i.test(b.textContent || '')) ? 'calculator on ' + want : false
+    return [...r.querySelectorAll('button')].some(b => /plate calculator/i.test(b.getAttribute('aria-label') || b.textContent || '') /* 2a: the button in the weight box, named by its label */) ? 'calculator on ' + want : false
   })()`)
 check('1j. ...and is not offered where there is no weight to load', unloadedCalc === false, unloadedCalc)
 

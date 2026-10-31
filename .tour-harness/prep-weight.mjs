@@ -72,7 +72,7 @@ const READ = `(() => {
     if (card.querySelector('input')) break
   }
   const text = (card.innerText || '').replace(/\\s+/g, ' ')
-  const big = [...card.querySelectorAll('.ds-num-lg')].map(n => (n.textContent || '').trim()).filter(Boolean)
+  const big = [...card.querySelectorAll('[data-testid="exercise-load"]') /* 2a: the weight in the card's meta line (was .ds-num-lg) */].map(n => (n.textContent || '').trim()).filter(Boolean)
   const boxes = [...card.querySelectorAll('input')]
     .filter(i => /^setgrid-weight-/.test(i.id))
     .map(i => ({ value: i.value, placeholder: i.placeholder }))

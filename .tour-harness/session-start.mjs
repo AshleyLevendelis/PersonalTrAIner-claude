@@ -22,7 +22,10 @@ const { ev, check, finish, tapExpr, q, byText, until, wait, load, tick, exercise
 
 const sessionRows = () => ev(`(window.__fakeDb?.workout_sessions ?? []).map(r => ({ day: r.day ?? null, week: r.week_number ?? null, started: !!r.started_at, split: r.split_type ?? null }))`)
 const dock = () => ev(`(() => { const n = ${q('[data-testid="session-running"]')}; return n ? { text: n.textContent.replace(/\\s+/g, ' ').trim(), startedAt: n.getAttribute('data-started-at') } : null })()`)
-const skipRest = async () => { if (await ev(`!!${byText('Skip ▸')}`)) { await tapExpr(byText('Skip ▸')); await wait(400) } }
+// RE-ANCHORED 31 Oct 2026 (Exercise 2a): the one rest is shown under the set while that row is in view, and in the
+// dock otherwise — either Skip ends the same engine's rest.
+const REST_SKIP = `(document.querySelector('[data-testid="inline-rest-skip"]') ?? ${byText('Skip ▸')})`
+const skipRest = async () => { if (await ev(`!!${REST_SKIP}`)) { await tapExpr(REST_SKIP); await wait(400) } }
 
 console.log('\nSESSION START PARITY\n')
 await load('dock=1')
@@ -125,7 +128,7 @@ await shoot('session-start-rest-bar')
 await load('dock=1')
 await until(`document.querySelectorAll('[data-exercise-name]').length > 0`, 12000)
 await wait(800)
-check('4f. another set is ticked, a rest is counting, and Finish session is tapped', (await tick(X, 0)) === true && (await ev(`!!${byText('Skip ▸')}`)) === true && await tapExpr(byText('Finish session')))
+check('4f. another set is ticked, a rest is counting, and Finish session is tapped', (await tick(X, 0)) === true && (await ev(`!!${REST_SKIP}`)) === true && await tapExpr(byText('Finish session')))
 // Sets are still to do, so the app asks first; either way this driver finishes.
 await wait(500)
 if (await ev(`!!${q('[data-testid="finish-check"]')}`)) await tapExpr(q('[data-testid="finish-anyway"]'))

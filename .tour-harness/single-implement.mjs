@@ -172,12 +172,9 @@ const headerFor = async name => {
     // SCOPED, NOT PAGE-WIDE: a page-wide search for a weight header returns the
     // FIRST one on screen, which belongs to a different exercise. That exact
     // mistake was made here once and reported as a missing prop.
-    let block = hit
-    for (let i = 0; i < 9 && block.parentElement; i++) {
-      block = block.parentElement
-      const t = block.textContent || ''
-      if (/Log weight|Weight/.test(t) && /Reps/.test(t)) break
-    }
+    // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the exercise's card is its own element; its column labels are drawn
+    // only where they say something the boxes do not (a per-hand or one-side weight, seconds or metres).
+    const block = hit.closest('[data-exercise-name]') ?? hit
     // If the walk overshot into a container holding more than this exercise,
     // the reading is about the wrong lift. Say so rather than returning it.
     const names = [...block.querySelectorAll('*')].filter(n => n.children.length === 0)
@@ -190,19 +187,20 @@ const headerFor = async name => {
     // check — is invisible to it. That is how this came back empty on a
     // column that was rendering correctly the whole time.
     const label = [...block.querySelectorAll('*')]
-      .filter(n => /^Log weight/.test((n.textContent || '').trim()) && (n.textContent || '').trim().length < 60)
+      .filter(n => /^(Log weight|Weight)/.test((n.textContent || '').trim()) && (n.textContent || '').trim().length < 60)
       .map(n => n.textContent.replace(/\\s+/g, ' ').trim())
-    return label
+    const boxes = [...block.querySelectorAll('input')].filter(i => /^setgrid-weight-/.test(i.id)).length
+    return { label, boxes }
   })()`.replace('NAME', name))
 }
 
 const total = await headerFor('Barbell Squats')
 check('6. a lift measured as a TOTAL asks for a plain weight, with no qualifier',
-  Array.isArray(total) && total.length > 0 && !total.some(h => /per hand|single side/i.test(h)), total)
+  !!total && total.boxes > 0 && !total.label.some(h => /per hand|single side/i.test(h)), total)
 
 const perSide = await headerFor('Single-Leg Dumbbell Calf Raise')
 check('7. ...while a one-sided lift still says so, so the column is genuinely wired',
-  Array.isArray(perSide) && perSide.some(h => /single side|per side/i.test(h)), perSide)
+  !!perSide && perSide.boxes > 0 && perSide.label.some(h => /single side|per side/i.test(h)), perSide)
 await shoot('single-implement-logging')
 
 // --- THE SWAP DIALOG: NOT VERIFIED HERE, AND SAYING SO ---------------------

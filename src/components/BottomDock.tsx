@@ -11,7 +11,7 @@
 // countdown). Overrun renders "Rest finished Ns ago", never a frozen 0:00.
 // ---------------------------------------------------------------------------
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Timer } from 'lucide-react'
@@ -25,6 +25,7 @@ import { tabHash, useAppRoute } from '@/lib/app-route'
 import { getAppNow } from '@/lib/dev-clock'
 import { playTimerCue } from '@/lib/timer-cues'
 import { roundHeadline, roundStyleOf } from '@/lib/timer-engine'
+import { inlineRestOnScreen, subscribeInlineRest } from '@/lib/inline-rest-presence'
 
 function formatDuration(ms: number): string {
   const totalSeconds = Math.round(Math.abs(ms) / 1000)
@@ -91,7 +92,10 @@ export function BottomDock() {
     && (timers.running || timers.isRoundComplete || timers.isActive)
     && route.kind === 'tab' && route.tab === 'tools'
   const hasStandaloneTimer = !hasRest && timers.isActive && !roundFieldOnScreen
-  const dockVisible = hasRest || hasStandaloneTimer || hasSessionIndicator
+  // ONE COUNTDOWN ON SCREEN (Exercise 2a, 31 Oct 2026): while the set grid's
+  // rest row is in view it is this same deadline, so the dock stands aside.
+  const inlineRestShown = useSyncExternalStore(subscribeInlineRest, inlineRestOnScreen, () => false)
+  const dockVisible = (hasRest && !inlineRestShown) || hasStandaloneTimer || hasSessionIndicator
 
   // Measure and publish, so the chat composer can offset above us. Observed
   // rather than measured once: the rest card grows a line when the exercise

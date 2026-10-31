@@ -93,8 +93,9 @@ const readCard = name => ev(`(() => {
       retry: !!receipt?.querySelector('[data-testid="set-retry"]'),
     }
   })
-  // The half after the dot: "3 working sets · 2 logged" → "2 logged".
-  const stated = card.innerText.match(/working sets · ([^\\n]+)/)?.[1]?.trim() ?? null
+  // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the count is the right half of the card's "Working sets" caption now
+  // ("2 logged", or what the app knows when it cannot count), in place of the design's "saved".
+  const stated = card.querySelector('[data-testid="logged-count"]')?.textContent?.trim() ?? null
   return { found: true, rows, count: stated, text: card.innerText }
 })()`)
 
@@ -265,7 +266,7 @@ check('5b. (read while the first request was still out)', lineDuring === null &&
 check('5c. THE SETS ARE ALREADY DRAWN — not "0 logged" until the read gives up', during.count === '3 logged', during.count)
 check('5d. ...the two that saved, as saved', during.rows[0]?.sync === 'saved' && during.rows[1]?.sync === 'saved', during.rows.map(r => r.sync))
 check('5e. ...and the one that was given up on, on the grid with Retry', during.rows[2]?.sync === 'failed' && during.rows[2]?.retry === true, during.rows[2])
-const zero = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(c => c.innerText.match(/working sets · ([^\\n]+)/)?.[1]?.trim()).filter(Boolean)`)
+const zero = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(c => c.querySelector('[data-testid="logged-count"]')?.textContent?.trim()).filter(Boolean)`)
 check('5f. every open card states a count, and none of them is a guess', Array.isArray(zero) && zero.length >= 1 && zero.every(z => /^\d+ logged$/.test(z)), zero)
 
 await until(`!!document.querySelector('[data-testid="sets-reconnecting"]')`, 14000)
