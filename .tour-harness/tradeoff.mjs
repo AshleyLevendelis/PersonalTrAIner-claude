@@ -145,7 +145,9 @@ const READ = `(() => {
     // is true from section 1 onwards and says nothing about THIS turn. Cost a
     // false failure on the reason ask before it was noticed.
     cards: document.querySelectorAll('[data-testid="proposal-card"]').length,
-    hasApply: buttons.some(t => /^Apply/.test(t)),
+    // RE-ANCHORED 31 Oct 2026 (her "Mix"): the lead button of a scoped offer reads "Just today" now; the property is
+    // that the card carries its primary (apply) button, whatever its words.
+    hasApply: !!document.querySelector('[data-testid="proposal-card"] [data-offer-weight="primary"]'),
     chips: buttons.filter(t => t.length < 30),
     tail: text.replace(/\\s+/g, ' ').slice(-420),
   }

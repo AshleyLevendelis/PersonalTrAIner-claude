@@ -335,7 +335,9 @@ const sayToCoach = async words => {
 /** What the coach's side of the page says AFTER a marker sentence the person just sent. */
 const since = async marker => { const t = await text(); const i = t.lastIndexOf(marker); return i === -1 ? '' : t.slice(i + marker.length) }
 const settled = async marker => { let last = '', same = 0; for (let i = 0; i < 40 && same < 3; i++) { await wait(400); const now = await since(marker); if (now && now === last) same++; else same = 0; last = now } return last }
-const hasCardButtons = () => ev(`[...document.querySelectorAll('button')].some(b => /^Apply/.test((b.textContent || '').trim()))`)
+// RE-ANCHORED 31 Oct 2026 (her "Mix"): a scoped offer's lead button now reads "Just today", not "Apply today", so
+// "the Apply button" is the card's PRIMARY button, whatever its words: [data-offer-weight="primary"].
+const hasCardButtons = () => ev(`!!document.querySelector('[data-testid="proposal-card"] [data-offer-weight="primary"]')`)
 
 // --- swap, naming the weekday on screen ------------------------------------
 const SWAP_SAID = 'swap the last one on today, the station is busy'
@@ -345,7 +347,7 @@ check(`7c. it does NOT answer "${TODAY_NAME} is a rest day — there's nothing o
 check('7d. ...it offers the swap (the offer itself on screen), naming the exercise that is on the moved session', (await ev(`!!document.querySelector('[data-testid="proposal-card"][data-offer="text"][data-card-status="pending"]')`)) && swapReply.includes(movedNames[movedNames.length - 1] ?? 'NO-NAME') && await hasCardButtons(), swapReply.slice(0, 260))
 check(`7e. ...and the card says ${TODAY_NAME}, never ${FROM_NAME}`, swapReply.includes(`${TODAY_NAME}'s other`) && !swapReply.includes(`${FROM_NAME}'s other`), swapReply.slice(0, 320))
 await shoot('moved-edit-7-coach-swap')
-check('7f. tapping Apply', await ev(`(() => { const b = [...document.querySelectorAll('button')].filter(x => /^Apply/.test((x.textContent || '').trim())).pop(); if (!b) return false; b.click(); return true })()`))
+check('7f. tapping Apply', await ev(`(() => { const b = [...document.querySelectorAll('[data-testid="proposal-card"] [data-offer-weight="primary"]')].pop(); if (!b) return false; b.click(); return true })()`))
 const coachSaved = (await until(async () => { const r = await savedRow(FROM_NAME); return r && !r.includes(movedNames[movedNames.length - 1]) ? r : null })) || (await savedRow(FROM_NAME)) || []
 check(`7g. THE SWAP LANDED on ${FROM_NAME}'s saved row`, coachSaved.length === movedNames.length && !coachSaved.includes(movedNames[movedNames.length - 1]), coachSaved)
 check(`7h. ...and ${TODAY_NAME}'s own row holds no exercises`, coachSaved.length > 0 && ((await savedRow(TODAY_NAME)) || []).length === 0, await savedRow(TODAY_NAME))
@@ -387,7 +389,7 @@ await ev(`window.__rowPatch = { pending_actions: () => ({ expires_at: new Date(D
 const LATE_SAID = 'actually I only have 25 minutes now'
 const sentAt = Date.now()
 check('11a. another offer is asked for', await sayToCoach(LATE_SAID))
-const cardStatus = () => ev(`(() => { const c = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); if (!c) return null; return { status: c.getAttribute('data-card-status'), apply: [...c.querySelectorAll('button')].some(b => /^Apply/.test(b.textContent.trim())), note: c.querySelector('[data-testid="proposal-terminal-note"]')?.textContent || '', opacity: Number(getComputedStyle(c).opacity) } })()`)
+const cardStatus = () => ev(`(() => { const c = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); if (!c) return null; return { status: c.getAttribute('data-card-status'), apply: !!c.querySelector('[data-offer-weight="primary"]'), note: c.querySelector('[data-testid="proposal-terminal-note"]')?.textContent || '', opacity: Number(getComputedStyle(c).opacity) } })()`)
 const live = await until(async () => { const c = await cardStatus(); return c && c.status === 'pending' && (await since(LATE_SAID)).length > 0 ? c : null }, 20)
 await ev(`window.__rowPatch = undefined`)
 check('11b. while it is live it has its Apply button and says nothing about a limit', !!live && live.apply === true && live.note === '' && live.opacity === 1 && !/minute|expire|timed/i.test((await since(LATE_SAID)).replace(/25 minutes|about \d+ minutes|~?\d+ min\b|\d+ minutes isn.t/g, '')), { live, text: (await since(LATE_SAID)).slice(0, 200) })

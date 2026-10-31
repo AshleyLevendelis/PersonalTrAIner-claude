@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **RELEASE OF 31 OCT 2026 — SWEEP, MERGE TO MAIN, SERVER HALF HANDED TO HER MACHINE.** Her word: "make it live",
+  then "After the redesign". **Full sweep** on `0f4ead5`, 450 gates: 442 PASS, 8 FAIL. Environmental, each read for its
+  own "could not reach" sentence: `test:meal-quality` ("VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY must be set"),
+  `test:schema-parity` ("Failed to link to TEST"), `verify:rls` ("No database to read, and no key given"). Expected:
+  `test:coach-exam-fresh` (the coach changed in this release; the exam needs her key, offered as an optional step in
+  her prompt). Real, all four DRIVER anchors on the pre-2c Home, the screen right each time: `verify:weigh-in` (fixed
+  before the sweep ended), `verify:rest-day-race` (waited for an "UP NEXT" heading 2c removed, so read Home only after
+  the plan landed; now the card's status, title, ring names and the tomorrow tile's dash; 4 mutations, 4 caught),
+  `verify:meal-counter` (ring label; 2/2, one being Home ignoring the corrected ledger), `verify:six` (the card named
+  and four rings drawn; 2/2). **The two wording commits came after the sweep**, so their gates were derived (19 `test:`
+  readers of the changed files, 30 drivers on the screens that print offer or sheet words, `test:bundle`,
+  `test:no-dead-code`) and run: 46 of 49 pass. `verify:weigh-in` had hit a leftover browser on its port; clean on
+  re-run. `verify:moved-edit` and `verify:tradeoff` looked for a button starting "Apply", and a scoped offer's lead
+  button now reads "Just today" (it read "Apply today"): re-anchored on the card's primary button. 2 mutations each;
+  moved-edit 2/2, tradeoff 1/2 — the miss is a confirm that does nothing, which tradeoff never taps by design
+  (moved-edit holds it). **A harness note**: my mutation runner counted only stdout, and drivers print ✗ to stderr, so
+  its first round read every catch as a short run; fixed before any result was used. Deploys: frontend on the merge;
+  `chat-gemini`, `generate-meals`, `onboarding-chat` and migration `20261022120000` on her machine (prompt handed over).
+  `macro-calibration` and `coach-reach-out` unchanged.
 - [x] **FIVE TABS REDRAWN FROM HER DESIGN HANDOFF, 31 Oct 2026, AND A LISTEN BUTTON ON THE COACH.** Ashley uploaded the
   tab-polish handoff (Home 2c, Nutrition 3a+3b, Exercise 2a, Tools 2a, Chat 2b) and, asked whether to build it as
   drawn or keep her earlier rulings where they clash, said **"build, keep my rulings"**. Layout only; nothing the app
