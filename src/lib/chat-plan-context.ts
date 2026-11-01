@@ -213,6 +213,13 @@ export interface CoachToday {
    * sets on PLANNED exercises) and not "every row in the log against the plan".
    */
   work?: CoachTodayWork | null
+  /**
+   * What SHE SAID about today, off the strip's cell (1 Nov 2026): a rest she chose, a swap for an activity
+   * ("Football · 60 min" when logged), or the session marked missed. Without it the header said "NOT
+   * LOGGED yet" on a day she had already told the app about, and the coach asked about a session she had
+   * called off.
+   */
+  declared?: { kind: 'rest_chosen' } | { kind: 'swapped'; line: string | null } | { kind: 'missed' } | null
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +466,12 @@ export function buildTodayHeader(today: CoachToday): string {
   let session: string
   if (today.movedTo) {
     session = `Today, ${today.dayName}, had ${today.focus ?? 'a session'} on it and THEY MOVED IT TO ${today.movedTo.dayName.toUpperCase()} — they told you so. It is not a rest day and it is not missed; the session is still owed, on ${today.movedTo.dayName}. They can still do it today if they want to.`
+  } else if (today.declared?.kind === 'rest_chosen') {
+    session = `Today, ${today.dayName}, they CHOSE TO REST — they told the app so. There is no session owed today; do not ask whether they trained.`
+  } else if (today.declared?.kind === 'swapped') {
+    session = `Today, ${today.dayName}, they SWAPPED ${today.focus ? `the ${today.focus} session` : 'the session'} for ${today.declared.line || 'another activity'} — they told the app so. Nothing more is owed today.`
+  } else if (today.declared?.kind === 'missed') {
+    session = `Today, ${today.dayName}, they said ${today.focus ? `the ${today.focus} session` : 'the session'} is NOT HAPPENING (marked missed). Do not ask whether they trained.`
   } else if (today.movedFrom) {
     session = `Today's session is ${today.movedFrom.dayName}'s ${today.focus}, MOVED TO TODAY at their request${today.finished ? (closedShort ? `. ${closedShort}` : ', and it is ALREADY DONE.') : setsLogged > 0 ? `, with ${setsLogged} of ${setsPlanned} sets logged.` : ', NOT LOGGED yet.'}`
   } else if (!today.focus) {

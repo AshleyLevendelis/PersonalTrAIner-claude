@@ -22,6 +22,7 @@ import { readFileSync } from 'node:fs'
 import { pickOpener, missedYesterdayFrom } from '../src/lib/coach-opener'
 import { pickNudge } from '../src/lib/coach-nudge'
 import { whenSaid } from '../src/lib/coach-voice'
+import { buildTodayHeader } from '../src/lib/chat-plan-context'
 
 let failures = 0
 let ran = 0
@@ -96,6 +97,20 @@ check('the dynamic calorie day is the app\'s today, not the machine\'s', /getApp
 check('the opener bubbles carry when they were said (seed, composed, reseed)',
   (chat.match(/status: 'complete',\s*created_at: new Date\(\)\.toISOString\(\)/g) ?? []).length >= 3
   && /content: greeting, status: 'complete', created_at: new Date\(\)\.toISOString\(\)/.test(chat), (chat.match(/status: 'complete',\s*created_at: new Date\(\)\.toISOString\(\)/g) ?? []).length)
+
+// ---------------------------------------------------------------------------
+console.log('\n6. What she said about today reaches the coach\'s header')
+// ---------------------------------------------------------------------------
+const hdr = { dayName: 'Sunday', hour: 11, clock: '11:21 AM', focus: 'Upper Pull', isGymSession: true, setsLogged: 0, setsPlanned: 12, finished: false, next: null }
+check('no declaration: "NOT LOGGED yet", as before', /Upper Pull, NOT LOGGED yet/.test(buildTodayHeader(hdr)))
+const rest = buildTodayHeader({ ...hdr, declared: { kind: 'rest_chosen' } })
+check('a rest she chose is said, and "NOT LOGGED" is not', /CHOSE TO REST/.test(rest) && !/NOT LOGGED/.test(rest), rest)
+const swap = buildTodayHeader({ ...hdr, declared: { kind: 'swapped', line: 'Football · 60 min' } })
+check('a swap names what she did instead', /SWAPPED the Upper Pull session for Football · 60 min/.test(swap) && !/NOT LOGGED/.test(swap), swap)
+const miss = buildTodayHeader({ ...hdr, declared: { kind: 'missed' } })
+check('a session she marked missed is said as not happening', /NOT HAPPENING \(marked missed\)/.test(miss) && !/NOT LOGGED yet/.test(miss), miss)
+check('the client reads the declaration off the strip\'s own cell',
+  /if \(cell\.state === 'rest_chosen'\) return \{ kind: 'rest_chosen' as const \}/.test(chat) && /if \(cell\.state === 'swapped'\)/.test(chat) && /if \(cell\.markedMissed\) return \{ kind: 'missed' as const \}/.test(chat))
 
 console.log(`\n${ran} checks ran`)
 if (failures > 0) { console.error(`chat today truth: ${failures} check(s) failed`); process.exit(1) }

@@ -2,6 +2,44 @@
 
 Newest first. One line each.
 
+- [x] **"YOU'VE JUST WRAPPED UP YOUR WORKOUT" ON A REST-DAY MORNING, 1 NOV 2026 — the coach may not describe a day
+  that is not hers, and the app's own sentences say only what happened.** Ashley, Sunday 11:22, rest day, nothing
+  logged all week, tapped Home's "What should I focus on for the rest of today?": *"Since it's late in the evening and
+  you've just wrapped up your workout, your main focus for the rest of tonight ..."*. MEASURED, not guessed: the client
+  sent "Sunday 11:21 AM (morning)" and "Workout Logged Today: No", and both prompt lines rendered; the model wrote over
+  them, most likely from two few-shot examples ("fit your evening nicely", "just finished deadlifts"). Nothing compared
+  a reply with the facts. (Her header still read "Coach": the phone held the pre-1-Nov bundle; not a cause.)
+  - **The guard** (`today-claim.ts`, src and _shared, identical): a sentence that says it IS a part of the day it is not
+    ("since it's late in the evening", "good evening", "the rest of tonight"), or that she trained / finished a workout
+    today when nothing was trained, is refused. Conditionals, questions, advice about later ("have the bolognese
+    tonight") and her own news ("I just did a 5k") pass; an unknown fact checks nothing. Server: every plain and tool
+    reply, refused → retried ONCE with the facts stated → floored ("Scratch that, I had your day wrong. It's Sunday
+    morning and there's nothing logged yet today."; a tool turn keeps its own template). Client: its own copy floors
+    before the screen, the only one live until `chat-gemini` is deployed. The few-shot is time-neutral and labelled
+    voice-only. `test:today-claim` (51 checks, 13 mutations, 13 caught, one only after a question case was added),
+    `verify:today-claim` (13 checks: her reply floored at midday; a TRUE "wrapped up" shown after a finished session;
+    "great session today" shown after "I just did a 5k"; 3 mutations caught, one first-try mutant did not create the
+    defect and was redone).
+  - **The app's own sentences, found by the trace** (`test:chat-today-truth`, 25 checks, 14 mutations, 14 caught):
+    "Workout Logged Today" counted warm-ups (now the strip's working sets; `trained_today` also sent); past the training
+    hour the opener and the first greeting said "today was X. How'd it go?" with nothing trained (now "did today's X
+    happen?" unless something was); three personal-best lines had no day though a best is shown for 7 days (now today /
+    yesterday / on Thursday); "N days on the trot" for a streak that counts sessions (her 17 Oct ruling); "how did
+    Friday feel?" about a completed row with no working sets, which the strip calls missed (now only rows with work; the
+    verify:coach-speaks-first fixture gained that session's sets, and its failing run before is the on-screen proof);
+    yesterday's miss named from today's plan week (now the cell's own session); the chat's copy of Home read no moves
+    and went stale on a plan change (now Home's moves and re-read keys); the dynamic calorie day used the machine clock
+    (now getAppNow); opener bubbles carried no time, so an old one restored later reached the coach as if just said
+    (now stamped); the coach's header said "NOT LOGGED yet" on a day she had marked rested, swapped or missed (now it
+    says what she told the app).
+  - Re-anchored (mechanism-pinned on code deliberately restructured, properties unchanged, each mutation-tested):
+    `test:local-dates`, `test:no-false-claim`, `test:plan-unknown`, `test:what-a-pr-is`. Derived gate sets: 122 + 126 +
+    17, all green after the fixes.
+  - **NOT DONE, named**: the Exercise strip draws a mint dot on a SELECTED rest day where Home draws a dash (a side
+    effect of the M52 fix; hers, asked). The push reach-out (built, not live) still asks about a set-less session.
+    About 40 edit paths address plan rows by weekday (writers, not readers of "today"; not audited one by one). The
+    coach EXAM is stale and is the only thing that can say whether the model now describes the day correctly unaided.
+  - Needs: frontend on merge (her word); `chat-gemini` deploy for the server half (retry with facts, the examples).
 - [x] **SMALL RELEASE, 1 NOV 2026: "Trainer" header, outlined offer buttons, Tools tour line.** Her rulings that day
   ("Sets done" as built, "Both say Trainer", "All outlined") and one factual fix (the tour said the timers were "behind
   here"; Tools 2a put them on the page). Merged to `main` on her "Yes, make them live"; Vercel production READY on

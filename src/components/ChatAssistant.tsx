@@ -1733,6 +1733,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           : null,
         movedTo: todayMovedTo ? { dayName: todayMovedTo.dayName } : null,
         movedFrom: todayMovedFrom ? { dayName: todayMovedFrom.dayName } : null,
+        // WHAT SHE SAID ABOUT TODAY, off the strip's own cell (1 Nov 2026).
+        declared: (() => {
+          const cell = trainingWeek.days.find(d => d.date === activeSession.date)
+          if (!cell) return null
+          if (cell.state === 'rest_chosen') return { kind: 'rest_chosen' as const }
+          if (cell.state === 'swapped') return { kind: 'swapped' as const, line: cell.swappedLine ?? cell.swappedForActivity ?? null }
+          if (cell.markedMissed) return { kind: 'missed' as const }
+          return null
+        })(),
       },
     })
 
