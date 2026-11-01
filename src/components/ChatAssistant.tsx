@@ -736,12 +736,18 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const el = composerRef.current
     if (!el || typeof ResizeObserver === 'undefined') return
     let lastWidth = el.clientWidth
+    let frame = 0
+    // Fitted on the next frame, not inside the observer: resizing the box from inside its own observer is the
+    // "ResizeObserver loop" error.
     const ro = new ResizeObserver(() => {
       const w = el.clientWidth
-      if (w !== lastWidth) { lastWidth = w; fitComposer() }
+      if (w === lastWidth) return
+      lastWidth = w
+      cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(fitComposer)
     })
     ro.observe(el)
-    return () => ro.disconnect()
+    return () => { ro.disconnect(); cancelAnimationFrame(frame) }
   }, [fitComposer])
   // Voice input — captures the input text at the moment listening starts so
   // a live transcript appends after whatever the user already typed, rather
