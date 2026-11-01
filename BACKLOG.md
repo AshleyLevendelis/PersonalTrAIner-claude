@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [ ] **WHOLE-APP TEST, 1 NOV 2026: about 60 findings, `docs/audits/whole-app-test-2026-11-01.md`.** Ashley: *"Run a
+  comprehensive test in the entire app and look for issues."* Five exploratory testers drove the real app at 390x844
+  (app-boot.html, the whole App.tsx, plus the single-screen pages and the setup harness), all nine themes and 360px,
+  reading screenshots; the full 455-gate sweep ran beside them. Every gate passes, and the testers still found ~22
+  wrong-number or false-claim defects, ~9 dead controls, and a readability/tap-size set. **The lesson is the one from
+  her voice report the same day: the gates hold what someone thought to hold; a person tapping through finds the
+  rest.** FIXED the same evening (both mechanical, both proven and mutation-tested): an empty steps box logged 0 over
+  the day's steps (`verify:home-steps`, 8 checks, 3 mutations), and the chat box did not grow when the app filled it
+  while the tab was hidden, a gap in that afternoon's own fix (`verify:chat-composer` section 4, 2 mutations).
+  Everything else is a LEAD for her to approve fixing. Two need an engine trace first: a knee-rehab drill on an upper
+  day (against her 20 Oct ruling, safety-adjacent) and a swapped lift weighing twice the plan's own. Sweep result to
+  follow; `test:cardio-reader` failed once under the testers' load and passed 16 reruns (failing line not captured).
 - [x] **VOICE TYPING REPEATED WORDS, AND THE CHAT BOX STAYED ONE LINE, 1 NOV 2026.** Ashley, from her Android phone:
   *"The voice to text repeats words. Also the text box is only thin and doesn't change size so you can see what
   you've typed when there's lots of text."* Her box read "what what is what is what is the what is the what is the
