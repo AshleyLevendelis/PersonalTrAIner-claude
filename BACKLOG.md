@@ -79,7 +79,9 @@ Newest first. One line each.
     `test:chat-2b`, `test:coach-kit-names`, `test:session-edit`, `test:sheet-manners`; drivers `offer-text`, `chat-2b`,
     `swap-request` and `coach-ban` (now find the offer's confirm and decline by the weights the card stamps, not by
     their words), `exercise-add`, `moved-edit`, `session-edit`. 24 derived logic gates green.
-  - **Open questions of hers (wording)**: the chat's session pill ("2 of 20 sets" done, or "set 3 of 20");
+  - **Open questions of hers (wording)**: the chat's session pill — ANSWERED 1 Nov 2026, **"Sets done"**, from two
+    options (over "set 3 of 20", the next set, as the design drew): "2 of 20 sets", the count Home, the strip and the
+    Exercise bar already say; as built, held by `test:chat-2b` §mid-session, nothing changed;
     the coach group label "Trainer" under a header that reads "Coach"; the first reply pill is now filled mint where
     her 20 Oct "small buttons" were outlines; the Tools tour line "All three timers live behind here".
   - NOT PROVEN: a real phone (the voice has never been heard on a device), and App.tsx's wiring around the Exercise
