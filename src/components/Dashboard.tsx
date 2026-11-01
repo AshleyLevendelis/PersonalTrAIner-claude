@@ -326,6 +326,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
    * sit alongside a real number — it becomes the number.
    */
   const handleLogSteps = async () => {
+    // AN EMPTY BOX IS NOT ZERO (1 Nov 2026, the whole-app test): Number('') is 0, so tapping Log steps on an empty
+    // box replaced the day's steps with 0. The last count shows as the placeholder, which reads like a filled box.
+    if (stepsInput.trim() === '') return
     const n = Number(stepsInput)
     if (!profile.id || !activeSession.date || !Number.isFinite(n) || n < 0) return
     const rounded = Math.round(n)
@@ -593,7 +596,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 className="h-11 w-28 rounded-[10px] px-3 text-[0.875rem] tabular-mono"
                 style={{ background: 'var(--surface-sunken)' }}
               />
-              <Button size="sm" className="h-11" onClick={() => void handleLogSteps()}>Log steps</Button>
+              <Button size="sm" className="h-11" disabled={stepsInput.trim() === ''} onClick={() => void handleLogSteps()}>Log steps</Button>
             </span>
             {/* WHERE THE TARGET COMES FROM — shown while the input is open. */}
             <span className="text-[0.6875rem] leading-[1.35] text-muted-foreground/80">

@@ -504,7 +504,8 @@
     "verify:today-claim": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/today-claim.mjs",
     "test:chat-today-truth": "tsx scripts/test-chat-today-truth.ts",
     "test:speech-merge": "tsx scripts/test-speech-merge.ts",
-    "verify:chat-composer": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-composer.mjs"
+    "verify:chat-composer": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-composer.mjs",
+    "verify:home-steps": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/home-steps.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

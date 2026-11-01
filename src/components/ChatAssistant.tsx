@@ -717,15 +717,32 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // can see what you've typed"). It was one fixed line with a scroll inside, so a long message or a voice
   // transcript was read through a slot. It now grows to fit, up to COMPOSER_MAX_PX (about six lines), and only
   // past that scrolls, kept at the end so the newest words are the ones in view.
-  useLayoutEffect(() => {
+  //
+  // AND WHEN THE APP FILLS IT (1 Nov 2026, found by the whole-app test the same evening): "Adjust today" on Home
+  // writes into the box while the chat tab is hidden, where a box measures 0 tall, so it stayed one line and cut
+  // the question off until she typed. So it is fitted again whenever it comes into view (its width goes from 0 to
+  // real), not only when its text changes.
+  const fitComposer = useCallback(() => {
     const el = composerRef.current
-    if (!el) return
+    if (!el || el.clientWidth === 0) return // hidden: nothing to measure yet, the observer below runs it on show
     el.style.height = 'auto'
     const full = el.scrollHeight
     el.style.height = `${Math.min(full, COMPOSER_MAX_PX)}px`
     el.style.overflowY = full > COMPOSER_MAX_PX ? 'auto' : 'hidden'
     if (full > COMPOSER_MAX_PX && el.selectionEnd === el.value.length) el.scrollTop = full
-  }, [input])
+  }, [])
+  useLayoutEffect(() => { fitComposer() }, [input, fitComposer])
+  useEffect(() => {
+    const el = composerRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    let lastWidth = el.clientWidth
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth
+      if (w !== lastWidth) { lastWidth = w; fitComposer() }
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [fitComposer])
   // Voice input — captures the input text at the moment listening starts so
   // a live transcript appends after whatever the user already typed, rather
   // than each recognition event (which reports the FULL transcript so far,

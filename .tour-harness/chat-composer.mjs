@@ -114,6 +114,18 @@ const sent = await ev(`(() => { const b = [...document.querySelectorAll('button'
 check('3f. she sends it', sent === true)
 const after = await until(() => ev(GEO), v => v && v.h === 44, 30)
 check('3g. after sending, the box is one line again', after?.h === 44, after)
-check('4. no uncaught error on the page', (await ev('window.__err ?? null')) === null, await ev('window.__err ?? null'))
+// 4. FILLED WHILE HIDDEN. Home's "Adjust today" writes into the box while the chat tab is display:none, where a
+// box measures 0 tall; on 1 Nov the box then stayed one line and cut the question off. Done here by hiding the chat
+// screen around the box (the same display:none an inactive tab has), filling it, and showing it again.
+console.log('\n4. Filled while the chat is hidden, then shown')
+const HIDE = on => ev(`(() => { const c = document.querySelector('[data-testid="chat-composer"]'); const scr = c && c.parentElement; if (!scr) return false; scr.style.display = ${on ? "'none'" : "''"}; return true })()`)
+check('4a. the chat screen is hidden', (await HIDE(true)) === true)
+await setText(medium)
+await wait(250)
+check('4b. it is shown again', (await HIDE(false)) === true)
+const shown = await until(() => ev(GEO), v => v && v.h > 80, 20)
+check('4c. the box grows to show what was put in it while hidden, without a keystroke', !!shown && shown.h > 80 && shown.sh <= shown.ch + 1, shown)
+await shoot('chat-composer-prefilled')
+check('5. no uncaught error on the page', (await ev('window.__err ?? null')) === null, await ev('window.__err ?? null'))
 
 await finish('verify:chat-composer PASSED')
