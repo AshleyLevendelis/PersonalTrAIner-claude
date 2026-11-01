@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **SMALL RELEASE, 1 NOV 2026: "Trainer" header, outlined offer buttons, Tools tour line.** Her rulings that day
+  ("Sets done" as built, "Both say Trainer", "All outlined") and one factual fix (the tour said the timers were "behind
+  here"; Tools 2a put them on the page). Merged to `main` on her "Yes, make them live"; Vercel production READY on
+  `13a51df`. Frontend only, no edge function or migration. **Deviation, named**: no full sweep before this merge, only
+  the gates derived from each change (97 for the header, 14 for the pills, 6 for the tour line, all green; mutations:
+  header 2/2, filled pill 2/2). The last full sweep was 31 Oct on `0f4ead5`; the next merge should run one.
 - [x] **RELEASE OF 31 OCT 2026 — SWEEP, MERGE TO MAIN, SERVER HALF HANDED TO HER MACHINE.** Her word: "make it live",
   then "After the redesign". **Full sweep** on `0f4ead5`, 450 gates: 442 PASS, 8 FAIL. Environmental, each read for its
   own "could not reach" sentence: `test:meal-quality` ("VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY must be set"),
