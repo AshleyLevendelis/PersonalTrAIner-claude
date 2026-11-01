@@ -87,6 +87,8 @@ export interface ToolReplyOptions {
   mustContain?: string[];
   /** None of these may match the reply or it falls to the floor. */
   forbid?: RegExp[];
+  /** Fact checks (the day as it is): a refused round trip gets ONE retry that states the facts, then this check's floor. */
+  checks?: ReplyCheck[];
   log?: (...args: unknown[]) => void;
 }
 
@@ -111,17 +113,40 @@ export function guardReason(text: string, mustContain: string[] = [], forbid: Re
   return null;
 }
 
+/**
+ * A FACT CHECK ON THE REPLY, with its own retry and its own last resort (1 Nov 2026, today-claim.ts).
+ * `test` returns why a text is refused, or null. Unlike `forbid`, a refusal here is answered with a
+ * retry that STATES THE FACTS (`nudge`), because the model wrote over facts it had already been given
+ * and a bare "try again" invites the same sentence back. `floor` is what ships when the retry is
+ * refused too.
+ */
+export interface ReplyCheck {
+  test: (text: string) => string | null;
+  nudge: (why: string) => string;
+  floor: string;
+}
+
+function firstCheckRefusal(text: string, checks: ReplyCheck[]): { why: string; check: ReplyCheck } | null {
+  for (const check of checks) {
+    const why = check.test(text);
+    if (why) return { why, check };
+  }
+  return null;
+}
+
 export async function resolveToolReply(opts: ToolReplyOptions): Promise<ToolReplyResult> {
   const { contents, firstParts, callGemini, outcome, floor } = opts;
   const log = opts.log ?? (() => {});
   const mustContain = opts.mustContain ?? [];
   const forbid = opts.forbid ?? [];
+  const checks = opts.checks ?? [];
   let legs = 0;
+  let checkFloor: string | null = null;
 
   if (opts.preferFirstLegText) {
     const own = sanitizeReply(textOf(firstParts));
     if (own) {
-      const why = guardReason(own, mustContain, forbid);
+      const why = guardReason(own, mustContain, forbid) ?? firstCheckRefusal(own, checks)?.why ?? null;
       if (!why) return { reply: own, source: "first_leg", legs };
       log("tool-reply: first-leg text refused", { tool: outcome.name, why });
     }
@@ -156,11 +181,21 @@ export async function resolveToolReply(opts: ToolReplyOptions): Promise<ToolRepl
       break;
     }
     const why = guardReason(text, mustContain, forbid);
-    if (!why) return { reply: text, source: "round_trip", legs };
-    log("tool-reply: round trip refused by guard", { tool: outcome.name, why });
+    const checked = why ? null : firstCheckRefusal(text, checks);
+    if (!why && !checked) return { reply: text, source: "round_trip", legs };
+    log("tool-reply: round trip refused by guard", { tool: outcome.name, why: why ?? checked?.why });
+    // A FACT CHECK GETS ONE RETRY THAT SAYS THE FACTS; the template guards above do not (their floor is right).
+    if (checked && attempt === 0) {
+      checkFloor = checked.check.floor;
+      turns.push({ role: "model", parts: [{ text }] }, { role: "user", parts: [{ text: checked.check.nudge(checked.why) }] });
+      continue;
+    }
     break;
   }
 
+  // The tool's own template is server-authored and says only what the tool did, so it stays the floor
+  // even after a fact check fired: it cannot describe the day wrongly. checkFloor is unused here on purpose.
+  void checkFloor;
   return { reply: floor, source: "floor", legs };
 }
 
@@ -213,6 +248,8 @@ export interface PlainReplyOptions {
   refusedFloor?: string;
   /** Replaces PLAIN_TURN_NUDGE when the retry needs to say what was wrong. */
   nudge?: string;
+  /** Fact checks (the day as it is), each with its own retry wording and its own floor. Run after `forbid` and `refuse`. */
+  checks?: ReplyCheck[];
   log?: (...args: unknown[]) => void;
 }
 
@@ -227,24 +264,34 @@ export const PLAIN_CLAIM_NUDGE =
 export async function resolvePlainReply(opts: PlainReplyOptions): Promise<ToolReplyResult> {
   const log = opts.log ?? (() => {});
   const forbid = opts.forbid ?? [];
-  const refuseReason = (t: string): string | null =>
-    guardReason(t, [], forbid) ?? (opts.refuse ? opts.refuse(t) : null);
+  const checks = opts.checks ?? [];
+  // WHY A TEXT IS REFUSED, AND WHAT THE RETRY AND THE LAST RESORT SAY FOR THAT REASON. A plan claim and a
+  // wrong description of the day are different untruths and need different words, or the retry repeats one.
+  const refusal = (t: string): { why: string; nudge: string; floor: string | undefined } | null => {
+    const why = guardReason(t, [], forbid) ?? (opts.refuse ? opts.refuse(t) : null);
+    if (why) return { why, nudge: opts.nudge ?? PLAIN_CLAIM_NUDGE, floor: opts.refusedFloor };
+    const checked = firstCheckRefusal(t, checks);
+    return checked ? { why: checked.why, nudge: checked.check.nudge(checked.why), floor: checked.check.floor } : null;
+  };
 
   let refused = false;
+  let refusedFloor: string | undefined = undefined;
+  let nudge = PLAIN_TURN_NUDGE;
   const own = sanitizeReply(textOf(opts.firstParts));
   if (own) {
     // THE ONE CHECK THAT WAS MISSING. guardReason already existed, already
     // exported, already ran on every tool turn — it had simply never been
     // pointed at this path, the one where the model is unsupervised.
-    const why = refuseReason(own);
-    if (!why) return { reply: own, source: "first_leg", legs: 0 };
+    const r = refusal(own);
+    if (!r) return { reply: own, source: "first_leg", legs: 0 };
     refused = true;
-    log("plain-reply: first-leg text refused", { why, text: own.slice(0, 160) });
+    refusedFloor = r.floor;
+    // A SILENT TURN AND A REFUSED ONE NEED DIFFERENT WORDS. Retrying a false
+    // claim with "you produced no message at all" tells the model something
+    // untrue about itself and invites the same sentence straight back.
+    nudge = r.nudge;
+    log("plain-reply: first-leg text refused", { why: r.why, text: own.slice(0, 160) });
   }
-  // A SILENT TURN AND A REFUSED ONE NEED DIFFERENT WORDS. Retrying a false
-  // claim with "you produced no message at all" tells the model something
-  // untrue about itself and invites the same sentence straight back.
-  const nudge = refused ? (opts.nudge ?? PLAIN_CLAIM_NUDGE) : PLAIN_TURN_NUDGE;
 
   let legs = 0;
   for (let attempt = 0; attempt < 2; attempt++) {
@@ -263,12 +310,13 @@ export async function resolvePlainReply(opts: PlainReplyOptions): Promise<ToolRe
     if (dropped.length > 0) log("plain-reply: retry returned calls with tools off — dropped", dropped.map((c) => c.name));
     const text = sanitizeReply(textOf(leg.parts));
     if (text) {
-      const why = refuseReason(text);
-      if (!why) return { reply: text, source: "round_trip", legs };
+      const r = refusal(text);
+      if (!r) return { reply: text, source: "round_trip", legs };
       // Twice is enough. The floor is server-authored and cannot claim
       // anything, which is the whole point of having one.
       refused = true;
-      log("plain-reply: retry refused by guard", { why, text: text.slice(0, 160) });
+      refusedFloor = r.floor;
+      log("plain-reply: retry refused by guard", { why: r.why, text: text.slice(0, 160) });
       break;
     }
     log("plain-reply: retry said nothing either");
@@ -278,5 +326,5 @@ export async function resolvePlainReply(opts: PlainReplyOptions): Promise<ToolRe
   // that one" is right for a model that said nothing and wrong for one that
   // said too much — she was perfectly clear, and blaming her for it would be
   // the app's second mistake in the same turn.
-  return { reply: refused && opts.refusedFloor ? opts.refusedFloor : opts.floor, source: "floor", legs };
+  return { reply: refused && refusedFloor ? refusedFloor : opts.floor, source: "floor", legs };
 }

@@ -499,7 +499,9 @@
     "test:workout-scenarios": "tsx scripts/test-workout-scenarios.ts",
     "verify:extra-cardio": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/extra-cardio.mjs",
     "verify:workout-scenarios": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/workout-scenarios.mjs",
-    "verify:workout-scenarios-chat": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/workout-scenarios-chat.mjs"
+    "verify:workout-scenarios-chat": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/workout-scenarios-chat.mjs",
+    "test:today-claim": "tsx scripts/test-today-claim.ts",
+    "verify:today-claim": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/today-claim.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

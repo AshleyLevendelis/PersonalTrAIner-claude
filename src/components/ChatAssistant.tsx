@@ -59,6 +59,7 @@ import { rebalanceSaid, rebalanceAskText, mealsNamed, type MealRebalanceControll
 import { DEFAULT_POOL_SIZE } from '@/lib/meal-generation'
 import { executeMealMove, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
+import { detectTodayClaim, todayClaimFloor, type TodayFacts } from '@/lib/today-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal, swapDiffFromTrial } from '@/lib/meal-swap-proposal'
 import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine } from '@/lib/coach-voice'
@@ -1622,6 +1623,22 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // Fix #4: System prompt context assembled once per call, separate from conversation window
   // eatenByDay: read fresh by callGemini for this turn (H26); null = the log could not be read.
   // weekReview: this week and last, Monday to Sunday, as the strip counts them (run 7, M50); null = unread.
+  /**
+   * WHAT WAS TRAINED TODAY, as the strip counts it (1 Nov 2026). `workoutLoggedToday` was
+   * `workoutLogHistory.includes(today)`, and that history carries warm-up rows, so one ticked warm-up
+   * told the coach "Workout Logged Today: Yes" on a day the strip calls missed. `trainedToday` is the
+   * fact the reply check reads (today-claim.ts): working sets, a session the strip calls done, part-done
+   * or swapped for an activity, or cardio logged today. One reader for the context and the check.
+   */
+  const trainedTodayFacts = (todayStr: string) => {
+    const todayCell = trainingWeek.days.find(d => d.date === todayStr)
+    const workoutLoggedToday = (todayCell?.workingLogs?.length ?? 0) > 0
+    const trainedToday = workoutLoggedToday
+      || (!!todayCell && (todayCell.state === 'done' || todayCell.state === 'partial' || todayCell.state === 'swapped'))
+      || cardioLogHistory.split('\n').some(l => l.startsWith(`${todayStr}: `))
+    return { workoutLoggedToday, trainedToday }
+  }
+
   const buildContext = (eatenByDay: string | null = null, weekReview: string | null = null) => {
     const activeWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length > 0 ? mesocycle.length : 4)
     // Split out from `.days` (not just `?.days || exercisePlan` inline) so
@@ -1744,7 +1761,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // of every day. The visible symptom was the coach insisting you hadn't
     // trained when you had, or congratulating you when you hadn't.
     const todayStr = getSessionDateContext(profile.id).date
-    const workoutLoggedToday = workoutLogHistory.includes(todayStr)
+    const { workoutLoggedToday, trainedToday } = trainedTodayFacts(todayStr)
 
     const effectiveWeightKg = latestWeightKg != null && latestWeightKg > 0 ? latestWeightKg : profile.weight_kg
     // Null when a body metric is missing. The coach is then told the numbers
@@ -1784,6 +1801,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       current_local_date: todayStr,
       current_time_formatted: currentTimeFormatted,
       workout_logged_today: workoutLoggedToday,
+      trained_today: trainedToday,
       day_of_week: now.toLocaleDateString('en-US', { weekday: 'long' }),
       profile_id: profile.id || '',
       profile: {
@@ -5978,6 +5996,24 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       if (claim) {
         console.error('chat: model claimed a change on a turn that called no tool —', claim)
         return { text: planClaimFloorText() }
+      }
+    }
+    // NOR MAY IT DESCRIBE A DAY THAT IS NOT HERS (1 Nov 2026, today-claim.ts): "since it's late in the
+    // evening and you've just wrapped up your workout" at 11:22 on a rest day with nothing logged. The
+    // server refuses it first and retries with the facts; this copy is the last thing before the screen,
+    // and the only one running until chat-gemini is deployed. It cannot retry, so it floors.
+    {
+      const checkNow = getAppNow(profile.id)
+      const facts: TodayFacts = {
+        partOfDay: partOfDay(checkNow.getHours()),
+        trainedToday: trainingWeek.loading ? null : trainedTodayFacts(getSessionDateContext(profile.id).date).trainedToday,
+        dayName: checkNow.toLocaleDateString('en-US', { weekday: 'long' }),
+        userMessage: userSaid,
+      }
+      const dayClaim = detectTodayClaim(result.reply ?? '', facts)
+      if (dayClaim) {
+        console.error('chat: model described the day wrongly —', dayClaim)
+        return { text: todayClaimFloor(facts) }
       }
     }
 

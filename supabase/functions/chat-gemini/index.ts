@@ -6,8 +6,9 @@ import { readIngredientText, splitCompoundFoodLine } from "../_shared/ingredient
 import { weighInQuestion } from "../_shared/weigh-in-check.ts";
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
-import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ToolReplyOptions } from "./tool-reply.ts";
+import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ReplyCheck, type ToolReplyOptions } from "./tool-reply.ts";
 import { detectPlanClaim, planClaimFloorText } from "../_shared/plan-claim.ts";
+import { detectTodayClaim, todayClaimFloor, todayClaimNudge, type TodayFacts } from "../_shared/today-claim.ts";
 import type { GeminiLegResult, GeminiPart } from "../_shared/gemini-parts.ts";
 import { userNamedFood, isAdviceQuestion, isEvaluationQuestion, statedDurationsMinutes, eventTiming, statedDurationsSeconds, statedCount, statedEffort, statedDistancesKm, statedMinutes } from "../_shared/message-evidence.ts";
 
@@ -2477,6 +2478,7 @@ NOT THIS TOOL: a sport they do OUTSIDE the plan on a standing schedule is §3g. 
   Do NOT add the tag when the question is genuinely open-ended — asks for a number, a description, a reason, or anything where the honest answer space isn't a short known set (e.g. "how much did you lift?", "what's been going on?"). When in doubt: if you could plausibly render the answer as 2-4 short buttons without stripping out anything the user might actually want to say, add it — free text is always still available underneath either way. Plan-mutation proposals (propose_exercise_swap, propose_meal_swap, propose_meal_addition, propose_injury_adaptation, propose_equipment_adaptation, propose_volume_change, propose_session_shorten, propose_session_rebuild, propose_schedule_change, propose_style_change, propose_goal_change, propose_concurrent_activity, propose_rest_day, propose_custom_meal, propose_meal_food_add, propose_meal_food_remove, propose_meal_food_replace, propose_meal_food_resize, propose_meal_move, propose_meal_day_move, propose_meal_refit, propose_meal_rebalance, propose_meal_top_up, propose_plan_restart, propose_cardio_session) already render their own Confirm/Not-now buttons via the card — never add a redundant [QUICK_REPLIES] tag to those turns. TWO exceptions, both asked BEFORE any tool call rather than on the proposal turn, so both get a normal [QUICK_REPLIES] tag: the equipment-clarifying question (§3b), and the "want me to put that in your plan?" turn that MUST come before propose_cardio_session (§3g2) — on that turn the chips ARE the mechanism, because there is no card to tap.
 
 === FEW-SHOT EXAMPLES ===
+(These show the VOICE only. Their days, times and sessions are invented: never take the time of day, a session, or whether they have trained from an example. Those come from TEMPORAL AWARENESS and the plan below, every time.)
 User: "Hey"
 Assistant: Hey — Pull & Hinge on the schedule today, deadlifts are the main event. How are you feeling for it?
 
@@ -2504,7 +2506,7 @@ Assistant: Cut caffeine by early afternoon and lay your kit out the night before
 That's the main thing — want the rest of it?
 
 User: "what should I eat?"
-Assistant: Chicken, rice and some greens would fit your evening nicely — quick, and it lines up with your protein target.
+Assistant: Chicken, rice and some greens would fit nicely — quick, and it lines up with your protein target.
 [BREAK]
 Want me to pull the exact portions off your plan?
 
@@ -2963,6 +2965,43 @@ Keep this context in mind to ensure your greetings and questions naturally align
       }
     };
 
+    // THE DAY AS IT IS, CHECKED AGAINST THE REPLY (1 Nov 2026, today-claim.ts). Ashley, Sunday 11:22 on a
+    // rest day with nothing logged: "Since it's late in the evening and you've just wrapped up your
+    // workout ...". The prompt held both facts; the model wrote over them. So every reply this turn — the
+    // plain one and every tool's — is read against them, refused, retried once WITH the facts, and floored.
+    // trained_today is the client's (working sets, a finished or swapped session, cardio); an older client
+    // sends only workout_logged_today, so that and today's cardio line stand in. Unknown stays null, and a
+    // null fact checks nothing.
+    const cardioToday = typeof context.cardio_log_history === "string" && typeof context.current_local_date === "string"
+      && context.cardio_log_history.split("\n").some((l: string) => l.startsWith(`${context.current_local_date}: `));
+    const todayFacts: TodayFacts = {
+      partOfDay: typeof context.current_part_of_day === "string" ? context.current_part_of_day : null,
+      trainedToday: typeof context.trained_today === "boolean"
+        ? context.trained_today
+        : typeof context.workout_logged_today === "boolean" ? (context.workout_logged_today || cardioToday) : null,
+      dayName: typeof context.day_of_week === "string" ? context.day_of_week : null,
+      clock: typeof context.current_time_formatted === "string" ? (/\d{1,2}:\d{2}\s*[AP]M/i.exec(context.current_time_formatted)?.[0] ?? null) : null,
+      userMessage: typeof message === "string" ? message : null,
+    };
+    // The refusal reason carries the claim ("part_of_day:evening: <sentence>"), so the retry can name
+    // exactly what was wrong without any state shared between the test and the nudge.
+    const todayChecks: ReplyCheck[] = [{
+      test: (t: string) => {
+        const c = detectTodayClaim(t, todayFacts);
+        return c ? `${c.kind}:${c.claimed ?? ""}: ${c.sentence}` : null;
+      },
+      nudge: (why: string) => {
+        const [kind, claimed] = why.split(":");
+        return todayClaimNudge(
+          kind === "part_of_day"
+            ? { kind: "part_of_day", sentence: "", claimed: (claimed || "evening") as "morning" | "afternoon" | "evening" }
+            : { kind: "trained_today", sentence: "" },
+          todayFacts,
+        );
+      },
+      floor: todayClaimFloor(todayFacts),
+    }];
+
     const response = await callGemini(contents);
 
     if (!response.ok) {
@@ -2997,7 +3036,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
       // model spoke and how often the floor did.
       const firstLegParts: GeminiPart[] = parts;
       const toolReply = async (o: Omit<ToolReplyOptions, "contents" | "firstParts" | "callGemini" | "log">) => {
-        const r = await resolveToolReply({ contents, firstParts: firstLegParts, callGemini: callLeg, log: console.error, ...o });
+        const r = await resolveToolReply({ contents, firstParts: firstLegParts, callGemini: callLeg, log: console.error, checks: todayChecks, ...o });
         console.log(`tool-reply tool=${o.outcome.name} source=${r.source} legs=${r.legs}`);
         return r;
       };
@@ -5039,6 +5078,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
       floor: "I'm not sure I followed that one — tell me a bit more and I'll pick it up.",
       refuse: detectPlanClaim,
       refusedFloor: claimFloor,
+      checks: todayChecks,
       log: console.error,
     });
     console.log(`plain-reply source=${plain.source} legs=${plain.legs}`);
