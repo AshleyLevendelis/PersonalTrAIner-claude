@@ -44,8 +44,9 @@ function effectiveProfile(profile: UserProfile, latestWeightKg?: number | null):
   return profile
 }
 
-function todayName(): string {
-  return new Date().toLocaleDateString('en-US', { weekday: 'long' })
+/** The app's today (dev clock included), never the machine's: one notion of today, as everywhere else (1 Nov 2026). */
+function todayName(profileId: string | undefined): string {
+  return getAppNow(profileId).toLocaleDateString('en-US', { weekday: 'long' })
 }
 
 /**
@@ -63,7 +64,7 @@ export function computeTargets(profile: UserProfile, opts: ComputeTargetsOptions
   const eff = effectiveProfile(profile, opts.latestWeightKg)
 
   if ((profile.macro_calculation_mode || 'STANDARD_STATIC') === 'DYNAMIC_CSCS') {
-    const day = opts.dayName ?? todayName()
+    const day = opts.dayName ?? todayName(profile.id)
     const result = calculateDailyMacros(eff, day, opts.exercisePlan ?? [])
     if (!result) return null
     return { calories: result.calories, protein: result.protein, carbs: result.carbs, fat: result.fat }

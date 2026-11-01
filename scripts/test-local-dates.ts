@@ -81,8 +81,10 @@ console.log('\n2. What the coach is told about "today" comes from the local help
   // clock while everything around it respected it.
   check('the coach also reads the clock through getAppNow, so time-travel is consistent',
     /const now = getAppNow\(profile\.id\)/.test(chat))
+  // RE-ANCHORED 1 Nov 2026: "logged today" is now the strip's working sets for that same local date
+  // (warm-ups out), read through trainedTodayFacts. The property is unchanged: the same todayStr.
   check('workoutLoggedToday still compares against that same todayStr',
-    /workoutLogHistory\.includes\(todayStr\)/.test(chat))
+    /trainedTodayFacts\(todayStr\)/.test(chat) && /const todayCell = trainingWeek\.days\.find\(d => d\.date === todayStr\)/.test(chat))
 }
 
 console.log('\n3. No calendar date is derived from a UTC slice, except where it is written down why')

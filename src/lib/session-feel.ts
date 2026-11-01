@@ -183,14 +183,14 @@ export async function loadFeelContext(profileId: string, todayDate: string): Pro
   const [awaitingRes, answeredRes] = await Promise.all([
     supabase
       .from('workout_sessions')
-      .select('date, day')
+      .select('id, date, day')
       .eq('profile_id', profileId)
       .eq('is_completed', true)
       .is('felt', null)
       .gte('date', earliestDate)
       .lte('date', todayDate)
       .order('date', { ascending: false })
-      .limit(1),
+      .limit(ASK_WITHIN_DAYS + 1),
     supabase
       .from('workout_sessions')
       .select('date, felt, felt_note')
@@ -203,7 +203,23 @@ export async function loadFeelContext(profileId: string, todayDate: string): Pro
   if (awaitingRes.error) console.error('loadFeelContext: awaiting query failed', awaitingRes.error)
   if (answeredRes.error) console.error('loadFeelContext: answered query failed', answeredRes.error)
 
-  const awaitingRow = awaitingRes.data?.[0]
+  // A FINISHED SESSION IS ONE WITH WORK IN IT (1 Nov 2026). The strip calls a day done only with working
+  // sets; this asked "how did Friday feel?" about any completed row, so a row whose sets were removed (or a
+  // legacy one with none) was "missed" on Home and "how did it feel?" in chat, the coach claiming a session
+  // the app says did not happen. Only a row with at least one working set is asked about; a failed read
+  // asks about nothing rather than risk the claim.
+  const candidates = (awaitingRes.data ?? []) as Array<{ id: string; date: string; day: string | null }>
+  let awaitingRow: { date: string; day: string | null } | undefined
+  if (candidates.length > 0) {
+    const { data: worked, error: workedErr } = await supabase
+      .from('exercise_set_logs')
+      .select('session_id')
+      .in('session_id', candidates.map(c => c.id))
+      .eq('is_warmup', false)
+    if (workedErr) console.error('loadFeelContext: working-set check failed', workedErr)
+    const withWork = new Set((workedErr ? [] : worked ?? []).map(r => (r as { session_id: string }).session_id))
+    awaitingRow = candidates.find(c => withWork.has(c.id))
+  }
   const answered: AnsweredSession[] = (answeredRes.data ?? []).map(r => ({
     date: r.date as string,
     felt: r.felt as SessionFeel,

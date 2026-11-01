@@ -172,12 +172,16 @@ console.log('\n5. The wiring — both guards, because they ship separately')
   // THE ASYMMETRY THAT WAS THE BUG: the tool path guarded its reply, the plain
   // path did not. Both halves, or the refusal only covers the first leg and a
   // claiming retry ships.
-  check('the plain path refuses the first leg', /const why = refuseReason\(own\)/.test(toolReply))
-  check('...and the retry as well', /const why = refuseReason\(text\)/.test(toolReply))
+  // RE-ANCHORED 1 Nov 2026 (today-claim.ts joined the plain path): one `refusal` decides why a text is
+  // refused AND which retry and floor go with it. The properties are unchanged: both legs are checked, a
+  // plan claim retries with PLAIN_CLAIM_NUDGE (a silent turn with PLAIN_TURN_NUDGE), and a refused turn
+  // floors on opts.refusedFloor, never on the "not sure I followed" floor.
+  check('the plain path refuses the first leg', /const r = refusal\(own\)/.test(toolReply) && /opts\.refuse \? opts\.refuse\(t\) : null/.test(toolReply))
+  check('...and the retry as well', /const r = refusal\(text\)/.test(toolReply))
   check('a refused turn gets a different nudge from a silent one',
-    /refused \? \(opts\.nudge \?\? PLAIN_CLAIM_NUDGE\) : PLAIN_TURN_NUDGE/.test(toolReply))
+    /let nudge = PLAIN_TURN_NUDGE/.test(toolReply) && /nudge: opts\.nudge \?\? PLAIN_CLAIM_NUDGE, floor: opts\.refusedFloor/.test(toolReply) && /nudge = r\.nudge/.test(toolReply))
   check('...and a different floor, so it does not blame her for being unclear',
-    /refused && opts\.refusedFloor \? opts\.refusedFloor : opts\.floor/.test(toolReply))
+    /refused && refusedFloor \? refusedFloor : opts\.floor/.test(toolReply))
 
   check('the edge function hands the plain path the detector', /refuse: detectPlanClaim/.test(edge))
   check('...and the offer floor to fall back to', /refusedFloor: claimFloor/.test(edge))

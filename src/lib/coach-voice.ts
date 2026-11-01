@@ -822,6 +822,20 @@ export function recordPhrase(pr: RecordFact): string {
   return `${pr.exerciseName} at ${personalBest(bestReadingOf(pr.metric, pr.value, pr.setReps))}`
 }
 
+/**
+ * WHEN SOMETHING HAPPENED, said so it cannot be heard as "just now" (1 Nov 2026). A best is shown for
+ * seven days, and "That's a PR — bench at 80 kg" on a Sunday about Thursday's set reads as a session
+ * she just finished, on a day she trained nothing: the same untruth as the coach's "you've just
+ * wrapped up your workout". "today", "yesterday", else "on Thursday". `today` is the app's date.
+ */
+export function whenSaid(date: string, today: string): string {
+  if (date === today) return 'today'
+  const d = new Date(`${date}T12:00:00`)
+  const t = new Date(`${today}T12:00:00`)
+  if (Math.round((t.getTime() - d.getTime()) / 86_400_000) === 1) return 'yesterday'
+  return `on ${d.toLocaleDateString('en-US', { weekday: 'long' })}`
+}
+
 export function ask(verbPhrase: string): string {
   const trimmed = verbPhrase.trim().replace(/[.?!:]+$/, '')
   return `Want me to ${trimmed}?`

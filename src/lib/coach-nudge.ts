@@ -40,7 +40,7 @@
 // caller's app clock, exactly as coach-opener.ts takes them.
 // ---------------------------------------------------------------------------
 
-import { recordPhrase, streakLabel, type RecordFact } from './coach-voice'
+import { recordPhrase, streakLabel, whenSaid, type RecordFact } from './coach-voice'
 
 export type NudgeKind =
   | 'session_feel'
@@ -216,7 +216,9 @@ export function pickNudge(input: NudgeInput, said: string[]): CoachNudge | null 
     return {
       kind: 'personal_best',
       keys: [keys.pr],
-      text: `That's a PR — ${recordPhrase(input.recentPR)}, the best you've logged on it.`,
+      // THE DAY IT HAPPENED (1 Nov 2026): a best is shown for a week, and undated it read as a session
+      // just finished, on a day she had trained nothing.
+      text: `That's a PR — ${recordPhrase(input.recentPR)} ${whenSaid(input.recentPR.date, input.today)}, the best you've logged on it.`,
       chips: ["What should I be lifting on that next time?"],
     }
   }

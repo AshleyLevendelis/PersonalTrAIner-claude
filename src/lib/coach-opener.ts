@@ -277,10 +277,17 @@ export function pickOpener(input: OpenerInput): Opener {
   //    asking about something that happened, which is what a coach does. Past
   //    their usual hour with nothing awaiting a feel means either they logged
   //    nothing or never marked it finished; both want the same question.
+  //
+  //    BUT "today was Push. How'd it go?" SAYS IT HAPPENED (1 Nov 2026). With nothing trained today it is
+  //    the same untruth as the coach's "you've just wrapped up your workout" on her rest day, said by the
+  //    app itself. Trained: ask how it went. Nothing trained: ask whether it happened, the way the coach's
+  //    own example asks ("did you get today's Push session in?").
   if (todaySession && hour >= cutoffHour) {
     return {
       kind: 'training_done_today',
-      text: `today was ${todaySession.focus} (${todaySession.movements}). How'd it go?`,
+      text: todayLogged
+        ? `today was ${todaySession.focus} (${todaySession.movements}). How'd it go?`
+        : `did today's ${todaySession.focus} happen?`,
       chips: [],
       attention: false,
     }
@@ -376,7 +383,7 @@ export function pickOpener(input: OpenerInput): Opener {
  * rare, and the alternative is a second range read for one edge case.
  */
 export function missedYesterdayFrom(
-  days: { date: string; dayName: string; state: string; markedMissed?: boolean }[],
+  days: { date: string; dayName: string; state: string; markedMissed?: boolean; session?: { focus?: string } | null }[],
   yesterdayDate: string,
   livePlan: { day: string; focus: string }[],
 ): { dayName: string; focus: string } | null {
@@ -386,7 +393,10 @@ export function missedYesterdayFrom(
   // question to reopen every morning. The strip still draws it missed; the
   // coach just does not ask about something it has been told.
   if (y.markedMissed) return null
-  const focus = livePlan.find(d => d.day === y.dayName)?.focus ?? 'session'
+  // YESTERDAY'S OWN SESSION (1 Nov 2026), off the strip's cell (moves taken into account, its own plan
+  // week), before the weekday row of TODAY's plan week: on the first day of a new plan week the two weeks
+  // differ, and the row named a session yesterday never held.
+  const focus = y.session?.focus || livePlan.find(d => d.day === y.dayName)?.focus || 'session'
   return { dayName: y.dayName, focus }
 }
 

@@ -62,7 +62,7 @@ import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { detectTodayClaim, todayClaimFloor, type TodayFacts } from '@/lib/today-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal, swapDiffFromTrial } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, streakLabel, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine } from '@/lib/coach-voice'
 import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
 import { getLastWorkingSessionDate } from '@/lib/set-log-store'
@@ -586,10 +586,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const todaySession = greetDays.find(d => d.day === dayName)
     const cutoff = sessionCutoffHour(profile.preferred_time)
 
-    if (todaySession) {
+    // A ROW WITH NO EXERCISES IS NOT A SESSION (1 Nov 2026): Home and todayPlan both ask exercises.length.
+    if (todaySession && todaySession.exercises.length > 0) {
       const movements = todaySession.exercises.map(e => e.name).slice(0, 3).join(', ')
+      // PAST THE HOUR, ASK WHETHER IT HAPPENED — never "today was X. How'd it go?" (1 Nov 2026). This bubble
+      // is drawn before any log has been read, so it cannot know a session happened; the composed opener
+      // that replaces it does, and says "How'd it go?" only then.
       if (hour >= cutoff) {
-        return `today was ${todaySession.focus} (${movements}). How'd it go?`
+        return `did today's ${todaySession.focus} happen?`
       }
       return `today's ${todaySession.focus}: ${movements}${todaySession.exercises.length > 3 ? '...' : ''}. Feeling good for it?`
     }
@@ -682,11 +686,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     const cached = profile.id ? loadChatCache(profile.id) : null
     if (cached) restoredKeysRef.current = new Set(cached.map((m, i) => m.id || `msg-${i}`))
+    // EVERY BUBBLE CARRIES WHEN IT WAS SAID (1 Nov 2026). The opener had no time, so when the thread was
+    // restored on a later day it showed with no day above it and reached the coach unstamped: Friday
+    // evening's "today was Push. How'd it go?" read, on Sunday morning, as said just now.
     return cached ?? [
       {
         role: 'assistant',
         content: seededGreetingRef.current as string,
         status: 'complete',
+        created_at: new Date().toISOString(),
       }
     ]
   })
@@ -1002,18 +1010,6 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const [isFirstEverChat, setIsFirstEverChat] = useState<boolean | null>(null)
   /** The one message currently mid-typewriter-reveal — set only for a reply that JUST arrived from sendMessage, never for restored history/cache (see TypewriterMarkdown.tsx). */
   const [animatingMessageId, setAnimatingMessageId] = useState<string | null>(null)
-  useEffect(() => {
-    if (!activeSession.ready || !profile.id || !macros) return
-    let cancelled = false
-    loadDashboardData({
-      profile, macros, exercisePlan, mesocycle, planCreatedAt,
-      todayLogs: activeSession.logs, liveWeek: activeSession.liveWeek,
-      dayName: activeSession.dayName, todayStr: activeSession.date,
-      now: getAppNow(profile.id),
-    }).then(d => { if (!cancelled) setProactiveData(d) }).catch(() => {})
-    return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, dataVersion, ownWriteVersion])
 
   // How recent sessions FELT — the affect signal (see session-feel.ts for why
   // it exists and Ashley's 2 Sep 2026 ruling that the coach asks for it in
@@ -1060,6 +1056,41 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // resolveMoveTarget reads those to keep two sessions off one day, and a
   // stale list would let it propose the day it just filled.
   const trainingWeek = useTrainingWeek(profile.id, activeSession.date, liveWeekDays, planCreatedAt ?? profile.created_at, dataVersion + ownWriteVersion, mesocycle)
+
+  // THE SAME READ HOME MAKES, WITH THE SAME INPUTS (1 Nov 2026). This passed no `moves`, so a moved session
+  // read differently here from Home; and it re-read only when the day, the logs or a write changed, so a plan
+  // that landed late, a rebuild or a change of days left the coach on its earlier read (status "unknown",
+  // the wrong session). Home re-reads on the plan arrays and on its moves; so does this, by the same key.
+  const chatMovesKey = trainingWeek.moves.map(m => `${m.fromDate}>${m.toDate}`).join('|')
+  useEffect(() => {
+    if (!activeSession.ready || !profile.id || !macros) return
+    let cancelled = false
+    loadDashboardData({
+      profile, macros, exercisePlan, mesocycle, planCreatedAt, moves: trainingWeek.moves,
+      todayLogs: activeSession.logs, liveWeek: activeSession.liveWeek,
+      dayName: activeSession.dayName, todayStr: activeSession.date,
+      now: getAppNow(profile.id),
+    }).then(d => { if (!cancelled) setProactiveData(d) }).catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSession.ready, activeSession.date, activeSession.logs.length, profile.id, dataVersion, ownWriteVersion, exercisePlan, mesocycle, planCreatedAt, chatMovesKey])
+
+  /**
+   * WHAT WAS TRAINED TODAY, as the strip counts it (1 Nov 2026). `workoutLoggedToday` was
+   * `workoutLogHistory.includes(today)`, and that history carries warm-up rows, so one ticked warm-up
+   * told the coach "Workout Logged Today: Yes" on a day the strip calls missed. `trainedToday` is the
+   * fact the reply check reads (today-claim.ts): working sets, a session the strip calls done, part-done
+   * or swapped for an activity, or cardio logged today. One reader for the context and the check.
+   */
+  const trainedTodayFacts = (todayStr: string) => {
+    const todayCell = trainingWeek.days.find(d => d.date === todayStr)
+    const workoutLoggedToday = (todayCell?.workingLogs?.length ?? 0) > 0
+    const trainedToday = workoutLoggedToday
+      || (!!todayCell && (todayCell.state === 'done' || todayCell.state === 'partial' || todayCell.state === 'swapped'))
+      || cardioLogHistory.split('\n').some(l => l.startsWith(`${todayStr}: `))
+    return { workoutLoggedToday, trainedToday }
+  }
+
   const yesterdayDate = (() => {
     const d = new Date(`${activeSession.date}T12:00:00`)
     d.setDate(d.getDate() - 1)
@@ -1172,7 +1203,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       planKnown,
       movedTo: todayMovedTo ? { dayName: todayMovedTo.dayName } : null,
       todaySession: todayPlan ? { focus: todayPlan.focus, movements: movementsOf(todayPlan) } : null,
-      todayLogged: activeSession.logs.length > 0,
+      todayLogged: activeSession.logs.some(l => !l.is_warmup) || trainedTodayFacts(activeSession.date).trainedToday,
       tomorrowSession,
       // ONE REAL THING WORTH NOTICING, or nothing. Built from facts the
       // proactive read already holds, so this costs no extra query — and
@@ -1200,14 +1231,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const pr = proactiveData?.recentPRs[0]
     if (pr) {
       return {
-        text: `nice one on ${pr.exerciseName} — ${personalBest(bestReadingOf(pr.metric, pr.value, pr.setReps))} is a best. How's it feeling?`,
+        // THE DAY IT HAPPENED (1 Nov 2026): a best stays in this list for a week, so undated it read as
+        // something she had just done. And the streak counts SESSIONS (her 17 Oct ruling), never days.
+        text: `nice one on ${pr.exerciseName} — ${personalBest(bestReadingOf(pr.metric, pr.value, pr.setReps))} ${whenSaid(pr.date, activeSession.date)} is a best. How's it feeling?`,
         chips: ['How am I doing so far?'],
       }
     }
     const streak = proactiveData?.streak ?? 0
     if (streak >= 3) {
       return {
-        text: `${streak} days on the trot now. How are you holding up?`,
+        text: `${streak} ${streakLabel(streak)} now. How are you holding up?`,
         chips: ['How am I doing so far?'],
       }
     }
@@ -1238,7 +1271,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     recentPR: proactiveData?.recentPRs[0] ?? null,
     streak: proactiveData?.streak ?? 0,
     todaySession: todayPlan ? { focus: todayPlan.focus, movements: movementsOf(todayPlan) } : null,
-    todayLogged: activeSession.logs.length > 0,
+    todayLogged: activeSession.logs.some(l => !l.is_warmup) || trainedTodayFacts(activeSession.date).trainedToday,
   }
   // A ref as well as the value, because the opener finalises from inside a
   // setTimeout: the closure it captured could be several data arrivals old by
@@ -1355,6 +1388,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           role: 'assistant',
           content: nudge.text,
           status: 'complete',
+          created_at: new Date().toISOString(),
           quickReplies: nudge.chips.length > 0 ? nudge.chips : undefined,
         }])
         setQuickRepliesDismissed(false)
@@ -1390,7 +1424,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const recentPR = proactiveData?.recentPRs[0]
       const detail = initialGreetingDetail()
       const scheduleLine = recentPR
-        ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${personalBest(bestReadingOf(recentPR.metric, recentPR.value, recentPR.setReps))}. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
+        ? `${greetName()} — nice PR on ${recentPR.exerciseName} at ${personalBest(bestReadingOf(recentPR.metric, recentPR.value, recentPR.setReps))} ${whenSaid(recentPR.date, activeSession.date)}. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`
         : buildInitialGreeting()
       // Chat round 2, item 1 — a brand-new user meets someone, rather than
       // opening a tool. Several short messages instead of one block: who this
@@ -1432,6 +1466,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         role: 'assistant',
         content,
         status: 'complete',
+        created_at: new Date().toISOString(),
         quickReplies: opener.chips.length > 0 ? opener.chips : undefined,
       }])
       // ADVANCE THE ROTATION, so the next conversation opens differently.
@@ -1623,22 +1658,6 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // Fix #4: System prompt context assembled once per call, separate from conversation window
   // eatenByDay: read fresh by callGemini for this turn (H26); null = the log could not be read.
   // weekReview: this week and last, Monday to Sunday, as the strip counts them (run 7, M50); null = unread.
-  /**
-   * WHAT WAS TRAINED TODAY, as the strip counts it (1 Nov 2026). `workoutLoggedToday` was
-   * `workoutLogHistory.includes(today)`, and that history carries warm-up rows, so one ticked warm-up
-   * told the coach "Workout Logged Today: Yes" on a day the strip calls missed. `trainedToday` is the
-   * fact the reply check reads (today-claim.ts): working sets, a session the strip calls done, part-done
-   * or swapped for an activity, or cardio logged today. One reader for the context and the check.
-   */
-  const trainedTodayFacts = (todayStr: string) => {
-    const todayCell = trainingWeek.days.find(d => d.date === todayStr)
-    const workoutLoggedToday = (todayCell?.workingLogs?.length ?? 0) > 0
-    const trainedToday = workoutLoggedToday
-      || (!!todayCell && (todayCell.state === 'done' || todayCell.state === 'partial' || todayCell.state === 'swapped'))
-      || cardioLogHistory.split('\n').some(l => l.startsWith(`${todayStr}: `))
-    return { workoutLoggedToday, trainedToday }
-  }
-
   const buildContext = (eatenByDay: string | null = null, weekReview: string | null = null) => {
     const activeWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length > 0 ? mesocycle.length : 4)
     // Split out from `.days` (not just `?.days || exercisePlan` inline) so
@@ -6322,7 +6341,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     seededGreetingRef.current = greeting
     openerFinalizedRef.current = false
     openerDeadlineRef.current = null
-    setMessages([{ role: 'assistant', content: greeting, status: 'complete' }])
+    setMessages([{ role: 'assistant', content: greeting, status: 'complete', created_at: new Date().toISOString() }])
     setHasMoreMessages(false)
     setQuickRepliesDismissed(false)
     setLastFailedInput(null)

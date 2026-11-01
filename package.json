@@ -501,7 +501,8 @@
     "verify:workout-scenarios": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/workout-scenarios.mjs",
     "verify:workout-scenarios-chat": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/workout-scenarios-chat.mjs",
     "test:today-claim": "tsx scripts/test-today-claim.ts",
-    "verify:today-claim": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/today-claim.mjs"
+    "verify:today-claim": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/today-claim.mjs",
+    "test:chat-today-truth": "tsx scripts/test-chat-today-truth.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
