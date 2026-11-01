@@ -35,8 +35,11 @@ Newest first. One line each.
   - Re-anchored (mechanism-pinned on code deliberately restructured, properties unchanged, each mutation-tested):
     `test:local-dates`, `test:no-false-claim`, `test:plan-unknown`, `test:what-a-pr-is`. Derived gate sets: 122 + 126 +
     17, all green after the fixes.
-  - **NOT DONE, named**: the Exercise strip draws a mint dot on a SELECTED rest day where Home draws a dash (a side
-    effect of the M52 fix; hers, asked). The push reach-out (built, not live) still asks about a set-less session.
+  - **The Exercise strip's selected rest day: her ruling 1 Nov 2026, "Dash on both"** (from two options, my
+    recommendation, over keeping the mint dot on whatever day is selected): a rest day shows the dash on both strips,
+    so a dot only ever means a session; the box still marks the day on screen. `verify:missed-day` B5 (1 mutation,
+    caught), `test:home-week-strip` re-anchored (caught too).
+  - **NOT DONE, named**: The push reach-out (built, not live) still asks about a set-less session.
     About 40 edit paths address plan rows by weekday (writers, not readers of "today"; not audited one by one). The
     coach EXAM is stale and is the only thing that can say whether the model now describes the day correctly unaided.
   - Needs: frontend on merge (her word); `chat-gemini` deploy for the server half (retry with facts, the examples).

@@ -300,7 +300,11 @@ export function WeekContextRow({
                     className="flex h-[26px] w-full items-center justify-center rounded-lg text-[0.6875rem] leading-none text-muted-foreground"
                     style={isSelected ? { background: 'var(--surface-raised)', boxShadow: 'inset 0 0 0 1px rgba(var(--glow-rgb), .45)' } : undefined}
                   >
-                    {isSelected ? (
+                    {isSelected && rest ? (
+                      // A SELECTED REST DAY IS STILL A REST DAY: the dash, as on Home. Her ruling 1 Nov 2026, "Dash
+                      // on both", over a mint dot on whatever day is selected, so a dot only ever means a session.
+                      <span data-selected-dot="rest">–</span>
+                    ) : isSelected ? (
                       // A SELECTED MISSED DAY STAYS MISSED (run 7, M52).
                       <span className="size-1.5 rounded-full" data-selected-dot={dot === 'missed' ? 'missed' : 'plain'} style={dot === 'missed' ? DOT_STYLE.missed! : { background: 'var(--primary)' }} />
                     ) : DOT_STYLE[dot] ? (

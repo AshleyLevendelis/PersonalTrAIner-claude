@@ -121,6 +121,11 @@ check('B3. "It was a rest day"', await clickSel('[data-testid="peek-missed-rest"
 const b4 = await until(async () => /rest/.test(await cell(MISSED) || '') ? cell(MISSED) : null)
 check(`B4. IT IS RECORDED: ${MISSED} is a chosen rest now, and the banner is gone`, /rest/.test(b4 || '') && !(await until(async () => !(await has('[data-testid="peek-missed"]')))) === false, { b4 })
 
+// HER RULING 1 NOV 2026, "Dash on both": a selected REST day draws the rest dash, as Home does, never the
+// mint dot a session gets. MISSED is selected and is now a chosen rest, so its marker must be the dash.
+const restMark = await until(() => ev(`(() => { const n = document.querySelector('[aria-label^="${MISSED}:"] [data-selected-dot]'); return n ? { kind: n.getAttribute('data-selected-dot'), text: n.textContent.trim(), bg: getComputedStyle(n).backgroundColor } : null })()`))
+check(`B5. the day you are looking at, now a rest, shows the dash, not a dot`, restMark?.kind === 'rest' && restMark?.text === '–' && /rgba\(0, 0, 0, 0\)|transparent/.test(restMark?.bg ?? ''), restMark)
+
 const err = await ev('window.__err ?? null')
 check('C. no uncaught error on the page', err === null, err)
 

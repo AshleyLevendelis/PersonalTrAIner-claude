@@ -101,9 +101,11 @@ console.log('\n[3] The two strips use the one rule for today')
   // hollow accent dot; every other day gets its state's dot, and a due day's
   // is plain — the accent belongs to the day being looked at, never to "due".
   // RUN 7 (M52): a tapped MISSED day keeps its warning dot rather than the ring, so the ring is now "unless missed".
-  check('src/components/exercise/WeekContextRow.tsx gives the accent dot only to the day on screen (unless it was missed), and a due day a plain one',
+  // HER RULING 1 NOV 2026, "Dash on both": a selected REST day draws the dash (as Home does) before the accent dot
+  // branch is reached, so the accent dot is now "the day on screen, unless it was missed or is a rest".
+  check('src/components/exercise/WeekContextRow.tsx gives the accent dot only to the day on screen (unless it was missed or is a rest), and a due day a plain one',
     // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the day on screen is a boxed cell with a FILLED accent dot (the design's).
-    /\{isSelected \? \(\s*<span className="size-1\.5 rounded-full"[^>]*style=\{dot === 'missed' \? DOT_STYLE\.missed! : \{ background: 'var\(--primary\)' \}\}/.test(ex)
+    /\{isSelected && rest \? \(\s*<span data-selected-dot="rest">–<\/span>\s*\) : isSelected \? \(\s*<span className="size-1\.5 rounded-full"[^>]*style=\{dot === 'missed' \? DOT_STYLE\.missed! : \{ background: 'var\(--primary\)' \}\}/.test(ex)
     && /due: \{ background: 'var\(--text-dim\)' \}/.test(ex))
   check('...and never the bare today test the old Home strip had', !/\{isToday \? \(/.test(ex))
 }
