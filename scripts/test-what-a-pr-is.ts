@@ -190,7 +190,7 @@ async function main() {
     todaySession: null, todayLogged: true,
   }
   const said = pickNudge(nudgeBase as never, [])
-  check('2. the coach\'s own nudge', said?.kind === 'personal_best' && said.text === "That's a PR — Push-Ups at 13 reps, the best you've logged on it.", said?.text)
+  check('2. the coach\'s own nudge', said?.kind === 'personal_best' && said.text === "That's a PR — Push-Ups at 13 reps today, the best you've logged on it." /* the day since 1 Nov 2026 */, said?.text)
   const folded = pickNudge({ ...nudgeBase, awaitingFeel: { date: NEXT_THU, day: 'Thursday', isToday: true } } as never, [])
   check('3. ...and the one folded into "how did it feel?"', /^Nice PR on Push-Ups at 13 reps\. /.test(folded?.text ?? ''), folded?.text)
   const chat = strip(read('src/components/ChatAssistant.tsx'))

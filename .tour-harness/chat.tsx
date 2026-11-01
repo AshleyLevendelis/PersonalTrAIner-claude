@@ -511,6 +511,18 @@ const finishedSession = SEED_NUDGE
       is_completed: true, felt: null,
     }]
   : []
+// AND ITS WORK (1 Nov 2026): a finished session is one with working sets in it. The app now asks how a
+// session felt only when it holds one (session-feel.ts), because a completed row with none is a day the
+// strip calls missed. The fixture chooses the input, a real session's sets; the app decides the rest.
+const finishedSets = SEED_NUDGE
+  ? (mesocycle[0].days.find(d => d.day === DAYS[todayIdx])?.exercises.slice(0, 1) ?? []).flatMap(ex =>
+      Array.from({ length: Math.min(3, ex.sets) }, (_, i) => ({
+        id: `fs-${ex.id}-${i}`, user_id: PROFILE_ID, session_id: 'ws-today',
+        exercise_id: getExerciseId(ex.name) ?? ex.id, exercise_name: ex.name, set_number: i + 1,
+        weight_kg: ex.suggested_load_kg ?? 0, reps_completed: 8, is_bodyweight: !(ex.suggested_load_kg ?? 0), is_warmup: false,
+        completed_at: new Date(anchorNowMs() + 9 * 3600000 + i * 120000).toISOString(), date: todayStr,
+      })))
+  : []
 
 // ?topup=1 — MORE OPTIONS FOR EVERY MEAL, ASKED OF THE COACH (29 Sep 2026).
 // A plan made at five options a meal (three meals a day, no snack), and two
@@ -618,7 +630,7 @@ const dayStateSeed = (() => {
 
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
-  daily_metrics: [], exercise_set_logs: dayStateSeed.sets, workout_sessions: [...finishedSession, ...movedInSession, ...movedAwaySession, ...dayStateSeed.sessions], cardio_logs: [],
+  daily_metrics: [], exercise_set_logs: [...dayStateSeed.sets, ...finishedSets], workout_sessions: [...finishedSession, ...movedInSession, ...movedAwaySession, ...dayStateSeed.sessions], cardio_logs: [],
   daily_steps: [], meal_events: dayStateSeed.meals, meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
   favorite_meals: [], grocery_items: topUpSeed.list, load_suggestions: [], pending_actions: [],
   plan_adaptations: KNEE_EASE ? [kneeEaseRow(PROFILE_ID)] : [], user_facts: [], user_context_facts: [], user_goals: [],

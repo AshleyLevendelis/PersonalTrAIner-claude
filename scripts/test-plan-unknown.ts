@@ -118,8 +118,9 @@ check('and NOWHERE in that effect is the greeting rebuilt to compare with',
 const clearFn = chatCode.match(/const greeting = buildInitialGreeting\(\)[\s\S]{0,400}/)?.[0] ?? ''
 check('Clear chat re-seeds the ref', /seededGreetingRef\.current = greeting/.test(clearFn))
 check('...and re-arms the one-shot finalize gate', /openerFinalizedRef\.current = false/.test(clearFn))
+// (It carries when it was said since 1 Nov 2026 — test:chat-today-truth holds that half.)
 check('...and the message it sets is that same greeting',
-  /setMessages\(\[\{ role: 'assistant', content: greeting, status: 'complete' \}\]\)/.test(clearFn))
+  /setMessages\(\[\{ role: 'assistant', content: greeting, status: 'complete'(?:, created_at: [^}]+)? \}\]\)/.test(clearFn))
 
 // ---------------------------------------------------------------------------
 console.log('\n[4] Home, from the aggregator itself — not from a regex')
