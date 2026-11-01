@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **RELEASED 1 NOV 2026: the "wrapped up" fix and "Dash on both", on her "yes make it live".** Full sweep in a
+  separate worktree at 7556b2e: 453 gates, 449 passed. The four that failed were all expected, each read from its own
+  output: `test:meal-quality` (no database variables), `test:schema-parity` (could not link to TEST), `verify:rls` (no
+  database, no key), and `test:coach-exam-fresh` (the coach prompt changed and the exam has not been re-run). Main
+  fast-forwarded 13a51df -> 7556b2e. Needs ONE edge deploy, `chat-gemini` (the server's retry; the app's own copy of the
+  check already floors a wrong reply). No migration. The other functions are unchanged since main. Copy-paste prompt
+  handed to Ashley. NOT proven live: the server half until she deploys, and whether the model gets the day right on its
+  own (only the coach exam can show that, and it is stale).
 - [x] **"YOU'VE JUST WRAPPED UP YOUR WORKOUT" ON A REST-DAY MORNING, 1 NOV 2026 — the coach may not describe a day
   that is not hers, and the app's own sentences say only what happened.** Ashley, Sunday 11:22, rest day, nothing
   logged all week, tapped Home's "What should I focus on for the rest of today?": *"Since it's late in the evening and
