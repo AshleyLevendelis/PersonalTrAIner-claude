@@ -87,7 +87,10 @@ Newest first. One line each.
     group's spoken name are "Trainer"; the tour counter and Profile's "Coach reminders" are other screens, unchanged; the first reply pill is now filled mint where
     her 20 Oct "small buttons" were outlines — ANSWERED 1 Nov 2026, **"All outlined"**, from two options (over my
     recommended "solid first"): no pill is filled; the applying choices are mint outlines, the decline a grey hairline,
-    as before the redesign; `verify:chat-2b` 4h re-anchored; the Tools tour line "All three timers live behind here".
+    as before the redesign; `verify:chat-2b` 4h re-anchored; the Tools tour line "All three timers live behind here" —
+    FIXED 1 Nov 2026 without asking, as a false claim with one right answer: Tools 2a put the three timers on the
+    page as tiles, so it now says "are right here". `test:app-tour`, `verify:tour`, `verify:tools-2a` green; no check
+    holds this sentence (the tour's wording is still held by reading the screen, as its own comment says).
   - NOT PROVEN: a real phone (the voice has never been heard on a device), and App.tsx's wiring around the Exercise
     dock. Not done: "go to the current set" from the chat pill; the carbs letter is faint on Daylight. Leftover:
     `RingKey` and `RingMeter` in `OnePage.tsx` have no screen any more (tree-shaken, so no size cost).
