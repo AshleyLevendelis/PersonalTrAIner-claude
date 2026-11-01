@@ -160,13 +160,14 @@ export function ProposalCard({
   // small buttons always"): the offer's first answer is the filled main colour,
   // the other scopes an outline in it, "Not now" a quiet grey outline. Still a
   // word-sized pill inside a 44px button, and no glow: small buttons, not a card.
+  // EVERY PILL IS AN OUTLINE — her ruling 1 Nov 2026, "All outlined", over the 2b design's solid-mint first pill (her
+  // 20 Oct "small buttons" were outlines). A choice that applies is mint-outlined, the decline a grey hairline; the
+  // first stays first, and 'primary' remains its role for the card, never a fill.
   const pill = (weight: 'primary' | 'scope' | 'reject') =>
-    `inline-flex h-9 items-center whitespace-nowrap rounded-full px-[15px] text-[0.8125rem] leading-5 ${
-      weight === 'primary'
-        ? 'bg-primary font-bold text-primary-foreground'
-        : weight === 'scope'
-          ? 'border border-[color:color-mix(in_oklab,var(--primary)_55%,transparent)] font-semibold text-primary-text'
-          : 'border border-[color:var(--hairline)] font-medium text-muted-foreground'
+    `inline-flex h-9 items-center whitespace-nowrap rounded-full border px-[15px] text-[0.8125rem] leading-5 ${
+      weight === 'reject'
+        ? 'border-[color:var(--hairline)] font-medium text-muted-foreground'
+        : 'border-[color:color-mix(in_oklab,var(--primary)_55%,transparent)] font-semibold text-primary-text'
     }`
   const small = 'inline-flex min-h-[44px] items-center disabled:opacity-60'
 

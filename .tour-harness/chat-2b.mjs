@@ -166,7 +166,9 @@ const [b0, b1, b2] = o?.btns ?? []
 // RE-ANCHORED 31 Oct 2026, her "Mix": "Just today" / "Whole block" / "Keep <the lift>".
 check('4g. the reply pills are the scopes in her words, in order: "Just today" (primary), "Whole block", then "Keep <the lift>"',
   b0?.label === 'Just today' && b0?.weight === 'primary' && b1?.label === 'Whole block' && b1?.weight === 'scope' && !!target && b2?.label === `Keep ${target.full}` && b2?.weight === 'reject' && (o?.btns ?? []).length === 3, o?.btns?.map(b => [b.label, b.weight]))
-check('4h. the primary is the filled main colour; the others are outlines', b0?.bg === o?.primary && b1?.bg !== o?.primary && b2?.bg !== o?.primary && b1?.border === '1px' && b2?.border === '1px', o?.btns?.map(b => [b.label, b.bg, b.border]))
+// RE-ANCHORED 1 Nov 2026, her "All outlined": no pill is filled with the main colour; each is a 1px outline, the
+// first included. (Was "the primary is the filled main colour", the 2b design.)
+check('4h. every pill is an outline, the first included; none is filled with the main colour', !!b0 && !!b1 && !!b2 && [b0, b1, b2].every(b => b.bg !== o?.primary && b.border === '1px'), o?.btns?.map(b => [b.label, b.bg, b.border]))
 check('4i. every pill keeps the 44px tap target, draws no taller than 40px, and has no glow', (o?.btns ?? []).length === 3 && o.btns.every(b => b.h >= 44 && b.w >= 44 && b.pillH <= 40 && b.shadow === 'none' && b.buttonShadow === 'none'), o?.btns?.map(b => [b.label, b.h, b.pillH, b.shadow, b.buttonShadow]))
 await ev(`[...document.querySelectorAll('[data-testid="proposal-card"]')].pop()?.scrollIntoView({ block: 'end' })`)
 await wait(300)

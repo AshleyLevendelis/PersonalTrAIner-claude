@@ -85,7 +85,9 @@ Newest first. One line each.
     the coach group label "Trainer" under a header that reads "Coach" — ANSWERED 1 Nov 2026, **"Both say Trainer"**,
     from three options (over both "Coach", my recommendation, and keeping the mismatch): the header and the coach
     group's spoken name are "Trainer"; the tour counter and Profile's "Coach reminders" are other screens, unchanged; the first reply pill is now filled mint where
-    her 20 Oct "small buttons" were outlines; the Tools tour line "All three timers live behind here".
+    her 20 Oct "small buttons" were outlines — ANSWERED 1 Nov 2026, **"All outlined"**, from two options (over my
+    recommended "solid first"): no pill is filled; the applying choices are mint outlines, the decline a grey hairline,
+    as before the redesign; `verify:chat-2b` 4h re-anchored; the Tools tour line "All three timers live behind here".
   - NOT PROVEN: a real phone (the voice has never been heard on a device), and App.tsx's wiring around the Exercise
     dock. Not done: "go to the current set" from the chat pill; the carbs letter is faint on Daylight. Leftover:
     `RingKey` and `RingMeter` in `OnePage.tsx` have no screen any more (tree-shaken, so no size cost).
