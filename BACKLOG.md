@@ -82,7 +82,9 @@ Newest first. One line each.
   - **Open questions of hers (wording)**: the chat's session pill — ANSWERED 1 Nov 2026, **"Sets done"**, from two
     options (over "set 3 of 20", the next set, as the design drew): "2 of 20 sets", the count Home, the strip and the
     Exercise bar already say; as built, held by `test:chat-2b` §mid-session, nothing changed;
-    the coach group label "Trainer" under a header that reads "Coach"; the first reply pill is now filled mint where
+    the coach group label "Trainer" under a header that reads "Coach" — ANSWERED 1 Nov 2026, **"Both say Trainer"**,
+    from three options (over both "Coach", my recommendation, and keeping the mismatch): the header and the coach
+    group's spoken name are "Trainer"; the tour counter and Profile's "Coach reminders" are other screens, unchanged; the first reply pill is now filled mint where
     her 20 Oct "small buttons" were outlines; the Tools tour line "All three timers live behind here".
   - NOT PROVEN: a real phone (the voice has never been heard on a device), and App.tsx's wiring around the Exercise
     dock. Not done: "go to the current set" from the chat pill; the carbs letter is faint on Daylight. Leftover:

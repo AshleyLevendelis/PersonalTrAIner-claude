@@ -7586,8 +7586,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     >
       <header data-testid="chat-header" className="shrink-0 border-b border-[color:var(--hairline)]" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
         {/* DESIGN 2b (31 Oct 2026): a 36px avatar, the 26 Sep names kept as
-            they were ("Coach" over "Personal TrAIner" — her rulings keep the
-            names), and a live line saying what the coach is sent. True by
+            they were ("Personal TrAIner" kept; the name "Trainer" since 1 Nov 2026, her
+            "Both say Trainer", so the header and each message's label name one person), and a live line saying what the coach is sent. True by
             construction: buildContext sends today's session (the exercise
             summary's today), the day's meals and the logs, every turn. */}
         <div className="flex min-h-16 items-center gap-3 py-2.5 pl-4 pr-1.5">
@@ -7601,7 +7601,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           </span>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-baseline gap-1.5">
-              <h2 className="text-[1.0625rem] font-bold leading-tight tracking-[-.01em] text-foreground">Coach</h2>
+              <h2 className="text-[1.0625rem] font-bold leading-tight tracking-[-.01em] text-foreground">Trainer</h2>
               <p className="truncate text-[0.6875rem] leading-tight text-muted-foreground">Personal TrAIner</p>
             </div>
             <p data-testid="chat-header-live" className="mt-0.5 flex items-center gap-1.5 truncate text-[0.71875rem] leading-tight text-muted-foreground">
@@ -7730,7 +7730,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                 <div
                   key={row.key}
                   role="group"
-                  aria-label={isUserGroup ? 'You' : 'Coach'}
+                  aria-label={isUserGroup ? 'You' : 'Trainer'}
                   className="flex flex-col"
                   data-testid="chat-group"
                   data-role={row.role}

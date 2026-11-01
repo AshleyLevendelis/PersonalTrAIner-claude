@@ -85,8 +85,8 @@ const HEAD = String.raw`(() => {
   return { avatar: a ? Math.round(a.getBoundingClientRect().width) : 0, live: live ? live.textContent.trim() : null, title: h ? h.textContent.trim() : null, sub: h?.parentElement?.querySelector('p')?.textContent.trim() ?? null }
 })()`
 const head = await ev(HEAD)
-check('1g. the header: a 36px avatar, the names kept ("Coach", "Personal TrAIner"), and the live line',
-  head?.avatar === 36 && head?.title === 'Coach' && head?.sub === 'Personal TrAIner' && head?.live === "Sees today's session, meals and logs", head)
+check('1g. the header: a 36px avatar, the names ("Trainer", her 1 Nov ruling, and "Personal TrAIner"), and the live line',
+  head?.avatar === 36 && head?.title === 'Trainer' && head?.sub === 'Personal TrAIner' && head?.live === "Sees today's session, meals and logs", head)
 await ev(`location.hash = ''`)
 await wait(300)
 await keep('mid-session')

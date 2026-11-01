@@ -1395,6 +1395,8 @@ menu" stays true when a copy is also left outside it.
 - **Voice: "Option 1, add a listen button"**, over voice-note bubbles and over not now: each coach bubble reads aloud with
   the phone's own voice, one at a time, a second tap stops it, never drawn where the phone cannot speak. No voice
   notes. `test:chat-2b`, `verify:chat-2b` (the voice is stubbed; never heard on a device)
+- **The chat names the coach "Trainer": "Both say Trainer"** (1 Nov 2026, from three options): the header and each
+  message's label, one name. `verify:chat-2b` 1g, `verify:chat-bubbles`
 - **The chat's session pill counts sets DONE: "Sets done"** (1 Nov 2026, over the design's "set 3 of 20"): "Legs · 2 of 20
   sets", the one count every screen says. `test:chat-2b`
 - **Offer words: "Mix"** — "Just today" / "Whole block" / "Keep <the exercise>" (the decline names what she keeps only on a
