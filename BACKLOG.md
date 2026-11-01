@@ -17,6 +17,10 @@ Newest first. One line each.
   `test:speech-merge` (12 checks, 6 mutations, all caught), `verify:chat-composer` (16 checks, 5 mutations, all
   caught; screenshots read at 390px). NOT proven on a real phone: the fake engine plays the shape inferred from her
   screenshot. If it still repeats, the long-press debug trace on the mic (kept) shows the real events. Frontend only.
+  **RELEASED the same day on her "Yes, when checks pass"**: the 133 checks derived from the diff (every gate and
+  driver reading the chat, the voice hook or the new file, plus `test:bundle` and `test:no-dead-code`) all passed in a
+  separate worktree at 775d35a; main fast-forwarded 7556b2e -> 0f6cb4b. The full sweep was NOT re-run: the last one
+  (449/453, four expected) was at 7556b2e, one commit before, and this commit's readers were all in the derived set.
 - [x] **RELEASED 1 NOV 2026: the "wrapped up" fix and "Dash on both", on her "yes make it live".** Full sweep in a
   separate worktree at 7556b2e: 453 gates, 449 passed. The four that failed were all expected, each read from its own
   output: `test:meal-quality` (no database variables), `test:schema-parity` (could not link to TEST), `verify:rls` (no
