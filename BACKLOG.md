@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [x] **VOICE TYPING REPEATED WORDS, AND THE CHAT BOX STAYED ONE LINE, 1 NOV 2026.** Ashley, from her Android phone:
+  *"The voice to text repeats words. Also the text box is only thin and doesn't change size so you can see what
+  you've typed when there's lots of text."* Her box read "what what is what is what is the what is the what is the
+  plan what is". **Cause, read off her own text:** in continuous mode the phone sends each growing guess at one phrase
+  as its own FINAL result ("what", "what is", "what is", "what is the" ...) and the hook joined every final with a
+  space. The earlier fix (results kept by index, a generation counter, a debug overlay) protected against replays and
+  stray sessions, neither of which is this; joining was the defect. **Fix:** `mergeSpeechSegments` folds a result into
+  the one just before it when it repeats or extends it, word by word (so "what" never swallows "whatever"), drops a
+  shorter copy, and otherwise joins as before (desktop shape, one result per phrase). **Named cost:** saying the very
+  same phrase twice in a row keeps one. **The box** was a fixed one-line field scrolling inside an 88px cap; it now
+  grows to fit up to 160px (about six lines), scrolls past that with the newest words in view, and returns to one
+  line after sending; the thread above shrinks, nothing covers the tab bar. Mechanical, not hers to rule on.
+  `test:speech-merge` (12 checks, 6 mutations, all caught), `verify:chat-composer` (16 checks, 5 mutations, all
+  caught; screenshots read at 390px). NOT proven on a real phone: the fake engine plays the shape inferred from her
+  screenshot. If it still repeats, the long-press debug trace on the mic (kept) shows the real events. Frontend only.
 - [x] **RELEASED 1 NOV 2026: the "wrapped up" fix and "Dash on both", on her "yes make it live".** Full sweep in a
   separate worktree at 7556b2e: 453 gates, 449 passed. The four that failed were all expected, each read from its own
   output: `test:meal-quality` (no database variables), `test:schema-parity` (could not link to TEST), `verify:rls` (no
