@@ -1,4 +1,4 @@
-import { Fragment, useState, useRef, useEffect, useCallback, type ReactNode } from 'react'
+import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
 import { blockShape } from '@/lib/timer-engine'
 import { circuitName } from '@/lib/circuit'
 import { rpeToStore, effortLabel, cardioReadback, type EffortKey } from '@/lib/cardio-effort'
@@ -205,6 +205,10 @@ const BREAK_TAG_RE = /^[ \t]*\[BREAK\][ \t]*$/gim
  * message, and the Retry path was the worse of the two: it blanked AND cleared
  * `lastFailedInput`, so a retried blank lost the button that produced it.
  */
+
+/** The chat box grows to about six lines before it scrolls (1 Nov 2026). */
+const COMPOSER_MAX_PX = 160
+
 export function floorReply(strippedText: string, hasSomethingElse: boolean): { text: string; blank: boolean } {
   if (strippedText.trim()) return { text: strippedText, blank: false }
   if (hasSomethingElse) return { text: strippedText, blank: false }
@@ -709,6 +713,19 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     window.addEventListener(CHAT_PREFILL_EVENT, take)
     return () => window.removeEventListener(CHAT_PREFILL_EVENT, take)
   }, [])
+  // THE BOX GROWS WITH WHAT IS IN IT (1 Nov 2026, Ashley: "the text box is only thin and doesn't change size so you
+  // can see what you've typed"). It was one fixed line with a scroll inside, so a long message or a voice
+  // transcript was read through a slot. It now grows to fit, up to COMPOSER_MAX_PX (about six lines), and only
+  // past that scrolls, kept at the end so the newest words are the ones in view.
+  useLayoutEffect(() => {
+    const el = composerRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    const full = el.scrollHeight
+    el.style.height = `${Math.min(full, COMPOSER_MAX_PX)}px`
+    el.style.overflowY = full > COMPOSER_MAX_PX ? 'auto' : 'hidden'
+    if (full > COMPOSER_MAX_PX && el.selectionEnd === el.value.length) el.scrollTop = full
+  }, [input])
   // Voice input — captures the input text at the moment listening starts so
   // a live transcript appends after whatever the user already typed, rather
   // than each recognition event (which reports the FULL transcript so far,
@@ -8072,7 +8089,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={speech.isListening ? 'Listening…' : speech.isSupported ? 'Tap the mic, or type…' : 'Ask about your plan or request changes...'}
-          className="min-h-[44px] max-h-[88px] flex-1 resize-none border-0 bg-transparent px-0 py-2.5 text-[0.875rem] shadow-none focus-visible:ring-0"
+          className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-0 py-2.5 text-[0.875rem] shadow-none focus-visible:ring-0"
           rows={1}
         />
         {/* keepsComposerFocus: tapping send used to leave focus on <body> —

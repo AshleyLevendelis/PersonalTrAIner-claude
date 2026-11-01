@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { mergeSpeechSegments } from '@/lib/speech-merge'
 
 // ---------------------------------------------------------------------------
 // Voice input for the chat box — on-device transcription via the browser's
@@ -138,8 +139,9 @@ export function useSpeechToText({
       }
       const last = event.results.length > 0 ? event.results[event.results.length - 1] : undefined
       const interimText = last && !last.isFinal ? last[0].transcript : ''
-      const finalText = finalsByIndex.filter(Boolean).join(' ')
-      const combined = finalText + (finalText && interimText ? ' ' : '') + interimText
+      // Android sends each growing guess at a phrase as its own final result ("what", "what is", ...);
+      // joining them repeated every word. mergeSpeechSegments folds a guess into the one it extends.
+      const combined = mergeSpeechSegments([...finalsByIndex.filter(Boolean), interimText])
 
       if (onDebugLineRef.current) {
         const perResult = Array.from({ length: event.results.length }, (_, i) => {
