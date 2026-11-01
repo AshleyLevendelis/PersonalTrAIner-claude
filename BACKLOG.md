@@ -12,8 +12,11 @@ Newest first. One line each.
   the day's steps (`verify:home-steps`, 8 checks, 3 mutations), and the chat box did not grow when the app filled it
   while the tab was hidden, a gap in that afternoon's own fix (`verify:chat-composer` section 4, 2 mutations).
   Everything else is a LEAD for her to approve fixing. Two need an engine trace first: a knee-rehab drill on an upper
-  day (against her 20 Oct ruling, safety-adjacent) and a swapped lift weighing twice the plan's own. Sweep result to
-  follow; `test:cardio-reader` failed once under the testers' load and passed 16 reruns (failing line not captured).
+  day (against her 20 Oct ruling, safety-adjacent) and a swapped lift weighing twice the plan's own. Sweep (455 gates,
+  the commit before the two fixes): 450 passed; the four that need a live database or her machine failed as always
+  (`test:meal-quality`, `test:schema-parity`, `verify:rls`, `test:coach-exam-fresh`), and `test:cardio-reader` failed
+  once under the testers' load and passed 16 reruns. Its failing line was cut off by the log's tail, so the cause is
+  NOT known: an intermittent, not a proven flake.
 - [x] **VOICE TYPING REPEATED WORDS, AND THE CHAT BOX STAYED ONE LINE, 1 NOV 2026.** Ashley, from her Android phone:
   *"The voice to text repeats words. Also the text box is only thin and doesn't change size so you can see what
   you've typed when there's lots of text."* Her box read "what what is what is what is the what is the what is the
