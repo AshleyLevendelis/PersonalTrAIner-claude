@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [ ] **A NEW PLAN'S MEALS MUST LAND A DAY ON HER NUMBERS, 2 NOV 2026.** Ashley, on her phone: "Only 2 of your 7
+  breakfasts fit your targets ... why are the meals not fitting the macros when I've not made any changes and that's
+  just what the app prescribed". FOUND: the app checked each new dish against its OWN meal's calories (7%) and a
+  protein floor, never its carbs or fat, and asked "can this land a whole day inside the bands?" only of a library
+  dish on "Get more options" (19 Oct). A fresh plan or a regenerate was never asked it, so under her 18 Oct 10% bands
+  the app could write seven breakfasts of which two worked. MY FIRST ANSWER TO HER WAS INCOMPLETE: I blamed the 18 Oct
+  tightening and moving targets (both real) before reading the acceptance path, which is where the app's own fault
+  was. FIX: after each round of the meal writer, every dish is asked the day question against everything accepted so
+  far (the assembler's own test, the one the offer counts with); one that cannot land a day is dropped and the next
+  round asks the writer for another. Guards: a meal where NOTHING fits keeps everything (the fault is elsewhere, and
+  dropping would empty the plan); the last round drops nothing (a dish kept is still a dish, her "seven" ruling, and
+  the Nutrition offer says honestly when fewer than three fit); a dish she already had is never touched. What is
+  saved follows the dishes, not the count. MEASURED (`measure:meal-fresh-fit`, our library re-portioned to each meal
+  standing in for the writer, 4 targets x 5 seeds): dishes that land a day 66.2% -> 86.5%; meals with fewer than three
+  that fit 11 -> 7 of 80; build 9 -> 39 ms. The real writer is asked for replacements more often, so a new plan can
+  take one more round (about 10 s) and one more model call; it was already allowed three rounds. NOT measured: the real
+  meal writer (needs the key, her machine); her own plan is NOT changed by this, only new plans and regenerates, so
+  "Get more options" (already day-tested) is her fix for this week. `test:meal-fresh-fit` (new, 15 checks; 4
+  mutations, 3 caught; the fourth, saving by count instead of by dish, is not reachable by the fixture because a
+  dropped dish is dropped before it is ever saved, recorded rather than given an invented check). ALSO FOUND while
+  re-running: `verify:weigh-in` was red since today's Home change (the visible "kg" put the spoken "since you
+  started" on its own line, and the check wanted one space); the words are right, the check was re-anchored to allow
+  the break, and a wrong figure still fails it (1 mutation, caught). My derivation for the Home change missed it
+  because its name says weigh-in, not Home: drivers are found by the screen, not the name.
 - [ ] **HOW MANY TAPS IS A WORKOUT, 2 NOV 2026 (UX item 6). MEASURED, nothing changed.** `measure:tap-count` walks
   today's whole session on the whole app the way a lifter would, using the big "Log set" button. Today's fixture
   session (19 working sets, one main lift with a 4-row warm-up): 26 taps from Home to finished, about 1.4 per working

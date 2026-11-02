@@ -774,16 +774,19 @@ export async function generateMealPools(params: {
    * a later round grows it again, which matches what persistPools already does
    * with a per-slot failure: log it and leave that slot alone.
    */
-  const persistedCount: Partial<Record<MealSlotName, number>> = {}
+  // WHAT IS ON DISK, BY DISH, not by count (2 Nov 2026): a round can now drop a dish that cannot be served (see
+  // dropUnservable below), so a slot can hold the same number of dishes as before and different ones. A count
+  // would leave the dropped dish saved.
+  const persistedNames: Partial<Record<MealSlotName, string>> = {}
+  const namesOf = (slot: MealSlotName) => (accepted[slot] ?? []).map(o => o.name).join('\u0000')
   const commitProgress = async () => {
     const grown: Partial<Record<MealSlotName, PoolOption[]>> = {}
     for (const slot of activeSlots) {
-      const have = accepted[slot]?.length ?? 0
-      if (have > (persistedCount[slot] ?? 0)) grown[slot] = accepted[slot]!
+      if ((accepted[slot]?.length ?? 0) > 0 && namesOf(slot) !== (persistedNames[slot] ?? '')) grown[slot] = accepted[slot]!
     }
     if (Object.keys(grown).length === 0) return
     await persistPools(params.profileId, grown)
-    for (const slot of Object.keys(grown) as MealSlotName[]) persistedCount[slot] = accepted[slot]?.length ?? 0
+    for (const slot of Object.keys(grown) as MealSlotName[]) persistedNames[slot] = namesOf(slot)
   }
 
   /**
@@ -855,6 +858,32 @@ export async function generateMealPools(params: {
       accepted[slot]!.push(params.appendToExisting && params.servedFrom
         ? { ...option, tags: tagsNewFrom(option.tags, params.servedFrom) }
         : option)
+    }
+  }
+
+  /**
+   * A NEW PLAN'S DISHES MUST LAND A DAY ON HER NUMBERS (2 Nov 2026; Ashley, on a plan the app had just written:
+   * "Only 2 of your 7 breakfasts fit... why, when I've not made any changes?"). verifyProposal checks each dish
+   * against its OWN meal's calories and a protein floor and never its carbs or fat, so under the 10% day bands
+   * (her 18 Oct ruling) a writer's dish could pass every check and serve no day on target. Only a library dish was
+   * asked the day question (fitsADay, 19 Oct); a fresh plan and a regenerate never were.
+   * So after each round, every dish in a meal is asked it, against everything accepted so far, and one that cannot
+   * land a day is dropped so the next round asks the writer for another. Two guards keep it from making things
+   * worse: a meal where NOTHING fits keeps everything (the fault is in another meal, or in the targets, and dropping
+   * would only empty the plan), and the last round drops nothing (a dish kept is still a dish; the offer on
+   * Nutrition says honestly when fewer than three fit).
+   */
+  const dropUnservable = (round: number): void => {
+    for (const slot of activeSlots) {
+      const options = accepted[slot] ?? []
+      if (options.length < 2) continue
+      const fits = options.map(o => fitsADay(slot, o))
+      if (!fits.some(f => f === true)) continue
+      const kept = options.filter((_, i) => fits[i] !== false)
+      for (const [i, o] of options.entries()) {
+        if (fits[i] === false) rejectionLog.push(`[${slot}] "${o.name}": dropped after round ${round}, no day of hers lands on target with it`)
+      }
+      accepted[slot] = kept
     }
   }
 
@@ -945,6 +974,8 @@ export async function generateMealPools(params: {
     })
     if (settled.every(r => r.status === 'rejected')) continue
     for (const proposal of proposals) considerProposal(proposal)
+    // A ROUND IS JUDGED BY THE DAYS IT CAN SERVE, while there is a round left to replace what it drops.
+    if (round < MAX_GENERATION_ROUNDS - 1) dropUnservable(round + 1)
 
     // The whole point: this round's meals are on disk before the next request
     // goes out, so losing the page from here on costs the REST of the plan

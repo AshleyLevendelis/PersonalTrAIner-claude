@@ -350,6 +350,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   plan: her saved meals cannot be read from a cloud session, so the cause of
   HER week is the likeliest one, not a proven one. Needs the `chat-gemini`
   deploy for chat.
+  **And a NEW plan's dishes are held to the same day test, since 2 Nov 2026**, on her "why are the meals not fitting
+  when that's just what the app prescribed": each round's dishes that cannot land a day are dropped and replaced
+  while a round is left; never when nothing in a meal fits, never in the last round. `test:meal-fresh-fit`,
+  `measure:meal-fresh-fit` (66% -> 86.5% of a new plan's dishes land a day).
   `meal-pool-size` (22 checks, 11 mutations), `meal-top-up` (131 checks, 30
   mutations in section 8), `verify:meal-top-up` (44 checks, 7 mutations),
   `verify:chat-top-up` (55 checks, 7 mutations), `meal-days` §3b

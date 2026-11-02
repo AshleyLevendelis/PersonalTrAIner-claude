@@ -410,6 +410,8 @@
     "test:meal-variety": "tsx scripts/test-meal-variety.ts",
     "test:meal-days": "tsx scripts/test-meal-days.ts",
     "test:meal-likes": "tsx scripts/test-meal-likes.ts",
+    "measure:meal-fresh-fit": "tsx scripts/measure-meal-fresh-fit.ts",
+    "test:meal-fresh-fit": "tsx scripts/test-meal-fresh-fit.ts",
     "test:meal-pool-size": "tsx scripts/test-meal-pool-size.ts",
     "test:meal-share": "tsx scripts/test-meal-share.ts",
     "test:meal-top-up": "tsx scripts/test-meal-top-up.ts",
