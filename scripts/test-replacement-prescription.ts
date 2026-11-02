@@ -31,10 +31,12 @@
  */
 import { generateExercisePlan, generateMesocycle, repRangeForIncomingExercise, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
+import { readFileSync } from 'fs'
+import { join } from 'path'
 import { getExerciseEntry } from '../src/lib/exercise-db'
 import { prescribeLoad, isExternallyLoaded, categorize, loadingMode, getEquipmentFloorKg, DELOAD_LOAD_FRACTION } from '../src/lib/load-prescription'
 import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
-import { applyReplacement, banExerciseFromMesocycle, swapExerciseInMesocycle, replacementProgramming, buildReplacementSlot, getReplacementCandidates } from '../src/lib/mesocycle-edit'
+import { applyReplacement, banExerciseFromMesocycle, swapExerciseInMesocycle, replacementProgramming, buildReplacementSlot, getReplacementCandidates, calibrates } from '../src/lib/mesocycle-edit'
 import { substituteForInjury } from '../src/lib/plan-adaptations'
 import { rebuildDayAroundMainLift } from '../src/lib/session-rebuild'
 import type { Exercise, MesocycleWeek, UserProfile } from '../src/lib/types'
@@ -165,7 +167,23 @@ async function main() {
   const heavy = rows.filter(r => (r.e.suggested_load_kg ?? 0) > 16).map(r => `wk${r.w.week_number} ${r.e.reps} ${r.e.suggested_load}`)
   check('never above 16kg for this 82kg intermediate (it was ~22kg, two kilos under his heaviest dumbbell)', heavy.length === 0, heavy)
   const wk2 = rows.find(r => r.w.week_number === 2)
-  check('week 2 reads 3 sets at about 14kg', wk2?.e.sets === 3 && wk2?.e.suggested_load_kg === 14, wk2 && { sets: wk2.e.sets, kg: wk2.e.suggested_load_kg, reps: wk2.e.reps })
+  // RE-ANCHORED 2 Nov 2026 (docs/plans/swap-load-anchor.md): this read "about 14kg", the full estimate at 16-19, which
+  // is roughly twice what his plan carries on its own unverified lifts (they descend from the calibration price). The
+  // number is now the plan's price for an unverified lift at this slot's reps, worked out here, and still under 16.
+  const planPrice = wk2 ? prescribeLoad(ote, cleared, { targetRpeLabel: wk2.e.intensity, isFirstBlock: false, sets: wk2.e.sets, repRangeLabel: wk2.e.reps, isCalibrationWeek: true }).starting_weight_kg : null
+  check('the plan calibrates, so the next check is the rule that binds', calibrates(samPlan))
+  // THE CONTRAST: the same plan with no calibration week (as a plan built from known working weights is) keeps the
+  // full estimate, because such a plan never discounted its own unverified lifts either.
+  const noCal = samPlan.map(w => ({ ...w, isCalibrationWeek: false }))
+  const bannedNoCal = await silencedAsync(() => banExerciseFromMesocycle({ mesocycle: noCal, profile: cleared, bannedName: 'Band Tricep Kickback', exclusions: ['Band Tricep Kickback'] }))
+  const wk2NoCal = bannedNoCal.find(w => w.week_number === 2)?.days.flatMap(d => d.exercises).find(e => e.name === 'Overhead Tricep Extension')
+  const fullPrice = wk2NoCal ? prescribeLoad(ote, cleared, { targetRpeLabel: wk2NoCal.intensity, isFirstBlock: false, sets: wk2NoCal.sets, repRangeLabel: wk2NoCal.reps }).starting_weight_kg : null
+  check('...and a plan with no calibration week prices the same lift at the full estimate, heavier',
+    !!wk2NoCal && wk2NoCal.suggested_load_kg === fullPrice && (fullPrice ?? 0) > (wk2?.e.suggested_load_kg ?? Infinity),
+    { noCal: wk2NoCal?.suggested_load_kg, fullPrice, withCal: wk2?.e.suggested_load_kg })
+  check('week 2 reads 3 sets at the price his plan gives an unverified lift (not the full estimate)',
+    wk2?.e.sets === 3 && planPrice != null && wk2?.e.suggested_load_kg === planPrice && planPrice < 14,
+    wk2 && { sets: wk2.e.sets, kg: wk2.e.suggested_load_kg, reps: wk2.e.reps, planPrice })
   const notOwn = rows.filter(r => r.e.reps !== repRangeForIncomingExercise(ote, cleared, r.w, r.e.intensity)).map(r => `wk${r.w.week_number} ${r.e.reps}`)
   check('every week\'s rep range is the extension\'s own for that week', notOwn.length === 0, notOwn)
 
@@ -210,7 +228,10 @@ async function main() {
             if (!w.is_deload && lever(e.name) === 'bodyweight' && peer && peer.size === 1 && !peer.has(e.reps)) offPeers.push(`${label} wk${w.week_number} ${d.day} ${e.name}: ${e.reps}, its untouched neighbours ${[...peer]}`)
           }
           if (e.tier === 'tier_1_primary' || entry.mechanics_tier === 'primer') continue
-          const full = prescribeLoad(entry, p, { targetRpeLabel: e.intensity, isFirstBlock: false, sets: e.sets, repRangeLabel: e.reps, isCalibrationWeek: w.isCalibrationWeek === true })
+          // RE-ANCHORED 2 Nov 2026 (docs/plans/swap-load-anchor.md): an unverified swapped-in lift in a plan that
+          // calibrates is priced like that plan's own unverified lifts, at the calibration price in every loading week,
+          // not only the first. A plan that skipped calibration keeps the estimate.
+          const full = prescribeLoad(entry, p, { targetRpeLabel: e.intensity, isFirstBlock: false, sets: e.sets, repRangeLabel: e.reps, isCalibrationWeek: w.isCalibrationWeek === true || calibrates(after) })
           // A deload week is 70% of that, floored at the lightest thing that
           // exists — generation's rule for a slot with no week-3 number.
           const priced = w.is_deload && full.starting_weight_kg != null
@@ -222,7 +243,7 @@ async function main() {
             const next = after.find(x => x.week_number === w.week_number + 1)?.days.find(x => x.day === d.day)?.exercises.find(x => x.name === e.name)
             if (next?.suggested_load_kg != null) {
               calibrationSeen++
-              if (!(e.suggested_load_kg < next.suggested_load_kg || e.suggested_load_kg <= getEquipmentFloorKg(entry))) heavyCalibration.push(`${label} ${e.name}: calibration week ${e.suggested_load_kg}kg, the week after ${next.suggested_load_kg}kg`)
+              if (!(e.suggested_load_kg <= next.suggested_load_kg || e.suggested_load_kg <= getEquipmentFloorKg(entry))) heavyCalibration.push(`${label} ${e.name}: calibration week ${e.suggested_load_kg}kg, the week after ${next.suggested_load_kg}kg`)
             }
           }
           if (w.is_deload && e.suggested_load_kg != null) {
@@ -301,7 +322,10 @@ async function main() {
   // before and after on this fixture: 3 -> 2, both remaining from the ban and the swap paths, one each. The property
   // (a calibration-week replacement starts under the week after) is unchanged; the floor still needs both paths.
   check(`replaced, weighted slots in the calibration week were seen (${calibrationSeen})`, calibrationSeen >= 2, calibrationSeen)
-  check('...and each starts lighter than the same lift the week after', heavyCalibration.length === 0, heavyCalibration.slice(0, 4))
+  // RE-ANCHORED 2 Nov 2026: the week after now carries the calibration price too (the unverified-ramp rule, which
+  // generation also follows), so "lighter than" became "never heavier than". What it exists to stop is the swapped
+  // lift being written at the full estimate in the calibration week, which this still fails on.
+  check('...and none starts heavier than the same lift the week after', heavyCalibration.length === 0, heavyCalibration.slice(0, 4))
 
   // -------------------------------------------------------------------------
   console.log('\n[4] One dumbbell held overhead is not priced as a cable pushdown')
@@ -402,7 +426,45 @@ async function silencedAsync<T>(fn: () => Promise<T>): Promise<T> {
   try { return await fn() } finally { console.warn = w; console.log = l }
 }
 
+// EVERY DOOR SAYS WHAT PLAN IT IS EDITING (2 Nov 2026, docs/plans/swap-load-anchor.md). The pricing rule lives in one
+// function; each caller passes whether its plan calibrates. A caller that forgets prices its lift at the full estimate
+// with nothing on screen to show it, and the weight checks above reach only the swap and ban paths. So the property is
+// read off the source, comments stripped: every call to buildReplacementSlot passes six arguments. Proven on a
+// five-argument call first, so it cannot go vacuous.
+function callsMissingTheSixth(src: string, fn = 'buildReplacementSlot'): string[] {
+  const code = src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const out: string[] = []
+  const re = new RegExp(`${fn}\\(`, 'g')
+  let m: RegExpExecArray | null
+  while ((m = re.exec(code))) {
+    if (/function\s+$/.test(code.slice(Math.max(0, m.index - 20), m.index))) continue
+    let depth = 0, i = m.index + fn.length + 1, args = 1
+    for (; i < code.length; i++) {
+      const c = code[i]
+      if ('([{'.includes(c)) depth++
+      else if (')]}'.includes(c)) { if (depth === 0) break; depth-- }
+      else if (c === ',' && depth === 0) args++
+    }
+    if (args < 6) out.push(code.slice(m.index, Math.min(i + 1, m.index + 120)))
+  }
+  return out
+}
+function checkEveryCallerPassesTheCalibrationFact() {
+  console.log('\n[x] Every caller of buildReplacementSlot says whether its plan calibrates')
+  check('the detector finds a five-argument call', callsMissingTheSixth('buildReplacementSlot(a, b, c, d, isMainLiftSlot(e))').length === 1)
+  const files = ['src/lib/mesocycle-edit.ts', 'src/lib/plan-adaptations.ts', 'src/lib/session-kind.ts', 'src/lib/session-rebuild.ts']
+  const calls = files.flatMap(f => (readFileSync(join(import.meta.dirname, '..', f), 'utf8').match(/buildReplacementSlot\(/g) ?? []).map(() => f))
+  check(`the callers were found (${calls.length})`, calls.length >= 7, calls.length)
+  const missing = files.flatMap(f => callsMissingTheSixth(readFileSync(join(import.meta.dirname, '..', f), 'utf8')).map(c => `${f}: ${c}`))
+  check('...and every one passes the sixth', missing.length === 0, missing)
+  // carryHerChoices replays her own swaps onto a rebuilt week through the same function, and takes the fact as its
+  // sixth argument the same way.
+  const pa = readFileSync(join(import.meta.dirname, '..', 'src/lib/plan-adaptations.ts'), 'utf8')
+  check('...and the rebuild\'s replay of her swaps passes it too', (pa.match(/carryHerChoices\(/g) ?? []).length >= 2 && callsMissingTheSixth(pa, 'carryHerChoices').length === 0, callsMissingTheSixth(pa, 'carryHerChoices'))
+}
+
 main().then(() => {
+  checkEveryCallerPassesTheCalibrationFact()
   console.log(`\n${ran} checks ran.`)
   if (failures > 0) { console.error(`${failures} check(s) FAILED.`); process.exit(1) }
   console.log('All replacement-prescription checks passed.')

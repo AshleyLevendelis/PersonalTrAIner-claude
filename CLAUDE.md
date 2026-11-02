@@ -487,6 +487,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   So the sort keys, outermost first: loaded, style, stated likes, implement
   quality, the ranker. `swap-style` (28 checks, 14 mutations),
   `verify:session-edit` §8, `single-implement`
+- **And a swapped-in lift is priced like the plan's own** — since 2 Nov 2026 (CSCS delegation): with no logged
+  history, an incoming lift in a plan with a calibration week starts at the calibration price in every week, as the
+  plan's own unverified lifts do. Measured 62 of 200 swaps over 1.5x the plan's own figure before, 0 after.
+  `test:replacement-prescription`, `docs/plans/swap-load-anchor.md`
 - Ban it from every future plan — **both**; `audit-fixes`, `silent-writes`,
   `coach-parity` §3. CORRECTED 15 Sep 2026, measured: this said `screen only`
   and quoted the decline "NOT WIRED UP YET… point the user at the ban button"

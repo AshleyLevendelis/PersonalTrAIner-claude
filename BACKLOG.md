@@ -2,6 +2,27 @@
 
 Newest first. One line each.
 
+- [ ] **A SWAPPED-IN LIFT IS PRICED LIKE THE PLAN'S OWN, 2 NOV 2026 (whole-app test #20).** `docs/plans/swap-load-anchor.md`.
+  A swap to Dumbbell Shrugs wrote ~26 kg per hand beside the plan's own Dumbbell Shrugs at ~12. Traced: every
+  swap-shaped edit (swap, ban, injury and kit adaptations, the rebuild's replay of her swaps, the session rebuild,
+  the different-kind session, the coach's swap) priced an unverified incoming lift at 100% of the estimate outside the
+  calibration week, while the plan's own unverified lifts descend from the calibration price one increment a week
+  (`load-prescription.ts`, the unverified-ramp rule). Now, when the plan has a calibration week and there is no
+  logged history for the lift, the incoming lift gets the calibration price in every week. A plan that skipped
+  calibration keeps the estimate; logged history still wins; the main-lift reset and the deload's 70% are unchanged.
+  **MEASURED** on a 27-plan grid, 200 swaps to a lift the plan already held in week 3: over 1.5x the plan's own
+  figure 62 (31%, median 1.20x) before, 0 after (median 0.80x: the plan's own figure has ramped since week 1, the
+  swap starts from the base). **CSCS (decided under the delegation, basis):** an unverified load starts
+  conservatively and is re-anchored from the first logged session (the progression engine already does it), which is
+  the rule the plan applies to every other unverified lift. Cost: the first session of a swapped-in lift is lighter
+  than before, never lighter than the plan's own calibration week. No set, rep, exercise or pattern changes; no floor
+  or ceiling is redefined (the estimate is still the ceiling, and the swap now obeys the one-increment rule). In
+  scope: healthy-training load only. `test:replacement-prescription` re-anchored: the replaced-price re-derivation
+  uses the same rule, "starts lighter than the week after" became "never heavier than" (the week after carries the
+  calibration price too), the tester's row reads the plan's price instead of the old 14 kg, a no-calibration contrast
+  keeps the estimate, and a source check holds that every caller passes the plan's fact (8 mutations, 8 caught).
+  NOT CHANGED, named: the "+ Add exercise" path prices through the main-lift reset branch at the full estimate, the
+  same defect one door over; that branch's weight is its own recorded decision, so it is left for its own change.
 - [ ] **WHOLE-APP TEST FIXES, BATCH 3, 2 NOV 2026.** Dead controls. Every check mutation-tested, every break caught.
   - **The running-timer chip did nothing** off Exercise: it asked the Exercise screen to open the timers, and only
     that screen listened. The chip now goes to Tools itself and Tools opens the running timer (a live round is

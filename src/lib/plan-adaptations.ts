@@ -16,6 +16,7 @@ import {
   pickAutomaticReplacement,
   pickDaysOwnWork,
   buildReplacementSlot,
+  calibrates,
   clearOrphanedSupersetLabels,
   isMainLiftSlot,
   getReplacementCandidates,
@@ -209,7 +210,7 @@ async function substituteSlots(
 
         onDay.add(pick.exercise.name)
         usedThisWeek.add(pick.exercise.name)
-        const replaced = await buildReplacementSlot(slot, pick.exercise, profile, week, isMainLiftSlot(slot))
+        const replaced = await buildReplacementSlot(slot, pick.exercise, profile, week, isMainLiftSlot(slot), calibrates(mesocycle))
         touchedSlots.push({
           weekNumber: week.week_number, dayName: day.day, position, before: slot.name, after: pick.exercise.name,
           note: pick.kind === 'off_style' ? ROW_NOTES.off_style
@@ -653,7 +654,7 @@ export async function rebuildAgainstProfile(
       phase_label: original.phase_label,
     }
     const spliced = keepDays(original, identity, mayChange)
-    return carryHerChoices(original, spliced, cautiousWeek ? cautiousProfile : clone, exclusions, mayChange)
+    return carryHerChoices(original, spliced, cautiousWeek ? cautiousProfile : clone, exclusions, mayChange, calibrates(mesocycle))
   }))
 }
 
@@ -677,6 +678,7 @@ async function carryHerChoices(
   profile: UserProfile,
   exclusions: string[],
   mayChange: (dayName: string) => boolean,
+  planCalibrates: boolean,
 ): Promise<MesocycleWeek> {
   const { patchBlockFromLiftedKg } = await import('./beat-target-offer')
   const lower = (n: string) => n.toLowerCase()
@@ -704,7 +706,7 @@ async function carryHerChoices(
       if (herChoice && !banned.has(lower(herChoice)) && !current.exercises.some(e => lower(e.name) === lower(herChoice))) {
         const allowed = getReplacementCandidates(slot.name, profile, exclusions).find(c => lower(c.exercise.name) === lower(herChoice))
         if (allowed) {
-          const replaced: Exercise = { ...(await buildReplacementSlot(slot, allowed.exercise, profile, week, isMainLiftSlot(slot))), swapped_for: slot.name }
+          const replaced: Exercise = { ...(await buildReplacementSlot(slot, allowed.exercise, profile, week, isMainLiftSlot(slot), planCalibrates)), swapped_for: slot.name }
           week = { ...week, days: week.days.map(d => (d.day === day.day
             ? { ...d, exercises: clearOrphanedSupersetLabels(d.exercises.map((e, i) => (i === exIndex ? replaced : e))) }
             : d)) }

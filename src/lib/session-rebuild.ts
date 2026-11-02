@@ -1,5 +1,5 @@
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
-import { getReplacementCandidates, buildReplacementSlot, isMainLiftSlot } from './mesocycle-edit'
+import { getReplacementCandidates, buildReplacementSlot, calibrates, isMainLiftSlot } from './mesocycle-edit'
 import { settleWeek, clearOrphanedSupersetLabels } from './settle-week'
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,7 @@ export async function rebuildDayAroundMainLift(params: RebuildSessionParams): Pr
 
     // isMainLiftReset false, always: a main lift never reaches this branch, so
     // passing true here could only ever mis-price an accessory as a new lift.
-    next.push(await buildReplacementSlot(slot, pick.exercise, profile, week, false))
+    next.push(await buildReplacementSlot(slot, pick.exercise, profile, week, false, calibrates(mesocycle)))
     // The incoming name is claimed, and the outgoing one stays claimed too —
     // a later slot must not re-introduce the exercise this rebuild just took
     // out, which would read as the app changing nothing.

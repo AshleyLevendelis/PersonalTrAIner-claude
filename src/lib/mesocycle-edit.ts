@@ -355,6 +355,14 @@ export async function recomputeLoad(
    * Ignored where a logged number exists, which is no longer a guess.
    */
   isCalibrationWeek = false,
+  /**
+   * The plan being edited HAS a calibration week (2 Nov 2026, docs/plans/swap-load-anchor.md). Every unverified lift
+   * that plan prints descends from the calibration price and moves one increment a week (load-prescription.ts, the
+   * unverified-ramp rule), so a lift swapped in later with no logged history starts at that price too, not at 100% of
+   * the estimate: measured, a swapped-in Dumbbell Shrug at 26 kg beside the plan's own at 12. A plan that skipped
+   * calibration never discounted its unverified lifts, and neither does this. Ignored where a logged number exists.
+   */
+  planCalibrates = false,
 ): Promise<LoadPrescription> {
   if (isMainLiftReset) {
     // NOTE, 9 Oct 2026: `isFirstBlock` below is accepted by prescribeLoad and
@@ -382,7 +390,7 @@ export async function recomputeLoad(
     sets,
     repRangeLabel: reps,
     forceStartingWeightKg: recommendation?.weightKg,
-    isCalibrationWeek,
+    isCalibrationWeek: isCalibrationWeek || (planCalibrates && recommendation?.weightKg == null),
   })
 }
 
@@ -480,15 +488,22 @@ export function replacementProgramming(
  * the outgoing lift's reps. Done in one place so the weight on the slot can
  * never have been worked out for a rep range the slot does not show.
  */
+/** Does this plan have a calibration week? The one question the swap pricing asks of the plan. */
+export function calibrates(mesocycle: readonly Pick<MesocycleWeek, 'isCalibrationWeek'>[]): boolean {
+  return mesocycle.some(w => w.isCalibrationWeek === true)
+}
+
 export async function buildReplacementSlot(
   slot: Exercise,
   entry: ExerciseEntry,
   profile: UserProfile,
   week: Pick<MesocycleWeek, 'phase_label' | 'week_in_block' | 'is_deload' | 'isCalibrationWeek'>,
   isMainLiftReset: boolean,
+  /** The plan being edited has a calibration week: see recomputeLoad. Every caller holds the plan and says so. */
+  planCalibrates = false,
 ): Promise<Exercise> {
   const programming = replacementProgramming(slot, entry, profile, week)
-  const fresh = await recomputeLoad(entry, profile, slot.intensity || '', programming.sets, programming.reps, isMainLiftReset, week.isCalibrationWeek === true)
+  const fresh = await recomputeLoad(entry, profile, slot.intensity || '', programming.sets, programming.reps, isMainLiftReset, week.isCalibrationWeek === true, planCalibrates)
   // A DELOAD STAYS A DELOAD. recomputeLoad prices a lift at its full working
   // weight whatever the week, so a swap made "for the rest of the block" used
   // to write the recovery week at the same weight as the weeks before it —
@@ -730,7 +745,7 @@ export async function swapExerciseInMesocycle(params: SwapExerciseParams): Promi
 
     // HER CHOICE IS RECORDED ON THE ROW (swapped_for), so a rebuild of these weeks can carry it through. A swap of
     // a swap keeps the name of the lift she first moved away from.
-    const replaced: Exercise = { ...(await buildReplacementSlot(slot, newExercise, profile, week, isMainLift)), swapped_for: slot.swapped_for ?? slot.name }
+    const replaced: Exercise = { ...(await buildReplacementSlot(slot, newExercise, profile, week, isMainLift, calibrates(mesocycle))), swapped_for: slot.swapped_for ?? slot.name }
     const exercises = clearOrphanedSupersetLabels(
       day.exercises.map((e, i) => (i === exIndex ? replaced : e))
     )
@@ -794,7 +809,7 @@ export async function banExerciseFromMesocycle(params: BanExerciseParams): Promi
       }
 
       const replacement = candidates[0].exercise
-      const replaced = await buildReplacementSlot(oldSlot, replacement, profile, week, isMainLiftSlot(oldSlot))
+      const replaced = await buildReplacementSlot(oldSlot, replacement, profile, week, isMainLiftSlot(oldSlot), calibrates(mesocycle))
       const exercises = clearOrphanedSupersetLabels(
         day.exercises.map((e, i) => (i === idx ? replaced : e))
       )

@@ -4,7 +4,7 @@ import {
   getConstrainedPool, getFlaggedJoints, isEquipmentAllowed, allowedEquipmentFor, orderCandidates, clampToVolumeRole, getRoleSetCeiling,
   setRandomSource, resetRandomSource, STYLE_CONFIGS, POOL_WIDE_IMPLEMENT_TIERS,
 } from './exercise-plan'
-import { buildReplacementSlot, isMainLiftSlot } from './mesocycle-edit'
+import { buildReplacementSlot, calibrates, isMainLiftSlot } from './mesocycle-edit'
 import { settleWeek, rebuildWarmup } from './settle-week'
 import { getGoalPolicy, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS } from './goal-policies'
 import { effectiveRecoveryCapacity } from './concurrent-activity'
@@ -421,7 +421,7 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
     // takes its own canonical units (replacementProgramming), and a rep lift
     // takes its own bracket for this style and phase.
     const template: Exercise = { name: entry.name, sets, reps: '8-12', rest: `${rest}s`, substitution: '', intensity, prescription_type: 'reps' }
-    const ex = await buildReplacementSlot(template, entry, styleProfile, week, false)
+    const ex = await buildReplacementSlot(template, entry, styleProfile, week, false, calibrates(mesocycle))
     if (entry.prescription_type === 'intervals') ex.sets = deload ? halve(Math.max(2, Math.round(6 * exp.sets_multiplier))) : Math.max(2, Math.round(6 * exp.sets_multiplier))
     else if (deload && entry.prescription_type !== 'reps' && entry.prescription_type !== 'steady_state') ex.sets = halve(ex.sets)
     return ex
