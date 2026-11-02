@@ -36,6 +36,12 @@ const USER_ID = '00000000-0000-4000-8000-0000000000a1'
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const created = new Date(anchorNowMs() - 9 * 86400000).toISOString()
 const TRAIN_TODAY = new URLSearchParams(location.search).has('session-day')
+// The anchor's Wednesday is "Active Recovery + Cardio" on this profile, a planned day with no lifting. ?no-cardio:
+// she would rather avoid cardio (an INPUT), and the generator then leaves Wednesday a plain rest day with no plan
+// entry (verify:home-day-named). ?weigh=79.55: yesterday's weigh-in (an INPUT), so a reading with two decimals
+// reaches Home and Profile. Without them the page is unchanged.
+const NO_CARDIO = new URLSearchParams(location.search).has('no-cardio')
+const WEIGH = Number(new URLSearchParams(location.search).get('weigh')) || 80
 
 setDevClockOverride(PROFILE_ID, ANCHOR_ISO)
 try {
@@ -56,7 +62,7 @@ const profileRow = {
   training_days: DAYS.map((day, i) => ({ day, available: (TRAIN_TODAY ? [1, 3, 4, 5] : [1, 2, 4, 5]).includes(i) })),
   weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [], exercise_exclusions: [],
   macro_calculation_mode: 'STANDARD_STATIC', coaching_persona: 'supportive', recovery_capacity: 'moderate',
-  conditioning_preference: 'tolerate', created_at: created,
+  conditioning_preference: NO_CARDIO ? 'avoid' : 'tolerate', created_at: created,
   bmr: 1800, tdee: 2500, calorie_target: 2700, protein_g: 160, carbs_g: 320, fat_g: 80,
 }
 
@@ -82,7 +88,7 @@ const db: Db = {
     meal('snack', 0, 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
   ],
   daily_metrics: [
-    { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 86400000)), weight_kg: 80 },
+    { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 86400000)), weight_kg: WEIGH },
     { id: 'm2', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 5 * 86400000)), weight_kg: 80.4 },
   ],
   daily_steps: [], water_logs: [], exercise_set_logs: [], workout_sessions: [], cardio_logs: [],

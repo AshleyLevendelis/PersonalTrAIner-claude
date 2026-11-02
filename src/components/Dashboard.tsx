@@ -560,7 +560,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
       {/* 3. THE TRAINER'S LINE — one per screen, no box. An adaptation message is shown alone, never rotated away. */}
       {trainerNudge
         ? <TrainerNudge {...trainerNudge} line className="px-1" />
-        : plainTips.length > 0 && <HomeCoachNote tips={plainTips} />}
+        : plainTips.length > 0 && <HomeCoachNote tips={plainTips} restToday={data.session.status === 'rest' && !data.session.recoveryLine} />}
 
       {/* 4. TODAY'S RINGS — calories, protein, water, steps (no sleep: the app records none). Steps opens the steps
           entry here (her "Tap the steps ring"); the other three open Nutrition, where water is logged. */}
@@ -682,7 +682,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               </span>
               {weightDeltaKg != null && (
                 <span className="glow-mint tabular-mono text-[0.75rem] font-semibold text-primary-text">
-                  {weightDeltaKg > 0 ? '+' : ''}{weightDeltaKg.toFixed(1)}<span className="sr-only"> kg since you started</span>
+                  {weightDeltaKg > 0 ? '+' : ''}{weightDeltaKg.toFixed(1)}{/* THE UNIT ON SCREEN TOO (2 Nov 2026; whole-app test §4): "−0.5" alone could be any unit. */}<span data-testid="home-weight-delta-unit"> kg</span><span className="sr-only"> since you started</span>
                 </span>
               )}
             </span>
@@ -842,8 +842,10 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
     sub = `${data.session.focus ?? "Today's session"} is waiting for you on ${data.session.movedTo.dayName}`
     right = weekCount
   } else if (status === 'rest') {
-    title = 'Rest day'
-    sub = 'Recovery is part of the program'
+    // ACTIVE RECOVERY IS NAMED AS THE PLAN NAMES IT (2 Nov 2026; whole-app test §4: "Rest day" on a day the plan
+    // calls "Active Recovery + Cardio"). A day with no plan entry is the plain rest day.
+    title = data.session.recoveryLine && data.session.focus ? data.session.focus : 'Rest day'
+    sub = data.session.recoveryLine ?? 'Recovery is part of the program'
     right = weekCount
   } else {
     title = data.session.focus ?? "Today's session"
@@ -988,7 +990,7 @@ const HOME_PROMPTS = [
  * reduced motion, and it holds still while a finger or keyboard is on it.
  * One tip: no dots and no movement. None: the caller draws nothing.
  */
-export function HomeCoachNote({ tips }: { tips: HomeTip[] }) {
+export function HomeCoachNote({ tips, restToday = false }: { tips: HomeTip[]; /** No session today: "Adjust today" has nothing to adjust (2 Nov 2026). */ restToday?: boolean }) {
   const [index, setIndex] = useState(0)
   const [fading, setFading] = useState(false)
   const [held, setHeld] = useState(false)
@@ -1024,7 +1026,7 @@ export function HomeCoachNote({ tips }: { tips: HomeTip[] }) {
       <TrainerNudge
         line
         className="px-1"
-        prompts={HOME_PROMPTS}
+        prompts={restToday ? HOME_PROMPTS.filter(p => p.label !== 'Adjust today') : HOME_PROMPTS}
         text={tip.text}
         tag={tip.tag}
         openChat

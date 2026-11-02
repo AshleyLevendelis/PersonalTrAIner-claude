@@ -1017,7 +1017,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     setSheet(initialSection ? SHEET_FOR_SECTION[initialSection] : null)
   }, [open, initialSection])
 
-  const nowKg = latestWeightKg != null && latestWeightKg > 0 ? latestWeightKg : profile.weight_kg ?? null
+  // To one decimal everywhere Profile prints it, as Home does (2 Nov 2026; whole-app test §4).
+  const nowKg = latestWeightKg != null && latestWeightKg > 0 ? Number(latestWeightKg.toFixed(1)) : profile.weight_kg ?? null
   const goalKg = goals.find(g => g.metric === 'body_weight_kg' && g.status === 'active')?.target_value ?? null
   const availableDays = (profile.training_days ?? []).filter(d => d.available).map(d => d.day.slice(0, 3))
   const knownLift = profile.known_bench_kg != null ? `Bench ${profile.known_bench_kg} kg`
@@ -1079,7 +1080,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               </div>
             )}
             <Row label="Current weight">
-              <span className="text-sm">{latestWeightKg != null && latestWeightKg > 0 ? `${latestWeightKg} kg` : 'Log a weigh-in on Home'}</span>
+              {/* ONE DECIMAL, as Home shows it (2 Nov 2026; whole-app test §4: 79.5 on Home, 79.55 here). */}
+              <span className="text-sm" data-testid="profile-current-weight">{latestWeightKg != null && latestWeightKg > 0 ? `${Number(latestWeightKg.toFixed(1))} kg` : 'Log a weigh-in on Home'}</span>
             </Row>
           </div>
         </div>

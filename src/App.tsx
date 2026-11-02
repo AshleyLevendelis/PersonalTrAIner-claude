@@ -652,6 +652,14 @@ function App() {
    * toggle would change somebody's training under them.
    */
   const [planInvalidation, setPlanInvalidation] = useState<PlanInvalidation | null>(null)
+  /** The rebuild landed: the dialog shows the result until she closes it (2 Nov 2026). Keyed to the offer it answered. */
+  const [rebuildDoneFor, setRebuildDoneFor] = useState<PlanInvalidation | null>(null)
+  // WHAT THE DIALOG SHOWS STAYS PUT WHILE IT CLOSES (2 Nov 2026, verify:profile-rebuild-decline): closing on the result
+  // used to swap the contents back to the offer at once, so the Close she tapped was gone before Profile asked where
+  // the tap landed, Profile read it as a tap outside itself, and she was dropped on Home. Read off the open offer;
+  // while closing (no offer) it keeps whatever it last showed.
+  const rebuildDoneShown = useRef(false)
+  if (planInvalidation) rebuildDoneShown.current = rebuildDoneFor === planInvalidation
   const [rebuilding, setRebuilding] = useState(false)
   /**
    * Offered instead of onboarding when this browser has no profile — the one
@@ -2668,6 +2676,7 @@ function App() {
 
   const handleConfirmRebuild = async () => {
     if (!profile?.id || rebuilding) return
+    let rebuiltOk = false
     setRebuilding(true)
     try {
       const currentWeek = getActiveMesocycleWeek(
@@ -2717,11 +2726,16 @@ function App() {
       // than hidden: declining means new targets with the old meals still
       // fitted to the old ones, the same shape declining has always had.
       if (planInvalidation?.field === 'fitness_goal') await handleRegenerateAllMeals()
+      // SAID WHERE THE TAP WAS (2 Nov 2026, the UX pass, item 4; whole-app test #29): the dialog closed and nothing
+      // said the plan had changed. It now stays open on the result until she closes it.
+      rebuiltOk = true
+      setRebuildDoneFor(planInvalidation)
     } finally {
       setRebuilding(false)
-      setPlanInvalidation(null)
+      if (!rebuiltOk) setPlanInvalidation(null)
     }
   }
+  const closeRebuildDialog = () => setPlanInvalidation(null)
 
   // THE OFFER SAYS WHAT THE REBUILD WILL DO, read off a trial of it (run 5, H28, 11 Oct 2026): the same rebuild,
   // seeded, so the plan the tap applies is the plan the dialog described.
@@ -3486,8 +3500,21 @@ function App() {
           ahead, so it happens on an explicit yes and nowhere else. Declining
           leaves the plan exactly as it was — the profile change itself has
           already been saved either way, so nothing is lost by saying no. */}
-      <Dialog open={planInvalidation !== null} onOpenChange={open => { if (!open && !rebuilding) setPlanInvalidation(null) }}>
+      <Dialog open={planInvalidation !== null} onOpenChange={open => { if (!open && !rebuilding) closeRebuildDialog() }}>
         <DialogContent className="max-w-sm">
+          {rebuildDoneShown.current ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Your plan is rebuilt</DialogTitle>
+                <DialogDescription data-testid="rebuild-done">
+                  It changes from today. Days you have already trained are left as they were.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button onClick={closeRebuildDialog} data-testid="rebuild-done-close">Close</Button>
+              </DialogFooter>
+            </>
+          ) : (<>
           <DialogHeader>
             <DialogTitle>{planInvalidation?.title}</DialogTitle>
             <DialogDescription>{planInvalidation?.detail}</DialogDescription>
@@ -3505,6 +3532,7 @@ function App() {
               {rebuilding ? 'Rebuilding...' : 'Rebuild my plan'}
             </Button>
           </DialogFooter>
+          </>)}
         </DialogContent>
       </Dialog>
       <Dialog open={newPlanConfirmOpen} onOpenChange={open => { if (!newPlanResetting) setNewPlanConfirmOpen(open) }}>

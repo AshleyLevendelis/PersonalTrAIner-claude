@@ -80,6 +80,10 @@ const RULES: Rule[] = [
     evaluate: ctx => {
       if (ctx.sessionsThisWeekSoFar === 0) return null
       if (ctx.sessionsLastWeekSameSpan == null) return null // no whole previous week: there is no "usual"
+      // ONLY WHEN ON TRACK — Ashley's ruling, 2 Nov 2026, from three options (over saying it literally, and over leaving
+      // it): it said "ahead of your usual pace" in a week with two sessions missed, because last week had been worse.
+      // A week with a session due so far and not done gets no pace praise; another line shows instead.
+      if (ctx.loggedOfScheduledSoFarThisWeek < ctx.scheduledSoFarThisWeek) return null
       if (ctx.sessionsThisWeekSoFar > ctx.sessionsLastWeekSameSpan) {
         return `${ordinal(ctx.sessionsThisWeekSoFar)} session this week — you're ahead of your usual pace.`
       }

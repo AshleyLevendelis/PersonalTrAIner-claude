@@ -111,7 +111,7 @@ async function main() {
   check('the tips draw as the boxless coach line', /data-nudge-line/.test(note) && !/data-nudge-slim/.test(note))
   check('...with the two chips the design draws', /data-nudge-prompt[^>]*>What changed\?</.test(note) && /data-nudge-prompt[^>]*>Adjust today</.test(note), note.match(/data-nudge-prompt[^>]*>[^<]*/g))
   check('...and still a rotation she can step through ("Tip 1 of 2")', /Tip 1 of 2/.test(note))
-  check('an adaptation is the same coach line, shown alone (never one tip among the rotation)', /\{trainerNudge\s*\? <TrainerNudge \{\.\.\.trainerNudge\} line\b[^>]*\/>\s*: plainTips\.length > 0 && <HomeCoachNote tips=\{plainTips\} \/>\}/.test(home))
+  check('an adaptation is the same coach line, shown alone (never one tip among the rotation)', /\{trainerNudge\s*\? <TrainerNudge \{\.\.\.trainerNudge\} line\b[^>]*\/>\s*: plainTips\.length > 0 && <HomeCoachNote tips=\{plainTips\}( restToday=\{[^}]*\})? \/>\}/.test(home))
   check('Home keeps its rotation rules: held while touched or focused, never under reduced motion', /onPointerDown=\{\(\) => setHeld\(true\)\}/.test(home) && /if \(count < 2 \|\| reduced \|\| held\) return/.test(home))
 
   console.log('\n5. The ring row')

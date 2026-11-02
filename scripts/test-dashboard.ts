@@ -689,7 +689,15 @@ async function main() {
     const ahead = fresh()
     done(ahead, '2026-09-21'); done(ahead, '2026-09-28'); done(ahead, '2026-10-02')
     const e = await load(ahead, '2026-09-21', '2026-10-02')
-    check('...while a genuinely busier week still says so', (e.coachTips ?? []).some(t => /^2nd session this week — you're ahead of your usual pace/.test(t.text)), (e.coachTips ?? []).map(t => t.text))
+    // REVERSED 2 Nov 2026, Ashley's "Only when on track": Wednesday was missed, so this week gets no pace praise
+    // however it compares with last week.
+    check('a busier week with a session missed does NOT say it is ahead (her 2 Nov ruling)', !(e.coachTips ?? []).some(t => /usual pace/.test(t.text)), (e.coachTips ?? []).map(t => t.text))
+    // THE CONTRAST, so that check cannot pass by the rule never firing: Monday, Wednesday and today all done, nothing
+    // missed, against Monday only at the same point last week.
+    const onTrack = fresh()
+    done(onTrack, '2026-09-21'); done(onTrack, '2026-09-28'); done(onTrack, '2026-09-30'); done(onTrack, '2026-10-02')
+    const e3 = await load(onTrack, '2026-09-21', '2026-10-02')
+    check('...while a busier week with nothing missed still says so', (e3.coachTips ?? []).some(t => /^3rd session this week — you're ahead of your usual pace/.test(t.text)), (e3.coachTips ?? []).map(t => t.text))
 
     // (e2) RUN 7, H31, AS FOUND: "7th session this week — you're ahead of your usual pace" while the strip said
     // 0 of 4 done. The plan began on a Thursday, so its week ran Thursday to Wednesday; she trained and walked

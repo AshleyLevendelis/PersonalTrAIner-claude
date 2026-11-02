@@ -185,7 +185,7 @@ async function main() {
     // RE-ANCHORED 31 Oct 2026 (tab polish): Home's note became the boxless coach line on both of its paths (2c), and
     // Exercise's the 2a coach line; Nutrition keeps the slim note.
     check('Nutrition uses the slim note, Exercise the coach line', /<TrainerNudge slim text=\{macroNudge\}/.test(nut) && /<TrainerNudge line text=\{coachLine\.text\}/.test(panel))
-    check('Home uses the coach line on both paths (an adaptation and the rotating tips), with its two chips', /<TrainerNudge \{\.\.\.trainerNudge\} line\b/.test(home) && /<TrainerNudge\s+line\b[\s\S]{0,80}prompts=\{HOME_PROMPTS\}/.test(home)
+    check('Home uses the coach line on both paths (an adaptation and the rotating tips), with its two chips', /<TrainerNudge \{\.\.\.trainerNudge\} line\b/.test(home) && /<TrainerNudge\s+line\b[\s\S]{0,80}prompts=\{(restToday \? HOME_PROMPTS\.filter\([^)]*\) : )?HOME_PROMPTS\}/.test(home)
       && /label: 'What changed\?'/.test(home) && /label: 'Adjust today'/.test(home))
   }
   // RE-ANCHORED 31 Oct 2026 (design 3a): the legend of the top card, one row each, the rings still left out.

@@ -30,6 +30,7 @@ import { computeConsistency, type ConsistencyScore } from './consistency-score'
 import { getActiveMesocycleWeek } from './calculations'
 import { planDaysForDate } from './plan-week'
 import { getLocalDateString } from './dev-clock'
+import { prescriptionLine } from './activity-day'
 import { supabase } from './supabase'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek, ExerciseSetLog } from './types'
 import { dayLengthParts, formatDayLength } from './session-duration'
@@ -85,6 +86,11 @@ export interface TodaySession {
   minutesLeft: number | null
   /** The heaviest external load in the session — see leadLiftPhrase for how it is said. */
   leadLift: LeadLift | null
+  /**
+   * A day the plan schedules with no lifting (active recovery): its cardio in the plan's words, so Home names the day
+   * as the plan does instead of calling it a rest day (2 Nov 2026; whole-app test §4). Rest status only.
+   */
+  recoveryLine?: string | null
   /**
    * Set when today's session has been MOVED to another day ("I'll do it
    * tomorrow") — status is 'moved', focus names what left, and nothing else is
@@ -506,8 +512,11 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
         }
       })()
     : isRestDay
-    ? { status: 'rest', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
-        exerciseCount: 0, estimatedMinutes: null, sessionLength: null, minutesLeft: null, leadLift: null }
+    ? { status: 'rest', focus: todayWorkoutDay?.focus ?? null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,
+        exerciseCount: 0, estimatedMinutes: null, sessionLength: null, minutesLeft: null, leadLift: null,
+        // A PLANNED DAY WITHOUT LIFTS IS ACTIVE RECOVERY, the program page's own reading (ProgramBrowse): named as the
+        // plan names it, with its cardio. No day in the plan at all is the plain rest day (focus stays null).
+        recoveryLine: todayWorkoutDay ? (todayWorkoutDay.recommendedCardio ? prescriptionLine(todayWorkoutDay.recommendedCardio) : 'Light movement and mobility.') : null }
     : activityToday
     ? { status: activityDoneToday ? 'done' : 'not_started', focus: activityToday.activity, exerciseNames: [],
         setsLogged: 0, setsPlanned: 0, exerciseCount: 0, estimatedMinutes: activityToday.duration, sessionLength: null,

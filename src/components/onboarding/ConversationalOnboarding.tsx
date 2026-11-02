@@ -1497,10 +1497,22 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       }
       commitWorkingState(responseWs)
     } catch {
+      // WHAT HAPPENED, AND THE WAY ON (2 Nov 2026, the UX pass, item 4; whole-app test #30). This said "say that again"
+      // to someone who had tapped an answer, offered no retry, and the next question never came. A tapped or matched
+      // answer is committed BEFORE this call, so it is kept: say so, and ask the next open question from the app's own
+      // list (the stuck-slot rescue's shape). A typed message that answered nothing goes back in the box to resend.
+      const next = answeredThisTurn ? openSlotsInOrder(ws.confirmed, ws.values)[0] : undefined
+      const def = next ? getSlotDef(next) : undefined
+      const saved = 'I couldn’t reach your coach just then, but your answer is saved.'
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: 'Connection hiccup on my end — say that again and we’ll keep going.' },
+        def && next
+          ? { role: 'assistant', content: `${saved} Next: ${def.question}`, slotCard: def.control === 'text' ? undefined : next }
+          : answeredThisTurn
+            ? { role: 'assistant', content: saved }
+            : { role: 'assistant', content: 'I couldn’t reach your coach just then, so that didn’t go through. Your message is back in the box: tap send to try again.' },
       ])
+      if (!answeredThisTurn && !preRecorded) setInput(trimmed)
     } finally {
       // A typed reply to an edit prompt has now been through the coach. Put
       // the prompt away whatever came back, so the summary can return: with

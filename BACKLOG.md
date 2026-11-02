@@ -2,6 +2,33 @@
 
 Newest first. One line each.
 
+- [ ] **HOME SAYS WHAT TODAY IS, 2 NOV 2026 (UX item 5, "the coach knows where you are"; whole-app test §4).** Four
+  findings, three mechanical and one hers. (1) Home called the plan's "Active Recovery + Cardio" day a plain "Rest
+  day": a planned day with no lifts is now named as the plan names it, with its cardio in the plan's own words
+  underneath (`recoveryLine`, the program page's reading); a day with no plan entry is still "Rest day". (2) The
+  coach note offered "Adjust today" on a plain rest day, where there is nothing to adjust; it is left off there
+  (MY CHOICE, unasked: it still shows on an active-recovery day, which has a session). (3) The weight change read
+  "-0.5" with the unit only for a screen reader; "kg" is now on screen. Profile printed 79.55 kg where Home printed
+  79.5; Profile rounds to one decimal too. (4) ASHLEY'S RULING, from three options, "Only when on track": the pace
+  line ("ahead of your usual pace") shows only when nothing due so far this week was missed, so it never praises a
+  week with a missed session in it (`test:dashboard` (e) reversed and (e3) added; 2 mutations, both caught).
+  `verify:home-day-named` (new, 15 checks, the whole app; two INPUTS added to its page, `?no-cardio` for a plain rest
+  day and `?weigh=` for a two-decimal weigh-in). FOUND WRITING IT: the whole-app page's ordinary Wednesday was
+  already active recovery, so the plain rest day needed its own input; and the app's kept copy of the last plan
+  carried one load's plan into the next, so the driver clears the phone's storage per load. 8 mutations (title,
+  sub line, the chip filter, its condition, the unit hidden, the plan line dropped, both Profile roundings), all caught. `test:home-2c`, `test:layout-revamp`, `test:one-page` re-anchored to the new `restToday` prop.
+- [ ] **NO DEAD ENDS, 2 NOV 2026 (UX item 4; whole-app test #29-#30).** Mechanical. (1) "Rebuild my plan" shut its
+  dialog and nothing said the plan had changed: the same dialog now ends on "Your plan is rebuilt. It changes from
+  today. Days you have already trained are left as they were." with a Close button, and she stays on Profile
+  (`verify:profile-rebuild-decline` steps 6-11). FOUND BY THE DRIVER, NOT BY READING: Close dropped her on Home. Closing
+  swapped the dialog's contents back to the offer at once, so the Close she tapped was gone by the time Profile asked
+  whether the tap was inside another dialog, and Profile shut. A scripted click passed; only a real pointer tap
+  showed it. The "rebuilt" line is now keyed to the offer it answered and held while the dialog closes, and the next
+  offer is a fresh one (step 10). 4 mutations, all caught. (2) When the setup coach could not be reached, setup said "say that
+  again" to someone who had TAPPED an answer and then stalled. A tapped answer is now kept, the screen says so, and
+  the next open question is asked with its card; a typed message that answered nothing goes back in the box with
+  "tap send to try again" (`verify:setup-hiccup`, new, 8 checks, 2 mutations caught). NOT covered: a rebuild that
+  fails (the existing failure toast is unchanged).
 - [ ] **READABLE AND TAPPABLE ON A GYM FLOOR, 2 NOV 2026 (UX item 3; whole-app test §3).** Mechanical, each measured
   on screen before and after. TAP SIZES (`verify:small-targets`, new: a point 21px above, below, left and right of
   each control must land on it; a disabled control is size-checked only): every ⋮ / ⋯ menu item 32 → 44px (the
