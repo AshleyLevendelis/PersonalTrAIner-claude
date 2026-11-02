@@ -89,7 +89,8 @@ console.log('\n4. The grid asks the one decision everywhere')
   check('the save logs typed, else that same value',
     /const weight = input\.isBodyweight\s*\?\s*0\s*:\s*parseFloat\(input\.weight \|\| defaultWeightFor\(ref\)\) \|\| 0/.test(grid))
   check('the box shows that same value', /placeholder=\{isBW \? 'BW' : weightPlaceholderFor\(ref\)\}/.test(grid))
-  check('the plate calculator opens on that same value', /onOpenPlateCalc\(parseFloat\(input\.weight \|\| defaultWeightFor\(ref\)\) \|\| 0\)/.test(grid))
+  // RE-ANCHORED 2 Nov 2026: the call also passes the bar for this lift (an EZ bar is 10 kg). The weight is the property.
+  check('the plate calculator opens on that same value', /onOpenPlateCalc\(parseFloat\(input\.weight \|\| defaultWeightFor\(ref\)\) \|\| 0(, plateBarKg\(catalogEntry\))?\)/.test(grid))
   // ONE read of last session's weight in the whole grid: the blank decision's
   // own input. Any second read is a second route into a box or a save.
   const ghostWeightReads = grid.match(/ghost(?:For\([^)]*\))?!?\??\.weight_kg/g) ?? []
