@@ -15,7 +15,7 @@
 // still re-plans the rest of the day, her 1 Sep "plan the rest of my meals".
 // The caller decides that; this function only holds.
 // ---------------------------------------------------------------------------
-import { dayVerdict, type AssembledDay, type HeldAround, type PoolOption } from './meal-generation'
+import { dayVerdict, namedMiss, type AssembledDay, type HeldAround, type PoolOption } from './meal-generation'
 import { resizeDish, AROUND_EATEN_MIN, AROUND_EATEN_MAX } from './day-as-shown'
 import { sameDish } from './meal-dish-identity'
 import type { MealSlotName } from './meal-store'
@@ -65,7 +65,7 @@ export function holdAroundPins(input: {
   const deltaKcal = Math.round(asPlanned.calories - targets.calories)
   const base = { ...planned, chosen, totals: asPlanned, withinTolerance: dayVerdict(asPlanned, targets).onTarget }
   if (base.withinTolerance) return { ...base, heldAround: { kind: 'none', slots: heldSlots } }
-  if (keepSizes) return { ...base, heldAround: { kind: 'kept', slots: heldSlots, deltaKcal } }
+  if (keepSizes) return { ...base, heldAround: { kind: 'kept', slots: heldSlots, deltaKcal, miss: namedMiss(asPlanned, targets) } }
 
   const fixedTotals = sum(Object.values(fixed) as PoolOption[])
   const heldTotals = sum(heldSlots.map(s => chosen[s]!))
@@ -87,7 +87,7 @@ export function holdAroundPins(input: {
     if (dayVerdict(at(f), targets).onTarget) candidates.push(f)
   }
   candidates.sort((x, y) => Math.abs(x - kcalFactor) - Math.abs(y - kcalFactor))
-  const tooFar: HeldAround = { kind: 'too_far', slots: heldSlots, deltaKcal }
+  const tooFar: HeldAround = { kind: 'too_far', slots: heldSlots, deltaKcal, miss: namedMiss(asPlanned, targets) }
   const resizedAt = (f: number): Partial<Record<MealSlotName, PoolOption>> | null => {
     const out = { ...chosen }
     for (const s of heldSlots) {

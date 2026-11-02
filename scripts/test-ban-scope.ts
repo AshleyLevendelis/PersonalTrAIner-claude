@@ -93,9 +93,12 @@ async function main() {
     const all = banBlastRadius(plan, victim, null)
     check('the confirm counts only the sessions that will change', radius.sessions + radius.kept === all.sessions && radius.kept === trainedHolders.length, { radius, all })
     const lines = banConfirmLines(radius)
-    check('...and says the ones already done keep it',
-      new RegExp(`${radius.kept === 1 ? 'The session' : `The ${radius.kept} sessions`} you've already done keeps? it`).test(lines.info), lines.info)
-    check('...and says nothing of the kind when nothing is trained', !/already done/.test(banConfirmLines(all).info), banConfirmLines(all).info)
+    // RE-WORDED 2 Nov 2026 (whole-app test): the guard keeps every day behind her, trained or not, so "already done"
+    // claimed a session she never trained. The property is unchanged: the kept count is said, and only when there is one.
+    check('...and says the ones already behind her keep it',
+      new RegExp(`${radius.kept === 1 ? 'The session' : `The ${radius.kept} sessions`} already behind you keeps? it`).test(lines.info), lines.info)
+    check('...and never calls them "done": the count includes days she did not train', !/already done/.test(lines.info), lines.info)
+    check('...and says nothing of the kind when nothing is behind her', !/already behind you/.test(banConfirmLines(all).info), banConfirmLines(all).info)
   }
 
   console.log('\n2. Both app paths load the trained-day guard before they ban')

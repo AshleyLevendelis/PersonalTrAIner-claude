@@ -1337,9 +1337,9 @@ export type HeldAround =
    */
   | { kind: 'resized'; factor: number; slots: MealSlotName[]; deltaKcal: number; sizes?: { slot: MealSlotName; fromKcal: number; toKcal: number }[] }
   /** Re-sizing would need more than about 25%: held as planned, the day is `deltaKcal` off. */
-  | { kind: 'too_far'; slots: MealSlotName[]; deltaKcal: number }
+  | { kind: 'too_far'; slots: MealSlotName[]; deltaKcal: number; miss?: { macro: DayMacro; delta: number } | null }
   /** Undo was tapped for this date: held as planned, the day is `deltaKcal` off. */
-  | { kind: 'kept'; slots: MealSlotName[]; deltaKcal: number }
+  | { kind: 'kept'; slots: MealSlotName[]; deltaKcal: number; miss?: { macro: DayMacro; delta: number } | null }
 
 function sumOptionMacros(options: PoolOption[]): MacroTargets {
   return options.reduce(

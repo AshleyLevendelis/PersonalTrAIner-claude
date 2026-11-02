@@ -78,6 +78,21 @@ console.log('\n1b. A day off on protein, a meal eaten as planned: nothing is re-
   check('...and every open meal is the size planned', asPlanned.slots.every(r => r.eaten || r.resizedBy == null))
 }
 
+console.log('\n1c. The line names the same miss as the header')
+{
+  // 1 Nov 2026, whole-app test: the header said "fat 11 g under" (the calories inside their band) while the line under
+  // it said "The day is 87 kcal under your target". Both now come from namedMiss.
+  const offOnFat: MacroTargets = { ...plan, fat: plan.fat + 25 }
+  const b = chosen.breakfast!.macros
+  const kept = dayAsShown({ slots: SLOTS, chosen, eatenBySlot: { breakfast: { kcal: b.calories, protein: b.protein, carbs: b.carbs, fat: b.fat } }, targets: offOnFat, keepAsPlanned: true })
+  const line = aroundEatenLine(kept.aroundEaten) ?? ''
+  check('calories on target, fat off: the line names fat, in grams', /\b25 g under your fat target/.test(line), line)
+  check('...and never a calorie gap the header does not name', !/kcal/.test(line), line)
+  const offOnKcal: MacroTargets = { ...plan, calories: plan.calories + 300 }
+  const kept2 = dayAsShown({ slots: SLOTS, chosen, eatenBySlot: { breakfast: { kcal: b.calories, protein: b.protein, carbs: b.carbs, fat: b.fat } }, targets: offOnKcal, keepAsPlanned: true })
+  check('calories off: it says the calorie gap, as the header does', /300 kcal under your target/.test(aroundEatenLine(kept2.aroundEaten) ?? ''), aroundEatenLine(kept2.aroundEaten))
+}
+
 console.log('\n2. Her ruling A: the rest of the day fits around what was eaten')
 {
   // Lunch came to 200 kcal more than planned: the other three shrink. (300

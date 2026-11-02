@@ -608,6 +608,20 @@ function slotList(slots: string[]): string {
   return slots.length <= 1 ? (slots[0] ?? '') : `${slots.slice(0, -1).join(', ')} and ${slots[slots.length - 1]}`
 }
 
+/** The day's one named miss (meal-generation's namedMiss): calories when they are off, else the macro furthest out. */
+export type DayMiss = { macro: 'calories' | 'protein' | 'carbs' | 'fat'; delta: number }
+
+/**
+ * HOW FAR OFF THE DAY IS, NAMING THE SAME MISS AS THE HEADER (1 Nov 2026, whole-app test): the header said "fat 11 g
+ * under" and the line under it "87 kcal under your target", inside the calorie band. With a named miss given, that is
+ * what is said; without one (an older caller), the calorie gap as before.
+ */
+function missGap(deltaKcal: number, miss: DayMiss | null | undefined): string {
+  if (miss && miss.macro !== 'calories') return `${Math.abs(miss.delta)} g ${miss.delta > 0 ? 'over' : 'under'} your ${miss.macro} target`
+  const d = miss ? miss.delta : deltaKcal
+  return `${Math.abs(d)} kcal ${d > 0 ? 'over' : 'under'} your target`
+}
+
 /**
  * THE ONE LINE UNDER TODAY'S MEALS WHEN THE DAY FITS AROUND WHAT WAS EATEN
  * (Ashley's ruling, 10 Oct 2026: "says so in one line with an undo"; beyond
@@ -616,10 +630,10 @@ function slotList(slots: string[]): string {
  */
 export function aroundEatenLine(a:
   | { kind: 'none' }
-  | { kind: 'kept'; deltaKcal: number }
+  | { kind: 'kept'; deltaKcal: number; miss?: DayMiss | null }
   | { kind: 'resized'; factor: number; slots: string[]; eatenVsPlanKcal: number; eatenSlots: string[] }
-  | { kind: 'too_far'; deltaKcal: number }): string | null {
-  const gap = (d: number) => `${Math.abs(d)} kcal ${d > 0 ? 'over' : 'under'} your target`
+  | { kind: 'too_far'; deltaKcal: number; miss?: DayMiss | null }): string | null {
+  const gap = (d: number) => missGap(d, a.kind === 'kept' || a.kind === 'too_far' ? a.miss : null)
   if (a.kind === 'none') return null
   if (a.kind === 'kept') return `Your meals are as planned. Today is ${gap(a.deltaKcal)}.`
   if (a.kind === 'too_far') return `Today is ${gap(a.deltaKcal)}: too far to fix by changing portions, so your meals are as planned.`
@@ -637,9 +651,9 @@ export function aroundEatenLine(a:
 export function heldAroundLine(h:
   | { kind: 'none'; slots: string[] }
   | { kind: 'resized'; factor: number; slots: string[]; deltaKcal: number; sizes?: { slot: string; fromKcal: number; toKcal: number }[] }
-  | { kind: 'too_far'; slots: string[]; deltaKcal: number }
-  | { kind: 'kept'; slots: string[]; deltaKcal: number }): string | null {
-  const gap = (d: number) => `${Math.abs(d)} kcal ${d > 0 ? 'over' : 'under'} your target`
+  | { kind: 'too_far'; slots: string[]; deltaKcal: number; miss?: DayMiss | null }
+  | { kind: 'kept'; slots: string[]; deltaKcal: number; miss?: DayMiss | null }): string | null {
+  const gap = (d: number) => missGap(d, h.kind === 'kept' || h.kind === 'too_far' ? h.miss : null)
   const yours = `your ${slotList(h.slots)}`
   if (h.kind === 'none') return null
   if (h.kind === 'kept') return `Kept ${yours} as planned after your swap. The day is ${gap(h.deltaKcal)}.`

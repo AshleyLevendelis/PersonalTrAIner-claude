@@ -17,7 +17,7 @@ import { computeMealMacros } from '../src/lib/food-db'
 import { holdAroundPins } from '../src/lib/hold-around-pins'
 import { dayAsShown, AROUND_EATEN_MIN, AROUND_EATEN_MAX } from '../src/lib/day-as-shown'
 import { heldAroundLine } from '../src/lib/coach-voice'
-import { dayVerdict, computeSlotBudgets, type AssembledDay, type PoolOption } from '../src/lib/meal-generation'
+import { dayVerdict, namedMiss, computeSlotBudgets, type AssembledDay, type PoolOption } from '../src/lib/meal-generation'
 import { buildRotation, assembleRotationDay, serveDates, rotationIndexFor, ROTATION_DAYS } from '../src/lib/meal-rotation'
 import { mulberry32, makeDish } from './meal-fixture'
 import type { MealSlotName } from '../src/lib/meal-store'
@@ -109,6 +109,10 @@ console.log('\n3. Beyond 25%: left as planned, and the gap said')
   check('it says too far, with the real gap', h?.kind === 'too_far' && h.deltaKcal === gap, { h, gap })
   check('the line says how far over, plainly', heldAroundLine(h!) === `Kept your breakfast, dinner and snack as planned: fitting them around your swap would take more than a 25% change. The day is ${Math.abs(gap)} kcal over your target.`, heldAroundLine(h!))
   check('the day is honestly off target', far?.withinTolerance === false)
+  // THE SAME MISS AS THE HEADER (1 Nov 2026, whole-app test): the held line carries the day's named miss, and says it.
+  check('the held day carries the header\'s own miss', !!h && 'miss' in h && JSON.stringify(h.miss) === JSON.stringify(namedMiss(sum(far!.chosen), targets)), h)
+  const fatOnly = heldAroundLine({ kind: 'kept', slots: ['dinner'], deltaKcal: -87, miss: { macro: 'fat', delta: -11 } })
+  check('...and a day off on fat alone says fat, never the calorie gap', /11 g under your fat target/.test(fatOnly ?? '') && !/kcal/.test(fatOnly ?? ''), fatOnly)
   // UPWARD TOO: a small swap that would need the others more than 25% BIGGER.
   // Scaling up is never refused by the portion scaler, so only the band stops it.
   const tinyLunch = opt('lunch', 'Rice cakes', [{ name: 'rice cakes', quantity: 20, unit: 'g' }])

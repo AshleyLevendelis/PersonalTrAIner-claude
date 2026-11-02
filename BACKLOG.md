@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [ ] **WHOLE-APP TEST FIXES, BATCH 4, 2 NOV 2026.** Two sentences that disagreed with the screen.
+  - **A day named two misses at once**: the header said "fat 11 g under" (calories inside their band) and the line
+    under it "The day is 87 kcal under your target". The kept and too-far lines (a logged meal's, a swap's) now carry
+    the day's named miss (`namedMiss`, the header's own function) and say it: "11 g under your fat target", the
+    calorie gap only when calories are what is off. `test:day-as-shown` §1c, `test:hold-around-pins` §3 (3 mutations).
+  - **The ban sheet said "The session you've already done keeps it"** about a day she never trained: the guard keeps
+    every day behind her (past, trained, missed, rested, swapped). Now "already behind you ... as it was".
+    `test:ban-scope` re-anchored, with a check that "done" never appears.
 - [ ] **A SWAPPED-IN LIFT IS PRICED LIKE THE PLAN'S OWN, 2 NOV 2026 (whole-app test #20).** `docs/plans/swap-load-anchor.md`.
   A swap to Dumbbell Shrugs wrote ~26 kg per hand beside the plan's own Dumbbell Shrugs at ~12. Traced: every
   swap-shaped edit (swap, ban, injury and kit adaptations, the rebuild's replay of her swaps, the session rebuild,

@@ -24,7 +24,8 @@
 // ---------------------------------------------------------------------------
 import { scaleToTarget } from './portion-scaler'
 import { computeMealMacros } from './food-db'
-import { dayVerdict, type PoolOption } from './meal-generation'
+import { dayVerdict, namedMiss, type PoolOption } from './meal-generation'
+import type { DayMiss } from './coach-voice'
 import type { MealSlotName } from './meal-store'
 import type { MacroTargets } from './types'
 
@@ -50,11 +51,11 @@ export type AroundEaten =
   /** Nothing logged, nothing left to fit, or the day already on target. */
   | { kind: 'none' }
   /** Undo was tapped for this day: the plan stands, and the day is said as it is. */
-  | { kind: 'kept'; deltaKcal: number }
+  | { kind: 'kept'; deltaKcal: number; miss?: DayMiss | null }
   /** The un-eaten meals were re-sized by `factor` (one line, with Undo). */
   | { kind: 'resized'; factor: number; slots: MealSlotName[]; deltaKcal: number; eatenVsPlanKcal: number; eatenSlots: MealSlotName[] }
   /** A fit would need more than 25% either way: meals left alone, the gap said. */
-  | { kind: 'too_far'; deltaKcal: number }
+  | { kind: 'too_far'; deltaKcal: number; miss?: DayMiss | null }
 
 export interface DayAsShown {
   slots: ShownSlot[]
@@ -119,7 +120,7 @@ export function dayAsShown(input: {
   // the plan-level refit follows.
   if (dayVerdict(baseTotals, targets).onTarget) return { slots: base, totals: baseTotals, aroundEaten: { kind: 'none' } }
   const deltaKcal = Math.round(baseTotals.calories - targets.calories)
-  if (keepAsPlanned) return { slots: base, totals: baseTotals, aroundEaten: { kind: 'kept', deltaKcal } }
+  if (keepAsPlanned) return { slots: base, totals: baseTotals, aroundEaten: { kind: 'kept', deltaKcal, miss: namedMiss(baseTotals, targets) } }
 
   const eatenKcal = logged.reduce((s, r) => s + r.macros.calories, 0)
   const openKcal = open.reduce((s, r) => s + r.macros.calories, 0)
@@ -132,7 +133,7 @@ export function dayAsShown(input: {
   // re-sizes together stay inside "about 25% either way" (her one rule).
   const combined = (r: ShownSlot) => factor * (r.option?.heldBy ?? 1)
   if (!(factor > 0) || open.some(r => !(combined(r) >= AROUND_EATEN_MIN - 1e-9 && combined(r) <= AROUND_EATEN_MAX + 1e-9))) {
-    return { slots: base, totals: baseTotals, aroundEaten: { kind: 'too_far', deltaKcal } }
+    return { slots: base, totals: baseTotals, aroundEaten: { kind: 'too_far', deltaKcal, miss: namedMiss(baseTotals, targets) } }
   }
   const rows = base.map(r => {
     if (r.eaten || !r.option) return r
@@ -141,7 +142,7 @@ export function dayAsShown(input: {
   })
   // Every open dish or none: a half-resized day would describe a fit it did not make.
   if (rows.some(r => !r.eaten && r.option && r.resizedBy == null)) {
-    return { slots: base, totals: baseTotals, aroundEaten: { kind: 'too_far', deltaKcal } }
+    return { slots: base, totals: baseTotals, aroundEaten: { kind: 'too_far', deltaKcal, miss: namedMiss(baseTotals, targets) } }
   }
   return {
     slots: rows,

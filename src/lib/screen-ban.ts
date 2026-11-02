@@ -60,7 +60,9 @@ export function banBlastRadius(mesocycle: MesocycleWeek[], exerciseName: string,
 export function banConfirmLines(radius: BanBlastRadius): { warn: string | null; info: string } {
   const { sessions, kept } = radius
   const keptLine = kept > 0
-    ? ` ${kept === 1 ? 'The session' : `The ${kept} sessions`} you've already done keep${kept === 1 ? 's' : ''} it, as the record of what you did.`
+    // "ALREADY BEHIND YOU", NOT "ALREADY DONE" (1 Nov 2026, whole-app test): the guard keeps every day that is past,
+    // trained, said missed, rested or swapped, so a day she never trained read as a session she had done.
+    ? ` ${kept === 1 ? 'The session' : `The ${kept} sessions`} already behind you keep${kept === 1 ? 's' : ''} it, as ${kept === 1 ? 'it was' : 'they were'}.`
     : ''
   if (sessions === 0) {
     return {
