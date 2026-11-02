@@ -76,7 +76,7 @@ import { describeKindToday, sessionKindsFor, kindTodayOf, type SessionKind } fro
 import type { SessionKindOffer, SessionKindPlan } from '@/lib/session-kind'
 import { settleWeek } from '@/lib/settle-week'
 import { sessionRefFromCell, sessionRefForPlanDay, editTarget, sayDayIn, type SessionRef } from '@/lib/session-ref'
-import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
+import { planLighterToday, undoLighterToday, type LighterPlan } from '@/lib/lighter-today'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
 import { executeCardioSession } from '@/lib/pending-action-executor'
 import { recomputeLoad, type SwapScope } from '@/lib/mesocycle-edit'
@@ -607,39 +607,33 @@ export function TodayPanel({
     }
   }
 
-  /** One step lighter, this week's session only — the same tail, the same scope. */
-  const lighterToday = async (): Promise<string | null> => {
-    if (!profile || !mesocycle) return 'No plan to edit.'
-    const week = mesocycle.find(w => w.week_number === liveWeek)
+  /**
+   * ONE STEP LIGHTER, today's session only (lighter-today.ts). The sheet shows the trial's words first and taps
+   * through to `lighterToday`; the reason chips' "I'm tired" applies it straight, as their own card already said.
+   */
+  const lighterPlan = (): LighterPlan => {
+    if (!profile || !mesocycle) return { ok: false, refusal: 'No plan to edit.' }
     const target = editTarget(todayRef)
-    if (!target.ok) return target.refusal
-    const planDay = target.planDayName
-    const day = week?.days.find(d => d.day === planDay)
-    if (!week || !day) return "I can't see today's session just now."
-    // AN EMPTY DAY IS NOT A DAY AT ITS FLOOR (M26). adjustDayVolume changes
-    // nothing and blocks nothing on a day with no exercises, and that used to
-    // print "Every exercise is already at its minimum" about a rest day.
-    if (day.exercises.length === 0) return "There's no session here to make lighter."
-    if (!isVolumeAdjustable(week)) return "This is a deload week — it's already lighter on purpose."
-    const result = adjustDayVolume(day, 'lighter', profile)
-    if (!result.changed) {
-      // SAY WHAT THE MINIMUM IS, AND WHAT IS STILL POSSIBLE (M26). The bare
-      // "Every exercise is already at its minimum." answered "I'm wiped" with
-      // a dead end. The numbers are the session's own.
-      const sets = day.exercises.reduce((n, e) => n + (e.sets ?? 0), 0)
-      const floor = `${todayRef.sayDay}'s session is already as light as it goes: ${sets} sets across ${day.exercises.length} exercises, the fewest that still trains each one.`
-      const blocked = result.blocked[0] ? ` (${result.blocked[0].name} is ${result.blocked[0].reason}.)` : ''
-      return `${floor}${blocked} You can still swap an exercise for an easier one, shorten the session, or move it to another day from the day menu.`
-    }
-    const settled = settleWeek(
-      { ...week, days: week.days.map(d => (d.day === planDay ? { ...result.day, lightened_today: true } : d)) },
-      planDay,
-      profile,
-    )
-    return applySessionEdit(
-      { mesocycle: mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w)), changed: true },
-      'today',
-    )
+    if (!target.ok) return { ok: false, refusal: target.refusal }
+    return planLighterToday({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, sayDay: todayRef.sayDay })
+  }
+  const lighterToday = async (): Promise<string | null> => {
+    const plan = lighterPlan()
+    if (!plan.ok) return plan.refusal
+    return applySessionEdit({ mesocycle: plan.mesocycle, changed: true }, 'today')
+  }
+  const [lighterBusy, setLighterBusy] = useState(false)
+  const [lighterError, setLighterError] = useState<string | null>(null)
+  const lighterUndo = async () => {
+    if (!mesocycle) return
+    const target = editTarget(todayRef)
+    if (!target.ok) { setLighterError(target.refusal); return }
+    const back = undoLighterToday(mesocycle, liveWeek, target.planDayName, loggedWorkingToday)
+    if (!back.ok) { setLighterError(back.refusal); return }
+    setLighterBusy(true); setLighterError(null)
+    const failed = await applySessionEdit({ mesocycle: back.mesocycle, changed: true }, 'today')
+    setLighterBusy(false)
+    if (failed) setLighterError(failed)
   }
 
   const [moveError, setMoveError] = useState<string | null>(null)
@@ -1340,6 +1334,7 @@ export function TodayPanel({
         onChanged={() => { weekTrain.refresh(); onLogsUpdated?.() }}
         onShorten={shortenToday}
         onLighter={lighterToday}
+        onLighterPlan={lighterPlan}
         onRebuild={rebuildToday}
         kindOptions={profile ? sessionKindsFor(profile) : []}
         onKindPlan={kindPlan}
@@ -1588,6 +1583,12 @@ export function TodayPanel({
             </div>
           )}
           {kindError && <p className="text-xs text-destructive" data-testid="kind-today-error">{kindError}</p>}
+          {/* MADE LIGHTER TODAY: the way back (2 Nov 2026), read off the stored planned day so it survives a reload. The
+              hero's line already says it was made lighter; this is only the button, so it is said once. */}
+          {workout?.lightened_from && (
+            <Button size="sm" variant="outline" className="min-h-11 self-start" disabled={lighterBusy} onClick={lighterUndo} data-testid="lighter-today-undo">Put the full session back</Button>
+          )}
+          {lighterError && <p className="text-xs text-destructive" data-testid="lighter-today-error">{lighterError}</p>}
           {/* START, FINISH AND THE SUMMARY ARE IN THE GLOWING CARD above (2a), beside the
               session they belong to; the reconnecting line went with them. */}
           {/* THE TRAINER'S LINE (2a): no box, the mint avatar and one sentence

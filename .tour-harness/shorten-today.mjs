@@ -155,7 +155,13 @@ check('5b. ...and so does the line saying so', /^Shortened/.test(await note()), 
 // --- one step lighter --------------------------------------------------------
 check('6a. the day menu still offers "make it easier"', (await openSheet()) === 'open' && (await verbs()).includes('lighter'), await verbs())
 const setsBefore = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`)
-check('6b. tapping it closes the sheet', await clickSel('[data-verb="lighter"]') && await untilClosed())
+// SHOWN FIRST (2 Nov 2026): the tap opens what it will do, and nothing changes until "Make it lighter".
+check('6b. tapping it shows what changes first', await clickSel('[data-verb="lighter"]') && (await wait(500), await has('[data-testid="what-happened-lighter"]')))
+const lines6 = await ev(`[...document.querySelectorAll('[data-testid="lighter-lines"] li')].map(n => n.textContent.trim())`)
+check('6b2. ...naming the exercises that lose a set, with both numbers', Array.isArray(lines6) && lines6.some(l => /^.+: \d+ → \d+ sets?$/.test(l)) && !lines6.some(l => /\b1 sets$/.test(l)), lines6)
+await shoot('shorten-today-lighter-preview')
+check('6b3. ...and nothing on the session has changed yet', JSON.stringify(await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`)) === JSON.stringify(setsBefore))
+check('6b4. confirming closes the sheet', await clickSel('[data-testid="lighter-confirm"]') && await untilClosed())
 let setsAfter = setsBefore
 for (let i = 0; i < 20 && JSON.stringify(setsAfter) === JSON.stringify(setsBefore); i++) { await wait(300); setsAfter = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`) }
 check('6c. ...and something on the session actually got lighter', JSON.stringify(setsAfter) !== JSON.stringify(setsBefore), { setsBefore, setsAfter })
@@ -183,12 +189,24 @@ await shoot('shorten-today-gated')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&load=8#/tab/exercise` })
 await wait(4000)
 check('8a. a fresh page, and the day menu offers "make it easier"', (await openSheet()) === 'open' && (await verbs()).includes('lighter'), await verbs())
-check('8b. tapping it', await clickSel('[data-verb="lighter"]') && await untilClosed())
+const sets8 = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`)
+check('8b. tapping it, then confirming what it showed', await clickSel('[data-verb="lighter"]') && (await wait(500), await clickSel('[data-testid="lighter-confirm"]')) && await untilClosed())
 let n8 = await note()
 for (let i = 0; i < 20 && !/lighter/i.test(n8); i++) { await wait(300); n8 = await note() }
 check('8c. the session says it was made lighter for today', /^Made lighter for today\./.test(n8), n8)
 check('8d. ...and never blames her equipment for the shorter session', !/your equipment|runs shorter than/.test(n8), n8)
 await shoot('shorten-today-lighter-alone')
+// AND THE WAY BACK (2 Nov 2026): one tap puts the planned session back, exactly.
+let undo8 = false
+for (let i = 0; i < 20 && !(undo8 = await has('[data-testid="lighter-today-undo"]')); i++) await wait(300)
+check('8e. the session offers "Put the full session back"', undo8)
+await ev(`document.querySelector('[data-testid="lighter-today-undo"]')?.scrollIntoView({ block: 'center' })`); await wait(300)
+await shoot('shorten-today-lighter-undo')
+check('8f. tapping it', await clickSel('[data-testid="lighter-today-undo"]'))
+let back8 = null
+for (let i = 0; i < 20; i++) { await wait(300); back8 = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`); if (JSON.stringify(back8) === JSON.stringify(sets8)) break }
+check('8g. ...puts every exercise back as it was planned', JSON.stringify(back8) === JSON.stringify(sets8), { was: sets8, now: back8 })
+check('8h. ...and the made-lighter line and its button are gone', !(await has('[data-testid="lighter-today-undo"]')) && !/lighter/i.test(await note()), await note())
 
 console.log(failures === 0 ? '\nShortening takes the tail off, keeps the main lift whole, says so, and sticks.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()

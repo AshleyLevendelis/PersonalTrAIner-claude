@@ -43,7 +43,7 @@ export interface WhatHappenedTarget {
 }
 
 type Verb = DayVerb
-type Phase = 'menu' | 'did_elsewhere' | 'move' | 'something_else' | 'missed_recorded' | 'shorten' | 'rebuild' | 'kind' | 'kind_offer'
+type Phase = 'menu' | 'did_elsewhere' | 'move' | 'something_else' | 'missed_recorded' | 'shorten' | 'rebuild' | 'kind' | 'kind_offer' | 'lighter'
 
 /** "box jumps, sled push and burpees" -> three moves. Empty when nothing was typed. */
 function movesFrom(typed: string): string[] {
@@ -82,6 +82,7 @@ export function WhatHappenedSheet({
   onShorten,
   onRebuild,
   onLighter,
+  onLighterPlan,
   kindOptions = [],
   onKindPlan,
   onKindConfirm,
@@ -115,6 +116,8 @@ export function WhatHappenedSheet({
   onRebuild?: () => Promise<string | null>
   /** Same contract: one step lighter, today only. */
   onLighter?: () => Promise<string | null>
+  /** The trial for it, in words, so the sheet shows what changes before the tap (2 Nov 2026). Nothing is written. */
+  onLighterPlan?: () => { ok: true; lines: string[] } | { ok: false; refusal: string }
   /**
    * A DIFFERENT KIND OF SESSION TODAY — Ashley's ruling, 20 Oct 2026: "Drop it,
    * today only." The trial and the write are the caller's (session-kind.ts,
@@ -231,6 +234,16 @@ export function WhatHappenedSheet({
   const runShorten = (minutes: number) => runEdit(() => onShorten!(minutes))
   const runRebuild = () => runEdit(() => onRebuild!())
   const runLighter = () => runEdit(() => onLighter!())
+  /** SHOWN FIRST (2 Nov 2026): the trial's words, then the tap. A refusal is said in the sheet, nothing written. */
+  const [lighterLines, setLighterLines] = useState<string[]>([])
+  const planLighter = () => {
+    setError(null)
+    const plan = onLighterPlan ? onLighterPlan() : null
+    if (!plan) { void runLighter(); return }
+    if (!plan.ok) { setError(plan.refusal); return }
+    setLighterLines(plan.lines)
+    setPhase('lighter')
+  }
   /** The TRIAL: nothing is written, the offer is shown in the sheet first. */
   const planKind = async (kind: SessionKind) => {
     setBusy(true); setError(null)
@@ -427,7 +440,7 @@ export function WhatHappenedSheet({
               <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={() => setPhase('kind')} data-verb="kind">A different kind of session today</Button>
             )}
             {verbs.includes('lighter') && (
-              <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={runLighter} data-verb="lighter">Make it easier today</Button>
+              <Button variant="outline" className="w-full justify-start" disabled={busy} onClick={planLighter} data-verb="lighter">Make it easier today</Button>
             )}
           </div>
         )}
@@ -466,6 +479,19 @@ export function WhatHappenedSheet({
             </p>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" disabled={busy} onClick={runRebuild} data-testid="rebuild-confirm">Rebuild it</Button>
+              <Button variant="ghost" size="sm" disabled={busy} onClick={() => setPhase('menu')}>Back</Button>
+            </div>
+          </div>
+        )}
+
+        {phase === 'lighter' && (
+          <div className="space-y-2" data-testid="what-happened-lighter">
+            <p className="text-sm">One step lighter, today only?</p>
+            <ul className="space-y-1 text-xs text-muted-foreground" data-testid="lighter-lines">
+              {lighterLines.map(l => <li key={l}>{l}</li>)}
+            </ul>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" disabled={busy} onClick={runLighter} data-testid="lighter-confirm">Make it lighter</Button>
               <Button variant="ghost" size="sm" disabled={busy} onClick={() => setPhase('menu')}>Back</Button>
             </div>
           </div>

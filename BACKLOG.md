@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [ ] **"MAKE IT EASIER TODAY" IS SHOWN FIRST AND CAN BE PUT BACK, 2 NOV 2026 (whole-app test #5; UX item 2, her "work
+  through all of these").** It applied on the tap with no preview and no Undo. Now (`lighter-today.ts`): the sheet
+  shows the trial first ("Pull-Ups: 3 → 2 sets", "About 26 → 24 min.", "Weights and reps stay the same. Only today
+  changes"), "Make it lighter" writes it, and the session offers "Put the full session back", which restores the
+  planned day byte for byte, only while nothing is logged and the day is still as it was left (her 29 Oct rule). The
+  planned day rides in the week row's jsonb (`lightened_from`), so Undo survives a reload. A MEASURED FINDING: the
+  old path ran the week-balance pass, which changed OTHER days of the week to pay for a tired day (the
+  `weekBalance` mutation turns "every other day is exactly as it was" red). CSCS decision, mine: a lighter day for
+  fatigue is a deliberate one-day dip; paying it back with sets on later days loads the days after a tired one,
+  so the pass no longer runs here (the reorder's rule). Review: 1 effect: one set fewer per exercise today, loads
+  and reps unchanged; 2 takes away: the silent extra sets elsewhere; 3 fundamentals: no exercise removed, patterns
+  and progression untouched, the week's volume dips by today's sets only; 4 floors: the role set-floors still
+  apply (adjustDayVolume); 5 scope: inside. Also "2 → 1 sets" said as "1 set". Checks: `test:lighter-today` (new,
+  20 checks, 7 mutations caught), `verify:shorten-today` 6b-6b4 and 8b-8h (preview, nothing changed before the
+  tap, Undo restores; 3 mutations caught, a 4th that broke the whole page discarded as a crash and redone),
+  `test:sheet-manners` re-anchored on the new module. 45 derived gates green in a worktree, 18 gates and Exercise
+  drivers green after the merge. The reason chip "I'm tired" still applies at once, as its own card says.
 - [ ] **AN EDIT TO A MEAL ALREADY EATEN KEEPS THE DAY'S OTHER DISHES, 2 NOV 2026. Ashley's ruling: "Same dishes"**,
   from two options, put to her as a COLLISION of two of her rulings (10 Oct logged-meal rule: same dishes within
   about a quarter; 10 Oct scope rule: an edited meal re-plans the day). She chose the logged-meal rule. Built: an

@@ -618,6 +618,8 @@ export interface WorkoutDay {
    * Rides in the week row's `days` jsonb like `shortened_to_minutes`; scoped by which week row is written.
    */
   lightened_today?: boolean
+  /** The planned day and a fingerprint of what "make it easier" left, so Undo can put it back exactly (lighter-today.ts). */
+  lightened_from?: import('./lighter-today').LightenedFrom
 }
 
 export interface ConstraintTraceEntry {

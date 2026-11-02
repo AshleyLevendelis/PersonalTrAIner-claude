@@ -106,7 +106,10 @@ console.log('\n4. An error belongs to the step that produced it; the question ma
   check('...and every wrapper announces the change', count(step, /=> \{ onStepChange\?\.\(\); set\w+Raw\(v\) \}/g) === 4)
   check('the scope question uses the buttons\' words', />Just today, or the rest of the block\?</.test(remove) && !/Just this week/.test(remove))
   check('...over buttons that read "Just today" and "Whole block" (her 31 Oct words)', />Just today</.test(remove) && />Whole block</.test(remove))
-  const lighter = today.slice(today.indexOf('const lighterToday'), today.indexOf('const [moveError'))
+  // RE-ANCHORED 2 Nov 2026: the lighter day's trial moved into its own module (lighter-today.ts) so the sheet can show
+  // it before the tap. The property is the same: an empty day says so before anything is adjusted; the floor says what
+  // is still possible.
+  const lighter = readFileSync(join(ROOT, 'src/lib/lighter-today.ts'), 'utf8')
   check('"I\'m wiped" on an empty day says there is no session, before anything is adjusted', lighter.indexOf("There's no session here to make lighter.") !== -1 && lighter.indexOf("There's no session here to make lighter.") < lighter.indexOf('adjustDayVolume('))
   check('...and at the floor it says what the minimum is and what is still possible', /already as light as it goes: \$\{sets\} sets across \$\{day\.exercises\.length\} exercises/.test(lighter) && /You can still swap an exercise for an easier one, shorten the session, or move it to another day/.test(lighter))
   check('...never the bare dead end', !/'Every exercise is already at its minimum\.'/.test(today))
