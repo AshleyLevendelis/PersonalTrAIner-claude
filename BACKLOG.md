@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [ ] **KNEE REHAB ON LEG DAYS ONLY, 2 NOV 2026 (whole-app test #19). Ashley's ruling: "B".** Asked as one question
+  with three options after the trace: A, every day for a lasting injury and leg days only for an ease-off
+  (recommended, as the 20 Oct ruling was made about ease-offs); B, leg days only, always; C, every day, always (what
+  the app did). She chose B. Cause: generation's guaranteed rehab slot (`pickRehabMovement`) filled every training day
+  for every flagged joint, so a knee on the list, or a rebuild while a knee ease-off ran, put Seated Short-Arc Quad
+  Set on Upper Pull & Core, against her 20 Oct ruling, which was built only into the slot-by-slot ease-off. Now, on a
+  day whose own work is not legs (`trackTrainsLegs`, the ease-off's own test), the knee leaves the joints the slot
+  is chosen for. Other joints unchanged; a full-body day is a leg day. MEASURED on the gate's grid (4 splits x 3
+  styles x 4 kits): 120 leg days all keep a gentle knee drill; 72 non-leg days, none carry one (one carries a Low Box
+  Step-Up as the week's second leg compound, training work, not rehab, and is allowed). CSCS review in
+  `docs/plans/knee-rehab-leg-days.md`: knee rehab now sits beside the knee's loading; frequency drops to about half
+  the sessions on a split, which is her ruling; no floor, pattern or volume moves. `test:rehab-prescribed` §1
+  re-anchored, with a check that the gentle slot itself is on every leg day (a leg day's own knee-friendly work hid
+  its loss: a MISSED mutation said so). 3 mutations, 3 caught. Needs the full sweep (exercise-plan.ts changed, so
+  `test:quality` and `test:audit` too).
 - [ ] **WHOLE-APP TEST FIXES, BATCH 4, 2 NOV 2026.** Two sentences that disagreed with the screen.
   - **A day named two misses at once**: the header said "fat 11 g under" (calories inside their band) and the line
     under it "The day is 87 kcal under your target". The kept and too-far lines (a logged meal's, a swap's) now carry

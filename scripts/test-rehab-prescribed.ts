@@ -28,7 +28,7 @@
 
 import {
   generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource,
-  getConstrainedPool, getFlaggedJoints, pickRehabMovement,
+  getConstrainedPool, getFlaggedJoints, pickRehabMovement, isLegDay,
 } from '../src/lib/exercise-plan'
 import { readFileSync } from 'fs'
 import { getExerciseEntry, isIndicatedFor, EXERCISE_DATABASE } from '../src/lib/exercise-db'
@@ -102,6 +102,10 @@ const EQUIP = ['full_gym', 'home_gym', 'minimalist', 'bodyweight'] as const
 // ---------------------------------------------------------------------------
 console.log('\n1. Every session carries the joint\'s own rehab work')
 // ---------------------------------------------------------------------------
+let kneeOffDays = 0
+const kneeOnUpper: string[] = []
+let kneeLegDays = 0
+const kneeLegNoSlot: string[] = []
 for (const injury of REHAB_INJURIES) {
   const flagged = getFlaggedJoints([injury])
   let days = 0
@@ -112,19 +116,41 @@ for (const injury of REHAB_INJURIES) {
         const profile = buildProfile({ injuries: [injury], workout_split_preference: split, training_style: style, equipment_access })
         for (const day of gen(profile, `rehab:${injury}:${split}:${style}:${equipment_access}`)) {
           if (day.exercises.length === 0) continue
-          days++
           const hit = day.exercises.some(ex => {
             const e = getExerciseEntry(ex.name)
             return !!e && isIndicatedFor(e, flagged)
           })
+          // KNEE REHAB ON LEG DAYS ONLY (Ashley, 2 Nov 2026, "B"): a day not about legs carries none, and is not
+          // counted as a miss. Every other joint is still on every day.
+          if (injury === 'knees' && !isLegDay(day.focus)) {
+            kneeOffDays++
+            // A REHAB move, as pickRehabMovement defines one: indicated and not a tier-2 compound. A week's second leg
+            // compound placed on another day (a step-up on a bodyweight Shoulders & Abs day) is training, not rehab.
+            const rehabHere = day.exercises.filter(ex => { const e = getExerciseEntry(ex.name); return !!e && isIndicatedFor(e, flagged) && e.mechanics_tier !== 'tier2_compound' })
+            if (rehabHere.length > 0) kneeOnUpper.push(`${split}/${style}/${equipment_access}: ${day.focus}: ${rehabHere.map(e => e.name).join(', ')}`)
+            continue
+          }
+          days++
           if (!hit) misses.push(`${split}/${style}/${equipment_access}: ${day.focus}`)
+          // THE SLOT ITSELF ON A LEG DAY (2 Nov 2026): a leg day's own work is often knee-friendly (a wall sit, a
+          // step-down), so "something indicated" passes with the rehab slot gone. The slot reaches only for the
+          // gentlest band (section 2), never for these bigger moves, so a leg day must hold one move outside them.
+          if (injury === 'knees') {
+            kneeLegDays++
+            const BIG = new Set(['Spanish Squat', 'Wall Sit', 'Step-Down (Eccentric)', 'Low Box Step-Up'])
+            const slot = day.exercises.some(ex => { const e = getExerciseEntry(ex.name); return !!e && isIndicatedFor(e, flagged) && e.mechanics_tier !== 'tier2_compound' && !BIG.has(e.name) })
+            if (!slot) kneeLegNoSlot.push(`${split}/${style}/${equipment_access}: ${day.focus}`)
+          }
         }
       }
     }
   }
-  check(`${injury}: rehab on every one of ${days} training days`, misses.length === 0,
+  check(`${injury}: rehab on every one of ${days} ${injury === 'knees' ? 'leg ' : ''}training days`, misses.length === 0,
     `${misses.length} without: ${misses.slice(0, 3).join(' | ')}`)
 }
+check(`knees: the grid has days that are not about legs (${kneeOffDays}), so the next check binds`, kneeOffDays >= 20, kneeOffDays)
+check('...and none of them carries a knee-rehab move', kneeOnUpper.length === 0, `${kneeOnUpper.length}: ${kneeOnUpper.slice(0, 3).join(' | ')}`)
+check(`knees: every one of ${kneeLegDays} leg days holds a move from the gentle rehab band, not only its own knee-friendly work`, kneeLegDays > 0 && kneeLegNoSlot.length === 0, `${kneeLegNoSlot.length}: ${kneeLegNoSlot.slice(0, 3).join(' | ')}`)
 
 // ---------------------------------------------------------------------------
 console.log('\n2. Gentlest means gentlest — the guaranteed slot stays small')

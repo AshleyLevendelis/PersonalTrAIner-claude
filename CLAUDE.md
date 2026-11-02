@@ -1435,6 +1435,11 @@ menu" stays true when a copy is also left outside it.
   session of the same kind.
 - **An ease-off on a non-leg day: "Work for that day instead."** A knee-loading move knocked out of a non-leg day is
   replaced by the day's own kind of work; no knee-rehab move is added to a non-leg day.
+  **And knee rehab goes on leg days only, always: her ruling 2 Nov 2026, "B"**, from three options (over every day
+  for a lasting injury and every day always). It partly REVERSES the older "rehab in every session" for the knee
+  alone: a knee on the injuries list, or a running knee ease-off, gets its rehab drill on leg and full-body days and
+  none on a day not about legs. Every other joint keeps rehab on every day. `test:rehab-prescribed` §1,
+  `docs/plans/knee-rehab-leg-days.md`
 - **"Move calories from lunch to dinner": "Ask how much first"**, with buttons, then both sizes before Apply.
   BUILT on a branch, both surfaces: the APP asks (the coach never writes the question), the same two dishes one
   smaller and one bigger, the smaller keeping at least half and the bigger at most doubling (CSCS, basis in BACKLOG),

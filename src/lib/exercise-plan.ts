@@ -439,7 +439,12 @@ export function isWeekSupportLeg(focus: string, entry: ExerciseEntry): boolean {
 
 /** True for a track whose own work is legs — used to decide whether the WEEK already trains them twice. */
 function isLegTrack(focus: TrackFocus): boolean {
-  return TRACKS[focus].primary_patterns.some(p => p === 'knee_dominant' || p === 'hip_hinge' || p === 'single_leg')
+  return trackTrainsLegs(TRACKS[focus])
+}
+
+/** The same question asked of the track itself, for code that holds the definition rather than its name. */
+function trackTrainsLegs(track: TrackDefinition): boolean {
+  return track.primary_patterns.some(p => p === 'knee_dominant' || p === 'hip_hinge' || p === 'single_leg')
 }
 
 /** The leg movement patterns: compound and isolation. */
@@ -2666,8 +2671,14 @@ function selectExercisesForTrack(
   // Push-Ups, Scapular Push-Ups", and, where the names differed, two warm-ups
   // doing the same job. The guarantee is that every session carries rehab,
   // not that every session carries a rehab SLOT.
-  const primerIsRehab = primer != null && isIndicatedFor(primer, flaggedJoints)
-  const rehab = primerIsRehab ? null : pickRehabMovement(pool, flaggedJoints, weeklyUsed)
+  //
+  // KNEE REHAB ON LEG DAYS ONLY — Ashley's ruling, 2 Nov 2026 ("B", from three options, over every day for a lasting
+  // injury and over every day always). Her 20 Oct "work for that day instead" said no knee-rehab move on a non-leg day,
+  // and this slot was putting Seated Short-Arc Quad Set on Upper Pull & Core. Only the knee: a shoulder keeps its band
+  // work on leg day, as above. docs/plans/knee-rehab-leg-days.md.
+  const rehabJoints = trackTrainsLegs(track) ? flaggedJoints : new Set([...flaggedJoints].filter(j => j !== 'knee'))
+  const primerIsRehab = primer != null && isIndicatedFor(primer, rehabJoints)
+  const rehab = primerIsRehab ? null : pickRehabMovement(pool, rehabJoints, weeklyUsed)
 
   // Keyed by movement family, not substitution_group, so the same movement
   // cannot appear twice under two different classifications. Seeded with the
