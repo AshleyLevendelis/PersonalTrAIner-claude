@@ -176,6 +176,20 @@ check('7c. a day you have said you missed is not offered shortening or lightenin
   !vMissed.includes('shorten') && !vMissed.includes('lighter'), vMissed)
 await shoot('shorten-today-gated')
 
+// --- 8. LIGHTER ALONE, ON A FRESH PAGE (1 Nov 2026, whole-app test) ---------------------------------------------------
+// "Make it easier" takes sets off and the session runs short; the length note then said it "runs shorter than you
+// asked for — there is only so much your equipment can be worked through", pointing at a button not on this screen.
+// Sections 4-6 cannot see it: the day was already shortened there, which quiets the note on its own.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&load=8#/tab/exercise` })
+await wait(4000)
+check('8a. a fresh page, and the day menu offers "make it easier"', (await openSheet()) === 'open' && (await verbs()).includes('lighter'), await verbs())
+check('8b. tapping it', await clickSel('[data-verb="lighter"]') && await untilClosed())
+let n8 = await note()
+for (let i = 0; i < 20 && !/lighter/i.test(n8); i++) { await wait(300); n8 = await note() }
+check('8c. the session says it was made lighter for today', /^Made lighter for today\./.test(n8), n8)
+check('8d. ...and never blames her equipment for the shorter session', !/your equipment|runs shorter than/.test(n8), n8)
+await shoot('shorten-today-lighter-alone')
+
 console.log(failures === 0 ? '\nShortening takes the tail off, keeps the main lift whole, says so, and sticks.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

@@ -10,6 +10,14 @@ Newest first. One line each.
     scroller and kept their scroll. A sheet now opens at its top. `verify:profile-sheet-top` (new).
   - **Sending did not scroll to her message** when she had scrolled up or after a long reply. Sending now follows.
     `verify:chat-send-scroll` (new).
+  - **"Make it easier" was explained as a short session "your equipment" cannot fill**, pointing at an extra-work
+    button that is not on that screen. The lighter day is now marked (`lightened_today`, in the week's jsonb, no
+    migration), says "Made lighter for today. Back to the full session next week.", and the shortfall note stays off
+    it. `test:session-shortfall`, `verify:shorten-today` §8 (a fresh page: §4-6 cannot see it, the day was already
+    shortened there). STILL OPEN, hers: it applies at once with no preview or Undo, like "I'm short of time"; and
+    whether the shortfall note's "extra-work button" names a real control on every screen it shows on.
+  - Batch-1 run in a separate copy: 179 of 183. The four: the two re-anchored gates (batch 2), the production-build
+    one (batch 2), and `verify:app-boot`.
   - The batch-1 run's one `verify:app-boot` failure ("no signal and nothing kept") is most likely the same driver run
     by hand in the main tree at the same time on the same port; it passes alone. Re-run in the copy to confirm.
 - [ ] **WHOLE-APP TEST FIXES, BATCH 2, 2 NOV 2026.** Same "Yes". Every check mutation-tested, every break caught.

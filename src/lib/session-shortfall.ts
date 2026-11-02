@@ -54,7 +54,7 @@ export interface SessionShortfall {
 export function describeSessionShortfall(
   estimatedSeconds: number,
   requested: SessionDuration | undefined,
-  options: { isDeload?: boolean; lowRecovery?: boolean; shortenedToMinutes?: number } = {},
+  options: { isDeload?: boolean; lowRecovery?: boolean; shortenedToMinutes?: number; lightened?: boolean } = {},
 ): SessionShortfall | null {
   if (!requested) return null
   // A deload is short on purpose.
@@ -65,6 +65,9 @@ export function describeSessionShortfall(
   // with a decision it had just carried out. The screen says what happened
   // instead, in the day's own words.
   if (options.shortenedToMinutes != null) return null
+  // AND A DAY SHE MADE LIGHTER (1 Nov 2026, whole-app test): "make it easier" takes sets off, the session runs short,
+  // and this note then blamed her equipment and pointed at an "extra-work button" that is not on that screen.
+  if (options.lightened) return null
   // So is a low-recovery week: computeDurationTopUp gives that profile zero
   // top-up deliberately, so its shorter sessions are the setting working, not
   // the engine failing. Flagging them would contradict the app's own choice.

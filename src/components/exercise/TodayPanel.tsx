@@ -632,7 +632,7 @@ export function TodayPanel({
       return `${floor}${blocked} You can still swap an exercise for an easier one, shorten the session, or move it to another day from the day menu.`
     }
     const settled = settleWeek(
-      { ...week, days: week.days.map(d => (d.day === planDay ? result.day : d)) },
+      { ...week, days: week.days.map(d => (d.day === planDay ? { ...result.day, lightened_today: true } : d)) },
       planDay,
       profile,
     )
@@ -1094,12 +1094,16 @@ export function TodayPanel({
       isDeload: currentMesoWeekObj?.is_deload,
       lowRecovery: !!profile && effectiveRecoveryCapacity(profile) === 'low',
       shortenedToMinutes: shortened,
+      lightened: workout.lightened_today === true,
     })
+    const lightenedLine = workout.lightened_today === true && shortened == null
+      ? 'Made lighter for today. Back to the full session next week.'
+      : null
     return {
       // Work and optional, apart — one helper, shared with the programme list
       // and Home (see dayLengthParts).
       length: formatDayLength(dayLengthParts(workout)),
-      note: [shortenedLine, shortfall?.note].filter(Boolean).join(' ') || undefined,
+      note: [shortenedLine, lightenedLine, shortfall?.note].filter(Boolean).join(' ') || undefined,
     }
   })()
 

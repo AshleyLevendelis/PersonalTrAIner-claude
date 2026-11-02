@@ -43,6 +43,9 @@ console.log('\n1. A session that fits says nothing')
   // would be noise, and noise is how a real warning gets ignored.
   check('a few minutes short is not flagged',
     describeSessionShortfall(min45 * 0.95, '45-60') === null, min45 * 0.95)
+  // 1 Nov 2026, whole-app test: "make it easier" takes sets off; the shorter session is her choice.
+  check('a day she made lighter is not explained as short (the same length without the flag is)',
+    describeSessionShortfall(min45 * 0.5, '45-60', { lightened: true }) === null && describeSessionShortfall(min45 * 0.5, '45-60') !== null)
   check('no requested length means nothing to be short of',
     describeSessionShortfall(1000, undefined) === null)
 }
@@ -120,7 +123,9 @@ console.log('\n4. It changed what is said, and not one set')
   // this gate would guard dead code. Both notes are collected and joined, so
   // losing the exemption puts the two contradicting sentences side by side.
   check('...and the two notes are joined rather than one skipping the other, so losing it shows',
-    /\[shortenedLine, shortfall\?\.note\]/.test(panel))
+    // RE-ANCHORED 2 Nov 2026: a lightened-today line joined the list. The property is that both lines and the
+    // shortfall note are collected in ONE list, so the describer's exemption is what keeps them apart.
+    /\[shortenedLine, (lightenedLine, )?shortfall\?\.note\]/.test(panel))
   // And the shortened line itself must never state a length the row's own
   // estimate contradicts: the main lift is protected and three exercises are
   // the floor, so a 48-minute day asked down to 20 lands at 26.

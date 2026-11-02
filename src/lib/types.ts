@@ -612,6 +612,12 @@ export interface WorkoutDay {
    * the week exactly, after a reload too.
    */
   kind_today?: import('./session-kind-marker').KindTodayMarker
+  /**
+   * Set when "make it easier" took this ONE day a step lighter (1 Nov 2026, whole-app test): the shorter session it
+   * leaves is her choice, so the "runs shorter than you asked for, your equipment..." note must not explain it.
+   * Rides in the week row's `days` jsonb like `shortened_to_minutes`; scoped by which week row is written.
+   */
+  lightened_today?: boolean
 }
 
 export interface ConstraintTraceEntry {
