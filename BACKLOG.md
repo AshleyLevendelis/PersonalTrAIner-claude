@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [ ] **HOW MANY TAPS IS A WORKOUT, 2 NOV 2026 (UX item 6). MEASURED, nothing changed.** `measure:tap-count` walks
+  today's whole session on the whole app the way a lifter would, using the big "Log set" button. Today's fixture
+  session (19 working sets, one main lift with a 4-row warm-up): 26 taps from Home to finished, about 1.4 per working
+  set. Open 1, Start 1, sets 19, warm-up rows 4, Finish 1; no sheet, question or timer got in the way, nothing needed
+  typing. The only part over one tap a set is the warm-up (one tap per row, her 17 Sep "a box for every set" ruling).
+  A set lifted differently from what is written costs the box, the keyboard and the tick (read off the screen, not
+  driven). PUT TO ASHLEY: one tap to log all of a lift's warm-ups as written, boxes still there to change. Also seen,
+  not fixed: the BW switch on a set row is 28px (her 44px rule; `verify:small-targets` never reaches a bodyweight-
+  capable row on the whole-app page).
 - [ ] **HOME SAYS WHAT TODAY IS, 2 NOV 2026 (UX item 5, "the coach knows where you are"; whole-app test §4).** Four
   findings, three mechanical and one hers. (1) Home called the plan's "Active Recovery + Cardio" day a plain "Rest
   day": a planned day with no lifts is now named as the plan names it, with its cardio in the plan's own words
