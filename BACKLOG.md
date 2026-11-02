@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [ ] **FULL SWEEP ON THE KNEE + SWAP-PRICING BRANCH, 2 NOV 2026.** 463 gates at `a38aef61`: 460 passed. Failed:
+  `test:coach-exam-fresh` (expected: the exam must be re-run on her machine), and `test:set-row` and `test:coach-knows`,
+  both pinned to the old text of calls changed on purpose (the plate calculator now gets the bar; the swap trial a
+  fourth argument). Re-anchored on the property and mutation-tested (1 of 1 caught each, counts unchanged).
+  `test:quality` passed, average 11.56 -> 11.63 of 12. A LEAD, NOT ATTRIBUTED: the report now lists several
+  `recovery_volume_not_reduced` lines (low-recovery week-1 sets not 15% below high, e.g. 77 vs 99) that the committed
+  report lacks. That report dates from 28 Sep, so a month of changes sits between them; removing an equal rehab slot
+  from both profiles would WIDEN the ratio, so the knee change is not the likely cause. Measure against a fresh
+  baseline before acting.
 - [ ] **KNEE REHAB ON LEG DAYS ONLY, 2 NOV 2026 (whole-app test #19). Ashley's ruling: "B".** Asked as one question
   with three options after the trace: A, every day for a lasting injury and leg days only for an ease-off
   (recommended, as the 20 Oct ruling was made about ease-offs); B, leg days only, always; C, every day, always (what
