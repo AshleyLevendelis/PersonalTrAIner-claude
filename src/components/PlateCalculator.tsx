@@ -45,11 +45,13 @@ interface PlateCalculatorProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialWeight?: number
+  /** The bar this lift is loaded on (plateBarKg): 20 for a barbell, 10 for an EZ bar. She can still change it. */
+  initialBarKg?: number
 }
 
-export function PlateCalculator({ open, onOpenChange, initialWeight = 0 }: PlateCalculatorProps) {
+export function PlateCalculator({ open, onOpenChange, initialWeight = 0, initialBarKg = 20 }: PlateCalculatorProps) {
   const [targetWeight, setTargetWeight] = useState(String(initialWeight || ''))
-  const [barWeight, setBarWeight] = useState('20')
+  const [barWeight, setBarWeight] = useState(String(initialBarKg))
 
   const target = parseFloat(targetWeight) || 0
   const bar = parseFloat(barWeight) || 20
@@ -84,6 +86,11 @@ export function PlateCalculator({ open, onOpenChange, initialWeight = 0 }: Plate
 
   // Reset target when modal opens with new initial weight
   const [lastInitial, setLastInitial] = useState(initialWeight)
+  const [lastBar, setLastBar] = useState(initialBarKg)
+  if (initialBarKg !== lastBar) {
+    setLastBar(initialBarKg)
+    setBarWeight(String(initialBarKg))
+  }
   if (initialWeight !== lastInitial) {
     setLastInitial(initialWeight)
     setTargetWeight(String(initialWeight || ''))

@@ -147,8 +147,10 @@ export function ExerciseTab({
   >(null)
   const [sessionHistoryOpen, setSessionHistoryOpen] = useState(false)
 
-  const handleOpenPlateCalc = (weightKg: number) => {
+  const [plateCalcBar, setPlateCalcBar] = useState(20)
+  const handleOpenPlateCalc = (weightKg: number, barKg = 20) => {
     setPlateCalcWeight(weightKg)
+    setPlateCalcBar(barKg)
     setPlateCalcOpen(true)
   }
 
@@ -366,6 +368,7 @@ export function ExerciseTab({
         open={plateCalcOpen}
         onOpenChange={setPlateCalcOpen}
         initialWeight={plateCalcWeight}
+        initialBarKg={plateCalcBar}
       />
       {/* MUST BE RENDERED IN THIS BRANCH TOO. It used to live only in the
           Full Program branch above, while this branch still passed

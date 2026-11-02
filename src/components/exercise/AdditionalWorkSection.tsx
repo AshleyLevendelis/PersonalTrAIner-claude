@@ -45,7 +45,7 @@ export function AdditionalWorkSection({
    * the working one three rows up, and did nothing at all when tapped. Extra
    * work is loaded work; there is no reason it should have a worse row.
    */
-  onOpenPlateCalc?: (weightKg: number) => void
+  onOpenPlateCalc?: (weightKg: number, barKg?: number) => void
 }) {
   const { logs, declaredOffPlan, undeclareOffPlan, setsFor } = useActiveSession()
   const plannedIds = new Set(plannedExercises.map(ex => ex.id ?? getExerciseId(ex.name)))

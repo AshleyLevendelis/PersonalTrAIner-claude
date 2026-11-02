@@ -43,7 +43,7 @@ export interface ExerciseRowProps {
   isCalibrationWeek?: boolean
   /** The first session back after a break, with eased weights: the boxes ignore last time's numbers (layoff.ts). */
   easedForBreak?: boolean
-  onOpenPlateCalc: (weightKg: number) => void
+  onOpenPlateCalc: (weightKg: number, barKg?: number) => void
   onSwap: () => void
   onBan: () => void | Promise<void>
   banBusy: boolean

@@ -7,6 +7,10 @@ Newest first. One line each.
     under it "The day is 87 kcal under your target". The kept and too-far lines (a logged meal's, a swap's) now carry
     the day's named miss (`namedMiss`, the header's own function) and say it: "11 g under your fat target", the
     calorie gap only when calories are what is off. `test:day-as-shown` §1c, `test:hold-around-pins` §3 (3 mutations).
+  - **The plate calculator started every lift on a 20 kg barbell**, so a 10 kg EZ-bar curl was "lighter than the bar".
+    A lift whose implement is an EZ bar now starts on 10 kg (editable as before). `test:plate-math` (3 mutations);
+    `test:exercise-2a` re-anchored (it pinned the call's exact text). NOT CHANGED: the T-bar row, loaded on one end, is
+    still split "per side" (suspected by the tester, not built: it needs a one-end mode, not a different bar).
   - **The ban sheet said "The session you've already done keeps it"** about a day she never trained: the guard keeps
     every day behind her (past, trained, missed, rested, swapped). Now "already behind you ... as it was".
     `test:ban-scope` re-anchored, with a check that "done" never appears.

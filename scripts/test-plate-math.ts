@@ -23,6 +23,8 @@ import {
   MAX_BARBELL_TARGET_KG,
   noPlatesMessage,
 } from '../src/lib/plate-math'
+import { plateBarKg } from '../src/lib/load-prescription'
+import { getExerciseEntry } from '../src/lib/exercise-db'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -179,6 +181,21 @@ console.log('\n5. The options are on screen, and tapping one changes the bar\n')
   check('...a target equal to the bar is bar only', noPlatesMessage(20, 20) === 'No plates needed — bar only')
   check('...no target asks for one', /Enter a target/.test(noPlatesMessage(0, 20)))
   check('...and the calculator screen shows this message rather than its own copy', /noPlatesMessage\(target, bar\)/.test(read('src/components/PlateCalculator.tsx')) && !/bar only'/.test(read('src/components/PlateCalculator.tsx')))
+}
+
+// THE BAR IS THE LIFT'S OWN (1 Nov 2026, whole-app test): every lift started on a 20 kg barbell, so a 10 kg EZ-bar curl
+// was "lighter than the bar". Called on real catalogue lifts, and the screen must pass it through.
+{
+  const ez = getExerciseEntry('Preacher Curl (EZ bar)')
+  const bench = getExerciseEntry('Barbell Bench Press') ?? getExerciseEntry('Bench Press')
+  check('an EZ-bar lift starts on a 10 kg bar', !!ez && plateBarKg(ez) === 10, ez?.equipment)
+  check('...a barbell lift stays on 20', !!bench && plateBarKg(bench) === 20, bench?.equipment)
+  check('...so a 10 kg EZ-bar curl is "bar only", not "lighter than the bar"', noPlatesMessage(10, plateBarKg(ez)) === 'No plates needed — bar only')
+  const grid = read('src/components/exercise/SetGrid.tsx')
+  const calc = read('src/components/PlateCalculator.tsx')
+  check('the weight box hands the lift\'s bar to the calculator', /onOpenPlateCalc\([^\n]*plateBarKg\(catalogEntry\)\)/.test(grid))
+  check('...and the calculator starts on the bar it was handed', /useState\(String\(initialBarKg\)\)/.test(calc) && /setBarWeight\(String\(initialBarKg\)\)/.test(calc))
+  check('...and the Exercise tab passes it on', /initialBarKg=\{plateCalcBar\}/.test(read('src/components/exercise/ExerciseTab.tsx')))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }

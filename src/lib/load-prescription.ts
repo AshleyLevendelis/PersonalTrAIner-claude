@@ -1111,6 +1111,16 @@ export function nextSetRungsKg(
  * a lift a dumbbell can also do (goblet squats, the carries) is a dumbbell
  * row for this purpose and is left exactly as it was.
  */
+/**
+ * THE BAR THE PLATES GO ON (1 Nov 2026, whole-app test): the calculator started every lift on a 20 kg barbell, so a
+ * 10 kg EZ-bar curl was "lighter than the bar". A lift whose implement IS an EZ bar starts on a 10 kg bar (the
+ * common straight-handled weight; she can change it in the calculator). Everything else stays on 20.
+ */
+export function plateBarKg(entry: ExerciseEntry | undefined): number {
+  const first = (entry?.equipment ?? []).find(e => e !== 'bodyweight')
+  return first && /^ez bar$/i.test(first) ? 10 : 20
+}
+
 export function takesPlateCalculator(entry: ExerciseEntry | undefined): boolean {
   if (!entry) return true
   const equipment = entry.equipment ?? []

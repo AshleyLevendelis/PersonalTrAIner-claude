@@ -25,7 +25,7 @@ import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropS
 import { lastTime, sameAsSet, setReading, loggedSetReading, loggedCountLabel, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE } from '@/lib/coach-voice'
 import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, nextSetRungsKg } from '@/lib/load-prescription'
+import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, plateBarKg, nextSetRungsKg } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG } from '@/lib/set-plausibility'
 import { blankWeightFor, carriedWeightFor, type BlankWeight } from '@/lib/set-row'
 import type { UserProfile } from '@/lib/types'
@@ -133,7 +133,7 @@ export interface SetGridProps {
    */
   profile?: UserProfile | null
   onSetCompleted?: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
-  onOpenPlateCalc?: (weight: number) => void
+  onOpenPlateCalc?: (weight: number, barKg?: number) => void
   /**
    * THE RAMP FOLDS INTO ONE ROW (tab polish, Exercise 2a, 31 Oct 2026). With a
    * toggle, the build-up rows sit behind a 44px "Ramp up" row; open, they are
@@ -1068,7 +1068,7 @@ export function SetGrid({
                   size="icon"
                   className="absolute right-1 top-1 h-9 w-8 rounded-[8px] p-0 disabled:opacity-40"
                   style={{ background: 'color-mix(in srgb, var(--role-ai) 12%, transparent)', color: 'var(--ramp-label)' }}
-                  onClick={() => onOpenPlateCalc(parseFloat(input.weight || defaultWeightFor(ref)) || 0)}
+                  onClick={() => onOpenPlateCalc(parseFloat(input.weight || defaultWeightFor(ref)) || 0, plateBarKg(catalogEntry))}
                   disabled={isBW}
                   aria-label="Plate calculator"
                   data-testid="row-plate-calc"

@@ -166,7 +166,7 @@ export function TodayPanel({
   /** "I haven't got the kit" — rebuild this week around a different tier. Same owner, same reason. */
   onEquipment?: (tier: string) => Promise<string | null>
   onProfileChanged?: (patch: Partial<UserProfile>) => void
-  onOpenPlateCalc: (weightKg: number) => void
+  onOpenPlateCalc: (weightKg: number, barKg?: number) => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
   /** Opens the technique panel — threaded to both ExerciseRow and PeekPanel. */
   onOpenDetail?: (exerciseName: string) => void
@@ -1873,7 +1873,7 @@ function ExerciseList({
   /** Reaches SetGrid via ExerciseRow, to judge a typed weight — see set-plausibility.ts. */
   profile?: UserProfile
   onOpenSwap: (dayName: string, exIndex: number, exerciseName: string, sayDay?: string) => void
-  onOpenPlateCalc: (weightKg: number) => void
+  onOpenPlateCalc: (weightKg: number, barKg?: number) => void
   onOpenHistory?: (exerciseId: string, exerciseName: string) => void
   onOpenDetail?: (exerciseName: string) => void
   /** Open the take-it-out sheet for one slot. Absent when there is no plan to edit. */
