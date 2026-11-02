@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [ ] **A FOOD CHANGED ON THE NUTRITION SCREEN CAN BE PUT BACK, 2 NOV 2026 (UX item 2).** Adding, taking out, swapping
+  or re-weighing a food from the screen had no Undo (the coach's receipt had one). Now the line saying what changed
+  carries "Undo", which removes the exact row the edit wrote and puts back the pick the slot had BEFORE (read just
+  before the write; none means the plan's own choice), so a slot she had swapped returns to her swap, not to the
+  default (`undoMealEdit`). A put-back that fails says so and keeps its button. The coach's Undo still clears the
+  pick rather than restoring an earlier one (its receipt carries no earlier pick); named, not changed. The test page
+  gained App's "an empty name clears the pick" (input parity: without it no driver could reach an Undo). Checks:
+  `verify:meal-food-edit` 3f-3j (Undo on screen, the food back at its calories, said), `test:meal-food-edit` §10
+  (the restore wiring, source only: no screen fixture yet has a hand-picked slot). 4 mutations: 3 caught on screen;
+  the 4th (Undo not removing the row) is INVISIBLE on screen, because the copy is held out of every day, and is
+  caught by the source check. 64 derived gates and 22 Nutrition drivers green.
 - [ ] **A DAY SWAP NEVER SERVES ONE DISH TWICE IN A DAY, 2 NOV 2026 (whole-app test #13).** Mechanical, from the app's
   own standing rule ("one dish, once a day": the rotation's leftover yields to a dinner of the same dish; a held swap
   never serves one twice). Swapping Monday's lunch for Tuesday's dinner, when Monday's dinner was that same dish,

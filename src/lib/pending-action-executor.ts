@@ -608,6 +608,28 @@ export async function applyMealOptionToSlot(
 }
 
 /**
+ * WHAT AN EDIT MADE ON THE NUTRITION SCREEN NEEDS TO BE PUT BACK (2 Nov 2026, the UX pass: every change offers Undo).
+ * The exact pool row the edit wrote, and the pick the slot had before it (null when the slot showed the plan's own
+ * choice), so Undo returns the slot to what she was looking at, not merely to the plan's default.
+ */
+export interface MealEditUndo {
+  payload: MealAdditionPayload
+  poolIndex: number | null
+  previous: string | null
+}
+
+/** Puts a screen edit back: the row it wrote is removed, then the slot's earlier pick restored (or cleared). */
+export async function undoMealEdit(
+  profileId: string,
+  undo: MealEditUndo,
+  pick: (slot: MealAdditionPayload['slot'], name: string) => Promise<boolean>,
+): Promise<boolean> {
+  const removed = await undoMealAddition(profileId, undo.payload, undo.poolIndex)
+  if (!removed) return false
+  return pick(undo.payload.slot, undo.previous ?? '')
+}
+
+/**
  * Removes an added option from the pool and clears the pick it set — both
  * halves. This is the undo, and also the rollback when the pool write lands
  * but the pick doesn't: a meal left in the pool after a receipt said

@@ -320,5 +320,23 @@ console.log('\n8. BOTH SURFACES, and neither of them a stub')
   check('...and the chat hands it a way to ask for one', /onAlternative=\{handleQuickReply\}/.test(ui))
 }
 
+console.log('\n10. Every screen edit offers Undo, back to what the slot showed (2 Nov 2026)')
+{
+  // SOURCE ONLY for the restored PICK: verify:meal-food-edit 3f-3j drives Undo on a slot with no pick of hers (the
+  // clear branch); the restore branch has no screen fixture yet, so its wiring is pinned here.
+  const strip = (x: string) => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const exec = strip(readFileSync('src/lib/pending-action-executor.ts', 'utf8'))
+  const fn = exec.slice(exec.indexOf('export async function undoMealEdit'), exec.indexOf('export async function undoMealAddition'))
+  check('Undo removes the exact row the edit wrote, then puts the earlier pick back (or clears it)',
+    /undoMealAddition\(profileId, undo\.payload, undo\.poolIndex\)/.test(fn) && /if \(!removed\) return false/.test(fn) && /pick\(undo\.payload\.slot, undo\.previous \?\? ''\)/.test(fn), fn.slice(0, 300))
+  for (const sheet of ['src/components/nutrition/MealFoodEditSheet.tsx', 'src/components/nutrition/MealFoodAddSheet.tsx']) {
+    const t = strip(readFileSync(sheet, 'utf8'))
+    const readAt = t.indexOf('getMealPicksForDate(ctx.profileId, ctx.date)')
+    const writeAt = t.indexOf('await applyMealOptionToSlot(')
+    check(`${sheet.split('/').pop()} reads the slot's pick BEFORE it writes, and hands it to Undo`,
+      readAt > -1 && writeAt > -1 && readAt < writeAt && /poolIndex: result\.poolIndex, previous \}\)/.test(t), { readAt, writeAt })
+  }
+}
+
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
 console.log('\nOne food in a meal can be taken out, swapped or resized — through the same checks as everything else.\n')

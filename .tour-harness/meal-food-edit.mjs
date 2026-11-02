@@ -218,6 +218,18 @@ check('3e. ...and the food is gone from the meal',
       Array.isArray(gone) && gone.length === lines.length - 1 && !gone.includes(lines[0]), { was: lines, now: gone })
 await shoot('meal-food-edit-applied')
 
+// --- 3f. AND IT CAN BE PUT BACK (2 Nov 2026: every change offers Undo) ------
+const undoBtn = await ev(`(() => { const b = document.querySelector('[data-testid="meal-edit-undo"]'); if (!b) return null; b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight } })()`)
+check('3f. the line saying what changed has an Undo, on screen', !!undoBtn && undoBtn.top >= 0 && undoBtn.bottom <= undoBtn.h, undoBtn)
+check('3g. tapping it', await ev(`(() => { const b = document.querySelector('[data-testid="meal-edit-undo"]'); if (!b || b.disabled) return false; b.click(); return true })()`))
+let backRows = null
+for (let i = 0; i < 20; i++) { await wait(300); backRows = await rows(); if (Array.isArray(backRows) && backRows.length === lines.length) break }
+check('3h. ...puts the food back in the meal', Array.isArray(backRows) && backRows.length === lines.length && backRows.includes(lines[0]), { was: lines, now: backRows })
+const mealBack = await mealCalories()
+check('3i. ...at the calories it had before', mealBefore !== null && mealBack !== null && Math.abs(Number(mealBack) - Number(mealBefore)) <= 2, { mealBefore, mealBack })
+check('3j. ...and says so, with the Undo gone', /Put back as it was/.test(await ev(`document.querySelector('[data-testid="meal-edit-note"]')?.textContent || ''`)) && !(await ev(`!!document.querySelector('[data-testid="meal-edit-undo"]')`)))
+await shoot('meal-food-edit-undone')
+
 // --- 5. ADDING a food, the fourth verb -----------------------------------
 // The last thing on this row the coach could do and the screen could not. The
 // written parity list called it a deliberate exception — "no free-text food

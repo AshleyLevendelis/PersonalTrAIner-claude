@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { FitnessGoal, MacroTargets } from '@/lib/types'
+import { undoMealEdit, type MealEditUndo } from '@/lib/pending-action-executor'
 import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { mealSections } from '@/lib/meal-sections'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
@@ -883,6 +884,18 @@ function MealSlotRow({
   /** Which ingredient line has its edit open, by index. One at a time. */
   const [editingLine, setEditingLine] = useState<number | null>(null)
   const [editNote, setEditNote] = useState<string | null>(null)
+  /** Set while the last food edit or addition on this row can be put back (2 Nov 2026: every change offers Undo). */
+  const [editUndo, setEditUndo] = useState<MealEditUndo | null>(null)
+  const runEditUndo = async () => {
+    if (!editUndo || !profileId || !onMealPickApplied) return
+    setUndoBusy(true)
+    const ok = await undoMealEdit(profileId, editUndo, onMealPickApplied)
+    setUndoBusy(false)
+    setAddNote(null)
+    // SAID EITHER WAY: a put-back that did not happen keeps its button, so it can be tried again.
+    if (ok) { setEditUndo(null); setEditNote('Put back as it was') }
+    else setEditNote("Couldn't put that back just now. Try again in a moment")
+  }
   const [findingMore, setFindingMore] = useState(false)
   const [findMoreNote, setFindMoreNote] = useState<string | null>(null)
   // Fix 4.3 (ux-sweep) — generateMealPools now rejects a same-named
@@ -1230,7 +1243,7 @@ function MealSlotRow({
                                   className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left"
                                   data-ingredient-row={line}
                                   aria-expanded={editingLine === i}
-                                  onClick={() => { setEditNote(null); setEditingLine(prev => (prev === i ? null : i)) }}
+                                  onClick={() => { setEditNote(null); setEditUndo(null); setEditingLine(prev => (prev === i ? null : i)) }}
                                 >
                                   {text}
                                   <span className="shrink-0 text-[0.625rem] text-muted-foreground">Change</span>
@@ -1247,7 +1260,7 @@ function MealSlotRow({
                                     line={line}
                                     knockOn={dayMove?.knockOn}
                                     onPick={onMealPickApplied}
-                                    onDone={summary => { setEditingLine(null); setEditNote(summary) }}
+                                    onDone={(summary, undo) => { setEditingLine(null); setAddNote(null); setEditNote(summary); setEditUndo(undo ?? null) }}
                                     onCancel={() => setEditingLine(null)}
                                   />
                                 )
@@ -1256,7 +1269,12 @@ function MealSlotRow({
                           )
                         })}
                       </div>
-                      {editNote && <p className="text-[0.71875rem] text-muted-foreground">{editNote}.</p>}
+                      {editNote && (
+                        <p className="flex items-center justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="meal-edit-note">
+                          <span>{editNote}.</span>
+                          {editUndo && <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" disabled={undoBusy} onClick={() => void runEditUndo()} data-testid="meal-edit-undo">Undo</button>}
+                        </p>
+                      )}
                     </div>
                   )}
 
@@ -1269,7 +1287,7 @@ function MealSlotRow({
                   {editContextFor(option) && onMealPickApplied && (
                     <button
                       type="button"
-                      onClick={() => { setAddOpen(prev => !prev); setAddNote(null) }}
+                      onClick={() => { setAddOpen(prev => !prev); setAddNote(null); setEditUndo(null) }}
                       className="-mt-2 flex min-h-[44px] items-center gap-1.5 self-start text-[0.75rem] font-semibold text-primary-text"
                       data-testid="meal-food-add-open"
                     >
@@ -1289,12 +1307,17 @@ function MealSlotRow({
                         }}
                         knockOn={dayMove?.knockOn}
                         onPick={onMealPickApplied}
-                        onDone={summary => { setAddOpen(false); setAddNote(summary) }}
+                        onDone={(summary, undo) => { setAddOpen(false); setEditNote(null); setAddNote(summary); setEditUndo(undo ?? null) }}
                         onCancel={() => setAddOpen(false)}
                       /></Suspense>
                     )
                   })()}
-                  {addNote && <p className="text-[0.71875rem] text-muted-foreground">{addNote}. The rest of the meal is unchanged.</p>}
+                  {addNote && (
+                    <p className="flex items-center justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="meal-add-note">
+                      <span>{addNote}. The rest of the meal is unchanged.</span>
+                      {editUndo && <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" disabled={undoBusy} onClick={() => void runEditUndo()} data-testid="meal-edit-undo">Undo</button>}
+                    </p>
+                  )}
 
                   {/* COOK ONCE, EAT TWICE — both halves of the pair, from the shared
                       phrasebook. The lunch line is the important one: without it a

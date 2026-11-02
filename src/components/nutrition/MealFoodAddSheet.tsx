@@ -2,7 +2,8 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { buildMealFoodAddProposal, withKnockOn } from '@/lib/meal-food-add'
 import type { MealKnockOn, MealKnockOnFn } from '@/lib/meal-knock-on'
-import { applyMealOptionToSlot } from '@/lib/pending-action-executor'
+import { applyMealOptionToSlot, type MealEditUndo } from '@/lib/pending-action-executor'
+import { getMealPicksForDate } from '@/lib/meal-store'
 import { FOOD_DB } from '@/lib/food-db'
 import type { MealAdditionPayload } from '@/lib/meal-addition'
 import type { MealSlotName } from '@/lib/meal-store'
@@ -62,7 +63,8 @@ export function MealFoodAddSheet({ ctx, knockOn, onPick, onDone, onCancel }: {
    */
   knockOn?: MealKnockOnFn
   onPick: (slot: MealSlotName, chosenName: string) => Promise<boolean>
-  onDone: (summary: string) => void
+  /** `undo` puts the edit back (the row it wrote, and the pick the slot had before). */
+  onDone: (summary: string, undo?: MealEditUndo) => void
   onCancel: () => void
 }) {
   const [query, setQuery] = useState('')
@@ -135,6 +137,8 @@ export function MealFoodAddSheet({ ctx, knockOn, onPick, onDone, onCancel }: {
     if (!proposal?.ok || !trialReady) return
     setBusy(true)
     setError(null)
+    // THE PICK BEFORE, read before the write so Undo can put it back (an unreadable read is "none": Undo then clears).
+    const previous = (await getMealPicksForDate(ctx.profileId, ctx.date).catch(() => ({} as Partial<Record<MealSlotName, string>>)))[ctx.slot as MealSlotName] ?? null
     const result = await applyMealOptionToSlot(
       ctx.profileId,
       proposal.payload as MealAdditionPayload,
@@ -146,7 +150,7 @@ export function MealFoodAddSheet({ ctx, knockOn, onPick, onDone, onCancel }: {
       return
     }
     // A sentence starts with a capital, whatever the food table calls it (runs 3-4, LOW).
-    onDone(`${(food ?? "").replace(/^./, c => c.toUpperCase())} added to your ${ctx.slot}`)
+    onDone(`${(food ?? "").replace(/^./, c => c.toUpperCase())} added to your ${ctx.slot}`, { payload: proposal.payload as MealAdditionPayload, poolIndex: result.poolIndex, previous })
   }
 
   return (

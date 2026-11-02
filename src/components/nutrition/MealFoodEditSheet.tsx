@@ -3,7 +3,8 @@ import { Loader2, ShieldAlert, Info } from 'lucide-react'
 import type { MacroTargets, FitnessGoal } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { MealAdditionPayload } from '@/lib/meal-addition'
-import { applyMealOptionToSlot } from '@/lib/pending-action-executor'
+import { applyMealOptionToSlot, type MealEditUndo } from '@/lib/pending-action-executor'
+import { getMealPicksForDate } from '@/lib/meal-store'
 import {
   buildMealFoodRemoveProposal,
   buildMealFoodReplaceProposal,
@@ -94,7 +95,8 @@ export function MealFoodEditSheet({
   knockOn?: MealKnockOnFn
   /** Makes a verified option the slot's meal, and refreshes the screen. Returns false if it didn't land. */
   onPick: (slot: MealSlotName, mealName: string) => Promise<boolean>
-  onDone: (summary: string) => void
+  /** `undo` puts the edit back (the row it wrote, and the pick the slot had before). */
+  onDone: (summary: string, undo?: MealEditUndo) => void
   onCancel: () => void
 }) {
   const [verb, setVerb] = useState<Verb | null>(null)
@@ -218,6 +220,8 @@ export function MealFoodEditSheet({
     if (!proposal?.ok || !trialReady) return
     setBusy(true)
     setSaveError(null)
+    // THE PICK BEFORE, read before the write so Undo can put it back (an unreadable read is "none": Undo then clears).
+    const previous = (await getMealPicksForDate(ctx.profileId, ctx.date).catch(() => ({} as Partial<Record<MealSlotName, string>>)))[ctx.slot as MealSlotName] ?? null
     const result = await applyMealOptionToSlot(
       ctx.profileId,
       proposal.payload as MealAdditionPayload,
@@ -230,7 +234,7 @@ export function MealFoodEditSheet({
       setSaveError(result.receipt.failed[0].error)
       return
     }
-    onDone(verb === 'remove' ? `Took the ${food} out` : verb === 'replace' ? `Swapped the ${food}` : `Changed the ${food}`)
+    onDone(verb === 'remove' ? `Took the ${food} out` : verb === 'replace' ? `Swapped the ${food}` : `Changed the ${food}`, { payload: proposal.payload as MealAdditionPayload, poolIndex: result.poolIndex, previous })
   }
 
   return (

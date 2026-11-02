@@ -40,7 +40,7 @@ import { seededRngFromKey } from '@/lib/seeded-random'
 import { resolveLoadFields } from '@/lib/warmup'
 import { computeTargets, retargetAfterWeighIn } from '@/lib/nutrition-targets'
 import { targetsMoved } from '@/lib/coach-voice'
-import { getPools, setMealPick } from '@/lib/meal-store'
+import { getPools, setMealPick, clearMealPick } from '@/lib/meal-store'
 import { persistResizedPools, type PoolOption } from '@/lib/meal-generation'
 import { checkMealRefit } from '@/lib/meal-refit'
 import { computeMealMacros } from '@/lib/food-db'
@@ -1493,7 +1493,19 @@ function Harness() {
     for (const d of mealDays.upcoming) out[d.date] = d.meals as Record<string, string>
     return out
   }
+  // The meals the page opened on: what a slot shows again once its pick is cleared.
+  const [openingChosen] = useState(liveChosen)
   const handleMealPickApplied = async (slot: string, chosenName: string) => {
+    // AN EMPTY NAME MEANS "NO PICK", as App's own handler reads it (undoing an addition or an edit puts the slot back
+    // to the plan's choice). INPUT parity with App, so a driver can reach an Undo: the page shows the meal it opened on.
+    if (!chosenName) {
+      try { await clearMealPick(PROFILE_ID, today, slot as never) } catch { return false }
+      if (DAYMOVE) setDayMovePicks(prev => { const next = { ...prev }; delete next[slot]; return next })
+      const fresh = await getPools(PROFILE_ID)
+      setLivePools(prev => ({ ...prev, [slot]: (fresh[slot as never] as PoolOption[] | undefined) ?? prev[slot] }))
+      setLiveChosen(prev => ({ ...prev, [slot]: openingChosen[slot] }))
+      return true
+    }
     try { await setMealPick(PROFILE_ID, today, slot as never, chosenName) } catch { return false }
     if (DAYMOVE) setDayMovePicks(prev => ({ ...prev, [slot]: chosenName }))
     const fresh = await getPools(PROFILE_ID)
