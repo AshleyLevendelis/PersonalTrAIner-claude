@@ -8,7 +8,7 @@ import type { ProposalDiff } from './pending-actions-store'
 import type { MealSlotName } from './meal-store'
 import type { CurrentMealForSlot } from './meal-food-add'
 import { oneDayEdit } from './coach-voice'
-import { tagsPinOnly } from './meal-new-from'
+import { tagsPinOnly, tagsAfterEaten } from './meal-new-from'
 import { dayLabel } from './day-labels'
 
 // ---------------------------------------------------------------------------
@@ -71,6 +71,11 @@ export interface BuildMealFoodEditInput {
    * rather than going quiet.
    */
   pantryFoods?: string[]
+  /**
+   * The meal is already logged as eaten (Ashley, 2 Nov 2026, "Same dishes"): the edited copy is marked so, and the
+   * rest of the day keeps its dishes rather than being re-planned. Absent or false: the edit re-plans, as before.
+   */
+  afterEating?: boolean
 }
 
 export type MealFoodEditResult =
@@ -204,7 +209,7 @@ function settle(
     scopeKey: `${input.profileId}:${verb}:${slot}:${date}`,
     preconditions: { slot, date, mealName: option.name, editedFrom: meal.name },
     // MADE FOR THIS DAY ONLY (tagsPinOnly): served where the pick names it, never by another day's search.
-    payload: { slot, date, option: { ...option, tags: tagsPinOnly(option.tags ?? []) } },
+    payload: { slot, date, option: { ...option, tags: tagsAfterEaten(tagsPinOnly(option.tags ?? []), input.afterEating && date === input.todayDate) } },
     diff,
   }
 }

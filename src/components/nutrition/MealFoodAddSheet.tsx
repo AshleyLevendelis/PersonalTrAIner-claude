@@ -42,6 +42,8 @@ export interface MealFoodAddContext {
   dietaryPreferences: string[]
   dislikedFoods: string[]
   meal: CurrentMealForSlot
+  /** This meal is already logged as eaten: the addition keeps the day's other dishes (Ashley, 2 Nov 2026, "Same dishes"). */
+  afterEating?: boolean
 }
 
 /** Grams unless the food carries named units — then its first one, which is how a person says it. */
@@ -95,6 +97,7 @@ export function MealFoodAddSheet({ ctx, knockOn, onPick, onDone, onCancel }: {
       includeSnacks: ctx.includeSnacks,
       dietaryPreferences: ctx.dietaryPreferences,
       dislikedFoods: ctx.dislikedFoods,
+      afterEating: ctx.afterEating,
     })
   }, [food, amount, unit, ctx])
 

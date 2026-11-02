@@ -71,6 +71,8 @@ export interface MealFoodEditContext {
    * "no planned day, no judgement".
    */
   dayTotals?: MacroTargets
+  /** This meal is already logged as eaten: the edit keeps the day's other dishes (Ashley, 2 Nov 2026, "Same dishes"). */
+  afterEating?: boolean
 }
 
 export function MealFoodEditSheet({
@@ -116,6 +118,7 @@ export function MealFoodEditSheet({
       dietaryPreferences: ctx.dietaryPreferences,
       dislikedFoods: ctx.dislikedFoods,
       pantryFoods: ctx.pantryFoods,
+      afterEating: ctx.afterEating,
     }
     if (v === 'remove') return buildMealFoodRemoveProposal(input)
     if (v === 'replace') return buildMealFoodReplaceProposal(input)

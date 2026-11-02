@@ -53,9 +53,28 @@ export function tagsPinOnly(tags: string[]): string[] {
   return tags.includes(PIN_ONLY_TAG) ? tags : [...tags, PIN_ONLY_TAG]
 }
 
+/**
+ * AN EDIT MADE AFTER THE MEAL WAS EATEN — Ashley's ruling, 2 Nov 2026 ("Same dishes"), over re-planning the day. An
+ * edit normally re-plans the rest of the day (her 10 Oct scope ruling: an edited meal is her own); correcting a meal
+ * already logged as eaten keeps the day's other dishes instead, resized together within about a quarter, her 10 Oct
+ * logged-meal rule. Recorded on the copy at the moment of the edit, because "eaten" alone would flip a day that was
+ * re-planned before the meal was logged the moment it was logged.
+ */
+const AFTER_EATEN_TAG = 'after-eaten'
+
+/** Was this edited copy made after its meal was logged as eaten? */
+export function isAfterEaten(option: { tags?: string[] }): boolean {
+  return (option.tags ?? []).includes(AFTER_EATEN_TAG)
+}
+
+/** An edited copy's tags, marked as made after eating when `afterEating` (unchanged otherwise). */
+export function tagsAfterEaten(tags: string[], afterEating: boolean | undefined): string[] {
+  return afterEating && !tags.includes(AFTER_EATEN_TAG) ? [...tags, AFTER_EATEN_TAG] : tags
+}
+
 /** Is this a tag the app keeps for itself, never one to show as a label? */
 export function isBookkeepingTag(tag: string): boolean {
-  return tag.startsWith(NEW_FROM_TAG_PREFIX) || tag === PIN_ONLY_TAG
+  return tag.startsWith(NEW_FROM_TAG_PREFIX) || tag === PIN_ONLY_TAG || tag === AFTER_EATEN_TAG
 }
 
 /**

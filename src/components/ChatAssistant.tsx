@@ -26,7 +26,7 @@ import { supabase } from '@/lib/supabase'
 import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
-import { swapPoolMeal, setMealPick, recordMealEvent, getEatenByDate, type MealSlotName } from '@/lib/meal-store'
+import { swapPoolMeal, setMealPick, recordMealEvent, getEatenByDate, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
 import { buildCoachEatenSummary, eatenWindow } from '@/lib/coach-eaten'
 import { buildCoachWeekReview, weekReviewDates } from '@/lib/coach-week-review'
 import { changeSinceStart } from '@/lib/weight-trend'
@@ -2035,6 +2035,18 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     })
     if (line) checkInUsedRef.current = true
     return line
+  }
+
+  /**
+   * Is this meal of today's already logged as eaten? An edit to it then keeps the day's other dishes (Ashley, 2 Nov 2026,
+   * "Same dishes"), the screen's rule. An unreadable ledger reads as not eaten: the edit re-plans, which is the old rule.
+   */
+  const slotEatenToday = async (slot: string): Promise<boolean> => {
+    if (!profile?.id || !macros) return false
+    try {
+      const ledger = await getTodayLedger(profile.id, getSessionDateContext(profile.id).date, macros)
+      return (loggedEventsBySlot(ledger.events)[slot as MealSlotName]?.length ?? 0) > 0
+    } catch { return false }
   }
 
   /** The knock-on trial for a meal card, or null when there is none to run or it failed (the card then says it could not check). */
@@ -5557,6 +5569,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             dietaryPreferences: profile.dietary_preferences ?? [],
             dislikedFoods: profile.disliked_foods ?? [],
             todayDate: getSessionDateContext(profile.id).date,
+            afterEating: await slotEatenToday(slotName),
           })
           // WHAT ELSE CHANGES, READ OFF A TRIAL (test log H9): the app's own
           // week served with and without this food, the same function the
@@ -5637,6 +5650,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             // whatever the database happens to match on macros.
             pantryFoods: mealPlan.flatMap(m => m.items.flatMap(i => i.ingredients ?? [])),
             todayDate: getSessionDateContext(profile.id).date,
+            afterEating: await slotEatenToday(slotName),
           })
           // WHAT ELSE CHANGES, READ OFF A TRIAL — the add-a-food card's rule, on the other three edits too (whole-app
           // test #11: an amount change swapped tonight's dinner and no card said so).

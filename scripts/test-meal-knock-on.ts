@@ -233,6 +233,38 @@ async function main() {
   }
 
   // ---------------------------------------------------------------------------
+  console.log('\n[2c] An edit to a meal ALREADY EATEN keeps the day\'s other dishes (Ashley, 2 Nov 2026, "Same dishes")')
+  {
+    const { isAfterEaten, displayTags } = await import('../src/lib/meal-new-from')
+    const served = serveMealWeek(serving).find(d => d.date === today)?.day.chosen.lunch
+    const eatenAdd = buildMealFoodAddProposal({
+      rawArgs: { meal_slot: 'lunch', food_lines: ['100g banana'], date: today },
+      currentMeal: served ? { name: served.name, ingredients: served.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`), macros: served.macros } : null,
+      profileId: 'p1', todayDate: today, targets, mealsPerDay: 3, includeSnacks: false, dietaryPreferences: [], dislikedFoods: [],
+      afterEating: true,
+    } as never)
+    const eatenOption = eatenAdd.ok ? eatenAdd.payload.option : null
+    check('the edit is marked as made after eating', !!eatenOption && isAfterEaten(eatenOption), eatenOption?.tags)
+    check('...and the mark is never shown as a label', !!eatenOption && displayTags(eatenOption.tags ?? []).length === displayTags((eatenOption.tags ?? []).filter(t => !isAfterEaten({ tags: [t] }))).length && !displayTags(eatenOption.tags ?? []).some(t => /eaten/.test(t)), eatenOption ? displayTags(eatenOption.tags ?? []) : null)
+    // THE CONTRAST, same fixture, same food: not eaten, today's other meals re-plan to a different dish ([0]).
+    const replanned = real.diff.filter(d => d.startsWith(`${today}|`) && d.endsWith('|dish'))
+    const held = eatenOption ? reallyApply(serving, today, 'lunch', eatenOption) : null
+    const heldDishes = (held?.diff ?? []).filter(d => d.startsWith(`${today}|`) && d.endsWith('|dish'))
+    check('not eaten: the same edit re-plans another of today\'s meals to a different dish (the fixture binds)', replanned.length >= 1, real.diff)
+    check('eaten: every other meal of today keeps its dish', !!held && heldDishes.length === 0, held?.diff)
+    check('...and the trial the card reads agrees with what is served', !!eatenOption && JSON.stringify(keys(trial(serving, today, 'lunch', eatenOption))) === JSON.stringify(held?.diff ?? null), { trial: eatenOption ? keys(trial(serving, today, 'lunch', eatenOption)) : null, served: held?.diff })
+    // Another day's meal cannot have been eaten yet: the flag is ignored there.
+    const tueServed = serveMealWeek(serving).find(d => d.date === dates[2])?.day.chosen.lunch
+    const tue = buildMealFoodAddProposal({
+      rawArgs: { meal_slot: 'lunch', food_lines: ['100g banana'], date: dates[2] },
+      currentMeal: tueServed ? { name: tueServed.name, ingredients: tueServed.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`), macros: tueServed.macros } : null,
+      profileId: 'p1', todayDate: today, targets, mealsPerDay: 3, includeSnacks: false, dietaryPreferences: [], dislikedFoods: [],
+      afterEating: true,
+    } as never)
+    check('a meal on another day is never marked as eaten', tue.ok && !isAfterEaten(tue.payload.option), tue.ok ? tue.payload.option.tags : tue)
+  }
+
+  // ---------------------------------------------------------------------------
   console.log('\n[3] The trial is the real thing')
   {
     check('the week the trial served is exactly the week the app serves once the option is stored and picked', !!k.after && names(k.after as never) === names(real.now) && real.now.length === 7, k.after ? undefined : 'no week returned')
@@ -356,6 +388,11 @@ async function main() {
     // coach; the screen half is driven in verify:meal-food-edit 2a2-2a3.)
     check('...and so is its card for taking out, swapping or re-weighing a food', /diff: withKnockOn\(edit\.diff, await mealKnockOn\(edit\.payload\)\)/.test(chat))
     check('the screen gives the food-edit sheet the hook\'s function too', /<MealFoodEditSheet[\s\S]{0,400}knockOn=\{dayMove\?\.knockOn\}/.test(mealPlan))
+    // "Same dishes" (2 Nov 2026) reaches the builders from both surfaces: the screen from the row's own ledger, the
+    // coach from the ledger read at the card. Source only; the behaviour is [2c].
+    check('the screen tells both edit sheets when the meal is already eaten', /afterEating: \(loggedBySlot\[slot\]\?\.length \?\? 0\) > 0/.test(mealPlan) && /meal: ctx\.meal, afterEating: ctx\.afterEating/.test(mealPlan)
+      && /afterEating: ctx\.afterEating/.test(read('src/components/nutrition/MealFoodEditSheet.tsx')) && /afterEating: ctx\.afterEating/.test(sheet))
+    check('...and so does the coach, on its add card and its edit card', (chat.match(/afterEating: await slotEatenToday\(slotName\)/g) ?? []).length === 2 && /const slotEatenToday = async[\s\S]{0,400}getTodayLedger\(/.test(chat))
     check('...through the prop, never a second copy of the trial', /const mealKnockOn = async[\s\S]{0,300}onMealKnockOn\(payload\.date, payload\.slot, payload\.option\)/.test(chat) && !/knockOnOfPin/.test(chat))
     check('the harness pages hand over the hook\'s function too, not a copy', /onMealKnockOn=\{mealDays\.dayMove\.knockOn\}/.test(read('.tour-harness/chat.tsx')) && /dayMove=\{mealDays\.dayMove\}/.test(read('.tour-harness/real.tsx')))
     const libSrc = read('src/lib/meal-knock-on.ts')

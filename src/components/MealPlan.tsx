@@ -427,6 +427,8 @@ export function MealPlan({
                   // looking at. Recomputing it here would be a second view of
                   // one number, free to drift.
                   dayTotals: totals,
+                  // ALREADY EATEN: an edit now keeps the day's other dishes (Ashley, 2 Nov 2026, "Same dishes").
+                  afterEating: (loggedBySlot[slot]?.length ?? 0) > 0,
                 }
               : null}
             moveContext={(profileId && targets && onMealPickApplied && !upcoming)
@@ -1283,7 +1285,7 @@ function MealSlotRow({
                           profileId: ctx.profileId, date: ctx.date, slot: ctx.slot, targets: ctx.targets,
                           mealsPerDay: ctx.mealsPerDay, includeSnacks: ctx.includeSnacks,
                           dietaryPreferences: ctx.dietaryPreferences, dislikedFoods: ctx.dislikedFoods,
-                          meal: ctx.meal,
+                          meal: ctx.meal, afterEating: ctx.afterEating,
                         }}
                         knockOn={dayMove?.knockOn}
                         onPick={onMealPickApplied}

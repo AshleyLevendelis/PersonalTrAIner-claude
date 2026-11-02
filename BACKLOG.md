@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [ ] **AN EDIT TO A MEAL ALREADY EATEN KEEPS THE DAY'S OTHER DISHES, 2 NOV 2026. Ashley's ruling: "Same dishes"**,
+  from two options, put to her as a COLLISION of two of her rulings (10 Oct logged-meal rule: same dishes within
+  about a quarter; 10 Oct scope rule: an edited meal re-plans the day). She chose the logged-meal rule. Built: an
+  edit made while the meal is logged as eaten marks its copy `after-eaten` (screen from the row's ledger, coach from
+  the ledger read at the card; ignored for any day but today), and the rotation's hold test judges such a copy by the
+  meal it was edited FROM (`editedFrom`, one step back): a plan dish holds the day, a dish of her own or an earlier
+  edit still re-plans. Marked at the moment of the edit, not read from "eaten", because a day re-planned before the
+  meal was logged would otherwise jump the moment it was logged. Checks: `test:meal-knock-on` [2c] (6, with the
+  not-eaten contrast proving the fixture binds) and [7] wiring (2), `test:meal-food-edit` 6b (2). 6 mutations, 6
+  caught. 138 derived gates and 22 Nutrition drivers green; `verify:meal-day-move` failed once while another browser
+  ran beside it and passes alone (78 checks). NOT driven on a screen: logging a meal then editing it.
 - [ ] **TAKING A FOOD OUT, SWAPPING IT OR CHANGING ITS AMOUNT SAYS WHAT ELSE MOVES, 2 NOV 2026 (whole-app test #11).**
   Mechanical: the edit re-plans the rest of the day (her 10 Oct scope ruling), and only the add-a-food card was read
   off a trial of that, so "Changed the egg" was the whole story while tonight's dinner became another dish. The

@@ -81,6 +81,20 @@ function build(options: readonly PoolOption[]): DishKeys {
   return keys
 }
 
+/**
+ * THE MEAL AN EDIT WAS MADE FROM — the one step back, not the root: the longest name among `names` that `name` extends
+ * with an edit connector. Null when it extends none. Read by the hold rule for an edit made after eating (meal-new-from).
+ */
+export function editedFrom(name: string, names: readonly string[]): string | null {
+  let base: string | null = null
+  for (const other of names) {
+    if (other === name || other.length >= name.length || !name.startsWith(other)) continue
+    if (!EDIT_CONNECTOR.test(name.slice(other.length))) continue
+    if (base === null || other.length > base.length) base = other
+  }
+  return base
+}
+
 const cache = new WeakMap<readonly PoolOption[], DishKeys>()
 
 /** The identity of every option in one slot's pool. Cached per pool array: a week asks for the same few pools again and again. */

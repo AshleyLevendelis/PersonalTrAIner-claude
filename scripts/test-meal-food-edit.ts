@@ -20,7 +20,7 @@ import {
   matchIngredient, MIN_FOODS_PER_MEAL,
 } from '../src/lib/meal-food-edit'
 import { computeMealMacros } from '../src/lib/food-db'
-import { isPinOnly } from '../src/lib/meal-new-from'
+import { isPinOnly, isAfterEaten } from '../src/lib/meal-new-from'
 import { parseIngredientLines, withQuantity } from '../src/lib/portion-scaler'
 import type { MacroTargets } from '../src/lib/types'
 
@@ -262,6 +262,10 @@ console.log('\n6b. Every edit is for its own day only (Ashley, 2 Nov 2026, "Toda
   check('remove, swap and amount change all build', edits.every(e => e.ok), edits.map(e => e.ok || e.reason))
   check('...and each edited meal is marked as made for that day only', edits.every(e => e.ok && isPinOnly(e.payload.option)), edits.map(e => e.ok && e.payload.option.tags))
   check('...and each card says the other days keep the original', edits.every(e => e.ok && e.diff.implications.some(i => /^Just for today\. On other days your lunch stays /.test(i.text))), edits.map(e => e.ok && e.diff.implications.map(i => i.text)))
+  // Ashley, 2 Nov 2026, "Same dishes": an edit to a meal already eaten is marked, so the day keeps its other dishes.
+  check('...none of them marked as made after eating unless the meal was eaten', edits.every(e => e.ok && !isAfterEaten(e.payload.option)))
+  const eaten = buildMealFoodResizeProposal({ ...base(), rawArgs: { meal_slot: 'lunch', food: 'rice', amount: 15 }, afterEating: true })
+  check('an amount changed on a meal already eaten is marked so', eaten.ok && isAfterEaten(eaten.payload.option), eaten.ok && eaten.payload.option.tags)
 }
 
 console.log('\n7. Nothing is written without a confirm')

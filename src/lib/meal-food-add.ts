@@ -6,7 +6,7 @@ import type { MealSlotName } from './meal-store'
 import type { MealKnockOn } from './meal-knock-on'
 import { dayLabel } from './day-labels'
 import { KNOCK_ON, oneDayEdit } from './coach-voice'
-import { tagsPinOnly } from './meal-new-from'
+import { tagsPinOnly, tagsAfterEaten } from './meal-new-from'
 
 // ---------------------------------------------------------------------------
 // "Add a banana to my breakfast" — a food JOINING a meal that is already on
@@ -53,6 +53,11 @@ export interface BuildMealFoodAddInput {
   includeSnacks?: boolean
   dietaryPreferences: string[]
   dislikedFoods?: string[]
+  /**
+   * The meal is already logged as eaten (Ashley, 2 Nov 2026, "Same dishes"): the edited copy is marked so, and the
+   * rest of the day keeps its dishes rather than being re-planned. Absent or false: the edit re-plans, as before.
+   */
+  afterEating?: boolean
 }
 
 export type MealFoodAddResult =
@@ -158,7 +163,7 @@ export function buildMealFoodAddProposal(input: BuildMealFoodAddInput): MealFood
     scopeKey: `${input.profileId}:propose_meal_food_add:${slot}:${date}`,
     preconditions: { slot, date, mealName: option.name, addedTo: currentMeal.name },
     // MADE FOR THIS DAY ONLY (tagsPinOnly): served where the pick names it, never by another day's search.
-    payload: { slot, date, option: { ...option, tags: tagsPinOnly(option.tags ?? []) } },
+    payload: { slot, date, option: { ...option, tags: tagsAfterEaten(tagsPinOnly(option.tags ?? []), input.afterEating && date === input.todayDate) } },
     diff,
   }
 }

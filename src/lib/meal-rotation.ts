@@ -32,14 +32,14 @@
 // ---------------------------------------------------------------------------
 
 import { assembleDay, computeSlotBudgets, VARIETY_MEMORY_DAYS, type AssembledDay, type PoolOption } from './meal-generation'
-import { newFromDate, isPinOnly } from './meal-new-from'
+import { newFromDate, isPinOnly, isAfterEaten } from './meal-new-from'
 import type { Macros100g } from './food-db'
 import { scaleToTarget, meetsProteinFloor } from './portion-scaler'
 import { costStoredMeal } from './meal-costing'
 import { USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { holdAroundPins } from './hold-around-pins'
 import type { MacroTargets } from './types'
-import { sameDish, resizedCopyBase, RESIZED_COPY_SUFFIX } from './meal-dish-identity'
+import { sameDish, resizedCopyBase, editedFrom, RESIZED_COPY_SUFFIX } from './meal-dish-identity'
 
 /**
  * How many days the rotation runs before it comes round again. Seven because
@@ -480,6 +480,15 @@ export function assembleRotationDay(
  */
 function isHerOwnDish(option: PoolOption, pools: Partial<Record<MealSlotName, PoolOption[]>>): boolean {
   if (!option.tags?.includes(USER_REQUESTED_TAG)) return false
+  // AN EDIT MADE AFTER EATING is judged by the meal it was made from (Ashley, 2 Nov 2026, "Same dishes"): a plan's own
+  // dish corrected after logging holds the rest of the day, as the logged meal itself does. Edited from a dish that is
+  // her own, or from one this day's pool no longer holds (an edit made before eating), it re-plans as before.
+  if (isAfterEaten(option)) {
+    const every = Object.values(pools).flatMap(o => o ?? [])
+    const from = editedFrom(option.name, every.map(o => o.name))
+    const base = from === null ? undefined : every.find(o => o.name === from)
+    return !base || isHerOwnDish(base, pools)
+  }
   const resized = RESIZED_COPY_SUFFIX.exec(option.name)
   if (!resized) return true
   const baseName = option.name.slice(0, resized.index)
