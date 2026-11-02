@@ -514,6 +514,9 @@
     "test:small-words": "tsx scripts/test-small-words.ts",
     "verify:nutrition-readable": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/nutrition-readable.mjs",
     "verify:profile-rebuild-decline": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-rebuild-decline.mjs",
+    "verify:small-targets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/small-targets.mjs",
+    "verify:strip-readable": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/strip-readable.mjs",
+    "verify:small-print": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/small-print.mjs",
     "verify:timer-chip": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/timer-chip.mjs",
     "verify:profile-sheet-top": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-sheet-top.mjs",
     "verify:chat-send-scroll": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-send-scroll.mjs"

@@ -594,7 +594,12 @@
  * Flagged rather than folded in silently — the right long-term shape is
  * per-theme role-warn tints, the same move --role-ai just made, and that is
  * a designer's call about hue, not mine. */
+/* --destructive ON PAPER, the same bug a third time (2 Nov 2026, the UX pass): #FF5C7A is tuned for a dark canvas and
+ * "Delete everything" / "Start a new plan…" measured 2.7:1 on the three light themes. The handoff's own rose TEXT
+ * step (--accent-text for rose, #B7264B), as --role-warn-text above uses amber's: 4.5:1 or better on all three, and
+ * the destructive fill keeps its white text readable too. verify:small-print. */
 [data-canvas="light"] {
+  --destructive: #B7264B;
   --role-warn-text: #9A3F0B;
   --role-ai-accent: #6A58E8;
   --role-ai-label: #5644C9;

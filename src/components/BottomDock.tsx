@@ -295,16 +295,16 @@ export function BottomDock() {
               reads as "a bit less", not "done". */}
           <Button
             variant="ghost" size="sm"
-            className="h-7 px-1.5 text-[0.6875rem] text-text-tertiary disabled:opacity-40"
+            className="h-11 min-w-11 px-1.5 text-[0.6875rem] text-text-tertiary disabled:opacity-40"
             disabled={restMs <= 30_000}
             onClick={() => adjustRest(-30)}
           >
             −30s
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[0.6875rem] text-text-tertiary" onClick={() => adjustRest(30)}>
+          <Button variant="ghost" size="sm" className="h-11 min-w-11 px-1.5 text-[0.6875rem] text-text-tertiary" onClick={() => adjustRest(30)}>
             +30s
           </Button>
-          <Button variant="ghost" size="sm" className="h-7 px-1.5 text-[0.6875rem] text-primary-text" onClick={dismissRest}>
+          <Button variant="ghost" size="sm" className="h-11 min-w-11 px-1.5 text-[0.6875rem] text-primary-text" onClick={dismissRest}>
             Skip ▸
           </Button>
         </div>

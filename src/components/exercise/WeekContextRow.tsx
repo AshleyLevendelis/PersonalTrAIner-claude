@@ -313,7 +313,9 @@ export function WeekContextRow({
                       <span>–</span>
                     )}
                   </span>
-                  <span className={`text-[0.625rem] ${isSelected ? 'font-semibold text-primary-text' : rest ? 'text-[color:var(--text-dim)]' : 'text-muted-foreground'}`}>
+                  {/* A REST DAY'S LETTER READS LIKE ANY OTHER (2 Nov 2026, the UX pass): it was drawn in the dim colour, 1.4-2.0:1 in
+                      every theme, too faint to read; the dash above already says it is a rest day. verify:strip-readable. */}
+                  <span className={`text-[0.625rem] ${isSelected ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
                     {(DAY3[d.dayName] ?? d.dayName).slice(0, 1)}
                   </span>
                 </button>

@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [ ] **READABLE AND TAPPABLE ON A GYM FLOOR, 2 NOV 2026 (UX item 3; whole-app test §3).** Mechanical, each measured
+  on screen before and after. TAP SIZES (`verify:small-targets`, new: a point 21px above, below, left and right of
+  each control must land on it; a disabled control is size-checked only): every ⋮ / ⋯ menu item 32 → 44px (the
+  shared menu item), the rest timer's −30s / +30s / Skip 28 → 44px, the "Why this weight" ⓘ 10px → a 44px
+  hit-slop, Profile's boxes, dropdowns, day chips and toggles 28 → 44px. CONTRAST, held to 4.5:1 in all nine themes
+  against what is actually behind the text: the Exercise strip's rest-day letters 1.4-2.0 → the normal letter
+  colour (the dash still marks rest; `verify:strip-readable`, new); Profile's fourteen faded lines (including the
+  keto/low-carb caveat and the data-deletion warning) and the program page's 60-70% fades → the standard secondary
+  colour; a done day on the program page no longer fades its row to 55% (2.9-3.7:1) but quiets its title colour;
+  today's "WED" on the program page uses the readable mint on light themes; the grocery list's empty line; and red
+  on the light themes ("Delete everything", "Start a new plan…" 2.7:1) is the handoff's own rose text step,
+  #B7264B, the pattern `--role-warn-text` already follows (`verify:small-print`, new). TWO MEASURING LESSONS, both
+  found by a reading that could not be true: a faded token computes to oklab(), which a number regex reads as
+  near-black (1.1:1 for a readable line), so colours are now sampled through a canvas pixel; and setting only the
+  theme name leaves the light-canvas flag off, so every light-theme token was measured at its dark value (the
+  existing readability drivers now set it the way the app does). And a third time this session: a run against the
+  last BUILD measured a mutation already undone; rebuild before reading a driver after a mutation round. Mutations:
+  4 (sizes) + 3 (strip, red, Profile line) + 2 (program, grocery), all caught. NOT covered: the grocery list with
+  items in it (the whole-app page has none), 360px truncation, plate colours, the bodyweight toggle and the steps
+  box (named, not measured).
 - [ ] **MOVING A MEAL TO ANOTHER SLOT IS READ OFF A TRIAL, STAYS ON ITS DAY, AND CAN BE PUT BACK, 2 NOV 2026
   (whole-app test #9; UX item 2).** Three findings, all mechanical. (1) The card's "your day goes up about N kcal"
   was the two moved meals' own sum, and the rest of the day re-fits around them, so the day moved by another amount.

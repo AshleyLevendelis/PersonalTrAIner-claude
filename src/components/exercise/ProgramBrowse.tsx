@@ -332,7 +332,7 @@ export function ProgramBrowse({
                 </div>
                 {blockCount > 1 && (
                   <span
-                    className={`mt-[7px] truncate text-center text-[0.625rem] uppercase tracking-[.1em] ${isCurrentBlock ? 'font-semibold' : 'text-muted-foreground/80'}`}
+                    className={`mt-[7px] truncate text-center text-[0.625rem] uppercase tracking-[.1em] ${isCurrentBlock ? 'font-semibold' : 'text-muted-foreground'}`}
                     style={isCurrentBlock ? { color: 'var(--primary-text)' } : undefined}
                   >
                     {shortPhaseLabel(b.label)}
@@ -470,7 +470,6 @@ export function ProgramBrowse({
                   paddingTop: trains ? 13 : 9,
                   paddingBottom: trains ? 13 : 9,
                   cursor: trains ? 'pointer' : 'default',
-                  opacity: dim ? 0.55 : 1,
                 }}
               >
                 <span
@@ -487,7 +486,7 @@ export function ProgramBrowse({
                 />
                 <span
                   className="tabular-mono shrink-0 w-8 text-[0.65625rem] font-semibold tracking-[.06em]"
-                  style={{ color: isToday ? 'var(--primary)' : 'color-mix(in srgb, var(--muted-foreground) 70%, transparent)' }}
+                  style={{ color: isToday ? 'var(--primary-text)' : 'var(--muted-foreground)' }}
                 >
                   {DAY_ABBR[dayName]}
                 </span>
@@ -495,7 +494,9 @@ export function ProgramBrowse({
                   <div className="flex items-baseline gap-2 flex-wrap">
                     <span
                       className={trains ? 'text-[0.96875rem] font-semibold tracking-[-.012em]' : 'text-[0.8125rem]'}
-                      style={trains ? undefined : { color: 'color-mix(in srgb, var(--muted-foreground) 70%, transparent)' }}
+                      // A DAY ALREADY DONE RECEDES BY ITS TITLE'S COLOUR, not by fading the row (2 Nov 2026, the UX pass): the
+                      // row at 55% put its small print at 2.9-3.7:1. verify:small-print.
+                      style={trains ? (dim ? { color: 'var(--muted-foreground)' } : undefined) : { color: 'var(--muted-foreground)' }}
                     >
                       {movedTo ? (leftBehind?.focus ?? 'Rest') : (workout?.focus ?? 'Rest')}
                     </span>
@@ -523,7 +524,7 @@ export function ProgramBrowse({
                       {main && (
                         <span className="text-[0.8125rem]" style={{ color: 'color-mix(in srgb, var(--foreground) 76%, transparent)' }}>
                           {main.name}{' '}
-                          <span className="tabular-mono text-[0.6875rem]" style={{ color: 'color-mix(in srgb, var(--muted-foreground) 70%, transparent)' }}>
+                          <span className="tabular-mono text-[0.6875rem]" style={{ color: 'var(--muted-foreground)' }}>
                             {main.summary}
                           </span>
                         </span>
@@ -542,14 +543,14 @@ export function ProgramBrowse({
                             }}
                           />
                         </div>
-                        <span className="tabular-mono text-[0.65625rem] shrink-0" style={{ color: 'color-mix(in srgb, var(--muted-foreground) 70%, transparent)' }}>
+                        <span className="tabular-mono text-[0.65625rem] shrink-0" style={{ color: 'var(--muted-foreground)' }}>
                           <span data-testid="program-day-length">{length ? `${length.workingSets} sets · ${formatDayLength(length)}` : ''}</span>
                         </span>
                       </div>
                     </div>
                   )}
                   {restNote && (
-                    <span className="text-[0.71875rem]" style={{ color: 'color-mix(in srgb, var(--muted-foreground) 60%, transparent)' }}>
+                    <span className="text-[0.71875rem]" style={{ color: 'var(--muted-foreground)' }}>
                       {restNote}
                     </span>
                   )}

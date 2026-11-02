@@ -301,7 +301,7 @@ function EditableStringField({
       onChange={e => setInput(e.target.value)}
       onBlur={commit}
       onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-      className="h-7 w-32 text-sm text-right"
+      className="h-11 w-32 text-sm text-right"
     />
   )
 }
@@ -323,7 +323,7 @@ function EditableSelectField<T extends string | number>({
       const match = options.find(o => String(o.value) === v)
       if (match) onSave(match.value)
     }}>
-      <SelectTrigger className="h-7 w-auto text-xs">
+      <SelectTrigger className="h-11 w-auto text-xs">
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -395,7 +395,7 @@ function EditableTagList({
             <button type="button" onClick={() => void remove(v)} disabled={saving} aria-label={`Remove ${v}`} className="hit-slop-44 disabled:opacity-50"><X className="size-2.5" /></button>
           </Badge>
         ))}
-        {values.length === 0 && <span className="text-xs text-muted-foreground/70">None yet</span>}
+        {values.length === 0 && <span className="text-xs text-muted-foreground">None yet</span>}
       </div>
       <div className="flex items-center gap-1.5">
         <Input
@@ -403,7 +403,7 @@ function EditableTagList({
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') void add() }}
           placeholder={placeholder}
-          className="h-7 text-xs flex-1 min-w-0"
+          className="h-11 text-xs flex-1 min-w-0"
           data-testid={inputTestId}
         />
         <Button size="icon" variant="outline" aria-label="Add" className="size-7 shrink-0" onClick={() => void add()} disabled={!input.trim() || saving}>
@@ -426,7 +426,7 @@ function TrainingDaysEditor({ days, onSave }: { days: TrainingDay[]; onSave: (ne
       className="flex-wrap"
     >
       {DAY_ORDER.map(day => (
-        <ToggleGroupItem key={day} value={day} className="text-[0.625rem] px-2 h-7">{day.slice(0, 3)}</ToggleGroupItem>
+        <ToggleGroupItem key={day} value={day} className="text-[0.625rem] px-2 h-11 min-w-11">{day.slice(0, 3)}</ToggleGroupItem>
       ))}
     </ToggleGroup>
   )
@@ -1172,7 +1172,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 <div key={g.id} className="rounded-md border p-2.5 space-y-1">
                   {editingId === g.id ? (
                     <div className="flex items-center gap-2.5">
-                      <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 text-sm" />
+                      <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-11 text-sm" />
                       <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveGoalEdit(g.id)} aria-label="Save this goal"><Check className="size-3.5" /></Button>
                       <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
                     </div>
@@ -1223,7 +1223,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         <div className="space-y-2">
           <h3 className="ds-label">Injuries</h3>
           <div className="space-y-2.5 text-sm">
-            <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Areas to work around. Picking one changes which exercises your plan gives you.</p>
+            <p className="text-[0.6875rem] leading-snug text-muted-foreground">Areas to work around. Picking one changes which exercises your plan gives you.</p>
             {/* WHAT IS BEING EASED OFF RIGHT NOW (M25). A temporary change is
                 deliberately not one of the toggles below — it ends on its own
                 and must never become a lasting injury — so until 9 Oct 2026 it
@@ -1257,7 +1257,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                  would be the same silent discarding this fix is about. Said
                  plainly, with a way to clear each one. */
               <div className="space-y-1.5 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
-                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+                <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                   These are saved but don't change your plan — the app can only work around the areas above. Tell your Personal TrAIner in Chat about anything else.
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -1298,7 +1298,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <div className="space-y-1">
               <span className="text-muted-foreground">Other training</span>
               {(profile.concurrent_activities ?? []).length === 0 ? (
-                <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">None yet — tell your Personal TrAIner in chat ("I also do Muay Thai on Tuesday and Thursday evenings") and the plan is rebuilt around it.</p>
+                <p className="text-[0.6875rem] leading-snug text-muted-foreground">None yet — tell your Personal TrAIner in chat ("I also do Muay Thai on Tuesday and Thursday evenings") and the plan is rebuilt around it.</p>
               ) : (
                 <div className="flex flex-wrap gap-x-2.5 gap-y-2.5">
                   {(profile.concurrent_activities ?? []).map(a => {
@@ -1475,7 +1475,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 writing to one place rather than two. */}
             <div className="space-y-1.5">
               <span className="text-muted-foreground">Exercises to avoid</span>
-              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything you'd rather never see in a session.</p>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground">Anything you'd rather never see in a session.</p>
               <EditableTagList values={exerciseDislikeValues} onSave={saveDislikedExercises} placeholder="e.g. burpees" resetKey={exerciseAvoidReset} inputTestId="exercise-avoid-input" />
               {exerciseAvoidAsk && (
                 <div className="space-y-2 pt-1" data-testid="exercise-avoid-ask" role="status">
@@ -1505,7 +1505,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 word about tags or the food database. */}
             <div ref={dietaryRef} className="space-y-1.5">
               <span className="text-muted-foreground">Dietary restrictions</span>
-              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Diets and allergies the app enforces when building your meals.</p>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground">Diets and allergies the app enforces when building your meals.</p>
               <ToggleGroup
                 type="multiple"
                 value={profile.dietary_preferences}
@@ -1528,7 +1528,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   going silent when somebody turns Keto on here would leave the
                   app honest only to people who chose it on day one. */}
               {dietTargetCaveat(profile.dietary_preferences ?? []) && (
-                <p data-testid="diet-target-caveat" className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+                <p data-testid="diet-target-caveat" className="text-[0.6875rem] leading-snug text-muted-foreground">
                   {dietTargetCaveat(profile.dietary_preferences ?? [])}
                 </p>
               )}
@@ -1542,7 +1542,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 as belonging only to the ToggleGroup, at the same space-y-3 gap
                 as every other unrelated field in this card, which risked
                 being misread as "the avoid-list doesn't have this limitation." */}
-            <p className="pt-2 text-[0.6875rem] leading-snug text-muted-foreground/70" style={{ borderTop: '1px solid var(--hairline)' }}>
+            <p className="pt-2 text-[0.6875rem] leading-snug text-muted-foreground" style={{ borderTop: '1px solid var(--hairline)' }}>
               These filters check ingredients we recognise. We can't check brands,
               preparation, or cross-contamination. If you have a food allergy,
               always check ingredients yourself.
@@ -1555,12 +1555,12 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 without splitting the two avoid lists, which sit together on purpose. */}
             <div className="space-y-1.5" data-testid="profile-food-likes">
               <span className="text-muted-foreground">Foods and meals I like</span>
-              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">New meals are made with these in mind, and they're favoured when each day's meals are picked. They never override what you avoid.</p>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground">New meals are made with these in mind, and they're favoured when each day's meals are picked. They never override what you avoid.</p>
               <EditableTagList values={foodLikeValues} onSave={saveLikedFoods} placeholder="e.g. salmon, curry" />
               {likeRefusal && <p role="alert" data-testid="profile-like-refused" className="text-[0.6875rem] leading-snug text-[color:var(--role-warn-text)]">{likeRefusal}</p>}
               {heartedMeals.length > 0 && (
                 <div className="space-y-1 pt-1" data-testid="profile-hearted-meals">
-                  <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Meals you've hearted count too:</p>
+                  <p className="text-[0.6875rem] leading-snug text-muted-foreground">Meals you've hearted count too:</p>
                   <ul className="flex flex-wrap gap-1.5">
                     {heartedMeals.map(name => (
                       <li key={name} className="flex items-center gap-1 rounded-full bg-[color:var(--surface-raised)] py-1 pl-2.5 pr-1 text-xs" data-hearted-meal={name} data-clashes={clashingHearts.has(name) ? 'yes' : 'no'}>
@@ -1594,7 +1594,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         <div className="space-y-3 text-sm">
             <div className="space-y-1.5">
               <span className="text-muted-foreground">Foods to avoid</span>
-              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Anything else you'd rather not see. Matched by name.</p>
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground">Anything else you'd rather not see. Matched by name.</p>
               <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" split={splitFoodList} />
             </div>
             {/* Honesty-copy round — applies to BOTH fields above (the
@@ -1606,7 +1606,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 as belonging only to the ToggleGroup, at the same space-y-3 gap
                 as every other unrelated field in this card, which risked
                 being misread as "the avoid-list doesn't have this limitation." */}
-            <p className="pt-2 text-[0.6875rem] leading-snug text-muted-foreground/70" style={{ borderTop: '1px solid var(--hairline)' }}>
+            <p className="pt-2 text-[0.6875rem] leading-snug text-muted-foreground" style={{ borderTop: '1px solid var(--hairline)' }}>
               These filters check ingredients we recognise. We can't check brands,
               preparation, or cross-contamination. If you have a food allergy,
               always check ingredients yourself.
@@ -1622,7 +1622,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <Row label="Cooking time"><EditableSelectField value={profile.cooking_time_preference ?? 'moderate'} options={COOKING_TIME_OPTIONS} onSave={v => savePatch({ cooking_time_preference: v })} /></Row>
             <Row label="Meals per day"><EditableSelectField value={profile.meals_per_day ?? 3} options={MEALS_PER_DAY_OPTIONS} onSave={v => savePatch({ meals_per_day: v })} /></Row>
             <Row label="Include snacks">
-              <Button size="sm" variant={profile.include_snacks ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => savePatch({ include_snacks: !profile.include_snacks })}>
+              <Button size="sm" variant={profile.include_snacks ? 'default' : 'outline'} className="h-11 text-xs" onClick={() => savePatch({ include_snacks: !profile.include_snacks })}>
                 {profile.include_snacks ? 'Yes' : 'No'}
               </Button>
             </Row>
@@ -1631,7 +1631,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 convention include_snacks uses one row above. Turning it off
                 frees lunch to be its own dish again from the next day. */}
             <Row label="Batch cook lunches">
-              <Button size="sm" variant={(profile.batch_cooking ?? true) ? 'default' : 'outline'} className="h-7 text-xs" onClick={() => savePatch({ batch_cooking: !(profile.batch_cooking ?? true) })}>
+              <Button size="sm" variant={(profile.batch_cooking ?? true) ? 'default' : 'outline'} className="h-11 text-xs" onClick={() => savePatch({ batch_cooking: !(profile.batch_cooking ?? true) })}>
                 {(profile.batch_cooking ?? true) ? 'Yes' : 'No'}
               </Button>
             </Row>
@@ -1701,7 +1701,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   <div key={f.id} className="rounded-md border p-2.5 space-y-1">
                     {editingId === f.id ? (
                       <div className="flex items-center gap-2.5">
-                        <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 text-sm" />
+                        <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-11 text-sm" />
                         <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveFactEdit(f.id)} aria-label="Save this note"><Check className="size-3.5" /></Button>
                         <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
                       </div>
@@ -1736,7 +1736,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               <div key={c.id} className="rounded-md border p-2.5 space-y-1">
                 {editingId === c.id ? (
                   <div className="flex items-center gap-2.5">
-                    <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-7 text-sm" />
+                    <Input value={editValue} onChange={e => setEditValue(e.target.value)} className="h-11 text-sm" />
                     <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={() => saveContextEdit(c.id)} aria-label="Save this note"><Check className="size-3.5" /></Button>
                     <Button size="icon" variant="ghost" className="hit-slop-44 size-7" onClick={cancelEdit} aria-label="Cancel editing"><X className="size-3.5" /></Button>
                   </div>
@@ -1902,7 +1902,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           <h3 className="ds-label">Your data</h3>
           <div className="space-y-3 text-sm">
             <div className="space-y-1.5">
-              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                 Everything the app has stored about you, as one file.
               </p>
               <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleDownloadData} disabled={dataBusy !== null}>
@@ -1912,7 +1912,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             </div>
 
             <div className="space-y-1.5 pt-3" style={{ borderTop: '1px solid var(--hairline)' }}>
-              <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                 Deleting removes your plan, your meals, every weigh-in and logged set, and your whole chat history. It cannot be undone, and there is no copy.
               </p>
               {!deleteArmed ? (

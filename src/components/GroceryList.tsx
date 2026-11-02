@@ -429,7 +429,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
             <div className="flex flex-col items-center justify-center gap-2 py-10 text-center" data-testid="grocery-empty">
               <ShoppingCart className="size-7 text-muted-foreground/50" />
               <p className="text-sm text-muted-foreground">Your list is empty.</p>
-              <p className="max-w-[26ch] text-xs text-muted-foreground/70">It fills from your meal plan — tap {buildListLabel(items)} above, or add an item by hand.</p>
+              <p className="max-w-[26ch] text-xs text-muted-foreground">It fills from your meal plan — tap {buildListLabel(items)} above, or add an item by hand.</p>
             </div>
           )}
 

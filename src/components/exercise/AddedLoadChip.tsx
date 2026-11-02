@@ -39,7 +39,7 @@ export function AddedLoadChip({ ex }: { ex: Exercise }) {
             type="button"
             onClick={() => setExplained(v => !v)}
             aria-label="Why this weight"
-            className="text-muted-foreground/60 hover:text-muted-foreground"
+            className="hit-slop-44 text-muted-foreground/60 hover:text-muted-foreground"
           >
             <Info className="size-2.5" />
           </button>
