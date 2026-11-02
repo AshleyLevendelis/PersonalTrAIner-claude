@@ -77,10 +77,17 @@ export interface MealKnockOnInput {
    * the screen's swap pins it, by itself, neither added to the options nor tagged as her own request.
    */
   existing?: boolean
+  /**
+   * More new options pinned on the SAME date with this one — a meal moved to another slot writes one or two resized
+   * copies (meal-move.ts), and both land at once (2 Nov 2026, the UX pass: the move's card is read off a trial too).
+   */
+  alsoPinned?: { slot: MealSlotName; option: PoolOption }[]
+  /** Say what the edit does to the day's total, read off the trial (the move's card used to compute it from the two meals alone). */
+  sayDayTotal?: boolean
 }
 
 export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
-  const { serving, date, slot, option, listDates, existing } = input
+  const { serving, date, slot, option, listDates, existing, alsoPinned = [], sayDayTotal } = input
   const { today, dates, targets, pools } = serving
   // No targets, or a day the strip does not serve: there is no week to try it
   // on. Said, not guessed.
@@ -90,12 +97,17 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
 
   // AS THE EXECUTOR WILL STORE IT (executeMealAddition): beside the meal's
   // other options, tagged as her own request, and pinned to this date.
-  const stored: PoolOption = existing ? option : { ...option, tags: [...(option.tags ?? []), USER_REQUESTED_TAG] }
-  const afterPools = existing ? pools : { ...pools, [slot]: [...(pools[slot] ?? []), stored] }
+  const store = (o: PoolOption): PoolOption => (existing ? o : { ...o, tags: [...(o.tags ?? []), USER_REQUESTED_TAG] })
+  const pinned = [{ slot, option }, ...alsoPinned].map(p => ({ slot: p.slot, stored: store(p.option) }))
+  const afterPools = { ...pools }
+  if (!existing) for (const p of pinned) afterPools[p.slot] = [...(afterPools[p.slot] ?? []), p.stored]
   const todaysPins = { ...serving.todaysPins }
   const pinsByDate = { ...serving.pinsByDate }
-  if (date === today) todaysPins[slot] = stored
-  else pinsByDate[date] = { ...(pinsByDate[date] ?? {}), [slot]: stored }
+  for (const p of pinned) {
+    if (date === today) todaysPins[p.slot] = p.stored
+    else pinsByDate[date] = { ...(pinsByDate[date] ?? {}), [p.slot]: p.stored }
+  }
+  const pinnedSlots = new Set(pinned.map(p => p.slot))
   // No rotation is handed over: the one in `serving` was built from the old
   // options, and the week builds its own for any pool it was not built from
   // (serveDates checks `builtFrom`) — which is what the app does when it reads
@@ -106,7 +118,7 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
   for (const served of after) {
     const wasDay = before.find(b => b.date === served.date)
     for (const s of SLOTS) {
-      if (served.date === date && s === slot) continue
+      if (served.date === date && pinnedSlots.has(s)) continue
       const now = served.day.chosen[s]
       const was = wasDay?.day.chosen[s]
       if (!now) continue
@@ -139,6 +151,13 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
     if (was?.day.withinTolerance && !served.day.withinTolerance) {
       lines.push({ severity: 'warn', text: DAY_MOVE.offTarget(dayLabel(served.date, today), Math.round(served.day.totals.calories), Math.round(served.day.totals.calories - targets.calories), namedMiss(served.day.totals, targets) ?? undefined) })
     }
+  }
+
+  // THE DAY'S TOTAL, as served after the tap against as served now (the move's card).
+  if (sayDayTotal) {
+    const was = before.find(b => b.date === date)?.day.totals.calories
+    const now = after.find(a => a.date === date)?.day.totals.calories
+    if (was != null && now != null) lines.push({ severity: 'info', text: KNOCK_ON.dayTotal(dayLabel(date, today), Math.round(was), Math.round(now)) })
   }
 
   // THE SHOPPING LIST IS NOT REBUILT BEHIND HER BACK (her refit and top-up

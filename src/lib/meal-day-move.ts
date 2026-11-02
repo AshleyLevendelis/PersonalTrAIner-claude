@@ -107,6 +107,11 @@ export interface MealDayMoveController {
    */
   knockOn: (date: string, slot: MealSlotName, option: PoolOption, existing?: boolean) => Promise<import('./meal-knock-on').MealKnockOn>
   /**
+   * The same trial for a meal moved to another slot on one date: every leg the move writes is pinned at once, and the
+   * day's total is said (2 Nov 2026). Optional so a caller without one says it could not check.
+   */
+  knockOnMove?: (date: string, legs: { slot: MealSlotName; option: PoolOption }[]) => Promise<import('./meal-knock-on').MealKnockOn>
+  /**
    * Moving calories from one meal to another on one date (meal-rebalance.ts, 20 Oct 2026). On this controller for the
    * reason `knockOn` is: it is planned over the same week and written by the same two-pick write as the swap, and this
    * object already reaches the Move sheet and the coach.

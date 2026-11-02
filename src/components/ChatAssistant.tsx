@@ -50,7 +50,8 @@ import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-
 import { buildMealLogProposal, type MealLogPayload, type MealLogComputed } from '@/lib/meal-log-proposal'
 import { buildCustomMealProposal } from '@/lib/custom-meal'
 import { buildMealFoodAddProposal, withKnockOn } from '@/lib/meal-food-add'
-import type { MealKnockOnFn } from '@/lib/meal-knock-on'
+import type { MealKnockOnFn, MealKnockOn } from '@/lib/meal-knock-on'
+import type { PoolOption } from '@/lib/meal-generation'
 import { buildMealMoveProposal, type MealMovePayload } from '@/lib/meal-move'
 import type { MealRefit } from '@/lib/meal-refit'
 import type { TopUpOutcome, TopUpPlan } from '@/lib/meal-top-up'
@@ -324,6 +325,8 @@ interface ChatAssistantProps {
    * disagree. Absent: the card says it could not check.
    */
   onMealKnockOn?: MealKnockOnFn
+  /** The same trial for a meal moved to another slot: both legs pinned at once, the day's total said (2 Nov 2026). */
+  onMealKnockOnMove?: (date: string, legs: { slot: MealSlotName; option: PoolOption }[]) => Promise<MealKnockOn>
   /** Fired when a chat log_weight action lands so the app recomputes living targets. */
   onWeightLogged?: () => void | Promise<void>
   /** Fired after a confirmed propose_exercise_swap executes — App.tsx's setMesocycle, since the executor is pure and returns the new array rather than mutating App.tsx's state directly. */
@@ -495,7 +498,7 @@ const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan — 
 /** The cards that would put a food on her plate: a named food her restrictions keep out never gets one (H41). */
 const FOOD_OFFER_KINDS = new Set(['propose_meal_swap', 'propose_meal_addition', 'propose_custom_meal', 'propose_meal_food_add', 'propose_meal_food_replace'])
 
-export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onMealKnockOn, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onMealKnockOn, onMealKnockOnMove, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -5607,7 +5610,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             dislikedFoods: profile.disliked_foods ?? [],
             todayDate: getSessionDateContext(profile.id).date,
           })
-          if (moved.ok) built = { scopeKey: moved.scopeKey, preconditions: moved.preconditions, payload: moved.payload as unknown as Record<string, unknown>, diff: moved.diff }
+          // READ OFF A TRIAL, the screen's own (2 Nov 2026): every other meal that moves, and the day's total as served.
+          let moveTrial: MealKnockOn | null = null
+          if (moved.ok && onMealKnockOnMove) {
+            try { moveTrial = await onMealKnockOnMove(moved.payload.date, moved.payload.legs.map(l => ({ slot: l.slot, option: l.payload.option }))) }
+            catch (err) { console.error('chat: the move trial failed', err) }
+          }
+          if (moved.ok) built = { scopeKey: moved.scopeKey, preconditions: moved.preconditions, payload: moved.payload as unknown as Record<string, unknown>, diff: withKnockOn(moved.diff, moveTrial) }
           else refusal = moved.reason
         }
       } else if (

@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [ ] **MOVING A MEAL TO ANOTHER SLOT IS READ OFF A TRIAL, STAYS ON ITS DAY, AND CAN BE PUT BACK, 2 NOV 2026
+  (whole-app test #9; UX item 2).** Three findings, all mechanical. (1) The card's "your day goes up about N kcal"
+  was the two moved meals' own sum, and the rest of the day re-fits around them, so the day moved by another amount.
+  The trial now pins both legs at once (`knockOnOfPin` gained `alsoPinned`), names every other meal that changes,
+  and states the day's total as served (`KNOCK_ON.dayTotal`): "Your day goes up about 294 kcal, to 2,274 kcal."
+  The builder no longer states a total of its own. Same trial on the coach's move card (`onMealKnockOnMove`). (2)
+  MEASURED BY THE NEW TRIAL: the move's resized copies joined the pool, so moving breakfast and dinner today
+  changed NINE meals across the week. The copies are now made for that day (`pin-only`), Ashley's "Today only"
+  ruling for edited meals applied to the move, whose card is about one day. (3) No Undo on the screen: now each
+  leg's copy is removed and its slot's earlier pick restored. Checks: `test:meal-knock-on` [2d] (6, with a move
+  found that moves the day 25+ kcal so the total check binds) and [7] two wiring checks, `test:meal-move`
+  re-anchored (no builder total), `verify:meal-move` 2g-2h and 6a-6d. 12 mutations; 3 MISSED at first and each
+  answered: the frozen total (the first fixture moved the day under 25 kcal, so a frozen number read the same:
+  re-chosen), the restored earlier pick and the coach card (no fixture or check reached them: source checks
+  added, both then caught). 148 derived gates and 18 screen drivers: 165 of 166 green, the one red was mine
+  (`toLocaleString` in the phrasebook, which `test:target-change-notice` forbids), fixed and re-run green.
+  NOT changed: the coach's move receipt still has no Undo (its receipt carries one token).
 - [ ] **A FOOD CHANGED ON THE NUTRITION SCREEN CAN BE PUT BACK, 2 NOV 2026 (UX item 2).** Adding, taking out, swapping
   or re-weighing a food from the screen had no Undo (the coach's receipt had one). Now the line saying what changed
   carries "Undo", which removes the exact row the edit wrote and puts back the pick the slot had BEFORE (read just

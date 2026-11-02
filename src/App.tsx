@@ -3399,6 +3399,7 @@ function App() {
               onMealDayMoveUndo={mealDays.dayMove.undo}
               onMealRebalance={mealDays.dayMove.rebalance}
               onMealKnockOn={mealDays.dayMove.knockOn}
+              onMealKnockOnMove={mealDays.dayMove.knockOnMove}
               mealTopUp={mealTopUpPlan ? { ...mealTopUpPlan, building: initialMealBuild } : null}
               onMealTopUpStart={previewMealTopUpStart}
               onMealTopUpConfirm={handleMealTopUpFromChat}

@@ -259,8 +259,14 @@ export function useMealDays(input: MealDaysInput) {
    * same shopping-list read the day swap makes. Never throws: a trial that
    * cannot run comes back as the line saying it could not be checked.
    */
-  const knockOn = async (date: string, slot: MealSlotName, option: PoolOption, existing?: boolean): Promise<MealKnockOn> => {
+  const knockOn = (date: string, slot: MealSlotName, option: PoolOption, existing?: boolean): Promise<MealKnockOn> =>
+    knockOnOf(date, [{ slot, option }], { existing })
+  /** A meal moved to another slot: every leg pinned at once, and the day's total said (2 Nov 2026). */
+  const knockOnMove = (date: string, legs: { slot: MealSlotName; option: PoolOption }[]): Promise<MealKnockOn> =>
+    knockOnOf(date, legs, { sayDayTotal: true })
+  const knockOnOf = async (date: string, pins: { slot: MealSlotName; option: PoolOption }[], opts: { existing?: boolean; sayDayTotal?: boolean }): Promise<MealKnockOn> => {
     const { knockOnOfPin } = await import('@/lib/meal-knock-on')
+    if (pins.length === 0) return { changes: [], lines: [{ severity: 'info', text: KNOCK_ON.unknown }] }
     let listDates: string[] | null = null
     if (profileId && targets) {
       try {
@@ -270,7 +276,8 @@ export function useMealDays(input: MealDaysInput) {
     try {
       return knockOnOfPin({
         serving,
-        date, slot, option, listDates, existing,
+        date, slot: pins[0].slot, option: pins[0].option, listDates, existing: opts.existing,
+        alsoPinned: pins.slice(1), sayDayTotal: opts.sayDayTotal,
       })
     } catch (err) {
       console.error('useMealDays: the knock-on trial failed', err)
@@ -429,7 +436,7 @@ export function useMealDays(input: MealDaysInput) {
     dayMove: {
       dates, today,
       slots: targets ? (Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks)) as MealSlotName[]) : [],
-      plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove, knockOn,
+      plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove, knockOn, knockOnMove,
       rebalance: { plan: planRebalance, confirm: confirmRebalance, undo: undoRebalance } satisfies MealRebalanceController,
     } satisfies MealDayMoveController,
   }

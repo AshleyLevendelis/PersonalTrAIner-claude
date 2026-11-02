@@ -1,3 +1,4 @@
+import { tagsPinOnly } from './meal-new-from'
 import { verifyProposal, computeSlotBudgets, type RawProposal, type PoolOption } from './meal-generation'
 import { normaliseSlot, normaliseDate, explainRejection, type MealAdditionPayload } from './meal-addition'
 import { parseIngredientLines, withParsedQuantity, isWeighedWhenResized, kitchenRound, computeScaleFactor, isScaleFactorAbsurd, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
@@ -188,7 +189,10 @@ function legFor(
     leg: {
       slot: toSlot,
       fromSlot,
-      payload: { slot: toSlot, date, option: moved.option },
+      // MADE FOR THIS DAY (2 Nov 2026): the resized copy is served where its pick names it, never by another day's
+      // search. Measured before: moving breakfast and dinner today changed nine meals across the week. Ashley's "Today
+      // only" ruling for an edited meal, applied to the move, whose card is about one day.
+      payload: { slot: toSlot, date, option: { ...moved.option, tags: tagsPinOnly(moved.option.tags ?? []) } },
       beforeKcal: moved.beforeKcal,
       afterKcal: moved.afterKcal,
       originalName: meal.name,
@@ -250,11 +254,11 @@ export function buildMealMoveProposal(input: BuildMealMoveInput): MealMoveResult
     // had gone up 96. The claim can never be right in general — each meal is
     // resized to its DESTINATION's budget, and the meals were not sitting at
     // their own budgets to begin with, so the totals only match by accident.
-    const net = legs.reduce((sum, l) => sum + (l.afterKcal - l.beforeKcal), 0)
-    const dayEffect = Math.abs(net) < 25
-      ? 'and your day lands within a few calories of where it was'
-      : `and your day goes ${net > 0 ? 'up' : 'down'} about ${Math.abs(net)} kcal`
-    implications.push({ severity: 'info', text: `${capitalise(slotWords(fromSlot))} and ${slotWords(toSlot)} swap places. Both are resized to fit where they land, ${dayEffect}.` })
+    //
+    // AND THEN NOT HERE AT ALL (2 Nov 2026, whole-app test #9): the two meals' own change was still not the day's,
+    // because the rest of the day re-fits around the moved meals. The day's total is now read off a trial by the
+    // caller (meal-knock-on.ts, sayDayTotal), with every other meal that moves.
+    implications.push({ severity: 'info', text: `${capitalise(slotWords(fromSlot))} and ${slotWords(toSlot)} swap places. Both are resized to fit where they land.` })
   } else {
     implications.push({ severity: 'warn', text: `Nothing comes back the other way, so ${slotWords(fromSlot)} will be empty. Your day will be lighter by about ${legs[0].beforeKcal} kcal unless you put something there.` })
   }

@@ -303,6 +303,14 @@ export const KNOCK_ON = {
   /** There was no week to try it on, or the trial failed: said, never guessed. */
   unknown: "I couldn't check what this does to your other meals.",
   listUnknown: "I couldn't check your shopping list. If this day is on it, rebuild the list afterwards to match.",
+  /** A day's total, read off the trial (2 Nov 2026, the move's card). Within 25 kcal reads as no change worth a number. */
+  dayTotal: (day: string, was: number, now: number): string => {
+    const d = now - was
+    const whose = day === 'today' ? 'Your day' : `${day[0].toUpperCase()}${day.slice(1)}`
+    return Math.abs(d) < 25
+      ? `${whose} lands within a few calories of where it was.`
+      : `${whose} goes ${d > 0 ? 'up' : 'down'} about ${Math.abs(d)} kcal, to ${grouped(now)} kcal.`
+  },
 }
 
 /**

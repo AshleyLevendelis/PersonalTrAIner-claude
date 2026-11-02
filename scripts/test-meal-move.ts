@@ -164,11 +164,11 @@ if (swap.ok) {
   check('...and never claims the day is unchanged when it is not',
     Math.abs(netKcal) < 25 || !/adds up the same|unchanged|no change to your day/i.test(dayLine),
     { netKcal, dayLine })
-  check('...it states the day\'s actual change, with the real number',
-    Math.abs(netKcal) < 25
-      ? /within a few calories/i.test(dayLine)
-      : dayLine.includes(String(Math.abs(netKcal))),
-    { netKcal, dayLine })
+  // RE-ANCHORED 2 Nov 2026 (whole-app test #9): the two meals' own change was still not the DAY's — the rest of the day
+  // re-fits around the moved meals — so the card's total now comes from a trial of the whole day (meal-knock-on.ts,
+  // sayDayTotal; test:meal-knock-on [2d]). The builder must not state one of its own, or the card says two numbers.
+  check('...and the builder states no day total of its own (the trial does)',
+    !/your day (goes|lands)/i.test(dayLine), { netKcal, dayLine })
   check('...and states BOTH new sizes',
     said.includes(`${toSnack?.afterKcal} kcal`) && said.includes(`${toDinner?.afterKcal} kcal`), swap.diff.rows)
 }

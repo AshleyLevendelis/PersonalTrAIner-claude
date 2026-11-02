@@ -265,6 +265,53 @@ async function main() {
   }
 
   // ---------------------------------------------------------------------------
+  console.log('\n[2d] A meal moved to another slot: both legs pinned at once, and the day\'s total read off the trial')
+  {
+    const { buildMealMoveProposal } = await import('../src/lib/meal-move')
+    const week = serveMealWeek(serving)
+    const day0 = week.find(d => d.date === today)!.day.chosen
+    const asCurrent = (o?: Opt) => o ? { name: o.name, ingredients: o.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`), macros: o.macros } : undefined
+    // INDEPENDENT: store the copies and pick them by name, as executeMealMove does, and serve the week.
+    const applyMove = (legs: { slot: Slot; option: Opt }[]) => {
+      const afterPools = { ...pools } as Record<string, Opt[]>
+      for (const l of legs) afterPools[l.slot] = [...(afterPools[l.slot] ?? []), { ...l.option, tags: [...(l.option.tags ?? []), USER_REQUESTED_TAG] } as Opt]
+      const pins = pinsFromPicks(Object.fromEntries(legs.map(l => [l.slot, l.option.name])), afterPools as never)
+      return serveMealWeek({ ...serving, pools: afterPools as never, rotation: buildRotation(afterPools as never, targets, [], serving.shape), todaysPins: { ...serving.todaysPins, ...pins } } as Serving)
+    }
+    // A MOVE WHOSE DAY TOTAL REALLY MOVES, found by the app's own numbers (a total inside 25 kcal reads the same either
+    // way, so it cannot tell a trial from a guess).
+    const pairs: [Slot, Slot][] = [['breakfast', 'dinner'], ['breakfast', 'lunch'], ['lunch', 'dinner']]
+    let move: ReturnType<typeof buildMealMoveProposal> | null = null
+    let legs: { slot: Slot; option: Opt }[] = []
+    let real2: ReturnType<typeof serveMealWeek> = []
+    for (const [from, to] of pairs) {
+      const m = buildMealMoveProposal({
+        rawArgs: { from_slot: from, to_slot: to },
+        mealsBySlot: { breakfast: asCurrent(day0.breakfast), lunch: asCurrent(day0.lunch), dinner: asCurrent(day0.dinner) } as never,
+        profileId: 'p1', todayDate: today, targets, mealsPerDay: 3, includeSnacks: false, dietaryPreferences: [], dislikedFoods: [],
+      } as never)
+      if (!m.ok || m.payload.legs.length !== 2) continue
+      const l = m.payload.legs.map(x => ({ slot: x.slot as Slot, option: x.payload.option as Opt }))
+      const w = applyMove(l)
+      if (Math.abs(w.find(d => d.date === today)!.day.totals.calories - week.find(d => d.date === today)!.day.totals.calories) >= 25) { move = m; legs = l; real2 = w; break }
+    }
+    check('a swap of two meals builds, with two legs, and moves the day by 25 kcal or more (the case binds)', !!move && legs.length === 2 && real2.length > 0, move && move.ok ? move.payload.legs.map(l => l.slot) : move)
+    const movedSlots = new Set(legs.map(l => l.slot))
+    const t = legs.length === 2 && lib?.knockOnOfPin
+      ? lib.knockOnOfPin({ serving, date: today, slot: legs[0].slot, option: legs[0].option, listDates: [], alsoPinned: legs.slice(1), sayDayTotal: true } as never)
+      : { changes: [], lines: [] }
+    const wasTotal = Math.round(week.find(d => d.date === today)!.day.totals.calories)
+    const nowTotal = Math.round(real2.find(d => d.date === today)?.day.totals.calories ?? -1)
+    const totalLine = (KNOCK_ON as unknown as { dayTotal?: (d: string, a: number, b: number) => string }).dayTotal?.('today', wasTotal, nowTotal) ?? '(missing)'
+    check('the card says the day\'s total as the week will serve it', text(t).includes(totalLine), { totalLine, said: text(t) })
+    check('neither moved meal is listed as a knock-on of itself', legs.length === 2 && !t.changes.some(c => c.date === today && movedSlots.has(c.slot)), t.changes)
+    check('...and every other meal that moves is the independent diff\'s', JSON.stringify(t.changes.map(c => `${c.date}|${c.slot}`).sort()) === JSON.stringify(real2.flatMap((d, i) => (['breakfast', 'lunch', 'dinner', 'snack'] as Slot[]).filter(s => !(d.date === today && movedSlots.has(s))).filter(s => { const a = week[i].day.chosen[s], b = d.day.chosen[s]; return !!b && (a?.name !== b.name || isNoticeableResize(a.macros.calories, b.macros.calories)) }).map(s => `${d.date}|${s}`)).sort()), { trial: t.changes })
+    // 2 Nov 2026: the move's copies are made for that day (measured before: nine meals across the week changed).
+    check('a move changes no meal on any other day', legs.length === 2 && t.changes.every(c => c.date === today) && real2.every((d, i) => d.date === today || names([d] as never) === names([week[i]] as never)), t.changes.filter(c => c.date !== today))
+    check('a one-meal card never states a day total (it was not asked to)', !text(k).some(l => /lands within a few calories|goes (up|down) about \d+ kcal, to/.test(l)), text(k))
+  }
+
+  // ---------------------------------------------------------------------------
   console.log('\n[3] The trial is the real thing')
   {
     check('the week the trial served is exactly the week the app serves once the option is stored and picked', !!k.after && names(k.after as never) === names(real.now) && real.now.length === 7, k.after ? undefined : 'no week returned')
@@ -371,7 +418,8 @@ async function main() {
       (hook.match(servingLiteral) ?? []).length === 1 && /const serving: MealDayMoveServing = useMemo\(\s*\(\) => \(\{ today, dates/.test(hook)
       && /serveMealWeek\(serving\)/.test(hook) && /knockOnOfPin\(\{\s*serving,\n/.test(hook) && /buildMealDayMoveProposal\(\{[^}]*?\n\s+serving,\n/.test(hook),
       (hook.match(servingLiteral) ?? []).length)
-    check('...with the shopping list read strictly (unreadable is null, not empty)', /const knockOn = async[\s\S]{0,500}readGroceryCoverage\([\s\S]{0,120}?strict: true/.test(hook))
+    // RE-ANCHORED 2 Nov 2026: the add-a-food and move trials share one reader (knockOnOf).
+    check('...with the shopping list read strictly (unreadable is null, not empty)', /const knockOnOf = async[\s\S]{0,600}readGroceryCoverage\([\s\S]{0,120}?strict: true/.test(hook) && /const knockOn = \([^)]*\)[^=]*=>\s*knockOnOf\(/.test(hook))
     check('...and hands it out on the one controller both surfaces already receive', /plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove, knockOn,/.test(hook))
     const mealPlan = read('src/components/MealPlan.tsx')
     check('the Nutrition screen gives the sheet the hook\'s function', /<MealFoodAddSheet[\s\S]{0,600}knockOn=\{dayMove\?\.knockOn\}/.test(mealPlan))
@@ -390,6 +438,12 @@ async function main() {
     check('the screen gives the food-edit sheet the hook\'s function too', /<MealFoodEditSheet[\s\S]{0,400}knockOn=\{dayMove\?\.knockOn\}/.test(mealPlan))
     // "Same dishes" (2 Nov 2026) reaches the builders from both surfaces: the screen from the row's own ledger, the
     // coach from the ledger read at the card. Source only; the behaviour is [2c].
+    // THE MOVE, both surfaces (2 Nov 2026): the screen's sheet reads its card off the move trial and puts back each
+    // slot's earlier pick on Undo (verify:meal-move 2g-2h, 6a-6d drive it; the earlier-pick half has no fixture with a
+    // hand-picked slot, so it is pinned here), and the coach's card is built with the same trial.
+    const moveSheet = read('src/components/nutrition/MealMoveSheet.tsx')
+    check('the move sheet reads the picks before it writes, and Undo restores them', moveSheet.indexOf('getMealPicksForDate(ctx.profileId, ctx.date)') > -1 && moveSheet.indexOf('getMealPicksForDate(ctx.profileId, ctx.date)') < moveSheet.indexOf('await executeMealMove(') && /previous: before\[leg\.slot\] \?\? null/.test(moveSheet))
+    check('the coach\'s move card is the builder\'s plus the move trial, from the hook', /diff: withKnockOn\(moved\.diff, moveTrial\)/.test(chat) && /onMealKnockOnMove\(moved\.payload\.date/.test(chat) && /onMealKnockOnMove=\{mealDays\.dayMove\.knockOnMove\}/.test(app) && /onMealKnockOnMove=\{mealDays\.dayMove\.knockOnMove\}/.test(read('.tour-harness/chat.tsx')))
     check('the screen tells both edit sheets when the meal is already eaten', /afterEating: \(loggedBySlot\[slot\]\?\.length \?\? 0\) > 0/.test(mealPlan) && /meal: ctx\.meal, afterEating: ctx\.afterEating/.test(mealPlan)
       && /afterEating: ctx\.afterEating/.test(read('src/components/nutrition/MealFoodEditSheet.tsx')) && /afterEating: ctx\.afterEating/.test(sheet))
     check('...and so does the coach, on its add card and its edit card', (chat.match(/afterEating: await slotEatenToday\(slotName\)/g) ?? []).length === 2 && /const slotEatenToday = async[\s\S]{0,400}getTodayLedger\(/.test(chat))

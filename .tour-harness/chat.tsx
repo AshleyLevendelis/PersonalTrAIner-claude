@@ -813,6 +813,7 @@ function Harness() {
               onMealDayMoveUndo={DAYMOVE ? mealDays.dayMove.undo : undefined}
               onMealRebalance={DAYMOVE ? mealDays.dayMove.rebalance : undefined}
               onMealKnockOn={mealDays.dayMove.knockOn}
+              onMealKnockOnMove={mealDays.dayMove.knockOnMove}
               mealTopUp={TOPUP && macros ? { ...topUpPlan(pools as never, topUpSlots as never, macros), building: false } : null}
               onMealTopUpStart={TOPUP ? () => previewTopUpStart({ profileId: PROFILE_ID, today: isoOf(anchorDate()) }) : undefined}
               onMealTopUpConfirm={TOPUP && macros ? async (startTomorrow?: boolean) => {

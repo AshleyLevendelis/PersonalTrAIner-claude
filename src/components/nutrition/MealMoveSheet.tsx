@@ -1,7 +1,10 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { buildMealMoveProposal } from '@/lib/meal-move'
-import { executeMealMove } from '@/lib/pending-action-executor'
+import { executeMealMove, undoMealEdit } from '@/lib/pending-action-executor'
+import { withKnockOn } from '@/lib/meal-food-add'
+import type { MealKnockOn } from '@/lib/meal-knock-on'
+import { getMealPicksForDate } from '@/lib/meal-store'
 import type { MealDayMoveController, MealDayMoveResult } from '@/lib/meal-day-move'
 import { DAY_MOVE, REBALANCE } from '@/lib/coach-voice'
 import type { MealRebalanceResult } from '@/lib/meal-rebalance'
@@ -72,7 +75,7 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
   /** Swapping with another day's. Null where the app has no days to swap between. */
   dayMove: { controller: MealDayMoveController; date: string; slot: MealSlotName } | null
   onPick?: (slot: MealSlotName, chosenName: string) => Promise<boolean>
-  /** `undo` is given for a swap between days only: the row shows it beside the summary. */
+  /** `undo` puts the move back; the row shows it beside the summary. */
   onDone: (summary: string, undo?: MealMoveUndo) => void
   onCancel: () => void
 }) {
@@ -158,6 +161,24 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rbTo, rbKcal, dayDate, daySlot])
 
+  // THE MOVE'S CARD IS READ OFF A TRIAL (2 Nov 2026, whole-app test #9): both moved meals pinned at once over the
+  // week the screen serves, every other meal that changes named, and the day's total as it will be served — the
+  // builder's own sum of the two meals was not the day's. Apply waits for it.
+  const [slotTrial, setSlotTrial] = useState<{ for: string; knockOn: MealKnockOn | null } | null>(null)
+  const slotKey = slotProposal?.ok ? slotProposal.payload.legs.map(l => `${l.slot}:${l.payload.option.name}:${l.afterKcal}`).join('|') : null
+  useEffect(() => {
+    setSlotTrial(null)
+    if (!slotProposal?.ok || !slotKey || !ctx) return
+    const run = dayMove?.controller.knockOnMove
+    if (!run) { setSlotTrial({ for: slotKey, knockOn: null }); return }
+    let live = true
+    run(ctx.date, slotProposal.payload.legs.map(l => ({ slot: l.slot, option: l.payload.option })))
+      .then(r => { if (live) setSlotTrial({ for: slotKey, knockOn: r }) })
+      .catch(() => { if (live) setSlotTrial({ for: slotKey, knockOn: null }) })
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slotKey])
+
   const preview: Preview | null = useMemo(() => {
     if (rbTo) {
       if (!rbAsk) return { kind: 'loading' }
@@ -221,24 +242,36 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
     if (slotProposal) {
       if (!slotProposal.ok) return { kind: 'refused', reason: slotProposal.reason }
       const proposal = slotProposal
+      if (!slotTrial || slotTrial.for !== slotKey) return { kind: 'loading' }
       return {
         kind: 'ready',
-        diff: proposal.diff,
+        diff: withKnockOn(proposal.diff, slotTrial.knockOn),
         confirmLabel: proposal.payload.legs.length === 2 ? 'Swap them' : 'Move it',
         run: async () => {
           if (!ctx || !onPick) return null
           const pick = (payload: MealAdditionPayload) => onPick(payload.slot, payload.option.name)
+          // THE PICKS BEFORE, so Undo puts each meal back where she had it (an unreadable read is "none": Undo clears).
+          const before = await getMealPicksForDate(ctx.profileId, ctx.date).catch(() => ({} as Partial<Record<MealSlotName, string>>))
           const receipt = await executeMealMove(ctx.profileId, proposal.payload, pick)
           if (receipt.failed.length > 0) return receipt.failed[0].error
+          const profileId = ctx.profileId
           onDone(`${proposal.payload.legs.length === 2
             ? `${SLOT_LABEL[ctx.fromSlot]} and ${SLOT_LABEL[proposal.payload.legs[0].slot]} swapped`
-            : `Moved to ${SLOT_LABEL[proposal.payload.legs[0].slot].toLowerCase()}`}. Both were resized to fit where they landed.`)
+            : `Moved to ${SLOT_LABEL[proposal.payload.legs[0].slot].toLowerCase()}`}. Both were resized to fit where they landed.`,
+          // UNDO (2 Nov 2026, the UX pass): each leg's copy removed and its slot's earlier pick put back, last leg first.
+          async () => {
+            for (const leg of [...proposal.payload.legs].reverse()) {
+              const ok = await undoMealEdit(profileId, { payload: leg.payload, poolIndex: null, previous: before[leg.slot] ?? null }, (slot, name) => onPick(slot, name))
+              if (!ok) return { ok: false, text: "Couldn't put that back just now. Try again in a moment." }
+            }
+            return { ok: true, text: 'Put back as it was.' }
+          })
           return null
         },
       }
     }
     return null
-  }, [rbTo, rbAsk, rbKcal, rbPlan, rebalance, toDate, dayPlan, slotProposal, ctx, dayMove, onPick, onDone])
+  }, [rbTo, rbAsk, rbKcal, rbPlan, rebalance, toDate, dayPlan, slotProposal, slotTrial, slotKey, ctx, dayMove, onPick, onDone])
 
   // WHATEVER THE TAP PRODUCES IS BROUGHT INTO VIEW. The card, a refusal and a
   // failure all appear below the buttons that were tapped, and on a phone that

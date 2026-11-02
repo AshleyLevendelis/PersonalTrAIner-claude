@@ -199,6 +199,10 @@ check('2e. ...and says they swap places rather than one vanishing',
   /swap places/i.test(preview ?? ''), preview)
 check('2f. ...and that the portions were resized',
   /resized|reduced|increased/i.test(preview ?? ''), preview)
+// READ OFF A TRIAL (2 Nov 2026, whole-app test #9): the card names what else on the plan moves, and the day's total as
+// the week will serve it, not the two meals' own sum.
+check('2g. ...and says what else on the plan changes, from the trial', /No other meal on your plan changes\.|becomes .+, so the day still fits\.|goes from [\d,]+ to [\d,]+ kcal so the day still fits\./.test(preview ?? '') && !/couldn't check what this does/i.test(preview ?? ''), preview)
+check('2h. ...and the day\'s total as it will be served', /Your day (lands within a few calories of where it was|goes (up|down) about \d+ kcal, to [\d,]+ kcal)\./.test(preview ?? ''), preview)
 await shoot('meal-move-2-preview')
 
 // THE NUMBERS THE CARD PROMISES, pulled out so the state after the tap can be
@@ -238,6 +242,15 @@ if (Array.isArray(promised) && promised.length >= 3) {
   check('4b. at least one promised new size is on the screen afterwards',
     present.length > 0, { promised, landedKcal: landedKcal.slice(0, 12) })
 }
+
+// --- 6. AND IT CAN BE PUT BACK (2 Nov 2026: every change offers Undo) ------
+const undoAt = await ev(`(() => { const b = document.querySelector('[data-testid="meal-move-undo"]'); if (!b) return null; b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight } })()`)
+check('6a. the line saying what moved has an Undo, on screen', !!undoAt && undoAt.top >= 0 && undoAt.bottom <= undoAt.h, undoAt)
+check('6b. tapping it', await tapTestId('meal-move-undo'))
+const back = await until(slotMeals, v => v && v[FROM] === before[FROM] && v[TO] === before[TO], 20000)
+check('6c. ...puts both meals back where they were', !!back && back[FROM] === before[FROM] && back[TO] === before[TO], { before, now: await slotMeals() })
+check('6d. ...and says so, with the Undo gone', /Put back as it was/.test((await textOf('meal-move-note')) ?? '') && !(await ev(`!!document.querySelector('[data-testid="meal-move-undo"]')`)), await textOf('meal-move-note'))
+await shoot('meal-move-6-undone')
 
 const pageErr = await ev('window.__err ?? null')
 check('5. no uncaught error on the page', pageErr === null, pageErr)
