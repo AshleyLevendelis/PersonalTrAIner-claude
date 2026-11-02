@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, ShieldAlert, Info } from 'lucide-react'
 import type { MacroTargets, FitnessGoal } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
@@ -13,6 +13,8 @@ import {
 import { parseIngredientLines } from '@/lib/portion-scaler'
 import { assessMealEdit, type MealEditKind } from '@/lib/meal-tradeoff'
 import { applyTradeoff, downgradeToCard } from '@/lib/tradeoff-shape'
+import { withKnockOn } from '@/lib/meal-food-add'
+import type { MealKnockOn, MealKnockOnFn } from '@/lib/meal-knock-on'
 
 // ---------------------------------------------------------------------------
 // CHANGING ONE FOOD, BY TAPPING IT.
@@ -74,6 +76,7 @@ export interface MealFoodEditContext {
 export function MealFoodEditSheet({
   ctx,
   line,
+  knockOn,
   onPick,
   onDone,
   onCancel,
@@ -81,6 +84,12 @@ export function MealFoodEditSheet({
   ctx: MealFoodEditContext
   /** The ingredient line being changed, exactly as the meal holds it. */
   line: string
+  /**
+   * What else on the plan changes — the app's own trial, the same one the add-a-food sheet and the coach's cards are
+   * handed (whole-app test #11, 1 Nov 2026: changing an egg's amount swapped tonight's dinner and the card never
+   * said). Absent only where no week is being served; the card then says it could not check.
+   */
+  knockOn?: MealKnockOnFn
   /** Makes a verified option the slot's meal, and refreshes the screen. Returns false if it didn't land. */
   onPick: (slot: MealSlotName, mealName: string) => Promise<boolean>
   onDone: (summary: string) => void
@@ -176,8 +185,34 @@ export function MealFoodEditSheet({
     return { ...rawProposal, diff: applyTradeoff(rawProposal.diff, t) }
   })()
 
+  // THE REST OF THE PLAN, READ OFF A TRIAL — the add sheet's pattern (MealFoodAddSheet). `undefined` is "still
+  // working it out", and Apply waits for it, so nobody agrees to a card that has not finished saying what it does.
+  const [trial, setTrial] = useState<{ for: string; knockOn: MealKnockOn | null } | undefined>(undefined)
+  const trialKey = proposal?.ok ? `${proposal.payload.slot}|${proposal.payload.date}|${proposal.payload.option.name}|${Math.round(proposal.payload.option.macros.calories)}` : null
+  const knockOnRef = useRef(knockOn)
+  knockOnRef.current = knockOn
+  const payloadRef = useRef(proposal?.ok ? proposal.payload : null)
+  payloadRef.current = proposal?.ok ? proposal.payload : null
+  useEffect(() => {
+    const payload = payloadRef.current
+    if (!payload || !trialKey) { setTrial(undefined); return }
+    const run = knockOnRef.current
+    if (!run) { setTrial({ for: trialKey, knockOn: null }); return }
+    let stale = false
+    setTrial(undefined)
+    // A beat, so an amount still being typed does not serve the week per keystroke.
+    const timer = setTimeout(() => {
+      run(payload.date, payload.slot as MealSlotName, payload.option)
+        .then(result => { if (!stale) setTrial({ for: trialKey, knockOn: result }) })
+        .catch(() => { if (!stale) setTrial({ for: trialKey, knockOn: null }) })
+    }, 250)
+    return () => { stale = true; clearTimeout(timer) }
+  }, [trialKey])
+  const trialReady = trial !== undefined && trial.for === trialKey
+  const card = proposal?.ok && trialReady ? withKnockOn(proposal.diff, trial.knockOn) : null
+
   const apply = async () => {
-    if (!proposal?.ok) return
+    if (!proposal?.ok || !trialReady) return
     setBusy(true)
     setSaveError(null)
     const result = await applyMealOptionToSlot(
@@ -271,11 +306,17 @@ export function MealFoodEditSheet({
         </p>
       )}
 
-      {verb !== null && proposal?.ok && (
+      {verb !== null && proposal?.ok && !card && (
+        <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground" data-edit-checking>
+          <Loader2 className="size-3.5 animate-spin" /> Checking what else this changes…
+        </p>
+      )}
+
+      {verb !== null && card && (
         /* THE SAME CARD THE COACH SHOWS, in the same order: what changes,
            then what it costs, then the offer, then the tap. */
         <div className="mt-3 space-y-2">
-          {proposal.diff.rows.map((row, i) => (
+          {card.rows.map((row, i) => (
             <div key={i} className="flex flex-col gap-0.5">
               <span className="text-[0.625rem] text-muted-foreground">{row.field}</span>
               <span className="text-[0.84375rem] line-through text-muted-foreground/70">{row.before}</span>
@@ -283,7 +324,7 @@ export function MealFoodEditSheet({
               {row.note && <span className="text-[0.625rem] text-muted-foreground/80">{row.note}</span>}
             </div>
           ))}
-          {proposal.diff.implications?.map((imp, i) => (
+          {card.implications?.map((imp, i) => (
             <p key={i} className={`flex items-start gap-1.5 text-xs ${imp.severity === 'warn' ? 'text-[color:var(--role-warn)]' : 'text-muted-foreground'}`}>
               {imp.severity === 'warn' ? <ShieldAlert className="mt-0.5 size-3.5 shrink-0" /> : <Info className="mt-0.5 size-3.5 shrink-0" />}
               <span>{imp.text}</span>
@@ -323,7 +364,7 @@ export function MealFoodEditSheet({
             className="min-h-[44px] rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-60"
             data-edit-apply
             onClick={() => void apply()}
-            disabled={busy || !proposal?.ok}
+            disabled={busy || !proposal?.ok || !trialReady}
           >
             {busy ? <Loader2 className="size-4 animate-spin" /> : 'Apply'}
           </button>

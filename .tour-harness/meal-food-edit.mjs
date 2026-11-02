@@ -146,8 +146,15 @@ check('1c. ...take it out, swap it, change amount', /Take it out/.test(opened||'
 
 // --- 2. taking it out says what it costs, in the app's own numbers ---------
 check('2a. choosing to take it out', await tapVerb('remove'))
-await wait(400)
+// WHAT ELSE CHANGES, READ OFF A TRIAL (whole-app test #11, 2 Nov 2026): while the week is being served twice the card
+// says it is checking and Apply cannot be tapped; then it names what else moves, or says nothing else does.
+const early = await ev(`(() => { const b = document.querySelector('[data-edit-apply]'); return { checking: !!document.querySelector('[data-edit-checking]'), disabled: b ? b.disabled : null } })()`)
+check('2a2. while it works out the rest of the plan, it says so and Apply waits', early?.checking === true && early?.disabled === true, early)
+for (let i = 0; i < 40 && await ev(`!!document.querySelector('[data-edit-checking]')`); i++) await wait(250)
+await wait(200)
 const card = await sheetText()
+check('2a3. ...then the card says what else on the plan changes (or that nothing does), from the trial',
+  /No other meal on your plan changes\.|becomes .+, so the day still fits\.|goes from [\d,]+ to [\d,]+ kcal so the day still fits\./.test(card || '') && !/couldn't check what this does/i.test(card || ''), (card || '').slice(-400))
 const kcalCost = (card||'').match(/Calories[\s\S]*?(-\d+) kcal/)
 check('2b. the card states the calorie cost as a loss', kcalCost !== null, card)
 check('2c. ...and promises not to re-portion the rest', /nothing is re-portioned/i.test(card||''), card)

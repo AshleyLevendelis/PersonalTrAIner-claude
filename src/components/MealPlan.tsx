@@ -1243,6 +1243,7 @@ function MealSlotRow({
                                   <MealFoodEditSheet
                                     ctx={ctx}
                                     line={line}
+                                    knockOn={dayMove?.knockOn}
                                     onPick={onMealPickApplied}
                                     onDone={summary => { setEditingLine(null); setEditNote(summary) }}
                                     onCancel={() => setEditingLine(null)}

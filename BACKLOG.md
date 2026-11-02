@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [ ] **TAKING A FOOD OUT, SWAPPING IT OR CHANGING ITS AMOUNT SAYS WHAT ELSE MOVES, 2 NOV 2026 (whole-app test #11).**
+  Mechanical: the edit re-plans the rest of the day (her 10 Oct scope ruling), and only the add-a-food card was read
+  off a trial of that, so "Changed the egg" was the whole story while tonight's dinner became another dish. The
+  food-edit sheet now takes the same trial (`dayMove.knockOn`), shows "Checking what else this changes…" with Apply
+  waiting, then names every other meal that moves or says none does; the coach's card for the same three edits is
+  built with the same trial (`withKnockOn`). Checks: `verify:meal-food-edit` 2a2-2a3 (new), `test:meal-knock-on` [7]
+  two wiring checks (the coach half is source-only until the coach exam or a chat driver reaches it). 4 mutations, 4
+  caught. 118 derived gates green. Ashley ruled the same day that editing a meal ALREADY LOGGED as eaten keeps the
+  day's other dishes ("Same dishes", over re-planning): built next.
 - [ ] **AN EDITED MEAL IS FOR ITS OWN DAY, 2 NOV 2026 (whole-app test #8). Ashley's ruling: "Today only"**, from
   three options (over carrying the food into later days with the card reworded, and over asking each time). Cause:
   adding, taking out, swapping or re-weighing a food made an edited copy that joined the dateless pool like any dish,

@@ -351,6 +351,11 @@ async function main() {
     const chat = read('src/components/ChatAssistant.tsx')
     check('the coach\'s add-a-food card is the builder\'s plus the trial', /diff: withKnockOn\(foodAdd\.diff, await mealKnockOn\(foodAdd\.payload\)\)/.test(chat))
     check('...and so is its custom-meal card', /diff: withKnockOn\(custom\.diff, await mealKnockOn\(custom\.payload\)\)/.test(chat))
+    // 2 Nov 2026 (whole-app test #11): taking a food out, swapping it or changing its amount re-plans the day too, and
+    // no card said so. The screen's edit sheet and the coach's edit card now carry the same trial. (Source only for the
+    // coach; the screen half is driven in verify:meal-food-edit 2a2-2a3.)
+    check('...and so is its card for taking out, swapping or re-weighing a food', /diff: withKnockOn\(edit\.diff, await mealKnockOn\(edit\.payload\)\)/.test(chat))
+    check('the screen gives the food-edit sheet the hook\'s function too', /<MealFoodEditSheet[\s\S]{0,400}knockOn=\{dayMove\?\.knockOn\}/.test(mealPlan))
     check('...through the prop, never a second copy of the trial', /const mealKnockOn = async[\s\S]{0,300}onMealKnockOn\(payload\.date, payload\.slot, payload\.option\)/.test(chat) && !/knockOnOfPin/.test(chat))
     check('the harness pages hand over the hook\'s function too, not a copy', /onMealKnockOn=\{mealDays\.dayMove\.knockOn\}/.test(read('.tour-harness/chat.tsx')) && /dayMove=\{mealDays\.dayMove\}/.test(read('.tour-harness/real.tsx')))
     const libSrc = read('src/lib/meal-knock-on.ts')

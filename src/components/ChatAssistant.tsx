@@ -5638,7 +5638,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             pantryFoods: mealPlan.flatMap(m => m.items.flatMap(i => i.ingredients ?? [])),
             todayDate: getSessionDateContext(profile.id).date,
           })
-          if (edit.ok) built = { scopeKey: edit.scopeKey, preconditions: edit.preconditions, payload: edit.payload as unknown as Record<string, unknown>, diff: edit.diff }
+          // WHAT ELSE CHANGES, READ OFF A TRIAL — the add-a-food card's rule, on the other three edits too (whole-app
+          // test #11: an amount change swapped tonight's dinner and no card said so).
+          if (edit.ok) built = { scopeKey: edit.scopeKey, preconditions: edit.preconditions, payload: edit.payload as unknown as Record<string, unknown>, diff: withKnockOn(edit.diff, await mealKnockOn(edit.payload)) }
           else refusal = edit.reason
         }
       } else if (result.proposal.kind === 'propose_custom_meal' && result.proposal.rawArgs) {
