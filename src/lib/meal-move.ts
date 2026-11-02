@@ -254,7 +254,7 @@ export function buildMealMoveProposal(input: BuildMealMoveInput): MealMoveResult
     const dayEffect = Math.abs(net) < 25
       ? 'and your day lands within a few calories of where it was'
       : `and your day goes ${net > 0 ? 'up' : 'down'} about ${Math.abs(net)} kcal`
-    implications.push({ severity: 'info', text: `${slotWords(fromSlot)} and ${slotWords(toSlot)} swap places. Both are resized to fit where they land, ${dayEffect}.` })
+    implications.push({ severity: 'info', text: `${capitalise(slotWords(fromSlot))} and ${slotWords(toSlot)} swap places. Both are resized to fit where they land, ${dayEffect}.` })
   } else {
     implications.push({ severity: 'warn', text: `Nothing comes back the other way, so ${slotWords(fromSlot)} will be empty. Your day will be lighter by about ${legs[0].beforeKcal} kcal unless you put something there.` })
   }
@@ -276,4 +276,9 @@ export function buildMealMoveProposal(input: BuildMealMoveInput): MealMoveResult
     payload: { date, legs, ...(displaced ? {} : { emptiedSlot: fromSlot }) },
     diff: { rows, implications },
   }
+}
+
+/** A sentence's first letter: the slot words start one ("lunch and dinner swap places", 1 Nov 2026 whole-app test). */
+function capitalise(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1)
 }

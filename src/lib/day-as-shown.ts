@@ -124,6 +124,10 @@ export function dayAsShown(input: {
   const eatenKcal = logged.reduce((s, r) => s + r.macros.calories, 0)
   const openKcal = open.reduce((s, r) => s + r.macros.calories, 0)
   const factor = openKcal > 0 ? Math.max(0, targets.calories - eatenKcal) / openKcal : 1
+  // NOTHING TO SAY WHEN NOTHING MOVES (1 Nov 2026, whole-app test): a day off on protein, with the meal eaten as
+  // planned, came out at a factor a hair from 1 and printed "0 kcal less ... 0% smaller" with an Undo. A re-fit that
+  // rounds to no change is not one.
+  if (Math.round(Math.abs(factor - 1) * 100) === 0) return { slots: base, totals: baseTotals, aroundEaten: { kind: 'none' } }
   // A dish a swap already re-sized counts from the dish AS PLANNED, so the two
   // re-sizes together stay inside "about 25% either way" (her one rule).
   const combined = (r: ShownSlot) => factor * (r.option?.heldBy ?? 1)

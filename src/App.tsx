@@ -3471,7 +3471,8 @@ function App() {
         initialSection={profileInfoSection}
         revealSpeed={revealSpeed}
         onRevealSpeedChange={handleRevealSpeedChange}
-        backLabel={activeTab === 'chat' ? 'Chat' : activeTab[0].toUpperCase() + activeTab.slice(1)}
+        // The tab's NAME, as the tab bar says it: 'dashboard' is Home there (1 Nov 2026, whole-app test: "‹ Dashboard").
+        backLabel={activeTab === 'chat' ? 'Chat' : activeTab === 'dashboard' ? 'Home' : activeTab[0].toUpperCase() + activeTab.slice(1)}
         calorieTarget={macros?.calories ?? null}
         onNewPlan={() => {
           setActiveAdaptationsForReset([])

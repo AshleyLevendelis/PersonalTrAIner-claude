@@ -77,7 +77,7 @@ function HomePreview({ theme, accent, glow }: { theme: ThemeName; accent: typeof
         <span className="text-[0.625rem] uppercase tracking-widest" style={{ color: t.muted }}>Wednesday</span>
         <span className="inline-flex items-center gap-1 rounded-full px-2 py-[3px] text-[0.625rem]" style={{ background: t.surface }}>
           <span className="inline-block size-[5px] rounded-full" style={{ background: a }} />
-          <span style={{ color: t.text }}>12 day streak</span>
+          <span style={{ color: t.text }}>12 in a row</span>
         </span>
       </div>
       <div className="mt-2 flex gap-[3px]">

@@ -450,14 +450,14 @@ export function NutritionDisplay({
                 key={ml}
                 type="button"
                 onClick={() => handleAddWater(ml)}
-                className="inline-flex h-10 items-center rounded-full px-4 text-[0.8125rem] font-semibold"
+                className="inline-flex h-11 items-center rounded-full px-4 text-[0.8125rem] font-semibold"
                 style={{ background: 'color-mix(in oklab, var(--chart-3) 15%, transparent)', color: 'var(--chart-3)' }}
               >
                 +{ml} ml
               </button>
             ))}
             {lastWaterLog && (
-              <button type="button" onClick={handleUndoWater} className="inline-flex h-10 items-center rounded-full px-3 text-[0.8125rem] text-muted-foreground" data-water-undo>
+              <button type="button" onClick={handleUndoWater} className="inline-flex h-11 items-center rounded-full px-3 text-[0.8125rem] text-muted-foreground" data-water-undo>
                 Undo
               </button>
             )}

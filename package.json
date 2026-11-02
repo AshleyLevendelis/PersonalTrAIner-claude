@@ -508,7 +508,11 @@
     "verify:home-steps": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/home-steps.mjs",
     "verify:chat-errors": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-errors.mjs",
     "verify:round-fullscreen-gear": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/round-fullscreen-gear.mjs",
-    "verify:live-set-count": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/live-set-count.mjs"
+    "verify:live-set-count": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/live-set-count.mjs",
+    "verify:meal-swap-note": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-swap-note.mjs",
+    "test:small-words": "tsx scripts/test-small-words.ts",
+    "verify:nutrition-readable": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/nutrition-readable.mjs",
+    "verify:profile-rebuild-decline": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-rebuild-decline.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

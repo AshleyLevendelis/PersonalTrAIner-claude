@@ -461,6 +461,9 @@ async function main() {
     const shown = displayTags(['Italian', `${NEW_FROM_TAG_PREFIX}2026-10-01`, 'favourite'])
     check('the card\'s labels never include the first day, and stay at two', JSON.stringify(shown) === JSON.stringify(['Italian', 'favourite']), shown)
     check('...and the old internal marker stays hidden too', JSON.stringify(displayTags(['slot_appropriate', 'Thai'])) === JSON.stringify(['Thai']))
+    // 1 Nov 2026, whole-app test: an edited, moved or added-to meal showed "own recipe" and "user-requested" as chips.
+    check('...and so do the edit and own-recipe markers, while a real label beside them shows',
+      JSON.stringify(displayTags(['user-requested', 'own recipe', 'Thai'])) === JSON.stringify(['Thai']), displayTags(['user-requested', 'own recipe', 'Thai']))
     const mealPlan = read('src/components/MealPlan.tsx')
     check('...and the card draws its labels ONLY through that function', /displayTags\(option\.tags\)\.map\(/.test(mealPlan) && !/option\.tags\.(filter|slice|map)\(/.test(mealPlan))
     const nd = read('src/components/NutritionDisplay.tsx')

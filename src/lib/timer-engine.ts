@@ -463,7 +463,7 @@ export function roundSubline(config: RoundConfig, phase: 'ready' | 'work' | 'res
   const total = sessionTotalRounds(config)
   const here = sessionRoundNumber(config, round)
   if (phase === 'ready') return `${Noun} ${sessionRoundNumber(config, 1)} of ${total} starts in a moment. Tap anywhere to start now.`
-  if (phase === 'done') return `All ${total} ${noun}s done — nice.`
+  if (phase === 'done') return total === 1 ? `${Noun} done — nice.` : `All ${total} ${noun}s done — nice.`
   if (phase === 'work') {
     if (round >= config.rounds) return `Last ${noun} — finish this one and you’re done.`
     return roundStyleOf(config) === 'emom'

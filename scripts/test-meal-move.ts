@@ -150,6 +150,8 @@ if (swap.ok) {
   // part she cannot predict from the request she made.
   const said = JSON.stringify(swap.diff)
   check('...the card says they swap places', /swap places/i.test(said), swap.diff.implications)
+  const swapLine = (swap.diff.implications ?? []).map(i => i.text).find(t => /swap places/i.test(t)) ?? ''
+  check('...in a sentence that starts with a capital', /^[A-Z]/.test(swapLine), swapLine)
   // WHAT THE DAY ACTUALLY DOES, and the reason this check exists at all: the
   // sentence used to end "so your day still adds up the same", which was
   // FALSE — caught by reading a real screenshot, where a 480 kcal breakfast

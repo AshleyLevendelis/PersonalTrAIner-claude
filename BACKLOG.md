@@ -2,6 +2,33 @@
 
 Newest first. One line each.
 
+- [ ] **WHOLE-APP TEST FIXES, BATCH 2, 2 NOV 2026.** Same "Yes". Every check mutation-tested, every break caught.
+  - **The swap sheet named a dinner change that never happened.** Its trial added a tagged copy of the picked dish,
+    which re-planned the day; the real swap pins the dish as it is. One argument (`existing`), as the coach's swap
+    trial already passed. `verify:meal-swap-note` (new, whole app with two more dishes a meal as input).
+  - **"0 kcal less than planned ... 0% smaller", with an Undo**, on a day off on protein: a re-fit that rounds to no
+    change now says nothing. `test:day-as-shown` §1b.
+  - **"own recipe" and "user-requested" showed as chips** on every edited, moved or added-to meal. Hidden with the
+    other internal markers. `test:meal-top-up`.
+  - **The slot-move card started lower-case** ("lunch and dinner swap places"). `test:meal-move`.
+  - **The allergy line** ("Ingredients are filtered, not verified...") was the faintest text on Nutrition: drawn at
+    70% of the muted colour. Now the secondary text colour, 9:1 or better on every theme's page, on Nutrition and
+    the grocery list. `verify:nutrition-readable` (new: computed colour against the first opaque background, all nine
+    themes).
+  - **The water buttons were 40px**; 44 now. Same driver.
+  - **"Leave it as it is" on a rebuild offer closed Profile.** The offer opens over Profile in its own portal, and
+    its tap read as a tap outside Profile. `verify:profile-rebuild-decline` (new, whole app, real taps).
+  - **Words:** "12 day streak" in the theme preview (her ruling is "12 in a row"), "‹ Dashboard" and "on Dashboard"
+    for Home, "All 1 intervals done". `test:small-words` (new).
+  - Two gates were mechanism-pinned to the old text of code changed in batch 1 and went red on correct code:
+    `test:exercise-today` (the Start button's condition is now a named const) and `test:coach-promises` (the intro's
+    shape is now a const). Both re-anchored on the property and re-mutated. `test:timer-field-fills-screen` failed in
+    the separate copy only because it reads a production build that copy had not made; it passes after `npm run build`.
+  - FOR ASHLEY, traced, not changed (Nutrition): an added or edited meal can be served on LATER days too (no ruling
+    says whether "for today" should hold), an edited logged meal re-plans the rest of the day against her "same
+    dishes" condition, and a food-amount change re-plans the day with no card saying so. Root causes are in this
+    session's trace: the new option enters the dateless pool with no first day, and several cards are not read off a
+    trial of the write.
 - [ ] **WHOLE-APP TEST FIXES, BATCH 1, 2 NOV 2026.** Ashley: "Yes" to fixing the clear bugs, most serious first, with
   the knee drill and the swapped-lift weight traced before anything changes. Each fix has a check, each check was
   mutation-tested (every deliberate break caught: 4 + 2 + 5 + 1 + 1 + 2 + 3 + 1).

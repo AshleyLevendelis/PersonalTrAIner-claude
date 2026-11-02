@@ -579,7 +579,9 @@ export function MealPlan({
           ONLY call site, and dropping it to match the frame would delete the
           one way to redo a day's meals. */}
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs text-muted-foreground/70">
+        {/* SAFETY WORDING READS AT FULL STRENGTH (1 Nov 2026, whole-app test): at muted/70 it was the faintest text on
+            the tab in every theme. The secondary text colour is 9:1 or better on every theme's page. */}
+        <p className="text-xs text-text-tertiary" data-testid="allergen-limit">
           Ingredients are filtered, not verified. Check labels if you have an allergy.
         </p>
         {!upcoming && (
@@ -909,7 +911,10 @@ function MealSlotRow({
     try {
       const picked = alternatives.find(o => o.name === name)
       const trial = picked && dayMove?.knockOn && date
-        ? await dayMove.knockOn(date, slot, picked).catch(() => null)
+        // `true`: picked is ALREADY one of the meal's options, pinned as the real swap pins it (the coach's swap trial
+        // passes the same). Without it the trial added a tagged copy, which re-planned the day, and the sheet named a
+        // dinner change the swap never made (1 Nov 2026, whole-app test, swap sheet).
+        ? await dayMove.knockOn(date, slot, picked, true).catch(() => null)
         : null
       await onSwap(slot, name)
       // Back to the recipe, where the knock-on line and the new dish are.

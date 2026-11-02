@@ -604,8 +604,12 @@ console.log('\n6. The first-run starter chips only offer things that work')
     /12 weeks in 3 blocks/.test(endToEnd) && !/16/.test(endToEnd), endToEnd)
 
   // ...and the component actually calls it, on the mesocycle it was handed.
+  // RE-ANCHORED 2 Nov 2026: the shape is now read into a const and handed on with the plan's age (the first chat on a
+  // plan already under way, whole-app test #14). What must hold: the shape comes from THIS prop, and that shape is
+  // what buildFirstRunIntro is given.
   check('ChatAssistant derives the shape from its own mesocycle prop',
-    /buildFirstRunIntro\(greetName\(\), firstRunSessionBrief\(\), planShapeFromMesocycle\(mesocycle\)\)/.test(ui))
+    /const shape = planShapeFromMesocycle\(mesocycle\)/.test(ui)
+      && /buildFirstRunIntro\(greetName\(\), firstRunSessionBrief\(\), shape \? \{ \.\.\.shape,/.test(ui))
 
   // Why the restriction exists, asserted rather than assumed — and now the
   // other direction too. §2.4 moved volume and schedule OFF the declining

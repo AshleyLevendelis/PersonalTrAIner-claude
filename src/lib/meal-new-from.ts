@@ -46,5 +46,12 @@ export function isBookkeepingTag(tag: string): boolean {
  * function, so the card cannot filter one list and render another.
  */
 export function displayTags(tags: string[]): string[] {
-  return tags.filter(t => t !== 'slot_appropriate' && !isBookkeepingTag(t)).slice(0, 2)
+  return tags.filter(t => !INTERNAL_TAGS.has(t) && !isBookkeepingTag(t)).slice(0, 2)
 }
+
+/**
+ * Markers the app writes for its own reasons, never a label. 'user-requested' says a dish was asked for or edited
+ * (the dish-identity rule reads it), and 'own recipe' is the verifier's mark on a dish costed from her own amounts:
+ * both showed as chips on every edited, moved or added-to meal (1 Nov 2026, whole-app test, meal cards).
+ */
+const INTERNAL_TAGS = new Set(['slot_appropriate', 'user-requested', 'own recipe'])

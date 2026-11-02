@@ -104,7 +104,7 @@ export interface MealDayMoveController {
    * the one controller, because it has to be run over the same week the swap's
    * own trial runs over, and because this object already reaches both surfaces.
    */
-  knockOn: (date: string, slot: MealSlotName, option: PoolOption) => Promise<import('./meal-knock-on').MealKnockOn>
+  knockOn: (date: string, slot: MealSlotName, option: PoolOption, existing?: boolean) => Promise<import('./meal-knock-on').MealKnockOn>
   /**
    * Moving calories from one meal to another on one date (meal-rebalance.ts, 20 Oct 2026). On this controller for the
    * reason `knockOn` is: it is planned over the same week and written by the same two-pick write as the swap, and this

@@ -378,12 +378,16 @@ console.log('\n5. A swapped day says so')
   // hold is that a swapped day is IN that condition and that the true branch is
   // the honest label — which is exactly what a mutation dropping swappedToday,
   // or restoring a bare 'Start workout', still breaks.
+  // RE-ANCHORED 2 Nov 2026: a chosen rest and a said miss joined the swap (whole-app test #3), so the condition is one
+  // named const. A swapped day must still be IN it: the const's own definition is read, not just its name.
+  const notThisDef = todayPanel.match(/const notThisSession = ([^\n]+)/)?.[1] ?? ''
+  const holdsSwap = (cond: string) => /swappedToday/.test(cond) || (/notThisSession/.test(cond) && /swappedToday/.test(notThisDef))
   const ctaLabel = todayPanel.match(/\{[^{}]*\? 'Train it anyway' : 'Start session'\}/)?.[0] ?? ''
   check('the button stops saying "Start workout" on a day already swapped',
-    ctaLabel.length > 0 && /swappedToday/.test(ctaLabel), ctaLabel)
+    ctaLabel.length > 0 && holdsSwap(ctaLabel), { ctaLabel, notThisDef })
   const ctaVariant = todayPanel.match(/variant=\{[^{}]*\? 'outline' : 'default'\}/)?.[0] ?? ''
   check('...and drops out of the accent, so it reads as the escape hatch it is',
-    ctaVariant.length > 0 && /swappedToday/.test(ctaVariant), ctaVariant)
+    ctaVariant.length > 0 && holdsSwap(ctaVariant), { ctaVariant, notThisDef })
 }
 
 if (failures > 0) { console.error(`\n${failures} exercise-today check(s) FAILED\n`); process.exit(1) }

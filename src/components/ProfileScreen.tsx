@@ -1063,7 +1063,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               </div>
             )}
             <Row label="Current weight">
-              <span className="text-sm">{latestWeightKg != null && latestWeightKg > 0 ? `${latestWeightKg} kg` : 'Log a weigh-in on Dashboard'}</span>
+              <span className="text-sm">{latestWeightKg != null && latestWeightKg > 0 ? `${latestWeightKg} kg` : 'Log a weigh-in on Home'}</span>
             </Row>
           </div>
         </div>
@@ -1766,6 +1766,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         showCloseButton={false}
         className="inset-0 top-0 left-0 h-[100dvh] max-h-none w-full max-w-none translate-x-0 translate-y-0 rounded-none border-0 pt-[env(safe-area-inset-top,0px)] sm:max-w-none [&_[data-slot=dialog-body]]:content-start [&_[data-slot=dialog-body]]:gap-[22px] [&_[data-slot=dialog-body]]:px-[22px] [&_[data-slot=dialog-body]]:pt-0"
         data-profile-page
+        // A DIALOG RAISED ABOVE PROFILE IS NOT "OUTSIDE" IT (1 Nov 2026, whole-app test): the rebuild offer opens over
+        // Profile from App, in its own portal, so tapping its "Leave it as it is" read here as a tap outside, and
+        // Profile shut and dropped her on Home. A tap or focus inside another open dialog leaves Profile where it is.
+        onInteractOutside={e => { const t = e.target as Element | null; if (t?.closest?.('[role="dialog"], [role="alertdialog"]')) e.preventDefault() }}
       >
         <DialogHeader className="sr-only">
           <DialogTitle>Profile</DialogTitle>

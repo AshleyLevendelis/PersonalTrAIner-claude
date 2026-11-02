@@ -65,6 +65,19 @@ console.log('\n1. The header is the sum of the rows, always')
   check('a meal that is not on screen is not in the header', three.totals.calories === plan.calories - chosen.snack!.macros.calories)
 }
 
+console.log('\n1b. A day off on protein, a meal eaten as planned: nothing is re-fitted, nothing is said')
+{
+  // 1 Nov 2026, whole-app test: "Breakfast came to 0 kcal less than planned, so lunch, dinner and snack are 0% smaller
+  // today", with an Undo. The calories match; only protein is out, which a calorie re-fit cannot touch.
+  const offOnProtein: MacroTargets = { ...plan, protein: plan.protein + 40 }
+  check('the fixture day is off target (so the guard below is what keeps it quiet)', !dayVerdict(plan, offOnProtein).onTarget)
+  const b = chosen.breakfast!.macros
+  const asPlanned = dayAsShown({ slots: SLOTS, chosen, eatenBySlot: { breakfast: { kcal: b.calories, protein: b.protein, carbs: b.carbs, fat: b.fat } }, targets: offOnProtein })
+  check('breakfast eaten exactly as planned: no re-fit at all', asPlanned.aroundEaten.kind === 'none', asPlanned.aroundEaten)
+  check('...so no "0% smaller" line', aroundEatenLine(asPlanned.aroundEaten) === null, aroundEatenLine(asPlanned.aroundEaten))
+  check('...and every open meal is the size planned', asPlanned.slots.every(r => r.eaten || r.resizedBy == null))
+}
+
 console.log('\n2. Her ruling A: the rest of the day fits around what was eaten')
 {
   // Lunch came to 200 kcal more than planned: the other three shrink. (300

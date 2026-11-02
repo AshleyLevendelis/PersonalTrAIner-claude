@@ -542,7 +542,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
                 : built
                   ? `Built from your next ${built.days} days of meals. `
                   : 'Built from the meals on your Nutrition tab. '}
-              Ingredients are filtered, not verified. Check labels if you have an allergy.
+              <span className="text-text-tertiary" data-testid="allergen-limit">Ingredients are filtered, not verified. Check labels if you have an allergy.</span>
             </p>
           )}
         </div>
