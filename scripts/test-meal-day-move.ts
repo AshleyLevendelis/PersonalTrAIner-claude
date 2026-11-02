@@ -242,6 +242,14 @@ async function main() {
 
     const same = servingFor(shapeOff, { pinsByDate: { [dates[1]]: { dinner: pools.dinner[0] }, [dates[2]]: { dinner: pools.dinner[0] } } })
     check('the same dish on both days: nothing to swap', refused({ meal_slot: 'dinner', from_date: dates[1], to_date: dates[2] }, undefined, same) === DAY_MOVE.refusals.sameDish('dinner', 'Monday', 'Tuesday'))
+    // ONE DISH, ONCE A DAY (whole-app test #13, 2 Nov 2026): Monday's lunch for Tuesday's dinner, when Monday's dinner
+    // is already that dish, would serve it twice on Monday. Refused, in the phrasebook's words, and nothing written.
+    const twiceKey = pools.dinner[0].name
+    const twiceWeek = serveMealWeek(same)
+    check('the fixture binds: Monday\'s and Tuesday\'s dinners are the same dish, Monday\'s lunch another', twiceWeek[1]?.day.chosen.dinner?.name === twiceKey && twiceWeek[2]?.day.chosen.dinner?.name === twiceKey && twiceWeek[1]?.day.chosen.lunch?.name !== twiceKey, twiceWeek.slice(1, 3).map(d => [d.day.chosen.lunch?.name, d.day.chosen.dinner?.name]))
+    const twice = refused({ meal_slot: 'lunch', from_date: dates[1], to_date: dates[2], to_slot: 'dinner' }, undefined, same)
+    check('a swap that would serve one dish twice on a day is refused, saying which', twice === DAY_MOVE.refusals.twiceInDay('Monday', twiceKey, 'lunch', 'dinner'), twice)
+    check('...in a sentence that reads right for today too', DAY_MOVE.refusals.twiceInDay('today', 'X', 'lunch', 'dinner').startsWith('That would serve X twice today, as lunch and dinner'))
 
     // A LEFTOVER LUNCH: with batch cooking on, a lunch that is last night's dinner.
     const on = servingFor(shapeOn)

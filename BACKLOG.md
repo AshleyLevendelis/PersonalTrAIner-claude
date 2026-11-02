@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [ ] **A DAY SWAP NEVER SERVES ONE DISH TWICE IN A DAY, 2 NOV 2026 (whole-app test #13).** Mechanical, from the app's
+  own standing rule ("one dish, once a day": the rotation's leftover yields to a dinner of the same dish; a held swap
+  never serves one twice). Swapping Monday's lunch for Tuesday's dinner, when Monday's dinner was that same dish,
+  put it on Monday twice. Now refused after the trial, naming it: "That would serve Tray bake twice on Monday, as
+  lunch and dinner, so I haven't swapped them. Pick a different meal to swap with." A copy made for the swap ("X
+  (as lunch)") counts as its dish. FLAGGED FOR ASHLEY: the refusal sentence is new wording; allowing it with a
+  warning instead would be the other defensible answer. `test:meal-day-move` (3 checks, the fixture asserted to
+  bind; 2 mutations, 2 caught). 37 derived gates incl. `verify:meal-day-move` and `verify:chat-day-move` green.
 - [ ] **"MAKE IT EASIER TODAY" IS SHOWN FIRST AND CAN BE PUT BACK, 2 NOV 2026 (whole-app test #5; UX item 2, her "work
   through all of these").** It applied on the tap with no preview and no Undo. Now (`lighter-today.ts`): the sheet
   shows the trial first ("Pull-Ups: 3 → 2 sets", "About 26 → 24 min.", "Weights and reps stay the same. Only today

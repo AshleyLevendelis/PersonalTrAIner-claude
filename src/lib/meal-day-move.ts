@@ -4,6 +4,7 @@ import { ask, DAY_MOVE } from './coach-voice'
 import { computeSlotBudgets, namedMiss, type PoolOption } from './meal-generation'
 import { movedOptionFor } from './meal-move'
 import { tagsNewFrom } from './meal-new-from'
+import { dishKeysFor, dishKeyOf, resizedCopyBase, RESIZED_COPY_SUFFIX } from './meal-dish-identity'
 import type { CurrentMealForSlot } from './meal-food-add'
 import type { MealSlotName } from './meal-store'
 import type { PendingActionReceipt, ProposalDiff } from './pending-actions-store'
@@ -303,6 +304,19 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
   // otherwise read as a swap that happened.
   if (afterA?.day.chosen[slotA]?.name !== landsInA.name || afterB?.day.chosen[slotB]?.name !== landsInB.name) {
     return refuse(DAY_MOVE.refusals.wouldNotHold)
+  }
+  // ONE DISH, ONCE A DAY — the app's own rule (the rotation's leftover yields to a dinner of the same dish; a held swap
+  // never serves one twice). A swap that lands a dish beside itself on one day is refused (whole-app test #13, 1 Nov
+  // 2026: lunch, and the same dish as dinner). A copy made for the swap ("X (as lunch)") is the dish it was made from.
+  const keys = dishKeysFor(Object.values(pools).flatMap(o => o ?? []))
+  const dishOf = (o: PoolOption) => dishKeyOf(keys, resizedCopyBase(o))
+  // The copies this swap made are not tagged as hers until they are stored, so their base is read off the name here.
+  const landedDish = (o: PoolOption) => dishKeyOf(keys, across ? o.name.replace(RESIZED_COPY_SUFFIX, '') : o.name)
+  for (const [d, landedSlot] of [[afterA, slotA], [afterB, slotB]] as const) {
+    const landed = d.day.chosen[landedSlot]!
+    const twin = (Object.entries(d.day.chosen) as [MealSlotName, PoolOption | undefined][])
+      .find(([s, o]) => s !== landedSlot && o && dishOf(o) === landedDish(landed))
+    if (twin) return refuse(DAY_MOVE.refusals.twiceInDay(dayLabel(d.date, today), landedDish(landed), landedSlot, twin[0]))
   }
 
   const rows: ProposalDiff['rows'] = [

@@ -377,6 +377,9 @@ export const DAY_MOVE = {
     ledgerUnreadable: "I couldn't check what you've eaten today just then, so I can't move today's meals. Try again in a moment.",
     notInPlan: (day: string, slot: string) => `${cap(poss(day))} ${slot} isn't one of your saved options any more, so I can't move it.`,
     wouldNotHold: "I can't make that swap fit your plan.",
+    /** The swap would put one dish on one day twice (whole-app test #13). */
+    twiceInDay: (day: string, dish: string, slot: string, otherSlot: string) =>
+      `That would serve ${dish} twice ${day === 'today' ? 'today' : `on ${day}`}, as ${slot} and ${otherSlot}, so I haven't swapped them. Pick a different meal to swap with.`,
   },
   /** Putting a swap back. Every line says whether anything changed. */
   undo: {
