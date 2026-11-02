@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import { useWakeLock } from '@/hooks/useWakeLock'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
-import { useTimers } from '@/hooks/useTimers'
 import { useDeadlineTick } from '@/hooks/useDeadlineTick'
 import { exerciseCoachLine } from '@/lib/exercise-coach-line'
 import { carriedWeightFor } from '@/lib/set-row'
@@ -35,7 +34,6 @@ import { seededRngFromKey } from '@/lib/seeded-random'
 import { executeSecondSportVolume } from '@/lib/pending-action-executor'
 import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
-import { tabHash } from '@/lib/app-route'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { ceilingToAskFor, saveStatedCeiling, declineStatedCeilings } from '@/lib/load-ceiling-prompt'
@@ -193,7 +191,6 @@ export function TodayPanel({
   // set. Best-effort: silently does nothing where the browser doesn't
   // support it (see useWakeLock).
   useWakeLock(status === 'running')
-  const timers = useTimers()
   // How tall BottomDock currently is, so the fixed CTA bar below rides above
   // it instead of under it — the same published height the chat composer uses.
   const { dockHeightPx } = useBottomDockHeight()
@@ -340,13 +337,7 @@ export function TodayPanel({
   // 12 moved the Timers surface out of an Exercise-tab dialog and into the
   // Tools tab, so "reopen" now means navigating there instead of opening a
   // local dialog.
-  useEffect(() => {
-    if (timers.screenOpenRequested) {
-      window.location.hash = tabHash('tools')
-      timers.clearScreenOpenRequest()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timers.screenOpenRequested])
+  // (Since 1 Nov 2026 the chip goes to Tools itself and Tools opens the timer: this screen no longer owns the request.)
 
   // Reset the warm-up collapse and any borrowed prescription whenever the
   // live day itself changes (a real day boundary, not a re-render).

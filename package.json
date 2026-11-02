@@ -512,7 +512,10 @@
     "verify:meal-swap-note": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-swap-note.mjs",
     "test:small-words": "tsx scripts/test-small-words.ts",
     "verify:nutrition-readable": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/nutrition-readable.mjs",
-    "verify:profile-rebuild-decline": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-rebuild-decline.mjs"
+    "verify:profile-rebuild-decline": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-rebuild-decline.mjs",
+    "verify:timer-chip": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/timer-chip.mjs",
+    "verify:profile-sheet-top": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-sheet-top.mjs",
+    "verify:chat-send-scroll": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-send-scroll.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

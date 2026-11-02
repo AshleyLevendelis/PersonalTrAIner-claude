@@ -156,7 +156,10 @@ export function BottomDock() {
       <div ref={dockRef} className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
         <button
           type="button"
-          onClick={timers.requestScreenOpen}
+          // THE CHIP GOES WHERE THE TIMERS ARE, from any tab (1 Nov 2026, whole-app test): it asked the Exercise screen
+          // to open them, so off Exercise the tap did nothing, and on Tools the chip was the only sign one was running.
+          // Tools takes the request and opens the timer that is running.
+          onClick={() => { window.location.hash = tabHash('tools'); timers.requestScreenOpen() }}
           className="w-full rounded-xl bg-card/95 glow-mint-box backdrop-blur-sm shadow-lg px-3 py-1.5 flex items-center gap-1.5 text-xs font-medium tabular-nums text-left"
         >
           <Timer className="h-3 w-3 text-primary-text shrink-0" />

@@ -6193,6 +6193,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const now = new Date().toISOString()
     const userMessage: ChatMessage = { role: 'user', content: userText, status: 'complete', created_at: now }
     setMessages(prev => [...prev, userMessage])
+    // WHAT SHE SENDS IS ON SCREEN (1 Nov 2026, whole-app test): scrolled up, or after a long reply, the chat only
+    // followed new messages while she was already near the bottom, so her own message landed out of sight. Sending
+    // is her saying "I'm here now": follow from this message on.
+    isNearBottomRef.current = true
+    setShowScrollPill(false)
+    scrollToBottom(true)
     setInput('')
 
     // Fix — confirmation-card stuck loop: a clear free-text yes/no to a

@@ -216,6 +216,17 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
     if (roundLive) setTimersOpen(false)
   }, [roundLive])
 
+  // THE DOCK'S TIMER CHIP (BottomDock): it brings her here and asks for the running timer. A live round is already the
+  // card on this tab (and full screen when she chose that), so only a stopwatch or lap timer opens its sheet.
+  useEffect(() => {
+    if (!timers.screenOpenRequested) return
+    timers.clearScreenOpenRequest()
+    if (roundLive) return
+    setTimerPick(timers.mode === 'lap' ? 'lap' : timers.mode === 'stopwatch' ? 'stopwatch' : 'round')
+    setTimersOpen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timers.screenOpenRequested])
+
   // WHAT THE IDLE CARD DESCRIBES, resolved in ONE place and handed to both the
   // card and the chips. A fallback computed twice is a card describing Tabata
   // above a chip row with nothing lit.

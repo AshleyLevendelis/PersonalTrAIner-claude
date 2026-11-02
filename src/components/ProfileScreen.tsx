@@ -517,6 +517,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
 
   useEffect(() => { if (open) void reload() }, [open, profileId])
 
+
   useEffect(() => {
     if (!open || !initialSection) return
     const ref = initialSection === 'goals' ? goalsRef : initialSection === 'facts' ? factsRef : initialSection === 'dietary' ? dietaryRef : contextRef
@@ -996,6 +997,20 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // before, on a page of their own. A deep link (initialSection) opens the
   // sheet holding the section it scrolls to, so the scroll still lands.
   const [sheet, setSheet] = useState<ProfileSheet | null>(null)
+
+  // A SHEET OPENS AT ITS TOP (1 Nov 2026, whole-app test): a sheet replaces the page of rows in the same scroller, so
+  // one opened from a row far down (Appearance) kept the rows' scroll and opened halfway down, title and back button
+  // off screen. The scroller is found from the sheet itself, so this never depends on how the dialog is built.
+  const sheetTopRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!sheet) return
+    let n: HTMLElement | null = sheetTopRef.current
+    while (n) {
+      const oy = getComputedStyle(n).overflowY
+      if ((oy === 'auto' || oy === 'scroll') && n.scrollHeight > n.clientHeight) { n.scrollTop = 0; break }
+      n = n.parentElement
+    }
+  }, [sheet])
   useEffect(() => {
     if (!open) { setSheet(null); return }
     setSheet(initialSection ? SHEET_FOR_SECTION[initialSection] : null)
@@ -1799,7 +1814,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         )}
 
         {sheet ? (
-          <div className="space-y-4" data-profile-sheet={sheet}>
+          <div ref={sheetTopRef} className="space-y-4" data-profile-sheet={sheet}>
             <h2 className="text-[1.375rem] font-bold tracking-[-.02em]">{SHEET_TITLE[sheet]}</h2>
             {sheetBody(sheet)}
           </div>

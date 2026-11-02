@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [ ] **WHOLE-APP TEST FIXES, BATCH 3, 2 NOV 2026.** Dead controls. Every check mutation-tested, every break caught.
+  - **The running-timer chip did nothing** off Exercise: it asked the Exercise screen to open the timers, and only
+    that screen listened. The chip now goes to Tools itself and Tools opens the running timer (a live round is
+    already its card). `verify:timer-chip` (new, Home, Nutrition and Tools).
+  - **Appearance opened halfway down**, title and back off screen: a sheet replaces Profile's rows in the same
+    scroller and kept their scroll. A sheet now opens at its top. `verify:profile-sheet-top` (new).
+  - **Sending did not scroll to her message** when she had scrolled up or after a long reply. Sending now follows.
+    `verify:chat-send-scroll` (new).
+  - The batch-1 run's one `verify:app-boot` failure ("no signal and nothing kept") is most likely the same driver run
+    by hand in the main tree at the same time on the same port; it passes alone. Re-run in the copy to confirm.
 - [ ] **WHOLE-APP TEST FIXES, BATCH 2, 2 NOV 2026.** Same "Yes". Every check mutation-tested, every break caught.
   - **The swap sheet named a dinner change that never happened.** Its trial added a tagged copy of the picked dish,
     which re-planned the day; the real swap pins the dish as it is. One argument (`existing`), as the coach's swap
