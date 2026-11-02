@@ -115,7 +115,7 @@ Newest first. One line each.
   - **#23 the full-screen timer's leave button** sat under the settings gear and opened Profile; the field now sits
     above the gear. `verify:round-fullscreen-gear` (new, on the whole app, a real tap).
   - **#7 the set count** in the chat pill and Exercise's "This week" stayed at 0 until a finish; the week now re-reads
-    when a set is saved. `verify:live-set-count` (new; the whole-app page gained `?train-today`, an input).
+    when a set is saved. `verify:live-set-count` (new; the whole-app page gained `?session-day`, an input).
   - **#6 finished short**, the card still said "Set 1 done. Set 2 next." and a lift wore NOW. Found on the way: the
     NOW marker's component read a bare `status`, which type-checks as the browser's `window.status`, so the first fix
     did nothing until a driver said so. `verify:finish-check` 2i2-2i3.

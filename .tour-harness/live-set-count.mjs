@@ -14,7 +14,7 @@ const pill = () => ev(`(() => { const s = document.querySelector('[data-testid="
 const meter = () => ev(`(() => { const m = document.querySelector('[data-testid="week-key"]')?.textContent?.match(/(\\d+)\\/(\\d+) sets/); return m ? { logged: +m[1], planned: +m[2] } : null })()`)
 const saved = () => ev(`(() => { const m = document.querySelector('[data-testid="hero-sets"]')?.textContent?.match(/^(\\d+) of/); return m ? +m[1] : null })()`)
 
-await go('&train-today=1')
+await go('&session-day=1')
 check('1. the app is up', (await until(() => ev(`!!document.querySelector('[data-testid="home-so-far"]')`), v => v === true, 120)) === true)
 await wait(1500)
 if (await ev(`!!(${btn('/^Not now$/')})`)) { await clickAt(btn('/^Not now$/')); await wait(500) }

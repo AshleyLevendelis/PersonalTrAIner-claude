@@ -35,7 +35,7 @@ const PROFILE_ID = '00000000-0000-4000-8000-00000000b007'
 const USER_ID = '00000000-0000-4000-8000-0000000000a1'
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const created = new Date(anchorNowMs() - 9 * 86400000).toISOString()
-const TRAIN_TODAY = new URLSearchParams(location.search).has('train-today')
+const TRAIN_TODAY = new URLSearchParams(location.search).has('session-day')
 
 setDevClockOverride(PROFILE_ID, ANCHOR_ISO)
 try {
@@ -51,7 +51,7 @@ const profileRow = {
   fitness_goal: 'hypertrophy', preferred_time: 'morning', meals_per_day: 3, include_snacks: true,
   equipment_access: 'full_gym', injuries: [], training_style: 'hybrid', training_experience: 'intermediate',
   session_duration_preference: '45-60', workout_split_preference: 'upper_lower',
-  // ?train-today makes the anchor's Wednesday a training day (an INPUT: which days she trains), for a driver that
+  // ?session-day makes the anchor's Wednesday a training day (an INPUT: which days she trains), for a driver that
   // needs a session today on the whole app (verify:live-set-count). Without it the page is exactly as before.
   training_days: DAYS.map((day, i) => ({ day, available: (TRAIN_TODAY ? [1, 3, 4, 5] : [1, 2, 4, 5]).includes(i) })),
   weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [], exercise_exclusions: [],
