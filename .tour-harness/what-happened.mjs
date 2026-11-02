@@ -78,6 +78,10 @@ const openSheet = async () => {
   return (await has('[data-testid="what-happened-sheet"]')) ? 'open' : 'no-sheet'
 }
 const untilClosed = async () => { for (let i = 0; i < 16 && await has('[data-testid="what-happened-sheet"]'); i++) await wait(250); return !(await has('[data-testid="what-happened-sheet"]')) }
+// THE CARD UNDER THE STRIP (1 Nov 2026, whole-app test #3): a rest she chose or a session she said she missed
+// drew the dash on the strip while this card still said "Start session" over the full workout.
+const card = () => ev(`({ line: document.querySelector('[data-testid="set-aside-today"]')?.innerText ?? null, start: document.querySelector('[data-testid="hero-start"]')?.textContent.trim() ?? null })`)
+const untilCard = async pred => { let c = await card(); for (let i = 0; i < 16 && !pred(c); i++) { await wait(300); c = await card() } return c }
 const untilCell = async (day, re) => { let c = await cell(day); for (let i = 0; i < 16 && !re.test(c || ''); i++) { await wait(300); c = await cell(day) } return c }
 
 console.log('\nWHAT HAPPENED TO TODAY’S SESSION — on the screen\n')
@@ -111,6 +115,9 @@ const offer = await ev(`(() => { const b = [...document.querySelectorAll('[data-
 check('4d. ...the offer to move it is there or honestly absent', Array.isArray(offer) && (offer.some(x => /^Move it to /.test(x)) || offer.includes('Done')), offer)
 await shoot('what-happened-missed')
 await clickText('/^(Leave it|Done)$/'); check('4e. leaving it closes the sheet', await untilClosed())
+const cMissed = await untilCard(c => !!c.line)
+check('4f. ...and the card says so, under the strip', /missed today/.test(cMissed?.line || ''), cMissed)
+check('4g. ...with "Train it anyway", never "Start session"', cMissed?.start === 'Train it anyway', cMissed)
 
 // --- Home agrees -----------------------------------------------------------
 await ev(`location.hash = '#/tab/home'`); await wait(1800)
@@ -126,7 +133,13 @@ check('6d. ...brings the day back to due', new RegExp(`^${TODAY_NAME}: due$`).te
 // --- rest day --------------------------------------------------------------
 check('7a. "Make it a rest day"', (await openSheet()) === 'open' && await clickSel('[data-verb="rest"]') && await untilClosed())
 check('7b. ...reads as a rest day you chose', /rest day you chose/.test(await untilCell(TODAY_NAME, /rest day/) || ''), await cell(TODAY_NAME))
+const cRest = await untilCard(c => !!c.line)
+check('7b2. ...and the card says today is a rest day', /made today a rest day/.test(cRest?.line || ''), cRest)
+check('7b3. ...with "Train it anyway", never "Start session"', cRest?.start === 'Train it anyway', cRest)
+await shoot('what-happened-rest-card')
 check('7c. ...and can be unsaid', (await openSheet()) === 'open' && await clickSel('button[aria-label="Undo the rest day"]') && await untilClosed() && new RegExp(`^${TODAY_NAME}: due$`).test(await untilCell(TODAY_NAME, /due/) || ''), await cell(TODAY_NAME))
+const cBack = await untilCard(c => !c.line)
+check('7d. ...after which the card is a session again: no line, "Start session"', !!cBack && cBack.line === null && cBack.start === 'Start session', cBack)
 
 // --- move ------------------------------------------------------------------
 check('8a. "Move it to another day" lists real destinations', (await openSheet()) === 'open' && await clickSel('[data-verb="move"]') && (await wait(400), (await ev(`document.querySelectorAll('[data-move-to]').length`)) >= 1))

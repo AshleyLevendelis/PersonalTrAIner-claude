@@ -1479,7 +1479,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // this only turns them into ChatMsg rows. CHIPS SHOW RATHER THAN TELL,
       // which is what keeps the how-to-use-it half out of the prose.
       if (isFirstEverChat) {
-        setMessages(buildFirstRunIntro(greetName(), firstRunSessionBrief(), planShapeFromMesocycle(mesocycle)).map(m => ({
+        const shape = planShapeFromMesocycle(mesocycle)
+        const startDay = getLocalDateString(new Date(planCreatedAt ?? profile.created_at ?? getAppNow(profile.id)))
+        const sinceStart = Math.max(0, daysBetween(startDay, activeSession.date))
+        setMessages(buildFirstRunIntro(greetName(), firstRunSessionBrief(), shape ? { ...shape, daysSinceStart: sinceStart } : null).map(m => ({
           role: 'assistant' as const,
           status: 'complete' as const,
           ...m,
@@ -2241,7 +2244,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       if (errorType === 'content_filter') {
         return { reply: errData.reply || 'That triggered a content filter. Try rephrasing.', action: undefined }
       }
-      throw { message: errData.error || `Request failed (${response.status})`, retryable: true, userInput: userMsg }
+      // NEVER THE SERVER'S OWN ERROR TEXT (1 Nov 2026, whole-app test #16): `error` is written for a log, and a
+      // crash put "Cannot read properties of undefined" in her chat. It goes to the console; she gets a sentence.
+      console.error('chat: the coach returned', response.status, errData.error ?? '(no error text)')
+      throw { message: 'Something went wrong on my side.', retryable: true, userInput: userMsg }
     }
 
     const data = await response.json()
@@ -6274,10 +6280,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // for a console, not a user, so it's replaced with the same honest
       // copy rather than surfacing "Failed to fetch" verbatim.
       const displayMessage = error.retryable
-        ? (error.message || 'Something went wrong with the AI service. Tap "Retry" to try again.')
-        : 'Couldn\'t reach your Personal TrAIner — check your connection and tap "Retry".'
+        ? (error.message || 'Something went wrong on my side.')
+        : 'Couldn\'t reach your Personal TrAIner. Check your connection.'
       responseText = isTimeout
-        ? '_That request took too long to process. Tap "Retry" to try again._'
+        ? '_That took too long to answer._'
         : `_${displayMessage}_`
       setLastFailedInput(userText)
     }
@@ -8060,7 +8066,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                 </div>
               )
             })}
-            {!isLoading && lastFailedInput && (
+            {/* ONE WAY TO TRY AGAIN (1 Nov 2026, whole-app test #31): a failed reply already carries its own
+                "tap to retry" in its bubble, so this one shows only when the last message has none. */}
+            {!isLoading && lastFailedInput && !(messages.length > 0 && messages[messages.length - 1].role === 'assistant' && isInterrupted(messages[messages.length - 1])) && (
               <div className="flex justify-start">
                 <button
                   type="button"

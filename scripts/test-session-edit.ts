@@ -34,6 +34,7 @@ import {
 } from '../src/lib/session-edit'
 import { describeBalanceCost, weekBalance } from '../src/lib/session-balance-cost'
 import { weeksTouchedByScope } from '../src/lib/mesocycle-persistence'
+import { settleWeek } from '../src/lib/settle-week'
 import type { UserProfile, MesocycleWeek, Exercise } from '../src/lib/types'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -338,6 +339,32 @@ console.log('\n4. Moving reorders, and a superset travels as one')
     return !!fromSecond && fromSecond.map(e => e.name).slice(0, 2).join('|') === 'Bench|Row'
   })(), reorderWithSupersets(withPair, 2, 0)?.map(e => e.name))
   check('a no-op reorder returns null rather than a fresh array', reorderWithSupersets([ex('A'), ex('B')], 0, 0) === null)
+
+  // A MOVE CHANGES NO SET COUNT, ANYWHERE IN THE WEEK (1 Nov 2026, whole-app test #4). Order carries no volume, and
+  // the week-balance pass in the shared tail used to rebalance any week it found outside its band: measured, 420 of
+  // 4,816 one-place moves across a 144-plan grid changed a set count, mostly on another day, silently. The fixture is
+  // one the measurement named, so the pass genuinely fires on it (asserted first, so this cannot pass on nothing).
+  const DAYS7 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const offender = { ...profile, fitness_goal: 'conditioning', training_style: 'bodybuilding', equipment_access: 'full_gym',
+    training_days: DAYS7.map((d, i) => ({ day: d, available: [0, 1, 3, 4, 5].includes(i) })) } as unknown as UserProfile
+  const quiet2 = console.log; console.log = () => {}
+  setRandomSource(seededRngFromKey('mv-conditioning-bodybuilding-full_gym-5'))
+  const oMeso = generateMesocycle(offender)
+  resetRandomSource(); console.log = quiet2
+  const oWeek = oMeso[1] ?? oMeso[0]
+  const oDay = oWeek?.days.find(d => d.exercises.length > 2)
+  const orderOf = (m: MesocycleWeek[]) => (m.find(w => w.week_number === oWeek?.week_number)?.days.find(d => d.day === oDay?.day)?.exercises ?? []).map(e => e.name).join('|')
+  const setsOf = (w: MesocycleWeek | undefined) => (w?.days ?? []).map(d => `${d.day}:${d.exercises.map(e => `${e.name}x${e.sets}`).sort().join(',')}`).join(' ')
+  const balanced = oWeek && oDay ? settleWeek(oWeek, oDay.day, offender) : null
+  check('the offender week is one the balance pass would change (so the next check binds)',
+    !!balanced && balanced.balance.changes.length > 0, balanced?.balance.changes.length)
+  const mv = oWeek && oDay ? moveExerciseInSession({ mesocycle: oMeso, profile: offender, weekNumber: oWeek.week_number, dayName: oDay.day, fromIndex: 0, toIndex: 1, scope: 'today' }) : null
+  const mvWeek = mv?.mesocycle.find(w => w.week_number === oWeek?.week_number)
+  check('moving an exercise on it changes no set count on any day', !!mv?.changed && setsOf(mvWeek) === setsOf(oWeek),
+    { before: setsOf(oWeek), after: setsOf(mvWeek) })
+  const back = mv && oWeek && oDay ? moveExerciseInSession({ mesocycle: mv.mesocycle, profile: offender, weekNumber: oWeek.week_number, dayName: oDay.day, fromIndex: 1, toIndex: 0, scope: 'today' }) : null
+  check('...and moving it back gives the week exactly as it was', !!back?.changed && setsOf(back.mesocycle.find(w => w.week_number === oWeek?.week_number)) === setsOf(oWeek) &&
+    orderOf(back.mesocycle) === orderOf(oMeso))
 }
 
 // ---------------------------------------------------------------------------

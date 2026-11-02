@@ -106,6 +106,11 @@ check(`2h. THE CARD SAYS IT IS DONE, WITH THE COUNT: "✓ Done · ${H.sets} of $
 const todayCellLabel = await ev(`(() => { const d = window.__fakeDb?.workout_sessions?.[0]?.date; if (!d) return null; const name = new Date(d + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long' }); return [...document.querySelectorAll('[aria-label]')].map(e => e.getAttribute('aria-label')).find(t => t.startsWith(name + ': ')) ?? null })()`)
 check(`2h2. the strip's cell for today now says it is done, with the same count: "done, ${H.sets} of ${N} sets"`, typeof todayCellLabel === 'string' && todayCellLabel.endsWith(`: done, ${H.sets} of ${N} sets`), todayCellLabel)
 check('2i. ...and neither Start nor Finish is offered beside it', (await ev(`!!${byText('Start session')}`)) === false && (await ev(`!!${byText('Finish session')}`)) === false)
+// FINISHED SHORT, NOTHING IS "NEXT" (1 Nov 2026, whole-app test #6): the line under the card still coached the next
+// set and a lift still wore NOW, as if she had not ended the session.
+const after2 = await ev(`({ line: document.querySelector('[data-testid="exercise-coach-line"]')?.innerText ?? null, now: [...document.querySelectorAll('[data-testid="exercise-eyebrow"]')].map(e => e.textContent).filter(t => /\\bnow\\b/i.test(t || '')) })`)
+check('2i2. ...no line coaches a next set or a next lift', !/next/i.test(after2?.line ?? ''), after2)
+check('2i3. ...and no exercise is marked NOW', Array.isArray(after2?.now) && after2.now.length === 0, after2)
 await shoot('finish-check-finished-bar')
 check('2j. tapping it opens the same summary again', (await tapExpr(q('[data-testid="session-finished"]'))) && !!(await until(`[...document.querySelectorAll('[role="dialog"] h2')].some(h => /^Session (complete|saved)$/.test(h.textContent))`, 4000)) && (await summary())?.sets === `${H.sets}/${N}`, (await summary())?.sets)
 await escape()

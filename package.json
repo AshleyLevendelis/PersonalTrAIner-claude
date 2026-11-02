@@ -505,7 +505,10 @@
     "test:chat-today-truth": "tsx scripts/test-chat-today-truth.ts",
     "test:speech-merge": "tsx scripts/test-speech-merge.ts",
     "verify:chat-composer": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-composer.mjs",
-    "verify:home-steps": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/home-steps.mjs"
+    "verify:home-steps": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/home-steps.mjs",
+    "verify:chat-errors": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-errors.mjs",
+    "verify:round-fullscreen-gear": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/round-fullscreen-gear.mjs",
+    "verify:live-set-count": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/live-set-count.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

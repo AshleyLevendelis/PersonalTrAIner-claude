@@ -122,6 +122,12 @@ export interface FirstRunPlanShape {
    * climb" above a sixteen-week plan containing no weights whatsoever.
    */
   activityOnly: boolean
+  /**
+   * Whole days since the plan's first day, when known. The intro is the FIRST CHAT, not the first day: someone who
+   * trains for nine days before opening the coach was told "Day one is today" and "you'll start light" (1 Nov 2026,
+   * whole-app test #14). Undefined keeps the day-one wording, which is right for a plan made today.
+   */
+  daysSinceStart?: number
 }
 
 export interface FirstRunSessionBrief {
@@ -255,7 +261,7 @@ export function buildFirstRunIntro(
     // No weights in this plan, so nothing about weights. What is actually
     // true of it: the dose steps up a block at a time, at the same effort.
     structureParts.push("It starts where you are and builds a little at a time — the same easy effort throughout, just a bit longer as the blocks go on.")
-  } else if (shape?.startsLight) {
+  } else if (shape?.startsLight && (shape.daysSinceStart ?? 0) < 7) {
     structureParts.push("You'll start light on purpose while we find your working weights, then the loads climb, and every block ends with an easier week so the work actually sticks.")
   } else if (shape && shape.blocks >= 2) {
     structureParts.push('The loads climb through each one, and every block ends with an easier week so the work actually sticks.')
@@ -288,11 +294,13 @@ export function buildFirstRunIntro(
     const brief = session.movements.trim()
       ? `${session.focus} — ${session.movements}${stop}`
       : `${session.focus}${/[.!?…]$/.test(session.focus) ? '' : '.'}`
-    if (session.when === 'today') return `Day one is today: ${brief}`
+    // A plan already under way has no "day one" left to name: the same three branches, said as the next session.
+    const underway = (shape?.daysSinceStart ?? 0) > 0
+    if (session.when === 'today') return underway ? `Today is ${brief}` : `Day one is today: ${brief}`
     // A training day, but past the hour they said they train. "Starts right
     // now" would be pushing someone into a session at 10pm.
-    if (session.when === 'whenever') return `Day one is ready when you are: ${brief}`
-    return `Day one is ${session.when}: ${brief}`
+    if (session.when === 'whenever') return underway ? `Today's session is ready when you are: ${brief}` : `Day one is ready when you are: ${brief}`
+    return underway ? `Your next session is ${session.when}: ${brief}` : `Day one is ${session.when}: ${brief}`
   })()
 
   // THE OPEN DOOR, and the reason it is here rather than left to the tour.

@@ -195,10 +195,10 @@ export function RoundField({ onLogSession }: {
       // the screen. The colour IS the signal in this design; a colour you have
       // to be holding the phone to notice does not carry across a gym.
       //
-      // z-30 sits under BottomTabBar's z-40, which together with the
-      // TAB_BAR_HEIGHT_PX inset is what keeps navigation visible AND tappable
-      // while a round runs.
-      className="fixed left-0 right-0 top-0 z-30 flex flex-col overflow-hidden"
+      // ABOVE THE PAGE'S FLOATING GEAR (z-40), 1 Nov 2026, whole-app test #23: at z-30 the gear sat on top of this
+      // field's own top-right "leave full screen", so tapping it opened Profile. Navigation is unaffected: the field
+      // stops at TAB_BAR_HEIGHT_PX, so the tab bar is never under it, whatever the order.
+      className="fixed left-0 right-0 top-0 z-[41] flex flex-col overflow-hidden"
       style={{ bottom: TAB_BAR_HEIGHT_PX, background: bg, padding: '3.5rem 1.5rem 1.625rem' }}
     >
       {/* Purely graphic, and hidden from assistive tech for that reason. */}

@@ -127,6 +127,10 @@ check('once the plan lands the opener is replaced, not frozen',
 // says it is waiting for the plan".
 check('...and it no longer says it is waiting for the plan',
   !/Checking your plan/i.test(chatLate), chatLate.slice(0, 300))
+// THIS PLAN IS NINE DAYS OLD (chat.tsx's created_at). The first chat is not the first day (1 Nov 2026, whole-app
+// test #14): it said "Day one is today" and "you'll start light on purpose" to someone in their second week.
+check('...and a plan nine days old is not greeted with "Day one"', !/Day one/i.test(chatLate), chatLate.slice(0, 400))
+check('...nor told it will "start light"', !/start light/i.test(chatLate), chatLate.slice(0, 400))
 const chatPlanFocus = await ev(`window.__todayFocus`)
 await shoot('rest-day-race-chat-settled')
 

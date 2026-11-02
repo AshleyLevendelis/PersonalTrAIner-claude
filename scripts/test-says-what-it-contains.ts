@@ -169,6 +169,23 @@ console.log('\n3. SURFACE: the first thing the app ever says — the welcome')
   check('a LIFTING plan is still told about its working weights', PROMISES_LOADING.test(liftMessages.map(m => m.content).join(' ')))
   check('...and is still offered the exercise swap',
     liftMessages.flatMap(m => m.quickReplies ?? []).some(r => /swap an exercise/i.test(r)))
+
+  // THE FIRST CHAT IS NOT THE FIRST DAY (1 Nov 2026, whole-app test #14): a plan nine days old met the coach for the
+  // first time and read "Day one is today" and "you'll start light on purpose". The fresh plan is the control.
+  const sayOf = (days: number | undefined, when: string) => buildFirstRunIntro('Hi Ashley',
+    { focus: liftDay.focus, movements: liftDay.exercises.slice(0, 3).map(e => e.name).join(', '), when },
+    liftShape ? { ...liftShape, daysSinceStart: days } : null).map(m => m.content).join(' ')
+  check('the fixture starts light, so the calibration sentence is in play', liftShape?.startsLight === true, liftShape)
+  check('a plan made today still says "Day one is today" and that it starts light',
+    /Day one is today/.test(sayOf(0, 'today')) && /start light/.test(sayOf(0, 'today')), sayOf(0, 'today'))
+  const nineDays = sayOf(9, 'today')
+  check('nine days in: never "Day one"', !/Day one/i.test(nineDays), nineDays)
+  check('...never "start light" once the first week is behind it', !/start light/.test(nineDays), nineDays)
+  check('...and today\'s session is still named', new RegExp(`Today is ${liftDay.focus.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(nineDays), nineDays)
+  check('nine days in, a later session is "your next session", not "day one"',
+    /Your next session is Thursday:/.test(sayOf(9, 'Thursday')) && !/Day one/.test(sayOf(9, 'Thursday')), sayOf(9, 'Thursday'))
+  check('three days in, still the calibration week: it may still say it starts light, but not "Day one"',
+    /start light/.test(sayOf(3, 'today')) && !/Day one/.test(sayOf(3, 'today')), sayOf(3, 'today'))
 }
 
 console.log('\n4. SURFACE: the week the coach is sent')

@@ -373,7 +373,7 @@ export function moveExerciseInSession(params: MoveExerciseParams): SessionEditRe
     // The passes preserve order (enforceSetHierarchy is a map, not a sort) and
     // are no-ops on a week they have nothing to fix, so running them costs the
     // move nothing and makes one rule true of every edit instead of most.
-    return settleWeek({ ...w, days: w.days.map(x => (x.day === dayName ? { ...d, exercises: reordered } : x)) }, dayName, profile).week
+    return settleWeek({ ...w, days: w.days.map(x => (x.day === dayName ? { ...d, exercises: reordered } : x)) }, dayName, profile, { weekBalance: false }).week
   })
   return changed
     ? { mesocycle: next, changed: true }

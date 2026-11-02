@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { getWeeklyDashboard, getSessionMovesInRange, type WeeklyDashboardDay } from '@/lib/daily-tracking'
+import { subscribeSetLogView } from '@/lib/set-log-store'
 import { sessionForDate, type SessionMove } from '@/lib/session-move'
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { planDaysForDate } from '@/lib/plan-week'
@@ -371,6 +372,20 @@ export function useTrainingWeek(
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  // A SAVED SET RE-READS THE WEEK (1 Nov 2026, whole-app test #7). The week was read on open and on a finish, so a
+  // screen that stays mounted while she trains (the chat, Exercise's own "This week") said "0 of 20 sets" while the
+  // grid said 3. The set store says when the day's sets may have changed: once when a set is saved on the phone, and
+  // again when it reaches the server, which is the read that sees it. Debounced, so a burst of ticks is one read.
+  useEffect(() => {
+    if (!profileId) return
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const off = subscribeSetLogView(() => {
+      if (timer) clearTimeout(timer)
+      timer = setTimeout(() => { timer = null; refresh() }, 400)
+    })
+    return () => { off(); if (timer) clearTimeout(timer) }
+  }, [profileId, refresh])
 
   const monday = sessionDate ? mondayOf(new Date(sessionDate + 'T12:00:00')) : new Date(getAppNow(profileId))
   const days = buildTrainingWeekDays({ monday, today: sessionDate, plan, mesocycle, planCreatedAt, dashboard, moves, loading })

@@ -64,7 +64,12 @@ export interface SettledWeek {
 
 export { rebuildWarmup }
 
-export function settleWeek(week: MesocycleWeek, dayName: string, profile: UserProfile): SettledWeek {
+export function settleWeek(
+  week: MesocycleWeek,
+  dayName: string,
+  profile: UserProfile,
+  opts: { weekBalance?: boolean } = {},
+): SettledWeek {
   // EVERY DAY IS COPIED FIRST, INCLUDING THE ONES NOT BEING EDITED.
   //
   // The three passes below mutate in place — that is their contract, and it is
@@ -106,6 +111,12 @@ export function settleWeek(week: MesocycleWeek, dayName: string, profile: UserPr
   // the warm-up exists, because the safety trim inside it prices the session
   // including its warm-up. It is also the only pass here that may change a day
   // OTHER than the one edited, which is why it returns what it did.
+  //
+  // NOT ON A REORDER (1 Nov 2026, whole-app test #4). Order carries no volume, so a move cannot make a week less
+  // balanced than it was, and running the pass anyway rebalanced whatever it found already outside its band: on
+  // 420 of 4,816 one-place moves across a 144-plan grid a set count changed, usually on ANOTHER day, with nothing
+  // said, and moving the exercise back did not put it back. Every other edit still gets the pass and its sentence.
+  if (opts.weekBalance === false) return { week: settled, balance: { changes: [], skipped: null } }
   const balance = settleWeekBalance(settled, profile)
   return { week: settled, balance }
 }

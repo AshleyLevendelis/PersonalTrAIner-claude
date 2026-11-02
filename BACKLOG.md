@@ -2,6 +2,37 @@
 
 Newest first. One line each.
 
+- [ ] **WHOLE-APP TEST FIXES, BATCH 1, 2 NOV 2026.** Ashley: "Yes" to fixing the clear bugs, most serious first, with
+  the knee drill and the swapped-lift weight traced before anything changes. Each fix has a check, each check was
+  mutation-tested (every deliberate break caught: 4 + 2 + 5 + 1 + 1 + 2 + 3 + 1).
+  - **#3 a chosen rest or a said miss** left the Exercise card saying "Start session" over the full workout. Now the
+    swapped day's treatment: a line ("You made today a rest day. This session is still here if you want it.") and
+    an outline "Train it anyway". `verify:what-happened` 4f-4g, 7b2-7d.
+  - **#4 moving an exercise** ran the week-balance pass, which rebalanced any week already outside its band: MEASURED
+    420 of 4,816 one-place moves over a 144-plan grid changed a set count, mostly on another day, silently, and moving
+    back did not undo it. A reorder now skips that pass (order carries no volume); every other edit keeps it and its
+    sentence. After: 0 of 4,816. `test:session-edit` §4 (an offender the measurement named, asserted to bind).
+    CSCS: weekly volume per muscle is unchanged by order, so nothing a coach would sign is lost; the pass still runs
+    on every edit that changes volume.
+  - **#16 the coach's own error text** ("Cannot read properties of undefined") reached the chat; now a plain sentence,
+    the raw text to the console. **#31** a failure drew two "tap to retry" controls and said tap "Retry"; now one.
+    `verify:chat-errors` (new, 13 checks).
+  - **#23 the full-screen timer's leave button** sat under the settings gear and opened Profile; the field now sits
+    above the gear. `verify:round-fullscreen-gear` (new, on the whole app, a real tap).
+  - **#7 the set count** in the chat pill and Exercise's "This week" stayed at 0 until a finish; the week now re-reads
+    when a set is saved. `verify:live-set-count` (new; the whole-app page gained `?train-today`, an input).
+  - **#6 finished short**, the card still said "Set 1 done. Set 2 next." and a lift wore NOW. Found on the way: the
+    NOW marker's component read a bare `status`, which type-checks as the browser's `window.status`, so the first fix
+    did nothing until a driver said so. `verify:finish-check` 2i2-2i3.
+  - **#14 the first chat on a plan already under way** said "Day one is today" and "you'll start light". It now names
+    the next session, and the start-light sentence stops after week one. `test:says-what-it-contains`,
+    `verify:rest-day-race`.
+  - NOT CHANGED, and why: **#15 "ahead of your usual pace" with a session missed** is allowed on purpose by an existing
+    check (run 7, H31 fixture (e)), so it is a wording question for Ashley. **#19 the knee drill on an upper day** is
+    two of her rulings colliding (rehab in every session vs her 20 Oct ease-off rule), traced, for her. **#20 a swapped
+    lift's weight**: traced, a real defect (a swap prices the incoming lift at the full estimate, skipping the
+    calibration factor and the one-step ramp, so 26 kg against the plan's own 12); a prescription change, so it gets a
+    plan first.
 - [ ] **WHOLE-APP TEST, 1 NOV 2026: about 60 findings, `docs/audits/whole-app-test-2026-11-01.md`.** Ashley: *"Run a
   comprehensive test in the entire app and look for issues."* Five exploratory testers drove the real app at 390x844
   (app-boot.html, the whole App.tsx, plus the single-screen pages and the setup harness), all nine themes and 360px,

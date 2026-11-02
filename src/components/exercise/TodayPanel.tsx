@@ -409,9 +409,15 @@ export function TodayPanel({
     : sessionRefFromCell(todayCell, liveWeek)
   /** Says the day on screen in whatever an edit wrote with the plan row's name. */
   const say = (text: string | null): string | null => sayDayIn(text, todayRef)
+  // A REST SHE CHOSE, OR A SESSION SHE SAID SHE MISSED, is the swapped day's case in other words (1 Nov 2026,
+  // whole-app test #3): the strip drew the dash and this card went on saying "Start session" over the full
+  // workout. Read off the reference, which already ranks logged work above a flag, so a day she trained after
+  // all is a session again. The session stays reachable; the button just stops pretending.
+  const setAsideToday = todayRef.kind === 'rest_chosen' || todayRef.kind === 'missed' ? todayRef.kind : null
   const swappedToday = weekTrain.days.find(d => d.date === today)?.state === 'swapped'
     ? (weekTrain.days.find(d => d.date === today)?.swappedForActivity || 'something else')
     : null
+  const notThisSession = !!swappedToday || !!setAsideToday
 
   // MOVED, the third thing that can have happened to today. Same source as the
   // glyph and the swap above — never a second read of the same row.
@@ -1209,13 +1215,13 @@ export function TodayPanel({
         // session she has already replaced is the app telling her it did not hear.
         <Button
           ref={heroStartRef}
-          className={swappedToday ? 'mt-4 h-[52px] w-full text-[0.9375rem] font-semibold' : `mt-4 ${PRIMARY_CTA_CLASS}`}
-          style={swappedToday ? undefined : PRIMARY_CTA_STYLE}
-          variant={swappedToday ? 'outline' : 'default'}
+          className={notThisSession ? 'mt-4 h-[52px] w-full text-[0.9375rem] font-semibold' : `mt-4 ${PRIMARY_CTA_CLASS}`}
+          style={notThisSession ? undefined : PRIMARY_CTA_STYLE}
+          variant={notThisSession ? 'outline' : 'default'}
           onClick={startSession}
           data-testid="hero-start"
         >
-          {swappedToday ? 'Train it anyway' : 'Start session'}
+          {notThisSession ? 'Train it anyway' : 'Start session'}
         </Button>
       )}
       {status === 'running' && (
@@ -1267,6 +1273,9 @@ export function TodayPanel({
   // calibration cue is attached to.
   const coachLine = (() => {
     if (!showsTodaysSession || !workout) return null
+    // Finished, short or not, there is no next set to coach: "Set 1 done. Set 2 next." under a session she has ended
+    // was the screen not hearing her (1 Nov 2026, whole-app test #6). The finish card says the count.
+    if (status === 'finished') return null
     const exs = workout.exercises
     const groups = groupExercises(exs)
     const inSuperset = new Set(groups.flatMap(g => (g.kind === 'superset' ? g.members.map(m => m.exIndex) : [])))
@@ -1520,6 +1529,15 @@ export function TodayPanel({
             workingSetsToday={logs.filter(l => !l.is_warmup && (l.drop_index ?? 0) === 0).length}
             onChanged={() => { weekTrain.refresh(); onLogsUpdated?.() }}
           />
+          {setAsideToday && (
+            <InsightBanner tone="ai" data-testid="set-aside-today">
+              <span className="text-sm">
+                {setAsideToday === 'rest_chosen'
+                  ? 'You made today a rest day. This session is still here if you want it.'
+                  : "You said you missed today's session. It's still here if you get to it."}
+              </span>
+            </InsightBanner>
+          )}
           {swappedToday && (
             <InsightBanner tone="ai" data-testid="swapped-today">
               <span className="text-sm">
@@ -1795,12 +1813,12 @@ export function TodayPanel({
           data-testid="start-bar"
         >
           <Button
-            className={swappedToday ? 'h-[52px] w-full text-[0.9375rem] font-semibold' : PRIMARY_CTA_CLASS}
-            style={swappedToday ? undefined : PRIMARY_CTA_STYLE}
-            variant={swappedToday ? 'outline' : 'default'}
+            className={notThisSession ? 'h-[52px] w-full text-[0.9375rem] font-semibold' : PRIMARY_CTA_CLASS}
+            style={notThisSession ? undefined : PRIMARY_CTA_STYLE}
+            variant={notThisSession ? 'outline' : 'default'}
             onClick={startSession}
           >
-            {swappedToday ? 'Train it anyway' : 'Start session'}
+            {notThisSession ? 'Train it anyway' : 'Start session'}
           </Button>
         </div>
       )}
@@ -1871,7 +1889,8 @@ function ExerciseList({
   onBan: (name: string) => void
   onSetCompleted: (exerciseName: string, setNumber: number, weight: number, reps: number, rest: string, sets: number, prescribedReps: string, tier?: string) => void
 }) {
-  const { setsFor, restLabel } = useActiveSession()
+  // `status` from the session, by name: a bare `status` here type-checks as the browser's own window.status.
+  const { setsFor, restLabel, status: sessionStatus } = useActiveSession()
   // User overrides only — the default expanded state (which exercise is
   // "current") is recomputed fresh every render from live logs below, so a
   // completed exercise's row auto-advances to the next incomplete one
@@ -1915,9 +1934,12 @@ function ExerciseList({
     return n > 0 && n < ex.sets
   }
   const recentExIndex = restLabel ? workout.exercises.findIndex(ex => ex.name === restLabel) : -1
-  const currentExIndex = recentExIndex >= 0 && partway(recentExIndex)
-    ? recentExIndex
-    : flatExIndexes.find(partway) ?? firstIncompleteExIndex
+  // A FINISHED SESSION HAS NO "NOW" (1 Nov 2026, whole-app test #6): finished short, the main lift still wore the
+  // NOW marker as if she were mid-set.
+  const currentExIndex = sessionStatus === 'finished' ? -1
+    : recentExIndex >= 0 && partway(recentExIndex)
+      ? recentExIndex
+      : flatExIndexes.find(partway) ?? firstIncompleteExIndex
 
   const rowProps = (ex: WorkoutDay['exercises'][number], exIndex: number) => {
     const defaultExpanded = exIndex === firstIncompleteExIndex
