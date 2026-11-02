@@ -7,6 +7,8 @@ Newest first. One line each.
     under it "The day is 87 kcal under your target". The kept and too-far lines (a logged meal's, a swap's) now carry
     the day's named miss (`namedMiss`, the header's own function) and say it: "11 g under your fat target", the
     calorie gap only when calories are what is off. `test:day-as-shown` §1c, `test:hold-around-pins` §3 (3 mutations).
+  - **"Starting from" was an empty dropdown** for anyone setup never asked. Unset, the row now shows the starting
+    point the plan is actually built from (`isStartingOut`). `verify:profile-sheet-top` §6 (1 mutation).
   - **The plate calculator started every lift on a 20 kg barbell**, so a 10 kg EZ-bar curl was "lighter than the bar".
     A lift whose implement is an EZ bar now starts on 10 kg (editable as before). `test:plate-math` (3 mutations);
     `test:exercise-2a` re-anchored (it pinned the call's exact text). NOT CHANGED: the T-bar row, loaded on one end, is

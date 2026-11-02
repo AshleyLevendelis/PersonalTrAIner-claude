@@ -25,4 +25,10 @@ check('3. Appearance opens', /appearance/i.test(top?.sheet ?? '') || /Appearance
 check('4. ...with its title on screen', !!top && top.titleTop >= 0 && top.titleTop < top.vh, top)
 check('5. ...and its back button on screen', !!top && top.backTop >= 0 && top.backTop < top.vh, top)
 await shoot('profile-sheet-top')
+
+// 6. "STARTING FROM" IS NEVER BLANK (same test): this profile was never asked, and the row showed an empty dropdown.
+await clickAt(`document.querySelector('[data-profile-back]')`); await wait(700)
+await clickAt(`[...document.querySelectorAll('[data-profile-page] button')].find(b => b.textContent.trim().startsWith('Goal'))`); await wait(900)
+const start = await ev(`(() => { const lab = [...document.querySelectorAll('[data-profile-sheet] span')].find(n => n.textContent.trim() === 'Starting from'); const row = lab?.parentElement; const trig = row?.querySelector('[role=combobox]'); return trig ? trig.textContent.trim() : null })()`)
+check('6. the Goal sheet\'s "Starting from" names the plan she has', /Straight into training|Get moving first/.test(start ?? ''), start)
 await finish('verify:profile-sheet-top PASSED')

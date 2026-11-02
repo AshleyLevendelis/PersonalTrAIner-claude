@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { splitFoodList } from '@/lib/food-list'
+import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
@@ -1121,8 +1122,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 re-price one, because it does not change a number — it changes
                 which plan you have. detectPlanInvalidation offers the rebuild
                 and nothing happens until the offer is accepted. */}
+            {/* NEVER AN EMPTY BOX (1 Nov 2026, whole-app test): anyone setup never asked saw a blank dropdown. Unset, the
+                plan is built from what starting-out.ts decides, so that is what the row shows. */}
             <Row label="Starting from"><EditableSelectField
-              value={profile.start_preference ?? ''}
+              value={profile.start_preference ?? (isStartingOut(profile) ? 'move_more' : 'train')}
               options={START_PREFERENCE_OPTIONS}
               onSave={v => savePatch({ start_preference: v as StartPreference })}
             /></Row>
