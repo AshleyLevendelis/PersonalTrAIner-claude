@@ -7,6 +7,9 @@ import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 import type { MealSlotName } from './meal-store'
 import type { CurrentMealForSlot } from './meal-food-add'
+import { oneDayEdit } from './coach-voice'
+import { tagsPinOnly } from './meal-new-from'
+import { dayLabel } from './day-labels'
 
 // ---------------------------------------------------------------------------
 // CHANGING ONE FOOD INSIDE A MEAL — take it out, swap it, resize it.
@@ -75,15 +78,6 @@ export type MealFoodEditResult =
   | { ok: false; reason: string }
 
 const signed = (n: number, unit: string) => `${n > 0 ? '+' : ''}${n}${unit}`
-
-/**
- * "today", not "2026-09-12". A date she can read off her own phone's clock is
- * not information; it is the app talking to itself in front of her.
- */
-const whenFor = (input: BuildMealFoodEditInput) => {
-  const date = normaliseDate(input.rawArgs.date, input.todayDate)
-  return date === input.todayDate ? 'today' : date
-}
 
 /**
  * The fewest foods a meal may be reduced to. One: a meal of a single food is
@@ -209,7 +203,8 @@ function settle(
     ok: true,
     scopeKey: `${input.profileId}:${verb}:${slot}:${date}`,
     preconditions: { slot, date, mealName: option.name, editedFrom: meal.name },
-    payload: { slot, date, option },
+    // MADE FOR THIS DAY ONLY (tagsPinOnly): served where the pick names it, never by another day's search.
+    payload: { slot, date, option: { ...option, tags: tagsPinOnly(option.tags ?? []) } },
     diff,
   }
 }
@@ -369,7 +364,7 @@ export function buildMealFoodRemoveProposal(input: BuildMealFoodEditInput): Meal
         ? { severity: 'info', text: `Tap one of the swaps below to put it in instead — or leave it out and your day just comes in lighter.` }
         : { severity: 'info', text: `Say the word and I'll put something else in its place instead — otherwise your day just comes in lighter.` },
       { severity: 'info', text: `The rest of your ${slot} keeps its amounts exactly; nothing is re-portioned to cover the gap.` },
-      { severity: 'info', text: `Becomes your ${slot} for ${whenFor(input)}; the original stays in your ${slot} options.` },
+      { severity: 'info', text: oneDayEdit(slot, dayLabel(normaliseDate(input.rawArgs.date, input.todayDate), input.todayDate), meal.name) },
     ],
     removed,
     alternatives)
@@ -393,7 +388,7 @@ export function buildMealFoodReplaceProposal(input: BuildMealFoodEditInput): Mea
     [
       { severity: 'info', text: `Everything else in your ${slot} stays exactly as it is.` },
       { severity: 'info', text: `Checked against your dietary settings the same way any new meal is.` },
-      { severity: 'info', text: `Becomes your ${slot} for ${whenFor(input)}; the original stays in your ${slot} options.` },
+      { severity: 'info', text: oneDayEdit(slot, dayLabel(normaliseDate(input.rawArgs.date, input.todayDate), input.todayDate), meal.name) },
     ],
     withLines.join(', '))
 }
@@ -418,7 +413,7 @@ export function buildMealFoodResizeProposal(input: BuildMealFoodEditInput): Meal
     { field: 'Changing', before, after },
     [
       { severity: 'info', text: `Only the amount changes — everything else in your ${slot} stays as it is.` },
-      { severity: 'info', text: `Becomes your ${slot} for ${whenFor(input)}; the original stays in your ${slot} options.` },
+      { severity: 'info', text: oneDayEdit(slot, dayLabel(normaliseDate(input.rawArgs.date, input.todayDate), input.todayDate), meal.name) },
     ],
     after)
 }

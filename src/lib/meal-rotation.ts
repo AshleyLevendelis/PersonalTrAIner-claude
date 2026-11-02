@@ -32,7 +32,7 @@
 // ---------------------------------------------------------------------------
 
 import { assembleDay, computeSlotBudgets, VARIETY_MEMORY_DAYS, type AssembledDay, type PoolOption } from './meal-generation'
-import { newFromDate } from './meal-new-from'
+import { newFromDate, isPinOnly } from './meal-new-from'
 import type { Macros100g } from './food-db'
 import { scaleToTarget, meetsProteinFloor } from './portion-scaler'
 import { costStoredMeal } from './meal-costing'
@@ -96,7 +96,7 @@ export function datesFrom(from: string, count: number): string[] {
 }
 
 /**
- * The pool as it stands on `date`: every option whose first day has come.
+ * The pool as it stands on `date`: every option whose first day has come, and never one made for one day.
  * Returns THE SAME OBJECT when nothing is held back — the rotation's
  * same-inputs shortcut, and every memo keyed on the pools, depend on that.
  */
@@ -104,7 +104,8 @@ export function poolsServedOn(
   pools: Partial<Record<MealSlotName, PoolOption[]>>,
   date: string,
 ): Partial<Record<MealSlotName, PoolOption[]>> {
-  const held = (o: PoolOption) => { const from = newFromDate(o); return from !== null && from > date }
+  // A meal made for one day is never searched for: only the pick that names it serves it (isPinOnly).
+  const held = (o: PoolOption) => { if (isPinOnly(o)) return true; const from = newFromDate(o); return from !== null && from > date }
   if (!Object.values(pools).some(opts => opts?.some(held))) return pools
   const out: Partial<Record<MealSlotName, PoolOption[]>> = {}
   for (const [slot, opts] of Object.entries(pools) as [MealSlotName, PoolOption[] | undefined][]) {

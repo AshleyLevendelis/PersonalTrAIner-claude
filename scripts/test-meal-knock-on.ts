@@ -161,9 +161,9 @@ async function main() {
     check('the add-a-food card no longer says the rest of the day "re-fits around it"', banana.ok && !said.some(t => /re-?fits? around/i.test(t)), said)
     check('...it still says the food joins at her amount', said.some(t => /100g banana joins it at the amount you said/.test(t)), said)
     check('...and how far the meal now is from its usual share, as a figure it computed', said.some(t => /^That is \d+ kcal (over|under) the usual lunch share\.$/.test(t)), said)
-    check('...and names the day in words ("today"), never as a stored date', said.some(t => /Becomes your lunch for today;/.test(t)) && !said.some(t => /\d{4}-\d{2}-\d{2}/.test(t)), said)
+    check('...and names the day in words ("today"), never as a stored date', said.some(t => /^Just for today\. On other days your lunch stays /.test(t)) && !said.some(t => /\d{4}-\d{2}-\d{2}/.test(t)), said)
     const tuesday = addFood(serving, dates[2], 'lunch', ['100g banana'])
-    check('...and another day by its weekday', tuesday.ok && text(tuesday.diff).some(t => /Becomes your lunch for Tuesday;/.test(t)) && !text(tuesday.diff).some(t => /\d{4}-\d{2}-\d{2}/.test(t)), tuesday.ok ? text(tuesday.diff) : tuesday)
+    check('...and another day by its weekday', tuesday.ok && text(tuesday.diff).some(t => /^Just for Tuesday\. On other days your lunch stays /.test(t)) && !text(tuesday.diff).some(t => /\d{4}-\d{2}-\d{2}/.test(t)), tuesday.ok ? text(tuesday.diff) : tuesday)
     const custom = buildCustomMealProposal({ rawArgs: { meal_slot: 'lunch', food_lines: ['200g chicken breast', '250g white rice', '1 banana'], name: 'My lunch' }, profileId: 'p1', todayDate: today, targets, mealsPerDay: 3, includeSnacks: false, dietaryPreferences: [], dislikedFoods: [] })
     const customSaid = custom.ok ? text(custom.diff) : []
     check('the custom-meal card no longer says it either', custom.ok && !customSaid.some(t => /re-?fits? around/i.test(t)), custom.ok ? customSaid : custom)
@@ -187,7 +187,10 @@ async function main() {
     const dishChange = k.changes.find(c => c.kind === 'dish')
     check('a different dish is named by the dish that will be served', !!dishChange && said.some(t => t.includes(dishChange.to) && /becomes/.test(t)), { dishChange, said })
     check('...and it really is a different dish from the one there now', !!dishChange && dishChange.from !== dishChange.to && dishChange.from !== null, dishChange)
-    check('a meal on a day NOBODY NAMED changes too, and is named with its day', k.changes.some(c => c.date !== today) && k.changes.filter(c => c.date !== today).every(c => said.some(t => t.startsWith(`${dayLabel(c.date, today)[0].toUpperCase()}${dayLabel(c.date, today).slice(1)}'s ${c.slot}`))), { changes: k.changes, said })
+    // REVERSED 2 Nov 2026, Ashley's "Today only". This asserted that an edit to today's lunch moved a meal on a day
+    // nobody named: the edited copy joined the pool and later days' searches served it. Now it is made for today, so
+    // with no leftovers chain (this fixture) every other day is exactly as it was. The chain case is [3b].
+    check('no meal on a day nobody named changes (the edit is for today only)', k.changes.length > 0 && k.changes.every(c => c.date === today) && real.diff.every(d => d.startsWith(`${today}|`)), { changes: k.changes, real: real.diff })
     // BOTH KINDS ON ONE CARD: chicken added to Tuesday's breakfast moves one of
     // Tuesday's meals to a different dish and resizes another. (A banana did this
     // under the old 25% bands; under the 10% bands, runs 7-10 M59, it only
@@ -204,6 +207,29 @@ async function main() {
     check('the meal being edited is not listed as a knock-on of itself', !k.changes.some(c => c.date === today && c.slot === 'lunch') && !mixed.changes.some(c => c.date === dates[2] && c.slot === 'breakfast'))
     check('it does not say "no other meal changes" when one does', !said.includes(KNOCK_ON.none), said)
     check('no line can read "undefined" or "NaN"', !said.some(t => /undefined|NaN/.test(t)), said)
+  }
+
+  // ---------------------------------------------------------------------------
+  console.log('\n[2b] An edited meal is for its own day only (Ashley, 2 Nov 2026, "Today only")')
+  {
+    const { isPinOnly } = await import('../src/lib/meal-new-from')
+    const { topUpPlan } = await import('../src/lib/meal-top-up')
+    check('the edit is marked as made for one day', !!bananaOption && isPinOnly(bananaOption), bananaOption?.tags)
+    // Every date of the week, before and after, with the copy stored and picked for TODAY only.
+    const copy = bananaOption?.name ?? '(none)'
+    const servedCopy = real.now.filter(d => (['breakfast', 'lunch', 'dinner', 'snack'] as Slot[]).some(s => d.day.chosen[s]?.name === copy)).map(d => d.date)
+    check('the edited meal is served on the day it was made for, and on no other', JSON.stringify(servedCopy) === JSON.stringify([today]), servedCopy)
+    const later = (w: typeof real.now) => names(w.filter(d => d.date !== today) as never)
+    check('...and every later day serves exactly what it served before', later(real.now) === later(real.was), { was: later(real.was), now: later(real.now) })
+    // Picked on Tuesday by name, the same copy is served there: a pick still finds it.
+    const onTue = bananaOption ? reallyApply(serving, dates[2], 'lunch', bananaOption) : null
+    check('a pick that names it on another day still serves it there', onTue?.now.find(d => d.date === dates[2])?.day.chosen.lunch?.name === copy, onTue?.now.find(d => d.date === dates[2])?.day.chosen.lunch?.name)
+    // The "more options" offer counts dishes she can be served: a copy made for one day is not one.
+    const stored = bananaOption ? { ...bananaOption, tags: [...(bananaOption.tags ?? []), USER_REQUESTED_TAG] } as Opt : null
+    const withCopy = stored ? { ...pools, lunch: [...pools.lunch, stored] } : pools
+    const slots = ['breakfast', 'lunch', 'dinner'] as Slot[]
+    const a = topUpPlan(pools as never, slots as never, targets as never), b = topUpPlan(withCopy as never, slots as never, targets as never)
+    check('the options count does not count it', !!stored && JSON.stringify(a.have) === JSON.stringify(b.have) && JSON.stringify(a.needs) === JSON.stringify(b.needs), { without: a, with: b })
   }
 
   // ---------------------------------------------------------------------------

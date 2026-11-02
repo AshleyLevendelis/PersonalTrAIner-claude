@@ -24,6 +24,10 @@ import { weekdayLong, longDate } from './day-labels'
 import { readGroceryCoverage } from './grocery-store'
 import { moreMealOptionsOffer, moreMealFitOffer, moreMealOptionsDone, moreMealOptionsWhy } from './coach-voice'
 import type { MealSlotName } from './meal-store'
+import { isPinOnly } from './meal-new-from'
+
+/** A dish she can be served from the pool: not against a restriction, and not a meal made for one day (isPinOnly). */
+const servableOption = (o: PoolOption) => !o.breaksRestriction && !isPinOnly(o)
 
 /**
  * How many more each meal needs to reach `size` options she can be SERVED.
@@ -39,7 +43,7 @@ export function topUpNeeds(
 ): Partial<Record<MealSlotName, number>> {
   const out: Partial<Record<MealSlotName, number>> = {}
   for (const slot of activeSlots) {
-    const servable = (pools[slot] ?? []).filter(o => !o.breaksRestriction).length
+    const servable = (pools[slot] ?? []).filter(servableOption).length
     if (servable > 0 && servable < size) out[slot] = size - servable
   }
   return out
@@ -86,7 +90,7 @@ export function fittingCounts(
   targets: MacroTargets,
 ): Partial<Record<MealSlotName, number>> {
   const usable: Partial<Record<MealSlotName, PoolOption[]>> = {}
-  for (const slot of activeSlots) usable[slot] = (pools[slot] ?? []).filter(o => !o.breaksRestriction)
+  for (const slot of activeSlots) usable[slot] = (pools[slot] ?? []).filter(servableOption)
   if (activeSlots.length === 0 || activeSlots.some(s => usable[s]!.length === 0)) return {}
   const out: Partial<Record<MealSlotName, number>> = {}
   for (const slot of activeSlots) {
@@ -119,7 +123,7 @@ export function topUpPlan(
   const fitting = fittingCounts(pools, activeSlots, targets)
   const have: TopUpPlan['have'] = {}
   for (const slot of activeSlots) {
-    const n = (pools[slot] ?? []).filter(o => !o.breaksRestriction).length
+    const n = (pools[slot] ?? []).filter(servableOption).length
     if (n > 0) have[slot] = n
   }
   const needs: TopUpPlan['needs'] = { ...short }

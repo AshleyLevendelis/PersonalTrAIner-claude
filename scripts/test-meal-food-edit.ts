@@ -20,6 +20,7 @@ import {
   matchIngredient, MIN_FOODS_PER_MEAL,
 } from '../src/lib/meal-food-edit'
 import { computeMealMacros } from '../src/lib/food-db'
+import { isPinOnly } from '../src/lib/meal-new-from'
 import { parseIngredientLines, withQuantity } from '../src/lib/portion-scaler'
 import type { MacroTargets } from '../src/lib/types'
 
@@ -251,14 +252,27 @@ console.log('\n6. THE SAFETY HALF — no operation is a way round the checks')
     (src.match(/return settle\(/g) ?? []).length === 3, (src.match(/return settle\(/g) ?? []).length)
 }
 
+console.log('\n6b. Every edit is for its own day only (Ashley, 2 Nov 2026, "Today only")')
+{
+  const edits = [
+    buildMealFoodRemoveProposal({ ...base(), rawArgs: { meal_slot: 'lunch', food: 'broccoli' } }),
+    buildMealFoodReplaceProposal({ ...base(), rawArgs: { meal_slot: 'lunch', food: 'rice', with_food: '200g potato' } }),
+    buildMealFoodResizeProposal({ ...base(), rawArgs: { meal_slot: 'lunch', food: 'rice', amount: 15 } }),
+  ]
+  check('remove, swap and amount change all build', edits.every(e => e.ok), edits.map(e => e.ok || e.reason))
+  check('...and each edited meal is marked as made for that day only', edits.every(e => e.ok && isPinOnly(e.payload.option)), edits.map(e => e.ok && e.payload.option.tags))
+  check('...and each card says the other days keep the original', edits.every(e => e.ok && e.diff.implications.some(i => /^Just for today\. On other days your lunch stays /.test(i.text))), edits.map(e => e.ok && e.diff.implications.map(i => i.text)))
+}
+
 console.log('\n7. Nothing is written without a confirm')
 {
   const r = buildMealFoodRemoveProposal({ ...base(), rawArgs: { meal_slot: 'lunch', food: 'broccoli' } })
   check('a build returns a proposal, never a write', r.ok === true && 'payload' in r && 'diff' in r)
   check('...scoped so two of the same cannot stack',
     r.ok === true && r.scopeKey === 'p1:propose_meal_food_remove:lunch:2026-09-12', r.ok && r.scopeKey)
-  check('...and the original stays in her options',
-    r.ok === true && r.diff.implications.some(i => /original stays/i.test(i.text)))
+  // RE-ANCHORED 2 Nov 2026, Ashley's "Today only": other days keep the original, and the card says so.
+  check('...and the other days keep the original',
+    r.ok === true && r.diff.implications.some(i => /^Just for today\. On other days your lunch stays /.test(i.text)), r.ok && r.diff.implications)
 }
 
 console.log('\n8. BOTH SURFACES, and neither of them a stub')

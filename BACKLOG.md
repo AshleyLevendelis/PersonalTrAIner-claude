@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [ ] **AN EDITED MEAL IS FOR ITS OWN DAY, 2 NOV 2026 (whole-app test #8). Ashley's ruling: "Today only"**, from
+  three options (over carrying the food into later days with the card reworded, and over asking each time). Cause:
+  adding, taking out, swapping or re-weighing a food made an edited copy that joined the dateless pool like any dish,
+  so later days' searches served it while the card said "for today". Now the four edit builders mark the copy
+  `pin-only` (`meal-new-from.ts`), `poolsServedOn` holds it out of every day's search, and only the pick that names
+  it serves it (a pick on another day still works). The "more options" counts leave it out too. The four cards say
+  one sentence from the phrasebook: "Just for today. On other days your lunch stays Baked chicken and rice."
+  Custom meals and meals asked for by name still JOIN the options, as their cards say. MEASURED on the screen: before,
+  the edited lunch was served again the next day (`verify:meal-knock-on` 3e, red with either half removed). Checks:
+  `test:meal-knock-on` [2b] (5) and its reversed "a day nobody named changes" check, `test:meal-food-edit` 6b (3),
+  re-anchored wording in `test:meal-food-add`; 7 mutations, 7 caught. A first mutation round was VOID: the harness
+  reused `f` inside its own runner, so nothing was restored and the mutations stacked; found because the derived run
+  went red, re-run with a script that restores on exit. 51 derived gates and 19 Nutrition drivers green. Not touched:
+  edits already stored without the mark (no live users).
 - [ ] **FULL SWEEP ON THE KNEE + SWAP-PRICING BRANCH, 2 NOV 2026.** 463 gates at `a38aef61`: 460 passed. Failed:
   `test:coach-exam-fresh` (expected: the exam must be re-run on her machine), and `test:set-row` and `test:coach-knows`,
   both pinned to the old text of calls changed on purpose (the plate calculator now gets the bar; the swap trial a

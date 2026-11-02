@@ -5,7 +5,8 @@ import type { ProposalDiff } from './pending-actions-store'
 import type { MealSlotName } from './meal-store'
 import type { MealKnockOn } from './meal-knock-on'
 import { dayLabel } from './day-labels'
-import { KNOCK_ON } from './coach-voice'
+import { KNOCK_ON, oneDayEdit } from './coach-voice'
+import { tagsPinOnly } from './meal-new-from'
 
 // ---------------------------------------------------------------------------
 // "Add a banana to my breakfast" — a food JOINING a meal that is already on
@@ -147,7 +148,7 @@ export function buildMealFoodAddProposal(input: BuildMealFoodAddInput): MealFood
       // "today" or the weekday, never "2026-09-16" — meal-food-edit.ts's rule:
       // a date she can read off her own phone's clock is not information, it
       // is the app talking to itself in front of her.
-      { severity: 'info', text: `Becomes your ${slot} for ${dayLabel(date, input.todayDate)}; the original stays in your ${slot} options.` },
+      { severity: 'info', text: oneDayEdit(slot, dayLabel(date, input.todayDate), currentMeal.name) },
     ],
     rationale: typeof rawArgs.origin_verbatim_quote === 'string' && rawArgs.origin_verbatim_quote.trim() ? rawArgs.origin_verbatim_quote.trim() : undefined,
     reversible: true,
@@ -156,7 +157,8 @@ export function buildMealFoodAddProposal(input: BuildMealFoodAddInput): MealFood
     ok: true,
     scopeKey: `${input.profileId}:propose_meal_food_add:${slot}:${date}`,
     preconditions: { slot, date, mealName: option.name, addedTo: currentMeal.name },
-    payload: { slot, date, option },
+    // MADE FOR THIS DAY ONLY (tagsPinOnly): served where the pick names it, never by another day's search.
+    payload: { slot, date, option: { ...option, tags: tagsPinOnly(option.tags ?? []) } },
     diff,
   }
 }

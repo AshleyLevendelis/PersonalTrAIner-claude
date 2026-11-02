@@ -289,6 +289,14 @@ const poss = (day: string) => `${day}'s`
  * (meal-knock-on.ts). The changes themselves are said in the day swap's own
  * sentences (DAY_MOVE, below); these are the three it has no use for.
  */
+/**
+ * An edited meal is for ONE day — Ashley's ruling, 2 Nov 2026 ("Today only"): adding, taking out, swapping or
+ * re-weighing a food changes that day's meal, and every other day keeps the dish as it was. One sentence for the
+ * four edit cards, so they cannot drift apart.
+ */
+export const oneDayEdit = (slot: string, when: string, original: string): string =>
+  `Just for ${when}. On other days your ${slot} stays ${original}.`
+
 export const KNOCK_ON = {
   /** The trial ran and no other meal moved. */
   none: 'No other meal on your plan changes.',

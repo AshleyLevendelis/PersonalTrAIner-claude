@@ -90,7 +90,7 @@ console.log('\n2. The card names what else will change\n')
 check('2a. the old assertion is gone: nothing says the day "re-fits around it"', lines.length > 0 && !lines.some(l => /re-?fits? around/i.test(l)), lines)
 check('2b. each other meal that changes is named with its day, its meal and the dish it becomes', (chosen?.named ?? []).filter(n => n.kind === 'dish').length >= 1 && (chosen?.named ?? []).every(n => !n.date.startsWith('?')), chosen?.named)
 check('2c. it does not also claim nothing else changes', !lines.includes('No other meal on your plan changes.'), lines)
-check('2d. the day is named in words, never as a stored date', lines.some(l => /Becomes your lunch for today;/.test(l)) && !lines.some(l => /\d{4}-\d{2}-\d{2}/.test(l)), lines)
+check('2d. the day is named in words, never as a stored date', lines.some(l => /^Just for today\. On other days your lunch stays /.test(l)) && !lines.some(l => /\d{4}-\d{2}-\d{2}/.test(l)), lines)
 const box = await ev(`(() => { const n = document.querySelector('[data-testid="meal-food-add-preview"]'); if (!n) return null; n.scrollIntoView({ block: 'center' }); const r = n.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight } })()`)
 check('2e. the whole card is on screen where she is about to tap', !!box && box.top >= 0 && box.bottom <= box.h, box)
 await shoot('meal-knock-on-card')
@@ -113,6 +113,10 @@ const more = Number((/^(\d+) more meals? changes? too\.$/.exec(lines.find(l => /
 check('3c. every dish the card named did change, to the dish it named', said.length >= 1 && said.every(x => moved.includes(x)), { said, moved })
 check('3d. ...and NOTHING changed that the card did not account for: the dishes it named plus the "N more" it counted cover every dish that moved',
   moved.length >= 1 && (more === 0 ? moved.length === said.length : moved.length > said.length && moved.length <= said.length + more) && said.length + sizes <= 4, { moved: moved.length, named: said.length, sizes, more, lines })
+// Ashley, 2 Nov 2026, "Today only": the edited lunch is today's, and no later day's search can serve it.
+const editedLunch = after?.[today]?.lunch ?? null
+const servedLater = dates.filter(dt => dt !== today && Object.values(after?.[dt] ?? {}).includes(editedLunch))
+check('3e. the edited lunch is served today only: no later day serves it', !!editedLunch && servedLater.length === 0, { editedLunch, servedLater })
 await ev(`window.scrollTo(0, 0)`)
 await wait(400)
 await shoot('meal-knock-on-after')

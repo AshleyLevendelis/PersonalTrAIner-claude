@@ -74,7 +74,8 @@ console.log('\n1. The meal keeps what it had; the food keeps its amount')
     // off a trial and added by the caller (test:meal-knock-on); the builder
     // must say nothing about it.
     check('...and asserts nothing about the rest of the day (that is read off a trial now)', r.diff.implications?.some(i => /re-?fits/i.test(i.text)) === false)
-    check('the original meal is kept in the options', r.diff.implications?.some(i => /original stays/.test(i.text)) === true)
+    // RE-ANCHORED 2 Nov 2026, Ashley's "Today only": the card now says the other days keep the original dish.
+    check('the card says other days keep the original meal', r.diff.implications?.some(i => /^Just for today\. On other days your breakfast stays .*parfait/i.test(i.text)) === true, r.diff.implications)
     check('the option is named as the meal plus the food', /parfait/i.test(r.payload.option.name) && /banana/i.test(r.payload.option.name), r.payload.option.name)
   }
 }
@@ -148,7 +149,7 @@ console.log("\n8. It says \"today\", not a date off her own clock")
   } })
   const otherSaid = other.ok ? (other.diff.implications ?? []).map(i => i.text).join(' ') : ''
   // RE-ANCHORED 9 Oct 2026 (L24): named as a day a person would say, not as the stored date.
-  check('...while another day is still named — by its weekday, never as a stored date', /for Saturday;/.test(otherSaid) && !/\d{4}-\d{2}-\d{2}/.test(otherSaid), otherSaid)
+  check('...while another day is still named — by its weekday, never as a stored date', /Just for Saturday\./.test(otherSaid) && !/\d{4}-\d{2}-\d{2}/.test(otherSaid), otherSaid)
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }

@@ -35,9 +35,27 @@ export function tagsNewFrom(tags: string[], date: string): string[] {
   return [...tags.filter(t => !t.startsWith(NEW_FROM_TAG_PREFIX)), `${NEW_FROM_TAG_PREFIX}${date}`]
 }
 
+/**
+ * A MEAL MADE FOR ONE DAY — Ashley's ruling, 2 Nov 2026 ("Today only"). A food added to, taken out of, swapped in
+ * or re-weighed in a meal makes an edited copy, and the card says it is for that day. The copy is served only where a
+ * pick names it: no day's search can find it, so later days keep the dish as it was. Before this the copy joined the
+ * pool like any dish and came back on later days (whole-app test #8, 1 Nov 2026).
+ */
+const PIN_ONLY_TAG = 'pin-only'
+
+/** Is this option served only where a pick names it (never by a day's search)? */
+export function isPinOnly(option: { tags?: string[] }): boolean {
+  return (option.tags ?? []).includes(PIN_ONLY_TAG)
+}
+
+/** An option's tags marked as made for one day. */
+export function tagsPinOnly(tags: string[]): string[] {
+  return tags.includes(PIN_ONLY_TAG) ? tags : [...tags, PIN_ONLY_TAG]
+}
+
 /** Is this a tag the app keeps for itself, never one to show as a label? */
 export function isBookkeepingTag(tag: string): boolean {
-  return tag.startsWith(NEW_FROM_TAG_PREFIX)
+  return tag.startsWith(NEW_FROM_TAG_PREFIX) || tag === PIN_ONLY_TAG
 }
 
 /**
