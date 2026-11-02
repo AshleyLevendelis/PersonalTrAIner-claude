@@ -518,6 +518,7 @@
     "verify:small-targets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/small-targets.mjs",
     "verify:strip-readable": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/strip-readable.mjs",
     "measure:tap-count": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tap-count.mjs",
+    "verify:warmups-one-tap": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/warmups-one-tap.mjs",
     "verify:home-day-named": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/home-day-named.mjs",
     "verify:small-print": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/small-print.mjs",
     "verify:timer-chip": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/timer-chip.mjs",

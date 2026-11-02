@@ -885,6 +885,23 @@ export function SetGrid({
     </button>
   )
 
+  // ONE TAP FOR THE WHOLE BUILD-UP (2 Nov 2026, Ashley's ruling "One tap for all", UX item 6): a main lift's warm-up
+  // rows each took a tap. This logs every one still open, as written, through the same save each tick uses; the boxes
+  // stay, so any of them can still be changed or typed first. Only while two or more are open and on screen.
+  const openWarmups = rowRefs.filter(r => isWarm(r) && !loggedRowFor(r))
+  const logAllWarmupsButton = showWarm && openWarmups.length >= 2 && profileId ? (
+    <button
+      type="button"
+      className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-[10px] text-[0.8125rem] font-semibold text-[color:var(--ramp-label)]"
+      style={{ boxShadow: 'inset 0 0 0 1.5px var(--ramp-rail)' }}
+      onClick={() => openWarmups.forEach(handleSaveSet)}
+      data-testid="log-all-warmups"
+    >
+      <Check className="size-3.5" strokeWidth={3} aria-hidden />
+      Log all {openWarmups.length} warm-ups
+    </button>
+  ) : null
+
   return (
     <div className="pb-1 space-y-1">
       {hasFold && (
@@ -911,6 +928,7 @@ export function SetGrid({
           <ChevronDown aria-hidden className={`size-[13px] shrink-0 text-muted-foreground transition-transform duration-150 ${rampOpen ? 'rotate-180' : ''}`} />
         </button>
       )}
+      {logAllWarmupsButton}
       {showColumnLabels && (
         <div className={`${GRID} px-0.5 text-[0.625rem] text-muted-foreground`} data-testid="set-columns">
           <span />

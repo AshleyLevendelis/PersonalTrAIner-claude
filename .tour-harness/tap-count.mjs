@@ -41,6 +41,13 @@ while (guard++ < 80) {
     if (!ok) break
     continue
   }
+  // Her "One tap for all" (2 Nov 2026): where a lift's warm-ups are open, the one button logs them all.
+  if (await ev(`!!document.querySelector('[data-testid="log-all-warmups"]')`)) {
+    const what = await ev(`document.querySelector('[data-testid="log-all-warmups"]').textContent.trim()`)
+    await tap('logSet', `document.querySelector('[data-testid="log-all-warmups"]')`, what)
+    warmupRows += Number((what.match(/(\d+)/) || [])[1] || 0)
+    continue
+  }
   const label = await nextLabel()
   if (!label) break
   if (/warm/i.test(label)) warmupRows++

@@ -8,7 +8,14 @@ Newest first. One line each.
   set. Open 1, Start 1, sets 19, warm-up rows 4, Finish 1; no sheet, question or timer got in the way, nothing needed
   typing. The only part over one tap a set is the warm-up (one tap per row, her 17 Sep "a box for every set" ruling).
   A set lifted differently from what is written costs the box, the keyboard and the tick (read off the screen, not
-  driven). PUT TO ASHLEY: one tap to log all of a lift's warm-ups as written, boxes still there to change. Also seen,
+  driven). ASHLEY'S RULING, from three options, "One tap for all" (over one tap each, and over going back to
+  unrecorded warm-ups, which would have reversed her 17 Sep ruling): "Log all 4 warm-ups" sits above a lift's open
+  warm-up rows and logs every one still open, as written, through the same save each tick uses; the boxes stay, so
+  any can be typed first or changed after. Shown only while two or more are open. Re-measured: 26 taps → 23 for the
+  same session. `verify:warmups-one-tap` (new, 10 checks: one ticked by hand first, so "all" must mean "all still
+  open"; the stored rows' weights and reps; filed as warm-ups; the working count untouched; 4 mutations, all
+  caught). The big "Log set" button is unchanged and still logs one row at a time. CSCS: a logging change only;
+  nothing prescribed moves, and a warm-up stays out of volume, records and progression by construction. Also seen,
   not fixed: the BW switch on a set row is 28px (her 44px rule; `verify:small-targets` never reaches a bodyweight-
   capable row on the whole-app page).
 - [ ] **HOME SAYS WHAT TODAY IS, 2 NOV 2026 (UX item 5, "the coach knows where you are"; whole-app test §4).** Four

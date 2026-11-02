@@ -530,7 +530,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   A warm-up row is filtered out of volume, personal bests, progression and
   history by construction, so logging one changes no number the app shows
   back. `working-sets`, `ramp-visibility`, `set-plausibility`,
-  `verify:warmup-rows`, `verify:ramp-readonly`
+  `verify:warmup-rows`, `verify:ramp-readonly`.
+  **And all of a lift's warm-ups in one tap: her ruling 2 Nov 2026, "One tap for all"**, from three options (over one
+  tap each and over unrecorded warm-ups): "Log all N warm-ups" logs every open row as written; the boxes stay.
+  `verify:warmups-one-tap`, `measure:tap-count` (26 → 23 taps for a 19-set session)
 - **The faint numbers in the boxes say whose they are** — `screen only`, since
   18 Sep 2026. Ashley, reading her own dumbbell rows: *"Last sets prescribed
   were sets of 11 reps. Is thay correct at the end of a exercise?"* Nothing had
