@@ -2,6 +2,31 @@
 
 Newest first. One line each.
 
+- [ ] **THE MACHINE PACK, 3 NOV 2026** (Ashley: "I want more exercises and machine options"; CSCS delegation, nothing
+  asked; `docs/plans/machine-pack.md`). MEASURED FIRST: single-leg work had no machine or cable option, quad isolation
+  one machine, a full-gym pool 54 machine/cable exercises. FIFTEEN ENTRIES, appended last, each copying its nearest
+  entry's exclusions and priced by an existing category, never heavier on the body than its model for four people:
+  Seated Dip Machine, Machine Tricep Extension, Cable Rear Delt Fly, Single-Arm Cable Row, Iso-Lateral High Row,
+  Iso-Lateral Pulldown, Cable Y-Raise, Bayesian Cable Curl, Leg Press Calf Raise, Smith Machine Split Squat
+  (intermediate and up: its empty bar is ~20kg against a beginner's 4kg split-squat dumbbells), Single-Leg Leg Press,
+  Single-Leg Leg Extension, Cable Glute Kickback, Cable Crunch, Half-Kneeling Single-Arm Dumbbell Press. NOT ADDED: an
+  incline cable fly (see the two-stack finding below), a pendulum squat (no pricing category fits without a new rule);
+  the cable Y-raise and rear-delt fly are written one-arm so their number is per side.
+  TWO ENGINE FIXES IT NEEDED. (1) A one-leg press is capped at half the two-leg ceiling: the ceiling was the two-leg
+  400kg in the units of a per-leg number, so a 120kg advanced lifter at 3-5 got 227.5kg a leg uncapped. Only lowers.
+  (2) BOTH ROTATIONS NOW SEE WHAT EARLIER SLOTS BECAME: each guessed the day's other movements from their OLD names,
+  assuming a substitution group is one movement; the triceps group holds three. On 1,024 grid plans: 24
+  repeated-movement days before today (18 pushdown pairs, 6 press pairs), 99 with the pack and no fix, 0 with both.
+  Each fix pinned by a plan it binds on (the week-to-week one was a MISSED mutation until a 1,024-plan measurement
+  named two).
+  FOUND, NOT FIXED (both pre-existing): (a) 712 days on that grid pair two core-stability drills (plank + bird dog
+  or dead bug) that the app's own duplicate rule calls the same movement; 760 after the pack re-rolled picks, untouched
+  by either fix (measured with them off). Mostly beginner and bad-back plans, which `test:movement-families`' sample
+  (intermediate, hypertrophy) never reaches. (b) A two-handed cable move on two stacks (Cable Crossover, Cable Flyes)
+  shows one total, which reads as the weight on EACH pulley: double. Both worth a build of their own.
+  `test:machine-pack` (57 checks), `test:movement-families` section 4, `test:ceiling-units`; the pricing snapshot,
+  family lists and injury counts updated with each entry's reason. 7 mutations, 7 caught (two after a check was
+  strengthened). Frontend only.
 - [ ] **A BAN MADE DURING AN INJURY EASE-OFF NOW SURVIVES ITS ENDING, AND THE SWEEP BEFORE IT, 3 NOV 2026.** FOUND by
   a MISSED mutation while re-anchoring gates after the dumbbell pack: emptying the ban list in
   `revertAdaptationChanges` failed nothing, because the check banned a triceps kickback, which a knee ease-off never
