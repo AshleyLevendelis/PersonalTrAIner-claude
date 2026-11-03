@@ -367,7 +367,12 @@ export function revertAdaptationChanges(
       const day = working.days.find(d => d.day === change.dayName)
       if (!day) { keptEdits++; continue }
       const names = day.exercises.map(e => e.name)
-      const untouched = !legacy && names.length === change.became.length && names.every((n, i) => n === change.became[i])
+      // A day nobody edited goes back whole, EXCEPT one whose old version holds something banned since: a knee
+      // ease-off swaps the reverse lunge out, she bans the lunge, and putting the old day back whole brought it
+      // back (found 3 Nov 2026; the ban guard below sat only on the slot-by-slot path). That day goes slot by
+      // slot instead, where a banned slot keeps its stand-in.
+      const holdsBanned = change.was.exercises.some(e => banned.has(e.name.toLowerCase()))
+      const untouched = !legacy && !holdsBanned && names.length === change.became.length && names.every((n, i) => n === change.became[i])
       if (untouched) {
         working = { ...working, days: working.days.map(d => (d.day === change.dayName ? change.was : d)) }
         restoredDays++

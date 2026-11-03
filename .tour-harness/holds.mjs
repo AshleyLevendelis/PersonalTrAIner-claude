@@ -67,15 +67,16 @@ const finish = async () => {
 // ---------------------------------------------------------------------------
 // verify:holds — A TIMED HOLD ON A REAL CARD (runs 3-4, M42, 10 Oct 2026).
 // A plank had no timer, a 33-second hold was logged as "33 reps", and "Add a
-// drop" was offered on it. On the ?legcurl=1 day, Dead Bug is a timed hold:
+// drop" was offered on it. On the harness's default day, Side Plank is a timed hold (until 3 Nov 2026 it was
+// Dead Bug on the ?legcurl=1 day, which the dumbbell pack re-rolled to a Bird Dog, counted in reps):
 // start and stop the row's timer, the seconds fill the box, tick it, and the
 // receipt says seconds, with no drop offered and no record claimed.
 // ---------------------------------------------------------------------------
 await send('Page.enable'); await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
-await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&legcurl=1#/tab/exercise` })
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/exercise` })
 await wait(5000)
-const HOLD = 'Dead Bug'
+const HOLD = 'Side Plank'
 const CARD = `[...document.querySelectorAll('[data-exercise-name]')].find(x => x.getAttribute('data-exercise-name') === ${JSON.stringify(HOLD)})`
 check('0. the day carries a timed hold', await ev(`!!${CARD}`))
 const at = await ev(`(() => { const card = ${CARD}; if (!card) return null; const head = card.querySelector('button,[role="button"]') || card; head.scrollIntoView({ block: 'center' }); const r = head.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)

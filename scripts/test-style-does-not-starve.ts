@@ -204,13 +204,17 @@ console.log('\n2. Improvised kit never beats the real thing you own')
   // the preference IS active. The first version of this only checked that
   // everything DROPPED had a peer, which a mutation dropping everything
   // passed trivially — it had nothing to say about what must be kept.
-  const fullPool = getConstrainedPool(hers, [])
-  const noPeer = fullPool.filter(e =>
+  // At a HOME gym, where the preference is also active: since the dumbbell pack (3 Nov 2026) every
+  // improvised entry at a full gym has a better peer (the band kickback gained the dumbbell one), so a
+  // full gym can no longer hold this case. Measured at home_gym/functional: the two band lat pulldowns.
+  const homePool = getConstrainedPool(profileFor('home_gym', 'functional'), [])
+  const homeRotation = poolForRotation(homePool, 'home_gym')
+  const noPeer = homePool.filter(e =>
     bestEquipmentRank(e) === 'low' && !isEquipmentQualityExempt(e) &&
-    !hasBetterLoadingPeer(e, fullPool))
+    !hasBetterLoadingPeer(e, homePool))
   check('improvised kit with no better peer is KEPT, not swept up',
-    noPeer.length > 0 && noPeer.every(e => rotation.some(r => r.name === e.name)),
-    { checked: noPeer.length, missing: noPeer.filter(e => !rotation.some(r => r.name === e.name)).map(e => e.name) })
+    noPeer.length > 0 && homeRotation.length < homePool.length && noPeer.every(e => homeRotation.some(r => r.name === e.name)),
+    { checked: noPeer.length, dropped: homePool.length - homeRotation.length, missing: noPeer.filter(e => !homeRotation.some(r => r.name === e.name)).map(e => e.name) })
 
   // ...and so does anyone whose only option in that group is improvised.
   const minimal = getConstrainedPool(profileFor('minimalist', 'functional'), [])

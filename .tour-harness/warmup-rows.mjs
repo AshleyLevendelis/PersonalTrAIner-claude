@@ -139,8 +139,10 @@ const LOADED = 'Barbell Squats'
 // Any bodyweight lift counted in reps will do: the plan is really generated, so
 // which one the day holds moves when generation does (9 Oct 2026, H4: a day
 // named for a body part now trains it, and the Cossack squat left this day).
-// Each name here is `equipment: ['bodyweight']`, `prescription_type: 'reps'`.
-const BODYWEIGHT_CANDIDATES = ['Cossack Squat (Bodyweight)', 'Chair Leg Extension']
+// Each name here is `equipment: ['bodyweight']`, `prescription_type: 'reps'`. 3 Nov 2026: the dumbbell
+// pack's reverse lunge (loaded) now takes the slot the bodyweight Cossack squat had, so the day's
+// bodyweight rep work is the Bird Dog.
+const BODYWEIGHT_CANDIDATES = ['Cossack Squat (Bodyweight)', 'Chair Leg Extension', 'Bird Dog']
 const present = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(r => r.getAttribute('data-exercise-name'))`)
 const BODYWEIGHT = BODYWEIGHT_CANDIDATES.find(n => (present ?? []).includes(n)) ?? BODYWEIGHT_CANDIDATES[0]
 check('the fixture still carries a loaded lift to read', (present ?? []).includes(LOADED), present)

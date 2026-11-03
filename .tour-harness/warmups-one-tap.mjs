@@ -21,10 +21,14 @@ if (await ev(`!!(${btn('/^Not now$/')})`)) { await clickAt(btn('/^Not now$/')); 
 await ev(`location.hash = '#/tab/exercise'`); await wait(2000)
 await clickAt(`document.querySelector('[data-testid="hero-start"]')`); await wait(1200)
 
-// The session opens on box jumps; the squat's rows open once its two sets are logged, as on her phone.
-for (let i = 0; i < 2 && /Box Jumps/.test(await ev(`document.querySelector('[data-next-set-button]')?.textContent ?? ''`)); i++) {
-  await clickAt(`document.querySelector('[data-next-set-button]')`); await wait(900)
+// The session opens on its movement prep (box jumps until 3 Nov 2026, squat marches since the dumbbell pack
+// re-rolled the day); the squat's rows open once the sets before it are logged, as on her phone. Whatever comes
+// first is logged with the big button while it still names that prep, and counted for 4b.
+let before = 0
+for (let i = 0; i < 4 && /Box Jumps|Marches/.test(await ev(`document.querySelector('[data-next-set-button]')?.textContent ?? ''`)); i++) {
+  await clickAt(`document.querySelector('[data-next-set-button]')`); await wait(900); before++
 }
+console.log(`  (logged ${before} set(s) before the squat)`)
 // The squat's ramp, read off its own rows: what each box would log if ticked blank.
 const ramp = await ev(`[...document.querySelectorAll('button[aria-label^="Save warm-up"], button[data-next-set^="Warm-up"]')].length`)
 check('2. today\'s squat has four warm-up rows (the case binds)', ramp === 4, ramp)
@@ -39,7 +43,7 @@ const label1 = await allButton()
 check('4. after one is ticked by hand it offers the three still open', label1 === 'Log all 3 warm-ups', label1)
 
 const working0 = await workingRows()
-check('4b. (the two box-jump sets are the only working sets so far)', working0 === 2, working0)
+check('4b. (the sets before the squat are the only working sets so far)', before >= 1 && working0 === before, { working0, before })
 const tapped = await clickAt(`document.querySelector('[data-testid="log-all-warmups"]')`)
 await wait(1500)
 const rows = await until(warmRows, v => (v ?? []).length >= 4, 20)

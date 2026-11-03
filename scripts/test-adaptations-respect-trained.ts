@@ -208,7 +208,7 @@ async function main() {
       const pick = pickAutomaticReplacement(e.name, functional, [], new Set())
       if (!pick || pick.kind !== 'same' || pick.exercise.movement_pattern !== e.movement_pattern || list.find(c => c.exercise.name === pick.exercise.name)?.offStyle) wrong.push(`${e.name} -> ${pick?.exercise.name} (${pick?.kind})`)
     }
-    check(`where the swap list leads with an off-style option, the automatic pick is on-style and on-pattern (${cases} lifts)`, cases >= 5 && wrong.length === 0, { cases, wrong: wrong.slice(0, 4) })
+    check(`where the swap list leads with an off-style option, the automatic pick is on-style and on-pattern (${cases} lifts)`, cases >= 4 && wrong.length === 0, { cases, wrong: wrong.slice(0, 4) })
 
     // Off-style only when the style has nothing for that movement, and said so.
     let offCases = 0
@@ -262,8 +262,8 @@ async function main() {
   {
     const record: AdaptationRecord = { version: 2, days: samTargets, changes: knee.changes }
     // The person bans an exercise while the adaptation is running (Run 2).
-    const banned = await silentlyAsync(() => banExerciseFromMesocycle({ mesocycle: knee.mesocycle, profile: sam, bannedName: 'Band Tricep Kickback', exclusions: ['Band Tricep Kickback'] }))
-    const hadKickback = plan.slice(0, 3).some(w => w.days.some(d => d.exercises.some(e => e.name === 'Band Tricep Kickback')))
+    const banned = await silentlyAsync(() => banExerciseFromMesocycle({ mesocycle: knee.mesocycle, profile: sam, bannedName: 'Dumbbell Tricep Kickback', exclusions: ['Dumbbell Tricep Kickback'] }))
+    const hadKickback = plan.slice(0, 3).some(w => w.days.some(d => d.exercises.some(e => e.name === 'Dumbbell Tricep Kickback')))
     check('the fixture has the banned exercise inside the window', hadKickback)
     // ...and swaps one of the adaptation's own replacements for something else.
     const swapped = knee.touchedSlots.find(s => s.weekNumber === 2 && s.dayName === 'Thursday' && s.after)!
@@ -272,9 +272,32 @@ async function main() {
     })
     // "End now" on Saturday 10 Oct, nothing logged that day.
     const guard = buildDayGuard(plan, { ...calendar('2026-10-10'), loggedDates: [], closedDates: [] })
-    const ended = silently(() => revertAdaptationChanges(edited, record, [1, 2, 3], guard, sam, adaptationConflictTest('injury', 'knees', null), ['Band Tricep Kickback']))
+    const ended = silently(() => revertAdaptationChanges(edited, record, [1, 2, 3], guard, sam, adaptationConflictTest('injury', 'knees', null), ['Dumbbell Tricep Kickback']))
     const all = (m: MesocycleWeek[]) => m.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name)))
-    check('the ban made during the adaptation survives its ending', !all(ended.mesocycle).includes('Band Tricep Kickback'))
+    // (The kickback is never a slot the knee adaptation removes, so this holds that ending leaves a non-knee ban
+    // alone; it cannot reach the ban guard. The block below can.)
+    check('the ban made during the adaptation survives its ending', !all(ended.mesocycle).includes('Dumbbell Tricep Kickback'))
+    // A BAN OF SOMETHING THE ADAPTATION TOOK OUT (found 3 Nov 2026): the knee ease-off swaps a knee move out, she
+    // bans that move, and ending the ease-off put the whole old day back, ban and all, because the day was otherwise
+    // untouched. Every knee move it removed is tried, on every day still ahead that it was removed from.
+    {
+      const removed = [...new Set(knee.touchedSlots.filter(s => s.after).map(s => s.before))]
+      let daysChecked = 0
+      const back: string[] = []
+      const otherSlotsBack: string[] = []
+      for (const X of removed) {
+        const b = await silentlyAsync(() => banExerciseFromMesocycle({ mesocycle: knee.mesocycle, profile: sam, bannedName: X, exclusions: [X] }))
+        const e2 = silently(() => revertAdaptationChanges(b, record, [1, 2, 3], guard, sam, adaptationConflictTest('injury', 'knees', null), [X]))
+        for (const c of knee.changes.filter(ch => !guard(ch.weekNumber, ch.dayName) && ch.slots.some(sl => sl.was.name === X))) {
+          daysChecked++
+          const now = namesOf(e2.mesocycle, c.weekNumber, c.dayName)
+          if (now.includes(X)) back.push(`${X} on ${c.weekNumber}:${c.dayName}`)
+          for (const sl of c.slots) if (sl.was.name !== X && !now.includes(sl.was.name)) otherSlotsBack.push(`${sl.was.name} on ${c.weekNumber}:${c.dayName}`)
+        }
+      }
+      check(`a knee move banned during the ease-off stays out when it ends (${removed.length} moves, ${daysChecked} days ahead)`, removed.length >= 3 && daysChecked >= 4 && back.length === 0, back)
+      check('...while the day\'s other knee work still comes back', daysChecked >= 4 && otherSlotsBack.length === 0, otherSlotsBack.slice(0, 4))
+    }
     check('a day nobody touched since goes back exactly as it was (same object)', dayOf(ended.mesocycle, 1, 'Saturday') === dayOf(plan, 1, 'Saturday') && dayOf(ended.mesocycle, 2, 'Saturday') === dayOf(plan, 2, 'Saturday'), namesOf(ended.mesocycle, 1, 'Saturday'))
     check('on the day the person edited, their swap stays', namesOf(ended.mesocycle, 2, 'Thursday').includes('Wall Sit') && !namesOf(ended.mesocycle, 2, 'Thursday').includes(swapped.before), namesOf(ended.mesocycle, 2, 'Thursday'))
     const others = knee.touchedSlots.filter(s => s.weekNumber === 2 && s.dayName === 'Thursday' && s !== swapped)
@@ -293,10 +316,10 @@ async function main() {
     // every day of plan weeks 1 and 2, trained or not.
     const everyDay = [1, 2].flatMap(w => plan[w - 1].days.map(d => ({ weekNumber: w, dayName: d.day })))
     const oldStyle = await silentlyAsync(() => substituteForInjury({ mesocycle: plan, profile: sam, injuryCode: 'knees', targetDays: everyDay, exclusions: [], context: untrainedPlanContext(calendar(THU)) }))
-    const oldBanned = await silentlyAsync(() => banExerciseFromMesocycle({ mesocycle: oldStyle.mesocycle, profile: sam, bannedName: 'Band Tricep Kickback', exclusions: ['Band Tricep Kickback'] }))
+    const oldBanned = await silentlyAsync(() => banExerciseFromMesocycle({ mesocycle: oldStyle.mesocycle, profile: sam, bannedName: 'Dumbbell Tricep Kickback', exclusions: ['Dumbbell Tricep Kickback'] }))
     const trained = buildDayGuard(plan, { ...calendar('2026-10-10'), loggedDates: [], closedDates: [] })
-    const oldEnded = silently(() => revertAdaptationChanges(oldBanned, plan.filter(w => w.week_number <= 2), [1, 2], trained, sam, adaptationConflictTest('injury', 'knees', null), ['Band Tricep Kickback']))
-    check('OLD stored shape: the ban still survives', !all(oldEnded.mesocycle.slice(0, 2)).includes('Band Tricep Kickback'))
+    const oldEnded = silently(() => revertAdaptationChanges(oldBanned, plan.filter(w => w.week_number <= 2), [1, 2], trained, sam, adaptationConflictTest('injury', 'knees', null), ['Dumbbell Tricep Kickback']))
+    check('OLD stored shape: the ban still survives', !all(oldEnded.mesocycle.slice(0, 2)).includes('Dumbbell Tricep Kickback'))
     check('OLD stored shape: the knee work comes back on days still ahead', oldStyle.touchedSlots.filter(s => s.weekNumber === 2 && s.dayName === 'Thursday').every(s => namesOf(oldEnded.mesocycle, 2, 'Thursday').includes(s.before)), namesOf(oldEnded.mesocycle, 2, 'Thursday'))
     check('OLD stored shape: the Thursday already trained stays as it now reads', dayOf(oldEnded.mesocycle, 1, 'Thursday') === dayOf(oldBanned, 1, 'Thursday'))
   }

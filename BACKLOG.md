@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [ ] **A BAN MADE DURING AN INJURY EASE-OFF NOW SURVIVES ITS ENDING, AND THE SWEEP BEFORE IT, 3 NOV 2026.** FOUND by
+  a MISSED mutation while re-anchoring gates after the dumbbell pack: emptying the ban list in
+  `revertAdaptationChanges` failed nothing, because the check banned a triceps kickback, which a knee ease-off never
+  removes. Measured with the case that binds: during a knee ease-off she bans a knee move it had swapped out (the reverse
+  lunge, a leg curl, a glute bridge: 5 moves, 6 days ahead), and ending the ease-off put the whole old day back, the
+  banned move with it, on every one of the 6 days. The ban guard sat on the slot-by-slot path only; a day nobody had
+  edited was restored whole. FIX: a day whose old version holds a banned exercise goes slot by slot, where the banned slot
+  keeps its stand-in and the rest come back. Live on the app's path (it passes its ban list). Pre-existing, not caused by
+  the pack. `test:adaptations-respect-trained` +2 checks, 3 mutations, 3 caught (the fix removed; the ban list emptied;
+  a banned day putting nothing back). Affected gates (17 readers + 2 drivers + bundle + dead code) green. Frontend only.
+  THE SWEEP (473 gates at the exam commit): 464 passed; `test:coach-exam-fresh` failed as expected (4 reasons, cleared
+  by the exam run on her machine); `test:quality` held the floor, average 11.64. Eight failed because the pack re-rolled
+  what some fixtures get, each re-anchored to keep its property, never loosened to fit: the ban fixture moved to the
+  dumbbell kickback sam's plan now holds; the swap-list case floor to its measured 4; the "improvised kit with no
+  better peer is kept" case to a home gym (at a full gym the band kickback now HAS a better peer, the dumbbell one),
+  with a new guard that the rule is active there; the backpack-row ceiling case gets its bag row back by excluding the
+  new row (an input); the long-session ceiling 3% -> 4% (measured 19 of 576, against 16 with the pack excluded, while
+  short sessions overall FELL 42 -> 38; a return to the pre-fix 13% still fails); the warm-up rows' bodyweight subject
+  is the Bird Dog (the loaded reverse lunge took the Cossack squat's slot, which is the pack working); the one-tap
+  warm-up driver logs whatever prep comes first; the hold driver moved to the default day's Side Plank; and the
+  past-day sheet's blank weight is now one she makes (clearing the squat's), not one the plan happens to leave.
+  Mutations on the moved checks: 9, 9 caught (rotation drops all improvised kit; the rule off at a home gym; the
+  no-change clamp removed; the filler gutted twice; a blank weight saved; warm-up controls on a bodyweight lift; the
+  hold timer removed; "log all" logging working sets).
 - [ ] **THE COACH EXAM ASKS ABOUT THE COACH SHE HAS, AND KNOWS WHICH QUESTIONS IT ASKED, 3 NOV 2026** (her item 3).
   FOUR CASES, each grading a ruling she had already given, so nothing new was decided: `layoff-restart-offered-not-imposed`
   (8 Oct, ruling B: after 12+ weeks the coach offers the restart card, and a hedge after it gets no second card),
