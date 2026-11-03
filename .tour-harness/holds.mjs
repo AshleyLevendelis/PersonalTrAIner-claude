@@ -21,7 +21,6 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
-import { ANCHOR_ISO } from './anchor.mjs'
 
 const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
@@ -77,7 +76,6 @@ const finish = async () => {
 // ---------------------------------------------------------------------------
 await send('Page.enable'); await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
-const isoPlus = n => { const [y, m, d] = ANCHOR_ISO.split('-').map(Number); const t = new Date(y, m - 1, d + n); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}` }
 const cardOf = name => `[...document.querySelectorAll('[data-exercise-name]')].find(x => x.getAttribute('data-exercise-name') === ${JSON.stringify(name)})`
 const openCard = async name => {
   const at = await ev(`(() => { const card = ${cardOf(name)}; if (!card) return null; const head = card.querySelector('button,[role="button"]') || card; head.scrollIntoView({ block: 'center' }); const r = head.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
@@ -85,8 +83,14 @@ const openCard = async name => {
   await wait(1200)
 }
 let HOLD = null, loads = 0, looked = 0
-search: for (const offset of [0, 2, 4, 5]) {
-  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&today=${isoPlus(offset)}&n=${++loads}#/tab/exercise` })
+// THE TRAINING DAYS COME FROM THE PAGE, never a list of offsets typed here
+// (test:harness-clock §5): real.tsx publishes the live week's training days
+// with their dates, so a plan reshaped to train other days is still walked.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&n=${++loads}#/tab/exercise` })
+await wait(5000)
+const trainingDates = await ev(`(window.__dayLengthTargets?.days ?? []).map(d => d.date)`) ?? []
+search: for (const date of trainingDates) {
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&today=${date}&n=${++loads}#/tab/exercise` })
   await wait(5000)
   const names = await ev(`[...new Set([...document.querySelectorAll('[data-exercise-name]')].map(x => x.getAttribute('data-exercise-name')))]`) ?? []
   for (const name of names) {

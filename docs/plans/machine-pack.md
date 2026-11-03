@@ -67,6 +67,8 @@ beginner and bad-back plans, which the movement-family gate's intermediate sampl
   exemption from the unilateral-vs-squat cap was measured and reverted: the cap was protecting an advanced lifter from
   127.5 kg a leg beside a 65 kg squat. Not done: the reps do not rise under a held clamp.
 - The kneeling one-arm press ranks as a main lift (it lost the label to a swing on a Shoulders day).
+- **The Cable Y-Raise counts as a side raise**, lateral deltoid only: listing the lower traps made each set in a
+  side-shoulder slot a full back set, and back:chest went 1.74 -> 1.81 on the balance gate's grid (1.75 after).
 
 ## CSCS review
 

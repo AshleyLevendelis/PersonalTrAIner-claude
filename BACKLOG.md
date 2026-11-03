@@ -51,6 +51,18 @@ Newest first. One line each.
   hold driver walks the week's days and opens cards until a row offers a hold timer). Mutations: 8, 8 caught (compare
   by card number; no reason recorded; the per-leg cap not halved back; the press rank removed; the muscle misspelt; a
   priced lift with no weight; the hold timer removed; "log all" removed). `test:machine-pack` 61 checks (+4).
+  THE SWEEP AFTER THE FIXES (at `3d9077f0`) found two more, both mine. (6) `test:harness-clock`: the hold driver's day
+  walk used typed offsets from the anchor; it now walks the training days the page itself publishes (an empty list
+  fails it: 7 failures, caught). (7) `test:muscle-balance`, back:chest 1.807 against its 1.80 line and 421 weeks over
+  1.5x against 420. MEASURED both ways before deciding: with the chest:back pass switched off it was 2.03 before the
+  pack and 2.11 after, so the pass still takes the same 0.3 off and the INPUT moved. Per exercise, 455 of the extra
+  back sets were the Cable Y-Raise, whose "lower trapezius" (renamed from an unrecognised "lower traps" in fix 3) made
+  every set in a side-shoulder slot count as a full back set. DECIDED (CSCS, not asked): it is counted as the side
+  raise it stands in for, lateral deltoid only, like Cable Lateral Raises; the lower-trap work stays in its swap note.
+  Basis: the slot is in the plan to train the side delts, and a set counts toward a muscle's weekly volume when the
+  slot prescribes it for that muscle; counting it as pulling tilted already back-heavy weeks further and would have
+  had the balance pass keep adding chest to offset a shoulder raise. After: back:chest 1.75, the gate unchanged.
+  Prone Y-T Raises keeps its lower traps: it fills an upper-back slot.
 - [ ] **A BAN MADE DURING AN INJURY EASE-OFF NOW SURVIVES ITS ENDING, AND THE SWEEP BEFORE IT, 3 NOV 2026.** FOUND by
   a MISSED mutation while re-anchoring gates after the dumbbell pack: emptying the ban list in
   `revertAdaptationChanges` failed nothing, because the check banned a triceps kickback, which a knee ease-off never

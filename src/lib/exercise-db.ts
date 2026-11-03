@@ -5303,7 +5303,10 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
     angle_vector: 'diagonal',
-    primary_muscles: ['lateral deltoid', 'lower trapezius'],
+    // Counted as the side-raise it stands in for (3 Nov 2026, CSCS): it fills a lateral_delt slot, and listing the
+    // lower traps made each set a full BACK set in the week's chest:back balance (455 of the grid's back sets, back:chest
+    // 1.74 -> 1.81). The lower-trap work is real and is named in the swap note, not counted as pulling volume.
+    primary_muscles: ['lateral deltoid'],
     equipment: ['cable machine'],
     joint_stress: 'low',
     form_cues: ['Set one pulley low and hold the handle in the opposite hand', 'Thumb up, arm nearly straight', 'Raise the hand up and out along the line of a Y', 'Stop at head height and lower slowly'],
