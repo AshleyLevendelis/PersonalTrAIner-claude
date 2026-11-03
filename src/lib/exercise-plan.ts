@@ -7591,6 +7591,12 @@ export function generateMesocycle(
         )
         const rotated = rotateVariation(ex.name, blockIndex, poolForRotation(pool, equipmentTierFor(profile)), experience, profile, usedNamesThisDay, avoidFamilies)
         usedNamesThisDay.add(rotated)
+        // THE PROXY ABOVE IS ONLY GOOD UNTIL A SLOT HAS ROTATED. One substitution_group can hold several families
+        // ('tricep_extension' holds pushdowns, kickbacks and overhead work), so a slot can rotate into a family
+        // another slot's OLD name did not have. Later slots see what earlier ones actually became (3 Nov 2026: a
+        // rope and a straight-bar pushdown on one day, once the machine pack widened that group).
+        const rotatedEntry = findEntry(rotated)
+        if (rotatedEntry) dayFamiliesByIndex[exIdx] = getMovementFamily(rotatedEntry)
         if (rotated === ex.name) return { ...ex, name: rotated }
         // A rotation can land on an exercise with a different prescription
         // TYPE, not just a different name — same substitution_group/tier is
@@ -7789,6 +7795,12 @@ export function generateMesocycle(
             .filter((_, i) => rotationTiers[dayIdx][i] !== 'accessory')
             .map(ex => ex.name)
         )
+        // Each slot's family as the week will actually hold it: the block's name until that slot's own weekly
+        // rotation below has run, then what it rotated to (same reason as the block-level rotation's update).
+        const weekFamilyByIndex = day.exercises.map(ex => {
+          const e = findEntry(ex.name)
+          return e ? getMovementFamily(e) : null
+        })
         const exercises: Exercise[] = day.exercises.map((ex, exIdx) => {
           // Accessories rotate on a 2-week sub-cycle within the block (weeks
           // 1-2 stay on the block's starting variation, weeks 3-4 move one
@@ -7811,16 +7823,13 @@ export function generateMesocycle(
           // would for a main lift, so they hold the block-level variation
           // for all four weeks. Intermediate+ keep the sub-cycle.
           const rotatesWeekly = tier === 'accessory' && !expConfig.repeat_movements_for_practice
-          const weeklyFamilies = new Set(
-            day.exercises
-              .map((e, i) => (i === exIdx ? null : findEntry(e.name)))
-              .filter((e): e is ExerciseEntry => !!e)
-              .map(e => getMovementFamily(e))
-          )
+          const weeklyFamilies = new Set(weekFamilyByIndex.filter((f, i) => f && i !== exIdx) as string[])
           const weeklyName = rotatesWeekly
             ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), poolForRotation(pool, equipmentTierFor(profile)), experience, profile, usedWeeklyNames, weeklyFamilies)
             : ex.name
           if (rotatesWeekly) usedWeeklyNames.add(weeklyName)
+          const weeklyEntry = findEntry(weeklyName)
+          if (weeklyEntry) weekFamilyByIndex[exIdx] = getMovementFamily(weeklyEntry)
 
           const dbEntry = EXERCISE_DATABASE.find(
             e => e.name.toLowerCase() === weeklyName.toLowerCase()

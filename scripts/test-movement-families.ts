@@ -65,13 +65,13 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
     families: {
       tricep_pushdown: ['Tricep Pushdowns', 'Rope Tricep Pushdown', 'Straight-Bar Tricep Pushdown', 'Band Tricep Pushdown'],
       tricep_kickback: ['Band Tricep Kickback', 'Dumbbell Tricep Kickback'],
-      tricep_extension: ['Lying Dumbbell Tricep Extension', 'Overhead Tricep Extension', 'Skull Crushers', 'Chair Dips'],
+      tricep_extension: ['Lying Dumbbell Tricep Extension', 'Overhead Tricep Extension', 'Skull Crushers', 'Chair Dips', 'Machine Tricep Extension'],
     },
   },
   row: {
     why: 'Close-Grip Lat Pulldown is filed with rows and is a pulldown: it shares the Lat Pulldown\'s family so the two cannot share a day.',
     families: {
-      row: ['Chest-Supported Row', 'Neutral-Grip Seated Cable Row', 'Barbell Rows', 'Seated Cable Row', 'Dumbbell Rows', 'Bent-Over Dumbbell Row', 'T-Bar Rows', 'Landmine Row', 'Inverted Row', 'Towel Row', 'Backpack Row', 'Table Row', 'Seated Machine Row', 'T-Bar Row Machine'],
+      row: ['Chest-Supported Row', 'Neutral-Grip Seated Cable Row', 'Barbell Rows', 'Seated Cable Row', 'Dumbbell Rows', 'Bent-Over Dumbbell Row', 'T-Bar Rows', 'Landmine Row', 'Inverted Row', 'Towel Row', 'Backpack Row', 'Table Row', 'Seated Machine Row', 'T-Bar Row Machine', 'Single-Arm Cable Row', 'Iso-Lateral High Row'],
       pulldown: ['Close-Grip Lat Pulldown'],
     },
   },
@@ -79,7 +79,7 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
     why: 'A pull-up and its assisted form are one movement; the two wide pulldowns are one movement; the rest of the group are different pulls.',
     families: {
       pull_up: ['Pull-Ups', 'Pull-Ups (Assisted)'],
-      pulldown: ['Lat Pulldown'],
+      pulldown: ['Lat Pulldown', 'Iso-Lateral Pulldown'],
       vertical_pull: ['Single-Arm Lat Pulldown', 'Kneeling Band Lat Pulldown', 'Chin-Ups', 'Band Lat Pulldown', 'Pull-Up Negatives'],
     },
   },
@@ -95,7 +95,7 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
     why: 'Bilateral calf raises are one movement whatever the implement; single-leg and bent-knee work is apart.',
     families: {
       calf_raise: ['Calf Raises', 'Seated Calf Raises', 'Calf Raises (Bodyweight)'],
-      calf: ['Standing Calf Raise Machine', 'Single-Leg Dumbbell Calf Raise', 'Single-Leg Calf Raise (Bodyweight)', 'Single-Leg Calf Raise Hold', 'Bent-Knee Calf Raise (Bodyweight)'],
+      calf: ['Standing Calf Raise Machine', 'Single-Leg Dumbbell Calf Raise', 'Single-Leg Calf Raise (Bodyweight)', 'Single-Leg Calf Raise Hold', 'Bent-Knee Calf Raise (Bodyweight)', 'Leg Press Calf Raise'],
     },
   },
   explosive_upper: {
@@ -110,7 +110,7 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
 /** Families that reach ACROSS substitution groups — "the same movement wearing different hats". */
 const DELIBERATE_MERGES: Record<string, string[]> = {
   push_up: ['Push-Ups', 'Plyo Push-Ups'],
-  pulldown: ['Lat Pulldown', 'Close-Grip Lat Pulldown'],
+  pulldown: ['Lat Pulldown', 'Close-Grip Lat Pulldown', 'Iso-Lateral Pulldown'],
   kettlebell_swing: ['Kettlebell Swing (Heavy)', 'Kettlebell Swings'],
 }
 
@@ -228,6 +228,43 @@ function main() {
   check('no day on it holds the same movement twice', offenders.length === 0,
     { count: offenders.length, first: offenders.slice(0, 4) })
   check('…and the detector can see a same-family pair at all (a zero above is not a blind detector)', variations > 0, variations)
+
+  // =========================================================================
+  console.log('\n4. A rotation sees what the slots before it actually became (3 Nov 2026)')
+  // =========================================================================
+  // One substitution_group can hold several families ('tricep_extension' holds pushdowns, kickbacks and overhead
+  // work), so a slot can rotate into a family another slot's OLD name did not have. Both rotations (block start and
+  // week to week) now read what earlier slots became. Measured on 1,024 grid plans: with neither, the machine pack
+  // put two pushdowns on one day 93 times; with the block fix alone, still on these two plans (week-to-week rotation);
+  // with both, none. Core stability pairs are a separate, older finding (BACKLOG, 3 Nov) and are not counted here.
+  {
+    const pinned: Combination[] = [
+      { equipment: 'full_gym', injuries: [], duration: '60-90', style: 'combat', experience: 'advanced', goal: 'functional', recovery: 'moderate', conditioningPref: 'tolerate' },
+      { equipment: 'full_gym', injuries: ['shoulders'], duration: '45-60', style: 'bodybuilding', experience: 'intermediate', goal: 'functional', recovery: 'moderate', conditioningPref: 'tolerate' },
+    ]
+    const pinnedOffenders: string[] = []
+    let pinnedDays = 0
+    console.log = () => {}; console.warn = () => {}
+    try {
+      for (const combo of pinned) {
+        setRandomSource(seededRngFromKey(comboKey(combo)))
+        let meso
+        try { meso = generateMesocycle(buildProfile(combo)) } finally { resetRandomSource() }
+        for (const week of meso) for (const day of week.days) {
+          if (day.exercises.length === 0) continue
+          pinnedDays++
+          const entries = day.exercises.map(ex => getExerciseEntry(ex.name)).filter((e): e is ExerciseEntry => !!e)
+          for (let i = 0; i < entries.length; i++) for (let j = i + 1; j < entries.length; j++) {
+            const a = entries[i], b = entries[j]
+            if (a.name === b.name || getMovementFamily(a) !== getMovementFamily(b) || getMovementFamily(a) === 'core_stability') continue
+            if (a.mechanics_tier === 'primer' && b.mechanics_tier === 'primer') continue
+            if (isGenuineDuplicate(a, b)) pinnedOffenders.push(`${comboKey(combo)} w${week.week_number} ${day.day}: ${a.name} + ${b.name}`)
+          }
+        }
+      }
+    } finally { console.log = log; console.warn = warn }
+    check(`on the two plans where the week-to-week rotation used to pair two pushdowns, no day repeats a movement (${pinnedDays} days)`, pinnedDays > 100 && pinnedOffenders.length === 0, pinnedOffenders.slice(0, 4))
+  }
 
   console.log(`\n${ran} checks ran, ${failures} failed.`)
   if (failures > 0) console.error(`\n${failures} movement-family check(s) FAILED`)

@@ -253,8 +253,16 @@ console.log('\n5. How MUCH each injury removes, frozen')
     //   elbows     21->23  Lying Dumbbell Tricep Extension, Dumbbell Tricep Kickback (every loaded extension)
     //   Dumbbell Hip Thrust adds to no count (as Hip Thrust)
     //   wrists     28->29  Lying Dumbbell Tricep Extension (as Skull Crushers)
-    lower_back: 18, knees: 38, shoulders: 69, neck: 7, wrists: 29,
-    hips: 20, ankles: 21, elbows: 23,
+    // 3 Nov 2026, the machine pack (docs/plans/machine-pack.md), each as the entry it copies:
+    //   lower_back 18->19  Cable Crunch (loaded spinal flexion, as Rotary Torso Machine and Russian Twist)
+    //   knees      38->41  Smith Machine Split Squat, Single-Leg Leg Press, Single-Leg Leg Extension
+    //   shoulders  69->75  Seated Dip Machine, Cable Rear Delt Fly, Iso-Lateral High Row, Iso-Lateral Pulldown,
+    //                      Cable Y-Raise, Half-Kneeling Single-Arm Dumbbell Press
+    //   hips       20->22  Smith Machine Split Squat, Single-Leg Leg Press
+    //   ankles     21->23  Smith Machine Split Squat, Leg Press Calf Raise
+    //   elbows     23->26  Seated Dip Machine, Machine Tricep Extension, Bayesian Cable Curl
+    lower_back: 19, knees: 41, shoulders: 75, neck: 7, wrists: 29,
+    hips: 22, ankles: 23, elbows: 26,
   }
   const drift: string[] = []
   for (const code of CODES) {

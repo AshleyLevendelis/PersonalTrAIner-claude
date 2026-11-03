@@ -836,7 +836,10 @@ const CALF_MACHINE_CEILING_KG = 250
 
 /** The realistic implement ceiling for this exercise, in the same units prescribeLoad's `rounded` already uses for its loading mode (per hand for a dumbbell pair, total otherwise). */
 export function getLoadingCeilingKg(entry: ExerciseEntry, category: string | null): number {
-  if (category === 'leg_press') return LEG_PRESS_CEILING_KG
+  // A one-leg press is prescribed PER LEG (isPerSideLoad), and this ceiling is in the prescription's own units, so
+  // it is half the two-leg ceiling: the same person who is capped at 400kg on the two-leg press is capped at 200kg a
+  // leg on one (3 Nov 2026, Single-Leg Leg Press: 227.5kg a leg uncapped for a 120kg advanced lifter at 3-5).
+  if (category === 'leg_press') return isPerSideLoad(entry) ? LEG_PRESS_CEILING_KG / 2 : LEG_PRESS_CEILING_KG
   if (category === 'isolation_calf' && loadingMode(entry) === 'stack') return CALF_MACHINE_CEILING_KG
   return LOADING_CEILING_KG_PER_HAND_OR_TOTAL[loadingMode(entry)]
 }
