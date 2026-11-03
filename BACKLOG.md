@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [ ] **THE EXERCISE LIBRARY FROM ASHLEY'S 1,001-EXERCISE LIST, 3 NOV 2026, PLANNED, NOT BUILT** ("I want the app to
+  have at its disposal"; `docs/plans/exercise-library.md`). MEASURED (name matching, an estimate): about 236 of the
+  list are already in the 231-entry catalogue; of about 765 left, ~476 use kit the app asks about, ~124 need new kit,
+  ~50 are elite or left out on purpose, ~115 are cardio or sport drills. HER RULING, from three options: **"Known kit
+  + a few"**: everything sensible for known kit, plus five new kit ticks (rings or suspension straps, sled, landmine,
+  slam ball, glute-ham bench); no strongman gear. Rejected: known kit only; a tick for everything. DECIDED (CSCS, not
+  asked): an entry is added only when a coach would prescribe it as a different exercise, never as a grip or angle
+  micro-variant the rotation would serve as fake variety; tempo, pause, pin, board and chains versions are methods,
+  not exercises; elite skills, kipping, behind-the-neck pressing, loaded Jefferson curls, depth jumps and strongman
+  implements are left out; landmine is assumed wherever a barbell is (to be measured). Five batches, each gated and
+  swept. NEXT: batch 1, barbell and dumbbell.
 - [ ] **THE MACHINE PACK, 3 NOV 2026** (Ashley: "I want more exercises and machine options"; CSCS delegation, nothing
   asked; `docs/plans/machine-pack.md`). MEASURED FIRST: single-leg work had no machine or cable option, quad isolation
   one machine, a full-gym pool 54 machine/cable exercises. FIFTEEN ENTRIES, appended last, each copying its nearest
