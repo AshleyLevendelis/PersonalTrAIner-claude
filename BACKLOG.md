@@ -2,6 +2,32 @@
 
 Newest first. One line each.
 
+- [ ] **EVERY DIET GETS A DEEP POOL FROM OUR OWN DISHES, 3 NOV 2026** (her "1 then 2 then 3 then 4", item 1: more
+  meal variety). MEASURED FIRST with a new walk (`measure:meal-library-depth`): the real "Get more options" path, one
+  person at a time, the meal writer off, asked again and again until our library has nothing left that lands her day
+  (the 10% bands), up to the ten a pool may hold; eight diets by six targets. A meat-eater got ten dishes in every
+  meal. A vegan got 2-4 lunches and 2-6 dinners, a vegetarian 4-5 lunches, dairy-free 1-6 snacks: **32 of 192 meals
+  under seven.** THE CAUSE WAS CUISINE, NOT COUNT: a pool takes one adventurous cuisine a meal (the coherence cap, not
+  touched), and 11 of 16 vegan lunches and 16 of 26 vegetarian ones were Thai, Indian, Japanese and the like, so a vegan
+  really chose from five. FIX: 59 dishes in everyday cuisines (British, Italian, American, Mexican, Mediterranean):
+  4 vegan breakfasts, 16 vegan lunches, 13 vegan dinners, 8 vegetarian lunches, 6 vegetarian dinners, 8 vegan snacks,
+  6 dairy-free snacks; each built on a protein food and a carb food in grams so the fit can move them (tofu, tempeh,
+  seitan, soy and vegan mince, Quorn, eggs, skyr, cottage cheese). Four first drafts were near-copies of dishes
+  already there (a second soy-mince chilli, bolognese, shepherd's pie, fajitas) and were replaced; three served almost
+  nobody (a jerky snack, a 100 kcal egg-white snack, a lean sausage and mash) and were rebuilt. AFTER: **0 of 192 under
+  seven, 186 at the full ten**; the lowest are a vegan lunch and snack at 3,040 kcal / 160 g (7). The gate's old
+  literal ("at most three meals the library cannot fill", 19 Oct) is now nought. NOT CHANGED: a NEW plan's dishes come
+  from the meal writer, so this deepens "Get more options", the swap list's "find more" and the coach's top-up, not
+  the first plan (seeding fresh plans from the library is still hers to rule). CSCS (general nutrition, mine): the
+  same protein floor, calorie band and scaling as every dish; no target moved; plant proteins are the ordinary ones
+  (soy, wheat gluten, mycoprotein), and the existing diet tags keep seitan from gluten-free and Quorn from egg-free.
+  `test:meal-library-depth` (new, 8 checks; 7 mutations, 6 caught; the seventh, asking for one dish at a time, still
+  reaches ten over the walk's twelve asks, so it is the same answer more slowly, recorded, not given a check). Its
+  self-proof caught a real defect in the walk on its first run: a second walk reused the first one's people and
+  started from full pools, reading 0 thin meals without the new dishes. `test:bundle`'s total moved 2542 -> 2577
+  (2552 measured; 2536 at the last release; all 16 kB in the lazily loaded library, first paint unchanged at 512).
+  Re-run green: every reader of the library (`test:meal-library` and 15 more), `verify:meal-top-up`,
+  `verify:chat-top-up`, typecheck. Frontend only: no edge function, no migration.
 - [ ] **A NEW PLAN'S MEALS MUST LAND A DAY ON HER NUMBERS, 2 NOV 2026.** Ashley, on her phone: "Only 2 of your 7
   breakfasts fit your targets ... why are the meals not fitting the macros when I've not made any changes and that's
   just what the app prescribed". FOUND: the app checked each new dish against its OWN meal's calories (7%) and a

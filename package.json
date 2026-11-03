@@ -459,6 +459,8 @@
     "test:week-boundaries": "tsx scripts/test-week-boundaries.ts",
     "test:layoff": "tsx scripts/test-layoff.ts",
     "measure:meal-library": "tsx scripts/measure-meal-library.ts",
+    "test:meal-library-depth": "tsx scripts/test-meal-library-depth.ts",
+    "measure:meal-library-depth": "tsx scripts/measure-meal-library-depth.ts",
     "test:layout-revamp": "tsx scripts/test-layout-revamp.ts",
     "test:one-page": "tsx scripts/test-one-page.ts",
     "test:home-2c": "tsx scripts/test-home-2c.ts",

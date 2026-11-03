@@ -376,6 +376,9 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   within a cook's "same dish") and PROVED through the scaler, which took
   servable from 73-87% (model only) to 94-99%. Named limit: high-energy,
   lower-protein targets get few good dishes; more low-density dishes fix that.
+  **AND EVERY DIET GETS A DEEP POOL, since 3 Nov 2026**: 59 everyday-cuisine plant dishes and dairy-free snacks took
+  meals under seven dishes that land her day from 32 of 192 (vegan, vegetarian, dairy-free) to 0, because the pool's
+  one-adventurous-cuisine cap had left a vegan five lunches. `test:meal-library-depth`, `measure:meal-library-depth`.
   Not built: the model-driven builder script (her machine, key needed), seeding
   fresh plans (hers), a "from our library" label, and the ingredient-amount
   reader, which must land before any OUTSIDE recipe text is accepted.

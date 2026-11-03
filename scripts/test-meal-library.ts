@@ -438,11 +438,12 @@ async function main() {
     }
   }
   check('for three real targets and seven diets, the library fills four dishes in every meal, or says the rest could not land her day', shortfalls.length === 0, shortfalls.slice(0, 6))
-  // MEASURED 19 Oct 2026: vegan snacks at 2,300 and 3,040 kcal with 160 g protein, and dairy-free at 3,040, are the
-  // only meals the library cannot fill with dishes that land the day inside the 10% bands. A literal, so growing
-  // the gap fails here rather than passing quietly.
+  // MEASURED 19 Oct 2026: vegan snacks at 2,300 and 3,040 kcal with 160 g protein, and dairy-free at 3,040, were the
+  // only meals the library could not fill with dishes that land the day inside the 10% bands. 3 Nov 2026: the
+  // everyday plant dishes and dairy-free snacks closed all three (test:meal-library-depth), so the literal is now
+  // nought, and any meal coming up short fails here rather than passing quietly.
   console.log(`     meals short because nothing left lands the day: ${honestShort.length} (${honestShort.join('; ')})`)
-  check('...and those are at most the three measured (high-protein vegan and dairy-free snacks), with every other meal filled', honestShort.length <= 3 && served4 >= PROFILES.length * DIET_SETS.length * 16 - 8, { honestShort, served4 })
+  check('...and there are none: every meal is filled (it was three until 3 Nov 2026, high-protein vegan and dairy-free snacks)', honestShort.length === 0 && served4 === PROFILES.length * DIET_SETS.length * 16, { honestShort, served4 })
   check('every dish the library added lands one of her days inside the bands (the fit test the offer counts with)', fitJudged >= 100 && unfit.length === 0, { fitJudged, unfit: unfit.slice(0, 5) })
   check('every dish offered meets the person\'s diet, stays within seven percent of the meal\'s calories and reaches its protein', breaches.length === 0, breaches.slice(0, 4))
   modelOn = true

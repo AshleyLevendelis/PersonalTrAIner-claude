@@ -621,7 +621,10 @@ console.log('\n3. Nothing has crept back up')
   // BOTH OF 20 Oct together (different-today + meal-rebalance): measured 2459 kB that day, 16 kB room.
   // MOVED 22 Oct 2026: 2475 -> 2492, the Sam live test (2467 measured, 25 raw of room).
   // MOVED 31 Oct 2026: 2492 -> 2542, the five-tab polish (2517 measured, 25 raw of room).
-  const TOTAL_BUDGET_KB = 2542
+  // MOVED 3 Nov 2026: 2542 -> 2577, the 59 everyday plant dishes and dairy-free snacks (2552 measured, 2536 the day
+  // before at the same tree minus the dishes; all 16 kB in the lazily loaded meal-library chunk, so first paint, the
+  // app chunk and a deploy's re-download did not move; 25 raw of room).
+  const TOTAL_BUDGET_KB = 2577
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
