@@ -55,7 +55,7 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
   bench_press: {
     why: 'A push-up is not a bench press (bodyweight, closed chain). And since 9 Oct 2026 a neutral-grip dumbbell press is not a flat barbell or floor press: different implement, grip, bar path and loaded range — a coach programmes a barbell/floor press and a dumbbell press in one session routinely. Decided as a CSCS coach; it is what gives a shoulder-flagged chest day a second press.',
     families: {
-      bench_press: ['Barbell Bench Press', 'Smith Machine Bench Press', 'Dumbbell Bench Press', 'Barbell Floor Press', 'Dumbbell Floor Press', 'Incline Dumbbell Press', 'Incline Machine Press', 'Incline Push-Ups', 'Deficit Push-Ups', 'Archer Push-Ups', 'Chest Press Machine', 'Knee Push-Ups', 'Wide Push-Ups', 'Single-Arm Dumbbell Bench Press'],
+      bench_press: ['Barbell Bench Press', 'Smith Machine Bench Press', 'Dumbbell Bench Press', 'Barbell Floor Press', 'Dumbbell Floor Press', 'Incline Dumbbell Press', 'Incline Machine Press', 'Incline Push-Ups', 'Deficit Push-Ups', 'Archer Push-Ups', 'Chest Press Machine', 'Knee Push-Ups', 'Wide Push-Ups', 'Single-Arm Dumbbell Bench Press', 'Incline Barbell Bench Press', 'Close-Grip Bench Press', 'Dumbbell Squeeze Press'],
       neutral_grip_press: ['Neutral-Grip Dumbbell Press'],
       push_up: ['Push-Ups'],
     },
@@ -71,7 +71,7 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
   row: {
     why: 'Close-Grip Lat Pulldown is filed with rows and is a pulldown: it shares the Lat Pulldown\'s family so the two cannot share a day.',
     families: {
-      row: ['Chest-Supported Row', 'Neutral-Grip Seated Cable Row', 'Barbell Rows', 'Seated Cable Row', 'Dumbbell Rows', 'Bent-Over Dumbbell Row', 'T-Bar Rows', 'Landmine Row', 'Inverted Row', 'Towel Row', 'Backpack Row', 'Table Row', 'Seated Machine Row', 'T-Bar Row Machine', 'Single-Arm Cable Row', 'Iso-Lateral High Row'],
+      row: ['Chest-Supported Row', 'Neutral-Grip Seated Cable Row', 'Barbell Rows', 'Seated Cable Row', 'Dumbbell Rows', 'Bent-Over Dumbbell Row', 'T-Bar Rows', 'Landmine Row', 'Inverted Row', 'Towel Row', 'Backpack Row', 'Table Row', 'Seated Machine Row', 'T-Bar Row Machine', 'Single-Arm Cable Row', 'Iso-Lateral High Row', 'Renegade Row'],
       pulldown: ['Close-Grip Lat Pulldown'],
     },
   },
@@ -88,7 +88,7 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
     families: {
       deadlift: ['Deadlifts', 'Trap Bar Deadlift', 'Sumo Deadlift'],
       kettlebell_swing: ['Kettlebell Swing (Heavy)'],
-      hip_hinge: ['Romanian Deadlifts', 'Cable Pull-Through', 'Good Mornings', 'Back Extension Machine', 'Reverse Hyper Machine', 'Glute Bridge', 'Single-Leg RDL (Bodyweight)', 'Bodyweight Good Morning', 'Bodyweight Hip Hinge to Wall', 'Single-Leg Dumbbell RDL'],
+      hip_hinge: ['Romanian Deadlifts', 'Cable Pull-Through', 'Good Mornings', 'Back Extension Machine', 'Reverse Hyper Machine', 'Glute Bridge', 'Single-Leg RDL (Bodyweight)', 'Bodyweight Good Morning', 'Bodyweight Hip Hinge to Wall', 'Single-Leg Dumbbell RDL', 'Suitcase Deadlift'],
     },
   },
   calf: {

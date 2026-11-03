@@ -4147,6 +4147,24 @@ export function enforceLoadCoherence(days: WorkoutDay[]): void {
  * one thing that matters here: a week that quietly asks for MORE than the
  * lift earned. That gate's §4 calls this directly with a two-day fixture.
  */
+/**
+ * ONE WEIGHT PER LIFT, AND EVERY CEILING, TOGETHER (3 Nov 2026). The one-weight pass runs first so the per-day ceilings
+ * get the last word; but a ceiling that lowers ONE day's copy of a lift (a one-leg press held to 0.65 of that day's
+ * main lift) leaves the same prescription at two weights in one week: measured, a deload week's Single-Leg Leg Press
+ * at 17.5 and 12.5 on a full-gym grid profile (test:week-load-consistency). So the pair runs again until nothing
+ * moves. Both passes only ever LOWER a number, so it settles; it is bounded anyway. Generation and every in-place edit
+ * (settle-week.ts) call this one function, so they cannot settle a week differently.
+ */
+export function settleWeekLoads(days: WorkoutDay[]): void {
+  const snapshot = () => days.map(d => d.exercises.map(e => e.suggested_load_kg ?? null).join(',')).join('|')
+  for (let round = 0; round < 4; round++) {
+    const before = snapshot()
+    enforceOneWeightPerPrescription(days)
+    enforceLoadCoherence(days)
+    if (snapshot() === before && round > 0) break
+  }
+}
+
 export function enforceOneWeightPerPrescription(days: WorkoutDay[]): void {
   const byPrescription = new Map<string, { ex: Exercise; entry: ExerciseEntry }[]>()
   for (const day of days) {
@@ -8594,6 +8612,11 @@ export function generateMesocycle(
                 loadIsProgressing: rampLoad,
                 forceStartingWeightKg: settled,
               })
+              // THE REASON FOLLOWS THE NUMBER (3 Nov 2026). naturalHold was decided from the price BEFORE this match, so a
+              // second day priced up to a stated 12 kg limit and then matched down to the first day's 10 kg kept
+              // "held at your limit" beside 10 kg (test:load-ceilings, found when the dumbbell front squat landed on two
+              // days). Matched is the reason, as enforceOneWeightPerPrescription records it.
+              naturalHold = 'matched'
             } else if (settled == null) {
               weightDecidedThisWeek.set(weekWeightKey, load.starting_weight_kg)
             }
@@ -8688,9 +8711,9 @@ export function generateMesocycle(
         return { ...day, exercises: isDeload ? exercises : enforceSetHierarchy(exercises) }
       })
 
-      // Before enforceLoadCoherence, deliberately — see its doc comment.
-      enforceOneWeightPerPrescription(days)
-      enforceLoadCoherence(days)
+      // One weight per lift BEFORE the ceilings, deliberately (see its doc comment), and again after them until the
+      // week settles (settleWeekLoads).
+      settleWeekLoads(days)
 
       // Decided ONCE, here, and used by both the tempo pass below and the
       // week's coach note. Splitting the decision would let a week be told

@@ -39,6 +39,17 @@ const BATCH: { name: string; copies: string; pricedAs: string | null; category: 
   // the whole lift is balanced on one ankle
   { name: 'Single-Leg Dumbbell RDL', copies: 'Romanian Deadlifts', pricedAs: 'Romanian Deadlifts', category: 'hinge_accessory', alsoExcludes: ['ankle'] },
   { name: 'Dumbbell Woodchop', copies: 'Cable Woodchops', pricedAs: null, category: null },
+  // THE LIGHTER VARIANTS (docs/plans/variant-pricing.md): each priced as a fraction of its parent, so never heavier
+  { name: 'Front Squat', copies: 'Barbell Squats', pricedAs: 'Barbell Squats', category: 'squat' },
+  { name: 'Incline Barbell Bench Press', copies: 'Barbell Bench Press', pricedAs: 'Barbell Bench Press', category: 'bench' },
+  // the narrow grip loads the elbows
+  { name: 'Close-Grip Bench Press', copies: 'Barbell Bench Press', pricedAs: 'Barbell Bench Press', category: 'bench', alsoExcludes: ['elbow'] },
+  { name: 'Dumbbell Squeeze Press', copies: 'Dumbbell Bench Press', pricedAs: 'Dumbbell Bench Press', category: 'bench' },
+  // a push-up plank on the dumbbells: wrists, shoulders and the trunk, as Push-Ups and a bad back
+  { name: 'Renegade Row', copies: 'Push-Ups', pricedAs: 'Dumbbell Rows', category: 'row', alsoExcludes: ['lower_back_axial'] },
+  // a pair held at the shoulders: knees as the goblet squat, and the hips
+  { name: 'Dumbbell Front Squat', copies: 'Goblet Squats', pricedAs: 'Barbell Squats', category: 'squat', alsoExcludes: ['hip'] },
+  { name: 'Suitcase Deadlift', copies: 'Deadlifts', pricedAs: 'Deadlifts', category: 'deadlift' },
 ]
 const contra = (n: string) => { const e = getExerciseEntry(n); return e ? (e.contraindicated_joints ?? e.loads_joints) : null }
 
@@ -97,14 +108,14 @@ console.log('\n2. Never heavier on the body than the model (a per-side number co
   check(`no new exercise prices heavier than its model (${compared} comparisons, ${atBar} at the empty bar)`, compared >= 25 && heavier.length === 0, heavier.slice(0, 4))
   check('...and the only allowance taken is the empty bar itself, never a loaded one', exempted.length > 0 && exempted.every(kg => kg === 20), exempted)
   // BY NAME, not by the unilateral flag (the machine pack's lesson: a list built from the flag drops the entry that lost it).
-  const ONE_HAND = ['Single-Arm Dumbbell Bench Press', 'Dumbbell Lateral Lunge', 'Single-Leg Dumbbell RDL']
+  const ONE_HAND = ['Single-Arm Dumbbell Bench Press', 'Dumbbell Lateral Lunge', 'Single-Leg Dumbbell RDL', 'Dumbbell Squeeze Press', 'Renegade Row', 'Dumbbell Front Squat', 'Suitcase Deadlift']
   check(`every dumbbell entry is prescribed per hand (${ONE_HAND.length})`, ONE_HAND.every(n => { const e = getExerciseEntry(n); return !!e && isPerSideLoad(e) }), ONE_HAND.filter(n => { const e = getExerciseEntry(n); return !e || !isPerSideLoad(e) }))
-  const TOTALS = ['Sumo Deadlift', 'Barbell Glute Bridge', 'Push Press', 'Barbell Reverse Lunge']
+  const TOTALS = ['Sumo Deadlift', 'Barbell Glute Bridge', 'Push Press', 'Barbell Reverse Lunge', 'Front Squat', 'Incline Barbell Bench Press', 'Close-Grip Bench Press']
   check(`...and every barbell entry as one total (${TOTALS.length})`, TOTALS.every(n => { const e = getExerciseEntry(n); return !!e && !isPerSideLoad(e) }))
 }
 
 console.log('\n3. A lift that needs a base waits for intermediate')
-for (const [name, regression] of [['Push Press', 'Overhead Press'], ['Barbell Reverse Lunge', 'Dumbbell Reverse Lunge']]) {
+for (const [name, regression] of [['Push Press', 'Overhead Press'], ['Barbell Reverse Lunge', 'Dumbbell Reverse Lunge'], ['Front Squat', 'Goblet Squats'], ['Renegade Row', 'Dumbbell Rows'], ['Suitcase Deadlift', 'Romanian Deadlifts']]) {
   const e = getExerciseEntry(name)!
   check(`${name}: a beginner and a novice do not meet it, an intermediate does`, !!e && !meetsCapabilityRequirement(e, 'beginner') && !meetsCapabilityRequirement(e, 'novice') && meetsCapabilityRequirement(e, 'intermediate'))
   check(`...and the beginner is sent to ${regression}, which exists`, e?.capability_requirement?.regression === regression && !!getExerciseEntry(regression))
@@ -112,9 +123,9 @@ for (const [name, regression] of [['Push Press', 'Overhead Press'], ['Barbell Re
 
 console.log('\n4. They reach a pool, and a plan')
 {
-  const pool = quiet(() => getConstrainedPool(person('male', 85, 'intermediate', { training_style: 'functional' }), []))
+  const pool = (['functional', 'bodybuilding'] as TrainingStyle[]).flatMap(style => quiet(() => getConstrainedPool(person('male', 85, 'intermediate', { training_style: style }), [])))
   const missing = BATCH.filter(p => !pool.some(x => x.name === p.name)).map(p => p.name)
-  check(`every entry reaches a full-gym functional intermediate pool (${BATCH.length})`, missing.length === 0, missing)
+  check(`every entry reaches a full-gym intermediate pool of a style it is tagged for (${BATCH.length})`, missing.length === 0, missing)
   // MEASURED, a property of the batch as a whole: a seeded grid of plans, counting which entries any plan prescribes.
   const seen = new Set<string>()
   let plans = 0
@@ -129,7 +140,7 @@ console.log('\n4. They reach a pool, and a plan')
         } finally { resetRandomSource() }
       }
   console.log(`     prescribed somewhere in ${plans} seeded plans: ${[...seen].sort().join(', ')}`)
-  check(`at least 6 of the ${BATCH.length} entries are prescribed by some plan in the seeded grid`, plans === 27 && seen.size >= 6, { seen: seen.size, plans })
+  check(`at least 12 of the ${BATCH.length} entries are prescribed by some plan in the seeded grid (14 measured 3 Nov 2026)`, plans === 27 && seen.size >= 12, { seen: seen.size, plans })
 }
 
 console.log(`\n${ran} checks ran`)

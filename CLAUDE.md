@@ -134,6 +134,11 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   the card** (a per-hand or per-leg figure is half the load; 181 of 1,024 plans had a cable or machine lift held under
   its own price), and a clamp that lowers a weight records why (`coherence`). `test:machine-pack` §5,
   `test:movement-families` §4, `test:frozen-weeks` §7, `docs/plans/machine-pack.md`
+- **More exercises, from her lists** — since 3 Nov 2026 (`docs/plans/exercise-library.md`): only a different
+  exercise is prescribable; a lighter variant takes a FRACTION of its parent's price (`price_fraction`, only ever
+  lowers, `docs/plans/variant-pricing.md`); her rulings "Known kit + a few" (five new kit ticks) and "Searchable,
+  log-only" (near-copies are found and logged under their own name, never prescribed). `test:exercise-library`,
+  `test:variant-pricing`
 - Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
   — `chosen-not-shuffled` since 16 Sep 2026 (19 checks, 10 mutations), which
   CALLS the ranker rather than reading it. It holds the tie-break to its job:

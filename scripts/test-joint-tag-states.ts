@@ -125,7 +125,8 @@ console.log('\n[5b] The lower back was reviewed: the two paths diverge by exactl
   // 18 -> 19 the same day, the machine pack's Cable Crunch (loaded spinal flexion, as Rotary Torso Machine).
   // 19 -> 24 the same day, the exercise library's batch 1: Sumo Deadlift, Push Press, Barbell Reverse Lunge, Landmine
   // Rotation and Single-Leg Dumbbell RDL, each excluding a bad back as the entry it copies does.
-  check(`what a bad back excludes did NOT move (${viaNew.length})`, viaNew.length === 24, { viaNew: viaNew.length })
+  // 24 -> 27, the lighter variants: Front Squat, Renegade Row and Suitcase Deadlift.
+  check(`what a bad back excludes did NOT move (${viaNew.length})`, viaNew.length === 27, { viaNew: viaNew.length })
   check('...and none of the rehab movements is among the exclusions',
     REHAB.every(n => !viaNew.some(e => e.name === n)),
     viaNew.filter(e => REHAB.includes(e.name)).map(e => e.name).join(', '))

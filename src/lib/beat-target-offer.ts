@@ -330,9 +330,18 @@ export function patchBlockFromLiftedKg(
   const next = mesocycle.map(week => {
     if (week.block_number !== anchor.blockNumber) return week
     if ((week.week_in_block ?? 1) < fromWeek) return week
-    const day = week.days.find(d => d.day === anchor.dayName)
-    const target = day?.exercises[anchor.exIndex]
-    if (!day || !target || target.name !== anchor.exerciseName) return week
+    // THE LIFT, WHEREVER THE WEEK PUT IT (3 Nov 2026). The anchored slot when it still holds the lift; otherwise the
+    // slot the week-to-week rotation moved it to. Found when the one-leg dumbbell RDL joined the catalogue: week 3 of
+    // a block traded Saturday's Romanian Deadlifts for Thursday's one-leg RDL, and a 30 kg calibration set reached
+    // weeks 2 and nothing after, so the deload was 70% of the GUESS (12 kg) instead of the 24 kg written
+    // (test:calibration-search). Day and index first, so a lift on two days keeps its own slot.
+    const home = week.days.find(d => d.day === anchor.dayName)
+    const at = home?.exercises[anchor.exIndex]?.name === anchor.exerciseName
+      ? { dayName: anchor.dayName, index: anchor.exIndex }
+      : week.days.flatMap(d => d.exercises.map((e, i) => ({ dayName: d.day, index: i, name: e.name })))
+        .find(x => x.name === anchor.exerciseName) ?? null
+    if (!at) return week
+    const target = week.days.find(d => d.day === at.dayName)!.exercises[at.index]
     // A DELOAD STAYS A DELOAD. The generator builds the block's deload at
     // DELOAD_LOAD_FRACTION of week 3's number; re-anchoring it to the full
     // lifted weight would make the recovery week the heaviest in its block
@@ -378,8 +387,8 @@ export function patchBlockFromLiftedKg(
     patched = true
     return {
       ...week,
-      days: week.days.map(d => (d.day === anchor.dayName
-        ? { ...d, exercises: d.exercises.map((e, i) => (i === anchor.exIndex ? patchedEx : e)) }
+      days: week.days.map(d => (d.day === at.dayName
+        ? { ...d, exercises: d.exercises.map((e, i) => (i === at.index ? patchedEx : e)) }
         : d)),
     }
   })

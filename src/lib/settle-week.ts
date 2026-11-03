@@ -1,8 +1,7 @@
 import type { Exercise, MesocycleWeek, UserProfile } from './types'
 import {
   enforceSetHierarchy,
-  enforceLoadCoherence,
-  enforceOneWeightPerPrescription,
+  settleWeekLoads,
   settleWeekBalance,
   type BalanceSettlement,
 } from './exercise-plan'
@@ -99,8 +98,7 @@ export function settleWeek(
   // Both of these take the whole week and mutate in place — the week's other
   // days are part of what they check (one weight per prescription is a WEEK
   // rule, and load coherence's fourth clamp spans the week too).
-  enforceOneWeightPerPrescription(days)
-  enforceLoadCoherence(days)
+  settleWeekLoads(days)
 
   const settled: MesocycleWeek = {
     ...week,

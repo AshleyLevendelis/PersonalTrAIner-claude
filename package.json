@@ -530,7 +530,8 @@
     "verify:timer-chip": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/timer-chip.mjs",
     "verify:profile-sheet-top": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-sheet-top.mjs",
     "verify:chat-send-scroll": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-send-scroll.mjs",
-    "test:exercise-library": "tsx scripts/test-exercise-library.ts"
+    "test:exercise-library": "tsx scripts/test-exercise-library.ts",
+    "test:variant-pricing": "tsx scripts/test-variant-pricing.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

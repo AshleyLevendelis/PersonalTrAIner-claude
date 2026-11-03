@@ -186,8 +186,15 @@ console.log('\n1. The libraries are cached separately from the app')
   //     after    deploy 353 gz   paint 509 gz   app 1208 raw   total 2517 raw   (all four OVER, by 3, 3, 15 and 25)
   // Five screens drawn again at first paint, so their growth is first-paint code by nature. Her 15 Sep ruling,
   // "raise it with room to grow": the same room as every move above, 8 kB gz, 25 kB raw.
-  headroom('a deploy re-downloads', appGzip, 361, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 361, appGzip)
+  // MOVED 3 Nov 2026, the lighter variants and their pricing rule (docs/plans/variant-pricing.md): seven catalogue
+  // entries, the fraction, the goblet fix and the week-settling loop. MEASURED through this gate on a clean worktree of
+  // 313d01cc and on the change:
+  //     before   deploy 360 gz   paint 516 gz   app 1242 raw   total 2575 raw   (1, 1, 8 and 2 kB of room)
+  //     after    deploy 361 gz   paint 517 gz   app 1249 raw   total 2581 raw   (deploy, paint and total OVER)
+  // The catalogue is read by every screen that shows a plan, so its growth is first-paint code by nature. Her 15 Sep
+  // ruling, "raise it with room to grow": the same room as every move above, 8 kB gz, 25 kB raw.
+  headroom('a deploy re-downloads', appGzip, 369, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 369, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -269,9 +276,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 18 Oct 2026: 492 -> 498, runs 7-10 batch 1 — see the deploy figure above for both ends.
   // MOVED 22 Oct 2026: 498 -> 506, the Sam live test — see the deploy figure above for both ends.
   // MOVED 31 Oct 2026: 506 -> 517, the five-tab polish — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 517, 'kB gzipped')
+  // MOVED 3 Nov 2026: 517 -> 525, the lighter variants — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 525, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 517, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 525, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -381,7 +389,8 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 31 Oct 2026: 1193 -> 1233, the five-tab polish — see the deploy figure above for both ends.
   // MOVED 3 Nov 2026: 1233 -> 1250 raw, on her 15 Sep ruling ("raise it with room to grow"). Measured that day: 1,235,
   // the machine pack's fifteen catalogue entries and its coherence fixes, which every screen that shows a plan reads.
-  const APP_CHUNK_BUDGET_KB = 1250
+  // MOVED 3 Nov 2026: 1250 -> 1274, the lighter variants — see the deploy figure above for both ends (1,249 measured).
+  const APP_CHUNK_BUDGET_KB = 1274
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -626,7 +635,8 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 3 Nov 2026: 2542 -> 2577, the 59 everyday plant dishes and dairy-free snacks (2552 measured, 2536 the day
   // before at the same tree minus the dishes; all 16 kB in the lazily loaded meal-library chunk, so first paint, the
   // app chunk and a deploy's re-download did not move; 25 raw of room).
-  const TOTAL_BUDGET_KB = 2577
+  // MOVED 3 Nov 2026: 2577 -> 2606, the lighter variants (2581 measured, 2575 at 313d01cc; 25 raw of room).
+  const TOTAL_BUDGET_KB = 2606
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

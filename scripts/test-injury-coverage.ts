@@ -270,8 +270,15 @@ console.log('\n5. How MUCH each injury removes, frozen')
     //   wrists     29->32  Sumo Deadlift, Push Press, Single-Leg Dumbbell RDL
     //   hips       22->26  Sumo Deadlift, Barbell Reverse Lunge, Dumbbell Lateral Lunge, Single-Leg Dumbbell RDL
     //   ankles     23->26  Barbell Reverse Lunge, Dumbbell Lateral Lunge, Single-Leg Dumbbell RDL (one-ankle balance)
-    lower_back: 24, knees: 44, shoulders: 77, neck: 8, wrists: 32,
-    hips: 26, ankles: 26, elbows: 26,
+    // 3 Nov 2026, the lighter variants (docs/plans/variant-pricing.md), each as the entry it copies:
+    //   lower_back 24->27  Front Squat, Renegade Row (a plank on the dumbbells), Suitcase Deadlift
+    //   knees      44->47  Front Squat, Dumbbell Front Squat, Suitcase Deadlift
+    //   shoulders  77->81  Incline Barbell Bench Press, Close-Grip Bench Press, Dumbbell Squeeze Press, Renegade Row
+    //   wrists     32->37  Front Squat, Incline Barbell Bench Press, Close-Grip Bench Press, Renegade Row, Suitcase Deadlift
+    //   hips       26->29  Front Squat, Dumbbell Front Squat, Suitcase Deadlift
+    //   elbows     26->27  Close-Grip Bench Press (the narrow grip)
+    lower_back: 27, knees: 47, shoulders: 81, neck: 8, wrists: 37,
+    hips: 29, ankles: 26, elbows: 27,
   }
   const drift: string[] = []
   for (const code of CODES) {

@@ -136,14 +136,16 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
   // other glute/hip machines (the 1 Sep precedent above); T-Bar Row Machine
   // in row; and Rotary Torso in no category, like Cable Woodchops, the one
   // other loaded core move. No pre-existing name moved.
+  // 3 Nov 2026, the lighter variants (docs/plans/variant-pricing.md): seven names, each in its parent's category and
+  // priced as a fraction of it (price_fraction, held by test:variant-pricing). No pre-existing name moved.
   // 3 Nov 2026, the exercise library's batch 1 (docs/plans/exercise-library.md): nine new names, each in the category
   // test:exercise-library prices and checks against its model. No pre-existing name moved.
   // 3 Nov 2026, the machine pack: fifteen new names, each in the category it was priced and checked against its model
   // in (docs/plans/machine-pack.md). No pre-existing name moved.
   const AT_THE_FIX: Record<string, string[]> = {
-    bench: ["Archer Push-Ups","Barbell Bench Press","Barbell Floor Press","Chest Dips","Chest Press Machine","Deficit Push-Ups","Dumbbell Bench Press","Dumbbell Floor Press","Incline Dumbbell Press","Incline Machine Press","Incline Push-Ups","Knee Push-Ups","Neutral-Grip Dumbbell Press","Push-Ups","Single-Arm Dumbbell Bench Press","Smith Machine Bench Press","Wide Push-Ups"],
+    bench: ["Archer Push-Ups","Barbell Bench Press","Barbell Floor Press","Chest Dips","Chest Press Machine","Close-Grip Bench Press","Deficit Push-Ups","Dumbbell Bench Press","Dumbbell Floor Press","Dumbbell Squeeze Press","Incline Barbell Bench Press","Incline Dumbbell Press","Incline Machine Press","Incline Push-Ups","Knee Push-Ups","Neutral-Grip Dumbbell Press","Push-Ups","Single-Arm Dumbbell Bench Press","Smith Machine Bench Press","Wide Push-Ups"],
     carry: ["Farmer Squat Hold (Isometric Carry)","Farmer's Walk","Loaded Backpack Walk","Suitcase Carry","Trap Bar Carry"],
-    deadlift: ["Deadlifts","Sumo Deadlift","Trap Bar Deadlift"],
+    deadlift: ["Deadlifts","Suitcase Deadlift","Sumo Deadlift","Trap Bar Deadlift"],
     goblet_squat: ["Goblet Squats"],
     hinge_accessory: ["Back Extension Machine","Barbell Glute Bridge","Bodyweight Good Morning","Dumbbell Hip Thrust","Glute Bridge","Good Mornings","Hip Thrust","Machine Hip Thrust","Reverse Hyper Machine","Romanian Deadlifts","Single-Leg Dumbbell RDL","Single-Leg Glute Bridge","Single-Leg RDL (Bodyweight)"],
     isolation_bicep: ["Backpack Curl","Band Curl","Barbell Curls","Bayesian Cable Curl","Cable Curls","Cable Rope Hammer Curl","Dumbbell Curls","Hammer Curls","Incline Dumbbell Curls","Machine Preacher Curl","Preacher Curl (EZ bar)"],
@@ -162,10 +164,10 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
     overhead: ["Arnold Press","Backpack Overhead Press","Band Shoulder Press","Dumbbell Shoulder Press","Half-Kneeling Single-Arm Dumbbell Press","Landmine Press","Overhead Press","Pike Push-Ups","Push Press","Shoulder Press Machine","Smith Machine Shoulder Press"],
     overhead_carry: ["Overhead Carry"],
     pulldown: ["Band Lat Pulldown","Close-Grip Lat Pulldown","Iso-Lateral Pulldown","Kneeling Band Lat Pulldown","Lat Pulldown","Single-Arm Lat Pulldown"],
-    row: ["Backpack Row","Barbell Rows","Bent-Over Dumbbell Row","Cable Rows","Chest-Supported Row","Chin-Ups","Dumbbell Rows","Inverted Row","Iso-Lateral High Row","Landmine Row","Neutral-Grip Seated Cable Row","Pull-Up Negatives","Pull-Ups","Pull-Ups (Assisted)","Rowing Machine","Seated Cable Row","Seated Machine Row","Single-Arm Cable Row","T-Bar Row Machine","T-Bar Rows","Table Row","Towel Row"],
+    row: ["Backpack Row","Barbell Rows","Bent-Over Dumbbell Row","Cable Rows","Chest-Supported Row","Chin-Ups","Dumbbell Rows","Inverted Row","Iso-Lateral High Row","Landmine Row","Neutral-Grip Seated Cable Row","Pull-Up Negatives","Pull-Ups","Pull-Ups (Assisted)","Renegade Row","Rowing Machine","Seated Cable Row","Seated Machine Row","Single-Arm Cable Row","T-Bar Row Machine","T-Bar Rows","Table Row","Towel Row"],
     shrug: ["Backpack Shrug","Band Shrug","Cable Shrug","Dumbbell Shrugs","Machine Shrug","Shrugs"],
     single_leg_dumbbell: ["Barbell Reverse Lunge","Bulgarian Split Squats","Dumbbell Lateral Lunge","Dumbbell Reverse Lunge","Low Box Step-Up","Smith Machine Split Squat","Split Squat (Bodyweight)","Step-Down (Eccentric)","Step-Ups","Step-Ups (Bodyweight)","Walking Lunges"],
-    squat: ["Air Squat","Barbell Squats","Bodyweight Squat Marches","Box Squat (Bodyweight)","Cossack Squat (Bodyweight)","Pistol Squat Progression","Smith Machine Squat","Spanish Squat","Tempo Air Squat"],
+    squat: ["Air Squat","Barbell Squats","Bodyweight Squat Marches","Box Squat (Bodyweight)","Cossack Squat (Bodyweight)","Dumbbell Front Squat","Front Squat","Pistol Squat Progression","Smith Machine Squat","Spanish Squat","Tempo Air Squat"],
   }
 
   const actual: Record<string, string[]> = {}

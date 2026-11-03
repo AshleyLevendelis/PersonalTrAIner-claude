@@ -734,6 +734,29 @@ export function loadingMode(entry: ExerciseEntry): LoadingMode {
  */
 const SINGLE_IMPLEMENT_TRICEP_FACTOR = 0.65
 
+/**
+ * A LIGHTER VARIANT'S SHARE OF ITS CATEGORY'S PRICE (3 Nov 2026, docs/plans/variant-pricing.md). A front squat sits
+ * in `squat` and would be priced as the back squat; its entry says 0.8. Applied once, to the ESTIMATE (the standard
+ * or a typed known weight), before calibration, halving, ramps, floors, rounding and ceilings; never to a forced
+ * figure, which is always this exercise's own. Anything outside (0, 1) reads as 1: it can only lower a number.
+ */
+export function variantPriceFraction(entry: ExerciseEntry): number {
+  const f = entry.price_fraction
+  return typeof f === 'number' && f > 0 && f < 1 ? f : 1
+}
+
+/**
+ * THE KNOWN WEIGHT, SCALED TO THE LIFT IT PRICES (3 Nov 2026). A typed squat anchors `goblet_squat` too
+ * (KNOWN_WEIGHT_FAMILY), and the known-weight branch used to take it whole: a 60 kg squat gave a 58 kg goblet squat,
+ * held at 48 only by the implement ceiling, while the estimate path gave the same person 32. The estimate path
+ * applies DERIVED_COMPOUND_SCALE against the parent's 1RM; this applies the same scale against the parent's typed
+ * working weight. A category that IS its known family (squat, bench, deadlift) scales by 1.
+ */
+function knownWeightScale(category: string, family: keyof KnownWorkingWeights): number {
+  const derived = DERIVED_COMPOUND_SCALE[category]
+  return derived && derived.parent === family ? derived.scale : 1
+}
+
 function isolationImplementFactor(entry: ExerciseEntry, category: string): number {
   if (category === 'isolation_tricep' && loadingMode(entry) === 'single_implement') return SINGLE_IMPLEMENT_TRICEP_FACTOR
   return 1
@@ -2015,7 +2038,7 @@ export function prescribeLoad(
       // anchored to a real number instead of a standards table.
       const baselinePercent = percentOf1RM(KNOWN_WEIGHT_REFERENCE_REPS, KNOWN_WEIGHT_REFERENCE_RPE)
       const targetPercent = percentOf1RM(repsMidpoint, rpeMidpoint)
-      estimate = knownAnchor! * (targetPercent / baselinePercent)
+      estimate = knownAnchor! * (targetPercent / baselinePercent) * knownWeightScale(category, knownFamily!)
     } else {
       const oneRepMax = resolveCompoundOneRepMaxKg(category, profile)
       if (oneRepMax != null) {
@@ -2029,6 +2052,8 @@ export function prescribeLoad(
           : 0
       }
     }
+    // A lighter variant takes its share of the price, here and nowhere else (see variantPriceFraction).
+    estimate *= variantPriceFraction(entry)
 
     if (options.isCalibrationWeek && !fromKnownWeight) {
       // Week 1 with no known numbers: start meaningfully under the estimate

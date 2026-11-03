@@ -375,12 +375,19 @@ console.log('\n6. The sentence and the plan agree, when the person has said what
   const samPlan = generateMesocycle(sam)
   console.log = quiet
   resetRandomSource()
-  const thu = samPlan[0].days.find(d => d.day === 'Thursday')!
-  const rdlIndex = thu.exercises.findIndex(e => e.name === 'Romanian Deadlifts')
-  const rdlKg = (w: typeof week1) => w.days.find(d => d.day === 'Thursday')!.exercises[rdlIndex]?.suggested_load_kg
-  check('the fixture has his Thursday Romanian Deadlifts, printed under 24kg in weeks 1 and 2', rdlIndex >= 0 && rdlKg(samPlan[0])! < 24 && rdlKg(samPlan[1])! < 24, { i: rdlIndex, w1: rdlIndex >= 0 && rdlKg(samPlan[0]), w2: rdlIndex >= 0 && rdlKg(samPlan[1]) })
+  // THE DAY IS FOUND, never named (3 Nov 2026): the exercise library re-rolled his Thursday onto a one-leg dumbbell RDL
+  // and his Romanian Deadlifts moved to Saturday. The person and the seed are the input; which day carries the lift is
+  // the plan's answer.
+  const rdlDay = samPlan[0].days.find(d => d.exercises.some(e => e.name === 'Romanian Deadlifts'))?.day ?? 'none'
+  const rdlIndex = samPlan[0].days.find(d => d.day === rdlDay)?.exercises.findIndex(e => e.name === 'Romanian Deadlifts') ?? -1
+  // ...and read wherever the week holds it: the week-to-week rotation can trade it onto another day mid-block.
+  const rdlKg = (w: typeof week1) => {
+    const home = w.days.find(d => d.day === rdlDay)?.exercises[rdlIndex]
+    return (home?.name === 'Romanian Deadlifts' ? home : w.days.flatMap(d => d.exercises).find(e => e.name === 'Romanian Deadlifts'))?.suggested_load_kg
+  }
+  check(`the fixture has his Romanian Deadlifts (${rdlDay}), printed under 24kg in weeks 1 and 2`, rdlIndex >= 0 && rdlKg(samPlan[0])! < 24 && rdlKg(samPlan[1])! < 24, { i: rdlIndex, w1: rdlIndex >= 0 && rdlKg(samPlan[0]), w2: rdlIndex >= 0 && rdlKg(samPlan[1]) })
 
-  const over = planCalibrationAnchors(samPlan, sam, 1, 'Thursday', [log(1, 30, {}, 'Romanian Deadlifts'), log(2, 30, {}, 'Romanian Deadlifts')])
+  const over = planCalibrationAnchors(samPlan, sam, 1, rdlDay, [log(1, 30, {}, 'Romanian Deadlifts'), log(2, 30, {}, 'Romanian Deadlifts')])
   const wk2 = over.next.find(w => w.week_number === 2)!
   check('week 2 is written at 24kg per hand — the plan respects what he owns', rdlKg(wk2) === 24, rdlKg(wk2))
   const said = calibrationAnchorMessage(2, over.applied)
@@ -394,7 +401,7 @@ console.log('\n6. The sentence and the plan agree, when the person has said what
   // (30): 70% of 30 is 21, 70% of 24 is 16.8.
   const samDeload = over.next.find(w => w.block_number === samPlan[0].block_number && w.is_deload)!
   check('the block\'s deload is 70% of the 24kg that was written, not of the 30kg lifted', rdlKg(samDeload) === roundToPlate(24 * DELOAD_LOAD_FRACTION, 'dumbbell') && rdlKg(samDeload)! < 20, rdlKg(samDeload))
-  const wk2Row = wk2.days.find(d => d.day === 'Thursday')!.exercises[rdlIndex]
+  const wk2Row = wk2.days.find(d => d.day === rdlDay)!.exercises[rdlIndex]
   check('week 2\'s row records WHY it stops at 24 — his own limit — and says so beside the weight',
     wk2Row.load_hold === 'stated_limit' && /24kg dumbbells/.test(wk2Row.load_guidance ?? '') && !/Add \d/.test(wk2Row.load_guidance ?? ''),
     { hold: wk2Row.load_hold, guidance: wk2Row.load_guidance })
@@ -410,11 +417,12 @@ console.log('\n6. The sentence and the plan agree, when the person has said what
   const limitPlan = generateMesocycle(atLimit)
   console.log = quiet
   resetRandomSource()
-  const lIndex = limitPlan[0].days.find(d => d.day === 'Thursday')!.exercises.findIndex(e => e.name === 'Romanian Deadlifts')
-  const lKg = (w: typeof week1) => w.days.find(d => d.day === 'Thursday')!.exercises[lIndex]?.suggested_load_kg
+  const lDay = limitPlan[0].days.find(d => d.exercises.some(e => e.name === 'Romanian Deadlifts'))?.day ?? 'none'
+  const lIndex = limitPlan[0].days.find(d => d.day === lDay)?.exercises.findIndex(e => e.name === 'Romanian Deadlifts') ?? -1
+  const lKg = (w: typeof week1) => w.days.find(d => d.day === lDay)?.exercises[lIndex]?.suggested_load_kg
   const block = limitPlan.filter(w => w.block_number === limitPlan[0].block_number && (w.week_in_block ?? 1) > 1 && !w.is_deload)
   check(`the second fixture's later loading weeks already sit at his ${limit}kg limit`, lIndex >= 0 && block.length >= 2 && block.every(w => lKg(w) === limit), block.map(w => lKg(w)))
-  const none = planCalibrationAnchors(limitPlan, atLimit, 1, 'Thursday', [log(1, limit + 6, {}, 'Romanian Deadlifts')])
+  const none = planCalibrationAnchors(limitPlan, atLimit, 1, lDay, [log(1, limit + 6, {}, 'Romanian Deadlifts')])
   const rdlApplied = none.applied.filter(a => a.exerciseName === 'Romanian Deadlifts')
   check('a lift that cannot move the plan is not reported as applied', rdlApplied.length === 0, none.applied)
   check('...no week is rewritten for it', none.changedWeeks.length === 0 && none.next === limitPlan, none.changedWeeks.map(w => w.week_number))
@@ -445,7 +453,7 @@ console.log('\n6. The sentence and the plan agree, when the person has said what
   // nothing to move, and must not be reported as patched for being rewritten
   // with the same figures.
   const settled = over.next
-  const again = patchBlockFromLiftedKg(settled, sam, { blockNumber: samPlan[0].block_number ?? 1, dayName: 'Thursday', exIndex: rdlIndex, exerciseName: 'Romanian Deadlifts', liftedKg: 30, fromWeekInBlock: 2 })
+  const again = patchBlockFromLiftedKg(settled, sam, { blockNumber: samPlan[0].block_number ?? 1, dayName: rdlDay, exIndex: rdlIndex, exerciseName: 'Romanian Deadlifts', liftedKg: 30, fromWeekInBlock: 2 })
   // (The helper always returns a fresh array; an untouched WEEK keeps its identity.)
   const untouched = again.next.every((w, i) => w === settled[i])
   check('re-anchoring a block that is already there changes nothing and says so', again.patched === false && untouched, { patched: again.patched, untouched })
@@ -472,7 +480,7 @@ console.log('\n6. The sentence and the plan agree, when the person has said what
   // set logged above the heaviest dumbbell the table allows (50kg per hand):
   // the plan stops at 50 and the sentence must not say he told us so.
   const noLimit = { ...sam, max_dumbbell_kg: undefined } as unknown as UserProfile
-  const huge = planCalibrationAnchors(samPlan, noLimit, 1, 'Thursday', [log(1, 60, {}, 'Romanian Deadlifts')])
+  const huge = planCalibrationAnchors(samPlan, noLimit, 1, rdlDay, [log(1, 60, {}, 'Romanian Deadlifts')])
   const hugeSaid = calibrationAnchorMessage(2, huge.applied)
   check('with no limit stated, a table clamp is never described as something he told us',
     huge.applied[0]?.nextWeek?.kg === 50 && huge.applied[0]?.nextWeek?.atStatedLimit === false && !!hugeSaid && /at 50kg per hand/.test(hugeSaid) && !/told me/.test(hugeSaid),

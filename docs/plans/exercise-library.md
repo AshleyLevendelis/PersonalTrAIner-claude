@@ -78,8 +78,8 @@ The list is a taxonomy, not a prescription list, and a plan's rotation reads eve
 ## Batches, each: entries, a gate on every field, mutation round, full sweep, the quality grid, BACKLOG
 
 1. Barbell and dumbbell (known kit). BUILT 3 Nov 2026: nine entries (BACKLOG); eight lighter variants wait for a
-   "fraction of the parent" pricing rule (front squat, incline and close-grip barbell bench, squeeze press, renegade
-   row, dumbbell front squat, suitcase deadlift, landmine squat).
+   "fraction of the parent" pricing rule. BUILT the same day (`docs/plans/variant-pricing.md`): seven of the eight;
+   Landmine Squat stays out.
 2. Cable and machine (known kit).
 3. Bodyweight and kettlebell (known kit).
 4. The five new kit ticks, then their exercises.

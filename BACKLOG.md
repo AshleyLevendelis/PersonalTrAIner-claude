@@ -2,6 +2,33 @@
 
 Newest first. One line each.
 
+- [ ] **A LIGHTER VARIANT IS PRICED AS A FRACTION OF ITS PARENT, 3 NOV 2026, BUILT, FULL SWEEP PENDING** (Ashley: "Build
+  the pricing rule for the held-back exercises"; `docs/plans/variant-pricing.md`). TRACED FIRST (engine-tracer): every
+  number made from a category's standard is made in one block of the price; every other path forces this exercise's
+  own figure. So `price_fraction` (strictly between 0 and 1, read through one function that reads anything else as 1)
+  multiplies the ESTIMATE, before calibration, halving, ramps, floors, rounding and ceilings, and so reaches a typed
+  known weight too; never a forced figure. SEVEN ENTRIES, fractions at the LOW end of the usual coaching ratio (CSCS,
+  basis in the plan): Front Squat 0.80 of the back squat, Incline Barbell Bench Press 0.80 and Close-Grip Bench Press
+  0.85 of the bench, Dumbbell Squeeze Press 0.60 of the dumbbell bench, Renegade Row 0.45 of the row, Dumbbell Front
+  Squat 0.40 of the back squat, Suitcase Deadlift 0.60 (one dumbbell: 0.30 in the hand). Landmine Squat stays out (the
+  unit of its number is unsettled). FOUR OLDER DEFECTS FOUND ON THE WAY, all fixed: (1) a typed squat priced the GOBLET
+  squat at the squat's own weight (60 kg squat -> 58 kg goblet, held at 48 only by the implement ceiling; the estimate
+  gives 32): the typed-weight branch now applies the goblet's 0.35 as the estimate does (20 kg now); (2) a weight
+  matched down to the same lift's other day kept "held at your limit" beside a lower number: the reason now follows
+  the number ('matched'); (3) a per-day ceiling could leave one prescription at two weights in a week (a deload's
+  one-leg press at 17.5 and 12.5): generation and every edit now settle the week through one function that repeats
+  one-weight and the ceilings until nothing moves, both only ever lowering; (4) a calibration set reached only the slot
+  it was logged in, so when the week-to-week rotation traded the lift onto another day mid-block the rest of the block
+  and its deload kept the guess (the deload was 12 kg, not 70% of the 24 written): it now follows the lift. Also: the
+  front squat listed "upper back" and tipped chest:back to 1.81 (fixed, 1.71); a cue read as one dumbbell (reworded);
+  a fixture that named Thursday now finds the day its lift is on. Size budgets raised on her 15 Sep ruling, both ends
+  measured (deploy 360->361 gz, paint 516->517, app 1242->1249, total 2575->2581). CSCS REVIEW: (1) seven real
+  exercises at sensible starting weights instead of their parents' full price; (2) nothing removed, picks re-roll; the
+  goblet fix LOWERS a typed-squat person's goblet squat to where the estimate always put it; (3) coverage and
+  progression unchanged, chest:back 1.71; (4) no floor or ceiling moved, a fraction can only lower; (5) load
+  prescription inside the delegation. `test:variant-pricing` (17 checks) 7 mutations, 7 caught;
+  `test:exercise-library` now 16 entries (68 checks); the three older fixes each caught by a mutation of their own
+  (calibration-search, week-load-consistency, load-ceilings). Snapshots moved with reasons.
 - [ ] **EXERCISE LIBRARY BATCH 1, BARBELL AND DUMBBELL, 3 NOV 2026, BUILT, FULL SWEEP PENDING** (plan:
   `docs/plans/exercise-library.md`). NINE ENTRIES, appended last, each a different exercise rather than a variant:
   Sumo Deadlift, Barbell Glute Bridge (no bench), Push Press (intermediate and up, from Overhead Press), Barbell
