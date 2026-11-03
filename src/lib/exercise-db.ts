@@ -1,5 +1,6 @@
 import { TrainingStyle, type TrainingExperience } from './types'
 import { isRegressionFor } from './periodization'
+import { NEAR_COPIES } from './exercise-near-copies'
 
 export type MovementPattern =
   | 'horizontal_push'
@@ -205,6 +206,15 @@ export interface ExerciseEntry {
    * number. Never on an isolation entry.
    */
   price_fraction?: number
+  /**
+   * (3 Nov 2026, her ruling "Searchable, log-only"; docs/plans/log-only-near-copies.md) A NEAR-COPY: the same lift as
+   * `parent` with another grip, angle, stance, tempo or setup. Never prescribed, never offered as a swap or an addition;
+   * found by the logging search and logged under its own name. Built from exercise-near-copies.ts, every other field
+   * copied from the parent, and kept OUT of EXERCISE_DATABASE so no pool, rotation or shortlist can ever see one.
+   */
+  log_only?: boolean
+  /** A near-copy's catalogue parent, by name. Set only with `log_only`. */
+  parent?: string
   substitution_group: string
   unilateral: boolean
   avg_duration_seconds: number
@@ -6142,10 +6152,46 @@ export function isContraindicatedFor(entry: ExerciseEntry, flaggedJoints: Set<st
   return contraindicatedJoints(entry).some(j => flaggedJoints.has(j))
 }
 
+/**
+ * THE NEAR-COPIES, built once on first use from exercise-near-copies.ts (lazily, so nothing that runs while this module
+ * is still loading can meet them half-made). Each is its parent with a new name, its own slug id (the coach's function
+ * slugs the name it logs, so the two must agree or her history splits in two), and no cues, note or style: it is
+ * never put in a plan, so nothing would read them, and the parent's cues would describe a different grip. A name the
+ * catalogue already holds, or a parent it does not, is left out (test:near-copies holds that none is).
+ */
+let logOnlyCache: Map<string, ExerciseEntry> | null = null
+function logOnlyByLowerName(): Map<string, ExerciseEntry> {
+  if (logOnlyCache) return logOnlyCache
+  const byName = new Map(EXERCISE_DATABASE.map(e => [e.name.toLowerCase(), e]))
+  const built = new Map<string, ExerciseEntry>()
+  for (const [name, parentName] of NEAR_COPIES) {
+    const parent = byName.get(parentName.toLowerCase())
+    if (!parent || parent.log_only || byName.has(name.toLowerCase())) continue
+    built.set(name.toLowerCase(), {
+      ...parent,
+      name,
+      id: slugifyExerciseName(name),
+      log_only: true,
+      parent: parent.name,
+      form_cues: [],
+      coach_note_swap: undefined,
+      style_tags: [],
+      retired: false,
+    })
+  }
+  logOnlyCache = built
+  return built
+}
+
+/** Every near-copy, for the logging search and the gates. Never for anything that builds or edits a plan. */
+export function logOnlyExercises(): ExerciseEntry[] {
+  return [...logOnlyByLowerName().values()]
+}
+
 export function getExerciseEntry(name: string): ExerciseEntry | undefined {
   return EXERCISE_DATABASE.find(
     e => e.name.toLowerCase() === name.toLowerCase()
-  )
+  ) ?? logOnlyByLowerName().get(name.toLowerCase())
 }
 
 /**
@@ -6228,6 +6274,27 @@ export function searchExerciseCatalogByWords(query: string, limit = 20): Exercis
   }
   allWords.sort((a, b) => a.name.localeCompare(b.name))
   return [...strict, ...allWords].slice(0, limit)
+}
+
+/**
+ * THE LOGGING SEARCH (3 Nov 2026): what she can LOG, which is everything a plan can hold plus the near-copies. The
+ * picker's search first, untouched, so a plan exercise ranks where it always did; then the near-copies, matched the
+ * same two ways (one contiguous phrase, or every typed word as a word prefix). Only the logging box calls this: the
+ * swap and add pickers, the ban resolver and the chat logger's search keep the plan-only searches, so a near-copy can
+ * never be offered for a plan, banned by a looser phrase, or turn a resolved logged set into "which did you mean?".
+ */
+export function searchExercisesToLog(query: string, limit = 8): ExerciseEntry[] {
+  const planned = searchExerciseCatalogByWords(query, limit)
+  const q = query.trim().toLowerCase()
+  const words = catalogWords(query)
+  if (!q) return planned
+  const copies = logOnlyExercises()
+    .filter(e => {
+      const name = e.name.toLowerCase()
+      return name.includes(q) || (words.length > 1 && words.every(w => catalogWords(e.name).some(nw => nw.startsWith(w))))
+    })
+    .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name))
+  return [...planned, ...copies].slice(0, limit)
 }
 
 /**

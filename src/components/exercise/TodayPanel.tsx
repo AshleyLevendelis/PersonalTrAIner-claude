@@ -1784,6 +1784,8 @@ export function TodayPanel({
             onOpenChange={setUnplannedWorkOpen}
             hideTrigger
             equipmentAccess={profile?.equipment_access}
+            profile={profile}
+            exclusions={exclusions}
           />
         </div>
       )}

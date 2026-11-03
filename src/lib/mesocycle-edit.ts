@@ -723,6 +723,9 @@ export interface SwapExerciseParams {
  */
 export async function swapExerciseInMesocycle(params: SwapExerciseParams): Promise<MesocycleWeek[]> {
   const { mesocycle, profile, currentWeekNumber, dayName, exIndex, newExercise, scope } = params
+  // A NEAR-COPY IS NEVER PRESCRIBED (her ruling "Searchable, log-only", 3 Nov 2026). Every swap route, the screen's
+  // and the coach's, ends here, so this is the one place it is refused; the callers say why before they get here.
+  if (newExercise.log_only) return mesocycle
   const currentWeek = mesocycle.find(w => w.week_number === currentWeekNumber)
   const currentDay = currentWeek?.days.find(d => d.day === dayName)
   const oldSlot = currentDay?.exercises[exIndex]

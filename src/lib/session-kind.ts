@@ -1,5 +1,5 @@
 import type { Exercise, MesocycleWeek, TrainingStyle, UserProfile, WorkoutDay } from './types'
-import { EXERCISE_DATABASE, getVolumeRole, type ExerciseEntry, type MechanicsTier, type MovementPattern } from './exercise-db'
+import { EXERCISE_DATABASE, getExerciseEntry, getVolumeRole, type ExerciseEntry, type MechanicsTier, type MovementPattern } from './exercise-db'
 import {
   getConstrainedPool, getFlaggedJoints, isEquipmentAllowed, allowedEquipmentFor, orderCandidates, clampToVolumeRole, getRoleSetCeiling,
   setRandomSource, resetRandomSource, STYLE_CONFIGS, POOL_WIDE_IMPLEMENT_TIERS,
@@ -15,7 +15,7 @@ import { equipmentTierFor } from './kit-list'
 import { estimateDaySeconds, getDurationBudgetSeconds, getSessionMaximumSeconds } from './session-duration'
 import { seededRngFromKey } from './seeded-random'
 import { resolveExerciseName } from './set-parse'
-import { ask, SCOPE } from './coach-voice'
+import { ask, SCOPE, logOnlyRefusal } from './coach-voice'
 import { SESSION_KINDS, kindTodayOf, plural, nextTimeDue, type SessionKind, type KindTodayMarker } from './session-kind-marker'
 export { SESSION_KINDS, sessionKindsFor, sessionKindFrom, kindTodayOf, describeKindToday, type SessionKind, type SessionKindOption, type KindTodayMarker } from './session-kind-marker'
 
@@ -273,6 +273,10 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
       else asked.push({ said, reason: `There's no ${said} in the app's exercise list, so it isn't in today's session.` })
       continue
     }
+    // A near-copy resolves by name but is never put in a session (her ruling "Searchable, log-only"): say so, rather
+    // than "there's no such exercise", which would be false, or "above your level", which would be wrong.
+    const copy = getExerciseEntry(r.exerciseName)
+    if (copy?.log_only) { asked.push({ said, reason: logOnlyRefusal(copy) }); continue }
     const entry = EXERCISE_DATABASE.find(e => e.name === r.exerciseName)
     if (!entry) { asked.push({ said, reason: `There's no ${said} in the app's exercise list, so it isn't in today's session.` }); continue }
     if (!namedPool.some(e => e.name === entry.name)) {

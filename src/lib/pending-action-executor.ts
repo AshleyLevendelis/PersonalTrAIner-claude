@@ -12,7 +12,7 @@
 // guard against double-execution, that's the claim's job.
 // ---------------------------------------------------------------------------
 
-import { didNotSave, DAY_MOVE } from './coach-voice'
+import { didNotSave, DAY_MOVE, logOnlyRefusal } from './coach-voice'
 import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
 import { rebuildFromCurrentWeek, rebuiltLine } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
@@ -102,6 +102,9 @@ export async function executeExerciseSwap(
       preImage,
       receipt: { landed: [], failed: [{ op: 'propose_exercise_swap', error: `"${payload.newExerciseName}" is no longer a recognized exercise` }] },
     }
+  }
+  if (newExercise.log_only) {
+    return { mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'propose_exercise_swap', error: logOnlyRefusal(newExercise) }] } }
   }
 
   const updatedMesocycle = await swapExerciseInMesocycle({

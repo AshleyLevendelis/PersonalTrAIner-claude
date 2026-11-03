@@ -383,6 +383,8 @@ export function patchBlockFromLiftedKg(
       // re-anchored to the person's own dumbbell limit carried no reason for
       // stopping there at all.
       load_hold: load.hold ?? undefined,
+      // Her own lifted weight, so the proportion clamps leave it standing (types.ts, load_from_log).
+      load_from_log: true,
     }
     patched = true
     return {

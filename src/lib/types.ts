@@ -355,6 +355,12 @@ export interface Exercise {
    */
   load_source?: 'estimate' | 'known_weight' | 'assumed_body'
   /**
+   * (3 Nov 2026) This week's number is a weight she LIFTED, written in by a calibration anchor, the beat-target offer
+   * or a rebuild carrying an earned weight (patchBlockFromLiftedKg). The proportion clamps in enforceLoadCoherence keep
+   * GUESSES in line with each other; they never pull a lifted weight down to match another lift's guess.
+   */
+  load_from_log?: boolean
+  /**
    * What is holding this week's weight where it is, when something is —
    * LoadPrescription.hold as computed for this slot's NATURAL prescription
    * (before any rep bump re-prescribed it), plus one the generator adds

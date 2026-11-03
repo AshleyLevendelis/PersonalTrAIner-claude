@@ -63,7 +63,7 @@ import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { detectTodayClaim, todayClaimFloor, type TodayFacts } from '@/lib/today-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal, swapDiffFromTrial } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, streakLabel, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, streakLabel, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine, logOnlyRefusal } from '@/lib/coach-voice'
 import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
 import { getLastWorkingSessionDate } from '@/lib/set-log-store'
@@ -2463,6 +2463,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (!newEntry) {
       return { ok: false, reason: swapNameFallback({ typed: newItem, oldExercise: oldEx.name, resolution: newResolved, profile: poolProfile, exclusions: exerciseExclusions }).text }
     }
+    // A NEAR-COPY IS NEVER PRESCRIBED (her ruling "Searchable, log-only"): said here, before any card is drawn.
+    if (newEntry.log_only) return { ok: false, reason: logOnlyRefusal(newEntry) }
 
     const scope: SwapScope = rawArgs.scope === 'permanent' ? 'permanent' : 'today'
     const payload: ExerciseSwapPayload = {

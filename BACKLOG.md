@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [ ] **LOG-ONLY NEAR-COPIES, 3 NOV 2026, BUILT, FULL SWEEP PENDING** (her ruling "Searchable, log-only" and "then
+  build the log-only near-copies"; `docs/plans/log-only-near-copies.md`). Traced first (investigator). 85 near-copies
+  (a paused squat, a wide-grip pulldown, a Pendlay row...) BUILT from their parents, kept outside the catalogue array so
+  nothing that builds a plan can see one; found by a new logging search only; refused by the two writers every swap
+  and addition ends in, by the coach's swap card and executor, and by the session-kind path, in one phrasebook
+  sentence naming the parent; logged under their own slug id (the one the coach writes) so history and bests are their
+  own; a banned parent marks its versions. "I also did…" now suggests as she types, labels a near-copy "Log only · a
+  version of X", shows the kit and injury marks, and scrolls itself above the docked bars (the first screenshot had it
+  under the Start bar; and my first fix remounted the box, which would drop a phone's keyboard: both caught by the
+  driver, which now asks where a finger lands and whether the box keeps focus). FOUND ON THE WAY, BLOCKING THE MERGE:
+  `test:rebuild-honours` was red at `9facd242` (the machine pack's sweep fix compared lifts by load on the body, and
+  that pulled a rebuild's carried, EARNED 10 kg kickback back to 6 to match another triceps lift's guess). DECIDED
+  (CSCS): a lifted weight is evidence, the proportion clamps keep GUESSES in line: a weight written from her own lifts
+  carries `load_from_log` and the clamps leave it. Caught by 2 mutations. `test:swap-name-fallback` (red since batch 1:
+  the new one-leg dumbbell RDL out-ranks the swing on the tier's guess) re-anchored on its property, the kit binds.
+  `test:near-copies` 27 checks, 10 mutations caught; `verify:near-copies` 17 checks, 4 caught. NOT DONE: the remaining
+  ~1,700 names of her lists, and whether elite or strongman lifts are loggable (not covered by her ruling).
 - [ ] **A LIGHTER VARIANT IS PRICED AS A FRACTION OF ITS PARENT, 3 NOV 2026, BUILT, FULL SWEEP PENDING** (Ashley: "Build
   the pricing rule for the held-back exercises"; `docs/plans/variant-pricing.md`). TRACED FIRST (engine-tracer): every
   number made from a category's standard is made in one block of the price; every other path forces this exercise's

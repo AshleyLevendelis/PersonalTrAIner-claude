@@ -1397,3 +1397,15 @@ export function allergenFilterReceipt(labels: readonly string[]): string {
   const names = labels.length <= 1 ? (labels[0] ?? '') : `${labels.slice(0, -1).join(', ')} and ${labels[labels.length - 1]}`
   return `${names} filter${labels.length === 1 ? '' : 's'} on. ${ALLERGEN_FILTER_LIMIT}`
 }
+
+/**
+ * A NEAR-COPY ASKED FOR A PLAN (3 Nov 2026, her ruling "Searchable, log-only"). One sentence, the app's, for every
+ * route that refuses one (the coach's swap card, its executor, an addition): what it is, that it is logged rather than
+ * planned, and the lift that IS planned, so the next step is obvious.
+ */
+export function logOnlyRefusal(entry: { name: string; parent?: string }): string {
+  return entry.parent
+    ? `${entry.name} is one to log, not to plan: it's a version of ${entry.parent}, which is the one that goes in a plan.`
+    : `${entry.name} is one to log, not to plan.`
+}
+

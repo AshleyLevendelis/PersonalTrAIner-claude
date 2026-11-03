@@ -4024,6 +4024,10 @@ export function reconcilePerSetLoads(days: WorkoutDay[]): void {
  * (progression-ceiling.ts).
  */
 function clampForCoherence(ex: Exercise, entry: ExerciseEntry, targetKg: number): void {
+  // A WEIGHT SHE LIFTED IS EVIDENCE, NOT A GUESS (3 Nov 2026, CSCS). These clamps keep estimates in proportion; they
+  // must not pull an earned 10 kg kickback back to 6 because another triceps lift is still on its guess (found by
+  // test:rebuild-honours once the clamps compared load on the body).
+  if (ex.load_from_log) return
   const before = ex.suggested_load_kg
   rebuildLoadForExercise(ex, entry, targetKg)
   if (before != null && ex.suggested_load_kg != null && ex.suggested_load_kg < before && !ex.load_hold) ex.load_hold = 'coherence'
@@ -5674,6 +5678,9 @@ export function getExerciseCompatibilityWarnings(
 
   if (exclusions.some(ex => ex.toLowerCase() === exercise.name.toLowerCase())) {
     warnings.push(`You've previously banned this exercise.`)
+  } else if (exercise.parent && exclusions.some(ex => ex.toLowerCase() === exercise.parent!.toLowerCase())) {
+    // A near-copy of a lift she banned: the same lift with another grip, so the mark is the parent's.
+    warnings.push(`You've banned ${exercise.parent}, and this is a version of it.`)
   }
 
   return warnings

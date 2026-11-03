@@ -61,9 +61,12 @@ async function main() {
   check('the kit binds: the tier\'s guess (bands) can offer a band move, his own kit never does',
     getReplacementCandidates('Goblet Squats', base, []).some(c => needsBand(c.exercise.name)) && !goblet.offered.some(needsBand), { guess: bandOwner.offered, his: goblet.offered })
   const rdl = ask('Romanian Deadlifts', 'Dumbbell Stiff Leg Thing')
-  const kbFirst = getReplacementCandidates('Romanian Deadlifts', base, [])[0]?.exercise.name
-  check("Sam's own symptom: on the tier's guess a kettlebell swing heads the hinge list; on his kit it is never offered",
-    /kettlebell/i.test(kbFirst ?? '') && rdl.offered.length > 0 && !rdl.offered.some(n => (getExerciseEntry(n)?.equipment ?? []).includes('kettlebell')), { guessFirst: kbFirst, his: rdl.offered })
+  // IN the guess's list, not FIRST in it (3 Nov 2026): the exercise library's one-leg dumbbell RDL now ranks above the
+  // swing, which is a better hinge stand-in. The property was always that the kit binds, never which lift ranks first.
+  const guessList = getReplacementCandidates('Romanian Deadlifts', base, []).map(c => c.exercise.name)
+  const kbFirst = guessList.find(n => /kettlebell/i.test(n))
+  check("Sam's own symptom: on the tier's guess a kettlebell swing is in the hinge list; on his kit it is never offered",
+    /kettlebell/i.test(kbFirst ?? '') && rdl.offered.length > 0 && !rdl.offered.some(n => (getExerciseEntry(n)?.equipment ?? []).includes('kettlebell')), { guess: guessList, his: rdl.offered })
   check('at most three offers', [bss, goblet, gym].every(r => r.offered.length <= 3))
 
   console.log('\n3. A name he cannot have is said so, with the true reason')
