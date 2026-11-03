@@ -23,7 +23,10 @@ chat, and never print a private key back.
 STEP 1. Get the code (you can do this)
   git fetch origin
   git checkout claude/coach-empty-text-fix-2c4bzv && git pull origin claude/coach-empty-text-fix-2c4bzv
-  VERIFY: git log --oneline -1 shows b4ec1dab or later ("Coach exam: four cases ...").
+  VERIFY: git log --oneline -1 shows 9facd242 or later ("Machine pack: Y-raise counted as a side raise ...").
+  VERIFY: git log --oneline -1 origin/main shows the same commit or later once Ashley has been told it is merged
+  (3 Nov 2026); until then main is behind and that is expected. The machine pack (more machine and cable exercises) changed
+  nothing under supabase/, so nothing below is new for it.
   VERIFY: git diff --stat origin/main...HEAD -- supabase/   prints NOTHING. That proves the edge functions on this
   branch are identical to main, so deploying from here ships exactly what main has. If it prints anything, stop and
   tell Ashley.
