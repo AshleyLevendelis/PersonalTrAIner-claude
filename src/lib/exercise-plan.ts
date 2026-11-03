@@ -4014,6 +4014,21 @@ export function reconcilePerSetLoads(days: WorkoutDay[]): void {
   }
 }
 
+/**
+ * A COHERENCE CLAMP SAYS SO (3 Nov 2026, the machine pack). Each clamp below lowers a weight to keep it in proportion
+ * with another lift (the day's main lift, the flat press, the same muscle group), and none of them used to record
+ * that it had. So a weight held there two weeks running, with the reps unchanged, read as a freeze with no reason
+ * (test:frozen-weeks §7: a one-leg press held at 50 kg a leg under 0.65 of a 77.5 kg squat). Recorded only where the
+ * clamp actually lowered the number and nothing else already explains it; a weight that can move as soon as the lift
+ * it is held against does is not one the app has run out of room on, so no label is drawn for it
+ * (progression-ceiling.ts).
+ */
+function clampForCoherence(ex: Exercise, entry: ExerciseEntry, targetKg: number): void {
+  const before = ex.suggested_load_kg
+  rebuildLoadForExercise(ex, entry, targetKg)
+  if (before != null && ex.suggested_load_kg != null && ex.suggested_load_kg < before && !ex.load_hold) ex.load_hold = 'coherence'
+}
+
 export function enforceLoadCoherence(days: WorkoutDay[]): void {
   reconcilePerSetLoads(days)
 
@@ -4032,7 +4047,7 @@ export function enforceLoadCoherence(days: WorkoutDay[]): void {
       const main = mainLifts.find(m => broadPattern(findEntry(m.name)!.movement_pattern) === pattern)
       if (!main || main.suggested_load_kg == null) continue
       const ceiling = main.suggested_load_kg * UNILATERAL_VS_MAIN_FRACTION_CEILING
-      if (ex.suggested_load_kg > ceiling) rebuildLoadForExercise(ex, entry, ceiling)
+      if (ex.suggested_load_kg > ceiling) clampForCoherence(ex, entry, ceiling)
     }
 
     // Incline press vs. flat press, same day — incline should never exceed flat.
@@ -4046,7 +4061,7 @@ export function enforceLoadCoherence(days: WorkoutDay[]): void {
         if (!entry || entry.name === flat.name || ex.suggested_load_kg == null) continue
         const isInclinePress = entry.substitution_group === 'bench_press' && entry.angle_vector === 'diagonal' && entry.movement_pattern === 'horizontal_push'
         if (isInclinePress && ex.suggested_load_kg > flat.suggested_load_kg) {
-          rebuildLoadForExercise(ex, entry, flat.suggested_load_kg * 0.9)
+          clampForCoherence(ex, entry, flat.suggested_load_kg * 0.9)
         }
       }
     }
@@ -4062,7 +4077,7 @@ export function enforceLoadCoherence(days: WorkoutDay[]): void {
         const entry = findEntry(ex.name)
         if (!entry || ex.suggested_load_kg == null) continue
         const isBoundedIsolation = entry.movement_pattern === 'isolation_bicep' || entry.movement_pattern === 'isolation_shoulder'
-        if (isBoundedIsolation && ex.suggested_load_kg > ceiling) rebuildLoadForExercise(ex, entry, ceiling)
+        if (isBoundedIsolation && ex.suggested_load_kg > ceiling) clampForCoherence(ex, entry, ceiling)
       }
     }
   }
@@ -4079,13 +4094,21 @@ export function enforceLoadCoherence(days: WorkoutDay[]): void {
       groups.get(group)!.push({ ex, entry })
     }
   }
+  // ON THE BODY, NOT ON THE CARD (3 Nov 2026, the machine pack). A per-hand, per-leg or one-side number is half the
+  // load, and this compared the printed numbers, so a one-leg extension at 10 kg a leg held the two-leg extension at
+  // 20 kg week after week, with no reason recorded (test:frozen-weeks §7). Dumbbells had always done the same to the
+  // cable and machine lifts beside them: measured on 1,024 grid plans, 1,377 of 217,078 loaded slots in 181 plans sat
+  // under their own price, median x1.33, at most x2.25 (a pushdown held at 7.5 kg beside a 5 kg kickback). The scorer
+  // has always compared on the body (quality-score.ts, "the per-side x2 below"). This pass only ever LOWERS a weight,
+  // so comparing correctly can never take one above the lift's own price.
+  const onBody = (kg: number, entry: ExerciseEntry) => labelModeForEntry(entry) !== 'total' ? kg * 2 : kg
   for (const items of groups.values()) {
     if (items.length < 2) continue
-    const min = Math.min(...items.map(i => i.ex.suggested_load_kg!))
+    const min = Math.min(...items.map(i => onBody(i.ex.suggested_load_kg!, i.entry)))
     if (min <= 0) continue
     const ceiling = min * SAME_MUSCLE_GROUP_MAX_RATIO
     for (const { ex, entry } of items) {
-      if (ex.suggested_load_kg! > ceiling) rebuildLoadForExercise(ex, entry, ceiling)
+      if (onBody(ex.suggested_load_kg!, entry) > ceiling) clampForCoherence(ex, entry, onBody(1, entry) === 2 ? ceiling / 2 : ceiling)
     }
   }
 }

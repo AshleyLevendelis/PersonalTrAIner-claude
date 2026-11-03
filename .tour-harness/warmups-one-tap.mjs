@@ -21,11 +21,12 @@ if (await ev(`!!(${btn('/^Not now$/')})`)) { await clickAt(btn('/^Not now$/')); 
 await ev(`location.hash = '#/tab/exercise'`); await wait(2000)
 await clickAt(`document.querySelector('[data-testid="hero-start"]')`); await wait(1200)
 
-// The session opens on its movement prep (box jumps until 3 Nov 2026, squat marches since the dumbbell pack
-// re-rolled the day); the squat's rows open once the sets before it are logged, as on her phone. Whatever comes
-// first is logged with the big button while it still names that prep, and counted for 4b.
+// The session opens on its movement prep; the squat's rows open once the sets before it are logged, as on her phone.
+// Whatever comes first is logged with the big button until the button names the squat or a warm-up, and counted for
+// 4b. NOT BY NAME (3 Nov 2026): the prep was pinned as box jumps, then squat marches, and each catalogue pack re-rolled
+// it (broad jumps since the machine pack), so a pinned name stopped the loop before it started.
 let before = 0
-for (let i = 0; i < 4 && /Box Jumps|Marches/.test(await ev(`document.querySelector('[data-next-set-button]')?.textContent ?? ''`)); i++) {
+for (let i = 0; i < 8 && !/Squat|Warm-up/.test(await ev(`document.querySelector('[data-next-set-button]')?.textContent ?? 'Squat'`)); i++) {
   await clickAt(`document.querySelector('[data-next-set-button]')`); await wait(900); before++
 }
 console.log(`  (logged ${before} set(s) before the squat)`)

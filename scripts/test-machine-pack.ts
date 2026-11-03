@@ -8,10 +8,10 @@
 // and never heavier than the model on the body, and the gaps are closed as properties. The Smith split squat's
 // beginner gate is held too: an empty Smith bar is far above a beginner's split-squat dumbbells.
 // ---------------------------------------------------------------------------
-import { getConstrainedPool } from '../src/lib/exercise-plan'
+import { getConstrainedPool, enforceLoadCoherence } from '../src/lib/exercise-plan'
 import { EXERCISE_DATABASE, getExerciseEntry, getMovementFamily, meetsCapabilityRequirement } from '../src/lib/exercise-db'
 import { categorize, prescribeLoad, isPerSideLoad } from '../src/lib/load-prescription'
-import type { UserProfile, TrainingExperience } from '../src/lib/types'
+import type { UserProfile, TrainingExperience, Exercise, WorkoutDay } from '../src/lib/types'
 
 let ran = 0, failures = 0
 const check = (label: string, ok: boolean, detail?: unknown) => {
@@ -125,6 +125,28 @@ console.log('\n4. The Smith split squat waits for intermediate')
   check('a beginner and a novice do not meet it', !meetsCapabilityRequirement(smith, 'beginner') && !meetsCapabilityRequirement(smith, 'novice'))
   check('...an intermediate does', meetsCapabilityRequirement(smith, 'intermediate'))
   check('...and the beginner is sent to the dumbbell split squat, which exists', smith.capability_requirement?.regression === 'Bulgarian Split Squats' && !!getExerciseEntry('Bulgarian Split Squats'))
+}
+
+console.log('\n5. Kept in proportion by the load on the body, not the number on the card')
+{
+  // The same-muscle-group pass holds a week's lifts within 2x of each other. It compared the printed numbers, and a
+  // one-leg number is per leg: a one-leg extension at 10 kg a leg (20 on the body) held the two-leg extension at 20,
+  // the same load, week after week (test:frozen-weeks §7). Measured on 1,024 grid plans: dumbbells had done the same to
+  // the cable and machine lifts beside them in 181 plans.
+  const ex = (name: string, kg: number): Exercise => ({ name, sets: 3, reps: '10-12', rest: '60s', suggested_load_kg: kg, suggested_load: `${kg}kg` } as unknown as Exercise)
+  const week = (a: number, b: number) => [{ day: 'Monday', focus: 'Legs', exercises: [ex('Leg Extensions', a)] }, { day: 'Thursday', focus: 'Legs', exercises: [ex('Single-Leg Leg Extension', b)] }] as unknown as WorkoutDay[]
+  const kgOf = (days: WorkoutDay[], name: string) => days.flatMap(d => d.exercises).find(e => e.name === name)?.suggested_load_kg
+  const fair = week(22.5, 10)
+  quiet(() => enforceLoadCoherence(fair))
+  check('a two-leg extension at 22.5 kg beside a one-leg one at 10 kg a leg (20 on the body) is left alone', kgOf(fair, 'Leg Extensions') === 22.5, kgOf(fair, 'Leg Extensions'))
+  const outlier = week(60, 10)
+  quiet(() => enforceLoadCoherence(outlier))
+  const held = outlier.flatMap(d => d.exercises).find(e => e.name === 'Leg Extensions')
+  check('...while one at 60 kg, three times the on-body 20, is still brought down to twice it (40 kg)', held?.suggested_load_kg === 40, held?.suggested_load_kg)
+  check('...and says why: held in proportion, so a repeated week is never a silent freeze', held?.load_hold === 'coherence', held?.load_hold)
+  const oneLeg = week(22.5, 30)
+  quiet(() => enforceLoadCoherence(oneLeg))
+  check('...and a one-leg extension at 30 kg a leg (60 on the body) is brought down to twice the two-leg 22.5, per leg (22.5)', kgOf(oneLeg, 'Single-Leg Leg Extension') === 22.5, kgOf(oneLeg, 'Single-Leg Leg Extension'))
 }
 
 console.log(`\n${ran} checks ran`)

@@ -58,6 +58,16 @@ Found, not fixed: 712 core-stability pairs (a plank with a bird dog, by the app'
 grid before today, 760 after the pack re-rolled picks, untouched by either fix (measured with them off). Mostly
 beginner and bad-back plans, which the movement-family gate's intermediate sample never reaches.
 
+## What the sweep found (3 Nov 2026)
+
+- **Kept in proportion by the load on the body.** The coherence pass compared printed numbers, so a per-leg or
+  per-hand figure (half the load) held a two-limb lift beside it down. Now compared on the body, as the scorer does.
+  1,377 of 217,078 loaded slots in 181 of 1,024 plans rise toward their own price (median x1.33); none can pass it.
+- **A coherence clamp records why** (`load_hold: 'coherence'`), so a held week is never a silent freeze. A machine
+  exemption from the unilateral-vs-squat cap was measured and reverted: the cap was protecting an advanced lifter from
+  127.5 kg a leg beside a 65 kg squat. Not done: the reps do not rise under a held clamp.
+- The kneeling one-arm press ranks as a main lift (it lost the label to a swing on a Shoulders day).
+
 ## CSCS review
 
 1. **Training effect.** A full-gym trainee gets one-leg machine work (a one-leg press, a Smith split squat), a second
@@ -65,11 +75,13 @@ beginner and bad-back plans, which the movement-family gate's intermediate sampl
 2. **What it takes away.** Nothing is removed; full-gym plans re-roll some picks among more options. Measured by the
    full quality grid, not assumed.
 3. **Fundamentals.** Pattern coverage unchanged or wider; progression is the existing load path.
-4. **Floors and ceilings.** One ceiling moved, and only down: a one-leg press at half the two-leg ceiling.
+4. **Floors and ceilings.** One ceiling moved, and only down: a one-leg press at half the two-leg ceiling. The
+   coherence pass now compares the load on the body; it still only lowers, so it raises nothing past a lift's own
+   price, and it now gives slightly LESS ground to a per-hand dumbbell number beside a machine (as it always meant to).
 5. **Scope.** Exercise selection. Every exclusion copies its nearest entry; nothing new about a joint is decided.
 
 ## Gates
 
-`test:machine-pack` (57 checks), `test:movement-families` §4, `test:ceiling-units`, and the full sweep (a catalogue
+`test:machine-pack` (61 checks), `test:movement-families` §4, `test:ceiling-units`, and the full sweep (a catalogue
 change). 7 mutations, 7 caught, two only after a check was strengthened (a one-arm row losing its one-arm flag; the
 week-to-week rotation fix, which had no plan it bound on until the 1,024-plan measurement named two).

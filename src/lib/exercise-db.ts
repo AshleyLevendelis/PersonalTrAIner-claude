@@ -5303,7 +5303,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
     angle_vector: 'diagonal',
-    primary_muscles: ['lateral deltoid', 'lower traps'],
+    primary_muscles: ['lateral deltoid', 'lower trapezius'],
     equipment: ['cable machine'],
     joint_stress: 'low',
     form_cues: ['Set one pulley low and hold the handle in the opposite hand', 'Thumb up, arm nearly straight', 'Raise the hand up and out along the line of a Y', 'Stop at head height and lower slowly'],

@@ -7,7 +7,7 @@ import {
 } from '../src/lib/session-kind'
 import { isMainLiftSlot } from '../src/lib/mesocycle-edit'
 import { EXERCISE_DATABASE, isContraindicatedFor, type ExerciseEntry } from '../src/lib/exercise-db'
-import { isExternallyLoaded } from '../src/lib/load-prescription'
+import { isExternallyLoaded, categorize } from '../src/lib/load-prescription'
 import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds } from '../src/lib/session-duration'
 import type { UserProfile, MesocycleWeek, WorkoutDay } from '../src/lib/types'
 
@@ -291,7 +291,12 @@ console.log('\n7. Priced the way generation prices that style and phase')
   check('no second-tier compound rests 30s or less (her 18 Sep report, as an absolute)', lifts.length >= 3 && lifts.every(e => restOf(e.rest) > 30), lifts.map(e => [e.name, e.rest]))
   const mains = [...(functional?.session ?? []), ...(bodybuilding?.session ?? [])].filter(isMainLiftSlot)
   check('a main lift rests at least 60s', mains.every(e => restOf(e.rest) >= 60), mains.map(e => [e.name, e.rest]))
-  const loaded = [...(functional?.session ?? [])].filter(e => e.prescription_type === 'reps' && e.tier !== 'tier_0_primer' && isExternallyLoaded(entryOf(e.name)!))
+  // A loaded lift the pricing engine prices. Core work on a ball or a cable (Russian Twist, Cable Woodchops, Cable
+  // Crunch) is deliberately progressed by reps with no number (categorize returns null for every core move), so it is
+  // not asked here; the machine pack's re-rolls put a medicine-ball twist in this session on 3 Nov 2026 and the check
+  // read that policy as a missing weight. Whether loaded core work should carry a number is a separate, open question
+  // (BACKLOG, the machine pack).
+  const loaded = [...(functional?.session ?? [])].filter(e => e.prescription_type === 'reps' && e.tier !== 'tier_0_primer' && isExternallyLoaded(entryOf(e.name)!) && categorize(entryOf(e.name)!) !== null)
   check('every loaded lift has a weight', loaded.length >= 2 && loaded.every(e => typeof e.suggested_load_kg === 'number' && e.suggested_load_kg > 0), loaded.map(e => [e.name, e.suggested_load_kg]))
 }
 {

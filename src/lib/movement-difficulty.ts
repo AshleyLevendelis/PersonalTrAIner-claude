@@ -75,6 +75,9 @@ export const ANCHOR_DIFFICULTY_BUMP: Record<string, 1 | 2> = {
   'Landmine Press': 2,
   'Arnold Press': 2,
   'Shoulder Press Machine': 2,
+  // The machine pack's one-arm press (3 Nov 2026): on a dumbbells-only Shoulders day it IS the day's press, and
+  // without this a kettlebell swing written after it took the "Main lift" label (test:day-purpose P10).
+  'Half-Kneeling Single-Arm Dumbbell Press': 2,
 
   // vertical_pull — the assisted/loaded stand-ins for a pull-up
   'Lat Pulldown': 2,

@@ -379,8 +379,10 @@ export interface Exercise {
    *                unexplained repeated weeks in a 1,024-plan sweep.
    * The load_guidance sentence says the first three in words; this is the
    * same fact in a form a measurement can read. Absent otherwise.
+   *   'coherence'  (3 Nov 2026) lowered to stay in proportion with another lift: the day's main lift, the flat press,
+   *                or the same muscle group's lightest this week. It moves again when that lift does.
    */
-  load_hold?: 'ceiling' | 'implement' | 'stated_limit' | 'floor' | 'matched' | 'unaffordable_step'
+  load_hold?: 'ceiling' | 'implement' | 'stated_limit' | 'floor' | 'matched' | 'unaffordable_step' | 'coherence'
   /**
    * THE EXERCISE THIS ONE REPLACED, by her choice (a swap), so a later rebuild can put her choice back where the
    * fresh plan brings the old one (run 5, H28, 11 Oct 2026: a rebuild dropped a Dumbbell Rows swap and handed back

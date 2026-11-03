@@ -21,6 +21,7 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
+import { ANCHOR_ISO } from './anchor.mjs'
 
 const DIST = new URL('./dist/', import.meta.url).pathname
 const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
@@ -67,21 +68,36 @@ const finish = async () => {
 // ---------------------------------------------------------------------------
 // verify:holds — A TIMED HOLD ON A REAL CARD (runs 3-4, M42, 10 Oct 2026).
 // A plank had no timer, a 33-second hold was logged as "33 reps", and "Add a
-// drop" was offered on it. On the harness's default day, Side Plank is a timed hold (until 3 Nov 2026 it was
-// Dead Bug on the ?legcurl=1 day, which the dumbbell pack re-rolled to a Bird Dog, counted in reps):
-// start and stop the row's timer, the seconds fill the box, tick it, and the
+// drop" was offered on it. THE DRIVER FINDS THE HOLD BY ASKING THE PAGE (3 Nov 2026): it was pinned by name twice (Dead
+// Bug on ?legcurl=1, then Side Plank on the default day) and each catalogue pack re-rolled the pin away (the machine
+// pack put Cable Woodchops where the plank was). Now it walks the week's training days, opens each card, and takes the
+// first whose row offers a hold timer, so a re-roll moves the hold and not the check. The INPUT is the harness's own plan.
+// Then: start and stop the row's timer, the seconds fill the box, tick it, and the
 // receipt says seconds, with no drop offered and no record claimed.
 // ---------------------------------------------------------------------------
 await send('Page.enable'); await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
-await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/tab/exercise` })
-await wait(5000)
-const HOLD = 'Side Plank'
-const CARD = `[...document.querySelectorAll('[data-exercise-name]')].find(x => x.getAttribute('data-exercise-name') === ${JSON.stringify(HOLD)})`
-check('0. the day carries a timed hold', await ev(`!!${CARD}`))
-const at = await ev(`(() => { const card = ${CARD}; if (!card) return null; const head = card.querySelector('button,[role="button"]') || card; head.scrollIntoView({ block: 'center' }); const r = head.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
-if (at) for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', clickCount: 1 })
-await wait(1200)
+const isoPlus = n => { const [y, m, d] = ANCHOR_ISO.split('-').map(Number); const t = new Date(y, m - 1, d + n); return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}` }
+const cardOf = name => `[...document.querySelectorAll('[data-exercise-name]')].find(x => x.getAttribute('data-exercise-name') === ${JSON.stringify(name)})`
+const openCard = async name => {
+  const at = await ev(`(() => { const card = ${cardOf(name)}; if (!card) return null; const head = card.querySelector('button,[role="button"]') || card; head.scrollIntoView({ block: 'center' }); const r = head.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`)
+  if (at) for (const type of ['mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', clickCount: 1 })
+  await wait(1200)
+}
+let HOLD = null, loads = 0, looked = 0
+search: for (const offset of [0, 2, 4, 5]) {
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&today=${isoPlus(offset)}&n=${++loads}#/tab/exercise` })
+  await wait(5000)
+  const names = await ev(`[...new Set([...document.querySelectorAll('[data-exercise-name]')].map(x => x.getAttribute('data-exercise-name')))]`) ?? []
+  for (const name of names) {
+    looked++
+    await openCard(name)
+    if (await ev(`!!${cardOf(name)}?.querySelector('[data-testid="hold-timer-start"]')`)) { HOLD = name; break search }
+  }
+}
+console.log(`      (looked at ${looked} exercises over ${loads} day(s); the hold is ${HOLD})`)
+const CARD = cardOf(HOLD)
+check('0. the week carries a timed hold, found on the page (and the search looked at more than one exercise)', !!HOLD && looked > 1 && await ev(`!!${CARD}`), { looked, loads })
 const q = sel => `(() => { const card = ${CARD}; return card ? card.querySelector(${JSON.stringify(sel)}) : null })()`
 check('1a. the row offers a hold timer', await ev(`!!${q('[data-testid="hold-timer-start"]')}`))
 check('1b. ...and only on the timed exercise', await ev(`document.querySelectorAll('[data-testid="hold-timer-start"]').length`) >= 1

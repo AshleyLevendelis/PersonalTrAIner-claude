@@ -27,6 +27,30 @@ Newest first. One line each.
   `test:machine-pack` (57 checks), `test:movement-families` section 4, `test:ceiling-units`; the pricing snapshot,
   family lists and injury counts updated with each entry's reason. 7 mutations, 7 caught (two after a check was
   strengthened). Frontend only.
+  THE SWEEP (474 gates at `879fdc4a`): 466 passed. Three expected (the coach exam is stale until the run on her machine;
+  `test:bundle`, 1,235 of a 1,233 kB budget, raised to 1,250 on her 15 Sep "room to grow" ruling with the measured
+  figure written beside it). Five more were the pack's: (1) A KNEELING ONE-ARM PRESS LOST "MAIN LIFT" TO A KETTLEBELL
+  SWING on a dumbbells-only Shoulders day (`test:day-purpose` P10): it now ranks with the other dumbbell presses.
+  (2) The Y-raise named its trap fibres in a spelling the muscle map did not know (`test:exercise-demo`). (3) A
+  medicine-ball twist reached `test:session-kind`'s fixture and read as "a loaded lift with no weight": core work is
+  progressed by reps on purpose, so the check now asks of lifts the pricing engine prices, with a mutation proving it
+  still catches a priced lift with none. (4) TWO WEIGHTS HELD TWO WEEKS WITH NO REASON (`test:frozen-weeks` §7),
+  traced before fixing (engine-tracer): the coherence pass, which keeps related lifts in proportion, records nothing
+  when it lowers a weight. (a) It compared the NUMBER ON THE CARD, so a one-leg extension at 10 kg a leg (20 on the
+  body) held the two-leg one at 20, week after week. Dumbbells had always done the same to the cable and machine lifts
+  beside them: measured on 1,024 grid plans, 1,377 of 217,078 loaded slots in 181 plans sat under their own price
+  (median x1.33, at most x2.25, e.g. a pushdown held at 7.5 kg beside a 5 kg kickback). It now compares the load on the
+  body, as the plan scorer always has. The pass only ever lowers, so nothing can go above a lift's own price.
+  (b) A one-leg press at 55 kg a leg held at 50 under 0.65 of a 77.5 kg squat. AN EXEMPTION FOR MACHINES WAS BUILT,
+  MEASURED AND REVERTED: without the cap an advanced lifter in week 5 got 127.5 kg a leg beside a 65 kg squat still
+  ramping from its guess, so the cap is doing its job. What was missing was the reason: every coherence clamp that
+  lowers a weight now records `coherence`, which draws no label (it moves as soon as the lift it is held against does).
+  NOT DONE, named: when a clamp holds the weight, the reps do not rise either, because the rep bump reads the weight
+  before the clamp. A held week with the same reps is now explained, not cured. (5) Two browser checks lost their
+  pinned exercise to the re-roll a third time (a plank, the prep before the squat): both now find it on the page (the
+  hold driver walks the week's days and opens cards until a row offers a hold timer). Mutations: 8, 8 caught (compare
+  by card number; no reason recorded; the per-leg cap not halved back; the press rank removed; the muscle misspelt; a
+  priced lift with no weight; the hold timer removed; "log all" removed). `test:machine-pack` 61 checks (+4).
 - [ ] **A BAN MADE DURING AN INJURY EASE-OFF NOW SURVIVES ITS ENDING, AND THE SWEEP BEFORE IT, 3 NOV 2026.** FOUND by
   a MISSED mutation while re-anchoring gates after the dumbbell pack: emptying the ban list in
   `revertAdaptationChanges` failed nothing, because the check banned a triceps kickback, which a knee ease-off never

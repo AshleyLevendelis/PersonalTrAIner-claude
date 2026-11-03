@@ -129,8 +129,11 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   lunge, each excluded as its nearest entry is. `test:dumbbell-pack`, `docs/plans/dumbbell-pack.md`
 - **More exercises and machine options** — since 3 Nov 2026, the machine pack: fifteen entries (one-leg machine work,
   a second quad machine, one-arm cable moves priced per side, loaded abs); a one-leg press capped at half the two-leg
-  ceiling; and both rotations now see what earlier slots became (two pushdowns on one day, 99 of 1,024 plans with the
-  pack, now 0). `test:machine-pack`, `test:movement-families` §4, `docs/plans/machine-pack.md`
+  ceiling; and both rotations now see what earlier slots became (two pushdowns on one day: 99 repeated-movement days on
+  1,024 plans with the pack, now 0). **Related lifts are kept in proportion by the load on the BODY, not the number on
+  the card** (a per-hand or per-leg figure is half the load; 181 of 1,024 plans had a cable or machine lift held under
+  its own price), and a clamp that lowers a weight records why (`coherence`). `test:machine-pack` §5,
+  `test:movement-families` §4, `test:frozen-weeks` §7, `docs/plans/machine-pack.md`
 - Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
   — `chosen-not-shuffled` since 16 Sep 2026 (19 checks, 10 mutations), which
   CALLS the ranker rather than reading it. It holds the tie-break to its job:

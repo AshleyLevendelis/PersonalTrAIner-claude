@@ -379,7 +379,9 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 18 Oct 2026: 1150 -> 1166, runs 7-10 batch 1 — see the deploy figure above for both ends.
   // MOVED 22 Oct 2026: 1166 -> 1193, the Sam live test — see the deploy figure above for both ends.
   // MOVED 31 Oct 2026: 1193 -> 1233, the five-tab polish — see the deploy figure above for both ends.
-  const APP_CHUNK_BUDGET_KB = 1233
+  // MOVED 3 Nov 2026: 1233 -> 1250 raw, on her 15 Sep ruling ("raise it with room to grow"). Measured that day: 1,235,
+  // the machine pack's fifteen catalogue entries and its coherence fixes, which every screen that shows a plan reads.
+  const APP_CHUNK_BUDGET_KB = 1250
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
