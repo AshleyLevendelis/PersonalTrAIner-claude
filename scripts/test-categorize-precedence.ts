@@ -136,14 +136,16 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
   // other glute/hip machines (the 1 Sep precedent above); T-Bar Row Machine
   // in row; and Rotary Torso in no category, like Cable Woodchops, the one
   // other loaded core move. No pre-existing name moved.
+  // 3 Nov 2026, the exercise library's batch 1 (docs/plans/exercise-library.md): nine new names, each in the category
+  // test:exercise-library prices and checks against its model. No pre-existing name moved.
   // 3 Nov 2026, the machine pack: fifteen new names, each in the category it was priced and checked against its model
   // in (docs/plans/machine-pack.md). No pre-existing name moved.
   const AT_THE_FIX: Record<string, string[]> = {
-    bench: ["Archer Push-Ups","Barbell Bench Press","Barbell Floor Press","Chest Dips","Chest Press Machine","Deficit Push-Ups","Dumbbell Bench Press","Dumbbell Floor Press","Incline Dumbbell Press","Incline Machine Press","Incline Push-Ups","Knee Push-Ups","Neutral-Grip Dumbbell Press","Push-Ups","Smith Machine Bench Press","Wide Push-Ups"],
+    bench: ["Archer Push-Ups","Barbell Bench Press","Barbell Floor Press","Chest Dips","Chest Press Machine","Deficit Push-Ups","Dumbbell Bench Press","Dumbbell Floor Press","Incline Dumbbell Press","Incline Machine Press","Incline Push-Ups","Knee Push-Ups","Neutral-Grip Dumbbell Press","Push-Ups","Single-Arm Dumbbell Bench Press","Smith Machine Bench Press","Wide Push-Ups"],
     carry: ["Farmer Squat Hold (Isometric Carry)","Farmer's Walk","Loaded Backpack Walk","Suitcase Carry","Trap Bar Carry"],
-    deadlift: ["Deadlifts","Trap Bar Deadlift"],
+    deadlift: ["Deadlifts","Sumo Deadlift","Trap Bar Deadlift"],
     goblet_squat: ["Goblet Squats"],
-    hinge_accessory: ["Back Extension Machine","Bodyweight Good Morning","Dumbbell Hip Thrust","Glute Bridge","Good Mornings","Hip Thrust","Machine Hip Thrust","Reverse Hyper Machine","Romanian Deadlifts","Single-Leg Glute Bridge","Single-Leg RDL (Bodyweight)"],
+    hinge_accessory: ["Back Extension Machine","Barbell Glute Bridge","Bodyweight Good Morning","Dumbbell Hip Thrust","Glute Bridge","Good Mornings","Hip Thrust","Machine Hip Thrust","Reverse Hyper Machine","Romanian Deadlifts","Single-Leg Dumbbell RDL","Single-Leg Glute Bridge","Single-Leg RDL (Bodyweight)"],
     isolation_bicep: ["Backpack Curl","Band Curl","Barbell Curls","Bayesian Cable Curl","Cable Curls","Cable Rope Hammer Curl","Dumbbell Curls","Hammer Curls","Incline Dumbbell Curls","Machine Preacher Curl","Preacher Curl (EZ bar)"],
     isolation_calf: ["Bent-Knee Calf Raise (Bodyweight)","Calf Raises","Calf Raises (Bodyweight)","Leg Press Calf Raise","Seated Calf Raises","Single-Leg Calf Raise (Bodyweight)","Single-Leg Calf Raise Hold","Standing Calf Raise Machine"],
     single_leg_calf: ["Single-Leg Dumbbell Calf Raise"],
@@ -156,13 +158,13 @@ console.log('\n3. TRAPDOOR: no other exercise in the database moved')
     isolation_tricep: ["Assisted Dip Machine","Band Tricep Kickback","Band Tricep Pushdown","Chair Dips","Dumbbell Tricep Kickback","Lying Dumbbell Tricep Extension","Machine Tricep Extension","Overhead Tricep Extension","Rope Tricep Pushdown","Seated Dip Machine","Skull Crushers","Straight-Bar Tricep Pushdown","Tricep Dips","Tricep Pushdowns"],
     kettlebell_swing: ["Kettlebell Swing (Heavy)","Kettlebell Swings"],
     leg_press: ["Belt Squat","Hack Squat","Leg Press","Single-Leg Leg Press"],
-    null: ["Ab Wheel Rollout","Ankle Alphabet","Arm Circles","Band Dislocates","Band Face Pulls","Band Pull-Aparts","Banded Ankle Dorsiflexion","Banded Wrist Extension","Banded Wrist Flexion","Battle Ropes","Bear Crawl","Bird Dog","Box Jumps","Broad Jumps","Burpees","Cable Crunch","Cable Woodchops","Clamshell","Cycling Intervals","Dead Bug","Eccentric Wrist Extension","Elliptical","Forearm Pronation-Supination","Hanging Leg Raises","High Knees","Isometric Grip Squeeze","Jump Rope","Jumping Jacks","Lateral Step Touches","Leg Swings","Medicine Ball Slams","Mountain Climbers","Pallof Press","Plank","Plyo Push-Ups","Prone Y-T Raises","Rotary Torso Machine","Russian Twist","Scapular Push-Ups","Shadow Boxing","Side Plank","Side-Lying Hip Abduction","Single-Leg Balance Hold","Skater Bounds","Standing Band Hip Abduction","Treadmill Intervals","Wall Slides","Wrist Circles"],
-    overhead: ["Arnold Press","Backpack Overhead Press","Band Shoulder Press","Dumbbell Shoulder Press","Half-Kneeling Single-Arm Dumbbell Press","Landmine Press","Overhead Press","Pike Push-Ups","Shoulder Press Machine","Smith Machine Shoulder Press"],
+    null: ["Ab Wheel Rollout","Ankle Alphabet","Arm Circles","Band Dislocates","Band Face Pulls","Band Pull-Aparts","Banded Ankle Dorsiflexion","Banded Wrist Extension","Banded Wrist Flexion","Battle Ropes","Bear Crawl","Bird Dog","Box Jumps","Broad Jumps","Burpees","Cable Crunch","Cable Woodchops","Clamshell","Cycling Intervals","Dead Bug","Dumbbell Woodchop","Eccentric Wrist Extension","Elliptical","Forearm Pronation-Supination","Hanging Leg Raises","High Knees","Isometric Grip Squeeze","Jump Rope","Jumping Jacks","Landmine Rotation","Lateral Step Touches","Leg Swings","Medicine Ball Slams","Mountain Climbers","Pallof Press","Plank","Plyo Push-Ups","Prone Y-T Raises","Rotary Torso Machine","Russian Twist","Scapular Push-Ups","Shadow Boxing","Side Plank","Side-Lying Hip Abduction","Single-Leg Balance Hold","Skater Bounds","Standing Band Hip Abduction","Treadmill Intervals","Wall Slides","Wrist Circles"],
+    overhead: ["Arnold Press","Backpack Overhead Press","Band Shoulder Press","Dumbbell Shoulder Press","Half-Kneeling Single-Arm Dumbbell Press","Landmine Press","Overhead Press","Pike Push-Ups","Push Press","Shoulder Press Machine","Smith Machine Shoulder Press"],
     overhead_carry: ["Overhead Carry"],
     pulldown: ["Band Lat Pulldown","Close-Grip Lat Pulldown","Iso-Lateral Pulldown","Kneeling Band Lat Pulldown","Lat Pulldown","Single-Arm Lat Pulldown"],
     row: ["Backpack Row","Barbell Rows","Bent-Over Dumbbell Row","Cable Rows","Chest-Supported Row","Chin-Ups","Dumbbell Rows","Inverted Row","Iso-Lateral High Row","Landmine Row","Neutral-Grip Seated Cable Row","Pull-Up Negatives","Pull-Ups","Pull-Ups (Assisted)","Rowing Machine","Seated Cable Row","Seated Machine Row","Single-Arm Cable Row","T-Bar Row Machine","T-Bar Rows","Table Row","Towel Row"],
     shrug: ["Backpack Shrug","Band Shrug","Cable Shrug","Dumbbell Shrugs","Machine Shrug","Shrugs"],
-    single_leg_dumbbell: ["Bulgarian Split Squats","Dumbbell Reverse Lunge","Low Box Step-Up","Smith Machine Split Squat","Split Squat (Bodyweight)","Step-Down (Eccentric)","Step-Ups","Step-Ups (Bodyweight)","Walking Lunges"],
+    single_leg_dumbbell: ["Barbell Reverse Lunge","Bulgarian Split Squats","Dumbbell Lateral Lunge","Dumbbell Reverse Lunge","Low Box Step-Up","Smith Machine Split Squat","Split Squat (Bodyweight)","Step-Down (Eccentric)","Step-Ups","Step-Ups (Bodyweight)","Walking Lunges"],
     squat: ["Air Squat","Barbell Squats","Bodyweight Squat Marches","Box Squat (Bodyweight)","Cossack Squat (Bodyweight)","Pistol Squat Progression","Smith Machine Squat","Spanish Squat","Tempo Air Squat"],
   }
 

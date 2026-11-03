@@ -55,7 +55,7 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
   bench_press: {
     why: 'A push-up is not a bench press (bodyweight, closed chain). And since 9 Oct 2026 a neutral-grip dumbbell press is not a flat barbell or floor press: different implement, grip, bar path and loaded range — a coach programmes a barbell/floor press and a dumbbell press in one session routinely. Decided as a CSCS coach; it is what gives a shoulder-flagged chest day a second press.',
     families: {
-      bench_press: ['Barbell Bench Press', 'Smith Machine Bench Press', 'Dumbbell Bench Press', 'Barbell Floor Press', 'Dumbbell Floor Press', 'Incline Dumbbell Press', 'Incline Machine Press', 'Incline Push-Ups', 'Deficit Push-Ups', 'Archer Push-Ups', 'Chest Press Machine', 'Knee Push-Ups', 'Wide Push-Ups'],
+      bench_press: ['Barbell Bench Press', 'Smith Machine Bench Press', 'Dumbbell Bench Press', 'Barbell Floor Press', 'Dumbbell Floor Press', 'Incline Dumbbell Press', 'Incline Machine Press', 'Incline Push-Ups', 'Deficit Push-Ups', 'Archer Push-Ups', 'Chest Press Machine', 'Knee Push-Ups', 'Wide Push-Ups', 'Single-Arm Dumbbell Bench Press'],
       neutral_grip_press: ['Neutral-Grip Dumbbell Press'],
       push_up: ['Push-Ups'],
     },
@@ -86,9 +86,9 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
   hip_hinge: {
     why: 'A deadlift from the floor is its own family (two bars, one lift); the heavy swing shares a family with the warm-up swing so they cannot share a session.',
     families: {
-      deadlift: ['Deadlifts', 'Trap Bar Deadlift'],
+      deadlift: ['Deadlifts', 'Trap Bar Deadlift', 'Sumo Deadlift'],
       kettlebell_swing: ['Kettlebell Swing (Heavy)'],
-      hip_hinge: ['Romanian Deadlifts', 'Cable Pull-Through', 'Good Mornings', 'Back Extension Machine', 'Reverse Hyper Machine', 'Glute Bridge', 'Single-Leg RDL (Bodyweight)', 'Bodyweight Good Morning', 'Bodyweight Hip Hinge to Wall'],
+      hip_hinge: ['Romanian Deadlifts', 'Cable Pull-Through', 'Good Mornings', 'Back Extension Machine', 'Reverse Hyper Machine', 'Glute Bridge', 'Single-Leg RDL (Bodyweight)', 'Bodyweight Good Morning', 'Bodyweight Hip Hinge to Wall', 'Single-Leg Dumbbell RDL'],
     },
   },
   calf: {

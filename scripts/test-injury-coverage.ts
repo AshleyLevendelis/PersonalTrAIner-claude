@@ -261,8 +261,17 @@ console.log('\n5. How MUCH each injury removes, frozen')
     //   hips       20->22  Smith Machine Split Squat, Single-Leg Leg Press
     //   ankles     21->23  Smith Machine Split Squat, Leg Press Calf Raise
     //   elbows     23->26  Seated Dip Machine, Machine Tricep Extension, Bayesian Cable Curl
-    lower_back: 19, knees: 41, shoulders: 75, neck: 7, wrists: 29,
-    hips: 22, ankles: 23, elbows: 26,
+    // 3 Nov 2026, the exercise library batch 1 (docs/plans/exercise-library.md), each as the entry it copies:
+    //   lower_back 19->24  Sumo Deadlift, Push Press, Barbell Reverse Lunge (bar on the back), Landmine Rotation
+    //                      (loaded rotation, as Russian Twist), Single-Leg Dumbbell RDL
+    //   knees      41->44  Sumo Deadlift, Barbell Reverse Lunge, Dumbbell Lateral Lunge
+    //   shoulders  75->77  Push Press, Single-Arm Dumbbell Bench Press
+    //   neck        7->8   Push Press (as Overhead Press)
+    //   wrists     29->32  Sumo Deadlift, Push Press, Single-Leg Dumbbell RDL
+    //   hips       22->26  Sumo Deadlift, Barbell Reverse Lunge, Dumbbell Lateral Lunge, Single-Leg Dumbbell RDL
+    //   ankles     23->26  Barbell Reverse Lunge, Dumbbell Lateral Lunge, Single-Leg Dumbbell RDL (one-ankle balance)
+    lower_back: 24, knees: 44, shoulders: 77, neck: 8, wrists: 32,
+    hips: 26, ankles: 26, elbows: 26,
   }
   const drift: string[] = []
   for (const code of CODES) {

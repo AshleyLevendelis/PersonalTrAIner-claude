@@ -2,6 +2,28 @@
 
 Newest first. One line each.
 
+- [ ] **EXERCISE LIBRARY BATCH 1, BARBELL AND DUMBBELL, 3 NOV 2026, BUILT, FULL SWEEP PENDING** (plan:
+  `docs/plans/exercise-library.md`). NINE ENTRIES, appended last, each a different exercise rather than a variant:
+  Sumo Deadlift, Barbell Glute Bridge (no bench), Push Press (intermediate and up, from Overhead Press), Barbell
+  Reverse Lunge (intermediate and up, from Dumbbell Reverse Lunge), Landmine Rotation, Single-Arm Dumbbell Bench Press,
+  Dumbbell Lateral Lunge, Single-Leg Dumbbell RDL, Dumbbell Woodchop. Each copies its nearest entry's exclusions (two
+  add one: the barbell lunge a bad back, as the back squat; the one-leg RDL an ankle) and is priced in an existing
+  category, never heavier on the body than its model across five people. HELD BACK, named: front squat, incline and
+  close-grip barbell bench, squeeze press, renegade row, dumbbell front squat, suitcase deadlift and landmine squat.
+  Each is a lighter variant its category would price at the parent lift's FULL weight (a front squat as a back
+  squat), so they wait for a "fraction of the parent" pricing rule, which is load prescription and gets its own plan
+  and trace. FOUND ON THE WAY: (1) the empty bar is a barbell's floor: a 55 kg intermediate woman's reverse lunge is 8
+  kg a hand and the barbell one starts at 20 kg, accepted for intermediates (a beginner never meets it) and pinned so
+  the allowance is the bar alone; (2) the neck check caught Push Press excluding a bad neck without listing it among
+  the joints it loads, unlike Overhead Press: fixed. Snapshots moved with reasons: injury counts (lower back 19->24,
+  knees 41->44, shoulders 75->77, neck 7->8, wrists 29->32, hips 22->26, ankles 23->26), the category snapshot, the
+  hinge and bench family splits. CSCS REVIEW: (1) a second deadlift stance, a glute option with no bench, a power
+  press, a loaded single-leg lift grip cannot limit, one-side pressing and hinging, a sideways lunge and a woodchop
+  with no cable; (2) nothing removed, picks re-roll among more options (measured by the full grid in the sweep);
+  (3) pattern coverage the same or wider, progression the existing paths, chest:back unchanged (1.75); (4) no floor or
+  ceiling moved; (5) exercise selection only. `test:exercise-library` (41 checks): 8 mutations, 8 caught (two only
+  after the check was strengthened), plus one equivalent (a kettlebell is priced per hand like a dumbbell). All nine
+  are prescribed somewhere in a 27-plan seeded grid.
 - [ ] **THE EXERCISE LIBRARY FROM ASHLEY'S 1,001-EXERCISE LIST, 3 NOV 2026, PLANNED, NOT BUILT** ("I want the app to
   have at its disposal"; `docs/plans/exercise-library.md`). MEASURED (name matching, an estimate): about 236 of the
   list are already in the 231-entry catalogue; of about 765 left, ~476 use kit the app asks about, ~124 need new kit,
@@ -12,7 +34,10 @@ Newest first. One line each.
   micro-variant the rotation would serve as fake variety; tempo, pause, pin, board and chains versions are methods,
   not exercises; elite skills, kipping, behind-the-neck pressing, loaded Jefferson curls, depth jumps and strongman
   implements are left out; landmine is assumed wherever a barbell is (to be measured). Five batches, each gated and
-  swept. NEXT: batch 1, barbell and dumbbell.
+  swept. SECOND LIST, same day (`expanded_exercise_database_2000.md`, ~1,820 distinct names, ~1,150 new, mostly grip,
+  angle and setup versions, no cardio). HER SECOND RULING, from three options: **"Searchable, log-only"**: a near-copy is
+  never prescribed but can be found in search and logged under its own name with its own history and best. Rejected:
+  leave them out (logged as the parent); add them all to plans. Batch 6 builds it. NEXT: batch 1, barbell and dumbbell.
 - [ ] **THE MACHINE PACK, 3 NOV 2026** (Ashley: "I want more exercises and machine options"; CSCS delegation, nothing
   asked; `docs/plans/machine-pack.md`). MEASURED FIRST: single-leg work had no machine or cable option, quad isolation
   one machine, a full-gym pool 54 machine/cable exercises. FIFTEEN ENTRIES, appended last, each copying its nearest

@@ -13,6 +13,28 @@ batches, each with its own gate and a full sweep.
   bands, bodyweight); about **124** need kit it never asks about; about **50** are elite skills or lifts left out on
   purpose; about **115** are cardio, conditioning or sport drills.
 
+## The second list (3 Nov 2026, the same day)
+
+Ashley then sent `expanded_exercise_database_2000.md`: 1,971 numbered lines, about 1,820 distinct names, about 1,150
+not in the first list, and no cardio section. Sampled, the additions are almost all grip, angle, stance and setup
+versions of the same lifts ("Leg Press Calf Raise Setup", "Dumbbell Pronated Kickback"). Both lists are the source
+for every batch; cardio still comes from the first.
+
+## Her second ruling, 3 Nov 2026, from three options: "Searchable, log-only"
+
+A NEAR-COPY (the same lift with another grip, angle, stance, setup or method) is never prescribed by a plan, but can be
+found in search and logged under its own name, with its own history and best. Rejected: leaving them out (logged as
+the parent lift) and making them all prescribable (plans would shuffle near-identical lifts and call it variety).
+What that needs, and so batch 6:
+- A log-only entry is its own kind: it names its PARENT, takes the parent's exclusions and kit for the clash marks the
+  search already shows, never enters a pool, a rotation, a swap list or the coach's choices, and carries no prescribed
+  weight (she types it).
+- Its history and best are its own; whether a parent's progression ever reads a near-copy's logs is decided in the
+  build, measured, and is the CSCS call (a paused squat is not a squat for estimating a squat).
+- The coach can log one by name, as it logs anything else (parity).
+- Not yet decided, and not covered by this ruling: whether the elite skills and strongman lifts left out of plans
+  (rule 3 below) are searchable log-only too.
+
 ## Her ruling, 3 Nov 2026, from three options: "Known kit + a few"
 
 Add everything sensible for the kit the app knows, and add a few common new kit ticks: **rings or suspension straps,
@@ -55,11 +77,14 @@ The list is a taxonomy, not a prescription list, and a plan's rotation reads eve
 
 ## Batches, each: entries, a gate on every field, mutation round, full sweep, the quality grid, BACKLOG
 
-1. Barbell and dumbbell (known kit).
+1. Barbell and dumbbell (known kit). BUILT 3 Nov 2026: nine entries (BACKLOG); eight lighter variants wait for a
+   "fraction of the parent" pricing rule (front squat, incline and close-grip barbell bench, squeeze press, renegade
+   row, dumbbell front squat, suitcase deadlift, landmine squat).
 2. Cable and machine (known kit).
 3. Bodyweight and kettlebell (known kit).
 4. The five new kit ticks, then their exercises.
 5. Cardio: missing activities onto the cardio list.
+6. Near-copies, searchable and log-only (her second ruling), from both lists.
 
 The CSCS review (five questions) is answered per batch, with numbers from the grid: pattern coverage, push:pull,
 chest:back, repeated-movement days, quality floor and average, and how many plans changed.
