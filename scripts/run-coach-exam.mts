@@ -1,6 +1,6 @@
 import fs from 'fs'
 import path from 'path'
-import { coachFingerprint } from './coach-fingerprint.ts'
+import { coachFingerprint, examCaseStamps } from './coach-fingerprint.ts'
 
 // ---------------------------------------------------------------------------
 // THE COACH EXAM, PART 1 OF 3 — play the conversations. This one costs money.
@@ -96,6 +96,9 @@ if (cases.length === 0) {
 }
 
 const fingerprint = coachFingerprint()
+// WHICH QUESTION EACH ANSWER IS TO (3 Nov 2026): stamped per transcript, so an edited or added case makes the scores
+// stale (test:coach-exam-fresh) instead of sitting beside answers to a question that is no longer asked.
+const caseStamps = examCaseStamps()
 const turns = cases.reduce((n, c) => n + c.messages.length, 0)
 // A project ref is the first label of the Supabase host. Printed, not
 // asserted: the exam is read-only against the chat function either way, and a
@@ -251,6 +254,7 @@ for (const c of cases) {
     why: c.why,
     checks: c.checks ?? {},
     fingerprint: fingerprint.hash,
+    caseStamp: caseStamps[c.name],
     model: fingerprint.model,
     ranAt,
     context,
@@ -266,6 +270,7 @@ fs.writeFileSync(path.join(OUT_BASE, 'run.json'), JSON.stringify({
   model: fingerprint.model,
   project: projectRef,
   cases: cases.map(c => c.name),
+  caseStamps: Object.fromEntries(cases.map(c => [c.name, caseStamps[c.name]])),
   partial: !!only,
   transportFailures,
 }, null, 2) + '\n')

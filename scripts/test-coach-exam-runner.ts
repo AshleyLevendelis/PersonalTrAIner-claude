@@ -5,6 +5,7 @@ import { join, dirname } from 'path'
 import { spawn } from 'child_process'
 import { fileURLToPath } from 'url'
 import { hardRuleViolations, coachLine, type Transcript } from './coach-exam-hard-rules.ts'
+import { examCaseStamps } from './coach-fingerprint.ts'
 
 // ---------------------------------------------------------------------------
 // THE COACH EXAM'S RUNNER, DRIVEN FOR FREE — a fake chat-gemini on localhost
@@ -169,6 +170,8 @@ async function main() {
     check('the fake coach was reached — so an explicit env var beat the decoy .env.local', coach.seen.length === wantsCard.messages.length, coach.seen.length)
     const t = r.transcript
     check('a transcript was written to the override directory', !!t && Array.isArray(t.turns), r.outDir)
+    // THE QUESTION IT ANSWERED (3 Nov 2026): the stamp test:coach-exam-fresh reads, written by the runner itself.
+    check('...stamped with the question it answered, the stamp the case on disk has', !!(t as { caseStamp?: string } | undefined)?.caseStamp && (t as { caseStamp?: string }).caseStamp === examCaseStamps(ROOT)[wantsCard.name] && r.run?.caseStamps?.[wantsCard.name] === examCaseStamps(ROOT)[wantsCard.name], { t: (t as { caseStamp?: string } | undefined)?.caseStamp, run: r.run?.caseStamps })
     if (!t) { console.error('  (no transcript to inspect — the rest of this section cannot run)'); finish() }
 
     const turn0 = t.turns[0]

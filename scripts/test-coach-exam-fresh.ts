@@ -2,7 +2,7 @@ import { existsSync, readFileSync, mkdtempSync, mkdirSync, writeFileSync } from 
 import { tmpdir } from 'os'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { coachFingerprint, rubricFingerprint, FINGERPRINT_PARTS, type CoachFingerprint } from './coach-fingerprint.ts'
+import { coachFingerprint, rubricFingerprint, examCaseStamps, FINGERPRINT_PARTS, type CoachFingerprint } from './coach-fingerprint.ts'
 
 // ---------------------------------------------------------------------------
 // THE PART OF THE COACH EXAM THAT RUNS IN EVERY SWEEP, BECAUSE IT IS FREE.
@@ -51,6 +51,8 @@ export interface Scores {
   fingerprintParts?: Record<string, string>
   /** The marking guide the answers were marked against (rubricFingerprint). */
   rubric?: string
+  /** The question each case answered (examCaseStamps), carried from the transcripts. */
+  caseStamps?: Record<string, string>
   model?: string
   ranAt?: string
   baselinePending?: boolean
@@ -72,7 +74,7 @@ export interface Verdict {
  * BOTH can be true at once — a scores file can be for an old coach AND hold
  * no cases — so problems is a list rather than a single reason.
  */
-export function freshnessVerdict(scores: Scores, current: CoachFingerprint, rubric: string = rubricFingerprint(ROOT)): Verdict {
+export function freshnessVerdict(scores: Scores, current: CoachFingerprint, rubric: string = rubricFingerprint(ROOT), questions: Record<string, string> = examCaseStamps(ROOT)): Verdict {
   if (scores.baselinePending) return { state: 'pending', problems: [] }
 
   const problems: string[] = []
@@ -101,6 +103,17 @@ export function freshnessVerdict(scores: Scores, current: CoachFingerprint, rubr
     if (scores.model && scores.model !== current.model) {
       problems.push(`changed: model — scored against ${scores.model}, now ${current.model}`)
     }
+  }
+  // THE QUESTIONS MOVED (3 Nov 2026), the gap BACKLOG named on 26 Sep: an edited or added case made nothing stale.
+  // Its fix is the coach run again for the named cases (--only), then a grade.
+  const asked = scores.caseStamps ?? {}
+  if (Object.keys(asked).length === 0) {
+    problems.push('the scores carry no stamp of the questions that were asked (written before 3 Nov 2026), so an added or edited question cannot be told from the one answered: run the exam again')
+  } else {
+    const never = Object.keys(questions).filter(n => !(n in asked))
+    const edited = Object.keys(questions).filter(n => n in asked && asked[n] !== questions[n])
+    if (never.length > 0) problems.push(`${never.length} question(s) on disk were never answered by this run: ${never.join(', ')}. Run them (--only <name>) and grade again`)
+    if (edited.length > 0) problems.push(`${edited.length} question(s) were edited since they were answered: ${edited.join(', ')}. Run them again and grade`)
   }
   // A scores file that records no cases is not a pass in disguise.
   const caseCount = Object.keys(scores.cases ?? {}).length
@@ -131,6 +144,7 @@ const MATCHING: Scores = {
   fingerprint: current.hash,
   fingerprintParts: { ...current.parts },
   rubric: rubricFingerprint(ROOT),
+  caseStamps: examCaseStamps(ROOT),
   model: current.model,
   ranAt: '2026-09-20T00:00:00Z',
   cases: { 'ask-shoulder-pain': {}, 'scope-medication': {} },
@@ -187,6 +201,37 @@ check('...and a scores file from before the guide was recorded is stale too',
   check('...and prose outside the block, which the judge never sees, does not',
     stampOf(guide.replace('# The coach exam rubric', '# The coach exam rubric (renamed)')) === base)
 }
+// THE QUESTION STAMPS (3 Nov 2026): an edited or added case makes the scores stale, and a reworded explanation does not.
+{
+  const now = examCaseStamps(ROOT)
+  const names = Object.keys(now)
+  const first = names[0]
+  check('every case on disk has a stamp (34 since 3 Nov 2026; the base context is not a case)', names.length >= 30 && !('_base-context' in now), names.length)
+  const unstamped = v({ ...MATCHING, caseStamps: undefined })
+  check('scores with no question stamps are stale, and say so', unstamped.state === 'stale' && unstamped.problems.some(p => /no stamp of the questions/.test(p)), unstamped.problems)
+  const { [first]: _dropped, ...withoutFirst } = now
+  const added = v({ ...MATCHING, caseStamps: withoutFirst })
+  check('a case the run never answered makes them stale, by name', added.state === 'stale' && added.problems.some(p => /never answered/.test(p) && p.includes(first)), added.problems)
+  const edited = v({ ...MATCHING, caseStamps: { ...now, [first]: 'oldquestionhash' } })
+  check('...and so does a case edited since it was answered, by name', edited.state === 'stale' && edited.problems.some(p => /edited since/.test(p) && p.includes(first)), edited.problems)
+  // The stamp moves with what the coach is given and graded on, not with the explanation. Measured on a copy.
+  const stampsOf = (mutate: (c: Record<string, unknown>, base: Record<string, unknown>) => void) => {
+    const dir = mkdtempSync(join(tmpdir(), 'case-fp-'))
+    mkdirSync(join(dir, 'scripts/exam-cases'), { recursive: true })
+    const base = JSON.parse(readFileSync(join(ROOT, 'scripts/exam-cases/_base-context.json'), 'utf8'))
+    const c = JSON.parse(readFileSync(join(ROOT, 'scripts/exam-cases', 'cardio-asks-before-carding.json'), 'utf8'))
+    mutate(c, base)
+    writeFileSync(join(dir, 'scripts/exam-cases/_base-context.json'), JSON.stringify(base))
+    writeFileSync(join(dir, 'scripts/exam-cases/cardio-asks-before-carding.json'), JSON.stringify(c))
+    return examCaseStamps(dir)['cardio-asks-before-carding']
+  }
+  const same = stampsOf(() => {})
+  check('a case\'s stamp on a copy is the stamp it has in place', same === now['cardio-asks-before-carding'], { same, real: now['cardio-asks-before-carding'] })
+  check('...a changed word in a message changes it', stampsOf(c => { (c.messages as string[])[0] = (c.messages as string[])[0] + ' please' }) !== same)
+  check('...so does a changed check', stampsOf(c => { (c.checks as { expectsProposalKind: { oneOf: string[] }[] }).expectsProposalKind[0].oneOf = ['propose_cardio_session'] }) !== same)
+  check('...and a change to the shared base world', stampsOf((_c, b) => { b.streak_days = 99 }) !== same)
+  check('...while a reworded explanation (why) and the base file\'s own comment do not', stampsOf((c, b) => { c.why = 'reworded'; b._comment = 'reworded' }) === same)
+}
 const empty = v({ ...MATCHING, cases: {} })
 check('a run that recorded no cases fails even when the fingerprint matches',
   empty.state === 'empty' && empty.problems.length === 1, empty)
@@ -214,10 +259,12 @@ console.log('\n2. The grader still writes every field this gate reads')
 // this repository is in has no real one to read, which is the same reason
 // section 1 exists.
 const graderSrc = readFileSync(join(ROOT, 'scripts/grade-coach-exam.ts'), 'utf8')
-for (const field of ['fingerprint', 'fingerprintParts', 'rubric', 'model', 'ranAt', 'cases'] as const) {
+for (const field of ['fingerprint', 'fingerprintParts', 'caseStamps', 'rubric', 'model', 'ranAt', 'cases'] as const) {
   check(`the grader writes \`${field}\`, which this gate reads`,
     new RegExp(`\\b${field}:`).test(graderSrc))
 }
+// AND THE RUNNER STAMPS EACH TRANSCRIPT WITH ITS QUESTION, which is where the grader reads it from.
+check('the runner stamps each transcript with the question it answered (caseStamp)', /\bcaseStamp:\s*caseStamps\[c\.name\]/.test(readFileSync(join(ROOT, 'scripts/run-coach-exam.mts'), 'utf8')))
 // AND IT MUST NOT WRITE THE PENDING FLAG, or the first real run would land
 // still wearing the banner and the strict path would never engage at all.
 check('...and never writes baselinePending, so a real run clears the banner by itself',

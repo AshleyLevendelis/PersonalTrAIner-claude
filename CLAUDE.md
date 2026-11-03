@@ -124,6 +124,9 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   it as an absolute: no second-tier compound at 30s or less, whatever the
   tables say. `rest-floors` (24 checks, 4 mutations), `session-length`,
   `today-only`
+- **A home trainee with dumbbells gets a proper week** — since 3 Nov 2026, the dumbbell pack: a loaded row with no
+  bench, triceps work with a sore shoulder (pressing 4 -> 8 sets, triceps 0 -> 3), a dumbbell hip thrust and reverse
+  lunge, each excluded as its nearest entry is. `test:dumbbell-pack`, `docs/plans/dumbbell-pack.md`
 - Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
   — `chosen-not-shuffled` since 16 Sep 2026 (19 checks, 10 mutations), which
   CALLS the ranker rather than reading it. It holds the tie-break to its job:
@@ -1214,6 +1217,8 @@ menu" stays true when a copy is also left outside it.
   at 1.75. There were 0 real hard-rule breaches once two more misfires were
   fixed ("130 grams" read as no number; "I can't guarantee it's safe" read as a
   verdict).
+  **AND A QUESTION IS STAMPED LIKE THE COACH, since 3 Nov 2026**: an edited or added case makes the scores stale
+  (`examCaseStamps`), closing the gap named below; 34 cases.
   **AN EXAM QUESTION IN THE COACH'S PROMPT IS AN ANSWER KEY.** Two were found
   that day. One was mine from the day before: the several-things example was
   the exam's own message with its answer, and the graded reply copied its

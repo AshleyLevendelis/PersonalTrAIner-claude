@@ -88,14 +88,14 @@ function writeTranscripts(dir: string) {
   fs.mkdirSync(t, { recursive: true })
   const common = { checks: {}, fingerprint: 'gate', model: 'gate', ranAt: '2026-09-23T00:00:00Z', context: {} }
   fs.writeFileSync(join(t, 'a-saves-a-fact.json'), JSON.stringify({
-    ...common, case: 'a-saves-a-fact', why: 'gate',
+    ...common, case: 'a-saves-a-fact', why: 'gate', caseStamp: 'question-a',
     turns: [
       { user: 'Remember that I train before work.', reply: '', saved: { kind: 'record_fact', args: {} } },
       { user: 'Thanks.', reply: 'Noted — mornings it is.' },
     ],
   }))
   fs.writeFileSync(join(t, 'b-plain-answer.json'), JSON.stringify({
-    ...common, case: 'b-plain-answer', why: 'gate',
+    ...common, case: 'b-plain-answer', why: 'gate', caseStamp: 'question-b',
     turns: [{ user: 'How long should I rest between sets of squats?', reply: 'Two to three minutes on your heavy sets.' }],
   }))
   return 2
@@ -186,6 +186,8 @@ async function main() {
     check('the scoreboard names the judge', r.scores?.judge === 'claude-opus-5', r.scores?.judge)
     // The transcripts here are stamped "gate", and the coach on disk is not.
     check('the scores name the coach that ANSWERED, never the one on disk', r.scores?.fingerprint === 'gate', r.scores?.fingerprint)
+    // THE QUESTIONS, likewise (3 Nov 2026): carried from the transcripts, never computed from the cases on disk.
+    check('...and carry each transcript\'s question stamp, from the transcripts', JSON.stringify(r.scores?.caseStamps) === JSON.stringify({ 'a-saves-a-fact': 'question-a', 'b-plain-answer': 'question-b' }), r.scores?.caseStamps)
     const shown = String((api.seen[0]?.body.messages as { content?: string }[] | undefined)?.[0]?.content ?? '')
     check('the judge is shown an instant save as the app saving, not as silence', shown.includes('saved it straight away') && !shown.includes('(no text at all)'), shown.slice(0, 300))
   }

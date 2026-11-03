@@ -1,0 +1,17 @@
+{
+  "name": "circuit-is-one-workout",
+  "why": "Ashley's ruling A, 8 Oct 2026: a circuit off the round timer is ONE workout made of blocks, logged with propose_circuit_log, built only from the rounds, times and effort SHE stated. Not five separate cardio logs, not 'Intervals', not log_workout (sets and reps of lifts). She gives the rounds, the length, the blocks and the effort in one message, so the card can come at once.",
+  "messages": [
+    "just did 5 rounds on the timer, 3 minutes each: skipping rope, press-ups, sit-ups, the bike, then rope again. really hard"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_circuit_log"
+        ]
+      }
+    ]
+  }
+}

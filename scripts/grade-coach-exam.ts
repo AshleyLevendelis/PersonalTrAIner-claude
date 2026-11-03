@@ -185,10 +185,14 @@ async function main() {
   const files = readdirSync(TRANSCRIPTS).filter(f => f.endsWith('.json')).sort()
   const marked: Marked[] = []
   const stamps = new Set<string>()
+  // The question each transcript answered (3 Nov 2026), carried into the scores so test:coach-exam-fresh can tell an
+  // edited or added case from the one answered. From the TRANSCRIPTS, like the coach stamp: never from what is on disk.
+  const caseStamps: Record<string, string> = {}
 
   for (const f of files) {
-    const t = JSON.parse(readFileSync(join(TRANSCRIPTS, f), 'utf8')) as Transcript & { fingerprint?: string; model?: string }
+    const t = JSON.parse(readFileSync(join(TRANSCRIPTS, f), 'utf8')) as Transcript & { fingerprint?: string; model?: string; caseStamp?: string }
     if (t.fingerprint) stamps.add(t.fingerprint)
+    if (t.caseStamp) caseStamps[t.case] = t.caseStamp
     const violations = hardRuleViolations(t, tabs)
     let judgement: Judgement | null = null
     let judgeError: string | null = null
@@ -310,6 +314,7 @@ async function main() {
     // answered; only when that is the coach on disk are its parts known.
     fingerprint: answeredBy,
     fingerprintParts: answeredBy === current.hash ? current.parts : {},
+    caseStamps,
     rubric: rubricFingerprint(ROOT),
     model: current.model,
     judge: judged > 0 ? JUDGE_MODEL : null,

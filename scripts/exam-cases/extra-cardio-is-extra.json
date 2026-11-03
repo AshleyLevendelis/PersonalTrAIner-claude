@@ -1,0 +1,22 @@
+{
+  "name": "extra-cardio-is-extra",
+  "why": "Ashley's ruling, 22 Oct 2026 (the Sam live test): a run already done, told in the past tense on a day with a lift planned, is logged as EXTRA work with its effort, and 'count it as today's workout' is the option, never the default. Effort is hers: if she has not said how hard, the coach asks and waits, never picks one. Today in the base world is a lower-body day. Turn one gives a time and no effort, so turn one must carry NO card (it asks); turn two gives the effort and must reach propose_cardio_log, not propose_session_activity_swap, which would replace her squat day.",
+  "messages": [
+    "went out for a jog before breakfast, roughly 35 minutes",
+    "it felt pretty tough tbh"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      },
+      {
+        "turn": 1,
+        "oneOf": [
+          "propose_cardio_log"
+        ]
+      }
+    ]
+  }
+}

@@ -2,6 +2,47 @@
 
 Newest first. One line each.
 
+- [ ] **THE COACH EXAM ASKS ABOUT THE COACH SHE HAS, AND KNOWS WHICH QUESTIONS IT ASKED, 3 NOV 2026** (her item 3).
+  FOUR CASES, each grading a ruling she had already given, so nothing new was decided: `layoff-restart-offered-not-imposed`
+  (8 Oct, ruling B: after 12+ weeks the coach offers the restart card, and a hedge after it gets no second card),
+  `kit-said-is-remembered` (9 Oct "Remember what they say": her whole kit, then one thing she lacks, both to
+  propose_kit_change), `extra-cardio-is-extra` (22 Oct: a past-tense jog on a lifting day with no effort gets a
+  question and NO card, then propose_cardio_log, never the day swap), `circuit-is-one-workout` (8 Oct ruling A). 34
+  cases now. None of their words is in the coach's prompt (an exam question in the prompt is an answer key).
+  FOUND writing them: the exam's fixed world (`_base-context.json`) is from 13 Sep and carries none of the context
+  added since (today's state, the week, the break line), so a case that needs one sets it the way the app sends it:
+  the break arrives inside `exercise_summary`, worded by the app's own `layoffCardLine`. Named, not rebuilt: the base
+  world is held stable on purpose, and widening it would move every mark. THE GAP NAMED ON 26 SEP IS CLOSED: an
+  edited or added case made nothing stale. Each case now has a stamp (`examCaseStamps`: its messages, context
+  overrides and checks, plus the base world; its `why` left out, like a comment), the runner writes it into every
+  transcript, the grader carries it from the TRANSCRIPTS into the scores (never from disk, the 25 Sep rule), and
+  `test:coach-exam-fresh` names every case never answered or edited since. The real scores now also fail on "no
+  stamp of the questions" (they predate it), beside the three coach-changed reasons already there: the next run on her
+  machine clears all four. 7 mutations, 7 caught (one only after a carry check was added to `test:coach-exam-judge`:
+  the grader dropping the stamps had changed nothing either gate could see). `test:coach-exam-fresh` (+10 checks),
+  `test:coach-exam-runner` (+1), `test:coach-exam-judge` (+1), `test:coach-exam-grader`, `test:coach-promises` green.
+  No deploy: scripts and exam data only.
+- [ ] **THE DUMBBELL PACK, 3 NOV 2026** (her item 2, "Fix dumbbell-only plans"; CSCS delegation, nothing asked;
+  `docs/plans/dumbbell-pack.md`). MEASURED FIRST on the kit list's own profiles across three styles and two goals: just
+  dumbbells (no bench) had NO loaded row (Towel and Table Rows only); dumbbells and a bench with a shoulder flag had NO
+  triceps isolation and pressed 4 sets a week against 12 pulling (quality 11.2). FIX: five catalogue entries, each
+  priced by an existing category and each copying its nearest entry's exclusions: Bent-Over Dumbbell Row (no bench;
+  lower back as the barbell row), Dumbbell Tricep Kickback (the band kickback's family; elbow, as every loaded
+  extension), Lying Dumbbell Tricep Extension (skull crushers' elbow, shoulder, wrist), Dumbbell Hip Thrust (one
+  dumbbell; as the barbell hip thrust), Dumbbell Reverse Lunge (walking lunges' ankle, hip, knee). AFTER, the shoulder
+  case: pressing 4 -> 8, pulling 12 -> 10, triceps 0 -> 3, quality 11.2 -> 11.6. ALSO: the plain Minimalist plan with no
+  kit list now rows with dumbbells where it rowed with a backpack. NOT ADDED: a close-grip "crush" press, which would
+  fall to the bench category and be priced as a full dumbbell bench press (the over-prescription direction). COSTS,
+  counted (CSCS question 2): the pool's own "worse implement than available" rule now drops some bodyweight single-leg
+  and hinge moves where a loaded twin exists; picks re-roll, and some knee-flag plans now hold a lift at the stated
+  24 kg dumbbell (the existing frozen-week mechanism, 12 -> 11.6). The full 9,216 grid is the measurement (below).
+  GATES RE-ANCHORED, each because it held a draw the catalogue changed, never the property: `test:replacement-prescription`
+  (the tester's plan predates the pack, so it is rebuilt without the pack's kickback), `test:kit-list` (the tier plan
+  now rows with dumbbells, so the contrast is WHICH row), `test:push-pull-score` [3] (the measured push-heavy grid plan
+  re-rolled to 4:3 and a search of 2,048 hybrid injured plans found none, so it is constructed like [4]; 2 mutations,
+  2 caught), and the snapshot gates that list every exercise (`categorize-precedence`, `movement-families`,
+  `injury-coverage`, `joint-tags`). New `test:dumbbell-pack` (28 checks; 7 mutations, 7 caught, one only after a
+  crash was made a failure). Frontend only.
 - [ ] **EVERY DIET GETS A DEEP POOL FROM OUR OWN DISHES, 3 NOV 2026** (her "1 then 2 then 3 then 4", item 1: more
   meal variety). MEASURED FIRST with a new walk (`measure:meal-library-depth`): the real "Get more options" path, one
   person at a time, the meal writer off, asked again and again until our library has nothing left that lands her day

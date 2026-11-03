@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs'
+import { readFileSync, readdirSync } from 'fs'
 import { createHash } from 'crypto'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -110,4 +110,27 @@ export function rubricFingerprint(root: string = ROOT): string {
   const end = md.indexOf('<!-- RUBRIC:END -->')
   if (start < 0 || end < start) return 'no-rubric-block'
   return sha(md.slice(start, end).replace(/\s+/g, ' ').trim())
+}
+
+/**
+ * WHICH QUESTIONS WERE ASKED — one stamp per exam case (3 Nov 2026).
+ *
+ * The coach stamp and the rubric stamp left one gap, named in BACKLOG since 26 Sep: an edited or ADDED case made
+ * nothing stale, so a reworded question could sit beside answers to the old wording, and a new case beside scores
+ * that never asked it, both reading as current. This is the third stamp. A case's stamp covers what the coach is
+ * actually given and what it is graded on: its messages, its context overrides, its checks, and the shared base
+ * world (minus that file's comment), so a change to the base marks every case. The case's `why` is documentation,
+ * like a comment, and is left out so explaining a case never demands a paid re-run.
+ */
+export function examCaseStamps(root: string = ROOT): Record<string, string> {
+  const dir = join(root, 'scripts/exam-cases')
+  const base = JSON.parse(readFileSync(join(dir, '_base-context.json'), 'utf8')) as Record<string, unknown>
+  delete base._comment
+  const baseStamp = sha(JSON.stringify(base))
+  const out: Record<string, string> = {}
+  for (const f of readdirSync(dir).filter(f => f.endsWith('.json') && !f.startsWith('_')).sort()) {
+    const c = JSON.parse(readFileSync(join(dir, f), 'utf8')) as { name: string; messages?: unknown; contextOverrides?: unknown; checks?: unknown }
+    out[c.name] = sha(JSON.stringify({ base: baseStamp, messages: c.messages ?? null, contextOverrides: c.contextOverrides ?? null, checks: c.checks ?? null }))
+  }
+  return out
 }
