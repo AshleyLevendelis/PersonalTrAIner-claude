@@ -246,8 +246,15 @@ console.log('\n5. How MUCH each injury removes, frozen')
     //   ankles     19->20  Standing Calf Raise Machine
     //   the four cable variants load nothing their parents did not, and
     //   add to no count
-    lower_back: 17, knees: 37, shoulders: 68, neck: 7, wrists: 28,
-    hips: 19, ankles: 20, elbows: 21,
+    // 3 Nov 2026, the dumbbell pack (docs/plans/dumbbell-pack.md), each exclusion copied from its nearest entry:
+    //   lower_back 17->18  Bent-Over Dumbbell Row (as Barbell Rows)
+    //   knees 37->38, hips 19->20, ankles 20->21  Dumbbell Reverse Lunge (as Walking Lunges)
+    //   shoulders  68->69  Lying Dumbbell Tricep Extension (as Skull Crushers)
+    //   elbows     21->23  Lying Dumbbell Tricep Extension, Dumbbell Tricep Kickback (every loaded extension)
+    //   Dumbbell Hip Thrust adds to no count (as Hip Thrust)
+    //   wrists     28->29  Lying Dumbbell Tricep Extension (as Skull Crushers)
+    lower_back: 18, knees: 38, shoulders: 69, neck: 7, wrists: 29,
+    hips: 20, ankles: 21, elbows: 23,
   }
   const drift: string[] = []
   for (const code of CODES) {

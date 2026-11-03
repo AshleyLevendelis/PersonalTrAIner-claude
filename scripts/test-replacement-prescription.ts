@@ -71,9 +71,9 @@ const sam = (over: Record<string, unknown> = {}) => ({
   ...base, fitness_goal: 'fat_loss', equipment_access: 'minimalist', injuries: ['shoulders'], training_style: 'bodybuilding',
   training_experience: 'intermediate', session_duration_preference: '30-45', max_dumbbell_kg: 24, training_days: SAM_DAYS, ...over,
 }) as unknown as UserProfile
-function build(p: UserProfile, seed: string): MesocycleWeek[] {
+function build(p: UserProfile, seed: string, exclusions: string[] = []): MesocycleWeek[] {
   setRandomSource(seededRngFromKey(seed))
-  try { return generateMesocycle(p, generateExercisePlan(p, []).plan) } finally { resetRandomSource() }
+  try { return generateMesocycle(p, generateExercisePlan(p, exclusions).plan) } finally { resetRandomSource() }
 }
 const silenced = <T>(fn: () => T): T => { const w = console.warn; console.warn = () => {}; try { return fn() } finally { console.warn = w } }
 const lever = (name: string) => {
@@ -156,11 +156,15 @@ async function main() {
   // -------------------------------------------------------------------------
   // His plan was built WITH the shoulder flag and the ban was made after he
   // had cleared it, which is why Overhead Tricep Extension was on offer.
-  const samPlan = silenced(() => build(sam(), 'sam:2'))
+  // HIS PLAN WAS WRITTEN BEFORE THE DUMBBELL PACK (3 Nov 2026), which added a Dumbbell Tricep Kickback that now
+  // wins his triceps slot over the band one (loaded beats band). Excluding it reproduces the plan he had, so this
+  // section keeps measuring the ban he made.
+  const PRE_PACK = ['Dumbbell Tricep Kickback']
+  const samPlan = silenced(() => build(sam(), 'sam:2', PRE_PACK))
   const cleared = sam({ injuries: [] })
   const wk2Before = samPlan.find(w => w.week_number === 2)!.days.find(d => d.day === 'Monday')!.exercises.find(e => e.name === 'Band Tricep Kickback')
   check('the plan has the band kickback on Monday, walked up to 16-19', wk2Before?.reps === '16-19', wk2Before?.reps)
-  const banned = await silencedAsync(() => banExerciseFromMesocycle({ mesocycle: samPlan, profile: cleared, bannedName: 'Band Tricep Kickback', exclusions: ['Band Tricep Kickback'] }))
+  const banned = await silencedAsync(() => banExerciseFromMesocycle({ mesocycle: samPlan, profile: cleared, bannedName: 'Band Tricep Kickback', exclusions: ['Band Tricep Kickback', ...PRE_PACK] }))
   const ote = getExerciseEntry('Overhead Tricep Extension')!
   const rows = banned.flatMap(w => w.days.flatMap(d => d.exercises.filter(e => e.name === 'Overhead Tricep Extension').map(e => ({ w, e }))))
   check('Overhead Tricep Extension came in for it', rows.length >= 2, rows.length)
@@ -175,7 +179,7 @@ async function main() {
   // THE CONTRAST: the same plan with no calibration week (as a plan built from known working weights is) keeps the
   // full estimate, because such a plan never discounted its own unverified lifts either.
   const noCal = samPlan.map(w => ({ ...w, isCalibrationWeek: false }))
-  const bannedNoCal = await silencedAsync(() => banExerciseFromMesocycle({ mesocycle: noCal, profile: cleared, bannedName: 'Band Tricep Kickback', exclusions: ['Band Tricep Kickback'] }))
+  const bannedNoCal = await silencedAsync(() => banExerciseFromMesocycle({ mesocycle: noCal, profile: cleared, bannedName: 'Band Tricep Kickback', exclusions: ['Band Tricep Kickback', ...PRE_PACK] }))
   const wk2NoCal = bannedNoCal.find(w => w.week_number === 2)?.days.flatMap(d => d.exercises).find(e => e.name === 'Overhead Tricep Extension')
   const fullPrice = wk2NoCal ? prescribeLoad(ote, cleared, { targetRpeLabel: wk2NoCal.intensity, isFirstBlock: false, sets: wk2NoCal.sets, repRangeLabel: wk2NoCal.reps }).starting_weight_kg : null
   check('...and a plan with no calibration week prices the same lift at the full estimate, heavier',

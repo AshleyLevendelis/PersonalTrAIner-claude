@@ -826,6 +826,29 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: true,
     avg_duration_seconds: 30,
   },
+  // THE DUMBBELL PACK (3 Nov 2026, CSCS delegation; docs/plans/dumbbell-pack.md). Measured: a home trainee with
+  // dumbbells and no bench had no loaded row at all (Towel and Table Rows only), and dumbbells-and-bench with a
+  // shoulder flag had no triceps isolation. Each entry below fills one measured gap.
+  {
+    name: 'Bent-Over Dumbbell Row',
+    id: 'bent-over-dumbbell-row',
+    movement_pattern: 'horizontal_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['lats', 'rhomboids', 'rear deltoid', 'biceps'],
+    equipment: ['dumbbells'],
+    joint_stress: 'moderate',
+    form_cues: ['Hinge at the hips until your chest is about 45 degrees', 'Dumbbells hang under the shoulders, back flat', 'Pull both elbows back towards the hips', 'Lower under control without rounding'],
+    coach_note_swap: 'A loaded two-arm row that needs no bench: the hinge is the support.',
+    // The hinge loads the lower back the way a barbell row does, so it carries the same tag and exclusion.
+    loads_joints: ['lower_back_axial'],
+    contraindicated_joints: ['lower_back_axial'],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'row',
+    unilateral: false,
+    avg_duration_seconds: 32,
+  },
   {
     name: 'T-Bar Rows',
     id: 't-bar-rows',
@@ -2137,6 +2160,27 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     unilateral: false,
     avg_duration_seconds: 32,
   },
+  // The dumbbell pack (3 Nov 2026): see the note above Bent-Over Dumbbell Row.
+  {
+    name: 'Dumbbell Hip Thrust',
+    id: 'dumbbell-hip-thrust',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['glutes', 'hamstrings'],
+    // ONE dumbbell, held across the hips: 'dumbbell' is one held centrally (load-prescription's loadingMode).
+    equipment: ['dumbbell', 'bench'],
+    joint_stress: 'low',
+    form_cues: ['Shoulder blades on the bench, the dumbbell held across your hips', 'Feet flat, shins vertical at the top', 'Drive through the heels and squeeze the glutes', 'Ribs down, no arching to gain height'],
+    coach_note_swap: 'The barbell hip thrust with one dumbbell: hard glute work with almost nothing on the spine.',
+    loads_joints: ['hip'],
+    contraindicated_joints: [],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'hip_thrust',
+    unilateral: false,
+    avg_duration_seconds: 32,
+  },
   {
     // MACHINE FLOOR: joint tags mirror Hip Thrust exactly — same movement,
     // the pad and lever replace the barbell-and-bench setup.
@@ -2567,6 +2611,26 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'moderate',
     form_cues: ['Long stride', 'Back knee near floor', 'Upright torso', 'Push off front heel'],
     coach_note_swap: 'Dynamic unilateral work building balance and single-leg strength.',
+    loads_joints: ['knee'],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'single_leg',
+    unilateral: true,
+    avg_duration_seconds: 35,
+  },
+  // The dumbbell pack (3 Nov 2026): see the note above Bent-Over Dumbbell Row.
+  {
+    name: 'Dumbbell Reverse Lunge',
+    id: 'dumbbell-reverse-lunge',
+    movement_pattern: 'single_leg',
+    contraindicated_joints: ['ankle', 'hip', 'knee'],
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['quadriceps', 'glutes', 'hamstrings'],
+    equipment: ['dumbbells'],
+    joint_stress: 'moderate',
+    form_cues: ['Dumbbells at your sides, stand tall', 'Step back and lower the back knee towards the floor', 'Front shin stays close to vertical', 'Drive through the front heel to stand'],
+    coach_note_swap: 'Stepping back keeps the front knee over the foot, and it needs no room to walk.',
     loads_joints: ['knee'],
     style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
     substitution_group: 'single_leg',
@@ -3378,6 +3442,50 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'tricep_extension',
     unilateral: true,
     avg_duration_seconds: 26,
+  },
+  // THE DUMBBELL PACK (3 Nov 2026, CSCS delegation; docs/plans/dumbbell-pack.md). Measured: a home trainee with
+  // dumbbells and no bench had no loaded row at all (Towel and Table Rows only), and dumbbells-and-bench with a
+  // shoulder flag had no triceps isolation. Each entry below fills one measured gap.
+  {
+    name: 'Dumbbell Tricep Kickback',
+    id: 'dumbbell-tricep-kickback',
+    movement_pattern: 'isolation_tricep',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['triceps'],
+    equipment: ['dumbbells'],
+    joint_stress: 'low',
+    form_cues: ['Hinge forward with the upper arm pinned to your side', 'Extend the forearm straight back until the arm is long', 'Squeeze, then lower slowly', 'Keep the upper arm still the whole set'],
+    coach_note_swap: 'Upper arm stays at your side, so the shoulder barely moves, unlike an overhead extension.',
+    // Shoulder-neutral like the band kickback, but a dumbbell loads the elbow more than a band does, so an elbow flag
+    // excludes it the way it excludes every other loaded triceps extension.
+    loads_joints: ['elbow'],
+    contraindicated_joints: ['elbow'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'tricep_extension',
+    unilateral: true,
+    avg_duration_seconds: 26,
+  },
+  {
+    name: 'Lying Dumbbell Tricep Extension',
+    id: 'lying-dumbbell-tricep-extension',
+    movement_pattern: 'isolation_tricep',
+    // Skull Crushers' three, wrist included: nothing new is decided about any joint here.
+    contraindicated_joints: ['elbow', 'shoulder', 'wrist'],
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['triceps (long head)', 'triceps'],
+    equipment: ['dumbbells', 'bench'],
+    joint_stress: 'moderate',
+    form_cues: ['Lie on the bench, dumbbells over your shoulders, palms facing in', 'Bend only at the elbows to lower beside your head', 'Keep the elbows pointing at the ceiling', 'Extend back to straight arms'],
+    coach_note_swap: 'The dumbbell version of a skull crusher, palms facing in, for a bench at home.',
+    loads_joints: ['elbow', 'shoulder'],
+    style_tags: ['bodybuilding', 'hybrid'],
+    substitution_group: 'tricep_extension',
+    unilateral: false,
+    avg_duration_seconds: 28,
   },
   {
     name: 'Overhead Tricep Extension',
@@ -5614,6 +5722,9 @@ const MOVEMENT_FAMILIES: Record<string, string> = {
   'Straight-Bar Tricep Pushdown': 'tricep_pushdown',
   'Band Tricep Pushdown': 'tricep_pushdown',
   'Band Tricep Kickback': 'tricep_kickback',
+  // The dumbbell pack (3 Nov 2026): the same extended-shoulder kickback with a dumbbell, so it is the band one's family
+  // (the two never share a day) and apart from the lying extension, which is the flexed arm.
+  'Dumbbell Tricep Kickback': 'tricep_kickback',
 }
 
 /**

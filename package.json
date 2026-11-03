@@ -460,6 +460,7 @@
     "test:layoff": "tsx scripts/test-layoff.ts",
     "measure:meal-library": "tsx scripts/measure-meal-library.ts",
     "test:meal-library-depth": "tsx scripts/test-meal-library-depth.ts",
+    "test:dumbbell-pack": "tsx scripts/test-dumbbell-pack.ts",
     "measure:meal-library-depth": "tsx scripts/measure-meal-library-depth.ts",
     "test:layout-revamp": "tsx scripts/test-layout-revamp.ts",
     "test:one-page": "tsx scripts/test-one-page.ts",

@@ -445,8 +445,11 @@ async function main() {
     const lead = d.exercises.find(e => getExerciseEntry(e.name)?.mechanics_tier === 'tier1_compound') ?? dayAnchorExercise(d.exercises)
     return d.exercises.some(e => e.name === 'Dumbbell Rows') && !!lead
   })
-  check('his week holds a loaded dumbbell row, where the tier plan held a backpack one',
-    rowDays.length >= 1 && samTierPlan[0].days.every(d => !d.exercises.some(e => e.name === 'Dumbbell Rows')) && samTierPlan[0].days.some(d => d.exercises.some(e => e.name === 'Backpack Row')),
+  // UNTIL 3 NOV 2026 the tier plan's row was a Backpack Row. The dumbbell pack added a Bent-Over Dumbbell Row that
+  // needs no bench, so the tier plan rows with dumbbells too; what his stated bench still changes is WHICH row: the
+  // bench-supported one, which the tier (no bench assumed) never offers.
+  check('his week holds the bench-supported dumbbell row his kit allows, which the tier plan (no bench) never does',
+    rowDays.length >= 1 && samTierPlan[0].days.every(d => !d.exercises.some(e => e.name === 'Dumbbell Rows')) && samTierPlan[0].days.some(d => d.exercises.some(e => e.name === 'Bent-Over Dumbbell Row')),
     { kit: samPlan[0].days.map(d => `${d.focus}: ${d.exercises.map(e => e.name).join(', ')}`) })
   // ADJUSTMENT KEEPS THE BAR: every kit plan in the grid clears the floor the
   // quality grid holds every generated plan to.

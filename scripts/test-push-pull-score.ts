@@ -78,10 +78,21 @@ console.log('\n[2] pull-heavy while a second press existed — still a flaw')
 }
 
 console.log('\n[3] push-heavy — the direction that costs a shoulder — still a flaw')
+// CONSTRUCTED SINCE 3 NOV 2026, the way [4] is. This was a measured grid plan (full gym, shoulders and wrists,
+// hybrid, advanced, conditioning) at 1.7:1. The dumbbell pack (docs/plans/dumbbell-pack.md) re-rolled its picks to
+// 4:3, and a search of the 2,048 hybrid plans with an injury found none push-heavy any more. The property is the
+// same: a week pressing far more than it pulls is counted whatever the pool, so the grid plan's own week has its
+// pressing raised and nothing else moved.
 {
-  const m = measure('full_gym|shoulders+wrists|45-60|hybrid|advanced|conditioning|moderate|love')
-  check('the plan really is push-heavy', m.ratio > 1.6, m)
-  check('...and the score counts it', m.flagged === true, m)
+  const key = 'full_gym|shoulders+wrists|45-60|hybrid|advanced|conditioning|moderate|love'
+  const { profile, meso } = planFor(key)
+  const week1 = { ...meso[0], days: meso[0].days.map(d => ({ ...d, exercises: d.exercises.map(e => (e.movement_pattern === 'push' ? { ...e, sets: e.sets * 3 } : e)) })) }
+  let push = 0, pull = 0
+  for (const d of week1.days) for (const e of d.exercises) { if (e.movement_pattern === 'push') push += e.sets; if (e.movement_pattern === 'pull') pull += e.sets }
+  const presses = getConstrainedPool(profile, []).filter(e => isPress(e.movement_pattern)).length
+  check('the plan really is push-heavy', pull > 0 && push / pull > 1.6, { push, pull })
+  check('...on a pool with more than one press, so the one-press exemption cannot be what decides it', presses >= 2, presses)
+  check('...and the score counts it', flaggedIn(scorePlan(profile, [week1, ...meso.slice(1)], key)))
 }
 
 // THE TWO BOUNDARIES NO GRID PLAN HAPPENS TO SIT ON, so they are built:

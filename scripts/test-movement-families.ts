@@ -64,14 +64,14 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
     why: 'Since 9 Oct 2026. Elbow extension with the shoulder neutral (pushdown), extended (kickback) and flexed (overhead, lying): three different lengths for the long head. The flexed arm keeps the group\'s own name, so Overhead Tricep Extension and Skull Crushers still exclude each other. Decided as a CSCS coach; both band triceps movements were one family, so a shoulder-flagged chest day had one triceps exercise.',
     families: {
       tricep_pushdown: ['Tricep Pushdowns', 'Rope Tricep Pushdown', 'Straight-Bar Tricep Pushdown', 'Band Tricep Pushdown'],
-      tricep_kickback: ['Band Tricep Kickback'],
-      tricep_extension: ['Overhead Tricep Extension', 'Skull Crushers', 'Chair Dips'],
+      tricep_kickback: ['Band Tricep Kickback', 'Dumbbell Tricep Kickback'],
+      tricep_extension: ['Lying Dumbbell Tricep Extension', 'Overhead Tricep Extension', 'Skull Crushers', 'Chair Dips'],
     },
   },
   row: {
     why: 'Close-Grip Lat Pulldown is filed with rows and is a pulldown: it shares the Lat Pulldown\'s family so the two cannot share a day.',
     families: {
-      row: ['Chest-Supported Row', 'Neutral-Grip Seated Cable Row', 'Barbell Rows', 'Seated Cable Row', 'Dumbbell Rows', 'T-Bar Rows', 'Landmine Row', 'Inverted Row', 'Towel Row', 'Backpack Row', 'Table Row', 'Seated Machine Row', 'T-Bar Row Machine'],
+      row: ['Chest-Supported Row', 'Neutral-Grip Seated Cable Row', 'Barbell Rows', 'Seated Cable Row', 'Dumbbell Rows', 'Bent-Over Dumbbell Row', 'T-Bar Rows', 'Landmine Row', 'Inverted Row', 'Towel Row', 'Backpack Row', 'Table Row', 'Seated Machine Row', 'T-Bar Row Machine'],
       pulldown: ['Close-Grip Lat Pulldown'],
     },
   },
