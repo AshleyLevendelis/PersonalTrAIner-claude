@@ -25,7 +25,11 @@ Newest first. One line each.
   function in Deno: reserved before sent, a refused reservation sends nothing, the meal read scoped to the person),
   `test:rls-local` §9 (the new migration on a real Postgres: two different reminders a day recorded, the same one
   twice refused), `verify:reminders` 30 at 390px (ten switches, "up to 3 a day, at least 3 hours apart", screenshot
-  read); 30 mutations, 30 caught, every run at full count. The 65 gates reading the changed files all pass; `tsc`
+  read); 30 mutations, 30 caught, every run at full count. **Missed, found by the pre-merge sweep:** the browser
+  harness's stand-in database lists each table's whole-number columns, and `protein_target_g` was not in it
+  (`test:meal-favourite`, which holds the stand-in to the migrations). I derived the affected gates by FILE name and
+  never grepped the TABLE name across the repo, which this file's own rule says to do. Re-run then: the only other
+  reader is the data export, which reads `*`. The 65 gates reading the changed files all pass; `tsc`
   clean. NOT proven: that a phone buzzes (needs her deploy and a real phone). `docs/plans/the-coach-can-reach-you.md`,
   "Three a day".
 - [x] **NO BAR ABOVE THE SELECTED TAB, 4 NOV 2026** (Ashley, with a screenshot: "Why is it adding a line above the tab
