@@ -142,7 +142,9 @@ const LOADED = 'Barbell Squats'
 // Each name here is `equipment: ['bodyweight']`, `prescription_type: 'reps'`. 3 Nov 2026: the dumbbell
 // pack's reverse lunge (loaded) now takes the slot the bodyweight Cossack squat had, so the day's
 // bodyweight rep work is the Bird Dog.
-const BODYWEIGHT_CANDIDATES = ['Cossack Squat (Bodyweight)', 'Chair Leg Extension', 'Bird Dog']
+// 4 Nov 2026: the gym machines rotated the Bird Dog off this day too; its bodyweight rep work is the Seated Short-Arc
+// Quad Set (`equipment: ['bodyweight']`, `prescription_type: 'reps'`, a working tier, not a primer).
+const BODYWEIGHT_CANDIDATES = ['Cossack Squat (Bodyweight)', 'Chair Leg Extension', 'Bird Dog', 'Seated Short-Arc Quad Set']
 const present = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(r => r.getAttribute('data-exercise-name'))`)
 const BODYWEIGHT = BODYWEIGHT_CANDIDATES.find(n => (present ?? []).includes(n)) ?? BODYWEIGHT_CANDIDATES[0]
 check('the fixture still carries a loaded lift to read', (present ?? []).includes(LOADED), present)
