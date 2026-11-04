@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **ACTIVE RECOVERY IN THE RECOVERY VIOLET, AND NEW TAB ICONS, 4 NOV 2026** (Ashley's handoff, "Exercise Screen"
+  option 4b and "Tab Icons" option 2a; two commits as it asked). (1) The active-recovery card had kept the amber
+  warning colour from before the 20 Sep rest-day rebuild; it now wears the rest day's deep surface, violet heart and
+  title size. `test:rest-day-card` had pinned the amber on purpose with no ruling recorded behind it; it now pins the
+  violet and no amber (3 mutations caught). (2) Tab icons: Home a layout grid, Exercise a flame, Tools a timer
+  (Nutrition unchanged), held by `verify:grocery` [10] (1 mutation caught). Said once: the grid is the kind of icon the
+  27 Sep revamp swapped OUT as generic; her board chose it. Both shot at 390x844 (all nine themes for the card, a dark
+  and a light theme for the bar). The handoff's zip was named "Workout screen ramp-up designs" but held these two.
 - [ ] **MACHINES SWAPPABLE, 4 NOV 2026, BUILT, NOT MERGED** (Ashley: "I've been in the gyms used machines which were not
   available as swaps in the app"; her ruling, from four options, **"Machines swappable only"**, partly reversing her
   3 Nov "Searchable, log-only" for machine, cable and Smith versions; `docs/plans/machine-versions.md`). 477 machine

@@ -1,4 +1,4 @@
-import { ChartSpline, Utensils, Dumbbell, Wrench, MessageCircle } from 'lucide-react'
+import { LayoutDashboard, Utensils, Flame, Timer, MessageCircle } from 'lucide-react'
 import { useViewportInset } from '@/hooks/useViewportInset'
 import type { Tab } from '@/lib/app-route'
 
@@ -32,14 +32,15 @@ const TOUR_KEY: Record<Tab, string> = {
   chat: 'chatfab',
 }
 
-// THE ICONS SAY WHAT IS BEHIND THEM (27 Sep 2026, with the grocery revamp):
-// a trend line for Home's progress, a knife and fork for food, a dumbbell for
-// training. The old dashboard grid, pie chart and pulse line were generic.
-const SIDE_TABS: { tab: Tab; label: string; icon: typeof ChartSpline }[] = [
-  { tab: 'dashboard', label: 'Home', icon: ChartSpline },
+// THE ICONS SAY WHAT IS BEHIND THEM. Ashley chose these on the Tab Icons board
+// (option 2a, 4 Nov 2026): Home a layout grid, Nutrition a knife and fork,
+// Exercise a flame, Tools a timer. They replace the 27 Sep set (a trend line,
+// the knife and fork, a dumbbell, a wrench).
+const SIDE_TABS: { tab: Tab; label: string; icon: typeof LayoutDashboard }[] = [
+  { tab: 'dashboard', label: 'Home', icon: LayoutDashboard },
   { tab: 'nutrition', label: 'Nutrition', icon: Utensils },
-  { tab: 'exercise', label: 'Exercise', icon: Dumbbell },
-  { tab: 'tools', label: 'Tools', icon: Wrench },
+  { tab: 'exercise', label: 'Exercise', icon: Flame },
+  { tab: 'tools', label: 'Tools', icon: Timer },
 ]
 
 export function BottomTabBar({
@@ -164,7 +165,7 @@ function SideTabButton({
 }: {
   tab: Tab
   label: string
-  icon: typeof ChartSpline
+  icon: typeof LayoutDashboard
   active: boolean
   onClick: () => void
 }) {

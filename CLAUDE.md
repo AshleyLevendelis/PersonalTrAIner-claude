@@ -1437,6 +1437,9 @@ menu" stays true when a copy is also left outside it.
   mint outline for a choice that applies, grey hairline for the decline. `verify:chat-2b` 4h
 - **A rest day shows the dash on BOTH week strips: "Dash on both"** (1 Nov 2026): Exercise no longer draws the mint dot
   on a selected rest day, so a dot only ever means a session. `verify:missed-day` B5, `test:home-week-strip`
+- **Tab icons: her Tab Icons board, option 2a** (4 Nov 2026): Home a layout grid, Nutrition a knife and fork, Exercise a
+  flame, Tools a timer. And **active recovery wears the rest day's violet** (option 4b): amber is for warnings.
+  `verify:grocery` [10], `test:rest-day-card`
 - **The chat names the coach "Trainer": "Both say Trainer"** (1 Nov 2026, from three options): the header and each
   message's label, one name. `verify:chat-2b` 1g, `verify:chat-bubbles`
 - **The chat's session pill counts sets DONE: "Sets done"** (1 Nov 2026, over the design's "set 3 of 20"): "Legs · 2 of 20

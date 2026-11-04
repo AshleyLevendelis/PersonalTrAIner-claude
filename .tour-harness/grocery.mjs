@@ -428,7 +428,8 @@ await page(`document.documentElement.setAttribute('data-theme', 'nightshift'); d
 console.log('\n[10] The tab bar\'s icons say what is behind them')
 const icons = await page(`const nav = q('nav[aria-label="Primary"]'); return nav ? [...nav.querySelectorAll('button')].map(b => ({ label: b.textContent.trim(), icon: [...(b.querySelector('svg')?.classList ?? [])].find(c => /^lucide-/.test(c) && c !== 'lucide') ?? null })) : []`)
 const iconOf = l => icons.find(i => i.label === l)?.icon
-check('Home is a trend line, Nutrition a knife and fork, Exercise a dumbbell', iconOf('Home') === 'lucide-chart-spline' && iconOf('Nutrition') === 'lucide-utensils' && iconOf('Exercise') === 'lucide-dumbbell', icons)
+// Her Tab Icons board, option 2a (4 Nov 2026): a layout grid, a knife and fork, a flame, a timer.
+check('Home is a layout grid, Nutrition a knife and fork, Exercise a flame, Tools a timer', iconOf('Home') === 'lucide-layout-dashboard' && iconOf('Nutrition') === 'lucide-utensils' && iconOf('Exercise') === 'lucide-flame' && iconOf('Tools') === 'lucide-timer', icons)
 
 console.log('\n[11] Empty, and a list this phone never built')
 await open('?empty=1')
