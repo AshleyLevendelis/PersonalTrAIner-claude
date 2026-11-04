@@ -72,7 +72,11 @@ export const SAFETY_CEILING_KG_TOTAL: Partial<Record<string, number>> = {
   // the highest legitimate value puts the audit ceiling at 60.
   kettlebell_swing: 60,
   isolation_bicep: 70, isolation_tricep: 80, isolation_chest: 95,
-  shrug: 140, isolation_quad: 115,
+  // shrug 140 -> 185 (4 Nov 2026): calibrated when every shrug was a dumbbell pair or a stack, which their implement
+  // clamps hold at 100kg. Smith Machine Shrug is a BAR shrug (her gym machines), and the formula's top is 147.5kg for a
+  // 120kg advanced male at 3-5 reps, about 1.2x bodyweight, a normal heavy bar shrug. The usual ~25% of headroom over
+  // the highest legitimate value, as calves above. No prescribed weight changes; only the audit's alarm moves.
+  shrug: 185, isolation_quad: 115,
   isolation_hamstring: 115,
   // 140 was calibrated when the IMPLEMENT clamp held calf work at 100kg, so
   // it was never exercised above that. With calf machines given their own

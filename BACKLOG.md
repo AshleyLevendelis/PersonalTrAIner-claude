@@ -2,6 +2,11 @@
 
 Newest first. One line each.
 
+- [x] **THE AUDIT'S SHRUG ALARM 140 -> 185, 4 NOV 2026** (found by the merge check at `d4eb6e6a`,
+  `test:ceiling-units`). The new Smith Machine Shrug is a bar shrug: 147.5kg for a 120kg advanced male at 3-5 reps,
+  past the audit's 140, which was set when every shrug was a dumbbell pair or a stack held at 100kg by its implement
+  clamp. DECIDED (CSCS): 1.2x bodyweight is a normal heavy bar shrug, so the alarm was wrong, not the load, as for calf
+  machines (140 -> 230). 185 keeps the usual ~25% headroom. No prescribed weight changes. `test:audit` passes.
 - [x] **"RDL" IS A SEARCH WORD FOR ROMANIAN DEADLIFT, 4 NOV 2026** (Ashley: "add RDL as a search word for Romanian
   deadlift"). The coach already read "rdl" through the shorthand table (19 Oct); the swap, add and logging search boxes
   did not, so "rdl" found only the two single-leg lifts named with the letters and "smith rdl" found nothing. Now a
