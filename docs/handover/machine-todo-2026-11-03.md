@@ -1,5 +1,7 @@
 # Everything waiting on Ashley's machine (3 Nov 2026)
 
+**Replaced by `machine-todo-2026-11-04.md`** (4 Nov 2026: reminders three a day, a real test buzz, the cron check).
+
 Paste the block below into Claude Code in VS Code, in the PersonalTrAIner-claude folder. Steps marked **(Ashley types)**
 ask for the `yes-production` phrase or a secret; Claude Code cannot do those, so it prepares them and hands over.
 
