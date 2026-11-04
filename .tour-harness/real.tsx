@@ -225,6 +225,7 @@ const FINISHER = new URLSearchParams(location.search).get('finisher') === '1'
 // running the harness's own day pattern and seed across 108 variants, not by
 // guessing — the first guess (30-45) gave the live week no such day at all.
 const MOBILITY = new URLSearchParams(location.search).get('mobility') === '1'
+const MOBILITY_SEED = '0'
 // ?sam=1 — THE TESTER'S PROFILE (test log H4), for verify:day-length. Minimalist
 // kit, bodybuilding, four days, 30-45 minutes, intermediate, fat loss, and a
 // shoulder flag. It is the profile where a day's printed length was "9 sets ·
@@ -303,7 +304,10 @@ const profile: UserProfile = {
 // render-screens.tsx records why: the base week has `tier` undefined, so a
 // panel fed one shows a state no user can reach (a squat under an ACCESSORY
 // label, no MAIN LIFT anywhere). Seeded so a re-run is comparable.
-setRandomSource(seededRngFromKey('tour-real-screens'))
+// ?mobility=1 has its OWN seed (4 Nov 2026): the grown catalogue thickened its thin pool, and the shared seed's live week
+// no longer ran a cardio day short. &mseed= lets a search pick one; the default is the one that search found.
+const MSEED = new URLSearchParams(location.search).get('mseed') ?? MOBILITY_SEED
+setRandomSource(seededRngFromKey(MOBILITY ? `tour-real-screens|mobility|${MSEED}` : 'tour-real-screens'))
 const generated0 = generateMesocycle(profile)
 // &cleared=1 (with sam=1) — THE LIVE TEST'S STALE DAY (19 Oct 2026). The plan is made while the shoulder is flagged,
 // then the flag is taken off and nothing rebuilds it: the Shoulders day keeps no press while presses now fit the kit.

@@ -2,6 +2,13 @@
 
 Newest first. One line each.
 
+- [x] **TWO MORE FROM THE MERGE CHECK AT `d4eb6e6a`, 4 NOV 2026.** (1) `verify:mobility-filler`: the eight new
+  machines thickened the fixture's thin pool, so the shared seed's live week no longer ran a cardio day short (the
+  behaviour's own logic gate, `test:filler-yields`, passed). `?mobility=1` now has its own seed, chosen by searching
+  20 (8 hold the case); `verify:day-length` and `verify:finish-check`, which share it, pass. A mutation of the seed is
+  caught (7 failures). (2) `verify:correction-loop` 1e was red at `d4eb6e6a` and passes twice at the head: at that
+  commit a typed "bench" brought machine bench variants into the search, and the alias-first search (the RDL commit)
+  puts the Barbell Bench Press first again. Not separately mutation-tested: the check is unchanged.
 - [x] **THE `?bwpr=1` FIXTURE READS ITS LIFT OFF TODAY'S CARD, 4 NOV 2026** (merge check at `d4eb6e6a`). The grown
   catalogue rotated the harness's seeded Upper Pull day from Pull-Ups to Chin-Ups, and the fixture seeded its history on
   "Pull-Ups" by name, so `verify:bodyweight-progress` found no row and `verify:one-number` §8g found no box. The fixture
