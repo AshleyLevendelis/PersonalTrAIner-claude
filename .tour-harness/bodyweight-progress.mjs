@@ -77,6 +77,11 @@ console.log('\nPROGRESS WHEN THERE IS NO WEIGHT ON THE BAR\n')
 console.log('  HOME — the recent personal bests')
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&bwpr=1#/tab/home` })
 await wait(5000)
+// THE LIFT THE FIXTURE SEEDED, read off today's card (4 Nov 2026: it rotated from Pull-Ups to Chin-Ups when the
+// catalogue grew, and a name hoped for found no row). Everything below asks for THIS lift.
+const LIFT = (await ev('window.__bwprLift')) ?? 'Pull-Ups'
+const LIFT_RE = new RegExp(LIFT.replace(/[-]/g, '-?').replace(/[()]/g, '\\$&'), 'i')
+check('0. the fixture seeded a bodyweight pull that is on today\'s card', /^(Pull|Chin)-Ups$/.test(LIFT), LIFT)
 
 // Behind one Progress row since 30 Oct 2026 ("less is more"): open it first.
 await ev(`(() => { const t = document.querySelector('[data-home-progress-toggle]'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click() })()`)
@@ -89,10 +94,10 @@ const home = await ev('document.body.innerText')
 // "+12kg" rendering is held by test:bodyweight-progress through personalBest.
 check('1a. the PR cell is on screen at all', await ev(`!!document.querySelector('[data-home-latest-pr]')`), home.slice(0, 200))
 const prBlock = await ev(`document.querySelector('[data-home-latest-pr]')?.innerText ?? ''`)
-check('1b. the bodyweight exercise reached it', /Pull-Ups/i.test(prBlock), prBlock)
+check('1b. the bodyweight exercise reached it', LIFT_RE.test(prBlock), prBlock)
 check('1c. the PR block was found, so the checks below are not vacuous', prBlock.length > 0, prBlock)
 // RE-ANCHORED 31 Oct 2026 (tab polish 2c): the PR half shows the figure first, then "Pull-Ups · new PR".
-check('1d. the bodyweight best reads in REPS', /\b14 reps\b/.test(prBlock) && /Pull-Ups/.test(prBlock), prBlock)
+check('1d. the bodyweight best reads in REPS', /\b14 reps\b/.test(prBlock) && LIFT_RE.test(prBlock), prBlock)
 // THE DEFECT THIS EXISTS FOR: `${value} kg` with no branch printed "0 kg"
 // for a bodyweight record and would have printed "14 kg" for a reps one.
 check('1e. ...and NOT as kilograms', !/\b14 ?kg\b/.test(prBlock), prBlock)
@@ -124,7 +129,7 @@ await wait(5000)
 // by its own data-exercise-name, opened by its own toggle, and its menu is
 // brought on screen before the tap — a mouse event at off-screen coordinates
 // lands on nothing.
-const ROW = `[...document.querySelectorAll('[data-exercise-name]')].find(e => /^Pull-?Ups?$/i.test(e.getAttribute('data-exercise-name') ?? ''))`
+const ROW = `[...document.querySelectorAll('[data-exercise-name]')].find(e => e.getAttribute('data-exercise-name') === ${JSON.stringify(LIFT)})`
 const opened = await ev(`(() => {
   const row = ${ROW}
   if (!row) return 'no row'
@@ -148,11 +153,11 @@ const clickedHistory = await tapCentre(`[...document.querySelectorAll('[role="me
 // this exercise — not on any of its section headings, which appear on every
 // exercise's dialog and would have been satisfied by the wrong one.
 for (let i = 0; i < 20; i++) {
-  if (await ev(`/Pull-?Ups?/i.test(document.querySelector('[role="dialog"]')?.innerText ?? '')`)) break
+  if (await ev(`(document.querySelector('[role="dialog"]')?.innerText ?? '').includes(${JSON.stringify(LIFT)})`)) break
   await wait(400)
 }
 const dialog = await ev(`document.querySelector('[role="dialog"]')?.innerText ?? ''`)
-const sawDetail = /Pull-?Ups?/i.test(dialog)
+const sawDetail = dialog.includes(LIFT)
 if (!sawDetail) {
   // NOT REPORTED AS A PASS. "The driver could not reach the screen" and "the
   // screen is correct" must never print the same thing, so this fails.
@@ -160,7 +165,7 @@ if (!sawDetail) {
     false, { opened, menuOpened, clickedHistory, text: (await ev('document.body.innerText')).slice(0, 300) })
   await shoot('bodyweight-progress-trend-unreachable')
 } else {
-  check('2a. the dialog is this exercise, not the row above it', /Pull-?Ups?/i.test(dialog), dialog.slice(0, 120))
+  check('2a. the dialog is this exercise, not the row above it', dialog.includes(LIFT), dialog.slice(0, 120))
   // THE HISTORY TAB. Before today this said "No PRs recorded yet" for every
   // bodyweight exercise, however many sessions were behind it.
   check('2b. the PR list is no longer empty for a bodyweight exercise',

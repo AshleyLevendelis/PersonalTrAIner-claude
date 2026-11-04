@@ -514,6 +514,17 @@ const loggedTarget = (() => {
   return { name: ex.name, planKg: ex.suggested_load_kg as number, liftedKg, sets: ex.sets }
 })()
 ;(window as unknown as { __loggedTarget: unknown }).__loggedTarget = loggedTarget
+// ?bwpr=1's lift, READ OFF TODAY'S CARD (4 Nov 2026): the bodyweight vertical pull the session holds. It was named
+// "Pull-Ups", and when the catalogue grew the seeded plan rotated to Chin-Ups, so the history sat on a lift that was
+// not on the card and verify:bodyweight-progress found no row. The fixture chooses the input, never a name to hope for.
+const bwprLift = (() => {
+  if (!BWPR) return 'Pull-Ups'
+  const liveWeekNo = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const day = mesocycle.find(w => w.week_number === liveWeekNo)?.days.find(d => d.day === DAYS[todayIdx])
+  const ex = day?.exercises.find(e => getExerciseEntry(e.name)?.movement_pattern === 'vertical_pull' && e.suggested_load_kg == null)
+  return ex?.name ?? 'Pull-Ups'
+})()
+;(window as unknown as { __bwprLift: unknown }).__bwprLift = bwprLift
 const awayTarget = (() => {
   if (AWAY <= 0) return null
   const liveWeekNo = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
@@ -881,7 +892,7 @@ const db: Db = {
       ? [
           ...[20, 13, 2].map((back, i) => ({
             id: `bw${i}`, user_id: PROFILE_ID, session_id: `bw-sess-${i}`,
-            exercise_id: getExerciseId('Pull-Ups') ?? 'pull-ups', exercise_name: 'Pull-Ups',
+            exercise_id: getExerciseId(bwprLift), exercise_name: bwprLift,
             set_number: 1, weight_kg: 0, reps_completed: [8, 11, 14][i],
             is_bodyweight: true, is_warmup: false,
             completed_at: new Date(anchorNowMs() - back * 86400000).toISOString(),

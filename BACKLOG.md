@@ -2,6 +2,11 @@
 
 Newest first. One line each.
 
+- [x] **THE `?bwpr=1` FIXTURE READS ITS LIFT OFF TODAY'S CARD, 4 NOV 2026** (merge check at `d4eb6e6a`). The grown
+  catalogue rotated the harness's seeded Upper Pull day from Pull-Ups to Chin-Ups, and the fixture seeded its history on
+  "Pull-Ups" by name, so `verify:bodyweight-progress` found no row and `verify:one-number` §8g found no box. The fixture
+  now picks today's bodyweight vertical pull and exposes it (`__bwprLift`); both drivers ask for that lift. A mutation
+  putting the name back is caught. The fixture chooses the input, never a name to hope for.
 - [x] **THE AUDIT'S SHRUG ALARM 140 -> 185, 4 NOV 2026** (found by the merge check at `d4eb6e6a`,
   `test:ceiling-units`). The new Smith Machine Shrug is a bar shrug: 147.5kg for a 120kg advanced male at 3-5 reps,
   past the audit's 140, which was set when every shrug was a dumbbell pair or a stack held at 100kg by its implement

@@ -360,7 +360,10 @@ if (marked.grid) {
 {
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&bwpr=1&load=8g#/tab/exercise` })
   await wait(5000)
-  const PU = JSON.stringify('Pull-Ups')
+  // The lift ?bwpr=1 seeded, read off today's card (4 Nov 2026: it rotated from Pull-Ups to Chin-Ups).
+  const PU = JSON.stringify((await ev('window.__bwprLift')) ?? 'Pull-Ups')
+  // The set grid's box id is keyed on the exercise's slug (setgrid-weight-<slug>-s1).
+  const BOX = JSON.stringify(`input[id^="setgrid-weight-${JSON.parse(PU).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')}-s1"]`)
   // OPEN ITS OWN CARD FIRST, and wait for its own boxes: walking up from a
   // collapsed card's name reaches the neighbour's grid, which is what the
   // first run of this section read (2 rows of Prone Y-T Raises).
@@ -368,12 +371,12 @@ if (marked.grid) {
   for (let attempt = 0; attempt < 3 && !open; attempt++) {
     await ev(`(()=>{const n=[...document.querySelectorAll('*')].find(x=>x.children.length===0&&x.textContent.trim()===${PU});
      if(!n) return false; let p=n; for(let i=0;i<6&&p.parentElement;i++){p=p.parentElement; if(p.tagName==='BUTTON'||p.getAttribute('role')==='button'){p.click();return true}} return false})()`)
-    for (let i = 0; i < 10 && !open; i++) { await wait(400); open = !!(await ev(`!!document.querySelector('input[id^="setgrid-weight-pull-ups-s1"]')`)) }
+    for (let i = 0; i < 10 && !open; i++) { await wait(400); open = !!(await ev(`!!document.querySelector(${BOX})`)) }
   }
-  check('8g0. the Pull-Ups card is open', open)
+  check(`8g0. the ${JSON.parse(PU)} card is open (the seeded bodyweight pull)`, open)
   // Read the grid THROUGH its own box (the name also appears outside the card).
   const bw = await ev(`(() => {
-    const box = document.querySelector('input[id^="setgrid-weight-pull-ups-s1"]')
+    const box = document.querySelector(${BOX})
     const row = box && box.closest('[data-testid="working-row"]')
     if (!row) return { found: false }
     const kids = [...row.parentElement.children]
