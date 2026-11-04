@@ -4,8 +4,8 @@ Newest first. One line each.
 
 - [ ] **MACHINES SWAPPABLE, 4 NOV 2026, BUILT, NOT MERGED** (Ashley: "I've been in the gyms used machines which were not
   available as swaps in the app"; her ruling, from four options, **"Machines swappable only"**, partly reversing her
-  3 Nov "Searchable, log-only" for machine, cable and Smith versions; `docs/plans/machine-versions.md`). 480 machine
-  versions (395 moved from the log-only table by one rule, 85 more matched to a same-kit parent) are found by the swap
+  3 Nov "Searchable, log-only" for machine, cable and Smith versions; `docs/plans/machine-versions.md`). 477 machine
+  versions (395 moved from the log-only table by one rule, 82 more matched to a same-kit parent) are found by the swap
   and add search, taken by every writer and the coach, priced as their parent (one-sided ones per side), never
   generated (144 seeded plans byte-identical), loaded with the app so a plan holding one opens at once. FOUND AND
   FIXED: the price read the NAME (a V-squat at 45 kg against the hack squat's 97.5 in the same slot); the coach told

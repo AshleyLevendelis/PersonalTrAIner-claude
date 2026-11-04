@@ -15,9 +15,10 @@
 //
 // WHICH ROWS ARE HERE, by rule (test:machine-versions holds it): the parent needs a machine; the name names no free
 // weight, and names a machine or sits under a machine-only parent; and a one-sided name only under a parent whose kit
-// is priced per side. Built from her two lists: 395 rows moved from the near-copy table by that rule, 85 more matched
-// to a same-kit parent (docs/plans/machine-versions.md). Loaded WITH the app, never after it: a plan holding one must
-// resolve on the first screen.
+// is priced per side; and never a lever squat (pendulum, super squat), which no price category fits (the machine
+// pack's 3 Nov finding): those are log-only until one does. Built from her two lists: 395 rows moved from the
+// near-copy table by that rule, 82 more matched to a same-kit parent (docs/plans/machine-versions.md). Loaded WITH
+// the app, never after it: a plan holding one must resolve on the first screen.
 // ---------------------------------------------------------------------------
 
 export const MACHINE_VERSIONS: readonly (readonly [name: string, parent: string])[] = [
@@ -200,11 +201,8 @@ export const MACHINE_VERSIONS: readonly (readonly [name: string, parent: string]
   ["Hack Squat Machine (Plate-Loaded)", "Hack Squat"],
   ["Hack Squat Machine (Pin-Selected)", "Hack Squat"],
   ["Reverse Hack Squat (Plate-Loaded)", "Hack Squat"],
-  ["Pendulum Squat Machine", "Hack Squat"],
   ["V-Squat Machine", "Hack Squat"],
-  ["Super Squat Machine", "Hack Squat"],
   ["Single-Leg Hack Squat", "Hack Squat"],
-  ["Pendulum Squat (Plate-Loaded)", "Hack Squat"],
   ["V-Squat Machine (Plate-Loaded)", "Hack Squat"],
   // Hip Abduction Machine
   ["Seated Abductor Machine", "Hip Abduction Machine"],

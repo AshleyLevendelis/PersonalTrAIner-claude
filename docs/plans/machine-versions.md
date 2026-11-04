@@ -15,10 +15,12 @@ the leg press foot placements and the assisted pull-up machine.
 ## Built
 
 - `exercise-machine-versions.ts`: name -> parent, pure data. 395 rows moved from the log-only table by one rule, and 85
-  more matched to a same-kit parent (480). The rule, held by `test:machine-versions`: the parent needs a machine; the
+  more matched to a same-kit parent (477). The rule, held by `test:machine-versions`: the parent needs a machine; the
   name names no free weight, and names a machine or sits under a machine-only parent; a one-sided name (single-arm,
   one-leg, iso-lateral) only under kit the app prices per side. 14 one-sided names under other kit (an iso-lateral
-  abductor, a single-arm T-bar row) stay log-only rather than be priced as two-sided.
+  abductor, a single-arm T-bar row) stay log-only rather than be priced as two-sided. So do the lever squats
+  (pendulum, super squat): the machine pack found no price category fits them, and a first build priced them as the
+  hack squat; caught by its own CSCS review an hour later and made log-only.
 - Loaded WITH the app, not after it: a plan holding one must open on the first screen. The log-only names still load
   after the app opens. App chunk 1252 -> 1279 kB raw, budget 1274 -> 1304.
 - Built from the parent in `exercise-db.ts`: its joints, tier, pattern and style; the parent's MACHINE kit (a cable
@@ -38,7 +40,7 @@ the leg press foot placements and the assisted pull-up machine.
 
 - **Priced by its own name.** The price category and the movement family read the exercise's NAME, so "V-Squat
   Machine" came out at 45 kg where the hack squat got 97.5 kg in the same slot. A version is now priced and grouped as
-  its parent (`categorize`, `getMovementFamily`). Checked across all 480.
+  its parent (`categorize`, `getMovementFamily`). Checked across all 477.
 - **The coach said an injury kept a machine out.** Asked for "pendulum squat", the coach's fallback looked the
   machine up in the catalogue-only pool and told her her injuries ruled it out. It now judges a version as its parent,
   and still says so when an injury really does (a shoulder press with a shoulder injury).
@@ -65,6 +67,6 @@ the leg press foot placements and the assisted pull-up machine.
 
 ## Gates
 
-`test:machine-versions` (38 checks; 16 mutations: 15 caught, 1 recorded as equivalent: timing reads nothing from a
+`test:machine-versions` (39 checks; 17 mutations: 16 caught, 1 recorded as equivalent: timing reads nothing from a
 machine entry that an unknown name lacks), `verify:machine-swap` (12 checks at 390x844, 4 mutations caught),
 `test:near-copies` (floor 800 -> 450 rows), `test:bundle`.

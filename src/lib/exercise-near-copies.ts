@@ -19,6 +19,11 @@
 // ---------------------------------------------------------------------------
 
 export const NEAR_COPIES: readonly (readonly [name: string, parent: string])[] = [
+  // LEVER SQUATS (4 Nov 2026): machines, but no price category fits them (docs/plans/machine-pack.md), so priced as a
+  // hack squat they could be handed far too much. Log-only until one does; never a swap option.
+  ['Pendulum Squat Machine', 'Hack Squat'],
+  ['Pendulum Squat (Plate-Loaded)', 'Hack Squat'],
+  ['Super Squat Machine', 'Hack Squat'],
   // squat
   ['High-Bar Back Squat', 'Barbell Squats'],
   ['Low-Bar Back Squat', 'Barbell Squats'],

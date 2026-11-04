@@ -510,7 +510,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   quality, the ranker. `swap-style` (28 checks, 14 mutations),
   `verify:session-edit` §8, `single-implement`
 - **A machine at her gym is a swap option: her ruling 4 Nov 2026, "Machines swappable only"** (from four options; it
-  partly REVERSES "Searchable, log-only" below for machine, cable and Smith versions): 480 versions are found by the swap
+  partly REVERSES "Searchable, log-only" below for machine, cable and Smith versions): 477 versions are found by the swap
   and add search and the coach, priced as the machine they are a version of (one-sided ones per side), never generated.
   Free-weight versions stay log-only; no "add your own". `test:machine-versions`, `verify:machine-swap`,
   `docs/plans/machine-versions.md`

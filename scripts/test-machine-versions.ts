@@ -74,6 +74,8 @@ function admits(name: string, parentName: string): string | null {
   // behind the legs, not the hack machine; a mutation adding that row was MISSED until this line).
   if (FREE.test(name) || !(MACH.test(name) || p.equipment.every(q => /machine/.test(q)))) return 'name is a free-weight lift'
   if (ONE.test(name) && !p.unilateral && !p.equipment.some(q => STACK.has(q))) return 'one-sided under kit not priced per side'
+  // A LEVER SQUAT has no price category (the machine pack, 3 Nov): priced as a hack squat it could be handed far too much.
+  if (/pendulum|super squat/i.test(name)) return 'no price category fits it'
   return null
 }
 
@@ -83,7 +85,7 @@ console.log('\nMACHINE VERSIONS: SWAPPABLE, PRICED AS THEIR PARENT, NEVER GENERA
 console.log('2. Present with the app, before the log-only table is fetched')
 check('a machine version resolves before the near-copy chunk lands (a plan holding one opens on the first screen)',
   logOnlyExercises().length === 0 && getExerciseEntry('V-Squat Machine')?.parent === 'Hack Squat', getExerciseEntry('V-Squat Machine')?.name)
-check('...and the swap search finds one then too', searchExerciseCatalogByWords('pendulum', 20).some(e => e.name === 'Pendulum Squat Machine'))
+check('...and the swap search finds one then too', searchExerciseCatalogByWords('v-squat', 20).some(e => e.name === 'V-Squat Machine'))
 await ensureNearCopies()
 
 const versions = machineVersions()
@@ -105,7 +107,10 @@ console.log('\n1. Every row is a machine version, and none is left behind in the
     admits('Barbell Hyperextension (Weighted)', 'Back Extension Machine') === 'name is a free-weight lift'
     && admits('Abduction Machine (Iso-Lateral)', 'Hip Abduction Machine') === 'one-sided under kit not priced per side'
     && admits('Paused Bench Press', 'Barbell Bench Press') === 'parent needs no machine'
-    && admits('Barbell Hack Squat (Behind the Back Barbell)', 'Hack Squat') === 'name is a free-weight lift')
+    && admits('Barbell Hack Squat (Behind the Back Barbell)', 'Hack Squat') === 'name is a free-weight lift'
+    && admits('Pendulum Squat Machine', 'Hack Squat') === 'no price category fits it')
+  const pendulum = getExerciseEntry('Pendulum Squat Machine')
+  check('a pendulum squat is loggable but never a swap option (log-only, absent from the swap search)', pendulum?.log_only === true && !searchExerciseCatalogByWords('pendulum', 20).some(e => /pendulum/i.test(e.name)), pendulum?.name)
 }
 
 console.log('\n3. Built from the parent: its joints, the machine kit, its style; one-sided by name; its own id')
@@ -174,7 +179,7 @@ console.log('\n5. Never generated, never resolved by a looser phrase')
 
 console.log('\n6. Found by her words, and swapped, added and confirmed through every writer')
 {
-  for (const [said, want] of [['pendulum', 'Pendulum Squat Machine'], ['iso lateral chest', 'Plate-Loaded Iso-Lateral Chest Press'], ['assisted chin', 'Assisted Chin-Up Machine'], ['v-squat', 'V-Squat Machine']]) {
+  for (const [said, want] of [['neutral grip chest press', 'Neutral-Grip Chest Press Machine'], ['iso lateral chest', 'Plate-Loaded Iso-Lateral Chest Press'], ['assisted chin', 'Assisted Chin-Up Machine'], ['v-squat', 'V-Squat Machine']]) {
     const got = searchExerciseCatalogByWords(said, 20).map(e => e.name)
     check(`the swap and add search finds "${said}" -> ${want}`, got.includes(want), got)
   }
@@ -184,8 +189,8 @@ console.log('\n6. Found by her words, and swapped, added and confirmed through e
   check('the logging box finds them too, through the same search', searchExercisesToLog('v-squat', 8).some(e => e.name === 'V-Squat Machine'))
   // THE COACH, given a loose name: offered the machine as a swap, never told an injury keeps it out (it said exactly
   // that before the fallback judged a version as its parent).
-  const loose = swapNameFallback({ typed: 'pendulum squat', oldExercise: 'Hack Squat', resolution: resolveExerciseName('pendulum squat', []), profile: person(), exclusions: [] })
-  check('the coach, asked for "pendulum squat", offers the pendulum squat machine as a swap', /^Pendulum Squat/.test(loose.offered[0] ?? '') && !/keep it out/.test(loose.text), loose.text)
+  const loose = swapNameFallback({ typed: 'v squat', oldExercise: 'Hack Squat', resolution: resolveExerciseName('v squat', []), profile: person(), exclusions: [] })
+  check('the coach, asked for "v squat", offers the V-squat machine as a swap', /^V-Squat/.test(loose.offered[0] ?? '') && !/keep it out/.test(loose.text), loose.text)
   const shoulder = swapNameFallback({ typed: 'iso lateral shoulder press', oldExercise: 'Lateral Raises', resolution: resolveExerciseName('iso lateral shoulder press', []), profile: person({ injuries: ['shoulders'] }), exclusions: [] })
   check('...and still says when her injury does keep one out (a shoulder press with a shoulder injury)', !shoulder.offered.some(n => /shoulder press/i.test(n)) && /injuries/.test(shoulder.text), shoulder.text)
   check('no version name can break the coach\'s tap buttons (no "]" or "|")', versions.every(v => !/[\]|]/.test(v.name)))
