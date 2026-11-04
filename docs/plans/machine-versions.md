@@ -56,10 +56,34 @@ the leg press foot placements and the assisted pull-up machine.
    guess, as any machine's is: the calibration price and the RPE target correct it. Named, not hidden.
 5. Scope: inside it.
 
+## Part 2: the gym machines with nothing to be a version of (4 Nov 2026)
+
+Eight new catalogue entries, appended at the END (a tie still goes to an entry the app already had), each priced by
+and in the category of its nearest entry, with its movement pattern and its exclusions:
+
+| Entry | Priced and excluded as | Load on the body, 82 kg intermediate man, 10 reps |
+|---|---|---|
+| Smith Machine Romanian Deadlift | Romanian Deadlifts | 62.5 kg (64 for the dumbbell pair) |
+| Smith Machine Bent-Over Row | Barbell Rows (one tier below, as Smith Machine Squat) | 57.5 kg (57.5) |
+| Smith Machine Shrug | Shrugs (a bar across the traps, so a neck flag removes it) | 65 kg (Machine Shrug 65) |
+| Smith Machine Hip Thrust | Hip Thrust | 62.5 kg (62.5) |
+| Smith Machine Calf Raise | Standing Calf Raise Machine | 75 kg (75) |
+| Machine Pullover | Dumbbell Pullover | 22.5 kg (22) |
+| Ab Crunch Machine | Cable Crunch (no weight: core progresses by reps) | by feel |
+| Cable Front Raise | Front Raises (one stack, so a total) | 15 kg (two 8 kg dumbbells) |
+
+Plus 26 versions of them and of existing machines from her lists (her abdominal, pullover, Smith row and shrug
+machines; incline and decline fly machines as the pec deck; a scaption machine as the machine lateral raise): 503
+machine versions in all. These eight CAN be prescribed by a plan, as any catalogue entry can (CSCS, mine: each is a
+standard gym lift with a clear price), so plans may pick them; the full sweep's quality and audit runs hold the floor.
+
+Left out on purpose: cable chest and shoulder presses (two stacks: the app's one number reads as the weight on each
+pulley, double; the machine pack's named limit), and lever squats (no price category).
+
 ## Not done, named
 
-- The common machines with nothing to be a version of (ab crunch machine, pullover machine, cable chest press and
-  shoulder press, Smith machine rows, Romanian deadlift, shrug and hip thrust): part 2, full exercises.
+- Cable chest and shoulder presses, lever squats, and "RDL" read as Romanian deadlift in the swap search (a search
+  limit for every exercise, not new).
 - 81 machine names still unmatched, and the 14 one-sided ones kept log-only.
 - No form cues on a version.
 - A loose name logged through the coach ("pendulum squat") goes under its own words, not the machine's id (as for any

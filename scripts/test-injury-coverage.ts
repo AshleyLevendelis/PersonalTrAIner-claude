@@ -277,8 +277,15 @@ console.log('\n5. How MUCH each injury removes, frozen')
     //   wrists     32->37  Front Squat, Incline Barbell Bench Press, Close-Grip Bench Press, Renegade Row, Suitcase Deadlift
     //   hips       26->29  Front Squat, Dumbbell Front Squat, Suitcase Deadlift
     //   elbows     26->27  Close-Grip Bench Press (the narrow grip)
-    lower_back: 27, knees: 47, shoulders: 81, neck: 8, wrists: 37,
-    hips: 29, ankles: 26, elbows: 27,
+    // 4 Nov 2026, the gym machines with no parent (docs/plans/machine-versions.md), each as the entry it copies:
+    //   lower_back 27->30  Smith Machine Romanian Deadlift, Smith Machine Bent-Over Row, Ab Crunch Machine (as Cable Crunch)
+    //   shoulders  81->83  Machine Pullover (as Dumbbell Pullover), Cable Front Raise (as Front Raises)
+    //   neck        8->9   Smith Machine Shrug (a bar across the traps, as Shrugs)
+    //   wrists     37->38  Smith Machine Romanian Deadlift
+    //   hips       29->30  Smith Machine Romanian Deadlift
+    //   ankles     26->27  Smith Machine Calf Raise (as Standing Calf Raise Machine)
+    lower_back: 30, knees: 47, shoulders: 83, neck: 9, wrists: 38,
+    hips: 30, ankles: 27, elbows: 27,
   }
   const drift: string[] = []
   for (const code of CODES) {

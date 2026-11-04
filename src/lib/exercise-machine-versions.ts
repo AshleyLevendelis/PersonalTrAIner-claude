@@ -563,4 +563,41 @@ export const MACHINE_VERSIONS: readonly (readonly [name: string, parent: string]
   ["Cable Seated Triceps Pushdown", "Tricep Pushdowns"],
   ["Cable Kneeling Triceps Pushdown", "Tricep Pushdowns"],
   ["Cable Standing Triceps Pushdown with Pause", "Tricep Pushdowns"],
+  // ---- part 2 (4 Nov 2026): versions of the machines added to the catalogue the same day, and three more fly
+  // machines and a scaption machine matched to an existing parent.
+  // Smith Machine Romanian Deadlift
+  ["Smith Machine Stiff-Legged Deadlift", "Smith Machine Romanian Deadlift"],
+  // Smith Machine Bent-Over Row
+  ["Smith Machine Wide-Grip Row", "Smith Machine Bent-Over Row"],
+  ["Smith Machine Underhand Row", "Smith Machine Bent-Over Row"],
+  ["Smith Machine Reverse Grip Row", "Smith Machine Bent-Over Row"],
+  // Smith Machine Shrug
+  ["Smith Machine Standing Shrug", "Smith Machine Shrug"],
+  ["Smith Machine Behind-the-Back Shrug", "Smith Machine Shrug"],
+  // Smith Machine Calf Raise
+  ["Smith Machine Calf Raise (On Block)", "Smith Machine Calf Raise"],
+  // Machine Pullover
+  ["Pullover Machine (Plate-Loaded)", "Machine Pullover"],
+  ["Pullover Machine (Pin-Selected)", "Machine Pullover"],
+  ["Pullover Machine (Iso-Lateral)", "Machine Pullover"],
+  ["Iso-Lateral Pullover Machine", "Machine Pullover"],
+  ["Single-Arm Pullover Machine", "Machine Pullover"],
+  // Ab Crunch Machine
+  ["Abdominal Crunch Machine (Pin-Selected)", "Ab Crunch Machine"],
+  ["Plate-Loaded Abdominal Crunch Machine", "Ab Crunch Machine"],
+  ["Abdominal Machine (Pin-Selected)", "Ab Crunch Machine"],
+  ["Abdominal Machine (Plate-Loaded)", "Ab Crunch Machine"],
+  ["Standing Abdominal Crunch Machine", "Ab Crunch Machine"],
+  ["Seated Flexion Machine (Abs)", "Ab Crunch Machine"],
+  ["Incline Ab Crunch Machine", "Ab Crunch Machine"],
+  // Cable Front Raise
+  ["Cable Front Raise (Bar Attachment)", "Cable Front Raise"],
+  ["Cable Front Raise (Rope Attachment)", "Cable Front Raise"],
+  ["Cable Single-Arm Front Raise", "Cable Front Raise"],
+  // Pec Deck Machine
+  ["Incline Fly Machine (Plate-Loaded)", "Pec Deck Machine"],
+  ["Decline Fly Machine (Plate-Loaded)", "Pec Deck Machine"],
+  ["Iso-Lateral Incline Fly Machine", "Pec Deck Machine"],
+  // Machine Lateral Raise
+  ["Pin-Selected Scaption Machine", "Machine Lateral Raise"],
 ]

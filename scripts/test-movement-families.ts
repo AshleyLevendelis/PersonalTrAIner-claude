@@ -71,7 +71,7 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
   row: {
     why: 'Close-Grip Lat Pulldown is filed with rows and is a pulldown: it shares the Lat Pulldown\'s family so the two cannot share a day.',
     families: {
-      row: ['Chest-Supported Row', 'Neutral-Grip Seated Cable Row', 'Barbell Rows', 'Seated Cable Row', 'Dumbbell Rows', 'Bent-Over Dumbbell Row', 'T-Bar Rows', 'Landmine Row', 'Inverted Row', 'Towel Row', 'Backpack Row', 'Table Row', 'Seated Machine Row', 'T-Bar Row Machine', 'Single-Arm Cable Row', 'Iso-Lateral High Row', 'Renegade Row'],
+      row: ['Chest-Supported Row', 'Neutral-Grip Seated Cable Row', 'Barbell Rows', 'Seated Cable Row', 'Dumbbell Rows', 'Bent-Over Dumbbell Row', 'T-Bar Rows', 'Landmine Row', 'Inverted Row', 'Towel Row', 'Backpack Row', 'Table Row', 'Seated Machine Row', 'T-Bar Row Machine', 'Single-Arm Cable Row', 'Iso-Lateral High Row', 'Renegade Row', 'Smith Machine Bent-Over Row'],
       pulldown: ['Close-Grip Lat Pulldown'],
     },
   },
@@ -88,14 +88,14 @@ const DELIBERATE_SPLITS: Record<string, { why: string; families: Record<string, 
     families: {
       deadlift: ['Deadlifts', 'Trap Bar Deadlift', 'Sumo Deadlift'],
       kettlebell_swing: ['Kettlebell Swing (Heavy)'],
-      hip_hinge: ['Romanian Deadlifts', 'Cable Pull-Through', 'Good Mornings', 'Back Extension Machine', 'Reverse Hyper Machine', 'Glute Bridge', 'Single-Leg RDL (Bodyweight)', 'Bodyweight Good Morning', 'Bodyweight Hip Hinge to Wall', 'Single-Leg Dumbbell RDL', 'Suitcase Deadlift'],
+      hip_hinge: ['Romanian Deadlifts', 'Cable Pull-Through', 'Good Mornings', 'Back Extension Machine', 'Reverse Hyper Machine', 'Glute Bridge', 'Single-Leg RDL (Bodyweight)', 'Bodyweight Good Morning', 'Bodyweight Hip Hinge to Wall', 'Single-Leg Dumbbell RDL', 'Suitcase Deadlift', 'Smith Machine Romanian Deadlift'],
     },
   },
   calf: {
     why: 'Bilateral calf raises are one movement whatever the implement; single-leg and bent-knee work is apart.',
     families: {
       calf_raise: ['Calf Raises', 'Seated Calf Raises', 'Calf Raises (Bodyweight)'],
-      calf: ['Standing Calf Raise Machine', 'Single-Leg Dumbbell Calf Raise', 'Single-Leg Calf Raise (Bodyweight)', 'Single-Leg Calf Raise Hold', 'Bent-Knee Calf Raise (Bodyweight)', 'Leg Press Calf Raise'],
+      calf: ['Standing Calf Raise Machine', 'Single-Leg Dumbbell Calf Raise', 'Single-Leg Calf Raise (Bodyweight)', 'Single-Leg Calf Raise Hold', 'Bent-Knee Calf Raise (Bodyweight)', 'Leg Press Calf Raise', 'Smith Machine Calf Raise'],
     },
   },
   explosive_upper: {

@@ -512,7 +512,9 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - **A machine at her gym is a swap option: her ruling 4 Nov 2026, "Machines swappable only"** (from four options; it
   partly REVERSES "Searchable, log-only" below for machine, cable and Smith versions): 477 versions are found by the swap
   and add search and the coach, priced as the machine they are a version of (one-sided ones per side), never generated.
-  Free-weight versions stay log-only; no "add your own". `test:machine-versions`, `verify:machine-swap`,
+  Free-weight versions stay log-only; no "add your own"; lever squats stay log-only (no price category). Eight gym
+  machines with no parent are catalogue entries (Smith RDL, row, shrug, hip thrust, calf raise; machine pullover; ab
+  crunch machine; cable front raise). `test:machine-versions`, `verify:machine-swap`,
   `docs/plans/machine-versions.md`
 - **And a swapped-in lift is priced like the plan's own** — since 2 Nov 2026 (CSCS delegation): with no logged
   history, an incoming lift in a plan with a calibration week starts at the calibration price in every week, as the

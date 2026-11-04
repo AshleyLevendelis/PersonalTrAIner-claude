@@ -245,6 +245,36 @@ console.log('\n7. Every plan reader asks the shared lookup, and the row says wha
   check('the swap and add sheets draw it (source; the driver is verify:machine-swap)', /machineVersionLine\(exercise\)/.test(swapSheet) && /machineVersionLine\(exercise\)/.test(addSheet))
 }
 
+console.log('\n8. The gym machines with nothing to be a version of: priced and excluded as their nearest lift')
+{
+  const PAIRS: [string, string][] = [
+    ['Smith Machine Romanian Deadlift', 'Romanian Deadlifts'], ['Smith Machine Bent-Over Row', 'Barbell Rows'],
+    ['Smith Machine Shrug', 'Shrugs'], ['Smith Machine Hip Thrust', 'Hip Thrust'], ['Smith Machine Calf Raise', 'Standing Calf Raise Machine'],
+    ['Machine Pullover', 'Dumbbell Pullover'], ['Ab Crunch Machine', 'Cable Crunch'], ['Cable Front Raise', 'Front Raises'],
+  ]
+  const who = person({ gender: 'male', weight_kg: 82 })
+  const total = (n: string) => { const e = byName.get(n)!; const w = quiet(() => prescribeLoad(e, who, { reps: 10, rpe: 8 } as never)).starting_weight_kg; return w == null ? null : isPerSideLoad(e) ? w * 2 : w }
+  const wrong: string[] = []
+  for (const [n, near] of PAIRS) {
+    const e = byName.get(n), m = byName.get(near)
+    if (!e || !m) { wrong.push(`${n}: missing`); continue }
+    if (categorize(e) !== categorize(m)) wrong.push(`${n}: category ${categorize(e)} vs ${categorize(m)}`)
+    // THE WEEK COUNTS IT AS ITS NEAREST: same movement pattern; same tier, except a Smith lift sits one below its
+    // barbell lift (as Smith Machine Squat does: the rails take the balance, not the load).
+    if (e.movement_pattern !== m.movement_pattern) wrong.push(`${n}: pattern ${e.movement_pattern} vs ${m.movement_pattern}`)
+    const smithStep = /^Smith /.test(n) && m.mechanics_tier === 'tier1_compound' && e.mechanics_tier === 'tier2_compound'
+    if (e.mechanics_tier !== m.mechanics_tier && !smithStep) wrong.push(`${n}: tier ${e.mechanics_tier} vs ${m.mechanics_tier}`)
+    if (JSON.stringify(contraindicatedJoints(e)) !== JSON.stringify(contraindicatedJoints(m))) wrong.push(`${n}: excluded for ${contraindicatedJoints(e)} vs ${contraindicatedJoints(m)}`)
+    const a = total(n), b = total(near)
+    if (a == null ? b != null : b == null || Math.abs(a - b) > 0.1 * b + 2.5) wrong.push(`${n}: ${a} kg on the body vs ${near} ${b}`)
+  }
+  check('each is in its nearest lift\'s price category and pattern, its tier, excluded for the same injuries, within 10% of its load on the body', wrong.length === 0, wrong)
+  check('...appended at the END of the catalogue, so a tie still goes to an entry the app already had', PAIRS.every(([n]) => EXERCISE_DATABASE.findIndex(e => e.name === n) >= EXERCISE_DATABASE.length - PAIRS.length))
+  const found = ['smith romanian', 'pullover machine', 'ab crunch machine', 'smith shrug'].map(w => [w, searchExerciseCatalogByWords(w, 20).map(e => e.name)] as const)
+  check('...and found by the words on the machine', found.every(([, r]) => r.length > 0) && found[1][1].includes('Machine Pullover') && found[2][1].includes('Ab Crunch Machine'), found)
+  check('her abdominal machines are versions of it', getExerciseEntry('Abdominal Crunch Machine (Pin-Selected)')?.parent === 'Ab Crunch Machine')
+}
+
 console.log(`\n${ran} checks ran`)
 if (failures > 0) { console.log(`${failures} machine-version check(s) failed`); process.exit(1) }
 console.log('machine-versions: all checks passed')

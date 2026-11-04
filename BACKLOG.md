@@ -12,8 +12,15 @@ Newest first. One line each.
   her an injury kept a pendulum squat out. Every plan reader now asks the shared lookup. DECIDED (CSCS): a version's
   history is its own; a one-sided name under kit not priced per side stays log-only (14). `test:machine-versions` 38
   checks, 16 mutations (15 caught, 1 equivalent, recorded); `verify:machine-swap` 12 checks at 390x844, 4 caught,
-  screenshots read. App chunk budget 1274 -> 1304 (1279). NOT DONE: part 2, the common machines with no parent (ab
-  crunch, pullover, cable chest press, Smith rows, RDL, shrug); 81 unmatched names; no cues on a version.
+  screenshots read. App chunk budget 1274 -> 1304 (1279). PART 2, the same day: eight new catalogue entries for gym
+  machines with nothing to be a version of (Smith Romanian deadlift, row, shrug, hip thrust and calf raise, machine
+  pullover, ab crunch machine, cable front raise), each priced, patterned and excluded as its nearest entry (held in
+  `test:machine-versions` §8, 43 checks, 6 more mutations caught after 3 that never applied were re-made), and 26
+  more versions (503 in all). Four snapshot gates updated by hand with each name accounted for (injury coverage,
+  joint tags, categories, movement families). DECIDED (CSCS): plans may prescribe them. LEFT OUT: cable chest and
+  shoulder presses (two stacks read double), lever squats (no price category, so pendulum and super squat stay
+  log-only, corrected an hour after the first build priced them as a hack squat). NOT DONE: 81 unmatched names; no cues
+  on a version; "RDL" is not read as Romanian deadlift by the swap search.
 - [x] **`test:shoulders-day` RE-SEEDED, 4 NOV 2026**: red in the merge check at `a5f76b8a`, the grown catalogue moved
   its case (0 knee-loading leg slots on a shoulders day). Seed `sam:shoulders-day:2` holds it; a mutation is caught.
 - [ ] **THE REST OF HER NEAR-COPIES, 4 NOV 2026, BUILT, FULL SWEEP PENDING** (her "carry on with the rest of the
