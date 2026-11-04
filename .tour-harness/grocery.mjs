@@ -429,6 +429,10 @@ console.log('\n[10] The tab bar\'s icons say what is behind them')
 const icons = await page(`const nav = q('nav[aria-label="Primary"]'); return nav ? [...nav.querySelectorAll('button')].map(b => ({ label: b.textContent.trim(), icon: [...(b.querySelector('svg')?.classList ?? [])].find(c => /^lucide-/.test(c) && c !== 'lucide') ?? null })) : []`)
 const iconOf = l => icons.find(i => i.label === l)?.icon
 // Her Tab Icons board, option 2a (4 Nov 2026): a layout grid, a knife and fork, a flame, a timer.
+// HER "Remove that" (4 Nov 2026): the active tab holds its icon and its label and nothing else (the 31 Oct mint bar
+// above the icon is gone), and it still reads as active: marked for a screen reader, in the main colour.
+const activeTab = await page(`const b = q('nav[aria-label="Primary"] button[aria-current="page"]'); return b ? { kids: [...b.children].map(c => c.tagName.toLowerCase()), color: getComputedStyle(b).color, other: getComputedStyle([...q('nav[aria-label="Primary"]').querySelectorAll('button')].find(x => x !== b && !x.getAttribute('aria-current') && x.textContent.trim()) ?? b).color } : null`)
+check('the active tab is the icon and the label, no bar above it, and still shown in its own colour', JSON.stringify(activeTab?.kids) === '["svg","span"]' && activeTab.color !== activeTab.other, activeTab)
 check('Home is a layout grid, Nutrition a knife and fork, Exercise a flame, Tools a timer', iconOf('Home') === 'lucide-layout-dashboard' && iconOf('Nutrition') === 'lucide-utensils' && iconOf('Exercise') === 'lucide-flame' && iconOf('Tools') === 'lucide-timer', icons)
 
 console.log('\n[11] Empty, and a list this phone never built')

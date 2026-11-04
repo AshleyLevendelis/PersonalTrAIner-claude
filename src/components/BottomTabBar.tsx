@@ -179,11 +179,8 @@ function SideTabButton({
         active ? 'text-primary-text glow-mint' : 'text-muted-foreground'
       }`}
     >
-      {/* THE ACTIVE MARKER (tab polish handoff, 31 Oct 2026): an 18×3 mint bar above the icon, so the tab she is
-          on is not lost beside the glowing chat disc. */}
-      {active && (
-        <span aria-hidden data-tab-marker className="absolute left-1/2 h-[3px] w-[18px] -translate-x-1/2 rounded-full bg-primary" style={{ top: 9, boxShadow: '0 0 8px rgba(var(--glow-rgb), .6)' }} />
-      )}
+      {/* NO BAR ABOVE THE ACTIVE TAB: Ashley, 4 Nov 2026, "Remove that". The 31 Oct handoff's 18x3 mint bar is gone;
+          the tab she is on reads by its mint, glowing icon and bold label alone. */}
       <Icon className={`size-5 ${active ? 'glow-icon' : ''}`} />
       <span className={`text-[0.625rem] ${active ? 'font-bold' : 'font-medium'}`}>{label}</span>
     </button>

@@ -2,6 +2,11 @@
 
 Newest first. One line each.
 
+- [x] **NO BAR ABOVE THE SELECTED TAB, 4 NOV 2026** (Ashley, with a screenshot: "Why is it adding a line above the tab
+  that is selected. Remove that"). The 31 Oct tab-polish handoff drew an 18x3 mint bar above the active icon; it is
+  gone. The selected tab still reads as selected: mint, glowing icon, bold label, marked for a screen reader.
+  `verify:grocery` [10] now holds that the active tab is the icon and the label alone and still in its own colour
+  (2 mutations caught: the bar put back, the colour taken away). Shot in a dark and a light theme.
 - [x] **TWO MORE FROM THE MERGE CHECK AT `d4eb6e6a`, 4 NOV 2026.** (1) `verify:mobility-filler`: the eight new
   machines thickened the fixture's thin pool, so the shared seed's live week no longer ran a cardio day short (the
   behaviour's own logic gate, `test:filler-yields`, passed). `?mobility=1` now has its own seed, chosen by searching
