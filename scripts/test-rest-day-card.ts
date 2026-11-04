@@ -161,8 +161,14 @@ console.log('\n6. Three cards, still three cards')
 for (const name of ['RestDayCard', 'MovedDayCard', 'ActiveRecoveryCard']) {
   check(`${name} is still its own export`, new RegExp(`export function ${name}\\(`).test(cardBare))
 }
-check('active recovery keeps its warn-role colouring rather than inheriting the violet',
-  /var\(--role-warn-bg\)/.test(recoveryBody) && /var\(--role-warn\)/.test(recoveryBody))
+// REVERSED 4 Nov 2026 by Ashley's handoff (Exercise Screen option 4b): this pinned the amber, kept from before the
+// 20 Sep rebuild; amber is for warnings. Now the property is the rest day's violet on the deep surface, and NO amber.
+const recoveryCard = recoveryBody.slice(0, recoveryBody.indexOf('<WeekTrack'))
+check('active recovery wears the recovery violet on the deep surface, as the rest day does, and no warning amber',
+  /bg-\[color:var\(--surface-deep\)\]/.test(recoveryCard) && /var\(--role-ai\) 16%/.test(recoveryCard) && /var\(--role-ai-text\)/.test(recoveryCard)
+  && !/role-warn/.test(recoveryCard), recoveryCard.slice(0, 300))
+check('...with its title the rest day\'s size, and the testid kept',
+  /text-\[1\.1875rem\] font-semibold[^"]*" data-testid="activity-day-title"/.test(recoveryCard))
 // BOTH of them: the walk the plan prescribes AND the suggestion an otherwise
 // empty day gets. The first version asked for one row and so passed with the
 // suggestion deleted — found by mutation.

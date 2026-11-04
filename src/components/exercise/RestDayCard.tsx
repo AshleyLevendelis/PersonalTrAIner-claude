@@ -471,17 +471,22 @@ export function ActiveRecoveryCard({
   // is why it leads the card and why the card stops calling itself recovery.
   const planned = workout.plannedActivity
   return (
-    <Card className="border-[color:var(--role-warn-border)] bg-gradient-to-br from-[color:var(--role-warn-bg)] to-background">
+    // THE RECOVERY COLOUR, as the rest day (Ashley's handoff, 4 Nov 2026, Exercise Screen option 4b): amber is for
+    // warnings such as "That didn't save", and this card had kept it from before the 20 Sep rest-day rebuild.
+    <Card className="bg-[color:var(--surface-deep)]">
       <CardContent className="py-4 space-y-3">
         <div className="flex items-center gap-3">
-          <div className="size-10 rounded-full bg-[color:var(--role-warn-bg)] flex items-center justify-center shrink-0">
-            <Heart className="size-5 text-[color:var(--role-warn)]" />
+          <div
+            className="flex items-center justify-center size-10 rounded-full shrink-0"
+            style={{ background: 'color-mix(in srgb, var(--role-ai) 16%, transparent)' }}
+          >
+            <Heart className="size-[19px] text-[color:var(--role-ai-text)]" />
           </div>
           <div className="space-y-0.5">
-            <p className="text-sm font-medium" data-testid="activity-day-title">
+            <p className="text-[1.1875rem] font-semibold tracking-[-.01em] text-foreground leading-tight" data-testid="activity-day-title">
               {planned ? `${workout.focus} · ${workout.day}` : `Active recovery · ${workout.day}`}
             </p>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-muted-foreground mt-0.5">
               {planned ? "This is today's session." : workout.focus}
             </p>
           </div>
