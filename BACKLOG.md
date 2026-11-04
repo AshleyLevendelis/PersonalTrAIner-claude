@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [x] **REMINDERS: UP TO THREE A DAY, AND THE THREE SHE ASKED FOR, 4 NOV 2026** (Ashley: "The app desperately needs
+  push notifications ... remind them of an upcoming workouts or check in on them after a workout. Or to remind them to
+  hit their protein goal or log a meal"). MEASURED FIRST: the phone reminders were already built (24 Sep) but not live,
+  and covered two of her four: the after-workout check-in, and a workout reminder only as the 6pm "still waiting"
+  nudge. Nothing for protein or meal logging, and a one-a-day cap (my default) that would have starved any second one.
+  **Her ruling, from three options: "Up to 3, spaced"** (three a day, three hours apart), over one a day and no limit.
+  BUILT: a training-day morning reminder (8am-noon, nothing logged yet, opens Exercise, every training day); a "log
+  your meals" nudge from 7pm (fewer than two meals accounted for, only for someone who logged a meal in the last
+  fortnight, opens Nutrition); a "behind on protein" nudge from 7pm (two+ meals logged, under 80% AND 20g short; no
+  grams and no named food on the lock screen; opens Nutrition). The sender walks every live moment best-first and takes
+  the first its limits allow; never the same moment twice a day; the 3-hour gap read off the send time, across
+  midnight. RESERVED before sending, so two runs cannot both send, and before the new migration the old one-a-day rule
+  refuses the second reservation: once a day, never once an hour. Home sends today's protein target ahead, retrying
+  without it on a missing column. A tap opens the tab the server names, only ever a tab of this app.
+  **Mine, flagged (CSCS for the protein line, the rest hers to move):** the windows, the 80%/20g threshold, "a logger"
+  = a meal in 14 days, the sentences and switch labels. **NOT DONE, named:** the morning reminder does not name the
+  session; the after-workout check-in still waits a day on back-to-back training days (24 Sep rule, unchanged); iPhone
+  needs the app on the home screen. **STILL NOT LIVE:** two migrations (24 Sep and `20261104120000`), the
+  `coach-reach-out` deploy and the keys, all on her machine (handover prompt, steps 2-5). VERIFIED: GATES_LINE
+  MUTATIONS_LINE `docs/plans/the-coach-can-reach-you.md`, "Three a day".
 - [x] **NO BAR ABOVE THE SELECTED TAB, 4 NOV 2026** (Ashley, with a screenshot: "Why is it adding a line above the tab
   that is selected. Remove that"). The 31 Oct tab-polish handoff drew an 18x3 mint bar above the active icon; it is
   gone. The selected tab still reads as selected: mint, glowing icon, bold label, marked for a screen reader.

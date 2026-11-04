@@ -61,6 +61,28 @@ async function restWrite(method: "POST" | "DELETE", path: string, body?: unknown
   if (!res.ok) throw new Error(`${method} ${path.split("?")[0]} ${res.status}: ${await res.text()}`);
 }
 
+/**
+ * TODAY'S FOOD, from the fortnight's log: meals accounted for (eaten, or said
+ * skipped), protein logged as eaten, and whether anything was logged before
+ * today. Eaten is the app's own three types (meal-store.ts): confirmed,
+ * swapped_in and extra.
+ */
+function foodFacts(rows: { date: string; event_type: string; macros: { protein?: number } | null }[], today: string) {
+  const EATEN = new Set(["confirmed", "swapped_in", "extra"]);
+  let mealsAccountedToday = 0;
+  let proteinEatenToday = 0;
+  let mealLoggedRecently = false;
+  for (const r of rows) {
+    if (r.date === today) {
+      if (EATEN.has(r.event_type) || r.event_type === "skipped") mealsAccountedToday++;
+      if (EATEN.has(r.event_type)) proteinEatenToday += Number(r.macros?.protein ?? 0) || 0;
+    } else if (r.date < today) {
+      mealLoggedRecently = true;
+    }
+  }
+  return { mealsAccountedToday, proteinEatenToday, mealLoggedRecently };
+}
+
 /** The local YYYY-MM-DD of an instant, in a timezone. */
 function localDateOf(iso: string, timezone: string): string {
   try {
@@ -98,12 +120,17 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
     loadLive: async (userId, today, timezone): Promise<LiveFacts> => {
       const since = addDays(today, -35);
       const recentSince = new Date(now.getTime() - 36 * 3_600_000).toISOString();
-      const [sets, cardio, sessions, offers] = await Promise.all([
+      const [sets, cardio, sessions, offers, meals] = await Promise.all([
         rest<{ completed_at: string | null }[]>(`exercise_set_logs?user_id=eq.${userId}&completed_at=gte.${since}T00:00:00Z&select=completed_at&order=completed_at.desc&limit=500`),
         rest<{ date: string }[]>(`cardio_logs?user_id=eq.${userId}&date=gte.${since}&select=date&order=date.desc&limit=200`),
         rest<Record<string, unknown>[]>(`workout_sessions?profile_id=eq.${userId}&date=gte.${addDays(today, -3)}&select=*`),
         rest<{ id: string }[]>(`pending_actions?profile_id=eq.${userId}&kind=eq.propose_load_catchup&status=eq.pending&expires_at=gt.${now.toISOString()}&select=id&limit=1`),
+        // THE FORTNIGHT'S MEAL LOG, voided rows excluded the way the app's own
+        // ledger excludes them. Her own calendar dates: meal_events.date is the
+        // day she logged it FOR, already local.
+        rest<{ date: string; event_type: string; macros: { protein?: number } | null }[]>(`meal_events?profile_id=eq.${userId}&date=gte.${addDays(today, -14)}&voided_at=is.null&select=date,event_type,macros&limit=500`),
       ]);
+      const food = foodFacts(meals, today);
       const dates = new Set<string>();
       for (const s of sets) if (s.completed_at) dates.add(localDateOf(s.completed_at, timezone));
       for (const c of cardio) dates.add(c.date);
@@ -127,11 +154,12 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
         movedInto,
         unratedRecentSession: unrated,
         beatTargetOffered: offers.length > 0,
+        ...food,
       };
     },
 
     loadRecentSends: (userId) =>
-      rest<SentRecord[]>(`coach_notifications_sent?user_id=eq.${userId}&select=moment,sent_on&order=sent_on.desc&limit=7`),
+      rest<SentRecord[]>(`coach_notifications_sent?user_id=eq.${userId}&select=moment,sent_on,sent_at&order=sent_at.desc&limit=30`),
 
     send: async (sub, payload) => {
       try {
@@ -146,7 +174,21 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
       }
     },
 
-    recordSent: (userId, date, moment) => restWrite("POST", "coach_notifications_sent", { user_id: userId, sent_on: date, moment }),
+    // A 409 is the database refusing the reservation (a unique rule): not an
+    // error, an answer — the caller sends nothing. Anything else throws, and the
+    // loop skips this person for the hour.
+    recordSent: async (userId, date, moment) => {
+      const res = await fetch(`${supabaseUrl}/rest/v1/coach_notifications_sent`, {
+        method: "POST",
+        headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ user_id: userId, sent_on: date, moment }),
+      });
+      if (res.status === 409) return false;
+      if (!res.ok) throw new Error(`POST coach_notifications_sent ${res.status}: ${await res.text()}`);
+      return true;
+    },
+    unrecordSent: (userId, date, moment) =>
+      restWrite("DELETE", `coach_notifications_sent?user_id=eq.${userId}&sent_on=eq.${date}&moment=eq.${moment}`),
     dropSubscription: (id) => restWrite("DELETE", `push_subscriptions?id=eq.${id}`),
   };
 }
@@ -190,7 +232,7 @@ Deno.serve(async (req: Request) => {
       const devices = await rest<PushSubscriptionRow[]>(`push_subscriptions?user_id=eq.${body.test}&select=id,user_id,endpoint,p256dh,auth,timezone`);
       const outcomes: string[] = [];
       for (const device of devices) {
-        outcomes.push(await deps.send(device, { title: "Your coach", body: "Reminders are working on this phone.", moment: "test" }));
+        outcomes.push(await deps.send(device, { title: "Your coach", body: "Reminders are working on this phone.", moment: "test" as never, url: "/#/tab/chat" }));
       }
       return new Response(JSON.stringify({ test: true, devices: devices.length, outcomes }), { headers: { ...cors, "Content-Type": "application/json" } });
     }

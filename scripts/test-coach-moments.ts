@@ -18,6 +18,7 @@ import { fileURLToPath } from 'url'
 import {
   momentToRaise, liveMoments, MOMENT_KEYS, DEFAULT_MOMENT_SWITCHES,
   QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, NOT_LOGGED_AFTER_HOUR, QUIET_WEEK_DAYS,
+  WORKOUT_REMINDER_BEFORE_HOUR, FOOD_NUDGE_AFTER_HOUR, MAX_NOTIFICATIONS_PER_DAY, MIN_HOURS_BETWEEN, momentsToRaise,
   type MomentFacts, type MomentKey,
 } from '../src/lib/coach-moments'
 import { notification } from '../src/lib/coach-voice'
@@ -71,8 +72,13 @@ console.log('\n2. At most ONE thing, ever')
     localHour: 19, awaitingFeel: true, plannedToday: true, loggedToday: false,
     missedYesterday: true, daysSinceAnyLog: 30, streakDays: 9,
     blockJustEnded: true, beatTargetPending: true,
+    logsMeals: true, mealsAccountedToday: 0,
   }
-  check('every moment really is live on this day', liveMoments(everything).length === MOMENT_KEYS.length,
+  // The morning reminder and the evening ones cannot share an hour, so "every
+  // moment live at once" is every moment but the morning one, at 7pm — and
+  // the morning one has its own case below.
+  const eveningKeys = MOMENT_KEYS.filter(k => k !== 'workout_today' && k !== 'protein_short')
+  check('every evening moment really is live on this day', eveningKeys.every(k => liveMoments(everything).includes(k)),
     liveMoments(everything))
   const got = momentToRaise(everything)
   check('...and exactly one is raised', !!got && MOMENT_KEYS.includes(got.key), got)
@@ -95,6 +101,9 @@ console.log('\n3. Each moment fires on its own fact, and only on it')
     ['streak_at_risk', { streakDays: 5, plannedToday: true, localHour: 19 }],
     ['block_review', { blockJustEnded: true }],
     ['beat_target', { beatTargetPending: true }],
+    ['workout_today', { plannedToday: true, localHour: 9 }],
+    ['meal_not_logged', { logsMeals: true, mealsAccountedToday: 0, localHour: 19 }],
+    ['protein_short', { proteinTargetG: 160, proteinEatenToday: 100, mealsAccountedToday: 3, localHour: 19 }],
   ]
   for (const [key, patch] of cases) {
     const live = liveMoments({ ...QUIET, ...patch })
@@ -109,9 +118,13 @@ console.log('\n3. Each moment fires on its own fact, and only on it')
 console.log('\n4. The two that wait for the evening, because a morning nag is about nothing')
 {
   const trainingDay: MomentFacts = { ...QUIET, plannedToday: true, streakDays: 5 }
-  check('a session unlogged at 9am says nothing',
-    liveMoments({ ...trainingDay, localHour: 9 }).length === 0,
+  // At 9am the only thing live is the MORNING reminder — never the evening
+  // nudge or the streak, which would be a nag about a session not yet due.
+  check('a session unlogged at 9am gets the morning reminder and nothing else',
+    JSON.stringify(liveMoments({ ...trainingDay, localHour: 9 })) === '["workout_today"]',
     liveMoments({ ...trainingDay, localHour: 9 }))
+  check('...and at 2pm nothing at all',
+    liveMoments({ ...trainingDay, localHour: 14 }).length === 0, liveMoments({ ...trainingDay, localHour: 14 }))
   check('...and at the evening it does',
     liveMoments({ ...trainingDay, localHour: NOT_LOGGED_AFTER_HOUR }).includes('session_not_logged'))
   check('...and a logged session never does, however late',
@@ -124,6 +137,57 @@ console.log('\n4. The two that wait for the evening, because a morning nag is ab
     !liveMoments({ ...QUIET, localHour: 19, plannedToday: true, streakDays: 2 }).includes('streak_at_risk'))
   check('...while a real one is',
     liveMoments({ ...QUIET, localHour: 19, plannedToday: true, streakDays: 3 }).includes('streak_at_risk'))
+}
+
+console.log('\n4b. The three of 4 Nov 2026: the morning reminder and the two food nudges')
+{
+  // THE MORNING REMINDER: a training day, nothing logged yet, before lunch.
+  const day: MomentFacts = { ...QUIET, plannedToday: true }
+  check(`the morning reminder speaks at ${QUIET_BEFORE_HOUR}am`, liveMoments({ ...day, localHour: QUIET_BEFORE_HOUR }).includes('workout_today'))
+  check(`...up to ${WORKOUT_REMINDER_BEFORE_HOUR - 1}:00, and not at ${WORKOUT_REMINDER_BEFORE_HOUR}:00`,
+    liveMoments({ ...day, localHour: WORKOUT_REMINDER_BEFORE_HOUR - 1 }).includes('workout_today')
+    && !liveMoments({ ...day, localHour: WORKOUT_REMINDER_BEFORE_HOUR }).includes('workout_today'))
+  check('...and the window is the morning, written down (before noon)', WORKOUT_REMINDER_BEFORE_HOUR === 12, WORKOUT_REMINDER_BEFORE_HOUR)
+  check('...never on a rest day', !liveMoments({ ...QUIET, localHour: 9 }).includes('workout_today'))
+  check('...never once she has logged (an early session is not reminded about)',
+    !liveMoments({ ...day, localHour: 9, loggedToday: true }).includes('workout_today'))
+
+  // THE MEAL NUDGE: only someone who logs meals, only in the evening, only
+  // with fewer than two meals accounted for.
+  const eater: MomentFacts = { ...QUIET, logsMeals: true, mealsAccountedToday: 0, localHour: FOOD_NUDGE_AFTER_HOUR }
+  check('nothing logged by 7pm, from somebody who logs: the meal nudge', liveMoments(eater).includes('meal_not_logged'))
+  check('...one meal logged still counts as unlogged', liveMoments({ ...eater, mealsAccountedToday: 1 }).includes('meal_not_logged'))
+  check('...two do not', !liveMoments({ ...eater, mealsAccountedToday: 2 }).includes('meal_not_logged'))
+  check('...somebody who never logs meals is never nagged to', !liveMoments({ ...eater, logsMeals: false }).includes('meal_not_logged'))
+  check(`...and not before ${FOOD_NUDGE_AFTER_HOUR}:00, when the day is unfinished rather than unlogged`,
+    !liveMoments({ ...eater, localHour: FOOD_NUDGE_AFTER_HOUR - 1 }).includes('meal_not_logged'))
+  check('...and the evening is written down (7pm)', FOOD_NUDGE_AFTER_HOUR === 19, FOOD_NUDGE_AFTER_HOUR)
+
+  // THE PROTEIN NUDGE: under 80% AND at least 20g short, with two meals logged.
+  // Each threshold checked on a case where it BINDS (CLAUDE.md).
+  const short: MomentFacts = { ...QUIET, localHour: 19, mealsAccountedToday: 3, proteinTargetG: 160 }
+  check('127g of 160 (79%, 33g short) is behind', liveMoments({ ...short, proteinEatenToday: 127 }).includes('protein_short'))
+  check('...129g of 160 (81%) is not', !liveMoments({ ...short, proteinEatenToday: 129 }).includes('protein_short'))
+  check('...45g of 60 (75%, but only 15g short) is not — a small target, a small gap',
+    !liveMoments({ ...short, proteinTargetG: 60, proteinEatenToday: 45 }).includes('protein_short'))
+  check('...35g of 60 (58%, 25g short) is', liveMoments({ ...short, proteinTargetG: 60, proteinEatenToday: 35 }).includes('protein_short'))
+  check('...one meal logged is the meal nudge\'s business, never "behind on protein"',
+    !liveMoments({ ...short, mealsAccountedToday: 1, proteinEatenToday: 30 }).includes('protein_short'))
+  check('...an unknown target (0) never says she is behind', !liveMoments({ ...short, proteinTargetG: 0, proteinEatenToday: 0 }).includes('protein_short'))
+  check('...and not before the evening', !liveMoments({ ...short, localHour: 18, proteinEatenToday: 50 }).includes('protein_short'))
+  check('a caller that knows nothing about food raises nothing about it',
+    !liveMoments({ ...QUIET, localHour: 20 }).some(k => k === 'meal_not_logged' || k === 'protein_short'))
+
+  // HER RULING, as numbers that cannot move by accident: three a day, three hours apart.
+  check('up to 3 a day, at least 3 hours apart (her ruling of 4 Nov)', MAX_NOTIFICATIONS_PER_DAY === 3 && MIN_HOURS_BETWEEN === 3,
+    { MAX_NOTIFICATIONS_PER_DAY, MIN_HOURS_BETWEEN })
+  const screen = strip(read('src/components/RemindersSection.tsx'))
+  check('...and the switches screen states both, from those constants, not "once a day"',
+    /\{MAX_NOTIFICATIONS_PER_DAY\}/.test(screen) && /\{MIN_HOURS_BETWEEN\}/.test(screen) && !/once a day/i.test(screen))
+  // ALL LIVE ONES, BEST FIRST — what the sender walks.
+  const both = momentsToRaise({ ...eater, plannedToday: true }).map(m => m.key)
+  check('the full list is in the declared order, the one-thing answer at its head',
+    both[0] === momentToRaise({ ...eater, plannedToday: true })?.key && both.indexOf('session_not_logged') < both.indexOf('meal_not_logged'), both)
 }
 
 console.log('\n5. A quiet week is days, not a guess, and "never logged" is not a quiet week')
@@ -183,6 +247,12 @@ console.log('\n7. Every word comes from the phrasebook')
     MOMENT_KEYS.map(k => notification(k, 9)))
   // The house voice, applied to a surface that arrives uninvited.
   check('...and none of them shouts', MOMENT_KEYS.every(k => !notification(k).includes('!')))
+  // The meal nudge says what is true: nothing logged, or only one meal.
+  check('the meal nudge has two wordings: nothing logged, and just one',
+    notification('meal_not_logged', 0, 0) !== notification('meal_not_logged', 0, 1) && /one meal/.test(notification('meal_not_logged', 0, 1))
+    && /nothing logged/.test(notification('meal_not_logged', 0, 0)))
+  // NO NAMED FOOD on the protein line: it cannot see her diet or allergies.
+  check('the protein nudge names no food', !/chicken|egg|yog|shake|whey|milk|meat|fish|tofu|nut/i.test(notification('protein_short')), notification('protein_short'))
 }
 
 console.log('\n8. It is pure, so a server can ask it too')

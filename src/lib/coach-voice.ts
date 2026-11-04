@@ -511,9 +511,19 @@ export const REBALANCE = {
  * app cannot promise is still true when it is read. The streak is the
  * exception because it IS the subject of its own line.
  */
-export function notification(key: string, streakDays = 0): string {
+export function notification(key: string, streakDays = 0, mealsLogged = 0): string {
   switch (key) {
     case 'session_feel': return 'how did that session actually feel?'
+    // 4 Nov 2026, Ashley: "remind them of an upcoming workout ... remind them
+    // to hit their protein goal or log a meal". No grams on the protein line,
+    // by the rule above: a figure on a lock screen may be stale when read. And
+    // no named food, because the line cannot see her diet or her allergies —
+    // "a protein-rich snack" is true for every one of them.
+    case 'workout_today': return "training day today — your session's ready when you are."
+    case 'meal_not_logged': return mealsLogged >= 1
+      ? 'just one meal logged today — add the rest so your numbers add up?'
+      : "nothing logged on nutrition yet today. got a minute to add what you've eaten?"
+    case 'protein_short': return "you're behind on protein today. a protein-rich snack this evening would help close the gap."
     case 'session_not_logged': return "today's session is still waiting — got twenty minutes?"
     case 'missed_yesterday': return 'yesterday got away from you. want to move it or let it go?'
     case 'week_gone_quiet': return "it's been a quiet week. shall we pick something small to start again?"

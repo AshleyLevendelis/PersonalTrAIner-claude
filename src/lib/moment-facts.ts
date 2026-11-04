@@ -22,6 +22,7 @@ import { getActiveMesocycleWeek } from './calculations'
 import { addDays } from './session-move'
 import { getLocalDateString } from './dev-clock'
 import { supabase } from './supabase'
+import { isMissingColumnError } from './missing-column'
 
 export interface FactsAhead {
   trainingWeekdays?: string[]
@@ -29,6 +30,12 @@ export interface FactsAhead {
   blockEndsOn?: string | null
   streakDays?: number
   streakAsOf?: string
+  /**
+   * Today's protein target, as Home shows it (4 Nov 2026: the evening protein
+   * nudge). Null when Home has no targets to show — the server then never says
+   * she is behind on a number the app itself would not print.
+   */
+  proteinTargetG?: number | null
 }
 
 const SENT_KEY = 'fitplan_moment_facts_sent_v1'
@@ -49,6 +56,7 @@ export async function sendFactsAhead(profileId: string, facts: FactsAhead): Prom
   if (facts.blockEndsOn !== undefined) row.block_ends_on = facts.blockEndsOn
   if (facts.streakDays !== undefined) row.streak_days = facts.streakDays
   if (facts.streakAsOf !== undefined) row.streak_as_of = facts.streakAsOf
+  if (facts.proteinTargetG !== undefined) row.protein_target_g = facts.proteinTargetG
 
   let remembered: Record<string, string> = {}
   try { remembered = JSON.parse(localStorage.getItem(SENT_KEY) ?? '{}') } catch { /* private window: send anyway */ }
@@ -56,7 +64,14 @@ export async function sendFactsAhead(profileId: string, facts: FactsAhead): Prom
   const fingerprint = JSON.stringify(row)
   if (remembered[memoKey] === fingerprint) return 'unchanged'
 
-  const { error } = await supabase.from('coach_moment_facts').upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+  let { error } = await supabase.from('coach_moment_facts').upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
+  // THE PROTEIN COLUMN COMES IN A LATER MIGRATION than the table. Before it
+  // lands, the rest of the facts must still go: a missing column costs the
+  // protein nudge, never the streak or the training days.
+  if (error && 'protein_target_g' in row && isMissingColumnError(error, 'protein_target_g')) {
+    const { protein_target_g: _dropped, ...rest } = row
+    ;({ error } = await supabase.from('coach_moment_facts').upsert({ ...rest, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }))
+  }
   if (error) {
     const code = String((error as { code?: string }).code ?? '')
     // THE TABLE ITSELF MISSING, and nothing broader: a row-level-security
@@ -77,6 +92,8 @@ export function momentFactsFrom(input: {
   now: Date
   streakDays: number
   today: string
+  /** Today's protein target; null or absent when Home has none to show. */
+  proteinTarget?: number | null
 }): FactsAhead {
   // The LIVE week's pattern, not the week-1 snapshot: after a schedule change from a later week the
   // snapshot still holds the old weekdays, and the phone would be reminding her on days she no longer trains.
@@ -102,5 +119,6 @@ export function momentFactsFrom(input: {
       blockEndsOn = addDays(start, (last + 1) * 7)
     }
   }
-  return { trainingWeekdays, planEndsOn, blockEndsOn, streakDays: Math.max(0, input.streakDays), streakAsOf: input.today }
+  const proteinTargetG = input.proteinTarget && input.proteinTarget > 0 ? Math.round(input.proteinTarget) : null
+  return { trainingWeekdays, planEndsOn, blockEndsOn, streakDays: Math.max(0, input.streakDays), streakAsOf: input.today, proteinTargetG }
 }

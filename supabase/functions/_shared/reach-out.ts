@@ -22,7 +22,10 @@
 // moves, a finished session nobody has rated, and an unanswered offer.
 // ---------------------------------------------------------------------------
 
-import { momentToRaise, type MomentFacts, type MomentKey, type MomentSwitches } from './coach-moments.ts'
+import {
+  momentsToRaise, MAX_NOTIFICATIONS_PER_DAY, MIN_HOURS_BETWEEN,
+  type MomentFacts, type MomentKey, type MomentSwitches,
+} from './coach-moments.ts'
 
 export interface PushSubscriptionRow {
   id: string
@@ -45,6 +48,8 @@ export interface MomentFactsRow {
   streak_days?: number | null
   /** The local date the streak was counted on. A streak not counted since before yesterday is not trusted. */
   streak_as_of?: string | null
+  /** Today's protein target in grams, as Home last showed it. Absent or 0 means unknown: no protein nudge. */
+  protein_target_g?: number | null
   updated_at?: string | null
 }
 
@@ -67,9 +72,23 @@ export interface LiveFacts {
   unratedRecentSession: boolean
   /** An open "you're beating the weights" offer, not yet answered or expired. */
   beatTargetOffered: boolean
+  /**
+   * FOOD, read live (4 Nov 2026). Meals accounted for today (eaten or said
+   * skipped), protein logged as eaten today, and whether anything was logged
+   * in the fortnight before today. Optional: a run that could not read meals
+   * raises nothing about food rather than guessing.
+   */
+  mealsAccountedToday?: number
+  proteinEatenToday?: number
+  mealLoggedRecently?: boolean
 }
 
-export interface SentRecord { moment: MomentKey; sent_on: string }
+export interface SentRecord {
+  moment: MomentKey
+  sent_on: string
+  /** When it went out. The three-hour spacing reads it; a record without one counts as just now. */
+  sent_at?: string | null
+}
 
 export interface ReachOutDeps {
   now: Date
@@ -80,8 +99,15 @@ export interface ReachOutDeps {
   /** The last few notifications this person was sent, newest first. */
   loadRecentSends(userId: string): Promise<SentRecord[]>
   /** 'gone' means the phone unsubscribed; the row should be dropped. */
-  send(sub: PushSubscriptionRow, payload: { title: string; body: string; moment: MomentKey }): Promise<'ok' | 'gone' | 'failed'>
-  recordSent(userId: string, localDate: string, moment: MomentKey): Promise<void>
+  send(sub: PushSubscriptionRow, payload: { title: string; body: string; moment: MomentKey; url: string }): Promise<'ok' | 'gone' | 'failed'>
+  /**
+   * RESERVES the notification BEFORE it is sent, and says whether the
+   * reservation landed. False means the database refused it (two runs racing,
+   * or the one-a-day rule still in place before its migration): send nothing.
+   */
+  recordSent(userId: string, localDate: string, moment: MomentKey): Promise<boolean>
+  /** Takes a reservation back when the send reached no phone, so the next hour tries again. */
+  unrecordSent(userId: string, localDate: string, moment: MomentKey): Promise<void>
   dropSubscription(id: string): Promise<void>
 }
 
@@ -89,6 +115,7 @@ export interface ReachOutReport {
   people: number
   sent: number
   quiet: number
+  /** Held back by the day's limits: three already, one too recently, or a reservation refused. */
   alreadyToday: number
   failed: number
   dropped: number
@@ -166,18 +193,56 @@ export function factsFor(row: MomentFactsRow | null, live: LiveFacts, localToday
     streakDays: streakFresh ? Math.max(0, row?.streak_days ?? 0) : 0,
     blockJustEnded: !!blockEnd && daysBetween(blockEnd, localToday) >= 0 && daysBetween(blockEnd, localToday) <= 3,
     beatTargetPending: live.beatTargetOffered,
+    mealsAccountedToday: live.mealsAccountedToday ?? 0,
+    logsMeals: !!live.mealLoggedRecently,
+    proteinEatenToday: live.proteinEatenToday ?? 0,
+    proteinTargetG: Math.max(0, Number(row?.protein_target_g ?? 0) || 0),
   }
 }
 
 /**
- * HOW OFTEN, and these are MY defaults rather than her ruling — how often the
- * app speaks is Ashley's, and these are the conservative reading until she
- * rules (docs/plans/the-coach-can-reach-you.md). At most ONE notification a
- * day, whatever is live; and never the SAME moment two days running, so an
- * unanswered "you missed yesterday" does not become a daily chant.
+ * WHERE A TAP GOES. The chat by default, where the coach picks the thought up;
+ * the training-day reminder opens the session, and the food nudges open
+ * Nutrition, where the logging is.
  */
-export function mayNotify(recent: SentRecord[], localToday: string, moment: MomentKey): 'ok' | 'already_today' | 'same_as_yesterday' {
-  if (recent.some(r => r.sent_on === localToday)) return 'already_today'
+export function tapTarget(moment: MomentKey): string {
+  if (moment === 'workout_today') return '/#/tab/exercise'
+  if (moment === 'meal_not_logged' || moment === 'protein_short') return '/#/tab/nutrition'
+  return '/#/tab/chat'
+}
+
+/**
+ * MAY THE PERSON HEAR ANYTHING AT ALL RIGHT NOW? Ashley's ruling, 4 Nov 2026,
+ * "Up to 3, spaced": at most three a day, at least three hours apart. Asked
+ * once per person per run, before any of their data is read.
+ */
+export function dayAllows(recent: SentRecord[], localToday: string, now: Date): 'ok' | 'day_full' | 'too_soon' {
+  const today = recent.filter(r => r.sent_on === localToday)
+  if (today.length >= MAX_NOTIFICATIONS_PER_DAY) return 'day_full'
+  const gapMs = MIN_HOURS_BETWEEN * 3_600_000
+  // ACROSS MIDNIGHT TOO: a 9pm nudge and an 8am one are eleven hours apart,
+  // but 11pm (another zone's clock) and 1am would not be, so the gap is read
+  // off every recent send, not only today's. A record with no time counts as
+  // just now: holding back is the safe reading of a gap nobody can measure.
+  const tooSoon = recent.some(r => {
+    const at = r.sent_at ? Date.parse(r.sent_at) : NaN
+    if (Number.isNaN(at)) return r.sent_on === localToday
+    return now.getTime() - at < gapMs
+  })
+  return tooSoon ? 'too_soon' : 'ok'
+}
+
+/**
+ * MAY THIS MOMENT BE THE ONE? Never the same moment twice in a day — the
+ * evening nudge sent at 6pm is still "live" at 7pm and must not go again. And
+ * never the same moment two days running, so an unanswered "you missed
+ * yesterday" does not become a daily chant (my default of 24 Sep, kept).
+ * EXCEPT the training-day reminder: it is a reminder of the day's schedule,
+ * and Monday's and Tuesday's are two different sessions.
+ */
+export function mayNotify(recent: SentRecord[], localToday: string, moment: MomentKey): 'ok' | 'said_today' | 'same_as_yesterday' {
+  if (recent.some(r => r.sent_on === localToday && r.moment === moment)) return 'said_today'
+  if (moment === 'workout_today') return 'ok'
   const yesterday = addDays(localToday, -1)
   if (recent.some(r => r.sent_on === yesterday && r.moment === moment)) return 'same_as_yesterday'
   return 'ok'
@@ -198,24 +263,35 @@ export async function runReachOut(deps: ReachOutDeps): Promise<ReachOutReport> {
       // zones is rare enough that the gap is named rather than engineered.
       const { date: today, hour } = localParts(deps.now, devices[0].timezone)
       const recent = await deps.loadRecentSends(userId)
-      if (recent.some(r => r.sent_on === today)) { report.alreadyToday++; continue }
+      // HELD BACK BY THE DAY'S LIMITS: three already, or one too recently.
+      if (dayAllows(recent, today, deps.now) !== 'ok') { report.alreadyToday++; continue }
 
       const [row, switches, live] = await Promise.all([
         deps.loadFactsRow(userId), deps.loadSwitches(userId), deps.loadLive(userId, today, devices[0].timezone),
       ])
-      const moment = momentToRaise(factsFor(row, live, today, hour), switches)
-      if (!moment || mayNotify(recent, today, moment.key) !== 'ok') { report.quiet++; continue }
+      // THE FIRST LIVE MOMENT ITS OWN LIMITS ALLOW, not merely the first live
+      // one: a nudge already said today must not stand in front of the next.
+      const moment = momentsToRaise(factsFor(row, live, today, hour), switches)
+        .find(m => mayNotify(recent, today, m.key) === 'ok')
+      if (!moment) { report.quiet++; continue }
+
+      // RESERVED BEFORE IT IS SENT. Two overlapping runs cannot both send the
+      // same thing, and before the three-a-day migration lands the database's
+      // old one-a-day rule refuses the second reservation, so the phone hears
+      // once a day rather than every hour.
+      if (!(await deps.recordSent(userId, today, moment.key))) { report.alreadyToday++; continue }
 
       let delivered = false
       for (const device of devices) {
-        const outcome = await deps.send(device, { title: 'Your coach', body: moment.text, moment: moment.key })
+        const outcome = await deps.send(device, { title: 'Your coach', body: moment.text, moment: moment.key, url: tapTarget(moment.key) })
         if (outcome === 'ok') delivered = true
         else if (outcome === 'gone') { await deps.dropSubscription(device.id); report.dropped++ }
         else report.failed++
       }
-      // RECORDED ONLY WHEN SOMETHING ARRIVED. A send that failed everywhere
-      // is tried again next hour rather than counted as said.
-      if (delivered) { await deps.recordSent(userId, today, moment.key); report.sent++ }
+      // COUNTED ONLY WHEN SOMETHING ARRIVED. A send that failed everywhere
+      // gives its reservation back, and the next hour tries again.
+      if (delivered) report.sent++
+      else await deps.unrecordSent(userId, today, moment.key)
     } catch (err) {
       console.error('[reach-out] skipped one person this hour:', err)
       report.failed++

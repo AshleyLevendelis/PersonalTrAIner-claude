@@ -34,10 +34,13 @@ import { notification } from './coach-voice'
  */
 export const MOMENT_KEYS = [
   'session_feel',
+  'workout_today',
   'session_not_logged',
   'missed_yesterday',
   'week_gone_quiet',
   'streak_at_risk',
+  'meal_not_logged',
+  'protein_short',
   'block_review',
   'beat_target',
 ] as const
@@ -66,6 +69,17 @@ export interface MomentFacts {
   blockJustEnded: boolean
   /** The accelerator offer is waiting and has not been answered. */
   beatTargetPending: boolean
+  /**
+   * FOOD (4 Nov 2026, Ashley: "remind them to hit their protein goal or log a
+   * meal"). Meals accounted for today — eaten, or said to be skipped — and
+   * whether she logs meals at all (anything in the fortnight before today).
+   * Optional, so a caller that knows nothing about food raises nothing about it.
+   */
+  mealsAccountedToday?: number
+  logsMeals?: boolean
+  /** Protein logged as eaten today, and today's target. A target of 0 is unknown. */
+  proteinEatenToday?: number
+  proteinTargetG?: number
 }
 
 /** Which moments this person has left switched on. Absent means on — see DEFAULT_MOMENT_SWITCHES. */
@@ -95,6 +109,39 @@ export const NOT_LOGGED_AFTER_HOUR = 18
 /** A week is "gone quiet" at this many days with nothing logged at all. */
 export const QUIET_WEEK_DAYS = 7
 
+/**
+ * HOW MANY, AND HOW CLOSE TOGETHER — Ashley's ruling, 4 Nov 2026, "Up to 3,
+ * spaced", from three options (over one a day and over no limit): at most
+ * three notifications a day, at least three hours apart. The screen states
+ * both numbers and the server enforces them, from this one place.
+ */
+export const MAX_NOTIFICATIONS_PER_DAY = 3
+export const MIN_HOURS_BETWEEN = 3
+
+/**
+ * THE MORNING REMINDER, 4 Nov 2026 (her "remind them of an upcoming
+ * workout"): from the start of the day until this hour, on a training day
+ * with nothing logged yet. Before lunch, because a reminder at 3pm is the
+ * evening nudge arriving early. My default, flagged to her.
+ */
+export const WORKOUT_REMINDER_BEFORE_HOUR = 12
+
+/**
+ * THE FOOD NUDGES wait for the evening: a day's eating is not short at
+ * lunchtime, it is unfinished. My default, flagged to her.
+ */
+export const FOOD_NUDGE_AFTER_HOUR = 19
+
+/**
+ * BEHIND ON PROTEIN means under 80% of the target AND at least 20g short, with
+ * two or more meals logged. Under two meals the gap is far more likely an
+ * unlogged meal than an uneaten one, and that has its own nudge. The 80% sits
+ * well under the app's own on-target floor (95%), so the nudge is about a real
+ * gap at the end of a day, not a rounding (CSCS, population-level nutrition).
+ */
+export const PROTEIN_SHORT_SHARE = 0.8
+export const PROTEIN_SHORT_MIN_G = 20
+
 export interface CoachMoment {
   key: MomentKey
   /** What the phone says. From the phrasebook, never written at a call site. */
@@ -116,13 +163,26 @@ function isLive(key: MomentKey, f: MomentFacts): boolean {
     case 'streak_at_risk': return f.streakDays >= 3 && f.plannedToday && !f.loggedToday && f.localHour >= NOT_LOGGED_AFTER_HOUR
     case 'block_review': return f.blockJustEnded
     case 'beat_target': return f.beatTargetPending
+    // NOT "today is a training day": a reminder after she has already logged
+    // is a reminder about nothing, and one after lunch is the evening nudge early.
+    case 'workout_today': return f.plannedToday && !f.loggedToday && f.localHour < WORKOUT_REMINDER_BEFORE_HOUR
+    // ONLY SOMEONE WHO LOGS MEALS. Somebody who has never logged one is not
+    // reminded every evening about a habit she does not have; that is a daily
+    // nag, and the switch would be the only way out of it.
+    case 'meal_not_logged': return !!f.logsMeals && (f.mealsAccountedToday ?? 0) < 2 && f.localHour >= FOOD_NUDGE_AFTER_HOUR
+    case 'protein_short': {
+      const target = f.proteinTargetG ?? 0
+      const eaten = f.proteinEatenToday ?? 0
+      return target > 0 && (f.mealsAccountedToday ?? 0) >= 2 && f.localHour >= FOOD_NUDGE_AFTER_HOUR
+        && eaten < target * PROTEIN_SHORT_SHARE && target - eaten >= PROTEIN_SHORT_MIN_G
+    }
   }
 }
 
 /**
- * The one thing to say, or nothing.
+ * The one thing to say now, or nothing.
  *
- * AT MOST ONE, EVER. Three buzzes in a row is how a person learns to swipe
+ * AT MOST ONE AT A TIME. Three buzzes in a row is how a person learns to swipe
  * notifications away without reading them, and the two that mattered go with
  * the one that did not. The order in MOMENT_KEYS decides which wins.
  */
@@ -130,15 +190,30 @@ export function momentToRaise(
   facts: MomentFacts,
   switches: MomentSwitches = {},
 ): CoachMoment | null {
-  if (facts.localHour < QUIET_BEFORE_HOUR || facts.localHour > QUIET_AFTER_HOUR) return null
+  return momentsToRaise(facts, switches)[0] ?? null
+}
+
+/**
+ * EVERY MOMENT THAT MAY SPEAK NOW, best first: live, switched on, inside
+ * waking hours. Since 4 Nov 2026 (her "Up to 3, spaced") a day can hold more
+ * than one notification, so the sender walks this list and takes the first
+ * that its own limits allow — the evening nudge already sent at 6pm must not
+ * stand in front of the food nudge at 7pm for the rest of the evening.
+ */
+export function momentsToRaise(
+  facts: MomentFacts,
+  switches: MomentSwitches = {},
+): CoachMoment[] {
+  if (facts.localHour < QUIET_BEFORE_HOUR || facts.localHour > QUIET_AFTER_HOUR) return []
+  const out: CoachMoment[] = []
   for (const key of MOMENT_KEYS) {
     // ABSENT MEANS ON. A profile written before these columns existed has no
     // answer stored, and the honest reading of that is the default rather
     // than silence — a person who has never been asked has not said no.
     if (switches[key] === false) continue
-    if (isLive(key, facts)) return { key, text: notification(key, facts.streakDays) }
+    if (isLive(key, facts)) out.push({ key, text: notification(key, facts.streakDays, facts.mealsAccountedToday ?? 0) })
   }
-  return null
+  return out
 }
 
 /**

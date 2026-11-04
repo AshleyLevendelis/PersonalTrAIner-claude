@@ -34,7 +34,8 @@ STEP 1. Get the code (you can do this)
 STEP 2. Database changes (Ashley types for production)
   Tell Ashley to run:  npm run db:push-both
   It pushes pending migrations to TEST, then asks for `yes-production` and pushes to PRODUCTION, then relinks TEST.
-  The two that matter now: 20260924120000_coach_reach_out.sql (reminders) and 20261022120000_add_distance_to_cardio_logs.sql.
+  The three that matter now: 20260924120000_coach_reach_out.sql (reminders), 20261022120000_add_distance_to_cardio_logs.sql,
+  and 20261104120000_reminders_three_a_day.sql (up to three reminders a day, and the protein target for the protein nudge).
   VERIFY (you can run it): npm run test:schema-parity   must pass, saying both projects have the same migrations.
   "Remote database is up to date" alone proves nothing: it prints the same whether a push happened or not.
 

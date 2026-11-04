@@ -6,7 +6,7 @@
 // real screen can:
 //   1. before the migration lands, the section says "not live yet" and
 //      offers NO switch (nothing is offered that is not built);
-//   2. after it, seven switches, all on, each saving to her profile and
+//   2. after it, ten switches (seven of 24 Sep, three of 4 Nov), all on, each saving to her profile and
 //      reading back after Profile is closed and reopened;
 //   3. the phone's own switch asks the browser for permission ONLY when she
 //      taps it — never on load — and a yes writes this phone's address for
@@ -116,15 +116,16 @@ check('1c. ...offering no switch that could not save', Array.isArray(sw0) && sw0
 await ev(`document.querySelector('${SECTION}')?.scrollIntoView({ block: 'center' })`)
 await shoot('reminders-not-live')
 
-// --- 2. After it: the seven switches -----------------------------------------------------
+// --- 2. After it: the ten switches -----------------------------------------------------
 console.log('  2. After it: which messages')
 await navigate('/?reminders=live', { permission: 'default', answer: 'granted' })
-const live = await until(sectionText, s => /once a day/.test(s))
-check('2a. it says how often and when, in plain words', /once a day at most/.test(live) && /before 8am/.test(live) && /after 9pm/.test(live), live)
-const sw1 = await until(switches, v => Array.isArray(v) && v.length >= 8)
+const live = await until(sectionText, s => /up to 3 a day/.test(s))
+// HER RULING OF 4 NOV 2026, "Up to 3, spaced": the screen says both numbers, and never the old "once a day".
+check('2a. it says how often and when, in plain words', /up to 3 a day, at least 3 hours apart/.test(live) && !/once a day/.test(live) && /before 8am/.test(live) && /after 9pm/.test(live), live)
+const sw1 = await until(switches, v => Array.isArray(v) && v.length >= 11)
 const moments = (sw1 ?? []).filter(s => s.id.startsWith('reminder-'))
-check('2b. seven message switches, each named for what arrives', moments.length === 7 && moments.every(s => s.label && s.label.length > 10), moments.map(s => s.label))
-check('2c. ...all on to begin with (her ruling)', moments.length === 7 && moments.every(s => s.on), moments)
+check('2b. ten message switches, each named for what arrives', moments.length === 10 && moments.every(s => s.label && s.label.length > 10), moments.map(s => s.label))
+check('2c. ...all on to begin with (her ruling)', moments.length === 10 && moments.every(s => s.on), moments)
 const pushAsked0 = await ev('window.__push?.asked')
 check('2d. loading the screen never raised the permission prompt', pushAsked0 === 0, { asked: pushAsked0, stubError: await ev('window.__pushStubError ?? null') })
 const rows = await ev(`[...document.querySelectorAll('${SECTION} [role="switch"]')].map(s => Math.round(s.closest('div').getBoundingClientRect().height))`)
@@ -148,7 +149,7 @@ await until(() => ev(`!!document.querySelector('[data-slot="dialog-content"]')`)
 await ev(`(() => { document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click(); setTimeout(() => document.querySelector('[data-profile-row="Reminders"]')?.click(), 200) })()`)
   await wait(300)
 const reread = await until(switches, v => Array.isArray(v) && v.length >= 8)
-check('2i. closing and reopening Profile reads it back off', reread?.find(s => s.id === 'reminder-missed_yesterday')?.on === false && reread.filter(s => s.id.startsWith('reminder-')).length === 7, reread)
+check('2i. closing and reopening Profile reads it back off', reread?.find(s => s.id === 'reminder-missed_yesterday')?.on === false && reread.filter(s => s.id.startsWith('reminder-')).length === 10, reread)
 
 // --- 3. This phone ---------------------------------------------------------------------------
 console.log('  3. This phone')
@@ -172,7 +173,7 @@ check('3g. ...and the server no longer has this phone', (await db(`(db.push_subs
 // --- 4. The honest dead ends --------------------------------------------------------------
 console.log('  4. When the phone cannot be reached')
 await navigate('/?reminders=live', { permission: 'denied', answer: 'denied' })
-await until(sectionText, s => /once a day/.test(s))
+await until(sectionText, s => /up to 3 a day/.test(s))
 const blockedPhone = await until(() => switches().then(v => v?.find(s => s.id === 'reminders-phone')), v => v?.disabled === true)
 const blockedText = await sectionText()
 check('4a. a refused permission: the switch is not offered as if it worked', blockedPhone?.disabled === true && blockedPhone?.on === false, blockedPhone)
@@ -183,7 +184,7 @@ check('4d. ...while the message switches still work (they follow her to other ph
 
 await send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1' })
 await navigate('/?reminders=live', { permission: 'default', answer: 'granted' })
-await until(sectionText, s => /once a day/.test(s))
+await until(sectionText, s => /up to 3 a day/.test(s))
 const iosPhone = await until(() => switches().then(v => v?.find(s => s.id === 'reminders-phone')), v => v?.disabled === true)
 const iosText = await sectionText()
 check('4e. an iPhone in the browser: no dead switch', iosPhone?.disabled === true, iosPhone)

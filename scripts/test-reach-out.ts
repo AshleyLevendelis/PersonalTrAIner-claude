@@ -16,7 +16,7 @@
  */
 
 import {
-  runReachOut, factsFor, isPlanned, mayNotify, localParts, weekdayOf, addDays,
+  runReachOut, factsFor, isPlanned, mayNotify, dayAllows, tapTarget, localParts, weekdayOf, addDays,
   type ReachOutDeps, type PushSubscriptionRow, type MomentFactsRow, type LiveFacts, type SentRecord,
 } from '../supabase/functions/_shared/reach-out'
 import * as server from '../supabase/functions/_shared/coach-moments'
@@ -75,12 +75,36 @@ async function main() {
   check('a block that ended two days ago has just ended', factsFor({ ...MWF, block_ends_on: '2026-09-21' }, NONE, TODAY, 12).blockJustEnded === true)
   check('...one that ended a week ago has not', factsFor({ ...MWF, block_ends_on: '2026-09-16' }, NONE, TODAY, 12).blockJustEnded === false)
   check('...and one still to come has not', factsFor({ ...MWF, block_ends_on: '2026-09-25' }, NONE, TODAY, 12).blockJustEnded === false)
+  // FOOD (4 Nov 2026), carried from the live read and the sent-ahead target.
+  const fed = factsFor({ ...MWF, protein_target_g: 160 }, { ...NONE, mealsAccountedToday: 2, proteinEatenToday: 90, mealLoggedRecently: true }, TODAY, 19)
+  check('the meal count, protein eaten, the target and "logs meals" all reach the decision',
+    fed.mealsAccountedToday === 2 && fed.proteinEatenToday === 90 && fed.proteinTargetG === 160 && fed.logsMeals === true, fed)
+  const unfed = factsFor(MWF, NONE, TODAY, 19)
+  check('...and a read with no food in it reads as nothing known, never as a target of something',
+    unfed.mealsAccountedToday === 0 && unfed.proteinTargetG === 0 && unfed.logsMeals === false, unfed)
 
-  console.log('\n4. How often — one a day, and never the same thing two days running')
-  check('nothing sent yet: ok', mayNotify([], TODAY, 'session_not_logged') === 'ok')
-  check('anything already sent today: no', mayNotify([{ moment: 'block_review', sent_on: TODAY }], TODAY, 'session_not_logged') === 'already_today')
+  console.log('\n4. How often — up to three a day, three hours apart (her ruling, 4 Nov 2026)')
+  const at = (h: number, m = 0) => new Date(Date.UTC(2026, 8, 23, h, m))
+  const sentAt = (moment: SentRecord['moment'], h: number, on = TODAY): SentRecord => ({ moment, sent_on: on, sent_at: at(h).toISOString() })
+  check('nothing sent yet: ok', dayAllows([], TODAY, at(12)) === 'ok' && mayNotify([], TODAY, 'session_not_logged') === 'ok')
+  check('one sent two hours ago: too soon', dayAllows([sentAt('workout_today', 10)], TODAY, at(12)) === 'too_soon')
+  check('...two hours fifty-nine: still too soon', dayAllows([sentAt('workout_today', 9)], TODAY, at(11, 59)) === 'too_soon')
+  check('...three hours: ok, a second one may go', dayAllows([sentAt('workout_today', 9)], TODAY, at(12)) === 'ok')
+  check('two sent, the last long enough ago: a third may go', dayAllows([sentAt('workout_today', 8), sentAt('session_feel', 12)], TODAY, at(17)) === 'ok')
+  check('three sent: the day is full, however long ago',
+    dayAllows([sentAt('workout_today', 7), sentAt('session_feel', 10), sentAt('block_review', 13)], TODAY, at(20)) === 'day_full')
+  check('the gap holds across midnight too', dayAllows([sentAt('meal_not_logged', 23, '2026-09-22')], TODAY, new Date(Date.UTC(2026, 8, 24, 1))) === 'too_soon')
+  check('a record with no time counts as just now (hold back, never guess)', dayAllows([{ moment: 'block_review', sent_on: TODAY }], TODAY, at(20)) === 'too_soon')
+  check('the same moment already today: not again', mayNotify([sentAt('session_not_logged', 8)], TODAY, 'session_not_logged') === 'said_today')
+  check('...a different one today: ok', mayNotify([sentAt('workout_today', 8)], TODAY, 'session_not_logged') === 'ok')
   check('the same moment yesterday: no', mayNotify([{ moment: 'missed_yesterday', sent_on: '2026-09-22' }], TODAY, 'missed_yesterday') === 'same_as_yesterday')
   check('a different moment yesterday: ok', mayNotify([{ moment: 'missed_yesterday', sent_on: '2026-09-22' }], TODAY, 'session_not_logged') === 'ok')
+  check('...but the training-day reminder comes every training day, yesterday\'s or not',
+    mayNotify([{ moment: 'workout_today', sent_on: '2026-09-22' }], TODAY, 'workout_today') === 'ok')
+  check('a tap opens the right tab: the session, Nutrition, or the chat',
+    tapTarget('workout_today') === '/#/tab/exercise' && tapTarget('meal_not_logged') === '/#/tab/nutrition'
+    && tapTarget('protein_short') === '/#/tab/nutrition' && tapTarget('session_feel') === '/#/tab/chat',
+    app.MOMENT_KEYS.map(k => tapTarget(k)))
 
   console.log('\n5. The whole run, against a fake world')
   type Person = { sub: PushSubscriptionRow[]; row: MomentFactsRow | null; live: LiveFacts; switches?: Record<string, boolean>; throws?: boolean }
@@ -93,6 +117,7 @@ async function main() {
     movedAway: { sub: [sub('s5', 'movedAway')], row: MWF, live: { ...NONE, marks: { [TODAY]: { movedAway: true } } } },
     broken: { sub: [sub('s6', 'broken')], row: MWF, live: NONE, throws: true },
     allFail: { sub: [sub('s7', 'allFail')], row: MWF, live: NONE },
+    raced: { sub: [sub('s8', 'raced')], row: MWF, live: NONE },
   }
   const sent: { sub: string; body: string; moment: string }[] = []
   const recorded: Record<string, SentRecord[]> = {}
@@ -109,7 +134,15 @@ async function main() {
       if (s.id === 's7') return 'failed'
       sent.push({ sub: s.id, body: payload.body, moment: payload.moment }); return 'ok'
     },
-    recordSent: async (u, date, moment) => { (recorded[u] ??= []).push({ moment, sent_on: date }) },
+    // 'raced' is another run that got there first: the reservation is refused.
+    recordSent: async (u, date, moment) => {
+      if (u === 'raced') return false
+      ;(recorded[u] ??= []).push({ moment, sent_on: date, sent_at: at.toISOString() }); return true
+    },
+    unrecordSent: async (u, date, moment) => {
+      recorded[u] = (recorded[u] ?? []).filter(r => !(r.sent_on === date && r.moment === moment))
+      if (recorded[u].length === 0) delete recorded[u]
+    },
     dropSubscription: async id => { dropped.push(id) },
   })
   // A RUN THAT THROWS IS A FAILED CHECK, NOT A CRASHED GATE: the whole point of
@@ -122,7 +155,7 @@ async function main() {
   const report = await safeRun(deps(new Date('2026-09-23T18:30:00Z')))
   const to = (id: string) => sent.filter(x => x.sub === id)
   check('the run itself never throws, whatever one person\'s data does', report.threw === null, report.threw)
-  check('it looked at every person with a device', report.people === 7, report)
+  check('it looked at every person with a device', report.people === 8, report)
   check('a training day at 19:00 with nothing logged gets the evening nudge, in the phrasebook\'s words',
     to('s1').length === 1 && to('s1')[0].moment === 'session_not_logged' && to('s1')[0].body === appNotification('session_not_logged'), to('s1'))
   check('...and it is recorded, so it is not said again today', recorded.due?.length === 1 && recorded.due[0].sent_on === TODAY, recorded.due)
@@ -134,11 +167,41 @@ async function main() {
   check('a session she moved away is not nagged about on the day it left', to('s5').length === 0, to('s5'))
   check('one person whose read fails does not stop the rest of the run', report.failed >= 1 && to('s1').length === 1, report)
   check('a send that failed everywhere is not recorded as said — next hour tries again', !recorded.allFail, recorded.allFail)
+  check('a reservation the database refused sends nothing (another run got there first)', to('s8').length === 0, to('s8'))
 
   const again = await safeRun(deps(new Date('2026-09-23T19:30:00Z')))
-  check('the next hour, nobody who already heard today hears again',
+  check('the next hour, nobody who heard an hour ago hears again (three hours apart)',
     to('s1').length === 1 && to('s3b').length === 1 && to('s4').length === 1 && again.alreadyToday >= 3, { again, s1: to('s1').length })
   check('...and the one whose send failed is tried again', again.failed >= 1 && !recorded.allFail)
+
+  console.log('\n5b. One person, one whole day: three at most, spaced, each the next thing worth saying')
+  {
+    // A training day for someone who logs meals and has logged none today.
+    const me: Person = { sub: [sub('d1', 'me')], row: { ...MWF, protein_target_g: 160 }, live: { ...NONE, mealLoggedRecently: true, mealsAccountedToday: 0 } }
+    const rec: SentRecord[] = []
+    const got: string[] = []
+    const dayDeps = (when: Date): ReachOutDeps => ({
+      now: when,
+      listSubscriptions: async () => me.sub,
+      loadFactsRow: async () => me.row,
+      loadSwitches: async () => ({}),
+      loadLive: async () => me.live,
+      loadRecentSends: async () => [...rec].reverse(),
+      send: async (_s, payload) => { got.push(`${when.toISOString().slice(11, 16)} ${payload.moment} ${payload.url}`); return 'ok' },
+      recordSent: async (_u, date, moment) => { rec.push({ moment, sent_on: date, sent_at: when.toISOString() }); return true },
+      unrecordSent: async () => {},
+      dropSubscription: async () => {},
+    })
+    // Every hour of a London day, 23 Sep (BST): 07:00Z is 8am there, 20:00Z is 9pm.
+    for (let h = 0; h < 24; h++) await safeRun(dayDeps(new Date(Date.UTC(2026, 8, 23, h, 5))))
+    check(`no more than ${server.MAX_NOTIFICATIONS_PER_DAY} in the day`, got.length === server.MAX_NOTIFICATIONS_PER_DAY, got)
+    check('the morning reminder first, at 8am, opening the session', got[0] === '07:05 workout_today /#/tab/exercise', got)
+    check('then the evening nudge at 6pm, opening the chat', got[1] === '17:05 session_not_logged /#/tab/chat', got)
+    check('then the meal nudge three hours later, opening Nutrition — not at 7pm, too close to 6pm',
+      got[2] === '20:05 meal_not_logged /#/tab/nutrition', got)
+    const gaps = rec.slice(1).map((r, i) => (Date.parse(r.sent_at!) - Date.parse(rec[i].sent_at!)) / 3_600_000)
+    check('...every gap at least three hours', gaps.every(g => g >= server.MIN_HOURS_BETWEEN), gaps)
+  }
 
   console.log('\n6. The server\'s copy of the decision is the app\'s, answer for answer')
   // EVERY combination of the eight booleans, at hours either side of every
@@ -166,10 +229,38 @@ async function main() {
     }
   }
   check(`the two copies agree on all ${compared} cases`, compared > 40_000 && disagreements.length === 0, disagreements.slice(0, 2))
+  // THE FOOD FACTS AND THE MORNING WINDOW, the same way: every combination
+  // that moves an answer, with the full best-first list compared, not only its head.
+  let foodCompared = 0
+  const foodDisagreements: unknown[] = []
+  for (const localHour of [7, 8, 11, 12, 18, 19, 21, 22]) {
+    for (const meals of [0, 1, 2, 3]) {
+      for (const logsMeals of [false, true]) {
+        for (const [target, eaten] of [[0, 0], [160, 100], [160, 127], [160, 129], [60, 45], [60, 35]]) {
+          for (const bits of [0, 2, 6, 3]) {
+            for (const sw of [{}, { workout_today: false }, { meal_not_logged: false }, { protein_short: false }]) {
+              const f: app.MomentFacts = {
+                localHour, awaitingFeel: !!(bits & 1), plannedToday: !!(bits & 2), loggedToday: !!(bits & 4),
+                missedYesterday: false, daysSinceAnyLog: 1, streakDays: 0, blockJustEnded: false, beatTargetPending: false,
+                mealsAccountedToday: meals, logsMeals, proteinTargetG: target, proteinEatenToday: eaten,
+              }
+              foodCompared++
+              const a = JSON.stringify(app.momentsToRaise(f, sw)), b = JSON.stringify(server.momentsToRaise(f, sw))
+              if (a !== b) foodDisagreements.push({ f, sw, app: a, server: b })
+            }
+          }
+        }
+      }
+    }
+  }
+  check(`...and on all ${foodCompared} food and morning cases, the whole list`, foodCompared > 6_000 && foodDisagreements.length === 0, foodDisagreements.slice(0, 2))
   check('...and on the thresholds they share', app.QUIET_BEFORE_HOUR === server.QUIET_BEFORE_HOUR && app.QUIET_AFTER_HOUR === server.QUIET_AFTER_HOUR
     && app.NOT_LOGGED_AFTER_HOUR === server.NOT_LOGGED_AFTER_HOUR && app.QUIET_WEEK_DAYS === server.QUIET_WEEK_DAYS
+    && app.WORKOUT_REMINDER_BEFORE_HOUR === server.WORKOUT_REMINDER_BEFORE_HOUR && app.FOOD_NUDGE_AFTER_HOUR === server.FOOD_NUDGE_AFTER_HOUR
+    && app.PROTEIN_SHORT_SHARE === server.PROTEIN_SHORT_SHARE && app.PROTEIN_SHORT_MIN_G === server.PROTEIN_SHORT_MIN_G
+    && app.MAX_NOTIFICATIONS_PER_DAY === server.MAX_NOTIFICATIONS_PER_DAY && app.MIN_HOURS_BETWEEN === server.MIN_HOURS_BETWEEN
     && JSON.stringify(app.MOMENT_KEYS) === JSON.stringify(server.MOMENT_KEYS))
-  check('...and every sentence is the phrasebook\'s', app.MOMENT_KEYS.every(k => server.notification(k, 4) === appNotification(k, 4)))
+  check('...and every sentence is the phrasebook\'s', app.MOMENT_KEYS.every(k => [0, 1].every(m => server.notification(k, 4, m) === appNotification(k, 4, m))))
 
   console.log('\n7. The phone\'s half: what the service worker does with a push')
   {
@@ -204,6 +295,11 @@ async function main() {
     check('a push shows the coach\'s words, under one shared tag so a new one replaces an unread one',
       shown.length === 1 && shown[0].opts.body === appNotification('missed_yesterday') && shown[0].opts.tag === 'coach', shown)
     check('...and carries where a tap should go: the chat', (shown[0]?.opts.data as { url?: string })?.url === '/#/tab/chat', shown[0]?.opts.data)
+    await fire('push', { data: { json: () => ({ title: 'Your coach', body: 'x', moment: 'meal_not_logged', url: '/#/tab/nutrition' }) } })
+    check('...or the tab the server names (a food nudge opens Nutrition)', (shown[1]?.opts.data as { url?: string })?.url === '/#/tab/nutrition', shown[1]?.opts.data)
+    await fire('push', { data: { json: () => ({ title: 'Your coach', body: 'x', moment: 'x', url: 'https://elsewhere.example/#/tab/chat' }) } })
+    check('...but never anywhere outside the app: a link out falls back to the chat', (shown[2]?.opts.data as { url?: string })?.url === '/#/tab/chat', shown[2]?.opts.data)
+    shown.splice(1)
     await fire('push', { data: { json: () => ({ title: 'x', body: '' }) } })
     await fire('push', { data: null })
     check('a push with no words shows nothing', shown.length === 1, shown.length)
@@ -239,6 +335,11 @@ async function main() {
     check('the streak is sent as counted, with the day it was counted on, never below zero', f.streakDays === 4 && f.streakAsOf === '2026-09-10' && f2.streakDays === 0, { f, f2 })
     const noBlocks = momentFactsFrom({ exercisePlan: plan, mesocycle: meso.map(w => ({ ...w, block_number: undefined })), planCreatedAt: created, now: new Date('2026-09-10T12:00:00'), streakDays: 0, today: '2026-09-10' })
     check('a plan with no blocks sends no block end, rather than inventing one', noBlocks.blockEndsOn === null && noBlocks.planEndsOn === '2026-10-28', noBlocks)
+    const withTarget = momentFactsFrom({ exercisePlan: plan, mesocycle: meso, planCreatedAt: created, now: new Date('2026-09-10T12:00:00'), streakDays: 0, today: '2026-09-10', proteinTarget: 159.6 })
+    check('the protein target goes ahead, in whole grams; none known sends none (never a 0 that reads as a target)',
+      withTarget.proteinTargetG === 160 && f.proteinTargetG === null
+      && momentFactsFrom({ exercisePlan: plan, mesocycle: meso, planCreatedAt: created, now: new Date('2026-09-10T12:00:00'), streakDays: 0, today: '2026-09-10', proteinTarget: 0 }).proteinTargetG === null,
+      { withTarget: withTarget.proteinTargetG, none: f.proteinTargetG })
 
     // A fake client that records upserts and can be told to fail.
     const store = new Map<string, string>()
@@ -270,6 +371,17 @@ async function main() {
     check('...but a refusal that merely NAMES the table is a real failure', r5 === 'failed', r5)
     const r6 = await sendFactsAhead('p1', { ...f, streakDays: 7 })
     check('...and a failed send is retried next time, not remembered as sent', r6 === 'sent', r6)
+    // BEFORE THE 4 NOV MIGRATION: the protein column is missing. The rest of
+    // the facts must still go, without it — a missing column costs the
+    // protein nudge, never the streak.
+    nextError = { code: 'PGRST204', message: "Could not find the 'protein_target_g' column of 'coach_moment_facts' in the schema cache" }
+    const n = upserts.length
+    const r7 = await sendFactsAhead('p1', { ...f, streakDays: 8, proteinTargetG: 150 })
+    const retried = upserts[n] as { row?: Record<string, unknown> } | undefined
+    check('a missing protein column: the facts still go, once, without it',
+      r7 === 'sent' && upserts.length === n + 1 && retried?.row?.streak_days === 8 && !('protein_target_g' in (retried?.row ?? {})), { r7, retried })
+    const r8 = await sendFactsAhead('p1', { ...f, streakDays: 9, proteinTargetG: 150 })
+    check('...and once it lands, the target is sent', r8 === 'sent' && (upserts[upserts.length - 1] as { row?: Record<string, unknown> }).row?.protein_target_g === 150, upserts[upserts.length - 1])
 
     profileRow = { id: 'p1' }
     const before = await loadSwitches('p1')

@@ -104,7 +104,7 @@ self.addEventListener('fetch', event => {
 // THE COACH, WHEN THE APP IS SHUT — docs/plans/the-coach-can-reach-you.md.
 //
 // The coach-reach-out function sends one encrypted JSON message:
-//   { title, body, moment }
+//   { title, body, moment, url }
 // The words are the phrasebook's (coach-voice.ts notification()), chosen on
 // the server by the same decision the app makes; nothing here writes any.
 //
@@ -129,7 +129,10 @@ self.addEventListener('push', event => {
     renotify: false,
     icon: '/icon-192.png',
     badge: '/icon-192.png',
-    data: { url: '/#/tab/chat', moment: data.moment || null },
+    // WHERE A TAP GOES is the server's to say (a training-day reminder opens the
+    // session, a food nudge opens Nutrition), but only ever a tab of THIS app:
+    // anything else falls back to the chat rather than becoming a link out.
+    data: { url: typeof data.url === 'string' && /^\/#\/tab\/[a-z]+$/.test(data.url) ? data.url : '/#/tab/chat', moment: data.moment || null },
   }))
 })
 

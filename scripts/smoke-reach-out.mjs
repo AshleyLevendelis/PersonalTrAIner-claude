@@ -81,6 +81,10 @@ const daysBefore = (date, n) => { const d = new Date(`${date}T12:00:00Z`); d.set
 const writes = []
 const reads = []
 const pushes = []
+// ONE CLOCK FOR WRITES AND PUSHES, so the order they happened in can be read.
+let seq = 0
+// When true, the database refuses a reservation the way a unique rule does (409).
+let refuseReservations = false
 let dbPort = 0
 const db = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x')
@@ -88,12 +92,18 @@ const db = createServer(async (req, res) => {
   let body = ''
   for await (const c of req) body += c
   if (req.method === 'GET') reads.push({ table, query: decodeURIComponent(url.search) })
-  if (req.method !== 'GET') { writes.push({ method: req.method, table, query: url.search, body: body ? JSON.parse(body) : null }); res.writeHead(201); res.end(); return }
+  if (req.method !== 'GET') {
+    if (refuseReservations && req.method === 'POST' && table === 'coach_notifications_sent') { res.writeHead(409); res.end(JSON.stringify({ code: '23505' })); return }
+    writes.push({ seq: ++seq, method: req.method, table, query: url.search, body: body ? JSON.parse(body) : null }); res.writeHead(201); res.end(); return
+  }
   const rows = {
     push_subscriptions: [{ id: 'sub-1', user_id: USER, endpoint: `http://127.0.0.1:${dbPort}/push/1`, p256dh: uaPublic.toString('base64url'), auth: authSecret.toString('base64url'), timezone: ZONE }],
     coach_moment_facts: [{ user_id: USER, training_weekdays: [parts.weekday], plan_ends_on: '2099-01-01' }],
     fitness_profiles: [{ id: USER, notification_switches: {} }],
     exercise_set_logs: [], cardio_logs: [], workout_sessions: [], pending_actions: [], coach_notifications_sent: [],
+    // A meal logged YESTERDAY and none today: she logs meals, so the evening
+    // meal nudge is live too — and must lose to the session nudge, which ranks first.
+    meal_events: [{ date: daysBefore(localToday, 1), event_type: 'confirmed', macros: { protein: 40 } }],
   }[table]
   if (!rows) { res.writeHead(404); res.end(JSON.stringify({ message: `no table ${table}` })); return }
   res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(rows))
@@ -108,7 +118,7 @@ db.emit = (ev, req, res) => {
     const chunks = []
     req.on('data', c => chunks.push(c))
     req.on('end', () => {
-      pushes.push({ headers: req.headers, body: Buffer.concat(chunks) })
+      pushes.push({ seq: ++seq, headers: req.headers, body: Buffer.concat(chunks) })
       res.writeHead(201); res.end()
     })
     return true
@@ -166,7 +176,7 @@ try {
   // are the only thing keeping one person's logs out of another's nudge. Every
   // per-person read must name this person — checked on the reads it actually
   // made, not on the source.
-  const PER_PERSON = ['coach_moment_facts', 'fitness_profiles', 'exercise_set_logs', 'cardio_logs', 'workout_sessions', 'pending_actions', 'coach_notifications_sent']
+  const PER_PERSON = ['coach_moment_facts', 'fitness_profiles', 'exercise_set_logs', 'cardio_logs', 'workout_sessions', 'pending_actions', 'coach_notifications_sent', 'meal_events']
   const unscoped = PER_PERSON.filter(tbl => {
     const mine = reads.filter(r => r.table === tbl)
     return mine.length === 0 || mine.some(r => !new RegExp(`(user_id|profile_id|id)=eq\\.${USER}(&|$)`).test(r.query.slice(1)))
@@ -185,6 +195,22 @@ try {
     writes.filter(w => w.table === 'coach_notifications_sent').length === recordedBefore, writes)
   const noSecretTest = await fetch(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ test: USER }) })
   check('11. ...and needs the secret like everything else', noSecretTest.status === 403 && pushes.length === 2, noSecretTest.status)
+  // 4 NOV 2026: up to three a day. What the function sends is RESERVED first,
+  // and opens the tab the server names.
+  const reservation = writes.find(w => w.method === 'POST' && w.table === 'coach_notifications_sent')
+  check('13. the notification is reserved BEFORE it is sent (two runs racing cannot both send it)',
+    !!reservation && !!pushes[0] && reservation.seq < pushes[0].seq, { reservation: reservation?.seq, push: pushes[0]?.seq })
+  check('14. ...and carries where a tap goes: the chat, for the evening nudge', payload?.url === '/#/tab/chat', payload)
+  const mealRead = reads.find(r => r.table === 'meal_events')?.query ?? ''
+  check(`15. the meal log was read from a fortnight before THEIR today, voided rows left out`,
+    mealRead.includes(`date=gte.${daysBefore(localToday, 14)}`) && mealRead.includes('voided_at=is.null'), mealRead)
+  refuseReservations = true
+  const pushesBefore = pushes.length
+  const refusedRun = await fetch(base, { method: 'POST', headers: { 'x-reach-out-secret': 'shh' } })
+  const refusedReport = await refusedRun.json().catch(() => ({}))
+  check('16. a reservation the database refuses (409) sends nothing, and is not an error',
+    refusedRun.status === 200 && pushes.length === pushesBefore && refusedReport.alreadyToday === 1 && refusedReport.failed === 0, { refusedReport, pushes: pushes.length })
+  refuseReservations = false
   const setRead = reads.find(r => r.table === 'exercise_set_logs')?.query ?? ''
   check(`12. ...and the logs were read from five weeks before THEIR today (${localToday}), not the server's`,
     setRead.includes(`completed_at=gte.${daysBefore(localToday, 35)}`), setRead)

@@ -26,10 +26,13 @@ import { MOMENT_KEYS, type MomentKey, type MomentSwitches } from './coach-moment
  */
 export const MOMENT_LABELS: Record<MomentKey, string> = {
   session_feel: 'Ask how a session felt',
+  workout_today: 'Remind me on the morning of a training day',
   session_not_logged: "Remind me if I haven't logged a session",
   missed_yesterday: 'Check in when I miss a day',
   week_gone_quiet: 'Check in if a week goes quiet',
   streak_at_risk: 'Tell me when a streak is at risk',
+  meal_not_logged: 'Remind me to log my meals',
+  protein_short: "Tell me if I'm behind on protein",
   block_review: 'Tell me when a block is done',
   beat_target: "Tell me when I'm beating my weights",
 }

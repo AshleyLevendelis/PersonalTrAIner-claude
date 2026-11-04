@@ -262,6 +262,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           void sendFactsAhead(profile.id, momentFactsFrom({
             exercisePlan, mesocycle: mesocycle ?? [], planCreatedAt,
             now: getAppNow(profile.id), streakDays: fresh.streak, today: activeSession.date,
+            proteinTarget: fresh.hasNutritionTargets ? fresh.proteinTarget : null,
           }))
         }
       })

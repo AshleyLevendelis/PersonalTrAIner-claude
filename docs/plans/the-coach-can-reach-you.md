@@ -176,3 +176,57 @@ When the app first asks permission to send notifications. Built: a switch in
 Profile that she turns on herself — the app never asks unprompted. Whether the
 coach should also offer it (for instance after the first logged session) is
 how the app speaks, so it is asked, not decided.
+
+## Three a day, and the three reminders she asked for — 4 Nov 2026
+
+Ashley: *"The app desperately needs push notifications because so much of the
+apps appeal relies on the coach proactively reaching out to the user to remind
+them of an upcoming workouts or check in on them after a workout. Or to remind
+them to hit their protein goal or log a meal."*
+
+Measured against what was built: the after-workout check-in existed
+(`session_feel`); a workout reminder existed only as the 6pm "still waiting"
+nudge; protein and meal logging had nothing. And the one-a-day cap (my default
+of 24 Sep) would have starved any second reminder.
+
+**Her ruling, from three options: "Up to 3, spaced"** — at most three a day, at
+least three hours apart — over "keep it to one" and over "no limit".
+
+### Built
+- `workout_today`: a training day with nothing logged yet, 8am to 11:59.
+  Opens the Exercise tab. Every training day (the "not two days running" rule
+  does not apply to a schedule reminder).
+- `meal_not_logged`: from 7pm, fewer than two meals accounted for (eaten or
+  said skipped), and only for someone who logged a meal in the fortnight before
+  today. Two wordings: nothing logged / just one. Opens Nutrition.
+- `protein_short`: from 7pm, two or more meals logged, under 80% of the target
+  AND at least 20g short. No grams on the lock screen (the phrasebook's
+  standing rule) and no named food (the line cannot see her diet). Opens
+  Nutrition.
+- The cap: three a day, three hours apart, read off `sent_at` across midnight
+  too; never the same moment twice in a day; the sender walks every live
+  moment best-first and takes the first its limits allow.
+- The notification is RESERVED before it is sent and given back if no phone
+  took it. Before the new migration lands, the old one-a-day rule refuses the
+  second reservation, so the phone hears once a day, never once an hour.
+- Home sends today's protein target ahead (`protein_target_g`), retrying
+  without it on a missing column so the streak still goes.
+- A tap opens the tab the server names, only ever a tab of this app.
+- Migration `20261104120000_reminders_three_a_day.sql`: one-per-moment-a-day
+  instead of one-a-day; the protein column.
+
+### Defaults that are mine, flagged
+- The morning window (8am to noon), the evening for food (7pm), the protein
+  threshold (80% and 20g; CSCS, population-level), "a logger" (a meal in the
+  last 14 days), and the switch labels and sentences (hers to reword).
+
+### Not done, named
+- The training-day reminder does not name the session ("Legs today"): the
+  server knows the weekday pattern, not the day's name.
+- The after-workout check-in keeps "never the same moment two days running", so
+  on back-to-back training days the second day's check-in waits a day. Unchanged
+  from 24 Sep.
+- On iPhone a reminder arrives only once the app is on the home screen (iOS
+  16.4+). Nothing here changes that.
+- Still not live: the two migrations, the function deploy and the keys are
+  hers (the handover prompt).

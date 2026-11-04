@@ -1328,7 +1328,14 @@ menu" stays true when a copy is also left outside it.
   clock, the permission asked only from her own tap — `reach-out`,
   `verify:reminders`, `verify:reach-out-function`. Live only once the
   migration, the function deploy and the keys are done on her machine; until
-  then Profile says "Not live yet" and offers no switch
+  then Profile says "Not live yet" and offers no switch.
+  **Up to 3 a day, at least 3 hours apart — her ruling 4 Nov 2026, "Up to 3,
+  spaced"** (over one a day and over no limit), REPLACING the one-a-day cap
+  above, with three more of the ten switches: a training-day morning reminder,
+  a "log your meals" nudge (only for someone who logs) and a "behind on
+  protein" nudge, both from 7pm. `test:coach-moments` §4b, `test:reach-out` §4,
+  §5b, `verify:reach-out-function` 13-16, `verify:reminders` 2a-2c. Needs the
+  new migration and the `coach-reach-out` deploy
 - History is permanent — `diary-preservation`, `replace-without-losing`
 - Every write succeeds or says it did not — `silent-writes`,
   `queue-listeners`, `stale-after-write`

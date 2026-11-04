@@ -25,7 +25,7 @@ import {
   MOMENT_LABELS, SWITCH_ORDER, loadSwitches, saveSwitches,
   currentPushState, turnOnPush, turnOffPush, type PushState,
 } from '@/lib/coach-reach-out'
-import { DEFAULT_MOMENT_SWITCHES, QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, type MomentKey, type MomentSwitches } from '@/lib/coach-moments'
+import { DEFAULT_MOMENT_SWITCHES, QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, MAX_NOTIFICATIONS_PER_DAY, MIN_HOURS_BETWEEN, type MomentKey, type MomentSwitches } from '@/lib/coach-moments'
 
 function Switch({ id, checked, disabled, label, onChange }: {
   id: string; checked: boolean; disabled?: boolean; label: string; onChange: (next: boolean) => void
@@ -134,7 +134,7 @@ export function RemindersSection({ profileId }: { profileId: string }) {
       ) : (
         <div className="space-y-3 text-sm">
           <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
-            The coach can message your phone when the app is shut — once a day at most, and never before {hourLabel(QUIET_BEFORE_HOUR)} or after {hourLabel(QUIET_AFTER_HOUR)}.
+            The coach can message your phone when the app is shut — up to {MAX_NOTIFICATIONS_PER_DAY} a day, at least {MIN_HOURS_BETWEEN} hours apart, and never before {hourLabel(QUIET_BEFORE_HOUR)} or after {hourLabel(QUIET_AFTER_HOUR)}.
           </p>
 
           <div className="space-y-1">
