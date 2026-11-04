@@ -83,7 +83,10 @@ async function main() {
 
   console.log('\n§2 A knee ease-off on a non-leg day keeps the day\'s purpose')
   {
-    setRandomSource(seededRngFromKey('sam:shoulders-day'))
+    // SEED 'sam:shoulders-day:2' since 4 Nov 2026: the catalogue grew (her exercise lists) and the old seed's plan no
+    // longer put a knee-loading leg move on a shoulders day, so the case went missing (0 slots; the two checks that
+    // need it failed). Seeds 2, 5, 7 and 8 all hold it (4 slots each); 1, 3, 4 and 6 do not. The fixture is the case.
+    setRandomSource(seededRngFromKey('sam:shoulders-day:2'))
     const plan: MesocycleWeek[] = silently(() => generateMesocycle(sam))
     resetRandomSource()
     const CREATED = new Date(2026, 9, 5, 0, 0, 0).toISOString()
