@@ -533,6 +533,8 @@
     "test:exercise-library": "tsx scripts/test-exercise-library.ts",
     "test:variant-pricing": "tsx scripts/test-variant-pricing.ts",
     "test:near-copies": "tsx scripts/test-near-copies.ts",
+    "test:machine-versions": "tsx scripts/test-machine-versions.ts",
+    "verify:machine-swap": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/machine-swap.mjs",
     "verify:near-copies": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/near-copies.mjs"
   },
   "dependencies": {

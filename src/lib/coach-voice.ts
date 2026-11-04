@@ -1403,6 +1403,14 @@ export function allergenFilterReceipt(labels: readonly string[]): string {
  * route that refuses one (the coach's swap card, its executor, an addition): what it is, that it is logged rather than
  * planned, and the lift that IS planned, so the next step is obvious.
  */
+/**
+ * A MACHINE VERSION ON A PICKER ROW (4 Nov 2026, her ruling "Machines swappable only"): which machine it is a version
+ * of, and that its weight is worked out the same way, so a starting number on an unfamiliar machine is not a surprise.
+ */
+export function machineVersionLine(entry: { parent?: string; log_only?: boolean }): string | null {
+  return entry.parent && !entry.log_only ? `A version of ${entry.parent}, priced like it.` : null
+}
+
 export function logOnlyRefusal(entry: { name: string; parent?: string }): string {
   return entry.parent
     ? `${entry.name} is one to log, not to plan: it's a version of ${entry.parent}, which is the one that goes in a plan.`

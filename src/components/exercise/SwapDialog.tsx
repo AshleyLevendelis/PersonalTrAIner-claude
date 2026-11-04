@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { Input } from '@/components/ui/input'
 import { EditReasonStep, type ReasonAnswer } from './EditReasonStep'
 import { isNothingToChangeMessage } from '@/lib/edit-reason'
-import { tierWords, blockSwapLine } from '@/lib/coach-voice'
+import { tierWords, blockSwapLine, machineVersionLine } from '@/lib/coach-voice'
 import { ArrowRightLeft, ShieldAlert, Zap } from 'lucide-react'
 import { getExerciseEntry, searchExerciseCatalogByWords, type ExerciseEntry } from '@/lib/exercise-db'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
@@ -377,6 +377,9 @@ export function SwapDialog({
                                 you are least likely to know the movement. */}
                             {exercise.coach_note_swap && (
                               <p className="text-xs leading-[1.45] text-muted-foreground">{exercise.coach_note_swap}</p>
+                            )}
+                            {machineVersionLine(exercise) && (
+                              <p data-testid="swap-version-of" className="text-xs leading-[1.45] text-muted-foreground">{machineVersionLine(exercise)}</p>
                             )}
                             {warnings.map((w, i) => (
                               <p key={i} className="text-xs text-[color:var(--role-warn-text)] mt-1 flex items-start gap-1">

@@ -10,7 +10,7 @@ import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
 import { getAdditionCandidates } from '@/lib/exercise-add-candidates'
 import type { SwapScope } from '@/lib/mesocycle-edit'
 import type { UserProfile, WorkoutDay } from '@/lib/types'
-import { tierWords } from '@/lib/coach-voice'
+import { tierWords, machineVersionLine } from '@/lib/coach-voice'
 
 // ---------------------------------------------------------------------------
 // PUTTING ONE EXERCISE INTO A SESSION — the last operation in the exercise
@@ -214,7 +214,7 @@ export function AddExerciseSheet({
                         shows, from the same helper. */}
                     {searchResults.map(exercise => row(
                       exercise,
-                      exercise.coach_note_swap ?? null,
+                      exercise.coach_note_swap ?? machineVersionLine(exercise),
                       profile ? getExerciseCompatibilityWarnings(exercise, profile, exclusions) : [],
                     ))}
                   </div>

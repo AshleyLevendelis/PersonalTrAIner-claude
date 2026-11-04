@@ -390,7 +390,10 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 3 Nov 2026: 1233 -> 1250 raw, on her 15 Sep ruling ("raise it with room to grow"). Measured that day: 1,235,
   // the machine pack's fifteen catalogue entries and its coherence fixes, which every screen that shows a plan reads.
   // MOVED 3 Nov 2026: 1250 -> 1274, the lighter variants — see the deploy figure above for both ends (1,249 measured).
-  const APP_CHUNK_BUDGET_KB = 1274
+  // MOVED 4 Nov 2026: 1274 -> 1304, her machine versions (480 names a swap can choose) IN the app chunk on purpose: a
+  // plan holding one must resolve on the first screen, so they cannot wait for the lazy chunk the log-only names use.
+  // Measured through this gate: 1252 at 56adf296, 1279 with them; first paint 522 of 525 gz. Her 15 Sep ruling, 25 raw.
+  const APP_CHUNK_BUDGET_KB = 1304
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,

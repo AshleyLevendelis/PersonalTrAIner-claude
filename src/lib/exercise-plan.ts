@@ -4,7 +4,7 @@ import type {
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup } from './exercise-db'
+import { EXERCISE_DATABASE, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup, getExerciseEntry } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -3682,7 +3682,7 @@ export function selectDayExercises(
 // eligible accessory slot it can find.
 
 function findEntry(name: string): ExerciseEntry | undefined {
-  return EXERCISE_DATABASE.find(e => e.name.toLowerCase() === name.toLowerCase())
+  return getExerciseEntry(name)
 }
 
 // ---------------------------------------------------------------------------
@@ -6179,7 +6179,7 @@ function applyTempoPrescription(
   const notation = formatTempo(tempo)
   for (const day of days) {
     for (const ex of day.exercises) {
-      const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+      const entry = getExerciseEntry(ex.name)
       if (isTempoEligible(entry, ex, experience)) ex.tempo = notation
     }
   }
@@ -6447,7 +6447,7 @@ type RotationTier = 'main' | 'accessory' | 'core'
 function classifyRotationTiers(exercises: Exercise[]): RotationTier[] {
   let mainCount = 0
   return exercises.map(ex => {
-    const dbEntry = EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase())
+    const dbEntry = getExerciseEntry(ex.name)
     if (!dbEntry || dbEntry.mechanics_tier === 'primer') return 'core'
     if (dbEntry.movement_pattern === 'core' || dbEntry.movement_pattern === 'carry') return 'core'
 
@@ -6578,7 +6578,7 @@ function computeDurationTopUp(
     const fixedCostSeconds = (day.warmup?.total_seconds ?? 0) + SESSION_OVERHEAD_SECONDS +
       (day.recommendedCardio?.timing === 'post_session' ? day.recommendedCardio.duration * 60 : 0)
     const targetSeconds = (totalBudgetSeconds - fixedCostSeconds) * 0.95
-    const entries = day.exercises.map(ex => EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase()))
+    const entries = day.exercises.map(ex => getExerciseEntry(ex.name))
     const topUpAnchor = dayAnchorExercise(day.exercises)
     const restSeconds = day.exercises.map((ex, i) => {
       const match = ex.rest.match(/(\d+)/)
@@ -7347,7 +7347,7 @@ export function repRangeForIncomingExercise(
 
 /** Carries progress by DISTANCE, not weight — see the load-floor comment. */
 function isCarryByName(name: string): boolean {
-  const entry = EXERCISE_DATABASE.find(e => e.name === name)
+  const entry = getExerciseEntry(name)
   return entry?.prescription_type === 'distance_load'
 }
 
@@ -7879,9 +7879,7 @@ export function generateMesocycle(
           const weeklyEntry = findEntry(weeklyName)
           if (weeklyEntry) weekFamilyByIndex[exIdx] = getMovementFamily(weeklyEntry)
 
-          const dbEntry = EXERCISE_DATABASE.find(
-            e => e.name.toLowerCase() === weeklyName.toLowerCase()
-          )
+          const dbEntry = getExerciseEntry(weeklyName)
           const isPrimer = dbEntry?.mechanics_tier === 'primer'
           const category = dbEntry ? categorize(dbEntry) : null
           // Same re-derivation as the block-level rotation above — a weekly

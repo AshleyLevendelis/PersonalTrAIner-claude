@@ -2,7 +2,7 @@ import { GOAL_TERMS } from './coach-voice'
 import type { MesocycleWeek, UserProfile, WorkoutDay, FitnessGoal } from './types'
 import type { Tradeoff, TradeoffAlternative, EditScope } from './tradeoff-shape'
 import { reasonChipsFor } from './edit-reason'
-import { EXERCISE_DATABASE, muscleGroupsOf, type ExerciseEntry, type MuscleGroup } from './exercise-db'
+import { muscleGroupsOf, type ExerciseEntry, type MuscleGroup, getExerciseEntry } from './exercise-db'
 import { scorePlan, ONE_RULE, DIMENSION_KEYS, type DimensionKey } from './quality-score'
 
 // ---------------------------------------------------------------------------
@@ -68,8 +68,7 @@ const GROUP_LABEL: Record<MuscleGroup, string> = {
   glutes: 'glutes', calves: 'calves', core: 'core',
 }
 
-const entryFor = (name: string): ExerciseEntry | undefined =>
-  EXERCISE_DATABASE.find(e => e.name.toLowerCase() === name.toLowerCase())
+const entryFor = (name: string): ExerciseEntry | undefined => getExerciseEntry(name)
 
 /**
  * Working sets per muscle group across ONE week.

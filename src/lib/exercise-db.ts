@@ -1,5 +1,6 @@
 import { TrainingStyle, type TrainingExperience } from './types'
 import { isRegressionFor } from './periodization'
+import { MACHINE_VERSIONS } from './exercise-machine-versions'
 
 export type MovementPattern =
   | 'horizontal_push'
@@ -212,7 +213,11 @@ export interface ExerciseEntry {
    * copied from the parent, and kept OUT of EXERCISE_DATABASE so no pool, rotation or shortlist can ever see one.
    */
   log_only?: boolean
-  /** A near-copy's catalogue parent, by name. Set only with `log_only`. */
+  /**
+   * The catalogue lift this one is a version of, by name: a near-copy (with `log_only`) or, since 4 Nov 2026 (her
+   * ruling "Machines swappable only"), a MACHINE VERSION (without it), which a swap or an addition may choose and the
+   * generator never does (exercise-machine-versions.ts).
+   */
   parent?: string
   substitution_group: string
   unilateral: boolean
@@ -6197,10 +6202,54 @@ export function logOnlyExercises(): ExerciseEntry[] {
   return [...logOnlyByLowerName().values()]
 }
 
+/**
+ * THE MACHINE VERSIONS (4 Nov 2026, her ruling "Machines swappable only"; exercise-machine-versions.ts). Built like a
+ * near-copy, with three differences, each because a swap can now put one in a plan:
+ *   - its kit is the parent's MACHINE kit (a free-weight item on a mixed parent is dropped), so the kit marks and the
+ *     price read the machine she is standing at;
+ *   - a name saying one arm, one leg or iso-lateral is one-sided, so `isPerSideLoad` prices it per side rather than
+ *     handing one arm the number made for two (the rows table only admits those under kit priced that way);
+ *   - it keeps the parent's style, so the swap sheet's style mark judges the movement, not the missing tag.
+ * No cues of its own: the parent's describe a different grip or setup. Loaded with the app (a plan holding one must
+ * resolve on the first screen), and built on first use so nothing running while this module loads meets one half-made.
+ */
+const ONE_SIDED_NAME = /single[- ](arm|leg)|one[- ](arm|leg)|unilateral|\b1[- ](arm|leg)|iso[- ]lateral/i
+const FREE_WEIGHT_KIT = new Set(['dumbbell', 'dumbbells', 'barbell', 'kettlebell', 'resistance band', 'bodyweight'])
+let machineVersionCache: Map<string, ExerciseEntry> | null = null
+function machineVersionsByLowerName(): Map<string, ExerciseEntry> {
+  if (machineVersionCache) return machineVersionCache
+  const byName = new Map(EXERCISE_DATABASE.map(e => [e.name.toLowerCase(), e]))
+  const built = new Map<string, ExerciseEntry>()
+  for (const [name, parentName] of MACHINE_VERSIONS) {
+    const parent = byName.get(parentName.toLowerCase())
+    if (!parent || parent.log_only || parent.retired || byName.has(name.toLowerCase())) continue
+    const machineKit = parent.equipment.filter(q => !FREE_WEIGHT_KIT.has(q))
+    built.set(name.toLowerCase(), {
+      ...parent,
+      name,
+      id: slugifyExerciseName(name),
+      parent: parent.name,
+      equipment: machineKit.length > 0 ? machineKit : parent.equipment,
+      unilateral: parent.unilateral || ONE_SIDED_NAME.test(name),
+      form_cues: [],
+      coach_note_swap: undefined,
+      retired: false,
+    })
+  }
+  machineVersionCache = built
+  return built
+}
+
+/** Every machine version: what a swap or an addition may choose beyond the catalogue. Never read by the generator. */
+export function machineVersions(): ExerciseEntry[] {
+  return [...machineVersionsByLowerName().values()]
+}
+
 export function getExerciseEntry(name: string): ExerciseEntry | undefined {
-  return EXERCISE_DATABASE.find(
-    e => e.name.toLowerCase() === name.toLowerCase()
-  ) ?? logOnlyByLowerName().get(name.toLowerCase())
+  const lower = name.toLowerCase()
+  return EXERCISE_DATABASE.find(e => e.name.toLowerCase() === lower)
+    ?? machineVersionsByLowerName().get(lower)
+    ?? logOnlyByLowerName().get(lower)
 }
 
 /**
@@ -6270,10 +6319,9 @@ function catalogWords(text: string): string[] {
 export function searchExerciseCatalogByWords(query: string, limit = 20): ExerciseEntry[] {
   const strict = searchExerciseCatalog(query, limit)
   const words = catalogWords(query)
-  if (words.length < 2) return strict
   const already = new Set(strict.map(e => e.name))
   const allWords: ExerciseEntry[] = []
-  for (const ex of EXERCISE_DATABASE) {
+  for (const ex of words.length < 2 ? [] : EXERCISE_DATABASE) {
     if (ex.retired || already.has(ex.name)) continue
     const nameWords = catalogWords(ex.name)
     // Every word she typed has to appear, so "leg curl" cannot drag in a leg
@@ -6282,11 +6330,22 @@ export function searchExerciseCatalogByWords(query: string, limit = 20): Exercis
     if (words.every(w => nameWords.some(nw => nw.startsWith(w)))) allWords.push(ex)
   }
   allWords.sort((a, b) => a.name.localeCompare(b.name))
-  return [...strict, ...allWords].slice(0, limit)
+  // THE MACHINE VERSIONS, after every catalogue match (4 Nov 2026, her "Machines swappable only"): matched the same two
+  // ways, so the machine she is standing at is found by its own name in the swap and add pickers. Only here: the strict
+  // search above stays catalogue-only, because its other callers RESOLVE a phrase (a ban, a logged set) and more
+  // matches there would ban more than she named or turn a resolved set into "which did you mean?".
+  const found = [...strict, ...allWords]
+  const q = query.trim().toLowerCase()
+  const versions = q ? machineVersions()
+    .filter(e => e.name.toLowerCase().includes(q) || (words.length > 1 && words.every(w => catalogWords(e.name).some(nw => nw.startsWith(w)))))
+    .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name))
+    : []
+  return [...found, ...versions].slice(0, limit)
 }
 
 /**
- * THE LOGGING SEARCH (3 Nov 2026): what she can LOG, which is everything a plan can hold plus the near-copies. The
+ * THE LOGGING SEARCH (3 Nov 2026): what she can LOG, which is everything a plan can hold (the machine versions
+ * included, through the picker's search) plus the near-copies. The
  * picker's search first, untouched, so a plan exercise ranks where it always did; then the near-copies, matched the
  * same two ways (one contiguous phrase, or every typed word as a word prefix). Only the logging box calls this: the
  * swap and add pickers, the ban resolver and the chat logger's search keep the plan-only searches, so a near-copy can
@@ -6446,7 +6505,9 @@ const MOVEMENT_FAMILIES: Record<string, string> = {
  * single session.
  */
 export function getMovementFamily(entry: ExerciseEntry): string {
-  return MOVEMENT_FAMILIES[entry.name] ?? entry.substitution_group
+  // A version is in its parent's family (keyed by name, so the parent's name is the key): a V-squat beside a hack
+  // squat is one movement twice, and the weight-coherence pass must compare it with the same lifts its parent is.
+  return MOVEMENT_FAMILIES[entry.parent ?? entry.name] ?? entry.substitution_group
 }
 
 /**

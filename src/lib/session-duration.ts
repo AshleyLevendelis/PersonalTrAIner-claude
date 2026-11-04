@@ -1,5 +1,5 @@
 import type { SessionDuration, WorkoutDay } from './types'
-import { EXERCISE_DATABASE, type ExerciseEntry } from './exercise-db'
+import { type ExerciseEntry, getExerciseEntry } from './exercise-db'
 import { parseTempo, tempoSecondsPerRep } from './periodization'
 
 // ---------------------------------------------------------------------------
@@ -241,7 +241,7 @@ export function estimateSlotsSeconds(slots: DurationSlot[]): number {
 export function estimateDaySeconds(day: WorkoutDay): number {
   if (day.exercises.length === 0) return 0
   const slots: DurationSlot[] = day.exercises.map(ex => ({
-    entry: EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase()),
+    entry: getExerciseEntry(ex.name),
     sets: ex.sets,
     reps: ex.reps,
     restSeconds: parseRestSeconds(ex.rest),
@@ -336,7 +336,7 @@ export function dayLengthParts(day: WorkoutDay): DayLengthParts {
   let workingSets = 0
   let warmupSets = 0
   for (const ex of day.exercises) {
-    const entry = EXERCISE_DATABASE.find(e => e.name.toLowerCase() === ex.name.toLowerCase())
+    const entry = getExerciseEntry(ex.name)
     if (ex.tier === 'tier_0_primer' || entry?.mechanics_tier === 'primer') warmupSets += ex.sets
     else workingSets += ex.sets
   }

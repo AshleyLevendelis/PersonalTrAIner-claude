@@ -84,7 +84,10 @@ export function swapNameFallback(input: {
   // swap card states what a cross-pattern swap costs the week before the tap (the swap path's own trade-off).
   // "Can do" is the generator's own pool with every stage but style (kit, injuries, avoid list, skill).
   const legal = new Set(getConstrainedPool(profile, exclusions, { skipStyle: true }).map(e => e.name.toLowerCase()))
-  const near = lookalikes.filter(n => legal.has(n.toLowerCase()) || allowedSet.has(n.toLowerCase())).slice(0, 1)
+  // A MACHINE VERSION (4 Nov 2026, her "Machines swappable only") is judged as the lift it is a version of: the pool
+  // holds catalogue lifts only, so asking it about "Pendulum Squat (Plate-Loaded)" told her an injury kept it out.
+  const poolKey = (n: string) => { const e = getExerciseEntry(n); return (e && !e.log_only && e.parent ? e.parent : n).toLowerCase() }
+  const near = lookalikes.filter(n => legal.has(poolKey(n)) || allowedSet.has(n.toLowerCase())).slice(0, 1)
   const ruledOut = near.length === 0 ? lookalikes[0] ?? null : null
   const ruledEntry = ruledOut ? getExerciseEntry(ruledOut) : undefined
   const ruledOutBy: SwapNameFallback['ruledOutBy'] = !ruledEntry ? null : isEquipmentAllowed(ruledEntry, profile) ? 'injuries' : 'kit'

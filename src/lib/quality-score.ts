@@ -1,5 +1,5 @@
 import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, isGenuineDuplicate, getVolumeRole, isIndicatedFor, type ExerciseEntry, getExerciseEntry} from './exercise-db'
+import { getMovementFamily, isGenuineDuplicate, getVolumeRole, isIndicatedFor, type ExerciseEntry, getExerciseEntry } from './exercise-db'
 import { getConstrainedPool, generateMesocycle, primerPatternsForTrack, getAffinityPrimerPool, getFlaggedJoints, CARDIO_RESERVED_SHARE, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, isEquipmentQualityExempt, hasBetterLoadingPeer, TRACKS, dayHoldsDefiningWork, pullHeavyIsPrescribed } from './exercise-plan'
 import { getGoalPolicy, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS } from './goal-policies'
 import { EXPERIENCE_RPE_CEILING } from './periodization'
@@ -59,7 +59,7 @@ function scoreFromViolatedRules(violatedRuleCount: number): number {
 }
 
 function dbEntry(name: string): ExerciseEntry | undefined {
-  return EXERCISE_DATABASE.find(e => e.name.toLowerCase() === name.toLowerCase())
+  return getExerciseEntry(name)
 }
 
 function isMainCompound(ex: Exercise): boolean {

@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [ ] **MACHINES SWAPPABLE, 4 NOV 2026, BUILT, NOT MERGED** (Ashley: "I've been in the gyms used machines which were not
+  available as swaps in the app"; her ruling, from four options, **"Machines swappable only"**, partly reversing her
+  3 Nov "Searchable, log-only" for machine, cable and Smith versions; `docs/plans/machine-versions.md`). 480 machine
+  versions (395 moved from the log-only table by one rule, 85 more matched to a same-kit parent) are found by the swap
+  and add search, taken by every writer and the coach, priced as their parent (one-sided ones per side), never
+  generated (144 seeded plans byte-identical), loaded with the app so a plan holding one opens at once. FOUND AND
+  FIXED: the price read the NAME (a V-squat at 45 kg against the hack squat's 97.5 in the same slot); the coach told
+  her an injury kept a pendulum squat out. Every plan reader now asks the shared lookup. DECIDED (CSCS): a version's
+  history is its own; a one-sided name under kit not priced per side stays log-only (14). `test:machine-versions` 38
+  checks, 16 mutations (15 caught, 1 equivalent, recorded); `verify:machine-swap` 12 checks at 390x844, 4 caught,
+  screenshots read. App chunk budget 1274 -> 1304 (1279). NOT DONE: part 2, the common machines with no parent (ab
+  crunch, pullover, cable chest press, Smith rows, RDL, shrug); 81 unmatched names; no cues on a version.
+- [x] **`test:shoulders-day` RE-SEEDED, 4 NOV 2026**: red in the merge check at `a5f76b8a`, the grown catalogue moved
+  its case (0 knee-loading leg slots on a shoulders day). Seed `sam:shoulders-day:2` holds it; a mutation is caught.
 - [ ] **THE REST OF HER NEAR-COPIES, 4 NOV 2026, BUILT, FULL SWEEP PENDING** (her "carry on with the rest of the
   near-copies"; `docs/plans/log-only-near-copies.md`). 778 more from her two lists, 862 in all, each matched to a plain
   parent by written rules kept beside the plan; 1,210 left out by rule (cardio, elite, strongman, Olympic, jumps,

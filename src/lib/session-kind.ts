@@ -1,5 +1,5 @@
 import type { Exercise, MesocycleWeek, TrainingStyle, UserProfile, WorkoutDay } from './types'
-import { EXERCISE_DATABASE, getExerciseEntry, getVolumeRole, type ExerciseEntry, type MechanicsTier, type MovementPattern } from './exercise-db'
+import { getExerciseEntry, getVolumeRole, type ExerciseEntry, type MechanicsTier, type MovementPattern } from './exercise-db'
 import {
   getConstrainedPool, getFlaggedJoints, isEquipmentAllowed, allowedEquipmentFor, orderCandidates, clampToVolumeRole, getRoleSetCeiling,
   setRandomSource, resetRandomSource, STYLE_CONFIGS, POOL_WIDE_IMPLEMENT_TIERS,
@@ -277,10 +277,13 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
     // than "there's no such exercise", which would be false, or "above your level", which would be wrong.
     const copy = getExerciseEntry(r.exerciseName)
     if (copy?.log_only) { asked.push({ said, reason: logOnlyRefusal(copy) }); continue }
-    const entry = EXERCISE_DATABASE.find(e => e.name === r.exerciseName)
+    // A MACHINE VERSION (4 Nov 2026, her "Machines swappable only") goes in as itself, judged as its parent: the pool
+    // holds catalogue lifts only, so membership, a ban and the injury check read the lift it is a version of.
+    const entry = copy && !copy.retired ? copy : undefined
     if (!entry) { asked.push({ said, reason: `There's no ${said} in the app's exercise list, so it isn't in today's session.` }); continue }
-    if (!namedPool.some(e => e.name === entry.name)) {
-      if (exclusions.some(x => x.toLowerCase() === entry.name.toLowerCase())) {
+    const poolName = entry.parent ?? entry.name
+    if (!namedPool.some(e => e.name === poolName)) {
+      if (exclusions.some(x => x.toLowerCase() === entry.name.toLowerCase() || x.toLowerCase() === poolName.toLowerCase())) {
         asked.push({ said, reason: `${entry.name} ${plural(entry.name) ? 'are' : 'is'} on your exercises to avoid, so I've left ${plural(entry.name) ? 'them' : 'it'} out.` })
       } else if (!isEquipmentAllowed(entry, profile)) {
         const allow = allowedEquipmentFor(profile)
@@ -288,7 +291,7 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
         const move: AskedMove = { said, reason: `${entry.name} ${plural(entry.name) ? 'need' : 'needs'} ${kitWords(missing)}, which ${missing.length > 1 || plural(missing[0] ?? '') ? "aren't" : "isn't"} in your kit` }
         asked.push(move)
         lacking.set(move, entry)
-      } else if (getConstrainedPool({ ...styleProfile, injuries: [] }, exclusions, { skipStyle: true }).some(e => e.name === entry.name)) {
+      } else if (getConstrainedPool({ ...styleProfile, injuries: [] }, exclusions, { skipStyle: true }).some(e => e.name === poolName)) {
         asked.push({ said, reason: `${entry.name} ${plural(entry.name) ? 'are' : 'is'} kept out by the injury on your profile, so I've left ${plural(entry.name) ? 'them' : 'it'} out.` })
       } else {
         asked.push({ said, reason: `${entry.name} ${plural(entry.name) ? 'are' : 'is'} above the level your plan is set at, so I've left ${plural(entry.name) ? 'them' : 'it'} out.` })
@@ -488,7 +491,7 @@ export async function planSessionKindToday(p: PlanSessionKindParams): Promise<Se
     const capOf = (ex: Exercise): number => {
       if (ex.prescription_type === 'intervals') return lifts ? ex.sets : (isLong ? 10 : 8)
       if (!lifts || ex.tier === 'tier_0_primer' || ex.prescription_type === 'steady_state') return ex.sets
-      const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+      const entry = getExerciseEntry(ex.name)
       const role = entry ? getVolumeRole(entry) : null
       return role ? getRoleSetCeiling(role, isLong) : ex.sets
     }

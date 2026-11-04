@@ -250,6 +250,9 @@ export function AddUnplannedWork({
                   {e.log_only && e.parent && (
                     <span data-testid="log-suggestion-kind" className="block text-xs text-muted-foreground">Log only · a version of {e.parent}</span>
                   )}
+                  {!e.log_only && e.parent && (
+                    <span data-testid="log-suggestion-kind" className="block text-xs text-muted-foreground">A version of {e.parent}</span>
+                  )}
                   {marks.map(m => (
                     <span key={m} data-testid="log-suggestion-mark" className="block text-xs text-amber-600 dark:text-amber-400">{m}</span>
                   ))}

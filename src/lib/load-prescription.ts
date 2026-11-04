@@ -1,6 +1,6 @@
 import { equipmentTierFor, ownsKitItem, type KitItem } from './kit-list'
 import type { TrainingExperience, UserProfile } from './types'
-import type { ExerciseEntry } from './exercise-db'
+import { getExerciseEntry, type ExerciseEntry } from './exercise-db'
 
 // ---------------------------------------------------------------------------
 // LOAD PRESCRIPTION
@@ -457,6 +457,14 @@ const KNOWN_WEIGHT_REFERENCE_RPE = 8
 
 /** Maps an exercise onto a standards category. */
 export function categorize(entry: ExerciseEntry): string | null {
+  // A VERSION IS PRICED AS ITS PARENT (4 Nov 2026, her "Machines swappable only"): the rules below read the NAME
+  // ("hack", "fly", "shrug"...), so "V-Squat Machine" would otherwise land in a different category from the Hack Squat
+  // it is a version of. Measured before this line: 45 kg against the parent's 97.5 in the same slot. Its own one-sided
+  // flag still halves it afterwards (isPerSideLoad reads the version, not the parent).
+  if (entry.parent) {
+    const parent = getExerciseEntry(entry.parent)
+    if (parent && parent !== entry && !parent.parent) return categorize(parent)
+  }
   const n = entry.name.toLowerCase()
 
   // Isolation work is checked FIRST, before any pattern matching. A Cable Fly

@@ -1,5 +1,5 @@
 import type { FitnessGoal, TrainingExperience, WorkoutDay, Exercise, UserProfile } from './types'
-import { EXERCISE_DATABASE, getMovementFamily, meetsCapabilityRequirement, isBallisticMovement, type ExerciseEntry } from './exercise-db'
+import { getMovementFamily, meetsCapabilityRequirement, isBallisticMovement, type ExerciseEntry, getExerciseEntry } from './exercise-db'
 import { getExperienceConfig, isSkillAppropriate } from './experience-config'
 import { isExternallyLoaded, preservesRelativeLoad } from './load-prescription'
 
@@ -479,9 +479,7 @@ export function rotateVariation(
    */
   avoidFamilies?: Set<string>,
 ): string {
-  const current = EXERCISE_DATABASE.find(
-    e => e.name.toLowerCase() === exerciseName.toLowerCase()
-  )
+  const current = getExerciseEntry(exerciseName)
   if (!current) return exerciseName
 
   // Loading class must never regress on rotation: an externally-loaded
@@ -650,7 +648,7 @@ export function describeExerciseTempo(
   const described = describeTempo(ex.tempo)
   if (!described) return null
   if (!/^\d+(\s*-\s*\d+)?$/.test(String(ex.reps).trim())) return null
-  const entry = EXERCISE_DATABASE.find(e => e.name === ex.name)
+  const entry = getExerciseEntry(ex.name)
   const type = entry?.prescription_type ?? ex.prescription_type ?? 'reps'
   if (type !== 'reps') return null
   if (entry && (entry.mechanics_tier === 'primer' || isBallisticMovement(entry))) return null

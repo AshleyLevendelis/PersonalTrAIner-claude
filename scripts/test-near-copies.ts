@@ -56,7 +56,7 @@ const copyNames = new Set(copies.map(c => c.name.toLowerCase()))
 
 console.log('\n1. Every near-copy is built from a real parent, and copies what keeps it safe')
 {
-  check(`every row of the table builds (${copies.length} of ${NEAR_COPIES.length})`, NEAR_COPIES.length >= 800 && copies.length === NEAR_COPIES.length,
+  check(`every row of the table builds (${copies.length} of ${NEAR_COPIES.length})`, NEAR_COPIES.length >= 450 && copies.length === NEAR_COPIES.length,
     NEAR_COPIES.filter(([n]) => !copyNames.has(n.toLowerCase())).map(([n, p]) => `${n} <- ${p}`))
   const dupes = NEAR_COPIES.map(([n]) => n.toLowerCase()).filter((n, i, a) => a.indexOf(n) !== i)
   check('...no name twice, and none the catalogue already holds', dupes.length === 0 && !copies.some(c => EXERCISE_DATABASE.some(e => e.name.toLowerCase() === c.name.toLowerCase())), dupes)
