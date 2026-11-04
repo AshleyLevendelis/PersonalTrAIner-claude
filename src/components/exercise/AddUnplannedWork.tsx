@@ -11,6 +11,7 @@ import { BLOCK_NAMES, blockChipLabel } from '@/lib/circuit'
 import { cardioPresetsFor } from '@/lib/cardio-presets'
 import type { EquipmentAccess, UserProfile } from '@/lib/types'
 import { searchExercisesToLog } from '@/lib/exercise-db'
+import { ensureNearCopies } from '@/lib/near-copies-loader'
 import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
 
 // ---------------------------------------------------------------------------
@@ -111,12 +112,19 @@ export function AddUnplannedWork({
   // WHAT SHE CAN LOG, as she types (her ruling "Searchable, log-only", 3 Nov 2026): plan exercises first, then the
   // near-copies (a paused squat, a wide-grip pulldown), each tap filling the exact name so the set lands in its own
   // history. Hidden once the box already holds one of them exactly.
+  // The near-copies arrive in their own chunk; the box asks for them and redraws when they land.
+  const [copiesReady, setCopiesReady] = useState(0)
+  useEffect(() => {
+    let live = true
+    void ensureNearCopies().then(() => { if (live) setCopiesReady(n => n + 1) })
+    return () => { live = false }
+  }, [])
   const suggestions = useMemo(() => {
     const typed = liftName.trim()
     if (typed.length < 2) return []
     const found = searchExercisesToLog(typed, 6)
     return found.some(e => e.name.toLowerCase() === typed.toLowerCase()) ? [] : found
-  }, [liftName])
+  }, [liftName, copiesReady])
   // ON SCREEN, NOT MERELY IN THE PAGE (read off the first screenshot, 3 Nov 2026): the list opened under the floating
   // Start bar, its "Log only" line and its marks hidden until she scrolled. So it brings itself into view, clear of
   // the docked bars (scroll-margin), each time it appears or changes size.

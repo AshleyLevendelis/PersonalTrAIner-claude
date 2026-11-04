@@ -42,13 +42,29 @@ name with its own history and best.
   evidence for a squat's working weight.
 - A personal best on a near-copy is its own record (it is a lift, never a primer or cardio).
 
+## The rest of her lists (4 Nov 2026, her "carry on with the rest of the near-copies")
+
+- 778 more, matched by written rules (`log-only-near-copies-rules.txt`, kept beside this plan): the kit word in the
+  name picks the family (Smith, barbell, dumbbell, cable, machine, kettlebell, band, bodyweight), then the movement
+  picks the parent, most specific first. 862 near-copies in all.
+- Left out, 1,210 by rule: cardio, elite skills, strongman and specialty bars, Olympic and ballistic lifts, jumps,
+  isometric holds, grip and neck work, kit the app does not ask about. A name goes in only when its parent is plain.
+- Unmatched, 336: no rule named a parent with confidence (mostly odd combinations and one-off setups). Left out
+  rather than guessed; a wrong parent would give a lift the wrong joints and marks.
+- Every rule was read against the names it caught, and the wrong catches fixed before writing (upright rows read as
+  rows, leg curls read as biceps curls, rear-delt flies read as chest flies, a safety squat bar read as a T-bar,
+  hip and glute "extensions" read as triceps). Some of her names are near-duplicates of each other ("Paused Bench
+  Press", "Barbell Paused Bench Press"); both kept, since she may type either.
+- The table is its own download, fetched just after the app opens, so the first screen is no heavier (first paint and
+  the app chunk went DOWN slightly, the first 85 left the app chunk with it). The logging box waits for it. Total size
+  2588 -> 2631 kB raw; the total budget moved 2606 -> 2656 (her standing ruling, 25 raw of room).
+
 ## Not done, named
 
-- The rest of her two lists: about 1,700 names remain, many cardio, strongman, elite or ambiguous. More slices follow
-  the same table; a name goes in only when its parent is unambiguous.
+- The 336 unmatched and the 1,210 left out by rule.
 - Whether elite skills and strongman lifts (left out of plans) are searchable log-only too: not covered by her ruling.
 
 ## Gates
 
-`test:near-copies` (27 checks, 10 mutations caught, one first crashed and was re-made to fail cleanly),
+`test:near-copies` (28 checks since 4 Nov; 10 mutations caught, one first crashed and was re-made to fail cleanly),
 `verify:near-copies` (17 checks at 390x844, 4 mutations caught).

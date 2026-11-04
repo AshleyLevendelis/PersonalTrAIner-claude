@@ -58,7 +58,11 @@ const sam = {
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
 } as unknown as UserProfile
 
-setRandomSource(seededRngFromKey('sam:2'))
+// SEED 3, NOT 2 (4 Nov 2026): the exercise library's new hinge and single-leg lifts re-rolled seed 2's Saturdays onto
+// an upper-and-hinge day with no knee work, so the knee ease-off touched 4 slots on one day and every check below that
+// needs knee work on Saturday AND Thursday asked about a day the ease-off never changed. The person is the input; the
+// seed is chosen so the plan holds what these checks are about (seeds 3, 6, 9 and 11 all do; 2, 4, 5, 7, 8, 10, 12 not).
+setRandomSource(seededRngFromKey('sam:3'))
 const plan: MesocycleWeek[] = silently(() => generateMesocycle(sam))
 resetRandomSource()
 

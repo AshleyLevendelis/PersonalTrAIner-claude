@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [ ] **THE REST OF HER NEAR-COPIES, 4 NOV 2026, BUILT, FULL SWEEP PENDING** (her "carry on with the rest of the
+  near-copies"; `docs/plans/log-only-near-copies.md`). 778 more from her two lists, 862 in all, each matched to a plain
+  parent by written rules kept beside the plan; 1,210 left out by rule (cardio, elite, strongman, Olympic, jumps,
+  holds, kit not asked about) and 336 unmatched rather than guessed. The table is its own download after the app
+  opens (first paint unchanged); `test:near-copies` gained a check that nothing exists before it loads. Total size
+  budget 2606 -> 2656 (2631 measured). ALSO: `test:adaptations-respect-trained` was red at `d2853d57` (found by the
+  merge sweep): its fixture plan, seed `sam:2`, changed shape with the new catalogue entries and no longer held the
+  case it tests; seed `sam:3` does (3, 6, 9, 11 all pass), and a mutation of the code it guards is still caught.
+  Driven at 390x844: `verify:near-copies` 15 of 15, screenshots read.
 - [ ] **LOG-ONLY NEAR-COPIES, 3 NOV 2026, BUILT, FULL SWEEP PENDING** (her ruling "Searchable, log-only" and "then
   build the log-only near-copies"; `docs/plans/log-only-near-copies.md`). Traced first (investigator). 85 near-copies
   (a paused squat, a wide-grip pulldown, a Pendlay row...) BUILT from their parents, kept outside the catalogue array so

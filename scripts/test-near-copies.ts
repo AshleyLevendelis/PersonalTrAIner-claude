@@ -24,6 +24,7 @@ import { resolveExerciseTarget } from '../src/lib/fact-compiler'
 import { resolveExerciseName } from '../src/lib/set-parse'
 import { canHoldRecord } from '../src/lib/pr-engine'
 import { logOnlyRefusal } from '../src/lib/coach-voice'
+import { ensureNearCopies } from '../src/lib/near-copies-loader'
 import type { UserProfile, TrainingStyle, FitnessGoal, TrainingExperience, EquipmentAccess } from '../src/lib/types'
 
 let ran = 0, failures = 0
@@ -47,12 +48,15 @@ const person = (over: Partial<UserProfile> = {}): UserProfile => ({
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate', ...over,
 }) as unknown as UserProfile
 
+// THE TABLE IS FETCHED, as the app fetches it (near-copies-loader.ts): before it lands there are none.
+check('before the table is fetched there are no near-copies, so nothing can be prescribed by the gap', logOnlyExercises().length === 0 && !getExerciseEntry('Paused Bench Press'))
+await ensureNearCopies()
 const copies = logOnlyExercises()
 const copyNames = new Set(copies.map(c => c.name.toLowerCase()))
 
 console.log('\n1. Every near-copy is built from a real parent, and copies what keeps it safe')
 {
-  check(`every row of the table builds (${copies.length} of ${NEAR_COPIES.length})`, NEAR_COPIES.length >= 80 && copies.length === NEAR_COPIES.length,
+  check(`every row of the table builds (${copies.length} of ${NEAR_COPIES.length})`, NEAR_COPIES.length >= 800 && copies.length === NEAR_COPIES.length,
     NEAR_COPIES.filter(([n]) => !copyNames.has(n.toLowerCase())).map(([n, p]) => `${n} <- ${p}`))
   const dupes = NEAR_COPIES.map(([n]) => n.toLowerCase()).filter((n, i, a) => a.indexOf(n) !== i)
   check('...no name twice, and none the catalogue already holds', dupes.length === 0 && !copies.some(c => EXERCISE_DATABASE.some(e => e.name.toLowerCase() === c.name.toLowerCase())), dupes)

@@ -165,6 +165,7 @@ import { flushPending as flushWaterPending } from '@/lib/water-store'
 import { flushPending as flushCardioPending } from '@/lib/cardio-log-store'
 import type { UserProfile, MacroTargets, WorkoutDay, PlanAction, MesocycleWeek } from '@/lib/types'
 import type { ExerciseEntry } from '@/lib/exercise-db'
+import { ensureNearCopies } from '@/lib/near-copies-loader'
 
 const STORAGE_KEY = 'fitplan_profile_id'
 /** The start could not reach the server and had nothing kept on the phone to show. Nothing is lost: the row is untouched. */
@@ -296,6 +297,9 @@ function App() {
   // A failure belongs to the screen it happened on (M29): leaving the tab
   // puts it away rather than carrying "That swap didn't save" onto Nutrition.
   useEffect(() => { setWriteError(null) }, [activeTab])
+  // The near-copy table (log-only names, her ruling "Searchable, log-only") is fetched once the app is open, so a
+  // set said to the coach or a history row under one resolves; never part of the first download.
+  useEffect(() => { void ensureNearCopies() }, [])
   /** Which load_suggestions row a Confirm/Decline tap is currently in flight for — disables both buttons on that one banner only. */
   const [loadSuggestionBusy, setLoadSuggestionBusy] = useState<string | null>(null)
   /** When the CURRENT mesocycle was generated — anchors live-week detection (falls back to profile.created_at for legacy profiles without persisted weeks). */

@@ -1,0 +1,147 @@
+import { readFileSync, writeFileSync } from 'fs'
+import { EXERCISE_DATABASE } from '/home/user/PersonalTrAIner-claude/src/lib/exercise-db'
+const rows: { name: string; section: string; sub: string }[] = JSON.parse(readFileSync(process.argv[2], 'utf-8'))
+const names = new Set(EXERCISE_DATABASE.map(e => e.name))
+// Left out whatever its parent: elite skills, strongman and specialty bars, Olympic and ballistic lifts, jumps and
+// cardio, and kit the app does not ask about yet (her "Known kit + a few" ticks are batch 4).
+const SKIP = /planche|\blever\b|human flag|iron cross|one[- ]arm (pull|push|chin)|muscle[- ]up|kipping|butterfly (pull|sit)|dragon|impossible|korean|guillotine|behind[- ]the[- ]neck|depth|skin[- ]the[- ]cat|handstand|typewriter|around[- ]the[- ]world|triple|jefferson|sots|bent press|hatfield|anderson|savickas|bradford|viking|\blog\b|axle|atlas|yoke|keg|tire|husafell|shield|frame|circus|sandbag|sled|prowler|suspension|trx|\brings?\b|gymnastic|swiss ball|stability ball|bosu|mace|club|parallette|peg ?board|salmon|slam|\bghd\b|glute[- ]ham|safety[- ]bar|\bssb\b|swiss bar|cambered|football bar|chains?\b|band[- ](resisted|assisted)|reverse band|vest|ankle weight|landmine|snatch|clean|jerk|thruster|man maker|devil|burpee|turkish|get[- ]up|windmill|halo|figure ?8|slingshot|bottoms?[- ]up|jump|hop|bound|skater|agility|ladder|sprint|treadmill|bike|erg\b|rower|swim|elliptical|stair|climber|\brope (wave|slam|climb)|battle|wall ball|throw|toss|\bpass\b|crawl|crab|duck walk|wall walk|zercher|overhead squat|pistol|shrimp|cossack|sissy|nordic|isomorphic|batwing|speed|dynamic effort|cluster|complex|plyo|tuck|v-sit|l-sit|hollow|flutter|scissor|mountain|jack|star|high knee|butt kick|shadow|bag|mitt|pad|kick(?!back)|punch|strike|uppercut|hip circle|clam|monster|walk(?!ing lunge)|march|hold\b|isometric|quarter|half squat|partial|pulse|cheat|kroc|tripod|seal|meadows?|deficit (deadlift|push)|block pull|rack pull|pin |board|spoto|larsen|larson|z-press|pendlay|feet[- ]up|floor fly|svend|around the world|twisted|pronated[- ]to|tate|jm press|spider|drag curl|zottman|wrist|radial|ulnar|forearm|grip|finger|fingertip|knuckle|neck|tibialis|tib |toe|ankle|foot|calf raise (setup)|setup|wall|towel|sliders?|slide|ab roller|wheel|buffalo|reverse[- ]band|with bands|upright|corner|deadstop row|combo|sot[- ]?press|belt squat .*(lunge|split|romanian|morning|calf)|\b[ytwl]-fly|pull[- ]through calf|side[- ]plank pull|calf raise pause|pendulum|combination|reverse plank|clap|explosive|scapular push|medicine ball(?! russian)|trap bar|safety squat|hip dip| to |kickback with|single[- ]leg hack|barbell single[- ]arm|barbell single[- ]leg (rdl|deadlift|romanian)|leg curl machine \(iso|cable.*(hamstring|leg) curl|cable.*(chest|bench) press|cable.*press[- ]out/i
+type Rule = [RegExp, RegExp | null, string]
+const DB = /dumbbell|\bdb\b/i, BB = /barbell|\bbb\b|ez[- ]bar/i, CABLE = /cable|pulley|rope attachment/i, MACH = /machine|selector|pin[- ]select|plate[- ]loaded|lever|hammer strength|iso[- ]lateral|converging|diverging/i, SMITH = /smith/i, KB = /kettlebell|\bkb\b/i, BAND = /\bband(ed)?\b/i
+const R: Rule[] = [
+  // the Smith machine
+  [/split squat|bulgarian|single[- ]leg squat/i, SMITH, 'Smith Machine Split Squat'],
+  [/incline.*(press|bench)|(press|bench).*incline|(bench|chest) press|flat press|floor press|bench\b/i, SMITH, 'Smith Machine Bench Press'],
+  [/(overhead|shoulder|military) press/i, SMITH, 'Smith Machine Shoulder Press'],
+  [/squat/i, SMITH, 'Smith Machine Squat'],
+  // barbell
+  [/\bt[- ]bar/i, BB, 'T-Bar Rows'], [/row/i, BB, 'Barbell Rows'],
+  [/close[- ]grip.*(bench|press)|narrow[- ]grip.*bench/i, BB, 'Close-Grip Bench Press'],
+  [/incline.*(press|bench)/i, BB, 'Incline Barbell Bench Press'],
+  [/floor press/i, BB, 'Barbell Floor Press'],
+  [/bench press|decline press|wide[- ]grip press/i, BB, 'Barbell Bench Press'],
+  [/(overhead|military|shoulder|strict) press|\bohp\b|push press/i, BB, 'Overhead Press'],
+  [/\bt[- ]bar/i, BB, 'T-Bar Rows'], [/row/i, BB, 'Barbell Rows'],
+  [/shrug/i, BB, 'Shrugs'],
+  [/split squat|bulgarian/i, BB, 'Barbell Reverse Lunge'],
+  [/front squat/i, BB, 'Front Squat'], [/squat/i, BB, 'Barbell Squats'],
+  [/lunge/i, BB, 'Barbell Reverse Lunge'],
+  [/sumo deadlift/i, BB, 'Sumo Deadlift'], [/romanian|\brdl\b|stiff[- ]leg/i, BB, 'Romanian Deadlifts'],
+  [/good morning/i, BB, 'Good Mornings'], [/single[- ]leg (glute bridge|hip thrust)/i, BB, 'Hip Thrust'], [/hip thrust/i, BB, 'Hip Thrust'], [/glute bridge/i, BB, 'Barbell Glute Bridge'],
+  [/deadlift/i, BB, 'Deadlifts'],
+  [/preacher/i, BB, 'Preacher Curl (EZ bar)'], [/curl/i, BB, 'Barbell Curls'], [/skull|lying.*(tricep|extension)/i, BB, 'Skull Crushers'],
+  // dumbbell
+  [/rear delt|reverse fly/i, DB, 'Rear Delt Flyes'],
+  [/squeeze|hex press/i, DB, 'Dumbbell Squeeze Press'],
+  [/fly|flye/i, DB, 'Dumbbell Flyes'],
+  [/arnold/i, DB, 'Arnold Press'],
+  [/(shoulder|overhead|military) press|push press/i, DB, 'Dumbbell Shoulder Press'],
+  [/incline.*press/i, DB, 'Incline Dumbbell Press'],
+  [/neutral[- ]grip.*(bench|press|flat)/i, DB, 'Neutral-Grip Dumbbell Press'],
+  [/floor press/i, DB, 'Dumbbell Floor Press'],
+  [/single[- ]arm.*(bench press|flat press|chest press|decline press)/i, DB, 'Single-Arm Dumbbell Bench Press'],
+  [/(bench|chest|decline|flat) press/i, DB, 'Dumbbell Bench Press'],
+  [/renegade|plank row|bird[- ]dog row/i, DB, 'Renegade Row'],
+  [/chest[- ]supported.*row|row.*chest[- ]supported|incline.*row/i, DB, 'Chest-Supported Row'],
+  [/single[- ]arm.*row|one[- ]arm.*row/i, DB, 'Dumbbell Rows'],
+  [/row/i, DB, 'Bent-Over Dumbbell Row'],
+  [/pullover/i, DB, 'Dumbbell Pullover'],
+  [/shrug/i, DB, 'Dumbbell Shrugs'],
+  [/lateral raise|side raise/i, DB, 'Lateral Raises'], [/front raise/i, DB, 'Front Raises'],
+  [/goblet/i, DB, 'Goblet Squats'], [/front squat/i, DB, 'Dumbbell Front Squat'],
+  [/bulgarian|split squat/i, DB, 'Bulgarian Split Squats'], [/step[- ]up/i, DB, 'Step-Ups'],
+  [/lateral lunge|side lunge/i, DB, 'Dumbbell Lateral Lunge'], [/walking lunge/i, DB, 'Walking Lunges'],
+  [/lunge/i, DB, 'Dumbbell Reverse Lunge'],
+  [/single[- ]leg.*(rdl|romanian|deadlift)/i, DB, 'Single-Leg Dumbbell RDL'], [/suitcase deadlift/i, DB, 'Suitcase Deadlift'],
+  [/romanian|\brdl\b|stiff[- ]leg/i, DB, 'Romanian Deadlifts'], [/hip thrust/i, DB, 'Dumbbell Hip Thrust'],
+  [/hamstring curl|leg curl/i, DB, 'Dumbbell Leg Curl'], [/calf raise/i, DB, 'Single-Leg Dumbbell Calf Raise'],
+  [/kickback/i, DB, 'Dumbbell Tricep Kickback'], [/overhead.*(extension|tricep)/i, DB, 'Overhead Tricep Extension'],
+  [/skull|lying.*(extension|tricep)/i, DB, 'Lying Dumbbell Tricep Extension'],
+  [/hammer/i, DB, 'Hammer Curls'], [/incline.*curl/i, DB, 'Incline Dumbbell Curls'], [/curl/i, DB, 'Dumbbell Curls'],
+  [/woodchop|wood chop/i, DB, 'Dumbbell Woodchop'],
+  // cable
+  [/crossover/i, CABLE, 'Cable Crossover'],
+  [/rear delt|reverse fly/i, CABLE, 'Cable Rear Delt Fly'],
+  [/fly|flye/i, CABLE, 'Cable Flyes'],
+  [/single[- ]arm.*pulldown|one[- ]arm.*pulldown|pulldown \(single[- ]arm\)/i, CABLE, 'Single-Arm Lat Pulldown'],
+  [/close[- ]grip.*pulldown|v[- ]bar.*pulldown|pulldown.*v[- ]bar/i, CABLE, 'Close-Grip Lat Pulldown'],
+  [/straight[- ]arm/i, CABLE, 'Straight-Arm Pulldown'],
+  [/pulldown|pull[- ]down/i, CABLE, 'Lat Pulldown'],
+  [/face pull/i, CABLE, 'Face Pulls'],
+  [/single[- ]arm.*row|one[- ]arm.*row/i, CABLE, 'Single-Arm Cable Row'],
+  [/neutral[- ]grip.*row|v[- ]bar.*row|close[- ]grip.*row/i, CABLE, 'Neutral-Grip Seated Cable Row'],
+  [/bird[- ]dog row|plank row/i, CABLE, '(skip)'], [/row/i, CABLE, 'Seated Cable Row'],
+  [/shrug/i, CABLE, 'Cable Shrug'],
+  [/lateral raise|side raise/i, CABLE, 'Cable Lateral Raises'],
+  [/pull[- ]through/i, CABLE, 'Cable Pull-Through'], [/kickback.*(glute|leg)|(glute|leg).*kickback|single[- ]leg.*kickback/i, CABLE, 'Cable Glute Kickback'],
+  [/bayesian/i, CABLE, 'Bayesian Cable Curl'], [/hammer.*curl|rope.*curl|curl.*rope/i, CABLE, 'Cable Rope Hammer Curl'], [/curl/i, CABLE, 'Cable Curls'],
+  [/pushdown.*rope|rope.*pushdown/i, CABLE, 'Rope Tricep Pushdown'], [/pushdown|push[- ]down/i, CABLE, 'Tricep Pushdowns'],
+  [/overhead.*(extension|tricep)/i, CABLE, 'Overhead Tricep Extension'],
+  [/woodchop|wood chop|\bchop\b/i, CABLE, 'Cable Woodchops'], [/crunch/i, CABLE, 'Cable Crunch'],
+  // machines (and machine names with no kit word)
+  [/leg press.*calf|calf.*leg press/i, null, 'Leg Press Calf Raise'], [/leg press.*calf|calf.*leg press/i, MACH, 'Leg Press Calf Raise'],
+  [/seated calf/i, null, 'Seated Calf Raises'], [/seated calf/i, MACH, 'Seated Calf Raises'],
+  [/hack squat calf/i, null, 'Standing Calf Raise Machine'], [/calf/i, MACH, 'Standing Calf Raise Machine'],
+  [/single[- ]leg.*leg press|leg press.*single[- ]leg/i, null, 'Single-Leg Leg Press'], [/single[- ]leg.*leg press|leg press.*single[- ]leg/i, MACH, 'Single-Leg Leg Press'],
+  [/leg press/i, MACH, 'Leg Press'], [/leg press/i, null, 'Leg Press'],
+  [/hack squat/i, MACH, 'Hack Squat'], [/hack squat/i, null, 'Hack Squat'],
+  [/belt squat/i, MACH, 'Belt Squat'], [/belt squat/i, null, 'Belt Squat'],
+  [/single[- ]leg.*extension/i, MACH, 'Single-Leg Leg Extension'], [/leg extension/i, MACH, 'Leg Extensions'],
+  [/(single[- ]leg )?seated.*(leg |hamstring )?curl machine|seated.*(leg|hamstring) curl/i, MACH, 'Seated Leg Curl'],
+  [/lying.*(leg |hamstring )?curl|prone.*curl/i, MACH, 'Lying Leg Curl'],
+  [/kneeling.*curl|standing.*(leg|hamstring|single[- ]leg) curl/i, MACH, 'Iso-Lateral Kneeling Leg Curl'],
+  [/standing.*(glute drive|kickback)|kickback/i, MACH, 'Glute Kickback Machine'],
+  [/hip thrust|glute drive/i, MACH, 'Machine Hip Thrust'],
+  [/abduct/i, MACH, 'Hip Abduction Machine'], [/adduct/i, MACH, 'Hip Adduction Machine'],
+  [/reverse hyper/i, null, 'Reverse Hyper Machine'], [/reverse hyper/i, MACH, 'Reverse Hyper Machine'],
+  [/back extension|hyperextension|roman chair/i, null, 'Back Extension Machine'], [/back extension|hyperextension/i, MACH, 'Back Extension Machine'],
+  [/reverse pec|rear delt/i, MACH, 'Reverse Pec Deck'], [/pec deck|chest fly/i, MACH, 'Pec Deck Machine'],
+  [/incline.*press/i, MACH, 'Incline Machine Press'], [/(chest|bench|decline|vertical|wide) press/i, MACH, 'Chest Press Machine'],
+  [/(shoulder|overhead) press/i, MACH, 'Shoulder Press Machine'],
+  [/pulldown|pull[- ]down/i, MACH, 'Iso-Lateral Pulldown'],
+  [/\bt[- ]bar/i, MACH, 'T-Bar Row Machine'], [/high row/i, MACH, 'Iso-Lateral High Row'], [/row/i, MACH, 'Seated Machine Row'],
+  [/shrug/i, MACH, 'Machine Shrug'], [/lateral raise/i, MACH, 'Machine Lateral Raise'],
+  [/(bicep|preacher).*curl|curl machine \(|preacher/i, MACH, 'Machine Preacher Curl'],
+  [/assisted dip/i, MACH, 'Assisted Dip Machine'], [/tricep.*extension|extension.*tricep|overhead tri/i, MACH, 'Machine Tricep Extension'], [/dip/i, MACH, 'Seated Dip Machine'],
+  [/rotary torso|torso rotation/i, MACH, 'Rotary Torso Machine'], [/rotary torso/i, null, 'Rotary Torso Machine'],
+  // kettlebell and band, where the parent is that kit's own entry
+  [/swing/i, KB, 'Kettlebell Swing (Heavy)'], [/goblet squat/i, KB, 'Goblet Squats'], [/suitcase carry/i, KB, 'Suitcase Carry'], [/overhead carry|waiter.*carry/i, KB, 'Overhead Carry'],
+  [/(bicep|hammer) curl/i, BAND, 'Band Curl'], [/pallof/i, BAND, 'Pallof Press'], [/pulldown/i, BAND, 'Band Lat Pulldown'], [/(shoulder|overhead) press/i, BAND, 'Band Shoulder Press'],
+  // a few the first pass left unmatched, each with an unambiguous parent
+  [/step[- ]up/i, BB, 'Barbell Reverse Lunge'], [/hyperextension/i, BB, 'Back Extension Machine'],
+  [/overhead.*(tricep|extension)|tricep.*extension/i, BB, 'Skull Crushers'],
+  [/(incline|decline).*tricep.*extension/i, DB, 'Lying Dumbbell Tricep Extension'],
+  [/(single[- ]leg )?glute bridge/i, DB, 'Dumbbell Hip Thrust'], [/single[- ]leg.*good morning/i, DB, 'Single-Leg Dumbbell RDL'], [/good morning/i, DB, 'Romanian Deadlifts'],
+  [/incline.*tricep.*extension/i, CABLE, 'Overhead Tricep Extension'],
+  [/walking lunge/i, null, 'Walking Lunges'], [/(alternating )?(reverse|forward) lunge|curtsy lunge/i, null, 'Split Squat (Bodyweight)'],
+  // bodyweight and small kit
+  [/pallof/i, null, 'Pallof Press'], [/farmer/i, null, "Farmer's Walk"], [/suitcase carry/i, null, 'Suitcase Carry'], [/overhead carry|waiter/i, null, 'Overhead Carry'],
+  [/inverted row|australian/i, null, 'Inverted Row'],
+  [/chin[- ]up/i, null, 'Chin-Ups'], [/assisted.*pull[- ]up|pull[- ]up.*assisted/i, null, 'Pull-Ups (Assisted)'],
+  [/negative.*pull|pull[- ]up negative/i, null, 'Pull-Up Negatives'], [/scapular pull/i, null, 'Scapular Pull-Ups'],
+  [/pull[- ]up/i, null, 'Pull-Ups'],
+  [/pike push/i, null, 'Pike Push-Ups'], [/archer push/i, null, 'Archer Push-Ups'], [/(decline|feet[- ]elevated) push/i, null, 'Deficit Push-Ups'],
+  [/incline push|hands[- ]elevated push/i, null, 'Incline Push-Ups'], [/wide.*push/i, null, 'Wide Push-Ups'], [/knee push/i, null, 'Knee Push-Ups'],
+  [/push[- ]up plank/i, null, 'Plank'], [/push[- ]up/i, null, 'Push-Ups'],
+  [/(chest|parallel bar|straight bar) dip/i, null, 'Chest Dips'], [/bench dip|chair dip/i, null, 'Chair Dips'], [/\bdips?\b/i, null, 'Tricep Dips'],
+  [/air squat|bodyweight squat|pause.*squat/i, null, 'Air Squat'], [/split squat/i, null, 'Split Squat (Bodyweight)'],
+  [/step[- ]up/i, null, 'Step-Ups (Bodyweight)'], [/single[- ]leg.*(glute bridge|hip thrust)/i, null, 'Single-Leg Glute Bridge'],
+  [/glute bridge|hip thrust/i, null, 'Glute Bridge'], [/single[- ]leg.*(rdl|deadlift)/i, null, 'Single-Leg RDL (Bodyweight)'],
+  [/side[- ]plank/i, null, 'Side Plank'], [/plank/i, null, 'Plank'], [/dead bug/i, null, 'Dead Bug'], [/bird[- ]dog/i, null, 'Bird Dog'],
+  [/hanging.*(leg|knee) raise|toes[- ]to[- ]bar|knees[- ]to[- ]elbow|captain/i, null, 'Hanging Leg Raises'], [/russian twist/i, null, 'Russian Twist'],
+  [/calf raise/i, null, 'Calf Raises (Bodyweight)'],
+]
+const IMPL = [CABLE, SMITH, MACH, BB, DB, KB, BAND]
+const out: [string, string][] = [], skipped: string[] = [], unmapped: string[] = []
+for (const r of rows) {
+  if (r.section.startsWith('Cardio')) { skipped.push(r.name); continue }
+  if (SKIP.test(r.name)) { skipped.push(r.name); continue }
+  const implOf = IMPL.find(re => re.test(r.name)) ?? null
+  const rule = R.find(([mv, im]) => mv.test(r.name) && (im ? im === implOf : !implOf || (implOf === MACH && /press|curl|extension|hyper|back ext/i.test(r.name) && /leg press|hack|belt|leg curl|extension|hyper/i.test(r.name)) ))
+  if (!rule || !names.has(rule[2])) { unmapped.push(r.name); continue }
+  out.push([r.name, rule[2]])
+}
+writeFileSync(process.argv[3], JSON.stringify(out))
+const g: Record<string, string[]> = {}; for (const [n, p] of out) (g[p] ??= []).push(n)
+console.log(`mapped ${out.length}, skipped ${skipped.length}, unmapped ${unmapped.length}`)
+if (process.argv[4] === 'groups') for (const [p, ns] of Object.entries(g).sort()) console.log(`\n## ${p} (${ns.length}): ${ns.join(' | ')}`)
+if (process.argv[4] === 'unmapped') console.log(unmapped.join(' | '))

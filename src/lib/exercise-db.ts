@@ -1,6 +1,5 @@
 import { TrainingStyle, type TrainingExperience } from './types'
 import { isRegressionFor } from './periodization'
-import { NEAR_COPIES } from './exercise-near-copies'
 
 export type MovementPattern =
   | 'horizontal_push'
@@ -6160,11 +6159,21 @@ export function isContraindicatedFor(entry: ExerciseEntry, flaggedJoints: Set<st
  * catalogue already holds, or a parent it does not, is left out (test:near-copies holds that none is).
  */
 let logOnlyCache: Map<string, ExerciseEntry> | null = null
+/**
+ * The near-copy TABLE arrives after the app opens (near-copies-loader.ts), so the first download does not carry ~860
+ * names nothing on the first screen needs. Until then there are none: a near-copy name resolves to nothing, which every
+ * plan path already treats as "not an exercise", so nothing can be prescribed by the gap.
+ */
+let nearCopyRows: readonly (readonly [string, string])[] = []
+export function registerNearCopies(rows: readonly (readonly [string, string])[]): void {
+  nearCopyRows = rows
+  logOnlyCache = null
+}
 function logOnlyByLowerName(): Map<string, ExerciseEntry> {
   if (logOnlyCache) return logOnlyCache
   const byName = new Map(EXERCISE_DATABASE.map(e => [e.name.toLowerCase(), e]))
   const built = new Map<string, ExerciseEntry>()
-  for (const [name, parentName] of NEAR_COPIES) {
+  for (const [name, parentName] of nearCopyRows) {
     const parent = byName.get(parentName.toLowerCase())
     if (!parent || parent.log_only || byName.has(name.toLowerCase())) continue
     built.set(name.toLowerCase(), {
