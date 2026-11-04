@@ -14,7 +14,7 @@ the leg press foot placements and the assisted pull-up machine.
 
 ## Built
 
-- `exercise-machine-versions.ts`: name -> parent, pure data. 395 rows moved from the log-only table by one rule, and 85
+- `exercise-machine-versions.ts`: name -> parent, pure data. 395 rows moved from the log-only table by one rule, and 82
   more matched to a same-kit parent (477). The rule, held by `test:machine-versions`: the parent needs a machine; the
   name names no free weight, and names a machine or sits under a machine-only parent; a one-sided name (single-arm,
   one-leg, iso-lateral) only under kit the app prices per side. 14 one-sided names under other kit (an iso-lateral
