@@ -20,8 +20,14 @@ Newest first. One line each.
   = a meal in 14 days, the sentences and switch labels. **NOT DONE, named:** the morning reminder does not name the
   session; the after-workout check-in still waits a day on back-to-back training days (24 Sep rule, unchanged); iPhone
   needs the app on the home screen. **STILL NOT LIVE:** two migrations (24 Sep and `20261104120000`), the
-  `coach-reach-out` deploy and the keys, all on her machine (handover prompt, steps 2-5). VERIFIED: GATES_LINE
-  MUTATIONS_LINE `docs/plans/the-coach-can-reach-you.md`, "Three a day".
+  `coach-reach-out` deploy and the keys, all on her machine (handover prompt, steps 2-5). VERIFIED: `test:coach-moments` 75 checks (§4b new), `test:reach-out` 85
+  (§4, §5b one whole day hour by hour, §6 food parity over 6,144 cases), `verify:reach-out-function` 17 (the REAL
+  function in Deno: reserved before sent, a refused reservation sends nothing, the meal read scoped to the person),
+  `test:rls-local` §9 (the new migration on a real Postgres: two different reminders a day recorded, the same one
+  twice refused), `verify:reminders` 30 at 390px (ten switches, "up to 3 a day, at least 3 hours apart", screenshot
+  read); 30 mutations, 30 caught, every run at full count. The 65 gates reading the changed files all pass; `tsc`
+  clean. NOT proven: that a phone buzzes (needs her deploy and a real phone). `docs/plans/the-coach-can-reach-you.md`,
+  "Three a day".
 - [x] **NO BAR ABOVE THE SELECTED TAB, 4 NOV 2026** (Ashley, with a screenshot: "Why is it adding a line above the tab
   that is selected. Remove that"). The 31 Oct tab-polish handoff drew an 18x3 mint bar above the active icon; it is
   gone. The selected tab still reads as selected: mint, glowing icon, bold label, marked for a screen reader.

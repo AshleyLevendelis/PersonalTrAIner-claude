@@ -367,6 +367,24 @@ try {
     const bumped = expectRefused(`SELECT increment_ai_usage('profile:x', 'chat-gemini');`, { role: 'anon' })
     check('anon cannot call the increment function', bumped !== null && /permission denied/i.test(bumped), bumped)
   }
+
+  // HER RULING OF 4 NOV 2026, "Up to 3, spaced". The 24 Sep migration allowed one
+  // notification row per person per day; 20261104120000 makes it one per MOMENT per
+  // day, and the function reserves the row before it sends. Checked on a database
+  // that ran every migration: if the old rule's name were wrong, the DROP would
+  // silently do nothing and the second reminder of the day would never go.
+  console.log('\n9. Reminders: two different ones a day may be recorded, the same one twice may not')
+  {
+    const second = expectRefused(`
+      INSERT INTO coach_notifications_sent (user_id, moment, sent_on) VALUES ('${PROFILE_A}', 'workout_today', '2026-11-04');
+      INSERT INTO coach_notifications_sent (user_id, moment, sent_on) VALUES ('${PROFILE_A}', 'session_not_logged', '2026-11-04');
+    `)
+    check('a second, different reminder the same day is recorded (the one-a-day rule is gone)', second === null, second)
+    const repeat = expectRefused(`INSERT INTO coach_notifications_sent (user_id, moment, sent_on) VALUES ('${PROFILE_A}', 'workout_today', '2026-11-04');`)
+    check('...the same reminder twice in a day is refused (two runs racing cannot both send it)', repeat !== null && /duplicate key|unique/i.test(repeat), repeat)
+    const col = psql(`SELECT count(*) FROM information_schema.columns WHERE table_name = 'coach_moment_facts' AND column_name = 'protein_target_g';`)
+    check('...and the facts row has room for the protein target', col === '1', col)
+  }
 } finally {
   stop()
 }
