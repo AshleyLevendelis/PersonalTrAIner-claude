@@ -24,7 +24,9 @@
 
 import { EXERCISE_ALIASES, exerciseAliasFor, normaliseAliasPhrase } from '../src/lib/exercise-aliases'
 import { resolveExerciseName, parseWorkoutEntries, isNamedByTheUser, type WorkoutEntryInput } from '../src/lib/set-parse'
-import { EXERCISE_DATABASE, getExerciseEntry, searchExerciseCatalog } from '../src/lib/exercise-db'
+import { EXERCISE_DATABASE, getExerciseEntry, searchExerciseCatalog, searchExerciseCatalogByWords, searchExercisesToLog } from '../src/lib/exercise-db'
+import { SEARCH_WORDS } from '../src/lib/exercise-aliases'
+import { ensureNearCopies } from '../src/lib/near-copies-loader'
 import { isExternallyLoaded } from '../src/lib/load-prescription'
 import { resolveExerciseDislike } from '../src/lib/fact-compiler'
 
@@ -203,6 +205,21 @@ console.log('\n9. The other callers of the resolver gain, never lose')
   const lat = resolveExerciseDislike('lat pulldown', resolveExerciseName)
   check('a full name still works', lat.ok && lat.name === 'Lat Pulldown', lat)
   check('exerciseAliasFor has no answer for a blank phrase', exerciseAliasFor('   ') === undefined)
+}
+
+console.log('\nTHE SEARCH BOXES READ "RDL" (4 Nov 2026, her "add RDL as a search word for Romanian deadlift")')
+{
+  await ensureNearCopies()
+  const names = (q: string) => searchExerciseCatalogByWords(q, 20).map(e => e.name)
+  check('"rdl" in the swap and add search puts Romanian Deadlifts first', names('rdl')[0] === 'Romanian Deadlifts', names('rdl'))
+  check('...and still finds the lifts named with the letters ("Single-Leg RDL (Bodyweight)")', names('rdl').includes('Single-Leg RDL (Bodyweight)'), names('rdl'))
+  check('"RDLs", any case, the same', names('RDLs').includes('Romanian Deadlifts'), names('RDLs'))
+  check('"rdl" inside a longer search is written out ("smith rdl" finds the Smith machine one)', names('smith rdl').includes('Smith Machine Romanian Deadlift'), names('smith rdl'))
+  check('the logging box too ("paused rdl" finds a paused Romanian deadlift, log-only)', searchExercisesToLog('paused rdl', 8).some(e => /paused romanian/i.test(e.name)), searchExercisesToLog('paused rdl', 8).map(e => e.name))
+  check('the strict search the ban and set resolvers use is untouched (no "smith rdl" there)', searchExerciseCatalog('smith rdl', 20).length === 0)
+  const both = names('rdl'), firstVersion = both.findIndex(n => !!getExerciseEntry(n)?.parent), lastLift = both.map(n => !getExerciseEntry(n)?.parent).lastIndexOf(true)
+  check('...and catalogue lifts stay above machine versions', firstVersion === -1 || lastLift < firstVersion, both)
+  check('every search word writes out to words a catalogue name holds', Object.values(SEARCH_WORDS).every(w => EXERCISE_DATABASE.some(e => e.name.toLowerCase().includes(w.split(' ')[0]))))
 }
 
 console.log(`\n${ran} checks ran, ${failures} failed`)

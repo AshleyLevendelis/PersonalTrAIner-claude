@@ -1,6 +1,7 @@
 import { TrainingStyle, type TrainingExperience } from './types'
 import { isRegressionFor } from './periodization'
 import { MACHINE_VERSIONS } from './exercise-machine-versions'
+import { exerciseAliasFor, SEARCH_WORDS } from './exercise-aliases'
 
 export type MovementPattern =
   | 'horizontal_push'
@@ -6471,7 +6472,30 @@ function catalogWords(text: string): string[] {
  * above, so there is exactly one implementation of them; this only APPENDS a
  * looser tier below everything it already found.
  */
+/**
+ * GYM SHORTHAND IN THE SEARCH BOXES (4 Nov 2026, her "add RDL as a search word for Romanian deadlift"). The query as
+ * typed, then the same query with each shorthand word written out ("smith rdl" -> "smith romanian deadlift"). The
+ * typed form stays first because some names carry the letters themselves ("Single-Leg RDL (Bodyweight)").
+ */
+function searchPhrasings(query: string): string[] {
+  const words = query.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+  const written = words.map(w => SEARCH_WORDS[w] ?? SEARCH_WORDS[w.replace(/s$/, '')] ?? w).join(' ')
+  return written !== words.join(' ') ? [query, written] : [query]
+}
+
 export function searchExerciseCatalogByWords(query: string, limit = 20): ExerciseEntry[] {
+  // A whole phrase the shorthand table gives ONE meaning to ("rdl", "db rdl", "ohp") leads, then every phrasing's
+  // matches, catalogue lifts above machine versions throughout (as below).
+  const alias = exerciseAliasFor(query)
+  const aliasEntry = alias ? EXERCISE_DATABASE.find(e => e.name === alias && !e.retired) : undefined
+  const all = [...(aliasEntry ? [aliasEntry] : []), ...searchPhrasings(query).flatMap(q => searchOnePhrasing(q, limit))]
+  const seen = new Set<string>()
+  const unique = all.filter(e => !seen.has(e.name) && !!seen.add(e.name))
+  const isVersion = (e: ExerciseEntry) => !!e.parent && !e.log_only
+  return [...unique.filter(e => !isVersion(e)), ...unique.filter(isVersion)].slice(0, limit)
+}
+
+function searchOnePhrasing(query: string, limit: number): ExerciseEntry[] {
   const strict = searchExerciseCatalog(query, limit)
   const words = catalogWords(query)
   const already = new Set(strict.map(e => e.name))
@@ -6509,12 +6533,13 @@ export function searchExerciseCatalogByWords(query: string, limit = 20): Exercis
 export function searchExercisesToLog(query: string, limit = 8): ExerciseEntry[] {
   const planned = searchExerciseCatalogByWords(query, limit)
   const q = query.trim().toLowerCase()
-  const words = catalogWords(query)
   if (!q) return planned
+  // Every phrasing, so "paused rdl" finds a paused Romanian deadlift here too.
+  const matchers = searchPhrasings(query).map(p => ({ q: p.trim().toLowerCase(), words: catalogWords(p) }))
   const copies = logOnlyExercises()
     .filter(e => {
       const name = e.name.toLowerCase()
-      return name.includes(q) || (words.length > 1 && words.every(w => catalogWords(e.name).some(nw => nw.startsWith(w))))
+      return matchers.some(m => name.includes(m.q) || (m.words.length > 1 && m.words.every(w => catalogWords(e.name).some(nw => nw.startsWith(w)))))
     })
     .sort((a, b) => Number(!a.name.toLowerCase().startsWith(q)) - Number(!b.name.toLowerCase().startsWith(q)) || a.name.localeCompare(b.name))
   return [...planned, ...copies].slice(0, limit)

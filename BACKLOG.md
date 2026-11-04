@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **"RDL" IS A SEARCH WORD FOR ROMANIAN DEADLIFT, 4 NOV 2026** (Ashley: "add RDL as a search word for Romanian
+  deadlift"). The coach already read "rdl" through the shorthand table (19 Oct); the swap, add and logging search boxes
+  did not, so "rdl" found only the two single-leg lifts named with the letters and "smith rdl" found nothing. Now a
+  whole phrase the table gives one meaning leads the list ("rdl", "db rdl", "ohp", "bench"), and a shorthand WORD is
+  written out inside any search (`SEARCH_WORDS`, "rdl" only for now). The strict search the ban and logged-set
+  resolvers use is untouched. `test:exercise-aliases` +8 checks, 5 mutations: 4 caught, 1 equivalent today (no machine
+  name holds "rdl", so the catalogue-above-versions ordering cannot bind on this word). ALSO: `test:slot-replacement`'s
+  "a single word is handled by the strict matcher alone" compared lengths, which machine versions broke this morning;
+  re-anchored on catalogue lifts. Found while doing it: that check is vacuous (for one word, the loose tier finds only
+  what the strict one already does), a mutation confirms; recorded, not replaced.
 - [x] **ACTIVE RECOVERY IN THE RECOVERY VIOLET, AND NEW TAB ICONS, 4 NOV 2026** (Ashley's handoff, "Exercise Screen"
   option 4b and "Tab Icons" option 2a; two commits as it asked). (1) The active-recovery card had kept the amber
   warning colour from before the 20 Sep rest-day rebuild; it now wears the rest day's deep surface, violet heart and

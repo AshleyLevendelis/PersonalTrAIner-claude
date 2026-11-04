@@ -223,8 +223,12 @@ console.log('\n[7] The picker finds what a person actually types')
   check('a word that appears nowhere finds nothing',
     searchExerciseCatalogByWords('zebra curl', 30).length === 0,
     searchExerciseCatalogByWords('zebra curl', 30).map(r => r.name))
-  check('...and a single word is still handled by the strict matcher alone',
-    searchExerciseCatalogByWords('deadlift', 30).length === searchExerciseCatalog('deadlift', 30).length)
+  // Among CATALOGUE lifts (4 Nov 2026): machine versions now follow the catalogue's matches (her "Machines swappable
+  // only"), which a bare length comparison would count as the loose tier. The property is unchanged: no loose word
+  // matching for a single word.
+  const catalogueOnly = searchExerciseCatalogByWords('deadlift', 30).filter(e => !e.parent).map(e => e.name).sort()
+  check('...and a single word is still handled by the strict matcher alone (among catalogue lifts)',
+    JSON.stringify(catalogueOnly) === JSON.stringify(searchExerciseCatalog('deadlift', 30).map(e => e.name).sort()), catalogueOnly)
 }
 
 // ---------------------------------------------------------------------------

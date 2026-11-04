@@ -94,6 +94,17 @@ export const EXERCISE_ALIASES: Readonly<Record<string, string>> = {
   'kettlebell swing': 'Kettlebell Swings',
 }
 
+/**
+ * SHORTHAND WORDS FOR THE SEARCH BOXES (4 Nov 2026, Ashley: "add RDL as a search word for Romanian deadlift"). Where
+ * the table above maps a WHOLE phrase to one lift, this writes one WORD out inside any search, so "smith rdl" finds
+ * the Smith Machine Romanian Deadlift and "rdl" finds every Romanian deadlift. Only the pickers' and the logging box's
+ * search read it (searchPhrasings in exercise-db.ts); the resolvers keep the table above. Add a word only when it has
+ * one meaning, as for the table.
+ */
+export const SEARCH_WORDS: Readonly<Record<string, string>> = {
+  rdl: 'romanian deadlift',
+}
+
 /** Shorthand prefixes written out, so "db rdl" and "dumbbell rdl" are one key. */
 const WORD_EXPANSIONS: Readonly<Record<string, string>> = {
   db: 'dumbbell',
