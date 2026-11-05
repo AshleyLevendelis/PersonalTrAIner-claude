@@ -2,6 +2,27 @@
 
 Newest first. One line each.
 
+- [x] **REMINDERS LIVE ON PRODUCTION, AND A REAL BUZZ ON HER ANDROID PHONE, 5 NOV 2026** (her machine, her typed
+  production steps). Her phone said "The reminder service isn't running yet". MEASURED in order, from the LIVE app's
+  own point of view: the app she opens (`personal-tr-a-iner-claude-yco8.vercel.app`) is built against PRODUCTION with
+  a new-style `sb_publishable_` key; `coach-reach-out?vapid` there returned **404** (never deployed), then after her
+  `deploy:functions:prod` **503 "VAPID_KEYS is not set"**, then after her secrets set **200 with a public key**, CORS
+  preflight 200. Both 24 Sep and 4 Nov migrations were already on both projects (parity PASS, 62). Vault
+  `project_url` and `reach_out_secret` set by her in the PRODUCTION SQL editor (both names read back). Test push:
+  `devices:1, outcomes:["ok"]`, and she confirmed the notification ARRIVED. **"ok" is not a buzz**: the first test
+  returned ok and showed nothing; it appeared once the phone's own notification settings were sorted (app info /
+  Do Not Disturb). Every reminder is sent at default ("normal") priority, so Android may hold one while the phone
+  sleeps; raising it is a one-line change, not made. **Found on the way, NOT FIXED:** (1) a second Vercel address,
+  `personal-tr-a-iner-claude.vercel.app`, is built with NO Supabase settings at all and cannot work: hers to delete or
+  fix; (2) `test:schema-parity` read a RESTORING TEST project as zero migrations and printed a false "diverged" over
+  60 lines: it should refuse an empty read, `verify:rls`-style; (3) Supabase CLI 3.0.0 now defaults to the LOCAL stack,
+  deprecates `--linked`/`--project-ref` for `--remote`, and refuses hosted changes in agent mode without `--yes`: the
+  repo's link/deploy scripts still work today but are on borrowed time; (4) on Windows the three synced `_shared`
+  copies check out with CRLF and `deploy:functions` refuses them as STALE; `npm run sync:shared` rewrites them as LF
+  with no content change (git diff empty). TEST also has its own keys now (`?vapid` 200) but NO vault secrets, so
+  TEST's hourly job sends nothing. NOT YET VERIFIED: an hourly run in `cron.job_run_details` reading "succeeded".
+  Secrets kept only in this session's scratchpad on her machine; one production secret was printed to the session
+  log by a check and was replaced before it was ever used.
 - [x] **REMINDERS: UP TO THREE A DAY, AND THE THREE SHE ASKED FOR, 4 NOV 2026** (Ashley: "The app desperately needs
   push notifications ... remind them of an upcoming workouts or check in on them after a workout. Or to remind them to
   hit their protein goal or log a meal"). MEASURED FIRST: the phone reminders were already built (24 Sep) but not live,
