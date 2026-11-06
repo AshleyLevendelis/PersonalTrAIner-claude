@@ -271,7 +271,10 @@ console.log('\n4. Attention: the chat button lights for exactly the opener kinds
   // mesocycle user is told about the right day.
   check('the opener reads the live week\'s days', /const liveWeekDays = mesocycle\.find\(w => w\.week_number === openerWeek\)\?\.days \?\? exercisePlan/.test(chatUi))
   check('...and the week strip\'s own states decide "missed"', /missedYesterdayFrom\(trainingWeek\.days, yesterdayDate, liveWeekDays\)/.test(chatUi))
-  check('chips ride on the opener message', /quickReplies: opener\.chips\.length > 0 \? opener\.chips : undefined/.test(chatUi))
+  // 6 Nov 2026: the opener may now be in the coach's own words (her "Coach writes, app checks"), and the
+  // buttons ride on whichever words show, the coach's or the fixed ones.
+  check('chips ride on the opener message', /const chips = opener\.chips\.length > 0 \? opener\.chips : undefined/.test(chatUi)
+    && /content: coach \?\? content, [^\n]*quickReplies: chips/.test(chatUi))
 
   // THE OTHER HALF OF THE 7 SEP FIX. pickOpener can only be honest about a
   // missing plan if it is TOLD the plan is missing, and the opener can only
