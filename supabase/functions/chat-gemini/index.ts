@@ -1,5 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { cleanCoachResponse } from "./text-like-a-coach.ts";
+import { deliverReply, type ReplyPushDeps } from "./reply-push.ts";
+import { pushServer, sendPush } from "../_shared/push.ts";
+import type { NotificationSettings } from "../_shared/coach-moments.ts";
 import { GEMINI_MODEL } from "../_shared/gemini.ts";
 import { assumedLine, computeMealMacros, doubtAboutLoggedMeal, type MealIngredientLine } from "../_shared/food-db.ts";
 import { readIngredientText, splitCompoundFoodLine } from "../_shared/ingredient-units.ts";
@@ -2090,7 +2093,70 @@ interface ConcurrentActivity {
 // and cleanCoachResponse strips the formatting a coach does not text (headers,
 // bold) from its words on the way out. One door rather than sixty call sites,
 // so no future return can forget it. See text-like-a-coach.ts for why.
-Deno.serve(async (req: Request) => cleanCoachResponse(await handleChatRequest(req)));
+//
+// AND THEN, once the reply is out of the door, it is saved in her chat and
+// texted to her phone (6 Nov 2026, "like a WhatsApp notification"): see
+// reply-push.ts. After the response, never before it, so she never waits on a
+// push to see her answer; and a failure there never touches the reply itself.
+Deno.serve(async (req: Request) => {
+  const request = req.method === "POST" ? await req.clone().json().catch(() => null) : null;
+  const res = await cleanCoachResponse(await handleChatRequest(req));
+  if (request && (request as { placeholder_id?: unknown }).placeholder_id) {
+    const job = (async () => {
+      const body = await res.clone().json().catch(() => null);
+      const outcome = await deliverReply(request, body, res.status, replyPushDeps());
+      if (outcome === "sent" || outcome === "not_delivered") console.log("[chat-gemini] reply push:", outcome);
+    })().catch(err => console.error("[chat-gemini] reply push failed:", String(err)));
+    const runtime = (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime;
+    if (runtime?.waitUntil) runtime.waitUntil(job);
+    else await job;
+  }
+  return res;
+});
+
+/** The real world for reply-push.ts: the chat row, her settings and phones, and the push service. */
+function replyPushDeps(): ReplyPushDeps {
+  const url = Deno.env.get("SUPABASE_URL") ?? "";
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const headers = { apikey: key, Authorization: `Bearer ${key}` };
+  const get = async <T>(path: string): Promise<T> => {
+    const r = await fetch(`${url}/rest/v1/${path}`, { headers });
+    if (!r.ok) throw new Error(`${path.split("?")[0]} ${r.status}: ${await r.text()}`);
+    return await r.json() as T;
+  };
+  let server: Awaited<ReturnType<typeof pushServer>> | null = null;
+  return {
+    now: new Date(),
+    loadRow: async (id, profileId) => {
+      const rows = await get<{ id: string; profile_id: string; role: string; created_at: string }[]>(
+        `chat_messages?id=eq.${id}&profile_id=eq.${profileId}&select=id,profile_id,role,created_at`);
+      return rows[0] ?? null;
+    },
+    completeRow: async (id, profileId, content) => {
+      const r = await fetch(`${url}/rest/v1/chat_messages?id=eq.${id}&profile_id=eq.${profileId}&role=eq.assistant`, {
+        method: "PATCH",
+        headers: { ...headers, "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ content, status: "complete" }),
+      });
+      if (!r.ok) throw new Error(`PATCH chat_messages ${r.status}: ${await r.text()}`);
+    },
+    loadSettings: async (profileId) => {
+      // select=*: a pending migration costs the switches (absent means on), never the reply.
+      const rows = await get<Record<string, unknown>[]>(`fitness_profiles?id=eq.${profileId}&select=*`);
+      const sw = rows[0]?.notification_switches;
+      return (sw && typeof sw === "object" ? sw : {}) as NotificationSettings;
+    },
+    listSubscriptions: (profileId) =>
+      get(`push_subscriptions?user_id=eq.${profileId}&select=id,user_id,endpoint,p256dh,auth,timezone`),
+    send: async (sub, payload) => {
+      server ??= await pushServer();
+      return await sendPush(server, sub, payload);
+    },
+    dropSubscription: async (id) => {
+      await fetch(`${url}/rest/v1/push_subscriptions?id=eq.${id}`, { method: "DELETE", headers });
+    },
+  };
+}
 
 async function handleChatRequest(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") {

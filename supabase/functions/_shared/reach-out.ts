@@ -23,8 +23,8 @@
 // ---------------------------------------------------------------------------
 
 import {
-  momentsToRaise, MAX_NOTIFICATIONS_PER_DAY, MIN_HOURS_BETWEEN,
-  type MomentFacts, type MomentKey, type MomentSwitches,
+  momentsToRaise, dailyCap, MIN_HOURS_BETWEEN,
+  type MomentFacts, type MomentKey, type NotificationSettings,
 } from './coach-moments.ts'
 
 export interface PushSubscriptionRow {
@@ -81,6 +81,8 @@ export interface LiveFacts {
   mealsAccountedToday?: number
   proteinEatenToday?: number
   mealLoggedRecently?: boolean
+  /** When the most recent unrated session finished (an ISO instant), for "how was the workout this morning?". */
+  lastFinishedAt?: string | null
 }
 
 export interface SentRecord {
@@ -90,16 +92,43 @@ export interface SentRecord {
   sent_at?: string | null
 }
 
+/** What a notification carries to the phone. The service worker reads all of it (public/sw.js). */
+export interface PushPayload {
+  title: string
+  body: string
+  /** A moment key, 'coach_reply', or 'test'. */
+  moment: string
+  url: string
+  /** The chat row holding the same words, so a tap lands on the message. */
+  messageId?: string | null
+}
+
+/**
+ * WHO THE MESSAGES COME FROM: the name the chat uses for the coach (her ruling
+ * 1 Nov 2026, "Both say Trainer"), so a notification reads like a text from
+ * the same person whose messages are in the chat.
+ */
+export const COACH_SENDER = 'Trainer'
+
 export interface ReachOutDeps {
   now: Date
   listSubscriptions(): Promise<PushSubscriptionRow[]>
   loadFactsRow(userId: string): Promise<MomentFactsRow | null>
-  loadSwitches(userId: string): Promise<MomentSwitches>
+  /** Her Reminders settings (switches, frequency) and the name the coach uses for her. */
+  loadSettings(userId: string): Promise<{ settings: NotificationSettings; name: string | null }>
   loadLive(userId: string, localToday: string, timezone: string): Promise<LiveFacts>
   /** The last few notifications this person was sent, newest first. */
   loadRecentSends(userId: string): Promise<SentRecord[]>
   /** 'gone' means the phone unsubscribed; the row should be dropped. */
-  send(sub: PushSubscriptionRow, payload: { title: string; body: string; moment: MomentKey; url: string }): Promise<'ok' | 'gone' | 'failed'>
+  send(sub: PushSubscriptionRow, payload: PushPayload): Promise<'ok' | 'gone' | 'failed'>
+  /**
+   * THE SAME WORDS AS A MESSAGE IN THE CHAT (her ruling 6 Nov 2026, "Chat,
+   * with a shortcut"): an assistant row, written BEFORE the push so a tap
+   * always finds it. Returns its id.
+   */
+  insertChatMessage(userId: string, message: { content: string; moment: MomentKey; shortcut: 'exercise' | 'nutrition' | null }): Promise<string>
+  /** Takes the message back when no phone took the push: the chat never holds a message nobody was sent. */
+  deleteChatMessage(userId: string, id: string): Promise<void>
   /**
    * RESERVES the notification BEFORE it is sent, and says whether the
    * reservation landed. False means the database refused it (two runs racing,
@@ -175,7 +204,20 @@ export function isPlanned(date: string, row: MomentFactsRow | null, live: LiveFa
  * counts for 36 hours (bounded by the read), a block's end for three days, and
  * a streak only if Home counted it yesterday or today.
  */
-export function factsFor(row: MomentFactsRow | null, live: LiveFacts, localToday: string, localHour: number): MomentFacts {
+/**
+ * WHEN THE SESSION BEING ASKED ABOUT FINISHED, in her words and on her clock:
+ * "this morning", "this afternoon", "this evening" or "yesterday". Null when
+ * there is no time to read, and the message then says "earlier".
+ */
+export function finishedWhen(finishedAt: string | null | undefined, localToday: string, timezone: string): MomentFacts['finishedWhen'] {
+  if (!finishedAt || Number.isNaN(Date.parse(finishedAt))) return null
+  const { date, hour } = localParts(new Date(finishedAt), timezone)
+  if (date === localToday) return hour < 12 ? 'this morning' : hour < 17 ? 'this afternoon' : 'this evening'
+  if (date === addDays(localToday, -1)) return 'yesterday'
+  return null
+}
+
+export function factsFor(row: MomentFactsRow | null, live: LiveFacts, localToday: string, localHour: number, words: { name?: string | null; timezone?: string } = {}): MomentFacts {
   const yesterday = addDays(localToday, -1)
   const logged = new Set(live.activityDates)
   const lastLog = live.activityDates[0] ?? null
@@ -197,28 +239,19 @@ export function factsFor(row: MomentFactsRow | null, live: LiveFacts, localToday
     logsMeals: !!live.mealLoggedRecently,
     proteinEatenToday: live.proteinEatenToday ?? 0,
     proteinTargetG: Math.max(0, Number(row?.protein_target_g ?? 0) || 0),
+    name: words.name ?? null,
+    finishedWhen: finishedWhen(live.lastFinishedAt, localToday, words.timezone ?? 'UTC'),
   }
 }
 
 /**
- * WHERE A TAP GOES. The chat by default, where the coach picks the thought up;
- * the training-day reminder opens the session, and the food nudges open
- * Nutrition, where the logging is.
+ * MAY THE PERSON HEAR ANYTHING AT ALL RIGHT NOW? Her own frequency (her
+ * ruling 6 Nov 2026, "Three levels": Light 1, Normal 3, Lots 5 a day), and at
+ * least three hours apart at every level (her 4 Nov "Up to 3, spaced").
  */
-export function tapTarget(moment: MomentKey): string {
-  if (moment === 'workout_today') return '/#/tab/exercise'
-  if (moment === 'meal_not_logged' || moment === 'protein_short') return '/#/tab/nutrition'
-  return '/#/tab/chat'
-}
-
-/**
- * MAY THE PERSON HEAR ANYTHING AT ALL RIGHT NOW? Ashley's ruling, 4 Nov 2026,
- * "Up to 3, spaced": at most three a day, at least three hours apart. Asked
- * once per person per run, before any of their data is read.
- */
-export function dayAllows(recent: SentRecord[], localToday: string, now: Date): 'ok' | 'day_full' | 'too_soon' {
+export function dayAllows(recent: SentRecord[], localToday: string, now: Date, cap: number): 'ok' | 'day_full' | 'too_soon' {
   const today = recent.filter(r => r.sent_on === localToday)
-  if (today.length >= MAX_NOTIFICATIONS_PER_DAY) return 'day_full'
+  if (today.length >= cap) return 'day_full'
   const gapMs = MIN_HOURS_BETWEEN * 3_600_000
   // ACROSS MIDNIGHT TOO: a 9pm nudge and an 8am one are eleven hours apart,
   // but 11pm (another zone's clock) and 1am would not be, so the gap is read
@@ -262,16 +295,17 @@ export async function runReachOut(deps: ReachOutDeps): Promise<ReachOutReport> {
       // The first device's timezone speaks for the person. Two phones in two
       // zones is rare enough that the gap is named rather than engineered.
       const { date: today, hour } = localParts(deps.now, devices[0].timezone)
-      const recent = await deps.loadRecentSends(userId)
-      // HELD BACK BY THE DAY'S LIMITS: three already, or one too recently.
-      if (dayAllows(recent, today, deps.now) !== 'ok') { report.alreadyToday++; continue }
+      const [recent, profile] = await Promise.all([deps.loadRecentSends(userId), deps.loadSettings(userId)])
+      // HELD BACK BY THE DAY'S LIMITS: her frequency reached, or one too recently.
+      if (dayAllows(recent, today, deps.now, dailyCap(profile.settings.frequency)) !== 'ok') { report.alreadyToday++; continue }
 
-      const [row, switches, live] = await Promise.all([
-        deps.loadFactsRow(userId), deps.loadSwitches(userId), deps.loadLive(userId, today, devices[0].timezone),
+      const [row, live] = await Promise.all([
+        deps.loadFactsRow(userId), deps.loadLive(userId, today, devices[0].timezone),
       ])
       // THE FIRST LIVE MOMENT ITS OWN LIMITS ALLOW, not merely the first live
       // one: a nudge already said today must not stand in front of the next.
-      const moment = momentsToRaise(factsFor(row, live, today, hour), switches)
+      const facts = factsFor(row, live, today, hour, { name: profile.name, timezone: devices[0].timezone })
+      const moment = momentsToRaise(facts, profile.settings)
         .find(m => mayNotify(recent, today, m.key) === 'ok')
       if (!moment) { report.quiet++; continue }
 
@@ -281,9 +315,20 @@ export async function runReachOut(deps: ReachOutDeps): Promise<ReachOutReport> {
       // once a day rather than every hour.
       if (!(await deps.recordSent(userId, today, moment.key))) { report.alreadyToday++; continue }
 
+      // THE MESSAGE GOES IN THE CHAT FIRST, so a tap always finds it there. A
+      // chat that cannot be written to means no notification this hour: a buzz
+      // whose message is missing from the chat is the thing she asked not to get.
+      let messageId: string
+      try {
+        messageId = await deps.insertChatMessage(userId, { content: moment.text, moment: moment.key, shortcut: moment.shortcut })
+      } catch (err) {
+        await deps.unrecordSent(userId, today, moment.key)
+        throw err
+      }
+
       let delivered = false
       for (const device of devices) {
-        const outcome = await deps.send(device, { title: 'Your coach', body: moment.text, moment: moment.key, url: tapTarget(moment.key) })
+        const outcome = await deps.send(device, { title: COACH_SENDER, body: moment.text, moment: moment.key, url: '/#/tab/chat', messageId })
         if (outcome === 'ok') delivered = true
         else if (outcome === 'gone') { await deps.dropSubscription(device.id); report.dropped++ }
         else report.failed++
@@ -291,7 +336,10 @@ export async function runReachOut(deps: ReachOutDeps): Promise<ReachOutReport> {
       // COUNTED ONLY WHEN SOMETHING ARRIVED. A send that failed everywhere
       // gives its reservation back, and the next hour tries again.
       if (delivered) report.sent++
-      else await deps.unrecordSent(userId, today, moment.key)
+      else {
+        await deps.deleteChatMessage(userId, messageId)
+        await deps.unrecordSent(userId, today, moment.key)
+      }
     } catch (err) {
       console.error('[reach-out] skipped one person this hour:', err)
       report.failed++

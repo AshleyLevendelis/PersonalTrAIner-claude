@@ -101,21 +101,35 @@ self.addEventListener('fetch', event => {
 })
 
 // ---------------------------------------------------------------------------
-// THE COACH, WHEN THE APP IS SHUT — docs/plans/the-coach-can-reach-you.md.
+// THE COACH TEXTS YOU — docs/plans/the-coach-can-reach-you.md.
 //
-// The coach-reach-out function sends one encrypted JSON message:
-//   { title, body, moment, url }
-// The words are the phrasebook's (coach-voice.ts notification()), chosen on
-// the server by the same decision the app makes; nothing here writes any.
+// Two functions send one encrypted JSON message:
+//   { title, body, moment, url, messageId }
+// coach-reach-out for a reminder, chat-gemini for a REPLY when she has left the
+// app. Since 6 Nov 2026 (her "like a WhatsApp notification") the words are a
+// message in the chat too: the title is the coach's name ("Trainer"), the body
+// is the very message, and a tap opens the chat where it sits at the bottom.
+// Nothing here writes any words.
 //
-// ONE AT A TIME ON THE LOCK SCREEN: every coach notification shares one tag,
-// so a new one replaces an unread old one rather than stacking beside it —
-// the same "at most one thing to say" the decision is built on.
+// ALREADY LOOKING: when a window of the app is visible and focused she is in
+// it, so nothing pops up over her own screen; the window is told a message
+// arrived and draws it.
 //
-// A tap opens the chat, where the coach can pick the thought up with
-// everything a screen has — focusing an open window rather than starting a
-// second one.
+// One tag per kind: a newer reminder replaces an unread reminder, and a newer
+// reply replaces an unread reply but buzzes again ("renotify"), the way a
+// messaging app updates one conversation.
 // ---------------------------------------------------------------------------
+const CHAT_URL = '/#/tab/chat'
+
+async function appWindows() {
+  const all = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  return all.filter(w => { try { return new URL(w.url).origin === self.location.origin } catch { return false } })
+}
+
+function tellWindows(windows, messageId) {
+  for (const w of windows) { try { w.postMessage({ type: 'coach-message', messageId: messageId || null }) } catch { /* gone */ } }
+}
+
 self.addEventListener('push', event => {
   let data = {}
   try { data = event.data ? event.data.json() : {} } catch { data = {} }
@@ -123,30 +137,37 @@ self.addEventListener('push', event => {
   // ever arrives the browser may put up its own generic notice, which is
   // still better than a notification in words nobody wrote.
   if (!data || typeof data.body !== 'string' || !data.body) return
-  event.waitUntil(self.registration.showNotification(data.title || 'Your coach', {
-    body: data.body,
-    tag: 'coach',
-    renotify: false,
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    // WHERE A TAP GOES is the server's to say (a training-day reminder opens the
-    // session, a food nudge opens Nutrition), but only ever a tab of THIS app:
-    // anything else falls back to the chat rather than becoming a link out.
-    data: { url: typeof data.url === 'string' && /^\/#\/tab\/[a-z]+$/.test(data.url) ? data.url : '/#/tab/chat', moment: data.moment || null },
-  }))
+  event.waitUntil((async () => {
+    const windows = await appWindows()
+    tellWindows(windows, data.messageId)
+    if (windows.some(w => w.visibilityState === 'visible' && w.focused)) return
+    const reply = data.moment === 'coach_reply'
+    await self.registration.showNotification(data.title || 'Trainer', {
+      body: data.body,
+      tag: reply ? 'coach-chat' : 'coach',
+      renotify: reply,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      // ONLY EVER A TAB OF THIS APP: anything else falls back to the chat
+      // rather than becoming a link out.
+      data: { url: typeof data.url === 'string' && /^\/#\/tab\/[a-z]+$/.test(data.url) ? data.url : CHAT_URL, moment: data.moment || null, messageId: data.messageId || null },
+    })
+  })())
 })
 
 self.addEventListener('notificationclick', event => {
   event.notification.close()
-  const target = (event.notification.data && event.notification.data.url) || '/#/tab/chat'
+  const d = event.notification.data || {}
+  const target = d.url || CHAT_URL
   event.waitUntil((async () => {
-    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    const windows = await appWindows()
     for (const w of windows) {
-      if (new URL(w.url).origin === self.location.origin) {
-        await w.focus()
-        if ('navigate' in w) await w.navigate(target).catch(() => {})
-        return
-      }
+      await w.focus()
+      if ('navigate' in w) await w.navigate(target).catch(() => {})
+      // The window was open in the background: tell it to read the chat again,
+      // so the message she tapped is there when it comes forward.
+      tellWindows([w], d.messageId)
+      return
     }
     await self.clients.openWindow(target)
   })())

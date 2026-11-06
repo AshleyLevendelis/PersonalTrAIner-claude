@@ -18,10 +18,11 @@ import { fileURLToPath } from 'url'
 import {
   momentToRaise, liveMoments, MOMENT_KEYS, DEFAULT_MOMENT_SWITCHES,
   QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, NOT_LOGGED_AFTER_HOUR, QUIET_WEEK_DAYS,
-  WORKOUT_REMINDER_BEFORE_HOUR, FOOD_NUDGE_AFTER_HOUR, MAX_NOTIFICATIONS_PER_DAY, MIN_HOURS_BETWEEN, momentsToRaise,
+  WORKOUT_REMINDER_BEFORE_HOUR, FOOD_NUDGE_AFTER_HOUR, MIN_HOURS_BETWEEN, momentsToRaise, dailyCap, REMINDER_FREQUENCIES, DEFAULT_FREQUENCY,
   type MomentFacts, type MomentKey,
 } from '../src/lib/coach-moments'
-import { notification } from '../src/lib/coach-voice'
+import { coachMessage, coachMessageShortcut, coachShortcutLabel } from '../src/lib/coach-voice'
+const notification = (k: string, streak = 0, meals = 0) => coachMessage(k, { name: 'Ashley', streak, mealsLogged: meals })
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (f: string) => readFileSync(join(ROOT, f), 'utf8')
@@ -179,11 +180,19 @@ console.log('\n4b. The three of 4 Nov 2026: the morning reminder and the two foo
     !liveMoments({ ...QUIET, localHour: 20 }).some(k => k === 'meal_not_logged' || k === 'protein_short'))
 
   // HER RULING, as numbers that cannot move by accident: three a day, three hours apart.
-  check('up to 3 a day, at least 3 hours apart (her ruling of 4 Nov)', MAX_NOTIFICATIONS_PER_DAY === 3 && MIN_HOURS_BETWEEN === 3,
-    { MAX_NOTIFICATIONS_PER_DAY, MIN_HOURS_BETWEEN })
+  // HER RULINGS, as numbers that cannot move by accident: three hours apart (4 Nov), and how many a day by her
+  // own setting (6 Nov, "Three levels"): Light 1, Normal 3, Lots 5. Literal numbers, never read back off the table.
+  check('at least 3 hours apart (her ruling of 4 Nov)', MIN_HOURS_BETWEEN === 3, MIN_HOURS_BETWEEN)
+  check('Light is 1 a day, Normal 3, Lots 5 (her ruling of 6 Nov)',
+    dailyCap('light') === 1 && dailyCap('normal') === 3 && dailyCap('lots') === 5, REMINDER_FREQUENCIES.map(f => dailyCap(f)))
+  check('...three levels, Normal the default', JSON.stringify([...REMINDER_FREQUENCIES]) === '["light","normal","lots"]' && DEFAULT_FREQUENCY === 'normal')
+  check('...and a setting never saved, or one the app does not know, reads as Normal: never asked is not "less"',
+    dailyCap(undefined) === 3 && dailyCap(null) === 3 && dailyCap('loud') === 3 && dailyCap(5) === 3)
+  check('...and Lots fits its five in the waking window at the three-hour gap (8, 11, 14, 17, 20)',
+    QUIET_BEFORE_HOUR + (dailyCap('lots') - 1) * MIN_HOURS_BETWEEN <= QUIET_AFTER_HOUR)
   const screen = strip(read('src/components/RemindersSection.tsx'))
-  check('...and the switches screen states both, from those constants, not "once a day"',
-    /\{MAX_NOTIFICATIONS_PER_DAY\}/.test(screen) && /\{MIN_HOURS_BETWEEN\}/.test(screen) && !/once a day/i.test(screen))
+  check('...and the switches screen states the gap from the constant, the limit from her setting, never "once a day"',
+    /\{MIN_HOURS_BETWEEN\}/.test(screen) && /frequencyLabel\(frequency\)\.detail/.test(screen) && !/once a day/i.test(screen))
   // ALL LIVE ONES, BEST FIRST — what the sender walks.
   const both = momentsToRaise({ ...eater, plannedToday: true }).map(m => m.key)
   check('the full list is in the declared order, the one-thing answer at its head',
@@ -233,14 +242,36 @@ console.log('\n7. Every word comes from the phrasebook')
   // A NOTIFICATION IS THE COACH SPEAKING. A second place to write its words is
   // a second voice, and the half that drifts is the half nobody re-reads.
   check('the decider writes no sentences of its own',
-    !/return\s*[`'"][a-z]/i.test(src.replace(/notification\(/g, '')), src.match(/return\s*[`'"][a-z][^`'"]*/gi)?.slice(0, 3))
-  check('...it asks the phrasebook', /notification\(/.test(src))
+    !/return\s*[`'"][a-z]/i.test(src.replace(/coachMessage\(/g, '')), src.match(/return\s*[`'"][a-z][^`'"]*/gi)?.slice(0, 3))
+  check('...it asks the phrasebook', /coachMessage\(/.test(src))
   check('every moment has words', MOMENT_KEYS.every(k => notification(k).length > 0),
     MOMENT_KEYS.filter(k => !notification(k)))
   check('...and they all differ', new Set(MOMENT_KEYS.map(k => notification(k))).size === MOMENT_KEYS.length)
   // PROVING THAT DETECTOR: an unknown key must come back empty rather than
   // with something generic, so a new moment cannot ship in words nobody wrote.
   check('...while an unknown moment has none', notification('not_a_moment') === '')
+  // A TEXT FROM YOUR COACH (6 Nov 2026): her name first, sentence case, and the same words on the phone and in the chat.
+  check('every message opens with her name, "Hey Ashley, ..."', MOMENT_KEYS.every(k => notification(k).startsWith('Hey Ashley, ')),
+    MOMENT_KEYS.map(k => notification(k)))
+  check('...and with no name on the profile, just "Hey, ..." (never "Hey undefined" or "Hey null")',
+    MOMENT_KEYS.every(k => coachMessage(k, { name: null }).startsWith('Hey, ') && coachMessage(k, { name: '  ' }).startsWith('Hey, ')
+      && !/undefined|null/.test(coachMessage(k, {}))))
+  check('the check-in names when the session was: "how was the workout this morning?"',
+    coachMessage('session_feel', { name: 'Ashley', finishedWhen: 'this morning' }) === 'Hey Ashley, how was the workout this morning?'
+      && /earlier\?$/.test(coachMessage('session_feel', { name: 'Ashley' })), coachMessage('session_feel', { name: 'Ashley', finishedWhen: 'this morning' }))
+  check('the morning reminder is her own example, "are you ready for your session today?"',
+    notification('workout_today') === 'Hey Ashley, are you ready for your session today?', notification('workout_today'))
+  check('the streak counts sessions, "5 in a row", never days (her 17 Oct ruling)',
+    /\b5 in a row\b/.test(notification('streak_at_risk', 5)) && !/\bdays?\b/i.test(notification('streak_at_risk', 5)), notification('streak_at_risk', 5))
+  check('the session and food messages carry their shortcut, the rest none',
+    coachMessageShortcut('workout_today') === 'exercise' && coachMessageShortcut('session_not_logged') === 'exercise'
+      && coachMessageShortcut('meal_not_logged') === 'nutrition' && coachMessageShortcut('protein_short') === 'nutrition'
+      && MOMENT_KEYS.filter(k => !['workout_today', 'session_not_logged', 'meal_not_logged', 'protein_short'].includes(k)).every(k => coachMessageShortcut(k) === null))
+  check('...worded as she chose: "Open today\'s session", "Open Nutrition"',
+    coachShortcutLabel('exercise') === "Open today's session" && coachShortcutLabel('nutrition') === 'Open Nutrition')
+  check('...and every moment raised carries its message and its shortcut',
+    momentsToRaise({ ...QUIET, localHour: 9, plannedToday: true, name: 'Ashley' })[0]?.shortcut === 'exercise'
+      && momentsToRaise({ ...QUIET, localHour: 9, plannedToday: true, name: 'Ashley' })[0]?.text === 'Hey Ashley, are you ready for your session today?')
   check('the streak line is the only one carrying a number',
     /\b9\b/.test(notification('streak_at_risk', 9))
     && MOMENT_KEYS.filter(k => k !== 'streak_at_risk').every(k => !/\d/.test(notification(k, 9))),
@@ -250,7 +281,7 @@ console.log('\n7. Every word comes from the phrasebook')
   // The meal nudge says what is true: nothing logged, or only one meal.
   check('the meal nudge has two wordings: nothing logged, and just one',
     notification('meal_not_logged', 0, 0) !== notification('meal_not_logged', 0, 1) && /one meal/.test(notification('meal_not_logged', 0, 1))
-    && /nothing logged/.test(notification('meal_not_logged', 0, 0)))
+    && /nothing logged/i.test(notification('meal_not_logged', 0, 0)))
   // NO NAMED FOOD on the protein line: it cannot see her diet or allergies.
   check('the protein nudge names no food', !/chicken|egg|yog|shake|whey|milk|meat|fish|tofu|nut/i.test(notification('protein_short')), notification('protein_short'))
 }

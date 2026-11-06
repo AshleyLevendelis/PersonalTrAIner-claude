@@ -40,15 +40,30 @@ export interface MomentFacts {
   logsMeals?: boolean
   proteinEatenToday?: number
   proteinTargetG?: number
+  name?: string | null
+  finishedWhen?: 'this morning' | 'this afternoon' | 'this evening' | 'yesterday' | null
 }
 
 export type MomentSwitches = Partial<Record<MomentKey, boolean>>
+
+export const REMINDER_FREQUENCIES = ['light', 'normal', 'lots'] as const
+export type ReminderFrequency = typeof REMINDER_FREQUENCIES[number]
+export const DEFAULT_FREQUENCY: ReminderFrequency = 'normal'
+const DAILY_CAP: Record<ReminderFrequency, number> = { light: 1, normal: 3, lots: 5 }
+
+export function dailyCap(frequency: unknown): number {
+  return DAILY_CAP[(REMINDER_FREQUENCIES as readonly unknown[]).includes(frequency) ? frequency as ReminderFrequency : DEFAULT_FREQUENCY]
+}
+
+export type NotificationSettings = MomentSwitches & {
+  frequency?: ReminderFrequency
+  coach_reply?: boolean
+}
 
 export const QUIET_BEFORE_HOUR = 8
 export const QUIET_AFTER_HOUR = 21
 export const NOT_LOGGED_AFTER_HOUR = 18
 export const QUIET_WEEK_DAYS = 7
-export const MAX_NOTIFICATIONS_PER_DAY = 3
 export const MIN_HOURS_BETWEEN = 3
 export const WORKOUT_REMINDER_BEFORE_HOUR = 12
 export const FOOD_NUDGE_AFTER_HOUR = 19
@@ -58,25 +73,51 @@ export const PROTEIN_SHORT_MIN_G = 20
 export interface CoachMoment {
   key: MomentKey
   text: string
+  shortcut: 'exercise' | 'nutrition' | null
 }
 
-/** The phrasebook's notification lines — a copy of coach-voice.ts `notification()`. */
-export function notification(key: string, streakDays = 0, mealsLogged = 0): string {
+/** The phrasebook's coach messages — a copy of coach-voice.ts `coachMessage()`. */
+export interface CoachMessageDetail {
+  name?: string | null
+  streak?: number
+  mealsLogged?: number
+  finishedWhen?: 'this morning' | 'this afternoon' | 'this evening' | 'yesterday' | null
+}
+
+export function coachMessage(key: string, d: CoachMessageDetail = {}): string {
+  const name = (d.name ?? '').trim()
+  const hey = name ? `Hey ${name}, ` : 'Hey, '
   switch (key) {
-    case 'session_feel': return 'how did that session actually feel?'
-    case 'workout_today': return "training day today — your session's ready when you are."
-    case 'meal_not_logged': return mealsLogged >= 1
-      ? 'just one meal logged today — add the rest so your numbers add up?'
-      : "nothing logged on nutrition yet today. got a minute to add what you've eaten?"
-    case 'protein_short': return "you're behind on protein today. a protein-rich snack this evening would help close the gap."
-    case 'session_not_logged': return "today's session is still waiting — got twenty minutes?"
-    case 'missed_yesterday': return 'yesterday got away from you. want to move it or let it go?'
-    case 'week_gone_quiet': return "it's been a quiet week. shall we pick something small to start again?"
-    case 'streak_at_risk': return `${streakDays} days in a row so far — today would keep it going.`
-    case 'block_review': return "that's a block done. come and see what moved."
-    case 'beat_target': return "you're beating the weights I set you. want them raised?"
+    case 'session_feel': return `${hey}how was the workout ${d.finishedWhen ?? 'earlier'}?`
+    case 'workout_today': return `${hey}are you ready for your session today?`
+    case 'session_not_logged': return `${hey}today's session is still waiting. Got twenty minutes?`
+    case 'missed_yesterday': return `${hey}yesterday's session got away from you. Want to move it or let it go?`
+    case 'week_gone_quiet': return `${hey}it's been a quiet week. Shall we pick something small to start again?`
+    case 'streak_at_risk': return `${hey}that's ${Math.max(0, d.streak ?? 0)} in a row. Today would keep it going.`
+    case 'meal_not_logged': return (d.mealsLogged ?? 0) >= 1
+      ? `${hey}just one meal logged today. Add the rest so your numbers add up?`
+      : `${hey}nothing logged on Nutrition yet today. Got a minute to add what you've eaten?`
+    case 'protein_short': return `${hey}you're behind on protein today. A protein-rich snack this evening would help close the gap.`
+    case 'block_review': return `${hey}that's a block done. Want to see what moved?`
+    case 'beat_target': return `${hey}you're beating the weights I set you. Want them raised?`
     default: return ''
   }
+}
+
+/**
+ * A REPLY THAT ISN'T A SENTENCE: a turn whose answer is a card the app draws
+ * (a swap, a log), when she has left the app (6 Nov 2026). The model's own
+ * words for such a turn are never shown (D1), so the phone says only that the
+ * coach has answered, and the chat holds the card. Server-only: no screen
+ * shows it, so it has no copy in src/.
+ */
+export const REPLY_WAITING = "I've replied. Tap to see it."
+
+/** A copy of coach-voice.ts `coachMessageShortcut()`. */
+export function coachMessageShortcut(key: string): 'exercise' | 'nutrition' | null {
+  if (key === 'workout_today' || key === 'session_not_logged') return 'exercise'
+  if (key === 'meal_not_logged' || key === 'protein_short') return 'nutrition'
+  return null
 }
 
 function isLive(key: MomentKey, f: MomentFacts): boolean {
@@ -109,7 +150,13 @@ export function momentsToRaise(facts: MomentFacts, switches: MomentSwitches = {}
   const out: CoachMoment[] = []
   for (const key of MOMENT_KEYS) {
     if (switches[key] === false) continue
-    if (isLive(key, facts)) out.push({ key, text: notification(key, facts.streakDays, facts.mealsAccountedToday ?? 0) })
+    if (isLive(key, facts)) {
+      out.push({
+        key,
+        text: coachMessage(key, { name: facts.name, streak: facts.streakDays, mealsLogged: facts.mealsAccountedToday ?? 0, finishedWhen: facts.finishedWhen }),
+        shortcut: coachMessageShortcut(key),
+      })
+    }
   }
   return out
 }

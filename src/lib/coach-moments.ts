@@ -25,7 +25,7 @@
 // is not the person's. See `.tour-harness/anchor.mjs` and test:harness-clock.
 // ---------------------------------------------------------------------------
 
-import { notification } from './coach-voice'
+import { coachMessage, coachMessageShortcut } from './coach-voice'
 
 /**
  * Every moment that can reach a phone, in the order they outrank each other.
@@ -80,10 +80,45 @@ export interface MomentFacts {
   /** Protein logged as eaten today, and today's target. A target of 0 is unknown. */
   proteinEatenToday?: number
   proteinTargetG?: number
+  /**
+   * WORDS ONLY, never a decision (6 Nov 2026, her "like a text from your
+   * coach"): the name the coach uses for her, and when the session it asks
+   * about finished. Neither changes WHETHER a moment is live.
+   */
+  name?: string | null
+  finishedWhen?: 'this morning' | 'this afternoon' | 'this evening' | 'yesterday' | null
 }
 
 /** Which moments this person has left switched on. Absent means on — see DEFAULT_MOMENT_SWITCHES. */
 export type MomentSwitches = Partial<Record<MomentKey, boolean>>
+
+/**
+ * HOW OFTEN THE COACH REACHES OUT — Ashley's ruling, 6 Nov 2026, "Three
+ * levels", over two levels and over a number picker, so nobody is overwhelmed:
+ * Light is one a day, Normal up to three (the default, her 4 Nov "Up to 3,
+ * spaced"), Lots up to five. Every level keeps the three-hour gap, the waking
+ * hours and the per-message switches. Five fit the window: 8, 11, 14, 17, 20.
+ */
+export const REMINDER_FREQUENCIES = ['light', 'normal', 'lots'] as const
+export type ReminderFrequency = typeof REMINDER_FREQUENCIES[number]
+export const DEFAULT_FREQUENCY: ReminderFrequency = 'normal'
+const DAILY_CAP: Record<ReminderFrequency, number> = { light: 1, normal: 3, lots: 5 }
+
+/** The day's limit for a stored setting. Anything unknown or absent reads as Normal: never asked is not "less". */
+export function dailyCap(frequency: unknown): number {
+  return DAILY_CAP[(REMINDER_FREQUENCIES as readonly unknown[]).includes(frequency) ? frequency as ReminderFrequency : DEFAULT_FREQUENCY]
+}
+
+/**
+ * EVERYTHING ON THE REMINDERS SCREEN, as one stored object (the profile's
+ * `notification_switches`): the per-message switches, the frequency, and
+ * whether a coach REPLY pings (6 Nov 2026). Absent keys mean the defaults.
+ */
+export type NotificationSettings = MomentSwitches & {
+  frequency?: ReminderFrequency
+  /** A reply to a message she sent. Never held back by the frequency: she asked, the coach answers. */
+  coach_reply?: boolean
+}
 
 /**
  * ALL ON, because that is what Ashley chose. The risk this accepts is being
@@ -110,12 +145,9 @@ export const NOT_LOGGED_AFTER_HOUR = 18
 export const QUIET_WEEK_DAYS = 7
 
 /**
- * HOW MANY, AND HOW CLOSE TOGETHER — Ashley's ruling, 4 Nov 2026, "Up to 3,
- * spaced", from three options (over one a day and over no limit): at most
- * three notifications a day, at least three hours apart. The screen states
- * both numbers and the server enforces them, from this one place.
+ * HOW CLOSE TOGETHER — Ashley's ruling, 4 Nov 2026, "Up to 3, spaced": at
+ * least three hours apart, at every frequency. How MANY is `dailyCap`.
  */
-export const MAX_NOTIFICATIONS_PER_DAY = 3
 export const MIN_HOURS_BETWEEN = 3
 
 /**
@@ -144,8 +176,10 @@ export const PROTEIN_SHORT_MIN_G = 20
 
 export interface CoachMoment {
   key: MomentKey
-  /** What the phone says. From the phrasebook, never written at a call site. */
+  /** What the coach says, on the phone and in the chat alike. From the phrasebook, never written at a call site. */
   text: string
+  /** The small button under the message in the chat, if it has one. */
+  shortcut: 'exercise' | 'nutrition' | null
 }
 
 /** Is this moment live, on the facts alone? Switches and quiet hours are applied above. */
@@ -211,7 +245,13 @@ export function momentsToRaise(
     // answer stored, and the honest reading of that is the default rather
     // than silence — a person who has never been asked has not said no.
     if (switches[key] === false) continue
-    if (isLive(key, facts)) out.push({ key, text: notification(key, facts.streakDays, facts.mealsAccountedToday ?? 0) })
+    if (isLive(key, facts)) {
+      out.push({
+        key,
+        text: coachMessage(key, { name: facts.name, streak: facts.streakDays, mealsLogged: facts.mealsAccountedToday ?? 0, finishedWhen: facts.finishedWhen }),
+        shortcut: coachMessageShortcut(key),
+      })
+    }
   }
   return out
 }

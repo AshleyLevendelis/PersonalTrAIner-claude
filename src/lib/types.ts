@@ -759,6 +759,11 @@ export interface ChatMessage {
   quickReplies?: string[]
   created_at?: string
   /**
+   * A COACH REMINDER the server wrote into the chat (6 Nov 2026, her "Chat,
+   * with a shortcut"): which moment it was, and the small button under it.
+   */
+  reminder?: { moment: string; shortcut: 'exercise' | 'nutrition' | null }
+  /**
    * How this turn's request ENDED, when the turn itself no longer says:
    * 'refused' on a reply that is the app declining to build a card, and the
    * last known outcome of a card whose view was dropped when history was

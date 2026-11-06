@@ -94,12 +94,17 @@ const db = createServer(async (req, res) => {
   if (req.method === 'GET') reads.push({ table, query: decodeURIComponent(url.search) })
   if (req.method !== 'GET') {
     if (refuseReservations && req.method === 'POST' && table === 'coach_notifications_sent') { res.writeHead(409); res.end(JSON.stringify({ code: '23505' })); return }
-    writes.push({ seq: ++seq, method: req.method, table, query: url.search, body: body ? JSON.parse(body) : null }); res.writeHead(201); res.end(); return
+    writes.push({ seq: ++seq, method: req.method, table, query: decodeURIComponent(url.search), body: body ? JSON.parse(body) : null })
+    // THE CHAT ROW comes back with its id, as PostgREST does for Prefer: return=representation.
+    if (req.method === 'POST' && table === 'chat_messages') {
+      res.writeHead(201, { 'Content-Type': 'application/json' }); res.end(JSON.stringify([{ id: `chat-${seq}` }])); return
+    }
+    res.writeHead(201); res.end(); return
   }
   const rows = {
     push_subscriptions: [{ id: 'sub-1', user_id: USER, endpoint: `http://127.0.0.1:${dbPort}/push/1`, p256dh: uaPublic.toString('base64url'), auth: authSecret.toString('base64url'), timezone: ZONE }],
     coach_moment_facts: [{ user_id: USER, training_weekdays: [parts.weekday], plan_ends_on: '2099-01-01' }],
-    fitness_profiles: [{ id: USER, notification_switches: {} }],
+    fitness_profiles: [{ id: USER, notification_switches: {}, display_name: 'Ashley' }],
     exercise_set_logs: [], cardio_logs: [], workout_sessions: [], pending_actions: [], coach_notifications_sent: [],
     // A meal logged YESTERDAY and none today: she logs meals, so the evening
     // meal nudge is live too — and must lose to the session nudge, which ranks first.
@@ -168,7 +173,7 @@ try {
   let payload = null
   try { payload = JSON.parse(decrypt(pushes[0].body)) } catch (err) { payload = { error: String(err) } }
   check('5. what arrives decrypts, with the phone\'s own keys, to the phrasebook\'s words',
-    payload?.moment === 'session_not_logged' && payload?.body === "today's session is still waiting — got twenty minutes?", payload)
+    payload?.moment === 'session_not_logged' && payload?.body === "Hey Ashley, today's session is still waiting. Got twenty minutes?" && payload?.title === 'Trainer', payload)
   check('6. ...signed with the VAPID key it advertised', String(pushes[0]?.headers.authorization ?? '').includes(`k=${vapidPublic}`), pushes[0]?.headers.authorization)
   check('7. and what was sent is recorded, so the next hour stays quiet',
     writes.some(w => w.method === 'POST' && w.table === 'coach_notifications_sent' && w.body?.moment === 'session_not_logged' && w.body?.user_id === USER), writes)
@@ -195,6 +200,14 @@ try {
     writes.filter(w => w.table === 'coach_notifications_sent').length === recordedBefore, writes)
   const noSecretTest = await fetch(base, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ test: USER }) })
   check('11. ...and needs the secret like everything else', noSecretTest.status === 403 && pushes.length === 2, noSecretTest.status)
+  // 6 NOV 2026: the reminder is a message in her chat, the same words, written before the push.
+  const chatRow = writes.find(w => w.method === 'POST' && w.table === 'chat_messages')
+  check('17. the same words are written into HER chat as a coach message, with its shortcut',
+    chatRow?.body?.profile_id === USER && chatRow?.body?.role === 'assistant' && chatRow?.body?.status === 'complete'
+      && chatRow?.body?.content === payload?.body && chatRow?.body?.action_data?.source === 'reminder'
+      && chatRow?.body?.action_data?.shortcut === 'exercise', chatRow)
+  check('18. ...before the push, and the push names that message so a tap lands on it',
+    !!chatRow && chatRow.seq < pushes[0]?.seq && payload?.messageId === `chat-${chatRow.seq}`, { chat: chatRow?.seq, push: pushes[0]?.seq, messageId: payload?.messageId })
   // 4 NOV 2026: up to three a day. What the function sends is RESERVED first,
   // and opens the tab the server names.
   const reservation = writes.find(w => w.method === 'POST' && w.table === 'coach_notifications_sent')
@@ -211,6 +224,8 @@ try {
   check('16. a reservation the database refuses (409) sends nothing, and is not an error',
     refusedRun.status === 200 && pushes.length === pushesBefore && refusedReport.alreadyToday === 1 && refusedReport.failed === 0, { refusedReport, pushes: pushes.length })
   refuseReservations = false
+  check('19. ...and a refused reservation writes nothing into the chat either',
+    writes.filter(w => w.method === 'POST' && w.table === 'chat_messages').length === 1, writes.filter(w => w.table === 'chat_messages'))
   const setRead = reads.find(r => r.table === 'exercise_set_logs')?.query ?? ''
   check(`12. ...and the logs were read from five weeks before THEIR today (${localToday}), not the server's`,
     setRead.includes(`completed_at=gte.${daysBefore(localToday, 35)}`), setRead)

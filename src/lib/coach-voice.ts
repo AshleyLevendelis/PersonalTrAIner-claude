@@ -494,47 +494,75 @@ export const REBALANCE = {
 } as const
 
 /**
- * WHAT A NOTIFICATION SAYS, and it is the coach saying it.
+ * WHAT THE COACH TEXTS YOU, and it is the coach saying it.
  *
- * Ashley chose notifications on 17 Sep 2026. These live here rather than beside
- * the sending code for the reason every other card lead does: a notification is
- * the coach speaking, and a second place to write the coach's words is a second
- * voice. `test:coach-voice` and the coach exam can only grade what is in the
- * phrasebook.
+ * Ashley chose notifications on 17 Sep 2026, and on 6 Nov 2026 asked for them
+ * to read like a message from your coach on WhatsApp: "Hey Ashley, are you
+ * ready for your session today?", "Hey Ashley, how was the workout this
+ * morning?". The SAME sentence is the notification and the coach's message in
+ * the chat (her ruling "Chat, with a shortcut"), so it is written once, here,
+ * where `test:coach-moments` and the coach exam can grade it.
  *
- * SHORT, because a phone truncates. Lower case and no exclamation marks, which
- * is the house voice everywhere else — a notification that shouts is a
- * different personality arriving in someone's pocket.
+ * A TEXT, NOT A LOCK-SCREEN LABEL: sentence case, her name first when the app
+ * knows it, a question where one is natural. Never an exclamation mark — a
+ * coach checking in, not an app shouting.
  *
- * NO NUMBERS EXCEPT THE STREAK, deliberately. A notification is read on a lock
- * screen, out of context, possibly days late; a figure quoted there is one the
- * app cannot promise is still true when it is read. The streak is the
- * exception because it IS the subject of its own line.
+ * NO NUMBERS EXCEPT THE STREAK, deliberately. The message may be read hours
+ * late; a figure quoted in it is one the app cannot promise is still true. The
+ * streak is the exception because it IS the subject of its own line, and it
+ * counts SESSIONS ("5 in a row", her 17 Oct ruling: never "days").
+ *
+ * No grams and no named food on the protein line: it cannot see her diet or
+ * her allergies, and "a protein-rich snack" is true for every one of them.
  */
-export function notification(key: string, streakDays = 0, mealsLogged = 0): string {
+export interface CoachMessageDetail {
+  /** The name the coach uses for her (the profile's display name). Blank means no name: "Hey, …". */
+  name?: string | null
+  /** Sessions in the current run, for the streak line. */
+  streak?: number
+  /** Meals accounted for today, for the meal line's two wordings. */
+  mealsLogged?: number
+  /** When the session being asked about finished, in her words. Absent reads as "earlier". */
+  finishedWhen?: 'this morning' | 'this afternoon' | 'this evening' | 'yesterday' | null
+}
+
+export function coachMessage(key: string, d: CoachMessageDetail = {}): string {
+  const name = (d.name ?? '').trim()
+  const hey = name ? `Hey ${name}, ` : 'Hey, '
   switch (key) {
-    case 'session_feel': return 'how did that session actually feel?'
-    // 4 Nov 2026, Ashley: "remind them of an upcoming workout ... remind them
-    // to hit their protein goal or log a meal". No grams on the protein line,
-    // by the rule above: a figure on a lock screen may be stale when read. And
-    // no named food, because the line cannot see her diet or her allergies —
-    // "a protein-rich snack" is true for every one of them.
-    case 'workout_today': return "training day today — your session's ready when you are."
-    case 'meal_not_logged': return mealsLogged >= 1
-      ? 'just one meal logged today — add the rest so your numbers add up?'
-      : "nothing logged on nutrition yet today. got a minute to add what you've eaten?"
-    case 'protein_short': return "you're behind on protein today. a protein-rich snack this evening would help close the gap."
-    case 'session_not_logged': return "today's session is still waiting — got twenty minutes?"
-    case 'missed_yesterday': return 'yesterday got away from you. want to move it or let it go?'
-    case 'week_gone_quiet': return "it's been a quiet week. shall we pick something small to start again?"
-    case 'streak_at_risk': return `${streakDays} days in a row so far — today would keep it going.`
-    case 'block_review': return "that's a block done. come and see what moved."
-    case 'beat_target': return "you're beating the weights I set you. want them raised?"
+    case 'session_feel': return `${hey}how was the workout ${d.finishedWhen ?? 'earlier'}?`
+    case 'workout_today': return `${hey}are you ready for your session today?`
+    case 'session_not_logged': return `${hey}today's session is still waiting. Got twenty minutes?`
+    case 'missed_yesterday': return `${hey}yesterday's session got away from you. Want to move it or let it go?`
+    case 'week_gone_quiet': return `${hey}it's been a quiet week. Shall we pick something small to start again?`
+    case 'streak_at_risk': return `${hey}that's ${Math.max(0, d.streak ?? 0)} in a row. Today would keep it going.`
+    case 'meal_not_logged': return (d.mealsLogged ?? 0) >= 1
+      ? `${hey}just one meal logged today. Add the rest so your numbers add up?`
+      : `${hey}nothing logged on Nutrition yet today. Got a minute to add what you've eaten?`
+    case 'protein_short': return `${hey}you're behind on protein today. A protein-rich snack this evening would help close the gap.`
+    case 'block_review': return `${hey}that's a block done. Want to see what moved?`
+    case 'beat_target': return `${hey}you're beating the weights I set you. Want them raised?`
     // A KEY WITH NO SENTENCE IS NOT A SENTENCE. Returning something generic
     // here would let a new moment ship with placeholder words nobody wrote,
     // which is exactly how a screen ends up speaking in a voice no one chose.
     default: return ''
   }
+}
+
+/**
+ * THE SHORTCUT UNDER A MESSAGE (her ruling 6 Nov 2026, "Chat, with a
+ * shortcut"): a reminder opens the chat, and one about the session or food
+ * carries a small button to it, so the one tap she liked is still there.
+ */
+export function coachMessageShortcut(key: string): 'exercise' | 'nutrition' | null {
+  if (key === 'workout_today' || key === 'session_not_logged') return 'exercise'
+  if (key === 'meal_not_logged' || key === 'protein_short') return 'nutrition'
+  return null
+}
+
+/** The shortcut's words, the same on every message that carries it. */
+export function coachShortcutLabel(to: 'exercise' | 'nutrition'): string {
+  return to === 'exercise' ? "Open today's session" : 'Open Nutrition'
 }
 
 // ---------------------------------------------------------------------------

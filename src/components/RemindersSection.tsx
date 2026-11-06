@@ -22,10 +22,13 @@
 // ---------------------------------------------------------------------------
 import { useEffect, useState } from 'react'
 import {
-  MOMENT_LABELS, SWITCH_ORDER, loadSwitches, saveSwitches,
+  MOMENT_LABELS, SWITCH_ORDER, COACH_REPLY_LABEL, frequencyLabel, loadSwitches, saveSwitches,
   currentPushState, turnOnPush, turnOffPush, type PushState,
 } from '@/lib/coach-reach-out'
-import { DEFAULT_MOMENT_SWITCHES, QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, MAX_NOTIFICATIONS_PER_DAY, MIN_HOURS_BETWEEN, type MomentKey, type MomentSwitches } from '@/lib/coach-moments'
+import {
+  DEFAULT_MOMENT_SWITCHES, DEFAULT_FREQUENCY, REMINDER_FREQUENCIES, QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, MIN_HOURS_BETWEEN,
+  type MomentKey, type NotificationSettings, type ReminderFrequency,
+} from '@/lib/coach-moments'
 
 function Switch({ id, checked, disabled, label, onChange }: {
   id: string; checked: boolean; disabled?: boolean; label: string; onChange: (next: boolean) => void
@@ -70,7 +73,7 @@ function hourLabel(h: number): string {
 }
 
 export function RemindersSection({ profileId }: { profileId: string }) {
-  const [switches, setSwitches] = useState<MomentSwitches>({})
+  const [switches, setSwitches] = useState<NotificationSettings>({})
   const [live, setLive] = useState<boolean | null>(null)
   const [phone, setPhone] = useState<PushState | null>(null)
   const [phoneNote, setPhoneNote] = useState<string | null>(null)
@@ -86,7 +89,12 @@ export function RemindersSection({ profileId }: { profileId: string }) {
 
   const isOn = (k: MomentKey) => switches[k] ?? DEFAULT_MOMENT_SWITCHES[k]
 
-  async function toggleMoment(k: MomentKey, next: boolean) {
+  // ABSENT MEANS THE DEFAULT, for the frequency as for every switch: Normal.
+  const frequency: ReminderFrequency = (REMINDER_FREQUENCIES as readonly unknown[]).includes(switches.frequency)
+    ? switches.frequency as ReminderFrequency : DEFAULT_FREQUENCY
+  const replyOn = switches.coach_reply ?? true
+
+  async function toggleMoment(k: MomentKey | 'coach_reply' | 'frequency', next: boolean | ReminderFrequency) {
     const before = switches
     const after = { ...switches, [k]: next }
     setSwitches(after)
@@ -134,8 +142,35 @@ export function RemindersSection({ profileId }: { profileId: string }) {
       ) : (
         <div className="space-y-3 text-sm">
           <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
-            The coach can message your phone when the app is shut — up to {MAX_NOTIFICATIONS_PER_DAY} a day, at least {MIN_HOURS_BETWEEN} hours apart, and never before {hourLabel(QUIET_BEFORE_HOUR)} or after {hourLabel(QUIET_AFTER_HOUR)}.
+            The coach can message your phone when the app is shut — {frequencyLabel(frequency).detail}, at least {MIN_HOURS_BETWEEN} hours apart, and never before {hourLabel(QUIET_BEFORE_HOUR)} or after {hourLabel(QUIET_AFTER_HOUR)}.
           </p>
+
+          {/* HOW OFTEN: her ruling 6 Nov 2026, "Three levels", so nobody is overwhelmed. One tap; the sentence
+              above follows it. Replies to her own messages are never counted. */}
+          <div role="radiogroup" aria-label="How often the coach messages you" className="grid grid-cols-3 gap-1.5" data-testid="reminders-frequency">
+            {REMINDER_FREQUENCIES.map(f => {
+              const on = f === frequency
+              const { name, detail } = frequencyLabel(f)
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  data-frequency={f}
+                  onClick={() => { if (!on) void toggleMoment('frequency', f) }}
+                  className="min-h-11 rounded-xl px-2 py-1.5 text-center leading-tight transition-colors"
+                  style={{
+                    border: `1px solid ${on ? 'var(--primary)' : 'var(--hairline)'}`,
+                    background: on ? 'color-mix(in srgb, var(--primary) 14%, transparent)' : 'transparent',
+                  }}
+                >
+                  <span className="block text-sm font-medium">{name}</span>
+                  <span className="block text-[0.6875rem] text-muted-foreground">{detail}</span>
+                </button>
+              )
+            })}
+          </div>
 
           <div className="space-y-1">
             <div className="flex min-h-11 items-center justify-between gap-3">
@@ -155,6 +190,10 @@ export function RemindersSection({ profileId }: { profileId: string }) {
 
           <div className="space-y-0.5 pt-2" style={{ borderTop: '1px solid var(--hairline)' }}>
             <p className="text-[0.6875rem] leading-snug text-muted-foreground/70 pb-1">Which messages — for every phone you've turned on.</p>
+            <div className="flex min-h-11 items-center justify-between gap-3">
+              <label htmlFor="reminder-coach_reply" className="text-sm leading-snug">{COACH_REPLY_LABEL}</label>
+              <Switch id="reminder-coach_reply" label={COACH_REPLY_LABEL} checked={replyOn} onChange={next => toggleMoment('coach_reply', next)} />
+            </div>
             {SWITCH_ORDER.map(k => (
               <div key={k} className="flex min-h-11 items-center justify-between gap-3">
                 <label htmlFor={`reminder-${k}`} className="text-sm leading-snug">{MOMENT_LABELS[k]}</label>

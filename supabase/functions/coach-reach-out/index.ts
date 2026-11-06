@@ -1,10 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import * as webpush from "jsr:@negrel/webpush@0.5.0";
+import type * as webpush from "jsr:@negrel/webpush@0.5.0";
 import {
-  runReachOut, addDays,
+  runReachOut, addDays, COACH_SENDER,
   type ReachOutDeps, type PushSubscriptionRow, type MomentFactsRow, type LiveFacts, type SentRecord, type DayMarks,
 } from "../_shared/reach-out.ts";
-import type { MomentSwitches } from "../_shared/coach-moments.ts";
+import type { NotificationSettings } from "../_shared/coach-moments.ts";
+import { pushServer, publicKey, sendPush } from "../_shared/push.ts";
 
 // ---------------------------------------------------------------------------
 // coach-reach-out — the coach, when the app is shut.
@@ -92,12 +93,6 @@ function localDateOf(iso: string, timezone: string): string {
   }
 }
 
-async function loadVapid() {
-  const raw = Deno.env.get("VAPID_KEYS");
-  if (!raw) throw new Error("VAPID_KEYS is not set");
-  return await webpush.importVapidKeys(JSON.parse(raw), { extractable: false });
-}
-
 function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps {
   return {
     now,
@@ -108,13 +103,17 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
       return rows[0] ?? null;
     },
 
-    loadSwitches: async (userId) => {
+    loadSettings: async (userId) => {
       // select=* rather than the column by name: a pending migration must cost
       // the switches (absent means on), never the whole run. See CLAUDE.md on
       // column lists as migration dependencies.
       const rows = await rest<Record<string, unknown>[]>(`fitness_profiles?id=eq.${userId}&select=*`);
       const sw = rows[0]?.notification_switches;
-      return (sw && typeof sw === "object" ? sw : {}) as MomentSwitches;
+      const name = rows[0]?.display_name;
+      return {
+        settings: (sw && typeof sw === "object" ? sw : {}) as NotificationSettings,
+        name: typeof name === "string" && name.trim() ? name.trim() : null,
+      };
     },
 
     loadLive: async (userId, today, timezone): Promise<LiveFacts> => {
@@ -137,6 +136,7 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
       const marks: Record<string, DayMarks> = {};
       const movedInto: string[] = [];
       let unrated = false;
+      let lastFinishedAt: string | null = null;
       for (const row of sessions) {
         const date = String(row.date);
         marks[date] = {
@@ -146,7 +146,10 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
           missed: row.marked_missed === true,
         };
         if (typeof row.moved_to_date === "string") movedInto.push(row.moved_to_date);
-        if (typeof row.finished_at === "string" && row.finished_at >= recentSince && (row.felt === null || row.felt === undefined)) unrated = true;
+        if (typeof row.finished_at === "string" && row.finished_at >= recentSince && (row.felt === null || row.felt === undefined)) {
+          unrated = true;
+          if (!lastFinishedAt || row.finished_at > lastFinishedAt) lastFinishedAt = row.finished_at;
+        }
       }
       return {
         activityDates: [...dates].sort().reverse(),
@@ -154,6 +157,7 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
         movedInto,
         unratedRecentSession: unrated,
         beatTargetOffered: offers.length > 0,
+        lastFinishedAt,
         ...food,
       };
     },
@@ -161,18 +165,30 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
     loadRecentSends: (userId) =>
       rest<SentRecord[]>(`coach_notifications_sent?user_id=eq.${userId}&select=moment,sent_on,sent_at&order=sent_at.desc&limit=30`),
 
-    send: async (sub, payload) => {
-      try {
-        const subscriber = appServer.subscribe({ endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } });
-        // The service worker reads title/body/moment and opens the chat on tap.
-        await subscriber.pushTextMessage(JSON.stringify(payload), { ttl: 6 * 3600, topic: "coach" });
-        return "ok";
-      } catch (err) {
-        if (err instanceof webpush.PushMessageError && (err.isGone() || err.response.status === 404)) return "gone";
-        console.error("[coach-reach-out] push failed:", String(err));
-        return "failed";
-      }
+    // The service worker reads title/body/moment/url/messageId and opens the chat on tap.
+    send: (sub, payload) => sendPush(appServer, sub, payload, { topic: "coach" }),
+
+    // THE SAME WORDS IN THE CHAT. Written with the service key, so the
+    // person's own id is named on the row itself; the shortcut rides in
+    // action_data, which the chat reads for its small button.
+    insertChatMessage: async (userId, message) => {
+      const res = await fetch(`${supabaseUrl}/rest/v1/chat_messages`, {
+        method: "POST",
+        headers: {
+          apikey: serviceKey, Authorization: `Bearer ${serviceKey}`,
+          "Content-Type": "application/json", Prefer: "return=representation",
+        },
+        body: JSON.stringify({
+          profile_id: userId, role: "assistant", content: message.content, status: "complete",
+          action_data: { source: "reminder", moment: message.moment, shortcut: message.shortcut },
+        }),
+      });
+      if (!res.ok) throw new Error(`POST chat_messages ${res.status}: ${await res.text()}`);
+      const rows = await res.json() as { id?: string }[];
+      if (!rows[0]?.id) throw new Error("chat_messages insert returned no id");
+      return rows[0].id;
     },
+    deleteChatMessage: (userId, id) => restWrite("DELETE", `chat_messages?id=eq.${id}&profile_id=eq.${userId}`),
 
     // A 409 is the database refusing the reservation (a unique rule): not an
     // error, an answer — the caller sends nothing. Anything else throws, and the
@@ -199,7 +215,7 @@ Deno.serve(async (req: Request) => {
 
   if (req.method === "GET" && url.searchParams.has("vapid")) {
     try {
-      const key = await webpush.exportApplicationServerKey(await loadVapid());
+      const key = await publicKey();
       return new Response(JSON.stringify({ publicKey: key }), { headers: { ...cors, "Content-Type": "application/json" } });
     } catch (err) {
       return new Response(JSON.stringify({ error: String(err) }), { status: 503, headers: { ...cors, "Content-Type": "application/json" } });
@@ -213,10 +229,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const appServer = await webpush.ApplicationServer.new({
-      contactInformation: Deno.env.get("VAPID_CONTACT") ?? "mailto:admin@example.com",
-      vapidKeys: await loadVapid(),
-    });
+    const appServer = await pushServer();
 
     // A TEST PUSH, for proving a real phone buzzes without waiting for a
     // moment to come due. Behind the same secret as the hourly run, so only
@@ -232,7 +245,7 @@ Deno.serve(async (req: Request) => {
       const devices = await rest<PushSubscriptionRow[]>(`push_subscriptions?user_id=eq.${body.test}&select=id,user_id,endpoint,p256dh,auth,timezone`);
       const outcomes: string[] = [];
       for (const device of devices) {
-        outcomes.push(await deps.send(device, { title: "Your coach", body: "Reminders are working on this phone.", moment: "test" as never, url: "/#/tab/chat" }));
+        outcomes.push(await deps.send(device, { title: COACH_SENDER, body: "Reminders are working on this phone.", moment: "test", url: "/#/tab/chat" }));
       }
       return new Response(JSON.stringify({ test: true, devices: devices.length, outcomes }), { headers: { ...cors, "Content-Type": "application/json" } });
     }

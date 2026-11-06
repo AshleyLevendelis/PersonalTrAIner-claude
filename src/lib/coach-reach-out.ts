@@ -17,7 +17,7 @@
 
 import { supabase } from './supabase'
 import { isMissingColumnError } from './missing-column'
-import { MOMENT_KEYS, type MomentKey, type MomentSwitches } from './coach-moments'
+import { MOMENT_KEYS, dailyCap, type MomentKey, type NotificationSettings, type ReminderFrequency } from './coach-moments'
 
 /**
  * WHAT EACH SWITCH DOES, in the words the plan asked for ("Remind me if I
@@ -39,6 +39,25 @@ export const MOMENT_LABELS: Record<MomentKey, string> = {
 
 export const SWITCH_ORDER: readonly MomentKey[] = MOMENT_KEYS
 
+/**
+ * A REPLY FROM THE COACH, when she has left the app before it arrived (6 Nov
+ * 2026, her "like a normal text or WhatsApp conversation notification"). Its
+ * own switch, on by default, and never held back by the frequency: she asked,
+ * the coach answers.
+ */
+export const COACH_REPLY_LABEL = 'Message me when the coach replies'
+
+/**
+ * HOW OFTEN, in her words (her ruling 6 Nov 2026, "Three levels"). The number
+ * in each comes from `dailyCap`, the same function the server obeys, so the
+ * screen cannot promise one limit while the phone gets another.
+ */
+export function frequencyLabel(f: ReminderFrequency): { name: string; detail: string } {
+  const cap = dailyCap(f)
+  const name = f === 'light' ? 'Light' : f === 'lots' ? 'Lots' : 'Normal'
+  return { name, detail: cap === 1 ? '1 a day' : `up to ${cap} a day` }
+}
+
 // --- 1. The switches ----------------------------------------------------------------
 
 /**
@@ -51,19 +70,19 @@ export const SWITCH_ORDER: readonly MomentKey[] = MOMENT_KEYS
  * honest way for the screen to know the migration has landed before it offers
  * a switch that could not save.
  */
-export async function loadSwitches(profileId: string): Promise<{ switches: MomentSwitches; live: boolean }> {
+export async function loadSwitches(profileId: string): Promise<{ switches: NotificationSettings; live: boolean }> {
   const { data } = await supabase.from('fitness_profiles').select('*').eq('id', profileId).maybeSingle()
   const row = data as Record<string, unknown> | null
   const sw = row?.notification_switches
   return {
-    switches: sw && typeof sw === 'object' ? sw as MomentSwitches : {},
+    switches: sw && typeof sw === 'object' ? sw as NotificationSettings : {},
     live: !!row && 'notification_switches' in row,
   }
 }
 
 export type SaveOutcome = 'saved' | 'not_live_yet' | 'failed'
 
-export async function saveSwitches(profileId: string, switches: MomentSwitches): Promise<SaveOutcome> {
+export async function saveSwitches(profileId: string, switches: NotificationSettings): Promise<SaveOutcome> {
   const { error } = await supabase.from('fitness_profiles').update({ notification_switches: switches }).eq('id', profileId)
   if (!error) return 'saved'
   if (isMissingColumnError(error, 'notification_switches')) return 'not_live_yet'

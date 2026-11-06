@@ -535,7 +535,9 @@
     "test:near-copies": "tsx scripts/test-near-copies.ts",
     "test:machine-versions": "tsx scripts/test-machine-versions.ts",
     "verify:machine-swap": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/machine-swap.mjs",
-    "verify:near-copies": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/near-copies.mjs"
+    "verify:near-copies": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/near-copies.mjs",
+    "test:coach-texts-you": "tsx scripts/test-coach-texts-you.ts",
+    "verify:coach-texts-you": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-texts-you.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

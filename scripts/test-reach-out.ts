@@ -16,12 +16,15 @@
  */
 
 import {
-  runReachOut, factsFor, isPlanned, mayNotify, dayAllows, tapTarget, localParts, weekdayOf, addDays,
+  runReachOut, factsFor, finishedWhen, isPlanned, mayNotify, dayAllows, localParts, weekdayOf, addDays, COACH_SENDER,
   type ReachOutDeps, type PushSubscriptionRow, type MomentFactsRow, type LiveFacts, type SentRecord,
 } from '../supabase/functions/_shared/reach-out'
 import * as server from '../supabase/functions/_shared/coach-moments'
 import * as app from '../src/lib/coach-moments'
-import { notification as appNotification } from '../src/lib/coach-voice'
+import { coachMessageShortcut as appShortcut } from '../src/lib/coach-voice'
+import { coachMessage } from '../src/lib/coach-voice'
+/** The phrasebook's words with no name: what a profile with no display name hears. */
+const appNotification = (k: string, streak = 0, meals = 0) => coachMessage(k, { streak, mealsLogged: meals })
 
 let failures = 0
 let ran = 0
@@ -86,28 +89,41 @@ async function main() {
   console.log('\n4. How often — up to three a day, three hours apart (her ruling, 4 Nov 2026)')
   const at = (h: number, m = 0) => new Date(Date.UTC(2026, 8, 23, h, m))
   const sentAt = (moment: SentRecord['moment'], h: number, on = TODAY): SentRecord => ({ moment, sent_on: on, sent_at: at(h).toISOString() })
-  check('nothing sent yet: ok', dayAllows([], TODAY, at(12)) === 'ok' && mayNotify([], TODAY, 'session_not_logged') === 'ok')
-  check('one sent two hours ago: too soon', dayAllows([sentAt('workout_today', 10)], TODAY, at(12)) === 'too_soon')
-  check('...two hours fifty-nine: still too soon', dayAllows([sentAt('workout_today', 9)], TODAY, at(11, 59)) === 'too_soon')
-  check('...three hours: ok, a second one may go', dayAllows([sentAt('workout_today', 9)], TODAY, at(12)) === 'ok')
-  check('two sent, the last long enough ago: a third may go', dayAllows([sentAt('workout_today', 8), sentAt('session_feel', 12)], TODAY, at(17)) === 'ok')
+  check('nothing sent yet: ok', dayAllows([], TODAY, at(12), 3) === 'ok' && mayNotify([], TODAY, 'session_not_logged') === 'ok')
+  check('one sent two hours ago: too soon', dayAllows([sentAt('workout_today', 10)], TODAY, at(12), 3) === 'too_soon')
+  check('...two hours fifty-nine: still too soon', dayAllows([sentAt('workout_today', 9)], TODAY, at(11, 59), 3) === 'too_soon')
+  check('...three hours: ok, a second one may go', dayAllows([sentAt('workout_today', 9)], TODAY, at(12), 3) === 'ok')
+  check('two sent, the last long enough ago: a third may go', dayAllows([sentAt('workout_today', 8), sentAt('session_feel', 12)], TODAY, at(17), 3) === 'ok')
   check('three sent: the day is full, however long ago',
-    dayAllows([sentAt('workout_today', 7), sentAt('session_feel', 10), sentAt('block_review', 13)], TODAY, at(20)) === 'day_full')
-  check('the gap holds across midnight too', dayAllows([sentAt('meal_not_logged', 23, '2026-09-22')], TODAY, new Date(Date.UTC(2026, 8, 24, 1))) === 'too_soon')
-  check('a record with no time counts as just now (hold back, never guess)', dayAllows([{ moment: 'block_review', sent_on: TODAY }], TODAY, at(20)) === 'too_soon')
+    dayAllows([sentAt('workout_today', 7), sentAt('session_feel', 10), sentAt('block_review', 13)], TODAY, at(20), 3) === 'day_full')
+  check('the gap holds across midnight too', dayAllows([sentAt('meal_not_logged', 23, '2026-09-22')], TODAY, new Date(Date.UTC(2026, 8, 24, 1)), 3) === 'too_soon')
+  check('a record with no time counts as just now (hold back, never guess)', dayAllows([{ moment: 'block_review', sent_on: TODAY }], TODAY, at(20), 3) === 'too_soon')
   check('the same moment already today: not again', mayNotify([sentAt('session_not_logged', 8)], TODAY, 'session_not_logged') === 'said_today')
   check('...a different one today: ok', mayNotify([sentAt('workout_today', 8)], TODAY, 'session_not_logged') === 'ok')
   check('the same moment yesterday: no', mayNotify([{ moment: 'missed_yesterday', sent_on: '2026-09-22' }], TODAY, 'missed_yesterday') === 'same_as_yesterday')
   check('a different moment yesterday: ok', mayNotify([{ moment: 'missed_yesterday', sent_on: '2026-09-22' }], TODAY, 'session_not_logged') === 'ok')
   check('...but the training-day reminder comes every training day, yesterday\'s or not',
     mayNotify([{ moment: 'workout_today', sent_on: '2026-09-22' }], TODAY, 'workout_today') === 'ok')
-  check('a tap opens the right tab: the session, Nutrition, or the chat',
-    tapTarget('workout_today') === '/#/tab/exercise' && tapTarget('meal_not_logged') === '/#/tab/nutrition'
-    && tapTarget('protein_short') === '/#/tab/nutrition' && tapTarget('session_feel') === '/#/tab/chat',
-    app.MOMENT_KEYS.map(k => tapTarget(k)))
+  // HER OWN FREQUENCY (6 Nov 2026, "Three levels"): the same day, three caps.
+  const two = [sentAt('workout_today', 8), sentAt('session_feel', 12)]
+  check('Light: the day is full after one', dayAllows([sentAt('workout_today', 8)], TODAY, at(17), 1) === 'day_full')
+  check('Normal: a third may go; Lots: a fourth and fifth too',
+    dayAllows(two, TODAY, at(17), 3) === 'ok'
+      && dayAllows([...two, sentAt('block_review', 15), sentAt('beat_target', 18)], TODAY, at(21, 30), 5) === 'ok'
+      && dayAllows([...two, sentAt('block_review', 15), sentAt('beat_target', 18), sentAt('meal_not_logged', 21)], TODAY, at(23, 59), 5) === 'day_full')
+  // "this morning / this afternoon / this evening / yesterday" on HER clock, never the server's.
+  check('the check-in says when on her clock: 07:30Z in London is "this morning", 13:30Z "this afternoon", 18:30Z "this evening"',
+    finishedWhen('2026-09-23T07:30:00Z', TODAY, 'Europe/London') === 'this morning'
+      && finishedWhen('2026-09-23T13:30:00Z', TODAY, 'Europe/London') === 'this afternoon'
+      && finishedWhen('2026-09-23T18:30:00Z', TODAY, 'Europe/London') === 'this evening')
+  check('...yesterday\'s is "yesterday", and an older or missing time is no claim at all',
+    finishedWhen('2026-09-22T18:30:00Z', TODAY, 'Europe/London') === 'yesterday'
+      && finishedWhen('2026-09-20T18:30:00Z', TODAY, 'Europe/London') === null && finishedWhen(null, TODAY, 'Europe/London') === null)
+  check('...and the same instant is "this evening" in London but the NEXT day\'s morning in Auckland',
+    finishedWhen('2026-09-23T18:30:00Z', '2026-09-24', 'Pacific/Auckland') === 'this morning')
 
   console.log('\n5. The whole run, against a fake world')
-  type Person = { sub: PushSubscriptionRow[]; row: MomentFactsRow | null; live: LiveFacts; switches?: Record<string, boolean>; throws?: boolean }
+  type Person = { sub: PushSubscriptionRow[]; row: MomentFactsRow | null; live: LiveFacts; switches?: Record<string, unknown>; name?: string | null; throws?: boolean; chatFails?: boolean }
   const sub = (id: string, user: string, tz = 'Europe/London'): PushSubscriptionRow => ({ id, user_id: user, endpoint: `https://push.example/${id}`, p256dh: 'k', auth: 'a', timezone: tz })
   const people: Record<string, Person> = {
     due: { sub: [sub('s1', 'due')], row: MWF, live: NONE },
@@ -118,22 +134,36 @@ async function main() {
     broken: { sub: [sub('s6', 'broken')], row: MWF, live: NONE, throws: true },
     allFail: { sub: [sub('s7', 'allFail')], row: MWF, live: NONE },
     raced: { sub: [sub('s8', 'raced')], row: MWF, live: NONE },
+    named: { sub: [sub('s9', 'named')], row: MWF, live: NONE, name: 'Ashley' },
+    noChat: { sub: [sub('s10', 'noChat')], row: MWF, live: NONE, chatFails: true },
   }
-  const sent: { sub: string; body: string; moment: string }[] = []
+  const sent: { sub: string; body: string; moment: string; title: string; url: string; messageId?: string | null }[] = []
+  // THE CHAT, as the server writes it: one row per message, in order, so a check can ask WHEN it was written.
+  const chat: { user: string; id: string; content: string; moment: string; shortcut: string | null; deleted?: boolean; seq: number }[] = []
+  let seq = 0
+  const sentSeq: Record<string, number> = {}
   const recorded: Record<string, SentRecord[]> = {}
   const dropped: string[] = []
   const deps = (at: Date): ReachOutDeps => ({
     now: at,
     listSubscriptions: async () => Object.values(people).flatMap(p => p.sub),
     loadFactsRow: async u => people[u].row,
-    loadSwitches: async u => people[u].switches ?? {},
+    loadSettings: async u => ({ settings: people[u].switches ?? {}, name: people[u].name ?? null }),
     loadLive: async u => { if (people[u].throws) throw new Error('read failed'); return people[u].live },
     loadRecentSends: async u => [...(recorded[u] ?? [])].reverse(),
     send: async (s, payload) => {
+      sentSeq[s.id] = ++seq
       if (s.id === 's3') return 'gone'
       if (s.id === 's7') return 'failed'
-      sent.push({ sub: s.id, body: payload.body, moment: payload.moment }); return 'ok'
+      sent.push({ sub: s.id, body: payload.body, moment: payload.moment, title: payload.title, url: payload.url, messageId: payload.messageId }); return 'ok'
     },
+    insertChatMessage: async (u, m) => {
+      if (people[u].chatFails) throw new Error('chat insert failed')
+      const id = `msg-${u}-${chat.length}`
+      chat.push({ user: u, id, content: m.content, moment: m.moment, shortcut: m.shortcut, seq: ++seq })
+      return id
+    },
+    deleteChatMessage: async (u, id) => { const row = chat.find(r => r.id === id && r.user === u); if (row) row.deleted = true },
     // 'raced' is another run that got there first: the reservation is refused.
     recordSent: async (u, date, moment) => {
       if (u === 'raced') return false
@@ -155,7 +185,7 @@ async function main() {
   const report = await safeRun(deps(new Date('2026-09-23T18:30:00Z')))
   const to = (id: string) => sent.filter(x => x.sub === id)
   check('the run itself never throws, whatever one person\'s data does', report.threw === null, report.threw)
-  check('it looked at every person with a device', report.people === 8, report)
+  check('it looked at every person with a device', report.people === 10, report)
   check('a training day at 19:00 with nothing logged gets the evening nudge, in the phrasebook\'s words',
     to('s1').length === 1 && to('s1')[0].moment === 'session_not_logged' && to('s1')[0].body === appNotification('session_not_logged'), to('s1'))
   check('...and it is recorded, so it is not said again today', recorded.due?.length === 1 && recorded.due[0].sent_on === TODAY, recorded.due)
@@ -168,6 +198,18 @@ async function main() {
   check('one person whose read fails does not stop the rest of the run', report.failed >= 1 && to('s1').length === 1, report)
   check('a send that failed everywhere is not recorded as said — next hour tries again', !recorded.allFail, recorded.allFail)
   check('a reservation the database refused sends nothing (another run got there first)', to('s8').length === 0, to('s8'))
+  // A TEXT FROM YOUR COACH (6 Nov 2026): the same words in the chat, from "Trainer", opening the chat.
+  const dueRow = chat.find(r => r.user === 'due' && !r.deleted)
+  check('the reminder is written into her chat, in the same words the phone shows',
+    !!dueRow && dueRow.content === to('s1')[0]?.body && dueRow.moment === 'session_not_logged' && dueRow.shortcut === 'exercise', { dueRow, s1: to('s1') })
+  check('...BEFORE the push goes, so a tap always finds it', !!dueRow && dueRow.seq < (sentSeq.s1 ?? 0), { row: dueRow?.seq, push: sentSeq.s1 })
+  check('...and the push names that message, comes from "Trainer" and opens the chat',
+    to('s1')[0]?.messageId === dueRow?.id && to('s1')[0]?.title === 'Trainer' && COACH_SENDER === 'Trainer' && to('s1')[0]?.url === '/#/tab/chat', to('s1')[0])
+  check('with her name on the profile it reads "Hey Ashley, ..."', /^Hey Ashley, /.test(to('s9')[0]?.body ?? ''), to('s9'))
+  check('a message no phone took is taken back out of the chat (and the day\'s count with it)',
+    chat.filter(r => r.user === 'allFail').length >= 1 && chat.filter(r => r.user === 'allFail').every(r => r.deleted) && !recorded.allFail, chat.filter(r => r.user === 'allFail'))
+  check('a chat that cannot be written to means no notification this hour, and nothing counted',
+    to('s10').length === 0 && !recorded.noChat, { s10: to('s10'), rec: recorded.noChat })
 
   const again = await safeRun(deps(new Date('2026-09-23T19:30:00Z')))
   check('the next hour, nobody who heard an hour ago hears again (three hours apart)',
@@ -184,23 +226,47 @@ async function main() {
       now: when,
       listSubscriptions: async () => me.sub,
       loadFactsRow: async () => me.row,
-      loadSwitches: async () => ({}),
+      loadSettings: async () => ({ settings: dayFrequency ? { frequency: dayFrequency } : {}, name: 'Ashley' }),
       loadLive: async () => me.live,
       loadRecentSends: async () => [...rec].reverse(),
       send: async (_s, payload) => { got.push(`${when.toISOString().slice(11, 16)} ${payload.moment} ${payload.url}`); return 'ok' },
+      insertChatMessage: async () => `m${rec.length}`,
+      deleteChatMessage: async () => {},
       recordSent: async (_u, date, moment) => { rec.push({ moment, sent_on: date, sent_at: when.toISOString() }); return true },
       unrecordSent: async () => {},
       dropSubscription: async () => {},
     })
     // Every hour of a London day, 23 Sep (BST): 07:00Z is 8am there, 20:00Z is 9pm.
-    for (let h = 0; h < 24; h++) await safeRun(dayDeps(new Date(Date.UTC(2026, 8, 23, h, 5))))
-    check(`no more than ${server.MAX_NOTIFICATIONS_PER_DAY} in the day`, got.length === server.MAX_NOTIFICATIONS_PER_DAY, got)
-    check('the morning reminder first, at 8am, opening the session', got[0] === '07:05 workout_today /#/tab/exercise', got)
-    check('then the evening nudge at 6pm, opening the chat', got[1] === '17:05 session_not_logged /#/tab/chat', got)
-    check('then the meal nudge three hours later, opening Nutrition — not at 7pm, too close to 6pm',
-      got[2] === '20:05 meal_not_logged /#/tab/nutrition', got)
+    let dayFrequency: string | null = null
+    const runDay = async (frequency: string | null) => {
+      dayFrequency = frequency; rec.length = 0; got.length = 0
+      for (let h = 0; h < 24; h++) await safeRun(dayDeps(new Date(Date.UTC(2026, 8, 23, h, 5))))
+      return [...got]
+    }
+    const normal = await runDay(null)
+    check('Normal (never set): three in the day', normal.length === 3, normal)
+    check('the morning reminder first, at 8am, opening the chat', normal[0] === '07:05 workout_today /#/tab/chat', normal)
+    check('then the evening nudge at 6pm', normal[1] === '17:05 session_not_logged /#/tab/chat', normal)
+    check('then the meal nudge three hours later — not at 7pm, too close to 6pm',
+      normal[2] === '20:05 meal_not_logged /#/tab/chat', normal)
     const gaps = rec.slice(1).map((r, i) => (Date.parse(r.sent_at!) - Date.parse(rec[i].sent_at!)) / 3_600_000)
     check('...every gap at least three hours', gaps.every(g => g >= server.MIN_HOURS_BETWEEN), gaps)
+    const light = await runDay('light')
+    check('Light: exactly one, and it is the first thing worth saying (the morning reminder)',
+      light.length === 1 && light[0] === '07:05 workout_today /#/tab/chat', light)
+    const explicitNormal = await runDay('normal')
+    check('Normal chosen is the same day as Normal never set', JSON.stringify(explicitNormal) === JSON.stringify(normal), explicitNormal)
+    // LOTS needs more to say: everything a busy day holds.
+    const busy = me.live
+    me.live = { ...NONE, mealLoggedRecently: true, mealsAccountedToday: 0, beatTargetOffered: true, unratedRecentSession: true }
+    me.row = { ...MWF, protein_target_g: 160, block_ends_on: TODAY, streak_days: 5, streak_as_of: '2026-09-22' }
+    const lots = await runDay('lots')
+    const normalBusy = await runDay(null)
+    me.live = busy; me.row = { ...MWF, protein_target_g: 160 }
+    const lotsGaps = lots.map(x => Number(x.slice(0, 2)))
+    check('Lots: up to five on a day with that much to say, where Normal stops at three',
+      lots.length === 5 && normalBusy.length === 3, { lots, normalBusy })
+    check('...every one of them at least three hours apart, inside 8am-9pm', lotsGaps.slice(1).every((h, i) => h - lotsGaps[i] >= 3), lots)
   }
 
   console.log('\n6. The server\'s copy of the decision is the app\'s, answer for answer')
@@ -260,7 +326,12 @@ async function main() {
     && app.PROTEIN_SHORT_SHARE === server.PROTEIN_SHORT_SHARE && app.PROTEIN_SHORT_MIN_G === server.PROTEIN_SHORT_MIN_G
     && app.MAX_NOTIFICATIONS_PER_DAY === server.MAX_NOTIFICATIONS_PER_DAY && app.MIN_HOURS_BETWEEN === server.MIN_HOURS_BETWEEN
     && JSON.stringify(app.MOMENT_KEYS) === JSON.stringify(server.MOMENT_KEYS))
-  check('...and every sentence is the phrasebook\'s', app.MOMENT_KEYS.every(k => [0, 1].every(m => server.notification(k, 4, m) === appNotification(k, 4, m))))
+  const details = [{}, { name: 'Ashley' }, { name: 'Ashley', streak: 4, mealsLogged: 1 }, { name: ' ', finishedWhen: 'this morning' as const }, { finishedWhen: 'yesterday' as const, mealsLogged: 0 }]
+  check('...and every sentence is the phrasebook\'s, with and without her name',
+    app.MOMENT_KEYS.every(k => details.every(d => server.coachMessage(k, d) === coachMessage(k, d))))
+  check('...and the same shortcut on each, and the same daily limits',
+    app.MOMENT_KEYS.every(k => server.coachMessageShortcut(k) === appShortcut(k))
+      && ['light', 'normal', 'lots', undefined, 'x'].every(f => server.dailyCap(f) === app.dailyCap(f)))
 
   console.log('\n7. The phone\'s half: what the service worker does with a push')
   {
@@ -272,7 +343,9 @@ async function main() {
     const shown: { title: string; opts: Record<string, unknown> }[] = []
     const opened: string[] = []
     const focused: string[] = []
-    let windows: { url: string; focus: () => Promise<void>; navigate: (u: string) => Promise<void> }[] = []
+    type FakeWindow = { url: string; visibilityState?: string; focused?: boolean; focus: () => Promise<void>; navigate: (u: string) => Promise<void>; postMessage?: (m: unknown) => void }
+    let windows: FakeWindow[] = []
+    const posted: unknown[] = []
     const fakeSelf = {
       addEventListener: (type: string, fn: (e: unknown) => void) => { handlers[type] = fn },
       registration: { showNotification: async (title: string, opts: Record<string, unknown>) => { shown.push({ title, opts }) } },
@@ -295,8 +368,9 @@ async function main() {
     check('a push shows the coach\'s words, under one shared tag so a new one replaces an unread one',
       shown.length === 1 && shown[0].opts.body === appNotification('missed_yesterday') && shown[0].opts.tag === 'coach', shown)
     check('...and carries where a tap should go: the chat', (shown[0]?.opts.data as { url?: string })?.url === '/#/tab/chat', shown[0]?.opts.data)
-    await fire('push', { data: { json: () => ({ title: 'Your coach', body: 'x', moment: 'meal_not_logged', url: '/#/tab/nutrition' }) } })
-    check('...or the tab the server names (a food nudge opens Nutrition)', (shown[1]?.opts.data as { url?: string })?.url === '/#/tab/nutrition', shown[1]?.opts.data)
+    check('...titled with the sender the server names ("Trainer" when it names none)', shown[0]?.title === 'Your coach', shown[0]?.title)
+    await fire('push', { data: { json: () => ({ title: 'Trainer', body: 'x', moment: 'meal_not_logged', url: '/#/tab/nutrition' }) } })
+    check('...or the tab the server names', (shown[1]?.opts.data as { url?: string })?.url === '/#/tab/nutrition', shown[1]?.opts.data)
     await fire('push', { data: { json: () => ({ title: 'Your coach', body: 'x', moment: 'x', url: 'https://elsewhere.example/#/tab/chat' }) } })
     check('...but never anywhere outside the app: a link out falls back to the chat', (shown[2]?.opts.data as { url?: string })?.url === '/#/tab/chat', shown[2]?.opts.data)
     shown.splice(1)
@@ -310,6 +384,25 @@ async function main() {
     await fire('notificationclick', { notification: note })
     check('...and with it open, brings that window forward and takes it to the chat rather than opening a second',
       opened.length === 1 && focused.join(',') === 'w,/#/tab/chat', { opened, focused })
+
+    // ALREADY LOOKING (6 Nov 2026): a coach message never pops up over the app she is in. The window is told instead.
+    const n0 = shown.length
+    windows = [{ url: 'https://app.example/#/tab/chat', visibilityState: 'visible', focused: true, focus: async () => {}, navigate: async () => {}, postMessage: m => { posted.push(m) } }]
+    await fire('push', { data: { json: () => ({ title: 'Trainer', body: 'Hey Ashley, how was the workout?', moment: 'coach_reply', url: '/#/tab/chat', messageId: 'm1' }) } })
+    check('in the app and looking at it: no notification, and the window is told a message came', shown.length === n0
+      && posted.some(m => (m as { type?: string; messageId?: string }).type === 'coach-message' && (m as { messageId?: string }).messageId === 'm1'), { shown: shown.length - n0, posted })
+    windows = [{ url: 'https://app.example/#/tab/chat', visibilityState: 'hidden', focused: false, focus: async () => {}, navigate: async () => {}, postMessage: m => { posted.push(m) } }]
+    await fire('push', { data: { json: () => ({ title: 'Trainer', body: 'Hey Ashley, how was the workout?', moment: 'coach_reply', url: '/#/tab/chat', messageId: 'm2' }) } })
+    const replyShown = shown[shown.length - 1]
+    check('the app open but in the background: the notification shows, from "Trainer"', shown.length === n0 + 1 && replyShown?.title === 'Trainer', replyShown)
+    check('...a reply buzzes again under its own conversation tag, and carries its message', replyShown?.opts.tag === 'coach-chat' && replyShown?.opts.renotify === true
+      && (replyShown?.opts.data as { messageId?: string })?.messageId === 'm2', replyShown?.opts)
+    const reminderBefore = shown.length
+    await fire('push', { data: { json: () => ({ title: 'Trainer', body: 'Hey Ashley, are you ready?', moment: 'workout_today', url: '/#/tab/chat', messageId: 'm3' }) } })
+    check('...a reminder keeps the reminder tag, replacing an unread reminder quietly', shown.length === reminderBefore + 1 && shown[shown.length - 1].opts.tag === 'coach' && shown[shown.length - 1].opts.renotify === false)
+    posted.length = 0
+    await fire('notificationclick', { notification: { close: () => {}, data: { url: '/#/tab/chat', messageId: 'm2' } } })
+    check('a tap on it brings the app forward AND tells it to read the chat again', posted.some(m => (m as { messageId?: string }).messageId === 'm2'), posted)
   }
 
   console.log('\n8. The app\'s half: the facts it sends ahead, and when')

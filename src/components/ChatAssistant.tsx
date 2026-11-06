@@ -63,7 +63,7 @@ import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { detectTodayClaim, todayClaimFloor, type TodayFacts } from '@/lib/today-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal, swapDiffFromTrial } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, streakLabel, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine, logOnlyRefusal } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, streakLabel, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine, logOnlyRefusal, coachShortcutLabel } from '@/lib/coach-voice'
 import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
 import { getLastWorkingSessionDate } from '@/lib/set-log-store'
@@ -144,14 +144,14 @@ import { takeChatPrefill, CHAT_PREFILL_EVENT } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 import { useTrainingWeek, readTrainingWeeks } from '@/hooks/useTrainingWeek'
 import { pickOpener, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
+import { cleanReplyText, applyMessageBreaks, ACTION_TAG_RE, QUICK_REPLIES_RE } from '@/lib/reply-text'
+import { rowToMessage, addServerMessages } from '@/lib/chat-history-merge'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
   rememberNudge, rememberWithoutSpeaking, NUDGE_MIN_GAP_MS,
   type NudgeInput, type NudgeStore,
 } from '@/lib/coach-nudge'
 
-const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
-const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
 const TRAILING_BRACKET_RE = /\[(?:ACTION|QUICK_REPLIES|BREAK)[^\]]*$/i
 const PAGE_SIZE = 20
 /**
@@ -177,7 +177,6 @@ const OPENER_MAX_WAIT_MS = 2500
 // break so each beat renders as its own visually separated block. NOTE this
 // is a paragraph split, not yet a genuinely separate chat bubble per part —
 // see the round-2 report for the remaining piece.
-const BREAK_TAG_RE = /^[ \t]*\[BREAK\][ \t]*$/gim
 
 /**
  * A COACH BUBBLE IS NEVER BOTH EMPTY AND FEATURELESS.
@@ -221,13 +220,8 @@ export function floorReply(strippedText: string, hasSomethingElse: boolean): { t
   return { text: 'That came back empty — nothing came through from your coach.', blank: true }
 }
 
-function applyMessageBreaks(text: string): string {
-  return text.replace(BREAK_TAG_RE, '\n')
-}
-
-function stripTags(text: string): string {
-  return applyMessageBreaks(text).replace(ACTION_TAG_RE, '').replace(QUICK_REPLIES_RE, '').trim()
-}
+// THE SAME CLEAN-UP THE COACH'S SERVER APPLIES before it saves a reply or sends it to her phone (6 Nov 2026).
+const stripTags = cleanReplyText
 
 function stripStreamingTags(text: string): string {
   let cleaned = applyMessageBreaks(text).replace(ACTION_TAG_RE, '').replace(QUICK_REPLIES_RE, '')
@@ -1568,14 +1562,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         .limit(PAGE_SIZE)
 
       if (data && data.length > 0) {
-        const loaded: ChatMessage[] = data.reverse().map(row => ({
-          id: row.id,
-          role: row.role as 'user' | 'assistant',
-          content: row.content,
-          status: (row.status || 'complete') as ChatMessage['status'],
-          action: row.action_data as PlanAction | undefined,
-          created_at: row.created_at,
-        }))
+        const loaded: ChatMessage[] = data.reverse().map(rowToMessage)
         // Never regress below what the localStorage-cache-restored state
         // already shows — the DB fetch can legitimately be behind if the
         // most recent write(s) hadn't landed yet (see chat-cache.ts). A
@@ -1587,7 +1574,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // "Want me to …?" as an open question. Carried across by message id
         // from what this phone already knew (the cache restored just above).
         setMessages(prev => {
-          if (loaded.length < prev.length) return prev
+          // A SHORTER SERVER PAGE STILL CARRIES WHAT IS NEW: a reminder or a reply
+          // the server wrote while she was away is added, never dropped with the page.
+          if (loaded.length < prev.length) return addServerMessages(prev, loaded)
           const known = new Map(prev.filter(m => m.id).map(m => [m.id, turnOutcomeOf(m)] as const))
           return loaded.map(m => {
             const outcome = m.id ? known.get(m.id) : null
@@ -1606,6 +1595,52 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     }
   }
 
+  /**
+   * READ THE CHAT AGAIN when she comes back to the app (6 Nov 2026): the coach's
+   * server may have written a reminder or finished a reply while she was away,
+   * and the chat stays mounted for the app's whole life. Only ever ADDS (see
+   * chat-history-merge.ts), so an open card on screen is never lost to a re-read.
+   */
+  const lastRefreshRef = useRef(0)
+  const refreshFromServer = async (force = false) => {
+    if (!profile.id || !historyLoaded) return
+    const now = Date.now()
+    if (!force && now - lastRefreshRef.current < 2000) return
+    lastRefreshRef.current = now
+    try {
+      const { data } = await supabase
+        .from('chat_messages')
+        .select('id, role, content, action_data, status, created_at')
+        .eq('profile_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE)
+      if (!data || data.length === 0) return
+      const loaded = data.reverse().map(rowToMessage)
+      setMessages(prev => addServerMessages(prev, loaded))
+    } catch (err) {
+      console.error('Re-reading the chat failed:', err)
+    }
+  }
+  const refreshRef = useRef(refreshFromServer)
+  refreshRef.current = refreshFromServer
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') void refreshRef.current() }
+    const onFocus = () => { void refreshRef.current() }
+    const onHash = () => { if (window.location.hash === '#/tab/chat') void refreshRef.current() }
+    // The service worker says a coach message just arrived (public/sw.js).
+    const onWorker = (e: MessageEvent) => { if (e.data && e.data.type === 'coach-message') void refreshRef.current(true) }
+    document.addEventListener('visibilitychange', onVisible)
+    window.addEventListener('focus', onFocus)
+    window.addEventListener('hashchange', onHash)
+    navigator.serviceWorker?.addEventListener?.('message', onWorker)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible)
+      window.removeEventListener('focus', onFocus)
+      window.removeEventListener('hashchange', onHash)
+      navigator.serviceWorker?.removeEventListener?.('message', onWorker)
+    }
+  }, [])
+
   const loadOlderMessages = async () => {
     if (!profile.id || isLoadingOlder) return
     setIsLoadingOlder(true)
@@ -1623,14 +1658,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         .limit(PAGE_SIZE)
 
       if (data && data.length > 0) {
-        const older: ChatMessage[] = data.reverse().map(row => ({
-          id: row.id,
-          role: row.role as 'user' | 'assistant',
-          content: row.content,
-          status: (row.status || 'complete') as ChatMessage['status'],
-          action: row.action_data as PlanAction | undefined,
-          created_at: row.created_at,
-        }))
+        const older: ChatMessage[] = data.reverse().map(rowToMessage)
         const scrollEl = scrollRef.current
         const prevHeight = scrollEl?.scrollHeight || 0
         setMessages(prev => [...older, ...prev])
@@ -2200,7 +2228,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const turnOutcomeOf = (m: ChatMessage): TurnOutcome | null =>
     m.pendingAction ? outcomeOfCard(m.pendingAction.status, pendingWindowPassed(m.pendingAction.expiresAt)) : m.outcome ?? null
 
-  const callGemini = async (userMessage: string): Promise<ChatApiResponse> => {
+  const callGemini = async (userMessage: string, placeholderId?: string): Promise<ChatApiResponse> => {
     // Fix #4: Only send conversation turns (last 20), context goes separately as system prompt
     // EVERY TURN SAYS WHEN IT WAS SAID — see stampTurnTime. History is
     // restored with no date filter, so this morning's conversation is replayed
@@ -2244,6 +2272,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         message: userMessage,
         history,
         context: buildContext(eatenByDay, weekReview),
+        // THE ROW THIS REPLY GOES IN (6 Nov 2026): the coach's server saves the
+        // reply there itself and texts her phone if she has left the app, so a
+        // reply is never lost to a closed page. It writes only into this row.
+        placeholder_id: placeholderId ?? null,
       }),
       signal: controller.signal,
     })
@@ -6160,7 +6192,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     }
 
     try {
-      const result = await callGemini(userMsg.content)
+      const result = await callGemini(userMsg.content, failedMsg.id)
       const processed = await processResponse(result, userMsg.content)
       const quickReplies = extractQuickReplies(processed.text)
       // THE SAME FLOOR AS THE SEND PATH. Without it a retried blank came back
@@ -6278,7 +6310,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     let coachSavedAFoodDislike = false
     try {
-      const result = await callGemini(userText)
+      const result = await callGemini(userText, placeholderId)
       coachSavedAFoodDislike = result.memoryIntent?.tool === 'record_fact'
         && result.memoryIntent.rawArgs?.kind === 'food_preference' && result.memoryIntent.rawArgs?.polarity !== 'like'
       const processed = await processResponse(result, userText)
@@ -8014,6 +8046,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                 4px under its bubble like everything else in
                                 the group. */}
                             <div data-testid="chat-cards" className="w-full empty:hidden [&>*:first-child]:mt-0" style={{ maxWidth: widest }}>
+                              {/* A REMINDER'S SHORTCUT (her ruling 6 Nov 2026, "Chat, with a
+                                  shortcut"): the one tap to the session or to Nutrition she
+                                  liked, as a small outline button under the coach's message. */}
+                              {msg.reminder?.shortcut && (
+                                <button
+                                  type="button"
+                                  data-testid="chat-reminder-shortcut"
+                                  onClick={() => openStripLink(msg.reminder!.shortcut!)}
+                                  className="mt-1 inline-flex min-h-11 items-center rounded-full px-4 text-sm font-medium"
+                                  style={{ border: '1px solid var(--primary)', color: 'var(--primary)', background: 'transparent' }}
+                                >
+                                  {coachShortcutLabel(msg.reminder.shortcut)}
+                                </button>
+                              )}
                               {msg.receipt && msg.status !== 'failed' && (
                                 <ReceiptCard
                                   title={msg.receipt.title}

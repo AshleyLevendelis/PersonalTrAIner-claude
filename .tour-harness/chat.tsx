@@ -456,7 +456,20 @@ const grouped = [
   { id: 'g9', role: 'assistant', status: 'complete', created_at: at(20 * MIN), content: "One more thing — you're under on water today. [Why it matters](https://www.nhs.uk/live-well/eat-well/food-guidelines-and-food-labels/water-drinks-nutrition/)" },
   { id: 'g10', role: 'user', status: 'complete', created_at: at(2 * MIN), content: 'Will do.' },
 ]
-if (!OPENER) localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(GROUPS ? grouped : seeded))
+// ?seed=texts — THE COACH TEXTED HER WHILE THE APP WAS SHUT (6 Nov 2026). This phone remembers the ten
+// grouped messages; the server holds only the last six of them plus a REMINDER the coach's server wrote a
+// minute ago. That is the case the chat used to drop: a server page shorter than the screen was thrown away
+// whole, reminder included. The fixture chooses the input (which rows exist where); the chat decides the rest.
+const TEXTS = new URLSearchParams(location.search).get('seed') === 'texts'
+const textsRows = TEXTS
+  ? [
+      ...grouped.slice(4).filter(m => !('receipt' in m)).map(m => ({ id: m.id, profile_id: PROFILE_ID, role: m.role, content: m.content, status: m.status, created_at: m.created_at })),
+      { id: 'rem-1', profile_id: PROFILE_ID, role: 'assistant', status: 'complete', created_at: at(MIN),
+        content: 'Hey Ashley, are you ready for your session today?',
+        action_data: { source: 'reminder', moment: 'workout_today', shortcut: 'exercise' } },
+    ]
+  : []
+if (!OPENER) localStorage.setItem(`chat_history_cache_${PROFILE_ID}`, JSON.stringify(GROUPS || TEXTS ? grouped : seeded))
 else localStorage.removeItem(`chat_history_cache_${PROFILE_ID}`)
 
 // ---------------------------------------------------------------------------
@@ -634,7 +647,7 @@ const db: Db = {
   daily_steps: [], meal_events: dayStateSeed.meals, meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
   favorite_meals: [], grocery_items: topUpSeed.list, load_suggestions: [], pending_actions: [],
   plan_adaptations: KNEE_EASE ? [kneeEaseRow(PROFILE_ID)] : [], user_facts: [], user_context_facts: [], user_goals: [],
-  chat_messages: seededRows, exercise_plans: [], mesocycle_weeks: [],
+  chat_messages: [...seededRows, ...textsRows], exercise_plans: [], mesocycle_weeks: [],
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
 }
 setSupabaseClient(makeFakeSupabase(db) as never)
