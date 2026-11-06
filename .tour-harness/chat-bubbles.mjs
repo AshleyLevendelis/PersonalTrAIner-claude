@@ -393,11 +393,11 @@ for (let i = 0; i < 12 && !sendBox; i++) {
   await wait(250)
   sendBox = await call(() => {
     const c = document.querySelector('[data-testid="chat-composer"]').getBoundingClientRect()
-    const s = document.querySelector('[data-chat-send]')?.getBoundingClientRect()
+    const s = document.querySelector('[data-testid="chat-composer"] [data-composer-lead]')?.getBoundingClientRect()
     return s ? { send: { left: s.left, right: s.right, top: s.top, bottom: s.bottom }, composer: { left: c.left, right: c.right, top: c.top, bottom: c.bottom } } : null
   })
 }
-check('the send button is inside the composer', !!sendBox && sendBox.send.left >= sendBox.composer.left && sendBox.send.right <= sendBox.composer.right && sendBox.send.top >= sendBox.composer.top && sendBox.send.bottom <= sendBox.composer.bottom, sendBox)
+check('the composer\'s one button (mic or send, her 6 Nov WhatsApp ruling) is inside the composer', !!sendBox && sendBox.send.left >= sendBox.composer.left && sendBox.send.right <= sendBox.composer.right && sendBox.send.top >= sendBox.composer.top && sendBox.send.bottom <= sendBox.composer.bottom, sendBox)
 await wait(1500)
 await wait(300)
 await shoot('chat-bubbles-reply')

@@ -72,15 +72,30 @@ const second = await box()
 check('1f. a new phrase after it is added after it, and its own guesses fold the same way', second === 'What is the plan for today? and tomorrow', second)
 await stopMic()
 
-console.log('\n2. Voice typing, the desktop shape, after typed words')
+console.log('\n2. One button, the WhatsApp way (her 6 Nov 2026 ruling), and the desktop voice shape')
+// Typed words turn the mic into send: there is no mic to tap behind typed words any more (the phone keyboard's
+// own mic covers dictation there). Clearing the box brings the mic back.
+const pillButtons = () => ev(`[...document.querySelectorAll('[data-testid="chat-composer-pill"] button')].map(b => b.getAttribute('aria-label'))`)
 await setText('Quick one:')
 await wait(200)
-check('2a. the mic starts again', (await tapMic()) === true)
+const typed = await pillButtons()
+check('2a. typed words: ONE button, and it is send', Array.isArray(typed) && typed.length === 1 && typed[0] === 'Send message', typed)
+await setText('')
+await wait(200)
+const cleared = await pillButtons()
+check('2b. cleared: ONE button again, and it is the mic', Array.isArray(cleared) && cleared.length === 1 && cleared[0] === 'Start voice input', cleared)
+check('2c. the mic starts again', (await tapMic()) === true)
 await play([['what is the plan', true]], 0)
 await play([['what is the plan', true], ['for today', false]], 1)
 const desk = await box()
-check('2b. one result per phrase still joins, behind what she typed', desk === 'Quick one: what is the plan for today', desk)
+check('2d. one result per phrase still joins into one line', desk === 'what is the plan for today', desk)
+const listening = await pillButtons()
+check('2e. while she is still dictating, words in the box do NOT turn the button into send: it stays the stop',
+  Array.isArray(listening) && listening.length === 1 && listening[0] === 'Stop voice input', listening)
 await stopMic()
+await wait(200)
+const stopped = await pillButtons()
+check('2f. stopped, with her words in the box: the one button is send', Array.isArray(stopped) && stopped.length === 1 && stopped[0] === 'Send message', stopped)
 
 // 2. THE BOX
 console.log('\n3. The box grows with what is in it')

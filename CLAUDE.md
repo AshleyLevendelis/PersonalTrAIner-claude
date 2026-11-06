@@ -1464,6 +1464,8 @@ menu" stays true when a copy is also left outside it.
   flame, Tools a timer, and **no bar above the selected tab** (her "Remove that", the same day). And **active
   recovery wears the rest day's violet** (option 4b): amber is for warnings.
   `verify:grocery` [10], `test:rest-day-card`
+- **The message box has ONE round button, the WhatsApp way** (her request 6 Nov 2026, with screenshots): the mic while
+  the box is empty, send once there is text, the mic (as stop) while dictating. `verify:chat-composer` §2
 - **The chat names the coach "Trainer": "Both say Trainer"** (1 Nov 2026, from three options): the header and each
   message's label, one name. `verify:chat-2b` 1g, `verify:chat-bubbles`
 - **The chat's session pill counts sets DONE: "Sets done"** (1 Nov 2026, over the design's "set 3 of 20"): "Legs · 2 of 20

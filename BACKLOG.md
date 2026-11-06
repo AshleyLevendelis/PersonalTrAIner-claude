@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **THE CHAT BOX HAS ONE BUTTON, THE WHATSAPP WAY, 6 NOV 2026** (Ashley, with WhatsApp and app screenshots: "My
+  app has a voice note button next to a message button. WhatsApp does it better where it has a voice note button only
+  but when you start typing text in the text box it changes to a send button"). Built as asked: one round button in
+  the message box, the mic while it is empty and send as soon as there is text; it stays the mic (as "stop") while she
+  is dictating, even as her words fill the box; a phone that cannot listen always shows send. The 31 Oct 2b design
+  had both buttons with one highlighted. NAMED COST: dictation can no longer be added AFTER typed words from this
+  button (the phone keyboard's own mic still does it); the browser check that held that path now holds the new
+  behaviour instead. verify:chat-composer 23 checks (6 new, 3 mutations, 3 caught), verify:chat-bubbles re-anchored to
+  the one button, verify:chat-2b unchanged and green. Screenshots read: empty shows the mic alone, typed shows send.
 - [ ] **IDEA, NOT PLANNED: CHOOSE YOUR COACH (a personality and accountability quiz), 6 NOV 2026** (Ashley: users pick a
   coach by how they like to be coached, e.g. a drill sergeant or a hype coach, via a quiz that "feels like a high-end
   initial consultation", ending in a "Match Reveal" where the coach introduces itself. Four pillars: communication

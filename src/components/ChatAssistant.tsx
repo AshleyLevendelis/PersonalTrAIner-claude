@@ -7858,7 +7858,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // The old measured "clearance" padding is gone with the overlay it paid
   // for: a composer in the flow cannot sit on the thread.
   // The composer's main button (design 2b): the mic while the field is empty and the phone can listen, else send.
-  const micLeads = speech.isSupported && !input.trim()
+  // ONE ROUND BUTTON, THE WHATSAPP WAY (Ashley, 6 Nov 2026, with screenshots):
+  // the mic while the box is empty, send as soon as there is text. It stays the
+  // mic while she is dictating (as "stop"), even as her words fill the box.
+  const showMic = speech.isSupported && (speech.isListening || !input.trim())
   const dockOffsetPx = dockHeightPx > 0 ? dockHeightPx + (composerKeyboardOpen ? 16 : 12) : 0
   const chatScreenBottom = composerKeyboardOpen
     ? `${composerInsetPx + dockOffsetPx}px`
@@ -8309,9 +8312,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         data-testid="chat-composer"
         className="shrink-0 border-t border-[color:var(--hairline)] bg-[color:var(--surface-deep)] px-2.5 py-2"
       >
-      {/* DESIGN 2b (31 Oct 2026): a 52px pill. While it is empty and the phone
-          can listen, the MIC is the main button; once there is text, SEND is.
-          Only one of them is ever the filled main colour. */}
+      {/* DESIGN 2b (31 Oct 2026): a 52px pill, and since 6 Nov 2026 ONE button in
+          it (her WhatsApp ruling): the mic while the box is empty, send once
+          there is text. Where the phone cannot listen, it is always send. */}
       <div data-testid="chat-composer-pill" className="flex min-h-[52px] items-end gap-1.5 rounded-[26px] border border-[color:var(--hairline)] bg-[color:var(--surface-raised)] py-[3px] pl-4 pr-[3px]">
         <Textarea
           ref={composerRef}
@@ -8325,27 +8328,29 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         {/* keepsComposerFocus: tapping send used to leave focus on <body> —
             measured on the onboarding composer, identical shape here — which
             is a phone putting the keyboard away between every message. */}
-        <Button
-          data-chat-send
-          data-composer-lead={micLeads ? undefined : ''}
-          {...keepsComposerFocus}
-          onClick={() => { sendMessage(); refocusComposer(composerRef.current) }}
-          disabled={!input.trim() || isLoading}
-          size="icon"
-          variant={micLeads ? 'ghost' : 'default'}
-          className={cn('hit-slop-44 size-11 shrink-0 rounded-full', micLeads ? 'bg-[color:var(--hairline)] text-muted-foreground' : 'glow-mint-box')}
-          aria-label="Send message"
-        >
-          <Send className="size-[17px]" />
-        </Button>
-        {speech.isSupported && (
+        {!showMic && (
+          <Button
+            data-chat-send
+            data-composer-lead=""
+            {...keepsComposerFocus}
+            onClick={() => { sendMessage(); refocusComposer(composerRef.current) }}
+            disabled={!input.trim() || isLoading}
+            size="icon"
+            variant="default"
+            className="hit-slop-44 size-11 shrink-0 rounded-full glow-mint-box"
+            aria-label="Send message"
+          >
+            <Send className="size-[17px]" />
+          </Button>
+        )}
+        {showMic && (
           <Button
             type="button"
-            variant={speech.isListening ? 'destructive' : micLeads ? 'default' : 'ghost'}
+            variant={speech.isListening ? 'destructive' : 'default'}
             size="icon"
             {...keepsComposerFocus}
             onClick={handleMicClick}
-            data-composer-lead={micLeads ? '' : undefined}
+            data-composer-lead=""
             onPointerDown={() => {
               // Long-press (700ms) toggles the on-screen voice-debug trace —
               // see the TEMPORARY diagnostic comment above voiceDebugOn.
@@ -8365,7 +8370,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             onPointerLeave={() => { if (micLongPressTimerRef.current) window.clearTimeout(micLongPressTimerRef.current) }}
             aria-label={speech.isListening ? 'Stop voice input' : 'Start voice input'}
             title={speech.isListening ? 'Stop voice input' : 'Start voice input (hold to toggle debug trace)'}
-            className={cn('hit-slop-44 size-11 shrink-0 rounded-full', micLeads ? 'glow-mint-box' : 'text-muted-foreground', speech.isListening && 'animate-pulse')}
+            className={cn('hit-slop-44 size-11 shrink-0 rounded-full glow-mint-box', speech.isListening && 'animate-pulse')}
           >
             <Mic className="size-[17px]" />
           </Button>
