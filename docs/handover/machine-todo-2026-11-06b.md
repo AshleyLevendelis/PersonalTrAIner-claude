@@ -1,7 +1,7 @@
 # The warm coach who teaches: measure it, then put it live (6 Nov 2026)
 
 Paste the block below into Claude Code in VS Code, in the PersonalTrAIner-claude folder. It covers BOTH changes on the
-branch: "the coach texts you" (docs/handover/machine-todo-2026-11-06.md) and the warm coach. Do this one; the 6 Nov
+main: "the coach texts you" (docs/handover/machine-todo-2026-11-06.md) and the warm coach. Do this one; the 6 Nov
 "texts you" prompt's deploy steps are folded in here. Steps marked (Ashley types) need the yes-production phrase.
 
 ```
@@ -23,17 +23,18 @@ The coach exam is the ONLY thing that can say whether the model obeys. It has no
 WHAT YOU CANNOT DO: anything needing the typed phrase yes-production. Prepare it and tell Ashley what to type.
 Never print or ask for a secret. The exam costs money (one call per turn plus the judge): run each run ONCE.
 
-STEP 1. Before: the current coach, on main (optional but it is the only fair comparison)
+STEP 1. Before: the coach currently deployed on TEST (the old one), marked with the NEW exam
+  Everything is already merged into main (6 Nov). The exam talks to the coach DEPLOYED on TEST, which is still the
+  old one until STEP 2, so running it now measures the old coach on all 38 cases and all eight marks.
   git fetch origin && git checkout main && git pull origin main
+  VERIFY: git log --oneline -12 shows "The chat opener in the coach's own words" and "Lessons that build over time".
   npm run coach-exam:run && npm run coach-exam:grade
   VERIFY: coach-exam-report.txt names a judge and "marked N of N"; if it says the judge was NOT RUN, the
   ANTHROPIC_API_KEY is missing or wrong (it 401'd on 23 and 25 Sep): stop and tell Ashley.
   Copy coach-exam-report.txt and coach-exam-scores.json to a folder OUTSIDE the repo as "before", then
   git checkout -- coach-exam-report.txt coach-exam-scores.json  (and any transcript files it rewrote).
 
-STEP 2. The branch, deployed to TEST (you can)
-  git checkout claude/coach-empty-text-fix-2c4bzv && git pull origin claude/coach-empty-text-fix-2c4bzv
-  VERIFY: git log --oneline -8 shows "The chat opener in the coach's own words" and "Lessons that build over time".
+STEP 2. The new coach, deployed to TEST (you can), still on main
   On Windows, if a deploy refuses a _shared copy as STALE, run npm run sync:shared and confirm git diff is empty.
   npm run deploy:functions:test
   VERIFY: it names vswuurrtbzbrgubddefv and lists chat-gemini and coach-reach-out as deployed.
@@ -41,14 +42,16 @@ STEP 2. The branch, deployed to TEST (you can)
 STEP 3. After: the new coach on TEST
   npm run coach-exam:run && npm run coach-exam:grade
   VERIFY: 38 cases, eight dimensions (correct, specific, asks, scope, honest, voice, warm, teaches), judge marked all.
-  Report to Ashley, from the two reports: each dimension before and after (warm and teaches have no before), the
+  Report to Ashley, from the two reports: each of the eight marks before and after, the
   hard-rule breaches, and for the four new cases (warm-a-personal-best, warm-week-fell-apart, teach-protein-spread,
   warm-then-thanks) the coach's replies word for word. A move smaller than about 0.05 is the judge's own spread.
-  Commit the new coach-exam-report.txt and coach-exam-scores.json (and transcripts) to the branch and push: these
-  are the evidence, and test:coach-exam-fresh goes green only with them.
+  Commit the new coach-exam-report.txt and coach-exam-scores.json (and transcripts) on a branch and push it
+  (git checkout -b exam-results-nov6, commit, git push -u origin exam-results-nov6): these are the evidence, and
+  test:coach-exam-fresh goes green only with them. Never push to main yourself.
 
-STEP 4. Live (only after Ashley says "merge" and has read STEP 3)
-  The app part goes live with the merge (Vercel). Then (Ashley types): npm run deploy:functions:prod
+STEP 4. Live (only after Ashley has read STEP 3 and says go)
+  The app part is already live (merged 6 Nov, on Vercel). Back on main (git checkout main), then (Ashley types):
+  npm run deploy:functions:prod
   VERIFY with her: it names sdkhuczcfnqqimdgfiks before the phrase and lists chat-gemini and coach-reach-out after.
   VERIFY: curl the PRODUCTION ?vapid endpoint as on 5 Nov: still 200 with a publicKey.
 
