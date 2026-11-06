@@ -80,7 +80,16 @@ async function main() {
     .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   const serves = src.match(/Deno\.serve\(/g) ?? []
   check('there is exactly one Deno.serve', serves.length === 1, serves.length)
-  check('...and it hands every response to cleanCoachResponse(', /Deno\.serve\(\s*async\s*\(req[^)]*\)\s*=>\s*cleanCoachResponse\(\s*await\s+handleChatRequest\(req\)\s*\)\s*\)/.test(src))
+  // THE PROPERTY, not the line's shape (6 Nov 2026: the entry point grew a step that saves the reply in the chat
+  // and texts it, after the response is built). Whatever the body does, what it RETURNS is the cleaned response:
+  // the handler's result goes through cleanCoachResponse, and every return in the body returns that.
+  const serveStart = src.indexOf('Deno.serve(')
+  const serveBody = serveStart < 0 ? '' : src.slice(serveStart, src.indexOf('\n});', serveStart) + 4)
+  const cleanedRes = serveBody.match(/(?:const|let)\s+(\w+)\s*=\s*await\s+cleanCoachResponse\(\s*await\s+handleChatRequest\(req\)\s*\)/)
+  const inline = /Deno\.serve\(\s*async\s*\(req[^)]*\)\s*=>\s*cleanCoachResponse\(\s*await\s+handleChatRequest\(req\)\s*\)\s*\)/.test(src)
+  const returns = [...serveBody.matchAll(/\breturn\s+([^;\n]+)/g)].map(m => m[1].trim())
+  check('...and it hands every response to cleanCoachResponse(', inline
+    || (!!cleanedRes && returns.length > 0 && returns.every(r => r === cleanedRes[1])), { cleanedRes: cleanedRes?.[0], returns })
 
   console.log(`\ncoach-texting: ${ran} checks ran`)
   if (failures > 0) { console.error(`coach-texting: ${failures} check(s) FAILED`); process.exit(1) }
