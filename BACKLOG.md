@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [ ] **THE COACH SOUNDS LIKE A PERSON WHO TEACHES, 6 NOV 2026** (Ashley: "warmer, friendlier, more encouraging, but
+  also more human-like ... proactively reach out ... educate the user so that they can learn and progress ... the
+  reasons behind why we eat certain foods or do certain exercises ... informative, but not long-winded ... Previous
+  attempts at this haven't been successful"). **Her four rulings, each from three options:** "Warm coach" (earned
+  praise tied to a fact, notices her week, one why, an emoji now and then; over a friendly professional and a big
+  cheerleader); "A why on every answer" (plus lessons that build, taught when her own week makes them relevant, never
+  repeated; over big moments only and only when asked); "Coach writes, app checks" (reminders, opener and check-ins
+  written fresh by the AI from the app's facts, checked, a warm fixed sentence when a check fails; over warmer fixed
+  sentences and over leaving them); "Add two new marks" (`warm` and `teaches` join the exam's six, which stay as they
+  are so before and after compare). **WHY EARLIER ATTEMPTS FAILED, MEASURED FROM THE INSTRUCTIONS:** warmth was defined
+  as "attention, not praise" with encouragement banned in five places; teaching was gated ("only if confident", "one or
+  two sentences", "silence beats filler"); the fourteen worked replies were one-liners; half of what she reads as the
+  coach is fixed sentences; and the exam only ever rewarded short and plain, so every fix on 24-26 Sep cut and none
+  added. Plan and CSCS basis: `docs/plans/coach-persona.md`. Building in four steps: exam, instructions, lessons,
+  coach-written reminders.
 - [x] **THE COACH TEXTS YOU: REMINDERS AND REPLIES AS CHAT MESSAGES, AND HOW OFTEN, 6 NOV 2026** (Ashley: reminders
   should be "like a WhatsApp notification: the coach has just sent you a message ... 'Hey Ashley, are you ready for
   your session today?' ... And when you open it, it's the same message in the chat", and the same for a back-and-forth
