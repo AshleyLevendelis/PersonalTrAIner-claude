@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [ ] **IDEA, NOT PLANNED: CHOOSE YOUR COACH (a personality and accountability quiz), 6 NOV 2026** (Ashley: users pick a
+  coach by how they like to be coached, e.g. a drill sergeant or a hype coach, via a quiz that "feels like a high-end
+  initial consultation", ending in a "Match Reveal" where the coach introduces itself. Four pillars: communication
+  tone, accountability and push, educational depth ("the why"), motivation and win celebration). She will share a
+  document with each personality. Notes for the plan, not decisions: build personas as DIALS (tone, push, why-depth,
+  celebration) with named presets, so the 6 Nov warm coach is one preset and her rulings stay the floor; reminder
+  frequency (Light/Normal/Lots) and "a why on every answer" are existing dials; the match reveal can ride the
+  coach-written opener. Invariant across every persona: safety and truth (pain triage, red-flag hand-off, disordered
+  eating, allergen honesty, no invented numbers). Each persona needs its own coach exam run. Hers to decide: which
+  coaches, names, voice, where the quiz sits, switching mid-plan. Not started; waiting on her document.
 - [x] **THE COACH SOUNDS LIKE A PERSON WHO TEACHES, 6 NOV 2026** (Ashley: "warmer, friendlier, more encouraging, but
   also more human-like ... proactively reach out ... educate the user so that they can learn and progress ... the
   reasons behind why we eat certain foods or do certain exercises ... informative, but not long-winded ... Previous
