@@ -3,7 +3,8 @@ import { cleanCoachResponse } from "./text-like-a-coach.ts";
 import { deliverReply, type ReplyPushDeps } from "./reply-push.ts";
 import { pushServer, sendPush } from "../_shared/push.ts";
 import type { NotificationSettings } from "../_shared/coach-moments.ts";
-import { GEMINI_MODEL } from "../_shared/gemini.ts";
+import { GEMINI_MODEL, coachShortLine } from "../_shared/gemini.ts";
+import { writeOpener } from "../_shared/reminder-writer.ts";
 import { assumedLine, computeMealMacros, doubtAboutLoggedMeal, type MealIngredientLine } from "../_shared/food-db.ts";
 import { readIngredientText, splitCompoundFoodLine } from "../_shared/ingredient-units.ts";
 import { weighInQuestion } from "../_shared/weigh-in-check.ts";
@@ -2164,7 +2165,8 @@ async function handleChatRequest(req: Request): Promise<Response> {
   }
 
   try {
-    const { message, history, context } = await req.json();
+    const body = await req.json();
+    const { message, history, context } = body;
 
     // Audit §1.3 — a ceiling before any model call. The profile id keys the
     // per-caller counter; a request without one falls back to the client IP
@@ -2172,6 +2174,30 @@ async function handleChatRequest(req: Request): Promise<Response> {
     // layer fails open and the in-memory one does not.
     const cap = await checkSpendCap(req, CHAT_CAP, corsHeaders, context?.profile_id);
     if (cap.response) return cap.response;
+
+    // THE CHAT OPENER IN THE COACH'S OWN WORDS (her ruling 6 Nov 2026, "Coach
+    // writes, app checks"). The app has already chosen what the opener is about
+    // and sends its fixed opener; this only says it warmly, and every word is
+    // checked (reminder-writer.ts). Null means "use the fixed one".
+    if (body?.mode === "opener") {
+      const o = (body.opener && typeof body.opener === "object" ? body.opener : {}) as Record<string, unknown>;
+      const fixed = typeof o.fixed === "string" ? o.fixed.trim().slice(0, 400) : "";
+      const question = typeof o.question === "string" && o.question.trim() ? o.question.trim().slice(0, 200) : null;
+      const part = context?.current_part_of_day;
+      const written = fixed
+        ? await writeOpener({
+          fixed,
+          question,
+          partOfDay: part === "morning" || part === "afternoon" || part === "evening" ? part : null,
+          trainedToday: typeof context?.trained_today === "boolean" ? context.trained_today : null,
+        }, (prompt) => coachShortLine(prompt, 4000))
+        : null;
+      if (written?.by === "fixed" && written.why && written.why !== "no writer") console.log(`[chat-gemini] opener: fixed one used: ${written.why}`);
+      return new Response(
+        JSON.stringify({ opener: written?.by === "coach" ? written.text : null }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     if (!message || typeof message !== "string") {
       return new Response(

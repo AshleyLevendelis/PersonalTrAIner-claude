@@ -15,7 +15,7 @@
  *      a timeout, thinking off, null on any failure.
  */
 import { readFileSync } from 'node:fs'
-import { checkReminder, writeReminder, reminderPrompt, partOfDayFor } from '../supabase/functions/_shared/reminder-writer'
+import { checkReminder, writeReminder, reminderPrompt, partOfDayFor, writeOpener, openerPrompt } from '../supabase/functions/_shared/reminder-writer'
 import { runReachOut, type ReachOutDeps, type PushSubscriptionRow, type MomentFactsRow, type LiveFacts } from '../supabase/functions/_shared/reach-out'
 import { coachMessage, type CoachMoment, type MomentFacts } from '../supabase/functions/_shared/coach-moments'
 
@@ -132,12 +132,46 @@ async function main() {
   check('with no writer wired, the fixed sentence goes, as before', c.chat[0] === fixed && c.pushed[0] === fixed, c)
 
   console.log('\n5. The deployable function wires the real writer')
-  const fn = readFileSync('supabase/functions/coach-reach-out/index.ts', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-  check('the deps hand runReachOut the writer', /dropSubscription:[^\n]*\n\s*writeWithCoach,\n\s*\};/.test(fn))
-  check('...which reads the coach key from the environment and gives up without one', /async function writeWithCoach\(prompt: string\): Promise<string \| null>[\s\S]{0,200}Deno\.env\.get\("GEMINI_KEY"\)[\s\S]{0,80}if \(!key\) return null/.test(fn))
-  check('...stops waiting after a few seconds', /setTimeout\(\(\) => ctrl\.abort\(\), 8000\)/.test(fn) && /signal: ctrl\.signal/.test(fn))
-  check('...with thinking off, so it cannot spend the small budget thinking', /thinkingConfig: \{ thinkingBudget: 0 \}/.test(fn))
-  check('...and returns null, never throws, on any failure', /if \(!res\.ok\) return null/.test(fn) && /catch \{\s*return null;/.test(fn))
+  const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  const fn = strip(readFileSync('supabase/functions/coach-reach-out/index.ts', 'utf8'))
+  const gem = strip(readFileSync('supabase/functions/_shared/gemini.ts', 'utf8'))
+  check('the deps hand runReachOut the writer, the shared short-line call', /writeWithCoach: \(prompt\) => coachShortLine\(prompt\),\n\s*\};/.test(fn) && /import \{ coachShortLine \} from "\.\.\/_shared\/gemini\.ts"/.test(fn))
+  check('...which reads the coach key from the environment and gives up without one', /export async function coachShortLine\(prompt: string, timeoutMs = 8000\): Promise<string \| null>[\s\S]{0,200}Deno\.env\.get\("GEMINI_KEY"\)[\s\S]{0,80}if \(!key\) return null/.test(gem))
+  check('...stops waiting after a few seconds', /setTimeout\(\(\) => ctrl\.abort\(\), timeoutMs\)/.test(gem) && /signal: ctrl\.signal/.test(gem))
+  check('...with thinking off, so it cannot spend the small budget thinking', /coachShortLine[\s\S]*thinkingConfig: \{ thinkingBudget: 0 \}/.test(gem))
+  check('...and returns null, never throws, on any failure', /coachShortLine[\s\S]*if \(!res\.ok\) return null[\s\S]*catch \{\s*return null;/.test(gem))
+
+  console.log('\n6. The chat opener, in the coach\'s words, checked the same way')
+  const fixedQ = "Evening Ashley — yesterday's Push didn't happen, no drama. Run it today, mark it missed, or was it a rest day?"
+  const q = 'Run it today, mark it missed, or was it a rest day?'
+  const askQ = { fixed: fixedQ, question: q, partOfDay: 'evening' as const, trainedToday: false }
+  const o1 = await writeOpener(askQ, async () => "Evening Ashley! Yesterday's Push slipped by, and that's fine. Run it today, mark it missed, or was it a rest day?")
+  check('a warm rewrite that ends on the buttons\' question is the coach\'s', o1.by === 'coach', o1)
+  const o2 = await writeOpener(askQ, async () => "Evening Ashley! Yesterday's Push slipped by. Want to do it today?")
+  check('...one that changes the question its buttons answer is refused: the fixed opener', o2.by === 'fixed' && o2.text === fixedQ && o2.why === 'does not end on the question its buttons answer', o2)
+  const o3 = await writeOpener({ ...askQ, question: null, fixed: "Evening Ashley — how's the evening going?" }, async () => 'Evening Ashley! How was your day?')
+  check('an opener with no buttons may end on its own question', o3.by === 'coach', o3)
+  const o4 = await writeOpener(askQ, async () => "Evening Ashley! 3 sessions this week, nice. Run it today, mark it missed, or was it a rest day?")
+  check('...and is held to the same rules: no number the app did not give', o4.by === 'fixed' && /a number it was not given/.test(o4.why ?? ''), o4)
+  const o5 = await writeOpener({ ...askQ, question: null, fixed: "Evening Ashley — how's the evening going?" }, async () => "Evening Ashley, great session today! How's the evening going?")
+  check('...and no wrong claim about her day', o5.by === 'fixed' && /trained_today/.test(o5.why ?? ''), o5)
+  const p = openerPrompt(askQ)
+  check('the brief carries the app\'s opener, the question word for word, and "add no facts"',
+    p.includes(fixedQ) && p.includes(`End with exactly this question, word for word: "${q}"`) && /Keep every fact exactly as given and add none/.test(p))
+
+  console.log('\n7. The coach\'s server and the chat, wired')
+  const chatFn = strip(readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8'))
+  check('the coach\'s server answers an opener request with the checked words, or null',
+    /if \(body\?\.mode === "opener"\)/.test(chatFn) && /await writeOpener\(\{[\s\S]{0,300}\}, \(prompt\) => coachShortLine\(prompt, 4000\)\)/.test(chatFn)
+      && /JSON\.stringify\(\{ opener: written\?\.by === "coach" \? written\.text : null \}\)/.test(chatFn))
+  check('...after the spending cap, like every other request', chatFn.indexOf('const cap = await checkSpendCap(') > 0 && chatFn.indexOf('const cap = await checkSpendCap(') < chatFn.indexOf('if (body?.mode === "opener")'))
+  const chatUi = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
+  check('the chat asks with the fixed opener and the buttons\' question, and waits a few seconds at most',
+    /askCoachOpener\(content, chips \? openerQuestion\(content\) : null, !!chips\)/.test(chatUi)
+      && /setTimeout\(\(\) => \{ controller\.abort\(\); done\(null\) \}, OPENER_COACH_WAIT_MS\)/.test(chatUi) && /await Promise\.race\(\[ask, late\]\)/.test(chatUi) && /const OPENER_COACH_WAIT_MS = 4500\b/.test(chatUi))
+  check('...an opener with buttons and no question is never handed to the coach', /if \(needsQuestion && !question\) return null/.test(chatUi))
+  check('...and it shows the coach\'s words only while the chat is untouched, else keeps what is there',
+    /prev\.length === 1 && prev\[0\]\.role === 'assistant' && prev\[0\]\.content === seededGreetingRef\.current\s*\?\s*\[\{ role: 'assistant', content: coach \?\? content/.test(chatUi))
 
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.log(`reminder writer: ${failures} check(s) failed`); process.exit(1) }

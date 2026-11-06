@@ -172,6 +172,15 @@ const COACH_GRADIENT = 'linear-gradient(180deg, color-mix(in oklab, var(--primar
  * accurate opener and an immediate wrong one.
  */
 const OPENER_MAX_WAIT_MS = 2500
+// How long the chat waits for the coach to write the opener in its own words
+// (her ruling 6 Nov 2026, "Coach writes, app checks") before the fixed one shows.
+const OPENER_COACH_WAIT_MS = 4500
+
+/** The question a set of tap-buttons answers: the opener's last sentence, when it is a question. */
+function openerQuestion(text: string): string | null {
+  const last = text.trim().split(/(?<=[.!?])\s+/).pop() ?? ''
+  return last.endsWith('?') ? last.replace(/^.*\s—\s/, '') : null
+}
 
 // Chat round 2, item 2 — the model splits a reply into consecutive sent
 // messages with a [BREAK] line. Collapsed here into a blank-line paragraph
@@ -1522,13 +1531,18 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // one of the three things the coach may open with, and nothing else.
       const content = `${greetName()} — ${opener.text}`
       void scheduleLine
-      setMessages([{
-        role: 'assistant',
-        content,
-        status: 'complete',
-        created_at: new Date().toISOString(),
-        quickReplies: opener.chips.length > 0 ? opener.chips : undefined,
-      }])
+      // IN THE COACH'S OWN WORDS (her ruling 6 Nov 2026, "Coach writes, app
+      // checks"): the app has chosen what to say; the coach says it, and its
+      // server checks every word. The placeholder greeting stays on screen
+      // meanwhile, so nothing is blank, and the fixed opener shows if the coach
+      // is slow or its words fail a check. Buttons keep their question: the
+      // coach must end on it word for word, or the fixed opener is used.
+      const chips = opener.chips.length > 0 ? opener.chips : undefined
+      void askCoachOpener(content, chips ? openerQuestion(content) : null, !!chips).then(coach => {
+        setMessages(prev => (prev.length === 1 && prev[0].role === 'assistant' && prev[0].content === seededGreetingRef.current
+          ? [{ role: 'assistant', content: coach ?? content, status: 'complete', created_at: new Date().toISOString(), quickReplies: chips }]
+          : prev))
+      })
       // ADVANCE THE ROTATION, so the next conversation opens differently.
       // After setMessages rather than before: a bubble that never rendered
       // should not count as something the coach said.
@@ -2284,6 +2298,50 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   /** How this turn's request ended, from the card it still carries or the note left when the card's view was dropped. */
   const turnOutcomeOf = (m: ChatMessage): TurnOutcome | null =>
     m.pendingAction ? outcomeOfCard(m.pendingAction.status, pendingWindowPassed(m.pendingAction.expiresAt)) : m.outcome ?? null
+
+  /**
+   * THE OPENER IN THE COACH'S OWN WORDS, or null (use the fixed one). Never
+   * throws and never waits past OPENER_COACH_WAIT_MS. Sends only the fixed
+   * opener and the two facts its check needs: her part of the day and whether
+   * she has trained today.
+   */
+  const askCoachOpener = async (fixed: string, question: string | null, needsQuestion: boolean): Promise<string | null> => {
+    if (needsQuestion && !question) return null
+    const controller = new AbortController()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    // THE WAIT IS A HARD LIMIT, not a hope that the network obeys a cancel: an
+    // answer that lands after it is dropped whatever the request does (a run
+    // where the cancel was ignored put late words over the fixed opener).
+    const late = new Promise<null>(done => { timer = setTimeout(() => { controller.abort(); done(null) }, OPENER_COACH_WAIT_MS) })
+    const ask = (async (): Promise<string | null> => {
+      try {
+        const now = getAppNow(profile.id)
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-gemini`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mode: 'opener',
+            opener: { fixed, question },
+            context: {
+              profile_id: profile.id || '',
+              current_part_of_day: partOfDay(now.getHours()),
+              trained_today: trainedTodayFacts(getLocalDateString(now)).trainedToday,
+            },
+          }),
+          signal: controller.signal,
+        })
+        if (!res.ok) return null
+        const data = await res.json().catch(() => null) as { opener?: unknown } | null
+        return typeof data?.opener === 'string' && data.opener.trim() ? data.opener.trim() : null
+      } catch {
+        return null
+      }
+    })()
+    const words = await Promise.race([ask, late])
+    clearTimeout(timer)
+    return words
+  }
+
 
   const callGemini = async (userMessage: string, placeholderId?: string): Promise<ChatApiResponse> => {
     // Fix #4: Only send conversation turns (last 20), context goes separately as system prompt

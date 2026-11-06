@@ -83,24 +83,42 @@ function sentenceCount(t: string): number {
 
 export type ReminderCheck = { ok: true; text: string } | { ok: false; why: string }
 
-/** Is this written message safe to send in place of the fixed sentence? */
-export function checkReminder(raw: string | null | undefined, moment: CoachMoment, f: MomentFacts): ReminderCheck {
+/** What a coach-written line is checked against: the fixed sentence it replaces, and her day. */
+export interface LineRules {
+  /** The app's own sentence: the only source of numbers the coach may use. */
+  fixed: string
+  partOfDay: 'morning' | 'afternoon' | 'evening' | null
+  trainedToday: boolean | null
+  /** Reminders open "Hey" (her WhatsApp shape); the chat opener greets as it likes. */
+  mustOpenHey: boolean
+  /** When buttons answer a question, the message must END on exactly that question. */
+  mustEndWith?: string | null
+}
+
+/** Is this coach-written line safe to show in place of the fixed sentence? */
+export function checkCoachLine(raw: string | null | undefined, r: LineRules): ReminderCheck {
   const text = (raw ?? '').replace(/^["“]|["”]$/g, '').trim()
   if (!text) return { ok: false, why: 'empty' }
   if (text.length > MAX_REMINDER_CHARS) return { ok: false, why: 'too long' }
   if (sentenceCount(text) > 3) return { ok: false, why: 'too many sentences' }
   if (/[\n#*_`[\]]|^\s*[-•\d]+[.)]\s/m.test(text)) return { ok: false, why: 'formatting or a list' }
-  if (!/^hey\b/i.test(text)) return { ok: false, why: 'does not open "Hey"' }
-  const allowed = new Set(moment.text.match(/\d+/g) ?? [])
+  if (r.mustOpenHey && !/^hey\b/i.test(text)) return { ok: false, why: 'does not open "Hey"' }
+  if (r.mustEndWith && !text.toLowerCase().endsWith(r.mustEndWith.toLowerCase())) return { ok: false, why: 'does not end on the question its buttons answer' }
+  const allowed = new Set(r.fixed.match(/\d+/g) ?? [])
   const stray = (text.match(/\d+/g) ?? []).filter(n => !allowed.has(n))
   if (stray.length > 0) return { ok: false, why: `a number it was not given (${stray.join(', ')})` }
   const food = text.match(FOOD)
-  if (food) return { ok: false, why: `names a food (${food[0]})` }
+  if (food && !new RegExp(`\\b${food[0]}\\b`, 'i').test(r.fixed)) return { ok: false, why: `names a food (${food[0]})` }
   if (AI_TALK.test(text)) return { ok: false, why: 'talks about being an AI' }
   if ((text.match(EMOJI) ?? []).length > 1) return { ok: false, why: 'more than one emoji' }
-  const claim = detectTodayClaim(text, { partOfDay: partOfDayFor(f.localHour), trainedToday: f.loggedToday })
+  const claim = detectTodayClaim(text, { partOfDay: r.partOfDay, trainedToday: r.trainedToday })
   if (claim) return { ok: false, why: `a wrong claim about her day (${claim.kind})` }
   return { ok: true, text }
+}
+
+/** Is this written reminder safe to send in place of the fixed sentence? */
+export function checkReminder(raw: string | null | undefined, moment: CoachMoment, f: MomentFacts): ReminderCheck {
+  return checkCoachLine(raw, { fixed: moment.text, partOfDay: partOfDayFor(f.localHour), trainedToday: f.loggedToday, mustOpenHey: true })
 }
 
 export interface WrittenReminder {
@@ -125,4 +143,44 @@ export async function writeReminder(
   try { raw = await call(reminderPrompt(moment, f)) } catch { raw = null }
   const checked = checkReminder(raw, moment, f)
   return checked.ok ? { text: checked.text, by: 'coach' } : { text: moment.text, by: 'fixed', why: checked.why }
+}
+
+// ---------------------------------------------------------------------------
+// THE CHAT OPENER, the same way (her ruling covered "reminders, the chat
+// opener, check-ins"). The app still decides WHAT the opener is about
+// (coach-opener.ts picks one thing from real data); the coach only says it in
+// its own words. The app sends its fixed opener; nothing else about her is
+// sent or needed, so the coach can only restate what the app already chose.
+// ---------------------------------------------------------------------------
+
+export interface OpenerAsk {
+  /** The app's fixed opener, greeting included: the facts, and the fallback. */
+  fixed: string
+  partOfDay: 'morning' | 'afternoon' | 'evening' | null
+  trainedToday: boolean | null
+  /** The question its tap-buttons answer, when it has buttons: the message must end on it, word for word. */
+  question: string | null
+}
+
+export function openerPrompt(a: OpenerAsk): string {
+  return [
+    "You are this person's fitness and nutrition coach: warm, encouraging, knowledgeable, in their corner. They have just opened the chat. Write the first message, the way a good coach texts.",
+    `What the app wants said, plainly: "${a.fixed}"`,
+    'Say the same thing in your own warm, natural words. Keep every fact exactly as given and add none: no new exercise, session, day, number or food.',
+    a.question ? `End with exactly this question, word for word: "${a.question}"` : 'If it asks a question, end on a question.',
+    `It is ${a.partOfDay ?? 'today'} for them.${a.trainedToday === false ? ' Nothing has been trained or logged today.' : ''}`,
+    'One or two short sentences, under 200 characters. No lists, no formatting, at most one emoji, never mention being an AI.',
+    'Reply with the message only.',
+  ].join('\n')
+}
+
+export async function writeOpener(a: OpenerAsk, call: ((prompt: string) => Promise<string | null>) | null): Promise<WrittenReminder> {
+  if (!call) return { text: a.fixed, by: 'fixed', why: 'no writer' }
+  let raw: string | null = null
+  try { raw = await call(openerPrompt(a)) } catch { raw = null }
+  const checked = checkCoachLine(raw, {
+    fixed: a.fixed, partOfDay: a.partOfDay, trainedToday: a.trainedToday, mustOpenHey: false,
+    mustEndWith: a.question,
+  })
+  return checked.ok ? { text: checked.text, by: 'coach' } : { text: a.fixed, by: 'fixed', why: checked.why }
 }
