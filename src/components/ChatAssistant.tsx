@@ -143,6 +143,7 @@ import { FEEL_SCALE, type SessionFeel } from '@/lib/types'
 import { takeChatPrefill, CHAT_PREFILL_EVENT } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 import { useTrainingWeek, readTrainingWeeks } from '@/hooks/useTrainingWeek'
+import { lessonDue, lessonBrief, lessonTaughtIn, taughtFromRows, actionDataWithLesson, type TaughtLesson } from '@/lib/coach-lessons'
 import { pickOpener, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import { cleanReplyText, applyMessageBreaks, ACTION_TAG_RE, QUICK_REPLIES_RE } from '@/lib/reply-text'
 import { rowToMessage, addServerMessages } from '@/lib/chat-history-merge'
@@ -531,6 +532,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // resets naturally on remount, which is the conversation boundary the
   // brief means.
   const checkInUsedRef = useRef(false)
+  // LESSONS THAT BUILD (coach-lessons.ts, her 6 Nov 2026 ruling): what the
+  // coach has taught her, read from the coach messages that taught it, and the
+  // one lesson offered on this turn, so a [LESSON: id] in the reply is only
+  // recorded when it names the lesson the app actually offered.
+  // null until read, and after a failed read: no lesson is offered, rather than risk teaching one twice.
+  const [taughtLessons, setTaughtLessons] = useState<TaughtLesson[] | null>(null)
+  const offeredLessonRef = useRef<string | null>(null)
   /**
    * Every meal option this conversation has actually shown the user, per slot.
    * A ref, not state: nothing renders from it, and it must be readable inside
@@ -1043,6 +1051,18 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // (so the model can volunteer the one relevant unasked thing) and the
   // one-time initial-greeting upgrade below.
   const [proactiveData, setProactiveData] = useState<DashboardData | null>(null)
+  useEffect(() => {
+    if (!profile.id) return
+    let live = true
+    supabase.from('chat_messages').select('action_data, created_at')
+      .eq('profile_id', profile.id).eq('role', 'assistant').not('action_data', 'is', null)
+      .order('created_at', { ascending: false }).limit(300)
+      .then(({ data, error }) => {
+        if (!live || error) return
+        setTaughtLessons(taughtFromRows((data ?? []) as { action_data?: unknown; created_at?: string }[]))
+      })
+    return () => { live = false }
+  }, [profile.id])
   /** null = not yet known; set by loadChatHistory once the chat_messages count for this profile is confirmed. */
   const [isFirstEverChat, setIsFirstEverChat] = useState<boolean | null>(null)
   /** The one message currently mid-typewriter-reveal — set only for a reply that JUST arrived from sendMessage, never for restored history/cache (see TypewriterMarkdown.tsx). */
@@ -2032,7 +2052,44 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // support something specific, which is what makes "specific-or-silent"
       // structural rather than an instruction.
       accountability_check_in: accountabilityCheckIn(),
+      lesson_brief: lessonForThisTurn(activeWeek, activeMesoWeek),
     }
+  }
+
+  /**
+   * THE LESSON FOR THIS TURN (coach-lessons.ts): at most one a day, never one
+   * already taught, chosen from her own week. Remembers which was offered, so
+   * the reply's marker is only believed when it names this one.
+   */
+  const lessonForThisTurn = (activeWeek: number, week: { is_deload?: boolean; isCalibrationWeek?: boolean } | undefined): string => {
+    if (!taughtLessons) { offeredLessonRef.current = null; return '' }
+    const now = getAppNow(profile.id)
+    const todayStr = getLocalDateString(now)
+    const cell = trainingWeek.loading ? undefined : trainingWeek.days.find(d => d.date === todayStr)
+    const { trainedToday } = trainedTodayFacts(todayStr)
+    const made = planCreatedAt ?? profile.created_at ?? null
+    const ageDays = made ? (now.getTime() - new Date(made).getTime()) / 86_400_000 : Infinity
+    const due = lessonDue({
+      isDeload: !!week?.is_deload,
+      isCalibrationWeek: !!week?.isCalibrationWeek,
+      planIsNew: activeWeek === 1 && ageDays >= 0 && ageDays <= 3,
+      sessionDueToday: cell?.state === 'due' && !trainedToday,
+      trainedToday,
+      restDayToday: cell?.state === 'rest' || cell?.state === 'rest_chosen' || cell?.state === 'recovery',
+      recentBest: (proactiveData?.recentPRs.length ?? 0) > 0,
+      streak: proactiveData?.streak ?? null,
+      goal: profile.fitness_goal ?? null,
+      weightFalling: (proactiveData?.weightTrend?.ratePerWeekKg ?? 0) < 0,
+    }, taughtLessons, now)
+    offeredLessonRef.current = due?.id ?? null
+    return lessonBrief(due, taughtLessons)
+  }
+
+  /** Keep the record of a lesson the coach just taught, on screen at once. */
+  const noteLessonTaught = (lesson: string | null) => {
+    if (!lesson) return
+    setTaughtLessons(prev => [{ id: lesson, at: getAppNow(profile.id).toISOString() }, ...(prev ?? [])])
+    offeredLessonRef.current = null
   }
 
   /**
@@ -2356,12 +2413,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // placeholder row is stuck at status 'pending' with empty content forever
   // -- a ghost "..." message that reappears every reload, because nothing
   // else ever revisits this row. Logged for the same reason as above.
-  const finalizePlaceholder = (placeholderId: string | undefined, content: string, status: 'complete' | 'failed', action?: PlanAction) => {
+  const finalizePlaceholder = (placeholderId: string | undefined, content: string, status: 'complete' | 'failed', action?: PlanAction, lesson: string | null = null) => {
     if (!placeholderId || !profile.id) return
     supabase.from('chat_messages').update({
       content,
       status,
-      action_data: action || null,
+      // A lesson taught in this message is recorded on it (coach-lessons.ts).
+      action_data: actionDataWithLesson(action, lesson),
     }).eq('id', placeholderId).then(({ error }) => {
       if (error) console.error('finalizePlaceholder: update failed -- this placeholder will show as stuck pending on reload', error)
     })
@@ -6220,7 +6278,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       setQuickRepliesDismissed(false)
       // Keep Retry armed when the retry itself came back empty.
       if (!retryFloor.blank) setLastFailedInput(null)
-      finalizePlaceholder(failedMsg.id, cleanedText, retryFloor.blank ? 'failed' : 'complete', processed.action)
+      const retryLesson = retryFloor.blank ? null : lessonTaughtIn(processed.text, offeredLessonRef.current)
+      finalizePlaceholder(failedMsg.id, cleanedText, retryFloor.blank ? 'failed' : 'complete', processed.action, retryLesson)
+      noteLessonTaught(retryLesson)
     } catch {
       setMessages(prev => prev.map((m, i) =>
         i === failedIndex ? {
@@ -6355,6 +6415,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     const quickReplies = extractQuickReplies(responseText!)
     const strippedText = stripTags(responseText!)
+    const lessonTaught = failed ? null : lessonTaughtIn(responseText!, offeredLessonRef.current)
 
     // NEVER A BARE AVATAR. Reported live 15 Sep 2026 with a screenshot: three
     // messages in a row — including "Hello" — came back as a coach bubble with
@@ -6421,7 +6482,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     setIsLoading(false)
     setQuickRepliesDismissed(false)
 
-    finalizePlaceholder(placeholderId, cleanedText, finalStatus, action)
+    finalizePlaceholder(placeholderId, cleanedText, finalStatus, action, finalStatus === 'complete' ? lessonTaught : null)
+    if (finalStatus === 'complete') noteLessonTaught(lessonTaught)
 
     // The food backstop, after the coach's own turn has landed: its tick sits
     // under the reply, one per food, each with Undo like any saved fact.

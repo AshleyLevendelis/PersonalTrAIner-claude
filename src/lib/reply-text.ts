@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // THE COACH'S REPLY AS SHE READS IT: the markers the coach's model writes for
-// the app ([ACTION: …], [QUICK_REPLIES: …], [BREAK]) taken out, so what is
+// the app ([ACTION: …], [QUICK_REPLIES: …], [LESSON: …], [BREAK]) taken out, so what is
 // left is the sentence on screen.
 //
 // One definition for two readers since 6 Nov 2026: the chat (ChatAssistant)
@@ -12,6 +12,8 @@
 
 export const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 export const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
+/** A lesson the coach taught this turn (coach-lessons.ts): the app keeps the record, she never sees the marker. */
+export const LESSON_MARK_RE = /\[LESSON:\s*[a-z0-9-]*\s*\]/gi
 const BREAK_TAG_RE = /^[ \t]*\[BREAK\][ \t]*$/gim
 
 /** A [BREAK] line is a paragraph break, never a word. */
@@ -21,5 +23,5 @@ export function applyMessageBreaks(text: string): string {
 
 /** The reply with every app marker removed, trimmed. */
 export function cleanReplyText(text: string): string {
-  return applyMessageBreaks(text).replace(ACTION_TAG_RE, '').replace(QUICK_REPLIES_RE, '').trim()
+  return applyMessageBreaks(text).replace(ACTION_TAG_RE, '').replace(QUICK_REPLIES_RE, '').replace(LESSON_MARK_RE, '').trim()
 }

@@ -38,6 +38,10 @@ function reminderOf(actionData: unknown): ReminderMarker | null {
   return { source: 'reminder', moment: a.moment, shortcut }
 }
 
+function isPlanAction(a: unknown): a is PlanAction {
+  return !!a && typeof a === 'object' && typeof (a as Record<string, unknown>).type === 'string'
+}
+
 /** One stored row as a chat message. A reminder's marker is its own field, never mistaken for a plan action. */
 export function rowToMessage(row: ChatRow): ChatMessage {
   const reminder = reminderOf(row.action_data)
@@ -46,7 +50,9 @@ export function rowToMessage(row: ChatRow): ChatMessage {
     role: row.role as 'user' | 'assistant',
     content: row.content,
     status: (row.status || 'complete') as ChatMessage['status'],
-    action: reminder ? undefined : (row.action_data as PlanAction | undefined) ?? undefined,
+    // A plan action always names its type. Anything else stored there (a
+    // lesson's record, coach-lessons.ts) is never drawn as an action.
+    action: reminder || !isPlanAction(row.action_data) ? undefined : row.action_data,
     ...(reminder ? { reminder: { moment: reminder.moment, shortcut: reminder.shortcut } } : {}),
     created_at: row.created_at,
   }
