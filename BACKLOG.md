@@ -2,7 +2,7 @@
 
 Newest first. One line each.
 
-- [ ] **THE COACH SOUNDS LIKE A PERSON WHO TEACHES, 6 NOV 2026** (Ashley: "warmer, friendlier, more encouraging, but
+- [x] **THE COACH SOUNDS LIKE A PERSON WHO TEACHES, 6 NOV 2026** (Ashley: "warmer, friendlier, more encouraging, but
   also more human-like ... proactively reach out ... educate the user so that they can learn and progress ... the
   reasons behind why we eat certain foods or do certain exercises ... informative, but not long-winded ... Previous
   attempts at this haven't been successful"). **Her four rulings, each from three options:** "Warm coach" (earned
@@ -15,8 +15,32 @@ Newest first. One line each.
   as "attention, not praise" with encouragement banned in five places; teaching was gated ("only if confident", "one or
   two sentences", "silence beats filler"); the fourteen worked replies were one-liners; half of what she reads as the
   coach is fixed sentences; and the exam only ever rewarded short and plain, so every fix on 24-26 Sep cut and none
-  added. Plan and CSCS basis: `docs/plans/coach-persona.md`. Building in four steps: exam, instructions, lessons,
-  coach-written reminders.
+  added. Plan and CSCS basis: `docs/plans/coach-persona.md`.
+  **BUILT, four steps.** (1) The exam: `warm` and `teaches` in the rubric, four new cases (a personal best, a week that
+  fell apart, why protein in every meal, advice then a plain thanks); 38 cases. (2) The instructions: a character
+  (warm, in their corner, explains as it goes), warmth as EARNED encouragement with empty praise still banned, a new
+  "why on every answer" section (one short TRUE reason tied to them, never a lecture), advice as two to four short
+  lines never a block of text, warm check-ins, worked replies rewritten (7 of 18 carry a why; the greeting no longer
+  recites the session, her 17 Sep rule), after-action instructions ask for warmth and a why in a clause. Kept: allergens,
+  pain triage, medical hand-off, no lists outside the two shapes, one question at most. (3) Lessons that build:
+  eleven ideas (`coach-lessons.ts`, CSCS basis in the plan, no numbers), one a day from her week, marked
+  `[LESSON: id]` by the coach, removed before she sees it, recorded on the message that taught it, never repeated.
+  (4) Coach-written reminders AND the chat opener (`_shared/reminder-writer.ts`): the app chooses what to say, the
+  coach writes it, the app refuses it for a number it was not given, a food named (the reminder service never knows
+  her allergies), a wrong claim about her day, formatting, length, two emoji, AI talk, a reminder not opening "Hey",
+  or an opener not ending on its buttons' question; the warm fixed sentence goes instead (her own two sentences
+  unchanged, the rest warmer with a why). The opener waits a hard 4.5 seconds.
+  **FOUND ON THE WAY:** a slow coach whose request ignored the cancel put its late words over the fixed opener (fixed:
+  the wait is a race against a timer); a lessons driver tested a wrong marker only when no lesson was on offer, so it
+  could not fail (fixed); a check matched 4500 inside 45000 (fixed).
+  **VERIFIED:** test:coach-exam-judge 36, test:coach-promises (7 new), test:tool-reply (2 new), test:coach-lessons 38,
+  verify:coach-lessons 15, test:reminder-writer 48, verify:coach-opener-words 12, verify:reach-out-function under Deno;
+  every new check mutation-tested (49 mutations across them, all caught at full count once the three fixes above
+  landed; the "examples carry a why" floor of 5 catches three lost, not one). 166 derived gates and all 41 chat-screen
+  drivers pass. **NOT VERIFIED, AND IT IS THE POINT:** whether the model obeys. That needs the coach exam on her machine
+  (`docs/handover/machine-todo-2026-11-06b.md`: before on main, after on TEST). Named limits: a lesson taught in a reply
+  whose page closed is saved without its mark, so it may be taught once more; a first-ever chat's welcome stays the
+  app's; the opener rewrite runs for a returning user after a clear. Needs the chat-gemini and coach-reach-out deploys.
 - [x] **THE COACH TEXTS YOU: REMINDERS AND REPLIES AS CHAT MESSAGES, AND HOW OFTEN, 6 NOV 2026** (Ashley: reminders
   should be "like a WhatsApp notification: the coach has just sent you a message ... 'Hey Ashley, are you ready for
   your session today?' ... And when you open it, it's the same message in the chat", and the same for a back-and-forth

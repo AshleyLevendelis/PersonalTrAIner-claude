@@ -54,6 +54,9 @@ compound lifts come first (fatigue and technical demand), deloads (dissipating f
 recovery, daily steps (NEAT) in a deficit, what a plateau means. Every lesson is phrased in plain words with no
 number the app does not already show her.
 
+## Built
+All four steps, 6 Nov 2026; the record is BACKLOG's entry of the same name.
+
 ## Not measured, and why
 Whether the coach OBEYS needs the coach exam run against the real model, which needs keys only her machine has. The
 26 Sep run is the last measurement; the run before and the run after this change are both hers.
