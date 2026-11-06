@@ -5,6 +5,7 @@ import { pushServer, sendPush } from "../_shared/push.ts";
 import type { NotificationSettings } from "../_shared/coach-moments.ts";
 import { GEMINI_MODEL, coachShortLine } from "../_shared/gemini.ts";
 import { writeOpener } from "../_shared/reminder-writer.ts";
+import { voicePass } from "./voice-pass.ts";
 import { assumedLine, computeMealMacros, doubtAboutLoggedMeal, type MealIngredientLine } from "../_shared/food-db.ts";
 import { readIngredientText, splitCompoundFoodLine } from "../_shared/ingredient-units.ts";
 import { weighInQuestion } from "../_shared/weigh-in-check.ts";
@@ -5204,8 +5205,24 @@ Keep this context in mind to ensure your greetings and questions naturally align
     });
     console.log(`plain-reply source=${plain.source} legs=${plain.legs}`);
 
+    // THE SECOND PASS (her ruling 6 Nov 2026, "Second pass + checks"): an advice
+    // draft is edited into a text from the coach by a separate short call, and
+    // the edit is checked against the draft (voice-pass.ts). A floor is the
+    // app's own sentence and is never edited.
+    let finalReply = plain.reply;
+    if (plain.source !== "floor") {
+      const voiced = await voicePass(
+        plain.reply,
+        message,
+        (prompt) => coachShortLine(prompt, 6000, { maxTokens: 500, temperature: 0.6 }),
+        (t) => detectPlanClaim(t) ?? detectTodayClaim(t, todayFacts)?.sentence ?? null,
+      );
+      if (voiced.source !== "kept") console.log(`voice-pass source=${voiced.source}${voiced.why ? ` why=${voiced.why}` : ""}`);
+      finalReply = voiced.reply;
+    }
+
     return new Response(
-      JSON.stringify({ reply: plain.reply }),
+      JSON.stringify({ reply: finalReply }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {

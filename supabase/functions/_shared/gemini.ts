@@ -10,7 +10,7 @@ export const GEMINI_MODEL = "gemini-3.5-flash";
  * or no key, never a throw: the caller sends its fixed sentence instead, and
  * reminder-writer.ts checks every word of whatever comes back.
  */
-export async function coachShortLine(prompt: string, timeoutMs = 8000): Promise<string | null> {
+export async function coachShortLine(prompt: string, timeoutMs = 8000, opts: { maxTokens?: number; temperature?: number } = {}): Promise<string | null> {
   const key = Deno.env.get("GEMINI_KEY") || Deno.env.get("VITE_GEMINI_KEY");
   if (!key) return null;
   const ctrl = new AbortController();
@@ -25,7 +25,7 @@ export async function coachShortLine(prompt: string, timeoutMs = 8000): Promise<
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
           // A short text: thinking off so it cannot eat the small budget (generate-meals' finding).
-          generationConfig: { temperature: 0.9, maxOutputTokens: 200, thinkingConfig: { thinkingBudget: 0 } },
+          generationConfig: { temperature: opts.temperature ?? 0.9, maxOutputTokens: opts.maxTokens ?? 200, thinkingConfig: { thinkingBudget: 0 } },
         }),
       },
     );

@@ -269,6 +269,19 @@ async function main() {
     check('the grader renders the save rather than "(no text at all)"', coachLine(turn0).includes('saved it straight away'), coachLine(turn0))
   }
 
+  // AND A LOGGED WORKOUT (6 Nov 2026): "squats done, got 50kg for all three sets" was logged by the coach and
+  // shown as the app's receipt, and the exam marked it silence, because log_workout's key is not an *Intent.
+  console.log('\n[4c] a logged workout — the app receipt, not silence')
+  {
+    const coach = await fakeCoach(() => ({ body: { reply: '', logWorkout: { date: null, corrects_previous: false, entries: [{ exercise: 'Barbell Back Squat', text: '3x8 @ 50kg' }] } } }))
+    const r = await runExam(wantsCard.name, coach.port)
+    await coach.close()
+    const turn0 = r.transcript?.turns?.[0]
+    check('a logged workout is recorded as a save', turn0?.saved?.kind === 'log_workout', turn0)
+    const rules = r.transcript ? hardRuleViolations(r.transcript).map(v => v.rule) : ['no transcript']
+    check('...and silence does NOT fire on it', !rules.includes('silence'), rules)
+  }
+
   console.log('\n[5] --dry is still the free path, and still calls nothing')
   {
     const coach = await fakeCoach(() => TEXT('should never be reached'))

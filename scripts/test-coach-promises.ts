@@ -969,7 +969,8 @@ if (failures > 0) {
   // A plain question turn had no second chance at all.
   check('a plain turn gets the reply guarantee',
     /const plain = await resolvePlainReply\(\{/.test(src), null)
-  check('...and its answer is what actually ships', /reply: plain\.reply/.test(src), null)
+  // 6 Nov 2026: the second pass (her "Second pass + checks") may edit it, and starts from it and falls back to it.
+  check('...and its answer is what actually ships', /let finalReply = plain\.reply;/.test(src) && /JSON\.stringify\(\{ reply: finalReply \}\)/.test(src), null)
   check('...and no longer tells her to rephrase', !/try rephrasing/.test(src), null)
   check('...with a floor that does not blame her',
     /I'm not sure I followed that one/.test(src), null)

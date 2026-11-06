@@ -136,7 +136,7 @@ async function main() {
   const fn = strip(readFileSync('supabase/functions/coach-reach-out/index.ts', 'utf8'))
   const gem = strip(readFileSync('supabase/functions/_shared/gemini.ts', 'utf8'))
   check('the deps hand runReachOut the writer, the shared short-line call', /writeWithCoach: \(prompt\) => coachShortLine\(prompt\),\n\s*\};/.test(fn) && /import \{ coachShortLine \} from "\.\.\/_shared\/gemini\.ts"/.test(fn))
-  check('...which reads the coach key from the environment and gives up without one', /export async function coachShortLine\(prompt: string, timeoutMs = 8000\): Promise<string \| null>[\s\S]{0,200}Deno\.env\.get\("GEMINI_KEY"\)[\s\S]{0,80}if \(!key\) return null/.test(gem))
+  check('...which reads the coach key from the environment and gives up without one', /export async function coachShortLine\(prompt: string, timeoutMs = 8000[^)]*\): Promise<string \| null>[\s\S]{0,200}Deno\.env\.get\("GEMINI_KEY"\)[\s\S]{0,80}if \(!key\) return null/.test(gem))
   check('...stops waiting after a few seconds', /setTimeout\(\(\) => ctrl\.abort\(\), timeoutMs\)/.test(gem) && /signal: ctrl\.signal/.test(gem))
   check('...with thinking off, so it cannot spend the small budget thinking', /coachShortLine[\s\S]*thinkingConfig: \{ thinkingBudget: 0 \}/.test(gem))
   check('...and returns null, never throws, on any failure', /coachShortLine[\s\S]*if \(!res\.ok\) return null[\s\S]*catch \{\s*return null;/.test(gem))

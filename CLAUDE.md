@@ -1100,6 +1100,10 @@ menu" stays true when a copy is also left outside it.
   a check fails), and "Add two new marks" (`warm` and `teaches` in the exam; the six are unchanged). It REPLACES the
   old "warmth is attention, not praise" rule. `docs/plans/coach-persona.md`. Needs the `chat-gemini` and
   `coach-reach-out` deploys and an exam run on her machine before anything is known
+- **The second pass: her ruling 6 Nov 2026, "Second pass + checks"** (over checks only and over a stronger model):
+  advice replies are edited by a separate short call into two to four short lines, one option, one question at most,
+  and the edit is checked (markers, numbers, foods, claims, shape) or the draft stands; safety and medical wording is
+  never edited. `test:voice-pass`, `chat-gemini/voice-pass.ts`. Needs the `chat-gemini` deploy and an exam re-run
 - **It reads like texting a coach — Ashley's three rulings of 24 Sep 2026**,
   after seeing four-paragraph answers and a question tacked onto every reply:
   (1) **"short steps"**, from three options (over speech-only and over a

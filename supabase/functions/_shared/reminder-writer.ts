@@ -73,7 +73,7 @@ export function reminderPrompt(moment: CoachMoment, f: MomentFacts): string {
 }
 
 /** Words that name a food or a drink. A reminder never knows her allergies, so it never names one. */
-const FOOD = /\b(?:nuts?|peanuts?|almonds?|cashews?|walnuts?|milk|yog(?:h)?urts?|cheese|eggs?|fish|salmon|tuna|prawns?|shrimp|shellfish|soy|soya|tofu|wheat|bread|toast|oats?|porridge|rice|pasta|potato(?:es)?|chicken|beef|pork|turkey|ham|bacon|steak|lentils?|beans?|chickpeas?|hummus|banana|apples?|berries|fruit|shakes?|whey|protein\s+bars?|bars?|smoothies?|coffee|tea|juice|sesame|quark|skyr|cottage)\b/i
+export const FOOD = /\b(?:nuts?|peanuts?|almonds?|cashews?|walnuts?|milk|yog(?:h)?urts?|cheese|eggs?|fish|salmon|tuna|prawns?|shrimp|shellfish|soy|soya|tofu|wheat|bread|toast|oats?|porridge|rice|pasta|potato(?:es)?|chicken|beef|pork|turkey|ham|bacon|steak|lentils?|beans?|chickpeas?|hummus|banana|apples?|berries|fruit|shakes?|whey|protein\s+bars?|bars?|smoothies?|coffee|tea|juice|sesame|quark|skyr|cottage)\b/i
 const AI_TALK = /\b(?:as an ai|i'?m an ai|language model|i am an ai)\b/i
 const EMOJI = /\p{Extended_Pictographic}/gu
 

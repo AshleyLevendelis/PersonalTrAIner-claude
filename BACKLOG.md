@@ -2,6 +2,24 @@
 
 Newest first. One line each.
 
+- [x] **THE SECOND PASS: THE COACH DRAFTS, A SHORT EDIT MAKES IT A TEXT, 6 NOV 2026** (Ashley: "the chat is better
+  but not perfect. why?"). MEASURED on her machine the same day (38 cases, judge marked all): overall 2.30 before,
+  2.27 after the warm-coach instructions, voice 2.00 -> 1.94, warm 2.06 -> 2.00, teaches 2.14 -> 2.09, all inside
+  the judge's spread; hard-rule breaches 11 -> 5. The replies were warmer and gave a why, and still ran to three
+  paragraphs, handed over numbered menus ("We can adjust things... 1. ... 2. ... 3.") and ended on questions. The
+  cause: asking the model to be short does not work (24-26 Sep and 6 Nov all failed the same way); it takes what is
+  ADDED (warmth, a why) and ignores what is HELD BACK (length). **Her ruling, from three options: "Second pass +
+  checks"**, over checks only and over a stronger model (more cost per message). BUILT (`chat-gemini/voice-pass.ts`):
+  an advice reply over 220 characters, or the wrong shape, is rewritten by a separate short call to two to four short
+  lines, one option not a menu, one question at most, the why kept; the rewrite is refused if it changes a button,
+  lesson or action marker, adds a number or a food the draft did not have, or makes a claim the plan and today
+  checks refuse, or is still the wrong shape; one retry told why, then the draft stands. NEVER rewritten: allergy or
+  diet restriction, a doctor or physio, medication, pain or injury, eating very little, the full form guide. A floor
+  is never edited. ALSO FOUND: the personal-best "silence" was the exam, not the coach: it logged the sets and the
+  app showed its receipt, and the runner did not count `logWorkout` as a save (fixed, checked). NOT YET: tool-turn
+  and card wording are untouched by the pass (they are short by design); whether the model's edits read well is the
+  exam's to say, on her machine after the chat-gemini deploy. test:voice-pass 32 checks, 10 mutations, 10 caught;
+  test:coach-exam-runner +2 (1 mutation, caught); coach-promises and reminder-writer re-anchored (1 mutation, caught).
 - [x] **THE CHAT BOX HAS ONE BUTTON, THE WHATSAPP WAY, 6 NOV 2026** (Ashley, with WhatsApp and app screenshots: "My
   app has a voice note button next to a message button. WhatsApp does it better where it has a voice note button only
   but when you start typing text in the text box it changes to a send button"). Built as asked: one round button in

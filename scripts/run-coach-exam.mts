@@ -197,6 +197,11 @@ function readProposal(j: Record<string, unknown>): { kind: string; args: unknown
  *  would otherwise arrive here as silence all over again, which is how the
  *  first three were missed. */
 function readSaved(j: Record<string, unknown>): { kind: string; args: unknown } | null {
+  // A LOGGED WORKOUT IS A SAVE TOO (6 Nov 2026): log_workout returns
+  // { reply: "", logWorkout: {...} } and the app shows the parsed receipt, so
+  // "squats done, got 50kg for all three sets" was marked silence on a coach
+  // that had logged the sets. Its key does not end in "Intent", so it is named.
+  if (j.logWorkout && typeof j.logWorkout === 'object') return { kind: 'log_workout', args: j.logWorkout }
   for (const [key, v] of Object.entries(j)) {
     if (!key.endsWith('Intent') || !v || typeof v !== 'object') continue
     const kind = String((v as Record<string, unknown>).tool ?? '').trim()
