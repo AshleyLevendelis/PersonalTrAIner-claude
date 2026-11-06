@@ -1094,6 +1094,12 @@ menu" stays true when a copy is also left outside it.
   (`coach-exam-fresh`, `coach-exam-judge`). Measured first in
   `docs/audits/the-coachs-own-words-2026-09-15.md`: three grammars for one
   job, eight wordings of one failure, three narrators in one file
+- **The coach is a warm coach who teaches — her rulings 6 Nov 2026**, each from three options: "Warm coach" (earned
+  praise tied to a fact, never empty praise), "A why on every answer" (plus lessons that build, never repeated),
+  "Coach writes, app checks" (reminders and the opener written fresh from the app's facts, a warm fixed sentence when
+  a check fails), and "Add two new marks" (`warm` and `teaches` in the exam; the six are unchanged). It REPLACES the
+  old "warmth is attention, not praise" rule. `docs/plans/coach-persona.md`. Needs the `chat-gemini` and
+  `coach-reach-out` deploys and an exam run on her machine before anything is known
 - **It reads like texting a coach — Ashley's three rulings of 24 Sep 2026**,
   after seeing four-paragraph answers and a question tacked onto every reply:
   (1) **"short steps"**, from three options (over speech-only and over a
