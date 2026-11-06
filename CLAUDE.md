@@ -1335,7 +1335,17 @@ menu" stays true when a copy is also left outside it.
   a "log your meals" nudge (only for someone who logs) and a "behind on
   protein" nudge, both from 7pm. `test:coach-moments` §4b, `test:reach-out` §4,
   §5b, `verify:reach-out-function` 13-16, `verify:reminders` 2a-2c. Needs the
-  new migration and the `coach-reach-out` deploy
+  new migration and the `coach-reach-out` deploy.
+  **The coach TEXTS you — her rulings 6 Nov 2026, "Chat, with a shortcut" and
+  "Three levels".** A reminder is a real coach message in the chat ("Hey Ashley,
+  are you ready for your session today?"), titled "Trainer", and a tap opens the
+  chat where it sits, session and food ones with a small shortcut button. A coach
+  REPLY pings like a text when she has left the app and is saved in the chat; it
+  never counts against the reminders and has its own switch. How often: Light 1,
+  Normal up to 3 (default), Lots up to 5 a day. The coach's server writes only
+  into a fresh coach row the app made (it cannot see who is asking).
+  `test:coach-texts-you`, `verify:coach-texts-you`, `test:reach-out`,
+  `verify:reminders` 2j-2o. Needs the `coach-reach-out` and `chat-gemini` deploys
 - History is permanent — `diary-preservation`, `replace-without-losing`
 - Every write succeeds or says it did not — `silent-writes`,
   `queue-listeners`, `stale-after-write`

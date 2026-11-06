@@ -230,3 +230,12 @@ least three hours apart — over "keep it to one" and over "no limit".
   16.4+). Nothing here changes that.
 - Still not live: the two migrations, the function deploy and the keys are
   hers (the handover prompt).
+
+## The coach texts you — 6 Nov 2026
+
+Her ask: a reminder should read like a WhatsApp message from her coach and be the same message in the chat when she
+opens it; a reply should ping like a text when she has left the app; and people can turn the frequency down or up.
+Her rulings: "Chat, with a shortcut" and "Three levels" (Light 1 / Normal 3 / Lots 5 a day). The build, the safety
+rule on the coach's server (it writes only into a fresh coach row the app made, by id and profile), the two defects
+found on the way and what is not done are in BACKLOG's 6 Nov entry. Gates: `test:coach-texts-you`,
+`verify:coach-texts-you`, `test:reach-out`, `verify:reach-out-function`, `verify:reminders`.

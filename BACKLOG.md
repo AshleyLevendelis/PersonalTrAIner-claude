@@ -2,6 +2,42 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH TEXTS YOU: REMINDERS AND REPLIES AS CHAT MESSAGES, AND HOW OFTEN, 6 NOV 2026** (Ashley: reminders
+  should be "like a WhatsApp notification: the coach has just sent you a message ... 'Hey Ashley, are you ready for
+  your session today?' ... And when you open it, it's the same message in the chat", and the same for a back-and-forth
+  chat; then "we also don't want to overwhelm the user ... give them an option to turn down or turn up the
+  frequency"). **Her rulings, each from options:** "Chat, with a shortcut" (every reminder opens the chat; session and
+  food ones carry "Open today's session" / "Open Nutrition"), and "Three levels" (Light 1 a day, Normal up to 3 as
+  before, Lots up to 5; every level keeps the 3-hour gap and 8am-9pm). MEASURED FIRST: notifications were titled
+  "Your coach" in lock-screen words and wrote nothing to the chat; only the browser wrote chat rows; and the chat read
+  the server once per start and kept its own copy whenever the server page was shorter, so a server-written message
+  could never appear.
+  **BUILT:** `coach-reach-out` writes the reminder into `chat_messages` (marked `action_data.source: reminder`) BEFORE
+  the push, titled "Trainer", her `display_name` first, and deletes it if no phone took it; the check-in says "this
+  morning / this afternoon / this evening / yesterday" on HER clock. `chat-gemini`, after the reply has gone back,
+  saves a plain reply into the app's own fresh row and texts it to her phones; a card turn's words are the app's (D1),
+  so the phone says only "I've replied. Tap to see it." Replies never count against the reminders and have their own
+  switch, "Message me when the coach replies". The service worker shows nothing while she is looking at the app and
+  tells the window instead; a tap brings the chat forward and re-reads it. The chat folds server rows in by id, never
+  dropping what the screen shows (`chat-history-merge.ts`). Pushes are high urgency (her 5 Nov note: normal may be
+  held while the phone sleeps), from one shared sender (`_shared/push.ts`). The wording moved to sentence case and
+  "5 in a row" (her 17 Oct "in a row" ruling; it said "days"). One reply clean-up for the chat and the server
+  (`reply-text.ts`, copied to `_shared/`, held equal).
+  **SAFETY:** the coach's server cannot see who is asking (the app calls it with the public key), so it writes and
+  pushes ONLY for a coach row the app created in the last ten minutes, by id AND profile; anything else is refused.
+  **FOUND BY THE BROWSER DRIVER, FIXED:** "new since" was read off this phone's own message times, so a phone clock a
+  few minutes fast would hide every new server message; it is now read on the server's clock alone. **FOUND BY A
+  MISSED MUTATION:** the "never add her own message twice" rule was untested because the test message sat before the
+  cut-off, a case where the rule cannot bind; moved past it, now caught. **Mine, flagged:** the wording of every
+  message (hers to change), "a reply is never counted", ten minutes for a fresh row, 180 characters on the lock
+  screen, high urgency. **NOT DONE, named:** a reply whose page died arrives as text without its card; on iPhone the
+  app must be on the home screen; the chat re-reads on focus, return and the phone's word, not live in a second tab.
+  **NEEDS:** the merge, then the `coach-reach-out` AND `chat-gemini` deploys (`docs/handover/machine-todo-2026-11-06.md`).
+  No migration. **VERIFIED:** `test:coach-moments` 87, `test:reach-out` 106, new `test:coach-texts-you` 46,
+  `verify:reach-out-function` 20 (the real function in Deno: the chat row written before the push, its words decrypted
+  from the push), new `verify:coach-texts-you` 12 at 390px (screenshots read), `verify:reminders` 37 (frequency 2j-2o);
+  36 mutations, 36 caught, every run at full count. NOT proven: that a reply pings a real phone with the app shut, and
+  that Chrome shows no generic notice for a push it was told to keep quiet (both on her phone, in the handover).
 - [x] **REMINDERS LIVE ON PRODUCTION, AND A REAL BUZZ ON HER ANDROID PHONE, 5 NOV 2026** (her machine, her typed
   production steps). Her phone said "The reminder service isn't running yet". MEASURED in order, from the LIVE app's
   own point of view: the app she opens (`personal-tr-a-iner-claude-yco8.vercel.app`) is built against PRODUCTION with

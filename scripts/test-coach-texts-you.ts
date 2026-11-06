@@ -176,7 +176,7 @@ async function main() {
       action_data: { source: 'reminder', moment: 'workout_today', shortcut: 'exercise' } })
     const page: ChatMessage[] = [
       ...prev.slice(10, 27).map(m => ({ id: m.id, role: m.role, content: m.content, status: m.status, created_at: m.created_at })),
-      { id: 'user-row', role: 'user', content: 'yes please', status: 'complete', created_at: t(30) },
+      { id: 'user-row', role: 'user', content: 'yes please', status: 'complete', created_at: t(33) },
       { id: 'waiting', role: 'assistant', content: 'Done: swapped.', status: 'complete', created_at: t(31) },
       reminder,
     ]
