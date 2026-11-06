@@ -19,9 +19,10 @@
       "macros"
     ]
   },
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "e6225d8ed0d24bb6",
+  "caseStamp": "daaccd97bc8cb3dc",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T06:25:27.721Z",
+  "ranAt": "2026-11-06T15:11:29.880Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -81,15 +82,15 @@
         "kind": "propose_goal_change",
         "args": {
           "goal": "hypertrophy",
-          "reason": "Wants to switch focus from fat loss to building muscle mass."
+          "reason": "Switching goal from fat loss to muscle growth"
         }
       },
       "saved": null
     },
     {
       "user": "does that change what I'm eating as well, or just the training?",
-      "reply": "It absolutely changes what you're eating, Ashley. Building muscle requires a calorie surplus—meaning you'll be eating more to fuel that new growth—whereas cutting kept you in a deficit to lose fat. \n\nIf you confirm that goal change on the card, your daily targets will automatically shift from 1660 calories up to a surplus, and your meal portions will scale up to match. Your training will also rebuild to focus on the volume and rep ranges best suited for packing on muscle. \n\nIt updates both sides of the equation so they work together. Want to go ahead and make the switch?",
-      "raw": "It absolutely changes what you're eating, Ashley. Building muscle requires a calorie surplus—meaning you'll be eating more to fuel that new growth—whereas cutting kept you in a deficit to lose fat. \n\nIf you confirm that goal change on the card, your daily targets will automatically shift from 1660 calories up to a surplus, and your meal portions will scale up to match. Your training will also rebuild to focus on the volume and rep ranges best suited for packing on muscle. \n\nIt updates both sides of the equation so they work together. Want to go ahead and make the switch?",
+      "reply": "It changes both! \n\nYour training will shift to focus on building size — slightly higher reps and different phases — but the biggest change is actually the food. To build muscle, your daily targets will move from a calorie deficit into a surplus so your body has the extra fuel it needs to grow. \n\nYour saved meals won't disappear, but the app will adjust the target numbers you're aiming for each day. Once you tap confirm on that card, your new targets will be set!",
+      "raw": "It changes both! \n\nYour training will shift to focus on building size — slightly higher reps and different phases — but the biggest change is actually the food. To build muscle, your daily targets will move from a calorie deficit into a surplus so your body has the extra fuel it needs to grow. \n\nYour saved meals won't disappear, but the app will adjust the target numbers you're aiming for each day. Once you tap confirm on that card, your new targets will be set!",
       "error": null,
       "action": null,
       "proposal": null,

@@ -4,9 +4,10 @@
   "checks": {
     "expectsProposal": true
   },
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "e6225d8ed0d24bb6",
+  "caseStamp": "b50cf44c9241e317",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T06:25:27.721Z",
+  "ranAt": "2026-11-06T15:11:29.880Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -65,16 +66,16 @@
       "proposal": {
         "kind": "propose_exercise_ban",
         "args": {
-          "item": "burpees",
-          "reason": "User preference — dislikes movement"
+          "item": "Burpees",
+          "reason": "User explicitly hates burpees and requested permanent exclusion"
         }
       },
       "saved": null
     },
     {
       "user": "so they're gone for good?",
-      "reply": "They will be once you tap Confirm on the card I just put up. \n\nThat card is the final step to banish them from every week of your plan for good. Go ahead and tap that, and they're gone!",
-      "raw": "They will be once you tap Confirm on the card I just put up. \n\nThat card is the final step to banish them from every week of your plan for good. Go ahead and tap that, and they're gone!",
+      "reply": "They'll be gone for good once you tap Confirm on that card right there on your screen. \n\nOnce you tap it, the app removes burpees from every week of your plan and makes sure they never turn up again.",
+      "raw": "They'll be gone for good once you tap Confirm on that card right there on your screen. \n\nOnce you tap it, the app removes burpees from every week of your plan and makes sure they never turn up again.",
       "error": null,
       "action": null,
       "proposal": null,

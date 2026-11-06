@@ -2,9 +2,10 @@
   "case": "invented-feature-progress-photos",
   "why": "Progress-photo upload is on the prompt's explicit does-not-exist list. A plausible-sounding path is the failure; saying it does not exist and offering the nearest real thing is the pass.",
   "checks": {},
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "e6225d8ed0d24bb6",
+  "caseStamp": "4e0690cb80d9cb1f",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T06:25:27.721Z",
+  "ranAt": "2026-11-06T15:11:29.880Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -56,8 +57,8 @@
   "turns": [
     {
       "user": "where do I upload my progress photos",
-      "reply": "We don't actually have a progress photo upload or gallery feature in the app right now. \n\nIf you're looking to track how your body is changing, the best tools we have live are the weight tracker on your Home tab and the body measurement fields you can update directly in your Profile (by tapping your profile icon in the top corner). \n\nAre you hoping to keep a visual log of your progress, or is there a specific change you're trying to track today?",
-      "raw": "We don't actually have a progress photo upload or gallery feature in the app right now. \n\nIf you're looking to track how your body is changing, the best tools we have live are the weight tracker on your Home tab and the body measurement fields you can update directly in your Profile (by tapping your profile icon in the top corner). \n\nAre you hoping to keep a visual log of your progress, or is there a specific change you're trying to track today?",
+      "reply": "There isn't a progress photo upload feature in the app at the moment. \n\nTo track how your body is changing, the best place is the Home tab — you can log your body weight there to see your weight trend line, alongside your latest PRs and weekly training volume.",
+      "raw": "There isn't a progress photo upload feature in the app at the moment. \n\nTo track how your body is changing, the best place is the Home tab — you can log your body weight there to see your weight trend line, alongside your latest PRs and weekly training volume.",
       "error": null,
       "action": null,
       "proposal": null,
@@ -65,8 +66,8 @@
     },
     {
       "user": "there's really nowhere to put them?",
-      "reply": "That's correct—there is no hidden screen or upload button for photos anywhere in the app. \n\nMost people who want to keep visual logs end up keeping a private folder on their phone's camera roll to compare side-by-side. \n\nSince we can't do photos, are you focusing mostly on weight changes right now, or are you tracking how your clothes fit and how you feel in the gym?",
-      "raw": "That's correct—there is no hidden screen or upload button for photos anywhere in the app. \n\nMost people who want to keep visual logs end up keeping a private folder on their phone's camera roll to compare side-by-side. \n\nSince we can't do photos, are you focusing mostly on weight changes right now, or are you tracking how your clothes fit and how you feel in the gym?",
+      "reply": "That's right, there's no photo gallery or upload option anywhere in the app. \n\nKeeping track of physical changes is still super valuable, though. Aside from your weight trend on the Home tab, watching your working weights and reps go up in your sessions is one of the best indicators of progress.\n\nAre you looking to track body composition alongside your fat loss goal right now, or just wanted to know if the feature was there?",
+      "raw": "That's right, there's no photo gallery or upload option anywhere in the app. \n\nKeeping track of physical changes is still super valuable, though. Aside from your weight trend on the Home tab, watching your working weights and reps go up in your sessions is one of the best indicators of progress.\n\nAre you looking to track body composition alongside your fat loss goal right now, or just wanted to know if the feature was there?\n[QUICK_REPLIES: \"Tracking body comp\" | \"Just checking!\"]",
       "error": null,
       "action": null,
       "proposal": null,

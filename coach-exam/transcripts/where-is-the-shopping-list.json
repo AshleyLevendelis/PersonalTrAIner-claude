@@ -2,9 +2,10 @@
   "case": "where-is-the-shopping-list",
   "why": "The shopping list moved off the Tools tab on 12 Sep 2026 — it is its own screen now, reached from Nutrition and from a Home card on shop day. This case exists because a prompt that still says 'Tools: a stopwatch and the Grocery list' sends someone to a tab that no longer has it, and no static gate noticed. A tab-description drift is exactly what an exam catches that a text check does not.",
   "checks": {},
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "e6225d8ed0d24bb6",
+  "caseStamp": "e6b0529fd9e0c20a",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T06:25:27.721Z",
+  "ranAt": "2026-11-06T15:11:29.880Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -56,8 +57,8 @@
   "turns": [
     {
       "user": "where's my shopping list?",
-      "reply": "Your shopping list has its own dedicated screen in the app. You can open it a few different ways:\n\n1. Head over to the Nutrition tab and tap the shopping list link.\n2. Go to the Tools tab and tap the Grocery list row.\n3. Since today is Tuesday (which is typically shopping day), you'll also see a Shopping card right on your Home screen showing how many items you have left to buy. Tap that to open the list directly.\n\nAre you heading out to grab your groceries now?",
-      "raw": "Your shopping list has its own dedicated screen in the app. You can open it a few different ways:\n\n1. Head over to the Nutrition tab and tap the shopping list link.\n2. Go to the Tools tab and tap the Grocery list row.\n3. Since today is Tuesday (which is typically shopping day), you'll also see a Shopping card right on your Home screen showing how many items you have left to buy. Tap that to open the list directly.\n\nAre you heading out to grab your groceries now?",
+      "reply": "You can open your grocery list in a few different places:\n\n- Tools tab — scroll down to the \"Grocery list\" row.\n- Nutrition tab — tap the round basket icon near the top.\n- Home tab — tap the Shopping card whenever it appears on shopping day.\n\nThey all open the exact same list! Need to add or check anything off?",
+      "raw": "You can open your grocery list in a few different places:\n\n- Tools tab — scroll down to the \"Grocery list\" row.\n- Nutrition tab — tap the round basket icon near the top.\n- Home tab — tap the Shopping card whenever it appears on shopping day.\n\nThey all open the exact same list! Need to add or check anything off?",
       "error": null,
       "action": null,
       "proposal": null,

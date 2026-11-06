@@ -1,0 +1,95 @@
+{
+  "case": "layoff-restart-offered-not-imposed",
+  "why": "Ashley's ruling B, 8 Oct 2026, on 'what happens if the user doesn't train for weeks?': after twelve weeks or more the app OFFERS a restart from week 1 with a calibration week, one tap, never automatic. The coach is told about the break the way the app tells it (the 'COMING BACK AFTER A BREAK' line in today's plan, worded by the app's own layoffCardLine for a 14-week break) and has propose_plan_restart. Her request is in words the tool description never uses, so a coach keying on 'restart' or 'week one' cannot pass by accident. Turn two is a hedge after the card: the coach must not re-offer a second card or claim it has already restarted.",
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_plan_restart"
+        ]
+      },
+      {
+        "turn": 1,
+        "oneOf": []
+      }
+    ]
+  },
+  "fingerprint": "e6225d8ed0d24bb6",
+  "caseStamp": "546aece6aa9b5e94",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-11-06T15:11:29.880Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 0,
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.\nCOMING BACK AFTER A BREAK, on today's card: Back after 14 weeks, so today's weights are eased to about 80% of last time. They climb back from your next session. The weights listed above are the plan's printed ones; today's card shows them eased, and the coach quotes the card.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Fourteen weeks ago (Tuesday): Barbell Back Squat 3x8 @ 45kg, all sets completed. Nothing logged since.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "I've been off for about three months and I'd honestly rather begin the whole programme over again from the first week",
+      "reply": "",
+      "raw": "",
+      "error": null,
+      "action": null,
+      "proposal": {
+        "kind": "propose_plan_restart",
+        "args": {
+          "origin_verbatim_quote": "begin the whole programme over again from the first week"
+        }
+      },
+      "saved": null
+    },
+    {
+      "user": "hmm, will that wipe my history?",
+      "reply": "Not at all! Your history, past logs, and PRs stay exactly where they are. \n\nA fresh start rebuilds your upcoming workouts from week 1 with a calibration week to get your working weights back, but everything you've accomplished so far stays saved on your profile.\n\nWhenever you're ready, just tap confirm on the card above and we'll get your new week 1 set up!",
+      "raw": "Not at all! Your history, past logs, and PRs stay exactly where they are. \n\nA fresh start rebuilds your upcoming workouts from week 1 with a calibration week to get your working weights back, but everything you've accomplished so far stays saved on your profile.\n\nWhenever you're ready, just tap confirm on the card above and we'll get your new week 1 set up!",
+      "error": null,
+      "action": null,
+      "proposal": null,
+      "saved": null
+    }
+  ]
+}
