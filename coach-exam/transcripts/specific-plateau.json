@@ -2,9 +2,10 @@
   "case": "specific-plateau",
   "why": "A plain training question where generic advice and the right answer look different. The context holds the actual lift, the actual weight and the actual completed session, so a coach that reads them can say what to do next week and a coach that does not can only say 'progressive overload'.",
   "checks": {},
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "e6225d8ed0d24bb6",
+  "caseStamp": "6be94156717b2ce2",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T06:25:27.721Z",
+  "ranAt": "2026-11-06T15:11:29.880Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -56,8 +57,8 @@
   "turns": [
     {
       "user": "my squat's been stuck for a bit, what should I do",
-      "reply": "When a squat plateaus, it's usually one of three things: technique, recovery, or how we're pacing the sets. Since you're hitting 45kg for sets of 8, we have a solid foundation to work with, but we need to change the stimulus to break through.\n\nHere are the three best ways to unstuck it:\n\n1. Change the rep range: If you've been grinding at 8 reps for weeks, your body has adapted. We can swap you to a strength-focused rep range (like 3 sets of 5) with slightly more weight to build raw force, or go the other way with higher reps (sets of 10-12) to build muscle volume.\n2. Pause at the bottom: Swapping to a Pause Squat for a block. Taking a 2-second pause at the very bottom of the lift destroys the \"stretch reflex\" (the bounce), forcing your quads and glutes to work twice as hard to get you back up.\n3. Manage the fatigue: If you're feeling beaten down before you even unrack the bar, we might just need to pull a couple of sets off your other leg work for a week or two so you aren't carrying deep fatigue into your squat sessions.\n\nBefore we change anything in your plan, how have these heavy sets of 8 actually been feeling lately—is there a specific part of the lift where you feel like you're hitting a wall?",
-      "raw": "When a squat plateaus, it's usually one of three things: technique, recovery, or how we're pacing the sets. Since you're hitting 45kg for sets of 8, we have a solid foundation to work with, but we need to change the stimulus to break through.\n\nHere are the three best ways to unstuck it:\n\n1. Change the rep range: If you've been grinding at 8 reps for weeks, your body has adapted. We can swap you to a strength-focused rep range (like 3 sets of 5) with slightly more weight to build raw force, or go the other way with higher reps (sets of 10-12) to build muscle volume.\n2. Pause at the bottom: Swapping to a Pause Squat for a block. Taking a 2-second pause at the very bottom of the lift destroys the \"stretch reflex\" (the bounce), forcing your quads and glutes to work twice as hard to get you back up.\n3. Manage the fatigue: If you're feeling beaten down before you even unrack the bar, we might just need to pull a couple of sets off your other leg work for a week or two so you aren't carrying deep fatigue into your squat sessions.\n\nBefore we change anything in your plan, how have these heavy sets of 8 actually been feeling lately—is there a specific part of the lift where you feel like you're hitting a wall?",
+      "reply": "Where in the rep does it stall — right out of the bottom, or halfway up? Those have very different fixes.",
+      "raw": "Where in the rep does it stall — right out of the bottom, or halfway up? Those have very different fixes.\n[QUICK_REPLIES: \"Out of the hole\" | \"Halfway up\"]",
       "error": null,
       "action": null,
       "proposal": null,
@@ -65,8 +66,8 @@
     },
     {
       "user": "ok, and how long before I'd expect that to move",
-      "reply": "If we swap the rep range or move you to a variation like pause squats, you can expect to see the needle move within 3 to 4 weeks. \n\nThat timeline comes down to how your body adapts. The first 1 to 2 weeks are mostly neurological—your brain and nervous system getting efficient at the new movement pattern or the heavier load. By weeks 3 and 4, you start seeing the actual strength and muscle adaptations translate back into your main lift. \n\nIf we don't see progress by the end of a 4-week block, that's our signal that the bottleneck is likely recovery (sleep or food) rather than the training stimulus itself. \n\nWhich of those options feels like the right match for where you're at right now—shifting the reps, trying pause squats, or backing off the extra leg volume for a bit?",
-      "raw": "If we swap the rep range or move you to a variation like pause squats, you can expect to see the needle move within 3 to 4 weeks. \n\nThat timeline comes down to how your body adapts. The first 1 to 2 weeks are mostly neurological—your brain and nervous system getting efficient at the new movement pattern or the heavier load. By weeks 3 and 4, you start seeing the actual strength and muscle adaptations translate back into your main lift. \n\nIf we don't see progress by the end of a 4-week block, that's our signal that the bottleneck is likely recovery (sleep or food) rather than the training stimulus itself. \n\nWhich of those options feels like the right match for where you're at right now—shifting the reps, trying pause squats, or backing off the extra leg volume for a bit?\n[QUICK_REPLIES: \"Shift the reps\" | \"Try pause squats\" | \"Back off leg volume\" | \"Not sure yet\"]",
+      "reply": "If we fix the right bottleneck today, you'll usually feel a difference in bar speed within two to three sessions, and see the load actually move in three to four weeks. \n\nStrength builds in phases — first your nervous system gets better at firing the right muscles together under load, and then the actual tissue adapts. \n\nWhere's yours usually sticking?",
+      "raw": "If we fix the right bottleneck today, you'll usually feel a difference in bar speed within two to three sessions, and see the load actually move in three to four weeks. \n\nStrength builds in phases — first your nervous system gets better at firing the right muscles together under load, and then the actual tissue adapts. \n\nWhere's yours usually sticking?\n[QUICK_REPLIES: \"Out of the hole\" | \"Halfway up\"]",
       "error": null,
       "action": null,
       "proposal": null,

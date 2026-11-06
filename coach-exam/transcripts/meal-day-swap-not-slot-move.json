@@ -1,0 +1,132 @@
+{
+  "case": "meal-day-swap-not-slot-move",
+  "why": "29 Sep 2026, the coach got propose_meal_day_move (swap a meal with the SAME meal on another day; Ashley's ruling: they swap places). Its two nearest neighbours are one word apart and cost different things: propose_meal_move puts a meal in a different SLOT on ONE day (resized), propose_meal_swap picks a different DISH for one day. Until today the prompt told the coach the app could not move a meal between days at all, so a coach that still says so, or that reaches for a slot move or a swap, is the regression this case exists to see. The pair makes the days and the wording differ on the two turns, so a coach keying on the word 'swap' or 'move' alone cannot pass by accident: turn one names two DAYS and one meal; turn two names one DAY and two MEALS. Since 30 Sep 2026 the swap can also be between two DIFFERENT meals on two days (Monday's dinner with Wednesday's lunch, each resized), so a third turn names a different meal for the other day: it must reach propose_meal_day_move too, not propose_meal_move (that is between meals on ONE day) and not a refusal saying the app only swaps the same meal.",
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_meal_day_move"
+        ]
+      },
+      {
+        "turn": 1,
+        "oneOf": [
+          "propose_meal_move"
+        ]
+      },
+      {
+        "turn": 2,
+        "oneOf": [
+          "propose_meal_day_move"
+        ]
+      }
+    ]
+  },
+  "fingerprint": "e6225d8ed0d24bb6",
+  "caseStamp": "a4d80a8b54552e47",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-11-06T15:11:29.880Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null,
+    "upcoming_meal_summary": "Wednesday (2026-09-16): breakfast Greek yoghurt with berries · lunch Chicken and rice bowl · dinner Beef chilli with rice\nThursday (2026-09-17): breakfast Peanut-free granola bowl · lunch Tuna pasta salad · dinner Baked salmon with potatoes\nFriday (2026-09-18): breakfast Scrambled eggs on toast · lunch Turkey wrap · dinner Chicken stir-fry with noodles\nSaturday (2026-09-19): breakfast Overnight oats · lunch Chicken and rice bowl · dinner Lamb koftas with couscous\nSunday (2026-09-20): breakfast Greek yoghurt with berries · lunch Tuna pasta salad · dinner Salmon, potatoes, green beans\nMonday (2026-09-21): breakfast Scrambled eggs on toast · lunch Turkey wrap · dinner Beef chilli with rice"
+  },
+  "turns": [
+    {
+      "user": "I'm out on Thursday evening so can we trade Thursday's dinner with Saturday's",
+      "reply": "",
+      "raw": "",
+      "error": null,
+      "action": null,
+      "proposal": {
+        "kind": "propose_meal_day_move",
+        "args": {
+          "meal_slot": "dinner",
+          "from_date": "2026-09-17",
+          "to_date": "2026-09-19",
+          "origin_verbatim_quote": "trade Thursday's dinner with Saturday's"
+        }
+      },
+      "saved": null
+    },
+    {
+      "user": "never mind that, could I have tonight's dinner at lunchtime today instead",
+      "reply": "",
+      "raw": "",
+      "error": null,
+      "action": null,
+      "proposal": {
+        "kind": "propose_meal_move",
+        "args": {
+          "from_slot": "dinner",
+          "to_slot": "lunch",
+          "origin_verbatim_quote": "could I have tonight's dinner at lunchtime today instead"
+        }
+      },
+      "saved": null
+    },
+    {
+      "user": "actually forget that, could you put Thursday's dinner in Saturday's lunch instead",
+      "reply": "",
+      "raw": "",
+      "error": null,
+      "action": null,
+      "proposal": {
+        "kind": "propose_meal_day_move",
+        "args": {
+          "meal_slot": "dinner",
+          "from_date": "2026-09-17",
+          "to_date": "2026-09-19",
+          "to_meal_slot": "lunch",
+          "origin_verbatim_quote": "put Thursday's dinner in Saturday's lunch"
+        }
+      },
+      "saved": null
+    }
+  ]
+}

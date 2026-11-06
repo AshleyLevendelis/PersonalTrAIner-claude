@@ -1,0 +1,68 @@
+{
+  "case": "warm-week-fell-apart",
+  "why": "Ashley, 6 Nov 2026, 'Warm coach': a rough week is met with kindness before any fix, and never with guilt. 'A why on every answer': it should leave them knowing why one bad week costs little next to the weeks around it, in a line, not a lecture.",
+  "checks": {},
+  "fingerprint": "e6225d8ed0d24bb6",
+  "caseStamp": "b989e29f061d075a",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-11-06T15:11:29.880Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "honestly this week has been a write off. only trained once and I've been eating rubbish",
+      "reply": "We've all had weeks like that, Ashley — life gets busy or off-track, and that's completely normal. One rough week doesn't wipe out the progress you've been making, so there's no need to beat yourself up about it.\n\nThe best thing we can do now is just reset and focus on getting back into your rhythm. \n\nAre you planning to get a session in today to get momentum back, or would you prefer to just draw a line under it and start fresh tomorrow?",
+      "raw": "We've all had weeks like that, Ashley — life gets busy or off-track, and that's completely normal. One rough week doesn't wipe out the progress you've been making, so there's no need to beat yourself up about it.\n\nThe best thing we can do now is just reset and focus on getting back into your rhythm. \n\nAre you planning to get a session in today to get momentum back, or would you prefer to just draw a line under it and start fresh tomorrow?\n[QUICK_REPLIES: \"Train today\" | \"Start fresh tomorrow\"]",
+      "error": null,
+      "action": null,
+      "proposal": null,
+      "saved": null
+    }
+  ]
+}

@@ -2,9 +2,10 @@
   "case": "voice-several-things-at-once",
   "why": "Ashley, 24 Sep 2026: a voice note that asks several things must get every part answered, each on its own line starting with what it answers, so she can see nothing was dropped. No headers, no bold. And no closing question unless an answer genuinely changes what happens next.",
   "checks": {},
-  "fingerprint": "84f6086cd0500f29",
+  "fingerprint": "e6225d8ed0d24bb6",
+  "caseStamp": "228e939b1b55c399",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-09-25T06:25:27.721Z",
+  "ranAt": "2026-11-06T15:11:29.880Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -56,8 +57,8 @@
   "turns": [
     {
       "user": "ok so a few things, I'm starving today so I think I need more carbs, what should I have before training tomorrow morning, and is it fine that I skipped the stretching at the end yesterday",
-      "reply": "Carbs — yes, today is a good day to pull that lever, especially if the hunger is hitting hard. Adding a portion of rice, sweet potato, or oats to your meals today will help fuel you up and settle that appetite. \n\nBefore training tomorrow — since you're training in the morning, you want something fast-digesting about 30 to 60 minutes before you start so it doesn't sit heavy. A banana and a slice of toast with a little honey is a perfect, simple setup for quick energy. \n\nStretching — it is completely fine that you skipped it. Missing a stretch at the end of a session won't set you back at all. Sleep, hydration, and getting those extra carbs in today will do infinitely more for your recovery than a few minutes of stretching anyway. \n\nHow does that breakfast idea sound for tomorrow morning?",
-      "raw": "Carbs — yes, today is a good day to pull that lever, especially if the hunger is hitting hard. Adding a portion of rice, sweet potato, or oats to your meals today will help fuel you up and settle that appetite. \n\nBefore training tomorrow — since you're training in the morning, you want something fast-digesting about 30 to 60 minutes before you start so it doesn't sit heavy. A banana and a slice of toast with a little honey is a perfect, simple setup for quick energy. \n\nStretching — it is completely fine that you skipped it. Missing a stretch at the end of a session won't set you back at all. Sleep, hydration, and getting those extra carbs in today will do infinitely more for your recovery than a few minutes of stretching anyway. \n\nHow does that breakfast idea sound for tomorrow morning?",
+      "reply": "Carbs — a bowl of oats with a sliced banana, or two slices of toast with jam about 60 to 90 minutes before tomorrow's session. Carbs right before training restock your muscle glycogen so you have full strength on your heavy sets, and oats or toast digest easily enough to avoid any stomach heaviness while you lift.\n\nSkipping stretching yesterday — totally fine. Post-workout stretching feels nice and can help you wind down, but it doesn't reduce muscle soreness or drive your strength progress. The work that actually grows muscle and builds strength is what you did during the session itself.\n\nFor today's hunger, pulling a bit more food into your meals — especially slow-digesting carbs like potatoes, oats, or rice — will help settle your appetite without knocking your targets off track. Did you want to add a pre-workout meal into your plan for tomorrow morning?",
+      "raw": "Carbs — a bowl of oats with a sliced banana, or two slices of toast with jam about 60 to 90 minutes before tomorrow's session. Carbs right before training restock your muscle glycogen so you have full strength on your heavy sets, and oats or toast digest easily enough to avoid any stomach heaviness while you lift.\n\nSkipping stretching yesterday — totally fine. Post-workout stretching feels nice and can help you wind down, but it doesn't reduce muscle soreness or drive your strength progress. The work that actually grows muscle and builds strength is what you did during the session itself.\n\nFor today's hunger, pulling a bit more food into your meals — especially slow-digesting carbs like potatoes, oats, or rice — will help settle your appetite without knocking your targets off track. Did you want to add a pre-workout meal into your plan for tomorrow morning?\n[QUICK_REPLIES: \"Yes, add pre-workout meal\" | \"No, I'll just prep it myself\"]",
       "error": null,
       "action": null,
       "proposal": null,

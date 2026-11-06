@@ -1,0 +1,113 @@
+{
+  "case": "kit-said-is-remembered",
+  "why": "Ashley's ruling, 9 Oct 2026 (built 11 Oct): 'Remember what they say.' A statement about the kit she OWNS goes to propose_kit_change (her kit list, for good), never to record_fact, never to propose_equipment_adaptation (a trip, which reverts), and never as one ban per exercise. Turn one gives her whole kit, so the tool's 'only' mode; turn two adds one thing she does not own. Both are in words the tool description does not use.",
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_kit_change"
+        ]
+      },
+      {
+        "turn": 1,
+        "oneOf": [
+          "propose_kit_change"
+        ]
+      }
+    ]
+  },
+  "fingerprint": "e6225d8ed0d24bb6",
+  "caseStamp": "8b1c7511fcb06e64",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-11-06T15:11:29.880Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "9:15 AM",
+    "day_of_week": "Tuesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "for the record, the only training kit in my flat is a pair of dumbbells and a flat bench",
+      "reply": "",
+      "raw": "",
+      "error": null,
+      "action": null,
+      "proposal": {
+        "kind": "propose_kit_change",
+        "args": {
+          "mode": "only",
+          "items": [
+            "dumbbells",
+            "bench"
+          ],
+          "origin_verbatim_quote": "the only training kit in my flat is a pair of dumbbells and a flat bench"
+        }
+      },
+      "saved": null
+    },
+    {
+      "user": "and I definitely don't have resistance bands, so none of those please",
+      "reply": "",
+      "raw": "",
+      "error": null,
+      "action": null,
+      "proposal": {
+        "kind": "propose_kit_change",
+        "args": {
+          "mode": "only",
+          "items": [
+            "dumbbells",
+            "bench",
+            "bands"
+          ],
+          "origin_verbatim_quote": "the only training kit in my flat is a pair of dumbbells and a flat bench and I definitely don't have resistance bands"
+        }
+      },
+      "saved": null
+    }
+  ]
+}
