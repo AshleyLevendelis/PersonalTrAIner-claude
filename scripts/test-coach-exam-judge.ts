@@ -101,10 +101,12 @@ function writeTranscripts(dir: string) {
   return 2
 }
 
-// SIX, since the voice dimension (24 Sep 2026). Voice is marked 1 on purpose:
-// the only value that differs from every other mark, so the average below can
-// only come out right if voice was asked for, returned AND counted.
-const MARKS = { correct: 3, specific: 2, asks: 3, scope: 3, honest: 3, voice: 1 }
+// EIGHT, since warm and teaches (her 6 Nov 2026 "Add two new marks"); six since
+// voice (24 Sep 2026). Voice is 1 and teaches is 0 on purpose: values no other
+// mark has, so the average below can only come out right if each was asked
+// for, returned AND counted (an omitted mark is unmarked, not a zero, so a
+// dropped teaches would average 17/7, never 17/8).
+const MARKS = { correct: 3, specific: 2, asks: 3, scope: 3, honest: 3, voice: 1, warm: 2, teaches: 0 }
 const answer = (stop: string, text: string) => ({
   status: 200,
   body: {
@@ -170,7 +172,7 @@ async function main() {
     // that shipped and could be spent entirely on thinking.
     check('max_tokens leaves room to think AND answer (well above the 1024 that shipped)', maxTokens >= 8000, maxTokens)
     check('the key travels in x-api-key', api.seen[0]?.headers['x-api-key'] === 'sk-ant-gate', api.seen[0]?.headers['x-api-key'])
-    check('the marks were read from the TEXT block, not the thinking block', r.scores?.overall === (3 + 2 + 3 + 3 + 3 + 1) / 6, r.scores?.overall)
+    check('the marks were read from the TEXT block, not the thinking block', r.scores?.overall === (3 + 2 + 3 + 3 + 3 + 1 + 2 + 0) / 8, r.scores?.overall)
     const system = String(api.seen[0]?.body.system ?? '')
     check('the judge is sent the voice standard and asked for a voice mark',
       /DIMENSION: voice/.test(system) && /"voice": 0-3 or null/.test(system), system.slice(-300))
@@ -181,7 +183,10 @@ async function main() {
     check('...and nothing the coach does not have (no tempo or cue tool)', !/\bpropose_tempo|\bset_exercise_cue/.test(system))
     check('...and that an OFFER of something no tool does is marked under honest', /OFFERS to do/.test(system) && /mark it under honest/.test(system))
     const avgs = (r.scores?.dimensionAverages ?? {}) as Record<string, number | null>
-    check('...and the voice mark lands in the scoreboard as its own dimension', avgs.voice === 1 && Object.keys(avgs).length === 6, avgs)
+    check('...and the voice mark lands in the scoreboard as its own dimension', avgs.voice === 1 && Object.keys(avgs).length === 8, avgs)
+    check('the judge is sent the warm and teaches standards and asked for both marks (her 6 Nov rulings)',
+      /DIMENSION: warm/.test(system) && /DIMENSION: teaches/.test(system) && /"warm": 0-3 or null/.test(system) && /"teaches": 0-3 or null/.test(system))
+    check('...and both land in the scoreboard as their own dimensions', avgs.warm === 2 && avgs.teaches === 0, avgs)
     check('the report names the judge and how many cases it marked', /claude-opus-5 — marked 2 of 2/.test(judgeLine(r.report)), judgeLine(r.report))
     check('the scoreboard names the judge', r.scores?.judge === 'claude-opus-5', r.scores?.judge)
     // The transcripts here are stamped "gate", and the coach on disk is not.

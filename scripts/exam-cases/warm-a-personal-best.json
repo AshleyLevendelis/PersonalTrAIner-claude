@@ -1,0 +1,9 @@
+{
+  "name": "warm-a-personal-best",
+  "why": "Ashley, 6 Nov 2026, 'Warm coach': a win is named with what it means, and the coach sounds glad. Her last best on the squat was 45kg, so 50 for every set is a real first. The failure modes are 'Logged.' and empty cheerleading. 'A why on every answer': the reply also says why it moved, briefly.",
+  "contextOverrides": { "workout_logged_today": true },
+  "messages": [
+    "squats done, got 50kg for all three sets"
+  ],
+  "checks": {}
+}
