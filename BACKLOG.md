@@ -35,8 +35,10 @@ Newest first. One line each.
   could not fail (fixed); a check matched 4500 inside 45000 (fixed).
   **VERIFIED:** test:coach-exam-judge 36, test:coach-promises (7 new), test:tool-reply (2 new), test:coach-lessons 38,
   verify:coach-lessons 15, test:reminder-writer 48, verify:coach-opener-words 12, verify:reach-out-function under Deno;
-  every new check mutation-tested (49 mutations across them, all caught at full count once the three fixes above
-  landed; the "examples carry a why" floor of 5 catches three lost, not one). 166 derived gates and all 41 chat-screen
+  every new check mutation-tested, about fifty breaks in all, every one at full count. THREE MISSED, each named: the
+  lessons driver and the 4500 check (both fixed, then caught), and taking the why out of ONE worked reply, which the
+  "examples carry a why" floor (5 of 7) lets through by design; three lost are caught. CORRECTED: the commit for the
+  instructions said "8 tried, 8 caught"; one of those was this designed miss. 166 derived gates and all 41 chat-screen
   drivers pass. **NOT VERIFIED, AND IT IS THE POINT:** whether the model obeys. That needs the coach exam on her machine
   (`docs/handover/machine-todo-2026-11-06b.md`: before on main, after on TEST). Named limits: a lesson taught in a reply
   whose page closed is saved without its mark, so it may be taught once more; a first-ever chat's welcome stays the
