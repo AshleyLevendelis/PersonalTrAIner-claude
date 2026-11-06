@@ -532,16 +532,16 @@ export function coachMessage(key: string, d: CoachMessageDetail = {}): string {
   switch (key) {
     case 'session_feel': return `${hey}how was the workout ${d.finishedWhen ?? 'earlier'}?`
     case 'workout_today': return `${hey}are you ready for your session today?`
-    case 'session_not_logged': return `${hey}today's session is still waiting. Got twenty minutes?`
-    case 'missed_yesterday': return `${hey}yesterday's session got away from you. Want to move it or let it go?`
-    case 'week_gone_quiet': return `${hey}it's been a quiet week. Shall we pick something small to start again?`
-    case 'streak_at_risk': return `${hey}that's ${Math.max(0, d.streak ?? 0)} in a row. Today would keep it going.`
+    case 'session_not_logged': return `${hey}today's session is still waiting. Even a short one keeps you moving forward. Got twenty minutes?`
+    case 'missed_yesterday': return `${hey}yesterday's session got away from you, and that's fine. Want to move it or let it go?`
+    case 'week_gone_quiet': return `${hey}it's been a quiet week, and that happens. A small session is the quickest way back in. Shall we pick one?`
+    case 'streak_at_risk': return `${hey}that's ${Math.max(0, d.streak ?? 0)} in a row, brilliant. Today would keep it going.`
     case 'meal_not_logged': return (d.mealsLogged ?? 0) >= 1
       ? `${hey}just one meal logged today. Add the rest so your numbers add up?`
       : `${hey}nothing logged on Nutrition yet today. Got a minute to add what you've eaten?`
-    case 'protein_short': return `${hey}you're behind on protein today. A protein-rich snack this evening would help close the gap.`
-    case 'block_review': return `${hey}that's a block done. Want to see what moved?`
-    case 'beat_target': return `${hey}you're beating the weights I set you. Want them raised?`
+    case 'protein_short': return `${hey}you're behind on protein today. It's what rebuilds the muscle you train, so a protein-rich snack this evening would help close the gap.`
+    case 'block_review': return `${hey}that's a block done, well done. Want to see what moved?`
+    case 'beat_target': return `${hey}you're beating the weights I set you, which means you're getting stronger. Want them raised?`
     // A KEY WITH NO SENTENCE IS NOT A SENTENCE. Returning something generic
     // here would let a new moment ship with placeholder words nobody wrote,
     // which is exactly how a screen ends up speaking in a voice no one chose.

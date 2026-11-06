@@ -6,6 +6,43 @@ import {
 } from "../_shared/reach-out.ts";
 import type { NotificationSettings } from "../_shared/coach-moments.ts";
 import { pushServer, publicKey, sendPush } from "../_shared/push.ts";
+import { GEMINI_MODEL } from "../_shared/gemini.ts";
+
+/**
+ * THE COACH WRITES THE REMINDER (her ruling 6 Nov 2026, "Coach writes, app
+ * checks"; reminder-writer.ts checks every word). Null on any failure, a slow
+ * answer or no key, and the warm fixed sentence goes instead.
+ */
+async function writeWithCoach(prompt: string): Promise<string | null> {
+  const key = Deno.env.get("GEMINI_KEY") || Deno.env.get("VITE_GEMINI_KEY");
+  if (!key) return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 8000);
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`,
+      {
+        method: "POST",
+        signal: ctrl.signal,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          // A short text: thinking off so it cannot eat the small budget (generate-meals' finding).
+          generationConfig: { temperature: 0.9, maxOutputTokens: 200, thinkingConfig: { thinkingBudget: 0 } },
+        }),
+      },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const parts = data?.candidates?.[0]?.content?.parts ?? [];
+    const text = parts.map((p: { text?: string }) => p.text ?? "").join("").trim();
+    return text || null;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // coach-reach-out — the coach, when the app is shut.
@@ -206,6 +243,7 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
     unrecordSent: (userId, date, moment) =>
       restWrite("DELETE", `coach_notifications_sent?user_id=eq.${userId}&sent_on=eq.${date}&moment=eq.${moment}`),
     dropSubscription: (id) => restWrite("DELETE", `push_subscriptions?id=eq.${id}`),
+    writeWithCoach,
   };
 }
 

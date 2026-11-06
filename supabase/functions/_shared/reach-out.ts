@@ -26,6 +26,7 @@ import {
   momentsToRaise, dailyCap, MIN_HOURS_BETWEEN,
   type MomentFacts, type MomentKey, type NotificationSettings,
 } from './coach-moments.ts'
+import { writeReminder } from './reminder-writer.ts'
 
 export interface PushSubscriptionRow {
   id: string
@@ -138,6 +139,12 @@ export interface ReachOutDeps {
   /** Takes a reservation back when the send reached no phone, so the next hour tries again. */
   unrecordSent(userId: string, localDate: string, moment: MomentKey): Promise<void>
   dropSubscription(id: string): Promise<void>
+  /**
+   * THE COACH WRITES IT (her ruling 6 Nov 2026, "Coach writes, app checks"):
+   * the model's text for a brief, or null on any failure. Absent, or failing a
+   * check in reminder-writer.ts, the fixed sentence goes.
+   */
+  writeWithCoach?: (prompt: string) => Promise<string | null>
 }
 
 export interface ReachOutReport {
@@ -318,9 +325,15 @@ export async function runReachOut(deps: ReachOutDeps): Promise<ReachOutReport> {
       // THE MESSAGE GOES IN THE CHAT FIRST, so a tap always finds it there. A
       // chat that cannot be written to means no notification this hour: a buzz
       // whose message is missing from the chat is the thing she asked not to get.
+      // THE WORDS: the coach's own when they pass the app's checks, else the
+      // warm fixed sentence. One text for the chat AND the phone.
+      const written = await writeReminder(moment, facts, deps.writeWithCoach ?? null)
+      if (written.by === 'fixed' && written.why !== 'no writer') console.log(`[reach-out] fixed sentence used: ${written.why}`)
+      const text = written.text
+
       let messageId: string
       try {
-        messageId = await deps.insertChatMessage(userId, { content: moment.text, moment: moment.key, shortcut: moment.shortcut })
+        messageId = await deps.insertChatMessage(userId, { content: text, moment: moment.key, shortcut: moment.shortcut })
       } catch (err) {
         await deps.unrecordSent(userId, today, moment.key)
         throw err
@@ -328,7 +341,7 @@ export async function runReachOut(deps: ReachOutDeps): Promise<ReachOutReport> {
 
       let delivered = false
       for (const device of devices) {
-        const outcome = await deps.send(device, { title: COACH_SENDER, body: moment.text, moment: moment.key, url: '/#/tab/chat', messageId })
+        const outcome = await deps.send(device, { title: COACH_SENDER, body: text, moment: moment.key, url: '/#/tab/chat', messageId })
         if (outcome === 'ok') delivered = true
         else if (outcome === 'gone') { await deps.dropSubscription(device.id); report.dropped++ }
         else report.failed++

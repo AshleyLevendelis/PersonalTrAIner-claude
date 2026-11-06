@@ -172,8 +172,9 @@ try {
   check('4. an evening training day with nothing logged sends one push', pushes.length === 1 && report.sent === 1, { pushes: pushes.length, report })
   let payload = null
   try { payload = JSON.parse(decrypt(pushes[0].body)) } catch (err) { payload = { error: String(err) } }
+  // No coach key in this run, so the warm fixed sentence is what must arrive (reminder-writer.ts, her 6 Nov ruling).
   check('5. what arrives decrypts, with the phone\'s own keys, to the phrasebook\'s words',
-    payload?.moment === 'session_not_logged' && payload?.body === "Hey Ashley, today's session is still waiting. Got twenty minutes?" && payload?.title === 'Trainer', payload)
+    payload?.moment === 'session_not_logged' && payload?.body === "Hey Ashley, today's session is still waiting. Even a short one keeps you moving forward. Got twenty minutes?" && payload?.title === 'Trainer', payload)
   check('6. ...signed with the VAPID key it advertised', String(pushes[0]?.headers.authorization ?? '').includes(`k=${vapidPublic}`), pushes[0]?.headers.authorization)
   check('7. and what was sent is recorded, so the next hour stays quiet',
     writes.some(w => w.method === 'POST' && w.table === 'coach_notifications_sent' && w.body?.moment === 'session_not_logged' && w.body?.user_id === USER), writes)
