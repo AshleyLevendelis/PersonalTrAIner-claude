@@ -41,7 +41,7 @@ import {
 } from "../_shared/gemini-parts.ts";
 
 export const TOOL_TURN_NUDGE =
-  "(System: the app has done exactly what the result says and nothing else. Write your message as their coach texting: one to three short sentences, no lists, no bold, no field names. Say only what the result says happened — if activity_logged is false do not say logged. Never mention assumptions, tools, or what you couldn't do. At most one specific question. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
+  "(System: the app has done exactly what the result says and nothing else. Write your message as their coach texting, warm and glad to help: one to three short sentences, no lists, no bold, no field names. Where it teaches them something useful, add the why in a clause (her 6 Nov 2026 ruling, a why on every answer). Say only what the result says happened — if activity_logged is false do not say logged. Never mention assumptions, tools, or what you couldn't do. At most one specific question. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
 
 /**
  * For log_meal's advice arm: they asked what to eat; nothing was computed.
@@ -53,11 +53,11 @@ export const TOOL_TURN_NUDGE =
  * the prompt moved.
  */
 export const ADVICE_NUDGE =
-  "(System: they asked what to eat — nothing was computed and nothing was recorded. Answer as their coach texting: name one or two concrete options, when to have them, and briefly WHY that works for what they are about to do. A short paragraph is fine; stop when you would start repeating yourself. No numbers, no macros, no lists, no bold. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
+  "(System: they asked what to eat — nothing was computed and nothing was recorded. Answer as their coach texting: name one or two concrete options, when to have them, and briefly WHY that works for what they are about to do. Two to four short lines, never a paragraph; stop when you would start repeating yourself. No numbers, no macros, no lists, no bold. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
 
 /** For log_meal's evaluation arm: they asked whether the food they named was a good choice. */
 export const EVALUATION_NUDGE =
-  "(System: they asked whether that food was a good choice. Give your honest verdict as their coach texting — the verdict first, then the reason in plain words, then what you'd do next time if anything. A short paragraph is fine; stop when you would start repeating yourself. Quote the numbers in the result only if they help; never invent others. No lists, no bold, no field names; never mention assumptions or the database. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
+  "(System: they asked whether that food was a good choice. Give your honest verdict as their coach texting — the verdict first, kindly, then the reason in plain words, then what you'd do next time if anything. Two to four short lines, never a paragraph; stop when you would start repeating yourself. Quote the numbers in the result only if they help; never invent others. No lists, no bold, no field names; never mention assumptions or the database. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
 
 /** For log_meal's numbers arm: the figure has to come back in a form the guard can see. */
 export const NUMBERS_NUDGE =

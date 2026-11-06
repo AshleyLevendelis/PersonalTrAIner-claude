@@ -183,6 +183,11 @@ const run = async () => {
   // are a SECOND copy of that rule, and when they disagreed the second pass
   // kept writing to the old ceiling after the prompt had moved.
   check('the confirmation nudge stays short', /one to three short sentences/i.test(TOOL_TURN_NUDGE))
+  // Her 6 Nov 2026 rulings, "Warm coach" and "A why on every answer": the
+  // nudge is the LAST thing the model reads on an action turn, so it is the
+  // one it obeys. Short stays; warm and a why in a clause are now asked for.
+  check('...and asks for warmth and a why in a clause (her 6 Nov rulings)', /warm/i.test(TOOL_TURN_NUDGE) && /add the why in a clause/.test(TOOL_TURN_NUDGE), TOOL_TURN_NUDGE)
+  check('the advice and evaluation nudges are short lines, never a paragraph', [ADVICE_NUDGE, EVALUATION_NUDGE].every(n => /never a paragraph/.test(n) && !/A short paragraph is fine/.test(n)))
   check('the numbers nudge stays short', /one to three short sentences/i.test(NUMBERS_NUDGE))
   check('the advice nudge does NOT re-impose the ceiling', !/one to three short sentences/i.test(ADVICE_NUDGE), ADVICE_NUDGE)
   check('...and asks for the why', /why/i.test(ADVICE_NUDGE))

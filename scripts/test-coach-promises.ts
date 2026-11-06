@@ -984,8 +984,11 @@ if (failures > 0) {
   // anyway, so it gained the same cut-before-sending default confirmations
   // already had — a ceiling the model is told to enforce on its own draft.
   check('...with a ceiling of its own, and a cut-before-sending default, so it cannot become an essay',
-    /ANSWERING A QUESTION, OR GIVING ADVICE[\s\S]{0,700}two SHORT ones is the ceiling/.test(src)
-      && /if your draft runs to three paragraphs or more, cut it before sending/.test(src)
+    // 6 Nov 2026, her "not long-winded ... I don't want it to write in
+    // paragraphs": the ceiling is now lines, not paragraphs, with the same
+    // cut-before-sending default.
+    /ANSWERING A QUESTION, OR GIVING ADVICE[\s\S]{0,700}two to four lines, never a block of text/.test(src)
+      && /if any line runs past two sentences, or the reply past four lines, cut it before sending/.test(src)
       && /A caveat is a clause, never a paragraph of its own/.test(src), null)
   // AMENDED 24 Sep 2026, Ashley's "short steps": the ban on formatting stays,
   // with exactly two shapes let through — a how-to capped at three lines, and
@@ -1088,8 +1091,28 @@ if (failures > 0) {
     !/Provide step-by-step form cues, target muscles, common mistakes, and coaching tips/.test(src)
       && /in the how-to shape §1 gives/.test(src), null)
 
-  // Warmth, as Ashley asked for it — and not as the tone probe penalises it.
-  check('warmth is defined as attention, not praise', /WARMTH IS ATTENTION, NOT PRAISE/.test(src), null)
+  // Warmth, as Ashley asked for it. REVERSED 6 Nov 2026 by her, from three
+  // options ("Warm coach"): the old "warmth is attention, not praise" banned
+  // the encouragement she now wants, so with no fact to notice the coach said
+  // nothing warm at all. Earned praise is in; empty praise stays out.
+  check('warmth is earned encouragement (her 6 Nov ruling), and "attention, not praise" is gone',
+    /WARMTH IS EARNED ENCOURAGEMENT/.test(src) && !/WARMTH IS ATTENTION, NOT PRAISE/.test(src), null)
+  check('...encouragement is tied to something real about them',
+    /Encouragement is always tied to something real about them/.test(src), null)
+  check('...and empty praise is still banned, with gushing and stacked exclamation marks',
+    /EMPTY PRAISE IS STILL BANNED/.test(src) && /no gushing/i.test(src) && /stacked exclamation marks/.test(src), null)
+  check('...one emoji at most in a message',
+    /Emoji: one at most in a message/.test(src), null)
+  // Her 6 Nov 2026 ruling, "A why on every answer", over a why at big moments
+  // only and only when asked.
+  check('a why on every answer: one short reason, tied to them, true, never a lecture',
+    /A WHY ON EVERY ANSWER/.test(src) && /Every piece of advice carries ONE short reason/.test(src)
+      && /never a lecture/.test(src) && /It must be true/.test(src), null)
+  check('advice is a few short lines, never a block of text (her "I don\'t want it to write in paragraphs")',
+    /never a block of text/.test(src) && !/a short paragraph is fine, two SHORT ones is the ceiling/.test(src), null)
+  check('the old silence default on volunteering is gone, and the never-invent rule stays',
+    !/If you're not confident it applies to them right now, say nothing instead/.test(src)
+      && /never invent a fact about their plan or their logs/.test(src), null)
   check('grading openers are still banned by name',
     /Never open by grading them/.test(src), null)
   check('nothing tells the coach to congratulate any more',
@@ -1131,6 +1154,12 @@ if (failures > 0) {
       return /\?["”]?$/.test(lines[lines.length - 1] ?? '')
     })
     const onAnswer = endings.filter(q => !q).length
+    // THE EXAMPLES ARE THE VOICE (6 Nov 2026): fourteen one-liners taught a
+    // flat coach whatever the rules said. A literal floor: at least five worked
+    // replies give a reason, in the plain connectors a coach texts with.
+    const replies = [...sec.matchAll(/\nAssistant: ([\s\S]*?)(?=\nUser:|\n\(|\nAssistant, |$)/g)].map(m => m[1])
+    const withWhy = replies.filter(r => /\b(because|so you|so taking|so you're|which is|is how|is what|that's what|is the protein|on purpose|usually means|is the muscle)\b/i.test(r)).length
+    check('at least five worked replies carry a why', withWhy >= 5, `${withWhy} of ${replies.length}`)
     check('the worked examples mostly end on the answer (at least 40% of at least 12)',
       endings.length >= 12 && onAnswer / endings.length >= 0.4, `${onAnswer} of ${endings.length}`)
     const askFirst = sec.indexOf('A question that decides the answer goes FIRST and ALONE')
