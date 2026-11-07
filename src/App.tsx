@@ -22,7 +22,7 @@ import { isDevAccount, getSessionDateContext, getAppNow, getLocalDateString } fr
 import { useAppRoute, tabHash, groceryHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
 
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
-import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
+import { computeBMR, staticTDEEFor, resolveBodyMetrics } from '@/lib/macro-calculator'
 import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged, anchorTargetsAtSignUp, retargetAfterWeighIn } from '@/lib/nutrition-targets'
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
@@ -1764,7 +1764,7 @@ function App() {
     // does not need these numbers.
     const onboardingMetrics = resolveBodyMetrics(userProfile)
     const bmr = onboardingMetrics ? computeBMR(onboardingMetrics) : undefined
-    const tdee = bmr != null ? computeStaticTDEE(bmr, userProfile.activity_level) : undefined
+    const tdee = onboardingMetrics ? staticTDEEFor(userProfile, onboardingMetrics) : undefined
     // No weigh-ins can exist yet at onboarding, so computeTargets here is
     // equivalent to the static calculation — but going through the one
     // shared entry point keeps every consumer on identical numbers.

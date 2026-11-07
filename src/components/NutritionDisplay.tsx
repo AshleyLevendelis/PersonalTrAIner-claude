@@ -19,7 +19,7 @@ import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
-import { calculateWeeklySchedule, getMacroDerivation } from '@/lib/macro-calculator'
+import { calculateWeeklySchedule, getMacroDerivation, sportFuelNote } from '@/lib/macro-calculator'
 import { macroShortfallLine } from '@/lib/macro-shortfall'
 import { paceClock } from '@/lib/pace'
 import { getAppNow } from '@/lib/dev-clock'
@@ -709,6 +709,10 @@ export function NutritionDisplay({
                   ? `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · protein ${derivation.split.proteinPerKg.toFixed(1)} g/kg · fat ${Math.round(derivation.split.fatPercent * 100)}% · carbs the remainder.`
                   : `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · a fixed 20% protein / 25% fat / 55% carb split for conditioning goals.`}
               </p>
+              {/* ANOTHER SPORT'S FUEL, said where the number is explained (7 Nov 2026). */}
+              {effectiveProfile.weight_kg && sportFuelNote(effectiveProfile, effectiveProfile.weight_kg) && (
+                <p data-testid="sport-fuel-note" className="mt-1.5 text-[0.6875rem] leading-normal text-muted-foreground">{sportFuelNote(effectiveProfile, effectiveProfile.weight_kg)}</p>
+              )}
             </div>
           )}
 

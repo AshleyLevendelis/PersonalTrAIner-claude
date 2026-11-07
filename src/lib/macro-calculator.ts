@@ -1,3 +1,5 @@
+import { sportKcalOn, sportKcalPerWeek, sportSessionKcal, SPORT_SESSION_MINUTES } from './setup-sports'
+import { activityDays } from './concurrent-activity'
 import type {
   UserProfile,
   MacroTargets,
@@ -91,6 +93,35 @@ export function computeBMR(m: BodyMetrics): number {
 
 export function computeStaticTDEE(bmr: number, activityLevel: ActivityLevel): number {
   return Math.round(bmr * STATIC_PAL[activityLevel])
+}
+
+/**
+ * THE ONE-NUMBER DAY'S BURN, sport included (7 Nov 2026): the activity level
+ * is the day OUTSIDE training, so another sport's weekly energy
+ * (setup-sports.ts) is spread across the week and added. Every reader of the
+ * static TDEE goes through here, so the target and the TDEE shown beside it
+ * cannot disagree.
+ */
+export function staticTDEEFor(profile: Pick<UserProfile, 'activity_level' | 'concurrent_activities'>, m: BodyMetrics): number {
+  return computeStaticTDEE(computeBMR(m), profile.activity_level) + Math.round(sportKcalPerWeek(profile.concurrent_activities, m.weightKg) / 7)
+}
+
+/**
+ * The sentence that says what the sport added, for the "How your targets are
+ * set" sheet, or null with no sport. Never a number without saying it assumed
+ * a class length.
+ */
+export function sportFuelNote(profile: Pick<UserProfile, 'concurrent_activities' | 'macro_calculation_mode'>, weightKg: number): string | null {
+  const sports = (profile.concurrent_activities ?? []).filter(a => activityDays([a]).size > 0)
+  if (sports.length === 0) return null
+  const each = sports.map(a => {
+    const per = Math.round(sportSessionKcal(a, weightKg) / 10) * 10
+    const days = [...activityDays([a])]
+    return { a, per, days }
+  })
+  const lead = each.map(({ a, per, days }) => `${a.name} adds about ${per} kcal a class (taken as ${SPORT_SESSION_MINUTES} minutes), ${days.length === 1 ? 'once' : days.length === 2 ? 'twice' : `${days.length} times`} a week`).join('; ')
+  if ((profile.macro_calculation_mode || 'STANDARD_STATIC') === 'DYNAMIC_CSCS') return `${lead}, on the day itself.`
+  return `${lead}, spread across the week: +${Math.round(sportKcalPerWeek(sports, weightKg) / 7)} kcal a day.`
 }
 
 function getSessionDurationMinutes(profile: UserProfile): number {
@@ -293,8 +324,7 @@ export function computeMacroSplitTargets(weightKg: number, calorieTarget: number
 }
 
 function computeStaticMacros(profile: UserProfile, m: BodyMetrics): MacroTargets {
-  const bmr = computeBMR(m)
-  const tdee = computeStaticTDEE(bmr, profile.activity_level)
+  const tdee = staticTDEEFor(profile, m)
   const calorieTarget = applyGoalAdjustment(tdee, profile.fitness_goal, m.gender)
 
   // The calories field is always recomputed from the FINAL macros (M0),
@@ -333,6 +363,7 @@ function computeDynamicDay(
   m: BodyMetrics,
   isTraining: boolean,
   workoutFocus: string | null,
+  dayName: string,
 ): DailyMacroResult {
   const bmr = computeBMR(m)
   const neatTDEE = bmr * NEAT_MULTIPLIER[profile.activity_level]
@@ -346,6 +377,15 @@ function computeDynamicDay(
     const durationHr = getSessionDurationMinutes(profile) / 60
     eee = met * weight * durationHr
     intensity = classifyTrainingIntensity(workoutFocus)
+  }
+
+  // ANOTHER SPORT ON THIS DAY (7 Nov 2026, her "add the extra calories on
+  // sport days"): its energy on the day itself, and the carbs of a hard day
+  // for a class worth 300 kcal or more (setup-sports.ts sportKcalOn).
+  const sportKcal = sportKcalOn(profile.concurrent_activities, dayName, weight)
+  if (sportKcal > 0) {
+    eee += sportKcal
+    intensity = sportKcal >= 300 ? 'high' : intensity === 'rest' ? 'moderate' : intensity
   }
 
   const dailyTDEE = Math.round(neatTDEE + eee)
@@ -371,7 +411,7 @@ function computeDynamicDay(
     protein,
     carbs,
     fat,
-    dayType: isTraining ? 'training' : 'rest',
+    dayType: isTraining || sportKcal > 0 ? 'training' : 'rest',
     method: 'DYNAMIC_CSCS',
   }
 }
@@ -407,7 +447,7 @@ export function calculateDailyMacros(
     td => td.day === dayName && td.available
   )
   const workoutDay = exercisePlan.find(wp => wp.day === dayName)
-  return computeDynamicDay(profile, m, isTraining, workoutDay?.focus ?? null)
+  return computeDynamicDay(profile, m, isTraining, workoutDay?.focus ?? null, dayName)
 }
 
 /** Null when body metrics are missing — see calculateDailyMacros. All seven days share one resolution, so a week is never half-computed. */
@@ -465,7 +505,7 @@ export function getMacroDerivation(profile: UserProfile): MacroDerivation | null
   const m = resolveBodyMetrics(profile)
   if (!m) return null
   const bmr = computeBMR(m)
-  const tdee = computeStaticTDEE(bmr, profile.activity_level)
+  const tdee = staticTDEEFor(profile, m)
   const target = computeStaticMacros(profile, m)
   const surplusKcal = target.calories - tdee
   const surplusLabel =

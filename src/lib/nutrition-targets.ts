@@ -21,7 +21,7 @@
 // ---------------------------------------------------------------------------
 
 import type { UserProfile, MacroTargets, WorkoutDay } from './types'
-import { calculateDailyMacros, getStaticDailyMacros, computeBMR, computeStaticTDEE, resolveBodyMetrics } from './macro-calculator'
+import { calculateDailyMacros, getStaticDailyMacros, computeBMR, staticTDEEFor, resolveBodyMetrics } from './macro-calculator'
 import { getDailyMetrics, upsertNutritionTarget, getNutritionTargets } from './daily-tracking'
 import { computeWeightTrend } from './weight-trend'
 import { supabase } from './supabase'
@@ -323,7 +323,7 @@ export async function snapshotTargetsIfChanged(
       target_carbs_g: targets.carbs,
       target_fats_g: targets.fat,
       calculated_bmr: bmr,
-      calculated_tdee: computeStaticTDEE(bmr, eff.activity_level),
+      calculated_tdee: staticTDEEFor(eff, metrics),
       calculated_weight_kg: anchorWeightKg ?? eff.weight_kg,
     })
     return {

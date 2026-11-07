@@ -245,6 +245,10 @@ const KIT = new URLSearchParams(location.search).get('kit') === '1'
 const WEIGHIN = new URLSearchParams(location.search).get('weighin')
 // ?macromode=dynamic — targets that move with the training day (the app's DYNAMIC_CSCS mode). INPUT only.
 const DYNAMIC_MACROS = new URLSearchParams(location.search).get('macromode') === 'dynamic'
+// ?muay=1: Muay Thai on Tuesday and Thursday evenings, as Ashley said it in
+// setup (verify:sport-fuel, 7 Nov 2026). Input only: the plan and the targets
+// work out what it means.
+const MUAY = new URLSearchParams(location.search).get('muay') === '1'
 // ?walker=1 — THE BEGINNER'S WALKING PLAN, the only plan the app generates
 // whose days hold a prescribed ACTIVITY instead of exercises.
 //
@@ -290,7 +294,8 @@ const profile: UserProfile = {
   training_experience: WALKER || MOBILITY ? 'beginner' : 'intermediate', session_duration_preference: MOBILITY ? '90+' : SAM ? '30-45' : '45-60',
   workout_split_preference: LEG_CURL ? 'push_pull_legs' : SAM ? 'ai_recommendation' : 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
-  weekly_schedule: {}, dietary_preferences: new URLSearchParams(location.search).get('ate') === '1' || new URLSearchParams(location.search).get('nutfree') === '1' ? ['nut-free'] : [], concurrent_activities: [],
+  weekly_schedule: {}, dietary_preferences: new URLSearchParams(location.search).get('ate') === '1' || new URLSearchParams(location.search).get('nutfree') === '1' ? ['nut-free'] : [],
+  concurrent_activities: MUAY ? [{ name: 'Muay Thai', intensity: 0.8, days: ['Tuesday', 'Thursday'], movement_demands: ['striking', 'knee_dominant', 'hip_hinge', 'conditioning'], timeOfDay: 'evening' }] : [],
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: DYNAMIC_MACROS ? 'DYNAMIC_CSCS' : 'STANDARD_STATIC',
   coaching_persona: 'supportive', recovery_capacity: MOBILITY ? 'high' : 'moderate', conditioning_preference: MOBILITY ? 'love' : FINISHER ? 'enjoy' : 'tolerate',
   // NINE DAYS OLD, not today: a plan created today has no elapsed

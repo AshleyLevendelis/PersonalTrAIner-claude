@@ -21,7 +21,7 @@ import { tabHash } from '@/lib/app-route'
 import { readAloud } from '@/lib/read-aloud'
 import { ListenButton } from '@/components/chat/ListenButton'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { computeBMR, computeStaticTDEE, resolveBodyMetrics } from '@/lib/macro-calculator'
+import { computeBMR, staticTDEEFor, resolveBodyMetrics } from '@/lib/macro-calculator'
 import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
 import { groupMessages, bubblePositions, bubbleRadius, groupTimestamp, timeLabel } from '@/lib/chat-groups'
 import { supabase } from '@/lib/supabase'
@@ -1910,7 +1910,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const targetBasisKg = targetWeightKg != null && targetWeightKg > 0 ? targetWeightKg : effectiveWeightKg
     const liveMetrics = resolveBodyMetrics({ ...profile, weight_kg: targetBasisKg })
     const liveBmr = liveMetrics ? computeBMR(liveMetrics) : null
-    const liveTdee = liveBmr != null ? computeStaticTDEE(liveBmr, profile.activity_level) : null
+    const liveTdee = liveMetrics ? staticTDEEFor(profile, liveMetrics) : null
 
     return {
       /**
