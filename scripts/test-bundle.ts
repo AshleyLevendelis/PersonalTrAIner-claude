@@ -643,7 +643,10 @@ console.log('\n3. Nothing has crept back up')
   // fetched after the app opens. Measured both ends through this gate: d2853d57 deploy 363 gz, paint 519, app 1255,
   // total 2588; with the change deploy 362, paint 518, app 1252 (the first 85 left the app chunk too), total 2631.
   // Only the total grows, by the chunk nothing on the first screen fetches. Her 15 Sep ruling, 25 raw of room.
-  const TOTAL_BUDGET_KB = 2656
+  // MOVED 7 Nov 2026: 2656 -> 2681, the goal fix (a goal is asked for both its numbers before a card). Measured
+  // through this gate: 2654 at acf8a7d9 in a separate worktree, 2656 with the change (+2 kB raw); the room had already
+  // worn from 25 to 2 since 4 Nov without a move. 25 raw of room again.
+  const TOTAL_BUDGET_KB = 2681
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

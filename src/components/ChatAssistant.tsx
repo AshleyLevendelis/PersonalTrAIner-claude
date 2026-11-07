@@ -2,6 +2,7 @@ import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, ty
 import { blockShape } from '@/lib/timer-engine'
 import { circuitName } from '@/lib/circuit'
 import { textBesideSave, contextNoteText } from '@/lib/save-reply'
+import { goalAsk, goalAmount, goalLabel } from '@/lib/goal-ask'
 import { rpeToStore, effortLabel, cardioReadback, type EffortKey } from '@/lib/cardio-effort'
 import { easeOffQuestion } from '@/lib/cardio-ease-off'
 import ReactMarkdown from 'react-markdown'
@@ -4839,6 +4840,29 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     return receipts
   }
 
+  /**
+   * A goal's starting number: the one she stated, else what the app already
+   * knows ("using logged data where it already knows"). pr-engine's cache is
+   * the one synchronous source of a lift's last-known max weight
+   * (getLastSessionSets is async and gated to the one call site
+   * useActiveSession.loadGhosts owns — F1 in test-no-forked-state.ts — so
+   * this reuses the cache rather than adding a second fetcher). Read by the
+   * card's ask and by the save, so both see the same number.
+   */
+  const goalStart = (args: Record<string, unknown>): { baselineValue?: number; baselineSource?: 'logged_data' | 'user_stated' } => {
+    if (typeof args.baseline_value === 'number') return { baselineValue: args.baseline_value, baselineSource: 'user_stated' }
+    if (args.trackable !== 'measurable') return {}
+    const metric = String(args.metric || '')
+    const metricRef = args.metric_ref ? String(args.metric_ref).trim() : undefined
+    if ((metric === 'lift_working_kg' || metric === 'lift_1rm_kg') && metricRef && profile.id) {
+      const pr = getPRCache(profile.id)[metricRef]
+      if (pr) return { baselineValue: pr.maxWeight, baselineSource: 'logged_data' }
+    } else if (metric === 'body_weight_kg' && latestWeightKg != null) {
+      return { baselineValue: latestWeightKg, baselineSource: 'logged_data' }
+    }
+    return {}
+  }
+
   const resolveAndSaveMemory = async (intent: { tool: 'record_fact' | 'record_goal' | 'record_context_fact' | 'set_display_name'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
     const args = intent.rawArgs
     const profileId = profile.id
@@ -5063,27 +5087,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const rawPhrase = String(args.origin_verbatim_quote || '').trim()
     const metricRef = args.metric_ref ? String(args.metric_ref).trim() : undefined
     const targetValue = typeof args.target_value === 'number' ? args.target_value : undefined
-    let baselineValue = typeof args.baseline_value === 'number' ? args.baseline_value : undefined
-    let baselineSource: 'logged_data' | 'user_stated' | undefined = baselineValue != null ? 'user_stated' : undefined
+    const { baselineValue, baselineSource } = goalStart(args)
 
-    if (trackable === 'measurable' && baselineValue == null) {
-      // "Using logged data where it already knows" — pr-engine's cache is
-      // the one synchronous source of a lift's last-known max weight
-      // (getLastSessionSets is async and gated to the one call site
-      // useActiveSession.loadGhosts owns — F1 in test-no-forked-state.ts —
-      // so this reuses the cache rather than adding a second fetcher).
-      if ((metric === 'lift_working_kg' || metric === 'lift_1rm_kg') && metricRef && profileId) {
-        const pr = getPRCache(profileId)[metricRef]
-        if (pr) { baselineValue = pr.maxWeight; baselineSource = 'logged_data' }
-      } else if (metric === 'body_weight_kg' && latestWeightKg != null) {
-        baselineValue = latestWeightKg
-        baselineSource = 'logged_data'
-      }
-    }
-
-    if (trackable === 'measurable' && baselineValue == null) {
-      return { text: `What's your current ${metricRef ? metricRef + ' ' : ''}number? I need a starting point before I can track progress toward that.` }
-    }
+    // A MEASURABLE GOAL NEEDS BOTH NUMBERS (goal-ask.ts): the card is not
+    // offered without them, and this asks the same question if it is reached
+    // anyway, rather than handing createGoal a goal the table refuses.
+    const ask = goalAsk({ metric, trackable, metricRef, baselineValue, targetValue })
+    if (ask) return { text: ask }
 
     const knownLifts = { known_squat_kg: profile.known_squat_kg, known_bench_kg: profile.known_bench_kg, known_deadlift_kg: profile.known_deadlift_kg }
     const conflict = checkGoalConflict({ metric, metricRef, baselineValue }, memoryGoals, knownLifts)
@@ -5091,7 +5101,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     const displayText = trackable === 'directional'
       ? (String(args.description || '').trim() || 'directional goal')
-      : `${metricRef ? metricRef + ' ' : ''}${metric.replace(/_/g, ' ')}: ${baselineValue} → ${targetValue}${args.target_date ? ` by ${args.target_date}` : ''}`
+      : `${goalLabel(metric, metricRef, baselineValue as number, targetValue as number)}${args.target_date ? ` by ${args.target_date}` : ''}`
 
     const row = await createGoal({
       profileId, metric, trackable, metricRef, baselineValue, baselineSource,
@@ -5102,14 +5112,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     const trackingNote = trackable === 'directional'
       ? "I'll bias your plan toward this, but a directional goal like this can't be measured as a percentage — I won't report progress as a number."
-      : baselineSource === 'logged_data' ? `Starting point pulled from your logged data: ${baselineValue}.` : `Starting point: ${baselineValue}.`
+      : baselineSource === 'logged_data' ? `Starting point pulled from your logged data: ${goalAmount(metric, baselineValue as number)}.` : `Starting point: ${goalAmount(metric, baselineValue as number)}.`
 
     return {
       text: `Saved: ${displayText}\n\n${trackingNote}`,
       receipt: {
         kind: 'memory_goal_saved',
         title: 'Goal saved',
-        rows: [{ label: displayText, detail: trackable === 'directional' ? 'tracked directionally, not as a percentage' : 'baseline captured' }],
+        rows: [{ label: displayText, detail: trackable === 'directional' ? 'tracked directionally, not as a percentage' : 'your starting point is saved' }],
         status: 'done',
         undoToken: row.id,
         resolvedAt: new Date().toISOString(),
@@ -6092,7 +6102,25 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // check_off_grocery_item/log_water now arrive here too whenever
         // classifyImperative didn't confidently classify the request —
         // previously a bare offer with nothing to resolve on a later "yes".
-        built = buildIntentProposal(result.proposal.kind, result.proposal.rawArgs, profile.id, todaySteps)
+        // A GOAL MISSING A NUMBER IS ASKED ABOUT, NEVER CARDED (goal-ask.ts):
+        // "Set goal: Barbell Bench Press" with no target could only fail on Apply.
+        // And a card that IS offered says both numbers, so she can see what Apply sets.
+        const ga = result.proposal.rawArgs
+        const goal = result.proposal.kind === 'record_goal' ? {
+          metric: String(ga.metric || ''),
+          trackable: ga.trackable === 'measurable' ? 'measurable' as const : 'directional' as const,
+          metricRef: ga.metric_ref ? String(ga.metric_ref).trim() : undefined,
+          baselineValue: goalStart(ga).baselineValue,
+          targetValue: typeof ga.target_value === 'number' ? ga.target_value : undefined,
+        } : null
+        const goalQuestion = goal ? goalAsk(goal) : null
+        if (goalQuestion) refusal = goalQuestion
+        else {
+          built = buildIntentProposal(result.proposal.kind, ga, profile.id, todaySteps)
+          if (goal && goal.trackable === 'measurable' && built.diff.rows[0]) {
+            built.diff.rows[0].after = goalLabel(goal.metric, goal.metricRef, goal.baselineValue as number, goal.targetValue as number)
+          }
+        }
       } else if (result.proposal.diff && result.proposal.payload && result.proposal.scopeKey) {
         built = { scopeKey: result.proposal.scopeKey, preconditions: result.proposal.preconditions ?? {}, payload: result.proposal.payload, preImage: result.proposal.preImage, diff: result.proposal.diff }
       }
@@ -7351,7 +7379,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // log_steps to APPEND_PROPOSAL_KINDS without touching this line would
       // have logged WATER when the user confirmed a steps card. Caught before
       // it shipped; the gate now pins the routing per kind.
-      const saveResult = row.kind === 'record_fact' || row.kind === 'record_goal'
+      // A SAVE THAT THROWS SAYS SO (7 Nov 2026): a goal the table refused used
+      // to escape here unseen, so Apply looked dead and the row sat claimed.
+      let saveResult: { text: string; receipt?: ChatReceiptView } | null = null
+      try {
+      saveResult = row.kind === 'record_fact' || row.kind === 'record_goal'
         ? await resolveAndSaveMemory(intent as Parameters<typeof resolveAndSaveMemory>[0])
         : row.kind === 'add_to_grocery_list' || row.kind === 'check_off_grocery_item' || row.kind === 'add_day_to_grocery_list'
         ? await resolveAndSaveGrocery(intent as Parameters<typeof resolveAndSaveGrocery>[0])
@@ -7360,8 +7392,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         : row.kind === 'log_water'
         ? await resolveAndSaveWater(intent as Parameters<typeof resolveAndSaveWater>[0])
         : (() => { throw new Error(`No resolver wired for append proposal kind: ${row.kind}`) })()
+      } catch (err) {
+        console.error('append proposal: the save threw', row.kind, err)
+      }
 
-      if (saveResult.receipt) {
+      if (!saveResult) {
+        receipt = { landed: [], failed: [{ op: row.kind, error: "the save didn't go through, so try again in a moment" }] }
+        title = "Couldn't save that"
+        rows = []
+      } else if (saveResult.receipt) {
         richReceipt = saveResult.receipt
         title = saveResult.receipt.title
         rows = saveResult.receipt.rows.map(r => ({ label: r.label, detail: r.detail }))
@@ -7372,9 +7411,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // question (e.g. an unresolved exercise target) instead of writing
         // — the row is already claimed, so it resolves as a soft failure
         // with that question surfaced, rather than silently vanishing.
-        receipt = { landed: [], failed: [{ op: row.kind, error: saveResult.text || 'Needs more detail' }] }
-        title = 'Need more detail'
-        rows = saveResult.text ? [{ label: 'Note', detail: saveResult.text }] : []
+        // ...and the question is the COACH's next message, said once, never a
+        // "Note" row repeated in red beneath it (7 Nov 2026).
+        receipt = { landed: [], failed: [{ op: row.kind, error: 'it needs one more answer first' }] }
+        title = 'Not saved yet'
+        rows = []
+        if (saveResult.text) followUp = { text: saveResult.text, chips: [] }
       }
     } else {
       receipt = { landed: [], failed: [{ op: row.kind, error: 'Not available yet' }] }

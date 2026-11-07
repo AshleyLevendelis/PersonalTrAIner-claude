@@ -127,6 +127,21 @@ const COLUMN_DEFAULTS: Record<string, Row> = {
   favorite_meals: { times_used: 1 },
 }
 
+/**
+ * TABLE CHECK RULES THE APP HAS ALREADY TRIPPED, refused here as Postgres
+ * refuses them (23514). One so far, and it is why this exists: user_goals'
+ * "an active measurable goal has a baseline, its date AND a target"
+ * (20260806090000_create_memory_and_goals.sql). On 7 Nov 2026 a bench goal
+ * with no target was refused by the real table and Apply looked dead; a fake
+ * that stored it anyway could never have shown that. test:goal-ask reads the
+ * migration's CHECK and fails if it stops saying this.
+ */
+export const ROW_CHECKS: Record<string, (row: Row) => string | null> = {
+  user_goals: r => (r.status !== 'active' || r.trackable === 'directional'
+    || (r.baseline_value != null && r.baseline_captured_at != null && r.target_value != null))
+    ? null : 'user_goals_check',
+}
+
 /** The first value in `row` that an integer column would refuse, or null. */
 export function integerViolation(tableName: string, row: Row): { column: string; value: number } | null {
   for (const column of INTEGER_COLUMNS[tableName] ?? []) {
@@ -186,6 +201,10 @@ export function makeFakeSupabase(db: Db, opts: { session?: { user: { id: string;
       for (const row of op === 'insert' || op === 'upsert' ? payload : op === 'update' ? [updateObj] : []) {
         const bad = integerViolation(name, row)
         if (bad) return rejectAsPostgres(name, bad)
+      }
+      for (const row of op === 'insert' || op === 'upsert' ? payload : []) {
+        const broke = ROW_CHECKS[name]?.(row)
+        if (broke) return { data: null, error: { code: '23514', message: `new row for relation "${name}" violates check constraint "${broke}"`, details: null, hint: null } }
       }
       if (op === 'insert' || op === 'upsert') {
         // RETURN THE STORED ROWS, not the payload. The payload has no `id` —

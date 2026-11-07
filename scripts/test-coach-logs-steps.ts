@@ -74,7 +74,7 @@ console.log('\n2. Confirming a steps card logs STEPS\n')
   check('...and has a confirmation verb', !!INTENT_PROPOSAL_VERB.log_steps)
 
   // THE ANTI-FALLTHROUGH CHECK. The ternary's default used to be water.
-  const at = chat.indexOf('const saveResult = row.kind ===')
+  const at = chat.search(/saveResult = row\.kind ===/)
   const chain = at === -1 ? '' : chat.slice(at, at + 900)
   check('the confirm chain was found (sanity check on this check)', chain.length > 200, chain.length)
   check('log_steps routes to resolveAndSaveSteps by name',

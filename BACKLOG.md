@@ -2,6 +2,27 @@
 
 Newest first. One line each.
 
+- [x] **A GOAL GETS BOTH ITS NUMBERS, AND APPLY ALWAYS SAYS WHAT HAPPENED, 7 NOV 2026** (Ashley's phone, screenshot:
+  "set a bench goal", then "110kg is my max", a "Set goal: Barbell Bench Press" card, Apply did nothing). TRACED and
+  checked in the code: a measurable goal is only saved as active with a starting number, its date AND a target (the
+  user_goals CHECK rule, 20260806090000). Nothing ever asked for the target, so the insert was refused, `createGoal`
+  threw, nothing caught it, and the claimed row sat with no receipt: a dead Apply. The first turn's "what's your current
+  number?" had come back as a FAILED card ("Need more detail · Note ..." and the same sentence again in red). FIX, the
+  app's side only (no deploy): one function (`goal-ask.ts`) says which number is missing, with its unit, and both doors
+  use it. The card is not built until both numbers exist (the question is the coach's reply instead), the save asks the
+  same question if reached anyway, the card and the saved goal say both numbers ("Barbell Bench Press max: 110 kg ->
+  120 kg"), a save that throws now says "Couldn't save that", and a question back from Apply is the coach's next
+  message, said once, never a "Note" row. "baseline captured" on the saved row is now "your starting point is saved".
+  The harness's fake database now refuses the goal the real table refuses (`ROW_CHECKS`), or no driver could ever
+  have seen this. Decided by the session (a defect: a button that silently does nothing; "every write succeeds or
+  says it did not"). NOT changed: the coach's tool still lets the model call without a target (the app now asks), and
+  whether the deployed coach carries 110 into its next call is the model's; the app asks for whatever is still missing
+  either way. test:goal-ask 25 checks, 9 mutations, 9 caught (one only after the catch check was tightened: a
+  re-throw inside the catch passed). verify:chat-goal 26 checks, 9 mutations, 7 caught; the 2 missed sit behind the
+  new ask, so the screen cannot reach them, and the logic gate catches both. Screenshots read. test:coach-logs-steps
+  re-anchored (it pinned `const saveResult =`; re-mutated, still bites). test:bundle total 2656 -> 2681 (2654 at
+  acf8a7d9, 2656 with this; the room had worn to 2). Frontend only.
+
 - [x] **THE COACH STOPS TEACHING THE "ONLY 30-40 g OF PROTEIN AT A TIME" MYTH, 7 NOV 2026** (her machine's second exam
   that day, case teach-protein-spread: "your body can only use 30 to 40 grams of protein at a time ... a lot gets
   oxidized for energy instead"; the judge marked it outdated; her "fix the protein advice too"). The myth came from the
