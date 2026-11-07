@@ -19,10 +19,10 @@
       "macros"
     ]
   },
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "acaf220157f151eb",
   "caseStamp": "daaccd97bc8cb3dc",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T04:25:10.575Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -82,15 +82,15 @@
         "kind": "propose_goal_change",
         "args": {
           "goal": "hypertrophy",
-          "reason": "Switching goal from fat loss to muscle growth"
+          "reason": "Switching goal from fat loss to building muscle (hypertrophy)"
         }
       },
       "saved": null
     },
     {
       "user": "does that change what I'm eating as well, or just the training?",
-      "reply": "It changes both! \n\nYour training will shift to focus on building size — slightly higher reps and different phases — but the biggest change is actually the food. To build muscle, your daily targets will move from a calorie deficit into a surplus so your body has the extra fuel it needs to grow. \n\nYour saved meals won't disappear, but the app will adjust the target numbers you're aiming for each day. Once you tap confirm on that card, your new targets will be set!",
-      "raw": "It changes both! \n\nYour training will shift to focus on building size — slightly higher reps and different phases — but the biggest change is actually the food. To build muscle, your daily targets will move from a calorie deficit into a surplus so your body has the extra fuel it needs to grow. \n\nYour saved meals won't disappear, but the app will adjust the target numbers you're aiming for each day. Once you tap confirm on that card, your new targets will be set!",
+      "reply": "It changes both! \n\nBuilding muscle requires a slight calorie surplus so your body has the extra energy and raw materials to build new tissue instead of burning fat.\n\nYour targets will adjust so you're eating a bit more food to support growth and recovery, while your training shifts toward volume and rep ranges for muscle size.\n\nOnce you tap confirm on the card, your meals and targets will update automatically alongside your new training block.",
+      "raw": "It changes both! \n\nBuilding muscle requires a slight calorie surplus so your body has the extra energy and raw materials to build new tissue instead of burning fat.\n[BREAK]\nYour targets will adjust so you're eating a bit more food to support growth and recovery, while your training shifts toward volume and rep ranges for muscle size.\n[BREAK]\nOnce you tap confirm on the card, your meals and targets will update automatically alongside your new training block.\n[QUICK_REPLIES: \"Walk me through targets\" | \"Makes sense!\"]",
       "error": null,
       "action": null,
       "proposal": null,

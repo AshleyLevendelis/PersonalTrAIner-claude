@@ -15,10 +15,10 @@
       }
     ]
   },
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "acaf220157f151eb",
   "caseStamp": "546aece6aa9b5e94",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T04:25:10.575Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -84,8 +84,8 @@
     },
     {
       "user": "hmm, will that wipe my history?",
-      "reply": "Not at all! Your history, past logs, and PRs stay exactly where they are. \n\nA fresh start rebuilds your upcoming workouts from week 1 with a calibration week to get your working weights back, but everything you've accomplished so far stays saved on your profile.\n\nWhenever you're ready, just tap confirm on the card above and we'll get your new week 1 set up!",
-      "raw": "Not at all! Your history, past logs, and PRs stay exactly where they are. \n\nA fresh start rebuilds your upcoming workouts from week 1 with a calibration week to get your working weights back, but everything you've accomplished so far stays saved on your profile.\n\nWhenever you're ready, just tap confirm on the card above and we'll get your new week 1 set up!",
+      "reply": "Not at all, Sam! Your past logs, PRs, and saved meals stay completely intact.\n\nWe're just rebuilding your upcoming weeks with a calibration week so we can find your working weights safely after the break. All your history stays right where it is.",
+      "raw": "Not at all, Sam! Your past logs, PRs, and saved meals stay completely intact.\n[BREAK]\nWe're just rebuilding your upcoming weeks with a calibration week so we can find your working weights safely after the break. All your history stays right where it is.",
       "error": null,
       "action": null,
       "proposal": null,

@@ -2,10 +2,10 @@
   "case": "warm-week-fell-apart",
   "why": "Ashley, 6 Nov 2026, 'Warm coach': a rough week is met with kindness before any fix, and never with guilt. 'A why on every answer': it should leave them knowing why one bad week costs little next to the weeks around it, in a line, not a lecture.",
   "checks": {},
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "acaf220157f151eb",
   "caseStamp": "b989e29f061d075a",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T04:25:10.575Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -57,8 +57,8 @@
   "turns": [
     {
       "user": "honestly this week has been a write off. only trained once and I've been eating rubbish",
-      "reply": "We've all had weeks like that, Ashley — life gets busy or off-track, and that's completely normal. One rough week doesn't wipe out the progress you've been making, so there's no need to beat yourself up about it.\n\nThe best thing we can do now is just reset and focus on getting back into your rhythm. \n\nAre you planning to get a session in today to get momentum back, or would you prefer to just draw a line under it and start fresh tomorrow?",
-      "raw": "We've all had weeks like that, Ashley — life gets busy or off-track, and that's completely normal. One rough week doesn't wipe out the progress you've been making, so there's no need to beat yourself up about it.\n\nThe best thing we can do now is just reset and focus on getting back into your rhythm. \n\nAre you planning to get a session in today to get momentum back, or would you prefer to just draw a line under it and start fresh tomorrow?\n[QUICK_REPLIES: \"Train today\" | \"Start fresh tomorrow\"]",
+      "reply": "I hear you, Ashley, but one off-week doesn't undo your progress. Your body doesn't lose muscle or strength in seven days, and a few high-calorie meals won't ruin your momentum.\n\nLet's get a light session in today just to get moving again, though we can always pick another option if you prefer. How does getting active today sound to you? 🤗",
+      "raw": "I hear you, Ashley, but one off-week doesn't undo your progress. Your body doesn't lose muscle or strength in seven days, and a few high-calorie meals won't ruin your momentum.\n[BREAK]\nLet's get a light session in today just to get moving again, though we can always pick another option if you prefer. How does getting active today sound to you? 🤗\n[QUICK_REPLIES: \"Start fresh Monday\" | \"Light session today\" | \"Light session tomorrow\"]",
       "error": null,
       "action": null,
       "proposal": null,

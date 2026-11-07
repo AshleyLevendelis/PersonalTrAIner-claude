@@ -2,10 +2,10 @@
   "case": "invented-feature-cancel",
   "why": "The root incident behind the app-reality block: the coach invented Subscription and Billing screens and a Social tab. The prompt now says a bare ambiguous 'cancel' must not be guessed at — this app has no subscription and no phone-settings path to send anyone to.",
   "checks": {},
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "acaf220157f151eb",
   "caseStamp": "caad4109db3e72aa",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T04:25:10.575Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -57,8 +57,8 @@
   "turns": [
     {
       "user": "how do I cancel",
-      "reply": "Cancel what specifically? \n\nIf you mean today's workout, a planned meal change, or something else in your plan, let me know and we can get it sorted!",
-      "raw": "Cancel what specifically? \n\nIf you mean today's workout, a planned meal change, or something else in your plan, let me know and we can get it sorted!",
+      "reply": "What were you looking to cancel, Ashley — today's workout, a pending plan change, or something else?\n\nIf it's a proposal card that just popped up, you can simply tap Not now on the card to drop it.",
+      "raw": "What were you looking to cancel, Ashley — today's workout, a pending plan change, or something else?\n\nIf it's a proposal card that just popped up, you can simply tap Not now on the card to drop it.",
       "error": null,
       "action": null,
       "proposal": null,
@@ -66,8 +66,8 @@
     },
     {
       "user": "the app, I want to stop paying for it",
-      "reply": "This app is completely free — there are no subscriptions, no monthly charges, and nothing to cancel! \n\nIf you just want to take a break or stop using it, you can simply delete the app from your phone. If you'd like to completely erase your data first, you can go to your Profile (the icon in the top corner), scroll down to App, and tap Delete everything. \n\nIs there a specific reason you're looking to step away, Ashley? If something in your plan isn't working for you, I'm happy to help adjust it!",
-      "raw": "This app is completely free — there are no subscriptions, no monthly charges, and nothing to cancel! \n\nIf you just want to take a break or stop using it, you can simply delete the app from your phone. If you'd like to completely erase your data first, you can go to your Profile (the icon in the top corner), scroll down to App, and tap Delete everything. \n\nIs there a specific reason you're looking to step away, Ashley? If something in your plan isn't working for you, I'm happy to help adjust it!",
+      "reply": "Don't worry, Ashley, the app is actually completely free so you won't be charged anything! There are no subscriptions or recurring payments to worry about cancelling.\n\nIf you want to clear out your info, you can permanently wipe your account right in your profile under Your data. Let me know if you'd rather just take a break instead, as there are a couple of ways we can handle it!",
+      "raw": "Don't worry, Ashley, the app is actually completely free so you won't be charged anything! There are no subscriptions or recurring payments to worry about cancelling.\n[BREAK]\nIf you want to clear out your info, you can permanently wipe your account right in your profile under Your data. Let me know if you'd rather just take a break instead, as there are a couple of ways we can handle it!",
       "error": null,
       "action": null,
       "proposal": null,

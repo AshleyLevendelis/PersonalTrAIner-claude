@@ -4,10 +4,10 @@
   "checks": {
     "expectsProposal": true
   },
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "acaf220157f151eb",
   "caseStamp": "b50cf44c9241e317",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T04:25:10.575Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -67,15 +67,15 @@
         "kind": "propose_exercise_ban",
         "args": {
           "item": "Burpees",
-          "reason": "User explicitly hates burpees and requested permanent exclusion"
+          "reason": "User preference — dislikes movement"
         }
       },
       "saved": null
     },
     {
       "user": "so they're gone for good?",
-      "reply": "They'll be gone for good once you tap Confirm on that card right there on your screen. \n\nOnce you tap it, the app removes burpees from every week of your plan and makes sure they never turn up again.",
-      "raw": "They'll be gone for good once you tap Confirm on that card right there on your screen. \n\nOnce you tap it, the app removes burpees from every week of your plan and makes sure they never turn up again.",
+      "reply": "Yep, once you tap Confirm, they’re gone for good across your whole plan. \n\n\nRemoving them keeps your routine focused entirely on the exercises you actually enjoy and look forward to doing. \n\n\nUntil you want them back, you won't see another burpee!",
+      "raw": "Yep, once you tap Confirm, they’re gone for good across your whole plan. \n\n[BREAK]\nRemoving them keeps your routine focused entirely on the exercises you actually enjoy and look forward to doing. \n\n[BREAK]\nUntil you want them back, you won't see another burpee!",
       "error": null,
       "action": null,
       "proposal": null,

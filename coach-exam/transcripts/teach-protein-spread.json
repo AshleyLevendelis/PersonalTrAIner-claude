@@ -2,10 +2,10 @@
   "case": "teach-protein-spread",
   "why": "Ashley, 6 Nov 2026, 'A why on every answer': a why question is the coach's chance to teach. The answer must be true, tied to her plan and target, and short: a few lines, never a paragraph on muscle protein synthesis.",
   "checks": {},
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "acaf220157f151eb",
   "caseStamp": "136956fde9230a09",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T04:25:10.575Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -57,8 +57,8 @@
   "turns": [
     {
       "user": "why does my plan put protein in every single meal? can't I just have a big steak at dinner and be done",
-      "reply": "Spreading your protein across the day actually helps your body build and retain muscle much better than eating it all in one sitting. \n\nYour body can only trigger muscle protein synthesis — the process that repairs and builds muscle tissue — so many times a day, and it needs a solid hit of protein (usually 25–40g) each time to get that signal going. If you dump all 130g of your daily target into dinner, your body will use what it needs for repair in that window, but the rest gets burned for energy rather than helping your muscles recover throughout the day.\n\nHaving protein at breakfast and lunch keeps that repair signal turning on every few hours, which keeps you full longer and helps with fat loss.\n\nThat said, your targets are total daily goals, not strict rules. If you have a lighter protein lunch and a massive steak for dinner once in a while, it won't ruin your progress — the total at the end of the day still matters most. \n\nWould you like to adjust how your protein is split across your meals, or keep it balanced like it is?",
-      "raw": "Spreading your protein across the day actually helps your body build and retain muscle much better than eating it all in one sitting. \n\nYour body can only trigger muscle protein synthesis — the process that repairs and builds muscle tissue — so many times a day, and it needs a solid hit of protein (usually 25–40g) each time to get that signal going. If you dump all 130g of your daily target into dinner, your body will use what it needs for repair in that window, but the rest gets burned for energy rather than helping your muscles recover throughout the day.\n\nHaving protein at breakfast and lunch keeps that repair signal turning on every few hours, which keeps you full longer and helps with fat loss.\n\nThat said, your targets are total daily goals, not strict rules. If you have a lighter protein lunch and a massive steak for dinner once in a while, it won't ruin your progress — the total at the end of the day still matters most. \n\nWould you like to adjust how your protein is split across your meals, or keep it balanced like it is?\n[QUICK_REPLIES: \"Keep it balanced\" | \"Adjust meal split\"]",
+      "reply": "Your body can only use about 30 to 40 grams of protein for muscle building at one time. \n\n\n\nSpacing it out triggers muscle building multiple times a day instead of just once. \n\n\n\nSince full meals take effort, shifting to three solid meals with around 40g in each is your best option, but we can tweak it other ways too. How does your current meal setup feel to manage?",
+      "raw": "Your body can only use about 30 to 40 grams of protein for muscle building at one time. \n\n[BREAK]\n\nSpacing it out triggers muscle building multiple times a day instead of just once. \n\n[BREAK]\n\nSince full meals take effort, shifting to three solid meals with around 40g in each is your best option, but we can tweak it other ways too. How does your current meal setup feel to manage?",
       "error": null,
       "action": null,
       "proposal": null,

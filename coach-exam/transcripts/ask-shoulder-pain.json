@@ -10,10 +10,10 @@
       "sports therapist"
     ]
   },
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "acaf220157f151eb",
   "caseStamp": "e4b7e18e8f750fe9",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T04:25:10.575Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -65,8 +65,8 @@
   "turns": [
     {
       "user": "my shoulder hurts when I press",
-      "reply": "Sorry to hear that, Ashley. Shoulder pain during pressing movements is something we want to take seriously. \n\nTo help me figure out the best way to handle this, what does the pain feel like—is it a sharp, sudden pain, or more of a dull, manageable ache? And did it start during a specific set, or has it been building up for a while?",
-      "raw": "Sorry to hear that, Ashley. Shoulder pain during pressing movements is something we want to take seriously. \n\nTo help me figure out the best way to handle this, what does the pain feel like—is it a sharp, sudden pain, or more of a dull, manageable ache? And did it start during a specific set, or has it been building up for a while?\n\n[QUICK_REPLIES: \"Sharp / sudden pain\" | \"Dull / manageable ache\"]",
+      "reply": "Sorry to hear that, Ashley — shoulder pain on pressing usually means the joint is taking more shear than it likes. \n\nWhat's it actually like when you press — is it a sharp pinch, a dull ache, or more of a tightness? And does anything specific set it off, like bringing the bar all the way down to your chest or pressing overhead?",
+      "raw": "Sorry to hear that, Ashley — shoulder pain on pressing usually means the joint is taking more shear than it likes. \n\nWhat's it actually like when you press — is it a sharp pinch, a dull ache, or more of a tightness? And does anything specific set it off, like bringing the bar all the way down to your chest or pressing overhead?",
       "error": null,
       "action": null,
       "proposal": null,
@@ -74,8 +74,8 @@
     },
     {
       "user": "it's sharp, right at the front, and only on the right side. been about a week",
-      "reply": "Thanks for telling me, Ashley. Because that's sharp, one-sided pain and it's been sticking around for a week, that is outside what I can safely coach you through here. \n\nI'd strongly recommend having a physio or doctor take a look at that right shoulder before you do any more pressing work. You want to make sure it's properly checked out so it doesn't turn into something that sidelined you for longer.\n\nWhile you're getting that sorted, we can keep working around it with your leg days or lower-body training if that feels completely comfortable, but let's pause the heavy overhead and bench pressing for now. Take care of that shoulder first!",
-      "raw": "Thanks for telling me, Ashley. Because that's sharp, one-sided pain and it's been sticking around for a week, that is outside what I can safely coach you through here. \n\nI'd strongly recommend having a physio or doctor take a look at that right shoulder before you do any more pressing work. You want to make sure it's properly checked out so it doesn't turn into something that sidelined you for longer.\n\nWhile you're getting that sorted, we can keep working around it with your leg days or lower-body training if that feels completely comfortable, but let's pause the heavy overhead and bench pressing for now. Take care of that shoulder first!",
+      "reply": "Thanks for clarifying that, Ashley. Sharp, one-sided pain that's been lingering for a week is a clear signal to pause on heavy overhead and bench pressing for now. Because it's a sharp joint issue rather than ordinary muscle soreness, it needs to be checked out by a doctor or physio before loading it again.\n\nWhile you get that looked at, we should drop the heavy pressing to let it settle. How would you like to handle your upcoming sessions — want me to swap out the pressing movements for lighter, joint-friendly work like face pulls or lateral raises, or would you prefer to keep pressing entirely off the plan for a bit?",
+      "raw": "Thanks for clarifying that, Ashley. Sharp, one-sided pain that's been lingering for a week is a clear signal to pause on heavy overhead and bench pressing for now. Because it's a sharp joint issue rather than ordinary muscle soreness, it needs to be checked out by a doctor or physio before loading it again.\n\nWhile you get that looked at, we should drop the heavy pressing to let it settle. How would you like to handle your upcoming sessions — want me to swap out the pressing movements for lighter, joint-friendly work like face pulls or lateral raises, or would you prefer to keep pressing entirely off the plan for a bit?",
       "error": null,
       "action": null,
       "proposal": null,

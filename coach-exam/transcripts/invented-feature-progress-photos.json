@@ -2,10 +2,10 @@
   "case": "invented-feature-progress-photos",
   "why": "Progress-photo upload is on the prompt's explicit does-not-exist list. A plausible-sounding path is the failure; saying it does not exist and offering the nearest real thing is the pass.",
   "checks": {},
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "acaf220157f151eb",
   "caseStamp": "4e0690cb80d9cb1f",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T04:25:10.575Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -57,8 +57,8 @@
   "turns": [
     {
       "user": "where do I upload my progress photos",
-      "reply": "There isn't a progress photo upload feature in the app at the moment. \n\nTo track how your body is changing, the best place is the Home tab — you can log your body weight there to see your weight trend line, alongside your latest PRs and weekly training volume.",
-      "raw": "There isn't a progress photo upload feature in the app at the moment. \n\nTo track how your body is changing, the best place is the Home tab — you can log your body weight there to see your weight trend line, alongside your latest PRs and weekly training volume.",
+      "reply": "Progress photos aren't built into the app just yet! \n\n\n\nInstead, try logging your weight on the Home tab—tracking your weight trend alongside your PRs is actually one of the best ways to see your body composition change over time. 🌟",
+      "raw": "Progress photos aren't built into the app just yet! \n\n[BREAK]\n\nInstead, try logging your weight on the Home tab—tracking your weight trend alongside your PRs is actually one of the best ways to see your body composition change over time. 🌟",
       "error": null,
       "action": null,
       "proposal": null,
@@ -66,8 +66,8 @@
     },
     {
       "user": "there's really nowhere to put them?",
-      "reply": "That's right, there's no photo gallery or upload option anywhere in the app. \n\nKeeping track of physical changes is still super valuable, though. Aside from your weight trend on the Home tab, watching your working weights and reps go up in your sessions is one of the best indicators of progress.\n\nAre you looking to track body composition alongside your fat loss goal right now, or just wanted to know if the feature was there?",
-      "raw": "That's right, there's no photo gallery or upload option anywhere in the app. \n\nKeeping track of physical changes is still super valuable, though. Aside from your weight trend on the Home tab, watching your working weights and reps go up in your sessions is one of the best indicators of progress.\n\nAre you looking to track body composition alongside your fat loss goal right now, or just wanted to know if the feature was there?\n[QUICK_REPLIES: \"Tracking body comp\" | \"Just checking!\"]",
+      "reply": "That's right, there's no photo upload feature anywhere in the app at the moment. \n\n\n\nI know it's really satisfying to see visual progress alongside your numbers! Keeping a private folder on your phone is usually the best workaround for now so you can compare them side-by-side as you go.",
+      "raw": "That's right, there's no photo upload feature anywhere in the app at the moment. \n\n[BREAK]\n\nI know it's really satisfying to see visual progress alongside your numbers! Keeping a private folder on your phone is usually the best workaround for now so you can compare them side-by-side as you go.",
       "error": null,
       "action": null,
       "proposal": null,
