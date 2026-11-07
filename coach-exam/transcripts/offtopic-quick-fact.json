@@ -2,10 +2,10 @@
   "case": "offtopic-quick-fact",
   "why": "The other half of the same rule, and the one that fails in the opposite direction: a quick factual question gets a brief true answer AND a one-line pivot back. A refusal here is as wrong as a five-paragraph essay.",
   "checks": {},
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "c234cd0c1a76fd15",
   "caseStamp": "bc63a1f95cd89259",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T07:38:34.115Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -57,8 +57,8 @@
   "turns": [
     {
       "user": "how many ml in a cup",
-      "reply": "1 US cup is about 240 ml (or 250 ml if you're using a metric cup). \n\nSpeaking of hydration or cooking, how are you tracking things today — are you getting your session in later on?",
-      "raw": "1 US cup is about 240 ml (or 250 ml if you're using a metric cup). \n\nSpeaking of hydration or cooking, how are you tracking things today — are you getting your session in later on?\n[QUICK_REPLIES: \"Yes, training later\" | \"Rest day today\" | \"Already done\"]",
+      "reply": "There are 240 ml in 1 US cup (or 250 ml if you're using a metric cup). \n\nDid you get today's leg session in yet, Ashley?",
+      "raw": "There are 240 ml in 1 US cup (or 250 ml if you're using a metric cup). \n\nDid you get today's leg session in yet, Ashley?\n[QUICK_REPLIES: \"Yes\" | \"Not yet\" | \"Rest day\"]",
       "error": null,
       "action": null,
       "proposal": null,

@@ -2,10 +2,10 @@
   "case": "specific-plateau",
   "why": "A plain training question where generic advice and the right answer look different. The context holds the actual lift, the actual weight and the actual completed session, so a coach that reads them can say what to do next week and a coach that does not can only say 'progressive overload'.",
   "checks": {},
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "c234cd0c1a76fd15",
   "caseStamp": "6be94156717b2ce2",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T07:38:34.115Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -57,8 +57,8 @@
   "turns": [
     {
       "user": "my squat's been stuck for a bit, what should I do",
-      "reply": "Where in the rep does it stall — right out of the bottom, or halfway up? Those have very different fixes.",
-      "raw": "Where in the rep does it stall — right out of the bottom, or halfway up? Those have very different fixes.\n[QUICK_REPLIES: \"Out of the hole\" | \"Halfway up\"]",
+      "reply": "Is it stalling on the way down, right at the bottom, or halfway back up? Those point to completely different fixes.",
+      "raw": "Is it stalling on the way down, right at the bottom, or halfway back up? Those point to completely different fixes.\n\n[QUICK_REPLIES: \"At the bottom\" | \"Halfway up\" | \"On the way down\"]",
       "error": null,
       "action": null,
       "proposal": null,
@@ -66,8 +66,8 @@
     },
     {
       "user": "ok, and how long before I'd expect that to move",
-      "reply": "If we fix the right bottleneck today, you'll usually feel a difference in bar speed within two to three sessions, and see the load actually move in three to four weeks. \n\nStrength builds in phases — first your nervous system gets better at firing the right muscles together under load, and then the actual tissue adapts. \n\nWhere's yours usually sticking?",
-      "raw": "If we fix the right bottleneck today, you'll usually feel a difference in bar speed within two to three sessions, and see the load actually move in three to four weeks. \n\nStrength builds in phases — first your nervous system gets better at firing the right muscles together under load, and then the actual tissue adapts. \n\nWhere's yours usually sticking?\n[QUICK_REPLIES: \"Out of the hole\" | \"Halfway up\"]",
+      "reply": "You should see reps feel smoother within one to two weeks, with weight moving up inside three to four. \n\nThat’s because we’re tweaking your leverage to directly target your weak link.\n\n\nWhich spot is sticking for you right now — at the bottom, or halfway back up?",
+      "raw": "You should see reps feel smoother within one to two weeks, with weight moving up inside three to four. \n\nThat’s because we’re tweaking your leverage to directly target your weak link.\n\n[BREAK]\nWhich spot is sticking for you right now — at the bottom, or halfway back up?\n\n[QUICK_REPLIES: \"At the bottom\" | \"Halfway up\"]",
       "error": null,
       "action": null,
       "proposal": null,

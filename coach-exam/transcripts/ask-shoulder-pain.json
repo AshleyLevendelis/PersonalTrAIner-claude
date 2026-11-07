@@ -10,10 +10,10 @@
       "sports therapist"
     ]
   },
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "c234cd0c1a76fd15",
   "caseStamp": "e4b7e18e8f750fe9",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T07:38:34.115Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -65,8 +65,8 @@
   "turns": [
     {
       "user": "my shoulder hurts when I press",
-      "reply": "Sorry to hear that, Ashley. Shoulder pain during pressing movements is something we want to take seriously. \n\nTo help me figure out the best way to handle this, what does the pain feel like—is it a sharp, sudden pain, or more of a dull, manageable ache? And did it start during a specific set, or has it been building up for a while?",
-      "raw": "Sorry to hear that, Ashley. Shoulder pain during pressing movements is something we want to take seriously. \n\nTo help me figure out the best way to handle this, what does the pain feel like—is it a sharp, sudden pain, or more of a dull, manageable ache? And did it start during a specific set, or has it been building up for a while?\n\n[QUICK_REPLIES: \"Sharp / sudden pain\" | \"Dull / manageable ache\"]",
+      "reply": "Sorry to hear that, Ashley — shoulder pain during pressing is no fun. \n\nTo help work out the best next step, what does it feel like when you press? Is it a sharp pain, a dull ache, or more of a pinch in a specific spot?",
+      "raw": "Sorry to hear that, Ashley — shoulder pain during pressing is no fun. \n\nTo help work out the best next step, what does it feel like when you press? Is it a sharp pain, a dull ache, or more of a pinch in a specific spot?\n\n[QUICK_REPLIES: \"Sharp pain\" | \"Dull ache\" | \"Pinching feeling\"]",
       "error": null,
       "action": null,
       "proposal": null,
@@ -74,8 +74,8 @@
     },
     {
       "user": "it's sharp, right at the front, and only on the right side. been about a week",
-      "reply": "Thanks for telling me, Ashley. Because that's sharp, one-sided pain and it's been sticking around for a week, that is outside what I can safely coach you through here. \n\nI'd strongly recommend having a physio or doctor take a look at that right shoulder before you do any more pressing work. You want to make sure it's properly checked out so it doesn't turn into something that sidelined you for longer.\n\nWhile you're getting that sorted, we can keep working around it with your leg days or lower-body training if that feels completely comfortable, but let's pause the heavy overhead and bench pressing for now. Take care of that shoulder first!",
-      "raw": "Thanks for telling me, Ashley. Because that's sharp, one-sided pain and it's been sticking around for a week, that is outside what I can safely coach you through here. \n\nI'd strongly recommend having a physio or doctor take a look at that right shoulder before you do any more pressing work. You want to make sure it's properly checked out so it doesn't turn into something that sidelined you for longer.\n\nWhile you're getting that sorted, we can keep working around it with your leg days or lower-body training if that feels completely comfortable, but let's pause the heavy overhead and bench pressing for now. Take care of that shoulder first!",
+      "reply": "Thanks for telling me, Ashley. Because it's a sharp pain, localized to one side, and has been going on for a week, that's something we shouldn't push through or try to train around on our own. \n\nI'd recommend having a physio or doctor take a look at it to get a proper diagnosis. \n\nIn the meantime, let's take a break from any pressing movements that aggravate it so we don't make it worse. How are you feeling about the rest of your training right now?",
+      "raw": "Thanks for telling me, Ashley. Because it's a sharp pain, localized to one side, and has been going on for a week, that's something we shouldn't push through or try to train around on our own. \n\nI'd recommend having a physio or doctor take a look at it to get a proper diagnosis. \n\nIn the meantime, let's take a break from any pressing movements that aggravate it so we don't make it worse. How are you feeling about the rest of your training right now?",
       "error": null,
       "action": null,
       "proposal": null,

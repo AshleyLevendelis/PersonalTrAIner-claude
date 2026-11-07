@@ -2,10 +2,10 @@
   "case": "voice-several-things-at-once",
   "why": "Ashley, 24 Sep 2026: a voice note that asks several things must get every part answered, each on its own line starting with what it answers, so she can see nothing was dropped. No headers, no bold. And no closing question unless an answer genuinely changes what happens next.",
   "checks": {},
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "c234cd0c1a76fd15",
   "caseStamp": "228e939b1b55c399",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T07:38:34.115Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -57,8 +57,8 @@
   "turns": [
     {
       "user": "ok so a few things, I'm starving today so I think I need more carbs, what should I have before training tomorrow morning, and is it fine that I skipped the stretching at the end yesterday",
-      "reply": "Carbs — a bowl of oats with a sliced banana, or two slices of toast with jam about 60 to 90 minutes before tomorrow's session. Carbs right before training restock your muscle glycogen so you have full strength on your heavy sets, and oats or toast digest easily enough to avoid any stomach heaviness while you lift.\n\nSkipping stretching yesterday — totally fine. Post-workout stretching feels nice and can help you wind down, but it doesn't reduce muscle soreness or drive your strength progress. The work that actually grows muscle and builds strength is what you did during the session itself.\n\nFor today's hunger, pulling a bit more food into your meals — especially slow-digesting carbs like potatoes, oats, or rice — will help settle your appetite without knocking your targets off track. Did you want to add a pre-workout meal into your plan for tomorrow morning?",
-      "raw": "Carbs — a bowl of oats with a sliced banana, or two slices of toast with jam about 60 to 90 minutes before tomorrow's session. Carbs right before training restock your muscle glycogen so you have full strength on your heavy sets, and oats or toast digest easily enough to avoid any stomach heaviness while you lift.\n\nSkipping stretching yesterday — totally fine. Post-workout stretching feels nice and can help you wind down, but it doesn't reduce muscle soreness or drive your strength progress. The work that actually grows muscle and builds strength is what you did during the session itself.\n\nFor today's hunger, pulling a bit more food into your meals — especially slow-digesting carbs like potatoes, oats, or rice — will help settle your appetite without knocking your targets off track. Did you want to add a pre-workout meal into your plan for tomorrow morning?\n[QUICK_REPLIES: \"Yes, add pre-workout meal\" | \"No, I'll just prep it myself\"]",
+      "reply": "If you’re starving, add a solid portion of oats to your next meal to top up your muscle glycogen for tomorrow's lift, though rice or potatoes work great too.\n\nFor tomorrow morning, a banana with toast 30–60 minutes out digests fast so it won't sit heavy, but oats are another good option.\n\nSkipping yesterday's stretching is totally fine because missing it won't wreck your recovery, even if it feels nice to wind down.",
+      "raw": "If you’re starving, add a solid portion of oats to your next meal to top up your muscle glycogen for tomorrow's lift, though rice or potatoes work great too.\n[BREAK]\nFor tomorrow morning, a banana with toast 30–60 minutes out digests fast so it won't sit heavy, but oats are another good option.\n[BREAK]\nSkipping yesterday's stretching is totally fine because missing it won't wreck your recovery, even if it feels nice to wind down.",
       "error": null,
       "action": null,
       "proposal": null,
