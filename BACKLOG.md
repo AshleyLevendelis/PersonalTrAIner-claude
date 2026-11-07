@@ -2,6 +2,45 @@
 
 Newest first. One line each.
 
+- [x] **THE TWO REAL BREACHES FROM THE 7 NOV EXAM: A CIRCUIT CARD THE APP THREW AWAY, AND A SWAP TO KIT SHE LACKS,
+  7 NOV 2026** (Ashley: "fix the two exam breaches"). Both re-measured from the run's own transcripts first.
+  **(1) circuit-is-one-workout.** "just did 5 rounds on the timer, 3 minutes each: skipping rope, press-ups, sit-ups,
+  the bike, then rope again. really hard" got "How many rounds of skipping rope and press-ups and ... and how long was
+  each round?". TRACED: that sentence is the APP's, not the model's. The coach DID call `propose_circuit_log`, with five
+  blocks of one round each (the right reading: each round a different station), and the server's evidence check
+  refused every block because "1" is a number she never typed, then asked her for what she had just given. The exam
+  marked it as the coach offering no card. FIX (mechanical, her 8 Oct ruling A unchanged): the check moved into
+  `message-evidence.ts` (`circuitBlocksStated`, so the gate runs the real rule instead of grepping the handler) and
+  accepts one round per block exactly when EVERY block is one round and there are as many blocks as a round count she
+  wrote next to the word "round" ("5 rounds", "five rounds", "5rounds"; never "15 rounds", never a 5 that counts
+  something else). Anything else still needs its own count, a rest she never gave is still zero, a work time she never
+  gave still refuses. The tool description now names the shape (in words that are not the exam's).
+  **(2) swap-prefers-loaded-peer.** "Swap the walking lunges for something else today" got a card for Step-Ups, which
+  need a box this home gym does not have; nothing in the app checked a coach-chosen replacement against her kit, so on
+  her phone the coach could put in a lift she cannot do. TRACED: the coach chooses from memory; it is sent a pool list
+  (`exercises_that_fit`) but not the swap ranking, and the EXAM's base context did not even carry that list (the
+  fixture had drifted from what the app sends). FIX, one list for both halves (`coach-swap-pick.ts`, the Exercise tab's
+  own `getReplacementCandidates`, her likes included): (a) the coach is sent "SWAP OPTIONS FOR TODAY", the first three
+  options for each of today's exercises, inside the exercise summary (reaches on a frontend push), and told to take the
+  first when nothing is named; (b) the app holds it either way: with nothing named, a pick the list does not hold, or
+  an unloaded pick for a loaded lift while the list leads with a loaded one, becomes the list's first, and the card's
+  reason says so. A replacement SHE names is never touched (her 13 Sep "show everything, warn me"). "Named" ignores
+  the words of the lift being swapped and implement words ("swap the walking lunges" names no reverse lunge).
+  FOUND ON THE WAY: the case's answer was stale. It accepted Bulgarian Split Squats alone, written before the dumbbell
+  pack; the real list for that person now leads Dumbbell Reverse Lunge, Bulgarian Split Squats, Barbell Reverse Lunge,
+  Dumbbell Lateral Lunge, all loaded. The case now accepts exactly that loaded lead, and the gate fails if it drifts
+  from the real list. The exam fixture's kit list and summary are now the real functions' output, held equal.
+  **CSCS review (swap; the circuit changes no prescription):** (1) a swap with nothing named lands on a same-pattern,
+  loaded lift she can actually do, so the single-leg stimulus and its progression survive; before, the card could
+  name kit she lacks. (2) It takes away the coach's freedom only for an off-list or downgraded pick; any loaded option
+  on the list stays its choice (so "no bench today" can still get the second option). (3) Pattern coverage and
+  progression are the swap sheet's own, unchanged. (4) No floor or ceiling moved. (5) In scope.
+  `test:circuit-log` (75 checks; 8 mutations, 7 caught, the 8th an equivalent guard, deleted); 132 derived gates and drivers green, the 2 red being the exam itself (needs her machine) and its freshness (stale by design), `test:coach-swap-pick`
+  (29 checks; 10 mutations, all caught, two only after a check was tightened: one showed "lunges" stemmed to "lung").
+  NOT proven: whether the deployed coach now picks from the list (needs the `chat-gemini` deploy for the tool wording;
+  the list itself reaches on the frontend push) and an exam re-run. The scores are stale by design: the swap case, the
+  fixture and the coach all changed. Still open from that run, NOT touched: the allergen case's "the ingredients on
+  file don't contain nuts" (allergen band, hers), and the injury case's scope (it advised on a disc bulge first).
 - [x] **SETUP IS A CONVERSATION: FOLLOW-UPS FIRST, NOTED, THEN BACK; HER RULING "UP TO 3, THEN BACK", 7 NOV 2026**
   (Ashley: "during the onboarding, I mentioned that I do Muay Thai ... It then went on to the next question without
   even asking any follow-up questions ... it shouldn't be a rigid form ... a real person isn't just going to go on to
