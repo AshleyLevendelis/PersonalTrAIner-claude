@@ -1,7 +1,7 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
 import { blockShape } from '@/lib/timer-engine'
 import { circuitName } from '@/lib/circuit'
-import { textBesideSave } from '@/lib/save-reply'
+import { textBesideSave, contextNoteText } from '@/lib/save-reply'
 import { rpeToStore, effortLabel, cardioReadback, type EffortKey } from '@/lib/cardio-effort'
 import { easeOffQuestion } from '@/lib/cardio-ease-off'
 import ReactMarkdown from 'react-markdown'
@@ -4870,13 +4870,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     }
 
     if (intent.tool === 'record_context_fact') {
-      const displayText = String(args.display_text || '').trim()
       const rawPhrase = String(args.origin_verbatim_quote || '').trim()
-      if (!displayText || !rawPhrase) return { text: '' }
+      // A clinical or judging label is never kept or shown: her own words stand instead (save-reply.ts).
+      const displayText = contextNoteText(String(args.display_text || ''), rawPhrase)
+      if (!rawPhrase || displayText === '“”') return { text: '' }
       const row = await createContextFact({ profileId, source: 'chat', rawPhrase, displayText })
       await onMemoryChanged()
       return {
-        text: `Saved: ${displayText}`,
+        text: 'Thanks for telling me.',
         receipt: {
           kind: 'memory_context_fact_saved',
           title: 'Saved to memory',

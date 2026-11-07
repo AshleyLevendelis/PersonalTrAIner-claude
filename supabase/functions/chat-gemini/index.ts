@@ -1807,7 +1807,7 @@ const toolDeclarations = [
       type: "object",
       properties: {
         origin_verbatim_quote: { type: "string", description: "Exact substring of the user's message." },
-        display_text: { type: "string", description: "A short, clean restatement for the memory screen (e.g. 'Training for a wedding in June — wants extra encouragement')." },
+        display_text: { type: "string", description: "A short note for the memory screen, in plain, kind words, the way they might say it about themselves (e.g. 'Training for a wedding in June — wants extra encouragement', 'Busy few weeks at work'). Never a clinical, diagnostic or judging label about them (no 'disorder', 'pattern', 'restriction', 'compensatory', 'extreme'): they will read it, and the app shows their own words instead of a label like that." },
       },
       required: ["origin_verbatim_quote", "display_text"],
     },

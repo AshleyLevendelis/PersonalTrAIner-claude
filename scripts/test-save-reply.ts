@@ -16,10 +16,13 @@
  *   4. resolveToolReply, driven with a fake model on this exact nudge: the
  *      coach's text beside the call is used, an announcing one is refused and
  *      the round trip asked, and silence falls to the floor, never "".
+ *   5. The note a save leaves: a plain label stays; a clinical or judging one
+ *      (the exam's "Compensatory exercise pattern ... extreme restriction") is
+ *      replaced by HER OWN WORDS, in what is shown and what is kept.
  * Browser half: verify:chat-save-reply.
  */
 import { readFileSync } from 'node:fs'
-import { textBesideSave } from '../src/lib/save-reply'
+import { textBesideSave, contextNoteText } from '../src/lib/save-reply'
 import { resolveToolReply, SAVE_NUDGE, ANNOUNCES_THE_SAVE } from '../supabase/functions/chat-gemini/tool-reply'
 
 let ran = 0, failures = 0
@@ -80,6 +83,24 @@ async function main() {
   legs.length = 0
   const silent = await resolveToolReply({ ...opts, callGemini: model([]), firstParts: [] as never })
   check('a coach that says nothing at all falls to the floor, never an empty reply', silent.reply === 'Thanks for telling me.' && silent.source === 'floor', silent)
+
+  console.log('\n5. The note a save leaves')
+  const EXAM_LABEL = 'Compensatory exercise pattern (90m cardio after overeating) & extreme restriction (600 kcal rest day)'
+  const EXAM_SAID = "I did 90 minutes of cardio after dinner too because I'd overeaten"
+  check("the exam's clinical label is replaced by her own words", contextNoteText(EXAM_LABEL, EXAM_SAID) === `“${EXAM_SAID}”`, contextNoteText(EXAM_LABEL, EXAM_SAID))
+  const verdicts = ['Restrictive eating', 'Binge eating after work', 'Shows signs of low mood', 'Possible eating disorder', 'Extreme dieting', 'Obsessive about calories', 'Pattern of skipping meals', 'Avoidant behaviour around food']
+  check('...and so is every judging label', verdicts.every(v => contextNoteText(v, 'what I said').startsWith('“')), verdicts.filter(v => !contextNoteText(v, 'what I said').startsWith('“')))
+  const kind = ['Training for a wedding in June — wants extra encouragement', 'Having a rough few weeks', 'Busy few weeks at work', 'Likes being pushed hard']
+  check('a plain, kind label stays as the coach wrote it', kind.every(k => contextNoteText(k, 'x') === k), kind.map(k => contextNoteText(k, 'x')))
+  check('no label at all falls back to her words', contextNoteText('', 'new job') === '“new job”')
+  const long = contextNoteText('Extreme', 'word '.repeat(40))
+  check('her words are cut short on a word, with an ellipsis', long.length <= 82 && long.endsWith('…”') && !/wor…/.test(long), long)
+  const ctx = (() => { const a = chat.indexOf("if (intent.tool === 'record_context_fact') {"); const b = a < 0 ? -1 : chat.indexOf("if (intent.tool === 'record_fact')", a); return a >= 0 && b > a ? chat.slice(a, b) : '' })()
+  check('the chat keeps and shows the checked text, never the raw label',
+    /const displayText = contextNoteText\(String\(args\.display_text \|\| ''\), rawPhrase\)/.test(ctx) && /createContextFact\(\{ profileId, source: 'chat', rawPhrase, displayText \}\)/.test(ctx) && /detail: displayText/.test(ctx))
+  check('...and its own line is warm, never "Saved: <label>"', /text: 'Thanks for telling me\.'/.test(ctx) && !/Saved: \$\{/.test(ctx))
+  const decl = (() => { const a = idx.indexOf('name: "record_context_fact"'); return a < 0 ? '' : idx.slice(a, a + 1500) })()
+  check("the coach is told the label is plain, kind words, never clinical", /plain, kind words/.test(decl) && /Never a clinical, diagnostic or judging label/.test(decl))
 
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.log(`save reply: ${failures} check(s) failed`); process.exit(1) }

@@ -24,8 +24,17 @@ Newest first. One line each.
   called for; the day checks and the plan-claim check on it; a floor, "Thanks for telling me.", never empty), and the
   chat shows those words with the save's note beneath (`save-reply.ts`); the app's own question back still wins.
   Decided by the session, not asked: both are defects against rulings she already gave (the 6 Nov "safety wording"
-  and the prompt's own "acknowledge in half a sentence, then carry on"). NAMED, NOT CHANGED, hers: the save note
-  shows the coach's own label for what it kept, which on the disordered-eating turn read clinically; record_fact,
+  and the prompt's own "acknowledge in half a sentence, then carry on"). AND THE SAVE NOTE, on her "fix the save note
+  wording too" (7 Nov): the note under a save showed the coach's own label, which on the disordered-eating turn read
+  "Compensatory exercise pattern ... & extreme restriction (600 kcal rest day)", on her screen and her Profile. The
+  coach is now told the label is plain, kind words, never a clinical, diagnostic or judging one; and the app checks it
+  (`contextNoteText`): a label with a verdict word (disorder, compensatory, restriction, extreme, binge, pattern, low
+  mood ...) is replaced by HER OWN WORDS, quoted, in what is shown AND what is kept (Profile and the coach read the
+  kept text). The app's own line when the coach is silent is "Thanks for telling me.", never "Saved: <label>". The
+  label check is mine (a better source over a weaker rule, her own words can never be a verdict about her); the word
+  list is a judgement, not a measurement. test:save-reply 27 checks (+8, 6 mutations, 6 caught, one only after each
+  judging word got its own case), verify:chat-save-reply 15 (+5, 3 mutations, 3 caught), screenshot read. Still
+  NAMED: record_fact,
   record_goal and set_display_name still answer with the app's own line (they say what changed on her plan). The other
   exam marks that fell (scope 2.81 -> 2.50: the disc-bulge swap card after a refused physio check; asks) are not from
   this pass and are not fixed here. test:voice-pass 43 checks (+11), test:save-reply 19 (new), 16 mutations, 16

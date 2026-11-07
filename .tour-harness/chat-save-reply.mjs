@@ -9,8 +9,9 @@
 //   1. the coach's words are the message and the save keeps its small note,
 //      and the row is written;
 //   2. the app's own "Saved: ..." line is not shown in their place;
-//   3. an older coach that still sends an empty reply leaves the app's line,
-//      so a message is never blank.
+//   3. an older coach that still sends an empty reply leaves the app's own
+//      warm line, so a message is never blank;
+//   4. a clinical or judging label is never shown or kept: her own words are.
 //
 // WHAT THIS CANNOT SEE: the model is stubbed at the fetch boundary, so whether
 // the deployed coach writes a good reply is the exam's (cases ask-cant-face-it
@@ -36,6 +37,9 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
         origin_verbatim_quote: "it's been a rough few weeks", display_text: 'Having a rough few weeks' } } })
       if (/new job/i.test(said)) return reply({ reply: '', memoryIntent: { tool: 'record_context_fact', rawArgs: {
         origin_verbatim_quote: 'started a new job', display_text: 'Started a new job' } } })
+      if (/overeaten/i.test(said)) return reply({ reply: 'Thanks for telling me that, it matters.', memoryIntent: { tool: 'record_context_fact', rawArgs: {
+        origin_verbatim_quote: "I did 90 minutes of cardio after dinner too because I'd overeaten",
+        display_text: 'Compensatory exercise pattern (90m cardio after overeating) & extreme restriction (600 kcal rest day)' } } })
       return reply({ reply: 'Sure.' })
     }
     return realFetch(url, init)
@@ -73,9 +77,19 @@ await shoot('chat-save-reply-spoken')
 
 console.log('\n2. An older coach with an empty reply still leaves a message\n')
 check('2a. she says it', await say('I just started a new job so evenings are hard') === true)
-const t2 = await until(body, t => t.includes('Saved: Started a new job'), 40)
-check('2b. the app\'s own line is the message, never a blank', t2.includes('Saved: Started a new job'), t2.slice(-500))
-check('2c. the row is written', (await contextRows()).includes('Started a new job'), await contextRows())
+const t2 = await until(body, t => /Thanks for telling me\.\s/.test(t.slice(-400)) && t.includes('Started a new job'), 40)
+check('2b. the app\'s own warm line is the message, never a blank and never "Saved: ..."', /Thanks for telling me\./.test(t2.slice(-400)) && !t2.includes('Saved: Started a new job'), t2.slice(-500))
+check('2c. the row is written, and the note names it', (await contextRows()).includes('Started a new job') && t2.includes('Started a new job'), await contextRows())
 await shoot('chat-save-reply-empty')
+
+console.log('\n3. A clinical label never reaches her screen or her Profile\n')
+check('3a. she says it', await say("I did 90 minutes of cardio after dinner too because I'd overeaten") === true)
+const t3 = await until(body, t => t.includes('it matters') && t.includes('Saved to memory') && t.lastIndexOf('overeaten') > t.lastIndexOf('it matters'), 60)
+check('3b. the coach answers', t3.includes('Thanks for telling me that, it matters.'), t3.slice(-500))
+check('3c. the clinical label is nowhere on screen', !/Compensatory|extreme restriction|pattern/i.test(t3), t3.slice(-500))
+check('3d. the note shows her own words instead', t3.slice(t3.lastIndexOf('it matters')).includes("“I did 90 minutes of cardio after dinner too because I'd overeaten”"), t3.slice(-400))
+const rows3 = await contextRows()
+check('3e. the row keeps her own words, not the label (what Profile and the coach read)', rows3.includes("“I did 90 minutes of cardio after dinner too because I'd overeaten”") && !rows3.some(r => /Compensatory/i.test(r)), rows3)
+await shoot('chat-save-reply-clinical')
 
 await finish('chat save reply: the coach answers beside a save, and a message is never blank')
