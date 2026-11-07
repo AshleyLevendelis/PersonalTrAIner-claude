@@ -113,6 +113,18 @@ await open('', 'exercise')
 const t10b = await ev(`(() => { const m = document.querySelector('[data-exercise-strip] [aria-current="date"] [data-selected-dot]'); return m?.getAttribute('data-selected-dot') ?? null })()`)
 check('T10b. an ordinary training day on screen keeps its dot (the fixture binds)', t10b === 'plain', t10b)
 
+console.log('\nT8. Home\'s "Start <session>" starts it, so Exercise does not ask again\n')
+await open('', 'dashboard')
+const t8tap = await ev(`(() => { const b = document.querySelector('[data-home-cta] button'); if (!b) return null; b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2, text: b.textContent.trim() } })()`)
+if (t8tap) { await pointAt(t8tap); await wait(1500) }
+const t8 = await ev(`(() => ({
+  hash: location.hash,
+  start: !!document.querySelector('[data-testid="hero-start"]'),
+  finish: [...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Finish session'),
+}))()`)
+check('T8a. Home offers Start on a due day', !!t8tap && /^Start /.test(t8tap.text), t8tap)
+check('T8b. one tap opens Exercise with the session already running: Finish is there, Start is not', /exercise/.test(t8.hash) && t8.finish === true && t8.start === false, t8)
+
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)
 

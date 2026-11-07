@@ -545,12 +545,17 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         onSummary={card ? () => setSummaryOpen(true) : undefined}
         cta={showCta && (
           // THE START BUTTON: inside the card it starts. Gone on a rest day, a moved day, an unknown plan and once done.
+          // IT STARTS (whole-app QA walk, 7 Nov 2026): it only opened Exercise, where she tapped Start a second time.
+          // Now "Start" starts the session and opens it; "Continue" opens the one already running.
           <div className="mt-3.5" data-home-cta>
             <Button
               size="cta"
               className="glow-bloom-once glow-mint-box h-[54px] w-full gap-2 rounded-[16px] text-base font-bold"
               style={PRIMARY_CTA_STYLE}
-              onClick={() => { window.location.hash = tabHash('exercise') }}
+              onClick={() => {
+                if (status === 'not_started' && activeSession.status === 'idle') activeSession.startSession()
+                window.location.hash = tabHash('exercise')
+              }}
             >
               <Play aria-hidden className="size-4" fill="currentColor" strokeWidth={0} />
               {status === 'not_started' ? (data.session.focus ? `Start ${data.session.focus}` : 'Start session') : 'Continue session'}
