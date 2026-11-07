@@ -19,10 +19,10 @@
       "macros"
     ]
   },
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "c234cd0c1a76fd15",
   "caseStamp": "daaccd97bc8cb3dc",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T07:38:34.115Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -82,15 +82,15 @@
         "kind": "propose_goal_change",
         "args": {
           "goal": "hypertrophy",
-          "reason": "Switching goal from fat loss to muscle growth"
+          "reason": "Switching goal from fat loss to muscle growth."
         }
       },
       "saved": null
     },
     {
       "user": "does that change what I'm eating as well, or just the training?",
-      "reply": "It changes both! \n\nYour training will shift to focus on building size — slightly higher reps and different phases — but the biggest change is actually the food. To build muscle, your daily targets will move from a calorie deficit into a surplus so your body has the extra fuel it needs to grow. \n\nYour saved meals won't disappear, but the app will adjust the target numbers you're aiming for each day. Once you tap confirm on that card, your new targets will be set!",
-      "raw": "It changes both! \n\nYour training will shift to focus on building size — slightly higher reps and different phases — but the biggest change is actually the food. To build muscle, your daily targets will move from a calorie deficit into a surplus so your body has the extra fuel it needs to grow. \n\nYour saved meals won't disappear, but the app will adjust the target numbers you're aiming for each day. Once you tap confirm on that card, your new targets will be set!",
+      "reply": "Yes, it changes both! \n\nBuilding muscle needs a small calorie surplus to fuel new tissue, so your target moves up from a deficit while protein stays high for recovery. [BREAK]\n\nYour workouts will also shift to focus on progressive overload and volume for hypertrophy. Tap Confirm on your screen to update your plan automatically! 🏋️‍♂️",
+      "raw": "Yes, it changes both! \n\nBuilding muscle needs a small calorie surplus to fuel new tissue, so your target moves up from a deficit while protein stays high for recovery. [BREAK]\n\nYour workouts will also shift to focus on progressive overload and volume for hypertrophy. Tap Confirm on your screen to update your plan automatically! 🏋️‍♂️",
       "error": null,
       "action": null,
       "proposal": null,

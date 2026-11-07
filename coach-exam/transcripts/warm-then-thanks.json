@@ -2,10 +2,10 @@
   "case": "warm-then-thanks",
   "why": "Ashley, 6 Nov 2026: the advice turn carries a short why tied to today's session ('A why on every answer'); the sign-off turn is warm and short, with no question tacked on ('Warm coach', and her 24 Sep 'a question only when the answer matters').",
   "checks": {},
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "c234cd0c1a76fd15",
   "caseStamp": "3a82c6ccf19c15ef",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T07:38:34.115Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -57,8 +57,8 @@
   "turns": [
     {
       "user": "what should I eat about an hour before the gym today?",
-      "reply": "Have something light and easy to digest, with a focus on fast-acting carbs and a little protein — like a banana with a small spoonful of peanut butter, or a slice of toast with some honey. \n\nAn hour before training, your body just needs quick fuel for your muscles to draw on during your session without sitting heavily in your stomach. \n\nWant me to add something like that to your meal plan for today, or were you just looking for ideas?",
-      "raw": "Have something light and easy to digest, with a focus on fast-acting carbs and a little protein — like a banana with a small spoonful of peanut butter, or a slice of toast with some honey. \n\nAn hour before training, your body just needs quick fuel for your muscles to draw on during your session without sitting heavily in your stomach. \n\nWant me to add something like that to your meal plan for today, or were you just looking for ideas?\n[QUICK_REPLIES: \"Add to my plan\" | \"Just ideas, thanks\"]",
+      "reply": "Since you've got today's Lower Body session coming up, go with a slice of toast with a thin spread of honey.\n\nThat extra carb boost gives your muscles ready-to-use fuel for your squats and RDLs without sitting heavy while you lift. I have a couple of other great options if you prefer something else! 🏋️",
+      "raw": "Since you've got today's Lower Body session coming up, go with a slice of toast with a thin spread of honey.\n[BREAK]\nThat extra carb boost gives your muscles ready-to-use fuel for your squats and RDLs without sitting heavy while you lift. I have a couple of other great options if you prefer something else! 🏋️\n\n[QUICK_REPLIES: \"Banana & Greek yoghurt\" | \"Toast & honey\" | \"No thanks, I'm good\"]",
       "error": null,
       "action": null,
       "proposal": null,
@@ -66,8 +66,8 @@
     },
     {
       "user": "perfect, thank you",
-      "reply": "Any time! Good luck with your lower body session today — go crush those squats! 💪",
-      "raw": "Any time! Good luck with your lower body session today — go crush those squats! 💪",
+      "reply": "Anytime! Go crush those squats and RDLs today 💪 Have a great session!",
+      "raw": "Anytime! Go crush those squats and RDLs today 💪 Have a great session!",
       "error": null,
       "action": null,
       "proposal": null,

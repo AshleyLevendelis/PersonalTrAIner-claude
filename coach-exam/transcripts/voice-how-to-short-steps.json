@@ -2,10 +2,10 @@
   "case": "voice-how-to-short-steps",
   "why": "Ashley, 24 Sep 2026, after reading four paragraphs on how to deadlift: a how-to is up to three short steps, with the full guide one tap away (\"short steps\"). The first turn should be three lines or fewer plus the offer; the second, asked for, may be longer but still short lines, not paragraphs.",
   "checks": {},
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "c234cd0c1a76fd15",
   "caseStamp": "4da5ee362bce2310",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T07:38:34.115Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -57,8 +57,8 @@
   "turns": [
     {
       "user": "how do I do a deadlift",
-      "reply": "Here are the key cues to focus on:\n\n1. Set your stance — feet hip-width apart, with the bar sitting directly over the middle of your foot.\n2. Brace before you lift — take a deep breath into your belly, wedge your hips down, and pull the slack out of the bar until it feels heavy in your hands.\n3. Push the floor away — drive through your mid-foot to stand up, keeping the bar close to your shins the whole way up.\n\nThat's the core of it — keeping the bar over your mid-foot is what protects your lower back.\n\nWant the full form guide, or does that cover what you needed?",
-      "raw": "Here are the key cues to focus on:\n\n1. Set your stance — feet hip-width apart, with the bar sitting directly over the middle of your foot.\n2. Brace before you lift — take a deep breath into your belly, wedge your hips down, and pull the slack out of the bar until it feels heavy in your hands.\n3. Push the floor away — drive through your mid-foot to stand up, keeping the bar close to your shins the whole way up.\n\nThat's the core of it — keeping the bar over your mid-foot is what protects your lower back.\n\nWant the full form guide, or does that cover what you needed?\n[QUICK_REPLIES: \"Full form guide\" | \"Got it\"]",
+      "reply": "Here are the 3 main steps:\n1. Feet hip-width, bar over mid-foot. Grip outside your knees.\n2. Shins touch bar, chest up, squeeze armpits like crushing oranges to set your lats.\n3. Deep breath, brace hard, and push the floor away.\n\n\n\nFocus on pushing the floor away instead of pulling with your back to protect your spine and load your glutes and hamstrings.",
+      "raw": "Here are the 3 main steps:\n1. Feet hip-width, bar over mid-foot. Grip outside your knees.\n2. Shins touch bar, chest up, squeeze armpits like crushing oranges to set your lats.\n3. Deep breath, brace hard, and push the floor away.\n\n[BREAK]\n\nFocus on pushing the floor away instead of pulling with your back to protect your spine and load your glutes and hamstrings.\n\n[QUICK_REPLIES: \"Full form guide\" | \"Got it\"]",
       "error": null,
       "action": null,
       "proposal": null,
@@ -66,8 +66,8 @@
     },
     {
       "user": "Full form guide",
-      "reply": "Here is the complete step-by-step breakdown:\n\n1. Setup: Stand with feet hip-width apart, shins about an inch from the bar, with the bar directly over your mid-foot.\n2. Grip: Hinge at your hips, bend your knees slightly, and grip the bar just outside your legs with double-overhand or mixed grip.\n3. Lat engagement: Think about squeezing a orange under each armpit to turn your upper back on and lock your spine in place.\n4. The wedge: Pull your chest up, drop your hips into position, and take the slack out of the bar until you hear a click.\n5. The pull: Push the floor away with your legs rather than pulling with your lower back, keeping the bar touching your legs all the way up.\n6. Lockout: Stand tall by squeezing your glutes at the top — don't lean back or hyperextend your lower back.\n7. Lowering: Hinge at the hips first to send the bar straight down past your knees, then bend at the knees to set it on the floor.\n\nFocusing on pushing the floor away turns it into a leg and hip movement, which keeps your back completely safe.\n\nHow is your lower back feeling when you deadlift at the moment?",
-      "raw": "Here is the complete step-by-step breakdown:\n\n1. Setup: Stand with feet hip-width apart, shins about an inch from the bar, with the bar directly over your mid-foot.\n2. Grip: Hinge at your hips, bend your knees slightly, and grip the bar just outside your legs with double-overhand or mixed grip.\n3. Lat engagement: Think about squeezing a orange under each armpit to turn your upper back on and lock your spine in place.\n4. The wedge: Pull your chest up, drop your hips into position, and take the slack out of the bar until you hear a click.\n5. The pull: Push the floor away with your legs rather than pulling with your lower back, keeping the bar touching your legs all the way up.\n6. Lockout: Stand tall by squeezing your glutes at the top — don't lean back or hyperextend your lower back.\n7. Lowering: Hinge at the hips first to send the bar straight down past your knees, then bend at the knees to set it on the floor.\n\nFocusing on pushing the floor away turns it into a leg and hip movement, which keeps your back completely safe.\n\nHow is your lower back feeling when you deadlift at the moment?\n[QUICK_REPLIES: \"Feels great\" | \"A bit sore\" | \"Haven't tried yet\"]",
+      "reply": "Here is your complete guide to the deadlift:\n\n1. Setup — feet hip-width under the bar, bar over mid-foot.\n2. Grip — bend at the hips and take a double-overhand grip outside your knees.\n3. Position — bring your shins to the bar, lift your chest, and pull your shoulder blades down.\n4. Tension — pull the slack out of the bar until you hear a click before you lift.\n5. Execution — brace your core, push the floor away with your legs, and stand up tall.\n6. Lockout — squeeze your glutes at the top without leaning backward.\n7. Lowering — hinge at the hips first, then bend your knees once the bar clears them.\n\n\n\nThe key is making every rep a sequence of pushing the floor away, not pulling with your lower back.",
+      "raw": "Here is your complete guide to the deadlift:\n\n1. Setup — feet hip-width under the bar, bar over mid-foot.\n2. Grip — bend at the hips and take a double-overhand grip outside your knees.\n3. Position — bring your shins to the bar, lift your chest, and pull your shoulder blades down.\n4. Tension — pull the slack out of the bar until you hear a click before you lift.\n5. Execution — brace your core, push the floor away with your legs, and stand up tall.\n6. Lockout — squeeze your glutes at the top without leaning backward.\n7. Lowering — hinge at the hips first, then bend your knees once the bar clears them.\n\n[BREAK]\n\nThe key is making every rep a sequence of pushing the floor away, not pulling with your lower back.\n\n[QUICK_REPLIES: \"Where should I feel it?\" | \"Got it\"]",
       "error": null,
       "action": null,
       "proposal": null,

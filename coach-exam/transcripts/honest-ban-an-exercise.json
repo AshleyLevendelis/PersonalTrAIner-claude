@@ -4,10 +4,10 @@
   "checks": {
     "expectsProposal": true
   },
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "c234cd0c1a76fd15",
   "caseStamp": "b50cf44c9241e317",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T07:38:34.115Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -66,16 +66,16 @@
       "proposal": {
         "kind": "propose_exercise_ban",
         "args": {
-          "item": "Burpees",
-          "reason": "User explicitly hates burpees and requested permanent exclusion"
+          "item": "burpees",
+          "reason": "User preference — dislikes movement"
         }
       },
       "saved": null
     },
     {
       "user": "so they're gone for good?",
-      "reply": "They'll be gone for good once you tap Confirm on that card right there on your screen. \n\nOnce you tap it, the app removes burpees from every week of your plan and makes sure they never turn up again.",
-      "raw": "They'll be gone for good once you tap Confirm on that card right there on your screen. \n\nOnce you tap it, the app removes burpees from every week of your plan and makes sure they never turn up again.",
+      "reply": "They will be as soon as you tap Confirm on that card on your screen. \n\nOnce you confirm, the app takes burpees out of every session across your entire plan and won't schedule them in future blocks either.",
+      "raw": "They will be as soon as you tap Confirm on that card on your screen. \n\nOnce you confirm, the app takes burpees out of every session across your entire plan and won't schedule them in future blocks either.",
       "error": null,
       "action": null,
       "proposal": null,
