@@ -14,6 +14,7 @@
 // which ONE to show.
 // ---------------------------------------------------------------------------
 
+import { waterPaceSentence } from './macro-shortfall'
 import { seededRngFromKey } from './seeded-random'
 import { recordPhrase, type RecordFact } from './coach-voice'
 import { expectedByNow, WAKING_DAY, WAKING_START_HOUR, WAKING_END_HOUR, PACE_KEEPING_UP_FRACTION } from './pace'
@@ -150,9 +151,7 @@ const RULES: Rule[] = [
       // zero on the person's first day, which is what keeps this quiet then.
       const expected = expectedByNow(waterTargetMl, { hour: hourOfDay, firstDay: ctx.firstDay === true }, WAKING_DAY)
       if (expected <= 0 || waterMl >= expected * PACE_KEEPING_UP_FRACTION) return null
-      const behind = Math.round((expected - waterMl) / 50) * 50
-      if (behind < 250) return null
-      return `You're about ${behind}ml behind on water for this time of day.`
+      return waterPaceSentence(expected, waterMl)
     },
   },
   {

@@ -143,8 +143,9 @@ console.log('\n2. The shortfall line only speaks when there is something to say'
   const eveningTwoDue = macroShortfallLine({ ...base, clock: paceClock(new Date('2026-03-11T18:00:00'), ['2026-02-01T09:00:00']),
     eaten: { protein: 40, carbs: 60, fat: 18 }, meals: four([true, false, false, false]) })
   check('...while speaking still waits for three DUE (18:00, breakfast logged: two due, no logging line)', eveningTwoDue !== loggingGapLine(3) && eveningTwoDue !== loggingGapLine(2), eveningTwoDue)
+  // RE-ANCHORED 7 Nov 2026: behind on water is said as Home's pace sentence.
   check('...and water alone never becomes a logging line',
-    macroShortfallLine({ ...base, eaten: { protein: 180, carbs: 240, fat: 70 }, waterMl: 0, meals: four([false, false, false, false]) }) === 'Water is behind — 2000ml to go.')
+    /^You're about \d+ml behind on water for this time of day\.$/.test(macroShortfallLine({ ...base, eaten: { protein: 180, carbs: 240, fat: 70 }, waterMl: 0, meals: four([false, false, false, false]) }) ?? ''))
 
   // The covering meal.
   const withDinner = macroShortfallLine({
@@ -174,7 +175,7 @@ console.log('\n2. The shortfall line only speaks when there is something to say'
     ...base, eaten: { protein: 180, carbs: 240, fat: 70 }, waterMl: 200,
     meals: [meal('Dinner', false, 60)],
   })
-  check('a water gap is spoken', /^Water is behind — 1800ml to go\.$/.test(water ?? ''), water)
+  check('a water gap is spoken, as the gap for the time of day', /^You're about \d+ml behind on water for this time of day\.$/.test(water ?? ''), water)
   check('...and never names a meal', !/dinner/i.test(water ?? ''), water)
 
   // The component must actually use it, or the whole section tests a module

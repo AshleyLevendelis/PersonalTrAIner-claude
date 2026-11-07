@@ -159,10 +159,21 @@ console.log('\n2. The Nutrition line: the same day at 07:00, 12:00 and 20:00')
   // (d) Water.
   const water = (hhmm: string, ml: number) => line(day(['breakfast', 'lunch', 'dinner', 'snack'], hhmm, { waterMl: ml }))
   check('no water at 08:30: silent (this was "Water is behind — 2000ml to go")', water('08:30', 0) === null, water('08:30', 0))
-  check('no water at 12:00: behind', water('12:00', 0) === 'Water is behind — 2000ml to go.', water('12:00', 0))
+  // RE-ANCHORED 7 Nov 2026: behind on water is said as the PACE gap, in Home's own sentence (one number for one word;
+  // it said the day's remainder here and the pace gap on Home). 571 due by noon, nothing drunk: about 550 behind.
+  check('no water at 12:00: behind, by the gap for the time of day', water('12:00', 0) === "You're about 550ml behind on water for this time of day.", water('12:00', 0))
   check('400ml at 12:00 is keeping up with 571 due: silent', water('12:00', 400) === null, water('12:00', 400))
-  check('300ml at 12:00 is not (about half of what was due): behind', water('12:00', 300) === 'Water is behind — 1700ml to go.', water('12:00', 300))
-  check('400ml at 20:00 is not: behind', water('20:00', 400) === 'Water is behind — 1600ml to go.', water('20:00', 400))
+  check('300ml at 12:00 is not (about half of what was due): behind', water('12:00', 300) === "You're about 250ml behind on water for this time of day.", water('12:00', 300))
+  check('400ml at 20:00 is not: behind', water('20:00', 400) === "You're about 1300ml behind on water for this time of day.", water('20:00', 400))
+  // ONE SENTENCE ON EVERY SCREEN: Home's coach tip, asked the same question, says the same words.
+  {
+    const { eligibleCoachTips } = await import('../src/lib/coach-tips')
+    void eligibleCoachTips
+    const { waterPaceSentence } = await import('../src/lib/macro-shortfall')
+    const tipsSrc = readFileSync(join(ROOT, 'src/lib/coach-tips.ts'), 'utf8')
+    check("Home's water tip speaks through the same sentence", /return waterPaceSentence\(expected, waterMl\)/.test(tipsSrc) && !/ml behind on water/.test(tipsSrc.replace(/\/\/.*$/gm, '')))
+    check('...which says nothing under 250ml', waterPaceSentence(600, 400) === null && waterPaceSentence(600, 340) !== null)
+  }
 
   // (e) No meal plan for today: thirds, by the same hours.
   const noPlan = (hhmm: string) => line({ targets: T, eaten: { protein: 0, carbs: 0, fat: 0 }, waterTargetMl: 2000, waterMl: 2000, meals: [], clock: clockAt(hhmm) })

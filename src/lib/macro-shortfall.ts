@@ -80,6 +80,17 @@ export function loggingGapLine(n: number): string {
   return `${n} of today's meals still to log, so these numbers are only what's logged so far.`
 }
 
+/**
+ * Behind on water, in ONE sentence and ONE number for every screen (whole-app QA walk, 7 Nov 2026): Nutrition said
+ * "Water is behind — 1,500ml to go" (the day's remainder) while Home said "about 600ml behind for this time of day"
+ * (the pace gap), two numbers for one word. The gap is the pace one, rounded to 50ml, and under 250ml is not said.
+ */
+export function waterPaceSentence(expectedMl: number, actualMl: number): string | null {
+  const behind = Math.round((expectedMl - actualMl) / 50) * 50
+  if (!(behind >= 250)) return null
+  return `You're about ${behind}ml behind on water for this time of day.`
+}
+
 export function macroShortfallLine(input: ShortfallInput): string | null {
   const { targets, eaten, waterTargetMl, waterMl, meals, clock } = input
   // THE FIRST DAY IS QUIET, and there is no line here that makes it so:
@@ -158,7 +169,7 @@ export function macroShortfallLine(input: ShortfallInput): string | null {
   // Water has no planned meal behind it (the app plans food, not drinks), so
   // that gap always gets the bare line rather than a meal that happens to
   // contain some liquid.
-  if (worst.key === 'water') return bare
+  if (worst.key === 'water') return isBehind ? waterPaceSentence(worst.expected, worst.actual) : bare
 
   const macroKey = worst.key
   const covering = unlogged

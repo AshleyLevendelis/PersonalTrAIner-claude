@@ -44,6 +44,12 @@ Newest first. One line each.
   logged gets two messages instead of three, because the meal nudge used to go at 9:05pm, three hours after the 6pm
   one; Lots still fits five (8am, 11am, 2pm, 5pm, 8pm). `test:coach-moments` and `test:reach-out` re-anchored
   (2 mutations, one per copy, both caught). The phone half needs the `coach-reach-out` deploy.
+  (N11) FIXED, the water half: Nutrition said "Water is behind — 1500ml to go" (the day's remainder) while Home said
+  "You're about 600ml behind on water for this time of day" (the pace gap): one word, two numbers. Both now say
+  Home's sentence through one function, with the pace gap, and neither speaks under 250ml. No new wording.
+  `test:pace-clock` and `test:nutrition-layout` re-anchored (+2 checks; 2 mutations caught). NOT changed, named: the
+  protein line names the unlogged meal holding the most protein (lunch at noon) rather than the overdue breakfast;
+  both readings are defensible and it says "still to log", so it is left.
 - [x] **WHOLE-APP QA WALK, TRAINING: EIGHT DEFECTS FOUND AND FIXED, 7 NOV 2026** (Ashley: "I want you to test and fix",
   then "Keep testing and keep fixing"). Five testers walked the app at phone size against the browser harness; each
   finding was re-measured on a real screen before it was fixed. Found by me, none reported by her. Each fix has its
