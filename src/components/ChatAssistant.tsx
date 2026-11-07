@@ -152,9 +152,11 @@ import { cleanReplyText, applyMessageBreaks, ACTION_TAG_RE, QUICK_REPLIES_RE } f
 import { rowToMessage, addServerMessages } from '@/lib/chat-history-merge'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
-  rememberNudge, rememberWithoutSpeaking, NUDGE_MIN_GAP_MS,
+  rememberNudge, rememberWithoutSpeaking, pickUnprompted, keysSaidByMarkers, helloKey,
   type NudgeInput, type NudgeStore,
 } from '@/lib/coach-nudge'
+import { momentsToRaise, dailyCap, type NotificationSettings, type MomentFacts } from '@/lib/coach-moments'
+import { loadSwitches } from '@/lib/coach-reach-out'
 
 const TRAILING_BRACKET_RE = /\[(?:ACTION|QUICK_REPLIES|BREAK)[^\]]*$/i
 const PAGE_SIZE = 20
@@ -1349,6 +1351,57 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const nudgeInputRef = useRef(nudgeInput)
   nudgeInputRef.current = nudgeInput
 
+  // HER REMINDER SETTINGS (Profile → Reminders): the frequency caps every unprompted message of the day, and a
+  // message she switched off there is not said in the chat either. Read again when she comes back to the app.
+  const [reminderSettings, setReminderSettings] = useState<NotificationSettings>({})
+  // THE CLOCK MOVES ON WHILE THE APP SITS OPEN: an evening moment is checked again every ten minutes and on return.
+  const [clockTick, setClockTick] = useState(0)
+  useEffect(() => {
+    const bump = () => { if (document.visibilityState === 'visible') setClockTick(t => t + 1) }
+    const timer = setInterval(bump, 10 * 60 * 1000)
+    document.addEventListener('visibilitychange', bump)
+    return () => { clearInterval(timer); document.removeEventListener('visibilitychange', bump) }
+  }, [])
+  useEffect(() => {
+    if (!profile.id) return
+    let cancelled = false
+    loadSwitches(profile.id).then(r => { if (!cancelled) setReminderSettings(r.switches) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [profile.id, clockTick])
+  // WHETHER SHE LOGS MEALS AT ALL (anything in the fortnight before today), the phone's own test: the evening
+  // "nothing logged" line is never said to somebody who has never logged a meal.
+  const [logsMeals, setLogsMeals] = useState(false)
+  useEffect(() => {
+    if (!profile.id) return
+    let cancelled = false
+    const today = activeSession.date
+    void supabase.from('meal_events').select('date').eq('profile_id', profile.id)
+      .lt('date', today).gte('date', addDays(today, -14)).is('voided_at', null).limit(1)
+      .then(({ data }) => { if (!cancelled) setLogsMeals((data ?? []).length > 0) })
+    return () => { cancelled = true }
+  }, [profile.id, activeSession.date])
+  // THE PHONE'S MOMENT FACTS, from what this screen already holds, so a moment reads the same in either place.
+  // Events the chat raises itself (the feel question, a missed day, today's session) are its own; the block review
+  // and the raise-the-weights offer have their own cards; a quiet week is the opener's welcome back.
+  const momentFacts: MomentFacts | null = proactiveData && planKnown ? {
+    localHour: getAppNow(profile.id).getHours(),
+    awaitingFeel: false,
+    plannedToday: !!todayPlan && !todayMovedTo,
+    loggedToday: nudgeInput.todayLogged,
+    missedYesterday: false,
+    daysSinceAnyLog: null,
+    streakDays: proactiveData.streak ?? 0,
+    blockJustEnded: false,
+    beatTargetPending: false,
+    mealsAccountedToday: proactiveData.mealsAccountedToday ?? 0,
+    logsMeals,
+    proteinEatenToday: proactiveData.hasNutritionTargets ? proactiveData.proteinEaten : 0,
+    proteinTargetG: proactiveData.hasNutritionTargets ? proactiveData.proteinTarget : 0,
+    name: profile.display_name || null,
+  } : null
+  const momentFactsInputRef = useRef(momentFacts)
+  momentFactsInputRef.current = momentFacts
+
   const nudgeStoreRef = useRef<NudgeStore | null>(null)
   const nudgeStore = (): NudgeStore => {
     if (nudgeStoreRef.current == null) {
@@ -1427,18 +1480,49 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (messages.some(m => m.pendingAction?.status === 'pending')) return
     if (messages[messages.length - 1]?.clarification) return
 
-    const now = Date.now()
-    if (now - nudgeStore().lastAt < NUDGE_MIN_GAP_MS) return
-    const nudge = pickNudge(nudgeInputRef.current, nudgeStore().said)
-    if (!nudge) return
+    // HELLO + MORE MOMENTS (her ruling 7 Nov 2026): one decision over the day's events, the daily hello and the
+    // phone's time-of-day moments, capped by her Light / Normal / Lots setting. Every unprompted message is a chat
+    // row carrying the reminder marker, the server's included, so today's rows are the day's count.
+    const now = getAppNow(profile.id).getTime()
+    const today = nudgeInputRef.current.today
+    const unprompted = messages.filter(m => m.role === 'assistant' && m.reminder && m.created_at
+      && getLocalDateString(new Date(m.created_at)) === today)
+    const momentsSaidToday = unprompted.map(m => m.reminder!.moment)
+    const lastRowAt = unprompted.reduce((t, m) => Math.max(t, new Date(m.created_at!).getTime()), 0)
+    const keys = nudgeKeys(nudgeInputRef.current)
+    const said = [...nudgeStore().said, ...keysSaidByMarkers(keys, momentsSaidToday)]
+    const facts = momentFactsInputRef.current
+    const pick = pickUnprompted({
+      now, today,
+      cap: dailyCap(reminderSettings.frequency),
+      unpromptedToday: unprompted.length,
+      lastUnpromptedAt: Math.max(nudgeStore().lastAt, lastRowAt),
+      momentsSaidToday, said,
+      event: pickNudge(nudgeInputRef.current, said),
+      greeting: greetName(),
+      hello: () => {
+        const opener = composeOpener()
+        return { text: `${greetName()} — ${opener.text}`, chips: opener.chips, kind: opener.kind }
+      },
+      moments: facts ? momentsToRaise(facts, reminderSettings) : [],
+    })
+    if (!pick) return
 
     nudgeInFlightRef.current = true
     const profileId = profile.id
     void (async () => {
       try {
+        // THE HELLO IN THE COACH'S OWN WORDS when its server passes them (her 6 Nov "Coach writes, app checks"),
+        // else the app's fixed sentence. Events and moments keep their fixed words.
+        let text = pick.text
+        if (pick.fromOpener) {
+          const chips = pick.chips.length > 0 ? pick.chips : null
+          text = (await askCoachOpener(pick.text, chips ? openerQuestion(pick.text) : null, !!chips)) ?? pick.text
+        }
+        const marker = { source: 'reminder', moment: pick.moment, shortcut: pick.shortcut }
         const { data, error } = await supabase
           .from('chat_messages')
-          .insert({ profile_id: profileId, role: 'assistant', content: nudge.text, status: 'complete' })
+          .insert({ profile_id: profileId, role: 'assistant', content: text, status: 'complete', action_data: marker })
           .select('id')
           .maybeSingle()
         if (error || !data?.id) {
@@ -1451,14 +1535,21 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           writeNudgeStore({ ...nudgeStore(), lastAt: now })
           return
         }
-        writeNudgeStore(rememberNudge(nudgeStore(), nudge.keys, now))
+        let store = rememberNudge(nudgeStore(), pick.keys, now)
+        if (pick.fromOpener && pick.openerKind) {
+          // The hello IS the opener: advance its rotation and burn what it spoke for, as the first bubble does.
+          rememberOrdinaryKind(profileId, pick.openerKind as Opener['kind'])
+          store = rememberWithoutSpeaking(store, keysCoveredByOpener(pick.openerKind, keys, pick.openerKind === 'noticed'))
+        }
+        writeNudgeStore(store)
         setMessages(prev => [...prev, {
           id: data.id as string,
           role: 'assistant',
-          content: nudge.text,
+          content: text,
           status: 'complete',
-          created_at: new Date().toISOString(),
-          quickReplies: nudge.chips.length > 0 ? nudge.chips : undefined,
+          created_at: new Date(now).toISOString(),
+          reminder: { moment: pick.moment, shortcut: pick.shortcut },
+          quickReplies: pick.chips.length > 0 ? pick.chips : undefined,
         }])
         setQuickRepliesDismissed(false)
       } finally {
@@ -1466,7 +1557,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       }
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.id, historyLoaded, isFirstEverChat, isLoading, proactiveData, feelContext, trainingWeek.loading, planKnown, messages, seenAttention])
+  }, [profile.id, historyLoaded, isFirstEverChat, isLoading, proactiveData, feelContext, trainingWeek.loading, planKnown, messages, seenAttention, clockTick, reminderSettings, logsMeals])
 
   // One-shot finalization of the synchronous fallback greeting once we know
   // (a) whether this is a genuinely first-ever conversation (no prior
@@ -1554,9 +1645,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // it again the moment she replies. Burnt WITHOUT starting the quiet
       // period: she opened the chat herself, so this bubble is not an
       // interruption and must not delay one that would be.
+      // And it is today's hello (her 7 Nov "Hello + more moments"): no second greeting today.
       writeNudgeStore(rememberWithoutSpeaking(
         nudgeStore(),
-        keysCoveredByOpener(opener.kind, nudgeKeys(nudgeInputRef.current), opener.kind === 'noticed'),
+        [...keysCoveredByOpener(opener.kind, nudgeKeys(nudgeInputRef.current), opener.kind === 'noticed'), helloKey(nudgeInputRef.current.today)],
       ))
     }
 
@@ -1628,6 +1720,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       setHistoryLoaded(true)
     } catch (err) {
       console.error('Failed to load chat history:', err)
+      // A FAILED READ IS NOT A FIRST CHAT, and left unknown it silenced the coach for the whole visit: every
+      // unprompted message waits on knowing. Read as returning; the opener and the hello still speak.
+      setIsFirstEverChat(prev => prev ?? false)
       setHistoryLoaded(true)
     }
   }

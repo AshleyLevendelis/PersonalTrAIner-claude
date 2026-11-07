@@ -16,7 +16,7 @@
  */
 
 import {
-  runReachOut, factsFor, finishedWhen, isPlanned, mayNotify, dayAllows, localParts, weekdayOf, addDays, COACH_SENDER,
+  runReachOut, factsFor, finishedWhen, isPlanned, mayNotify, dayAllows, localParts, weekdayOf, addDays, COACH_SENDER, withChatToday,
   type ReachOutDeps, type PushSubscriptionRow, type MomentFactsRow, type LiveFacts, type SentRecord,
 } from '../supabase/functions/_shared/reach-out'
 import * as server from '../supabase/functions/_shared/coach-moments'
@@ -267,6 +267,46 @@ async function main() {
     check('Lots: up to five on a day with that much to say, where Normal stops at three',
       lots.length === 5 && normalBusy.length === 3, { lots, normalBusy })
     check('...every one of them at least three hours apart, inside 8am-9pm', lotsGaps.slice(1).every((h, i) => h - lotsGaps[i] >= 3), lots)
+  }
+
+  console.log('\n5c. The chat\'s own messages today count, and are not repeated (her ruling 7 Nov 2026, "Hello + more moments")')
+  {
+    // The app says hello and the same moments while she is in it, each a chat row with the reminder marker.
+    const me: Person = { sub: [sub('c1', 'chatty')], row: { ...MWF, protein_target_g: 160 }, live: { ...NONE, mealLoggedRecently: true, mealsAccountedToday: 0 } }
+    const AT = new Date('2026-09-23T18:05:00Z') // 7:05pm in London, a training day, nothing logged or eaten
+    const runWith = async (inChat: { moment: string; sent_at: string }[] | null, frequency?: string) => {
+      const got: string[] = []
+      const d: ReachOutDeps = {
+        now: AT,
+        listSubscriptions: async () => me.sub,
+        loadFactsRow: async () => me.row,
+        loadSettings: async () => ({ settings: frequency ? { frequency } as never : {}, name: 'Ashley' }),
+        loadLive: async () => me.live,
+        loadRecentSends: async () => [],
+        send: async (_s, payload) => { got.push(payload.moment); return 'ok' },
+        insertChatMessage: async () => 'm1',
+        deleteChatMessage: async () => {},
+        recordSent: async () => true,
+        unrecordSent: async () => {},
+        dropSubscription: async () => {},
+        ...(inChat ? { loadChatToday: async () => inChat } : {}),
+      }
+      await safeRun(d)
+      return got
+    }
+    const h = (hhmm: string) => `2026-09-23T${hhmm}:00Z`
+    const alone = await runWith(null)
+    check('without the chat read, the phone sends the evening nudge as before (fixture binds)', alone.length === 1 && alone[0] === 'session_not_logged', alone)
+    const saidInChat = await runWith([{ moment: 'daily_hello', sent_at: h('08:00') }, { moment: 'session_not_logged', sent_at: h('12:00') }])
+    check('a moment the chat already said today is not sent again: the next live one goes', saidInChat.length === 1 && saidInChat[0] === 'meal_not_logged', saidInChat)
+    const full = await runWith([{ moment: 'daily_hello', sent_at: h('07:00') }, { moment: 'personal_best', sent_at: h('10:00') }, { moment: 'workout_today', sent_at: h('13:00') }])
+    check('three unprompted chat messages today fill Normal: nothing is sent', full.length === 0, full)
+    const lots = await runWith([{ moment: 'daily_hello', sent_at: h('07:00') }, { moment: 'personal_best', sent_at: h('10:00') }, { moment: 'workout_today', sent_at: h('13:00') }], 'lots')
+    check('...while Lots still has room', lots.length === 1, lots)
+    const soon = await runWith([{ moment: 'daily_hello', sent_at: h('17:30') }])
+    check('a chat message 35 minutes ago keeps the three-hour spacing', soon.length === 0, soon)
+    check('the merge counts a send that is also its chat row once',
+      withChatToday([{ moment: 'workout_today', sent_on: '2026-09-23', sent_at: h('07:00') }], [{ moment: 'workout_today', sent_at: h('07:00') }, { moment: 'daily_hello', sent_at: h('06:30') }], '2026-09-23').length === 2)
   }
 
   console.log('\n6. The server\'s copy of the decision is the app\'s, answer for answer')

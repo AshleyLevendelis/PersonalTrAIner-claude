@@ -332,3 +332,123 @@ export function rememberWithoutSpeaking(store: NudgeStore, keys: string[]): Nudg
   const merged = [...store.said, ...keys.filter(k => !store.said.includes(k))]
   return { said: merged.slice(Math.max(0, merged.length - SAID_MAX)), lastAt: store.lastAt }
 }
+
+// ---------------------------------------------------------------------------
+// HELLO + MORE MOMENTS — Ashley's ruling, 7 Nov 2026, from three options ("the chat doesn't seem to proactively speak
+// to the user ... it only speaks if you speak to it first"). It REVERSES her 7 Sep "training and wins" scope for the
+// in-app coach (no evening food lines), in step with her later phone rulings (4 Nov "up to 3", 6 Nov "three levels").
+//
+//   - A DAILY HELLO: the first unprompted message of each day greets her by name. When an event above is due it IS
+//     the hello; otherwise the opener's own pick (coach-opener.ts: today's session, a rest day, a check-in, something
+//     noticed) is said, kept in the chat like any message.
+//   - MORE MOMENTS: the phone reminders' time-of-day moments (coach-moments.ts) are said in the chat too, in the
+//     same words, so a moment reads the same wherever it arrives.
+//   - ONE LIMIT: her Light / Normal / Lots setting (dailyCap) caps every unprompted message of the day, chat and
+//     phone together: each one is a chat row carrying the reminder marker, so the rows ARE the count. The events
+//     keep their 30-minute spacing; a time-of-day moment waits the phone's three hours.
+// ---------------------------------------------------------------------------
+
+/** The phone's moment name for each event above, so the phone never repeats what the chat already said. */
+export const NUDGE_MOMENT: Record<NudgeKind, string> = {
+  session_feel: 'session_feel',
+  missed_yesterday: 'missed_yesterday',
+  personal_best: 'personal_best',
+  streak_milestone: 'streak_milestone',
+  session_due: 'workout_today',
+}
+
+/** The marker the day's hello carries in the chat. */
+export const HELLO_MOMENT = 'daily_hello'
+
+/** Moments the events above already speak for: never said twice under two names. */
+const EVENT_MOMENTS = new Set(Object.values(NUDGE_MOMENT))
+
+/** A time-of-day moment waits this long after the last unprompted message (the phone's own spacing). */
+export const MOMENT_MIN_GAP_MS = 3 * 60 * 60 * 1000
+
+export function helloKey(today: string): string { return `hello:${today}` }
+
+/** "Hey Ashley — yesterday's Legs didn't happen…": the event, greeted, as the day's first message. */
+export function greeted(greeting: string, text: string): string {
+  return `${greeting} — ${text.charAt(0).toLowerCase()}${text.slice(1)}`
+}
+
+export interface Unprompted {
+  text: string
+  chips: string[]
+  /** Burnt in the nudge store when it is said. */
+  keys: string[]
+  /** The marker on the chat row: what the phone reads to skip a moment already said. */
+  moment: string
+  shortcut: 'exercise' | 'nutrition' | null
+  /** The opener's pick, when the hello is the opener: the caller advances its rotation and burns what it covered. */
+  fromOpener: boolean
+  /** Which of the opener's kinds the hello is, when it is the opener. */
+  openerKind?: string
+}
+
+export interface UnpromptedInput {
+  now: number
+  today: string
+  /** Her daily limit (dailyCap of her frequency). */
+  cap: number
+  /** Unprompted coach messages already in the chat today, from this phone or the server. */
+  unpromptedToday: number
+  /** Epoch ms of the newest unprompted message, from the store or the chat. 0 when none. */
+  lastUnpromptedAt: number
+  /** Moment markers already in the chat today. */
+  momentsSaidToday: string[]
+  /** Every key already burnt. */
+  said: string[]
+  /** The event worth raising, from pickNudge. */
+  event: CoachNudge | null
+  /** "Hey Ashley". */
+  greeting: string
+  /** The opener's pick for today, built only when it is needed. */
+  hello: () => { text: string; chips: string[]; kind?: string } | null
+  /** Time-of-day moments live now, best first, switches and waking hours applied (momentsToRaise). */
+  moments: { key: string; text: string; shortcut: 'exercise' | 'nutrition' | null }[]
+}
+
+/** The one unprompted message to say now, or null. Pure: the caller writes the row and burns the keys. */
+export function pickUnprompted(input: UnpromptedInput): Unprompted | null {
+  if (input.unpromptedToday >= input.cap) return null
+  const since = input.now - input.lastUnpromptedAt
+  if (since < NUDGE_MIN_GAP_MS) return null
+  const hello = helloKey(input.today)
+  const helloDue = !input.said.includes(hello) && !input.momentsSaidToday.includes(HELLO_MOMENT)
+
+  if (input.event) {
+    const moment = NUDGE_MOMENT[input.event.kind]
+    return {
+      text: helloDue ? greeted(input.greeting, input.event.text) : input.event.text,
+      chips: input.event.chips,
+      keys: [...input.event.keys, ...(helloDue ? [hello] : [])],
+      moment, shortcut: null, fromOpener: false,
+    }
+  }
+
+  if (helloDue) {
+    const h = input.hello()
+    if (h) return { text: h.text, chips: h.chips, keys: [hello], moment: HELLO_MOMENT, shortcut: null, fromOpener: true, openerKind: h.kind }
+  }
+
+  if (since < MOMENT_MIN_GAP_MS) return null
+  const m = input.moments.find(x => !EVENT_MOMENTS.has(x.key)
+    && !input.momentsSaidToday.includes(x.key)
+    && !input.said.includes(`moment:${x.key}:${input.today}`))
+  if (!m) return null
+  return { text: m.text, chips: [], keys: [`moment:${m.key}:${input.today}`, hello], moment: m.key, shortcut: m.shortcut, fromOpener: false }
+}
+
+/**
+ * The event keys a message already in the chat today speaks for (the phone's "how was the workout?" at 10am is the
+ * feel question; its 8am session reminder is today's "due"), so the chat never asks them again under another name.
+ */
+export function keysSaidByMarkers(keys: ReturnType<typeof nudgeKeys>, momentsSaidToday: string[]): string[] {
+  const out: (string | null)[] = []
+  if (momentsSaidToday.includes('session_feel')) out.push(keys.feel)
+  if (momentsSaidToday.includes('missed_yesterday')) out.push(keys.missed)
+  if (momentsSaidToday.includes('workout_today')) out.push(keys.due)
+  return out.filter((k): k is string => k != null)
+}

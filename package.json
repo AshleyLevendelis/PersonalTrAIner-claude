@@ -357,6 +357,7 @@
     "verify:equipment-labels": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/equipment-select.mjs",
     "verify:diary-preservation": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/diary-preservation.mjs",
     "verify:coach-speaks-first": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-speaks-first.mjs",
+    "verify:coach-hello": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-hello.mjs",
     "verify:six": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/six-from-her-phone.mjs",
     "verify:reveal": "vite build --config .tw-harness/vite.config.ts && node .tw-harness/measure.mjs",
     "report:frozen-weeks": "tsx scripts/report-frozen-weeks.ts",

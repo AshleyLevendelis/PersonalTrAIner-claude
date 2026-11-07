@@ -31,7 +31,9 @@ import { fileURLToPath } from 'url'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, rememberNudge, rememberWithoutSpeaking,
   STREAK_MILESTONES, NUDGE_MIN_GAP_MS, type NudgeInput, type NudgeStore,
+  pickUnprompted, keysSaidByMarkers, helloKey, greeted, HELLO_MOMENT, MOMENT_MIN_GAP_MS, type UnpromptedInput, type CoachNudge,
 } from '../src/lib/coach-nudge'
+import { momentsToRaise, dailyCap, type MomentFacts } from '../src/lib/coach-moments'
 import { hasUnreadCoachMessage } from '../src/lib/chat-unread'
 import type { ChatMessage } from '../src/lib/types'
 
@@ -275,7 +277,8 @@ console.log('\n8. The wiring — what makes it a nudge rather than a nag')
   // THE LOAD-BEARING ONE. A nudge composed in memory (like the opener) has no
   // database id, so chat-unread.ts would not count it, the button would not
   // light, and nothing would stop a second one landing on top of it.
-  const insert = /from\('chat_messages'\)[\s\S]{0,400}?insert\(\{[\s\S]{0,300}?content: nudge\.text[\s\S]{0,200}?\}\)[\s\S]{0,120}?select\('id'\)/
+  // Since 7 Nov 2026 the row also carries the reminder marker, so the day's count and the phone can read it.
+  const insert = /from\('chat_messages'\)[\s\S]{0,400}?insert\(\{[\s\S]{0,300}?content: text[\s\S]{0,80}?action_data: marker[\s\S]{0,60}?\}\)[\s\S]{0,120}?select\('id'\)/
   check('the nudge is written to chat_messages and its id read back', insert.test(chat))
   check('...and the id is what goes into the transcript',
     /setMessages\(prev => \[\.\.\.prev, \{[\s\S]{0,200}?id: data\.id/.test(chat))
@@ -295,8 +298,9 @@ console.log('\n8. The wiring — what makes it a nudge rather than a nag')
     /if \(messages\.some\(m => m\.pendingAction\?\.status === 'pending'\)\) return/.test(chat))
   check('never over a clarification waiting on a choice',
     /if \(messages\[messages\.length - 1\]\?\.clarification\) return/.test(chat))
+  // Since 7 Nov 2026 the spacing lives in pickUnprompted (section 9 runs it); the chat hands it the store's time.
   check('the quiet period is enforced against the persisted store',
-    /now - nudgeStore\(\)\.lastAt < NUDGE_MIN_GAP_MS/.test(chat))
+    /lastUnpromptedAt: Math\.max\(nudgeStore\(\)\.lastAt, lastRowAt\)/.test(chat))
   check('a refusing database is not retried every render',
     /writeNudgeStore\(\{ \.\.\.nudgeStore\(\), lastAt: now \}\)/.test(chat))
   check('the opener burns what it covered, without starting the quiet period',
@@ -341,6 +345,80 @@ console.log('\n8. The wiring — what makes it a nudge rather than a nag')
     !hasUnreadCoachMessage([...msgs, { role: 'user', content: 'ok' }], ''))
   check('a client-composed bubble with no id does not silence it',
     !hasUnreadCoachMessage([{ role: 'assistant', content: 'opener', status: 'complete' }], ''))
+}
+
+console.log('\n9. Hello + more moments (her ruling 7 Nov 2026): one decision over the day, capped by her setting')
+{
+  const T = '2026-11-07'
+  const NOW = Date.parse('2026-11-07T19:30:00')
+  const HOUR = 3_600_000
+  const event: CoachNudge = { kind: 'missed_yesterday', keys: [`missed:2026-11-06`], text: "Yesterday's Legs didn't happen — no drama.", chips: ['Mark it missed'] }
+  let helloBuilt = 0
+  const inp = (over: Partial<UnpromptedInput> = {}): UnpromptedInput => ({
+    now: NOW, today: T, cap: 3, unpromptedToday: 0, lastUnpromptedAt: 0, momentsSaidToday: [], said: [],
+    event: null, greeting: 'Hey Ashley',
+    hello: () => { helloBuilt++; return { text: "Hey Ashley — rest day today. How's the body feeling?", chips: [], kind: 'rest_day' } },
+    moments: [], ...over,
+  })
+  // An ordinary evening: she logs meals, nothing logged today (the phone's own test, run for real).
+  const facts: MomentFacts = {
+    localHour: 19, awaitingFeel: false, plannedToday: false, loggedToday: false, missedYesterday: false,
+    daysSinceAnyLog: null, streakDays: 0, blockJustEnded: false, beatTargetPending: false,
+    mealsAccountedToday: 0, logsMeals: true, proteinEatenToday: 0, proteinTargetG: 130, name: 'Ashley',
+  }
+  const moments = momentsToRaise(facts, {})
+  check('the phone\'s evening food moment is live on that evening (fixture binds)', moments.some(m => m.key === 'meal_not_logged'), moments.map(m => m.key))
+
+  const h = pickUnprompted(inp())
+  check('a quiet day with nothing said yet: the HELLO, from the opener', h?.moment === HELLO_MOMENT && h.fromOpener === true && h.keys.includes(helloKey(T)), h)
+  check('...greeting her by name', /^Hey Ashley/.test(h?.text ?? ''), h?.text)
+  check('...carrying the opener\'s kind, so its rotation advances', h?.openerKind === 'rest_day', h)
+  const second = pickUnprompted(inp({ said: [helloKey(T)], unpromptedToday: 1, lastUnpromptedAt: NOW - 10 * 60_000 }))
+  check('never a second hello the same day', second === null, second)
+  const fromPhone = pickUnprompted(inp({ momentsSaidToday: [HELLO_MOMENT], unpromptedToday: 1, lastUnpromptedAt: NOW - 4 * HOUR }))
+  check('a hello another phone already put in the chat counts as today\'s', fromPhone?.moment !== HELLO_MOMENT, fromPhone)
+
+  const e = pickUnprompted(inp({ event }))
+  check('an event due is the day\'s first message, greeted', e?.text === greeted('Hey Ashley', event.text) && /^Hey Ashley — yesterday's Legs/.test(e?.text ?? ''), e?.text)
+  check('...and it IS the hello: the hello key burns with it', !!e && e.keys.includes(helloKey(T)) && e.keys.includes(event.keys[0]), e?.keys)
+  check('...marked as the phone\'s moment name', e?.moment === 'missed_yesterday', e)
+  const e2 = pickUnprompted(inp({ event, said: [helloKey(T)], unpromptedToday: 1, lastUnpromptedAt: NOW - HOUR }))
+  check('an event after the hello is not greeted again', e2?.text === event.text, e2?.text)
+  check('an event waits the 30-minute spacing', pickUnprompted(inp({ event, lastUnpromptedAt: NOW - (NUDGE_MIN_GAP_MS - 1000) })) === null)
+
+  const m = pickUnprompted(inp({ said: [helloKey(T)], unpromptedToday: 1, lastUnpromptedAt: NOW - 4 * HOUR, moments }))
+  check('after the hello, the evening food moment, in the phone\'s words', m?.moment === 'meal_not_logged' && m.text === moments.find(x => x.key === 'meal_not_logged')!.text, m)
+  check('...with the phone\'s shortcut', m?.shortcut === 'nutrition', m)
+  check('a moment waits the phone\'s three hours, not 30 minutes',
+    pickUnprompted(inp({ said: [helloKey(T)], unpromptedToday: 1, lastUnpromptedAt: NOW - (MOMENT_MIN_GAP_MS - 60_000), moments })) === null)
+  check('a moment the phone already sent today is not said again',
+    pickUnprompted(inp({ said: [helloKey(T)], unpromptedToday: 1, lastUnpromptedAt: NOW - 4 * HOUR, moments, momentsSaidToday: [HELLO_MOMENT, 'meal_not_logged'] }))?.moment !== 'meal_not_logged')
+  check('nor one this phone already said', pickUnprompted(inp({ said: [helloKey(T), `moment:meal_not_logged:${T}`], unpromptedToday: 1, lastUnpromptedAt: NOW - 4 * HOUR, moments }))?.moment !== 'meal_not_logged')
+  const feelMoment = [{ key: 'session_feel', text: 'Hey Ashley, how was it?', shortcut: null }]
+  check('a moment an event speaks for is left to the event', pickUnprompted(inp({ said: [helloKey(T)], unpromptedToday: 1, lastUnpromptedAt: NOW - 4 * HOUR, moments: feelMoment })) === null)
+
+  check('Light (1 a day): nothing after the first', pickUnprompted(inp({ cap: dailyCap('light'), unpromptedToday: 1, event, lastUnpromptedAt: NOW - 5 * HOUR })) === null)
+  check('Normal allows a second', pickUnprompted(inp({ cap: dailyCap('normal'), unpromptedToday: 1, event, lastUnpromptedAt: NOW - 5 * HOUR })) !== null)
+  check('Normal stops at three', pickUnprompted(inp({ cap: dailyCap('normal'), unpromptedToday: 3, event, lastUnpromptedAt: NOW - 5 * HOUR })) === null)
+  check('Lots allows a fourth', pickUnprompted(inp({ cap: dailyCap('lots'), unpromptedToday: 4, event, lastUnpromptedAt: NOW - 5 * HOUR })) !== null)
+  helloBuilt = 0
+  pickUnprompted(inp({ event }))
+  check('the opener is not even built when an event speaks', helloBuilt === 0, helloBuilt)
+
+  const keys = nudgeKeys({ ...base, today: T, awaitingFeel: { date: T, isToday: true }, todaySession: { focus: 'Legs', movements: 'Squat' } })
+  const byMarkers = keysSaidByMarkers(keys, ['session_feel', 'workout_today'])
+  check('the phone\'s "how was it" and session reminder count as the chat\'s feel and due', byMarkers.includes(keys.feel!) && byMarkers.includes(keys.due!), byMarkers)
+
+  // THE WIRING: these values are what the chat hands it.
+  check('the chat decides through pickUnprompted', /const pick = pickUnprompted\(\{/.test(chat))
+  check('...capped by her own frequency', /cap: dailyCap\(reminderSettings\.frequency\)/.test(chat))
+  check('...counting every unprompted row of today in the chat', /const unprompted = messages\.filter\(m => m\.role === 'assistant' && m\.reminder && m\.created_at[\s\S]{0,80}=== today\)/.test(chat))
+  check('...with the phone\'s moments, her switches applied', /moments: facts \? momentsToRaise\(facts, reminderSettings\) : \[\]/.test(chat))
+  check('...and the phone\'s markers counted as said', /const said = \[\.\.\.nudgeStore\(\)\.said, \.\.\.keysSaidByMarkers\(keys, momentsSaidToday\)\]/.test(chat))
+  check('every unprompted row carries the reminder marker', /const marker = \{ source: 'reminder', moment: pick\.moment, shortcut: pick\.shortcut \}/.test(chat))
+  check('the empty-chat opener counts as today\'s hello', /rememberWithoutSpeaking\([\s\S]{0,200}helloKey\(nudgeInputRef\.current\.today\)/.test(chat))
+  check('a failed history read no longer silences the coach for the visit', /Failed to load chat history[\s\S]{0,400}setIsFirstEverChat\(prev => prev \?\? false\)/.test(chat))
+  check('the clock is checked again while the app sits open', /setInterval\(bump, 10 \* 60 \* 1000\)/.test(chat) && /clockTick, reminderSettings, logsMeals\]\)/.test(chat))
 }
 
 console.log(failures === 0 ? '\nAll coach-nudge checks passed.\n' : `\n${failures} check(s) FAILED.\n`)

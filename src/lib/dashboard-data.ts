@@ -270,6 +270,8 @@ export interface DashboardData {
   caloriesTarget: number
   proteinEaten: number
   proteinTarget: number
+  /** Meals accounted for today (eaten, or said skipped): the phone's evening food test, read by the chat's moments. */
+  mealsAccountedToday: number
   carbsEaten: number
   carbsTarget: number
   fatEaten: number
@@ -808,6 +810,8 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     caloriesEaten: ledger.eaten.kcal,
     caloriesTarget: ledger.targets.calories,
     proteinEaten: ledger.eaten.protein,
+    // The server's own count (coach-reach-out foodFacts): confirmed, swapped in, extra, or skipped.
+    mealsAccountedToday: ledger.events.filter(e => ['confirmed', 'swapped_in', 'extra', 'skipped'].includes(e.eventType)).length,
     proteinTarget: ledger.targets.protein,
     carbsEaten: ledger.eaten.carbs,
     carbsTarget: ledger.targets.carbs,

@@ -145,6 +145,13 @@ export interface ReachOutDeps {
    * check in reminder-writer.ts, the fixed sentence goes.
    */
   writeWithCoach?: (prompt: string) => Promise<string | null>
+  /**
+   * THE COACH'S UNPROMPTED MESSAGES ALREADY IN HER CHAT TODAY (her ruling 7 Nov 2026, "Hello + more moments"): the
+   * app says hello and the same moments while she is in it, each a chat row with the reminder marker. They count
+   * toward her daily limit and spacing, and a moment already said there is not sent again. Optional: without it the
+   * phone counts only its own sends, as before.
+   */
+  loadChatToday?: (userId: string, localToday: string, timezone: string) => Promise<{ moment: string; sent_at: string }[]>
 }
 
 export interface ReachOutReport {
@@ -256,6 +263,18 @@ export function factsFor(row: MomentFactsRow | null, live: LiveFacts, localToday
  * ruling 6 Nov 2026, "Three levels": Light 1, Normal 3, Lots 5 a day), and at
  * least three hours apart at every level (her 4 Nov "Up to 3, spaced").
  */
+/**
+ * Her own sends plus what the chat already holds today, each message counted once: a send the phone made is also a
+ * chat row (same moment, same day), so a row matching a send is the send.
+ */
+export function withChatToday(recent: SentRecord[], inChat: { moment: string; sent_at: string }[], localToday: string): SentRecord[] {
+  const own = new Set(recent.filter(r => r.sent_on === localToday).map(r => r.moment as string))
+  const extra = inChat
+    .filter(c => !own.has(c.moment))
+    .map(c => ({ moment: c.moment as MomentKey, sent_on: localToday, sent_at: c.sent_at }))
+  return [...recent, ...extra]
+}
+
 export function dayAllows(recent: SentRecord[], localToday: string, now: Date, cap: number): 'ok' | 'day_full' | 'too_soon' {
   const today = recent.filter(r => r.sent_on === localToday)
   if (today.length >= cap) return 'day_full'
@@ -302,7 +321,11 @@ export async function runReachOut(deps: ReachOutDeps): Promise<ReachOutReport> {
       // The first device's timezone speaks for the person. Two phones in two
       // zones is rare enough that the gap is named rather than engineered.
       const { date: today, hour } = localParts(deps.now, devices[0].timezone)
-      const [recent, profile] = await Promise.all([deps.loadRecentSends(userId), deps.loadSettings(userId)])
+      const [ownSends, profile, inChat] = await Promise.all([
+        deps.loadRecentSends(userId), deps.loadSettings(userId),
+        deps.loadChatToday ? deps.loadChatToday(userId, today, devices[0].timezone) : Promise.resolve([]),
+      ])
+      const recent = withChatToday(ownSends, inChat, today)
       // HELD BACK BY THE DAY'S LIMITS: her frequency reached, or one too recently.
       if (dayAllows(recent, today, deps.now, dailyCap(profile.settings.frequency)) !== 'ok') { report.alreadyToday++; continue }
 

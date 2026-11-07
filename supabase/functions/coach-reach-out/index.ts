@@ -191,6 +191,18 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
     },
     deleteChatMessage: (userId, id) => restWrite("DELETE", `chat_messages?id=eq.${id}&profile_id=eq.${userId}`),
 
+    // TODAY'S UNPROMPTED CHAT MESSAGES, the app's and this function's alike (the reminder marker), on her own
+    // calendar. A day and a half back is enough to cover any timezone's today.
+    loadChatToday: async (userId, localToday, timezone) => {
+      const since = new Date(now.getTime() - 36 * 3_600_000).toISOString();
+      const rows = await rest<{ action_data: { source?: string; moment?: string } | null; created_at: string }[]>(
+        `chat_messages?profile_id=eq.${userId}&role=eq.assistant&created_at=gte.${encodeURIComponent(since)}&select=action_data,created_at`,
+      );
+      return rows
+        .filter((r) => r.action_data?.source === "reminder" && typeof r.action_data.moment === "string" && localDateOf(r.created_at, timezone) === localToday)
+        .map((r) => ({ moment: r.action_data!.moment!, sent_at: r.created_at }));
+    },
+
     // A 409 is the database refusing the reservation (a unique rule): not an
     // error, an answer — the caller sends nothing. Anything else throws, and the
     // loop skips this person for the hour.

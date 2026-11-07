@@ -89,7 +89,8 @@ const PROFILE_ID = '00000000-0000-4000-8000-000000000001'
 // PINNED BEFORE FIRST RENDER — see .tour-harness/anchor.mjs. One fixed
 // "today" for every run, so a driver's day-name assertions stop depending on
 // what day it is where the machine is.
-setDevClockOverride(PROFILE_ID, ANCHOR_ISO)
+// ?clock=HH:MM pins the time of day as well (the evening moments, 7 Nov 2026); noon otherwise, as before.
+setDevClockOverride(PROFILE_ID, ANCHOR_ISO, new URLSearchParams(location.search).get('clock'))
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const todayIdx = anchorDate().getDay()
 
@@ -488,10 +489,16 @@ else localStorage.removeItem(`chat_history_cache_${PROFILE_ID}`)
 //     somewhere else in the app and the coach has something to say.
 // ---------------------------------------------------------------------------
 const SEED_NUDGE = new URLSearchParams(location.search).get('seed') === 'nudge'
+// ?seed=hello — HELLO + MORE MOMENTS (her ruling 7 Nov 2026): the same ongoing thread with NO event in it, the chat
+// on screen. &said=hello adds the day's hello already in the chat, from 3pm; &meals=1 adds a meal logged yesterday
+// (so she is somebody who logs meals) and none today. The fixture chooses those inputs; the app decides what to say.
+const SEED_HELLO = new URLSearchParams(location.search).get('seed') === 'hello'
+const SAID_HELLO = SEED_HELLO && new URLSearchParams(location.search).get('said') === 'hello'
+const MEALS_YESTERDAY = SEED_HELLO && new URLSearchParams(location.search).get('meals') === '1'
 const todayStr = isoOf(anchorDate())
 const OPENER_ROWS = Number(new URLSearchParams(location.search).get('rows') ?? '0')
-const seededRows = (SEED_NUDGE || (OPENER && OPENER_ROWS > 0))
-  ? (SEED_NUDGE ? seeded : seeded.slice(0, OPENER_ROWS)).map((m, i) => ({
+const seededRows = (SEED_NUDGE || SEED_HELLO || (OPENER && OPENER_ROWS > 0))
+  ? (SEED_NUDGE || SEED_HELLO ? seeded : seeded.slice(0, OPENER_ROWS)).map((m, i) => ({
       id: `seed-${i}`,
       profile_id: PROFILE_ID,
       role: m.role,
@@ -516,6 +523,19 @@ const movedAwaySession = MOVED_AWAY
       id: 'ws-movedaway', profile_id: PROFILE_ID, date: iso(0), is_completed: false,
       split_type: 'moved', duration_minutes: 0, moved_to_date: iso(1),
     }]
+  : []
+const helloRow = SAID_HELLO
+  ? [{
+      id: 'seed-hello', profile_id: PROFILE_ID, role: 'assistant', status: 'complete',
+      content: "Hey — how's the week treating you?",
+      action_data: { source: 'reminder', moment: 'daily_hello', shortcut: null },
+      created_at: new Date(anchorNowMs() + 15 * 3600000).toISOString(),
+    }]
+  : []
+const mealYesterday = MEALS_YESTERDAY
+  ? [{ id: 'me-yesterday', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 86400000)), slot: 'dinner', event_type: 'confirmed',
+      meal_name: 'Chicken and rice', macros: { kcal: 600, protein: 45, carbs: 70, fat: 12 }, source: 'manual', client_id: 'seed-yday',
+      created_at: new Date(anchorNowMs() - 86400000 + 19 * 3600000).toISOString(), voided_at: null }]
   : []
 const finishedSession = SEED_NUDGE
   ? [{
@@ -644,10 +664,10 @@ const dayStateSeed = (() => {
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
   daily_metrics: [], exercise_set_logs: [...dayStateSeed.sets, ...finishedSets], workout_sessions: [...finishedSession, ...movedInSession, ...movedAwaySession, ...dayStateSeed.sessions], cardio_logs: [],
-  daily_steps: [], meal_events: dayStateSeed.meals, meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
+  daily_steps: [], meal_events: [...dayStateSeed.meals, ...mealYesterday], meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
   favorite_meals: [], grocery_items: topUpSeed.list, load_suggestions: [], pending_actions: [],
   plan_adaptations: KNEE_EASE ? [kneeEaseRow(PROFILE_ID)] : [], user_facts: [], user_context_facts: [], user_goals: [],
-  chat_messages: [...seededRows, ...textsRows], exercise_plans: [], mesocycle_weeks: [],
+  chat_messages: [...seededRows, ...helloRow, ...textsRows], exercise_plans: [], mesocycle_weeks: [],
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
 }
 setSupabaseClient(makeFakeSupabase(db) as never)
