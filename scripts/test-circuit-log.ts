@@ -193,13 +193,48 @@ async function main() {
   const h0 = server.indexOf('if (name === "propose_circuit_log")')
   const handler = h0 >= 0 ? server.slice(h0, server.indexOf('if (name === "log_meal")', h0)) : ''
   const at = (re: RegExp) => { const m = re.exec(handler); return m ? m.index : -1 }
-  const checkRounds = at(/statedCount\(evidence, rounds\)/)
-  const checkWork = at(/said\(work\)/)
+  const checkBlocks = at(/circuitBlocksStated\(args\.blocks, evidence\)/)
   const askEffort = at(/if \(!effort\)/)
   const card = at(/kind: "propose_circuit_log"/)
   check('the handler exists', handler.length > 0)
-  check('a block is refused unless she stated its rounds and work time', checkRounds >= 0 && checkWork >= 0 && checkRounds < card && checkWork < card, { checkRounds, checkWork, card })
-  check('a rest she never gave is zero, not the model\'s number', /rest > 0 && said\(rest\) \? rest : 0/.test(handler))
+  check('the handler checks every block against her words before any card', checkBlocks >= 0 && card >= 0 && checkBlocks < card, { checkBlocks, card })
+
+  // THE RULE ITSELF, run (the handler only calls it). Her 8 Oct message: each block its own count.
+  const real = [
+    { activity_name: 'Skipping rope', rounds: 5, work_seconds: 180 },
+    { activity_name: 'Push ups', rounds: 3, work_seconds: 30 },
+    { activity_name: 'Sit ups', rounds: 3, work_seconds: 30 },
+    { activity_name: 'Assault bike', rounds: 5, work_seconds: 15, rest_seconds: 45 },
+  ]
+  const r1 = ev.circuitBlocksStated(real, HER_MESSAGE)
+  check('her 8 Oct circuit: all four blocks kept', r1.blocks.length === 4 && r1.unmatched.length === 0, r1)
+  check('...the bike keeps the 45s rest she gave', r1.blocks[3]?.rest_seconds === 45, r1.blocks[3])
+  const r2 = ev.circuitBlocksStated([{ ...real[0], rounds: 4 }, ...real.slice(1)], HER_MESSAGE)
+  check('a round count she never wrote is refused', r2.unmatched.includes('Skipping rope') && r2.blocks.length === 3, r2)
+  const r3 = ev.circuitBlocksStated([{ ...real[1], rest_seconds: 20 }], HER_MESSAGE)
+  check('a rest she never gave is zero, not the model\'s number', r3.blocks[0]?.rest_seconds === 0, r3)
+  const r4 = ev.circuitBlocksStated([{ ...real[1], work_seconds: 40 }], HER_MESSAGE)
+  check('a work time she never gave is refused', r4.unmatched.length === 1 && r4.blocks.length === 0, r4)
+
+  // ONE ROUND EACH (coach exam, 7 Nov 2026): five rounds, each a different station. "1" is never typed, and the app
+  // used to refuse every block and ask her for the rounds and times she had just given.
+  const EACH = 'just did 5 rounds on the timer, 3 minutes each: skipping rope, press-ups, sit-ups, the bike, then rope again. really hard'
+  const stations = ['Skipping rope', 'Press-ups', 'Sit-ups', 'Bike', 'Skipping rope'].map(n => ({ activity_name: n, rounds: 1, work_seconds: 180 }))
+  const e1 = ev.circuitBlocksStated(stations, EACH)
+  check('five rounds, five stations: five blocks of one round, nothing asked', e1.blocks.length === 5 && e1.unmatched.length === 0, e1)
+  check('...each at the 3 minutes she gave', e1.blocks.every(b => b.rounds === 1 && b.work_seconds === 180), e1.blocks)
+  check('...rope twice, in the order done', e1.blocks[0]?.activity_name === 'Skipping rope' && e1.blocks[4]?.activity_name === 'Skipping rope', e1.blocks)
+  const e2 = ev.circuitBlocksStated(stations.slice(0, 4), EACH)
+  check('four one-round blocks against "5 rounds": refused (not the shape she said)', e2.blocks.length === 0 && e2.unmatched.length === 4, e2)
+  const e3 = ev.circuitBlocksStated([stations[0]], 'did 1 rope? no: 5 rounds of 3 minutes skipping')
+  check('a lone block of one round needs its own "1"', ev.circuitBlocksStated([stations[0]], 'did 5 rounds of 3 minutes skipping').blocks.length === 0, e3)
+  const e4 = ev.circuitBlocksStated([...stations.slice(0, 4), { ...stations[4], rounds: 5 }], EACH)
+  check('one block with its own count beside one-round blocks: the one-round ones are refused', e4.unmatched.length === 4 && e4.blocks.length === 1, e4)
+  const e5 = ev.circuitBlocksStated(stations, 'did 5 things, 3 minutes each: skipping rope, press-ups, sit-ups, the bike, then rope again. hard')
+  check('a 5 that is not a count of ROUNDS does not make one round each', e5.blocks.length === 0, e5)
+  check('"five rounds" in words counts', ev.circuitBlocksStated(stations, EACH.replace('5 rounds', 'five rounds')).blocks.length === 5)
+  check('"5rounds" with no space counts', ev.circuitBlocksStated(stations, EACH.replace('5 rounds', '5rounds')).blocks.length === 5)
+  check('a "15 rounds" is not "5 rounds"', ev.circuitBlocksStated(stations, EACH.replace('5 rounds', '15 rounds')).blocks.length === 0)
   check('no effort in her words: it asks, before any card', askEffort >= 0 && card >= 0 && askEffort < card, { askEffort, card })
   check('the effort on the card is hers, never the model\'s argument', /effort = statedEffort\(/.test(handler) && !/args\.effort/.test(handler))
   check('the evidence is her messages, not the assistant\'s', /t\.role !== "assistant"/.test(handler))

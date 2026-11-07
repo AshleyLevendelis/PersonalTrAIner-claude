@@ -74,7 +74,8 @@ import { KIT_ITEMS, KIT_ITEM_LABELS, isKitItem, kitStatementInUserWords, kitItem
 import type { KitController } from '@/lib/kit-change'
 import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options'
-import { compileFoodDislikes } from '@/lib/fact-compiler'
+import { compileFoodDislikes, compileSoftExercisePreferences } from '@/lib/fact-compiler'
+import { coachSwapPick, swapOptionsBlock } from '@/lib/coach-swap-pick'
 import { namedFoodClash, clashSentence, allergyRefusal } from '@/lib/named-food-clash'
 import { detectFoodExclusions, mergeFoodsToAvoid } from '@/lib/food-exclusions'
 import { exercisesThatFit } from '@/lib/exercise-shortlist'
@@ -2020,7 +2021,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         .map(i => `${i.quantity}${i.unit === 'g' || i.unit === 'ml' ? i.unit : ` ${i.unit}`} ${i.display_name}`)
         .join('\n'),
       training_days_count: profile.training_days.filter(d => d.available).length,
-      exercise_summary: exerciseSummary,
+      // THE SWAP LIST FOR TODAY'S EXERCISES rides inside the summary (frontend-only reach, like the header): the
+      // coach picks from the Exercise tab's own list instead of from memory (coach exam, 7 Nov 2026).
+      exercise_summary: exerciseSummary && todayRow && !todayMovedTo
+        ? [exerciseSummary, swapOptionsBlock(todayRow.exercises.map(e => e.name), { profile: poolProfile, exclusions: exerciseExclusions, soft: compileSoftExercisePreferences(memoryFacts) })].filter(Boolean).join('\n\n')
+        : exerciseSummary,
       steps_summary: stepsSummary,
       water_summary: waterSummary,
       injuries_summary: injuriesSummary,
@@ -2572,7 +2577,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * lives in swap-target.ts, tolerantly, and what comes back says which part
    * did not resolve.
    */
-  const buildExerciseSwapProposal = async (rawArgs: Record<string, unknown>): Promise<{
+  const buildExerciseSwapProposal = async (rawArgs: Record<string, unknown>, userSaid = ''): Promise<{
     ok: true
     scopeKey: string
     preconditions: Record<string, unknown>
@@ -2607,7 +2612,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // parser already uses, so the chat means the same thing by a name however
     // it arrives.
     const newResolved = resolveExerciseName(newItem, day.exercises.map(e => e.name))
-    const newEntry = newResolved.resolution === 'resolved' ? getExerciseEntry(newResolved.exerciseName) : undefined
+    const coachEntry = newResolved.resolution === 'resolved' ? getExerciseEntry(newResolved.exerciseName) : undefined
+    // WHEN SHE NAMED NOTHING, THE SWAP LIST CHOOSES (coach exam, 7 Nov 2026): a pick the list does not hold (kit she
+    // lacks, an injury, her avoid list) or an unloaded one for a loaded lift becomes the list's first. Her own
+    // named choice is never touched.
+    const pick = coachEntry
+      ? coachSwapPick({ picked: coachEntry.name, outgoing: oldEx.name, userSaid, profile: poolProfile, exclusions: exerciseExclusions, soft: compileSoftExercisePreferences(memoryFacts) })
+      : null
+    const newEntry = pick ? getExerciseEntry(pick.name) : undefined
     // A name the catalogue does not have is ANSWERED (runs 7-10, H33): the nearest names and the alternatives his
     // kit and injuries allow, each a tap, and a tap to change the kit. Never "try another name".
     if (!newEntry) {
@@ -2686,7 +2698,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           ...(impact.balancing ? [{ severity: 'info' as const, text: impact.balancing }] : []),
           ...(impact.cost ? [{ severity: 'warn' as const, text: impact.cost }] : []),
         ],
-        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        // The coach's reason was about ITS pick; when the list's first replaced it, the card says why this one.
+        rationale: pick?.replaced
+          ? `First on your swap list for ${oldEx.name}: it fits your kit and injuries.`
+          : typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         editable: [{ field: 'scope', options: ['today', 'permanent'] }],
         reversible: true,
       },
@@ -5863,7 +5878,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           built = { scopeKey: kitCard.scopeKey, preconditions: kitCard.preconditions, payload: kitCard.payload, diff: kitCard.diff }
           kindOverride = 'propose_kit_change'
         } else {
-          const swap = await buildExerciseSwapProposal(result.proposal.rawArgs)
+          const swap = await buildExerciseSwapProposal(result.proposal.rawArgs, userSaid)
           if (swap.ok) { built = { scopeKey: swap.scopeKey, preconditions: swap.preconditions, payload: swap.payload as unknown as Record<string, unknown>, preImage: swap.preImage, diff: swap.diff }; advice = swap.advice }
           else refusal = swap.reason
         }

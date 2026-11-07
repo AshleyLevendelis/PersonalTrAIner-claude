@@ -15,7 +15,7 @@ import { resolvePlainReply, resolveToolReply, SAVE_NUDGE, ANNOUNCES_THE_SAVE, AD
 import { detectPlanClaim, planClaimFloorText } from "../_shared/plan-claim.ts";
 import { detectTodayClaim, todayClaimFloor, todayClaimNudge, type TodayFacts } from "../_shared/today-claim.ts";
 import type { GeminiLegResult, GeminiPart } from "../_shared/gemini-parts.ts";
-import { userNamedFood, isAdviceQuestion, isEvaluationQuestion, statedDurationsMinutes, eventTiming, statedDurationsSeconds, statedCount, statedEffort, statedDistancesKm, statedMinutes } from "../_shared/message-evidence.ts";
+import { userNamedFood, isAdviceQuestion, isEvaluationQuestion, statedDurationsMinutes, eventTiming, statedDurationsSeconds, statedCount, statedEffort, statedDistancesKm, statedMinutes, circuitBlocksStated } from "../_shared/message-evidence.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -823,7 +823,7 @@ const toolDeclarations = [
         },
         new_item: {
           type: "string",
-          description: "The name of the new exercise (must be biomechanically similar — same movement pattern)",
+          description: "The name of the new exercise (must be biomechanically similar — same movement pattern). When they named nothing to do instead, the FIRST option listed for that exercise under SWAP OPTIONS FOR TODAY, exactly as written: it is what the Exercise tab's swap list puts first for their kit and injuries.",
         },
         scope: {
           type: "string",
@@ -1500,7 +1500,7 @@ const toolDeclarations = [
   {
     name: "propose_circuit_log",
     description:
-      "PROPOSES logging a workout they DID that was made of timed blocks, each its own thing — this does NOT apply anything, the app shows a card and the user taps Confirm. Call when they tell you about a circuit or interval session they already did, block by block ('5 rounds of 3 min skipping, 3 rounds of 30s push-ups, then 5x15s on the bike with 45s rest'). One entry in blocks per block, in the order done, each with the name THEY used, the rounds, the work time and the rest between rounds, all as they stated them. Set replaced_session true when they did it INSTEAD of their planned session ('didn't do my workout, did this instead'); the app only counts it as that day's workout when the session is still due. The effort is theirs to say: if they have not said how hard it was overall, ask 'How hard did that feel overall — easy, steady or hard?' and wait; never pick one. NOT propose_session_activity_swap (one named activity like Muay Thai or a run, not timed blocks), NOT log_workout (sets and reps of lifts), NOT propose_cardio_session (planning one for later).",
+      "PROPOSES logging a workout they DID that was made of timed blocks, each its own thing — this does NOT apply anything, the app shows a card and the user taps Confirm. Call when they tell you about a circuit or interval session they already did, block by block ('5 rounds of 3 min skipping, 3 rounds of 30s push-ups, then 5x15s on the bike with 45s rest'). One entry in blocks per block, in the order done, each with the name THEY used, the rounds, the work time and the rest between rounds, all as they stated them. When each ROUND was a different thing ('4 rounds of 2 min: rower, burpees, kettlebell swings, rower') that is one block per round, in order, each with rounds 1 and that round's time, and a station repeated later is its own block again; never ask for rounds or times they have already given. Set replaced_session true when they did it INSTEAD of their planned session ('didn't do my workout, did this instead'); the app only counts it as that day's workout when the session is still due. The effort is theirs to say: if they have not said how hard it was overall, ask 'How hard did that feel overall — easy, steady or hard?' and wait; never pick one. NOT propose_session_activity_swap (one named activity like Muay Thai or a run, not timed blocks), NOT log_workout (sets and reps of lifts), NOT propose_cardio_session (planning one for later).",
     parameters: {
       type: "object",
       properties: {
@@ -4069,20 +4069,8 @@ Keep this context in mind to ensure your greetings and questions naturally align
           ? history.filter((t: { role?: string; content?: unknown }) => t && t.role !== "assistant" && typeof t.content === "string").slice(-3).map((t: { content: string }) => t.content)
           : [];
         const evidence = [...recentUser, message].join("\n");
-        const seconds = statedDurationsSeconds(evidence);
-        const said = (n: number) => seconds.some((s) => Math.abs(s - n) <= 1);
-        const rawBlocks = Array.isArray(args.blocks) ? args.blocks as Record<string, unknown>[] : [];
-        const blocks: { activity_name: string; rounds: number; work_seconds: number; rest_seconds: number }[] = [];
-        const unmatched: string[] = [];
-        for (const b of rawBlocks) {
-          const nameB = typeof b.activity_name === "string" ? b.activity_name.trim() : "";
-          const rounds = Math.round(Number(b.rounds));
-          const work = Math.round(Number(b.work_seconds));
-          const rest = Math.round(Number(b.rest_seconds ?? 0));
-          if (!nameB) continue;
-          if (!(rounds >= 1) || !statedCount(evidence, rounds) || !(work > 0) || !said(work)) { unmatched.push(nameB); continue; }
-          blocks.push({ activity_name: nameB, rounds, work_seconds: work, rest_seconds: rest > 0 && said(rest) ? rest : 0 });
-        }
+        // Every figure checked against her words, one place (message-evidence.ts), so the gate runs the real rule.
+        const { blocks, unmatched } = circuitBlocksStated(args.blocks, evidence);
         if (blocks.length === 0 || unmatched.length > 0) {
           const who = unmatched.length > 0 ? unmatched.join(" and ") : "each block";
           return new Response(

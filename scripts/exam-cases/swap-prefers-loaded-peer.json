@@ -1,11 +1,28 @@
 {
   "name": "swap-prefers-loaded-peer",
-  "why": "The 22 Sep 2026 equipment-quality rule: when the COACH is the one picking a swap's replacement (nothing named), it must prefer a genuinely loaded option over a band or bodyweight-only one, when both are realistic for this person's equipment. This is the first coach-exam case to exercise propose_exercise_swap at all, and the first that can grade WHICH exercise a card names rather than only whether one appeared. Walking Lunges is already in the base fixture's Tuesday plan; Bulgarian Split Squats is its one same-pattern, same-tier, home-gym-real, genuinely loaded peer in the catalogue (checked directly against EQUIPMENT_SETS.home_gym, not assumed) — Split Squat (Bodyweight) and the rest of the single-leg group are the unloaded compromise this rule exists to stop the coach reaching for by default.",
+  "why": "The 22 Sep 2026 equipment-quality rule: when the COACH is the one picking a swap's replacement (nothing named), it must prefer a genuinely loaded option over a band or bodyweight-only one, when both are realistic for this person's equipment. Walking Lunges is in the base fixture's Tuesday plan. CORRECTED 7 Nov 2026: this case accepted Bulgarian Split Squats alone, written before the dumbbell pack added loaded reverse and lateral lunges. The accepted names are now the loaded options leading the Exercise tab's own swap list for this person (getReplacementCandidates), and test:coach-swap-pick fails if they drift from it. Step-Ups, the coach's pick on 7 Nov, is not on that list at all: it needs a box this home gym does not have. Since 7 Nov the coach is SENT that list (SWAP OPTIONS FOR TODAY) and told to take the first when nothing is named.",
   "messages": [
     "Swap the walking lunges for something else today, please."
   ],
   "checks": {
-    "expectsProposalKind": [{ "turn": 0, "oneOf": ["propose_exercise_swap"] }],
-    "swapReplacementOneOf": [{ "turn": 0, "oneOf": ["Bulgarian Split Squats"] }]
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_exercise_swap"
+        ]
+      }
+    ],
+    "swapReplacementOneOf": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "Dumbbell Reverse Lunge",
+          "Bulgarian Split Squats",
+          "Barbell Reverse Lunge",
+          "Dumbbell Lateral Lunge"
+        ]
+      }
+    ]
   }
 }

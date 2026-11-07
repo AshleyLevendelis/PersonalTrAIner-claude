@@ -301,3 +301,45 @@ export function statedMinutes(text: string): number[] {
   else if (/\ban hour\b/.test(m)) out.push(60);
   return out;
 }
+
+export interface StatedCircuitBlock { activity_name: string; rounds: number; work_seconds: number; rest_seconds: number }
+
+/**
+ * The circuit blocks the coach proposed, kept only where every figure is one SHE wrote (Ashley's ruling A,
+ * 8 Oct 2026: the card writes what she said, never the model's numbers). A block whose rounds or work time she
+ * never stated goes to `unmatched`; a rest she never gave is zero.
+ *
+ * ONE ROUND EACH, WHEN EACH ROUND WAS A DIFFERENT THING (coach exam, 7 Nov 2026). "5 rounds on the timer, 3 minutes
+ * each: skipping rope, press-ups, sit-ups, the bike, then rope again" is five blocks of one round, and "1" is a number
+ * she never typed, so every block was refused and the app asked her for the rounds and times she had just given. A
+ * block of ONE round is stated when the proposal is that shape exactly: every block a single round, as many blocks
+ * as a round count she wrote next to the word "round" (a lone block therefore needs her own "1 round"). Anything else still needs its own count.
+ */
+export function circuitBlocksStated(rawBlocks: unknown, evidence: string): { blocks: StatedCircuitBlock[]; unmatched: string[] } {
+  const seconds = statedDurationsSeconds(evidence);
+  const said = (n: number) => seconds.some((s) => Math.abs(s - n) <= 1);
+  const list = Array.isArray(rawBlocks) ? rawBlocks as Record<string, unknown>[] : [];
+  const named = list.filter((b) => typeof b?.activity_name === "string" && (b.activity_name as string).trim() !== "");
+  const oneEach = named.length > 0
+    && named.every((b) => Math.round(Number(b.rounds)) === 1)
+    && statedRoundCount(evidence, named.length);
+  const blocks: StatedCircuitBlock[] = [];
+  const unmatched: string[] = [];
+  for (const b of named) {
+    const name = (b.activity_name as string).trim();
+    const rounds = Math.round(Number(b.rounds));
+    const work = Math.round(Number(b.work_seconds));
+    const rest = Math.round(Number(b.rest_seconds ?? 0));
+    const roundsStated = rounds >= 1 && (statedCount(evidence, rounds) || (rounds === 1 && oneEach));
+    if (!roundsStated || !(work > 0) || !said(work)) { unmatched.push(name); continue; }
+    blocks.push({ activity_name: name, rounds, work_seconds: work, rest_seconds: rest > 0 && said(rest) ? rest : 0 });
+  }
+  return { blocks, unmatched };
+}
+
+/** "5 rounds", "five rounds", "5rounds": a count she wrote as a number of ROUNDS, not any 5 in the message. */
+export function statedRoundCount(text: string, n: number): boolean {
+  const m = (text || "").toLowerCase();
+  const words = Object.entries(WORD_NUMBERS).filter(([, v]) => v === n).map(([w]) => w);
+  return [String(n), ...words].some((w) => new RegExp(`(^|[^\\w.])${w}\\s*rounds?\\b`).test(m));
+}

@@ -42,6 +42,7 @@
     "test:profile-restore": "tsx scripts/test-profile-restore.ts",
     "test:dashboard": "tsx scripts/test-dashboard.ts",
     "test:circuit-log": "tsx scripts/test-circuit-log.ts",
+    "test:coach-swap-pick": "tsx scripts/test-coach-swap-pick.ts",
     "test:round-logging": "tsx scripts/test-round-logging.ts",
     "test:round-presets": "tsx scripts/test-round-presets.ts",
     "test:timers": "tsx scripts/test-timers.ts",
