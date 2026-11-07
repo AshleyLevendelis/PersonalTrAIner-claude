@@ -1,6 +1,7 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
 import { blockShape } from '@/lib/timer-engine'
 import { circuitName } from '@/lib/circuit'
+import { textBesideSave } from '@/lib/save-reply'
 import { rpeToStore, effortLabel, cardioReadback, type EffortKey } from '@/lib/cardio-effort'
 import { easeOffQuestion } from '@/lib/cardio-ease-off'
 import ReactMarkdown from 'react-markdown'
@@ -6201,7 +6202,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       return resolveAndMaybeLog(entries, result.logWorkout.corrects_previous === true, userSaid)
     }
     if (result.memoryIntent) {
-      return resolveAndSaveMemory(result.memoryIntent)
+      return textBesideSave(await resolveAndSaveMemory(result.memoryIntent), result.reply)
     }
     if (result.groceryIntent) {
       return resolveAndSaveGrocery(result.groceryIntent)

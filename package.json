@@ -498,6 +498,7 @@
     "verify:one-calorie-target": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/one-calorie-target.mjs",
     "verify:named-food-clash": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/named-food-clash.mjs",
     "verify:chat-food-avoid": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-food-avoid.mjs",
+    "verify:chat-save-reply": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-save-reply.mjs",
     "verify:profile-temporary": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-temporary.mjs",
     "test:shoulders-day": "tsx scripts/test-shoulders-day.ts",
     "test:coach-kit-names": "tsx scripts/test-coach-kit-names.ts",
@@ -540,6 +541,7 @@
     "test:coach-lessons": "tsx scripts/test-coach-lessons.ts",
     "test:reminder-writer": "tsx scripts/test-reminder-writer.ts",
     "test:voice-pass": "tsx scripts/test-voice-pass.ts",
+    "test:save-reply": "tsx scripts/test-save-reply.ts",
     "verify:coach-texts-you": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-texts-you.mjs",
     "verify:coach-lessons": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-lessons.mjs",
     "verify:coach-opener-words": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-opener-words.mjs"

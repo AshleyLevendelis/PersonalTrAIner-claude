@@ -11,7 +11,7 @@ import { readIngredientText, splitCompoundFoodLine } from "../_shared/ingredient
 import { weighInQuestion } from "../_shared/weigh-in-check.ts";
 import { classifyImperative } from "../_shared/imperative-classifier.ts";
 import { checkSpendCap, CHAT_CAP } from "../_shared/spend-cap.ts";
-import { resolvePlainReply, resolveToolReply, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ReplyCheck, type ToolReplyOptions } from "./tool-reply.ts";
+import { resolvePlainReply, resolveToolReply, SAVE_NUDGE, ANNOUNCES_THE_SAVE, ADVICE_NUDGE, EVALUATION_NUDGE, NUMBERS_NUDGE, type ReplyCheck, type ToolReplyOptions } from "./tool-reply.ts";
 import { detectPlanClaim, planClaimFloorText } from "../_shared/plan-claim.ts";
 import { detectTodayClaim, todayClaimFloor, todayClaimNudge, type TodayFacts } from "../_shared/today-claim.ts";
 import type { GeminiLegResult, GeminiPart } from "../_shared/gemini-parts.ts";
@@ -4977,18 +4977,33 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // the full imperative classifier, since a stated context fact is
         // usually phrased as a plain statement ("I get discouraged easily"),
         // not a command. I1 still holds: forwarded, never written here.
+        //
+        // AND THE COACH STILL ANSWERS (7 Nov 2026). This used to return an
+        // empty reply, so the save was all she got: the exam's "rough few
+        // weeks" and compensatory-cardio turns were answered with silence and
+        // a receipt. The save stays the app's (the client writes it and shows
+        // its note); the words are the coach's, written with the app's own
+        // checks on them, with a plain floor that is never empty.
         const quote = String(args.origin_verbatim_quote || "").trim();
-        if (!quote || !message.toLowerCase().includes(quote.toLowerCase())) {
-          return new Response(
-            JSON.stringify({ reply: textPart?.text || "" }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
+        const kept = !!quote && message.toLowerCase().includes(quote.toLowerCase());
+        const spoken = await toolReply({
+          outcome: { name, args, response: kept
+            ? { status: "kept_for_next_time", note: "the app keeps this and shows its own small note; reply to what they said" }
+            : { status: "not_kept", note: "nothing was kept; reply to what they said" } },
+          nudge: SAVE_NUDGE,
+          floor: "Thanks for telling me.",
+          preferFirstLegText: true,
+          forbid: [ANNOUNCES_THE_SAVE],
+          checks: [...todayChecks, {
+            test: (t: string) => detectPlanClaim(t) ? "it says the plan changed" : null,
+            nudge: () => "(System: your reply said their plan or day changed, and nothing changed. Reply again to what they said without saying anything was changed.)",
+            floor: "Thanks for telling me.",
+          }],
+        });
         return new Response(
-          JSON.stringify({
-            reply: "",
-            memoryIntent: { tool: name, rawArgs: args },
-          }),
+          JSON.stringify(kept
+            ? { reply: spoken.reply, memoryIntent: { tool: name, rawArgs: args } }
+            : { reply: spoken.reply }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }

@@ -21,10 +21,24 @@
 // Nothing is ever lost: the worst case is the reply she would have had anyway.
 //
 // WHAT IS NEVER REWRITTEN, because the exact words matter more than the length:
-// anything about an allergy or a diet restriction, a doctor, physio or other
-// professional, medication, pain or injury, or eating very little. And a reply
-// that is already short and the right shape goes straight through, with no
-// extra call.
+//   - a reply to a message that REPORTS something: pain, a symptom or an injury,
+//     an allergy or intolerance, a medical question, medication, or eating very
+//     little (PROTECTED_ASK, read off her message);
+//   - a reply that hands her to a doctor, physio, pharmacist or dietitian, or
+//     talks about an allergy, medication or disordered eating (PROTECTED_REPLY).
+// And inside a reply that IS edited, every sentence about pain, an injury or a
+// warning sign (SAFETY_SENTENCE) must come back word for word, or the edit is
+// refused: "stop if you feel a sharp pain" is never shortened away.
+//
+// MEASURED 7 Nov 2026 (the exam on TEST): one list read off both her message
+// and the draft skipped 19 replies, 9 of them on plain training advice. "numb"
+// matched "numbers" (3), "chest" matched a press (3), "injury" matched a reply
+// explaining why an exercise was chosen (2), "starving" matched hunger (1). So
+// the territory is read off what she SAID, and a warning in the coach's own
+// advice is kept rather than used as a reason to skip the whole reply.
+//
+// A reply that is already short and the right shape goes straight through,
+// with no extra call.
 //
 // Everything that touches the world is handed in (`call`, `refuse`), so
 // test:voice-pass drives this exact code with fakes.
@@ -79,11 +93,26 @@ export function shapeProblem(text: string, userMessage: string): string | null {
   return null
 }
 
-/** Words that mean the exact wording matters more than its length. */
-const NEVER_REWRITE = /\b(?:allerg\w*|anaphyla\w*|nut-free|gluten|coeliac|celiac|lactose|sesame|shellfish|intoleran\w*|doctor|gp|physio\w*|pharmacist|dietitian|medic\w*|prescri\w*|diagnos\w*|injur\w*|pain|sharp|hurts?|numb\w*|dizz\w*|chest|faint\w*|disorder\w*|purg\w*|binge\w*|starv\w*|calories? a day|eating disorder)\b/i
+/** Her message reports something where the exact reply matters more than its length. */
+const PROTECTED_ASK = /\b(?:allerg\w*|anaphyla\w*|nut-free|gluten|coeliac|celiac|lactose|sesame|shellfish|intoleran\w*|doctor|gp|physio\w*|pharmac\w*|dietitian|medic(?:al|ation|ations|ine|ines)|prescri\w*|diagnos\w*|injur\w*|pain\w*|sharp|hurts?|hurting|numb|numbness|tingl\w*|dizz\w*|faint\w*|swell\w*|swollen|disorder\w*|purg\w*|binge\w*|starv\w* (?:myself|yourself)|starvation|calories? a day|[1-9]\d{2} ?(?:k?cals?|calories))\b/i
+/** The coach's draft hands her to a professional, or talks about an allergy, medication or disordered eating. */
+const PROTECTED_REPLY = /\b(?:allerg\w*|anaphyla\w*|nut-free|coeliac|celiac|intoleran\w*|doctor|gp|physio\w*|pharmac\w*|dietitian|medic(?:al|ation|ations|ine|ines)|prescri\w*|diagnos\w*|eating disorder\w*|purg\w*|binge\w*|starv\w* (?:myself|yourself)|starvation)\b/i
+/** A sentence in an edited reply that must come back word for word: a warning sign, pain, an injury. */
+const SAFETY_SENTENCE = /\b(?:pain\w*|hurts?|hurting|sharp|numb|numbness|tingl\w*|dizz\w*|faint\w*|swell\w*|swollen|injur\w*)\b/i
 
 export function mustNotRewrite(draft: string, userMessage: string): boolean {
-  return NEVER_REWRITE.test(draft) || NEVER_REWRITE.test(userMessage)
+  return PROTECTED_ASK.test(userMessage) || PROTECTED_REPLY.test(draft)
+}
+
+const norm = (t: string) => t.replace(/\s+/g, ' ').trim().toLowerCase()
+
+/** The draft's sentences that an edit must keep word for word (a step number in front is not part of it). */
+export function safetySentencesOf(draft: string): string[] {
+  return visibleLines(draft)
+    .map(l => l.replace(/^\d+[.)]\s+/, ''))
+    .flatMap(l => l.split(/(?<=[.!?])\s+/))
+    .map(s => s.trim())
+    .filter(s => s && SAFETY_SENTENCE.test(s))
 }
 
 export function voicePrompt(draft: string, userMessage: string, why: string | null): string {
@@ -99,6 +128,7 @@ export function voicePrompt(draft: string, userMessage: string, why: string | nu
     isHowTo(userMessage) ? '- A how-to may stay as up to three short numbered steps.' : '- No lists, no numbered lines, no bullets.',
     '- At most one question, and only if their answer changes what happens next. Otherwise end on the answer.',
     '- Keep every fact, number, name and food exactly as in the draft. Add nothing new: no new number, food, exercise or claim.',
+    ...(() => { const keep = safetySentencesOf(draft); return keep.length ? [`- Keep these sentences word for word, because they are about their safety: ${keep.map(k => `"${k}"`).join(' ')}`] : [] })(),
     '- Keep every marker in square brackets ([QUICK_REPLIES: ...], [LESSON: ...], [ACTION: ...]) exactly as written, at the end.',
     '- No bold, no headers. At most one emoji. Never mention being an AI or that you are editing.',
     'Reply with the message only.',
@@ -121,6 +151,9 @@ export function checkRewrite(raw: string | null | undefined, draft: string, user
   const foods = foodsOf(draft)
   const strayFood = [...foodsOf(text)].filter(f => !foods.has(f))
   if (strayFood.length) return { ok: false, why: `a food not in the draft (${strayFood.join(', ')})` }
+  const visible = norm(visibleLines(text).join(' '))
+  const lost = safetySentencesOf(draft).find(k => !visible.includes(norm(k)))
+  if (lost) return { ok: false, why: `a safety sentence not kept word for word ("${lost.slice(0, 60)}")` }
   const claim = refuse ? refuse(text) : null
   if (claim) return { ok: false, why: `a claim the checks refuse (${claim.slice(0, 60)})` }
   const shape = shapeProblem(text, userMessage)

@@ -8,11 +8,15 @@
  *      edit is retried once, told why; two bad edits leave the draft.
  *   3. What an edit may never do: lose a marker, add a number or a food, make a
  *      claim the checks refuse.
- *   4. What is never edited: safety wording, the full guide.
+ *   4. What is never edited: a reply to pain, a symptom, an allergy, a medical
+ *      question or eating very little; a hand-off to a professional; the full
+ *      guide. And what is: plain advice that merely mentions a body part,
+ *      "numbers" or an injury (the 7 Nov exam's 9 wrong skips), with every
+ *      warning sentence in it kept word for word.
  *   5. The coach's server uses it on every non-floor plain reply.
  */
 import { readFileSync } from 'node:fs'
-import { shapeProblem, voicePass, checkRewrite, voicePrompt, markersOf, mustNotRewrite, EDIT_OVER_CHARS } from '../supabase/functions/chat-gemini/voice-pass'
+import { shapeProblem, voicePass, checkRewrite, voicePrompt, markersOf, mustNotRewrite, safetySentencesOf, EDIT_OVER_CHARS } from '../supabase/functions/chat-gemini/voice-pass'
 
 let ran = 0, failures = 0
 const check = (label: string, ok: boolean, extra?: unknown) => {
@@ -90,9 +94,43 @@ async function main() {
   calls.length = 0
   const allergy = await voicePass(MENU.replace('heavy few weeks', 'nut allergy'), 'is my lunch safe for my nut allergy', fake([GOOD]))
   check('allergy wording is never edited, and no call is made', allergy.source === 'skipped' && calls.length === 0, allergy)
-  check('...nor a doctor or physio hand-off, medication, pain, or eating very little',
-    ['see your physio first', 'ask your doctor', 'on beta blockers medication', 'it is a sharp pain', 'I only ate 600 calories a day'].every(t => mustNotRewrite(t, '')))
+  check('...nor a reply that hands her to a professional, or is about medication',
+    ['see your physio first', 'ask your doctor', 'on beta blockers medication', 'check with a pharmacist', 'a dietitian can help'].every(t => mustNotRewrite(t, 'x')))
+  check('...nor a reply to a message about pain, a symptom, an injury, an allergy or eating very little',
+    ['it is a sharp pain', 'my knee hurts', 'I feel dizzy on the bike', 'I injured my wrist', 'I only ate 600 calories yesterday', 'I only eat 800 calories a day', 'is this safe for my nut allergy', 'can I take ibuprofen with my medication'].every(u => mustNotRewrite('Plain advice.', u)),
+    ['it is a sharp pain', 'my knee hurts', 'I feel dizzy on the bike', 'I injured my wrist', 'I only ate 600 calories yesterday', 'I only eat 800 calories a day', 'is this safe for my nut allergy', 'can I take ibuprofen with my medication'].filter(u => !mustNotRewrite('Plain advice.', u)))
   check('...while an ordinary reply is not held back', !mustNotRewrite(ESSAY, 'why are rdls after squats'))
+  // THE 7 NOV EXAM'S WRONG SKIPS, in the coach's own words (coach-exam/transcripts, branch exam-results-nov6b).
+  const WRONG_SKIPS: [string, string][] = [
+    ["Your squat is right where the numbers say it should be, so stay at 45kg today.", 'what weight for squats'],
+    ['Keep your chest up and the bar over mid-foot as you stand.', 'how do I squat'],
+    ['That is a fast track to injuring your shoulder tissue.', 'can I go heavier on the press'],
+    ['Squats go first because fatigue from the RDLs raises injury risk under the bar.', 'why is this exercise first'],
+    ['Have the rice at lunch.', "I'm starving after training, what should I eat"],
+  ]
+  check('plain advice that names "numbers", a chest, an injury or hunger is NOT held back (the 7 Nov exam skipped 9 such replies)',
+    WRONG_SKIPS.every(([d, u]) => !mustNotRewrite(d, u)), WRONG_SKIPS.filter(([d, u]) => mustNotRewrite(d, u)))
+
+  const HOWTO = "Hinge at the hips and keep the bar close to your legs. Stop if you feel a sharp pain in your lower back. Lower until you feel a stretch in your hamstrings, then drive your hips forward to stand. Keep your chest proud the whole way."
+  check('a warning sentence in the draft is found', JSON.stringify(safetySentencesOf(HOWTO)) === JSON.stringify(['Stop if you feel a sharp pain in your lower back.']), safetySentencesOf(HOWTO))
+  check('...also inside a numbered step, without its number (both "2." and "2)")',
+    JSON.stringify(safetySentencesOf('Cues:\n1. Brace.\n2. Stop if it hurts.')) === JSON.stringify(['Stop if it hurts.'])
+      && JSON.stringify(safetySentencesOf('Cues:\n1) Brace.\n2) Stop if it hurts.')) === JSON.stringify(['Stop if it hurts.']),
+    [safetySentencesOf('Cues:\n1. Brace.\n2. Stop if it hurts.'), safetySentencesOf('Cues:\n1) Brace.\n2) Stop if it hurts.')])
+  check('...and the brief tells the editor to keep it word for word', voicePrompt(HOWTO, 'how do I do a romanian deadlift', null).includes('word for word') && voicePrompt(HOWTO, 'how do I do a romanian deadlift', null).includes('"Stop if you feel a sharp pain in your lower back."'))
+  check('...while a draft with no warning asks for nothing extra', !voicePrompt(ESSAY, 'why', null).includes('word for word'))
+  const KEPT = "Hinge at the hips with the bar close.\nStop if you feel a sharp pain in your lower back.\nYou should feel it in your hamstrings, which is the point of the lift."
+  const DROPPED = "Hinge at the hips with the bar close.\nYou should feel it in your hamstrings, which is the point of the lift."
+  const REWORDED = "Hinge at the hips with the bar close.\nIf your back twinges, stop.\nYou should feel it in your hamstrings, which is the point of the lift."
+  check('an edit that keeps the warning word for word passes', checkRewrite(KEPT, HOWTO, 'how do I do a romanian deadlift').ok === true, checkRewrite(KEPT, HOWTO, 'how do I do a romanian deadlift'))
+  check('an edit that DROPS the warning is refused', (checkRewrite(DROPPED, HOWTO, 'how do I do a romanian deadlift') as { why?: string }).why?.startsWith('a safety sentence not kept word for word') === true, checkRewrite(DROPPED, HOWTO, 'how do I do a romanian deadlift'))
+  check('an edit that REWORDS the warning is refused', (checkRewrite(REWORDED, HOWTO, 'how do I do a romanian deadlift') as { why?: string }).why?.startsWith('a safety sentence not kept word for word') === true, checkRewrite(REWORDED, HOWTO, 'how do I do a romanian deadlift'))
+  calls.length = 0
+  const rdl = await voicePass(HOWTO, 'how do I do a romanian deadlift', fake([DROPPED, KEPT]))
+  check('a how-to with a warning IS edited now, and a dropped warning gets a second try that keeps it', rdl.source === 'edited' && rdl.reply === KEPT && calls.length === 2 && /safety sentence/.test(calls[1] ?? ''), { rdl, calls: calls.length })
+  calls.length = 0
+  const rdlBad = await voicePass(HOWTO, 'how do I do a romanian deadlift', fake([DROPPED, DROPPED]))
+  check('...and two edits that drop it leave the draft, warning and all', rdlBad.source === 'draft' && rdlBad.reply === HOWTO, rdlBad)
   calls.length = 0
   const guide = await voicePass('Full guide:\n1. a.\n2. b.\n3. c.\n4. d.\n5. e.', 'Full form guide', fake([GOOD]))
   check('the full form guide she asked for is never cut down', guide.source === 'skipped' && calls.length === 0, guide)

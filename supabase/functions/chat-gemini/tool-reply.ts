@@ -63,6 +63,18 @@ export const EVALUATION_NUDGE =
 export const NUMBERS_NUDGE =
   "(System: the app computed these numbers from its own food database; nothing was recorded. Answer as their coach texting — one to three short sentences. Quote the calories exactly as they appear in the result, as the number followed by 'kcal' (for example '61 kcal'); the other macros only if they help. No lists, no bold, no field names; never mention assumptions or the database, and never say anything was logged. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
 
+/**
+ * For record_context_fact: what she said was kept for next time (or not), and she is still waiting for an answer.
+ * MEASURED 7 Nov 2026 (the exam on TEST): this save answered with an EMPTY reply, so "it's been a rough few weeks"
+ * and "I did 90 minutes of cardio because I'd overeaten" got silence and a receipt. The save is the app's job; the
+ * reply is still the coach's, under every rule it was given (including naming a professional when it is called for).
+ */
+export const SAVE_NUDGE =
+  "(System: the app has kept what they told you for next time and shows its own small note, so never mention saving, remembering, noting or recording it. They are still waiting for your reply: answer what they actually said, as their coach texting, following every rule you were given, including naming a doctor, dietitian or other professional when what they said calls for one. Two to four short lines, no lists, no bold. Plain text only on this attempt — tool calls are unavailable and anything that looks like one will be discarded.)";
+
+/** Things a save reply may never say (the prompt's "DON'T ANNOUNCE THE SAVE"); a reply that does is refused. */
+export const ANNOUNCES_THE_SAVE = /\b(?:saved|added|stored|recorded|noted)\b[^.!?\n]{0,30}\b(?:memory|profile)\b|\bi'?ve (?:recorded|saved|noted) (?:that|it|this)\b/i;
+
 export interface ToolOutcome {
   name: string;
   args: Record<string, unknown>;
