@@ -99,7 +99,7 @@ console.log('\n3. Home\'s finished day')
   const branches = [...before.matchAll(/if \((.*?)\) \{/g)].map(m => m[1])
   check('the Done panel keeps the lift line (L9: what she lifted, today)',
     /<span data-testid="home-session-glance">\{sessionGlance\}<\/span>/.test(own) && /right = done\s*\?/.test(own)
-    && branches.length === 3 && branches.every(b => !/\bdone\b/.test(b)), { branches })
+    && branches.length === 4 && branches.every(b => !/(^|[^!])\bdone\b/.test(b)), { branches })
   check('...and offers the summary only when there is one',
     /onSummary=\{card \? \(\) => setSummaryOpen\(true\) : undefined\}/.test(dash) && /\{onSummary && \([\s\S]{0,200}data-home-summary/.test(hero) && /\{done && \([\s\S]{0,900}\{onSummary && \(/.test(hero))
   const store = new Map<string, string>()

@@ -295,7 +295,7 @@ const movedUi = homeUi.slice(Math.max(0, movedUiAt), Math.max(0, restUiAt))
 check('...that says where the session went', /Moved to \$\{data\.session\.movedTo\.dayName\}/.test(movedUi))
 check('...and names what left', /data\.session\.focus/.test(movedUi))
 check('...and offers nothing to start', movedUi.length > 0 && !/Start session|Continue session/.test(movedUi)
-  && /const showCta = status === 'not_started' \|\| status === 'in_progress'/.test(homeUi))
+  && /const showCta = homeOffersStart\(status, swappedFor\)/.test(homeUi))
 check('...and the old "still here if you want it today" is gone from Home too',
   !/still here if you want it today/.test(homeUi))
 

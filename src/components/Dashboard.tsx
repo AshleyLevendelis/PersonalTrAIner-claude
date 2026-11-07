@@ -25,7 +25,7 @@ import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { HomeWeekStrip, HomeWeekBoundaryNote, sessionOrdinal } from '@/components/HomeWeekStrip'
 import { PageRow, PRIMARY_CTA_STYLE } from '@/components/OnePage'
-import { ringShare, todaySoFarPercent, compactCount } from '@/lib/one-page'
+import { ringShare, todaySoFarPercent, compactCount, homeOffersStart } from '@/lib/one-page'
 import { dayAsShown, eatenMacrosBySlot, aroundEatenKeptKey, readAroundEatenKept } from '@/lib/day-as-shown'
 import { mealSections } from '@/lib/meal-sections'
 import { SLOT_ORDER, SLOT_LABEL } from '@/components/MealPlan'
@@ -494,7 +494,11 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const stepsShare = ringShare(stepsToday, stepsTarget)
   const soFar = todaySoFarPercent([calShare, proteinShare, waterShare, stepsShare])
   const toNutrition = () => { window.location.hash = tabHash('nutrition') }
-  const showCta = status === 'not_started' || status === 'in_progress'
+  // A DAY SHE SWAPPED FOR SOMETHING ELSE (whole-app QA walk, 7 Nov 2026): Exercise said she had swapped today for
+  // Muay Thai while Home still invited her to start the session. The swap is said here too, and Start is not offered
+  // on a day she has already replaced; Exercise keeps its own way to train it anyway.
+  const swappedFor = todayCell?.state === 'swapped' ? (todayCell.swappedLine || todayCell.swappedForActivity || 'something else') : null
+  const showCta = homeOffersStart(status, swappedFor)
 
   const recentCount = data.recentPRs.length
   const tomorrowSub = tomorrow && !tomorrow.rest && tomorrow.minutes != null ? `Tomorrow · ~${tomorrow.minutes} min` : 'Tomorrow'
@@ -536,6 +540,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         setsLogged={setsLogged}
         setsPlanned={setsPlanned}
         prCount={prCount}
+        swappedFor={swappedFor}
         topPr={prCount > 0 && topPr ? `${topPrLift ?? ''} ${topPr}`.trim() : null}
         onSummary={card ? () => setSummaryOpen(true) : undefined}
         cta={showCta && (
@@ -814,7 +819,7 @@ export function RingCell({ k, share, color, glow, icon, value, label, onClick, a
  * the week under a hairline. Every state the old row had is here: not yet planned, moved, rest, done (with its
  * time, PRs and the summary), and the session itself. data-tour and data-home-hero keep their names.
  */
-export function SessionHero({ status, data, week, sessionGlance, done, minutes, setsLogged, setsPlanned, prCount, topPr, onSummary, cta, footer }: {
+export function SessionHero({ status, data, week, sessionGlance, done, minutes, setsLogged, setsPlanned, prCount, topPr, onSummary, cta, footer, swappedFor = null }: {
   status: DashboardData['session']['status']
   data: DashboardData
   week: ReturnType<typeof useTrainingWeek>
@@ -828,6 +833,8 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
   onSummary?: () => void
   cta?: React.ReactNode
   footer?: React.ReactNode
+  /** What she swapped today's session for, when she did. */
+  swappedFor?: string | null
 }) {
   const weekCount = `${week.sessionsDone} of ${week.sessionsPlanned} session${week.sessionsPlanned === 1 ? '' : 's'} done`
   const ordinal = sessionOrdinal(week.days, data.today)
@@ -847,6 +854,10 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
     // calls "Active Recovery + Cardio"). A day with no plan entry is the plain rest day.
     title = data.session.recoveryLine && data.session.focus ? data.session.focus : 'Rest day'
     sub = data.session.recoveryLine ?? 'Recovery is part of the program'
+    right = weekCount
+  } else if (swappedFor && !done) {
+    title = `Swapped for ${swappedFor}`
+    sub = `${data.session.focus ?? "Today's session"} stays on the plan if you still want it`
     right = weekCount
   } else {
     title = data.session.focus ?? "Today's session"

@@ -87,6 +87,20 @@ check('T1b. ...it shows the day as finished instead', t1.finished === true, t1)
 check('T1c. ...and the saved session keeps its time', t1.minutes.length > 0 && t1.minutes.every(m => m > 1), t1.minutes)
 await shoot('qa-t1-done-day')
 
+console.log('\nT9. A day she swapped for something else: Home says so and offers no Start\n')
+await open('swapped=1', 'dashboard')
+const t9 = await ev(`(() => ({
+  title: document.querySelector('[data-home-title]')?.textContent ?? null,
+  start: !!document.querySelector('[data-home-cta]'),
+  strip: [...document.querySelectorAll('[aria-label]')].map(e => e.getAttribute('aria-label')).find(t => /swapped for/.test(t || '')) ?? null,
+}))()`)
+check('T9a. Home names the swap, the same activity the strip names', !!t9.title && /^Swapped for /.test(t9.title) && !!t9.strip && t9.strip.endsWith(t9.title.replace(/^Swapped for /, '')), t9)
+check('T9b. ...and does not invite her to start the session she replaced', t9.start === false, t9)
+await shoot('qa-t9-swapped-home')
+await open('', 'dashboard')
+const t9b = await ev(`({ title: document.querySelector('[data-home-title]')?.textContent ?? null, start: !!document.querySelector('[data-home-cta]') })`)
+check('T9c. an ordinary training day still offers Start (the fixture binds)', t9b.start === true && !/^Swapped/.test(t9b.title ?? ''), t9b)
+
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)
 

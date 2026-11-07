@@ -132,7 +132,14 @@ async function main() {
   console.log('\n5. Nothing the old screens carried is gone')
   check('Home: the weigh-in still opens from the weight', /onClick=\{\(\) => setWeighInOpen\(o => !o\)\}/.test(home) && /<WeighInCard /.test(home))
   check('Home: a finished session still opens its summary', /onSummary=\{card \? \(\) => setSummaryOpen\(true\) : undefined\}/.test(home) && /<SessionSummaryDialog /.test(home))
-  check('Home: the Start button starts or continues, and only then', /const showCta = status === 'not_started' \|\| status === 'in_progress'/.test(home) && /\{showCta && \(/.test(home))
+  {
+    const { homeOffersStart } = await import('../src/lib/one-page')
+    check('the rule itself: Start or Continue only while due or under way',
+      homeOffersStart('not_started', null) && homeOffersStart('in_progress', null)
+      && !['done', 'rest', 'moved', 'unknown'].some(s => homeOffersStart(s, null)))
+    check('...and never on a day she swapped for something else', !homeOffersStart('not_started', 'Muay Thai') && !homeOffersStart('in_progress', 'Muay Thai'))
+  }
+  check('Home: the Start button starts or continues, and only then', /const showCta = homeOffersStart\(status, swappedFor\)/.test(home) && /\{showCta && \(/.test(home))
   check('Nutrition: the targets sheet opens from the Targets row', /onClick=\{\(\) => setHowItsSetOpen\(true\)\}[\s\S]{0,200}data-targets-row/.test(nut))
   check('Nutrition: the resize and top-up offers still render', /data-testid="meal-refit-offer"/.test(nut) && /data-testid="meal-top-up-offer"/.test(nut))
   const row = read('src/components/exercise/WeekContextRow.tsx')

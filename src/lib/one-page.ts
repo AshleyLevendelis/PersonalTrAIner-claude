@@ -107,3 +107,12 @@ export function weekSetCount(days: TrainingWeekDay[]): { logged: number; planned
   }
   return { logged, planned }
 }
+
+/**
+ * WHETHER HOME OFFERS "START" OR "CONTINUE" ON TODAY'S CARD (her showCta rule): only while the session can start or
+ * go on, and never on a day she swapped for something else (whole-app QA walk, 7 Nov 2026). A function, so the five
+ * checks that ask this rule call it rather than each pinning one line of Home's source.
+ */
+export function homeOffersStart(status: string, swappedFor: string | null | undefined): boolean {
+  return !swappedFor && (status === 'not_started' || status === 'in_progress')
+}

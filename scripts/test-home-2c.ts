@@ -103,7 +103,8 @@ async function main() {
   const unknown = hero('unknown', { cta: false })
   check('unknown: "Checking your plan…", no mint word, no Start button', /Checking your plan…/.test(text(unknown)) && !/text-primary-text"[^>]*>plan…/.test(unknown) && !/data-home-cta/.test(unknown))
   const home = strip(readFileSync('src/components/Dashboard.tsx', 'utf8'))
-  check('the Start button is only handed in while it can start or continue (her showCta rule)', /cta=\{showCta && \(/.test(home) && /const showCta = status === 'not_started' \|\| status === 'in_progress'/.test(home))
+  // Since 7 Nov 2026 also never on a day she swapped for something else (whole-app QA walk).
+  check('the Start button is only handed in while it can start or continue (her showCta rule)', /cta=\{showCta && \(/.test(home) && /const showCta = homeOffersStart\(status, swappedFor\)/.test(home))
 
   console.log('\n4. The coach line')
   const tips = [{ key: 'a', text: 'Your bench moved from 60 to 62.5 kg.', tag: 'Training', prefill: 'p' }, { key: 'b', text: 'Second tip.', tag: 'Today', prefill: 'q' }]
