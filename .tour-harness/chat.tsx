@@ -90,7 +90,8 @@ const PROFILE_ID = '00000000-0000-4000-8000-000000000001'
 // "today" for every run, so a driver's day-name assertions stop depending on
 // what day it is where the machine is.
 // ?clock=HH:MM pins the time of day as well (the evening moments, 7 Nov 2026); noon otherwise, as before.
-setDevClockOverride(PROFILE_ID, ANCHOR_ISO, new URLSearchParams(location.search).get('clock'))
+const CLOCK_TIME = new URLSearchParams(location.search).get('clock')
+setDevClockOverride(PROFILE_ID, ANCHOR_ISO, CLOCK_TIME)
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const todayIdx = anchorDate().getDay()
 
