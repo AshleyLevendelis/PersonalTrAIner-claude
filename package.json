@@ -548,6 +548,7 @@
     "test:typed-days": "tsx scripts/test-typed-days.ts",
     "test:setup-sports": "tsx scripts/test-setup-sports.ts",
     "test:sport-fuel": "tsx scripts/test-sport-fuel.ts",
+    "test:setup-follow-ups": "tsx scripts/test-setup-follow-ups.ts",
     "test:protein-advice": "tsx scripts/test-protein-advice.ts",
     "verify:coach-texts-you": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-texts-you.mjs",
     "verify:coach-lessons": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-lessons.mjs",

@@ -2,6 +2,34 @@
 
 Newest first. One line each.
 
+- [x] **SETUP IS A CONVERSATION: FOLLOW-UPS FIRST, NOTED, THEN BACK; HER RULING "UP TO 3, THEN BACK", 7 NOV 2026**
+  (Ashley: "during the onboarding, I mentioned that I do Muay Thai ... It then went on to the next question without
+  even asking any follow-up questions ... it shouldn't be a rigid form ... a real person isn't just going to go on to
+  the next question. It's going to ask things that are relevant, note those down, and plan around those things.")
+  TRACED (investigator, then read here): the setup coach WAS told to be curious (two one-line rules), but four others
+  said "react in a clause, then the next question, same turn", the STILL UNKNOWN list arrived every turn in asking
+  order, and nothing said a follow-up came first; the app adds the next question only after a run of unanswered
+  turns, so it was not the cause of her turn. **Her ruling, from three options: "Up to 3, then back"** (over one
+  follow-up only and over following for as long as she likes). BUILT: (1) the coach's instructions gain FOLLOW-UPS COME
+  FIRST, outranking the checklist: what she volunteers that matters (a sport, an injury, a job or shifts, why she
+  stopped, an event, sleep, stress, a past diet) gets a follow-up turn, one question per turn, up to three on a topic,
+  noted as it goes (record_context_fact in plain words; a slot where one exists), then steered back using what was
+  learned; the sport the app records is followed up (how long, how hard, sparring) and never re-asked; the four
+  "next question, same turn" rules and the STILL UNKNOWN paragraph now give way to it. (2) The app's step-in counts
+  HER replies since her last recorded answer, so a typed answer and a tap count the same (a tick lands after the
+  coach's question in one and before it in the other) and the "Welcome back" line on a resumed setup no longer counts
+  as a coach turn (it cut in one turn early); three follow-ups stand, the fourth gets the next question under it.
+  (3) FOUND WHILE TESTING: a coach reply that asks nothing while something is still needed ("A calibration week it is,
+  then.") left her with nothing to answer; verify:onboarding-turns section 8 had only passed because the old count
+  misfired. The app now asks the next question itself, plainly, with no "let's lock this in" lead; a follow-up always
+  asks something, so this never cuts across one. (4) "What I'll remember" on the setup summary: every note, each with
+  Forget (44px), and one line saying notes help the coach talk to her and do not change the plan by themselves; a
+  clinical label is replaced by her own words, as in the chat. NOT PROVEN: whether the deployed model follows up is
+  model behaviour (a probe or a real setup on her machine); the coach exam does not cover setup. test:setup-follow-ups
+  19 checks; verify:onboarding-turns 144 (section 27 new; section 8 now passes on the real mechanism). 12 mutations,
+  18 runs: every one caught by at least one check (the driver missed "notes not shown"'s source half and one run
+  stopped short; the gate caught both). 35 derived gates green. Needs the `onboarding-chat` deploy.
+
 - [x] **ANOTHER SPORT IS FUELLED: ITS CALORIES REACH THE FOOD TARGETS, 7 NOV 2026** (Ashley: "yes, add the extra
   calories on sport days", after being told the targets ignored it). TRACED: the targets counted gym sessions (dynamic
   mode) and the activity level, which setup asks as "how active is your day-to-day, OUTSIDE training", so a second

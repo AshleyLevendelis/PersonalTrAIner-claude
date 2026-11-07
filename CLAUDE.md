@@ -1109,6 +1109,11 @@ menu" stays true when a copy is also left outside it.
   of them plain advice). And a save is never a silent turn: the coach answers beside it, and its note is never a
   clinical label about her (her "fix the save note wording too": her own words replace one) (`test:save-reply`,
   `verify:chat-save-reply`). `test:voice-pass`, `chat-gemini/voice-pass.ts`. Needs the `chat-gemini` deploy and an exam re-run
+- **Setup is a conversation, not a form: her ruling 7 Nov 2026, "Up to 3, then back"** (over one follow-up and over no
+  limit): what she volunteers gets up to three follow-ups, noted as it goes, before the coach steers back; the app steps
+  in on the fourth reply with nothing recorded, asks itself when a reply asks nothing, and the setup summary lists
+  "What I'll remember" with Forget. `test:setup-follow-ups`, `verify:onboarding-turns` §27. Needs the `onboarding-chat`
+  deploy; whether the model follows up is unproven until a real setup
 - **It reads like texting a coach — Ashley's three rulings of 24 Sep 2026**,
   after seeing four-paragraph answers and a question tacked onto every reply:
   (1) **"short steps"**, from three options (over speech-only and over a

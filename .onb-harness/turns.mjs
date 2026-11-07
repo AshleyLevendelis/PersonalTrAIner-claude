@@ -799,6 +799,43 @@ await section(26, 'Her muay thai is kept, with its days and evening, and the coa
   check('said again with other days, it is corrected, never doubled', again.length === 1 && JSON.stringify(again[0].days) === JSON.stringify(['Wednesday']), again)
 })
 
+await section(27, 'Up to 3, then back: a tangent gets three follow-ups before the app steps in, and the notes are shown', async () => {
+  await open('days')
+  // Her ruling 7 Nov 2026, "Up to 3, then back". She volunteers a night-shift job instead of
+  // answering; the coach follows up three times, noting as it goes, asking no setup question.
+  const followUp = (reply, note) => ({ reply, actions: note ? [{ name: 'record_context_fact', args: { display_text: note, raw_phrase: 'nights' } }] : [] })
+  const forced = () => ev(`(() => { const t = document.body.innerText; return /Let's lock this one in|Easiest if you just tap one here|Pick whichever is closest|leave that one for now|park that one|Skipping ahead a bit|That one can wait/.test(t) })()`)
+  // A real conversation: her last answer was recorded (a tick), so the count starts here.
+  await queue({ reply: 'Good to know. Which days can you actually train?', actions: [{ name: 'set_slot', args: { slot_key: 'recoveryCapacity', value: 'moderate' } }] })
+  await say('sleep is fine, stress is normal')
+  await queue(followUp('Nights are hard on a body. How many shifts a week, roughly?', 'Works night shifts'))
+  await say('honestly my week is messy, I work nights')
+  await queue(followUp('Two is manageable. Do you sleep straight after a shift, or split it?', 'Two night shifts a week'))
+  await say('two a week usually')
+  check('after two follow-ups the app has not cut in', !(await forced()))
+  await queue(followUp('Good, a proper block of sleep helps. Do you train before or after a night shift, if at all?', 'Sleeps straight after a shift'))
+  await say('straight after, about 7 hours')
+  check('after the THIRD follow-up the app still has not cut in (her "up to 3")', !(await forced()), (await ev('document.body.innerText')).slice(-400))
+  await shot('follow-ups-three')
+  // A fourth follow-up is past her ruling: the app puts the next setup question under it.
+  await queue(followUp('And what do you eat on a night shift, usually?', ''))
+  await say('never before, I am wrecked')
+  check('a FOURTH follow-up gets the next setup question put under it', await forced(), (await ev('document.body.innerText')).slice(-400))
+  const kept = (await evj(`__draft()`))?.pendingContextFacts?.map(f => f.displayText) ?? []
+  check('each follow-up was noted as it went', ['Works night shifts', 'Two night shifts a week', 'Sleeps straight after a shift'].every(n => kept.includes(n)), kept)
+
+  // The summary shows the notes, each can be forgotten, and says what a note is for.
+  await open('review-notes')
+  const notes = await evj(`[...document.querySelectorAll('[data-onboarding-note]')].map(li => li.innerText.replace(/\\s+/g, ' ').trim())`)
+  check('the summary lists what the coach will remember', JSON.stringify(notes) === JSON.stringify(['Three years of Muay Thai, spars most weeks Forget', 'Works two night shifts a week Forget']), notes)
+  check('...and says a note does not change the plan by itself', /don.t change your plan by themselves/.test(await ev(`document.querySelector('[data-testid="onboarding-notes"]')?.innerText ?? ''`)))
+  await shot('summary-notes')
+  await tapEl(`document.querySelector('[aria-label="Forget: Works two night shifts a week"]')`, 'the Forget button')
+  await wait(300)
+  const after = (await evj(`__draft()`))?.pendingContextFacts?.map(f => f.displayText) ?? []
+  check('Forget removes that note, and only that one, from what is kept', JSON.stringify(after) === JSON.stringify(['Three years of Muay Thai, spars most weeks']), after)
+})
+
 if (!isGone()) {
   try { check('harness: every request in this run was scripted', (await ev(`window.__onbUnscripted`)) === 0) } catch {}
 }

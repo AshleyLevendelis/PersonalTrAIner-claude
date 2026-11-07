@@ -131,7 +131,7 @@ if (state === 'kit') {
   ))
 }
 
-if (state === 'review' || state === 'review-card') {
+if (state === 'review' || state === 'review-card' || state === 'review-notes') {
   // Everything the plan needs is answered, so the review opens by itself —
   // the component's own effect, not a flag set here.
   const all = {
@@ -157,6 +157,16 @@ if (state === 'review' || state === 'review-card') {
     all,
     Object.keys(all),
   ))
+  // review-notes (7 Nov 2026): two notes the coach kept from the conversation,
+  // the way record_context_fact leaves them, so the summary has something to show.
+  if (state === 'review-notes') {
+    const d = JSON.parse(localStorage.getItem('fitplan_onboarding_draft') || '{}')
+    d.pendingContextFacts = [
+      { rawPhrase: 'been doing muay thai about three years', displayText: 'Three years of Muay Thai, spars most weeks' },
+      { rawPhrase: 'I work nights twice a week', displayText: 'Works two night shifts a week' },
+    ]
+    seed(d)
+  }
 }
 
 // JO, a gym lifter at the working-lifts question — the state Ashley was in on

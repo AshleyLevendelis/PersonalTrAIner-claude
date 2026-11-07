@@ -48,6 +48,7 @@ import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } fr
 import { chooseCard, questionPartOf } from '@/lib/onboarding-chip-match'
 import { mealCountIn, mergePendingGoal, sessionLengthNote, snackAnswerIn, trainingDaysIn } from '@/lib/onboarding-capture'
 import { sportsIn, mergeSports, parseSportsSlot, formatSportsSlot } from '@/lib/setup-sports'
+import { contextNoteText } from '@/lib/save-reply'
 import type { SessionDuration } from '@/lib/types'
 import { addParkedQuestion, saveParkedQuestions } from '@/lib/parked-questions'
 import {
@@ -372,6 +373,10 @@ function tryVolunteeredCapture(
 // How many turns the stuck-slot breaker below tolerates with no confirmed
 // answer anywhere before forcing a question regardless of how many times
 // (if any) that specific slot has been asked.
+// Ashley's ruling 7 Nov 2026, "Up to 3, then back": the coach may follow up
+// three times on something she volunteered; on the FOURTH reply with no answer
+// recorded the app puts the next question under it, the half of her ruling
+// code can hold. Counted per reply to her (turnsSinceLastConfirmation).
 const STALL_TURN_LIMIT = 4
 
 /** Ticks in the header's progress row. Four, per the v2 design — enough to
@@ -491,12 +496,17 @@ function forcedAskLead(timesSteppedIn: number, movedOn: boolean): string {
  * different slots — never trips it, because the count keeps resetting.
  */
 function turnsSinceLastConfirmation(msgs: ChatMsg[]): number {
-  let count = 0
+  // COACH REPLIES SINCE HER LAST RECORDED ANSWER, counting THIS one (7 Nov 2026,
+  // her "Up to 3, then back"). Counted by HER messages, not the coach's: a tick
+  // lands after the coach's question when the coach records the answer and
+  // before it when she taps, so counting coach messages gave two different
+  // numbers for the same conversation, and the app's "Welcome back" line on a
+  // resumed conversation counted as a coach turn.
+  let count = 1
   for (let i = msgs.length - 1; i >= 0; i--) {
     const m = msgs[i]
-    if (m.role !== 'assistant') continue
+    if (m.role === 'user') { count++; continue }
     if (m.isReceipt || (m.slotCard && m.slotCardResolved)) return count
-    count++
   }
   return count
 }
@@ -1015,8 +1025,10 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
           console.warn('onboarding: refused decline_slot for a slot the plan needs', key)
         }
       } else if (action.name === 'record_context_fact') {
-        const displayText = String(action.args.display_text ?? '').trim()
         const rawPhrase = String(action.args.raw_phrase ?? '').trim()
+        // A clinical or judging label is replaced by her own words, as the chat's
+        // notes are (save-reply.ts): these are now shown on the summary (7 Nov 2026).
+        const displayText = rawPhrase ? contextNoteText(String(action.args.display_text ?? '').trim(), rawPhrase) : ''
         if (displayText && rawPhrase && !ws.pendingContextFacts.some(f => f.displayText === displayText)) {
           ws.pendingContextFacts = [...ws.pendingContextFacts, { rawPhrase, displayText }]
         }
@@ -1498,7 +1510,14 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
           const priorAsks = priorMessages.filter(m => m.slotCard === canonicalNext).length
           const askedThisTurn = responseWs.newMessages.some(m => m.slotCard === canonicalNext)
           const stalledTurns = turnsSinceLastConfirmation(allMsgs)
-          if ((priorAsks >= 3 || stalledTurns >= STALL_TURN_LIMIT) && !askedThisTurn) {
+          // A DEAD END (7 Nov 2026): the coach's reply asks nothing ("A calibration
+          // week it is, then.") while something the plan needs is still open, so
+          // nobody asks it and she is left with nothing to answer. The app asks the
+          // next one itself, plainly. A follow-up always asks something, so this
+          // never cuts across one (her "Up to 3, then back").
+          const coachAsked = responseWs.newMessages.some(m => m.role === 'assistant' && !m.isReceipt && (!!m.slotCard || m.content.includes('?')))
+          const stuck = priorAsks >= 3 || stalledTurns >= STALL_TURN_LIMIT
+          if ((stuck || !coachAsked) && !askedThisTurn) {
             // Which question to force is a choice, not just "the first one
             // still missing". Hammering one slot the user plainly can't or
             // won't answer produced the same question three times over with
@@ -1514,10 +1533,11 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
             const def = target ? getSlotDef(target) : undefined
             if (def && target) {
               const timesSteppedIn = allMsgs.filter(m => FORCED_ASK_MARKERS.some(marker => m.content.startsWith(marker))).length
-              const lead = forcedAskLead(timesSteppedIn, target !== canonicalNext)
+              // A dead end gets the question alone; only a stuck conversation gets a lead.
+              const lead = stuck ? forcedAskLead(timesSteppedIn, target !== canonicalNext) : ''
               responseWs.newMessages.push({
                 role: 'assistant',
-                content: `${lead} ${def.question}`,
+                content: lead ? `${lead} ${def.question}` : def.question,
                 slotCard: def.control === 'text' ? undefined : target,
               })
             }
@@ -2193,6 +2213,32 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                   </button>
                 ))}
                 <p className="text-[0.6875rem] text-muted-foreground/70 pt-1">Tap anything above to change it.</p>
+                {/* WHAT THE COACH NOTED (7 Nov 2026, Ashley: "anything that you say off piece
+                    is logged and taken into account"). The notes from the conversation,
+                    shown before they are kept, each removable; said plainly that a note is
+                    for the coach and does not change the plan by itself. */}
+                {pendingContextFacts.length > 0 && (
+                  <div data-testid="onboarding-notes" className="border-t border-border/40 pt-2 mt-1">
+                    <p className="font-medium text-foreground">What I'll remember</p>
+                    <ul className="mt-1 space-y-0.5">
+                      {pendingContextFacts.map(f => (
+                        <li key={f.displayText} data-onboarding-note className="flex items-center justify-between gap-2 text-muted-foreground">
+                          <span>{f.displayText}</span>
+                          <button
+                            type="button"
+                            onClick={() => setPendingContextFacts(prev => prev.filter(x => x.displayText !== f.displayText))}
+                            disabled={busy}
+                            aria-label={`Forget: ${f.displayText}`}
+                            className="shrink-0 min-h-[44px] min-w-[44px] text-xs underline underline-offset-2 disabled:opacity-60"
+                          >
+                            Forget
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-[0.6875rem] text-muted-foreground/70 pt-1">Your coach keeps these in mind when you talk. They don&apos;t change your plan by themselves; the answers above do.</p>
+                  </div>
+                )}
                 {/* ASK ONCE, HERE, because here is the only place both rules
                     can run. The lift questions come BEFORE bodyweight in the
                     slot order, so at the moment someone types a squat number
