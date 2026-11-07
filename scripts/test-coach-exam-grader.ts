@@ -164,6 +164,11 @@ mustFire('a WRONG number with the unit spelled out ("150 grams")', 'contradicts-
 const squat = { statesNumber: [{ turn: 0, label: 'squat', expected: 45, unit: 'kg' }] }
 mustNotFire('the right number next to last week\'s', 'contradicts-context', t([{ reply: "You're squatting 45kg today, up from 42.5kg last week." }], squat))
 mustFire('a different weight with no comparison cue', 'contradicts-context', t([{ reply: "You're squatting 50kg today." }], squat))
+// VERBATIM from the graded run of 7 Nov 2026: a dash between the lift and its
+// number split them into two clauses and a correct answer was flagged.
+mustNotFire('the right number after a dash (7 Nov, verbatim)', 'contradicts-context', t([{ reply: "You've got Barbell Back Squats today — 3 sets of 8 reps at 45kg.\n\nYour legs hit 45kg last week too, so focus on smooth reps and full depth to keep building strength at this weight." }], squat))
+mustFire('...and its twin with the wrong number still fires', 'contradicts-context', t([{ reply: "You've got Barbell Back Squats today — 3 sets of 8 reps at 50kg." }], squat))
+mustFire('...and a number in ANOTHER sentence is not a squat number given', 'contradicts-context', t([{ reply: "You've got Barbell Back Squats today. Your bench is at 45kg." }], squat))
 
 console.log('\n[7] prescribed-before-asking — VISION\'s house style, at its floor')
 const asks = { asksBeforePrescribing: true }

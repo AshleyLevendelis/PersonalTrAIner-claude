@@ -365,6 +365,17 @@ function contradictsContext(t: Transcript): Violation[] {
         })
       }
     }
+    // A DASH SPLITS A CLAUSE, NOT A SENTENCE. Graded run of 7 Nov 2026: "You've
+    // got Barbell Back Squats today — 3 sets of 8 reps at 45kg." was reported as
+    // never giving the number, because the clause splitter cuts on " — " and
+    // the label and the number landed in different clauses. Whether the number
+    // was GIVEN is a question about the sentence that names it; whether a
+    // number CONTRADICTS stays clause-scoped above, for the reason given there.
+    if (!stated) {
+      const unitRe = new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:${unitPattern(spec.unit)})\\b`, 'gi')
+      stated = turn.reply.split(/(?<=[.!?])\s+|\n+/).some(sentence =>
+        new RegExp(`\\b${spec.label}`, 'i').test(sentence) && [...sentence.matchAll(unitRe)].some(m => Number(m[1]) === spec.expected))
+    }
     if (!stated && found.length === 0) {
       found.push({
         rule: 'contradicts-context',
