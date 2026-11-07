@@ -43,13 +43,15 @@ for (const flags of ['', 'legcurl=1', 'offstyle=1', 'mobility=1']) {
   const found = []
   for (const name of names) {
     await ensureOpen(name)
-    found.push({ name, sets: await ev(`${rowsExpr(name)}.length`), perHand: await ev(`/Log weight · per hand/.test(${cardExpr(name)}?.innerText ?? '')`), bodyweightOnly: await ev(`${rowsExpr(name)}[0]?.querySelectorAll('input')[0]?.disabled === true`) })
+    found.push({ name, sets: await ev(`${rowsExpr(name)}.length`), perHand: await ev(`/Log weight · per hand/.test(${cardExpr(name)}?.innerText ?? '')`), bodyweightOnly: await ev(`${rowsExpr(name)}[0]?.querySelectorAll('input')[0]?.disabled === true`), prep: await ev(`(window.__primerNames ?? []).includes(${JSON.stringify(name)})`) })
   }
   const pair = found.find(p => p.perHand && p.sets >= 2) ?? null
   if (pair || plan.length === 0) { FLAGS = flags; plan = found; H = pair }
   if (pair) break
 }
-const N = plan.reduce((s, p) => s + p.sets, 0)
+// WORKING SETS ONLY (7 Nov 2026): the day's movement prep is a warm-up on every count the app shows, so the planned
+// total leaves it out. Which rows are prep is the page's answer (window.__primerNames), never guessed here.
+const N = plan.filter(p => !p.prep).reduce((s, p) => s + p.sets, 0)
 check('0a. today has several exercises and their set counts were read', plan.length >= 3 && N >= 6 && plan.every(p => p.sets >= 1), plan)
 check('0b. ...one of them a pair of dumbbells, logged per hand', !!H, plan)
 if (!H || N < 6) finish()
@@ -120,9 +122,11 @@ console.log('\n  3. EVERY PLANNED SET DONE — nothing is asked, and the time is
 // All but one of today's planned sets, as the database would hold them: three
 // minutes apart from ten o'clock, then nothing until the driver's own tick at
 // the harness's noon. Input only.
-const last = plan[plan.length - 1]
+// Every planned WORKING set: the movement prep is a warm-up and is not part of "everything done" (7 Nov 2026).
+const working = plan.filter(p => !p.prep)
+const last = working[working.length - 1]
 await beforeLoad(`window.__seedDb = (db, ctx) => {
-  const plan = ${J(plan)}
+  const plan = ${J(working)}
   db.workout_sessions.push({ id: 'ws-today', profile_id: ctx.profileId, date: ctx.today, split_type: 'training', day: null, week_number: null, duration_minutes: 45, is_completed: false, started_at: ctx.today + 'T10:00:00' })
   let k = 0
   window.__seededTimes = []

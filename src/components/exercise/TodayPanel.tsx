@@ -26,7 +26,7 @@ import { getLastWorkingSessionDate } from '@/lib/set-log-store'
 import { addDays } from '@/lib/session-move'
 import { restartStillOffered } from '@/lib/plan-restart'
 import { layoffCardLine, layoffLiftNote, layoffRestartOffer } from '@/lib/coach-voice'
-import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds, dayLengthParts, formatDayLength } from '@/lib/session-duration'
+import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds, dayLengthParts, formatDayLength, isMovementPrepRow } from '@/lib/session-duration'
 import { describeSessionShortfall } from '@/lib/session-shortfall'
 import { effectiveRecoveryCapacity, volumeNotice, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
@@ -258,7 +258,8 @@ export function TodayPanel({
   const [finishCheck, setFinishCheck] = useState<{ done: number; planned: number; left: { name: string; sets: number }[] } | null>(null)
   const requestFinish = () => {
     if (!workout) { void handleFinish(); return }
-    const plannedExercises = workout.exercises.map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
+    // Working sets only, as every count on the app reads them: movement prep is a warm-up (isMovementPrepRow).
+    const plannedExercises = workout.exercises.filter(ex => !isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
     const progress = plannedSetProgress(logs, plannedExercises)
     const anyLogged = logs.some(l => !l.is_warmup)
     if (progress.remaining > 0 && anyLogged) {
@@ -296,7 +297,8 @@ export function TodayPanel({
     }
     setSummaryNothingLogged(false)
     onCalibrationSessionFinished?.({ date: today, dayName: workout.day })
-    const plannedExercises = workout.exercises.map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
+    // The summary's count is the same working-set count (isMovementPrepRow), never one that adds the warm-up drills.
+    const plannedExercises = workout.exercises.filter(ex => !isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
     const summary = computeSessionSummary(logs, plannedExercises, result.startedAtIso, result.finishedAtIso)
     const prs = computeSessionPRs(result.prBaseline, logs)
     // "What next session prescribes" reuses the same function already called

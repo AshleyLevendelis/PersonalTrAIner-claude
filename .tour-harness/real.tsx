@@ -586,6 +586,13 @@ const doneSeed = (() => {
   return { sets: [...before, ...sets], prLift: heaviest?.name ?? null, planned: day.exercises.reduce((n, e) => n + e.sets, 0) }
 })()
 ;(window as unknown as { __doneSeed: unknown }).__doneSeed = doneSeed && { prLift: doneSeed.prLift, planned: doneSeed.planned }
+// TODAY'S MOVEMENT PREP, as the plan tags it (7 Nov 2026): a driver counting working sets leaves these rows out, the
+// way every count on the app does. The plan's own tag, an input fact, never the app's decision read back.
+;(window as unknown as { __primerNames: string[] }).__primerNames = (() => {
+  const liveWeekNo = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const day = mesocycle.find(w => w.week_number === liveWeekNo)?.days.find(d => d.day === DAYS[todayIdx])
+  return (day?.exercises ?? []).filter(e => e.tier === 'tier_0_primer').map(e => e.name)
+})()
 
 // A CARD WITH NO EXTERNAL LOAD ON TODAY'S SESSION — published for
 // verify:bodyweight-progress §3, 23 Sep 2026. That section asked "today's first
