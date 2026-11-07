@@ -1018,7 +1018,7 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // ANOTHER SPORT, said in passing (7 Nov 2026, her "Remember it when they say
   // it"). Never asked and never set by the coach; see APP_ONLY_SLOTS.
   { key: 'otherSports', question: 'Do you do any other sport?',
-    inputHint: 'Muay Thai, Tuesday and Thursday evenings', shortLabel: 'Other training', control: 'text', required: false,
+    inputHint: 'Muay Thai, Tue & Thu evenings', shortLabel: 'Other training', control: 'text', required: false,
     destination: 'column', validate: v => v === '' || parseSportsSlot(v) !== null },
 ]
 

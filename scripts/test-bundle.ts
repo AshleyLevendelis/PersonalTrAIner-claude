@@ -193,8 +193,14 @@ console.log('\n1. The libraries are cached separately from the app')
   //     after    deploy 361 gz   paint 517 gz   app 1249 raw   total 2581 raw   (deploy, paint and total OVER)
   // The catalogue is read by every screen that shows a plan, so its growth is first-paint code by nature. Her 15 Sep
   // ruling, "raise it with room to grow": the same room as every move above, 8 kB gz, 25 kB raw.
-  headroom('a deploy re-downloads', appGzip, 369, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 369, appGzip)
+  // MOVED 7 Nov 2026, another sport said in setup (setup-sports.ts and the never-asked slot; her "Remember it when
+  // they say it"). MEASURED through this gate on a clean worktree of efd1c15f and on the change:
+  //     before   deploy 368 gz   paint 524 gz   app 1289 raw   total 2658 raw   (1, 1, 15 and 23 kB of room)
+  //     after    deploy 371 gz   paint 527 gz   app 1298 raw   total 2664 raw   (deploy and paint OVER by 2)
+  // Setup's slots are read by the app as it starts, so the reader is first-paint code by nature. Her 15 Sep ruling,
+  // "raise it with room to grow": 8 kB gz of room over today's numbers, the shape of every move above.
+  headroom('a deploy re-downloads', appGzip, 379, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 379, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -277,9 +283,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 22 Oct 2026: 498 -> 506, the Sam live test — see the deploy figure above for both ends.
   // MOVED 31 Oct 2026: 506 -> 517, the five-tab polish — see the deploy figure above for both ends.
   // MOVED 3 Nov 2026: 517 -> 525, the lighter variants — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 525, 'kB gzipped')
+  // MOVED 7 Nov 2026: 525 -> 535, another sport said in setup — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 535, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 525, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 535, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))

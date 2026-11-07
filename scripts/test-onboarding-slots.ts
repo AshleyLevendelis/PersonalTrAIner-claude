@@ -9,7 +9,7 @@
 // and the injury chip codes stay coupled to the engine's joint filter.
 // ---------------------------------------------------------------------------
 
-import {
+import { APP_ONLY_SLOTS,
   ONBOARDING_SLOTS,
   getSlotDef,
   initialSlotValues,
@@ -257,7 +257,10 @@ console.log('\n8. Helpers')
 check('toggleValue adds', JSON.stringify(toggleValue(['a'], 'b')) === JSON.stringify(['a', 'b']))
 check('toggleValue removes', JSON.stringify(toggleValue(['a', 'b'], 'a')) === JSON.stringify(['b']))
 const catalog = buildSlotCatalog()
-check('catalog covers every applicable slot', catalog.length === ONBOARDING_SLOTS.filter(s => isSlotApplicable(s, initialSlotValues())).length)
+// 7 Nov 2026: an APP-ONLY slot (another sport, read from her own words) is
+// deliberately not offered to the setup coach; every other applicable one is.
+check('catalog covers every applicable slot the coach may set', catalog.length === ONBOARDING_SLOTS.filter(s => isSlotApplicable(s, initialSlotValues()) && !APP_ONLY_SLOTS.includes(s.key)).length && APP_ONLY_SLOTS.length > 0)
+check('...and none it may not', !catalog.some(c => (APP_ONLY_SLOTS as readonly string[]).includes(c.key)))
 check('catalog serializes closed sets', catalog.find(c => c.key === 'fitnessGoal')?.values?.length === 4)
 
 console.log('\n9. requiredIf — genuinely conditional questions')
