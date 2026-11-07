@@ -33,7 +33,7 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
-  generateMesocycle, getConstrainedPool, bestEquipmentRank, getExerciseCompatibilityWarnings, mapTier, mapMovementPattern,
+  generateMesocycle, getConstrainedPool, bestEquipmentRank, settleWeekBalance, getExerciseCompatibilityWarnings, mapTier, mapMovementPattern,
 } from '../src/lib/exercise-plan'
 import { addExerciseToSession, peerProgrammingFor } from '../src/lib/session-edit'
 import { executeExerciseAdd } from '../src/lib/pending-action-executor'
@@ -562,6 +562,41 @@ async function main() {
   const squatTop = getAdditionCandidates(squatDay, PROFILE, [], 8)
   check('a squat day with only a two-legged squat offers single-leg work first',
     squatTop.length > 0 && squatTop[0].exercise.movement_pattern === SINGLE, squatTop.map(c => `${c.exercise.name}:${c.exercise.movement_pattern}`))
+
+  // -------------------------------------------------------------------------
+  console.log('\n10. An addition touches no other day (QA walk, 7 Nov 2026)')
+  // -------------------------------------------------------------------------
+  // Adding one press "just today" put a set on three pulling exercises across two other days, through the week-balance
+  // pass. Her 13 Sep add ruling: you asked for it, you get it, and nothing else moves; the card states the cost.
+  {
+    // The splits the measurement found it on (a press added to a push day, pulls topped up on two other days).
+    const grid = ['hybrid', 'bodybuilding'].flatMap(style => ['ai_recommendation', 'push_pull_legs'].map(split => ({
+      ...PROFILE, training_style: style, equipment_access: 'full_gym', workout_split_preference: split, fitness_goal: 'hypertrophy',
+      session_duration_preference: '45-60',
+    } as unknown as UserProfile)))
+    let adds = 0, touched = 0, wouldRebalance = 0
+    const seen: string[] = []
+    for (const p of grid) {
+      const meso = silence(() => generateMesocycle(p))
+      const w = meso[0]
+      for (const d of w.days.filter(x => x.exercises.length > 2)) {
+        for (const c of getAdditionCandidates(d, p, [], 3)) {
+          const r = silence(() => addExerciseToSession({ mesocycle: meso, profile: p, weekNumber: w.week_number, dayName: d.day, entry: c.exercise, load: undefined as unknown as LoadPrescription, scope: 'today' }))
+          if (!r.changed) continue
+          adds++
+          const after = r.mesocycle.find(x => x.week_number === w.week_number)!
+          const others = w.days.filter(x => x.day !== d.day)
+          const moved = others.some(od => JSON.stringify(od.exercises.map(e => [e.name, e.sets])) !== JSON.stringify(after.days.find(x => x.day === od.day)!.exercises.map(e => [e.name, e.sets])))
+          if (moved) { touched++; if (seen.length < 3) seen.push(`${p.training_style} ${c.exercise.name} on ${d.day}`) }
+          // Would the balance pass have moved another day here? (proves the grid reaches the case)
+          const probe = JSON.parse(JSON.stringify(after)) as MesocycleWeek
+          if (silence(() => settleWeekBalance(probe, p)).changes.some(ch => ch.day !== d.day)) wouldRebalance++
+        }
+      }
+    }
+    check('no addition, today only, changes a set on any other day', adds > 0 && touched === 0, { adds, touched, seen })
+    check('...on a grid where the week-balance pass WOULD have moved another day (the check binds)', wouldRebalance > 0, { adds, wouldRebalance })
+  }
 
   console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`)
   process.exit(failures === 0 ? 0 : 1)

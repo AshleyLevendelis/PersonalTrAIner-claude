@@ -239,7 +239,12 @@ export function addExerciseToSession(params: AddExerciseParams): SessionEditResu
     changed = true
     const exercises = insertByTier(d.exercises, slot, newTier)
     const grown = { ...d, exercises }
-    return settleWeek({ ...w, days: w.days.map(x => (x.day === dayName ? grown : x)) }, dayName, profile).week
+    // NO WEEK-BALANCE PASS (whole-app QA walk, 7 Nov 2026). It is the one pass that changes OTHER days, and here it
+    // broke the contract above: adding one press "just today" put a set on three pulling exercises across Tuesday and
+    // Friday (66 of 288 adds on a 72-plan grid), and nothing said so. The card already states what the addition does
+    // to the week's balance (assessAddition's cost line); it is her extra work, not a reason to reprogram two other
+    // sessions. The day's own passes (hierarchy, one weight, load coherence, warm-up) still run.
+    return settleWeek({ ...w, days: w.days.map(x => (x.day === dayName ? grown : x)) }, dayName, profile, { weekBalance: false }).week
   })
 
   return changed

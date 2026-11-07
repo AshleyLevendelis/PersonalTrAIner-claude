@@ -536,7 +536,8 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   pool, the search box beside it reaches the whole catalogue and states the
   clash on the row, which is what swap already did. Logging extra work
   (`AddUnplannedWork`) is still the different thing it always was: it never
-  joins the plan. `exercise-add`, `edit-keeps-the-bar`, `session-edit`,
+  joins the plan. **And an addition moves no other day** (7 Nov 2026, CSCS: the week-balance pass is skipped, as on
+  a reorder; the card states the balance cost instead). `exercise-add`, `edit-keeps-the-bar`, `session-edit`,
   `coach-volume-schedule`, `verify:exercise-add`
 - Remove it from one session without banning it — both surfaces since 11 Sep
   2026; asks whether to drop it or put something else there (her ruling);

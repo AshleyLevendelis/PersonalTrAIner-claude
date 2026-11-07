@@ -36,8 +36,19 @@ Newest first. One line each.
   one; (2) takes away: opposite-direction compounds from the ranked list only, never from search; (3) fundamentals:
   pattern coverage and the week's balance are untouched (an addition never removes anything); (4) no floor or
   ceiling moved; (5) in scope.
+  (T5) Adding one exercise ran the week-balance pass, the one pass that changes OTHER days: one press added "just
+  today" put a set on three pulling exercises across Tuesday and Friday, on 66 of 288 adds measured over a 72-plan
+  grid (the untouched weeks changed on 0, so every change was caused by the add). Both surfaces stated it, so it was
+  not silent, but it broke the add's own rule (her 13 Sep "you asked for it, you get it", and its code comment
+  "nothing here touches any other exercise; the caller states the cost"). DECIDED AS A CSCS COACH: an addition is
+  extra work she chose, and one extra accessory is noise in a week's push:pull ratio, not a reason to reprogram two
+  other sessions; the card already states the balance cost in plain words (tell-then-allow). The add now skips that
+  pass, as a reorder has since 1 Nov; the day's own passes still run. After: 0 of 288. CSCS review: (1) the added
+  work lands as asked; (2) takes away nothing (it stops adding sets elsewhere); (3) the week's balance is reported,
+  not silently corrected, so a block-long add that tips it says so on the card; (4) no floor or ceiling moved;
+  (5) in scope.
   CSCS: no prescription changes (counts and wording, not what is prescribed). Mutations: every new check was broken
-  on purpose and caught (T12: 4 of 4; T11: 3 of 3; T4: 8 of 8; the summary: 2 of 2). NOT proven: on her phone. Frontend only, no deploy beyond the merge.
+  on purpose and caught (T12: 4 of 4; T11: 3 of 3; T4: 8 of 8; the summary: 2 of 2; T5: 1 of 1). NOT proven: on her phone. Frontend only, no deploy beyond the merge.
   Still open from the walk, being worked: the add-exercise suggestion order, a set trimmed from another day on a
   "just today" add (CSCS), receipts for screen edits, and the nutrition, grocery and chat findings.
 - [x] **THE HELLO NEVER RE-ASKS A QUESTION SHE LEFT UNANSWERED, 7 NOV 2026** (found by me, not reported: a simulated
