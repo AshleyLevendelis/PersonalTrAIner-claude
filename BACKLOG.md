@@ -2,6 +2,29 @@
 
 Newest first. One line each.
 
+- [x] **ANOTHER SPORT IS FUELLED: ITS CALORIES REACH THE FOOD TARGETS, 7 NOV 2026** (Ashley: "yes, add the extra
+  calories on sport days", after being told the targets ignored it). TRACED: the targets counted gym sessions (dynamic
+  mode) and the activity level, which setup asks as "how active is your day-to-day, OUTSIDE training", so a second
+  sport was never counted in either mode. BUILT: a class costs (MET - 1) x body weight x an hour (`setup-sports.ts`
+  sportSessionKcal); Standard (one number a day) adds the week's sport energy over seven days, Dynamic (a number per
+  day) adds it on the sport day itself with a hard day's carbs (300 kcal or more); protein unchanged (body weight).
+  `staticTDEEFor` is now the one reader of the day's burn: the target, the TDEE on "How your targets are set", the
+  coach's context and the stored snapshot, so none can disagree. The sheet says what the sport adds and that it
+  assumed an hour. Muay Thai at 68 kg: about 480 kcal a class; twice a week is +136 kcal a day in Standard, +476 on
+  the night in Dynamic (before the goal's own adjustment). **CSCS (mine, the delegation; her yes covered the WHAT,
+  this records the HOW):** session-average METs in line with the Compendium of Physical Activities, below its
+  vigorous figures because a class mixes drilling, pads, rounds and rest (Muay Thai/kickboxing 8.0, BJJ/judo 7.5,
+  running 8.3, football 7.0, tennis 6.8, yoga 2.5); MINUS ONE because the resting hour is already in the day's
+  baseline (the gym figure still uses gross METs, unchanged, named here); an hour because classes usually are and the
+  app does not ask, said on screen; an unknown sport from the coach's effort estimate, 3 + 6 x intensity. Standard
+  stays one flat number because that is what Standard means (she was told, and can overrule); Dynamic was always the
+  per-day mode. Review: (1) fuels a real training load the plan already plans around; (2) takes nothing away; (3)
+  fundamentals untouched; (4) the activity level now means what its question says, the day outside training, and
+  sport sits beside it rather than inside it; (5) population-level performance nutrition, in scope. NOT done: the
+  class length is assumed, not asked; the gym's gross-MET figure is left as it was. test:sport-fuel 24 checks,
+  verify:sport-fuel 7 (screenshot read). 9 mutations, 14 runs, 12 caught; the driver missed 2 numbers-only breaks
+  (dynamic days, the formula) that the gate catches. Frontend only.
+
 - [x] **ANOTHER SPORT SAID IN SETUP REACHES THE FIRST PLAN, 7 NOV 2026** (Ashley's setup: "I train mon, tue, thu,
   fri mornings and do muay thai tue and thu evenings"; the coach acknowledged the muay thai and nothing kept it).
   TRACED: setup had no slot for another sport, `assembleProfile` never set `concurrent_activities`, the onboarding
