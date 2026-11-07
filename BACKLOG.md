@@ -28,6 +28,10 @@ Newest first. One line each.
   6b (6 checks; 3 mutations, all caught, one only after the after-Undo case was added). NOT fixed from the same
   finding, named: the bubble repeating its question beside the card, and old offers staying tappable (both are the
   offer card's wider behaviour, next in the list).
+  (N3) FIXED: a meal's sheet, once eaten, put the logged name over the plan's current dish's calories and macros
+  ("Leftover chilli and rice", 720 kcal, when she logged 610). The header now reads one serving as logged, the same
+  record the name comes from; the block below still says whose details it shows. `verify:diary-preservation` 6b
+  (mutation caught). 42 derived gates and drivers green.
 - [x] **WHOLE-APP QA WALK, TRAINING: EIGHT DEFECTS FOUND AND FIXED, 7 NOV 2026** (Ashley: "I want you to test and fix",
   then "Keep testing and keep fixing"). Five testers walked the app at phone size against the browser harness; each
   finding was re-measured on a real screen before it was fixed. Found by me, none reported by her. Each fix has its

@@ -101,6 +101,12 @@ const expanded = await read()
 check('6. opening the moved-on row says whose details are below it',
   /Your plan now shows Chicken, rice and roasted peppers here/.test(expanded.text), expanded.sample)
 
+// THE SHEET'S HEADER: the eaten name over the eaten numbers (whole-app QA walk, 7 Nov 2026: it paired the logged
+// name with the plan's current dish's calories).
+const head = await ev(`(() => { const k = document.querySelector('[data-meal-sheet="lunch"] [data-testid="meal-sheet-kcal"]'); const h = k && k.closest('[data-meal-sheet]')?.querySelector('h3'); return k ? { kcal: k.textContent.replace(/\\s+/g, ' ').trim(), name: h?.textContent ?? null } : null })()`)
+check('6b. the sheet\'s header gives the eaten meal\'s calories under its name (610), not the plan\'s (720)',
+  !!head && /Leftover chilli/.test(head.name ?? '') && /^610(?!\d)/.test(head.kcal) && !/720/.test(head.kcal), head)
+
 await shoot('diary-preservation-expanded')
 
 const err = await ev('window.__err ?? null')

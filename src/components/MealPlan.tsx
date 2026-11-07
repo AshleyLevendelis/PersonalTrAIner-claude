@@ -982,6 +982,12 @@ function MealSlotRow({
   // The plan has moved on from what was eaten. Said once, in the expanded
   // view, so the macros and ingredients below it are attributable.
   const planMovedOn = isLogged && loggedName != null && option != null && loggedName !== option.name
+  // THE HEADER'S NUMBERS ARE THE NAME'S (whole-app QA walk, 7 Nov 2026): the name above came from the log while the
+  // calories and P · C · F beside it came from the plan's current dish, so after a swap the sheet paired "Overnight
+  // Oats" with the new dish's 612 kcal. One serving as logged, the same record the name is read from.
+  const headerMacros = isLogged && loggedEvents[0]?.macros
+    ? { calories: loggedEvents[0].macros.kcal, protein: loggedEvents[0].macros.protein, carbs: loggedEvents[0].macros.carbs, fat: loggedEvents[0].macros.fat }
+    : option?.macros ?? null
   // Only meaningful when the eaten meal IS still this slot's option: the
   // ledger stores no ingredients, so for anything else there is nothing to
   // check and the honest output is silence rather than a guess.
@@ -1140,10 +1146,10 @@ function MealSlotRow({
                   <h3 className="mt-1 text-[1.375rem] font-bold leading-[1.15] tracking-[-.02em]">{displayName}</h3>
                   <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <span className="flex items-baseline gap-1" data-testid="meal-sheet-kcal">
-                      <span className="tabular-mono text-[0.9375rem] font-bold">{Math.round(option.macros.calories)}</span>
+                      <span className="tabular-mono text-[0.9375rem] font-bold">{Math.round(headerMacros?.calories ?? option.macros.calories)}</span>
                       <span className="text-[0.6875rem] text-muted-foreground">kcal</span>
                     </span>
-                    <MacroLine protein={option.macros.protein} carbs={option.macros.carbs} fat={option.macros.fat} />
+                    <MacroLine protein={headerMacros?.protein ?? option.macros.protein} carbs={headerMacros?.carbs ?? option.macros.carbs} fat={headerMacros?.fat ?? option.macros.fat} />
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center">
