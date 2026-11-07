@@ -1009,6 +1009,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       }
     })
     observer.observe(content)
+    // THE WINDOW AS WELL AS WHAT IS IN IT (whole-app QA walk, 7 Nov 2026): when the composer grows to three lines, or
+    // a bar appears above it, the scroller gets shorter while the thread stays the same size, so nothing fired and the
+    // newest message (and its shortcut button) slid under the composer.
+    const scroller = scrollRef.current
+    if (scroller) observer.observe(scroller)
     return () => observer.disconnect()
   }, [scrollToBottom])
 

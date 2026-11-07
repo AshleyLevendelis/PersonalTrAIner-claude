@@ -21,6 +21,7 @@
 // If App.tsx's wrapper changes, this diverges silently. `test:chat-shell`
 // is what holds the two together.
 // ---------------------------------------------------------------------------
+import { isMovementPrepRow } from '../src/lib/session-duration'
 import { StrictMode, useEffect, useMemo, useState, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 
@@ -645,7 +646,9 @@ const dayStateSeed = (() => {
   const day = mesocycle.find(w => w.week_number === liveWeekNo)?.days.find(d => d.day === DAYS[todayIdx])
   if (!day || day.exercises.length === 0) return { ...none, meals }
   const at = (min: number) => new Date(anchorNowMs() + 9 * 3600000 + min * 60000).toISOString()
-  const work = DAY_STATE === 'mid' ? day.exercises.slice(0, 1).map(ex => ({ ex, n: Math.min(2, ex.sets) })) : day.exercises.map(ex => ({ ex, n: ex.sets }))
+  // RE-ANCHORED 7 Nov 2026: mid-session means two sets of the first WORKING exercise. Movement prep is a warm-up, not a
+  // working set (whole-app QA walk), so two Arm Circles ticks count as 0 of the day's sets, rightly.
+  const work = DAY_STATE === 'mid' ? day.exercises.filter(ex => !isMovementPrepRow(ex)).slice(0, 1).map(ex => ({ ex, n: Math.min(2, ex.sets) })) : day.exercises.map(ex => ({ ex, n: ex.sets }))
   const sets = work.flatMap(({ ex, n }, k) => Array.from({ length: n }, (_, i) => ({
     id: `ds-${ex.id}-${i}`, user_id: PROFILE_ID, session_id: 'sess-today',
     exercise_id: getExerciseId(ex.name) ?? ex.id, exercise_name: ex.name, set_number: i + 1,

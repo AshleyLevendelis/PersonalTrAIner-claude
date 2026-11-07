@@ -129,6 +129,31 @@ const sent = await ev(`(() => { const b = [...document.querySelectorAll('button'
 check('3f. she sends it', sent === true)
 const after = await until(() => ev(GEO), v => v && v.h === 44, 30)
 check('3g. after sending, the box is one line again', after?.h === 44, after)
+// 3h. THE NEWEST MESSAGE STAYS IN VIEW AS THE BOX GROWS (whole-app QA walk, 7 Nov 2026). The box grows upward and
+// the thread above it gets shorter; nothing re-scrolled it, so the newest message slid under the box. A long thread
+// (seeded) so that there is something to scroll.
+console.log('\n3h. The newest message stays in view while the box grows')
+await go('seed=hello&clock=12:00')
+await loaded()
+await until(() => ev(`document.querySelectorAll('[data-testid="chat-thread"] > *').length`), v => v > 5, 40)
+await wait(1500)
+const NEWEST = String.raw`(() => {
+  const thread = document.querySelector('[data-testid="chat-thread"]'), sc = document.querySelector('[data-testid="chat-scroller"]')
+  const last = thread && thread.lastElementChild
+  if (!last || !sc) return null
+  const lr = last.getBoundingClientRect(), sr = sc.getBoundingClientRect()
+  return { lastBottom: Math.round(lr.bottom), scrollerBottom: Math.round(sr.bottom), scrolls: sc.scrollHeight > sc.clientHeight + 4 }
+})()`
+const before3h = await ev(NEWEST)
+check('3h1. a thread long enough to scroll, its newest message in view at the start', !!before3h && before3h.scrolls && before3h.lastBottom <= before3h.scrollerBottom + 1, before3h)
+await setText(medium + ' ' + medium)
+const grown3h = await until(() => ev(NEWEST), v => v && v.lastBottom <= v.scrollerBottom + 1, 20)
+const box3h = await ev(GEO)
+check('3h2. with the box grown to several lines, the newest message is still fully in view above it',
+  !!grown3h && grown3h.lastBottom <= grown3h.scrollerBottom + 1 && !!box3h && box3h.h > 80, { grown3h, h: box3h?.h })
+await setText('')
+await wait(300)
+
 // 4. FILLED WHILE HIDDEN. Home's "Adjust today" writes into the box while the chat tab is display:none, where a
 // box measures 0 tall; on 1 Nov the box then stayed one line and cut the question off. Done here by hiding the chat
 // screen around the box (the same display:none an inactive tab has), filling it, and showing it again.

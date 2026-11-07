@@ -14,6 +14,12 @@ Newest first. One line each.
   `verify:reminders` 2m re-anchored (2 mutations caught), `test:meal-day-move` §15 (3 checks, 2 mutations caught).
   46 of 47 derived gates and drivers green on the first run; the 47th (`verify:coach-hello` B4) failed once in five
   runs by 4px and is the next fix (the newest message's button can land just under the fold).
+  (N14) FIXED: when the message box grew to several lines (or anything above it appeared), the thread's window got
+  shorter while the thread stayed the same size, so nothing re-scrolled and the newest message, with its shortcut
+  button, slid under the box. The chat now also watches its own window. `verify:chat-composer` 3h (2 checks; the
+  mutation is caught), and `verify:coach-hello` passed 6 of 6 runs after it. FOUND ON THE WAY: `verify:chat-2b`'s
+  mid-session fixture logged two Arm Circles sets, which since the movement-prep fix rightly count as 0 working
+  sets; the fixture now logs the first working exercise.
 - [x] **WHOLE-APP QA WALK, TRAINING: EIGHT DEFECTS FOUND AND FIXED, 7 NOV 2026** (Ashley: "I want you to test and fix",
   then "Keep testing and keep fixing"). Five testers walked the app at phone size against the browser harness; each
   finding was re-measured on a real screen before it was fixed. Found by me, none reported by her. Each fix has its
