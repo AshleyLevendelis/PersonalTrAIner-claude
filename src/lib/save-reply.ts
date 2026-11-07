@@ -33,7 +33,7 @@ export function textBesideSave<T extends { text: string; receipt?: unknown }>(sa
 // ---------------------------------------------------------------------------
 
 /** Words that make a label a clinical or judging verdict about her, rather than a note of what she said. */
-export const VERDICT_WORDS = /\b(?:disorder\w*|disordered|compensat\w*|restrict\w*|extreme\w*|binge\w*|purg\w*|starv\w*|patho\w*|obsess\w*|compulsi\w*|depress\w*|anxiety|anxious disorder|low mood|symptom\w*|diagnos\w*|unhealthy|dangerous|problem(?:atic)?|issue with|addict\w*|self[- ]harm\w*|pattern|behaviou?r)\b/i
+const VERDICT_WORDS = /\b(?:disorder\w*|disordered|compensat\w*|restrict\w*|extreme\w*|binge\w*|purg\w*|starv\w*|patho\w*|obsess\w*|compulsi\w*|depress\w*|anxiety|anxious disorder|low mood|symptom\w*|diagnos\w*|unhealthy|dangerous|problem(?:atic)?|issue with|addict\w*|self[- ]harm\w*|pattern|behaviou?r)\b/i
 
 const MAX_NOTE = 80
 

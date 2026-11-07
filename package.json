@@ -542,6 +542,7 @@
     "test:reminder-writer": "tsx scripts/test-reminder-writer.ts",
     "test:voice-pass": "tsx scripts/test-voice-pass.ts",
     "test:save-reply": "tsx scripts/test-save-reply.ts",
+    "test:protein-advice": "tsx scripts/test-protein-advice.ts",
     "verify:coach-texts-you": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-texts-you.mjs",
     "verify:coach-lessons": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-lessons.mjs",
     "verify:coach-opener-words": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-opener-words.mjs"

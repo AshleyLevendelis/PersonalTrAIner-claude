@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH STOPS TEACHING THE "ONLY 30-40 g OF PROTEIN AT A TIME" MYTH, 7 NOV 2026** (her machine's second exam
+  that day, case teach-protein-spread: "your body can only use 30 to 40 grams of protein at a time ... a lot gets
+  oxidized for energy instead"; the judge marked it outdated; her "fix the protein advice too"). The myth came from the
+  model's own knowledge: nothing the app sends the coach states it. CSCS basis (mine, under her delegation, general
+  population nutrition): a larger serving is still digested and used, over a longer stretch (Trommelen et al., Cell
+  Reports Medicine 2023: 100 g gave a larger and longer muscle-building response than 25 g); the day's total is what
+  matters most (ISSN position stand, about 1.4-2.0 g/kg/day); spreading it over three or four meals is a practical way
+  to reach that total and keeps you full, a habit, not a rule. FIX: one line under the coach's "a why on every answer"
+  (where it is told every reason must be true): never claim a per-meal cap or that the rest is wasted; say a bigger
+  protein meal is fine, then the practical reason to spread it. The app's own protein lesson now leads with the day's
+  total. test:protein-advice 12 checks (7 mutations, 7 caught; its cap detector proved on the exam's own sentence; the
+  line shares no four-word run with the exam question, so it is not an answer key). Whether the coach OBEYS is the
+  exam's: needs the chat-gemini deploy and a run. ALSO: the save-note fix exported its word list with no caller
+  outside its file, which took test:no-dead-code from 40 to 41 against a budget of 40 (found by the pre-merge sweep,
+  red at 3acda727 for one commit); no longer exported.
 - [x] **THE SECOND PASS, MEASURED, AND TWO FIXES: SAFETY WORDS READ OFF HER MESSAGE, AND NO SILENT SAVES, 7 NOV 2026**
   (her machine's exam of the second pass on TEST, 38 cases, judge marked all: overall 2.27 -> 2.19, voice 1.94 ->
   2.03, warm 2.00 -> 1.97, teaches 2.09 -> 2.00, correct 2.55 -> 2.32, asks 2.13 -> 1.91, scope 2.81 -> 2.50, hard

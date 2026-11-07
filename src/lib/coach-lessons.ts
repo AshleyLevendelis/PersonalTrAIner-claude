@@ -95,7 +95,7 @@ export const LESSONS: readonly Lesson[] = [
   {
     id: 'protein-repair',
     title: 'protein and repair',
-    point: 'Training is the signal; protein is the building material. Spreading it across the day keeps the repair going all day, not just at one meal.',
+    point: 'Training is the signal; protein is the building material. The day\'s total matters most; spreading it across your meals makes that total easy to reach and keeps the repair supplied through the day.',
     when: f => f.trainedToday,
   },
   {
