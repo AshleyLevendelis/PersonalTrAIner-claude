@@ -452,3 +452,15 @@ export function keysSaidByMarkers(keys: ReturnType<typeof nudgeKeys>, momentsSai
   if (momentsSaidToday.includes('workout_today')) out.push(keys.due)
   return out.filter((k): k is string => k != null)
 }
+
+/**
+ * WHAT THE HELLO MUST NOT ASK AGAIN (simulated week, 7 Nov 2026): Monday's 9am "how did that session feel?" went
+ * unanswered, and Tuesday's hello, built by the opener, asked about the same session again. A question she has
+ * chosen not to answer is not asked a second time; the hello finds something else to say.
+ */
+export function openerSkips(keys: ReturnType<typeof nudgeKeys>, said: string[]): { feel: boolean; missed: boolean } {
+  return {
+    feel: keys.feel != null && said.includes(keys.feel),
+    missed: keys.missed != null && said.includes(keys.missed),
+  }
+}

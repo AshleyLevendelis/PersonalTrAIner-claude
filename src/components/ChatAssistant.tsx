@@ -152,7 +152,7 @@ import { cleanReplyText, applyMessageBreaks, ACTION_TAG_RE, QUICK_REPLIES_RE } f
 import { rowToMessage, addServerMessages } from '@/lib/chat-history-merge'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
-  rememberNudge, rememberWithoutSpeaking, pickUnprompted, keysSaidByMarkers, helloKey,
+  rememberNudge, rememberWithoutSpeaking, pickUnprompted, keysSaidByMarkers, helloKey, openerSkips,
   type NudgeInput, type NudgeStore,
 } from '@/lib/coach-nudge'
 import { momentsToRaise, dailyCap, type NotificationSettings, type MomentFacts } from '@/lib/coach-moments'
@@ -1256,7 +1256,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const nextSessionAfterToday = () =>
     nextSessionAfter({ date: activeSession.date, plan: liveWeekDays, moves: trainingWeek.moves })
 
-  const composeOpener = (): Opener => {
+  const composeOpener = (skip: { feel: boolean; missed: boolean } = { feel: false, missed: false }): Opener => {
     // Named "tomorrow" when it is, otherwise by its day — the opener's own
     // wording rule, applied to the shared walk above.
     const upcoming = nextSessionAfterToday()
@@ -1266,10 +1266,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     return pickOpener({
       hour: getAppNow(profile.id).getHours(),
       cutoffHour: sessionCutoffHour(profile.preferred_time),
-      awaitingFeel: feelContext?.awaiting
+      awaitingFeel: feelContext?.awaiting && !skip.feel
         ? { date: feelContext.awaiting.date, day: feelContext.awaiting.day, isToday: feelContext.awaiting.date === activeSession.date }
         : null,
-      missedYesterday,
+      missedYesterday: skip.missed ? null : missedYesterday,
       breakDays: breakStatus.band !== 'none' ? breakStatus.daysAway : null,
       planKnown,
       movedTo: todayMovedTo ? { dayName: todayMovedTo.dayName } : null,
@@ -1501,7 +1501,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       event: pickNudge(nudgeInputRef.current, said),
       greeting: greetName(),
       hello: () => {
-        const opener = composeOpener()
+        // Never a question already asked today or before and left unanswered (openerSkips).
+        const opener = composeOpener(openerSkips(keys, said))
         return { text: `${greetName()} — ${opener.text}`, chips: opener.chips, kind: opener.kind }
       },
       moments: facts ? momentsToRaise(facts, reminderSettings) : [],

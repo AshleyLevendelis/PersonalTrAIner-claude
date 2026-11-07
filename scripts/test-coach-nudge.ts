@@ -31,7 +31,7 @@ import { fileURLToPath } from 'url'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, rememberNudge, rememberWithoutSpeaking,
   STREAK_MILESTONES, NUDGE_MIN_GAP_MS, type NudgeInput, type NudgeStore,
-  pickUnprompted, keysSaidByMarkers, helloKey, greeted, HELLO_MOMENT, MOMENT_MIN_GAP_MS, type UnpromptedInput, type CoachNudge,
+  pickUnprompted, keysSaidByMarkers, helloKey, greeted, HELLO_MOMENT, MOMENT_MIN_GAP_MS, openerSkips, type UnpromptedInput, type CoachNudge,
 } from '../src/lib/coach-nudge'
 import { momentsToRaise, dailyCap, type MomentFacts } from '../src/lib/coach-moments'
 import { hasUnreadCoachMessage } from '../src/lib/chat-unread'
@@ -408,6 +408,18 @@ console.log('\n9. Hello + more moments (her ruling 7 Nov 2026): one decision ove
   const keys = nudgeKeys({ ...base, today: T, awaitingFeel: { date: T, isToday: true }, todaySession: { focus: 'Legs', movements: 'Squat' } })
   const byMarkers = keysSaidByMarkers(keys, ['session_feel', 'workout_today'])
   check('the phone\'s "how was it" and session reminder count as the chat\'s feel and due', byMarkers.includes(keys.feel!) && byMarkers.includes(keys.due!), byMarkers)
+
+  // NEVER ASKED TWICE (simulated week, 7 Nov 2026): Monday's unanswered feel question was asked again by Tuesday's hello.
+  const k2 = nudgeKeys({ ...base, today: '2026-11-10', awaitingFeel: { date: '2026-11-09', isToday: false }, missedYesterday: { date: '2026-11-09', dayName: 'Monday', focus: 'Legs' } })
+  const fresh = openerSkips(k2, [])
+  const asked = openerSkips(k2, [k2.feel!, k2.missed!])
+  check('a feel question not yet asked: the hello may ask it', fresh.feel === false && fresh.missed === false, fresh)
+  check('...one already asked and unanswered: the hello skips both the feel and the missed-day question', asked.feel === true && asked.missed === true, asked)
+  check('...each on its own key', openerSkips(k2, [k2.feel!]).missed === false && openerSkips(k2, [k2.missed!]).feel === false)
+  check('the chat builds the hello\'s opener without what was already asked',
+    /const opener = composeOpener\(openerSkips\(keys, said\)\)/.test(chat)
+    && /awaitingFeel: feelContext\?\.awaiting && !skip\.feel/.test(chat)
+    && /missedYesterday: skip\.missed \? null : missedYesterday/.test(chat))
 
   // THE WIRING: these values are what the chat hands it.
   check('the chat decides through pickUnprompted', /const pick = pickUnprompted\(\{/.test(chat))

@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **THE HELLO NEVER RE-ASKS A QUESTION SHE LEFT UNANSWERED, 7 NOV 2026** (found by me, not reported: a simulated
+  week of the coach's unprompted messages, run from the app's own decision functions over a persona who trains Mon/Wed/
+  Fri, skips Wednesday, and does not answer Monday's feel question). Monday 9am asked "how did that session feel?";
+  Tuesday's hello, built by the opener, asked about the same session again. A question she chose not to answer is not
+  asked twice. FIX: `openerSkips` (coach-nudge.ts) drops the feel and missed-day questions whose keys are already said
+  when the hello's opener is built, so it says something else ("how's the morning going?"). The rest of the simulated
+  week was reviewed as a coach would (Light, Normal, Lots): one message each morning on a training day, the feel
+  question after the session, the missed day once, the evening session and food nudges only after 6-7pm, nothing at
+  all after the day's limit. `test:coach-nudge` (134; 4 new, 4 mutations caught), `verify:coach-hello`,
+  `verify:coach-speaks-first` green. Frontend only.
 - [x] **THE COACH SPEAKS FIRST EVERY DAY: A HELLO, THEN THE PHONE'S MOMENTS; HER RULING "HELLO + MORE MOMENTS",
   7 NOV 2026** (Ashley: "The chat doesn't seem to proactively speak to the user. The chat is a main feature of the app
   but it only speaks if you speak to it first"). TRACED (investigator, then the guards read here): the opener runs only
