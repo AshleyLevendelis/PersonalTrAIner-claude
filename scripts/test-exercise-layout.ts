@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import { nextSetLabel, readNextSet, needsWeight, type NextSet } from '../src/lib/next-set-label'
+import { nextSetLabel, readNextSet, needsWeight, needsReps, type NextSet } from '../src/lib/next-set-label'
 import { stripDot } from '../src/components/exercise/WeekContextRow'
 import { StatusCircle } from '../src/components/exercise/ExerciseLine'
 import { createElement } from 'react'
@@ -29,7 +29,7 @@ function check(name: string, ok: boolean, detail?: unknown) {
   else { failures++; console.log(`  FAIL: ${name}${detail === undefined ? '' : ` — ${JSON.stringify(detail).slice(0, 300)}`}`) }
 }
 const code = (p: string) => readFileSync(join(ROOT, p), 'utf8').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
-const set = (o: Partial<NextSet>): NextSet => ({ set: 'Set 3', name: 'Barbell Bench Press', weight: '80', unit: 'kg', reps: '6', weightBox: 'box', ...o })
+const set = (o: Partial<NextSet>): NextSet => ({ set: 'Set 3', name: 'Barbell Bench Press', weight: '80', unit: 'kg', reps: '6', weightBox: 'box', repsBox: 'rbox', ...o })
 
 console.log('\n1. The words on the running button')
 {
@@ -48,8 +48,17 @@ console.log('\n1. The words on the running button')
   const blank = set({ weight: '' })
   check('no weight to take: the button asks for it rather than offering to log', needsWeight(blank) && nextSetLabel(blank) === 'Set 3 · Bench: type the weight', nextSetLabel(blank))
   check('...and a weight in hand needs no typing', !needsWeight(set({})))
-  const noReps = nextSetLabel(set({ reps: '' }))
-  check('no reps to take: no "× " left hanging', noReps === 'Log set 3 · Bench 80 kg', noReps)
+  // NO REPS TO TAKE IS A TICK THAT REFUSES (whole-app QA walk, 7 Nov 2026): this used to read "Log set 3 · Bench
+  // 80 kg" and the tick then answered "Enter reps to log this set". The button asks for the reps instead.
+  const noReps = set({ reps: '' })
+  check('no reps to take: the button asks for them rather than offering to log', needsReps(noReps) && nextSetLabel(noReps) === 'Set 3 · Bench: type the reps', nextSetLabel(noReps))
+  check('...and reps in hand need no typing', !needsReps(set({})))
+  const btn = code('src/components/exercise/NextSetButton.tsx')
+  check('the button opens the reps box when the reps are missing, never pressing a tick that refuses',
+    /if \(needsWeight\(next\) \|\| needsReps\(next\)\)[\s\S]{0,160}needsWeight\(next\) \? next\.weightBox : next\.repsBox[\s\S]{0,200}return\s*\}\s*tick\.click\(\)/.test(btn))
+  const grid = code('src/components/exercise/SetGrid.tsx')
+  check('the tick names its reps box, and the reps box carries that id',
+    /data-next-reps-box=\{[^}]*`setgrid-reps-\$\{exerciseId\}-\$\{rowKey\(ref\)\}`/.test(grid) && /id=\{`setgrid-reps-\$\{exerciseId\}-\$\{k\}`\}/.test(grid))
 }
 
 console.log('\n2. The button reads the FIRST set still to log, and its lift')
@@ -87,10 +96,10 @@ console.log('\n3. The tick says what it would save, by the save path\'s own fall
     /probeNeedsWeight\(ref\)/.test(tick) && /probeNeedsWeight\(ref\)/.test(save))
   const btn = code('src/components/exercise/NextSetButton.tsx')
   check('the button presses that tick', /tick\.click\(\)/.test(btn))
-  const typeAt = btn.indexOf('if (needsWeight(next)) {')
+  const typeAt = btn.indexOf('if (needsWeight(next) || needsReps(next)) {')
   const typeBranch = typeAt >= 0 ? btn.slice(typeAt, btn.indexOf('\n    }', typeAt)) : ''
   check('...unless the weight must be typed, when it opens the box instead — and presses nothing',
-    /getElementById\(next\.weightBox\)/.test(typeBranch) && /focus\(\)/.test(typeBranch) && /return$/.test(typeBranch.trim()) && !/\.click\(/.test(typeBranch), typeBranch)
+    /getElementById\(needsWeight\(next\) \? next\.weightBox : next\.repsBox\)/.test(typeBranch) && /focus\(\)/.test(typeBranch) && /return$/.test(typeBranch.trim()) && !/\.click\(/.test(typeBranch), typeBranch)
   check('it watches the list, so a typed box or a landed tick changes the words', /new MutationObserver\(read\)/.test(btn) && /attributeFilter/.test(btn))
   const today = code('src/components/exercise/TodayPanel.tsx')
   const btnAt = today.indexOf('<NextSetButton')

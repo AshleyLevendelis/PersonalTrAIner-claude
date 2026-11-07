@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { readNextSet, nextSetLabel, needsWeight, type NextSet } from '@/lib/next-set-label'
+import { readNextSet, nextSetLabel, needsWeight, needsReps, type NextSet } from '@/lib/next-set-label'
 
 /**
  * The fixed button during a session: "Log set 3 · Bench 80 kg × 6".
@@ -32,8 +32,8 @@ export function NextSetButton({ root, bottom }: { root: HTMLElement | null; bott
   const press = () => {
     const tick = root.querySelector<HTMLElement>('[data-next-set]')
     if (!tick) return
-    if (needsWeight(next)) {
-      const box = document.getElementById(next.weightBox)
+    if (needsWeight(next) || needsReps(next)) {
+      const box = document.getElementById(needsWeight(next) ? next.weightBox : next.repsBox)
       box?.scrollIntoView({ block: 'center', behavior: 'smooth' })
       box?.focus()
       return

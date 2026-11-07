@@ -1111,6 +1111,7 @@ export function SetGrid({
               <span aria-hidden className="flex justify-center text-muted-foreground"><Dumbbell className="size-3.5" /></span>
             )}
             <Input
+              id={`setgrid-reps-${exerciseId}-${k}`}
               type="number"
               min="0"
               max={MAX_REPS}
@@ -1158,6 +1159,7 @@ export function SetGrid({
                 data-next-weight={!isSaved && !drop ? (isBW ? 'BW' : probeNeedsWeight(ref) ? '' : (input.weight || defaultWeightFor(ref))) : undefined}
                 data-next-unit={!isSaved && !drop ? (loadUnitLabel ?? 'kg') : undefined}
                 data-next-weight-box={!isSaved && !drop ? `setgrid-weight-${exerciseId}-${rowKey(ref)}` : undefined}
+                data-next-reps-box={!isSaved && !drop ? `setgrid-reps-${exerciseId}-${rowKey(ref)}` : undefined}
                 data-next-reps={!isSaved && !drop ? (input.reps || (ghost ? String(ghost.reps_completed) : defaultRepsFor(ref))) : undefined}
                 // THE KIND IS IN THE SPOKEN LABEL TOO: warm-up 2 and working set
                 // 2 are two different ticks.

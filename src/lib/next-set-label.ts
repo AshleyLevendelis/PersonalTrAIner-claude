@@ -26,6 +26,8 @@ export interface NextSet {
   reps: string
   /** The id of the weight box, for when the weight has to be typed. */
   weightBox: string
+  /** The id of the reps box, for when the reps have to be typed. */
+  repsBox: string
 }
 
 /** The first set still to log in this list, or null when no open row has one. */
@@ -40,12 +42,22 @@ export function readNextSet(root: ParentNode): NextSet | null {
     unit: tick.dataset.nextUnit ?? 'kg',
     reps: tick.dataset.nextReps ?? '',
     weightBox: tick.dataset.nextWeightBox ?? '',
+    repsBox: tick.dataset.nextRepsBox ?? '',
   }
 }
 
 /** Whether one tap can log it, or the weight has to be typed first. */
 export function needsWeight(next: NextSet): boolean {
   return next.weight === ''
+}
+
+/**
+ * Whether the reps have to be typed first (whole-app QA walk, 7 Nov 2026): an added warm-up has no prescribed reps,
+ * so "Log warm-up 1 · Seated Machine Row 20 kg" pressed a tick that refused with "Enter reps to log this set". The
+ * reps the tick would take come from the same expression the save uses, so empty here is exactly a refusal there.
+ */
+export function needsReps(next: NextSet): boolean {
+  return next.reps === ''
 }
 
 /**
@@ -60,6 +72,7 @@ export function nextSetLabel(next: NextSet): string {
   const what = next.set ? next.set[0].toLowerCase() + next.set.slice(1) : 'set'
   const lift = LIFT_SHORT_NAME[next.name] ?? next.name
   if (needsWeight(next)) return `${next.set || 'Set'} · ${lift}: type the weight`
+  if (needsReps(next)) return `${next.set || 'Set'} · ${lift}: type the reps`
   // NO LOAD SAID FOR A BODYWEIGHT SET: "BW", or a 0 the box saves for a move
   // that carries nothing ("Prone Y-T Raises 0 kg" read like a missing number).
   const load = next.weight === 'BW' || Number(next.weight) === 0 ? '' : ` ${next.weight} ${next.unit}`
