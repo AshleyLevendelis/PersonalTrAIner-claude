@@ -32,6 +32,11 @@ Newest first. One line each.
   ("Leftover chilli and rice", 720 kcal, when she logged 610). The header now reads one serving as logged, the same
   record the name comes from; the block below still says whose details it shows. `verify:diary-preservation` 6b
   (mutation caught). 42 derived gates and drivers green.
+  (N4) PARTLY FIXED: each amount change on a meal appended a clause to its name ("... with 60g oats with 80g oats");
+  a second change to the same food now replaces the first's words, with the same connector so the dish keeps its
+  identity. NOT changed, named: every edit still stores a new copy beside the dish (the 29 Sep edited-copy design,
+  so the plan she has holds); the swap list counts those copies as one dish for variety, but it does show them.
+  `test:meal-food-edit` §4 (2 checks; mutation caught). 10 derived gates green.
 - [x] **WHOLE-APP QA WALK, TRAINING: EIGHT DEFECTS FOUND AND FIXED, 7 NOV 2026** (Ashley: "I want you to test and fix",
   then "Keep testing and keep fixing"). Five testers walked the app at phone size against the browser harness; each
   finding was re-measured on a real screen before it was fixed. Found by me, none reported by her. Each fix has its

@@ -130,6 +130,16 @@ console.log('\n4. Resizing a portion keeps her words')
   const noAmount = buildMealFoodResizeProposal({ ...base({ currentMeal: mealOf(['salt to taste', '80g white rice']) }),
     rawArgs: { meal_slot: 'lunch', food: 'salt', amount: 5 } })
   check('...and the app offers to swap it instead', noAmount.ok === false && /swap it instead/i.test(noAmount.reason), noAmount)
+  // A SECOND RESIZE REPLACES THE FIRST'S WORDS (whole-app QA walk, 7 Nov 2026): the name grew a clause per tap.
+  if (r.ok) {
+    const once = r.payload.option
+    const again = buildMealFoodResizeProposal({ ...base({ currentMeal: { name: once.name, ingredients: once.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`), macros: once.macros } }),
+      rawArgs: { meal_slot: 'lunch', food: 'rice', amount: 25 } })
+    const name2 = again.ok ? again.payload.option.name : ''
+    check('resizing the same food twice names the dish once, with the latest amount',
+      again.ok && (name2.match(/ with /g) ?? []).length === 1 && /25g/.test(name2) && !/15g/.test(name2), { first: once.name, second: name2 })
+    check('...keeping the base name in front (so it stays the same dish)', name2.startsWith('Chicken, rice and broccoli with '), name2)
+  }
 }
 
 console.log('\n5. Which food she meant is asked, never guessed')

@@ -414,7 +414,12 @@ export function buildMealFoodResizeProposal(input: BuildMealFoodEditInput): Meal
   }
   if (after === before) return { ok: false, reason: `Your ${slot} already has ${before}.` }
   const ingredients = [...meal.ingredients.slice(0, index), after, ...meal.ingredients.slice(index + 1)]
-  return settle(input, c, ingredients, `${meal.name} with ${after}`, 'propose_meal_food_resize',
+  // A SECOND RESIZE OF THE SAME FOOD REPLACES THE FIRST'S WORDS (whole-app QA walk, 7 Nov 2026): the name grew a
+  // clause per tap, "Overnight Oats with 60g oats with 80g oats with 70g oats". The same connector, so the dish keeps
+  // its identity (meal-dish-identity's " with ").
+  const lastClause = ` with ${before}`
+  const resizedName = meal.name.endsWith(lastClause) ? `${meal.name.slice(0, -lastClause.length)} with ${after}` : `${meal.name} with ${after}`
+  return settle(input, c, ingredients, resizedName, 'propose_meal_food_resize',
     { field: 'Changing', before, after },
     [
       { severity: 'info', text: `Only the amount changes — everything else in your ${slot} stays as it is.` },
