@@ -109,6 +109,19 @@ export async function markSessionCompleted(
 }
 
 /**
+ * IS THE DAY'S SESSION ALREADY CLOSED ON THE SERVER? (whole-app QA walk, 7 Nov 2026). The Exercise screen took
+ * "finished" only from this phone's own record, so on a second phone, after cleared storage, or with the sets logged
+ * from elsewhere, a day Home called "Done ✓ · 46 min" offered "Start session", and Start then Finish wrote 1 minute
+ * over the 46. Null when the read fails: unknown is not "not done". select('*'): a named column is a parse-time
+ * dependency.
+ */
+export async function isSessionClosedOn(profileId: string, date: string): Promise<boolean | null> {
+  const { data, error } = await supabase.from('workout_sessions').select('*').eq('profile_id', profileId).eq('date', date)
+  if (error) return null
+  return ((data ?? []) as { is_completed?: boolean | null }[]).some(r => r.is_completed === true)
+}
+
+/**
  * Records — or clears — "I'm resting this prescribed training day".
  *
  * READ BEFORE WRITE rather than an upsert, for the reason

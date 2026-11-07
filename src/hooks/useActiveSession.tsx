@@ -30,7 +30,7 @@ import {
   getLastSessionSets, initSetLogStore, ensureSessionSynced, type SaveSetInput,
 } from '@/lib/set-log-store'
 import { refreshPRCacheFromDB, getPRBaseline, isPRCacheLoaded, type PRRecord } from '@/lib/pr-engine'
-import { markSessionCompleted } from '@/lib/daily-tracking'
+import { markSessionCompleted, isSessionClosedOn } from '@/lib/daily-tracking'
 import { filterLoggableSets, trainingMinutes } from '@/lib/session-derive'
 import {
   getActiveSessionRecord,
@@ -354,6 +354,15 @@ export function ActiveSessionProvider({
     }
     const record = getActiveSessionRecord(identity.profileId, identity.date)
     setStatus(record?.status ?? 'idle')
+    // NO RECORD ON THIS PHONE IS NOT "NOT STARTED": the server may already hold today's session closed (another phone,
+    // cleared storage). Then the day reads finished, so Start is never offered on it (isSessionClosedOn). Only while
+    // nothing here has started meanwhile: a tap on Start in the gap wins.
+    if (!record) {
+      const { profileId, date } = identity
+      void isSessionClosedOn(profileId, date).then(closed => {
+        if (closed && statusRef.current === 'idle' && !getActiveSessionRecord(profileId, date)) setStatus('finished')
+      })
+    }
     setStartedAtIso(record?.startedAtIso ?? null)
     setTightAreasState(record?.tightAreas ?? [])
     setExtraSetsState(record?.extraSets ?? {})
