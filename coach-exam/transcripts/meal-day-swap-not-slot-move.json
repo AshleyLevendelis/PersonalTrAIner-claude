@@ -23,10 +23,10 @@
       }
     ]
   },
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "daed24141e375c6c",
   "caseStamp": "a4d80a8b54552e47",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T11:57:06.710Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -105,7 +105,7 @@
         "args": {
           "from_slot": "dinner",
           "to_slot": "lunch",
-          "origin_verbatim_quote": "could I have tonight's dinner at lunchtime today instead"
+          "origin_verbatim_quote": "have tonight's dinner at lunchtime today instead"
         }
       },
       "saved": null
@@ -123,7 +123,7 @@
           "from_date": "2026-09-17",
           "to_date": "2026-09-19",
           "to_meal_slot": "lunch",
-          "origin_verbatim_quote": "put Thursday's dinner in Saturday's lunch"
+          "origin_verbatim_quote": "put Thursday's dinner in Saturday's lunch instead"
         }
       },
       "saved": null

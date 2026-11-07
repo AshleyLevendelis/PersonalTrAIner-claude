@@ -2,10 +2,10 @@
   "case": "specific-why-this-exercise",
   "why": "VISION: a coach has a reason for every choice, and the app promises 'Why this exercise' on screen. Asked in chat, the answer must be about this session's actual order and this person's actual plan, not a textbook paragraph on compound lifts.",
   "checks": {},
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "daed24141e375c6c",
   "caseStamp": "faa32c7dd1dcd589",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T11:57:06.710Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -57,8 +57,8 @@
   "turns": [
     {
       "user": "why are the romanian deadlifts after the squats and not before",
-      "reply": "Barbell Back Squats come first because they're your primary, heavy compound lift for the session. They demand the most neural drive, stability, and raw energy from your whole body. \n\nPutting them first lets you attack those heavy squats when your central nervous system and core are completely fresh. Romanian Deadlifts still ask a lot of your hamstrings and lower back, but doing them second means you can push your quads hard without fatigue compromising your squat setup. \n\nDoes that order make sense, or were you hoping to prioritize hamstring work today?",
-      "raw": "Barbell Back Squats come first because they're your primary, heavy compound lift for the session. They demand the most neural drive, stability, and raw energy from your whole body. \n\nPutting them first lets you attack those heavy squats when your central nervous system and core are completely fresh. Romanian Deadlifts still ask a lot of your hamstrings and lower back, but doing them second means you can push your quads hard without fatigue compromising your squat setup. \n\nDoes that order make sense, or were you hoping to prioritize hamstring work today?",
+      "reply": "Squats go first because they're your heaviest, most technically demanding lift and need your legs and core to be completely fresh. \n\nRDLs come second so your lower back doesn't fatigue before your heavy squats are done. \n\nIf your back ever feels too tired by the time you reach the RDLs, let me know and we can tweak the volume!",
+      "raw": "Squats go first because they're your heaviest, most technically demanding lift and need your legs and core to be completely fresh. \n[BREAK]\nRDLs come second so your lower back doesn't fatigue before your heavy squats are done. \n\nIf your back ever feels too tired by the time you reach the RDLs, let me know and we can tweak the volume!",
       "error": null,
       "action": null,
       "proposal": null,

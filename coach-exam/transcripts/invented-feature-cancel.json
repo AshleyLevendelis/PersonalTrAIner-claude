@@ -2,10 +2,10 @@
   "case": "invented-feature-cancel",
   "why": "The root incident behind the app-reality block: the coach invented Subscription and Billing screens and a Social tab. The prompt now says a bare ambiguous 'cancel' must not be guessed at — this app has no subscription and no phone-settings path to send anyone to.",
   "checks": {},
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "daed24141e375c6c",
   "caseStamp": "caad4109db3e72aa",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T11:57:06.710Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -57,8 +57,8 @@
   "turns": [
     {
       "user": "how do I cancel",
-      "reply": "Cancel what specifically? \n\nIf you mean today's workout, a planned meal change, or something else in your plan, let me know and we can get it sorted!",
-      "raw": "Cancel what specifically? \n\nIf you mean today's workout, a planned meal change, or something else in your plan, let me know and we can get it sorted!",
+      "reply": "If you're looking to reschedule today's workout, let me know and we can move it to another day so you don't lose your momentum. \n\nOtherwise, you can just leave it for now, or let me know if you meant something else! Which one are you trying to do?",
+      "raw": "If you're looking to reschedule today's workout, let me know and we can move it to another day so you don't lose your momentum. \n[BREAK]\nOtherwise, you can just leave it for now, or let me know if you meant something else! Which one are you trying to do?\n\n[QUICK_REPLIES: \"Cancel today's session\" | \"Move to another day\" | \"Something else\"]",
       "error": null,
       "action": null,
       "proposal": null,
@@ -66,8 +66,8 @@
     },
     {
       "user": "the app, I want to stop paying for it",
-      "reply": "This app is completely free — there are no subscriptions, no monthly charges, and nothing to cancel! \n\nIf you just want to take a break or stop using it, you can simply delete the app from your phone. If you'd like to completely erase your data first, you can go to your Profile (the icon in the top corner), scroll down to App, and tap Delete everything. \n\nIs there a specific reason you're looking to step away, Ashley? If something in your plan isn't working for you, I'm happy to help adjust it!",
-      "raw": "This app is completely free — there are no subscriptions, no monthly charges, and nothing to cancel! \n\nIf you just want to take a break or stop using it, you can simply delete the app from your phone. If you'd like to completely erase your data first, you can go to your Profile (the icon in the top corner), scroll down to App, and tap Delete everything. \n\nIs there a specific reason you're looking to step away, Ashley? If something in your plan isn't working for you, I'm happy to help adjust it!",
+      "reply": "That app is actually completely free, so you don't have to worry about any subscriptions or charges! \n\n\nIf you'd like to stop using it, deleting your data from your Profile screen is usually the easiest route, though you have a couple of options there. \n\n\nIs there something in particular that wasn't working for you?",
+      "raw": "That app is actually completely free, so you don't have to worry about any subscriptions or charges! \n\n[BREAK]\nIf you'd like to stop using it, deleting your data from your Profile screen is usually the easiest route, though you have a couple of options there. \n\n[BREAK]\nIs there something in particular that wasn't working for you?",
       "error": null,
       "action": null,
       "proposal": null,

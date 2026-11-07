@@ -15,10 +15,10 @@
       }
     ]
   },
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "daed24141e375c6c",
   "caseStamp": "f4722d8d6ac9d119",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T11:57:06.710Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -70,8 +70,8 @@
   "turns": [
     {
       "user": "I keep getting the same dinners every single night, it's so boring",
-      "reply": "I hear you — eating the exact same thing every night gets old fast, and staying consistent is much harder when you're bored of your food. \n\nYour week draws from a saved set of dinner options, so if that set is small, the rotation gets repetitive quickly. \n\nIf you'd like, I can add some new dinner options to your plan so you've got more variety to pick from across the week. Want me to add those options for you?",
-      "raw": "I hear you — eating the exact same thing every night gets old fast, and staying consistent is much harder when you're bored of your food. \n\nYour week draws from a saved set of dinner options, so if that set is small, the rotation gets repetitive quickly. \n\nIf you'd like, I can add some new dinner options to your plan so you've got more variety to pick from across the week. Want me to add those options for you?\n[QUICK_REPLIES: \"Yes, add more options\" | \"No, I'm okay\"]",
+      "reply": "I hear you! Repeating the exact same meal gets boring fast, but eating for your goals should still be enjoyable. \n\nThat repetition happens when your plan draws from a small set of saved dinners. I can top up your dinner options with fresh dishes that fit your exact calorie and protein targets, while keeping today's meals and your current shopping list as they are. 🥑\n\nWant me to add some new options to your dinners?",
+      "raw": "I hear you! Repeating the exact same meal gets boring fast, but eating for your goals should still be enjoyable. \n[BREAK]\nThat repetition happens when your plan draws from a small set of saved dinners. I can top up your dinner options with fresh dishes that fit your exact calorie and protein targets, while keeping today's meals and your current shopping list as they are. 🥑\n[BREAK]\nWant me to add some new options to your dinners?\n\n[QUICK_REPLIES: \"Yes, add more options\" | \"No, I'm alright\"]",
       "error": null,
       "action": null,
       "proposal": null,

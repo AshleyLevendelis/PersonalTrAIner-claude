@@ -4,10 +4,10 @@
   "checks": {
     "expectsProposal": true
   },
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "daed24141e375c6c",
   "caseStamp": "b50cf44c9241e317",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T11:57:06.710Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -66,16 +66,16 @@
       "proposal": {
         "kind": "propose_exercise_ban",
         "args": {
-          "item": "Burpees",
-          "reason": "User explicitly hates burpees and requested permanent exclusion"
+          "item": "burpees",
+          "reason": "User preference — dislikes movement"
         }
       },
       "saved": null
     },
     {
       "user": "so they're gone for good?",
-      "reply": "They'll be gone for good once you tap Confirm on that card right there on your screen. \n\nOnce you tap it, the app removes burpees from every week of your plan and makes sure they never turn up again.",
-      "raw": "They'll be gone for good once you tap Confirm on that card right there on your screen. \n\nOnce you tap it, the app removes burpees from every week of your plan and makes sure they never turn up again.",
+      "reply": "Yep, once you tap Confirm on that card, they're gone for good. \n\n\nThe engine won't include them in any current or future training blocks so you can get a plan built entirely around what works for you.",
+      "raw": "Yep, once you tap Confirm on that card, they're gone for good. \n\n[BREAK]\nThe engine won't include them in any current or future training blocks so you can get a plan built entirely around what works for you.",
       "error": null,
       "action": null,
       "proposal": null,

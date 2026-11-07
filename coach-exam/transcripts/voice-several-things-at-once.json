@@ -2,10 +2,10 @@
   "case": "voice-several-things-at-once",
   "why": "Ashley, 24 Sep 2026: a voice note that asks several things must get every part answered, each on its own line starting with what it answers, so she can see nothing was dropped. No headers, no bold. And no closing question unless an answer genuinely changes what happens next.",
   "checks": {},
-  "fingerprint": "e6225d8ed0d24bb6",
+  "fingerprint": "daed24141e375c6c",
   "caseStamp": "228e939b1b55c399",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-06T15:11:29.880Z",
+  "ranAt": "2026-11-07T11:57:06.710Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -57,8 +57,8 @@
   "turns": [
     {
       "user": "ok so a few things, I'm starving today so I think I need more carbs, what should I have before training tomorrow morning, and is it fine that I skipped the stretching at the end yesterday",
-      "reply": "Carbs — a bowl of oats with a sliced banana, or two slices of toast with jam about 60 to 90 minutes before tomorrow's session. Carbs right before training restock your muscle glycogen so you have full strength on your heavy sets, and oats or toast digest easily enough to avoid any stomach heaviness while you lift.\n\nSkipping stretching yesterday — totally fine. Post-workout stretching feels nice and can help you wind down, but it doesn't reduce muscle soreness or drive your strength progress. The work that actually grows muscle and builds strength is what you did during the session itself.\n\nFor today's hunger, pulling a bit more food into your meals — especially slow-digesting carbs like potatoes, oats, or rice — will help settle your appetite without knocking your targets off track. Did you want to add a pre-workout meal into your plan for tomorrow morning?",
-      "raw": "Carbs — a bowl of oats with a sliced banana, or two slices of toast with jam about 60 to 90 minutes before tomorrow's session. Carbs right before training restock your muscle glycogen so you have full strength on your heavy sets, and oats or toast digest easily enough to avoid any stomach heaviness while you lift.\n\nSkipping stretching yesterday — totally fine. Post-workout stretching feels nice and can help you wind down, but it doesn't reduce muscle soreness or drive your strength progress. The work that actually grows muscle and builds strength is what you did during the session itself.\n\nFor today's hunger, pulling a bit more food into your meals — especially slow-digesting carbs like potatoes, oats, or rice — will help settle your appetite without knocking your targets off track. Did you want to add a pre-workout meal into your plan for tomorrow morning?\n[QUICK_REPLIES: \"Yes, add pre-workout meal\" | \"No, I'll just prep it myself\"]",
+      "reply": "Carbs before training tomorrow — a banana with a slice of toast about 45 to 60 minutes out works brilliantly. The banana gives you quick-digesting sugars to kickstart energy, and the bread adds a slower release so you don't crash halfway through your squats.\n\nSkipping the post-workout stretch — completely fine. Cool-down stretching feels nice and helps you wind down, but it doesn't reduce muscle soreness or change how you adapt from the session. If you're short on time, that's always the first thing to cut.\n\nAs for being starving today — your carbs are sitting at 150g, which is a bit tight on a lower-body day. Want me to shift 150 to 200 calories over from your dinner or snack into lunch to get some extra energy in before tonight?",
+      "raw": "Carbs before training tomorrow — a banana with a slice of toast about 45 to 60 minutes out works brilliantly. The banana gives you quick-digesting sugars to kickstart energy, and the bread adds a slower release so you don't crash halfway through your squats.\n[BREAK]\nSkipping the post-workout stretch — completely fine. Cool-down stretching feels nice and helps you wind down, but it doesn't reduce muscle soreness or change how you adapt from the session. If you're short on time, that's always the first thing to cut.\n[BREAK]\nAs for being starving today — your carbs are sitting at 150g, which is a bit tight on a lower-body day. Want me to shift 150 to 200 calories over from your dinner or snack into lunch to get some extra energy in before tonight?\n[QUICK_REPLIES: \"Yes, add carbs to lunch\" | \"No, I'll stick to it\"]",
       "error": null,
       "action": null,
       "proposal": null,
