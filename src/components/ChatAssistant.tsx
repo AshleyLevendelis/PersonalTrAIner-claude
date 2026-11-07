@@ -5745,6 +5745,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           dietaryPreferences: profile.dietary_preferences ?? [],
           today: getSessionDateContext(profile.id).date,
           upcomingDays: (upcomingMeals ?? []).map(d => ({ date: d.date, dayName: d.dayName })),
+          servedByDate: {
+            [getSessionDateContext(profile.id).date]: Object.fromEntries(mealPlan.map(m => [m.meal.toLowerCase(), m.items[0]?.name ?? ''])),
+            ...Object.fromEntries((upcomingMeals ?? []).map(d => [d.date, d.meals])),
+          },
         })
         if (swap.ok) {
           // THE SCREEN'S NUMBERS AND THE KNOCK-ON, BEFORE THE TAP (live test, 19 Oct 2026): the card read the saved

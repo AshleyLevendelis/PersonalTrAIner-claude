@@ -73,6 +73,13 @@ export interface BuildMealSwapInput {
    * rather than written somewhere nobody can see.
    */
   upcomingDays?: { date: string; dayName: string }[]
+  /**
+   * What each day's screen serves in each slot, by date (today and the strip's days). When she says "swap my dinner"
+   * and names no dish, the dish being swapped OUT is the one on her plate (whole-app QA walk, 7 Nov 2026: with no
+   * name the rotation always started from the top, so the second swap re-offered the first and said "you've seen the
+   * lot" after one option, and the card's before-side named the slot instead of the dish).
+   */
+  servedByDate?: Record<string, Partial<Record<string, string>>>
 }
 
 /**
@@ -143,7 +150,9 @@ export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<
     return { ok: false, reason: `I don't have any ${slot} options saved for you yet — generate your meals from the Meals tab and I'll be able to swap them.` }
   }
 
-  const currentName = byName(options, input.rawArgs.old_item)?.name ?? String(input.rawArgs.old_item ?? '').trim()
+  const saidOld = String(input.rawArgs.old_item ?? '').trim()
+  const servedName = input.servedByDate?.[upcomingDay?.date ?? input.today ?? '']?.[slot]
+  const currentName = byName(options, saidOld)?.name ?? (saidOld || byName(options, servedName)?.name || servedName || '')
 
   const disliked = input.dislikedFoods ?? []
   const prefs = input.dietaryPreferences ?? []
@@ -180,7 +189,14 @@ export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<
     }
   }
 
-  const chosen = requested ?? nextPoolOption(allowed, currentName || undefined)
+  // ROUND THE POOL, NOT BACK TO ITS TOP: the next option after the current one that this conversation has not shown
+  // yet; only when every other option has been shown does the rotation land on a seen one (and the offer follows).
+  const seen = new Set((input.alreadySeen ?? []).map(n => n.toLowerCase()))
+  const at = allowed.findIndex(o => o.name === currentName)
+  const unseen = allowed.length === 0 ? undefined
+    : Array.from({ length: allowed.length }, (_, k) => allowed[(at + 1 + k) % allowed.length])
+      .find(o => o.name !== currentName && !seen.has(o.name.toLowerCase()))
+  const chosen = requested ?? unseen ?? nextPoolOption(allowed, currentName || undefined)
 
   if (!chosen) {
     return {
@@ -193,7 +209,6 @@ export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<
   // The offer, per Ashley's ruling: only once they have actually been through
   // what they have, and only as an offer — generating costs money, so it is
   // never done on their behalf. Skipped when they named the meal themselves.
-  const seen = new Set((input.alreadySeen ?? []).map(n => n.toLowerCase()))
   if (!requested && seen.has(chosen.name.toLowerCase())) {
     return {
       ok: false,

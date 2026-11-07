@@ -165,6 +165,39 @@ console.log('\n6. Running out of options offers new ones instead of repeating')
     explicit.ok && explicit.payload.chooseName === POOL[3], explicit.ok ? explicit.payload.chooseName : explicit.reason)
 }
 
+console.log('\n6b. "Swap my breakfast" with no dish named (whole-app QA walk, 7 Nov 2026)')
+{
+  // With no name the rotation always began at the top of the pool, so the second swap re-offered the first and
+  // said "you've seen the lot" after ONE option, and the card's "before" named the slot. The dish on her plate is
+  // the one being swapped out, and repeated swaps walk the pool.
+  const { buildMealSwapProposal } = await import('../src/lib/meal-swap-proposal')
+  const today = '2026-11-07'
+  let served = POOL[2]
+  const shown: string[] = []
+  const alreadySeen: string[] = []
+  let exhaustedAt = -1
+  for (let i = 0; i < POOL.length + 1; i++) {
+    const r = await buildMealSwapProposal({ rawArgs: { meal_slot: 'breakfast' }, profileId: 'p', alreadySeen, today, servedByDate: { [today]: { breakfast: served } } })
+    if (!r.ok) { exhaustedAt = i; break }
+    if (i === 0) check('the card swaps out the dish on her plate, by name', r.preconditions.currentItemName === served, r.preconditions)
+    shown.push(r.payload.chooseName)
+    alreadySeen.push(r.payload.currentName, r.payload.chooseName)
+    served = r.payload.chooseName
+  }
+  check(`unnamed swaps walk every other option (${POOL.length - 1}) before saying "seen the lot"`,
+    new Set(shown).size === POOL.length - 1 && exhaustedAt === POOL.length - 1, { shown, exhaustedAt })
+  check('...the first swap is never the dish already served', shown[0] !== POOL[2], shown)
+  // Without the served dish (the old input) the first unnamed swap starts at the top of the pool: the check binds.
+  const old = await buildMealSwapProposal({ rawArgs: { meal_slot: 'breakfast' }, profileId: 'p', alreadySeen: [], today })
+  check('...where without it the swap has no dish to name (the input the fix supplies)', old.ok && old.preconditions.currentItemName === '', old.ok ? old.preconditions : old.reason)
+  // AFTER AN UNDO the plate holds the first dish again while the second has been shown: the next swap moves on to a
+  // third, never back to the shown one and never "seen the lot" with three untried.
+  const afterUndo = await buildMealSwapProposal({ rawArgs: { meal_slot: 'breakfast' }, profileId: 'p', alreadySeen: [POOL[0], POOL[1]], today, servedByDate: { [today]: { breakfast: POOL[0] } } })
+  check('after an Undo, the next unnamed swap offers a dish not yet shown', afterUndo.ok && ![POOL[0], POOL[1]].includes(afterUndo.payload.chooseName), afterUndo.ok ? afterUndo.payload.chooseName : afterUndo.reason)
+  const src = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+  check('the chat hands the swap what each day serves', /servedByDate: \{/.test(src))
+}
+
 console.log('\n7. Finding new options ADDS, it never replaces')
 {
   // persistPools deletes a slot's rows before inserting. Reaching for it here

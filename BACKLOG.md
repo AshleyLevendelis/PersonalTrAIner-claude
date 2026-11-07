@@ -20,6 +20,14 @@ Newest first. One line each.
   mutation is caught), and `verify:coach-hello` passed 6 of 6 runs after it. FOUND ON THE WAY: `verify:chat-2b`'s
   mid-session fixture logged two Arm Circles sets, which since the movement-prep fix rightly count as 0 working
   sets; the fixture now logs the first working exercise.
+  (N1) FIXED: "swap my breakfast" with no dish named told her "you've seen the lot" after ONE option, and the card's
+  "before" named the slot, not the dish. With no name, the swap started from the top of the pool every time, so the
+  second swap re-offered the first. The chat now tells the swap what each day serves (today and the strip's days),
+  so the dish on her plate is the one swapped out, and the rotation moves on to the next dish not yet shown
+  (including after an Undo); "seen the lot" only comes once every other option has been shown. `test:meal-swap-rotation`
+  6b (6 checks; 3 mutations, all caught, one only after the after-Undo case was added). NOT fixed from the same
+  finding, named: the bubble repeating its question beside the card, and old offers staying tappable (both are the
+  offer card's wider behaviour, next in the list).
 - [x] **WHOLE-APP QA WALK, TRAINING: EIGHT DEFECTS FOUND AND FIXED, 7 NOV 2026** (Ashley: "I want you to test and fix",
   then "Keep testing and keep fixing"). Five testers walked the app at phone size against the browser harness; each
   finding was re-measured on a real screen before it was fixed. Found by me, none reported by her. Each fix has its
