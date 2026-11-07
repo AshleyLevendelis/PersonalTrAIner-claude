@@ -220,5 +220,24 @@ export function chooseCard(input: CardChoiceInput): SlotKey | undefined {
       boxes.add(cardKeyFor(s.key))
     }
   }
-  return boxes.size === 1 ? [...boxes][0] : undefined
+  if (boxes.size > 0) return boxes.size === 1 ? [...boxes][0] : undefined
+
+  // Rule 4 (7 Nov 2026, Ashley's setup: the days question came with no
+  // buttons, only the typing box). The coach asked it in words and did not ask
+  // for chips. Until then a first asking with no request got no card, on the
+  // reasoning "wrong chips are impossible, missing chips are possible" (test
+  // log H14/M2, decided unprompted, reversible). Missing chips turned out to
+  // be the commoner harm, against her "one tap answers it" ruling, so: when
+  // the sentence plainly asks exactly ONE open setup question that has
+  // buttons, and that question is one setup must ask, its buttons come too.
+  // Two candidates, or none, still means no card, so a wrong grid stays
+  // impossible. And only a sentence that ASKS: a remark ("three days a week
+  // works well") brings nothing.
+  if (!question.includes('?')) return undefined
+  const choices = new Set<SlotKey>()
+  for (const s of ONBOARDING_SLOTS) {
+    const mustAsk = s.requiredIf ? s.requiredIf(values) : s.required
+    if ((s.control === 'single' || s.control === 'multi') && mustAsk && open(s.key) && asksOne(s.key, question)) choices.add(cardKeyFor(s.key))
+  }
+  return choices.size === 1 ? [...choices][0] : undefined
 }

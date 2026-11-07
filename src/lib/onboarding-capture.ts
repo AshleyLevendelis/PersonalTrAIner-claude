@@ -39,6 +39,81 @@ export function snackAnswerIn(text: string): boolean | undefined {
   return no === yes ? undefined : yes
 }
 
+// ---------------------------------------------------------------------------
+// TRAINING DAYS, TYPED (7 Nov 2026, Ashley's setup: "I train mon, tue, thu,
+// fri mornings and do muay thai tue and thu evenings"). The days question has
+// tap buttons, but a typed answer was left entirely to the model. The app now
+// reads the days itself when the reading is certain, the same shape as the
+// snack and meal backstops above.
+//
+// A "run" is days written together: "mon, tue, thu, fri", "Tuesday and
+// Thursday". A message with ONE run is that answer. With several, only a run
+// introduced by the person's own training ("I train", "gym", "lift") and not
+// by another sport or class counts, and only if exactly one run is. Anything
+// that says "except", "not", "can't" or "next week" is a conversation, not an
+// answer, and is left for the coach. And once the days are answered, only a
+// run introduced by her own training changes them.
+// ---------------------------------------------------------------------------
+
+const DAY_NAMES: readonly [string, RegExp][] = [
+  ['Mon', /^mon(day)?s?$/i],
+  ['Tue', /^tue(s(day)?)?s?$|^tuesdays?$/i],
+  ['Wed', /^wed(s|nesday)?s?$/i],
+  ['Thu', /^thu(r(s(day)?)?)?s?$|^thursdays?$/i],
+  ['Fri', /^fri(day)?s?$/i],
+  ['Sat', /^sat(urday)?s?$/i],
+  ['Sun', /^sun(day)?s?$/i],
+]
+const WEEK_ORDER = DAY_NAMES.map(d => d[0])
+const dayOf = (word: string): string | undefined => DAY_NAMES.find(([, re]) => re.test(word))?.[0]
+
+const DAY_WORD = /\b(?:mon(?:day)?s?|tue(?:s(?:day)?)?s?|tuesdays?|wed(?:s|nesday)?s?|thu(?:r(?:s(?:day)?)?)?s?|thursdays?|fri(?:day)?s?|sat(?:urday)?s?|sun(?:day)?s?)\b/gi
+const JOINER = /^(?:\s*(?:,|&|\/|\+|and|or)\s*|\s+)$/i
+const NOT_A_LIST = /\b(?:except|apart from|but not|not on|other than|excluding|no(?:t)? (?:on )?(?:mon|tue|wed|thu|fri|sat|sun)|can'?t|cannot|won'?t|unable|busy|off on|miss(?:ing)?|skip|next week|this week)/i
+const OWN_TRAINING = /\b(?:i (?:can )?(?:train|lift|work ?out|go to the gym|gym)|train(?:ing)? (?:on|days?)|gym|lift(?:ing)?|weights|sessions?|free on|available)\b/i
+const OTHER_ACTIVITY = /\b(?:muay thai|thai boxing|kick ?boxing|boxing|bjj|jiu[- ]?jitsu|judo|karate|mma|martial arts?|football|soccer|rugby|netball|hockey|basketball|tennis|squash|padel|swim(?:ming)?|run(?:ning)?|cycl(?:e|ing)|spin|yoga|pilates|climb(?:ing)?|dance|crossfit|hyrox|class(?:es)?|club|team|match(?:es)?|games?)\b/i
+
+/**
+ * The training days a typed message gives, as the setup slot stores them
+ * ("Mon".."Sun", week order), or undefined when the message does not say for
+ * certain.
+ */
+export function trainingDaysIn(text: string, opts: { answered?: boolean } = {}): string[] | undefined {
+  if (NOT_A_LIST.test(text)) return undefined
+  const hits = [...text.matchAll(DAY_WORD)]
+  // "Weekdays", "weekends", "every day": a whole span, certain only on its own.
+  const span = /\b(?:weekends?|every ?day|daily|each day|7 days)\b/i.test(text)
+  if (/\bweekdays?\b/i.test(text)) return hits.length === 0 && !span ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] : undefined
+  if (span) return undefined
+  if (hits.length === 0) return undefined
+  // Group the hits into runs: days separated only by commas, "and", "&", "/".
+  const runs: { days: string[]; start: number }[] = []
+  let prevEnd = -1
+  for (const h of hits) {
+    const at = h.index ?? 0
+    const day = dayOf(h[0])
+    if (!day) continue
+    const between = prevEnd >= 0 ? text.slice(prevEnd, at) : null
+    if (between !== null && JOINER.test(between)) runs[runs.length - 1].days.push(day)
+    else runs.push({ days: [day], start: at })
+    prevEnd = at + h[0].length
+  }
+  // Which runs are the person's own training: the words before a run, back to
+  // the previous run (or the start), say what it is for.
+  const lead = (i: number) => text.slice(i === 0 ? 0 : runs[i - 1].start, runs[i].start)
+  // Once the days are answered, only a plain statement about her own
+  // training changes them; a passing mention of a day does not.
+  const own = runs.filter((_, i) => runs.length === 1 && !opts.answered
+    ? !OTHER_ACTIVITY.test(lead(i))
+    : OWN_TRAINING.test(lead(i)) && !OTHER_ACTIVITY.test(lead(i)))
+  if (own.length !== 1) return undefined
+  // "I sat down", "in the sun": the short forms of the weekend are English
+  // words too, so on their own they are not a day.
+  if (own[0].days.every(d => (d === 'Sat' || d === 'Sun') && /^(sat|sun)$/i.test(hits.find(h => dayOf(h[0]) === d)?.[0] ?? ''))) return undefined
+  const days = new Set(own[0].days)
+  return WEEK_ORDER.filter(d => days.has(d))
+}
+
 const COUNT_WORDS: Record<string, 2 | 3 | 4> = { '2': 2, two: 2, '3': 3, three: 3, '4': 4, four: 4 }
 
 /**

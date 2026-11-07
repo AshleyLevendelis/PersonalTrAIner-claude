@@ -738,11 +738,42 @@ await section(24, 'Age, height and weight asked in words with no card requested:
   check('...with all three boxes', await ev(`['age','heightCm','weightKg'].every(k => !!document.getElementById('slot-' + k))`))
   await shot('body-card-unrequested')
 
-  // A CHIP question asked with no request still gets no chips — unchanged.
+  // CHANGED 7 Nov 2026: a chip question setup must ask, asked plainly with no
+  // request, now brings its chips (chooseCard rule 4).
   await open('h14')
   await queue({ reply: 'Fair enough. How many meals a day suits you?', actions: [{ name: 'set_slot', args: { slot_key: 'recoveryCapacity', value: 'moderate' } }] })
   await say('sleeping fine')
-  check('a chip question with no request still gets no chips', (await evj(`__cards()`)).length === 0, await evj(`__cards()`))
+  const mealsUnasked = await evj(`__cards('mealsPerDay')`)
+  check('a chip question asked with no request now gets its chips, under it, on screen',
+    mealsUnasked.length === 1 && /how many meals a day/i.test(mealsUnasked[0].under) && mealsUnasked[0].inView, await evj(`__cards()`))
+})
+
+await section(25, 'Her days question: the buttons come with it, and her typed days are read by the app', async () => {
+  await open('days')
+  // The coach asks in words and forgets the chips.
+  await queue({ reply: 'Love it. How many days a week can you realistically train?', actions: [] })
+  await say('sounds good')
+  const days = await evj(`__cards('trainingDays')`)
+  check('the days buttons are under the question, with no request', days.length === 1 && /how many days a week/i.test(days[0].under), await evj(`__cards()`))
+  check('...on screen', days.length === 1 && days[0].inView, days)
+  check('...one button per day', days.length === 1 && ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].every(d => days[0].labels.some(l => l.includes(d))), days.map(c => c.labels))
+  await shot('days-buttons')
+
+  // She types instead, and the coach records nothing (no set_slot).
+  await queue({ reply: 'Muay thai twice a week is great conditioning. How long can your sessions usually run?', actions: [] })
+  await say('I train mon, tue, thu, fri mornings and do muay thai tue and thu evenings')
+  const saved = (await evj(`__draft()`))?.values?.trainingDays
+  check('her gym days are saved, not her muay thai days', JSON.stringify(saved) === JSON.stringify(['Mon', 'Tue', 'Thu', 'Fri']), saved)
+  const ticks = await evj(`__ticks()`)
+  check('...and ticked on screen', ticks.some(t => /Training days/.test(t) && /Mon/.test(t) && /Fri/.test(t)), ticks)
+  const len = await evj(`__cards('sessionDuration')`)
+  check('the next question brings its buttons too', len.length === 1 && /how long can your sessions/i.test(len[0].under) && len[0].inView, await evj(`__cards()`))
+  await shot('days-typed')
+
+  // A passing mention later does not undo them.
+  await queue({ reply: 'No problem.', actions: [] })
+  await say("I can't do monday next week though")
+  check('a passing "can\'t do Monday" leaves her days alone', JSON.stringify((await evj(`__draft()`))?.values?.trainingDays) === JSON.stringify(['Mon', 'Tue', 'Thu', 'Fri']), (await evj(`__draft()`))?.values?.trainingDays)
 })
 
 if (!isGone()) {

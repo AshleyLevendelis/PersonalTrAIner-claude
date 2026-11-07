@@ -98,6 +98,23 @@ if (state === 'm2') {
   ))
 }
 
+if (state === 'days') {
+  // ASHLEY'S SETUP (7 Nov 2026): the days question with only a typing box, and
+  // her typed answer naming her gym days AND her muay thai days. Everything up
+  // to the kit answered; the days and what follows still open.
+  const { trainingDays: _a, sessionDuration: _b, trainingStyle: _c, conditioningPreference: _d, ...before } = SAM_SO_FAR
+  void _a; void _b; void _c; void _d
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Sam' },
+      { role: 'assistant', content: 'Dumbbells and a bench, that works.' },
+    ],
+    before,
+    Object.keys(before),
+  ))
+}
+
 if (state === 'kit') {
   // THE KIT TICKS (runs 7-10, H34, 18 Oct 2026): Sam has just picked "no barbell or bench" and said nothing more
   // about his kit; the app's own next question is the ticks. Equipment answered, the ticks not yet.

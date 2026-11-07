@@ -2,6 +2,27 @@
 
 Newest first. One line each.
 
+- [x] **SETUP: THE DAYS QUESTION BRINGS ITS BUTTONS, AND TYPED DAYS ARE READ BY THE APP, 7 NOV 2026** (Ashley's setup:
+  the days question was "just a text input field", and she typed "I train mon, tue, thu, fri mornings and do muay
+  thai tue and thu evenings"). TRACED and checked: the buttons came only when the model called `present_slot`, and a
+  typed list was left wholly to the model's `set_slot`; which of those failed on her phone is not known (no
+  transcript), so both are fixed. (1) `chooseCard` rule 4: when the coach's sentence plainly ASKS (has a question)
+  exactly one open setup question with buttons that setup must ask, its buttons come, requested or not. This
+  REVERSES the 9 Oct "a first asking where the model forgot present_slot gets no chips" (test log H14/M2, decided
+  unprompted and marked reversible): missing chips proved the commoner harm, against her "one tap answers it".
+  Two candidates, none, a remark, an optional question or an answered one still get nothing, so wrong chips stay
+  impossible. (2) `trainingDaysIn` (onboarding-capture.ts), the snack/meal backstop shape: one run of days, or the
+  ONE run introduced by her own training and not by another sport ("muay thai tue and thu" is never taken), ticked
+  like any answer; "except", "can't", "next week", spans with extra days, bare "sat"/"sun" and two unlabelled lists
+  are left for the coach, and once the days are answered only a plain statement about her training changes them.
+  Her sentence now ticks "Training days - Mon, Tue, Thu, Fri" even when the coach records nothing. NOT done, hers:
+  time of day (no question exists; nothing in the plan uses it except around another sport) and the Muay Thai
+  itself (setup has nowhere to keep another sport; asked as A/B/C). test:typed-days 24 checks; test:onboarding-chip-
+  match 78 (two checks that held the old rule rewritten to the new one, five added); verify:onboarding-turns 132
+  (section 24's old "no chips unrequested" check flipped, section 25 new: her exact sentence). 11 mutations across
+  the three: every one caught by at least one; the driver missed 3, each an equivalent mutant on its sentence
+  (a second guard catches the same message), all three caught by test:typed-days. Screenshots read. Frontend only.
+
 - [x] **A GOAL GETS BOTH ITS NUMBERS, AND APPLY ALWAYS SAYS WHAT HAPPENED, 7 NOV 2026** (Ashley's phone, screenshot:
   "set a bench goal", then "110kg is my max", a "Set goal: Barbell Bench Press" card, Apply did nothing). TRACED and
   checked in the code: a measurable goal is only saved as active with a starting number, its date AND a target (the

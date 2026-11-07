@@ -45,7 +45,7 @@ import { ceilingIsInUserWords, isCeilingSlot } from '@/lib/onboarding-ceiling-ca
 import { parseKitSlot, kitStatementInUserWords } from '@/lib/kit-list'
 import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
 import { chooseCard, questionPartOf } from '@/lib/onboarding-chip-match'
-import { mealCountIn, mergePendingGoal, sessionLengthNote, snackAnswerIn } from '@/lib/onboarding-capture'
+import { mealCountIn, mergePendingGoal, sessionLengthNote, snackAnswerIn, trainingDaysIn } from '@/lib/onboarding-capture'
 import type { SessionDuration } from '@/lib/types'
 import { addParkedQuestion, saveParkedQuestions } from '@/lib/parked-questions'
 import {
@@ -1269,6 +1269,18 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         if (mealsTaken) answeredThisTurn = true
         immediateCommit = true
       }
+    }
+
+    // TRAINING DAYS, TYPED (7 Nov 2026, Ashley's setup: "I train mon, tue,
+    // thu, fri mornings and do muay thai tue and thu evenings"). The days had
+    // tap buttons, but a typed list was left wholly to the model. Read here
+    // when certain (onboarding-capture.ts trainingDaysIn: one run of days, or
+    // the one run introduced by her own training and not by another sport),
+    // ticked like any answer; anything less certain is left for the coach.
+    const typedDays = preRecorded ? undefined : trainingDaysIn(trimmed, { answered: ws.confirmed.has('trainingDays') })
+    if (typedDays && applySlot(ws, 'trainingDays', typedDays, ws.values)) {
+      answeredThisTurn = true
+      immediateCommit = true
     }
 
     // Captured before the round trip: the rescue below needs to know the

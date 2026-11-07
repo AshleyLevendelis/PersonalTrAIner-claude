@@ -170,8 +170,10 @@ console.log('\n5. M2 — a re-asked question brings its card along')
     chooseCard({ ...base, hostText: reask, requested: [], liveCards: ['sessionDuration'] }) === 'sessionDuration')
   check('...but a detour that does not re-ask moves nothing',
     chooseCard({ ...base, hostText: "Good question. I'll come back to it once we're set up.", requested: [], liveCards: ['sessionDuration'] }) === undefined)
-  check('...and nothing is conjured for a question that never had a card',
-    chooseCard({ ...base, hostText: reask, requested: [], liveCards: [] }) === undefined)
+  // REVERSED 7 Nov 2026 (rule 4 in chooseCard): a question asked plainly in
+  // words brings its buttons, card requested or not.
+  check('...and a question that never had a card still gets its buttons when the words plainly ask it',
+    chooseCard({ ...base, hostText: reask, requested: [], liveCards: [] }) === 'sessionDuration')
 }
 
 console.log('\n6. The older rules still hold')
@@ -226,9 +228,17 @@ console.log('\n8. Numbers asked in words get their labelled boxes, asked for or 
   check('a TARGET weight is not her weight today, so no box', pick('Got a goal weight in mind, or just lighter?', []) === undefined)
   check('a load ceiling is never asked, so its box never comes unasked (Sam trains at home, where it would apply)',
     pick('What are your heaviest dumbbells?', []) === undefined, pick('What are your heaviest dumbbells?', []))
-  // UNCHANGED: chips are never conjured from words alone.
-  check('a CHIP question asked with nothing requested still gets no chips', pick('How many meals a day suits you?', []) === undefined)
-  check('...nor does this one', pick('Which should I use for your calorie maths — male or female?', []) === undefined)
+  // CHANGED 7 Nov 2026 (Ashley's setup: the days question had no buttons).
+  // A question setup must ask, asked plainly in words, brings its buttons.
+  check('a CHIP question setup must ask, asked with nothing requested, gets its chips', pick('How many meals a day suits you?', []) === 'mealsPerDay', pick('How many meals a day suits you?', []))
+  check("...her days question, both ways it is asked",
+    fresh('Which days can you actually train?', []) === 'trainingDays' && fresh('How many days a week can you realistically train?', []) === 'trainingDays',
+    [fresh('Which days can you actually train?', []), fresh('How many days a week can you realistically train?', [])])
+  check('...never for a question already answered', pick('Which days can you actually train?', []) === undefined)
+  check('...never when the sentence asks two such questions at once', fresh("What's your main goal, and how many days a week can you train?", []) === undefined,
+    fresh("What's your main goal, and how many days a week can you train?", []))
+  check('...never from a remark that asks nothing', fresh('Three days a week works well for most people.', []) === undefined, fresh('Three days a week works well for most people.', []))
+  check('...and an OPTIONAL question still gets no chips unasked', pick('Which should I use for your calorie maths — male or female?', []) === undefined)
   check('...and a question asking two numbered cards at once picks neither',
     fresh('How old are you, and what do you squat?', []) === undefined, fresh('How old are you, and what do you squat?', []))
 }
