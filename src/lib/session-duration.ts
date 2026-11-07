@@ -329,6 +329,15 @@ export interface DayLengthParts {
   warmupSets: number
 }
 
+/**
+ * MOVEMENT PREP IS NOT A WORKING SET, on every screen (whole-app QA walk, 7 Nov 2026): Program counted the day's
+ * primer rows as warm-up while Today, Home and the strip counted them as working sets, so one day read "18 sets" and
+ * "20 working sets". One predicate, read by the day length here and by the session count.
+ */
+export function isMovementPrepRow(ex: { tier?: string | null; name: string }): boolean {
+  return ex.tier === 'tier_0_primer' || getExerciseEntry(ex.name)?.mechanics_tier === 'primer'
+}
+
 export function dayLengthParts(day: WorkoutDay): DayLengthParts {
   if (day.exercises.length === 0) {
     return { workMinutes: 0, optionalMinutes: 0, separateMinutes: separateSessionMinutes(day), workingSets: 0, warmupSets: 0 }
@@ -336,8 +345,7 @@ export function dayLengthParts(day: WorkoutDay): DayLengthParts {
   let workingSets = 0
   let warmupSets = 0
   for (const ex of day.exercises) {
-    const entry = getExerciseEntry(ex.name)
-    if (ex.tier === 'tier_0_primer' || entry?.mechanics_tier === 'primer') warmupSets += ex.sets
+    if (isMovementPrepRow(ex)) warmupSets += ex.sets
     else workingSets += ex.sets
   }
   // Rounded so that the two printed numbers ADD UP to the day's rounded total:

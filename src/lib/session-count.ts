@@ -11,6 +11,7 @@
 // context module is too big to pull in for a number.
 // ---------------------------------------------------------------------------
 import { filterLoggableSets } from './session-derive'
+import { isMovementPrepRow } from './session-duration'
 import type { ExerciseSetLog, WorkoutDay } from './types'
 
 /**
@@ -20,7 +21,8 @@ import type { ExerciseSetLog, WorkoutDay } from './types'
  * when nothing was planned.
  */
 export function sessionSetCount(session: WorkoutDay | null | undefined, logs: ExerciseSetLog[] | null | undefined): { logged: number; planned: number } | null {
-  const exercises = session?.exercises ?? []
+  // Working sets only: the day's movement prep is a warm-up, as Program counts it (isMovementPrepRow).
+  const exercises = (session?.exercises ?? []).filter(e => !isMovementPrepRow(e))
   const planned = exercises.reduce((n, e) => n + (e.sets ?? 0), 0)
   if (planned === 0) return null
   const logged = exercises.reduce((n, e) => n + Math.min(filterLoggableSets(logs ?? [], e.id ?? '', e.name).length, e.sets ?? 0), 0)

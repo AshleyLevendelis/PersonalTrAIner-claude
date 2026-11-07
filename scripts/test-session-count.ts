@@ -53,6 +53,27 @@ console.log('\n1. The count')
   check('the same count the coach reads for today (one rule)', (() => { const t = todayWorkTotals(summariseTodayWork({ session, logs })!); return t.logged === c?.logged && t.planned === c?.planned })())
 }
 
+console.log('\n1b. Movement prep is a warm-up, not a working set (whole-app QA walk, 7 Nov 2026)')
+{
+  // Program said "18 sets" and Today and Home "20 working sets" for one day: 2 sets of Arm Circles were counted on two
+  // screens and not on the third. Both the plan's own tag and the catalogue's say a row is movement prep.
+  const withPrep = { ...session, exercises: [
+    { id: 'circles', name: 'Arm Circles', sets: 2, reps: '10', rest: '0s', tier: 'tier_0_primer' },
+    // Rest as the plan writes it ("90s"): the day length reads the text.
+    ...(session.exercises as { rest: number }[]).map(e => ({ ...e, rest: `${e.rest}s` })),
+  ] } as unknown as WorkoutDay
+  const prepLogs = [...logs, log('circles', 'Arm Circles'), log('circles', 'Arm Circles')]
+  const c = sessionSetCount(withPrep, prepLogs)
+  check('two sets of movement prep add nothing to planned (still 10)', c?.planned === 10, c)
+  check('...nor to logged when they are ticked (still 5)', c?.logged === 5, c)
+  const untagged = { ...withPrep, exercises: withPrep.exercises.map(e => e.name === 'Arm Circles' ? { ...e, tier: undefined } : e) } as WorkoutDay
+  check('a primer the plan did not tag is still known by the catalogue', sessionSetCount(untagged, prepLogs)?.planned === 10, sessionSetCount(untagged, prepLogs))
+  const { dayLengthParts } = await import('../src/lib/session-duration')
+  check('the same number Program prints for the day', dayLengthParts(withPrep).workingSets === c?.planned, { program: dayLengthParts(withPrep).workingSets, count: c?.planned })
+  const t = todayWorkTotals(summariseTodayWork({ session: withPrep, logs: prepLogs })!)
+  check('...and the coach reads the same count for today', t.planned === c?.planned && t.logged === c?.logged, { coach: t, count: c })
+}
+
 console.log('\n2. Said only when short')
 {
   check('short: "5 of 10 sets"', shortOfPlan({ logged: 5, planned: 10 }) === '5 of 10 sets')

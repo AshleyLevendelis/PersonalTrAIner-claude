@@ -26,6 +26,7 @@
  *   3. Send added load for weighted bodyweight work, where the whole
  *      prescription is the "+17.5kg" and `suggested_load` reads "Bodyweight".
  */
+import { isMovementPrepRow } from './session-duration'
 import type { Exercise, ExerciseSetLog, WorkoutDay } from './types'
 import { filterLoggableSets, isDropRow } from './session-derive'
 import { sessionSetCount } from './session-count'
@@ -243,6 +244,8 @@ export interface CoachToday {
 // and the coach's own rule is that their memory outranks the list.
 // ---------------------------------------------------------------------------
 export interface CoachTodayExercise {
+  /** Movement prep (isMovementPrepRow): listed, never counted as a working set. */
+  prep?: boolean
   name: string
   setsPlanned: number
   /** WORKING sets logged — no warm-up rows, no drops (filterLoggableSets, the same reader every tick on the Exercise tab uses). */
@@ -296,7 +299,7 @@ export function summariseTodayWork(input: {
     const rows = filterLoggableSets(logs, e.id ?? '', e.name)
     // Its warm-up and drop rows are this exercise's too — never "added work".
     for (const l of logs) if (l.exercise_id ? l.exercise_id === e.id : l.exercise_name === e.name) claimed.add(l)
-    return { name: e.name, setsPlanned: e.sets ?? 0, setsLogged: rows.length, logged: rows.map(describeLoggedSet).join(', ') }
+    return { name: e.name, setsPlanned: e.sets ?? 0, setsLogged: rows.length, logged: rows.map(describeLoggedSet).join(', '), ...(isMovementPrepRow(e) ? { prep: true } : {}) }
   })
 
   const extra = new Map<string, ExerciseSetLog[]>()
@@ -311,12 +314,14 @@ export function summariseTodayWork(input: {
 
 /** Planned sets and the working sets logged against them — the only like-for-like "N of M". */
 export function todayWorkTotals(work: CoachTodayWork): { logged: number; planned: number; notLogged: CoachTodayExercise[] } {
+  // Working sets only, as every screen counts them (sessionSetCount): movement prep is a warm-up.
+  const working = work.exercises.filter(e => !e.prep)
   return {
-    planned: work.exercises.reduce((n, e) => n + e.setsPlanned, 0),
+    planned: working.reduce((n, e) => n + e.setsPlanned, 0),
     // Capped per exercise: a fourth set on a three-set lift is extra work, not
     // cover for a set missing somewhere else.
-    logged: work.exercises.reduce((n, e) => n + Math.min(e.setsLogged, e.setsPlanned), 0),
-    notLogged: work.exercises.filter(e => e.setsPlanned > 0 && e.setsLogged < e.setsPlanned),
+    logged: working.reduce((n, e) => n + Math.min(e.setsLogged, e.setsPlanned), 0),
+    notLogged: working.filter(e => e.setsPlanned > 0 && e.setsLogged < e.setsPlanned),
   }
 }
 
