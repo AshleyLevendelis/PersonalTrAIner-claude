@@ -26,7 +26,7 @@ import {
   currentPushState, turnOnPush, turnOffPush, type PushState,
 } from '@/lib/coach-reach-out'
 import {
-  DEFAULT_MOMENT_SWITCHES, DEFAULT_FREQUENCY, REMINDER_FREQUENCIES, QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, MIN_HOURS_BETWEEN,
+  DEFAULT_MOMENT_SWITCHES, DEFAULT_FREQUENCY, REMINDER_FREQUENCIES, QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, MIN_HOURS_BETWEEN, dailyCap,
   type MomentKey, type NotificationSettings, type ReminderFrequency,
 } from '@/lib/coach-moments'
 
@@ -142,7 +142,7 @@ export function RemindersSection({ profileId }: { profileId: string }) {
       ) : (
         <div className="space-y-3 text-sm">
           <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
-            The coach can message your phone when the app is shut — {frequencyLabel(frequency).detail}, at least {MIN_HOURS_BETWEEN} hours apart, and never before {hourLabel(QUIET_BEFORE_HOUR)} or after {hourLabel(QUIET_AFTER_HOUR)}.
+            The coach can message your phone when the app is shut — {frequencyLabel(frequency).detail}{dailyCap(frequency) > 1 ? `, at least ${MIN_HOURS_BETWEEN} hours apart,` : ','} and never before {hourLabel(QUIET_BEFORE_HOUR)} or after {hourLabel(QUIET_AFTER_HOUR)}.
           </p>
 
           {/* HOW OFTEN: her ruling 6 Nov 2026, "Three levels", so nobody is overwhelmed. One tap; the sentence

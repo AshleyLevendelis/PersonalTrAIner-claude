@@ -26,7 +26,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { pickOpener, missedYesterdayFrom, type OpenerInput } from '../src/lib/coach-opener'
+import { pickOpener, missedYesterdayFrom, movementList, type OpenerInput } from '../src/lib/coach-opener'
 import { pickAccountabilityCheckIn, type AccountabilityInput } from '../src/lib/accountability'
 import type { ChatMessage } from '../src/lib/types'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, loadSeenAttention, saveSeenAttention } from '../src/lib/chat-unread'
@@ -578,6 +578,17 @@ console.log('\n9. The ring and the pulse vanish at glow Off and stop under reduc
   // being needed and this pairing should be revisited rather than left.
   check('...which is still exactly the setting that erases the ring',
     /\[data-glow="off"\] \{ --glow-strength: 0; \}/.test(css))
+}
+
+console.log('\n10. A session\'s exercises read as a phrase, never as four dots (whole-app QA walk, 7 Nov 2026)')
+{
+  check('three or fewer: just the names', movementList(['Squat', 'Lunge', 'Plank']) === 'Squat, Lunge, Plank')
+  check('more than three: "and more", no trailing dots', movementList(['Squat', 'Lunge', 'Plank', 'Carry']) === 'Squat, Lunge, Plank and more')
+  const said = pickOpener({ ...base, lastOrdinaryKind: 'noticed', todaySession: { focus: 'Legs', movements: movementList(['Squat', 'Lunge', 'Plank', 'Carry', 'Calf Raise']) } } as OpenerInput).text
+  check('...so the opener\'s sentence ends in one full stop', !/\.\.|…\./.test(said) && /and more/.test(said), said)
+  const src = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+  check('every list of a session\'s exercises in the chat goes through it (no hand-built "..." left)',
+    !/exercises\.map\(e => e\.name\)\.slice\(0, 3\)/.test(src) && !/length > 3 \? '(\.\.\.|…)'/.test(src) && (src.match(/movementList\(/g) ?? []).length >= 3)
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }

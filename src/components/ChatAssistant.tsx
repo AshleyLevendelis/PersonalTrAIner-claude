@@ -147,7 +147,7 @@ import { takeChatPrefill, CHAT_PREFILL_EVENT } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 import { useTrainingWeek, readTrainingWeeks } from '@/hooks/useTrainingWeek'
 import { lessonDue, lessonBrief, lessonTaughtIn, taughtFromRows, actionDataWithLesson, type TaughtLesson } from '@/lib/coach-lessons'
-import { pickOpener, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
+import { pickOpener, movementList, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import { cleanReplyText, applyMessageBreaks, ACTION_TAG_RE, QUICK_REPLIES_RE } from '@/lib/reply-text'
 import { rowToMessage, addServerMessages } from '@/lib/chat-history-merge'
 import {
@@ -611,14 +611,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     // A ROW WITH NO EXERCISES IS NOT A SESSION (1 Nov 2026): Home and todayPlan both ask exercises.length.
     if (todaySession && todaySession.exercises.length > 0) {
-      const movements = todaySession.exercises.map(e => e.name).slice(0, 3).join(', ')
+      const movements = movementList(todaySession.exercises.map(e => e.name))
       // PAST THE HOUR, ASK WHETHER IT HAPPENED — never "today was X. How'd it go?" (1 Nov 2026). This bubble
       // is drawn before any log has been read, so it cannot know a session happened; the composed opener
       // that replaces it does, and says "How'd it go?" only then.
       if (hour >= cutoff) {
         return `did today's ${todaySession.focus} happen?`
       }
-      return `today's ${todaySession.focus}: ${movements}${todaySession.exercises.length > 3 ? '...' : ''}. Feeling good for it?`
+      return `today's ${todaySession.focus}: ${movements}. Feeling good for it?`
     }
     return `it's a rest day on your plan. How's the recovery going?`
   }
@@ -653,7 +653,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const brief = (day: { focus: string; exercises: { name: string }[]; plannedActivity?: { duration?: number; targetRpe?: number } | null }) => ({
       focus: day.focus,
       movements: day.exercises.length > 0
-        ? day.exercises.map(e => e.name).slice(0, 3).join(', ') + (day.exercises.length > 3 ? '…' : '')
+        ? movementList(day.exercises.map(e => e.name))
         : day.plannedActivity?.duration != null
           ? `${day.plannedActivity.duration} minutes, easy pace`
           : '',
@@ -1197,7 +1197,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const todayPlan = todayMovedTo
     ? undefined
     : todayResolved.day && todayResolved.day.exercises.length > 0 ? todayResolved.day : undefined
-  const movementsOf = (d: WorkoutDay) => d.exercises.map(e => e.name).slice(0, 3).join(', ') + (d.exercises.length > 3 ? '...' : '')
+  const movementsOf = (d: WorkoutDay) => movementList(d.exercises.map(e => e.name))
 
   // -------------------------------------------------------------------------
   // THE ONE LOOKUP EVERY EXERCISE-GRAIN EDIT GOES THROUGH (H15, 9 Oct 2026).

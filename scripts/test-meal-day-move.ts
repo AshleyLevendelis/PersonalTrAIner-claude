@@ -936,6 +936,16 @@ async function main() {
     check('...and the week served after the real write and the real read is the card\'s, cell for cell', !!r && after.length === 7 && differs.length === 0, differs)
   }
 
+  console.log('\n15. The put-back sentence reads as English (whole-app QA walk, 7 Nov 2026)')
+  {
+    const { DAY_MOVE } = await import('../src/lib/coach-voice')
+    check('same meal on both days: "Today\'s and Tuesday\'s dinners are as they were."',
+      DAY_MOVE.undo.asTheyWere('dinner', 'today', 'dinner', 'Tuesday') === "Today's and Tuesday's dinners are as they were.",
+      DAY_MOVE.undo.asTheyWere('dinner', 'today', 'dinner', 'Tuesday'))
+    check('...and lunch takes "lunches"', /Sunday's and Tuesday's lunches are/.test(DAY_MOVE.undo.asTheyWere('lunch', 'Sunday', 'lunch', 'Tuesday')))
+    check('different meals keep naming each one', DAY_MOVE.undo.asTheyWere('dinner', 'Sunday', 'lunch', 'Tuesday') === "Sunday's dinner and Tuesday's lunch are as they were.")
+  }
+
   console.log(failed === 0 ? `\nAll ${ran} meal-day-move checks passed.` : `\n${failed} of ${ran} check(s) failed.`)
   console.log(`${ran} checks ran`)
   if (failed > 0) process.exit(1)

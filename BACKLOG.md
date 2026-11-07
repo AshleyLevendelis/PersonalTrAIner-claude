@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **WHOLE-APP QA WALK, CHAT AND NUTRITION WORDING: THREE SENTENCES THAT READ WRONG, 7 NOV 2026** (her "keep
+  testing and keep fixing"; found by the walk, none reported by her). (N10) The hello listed a session as "Pull-Ups,
+  Rows, Shrugs.... Feeling good for it?": a hand-built "..." met the sentence's own full stop, in three places. One
+  phrase now (`movementList`: "Pull-Ups, Rows, Shrugs and more"). (N9) Reminders on Light said "1 a day, at least 3
+  hours apart": a single message has no spacing to keep, so Light no longer says it (Normal and Lots still do).
+  (N8) Undoing a swap of the same meal across two days read "Today's dinner and Tuesday's are as they were"; it now
+  reads "Today's and Tuesday's dinners are as they were". No new wording beyond fixing the grammar of existing lines.
+  NOT fixed, named: the offer card's "Unchanged: The ..." keeps its capital, because lower-casing the first word would
+  also lower-case an exercise or day name that starts the line. `test:coach-opener` §10 (4 checks, 2 mutations caught),
+  `verify:reminders` 2m re-anchored (2 mutations caught), `test:meal-day-move` §15 (3 checks, 2 mutations caught).
+  46 of 47 derived gates and drivers green on the first run; the 47th (`verify:coach-hello` B4) failed once in five
+  runs by 4px and is the next fix (the newest message's button can land just under the fold).
 - [x] **WHOLE-APP QA WALK, TRAINING: EIGHT DEFECTS FOUND AND FIXED, 7 NOV 2026** (Ashley: "I want you to test and fix",
   then "Keep testing and keep fixing"). Five testers walked the app at phone size against the browser harness; each
   finding was re-measured on a real screen before it was fixed. Found by me, none reported by her. Each fix has its

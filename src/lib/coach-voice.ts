@@ -393,8 +393,9 @@ export const DAY_MOVE = {
   undo: {
     /** The claim alone, for a receipt whose title already says "Put back". */
     asTheyWere: (slot: string, day: string, otherSlot: string, otherDay: string) =>
+      // "Today's and Tuesday's dinners", never "Today's dinner and Tuesday's are" (whole-app QA walk, 7 Nov 2026).
       slot === otherSlot
-        ? `${cap(poss(day))} ${slot} and ${poss(otherDay)} are as they were.`
+        ? `${cap(poss(day))} and ${poss(otherDay)} ${/(ch|sh|s)$/.test(slot) ? `${slot}es` : `${slot}s`} are as they were.`
         : `${cap(poss(day))} ${slot} and ${poss(otherDay)} ${otherSlot} are as they were.`,
     /** The sheet's note, which has no title to carry the words. */
     done: (slot: string, day: string, otherSlot: string, otherDay: string) =>

@@ -171,6 +171,15 @@ export interface Opener {
  */
 export const PLAN_UNKNOWN_TEXT = `how's it going?`
 
+/**
+ * The first three of a session's exercises as a phrase: "Squat, Lunge, Plank", and "Squat, Lunge, Plank and more" when
+ * there are others. A trailing "..." met the sentence's own full stop and printed four dots (whole-app QA walk,
+ * 7 Nov 2026: "Pull-Ups, Rows, Shrugs.... Feeling good for it?").
+ */
+export function movementList(names: string[]): string {
+  return names.slice(0, 3).join(', ') + (names.length > 3 ? ' and more' : '')
+}
+
 export function pickOpener(input: OpenerInput): Opener {
   const { hour, cutoffHour, awaitingFeel, missedYesterday, planKnown, todaySession, todayLogged, tomorrowSession, movedTo, noticed, lastOrdinaryKind } = input
 
