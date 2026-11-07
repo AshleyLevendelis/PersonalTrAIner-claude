@@ -62,6 +62,11 @@ const tapTestId = async tid => {
   if (at) { await pointAt(at); await wait(900) }
   return !!at
 }
+const tapSelector = async sel => {
+  const at = await ev(`(() => { const n = document.querySelector('${sel}'); if (!n) return null; const r = n.getBoundingClientRect(); return r.width ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null })()`)
+  if (at) { await pointAt(at); await wait(700) }
+  return !!at
+}
 let load = 0
 const open = async (query, tab) => {
   load++
@@ -124,6 +129,36 @@ const t8 = await ev(`(() => ({
 }))()`)
 check('T8a. Home offers Start on a due day', !!t8tap && /^Start /.test(t8tap.text), t8tap)
 check('T8b. one tap opens Exercise with the session already running: Finish is there, Start is not', /exercise/.test(t8.hash) && t8.finish === true && t8.start === false, t8)
+
+console.log('\nT12. The running log button never cuts off the weight and reps, on the narrowest phone\n')
+// 320px is the narrowest phone the app supports (an iPhone SE). The session T8 started is still running.
+await send('Emulation.setDeviceMetricsOverride', { width: 320, height: 640, deviceScaleFactor: 1, mobile: true })
+await wait(800)
+const readT12 = () => ev(`(() => {
+  const b = document.querySelector('[data-next-set-button]')
+  if (!b) return null
+  const head = b.querySelector('[data-next-set-head]'), tail = b.querySelector('[data-next-set-tail]')
+  const br = b.getBoundingClientRect(), tr = tail ? tail.getBoundingClientRect() : null
+  return {
+    label: b.getAttribute('aria-label'), head: head?.textContent ?? null, tail: tail?.textContent ?? null,
+    headCut: !!head && head.scrollWidth > head.clientWidth + 1,
+    tailWhole: !!tail && tail.scrollWidth <= tail.clientWidth + 1 && tr.right <= br.right + 0.5 && tr.left >= br.left - 0.5,
+  }
+})()`)
+// Today opens with movement prep ("Arm Circles × 8", short enough to fit). Log sets with the button itself, as she
+// would, until it reaches a loaded lift whose label is too long for this phone.
+let t12 = await readT12()
+let t12taps = 0
+while (t12 && !(t12.headCut && /kg/.test(t12.tail ?? '')) && t12taps < 25) {
+  await tapSelector('[data-next-set-button]')
+  t12taps++
+  t12 = await readT12()
+}
+check('T12a. the button is there, with the numbers in their own part', !!t12 && !!t12.tail && /\d/.test(t12.tail), t12)
+check('T12b. the label is long enough on this phone that something must give (the fixture binds)', !!t12 && t12.headCut === true, t12)
+check('T12c. ...and what gives is the lift name: the weight and reps are shown whole, inside the button', !!t12 && t12.tailWhole === true, t12)
+check('T12d. a screen reader still hears the whole label', !!t12 && t12.label === (t12.head ?? '') + (t12.tail ?? ''), t12)
+await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
 
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)

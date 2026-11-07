@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { readNextSet, nextSetLabel, needsWeight, needsReps, type NextSet } from '@/lib/next-set-label'
+import { readNextSet, nextSetLabel, nextSetParts, needsWeight, needsReps, type NextSet } from '@/lib/next-set-label'
 
 /**
  * The fixed button during a session: "Log set 3 · Bench 80 kg × 6".
@@ -46,8 +46,12 @@ export function NextSetButton({ root, bottom }: { root: HTMLElement | null; bott
       className="fixed inset-x-0 z-40 px-[22px] pb-3 pt-2.5"
       style={{ bottom, background: 'linear-gradient(to top, var(--background) 70%, transparent)' }}
     >
-      <Button className="h-[52px] w-full truncate text-[0.9375rem] font-semibold" data-next-set-button onClick={press}>
-        <span className="truncate">{nextSetLabel(next)}</span>
+      <Button className="h-[52px] w-full text-[0.9375rem] font-semibold" data-next-set-button aria-label={nextSetLabel(next)} onClick={press}>
+        {/* The lift may be cut short; the weight and reps never are. */}
+        <span className="flex min-w-0 max-w-full">
+          <span className="min-w-0 truncate" data-next-set-head>{nextSetParts(next).head}</span>
+          <span className="shrink-0 whitespace-pre" data-next-set-tail>{nextSetParts(next).tail}</span>
+        </span>
       </Button>
     </div>
   )

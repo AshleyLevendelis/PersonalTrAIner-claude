@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [x] **WHOLE-APP QA WALK, TRAINING: EIGHT DEFECTS FOUND AND FIXED, 7 NOV 2026** (Ashley: "I want you to test and fix",
+  then "Keep testing and keep fixing"). Five testers walked the app at phone size against the browser harness; each
+  finding was re-measured on a real screen before it was fixed. Found by me, none reported by her. Each fix has its
+  own commit; `verify:qa-training` holds the screen-side ones (one section per finding, constant check count).
+  (T1) A day finished on another phone, or with cleared storage, offered "Start session" on Exercise while Home said
+  Done, and Start then Finish wrote 1 minute over the saved 46: with no local record the session now asks the server
+  whether today is closed. (T3) An added warm-up has no prescribed reps, so the floating button promised a set its
+  tick refused ("Enter reps"); it now says "type the reps" and opens the reps box. (T6) Program said 18 sets where
+  Today, Home, the strip and the coach said 20, because 2 sets of Arm Circles were counted on some screens: movement
+  prep is never a working set, one predicate for every count, the finish question and the summary. (T9) Home kept
+  inviting "Start Upper Pull & Core" on a day swapped for Muay Thai; it now reads "Swapped for Muay Thai" and offers
+  no Start (one function, `homeOffersStart`, that five checks call instead of pinning one line). (T10) Exercise's strip
+  gave a moved-away selected day the session dot where Home draws the dash (her 1 Nov "Dash on both"). (T8) Home's
+  Start only opened Exercise, where she tapped Start again; it now starts the session. (T12) On a narrow phone the
+  floating log button cut off the weight and reps ("Single-Leg Romanian Deadlift 12 kg per h…"): the lift name now
+  gives way and the numbers are always whole, with the full label still spoken to a screen reader.
+  CSCS: no prescription changes (counts and wording, not what is prescribed). Mutations: every new check was broken
+  on purpose and caught (T12: 4 of 4). NOT proven: on her phone. Frontend only, no deploy beyond the merge.
+  Still open from the walk, being worked: the add-exercise suggestion order, a set trimmed from another day on a
+  "just today" add (CSCS), receipts for screen edits, and the nutrition, grocery and chat findings.
 - [x] **THE HELLO NEVER RE-ASKS A QUESTION SHE LEFT UNANSWERED, 7 NOV 2026** (found by me, not reported: a simulated
   week of the coach's unprompted messages, run from the app's own decision functions over a persona who trains Mon/Wed/
   Fri, skips Wednesday, and does not answer Monday's feel question). Monday 9am asked "how did that session feel?";

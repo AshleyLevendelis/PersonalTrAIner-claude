@@ -69,13 +69,23 @@ export function needsReps(next: NextSet): boolean {
  * already shipped once.
  */
 export function nextSetLabel(next: NextSet): string {
+  const { head, tail } = nextSetParts(next)
+  return head + tail
+}
+
+/**
+ * The label in two halves: the lift (which may be cut short on a narrow phone) and the numbers (which never are).
+ * Whole-app QA walk, 7 Nov 2026: "Log set 1 · Single-Leg Romanian Deadlift 12 kg per hand × 8" was cut to
+ * "...Deadlift 12 kg per h…" at 390px, so the button hid the very reps it was about to save.
+ */
+export function nextSetParts(next: NextSet): { head: string; tail: string } {
   const what = next.set ? next.set[0].toLowerCase() + next.set.slice(1) : 'set'
   const lift = LIFT_SHORT_NAME[next.name] ?? next.name
-  if (needsWeight(next)) return `${next.set || 'Set'} · ${lift}: type the weight`
-  if (needsReps(next)) return `${next.set || 'Set'} · ${lift}: type the reps`
+  if (needsWeight(next)) return { head: `${next.set || 'Set'} · ${lift}`, tail: ': type the weight' }
+  if (needsReps(next)) return { head: `${next.set || 'Set'} · ${lift}`, tail: ': type the reps' }
   // NO LOAD SAID FOR A BODYWEIGHT SET: "BW", or a 0 the box saves for a move
   // that carries nothing ("Prone Y-T Raises 0 kg" read like a missing number).
   const load = next.weight === 'BW' || Number(next.weight) === 0 ? '' : ` ${next.weight} ${next.unit}`
   const reps = next.reps ? ` × ${next.reps}` : ''
-  return `Log ${what} · ${lift}${load}${reps}`
+  return { head: `Log ${what} · ${lift}`, tail: `${load}${reps}` }
 }
