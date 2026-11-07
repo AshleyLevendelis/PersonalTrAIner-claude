@@ -116,7 +116,10 @@ const setValue = `(el, v) => {
   el.dispatchEvent(new Event('input', { bubbles: true }))
 }`
 
-await ev(`(() => { const t = document.querySelector('textarea'); if (t) (${setValue})(t, 'swap this exercise, the rack is busy') })()`)
+// SHE NAMES THE REPLACEMENT (re-anchored 7 Nov 2026): with nothing named, the app now puts the swap list's first in
+// place of a coach pick that is a different movement (coach-swap-pick.ts), so a cross-pattern swap and its cost line
+// are reached the way they really are, by her asking for that exercise.
+await ev(`(() => { const t = document.querySelector('textarea'); if (t) (${setValue})(t, 'swap this exercise for leg press, the rack is busy') })()`)
 await wait(400)
 check('1. asking for the swap', await ev(`(() => {
   const b = [...document.querySelectorAll('button')].find(x => /send/i.test(x.getAttribute('aria-label') || ''))
@@ -216,7 +219,7 @@ if (cross) {
   await ev(`window.__swapOld = ${JSON.stringify(cross.from)}; window.__swapNew = ${JSON.stringify(cross.to)}`)
   await ev(`(() => { const t = document.querySelector('textarea'); if (t) {
     const proto = window.HTMLTextAreaElement.prototype
-    Object.getOwnPropertyDescriptor(proto, 'value').set.call(t, 'swap this exercise, the rack is busy')
+    Object.getOwnPropertyDescriptor(proto, 'value').set.call(t, ${JSON.stringify(`swap this exercise for ${cross.to}, the rack is busy`)})
     t.dispatchEvent(new Event('input', { bubbles: true }))
   } })()`)
   await wait(400)
