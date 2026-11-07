@@ -136,7 +136,9 @@ const typedLead = await lead()
 check('4b. once there is text, send is the one main button', Array.isArray(typedLead) && typedLead.length === 1 && /send/i.test(typedLead[0]), typedLead)
 const pillH = await ev(`Math.round(document.querySelector('[data-testid="chat-composer-pill"]')?.getBoundingClientRect().height ?? 0)`)
 check('4c. the field is a 52px pill', pillH === 52, pillH)
-check('4d. she asks for a swap', await say('swap this exercise, the rack is busy') === true)
+// She names the replacement (re-anchored 7 Nov 2026): with nothing named, a coach pick of a different movement now
+// becomes the swap list's first (coach-swap-pick.ts).
+check('4d. she asks for a swap', await say('swap this exercise for leg press, the rack is busy') === true)
 const OFFER = String.raw`(() => {
   const o = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop()
   if (!o) return null

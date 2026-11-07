@@ -127,7 +127,9 @@ const looksLikeText = (tag, o, confirmLabel, declineLabel = 'Not now') => {
 }
 
 // 1. AN EXERCISE SWAP: one change, two scopes.
-check('1. she asks for a swap', await say('swap this exercise, the rack is busy') === true)
+// She names the replacement (re-anchored 7 Nov 2026): with nothing named, a coach pick of a different movement now
+// becomes the swap list's first (coach-swap-pick.ts).
+check('1. she asks for a swap', await say('swap this exercise for leg press, the rack is busy') === true)
 await until(() => offer(), v => !!v, 60)
 await settle()
 const swap = await offer()
