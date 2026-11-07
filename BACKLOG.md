@@ -2,6 +2,42 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH SPEAKS FIRST EVERY DAY: A HELLO, THEN THE PHONE'S MOMENTS; HER RULING "HELLO + MORE MOMENTS",
+  7 NOV 2026** (Ashley: "The chat doesn't seem to proactively speak to the user. The chat is a main feature of the app
+  but it only speaks if you speak to it first"). TRACED (investigator, then the guards read here): the opener runs only
+  when the chat is exactly one untouched greeting (a brand-new account or Clear chat), so anyone with a conversation
+  never got it; the only unprompted path left was coach-nudge, which by her 7 Sep "training and wins" scope speaks for
+  five events only (feel, missed yesterday, PR, a streak milestone, a session due before her cutoff hour) and is silent
+  on most days; a failed history read left `isFirstEverChat` unknown and silenced the coach for the whole visit; and
+  nothing re-checked the clock while the app sat open. The phone reminders that write into the chat need the deploy,
+  cron, keys and a subscription, so they were not the in-app answer either.
+  **Her ruling, from three options: "Hello + more moments"** (over a daily hello alone, my recommendation, and over
+  more event moments with no hello). It REVERSES her 7 Sep in-app scope (no evening food lines), in step with her 4 Nov
+  and 6 Nov phone rulings; said in the report. BUILT (`pickUnprompted` in coach-nudge.ts, one decision):
+  (1) the first unprompted message of the day greets her: an event due IS the hello ("Hey Ashley — yesterday's Legs
+  didn't happen..."), else the opener's own pick (coach-opener.ts: today's session, rest day, a check-in, something
+  noticed), in the coach's words when its server passes them and kept in the chat as a row; the empty-chat opener
+  counts as the day's hello. (2) The phone's time-of-day moments (session not logged and streak at risk from 6pm,
+  meals not logged and behind on protein from 7pm, her switches applied) are said in the chat too, in the same words,
+  with the same shortcut button. The feel, missed and session-due moments stay the events' own; the block review and
+  the raise-the-weights offer have their own cards; a quiet week is the opener's welcome back. (3) ONE LIMIT: her
+  Light/Normal/Lots setting (dailyCap) caps every unprompted message of the day, chat and phone together. Each is a
+  chat row with the reminder marker, so today's rows are the count; coach-reach-out now reads them (`loadChatToday`,
+  `withChatToday`), counts them toward her cap and spacing, and never sends a moment the chat already said. Events keep
+  their 30-minute spacing; a time-of-day moment waits the phone's three hours. (4) The clock is checked again every 10
+  minutes and on return to the app; a failed history read reads as returning, not unknown. Words: the hello is the
+  opener's existing sentences, the moments are the phone's existing phrasebook lines, so no new wording was written;
+  the one new shape is the greeting in front of an event ("Hey Ashley — ..."), hers to change.
+  CSCS: no prescription changes (what is said, not what is prescribed). NOT built: a separate rest-day walk moment (the
+  rest-day hello covers it), a later post-session follow-up beyond the existing feel question.
+  `test:coach-nudge` (130 checks; section 9 new, 32), `test:reach-out` (113; 5c new, 7, one for a failed chat read never silencing the phone), `verify:coach-hello` (16, a
+  real browser at 390px: a 3pm hello on an ongoing thread kept with its marker, none again the same day even with this
+  phone's memory cleared, the session reminder as the hello at noon, the evening moment with its "Open today's session"
+  button at 7:30pm, one only). 16 mutations, all caught (10 logic, 3 phone, 3 browser). FOUND BY THE DERIVED RUN: `verify:reach-out-function`'s fake database had no chat table, so the new read 404'd and the person was skipped for the hour; the fake now answers it and the function treats a failed chat read as "count only my own sends", never a silent hour. ALSO FOUND, and owed to the exam fix before it: three drivers (`verify:swap-request`, `verify:offer-text`, `verify:chat-2b`) had the coach pick a different movement when she named nothing, which the swap list now overrides, so their cost lines went quiet; they now have her name the exercise, the real road to a cross-pattern swap. `verify:swap-request` was red at the exam-fix commit and not seen until this run, because that run's driver list was derived from file names (CLAUDE.md: a driver names a screen, never a file). NOT proven: on her phone. The
+  chat half ships with the frontend; the phone half (counting and skipping the chat's messages) needs the
+  `coach-reach-out` deploy, and the coach-worded hello needs `chat-gemini` (otherwise the app's fixed sentence shows).
+  Named limits: until coach-reach-out is redeployed the phone counts only its own sends, so on a day both speak she can
+  get more than her setting; a message whose chat row fails to write is never shown, and is tried again later.
 - [x] **THE TWO REAL BREACHES FROM THE 7 NOV EXAM: A CIRCUIT CARD THE APP THREW AWAY, AND A SWAP TO KIT SHE LACKS,
   7 NOV 2026** (Ashley: "fix the two exam breaches"). Both re-measured from the run's own transcripts first.
   **(1) circuit-is-one-workout.** "just did 5 rounds on the timer, 3 minutes each: skipping rope, press-ups, sit-ups,

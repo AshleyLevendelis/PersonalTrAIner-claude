@@ -106,6 +106,8 @@ const db = createServer(async (req, res) => {
     coach_moment_facts: [{ user_id: USER, training_weekdays: [parts.weekday], plan_ends_on: '2099-01-01' }],
     fitness_profiles: [{ id: USER, notification_switches: {}, display_name: 'Ashley' }],
     exercise_set_logs: [], cardio_logs: [], workout_sessions: [], pending_actions: [], coach_notifications_sent: [],
+    // HER CHAT TODAY (7 Nov 2026, "Hello + more moments"): nothing unprompted yet, so the evening nudge still goes.
+    chat_messages: [],
     // A meal logged YESTERDAY and none today: she logs meals, so the evening
     // meal nudge is live too — and must lose to the session nudge, which ranks first.
     meal_events: [{ date: daysBefore(localToday, 1), event_type: 'confirmed', macros: { protein: 40 } }],

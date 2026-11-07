@@ -323,7 +323,10 @@ export async function runReachOut(deps: ReachOutDeps): Promise<ReachOutReport> {
       const { date: today, hour } = localParts(deps.now, devices[0].timezone)
       const [ownSends, profile, inChat] = await Promise.all([
         deps.loadRecentSends(userId), deps.loadSettings(userId),
-        deps.loadChatToday ? deps.loadChatToday(userId, today, devices[0].timezone) : Promise.resolve([]),
+        // A FAILED CHAT READ IS NOT A SILENT HOUR: the phone counts its own sends, as it did before the chat spoke.
+        deps.loadChatToday
+          ? deps.loadChatToday(userId, today, devices[0].timezone).catch(err => { console.error('[reach-out] reading today\'s chat failed:', err); return [] })
+          : Promise.resolve([]),
       ])
       const recent = withChatToday(ownSends, inChat, today)
       // HELD BACK BY THE DAY'S LIMITS: her frequency reached, or one too recently.

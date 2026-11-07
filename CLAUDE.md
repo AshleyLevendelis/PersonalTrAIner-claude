@@ -1341,6 +1341,12 @@ menu" stays true when a copy is also left outside it.
   `personalBest(metric, value)` in the phrasebook, one place, so the exam and
   the gates can grade it. Any field that can hold two kinds of quantity needs
   the same treatment
+- **The coach speaks first every day: her ruling 7 Nov 2026, "Hello + more moments"** (over a daily hello alone and
+  over more moments alone; it REVERSES her 7 Sep "training and wins" in-app scope). The day's first unprompted
+  message greets her (an event due IS the hello, else the opener's pick), kept in the chat; the phone's time-of-day
+  moments are said in the chat too, same words and shortcut; her Light/Normal/Lots caps every unprompted message,
+  chat and phone together (each is a chat row with the reminder marker, which the phone reads).  §9,
+   §5c, . Needs the  deploy for the phone half
 - Accountability is active — the coach opens, asks how it went, follows up
   — `coach-opener`, `coach-nudge`, `session-feel`, `verify:coach-speaks-first`.
   **And from outside the app: BUILT 24 Sep 2026, NOT LIVE.** Seven switchable

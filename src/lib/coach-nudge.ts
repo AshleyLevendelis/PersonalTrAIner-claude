@@ -349,7 +349,7 @@ export function rememberWithoutSpeaking(store: NudgeStore, keys: string[]): Nudg
 // ---------------------------------------------------------------------------
 
 /** The phone's moment name for each event above, so the phone never repeats what the chat already said. */
-export const NUDGE_MOMENT: Record<NudgeKind, string> = {
+const NUDGE_MOMENT: Record<NudgeKind, string> = {
   session_feel: 'session_feel',
   missed_yesterday: 'missed_yesterday',
   personal_best: 'personal_best',

@@ -274,7 +274,7 @@ async function main() {
     // The app says hello and the same moments while she is in it, each a chat row with the reminder marker.
     const me: Person = { sub: [sub('c1', 'chatty')], row: { ...MWF, protein_target_g: 160 }, live: { ...NONE, mealLoggedRecently: true, mealsAccountedToday: 0 } }
     const AT = new Date('2026-09-23T18:05:00Z') // 7:05pm in London, a training day, nothing logged or eaten
-    const runWith = async (inChat: { moment: string; sent_at: string }[] | null, frequency?: string) => {
+    const runWith = async (inChat: { moment: string; sent_at: string }[] | null | 'throws', frequency?: string) => {
       const got: string[] = []
       const d: ReachOutDeps = {
         now: AT,
@@ -289,7 +289,7 @@ async function main() {
         recordSent: async () => true,
         unrecordSent: async () => {},
         dropSubscription: async () => {},
-        ...(inChat ? { loadChatToday: async () => inChat } : {}),
+        ...(inChat === 'throws' ? { loadChatToday: async () => { throw new Error('read failed') } } : inChat ? { loadChatToday: async () => inChat } : {}),
       }
       await safeRun(d)
       return got
@@ -305,6 +305,8 @@ async function main() {
     check('...while Lots still has room', lots.length === 1, lots)
     const soon = await runWith([{ moment: 'daily_hello', sent_at: h('17:30') }])
     check('a chat message 35 minutes ago keeps the three-hour spacing', soon.length === 0, soon)
+    const unread = await runWith('throws')
+    check('a chat read that fails is not a silent hour: the phone counts its own sends', unread.length === 1 && unread[0] === 'session_not_logged', unread)
     check('the merge counts a send that is also its chat row once',
       withChatToday([{ moment: 'workout_today', sent_on: '2026-09-23', sent_at: h('07:00') }], [{ moment: 'workout_today', sent_at: h('07:00') }, { moment: 'daily_hello', sent_at: h('06:30') }], '2026-09-23').length === 2)
   }
