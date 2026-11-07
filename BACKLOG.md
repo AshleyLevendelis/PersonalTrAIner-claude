@@ -37,6 +37,13 @@ Newest first. One line each.
   identity. NOT changed, named: every edit still stores a new copy beside the dish (the 29 Sep edited-copy design,
   so the plan she has holds); the swap list counts those copies as one dish for variety, but it does show them.
   `test:meal-food-edit` §4 (2 checks; mutation caught). 10 derived gates green.
+  (N12) FIXED, and it was an off-by-one in a rule of mine, not hers: the Reminders screen promises "never before 8am
+  or after 9pm", and the window let the whole 9pm hour through (hour 21 counted as allowed), on the phone and in the
+  chat, so "Today's session is still waiting. Got twenty minutes?" could arrive at 9:30pm. 9pm is now the first quiet
+  hour in both copies. Consequence, measured on the phone's day simulation: a Normal training day with nothing
+  logged gets two messages instead of three, because the meal nudge used to go at 9:05pm, three hours after the 6pm
+  one; Lots still fits five (8am, 11am, 2pm, 5pm, 8pm). `test:coach-moments` and `test:reach-out` re-anchored
+  (2 mutations, one per copy, both caught). The phone half needs the `coach-reach-out` deploy.
 - [x] **WHOLE-APP QA WALK, TRAINING: EIGHT DEFECTS FOUND AND FIXED, 7 NOV 2026** (Ashley: "I want you to test and fix",
   then "Keep testing and keep fixing"). Five testers walked the app at phone size against the browser harness; each
   finding was re-measured on a real screen before it was fixed. Found by me, none reported by her. Each fix has its

@@ -54,9 +54,13 @@ console.log('\n1. Silence is the default, and it is easy to reach')
     momentToRaise({ ...loud, localHour: QUIET_BEFORE_HOUR - 1 }) === null)
   check('...nor after the evening',
     momentToRaise({ ...loud, localHour: QUIET_AFTER_HOUR + 1 }) === null)
-  check('...and the boundary hours themselves are allowed',
+  // RE-ANCHORED 7 Nov 2026: the screen says "never after 9pm", so 9:30pm (hour 21) is quiet; the last hour that may
+  // speak is 8pm. It allowed the whole 9pm hour before (the QA walk saw "Got twenty minutes?" at 9:30pm).
+  check('...not even in the 9pm hour, which the screen promises is quiet',
+    QUIET_AFTER_HOUR === 21 && momentToRaise({ ...loud, localHour: QUIET_AFTER_HOUR }) === null)
+  check('...and the first morning hour and the last evening hour (8pm) are allowed',
     momentToRaise({ ...loud, localHour: QUIET_BEFORE_HOUR }) !== null
-    && momentToRaise({ ...loud, localHour: QUIET_AFTER_HOUR }) !== null)
+    && momentToRaise({ ...loud, localHour: QUIET_AFTER_HOUR - 1 }) !== null)
   // 3am is the case everyone pictures; pinned separately so a later change to
   // the window cannot quietly re-open it.
   check('...so 3am is silent whatever is going on', momentToRaise({

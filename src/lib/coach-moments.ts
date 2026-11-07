@@ -136,6 +136,8 @@ export const DEFAULT_MOMENT_SWITCHES: Record<MomentKey, boolean> =
  * named here so moving it is a decision rather than a discovery.
  */
 export const QUIET_BEFORE_HOUR = 8
+/** The first quiet hour: nothing from 9pm on, which is what the Reminders screen promises ("never ... after 9pm"). It
+ * allowed the whole 9pm hour until 7 Nov 2026 (the whole-app QA walk saw "Got twenty minutes?" at 9:30pm). */
 export const QUIET_AFTER_HOUR = 21
 
 /** The session-not-logged nudge waits until the day is genuinely getting on. */
@@ -238,7 +240,7 @@ export function momentsToRaise(
   facts: MomentFacts,
   switches: MomentSwitches = {},
 ): CoachMoment[] {
-  if (facts.localHour < QUIET_BEFORE_HOUR || facts.localHour > QUIET_AFTER_HOUR) return []
+  if (facts.localHour < QUIET_BEFORE_HOUR || facts.localHour >= QUIET_AFTER_HOUR) return []
   const out: CoachMoment[] = []
   for (const key of MOMENT_KEYS) {
     // ABSENT MEANS ON. A profile written before these columns existed has no

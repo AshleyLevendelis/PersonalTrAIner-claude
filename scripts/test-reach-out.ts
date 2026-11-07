@@ -244,11 +244,13 @@ async function main() {
       return [...got]
     }
     const normal = await runDay(null)
-    check('Normal (never set): three in the day', normal.length === 3, normal)
+    // RE-ANCHORED 7 Nov 2026: 9pm is quiet, as the Reminders screen promises ("never ... after 9pm"). The meal nudge
+    // used to go at 9:05pm here, three hours after the 6pm one; it now has nowhere to go, so this day holds two.
+    check('Normal (never set): two on this day', normal.length === 2, normal)
     check('the morning reminder first, at 8am, opening the chat', normal[0] === '07:05 workout_today /#/tab/chat', normal)
     check('then the evening nudge at 6pm', normal[1] === '17:05 session_not_logged /#/tab/chat', normal)
-    check('then the meal nudge three hours later — not at 7pm, too close to 6pm',
-      normal[2] === '20:05 meal_not_logged /#/tab/chat', normal)
+    check('...and no meal nudge at 9pm: three hours after 6pm is past the quiet hour, and 7pm is too close to 6pm',
+      !normal.some(x => /^20:/.test(x)), normal)
     const gaps = rec.slice(1).map((r, i) => (Date.parse(r.sent_at!) - Date.parse(rec[i].sent_at!)) / 3_600_000)
     check('...every gap at least three hours', gaps.every(g => g >= server.MIN_HOURS_BETWEEN), gaps)
     const light = await runDay('light')

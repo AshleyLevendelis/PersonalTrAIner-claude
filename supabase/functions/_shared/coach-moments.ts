@@ -61,6 +61,8 @@ export type NotificationSettings = MomentSwitches & {
 }
 
 export const QUIET_BEFORE_HOUR = 8
+/** The first quiet hour: nothing from 9pm on, which is what the Reminders screen promises ("never ... after 9pm"). It
+ * allowed the whole 9pm hour until 7 Nov 2026 (the whole-app QA walk saw "Got twenty minutes?" at 9:30pm). */
 export const QUIET_AFTER_HOUR = 21
 export const NOT_LOGGED_AFTER_HOUR = 18
 export const QUIET_WEEK_DAYS = 7
@@ -146,7 +148,7 @@ export function momentToRaise(facts: MomentFacts, switches: MomentSwitches = {})
 
 /** Every moment that may speak now, best first. The sender takes the first its own limits allow. */
 export function momentsToRaise(facts: MomentFacts, switches: MomentSwitches = {}): CoachMoment[] {
-  if (facts.localHour < QUIET_BEFORE_HOUR || facts.localHour > QUIET_AFTER_HOUR) return []
+  if (facts.localHour < QUIET_BEFORE_HOUR || facts.localHour >= QUIET_AFTER_HOUR) return []
   const out: CoachMoment[] = []
   for (const key of MOMENT_KEYS) {
     if (switches[key] === false) continue
