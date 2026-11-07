@@ -160,6 +160,27 @@ check('T12c. ...and what gives is the lift name: the weight and reps are shown w
 check('T12d. a screen reader still hears the whole label', !!t12 && t12.label === (t12.head ?? '') + (t12.tail ?? ''), t12)
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
 
+console.log('\nT11. A peeked rest day\'s way back is a real 44px button, and it goes back\n')
+await open('', 'exercise')
+const t11at = await ev(`(() => {
+  const b = [...document.querySelectorAll('[data-exercise-strip] button[aria-label]')].find(x => /: rest day$/.test(x.getAttribute('aria-label')) && x.getAttribute('aria-current') !== 'date')
+  if (!b) return null
+  const r = b.getBoundingClientRect()
+  return { x: r.x + r.width / 2, y: r.y + r.height / 2, label: b.getAttribute('aria-label') }
+})()`)
+if (t11at) { await pointAt(t11at); await wait(900) }
+const t11 = await ev(`(() => {
+  const card = document.querySelector('[data-testid="peek-rest-day"]')
+  const back = card ? [...card.querySelectorAll('button')].find(b => b.textContent.trim() === 'Back to today') : null
+  const r = back?.getBoundingClientRect()
+  return { card: !!card, back: !!back, h: r ? Math.round(r.height) : 0, w: r ? Math.round(r.width) : 0 }
+})()`)
+check('T11a. tapping a rest day on the strip shows its short card with a way back', !!t11at && t11.card && t11.back, { t11at, t11 })
+check('T11b. ...and the way back is at least 44px tall and wide', t11.h >= 44 && t11.w >= 44, t11)
+await tapSelector('[data-testid="peek-rest-day"] [data-testid="peek-back-today"]')
+const t11back = await ev(`!document.querySelector('[data-testid="peek-rest-day"]')`)
+check('T11c. ...and one tap on it returns to today', t11back === true, t11back)
+
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)
 

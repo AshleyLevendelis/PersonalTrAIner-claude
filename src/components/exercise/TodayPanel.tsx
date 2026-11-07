@@ -1372,13 +1372,13 @@ export function TodayPanel({
              the answer she needed and could not get from any screen. */
           <div className="rounded-xl bg-[color:var(--surface-deep)] p-4 text-center text-sm" data-testid="peek-moved-away">
             <p className="text-muted-foreground">{peekDay}'s session is on {peekMovedTo.dayName} now.</p>
-            <button
-              className="mt-2 text-xs font-semibold text-primary-text underline"
-              onClick={() => setPeekDay(peekMovedTo.dayName)}
-            >
-              See {peekMovedTo.dayName} →
-            </button>
-            <button className="block mx-auto mt-2 text-xs underline text-muted-foreground" onClick={() => setPeekDay(null)}>Back to today</button>
+            {/* Real buttons, not 16px text links (whole-app QA walk, 7 Nov 2026): a gym-floor tap needs 44px. */}
+            <div className="mt-3 flex flex-wrap justify-center gap-2">
+              <Button size="sm" variant="outline" className="min-h-11" data-testid="peek-see-moved" onClick={() => setPeekDay(peekMovedTo.dayName)}>
+                See {peekMovedTo.dayName} →
+              </Button>
+              <PeekBackToToday onClick={() => setPeekDay(null)} />
+            </div>
           </div>
         ) : !peekWorkout || peekWorkout.exercises.length === 0 ? (
           <div className="space-y-3">
@@ -1397,7 +1397,7 @@ export function TodayPanel({
                 : peekWorkout?.conditioning_note
                 ? `${peekDay} is a recovery day. ${peekWorkout.conditioning_note}`
                 : `${peekDay} is a rest or recovery day.`}
-              <button className="block mx-auto mt-2 text-xs underline" onClick={() => setPeekDay(null)}>Back to today</button>
+              <div className="mt-3 flex justify-center"><PeekBackToToday onClick={() => setPeekDay(null)} /></div>
             </div>
           </div>
         ) : (
@@ -2093,4 +2093,13 @@ function workingCtx(ex: Exercise): WorkingSetContext {
 function parseRestSeconds(rest: string): number {
   const match = rest.match(/(\d+)/)
   return match ? parseInt(match[1]) : 60
+}
+
+/** The way back from a peeked day's short card: one button, 44px tall, the same on every such card. */
+function PeekBackToToday({ onClick }: { onClick: () => void }) {
+  return (
+    <Button size="sm" variant="ghost" className="min-h-11 text-muted-foreground" data-testid="peek-back-today" onClick={onClick}>
+      Back to today
+    </Button>
+  )
 }

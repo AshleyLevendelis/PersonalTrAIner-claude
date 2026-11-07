@@ -17,9 +17,11 @@ Newest first. One line each.
   gave a moved-away selected day the session dot where Home draws the dash (her 1 Nov "Dash on both"). (T8) Home's
   Start only opened Exercise, where she tapped Start again; it now starts the session. (T12) On a narrow phone the
   floating log button cut off the weight and reps ("Single-Leg Romanian Deadlift 12 kg per h…"): the lift name now
-  gives way and the numbers are always whole, with the full label still spoken to a screen reader.
+  gives way and the numbers are always whole, with the full label still spoken to a screen reader. (T11) A peeked day's short card (a rest day, or a day whose
+  session moved) offered its way back as 16px underlined text links; they are now 44px buttons, one shared "Back to
+  today".
   CSCS: no prescription changes (counts and wording, not what is prescribed). Mutations: every new check was broken
-  on purpose and caught (T12: 4 of 4). NOT proven: on her phone. Frontend only, no deploy beyond the merge.
+  on purpose and caught (T12: 4 of 4; T11: 3 of 3). NOT proven: on her phone. Frontend only, no deploy beyond the merge.
   Still open from the walk, being worked: the add-exercise suggestion order, a set trimmed from another day on a
   "just today" add (CSCS), receipts for screen edits, and the nutrition, grocery and chat findings.
 - [x] **THE HELLO NEVER RE-ASKS A QUESTION SHE LEFT UNANSWERED, 7 NOV 2026** (found by me, not reported: a simulated
