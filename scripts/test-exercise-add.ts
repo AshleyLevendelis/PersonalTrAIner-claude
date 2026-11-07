@@ -33,13 +33,14 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
-  generateMesocycle, getConstrainedPool, getExerciseCompatibilityWarnings, mapTier, mapMovementPattern,
+  generateMesocycle, getConstrainedPool, bestEquipmentRank, getExerciseCompatibilityWarnings, mapTier, mapMovementPattern,
 } from '../src/lib/exercise-plan'
 import { addExerciseToSession, peerProgrammingFor } from '../src/lib/session-edit'
 import { executeExerciseAdd } from '../src/lib/pending-action-executor'
 import { getAdditionCandidates, resolveAdditionRequest } from '../src/lib/exercise-add-candidates'
 import { applyReplacement, recomputeLoad } from '../src/lib/mesocycle-edit'
-import { searchExerciseCatalog, muscleGroupsOf, EXERCISE_DATABASE, type ExerciseEntry } from '../src/lib/exercise-db'
+import { searchExerciseCatalog, muscleGroupsOf, getExerciseEntry, EXERCISE_DATABASE, type ExerciseEntry } from '../src/lib/exercise-db'
+import { isExternallyLoaded } from '../src/lib/load-prescription'
 import type { UserProfile, MesocycleWeek, Exercise, WorkoutDay } from '../src/lib/types'
 import type { LoadPrescription } from '../src/lib/load-prescription'
 
@@ -491,6 +492,76 @@ async function main() {
   check('...and the client calls that executor on confirm', /executeExerciseAdd\(poolProfile, mesocycle/.test(client))
   check('...and can be undone from the pre-image',
     /propose_exercise_add/.test(store) && /undoSessionEdit/.test(client))
+
+  // -------------------------------------------------------------------------
+  console.log('\n9. A coach\'s list: the session\'s direction, honest "least", gym tools, a new angle (QA walk, 7 Nov 2026)')
+  // -------------------------------------------------------------------------
+  // Constructed days, so each property is under pressure every run (a generated plan picks by seed).
+  const exOf = (name: string, sets = 3): Exercise => {
+    const e = getExerciseEntry(name)!
+    return { name, sets, reps: '8-10', movement_pattern: mapMovementPattern(e.movement_pattern), tier: mapTier(e.mechanics_tier) } as unknown as Exercise
+  }
+  const dayOfExs = (focus: string, names: Array<[string, number?]>): WorkoutDay =>
+    ({ day: 'Thursday', focus, exercises: names.map(([n, k]) => exOf(n, k)) } as unknown as WorkoutDay)
+  const isOppositeCompound = (e: ExerciseEntry, dir: 'push' | 'pull') =>
+    mapMovementPattern(e.movement_pattern) === dir && e.mechanics_tier !== 'tier3_isolation'
+
+  // THE QA REPRODUCTION: an upper pull day whose lateral raises put shoulders on its list.
+  const pullDay = dayOfExs('Upper Pull & Core', [['Pull-Ups', 4], ['Bent-Over Dumbbell Row', 3], ['Shrugs', 3], ['Hammer Curls', 3], ['Lateral Raises', 3], ['Side Plank', 3]])
+  const pullAll = getAdditionCandidates(pullDay, PROFILE, [], 500)
+  const pressesOnPull = pullAll.filter(c => isOppositeCompound(c.exercise, 'push')).map(c => c.exercise.name)
+  check('a pull day offers no pressing compound (Arnold Press, Floor Press, Chest Press Machine...)', pressesOnPull.length === 0, pressesOnPull.slice(0, 6))
+  check('...while the pool genuinely holds presses that touch its muscles (the check binds)',
+    getConstrainedPool(PROFILE, []).filter(e => isOppositeCompound(e, 'push') && muscleGroupsOf(e).includes('shoulders')).length > 3)
+  const pushDay = dayOfExs('Push & Press', [['Barbell Bench Press', 4], ['Arnold Press', 3], ['Cable Lateral Raises', 3], ['Rope Tricep Pushdown', 3]])
+  const pushAll = getAdditionCandidates(pushDay, PROFILE, [], 500)
+  const rowsOnPush = pushAll.filter(c => isOppositeCompound(c.exercise, 'pull')).map(c => c.exercise.name)
+  check('a push day offers no rowing or pulldown compound', rowsOnPush.length === 0, rowsOnPush.slice(0, 6))
+  check('...but keeps rear-delt isolation (face pulls, rear-delt flyes): shoulder-balance work a coach adds to a push day',
+    pushAll.some(c => mapMovementPattern(c.exercise.movement_pattern) === 'pull' && c.exercise.mechanics_tier === 'tier3_isolation'),
+    pushAll.slice(0, 12).map(c => c.exercise.name))
+  const fullBody = dayOfExs('Full Body Strength', [['Barbell Squats', 3], ['Barbell Bench Press', 3], ['Bent-Over Dumbbell Row', 3]])
+  const fullAll = getAdditionCandidates(fullBody, PROFILE, [], 500)
+  check('a day holding both directions is not restricted (full body keeps presses and rows)',
+    fullAll.some(c => isOppositeCompound(c.exercise, 'push')) && fullAll.some(c => isOppositeCompound(c.exercise, 'pull')))
+
+  // "THE LEAST" ONLY WHEN ONE MUSCLE IS. Back 6, biceps 3, core 3: two tie for the least.
+  const tiedDay = dayOfExs('Upper Pull & Core', [['Straight-Arm Pulldown', 6], ['Hammer Curls', 3], ['Cable Crunch', 3]])
+  const tiedNotes = getAdditionCandidates(tiedDay, PROFILE, [], 500).map(c => c.note)
+  check('when muscles tie for the least work, no row claims its muscle gets "the least work"',
+    tiedNotes.length > 0 && !tiedNotes.some(n => /the least work/.test(n)), tiedNotes.slice(0, 4))
+  check('...they say "among the least" instead, with the set count',
+    tiedNotes.some(n => /^Your (biceps|core) gets? 3 sets in this session, among the least\./.test(n)), tiedNotes.slice(0, 4))
+  const loneDay = dayOfExs('Upper Pull & Core', [['Straight-Arm Pulldown', 6], ['Hammer Curls', 2], ['Cable Crunch', 4]])
+  const loneNotes = getAdditionCandidates(loneDay, PROFILE, [], 500).map(c => c.note)
+  check('one muscle clearly thinnest still says "the least work"', loneNotes.some(n => /^Your biceps get the least work in this session — 2 sets/.test(n)), loneNotes.slice(0, 3))
+
+  // A GYM TOOL BEFORE AN IMPROVISED ONE, for a full-gym lifter.
+  const lowRank = (e: ExerciseEntry) => bestEquipmentRank(e) === 'low'
+  // Every improvised option sits below every loaded gym option of the same kind (same lead muscle, same direction).
+  const kind = (e: ExerciseEntry) => `${muscleGroupsOf(e)[0]}|${mapMovementPattern(e.movement_pattern)}`
+  const improvisedFirst = pushAll.flatMap((c, i) => !lowRank(c.exercise) ? [] : pushAll.slice(i + 1)
+    .filter(d => !lowRank(d.exercise) && isExternallyLoaded(d.exercise) && kind(d.exercise) === kind(c.exercise))
+    .map(d => `${c.exercise.name} before ${d.exercise.name}`))
+  check('a full-gym push day lists improvised kit (backpack, band) below the gym options of the same kind',
+    improvisedFirst.length === 0, { improvisedFirst: improvisedFirst.slice(0, 4), top8: pushAll.slice(0, 8).map(c => c.exercise.name) })
+  check('...where the pool does hold improvised options for that day (the check binds)',
+    pushAll.some(c => lowRank(c.exercise)), pushAll.map(c => c.exercise.name).filter(n => /Backpack|Band/.test(n)).slice(0, 3))
+
+  // A NEW ANGLE BEFORE A SECOND COPY, both ways round, and each the way the alphabet would NOT order it (Barbell
+  // Reverse Lunge sorts before Belt Squat and Goblet Squats): a squat day with only single-leg work offers a bilateral
+  // squat first, and one with only a bilateral squat offers single-leg work first.
+  const SINGLE = getExerciseEntry('Bulgarian Split Squats')!.movement_pattern
+  const singleDay = dayOfExs('Squat & Carry', [['Bulgarian Split Squats', 4], ['Leg Extensions', 3], ['Suitcase Carry', 3]])
+  const singleTop = getAdditionCandidates(singleDay, PROFILE, [], 8)
+  check('a squat day holding only single-leg work offers a two-legged squat before another single-leg move',
+    singleTop.length > 0 && singleTop[0].exercise.movement_pattern !== SINGLE, singleTop.map(c => `${c.exercise.name}:${c.exercise.movement_pattern}`))
+  check('...where the alphabet alone would have led with a single-leg move (the check binds)',
+    [...singleTop].sort((a, b) => a.exercise.name.localeCompare(b.exercise.name))[0].exercise.movement_pattern === SINGLE)
+  const squatDay = dayOfExs('Squat & Carry', [['Barbell Squats', 4], ['Leg Extensions', 3], ['Suitcase Carry', 3]])
+  const squatTop = getAdditionCandidates(squatDay, PROFILE, [], 8)
+  check('a squat day with only a two-legged squat offers single-leg work first',
+    squatTop.length > 0 && squatTop[0].exercise.movement_pattern === SINGLE, squatTop.map(c => `${c.exercise.name}:${c.exercise.movement_pattern}`))
 
   console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`)
   process.exit(failures === 0 ? 0 : 1)

@@ -299,7 +299,8 @@ export function TodayPanel({
     onCalibrationSessionFinished?.({ date: today, dayName: workout.day })
     // The summary's count is the same working-set count (isMovementPrepRow), never one that adds the warm-up drills.
     const plannedExercises = workout.exercises.filter(ex => !isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
-    const summary = computeSessionSummary(logs, plannedExercises, result.startedAtIso, result.finishedAtIso)
+    const prepRows = workout.exercises.filter(ex => isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name }))
+    const summary = computeSessionSummary(logs, plannedExercises, result.startedAtIso, result.finishedAtIso, prepRows)
     const prs = computeSessionPRs(result.prBaseline, logs)
     // "What next session prescribes" reuses the same function already called
     // above for the live progressedLoads badges — scoped to a date AFTER

@@ -823,9 +823,16 @@ export function computeSessionSummary(
   plannedExercises: { id?: string; name: string; sets: number }[],
   startedAtIso: string,
   finishedAtIso: string,
+  /**
+   * The day's movement prep: on the plan but not working sets, so its ticks are neither planned sets done nor
+   * "+1 extra" (whole-app QA walk, 7 Nov 2026: a ticked Arm Circles set read "0/15 planned sets +1 extra").
+   */
+  prep: { id?: string; name: string }[] = [],
 ): SessionSummary {
   const exercises: SessionExerciseSummary[] = []
   const accountedIds = new Set<string>()
+  const isPrep = (log: ExerciseSetLog) => prep.some(p =>
+    log.exercise_id ? log.exercise_id === (p.id ?? p.name) : log.exercise_name === p.name)
 
   for (const planned of plannedExercises) {
     const exerciseId = planned.id ?? planned.name
@@ -853,7 +860,7 @@ export function computeSessionSummary(
   for (const log of logs) {
     if (log.is_warmup) continue
     const id = log.exercise_id ?? log.exercise_name
-    if (accountedIds.has(id) || onPlan(log)) continue
+    if (accountedIds.has(id) || onPlan(log) || isPrep(log)) continue
     const list = extraByExercise.get(id) ?? []
     list.push(log)
     extraByExercise.set(id, list)

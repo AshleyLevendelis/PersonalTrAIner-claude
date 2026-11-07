@@ -19,9 +19,25 @@ Newest first. One line each.
   floating log button cut off the weight and reps ("Single-Leg Romanian Deadlift 12 kg per h…"): the lift name now
   gives way and the numbers are always whole, with the full label still spoken to a screen reader. (T11) A peeked day's short card (a rest day, or a day whose
   session moved) offered its way back as 16px underlined text links; they are now 44px buttons, one shared "Back to
-  today".
+  today". (T4) The "Add exercise" list on an upper pull day offered Arnold Press, Floor Press, Chest Press Machine and
+  Close-Grip Bench, each as "your shoulders get the least work", and ties fell to the alphabet: four muscles tied at 3
+  sets each all claimed "the least work", and a full-gym lifter was offered Backpack Row and Backpack Overhead Press.
+  DECIDED AS A CSCS COACH (exercise selection is mine under her 18 Sep delegation): a compound of the opposite
+  direction (a press on a pull day, a row on a push day) is not offered, because it turns the session into a
+  different one, the same reasoning that already kept squats off a bench day; isolation is judged on overlap alone,
+  so face pulls and rear-delt flyes stay on a push day (the shoulder-balance work a coach adds there), and a day
+  holding both directions (full body) is not restricted. For anyone with kit, a gym tool ranks above an improvised
+  one (backpack, band) of any kind. Among equal options, a pattern the day does not hold yet comes first (single-leg
+  work beside a bilateral squat, and the other way round). "The least work" is said only when one muscle is; tied,
+  it reads "Your back gets 3 sets in this session, among the least." The search box still reaches everything (her
+  13 Sep "show everything, warn me"). FOUND ON THE WAY: the T6 count fix left a ticked warm-up drill reading
+  "0/15 planned sets +1 extra" on the session summary; the summary now treats the day's prep as neither.
+  CSCS review (T4): (1) training effect: additions now extend the session's own stimulus instead of opening a second
+  one; (2) takes away: opposite-direction compounds from the ranked list only, never from search; (3) fundamentals:
+  pattern coverage and the week's balance are untouched (an addition never removes anything); (4) no floor or
+  ceiling moved; (5) in scope.
   CSCS: no prescription changes (counts and wording, not what is prescribed). Mutations: every new check was broken
-  on purpose and caught (T12: 4 of 4; T11: 3 of 3). NOT proven: on her phone. Frontend only, no deploy beyond the merge.
+  on purpose and caught (T12: 4 of 4; T11: 3 of 3; T4: 8 of 8; the summary: 2 of 2). NOT proven: on her phone. Frontend only, no deploy beyond the merge.
   Still open from the walk, being worked: the add-exercise suggestion order, a set trimmed from another day on a
   "just today" add (CSCS), receipts for screen edits, and the nutrition, grocery and chat findings.
 - [x] **THE HELLO NEVER RE-ASKS A QUESTION SHE LEFT UNANSWERED, 7 NOV 2026** (found by me, not reported: a simulated

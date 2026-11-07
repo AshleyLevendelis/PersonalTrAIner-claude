@@ -116,13 +116,20 @@ await wait(1200)
 console.log('\n  1. LOG A SET, THE FINISHER, AND SOMETHING THAT WAS NOT PLANNED')
 check('1a. nothing is listed under "Additional work" to begin with', (await ev(`!${q('[data-testid="additional-work"]')}`)) === true)
 // One working set, so finishing produces a summary rather than "nothing logged".
-const firstCard = await ev(`document.querySelector('[data-exercise-name]')?.getAttribute('data-exercise-name') ?? null`)
-const needsWeight = await ev(`${q('[data-exercise-name] [data-testid="working-row"]')}?.getAttribute('data-needs-weight') === 'true'`)
-if (needsWeight) { await tapExpr(`${q('[data-exercise-name] [data-testid="working-row"]')}?.querySelectorAll('input')[0]`); await typeText('10') }
-const tickSet = `[...(${q('[data-exercise-name] [data-testid="working-row"]')}?.querySelectorAll('button') ?? [])].find(b => /^save set/i.test(b.getAttribute('aria-label') || ''))`
+// RE-ANCHORED 7 Nov 2026: on the first WORKING exercise. Today opens with movement prep, and a prep tick is not a working
+// set (the whole-app QA walk), so the summary rightly counts it as neither done nor extra. Which cards are prep is the
+// page's answer (window.__primerNames), never guessed here.
+const workCard = `[...document.querySelectorAll('[data-exercise-name]')].find(n => !(window.__primerNames ?? []).includes(n.getAttribute('data-exercise-name')))`
+const workRow = `${workCard}?.querySelector('[data-testid="working-row"]')`
+const firstCard = await ev(`${workCard}?.getAttribute('data-exercise-name') ?? null`)
+// Only one card is open at a time: open this one by its header, the way she would.
+if (!(await ev(`!!${workRow}`))) { await tapExpr(`${workCard}?.querySelector('[role="button"]')`); await wait(600) }
+const needsWeight = await ev(`${workRow}?.getAttribute('data-needs-weight') === 'true'`)
+if (needsWeight) { await tapExpr(`${workRow}?.querySelectorAll('input')[0]`); await typeText('10') }
+const tickSet = `[...(${workRow}?.querySelectorAll('button') ?? [])].find(b => /^save set/i.test(b.getAttribute('aria-label') || ''))`
 await tapExpr(tickSet); await wait(700)
-if (!(await ev(`!!${q('[data-exercise-name] [data-testid="working-row"][data-sync]')}`))) { await tapExpr(tickSet); await wait(700) }
-check(`1b. one working set of ${firstCard} is logged`, (await ev(`!!${q('[data-exercise-name] [data-testid="working-row"][data-sync]')}`)) === true)
+if (!(await ev(`!!${workCard}?.querySelector('[data-testid="working-row"][data-sync]')`))) { await tapExpr(tickSet); await wait(700) }
+check(`1b. one working set of ${firstCard} is logged`, (await ev(`!!${workCard}?.querySelector('[data-testid="working-row"][data-sync]')`)) === true)
 
 check('1c. the finisher\'s tick is tapped', await tapExpr(q('[data-testid="finisher-row"] [data-testid="cardio-save"]')))
 await until(`!!${q('[data-testid="finisher-row"] [data-testid="cardio-readback"]')}`, 4000)

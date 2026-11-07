@@ -107,7 +107,7 @@ check('2c. nothing already in the session is offered',
   (cands ?? []).every(c => !start.includes(c)), (cands ?? []).filter(c => start.includes(c)))
 const reasons = await ev(`[...document.querySelectorAll('[data-add-candidate]')].map(n => n.textContent.trim())`)
 check('2d. every option says why it is there — chosen, not shuffled',
-  (reasons ?? []).every(t => /least work|like the rest of this session/i.test(t)), (reasons ?? [])[0])
+  (reasons ?? []).every(t => /least work|among the least|like the rest of this session/i.test(t)), (reasons ?? [])[0])
 check('2e. the search box reaches the whole catalogue', await has('[data-testid="add-exercise-search"]'))
 
 // --- her ruling, on the screen -------------------------------------------

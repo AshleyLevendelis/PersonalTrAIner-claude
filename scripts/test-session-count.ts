@@ -72,6 +72,22 @@ console.log('\n1b. Movement prep is a warm-up, not a working set (whole-app QA w
   check('the same number Program prints for the day', dayLengthParts(withPrep).workingSets === c?.planned, { program: dayLengthParts(withPrep).workingSets, count: c?.planned })
   const t = todayWorkTotals(summariseTodayWork({ session: withPrep, logs: prepLogs })!)
   check('...and the coach reads the same count for today', t.planned === c?.planned && t.logged === c?.logged, { coach: t, count: c })
+  // THE SUMMARY: a ticked prep set is neither a planned set done nor "+1 extra" (cardio-shows: "0/15 planned sets +1
+  // extra" after one tick of Arm Circles). TodayPanel hands the day's prep rows over; asked here through the function.
+  const { computeSessionSummary } = await import('../src/lib/session-derive')
+  const { isMovementPrepRow } = await import('../src/lib/session-duration')
+  const work = withPrep.exercises.filter(e => !isMovementPrepRow(e)).map(e => ({ id: e.id, name: e.name, sets: e.sets }))
+  const prep = withPrep.exercises.filter(e => isMovementPrepRow(e)).map(e => ({ id: e.id, name: e.name }))
+  const at = '2026-11-07T10:00:00Z'
+  const sum = computeSessionSummary(prepLogs, work, at, at, prep)
+  const noPrepTicked = computeSessionSummary(logs, work, at, at, prep)
+  check('the session summary counts no prep tick as extra work (two Arm Circles ticks change nothing)',
+    sum.extraSets === noPrepTicked.extraSets && sum.setsCompleted === noPrepTicked.setsCompleted && sum.setsPrescribed === 10,
+    { withTicks: sum.extraSets, without: noPrepTicked.extraSets, planned: sum.setsPrescribed })
+  check('...where without the prep list the same ticks WOULD read as two extra (the check binds)',
+    computeSessionSummary(prepLogs, work, at, at).extraSets === noPrepTicked.extraSets + 2)
+  check('Today hands the summary the day\'s prep rows', /computeSessionSummary\(logs, plannedExercises, result\.startedAtIso, result\.finishedAtIso, prepRows\)/.test(code('src/components/exercise/TodayPanel.tsx'))
+    && /const prepRows = workout\.exercises\.filter\(ex => isMovementPrepRow\(ex\)\)/.test(code('src/components/exercise/TodayPanel.tsx')))
 }
 
 console.log('\n2. Said only when short')

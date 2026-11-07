@@ -63,7 +63,7 @@
 // through one row component, and ties break on name so the same day offers
 // the same list twice.
 // ---------------------------------------------------------------------------
-import { getConstrainedPool, mapMovementPattern, hasBetterLoadingPeer, EQUIPMENT_QUALITY_TIERS, dayHoldsDefiningWork, isWeekSupportLeg } from './exercise-plan'
+import { getConstrainedPool, mapMovementPattern, hasBetterLoadingPeer, bestEquipmentRank, EQUIPMENT_QUALITY_TIERS, dayHoldsDefiningWork, isWeekSupportLeg } from './exercise-plan'
 import { isExternallyLoaded } from './load-prescription'
 import { EXERCISE_DATABASE, getExerciseEntry, muscleGroupsOf, type ExerciseEntry, type MuscleGroup } from './exercise-db'
 import type { WorkoutDay, UserProfile, MesocycleMovementPattern, EquipmentAccess } from './types'
@@ -88,6 +88,17 @@ export interface AdditionCandidate {
  */
 const STRUCTURAL_PATTERNS: ReadonlySet<MesocycleMovementPattern> =
   new Set(['squat', 'hinge', 'lunge'] as MesocycleMovementPattern[])
+
+/**
+ * A PRESS IS NOT AN ADDITION TO A PULL DAY, NOR A ROW TO A PUSH DAY — decided as a CSCS coach, 7 Nov 2026, from the
+ * whole-app QA walk: an upper pull day offered Arnold Press, Barbell Floor Press, Chest Press Machine and Close-Grip
+ * Bench, each as "your shoulders get the least work in this session", because a press touches the shoulders and the
+ * day's lateral raises put shoulders on its list. A compound of the OPPOSITE direction turns the session into a
+ * different one, the same reasoning as the squat on a bench day above. Isolation work is judged on overlap alone,
+ * so rear-delt flyes and face pulls on a push day stay (the shoulder-balance work a coach adds there), and a day that
+ * already holds both directions (full body) is not restricted.
+ */
+const OPPOSITE_DIRECTION: Partial<Record<MesocycleMovementPattern, MesocycleMovementPattern>> = { push: 'pull', pull: 'push' }
 
 /** Movement prep — a warm-up drill on the day's list. Dosed to prepare, so it is neither the session's work nor something to add more of. */
 function isMovementPrep(entry: ExerciseEntry | undefined): boolean {
@@ -186,6 +197,8 @@ export function getAdditionCandidates(
   const openSets = [...muscles].filter(([g]) => !flaggedGroups.has(g)).map(([, sets]) => sets)
   const leastInDay = Math.min(...openSets)
   const somethingIsThinner = leastInDay < Math.max(...openSets)
+  // "THE least" only when one muscle is: four tied at 3 sets each all read "your X gets the least work" (QA walk).
+  const tiedForLeast = openSets.filter(n => n === leastInDay).length > 1
   const present = new Set(day.exercises.map(e => e.name.toLowerCase()))
   const pool = getConstrainedPool(profile, exclusions)
   const equipment = equipmentTierFor(profile)
@@ -210,6 +223,8 @@ export function getAdditionCandidates(
       if (overlap.length === 0) return null
       const pattern = mapMovementPattern(exercise.movement_pattern)
       if (STRUCTURAL_PATTERNS.has(pattern) && !patterns.has(pattern)) return null
+      const opposite = OPPOSITE_DIRECTION[pattern]
+      if (opposite && exercise.mechanics_tier !== 'tier3_isolation' && patterns.has(opposite) && !patterns.has(pattern)) return null
 
       // THE GROUP THE EXERCISE LEADS WITH, not merely one it touches.
       // muscleGroupsOf preserves primary_muscles' order, so overlap[0] is what
@@ -230,8 +245,11 @@ export function getAdditionCandidates(
         + (thinnest ? 2 : 0)
         + (!isMainLift ? 1 : 0)
 
+      const setWord = `${leadSets} ${leadSets === 1 ? 'set' : 'sets'}`
       const note = thinnest
-        ? `Your ${leads} ${leastWorkVerb(leads)} the least work in this session — ${leadSets} ${leadSets === 1 ? 'set' : 'sets'}. This adds more.`
+        ? tiedForLeast
+          ? `Your ${leads} ${leastWorkVerb(leads)} ${setWord} in this session, among the least. This adds more.`
+          : `Your ${leads} ${leastWorkVerb(leads)} the least work in this session — ${setWord}. This adds more.`
         : `Trains ${overlap.slice(0, 2).join(' and ')}, like the rest of this session.`
 
       // THE DAY'S OWN WORK — the thing its name promises (point 2).
@@ -245,15 +263,28 @@ export function getAdditionCandidates(
       // wins"). With no kit nothing in the pool is loaded and this is silent.
       const loadable = isExternallyLoaded(exercise) ? 1 : 0
 
-      return { exercise, note, score, ofTheDay, loadable, thinnestSets: leadSets }
+      // A GYM TOOL BEFORE AN IMPROVISED ONE, for someone with kit (QA walk: a full-gym lifter was offered Backpack Row,
+      // Backpack Overhead Press and Band Shoulder Press). The swap list's own question, asked by rank, not by peer group.
+      const improvised = equipment && EQUIPMENT_QUALITY_TIERS.has(equipment) && bestEquipmentRank(exercise) === 'low' ? 1 : 0
+
+      // A PATTERN THE DAY DOES NOT HOLD YET, among otherwise equal options: single-leg work beside a bilateral squat, a
+      // fly beside two presses. Same stimulus, a new angle, before a second copy of one already there. Without it the
+      // last word was the alphabet.
+      const newPattern = day.exercises.some(e => getExerciseEntry(e.name)?.movement_pattern === exercise.movement_pattern) ? 0 : 1
+
+      return { exercise, note, score, ofTheDay, loadable, improvised, newPattern, thinnestSets: leadSets }
     })
     .filter((c): c is NonNullable<typeof c> => c !== null)
     .sort((a, b) =>
       // OUTERMOST: what the day is for, before what it happens to touch.
       (b.ofTheDay - a.ofTheDay)
+      // A gym tool before an improvised one, even before the main-lift preference: a backpack press is not a better
+      // addition than a barbell one for someone standing in a gym.
+      || (a.improvised - b.improvised)
       || (b.score - a.score)
       || (a.thinnestSets - b.thinnestSets)
       || (b.loadable - a.loadable)
+      || (b.newPattern - a.newPattern)
       // A REAL TOOL BEFORE AN IMPROVISED ONE, ADDED 21 Sep 2026. Every tied
       // candidate used to fall straight to alphabetical order — the exact
       // "Backpack Lateral Raise sorts to index 0" shape this whole line of
