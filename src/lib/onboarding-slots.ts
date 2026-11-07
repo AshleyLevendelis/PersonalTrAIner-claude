@@ -130,6 +130,8 @@ export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: st
  * claim, and must name things the tier genuinely lacks.
  */
 import { EQUIPMENT_OPTIONS, INJURY_OPTIONS } from './picker-options'
+import { parseSportsSlot } from './setup-sports'
+import { describeActivity } from './concurrent-activity'
 import { parseKitSlot, describeKitStatement, KIT_ITEMS, KIT_ITEM_LABELS, kitItemsFor, statementsForTicks, isKitItem, type KitItem, type KitStatement } from './kit-list'
 export { EQUIPMENT_OPTIONS, INJURY_OPTIONS }
 
@@ -455,6 +457,13 @@ export interface OnboardingSlotValues {
    */
   kitList: string
   /**
+   * ANOTHER SPORT they said they do, with its days (Ashley, 7 Nov 2026, "Remember
+   * it when they say it"): the activities as JSON, read from their own words
+   * by the app (setup-sports.ts sportsIn), '' for none. Never asked, and never
+   * set by the setup coach: only the app's reading of her words fills it.
+   */
+  otherSports: string
+  /**
    * THE KIT TICKS, shown ONCE in setup for any home equipment choice (Ashley, 18 Oct 2026, "Show ticks once"):
    * the nine kit items, pre-ticked with what the choice assumes (and anything they already said), untick what
    * they don't have. null until the card is answered; the card shows defaultKitTicks meanwhile.
@@ -502,6 +511,7 @@ export function initialSlotValues(): OnboardingSlotValues {
     maxSingleImplementKg: '',
     maxImprovisedKg: '',
     kitList: '',
+    otherSports: '',
     kitTicks: null,
   }
 }
@@ -1005,7 +1015,19 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'kitList', question: 'What kit do you actually have?',
     inputHint: 'only: dumbbells, bench', shortLabel: 'Your kit', control: 'text', required: false,
     destination: 'user_facts', validate: v => v === '' || parseKitSlot(v) !== null },
+  // ANOTHER SPORT, said in passing (7 Nov 2026, her "Remember it when they say
+  // it"). Never asked and never set by the coach; see APP_ONLY_SLOTS.
+  { key: 'otherSports', question: 'Do you do any other sport?',
+    inputHint: 'Muay Thai, Tuesday and Thursday evenings', shortLabel: 'Other training', control: 'text', required: false,
+    destination: 'column', validate: v => v === '' || parseSportsSlot(v) !== null },
 ]
+
+/**
+ * Slots only the app fills, from the person's own words: left out of what the
+ * setup coach is told it can set, and a set_slot for one is ignored. A sport's
+ * days are read in code (setup-sports.ts) and never taken from the model.
+ */
+export const APP_ONLY_SLOTS: readonly SlotKey[] = ['otherSports']
 
 export function getSlotDef(key: string): SlotDef | undefined {
   return ONBOARDING_SLOTS.find(s => s.key === key)
@@ -1030,6 +1052,7 @@ export function displaySlotValue(def: SlotDef, values: OnboardingSlotValues): st
     if (opt) return opt.label
   }
   if (def.key === 'kitList') { const s = parseKitSlot(v); if (s) return describeKitStatement(s).replace(/^Kit: /, '') }
+  if (def.key === 'otherSports') { const a = parseSportsSlot(v); if (a) return a.map(describeActivity).join('; ') }
   return def.unit ? `${v} ${def.unit}` : String(v)
 }
 
@@ -1140,6 +1163,8 @@ export const NEVER_BLOCKING_SLOTS: SlotKey[] = [
   // The kit list: never asked (Ashley, 9 Oct 2026: no new setup question),
   // only recorded when volunteered. See its slot def.
   'kitList',
+  // Another sport: never asked (her 7 Nov "Remember it when they say it").
+  'otherSports',
 ]
 
 /** Required slots whose VALUE must validate before completion, per the current answers (requiredIf-aware). */
@@ -1320,6 +1345,10 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     // is built from it; App then records it as a kit row after the insert.
     // and the kit ticks (18 Oct 2026), composed by kitStatementsFromSetup.
     ...(kitStatementsFromSetup(data).length > 0 ? { kit_statements: kitStatementsFromSetup(data) } : {}),
+    // ANOTHER SPORT SAID IN SETUP (her 7 Nov "Remember it when they say it"),
+    // so the FIRST plan is built around it (concurrent-activity.ts) and
+    // Profile shows it. App's insert names the column.
+    concurrent_activities: parseSportsSlot(data.otherSports) ?? [],
     ...PROFILE_CONSTANTS,
   }
 }
@@ -1412,7 +1441,7 @@ export function liftBoxesDue(
 
 export function buildSlotCatalog(values: OnboardingSlotValues = initialSlotValues()): SlotCatalogEntry[] {
   return ONBOARDING_SLOTS
-    .filter(s => isSlotApplicable(s, values))
+    .filter(s => isSlotApplicable(s, values) && !APP_ONLY_SLOTS.includes(s.key))
     .map(s => ({
       key: s.key,
       question: s.question,

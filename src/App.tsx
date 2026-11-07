@@ -1868,6 +1868,10 @@ function App() {
         known_squat_kg: enrichedProfile.known_squat_kg ?? null,
         known_bench_kg: enrichedProfile.known_bench_kg ?? null,
         known_deadlift_kg: enrichedProfile.known_deadlift_kg ?? null,
+        // Another sport said in setup (her 7 Nov "Remember it when they say
+        // it"; setup-sports.ts). Named here or the first plan is built around
+        // it and a reload forgets it.
+        concurrent_activities: enrichedProfile.concurrent_activities ?? [],
         // A ceiling volunteered during setup, so the Exercise tab does not ask
         // for something already said (roadmap item 11). Named here explicitly
         // because this insert is column-by-column: the same shape omitted these

@@ -73,6 +73,31 @@ const NOT_A_LIST = /\b(?:except|apart from|but not|not on|other than|excluding|n
 const OWN_TRAINING = /\b(?:i (?:can )?(?:train|lift|work ?out|go to the gym|gym)|train(?:ing)? (?:on|days?)|gym|lift(?:ing)?|weights|sessions?|free on|available)\b/i
 const OTHER_ACTIVITY = /\b(?:muay thai|thai boxing|kick ?boxing|boxing|bjj|jiu[- ]?jitsu|judo|karate|mma|martial arts?|football|soccer|rugby|netball|hockey|basketball|tennis|squash|padel|swim(?:ming)?|run(?:ning)?|cycl(?:e|ing)|spin|yoga|pilates|climb(?:ing)?|dance|crossfit|hyrox|class(?:es)?|club|team|match(?:es)?|games?)\b/i
 
+/** A run of days written together, where it sits in the text, and the words as written. */
+export interface DayRun { days: string[]; start: number; end: number; words: string[] }
+
+/**
+ * The days in a message, grouped into runs: days separated only by commas,
+ * "and", "or", "&", "/". "mon, tue, thu, fri mornings and do muay thai tue and
+ * thu" is two runs. Shared by the training-days reader and the other-sport
+ * reader (setup-sports.ts), so both see one message the same way.
+ */
+export function dayRunsIn(text: string): DayRun[] {
+  const runs: DayRun[] = []
+  let prevEnd = -1
+  for (const h of text.matchAll(DAY_WORD)) {
+    const at = h.index ?? 0
+    const day = dayOf(h[0])
+    if (!day) continue
+    const between = prevEnd >= 0 ? text.slice(prevEnd, at) : null
+    const end = at + h[0].length
+    if (between !== null && JOINER.test(between)) { const r = runs[runs.length - 1]; r.days.push(day); r.words.push(h[0]); r.end = end }
+    else runs.push({ days: [day], start: at, end, words: [h[0]] })
+    prevEnd = end
+  }
+  return runs
+}
+
 /**
  * The training days a typed message gives, as the setup slot stores them
  * ("Mon".."Sun", week order), or undefined when the message does not say for
@@ -86,18 +111,7 @@ export function trainingDaysIn(text: string, opts: { answered?: boolean } = {}):
   if (/\bweekdays?\b/i.test(text)) return hits.length === 0 && !span ? ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'] : undefined
   if (span) return undefined
   if (hits.length === 0) return undefined
-  // Group the hits into runs: days separated only by commas, "and", "&", "/".
-  const runs: { days: string[]; start: number }[] = []
-  let prevEnd = -1
-  for (const h of hits) {
-    const at = h.index ?? 0
-    const day = dayOf(h[0])
-    if (!day) continue
-    const between = prevEnd >= 0 ? text.slice(prevEnd, at) : null
-    if (between !== null && JOINER.test(between)) runs[runs.length - 1].days.push(day)
-    else runs.push({ days: [day], start: at })
-    prevEnd = at + h[0].length
-  }
+  const runs = dayRunsIn(text)
   // Which runs are the person's own training: the words before a run, back to
   // the previous run (or the start), say what it is for.
   const lead = (i: number) => text.slice(i === 0 ? 0 : runs[i - 1].start, runs[i].start)

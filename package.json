@@ -545,6 +545,7 @@
     "test:save-reply": "tsx scripts/test-save-reply.ts",
     "test:goal-ask": "tsx scripts/test-goal-ask.ts",
     "test:typed-days": "tsx scripts/test-typed-days.ts",
+    "test:setup-sports": "tsx scripts/test-setup-sports.ts",
     "test:protein-advice": "tsx scripts/test-protein-advice.ts",
     "verify:coach-texts-you": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-texts-you.mjs",
     "verify:coach-lessons": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-lessons.mjs",

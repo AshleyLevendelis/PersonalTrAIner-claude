@@ -776,6 +776,29 @@ await section(25, 'Her days question: the buttons come with it, and her typed da
   check('a passing "can\'t do Monday" leaves her days alone', JSON.stringify((await evj(`__draft()`))?.values?.trainingDays) === JSON.stringify(['Mon', 'Tue', 'Thu', 'Fri']), (await evj(`__draft()`))?.values?.trainingDays)
 })
 
+await section(26, 'Her muay thai is kept, with its days and evening, and the coach cannot write it', async () => {
+  await open('days')
+  // The coach acknowledges the sport and (wrongly) tries to set the slot
+  // itself with a guess; the app ignores that and reads her own words.
+  await queue({
+    reply: 'Muay thai twice a week is serious work. How long can your sessions usually run?',
+    actions: [{ name: 'set_slot', args: { slot_key: 'otherSports', value: 'Muay Thai Mon Wed' } }],
+  })
+  await say('I train mon, tue, thu, fri mornings and do muay thai tue and thu evenings')
+  const ticks = await evj(`__ticks()`)
+  check('her muay thai is ticked, with its days and evening', ticks.some(t => /Other training/.test(t) && /Muay Thai · Tuesday & Thursday evenings/.test(t)), ticks)
+  check('...beside her gym days', ticks.some(t => /Training days/.test(t) && /Mon, Tue, Thu, Fri/.test(t)), ticks)
+  const kept = JSON.parse((await evj(`__draft()`))?.values?.otherSports || '[]')
+  check("it is kept from her words, never the coach's guess", kept.length === 1 && kept[0].name === 'Muay Thai' && JSON.stringify(kept[0].days) === JSON.stringify(['Tuesday', 'Thursday']) && kept[0].timeOfDay === 'evening', kept)
+  check('...and the coach\'s attempt printed nothing', !(await ev(`document.body.innerText`)).includes("didn’t quite catch that"))
+  await shot('sport-kept')
+  // Said again with different days: corrected, not doubled.
+  await queue({ reply: 'Got it.', actions: [] })
+  await say('actually muay thai is wednesday evenings now')
+  const again = JSON.parse((await evj(`__draft()`))?.values?.otherSports || '[]')
+  check('said again with other days, it is corrected, never doubled', again.length === 1 && JSON.stringify(again[0].days) === JSON.stringify(['Wednesday']), again)
+})
+
 if (!isGone()) {
   try { check('harness: every request in this run was scripted', (await ev(`window.__onbUnscripted`)) === 0) } catch {}
 }

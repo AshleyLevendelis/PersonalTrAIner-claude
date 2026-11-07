@@ -2,6 +2,41 @@
 
 Newest first. One line each.
 
+- [x] **ANOTHER SPORT SAID IN SETUP REACHES THE FIRST PLAN, 7 NOV 2026** (Ashley's setup: "I train mon, tue, thu,
+  fri mornings and do muay thai tue and thu evenings"; the coach acknowledged the muay thai and nothing kept it).
+  TRACED: setup had no slot for another sport, `assembleProfile` never set `concurrent_activities`, the onboarding
+  insert never named the column, and the only trace was a free-text memory nothing in generation reads, so the first
+  plan ignored it and Profile said "Other training: None yet". **Her ruling, from three options: "Remember it when they
+  say it" (A)**, over asking everyone a new setup question (B) and leaving it to the chat after setup (C). BUILT:
+  `setup-sports.ts sportsIn` reads, in code and only when certain, which sport, which days and what time of day (a run
+  of days tied to the sport named just before or just after it, with nothing about her own training in between); a
+  hedge ("used to", "might", "maybe"), a sport with no days, or "a class" with no sport named gives nothing. It fills a
+  never-asked, app-only `otherSports` slot (the setup coach is not told about it and a `set_slot` for it is ignored, so
+  a guessed day never gets in), ticked "Other training - Muay Thai · Tuesday & Thursday evenings"; said again with
+  other days it is corrected, not doubled. `assembleProfile` carries it as `concurrent_activities` and the insert now
+  names the column, so the FIRST plan is built around it by the existing rules (concurrent-activity.ts, her 5-6 Sep
+  rulings): her four gym days kept, the lighter session on a class day, no prescribed cardio on either class night,
+  and week 2 one recovery notch lighter. **CSCS (mine, the delegation):** what a sport asks of the body is the coach's
+  estimate in chat and a table here. Striking sports (Muay Thai, kickboxing, boxing, karate) and grappling (BJJ, judo,
+  wrestling, rugby's contact) are tagged combat, which by her 6 Sep rule counts as load from ONE session a week:
+  high-intensity intermittent work with impact and, in grappling, isometric pulling, the load a coach plans around.
+  Intensity 0.7 and over (team field sports, squash/padel/badminton, CrossFit/Hyrox, rowing) also counts from one
+  session; steady running, cycling, swimming, climbing and tennis sit at 0.6 so ONE session moves only the schedule and two or more
+  take the notch (her "2+ sessions" rule, unchanged). Yoga, Pilates (0.3) and dance (0.5) never take the notch, her
+  words: "Light mobility/yoga only affects scheduling, not volume". The demands lists are the closed vocabulary the
+  coach's card uses and only "striking"/"grappling" change a plan today. Review: (1) the training effect is the one
+  her 6 Sep rulings set, now reached from setup; (2) it takes away sets in weeks with a hard sport, which is the
+  point, and moves lighter sessions onto class days; (3) pattern coverage and progression are untouched (the reorder
+  is a permutation, the notch is the existing low-recovery tier); (4) no floor or ceiling is redefined; (5) in scope.
+  NOT done: removing a sport from setup's summary (say it on Profile, which already deletes); time of day for her OWN
+  gym sessions (still not asked; nothing in the plan reads it); the onboarding coach's prompt still files a sport as
+  a memory note too (harmless; needs an onboarding-chat deploy to change); and THE FOOD TARGETS DO NOT COUNT THE
+  SPORT (they count gym sessions and the activity level only), put to her as a question the same day.
+  test:setup-sports 36 checks; verify:onboarding-turns 137 (section 26 new: her sentence, a coach guess ignored, a
+  correction). 13 mutations over both (18 runs): 17 caught; the one missed ("a sport named on two runs") exposed a
+  real gap (the sport was dropped) and is now kept with every day, two checks added, both re-mutations caught.
+  Frontend only, no migration (the column exists since July).
+
 - [x] **SETUP: THE DAYS QUESTION BRINGS ITS BUTTONS, AND TYPED DAYS ARE READ BY THE APP, 7 NOV 2026** (Ashley's setup:
   the days question was "just a text input field", and she typed "I train mon, tue, thu, fri mornings and do muay
   thai tue and thu evenings"). TRACED and checked: the buttons came only when the model called `present_slot`, and a

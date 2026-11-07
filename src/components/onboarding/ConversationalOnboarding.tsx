@@ -19,6 +19,7 @@ import {
   isSlotApplicable,
   canDeclineSlot,
   NEVER_BLOCKING_SLOTS,
+  APP_ONLY_SLOTS,
   assembleProfile,
   toggleValue,
   multiSelection,
@@ -46,6 +47,7 @@ import { parseKitSlot, kitStatementInUserWords } from '@/lib/kit-list'
 import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
 import { chooseCard, questionPartOf } from '@/lib/onboarding-chip-match'
 import { mealCountIn, mergePendingGoal, sessionLengthNote, snackAnswerIn, trainingDaysIn } from '@/lib/onboarding-capture'
+import { sportsIn, mergeSports, parseSportsSlot, formatSportsSlot } from '@/lib/setup-sports'
 import type { SessionDuration } from '@/lib/types'
 import { addParkedQuestion, saveParkedQuestions } from '@/lib/parked-questions'
 import {
@@ -912,6 +914,9 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
           console.warn('onboarding: set_slot with unknown slot_key', action.args.slot_key)
           continue
         }
+        // Only the app fills these, from her own words (APP_ONLY_SLOTS): a
+        // sport's days are never taken from the model.
+        if (APP_ONLY_SLOTS.includes(key)) continue
         // A slot's requiredIf gate can close mid-conversation (equipment
         // changed away from barbell-capable after knowsWorkingLifts was
         // already asked, say) — never write into one that's no longer
@@ -1281,6 +1286,18 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     if (typedDays && applySlot(ws, 'trainingDays', typedDays, ws.values)) {
       answeredThisTurn = true
       immediateCommit = true
+    }
+
+    // ANOTHER SPORT, SAID IN PASSING (her 7 Nov ruling, "Remember it when they
+    // say it"). "...and do muay thai tue and thu evenings" was acknowledged by
+    // the coach and kept nowhere, so the first plan never knew. Read here, with
+    // its days and time of day, only when certain (setup-sports.ts sportsIn),
+    // and ticked; the plan is then built around it. Said again with other
+    // days, it is corrected, not doubled.
+    const saidSports = preRecorded ? [] : sportsIn(trimmed)
+    if (saidSports.length > 0) {
+      const sports = mergeSports(parseSportsSlot(ws.values.otherSports) ?? [], saidSports)
+      if (applySlot(ws, 'otherSports', formatSportsSlot(sports), ws.values)) immediateCommit = true
     }
 
     // Captured before the round trip: the rescue below needs to know the
