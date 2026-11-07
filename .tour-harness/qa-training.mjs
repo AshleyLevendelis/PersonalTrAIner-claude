@@ -101,6 +101,18 @@ await open('', 'dashboard')
 const t9b = await ev(`({ title: document.querySelector('[data-home-title]')?.textContent ?? null, start: !!document.querySelector('[data-home-cta]') })`)
 check('T9c. an ordinary training day still offers Start (the fixture binds)', t9b.start === true && !/^Swapped/.test(t9b.title ?? ''), t9b)
 
+console.log('\nT10. A day whose session moved away: the Exercise strip draws the dash, as Home does, not a session dot\n')
+await open('moved=1', 'exercise')
+const t10 = await ev(`(() => {
+  const today = [...document.querySelectorAll('[data-exercise-strip] [aria-current="date"]')][0]
+  const mark = today?.querySelector('[data-selected-dot]')
+  return { label: today?.getAttribute('aria-label') ?? null, kind: mark?.getAttribute('data-selected-dot') ?? null, text: mark?.textContent?.trim() ?? null }
+})()`)
+check('T10a. today (moved away, on screen) carries the dash, never the session dot', t10.kind === 'away' && t10.text === '–', t10)
+await open('', 'exercise')
+const t10b = await ev(`(() => { const m = document.querySelector('[data-exercise-strip] [aria-current="date"] [data-selected-dot]'); return m?.getAttribute('data-selected-dot') ?? null })()`)
+check('T10b. an ordinary training day on screen keeps its dot (the fixture binds)', t10b === 'plain', t10b)
+
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)
 
