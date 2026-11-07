@@ -2,6 +2,36 @@
 
 Newest first. One line each.
 
+- [x] **THE SECOND PASS, MEASURED, AND TWO FIXES: SAFETY WORDS READ OFF HER MESSAGE, AND NO SILENT SAVES, 7 NOV 2026**
+  (her machine's exam of the second pass on TEST, 38 cases, judge marked all: overall 2.27 -> 2.19, voice 1.94 ->
+  2.03, warm 2.00 -> 1.97, teaches 2.09 -> 2.00, correct 2.55 -> 2.32, asks 2.13 -> 1.91, scope 2.81 -> 2.50, hard
+  rules 5 -> 6; production stays on the 6 Nov coach). The TEST logs: the edit ran on 18 replies and passed its checks
+  first time on every one; 18 more were SKIPPED as "safety wording". MEASURED here from the transcripts (branch
+  exam-results-nov6b): 19 replies skipped, 9 of them plain training advice. **"numb" matched "numbers"** (3: a squat
+  weight, the progress-photos reply, a plateau), "chest" matched a press cue (3), "injury" matched a reply explaining
+  exercise order (2), "starving" matched hunger (1). FIX (`voice-pass.ts`), inside her 6 Nov "safety and medical
+  wording is never edited": the skip is read off what SHE SAID (pain, a symptom, an injury, an allergy, a medical
+  question, medication, eating very little, now including "600 calories") or a draft that hands her to a doctor,
+  physio, pharmacist or dietitian or talks about an allergy, medication or disordered eating; and inside a reply that
+  IS edited, every sentence about pain, an injury or a warning sign must come back word for word or the edit is
+  refused (one retry, then the draft). Re-run over the same transcripts: 19 skips -> 11, the 9 plain-advice replies
+  now edited, the 2 warning sentences in them kept. SECOND DEFECT, not the pass: **a context save answered with an
+  empty reply.** "It's been a rough few weeks" and "I did 90 minutes of cardio because I'd overeaten" got silence and
+  a receipt ("Saved: Compensatory exercise pattern ... & extreme restriction (600 kcal rest day)"), because
+  `record_context_fact` returned `reply: ""` and threw away any words the coach wrote beside the call. FIX: the
+  handler writes the coach's reply through the checked tool-reply path (its own words beside the call when it wrote
+  some, else one round trip told to answer what she said, never mention the save, and name a professional when it is
+  called for; the day checks and the plan-claim check on it; a floor, "Thanks for telling me.", never empty), and the
+  chat shows those words with the save's note beneath (`save-reply.ts`); the app's own question back still wins.
+  Decided by the session, not asked: both are defects against rulings she already gave (the 6 Nov "safety wording"
+  and the prompt's own "acknowledge in half a sentence, then carry on"). NAMED, NOT CHANGED, hers: the save note
+  shows the coach's own label for what it kept, which on the disordered-eating turn read clinically; record_fact,
+  record_goal and set_display_name still answer with the app's own line (they say what changed on her plan). The other
+  exam marks that fell (scope 2.81 -> 2.50: the disc-bulge swap card after a refused physio check; asks) are not from
+  this pass and are not fixed here. test:voice-pass 43 checks (+11), test:save-reply 19 (new), 16 mutations, 16
+  caught (three only after the check or the mutation was corrected: a "2)" step, the floor check, a mutation that did
+  not break the filter); verify:chat-save-reply 10 checks (new), 3 mutations, 3 caught; screenshot read. Needs the
+  chat-gemini deploy and one more exam run on her machine.
 - [x] **THE SECOND PASS: THE COACH DRAFTS, A SHORT EDIT MAKES IT A TEXT, 6 NOV 2026** (Ashley: "the chat is better
   but not perfect. why?"). MEASURED on her machine the same day (38 cases, judge marked all): overall 2.30 before,
   2.27 after the warm-coach instructions, voice 2.00 -> 1.94, warm 2.06 -> 2.00, teaches 2.14 -> 2.09, all inside

@@ -1103,7 +1103,11 @@ menu" stays true when a copy is also left outside it.
 - **The second pass: her ruling 6 Nov 2026, "Second pass + checks"** (over checks only and over a stronger model):
   advice replies are edited by a separate short call into two to four short lines, one option, one question at most,
   and the edit is checked (markers, numbers, foods, claims, shape) or the draft stands; safety and medical wording is
-  never edited. `test:voice-pass`, `chat-gemini/voice-pass.ts`. Needs the `chat-gemini` deploy and an exam re-run
+  never edited. **Measured 7 Nov 2026 and narrowed**: "safety" is read off what SHE said (pain, a symptom, an
+  injury, an allergy, medical, eating very little) or a draft referring her to a professional; a warning sentence
+  inside an edited reply comes back word for word or the edit is refused ("numb" had matched "numbers": 19 skips, 9
+  of them plain advice). And a save is never a silent turn: the coach answers beside it (`test:save-reply`,
+  `verify:chat-save-reply`). `test:voice-pass`, `chat-gemini/voice-pass.ts`. Needs the `chat-gemini` deploy and an exam re-run
 - **It reads like texting a coach — Ashley's three rulings of 24 Sep 2026**,
   after seeing four-paragraph answers and a question tacked onto every reply:
   (1) **"short steps"**, from three options (over speech-only and over a
