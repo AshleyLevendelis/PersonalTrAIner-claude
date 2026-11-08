@@ -77,6 +77,14 @@ check('a gap is a separate run, not "3 days" stretched over it', coverageSentenc
 check('...and a run that started before today is not "your next" days', coverageSentence(run(14, 4), T) === 'Built from 4 days of meals, Mon 14 to Thu 17 Sept.', coverageSentence(run(14, 4), T))
 check('no dated rows: no sentence, so the screen falls back to its memo', coverageSentence([], T) === null)
 
+// MILLILITRES READ LIKE GRAMS (whole-app QA walk, 7 Nov 2026): "1000ml" sat beside "1kg".
+{
+  const ml = (q: number) => ({ display_name: 'semi-skimmed milk', quantity: q, unit: 'ml' })
+  check('1,000ml reads "1L", as 1,000g reads "1kg"', formatShoppingQuantity(ml(1000)).primary === '1L' && formatShoppingQuantity(ml(1000)).exact === '1000ml', formatShoppingQuantity(ml(1000)))
+  check('1,180ml reads "~1.2L", and the stepper says "1.2 L"', formatShoppingQuantity(ml(1180)).primary === '~1.2L' && stepperReadout(ml(1180)) === '1.2 L', [formatShoppingQuantity(ml(1180)), stepperReadout(ml(1180))])
+  check('under a litre it stays in ml, rounded to the same step as grams', formatShoppingQuantity(ml(333)).primary === '~350ml')
+}
+
 console.log(`\n${ran} checks ran`)
 if (failed > 0) { console.error(`${failed} check(s) failed`); process.exit(1) }
 console.log('grocery display: all checks passed')

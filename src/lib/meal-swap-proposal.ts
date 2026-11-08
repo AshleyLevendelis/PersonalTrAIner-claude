@@ -22,6 +22,7 @@ import type { PoolOption } from './meal-generation'
 import type { ProposalDiff } from './pending-actions-store'
 import type { MealKnockOn } from './meal-knock-on'
 import { withKnockOn } from './meal-food-add'
+import { REBALANCE } from './coach-voice'
 
 const SLOTS: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -80,6 +81,12 @@ export interface BuildMealSwapInput {
    * lot" after one option, and the card's before-side named the slot instead of the dish).
    */
   servedByDate?: Record<string, Partial<Record<string, string>>>
+  /**
+   * Today's meals already logged as eaten. One of those is not swapped (whole-app QA walk, 7 Nov 2026): the
+   * log is what the day counts and shows, so the swap changed nothing she could see except re-sizing her dinner around
+   * a dish she never ate. The rule moving a meal between days and moving calories between meals already keep.
+   */
+  eatenSlotsToday?: string[]
 }
 
 /**
@@ -143,6 +150,8 @@ export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<
   if (rawDate && rawDate !== input.today && !upcomingDay) {
     return { ok: false, reason: "I can only change meals for today and the next six days — which day did you mean?" }
   }
+
+  if (!upcomingDay && (input.eatenSlotsToday ?? []).includes(slot)) return { ok: false, reason: REBALANCE.refusals.eaten(slot) }
 
   const pools = await getPools(input.profileId)
   const options = pools[slot] ?? []

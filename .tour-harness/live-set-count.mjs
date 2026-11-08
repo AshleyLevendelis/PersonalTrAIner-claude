@@ -27,7 +27,12 @@ check('2. mid-session, the chat pill counts sets', !!p0 && p0.logged === 0, p0)
 
 await ev(`location.hash = '#/tab/exercise'`); await wait(1500)
 const before = await saved()
-for (let i = 0; i < 2; i++) { await clickAt(`document.querySelector('button[aria-label^="Save set "]')`); await wait(900) }
+// RE-ANCHORED 7 Nov 2026: two sets of the first WORKING exercise. Today opens with movement prep, which is a warm-up,
+// not a working set, so a tick of it rightly counts 0 (the whole-app QA walk). The card says which it is.
+const workTick = `[...document.querySelectorAll('[data-exercise-name]:not([data-movement-prep]) button[aria-label^="Save set "]')][0]`
+const openWork = `[...document.querySelectorAll('[data-exercise-name]:not([data-movement-prep])')][0]?.querySelector('[role="button"]')`
+if (!(await ev(`!!${workTick}`))) { await clickAt(openWork); await wait(800) }
+for (let i = 0; i < 2; i++) { await clickAt(workTick); await wait(900) }
 const after = await saved()
 check('3. two working sets are ticked: the session card itself counts 2', before === 0 && after === 2, { before, after })
 const m = await until(meter, v => v && v.logged >= 2, 30)

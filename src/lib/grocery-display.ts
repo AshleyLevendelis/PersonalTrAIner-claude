@@ -115,6 +115,17 @@ function purchaseUnitFor(item: Pick<GroceryItemRow, 'display_name' | 'unit'>) {
  */
 export function formatShoppingQuantity(item: Pick<GroceryItemRow, 'display_name' | 'quantity' | 'unit'>): { primary: string; exact: string } {
   const exact = formatQuantity(item)
+  // MILLILITRES READ LIKE GRAMS (whole-app QA walk, 7 Nov 2026): "1000ml" sat beside "1kg", the same rounding and the
+  // same step the stepper already moves in, with litres from 1,000 ("~1.2L").
+  if (item.unit === 'ml') {
+    const ml = item.quantity
+    const step = gramStep(ml)
+    const rounded = Math.round(ml / step) * step
+    if (ml > 0 && rounded <= 0) return { primary: exact, exact }
+    const approx = rounded !== ml ? '~' : ''
+    const primary = rounded >= 1000 ? `${approx}${(rounded / 1000).toFixed(rounded % 1000 === 0 ? 0 : 1)}L` : `${approx}${rounded}ml`
+    return { primary, exact }
+  }
   if (item.unit !== 'g') return { primary: exact, exact } // non-gram manual units (e.g. 'rolls') pass through unchanged
 
   const unit = purchaseUnitFor(item)
@@ -143,7 +154,7 @@ export function formatShoppingQuantity(item: Pick<GroceryItemRow, 'display_name'
  */
 export function stepperReadout(item: Pick<GroceryItemRow, 'display_name' | 'quantity' | 'unit'>): string {
   const { primary } = formatShoppingQuantity(item)
-  return primary.replace(/^~/, '').replace(/^([\d.]+)(kg|g|ml)$/, '$1 $2')
+  return primary.replace(/^~/, '').replace(/^([\d.]+)(kg|g|ml|L)$/, '$1 $2')
 }
 
 /** "exact 1,180g" — the stored figure, with thousands separated. */

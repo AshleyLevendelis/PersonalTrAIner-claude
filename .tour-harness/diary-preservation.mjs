@@ -107,6 +107,17 @@ const head = await ev(`(() => { const k = document.querySelector('[data-meal-she
 check('6b. the sheet\'s header gives the eaten meal\'s calories under its name (610), not the plan\'s (720)',
   !!head && /Leftover chilli/.test(head.name ?? '') && /^610(?!\d)/.test(head.kcal) && !/720/.test(head.kcal), head)
 
+// NO SWAP ON A MEAL ALREADY EATEN (whole-app QA walk, 7 Nov 2026): the log is what the day shows, so a swap changed
+// nothing she could see except re-sizing the rest of her day.
+const swapTab = await ev(`(() => { const sh = document.querySelector('[data-meal-sheet="lunch"]'); if (!sh) return 'no-sheet'; return [...sh.querySelectorAll('button')].some(b => /^Swap\\b/.test(b.textContent.trim())) })()`)
+check('6c. the eaten lunch\'s sheet offers no Swap', swapTab === false, swapTab)
+// ...where an uneaten meal's sheet, on the same page, does (the fixture binds: "More options" is there for every meal).
+await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`); await wait(600)
+await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /Salmon, new potatoes/.test(x.textContent||'')); if (b) b.click(); return !!b })()`)
+await wait(1200)
+const dinnerSwap = await ev(`(() => { const sh = document.querySelector('[data-meal-sheet="dinner"]'); if (!sh) return 'no-sheet'; return [...sh.querySelectorAll('button')].some(b => /^Swap\\b/.test(b.textContent.trim())) })()`)
+check('6d. ...while the uneaten dinner\'s sheet does offer Swap (the check binds)', dinnerSwap === true, dinnerSwap)
+
 await shoot('diary-preservation-expanded')
 
 const err = await ev('window.__err ?? null')

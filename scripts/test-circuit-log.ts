@@ -149,6 +149,8 @@ async function main() {
   check('3 × 30s of push-ups', blockShape({ rounds: 3, workSeconds: 30, restSeconds: 0 }) === '3 × 30s', blockShape({ rounds: 3, workSeconds: 30, restSeconds: 0 }))
   check('5 × 15s on the bike, with its 45s rest', blockShape({ rounds: 5, workSeconds: 15, restSeconds: 45 }) === '5 × 15s, 45s rest', blockShape({ rounds: 5, workSeconds: 15, restSeconds: 45 }))
   check('an EMOM by its interval', blockShape({ rounds: 10, workSeconds: 60, restSeconds: 0, style: 'emom' }) === '10 × every 1 min')
+  // Rest runs only between rounds, so one round names none (whole-app QA walk, 7 Nov 2026: "1 × 10s, 10s rest").
+  check('one round names no rest: there is none after the last', blockShape({ rounds: 1, workSeconds: 10, restSeconds: 10 }) === '1 × 10s', blockShape({ rounds: 1, workSeconds: 10, restSeconds: 10 }))
   check('the timer offers her four blocks by name', ['Skipping rope', 'Push-ups', 'Sit-ups', 'Assault bike'].every(n => (BLOCK_NAMES as readonly string[]).includes(n)), BLOCK_NAMES)
   check('...and never "Intervals"', !(BLOCK_NAMES as readonly string[]).some(n => /interval/i.test(n)))
 

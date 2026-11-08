@@ -1020,7 +1020,10 @@ function MealSlotRow({
 
   const method = option ? methodToShow(option.prep, option.ingredients, methodRules) : ''
   const hasMethod = method.length > 0
-  const canSwap = otherOptions.length > 0 || !!onFindMore
+  // NOT ONCE EATEN (whole-app QA walk, 7 Nov 2026): the log is what the day counts and shows, so a swap changed nothing
+  // she could see except re-sizing the rest of the day around a dish she never ate. Moving a meal to another day and
+  // moving calories between meals already refuse an eaten meal; the coach's swap says the same sentence.
+  const canSwap = !isLogged && (otherOptions.length > 0 || !!onFindMore)
   const kcalShown = Math.round(isLogged ? loggedKcal : (option?.macros.calories ?? 0))
   // THE ROW'S P · C · F (3a) is what its kcal is: what was logged when it was, the plan's dish when not.
   const rowMacros = isLogged

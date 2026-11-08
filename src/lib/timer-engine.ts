@@ -518,7 +518,9 @@ export function roundSubline(config: RoundConfig, phase: 'ready' | 'work' | 'res
 export function blockShape(config: RoundConfig): string {
   const unit = (s: number) => (s >= 60 && s % 60 === 0 ? `${s / 60} min` : `${s}s`)
   if (roundStyleOf(config) === 'emom') return `${config.rounds} × every ${unit(config.workSeconds)}`
-  return `${config.rounds} × ${unit(config.workSeconds)}${config.restSeconds > 0 ? `, ${unit(config.restSeconds)} rest` : ''}`
+  // NO REST NAMED FOR ONE ROUND (whole-app QA walk, 7 Nov 2026): rest only ever runs BETWEEN rounds (the totals above),
+  // so "1 × 10s, 10s rest" described a rest that never happens.
+  return `${config.rounds} × ${unit(config.workSeconds)}${config.restSeconds > 0 && config.rounds > 1 ? `, ${unit(config.restSeconds)} rest` : ''}`
 }
 
 export interface RoundLogSummary {

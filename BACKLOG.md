@@ -50,6 +50,27 @@ Newest first. One line each.
   `test:pace-clock` and `test:nutrition-layout` re-anchored (+2 checks; 2 mutations caught). NOT changed, named: the
   protein line names the unlogged meal holding the most protein (lunch at noon) rather than the overdue breakfast;
   both readings are defensible and it says "still to log", so it is left.
+  (N2) FIXED: a meal already logged as eaten could still be swapped, on the sheet and by the coach. The log is what
+  the day counts and shows, so the swap changed nothing she could see except re-sizing her dinner around a dish she
+  never ate. Moving a meal to another day and moving calories between meals already refuse an eaten meal; swapping now
+  does too: the sheet offers no Swap once eaten, and the coach says the rebalance's existing sentence ("You've already
+  logged today's breakfast as eaten, so it stays as you ate it."). Tomorrow's meals are unaffected. An EDIT to an
+  eaten meal is unchanged (her 2 Nov "Same dishes"). `test:meal-swap-rotation` 6c (5 checks; 4 mutations caught),
+  `verify:diary-preservation` 6c-6d (the first version could not fail: the fixture's meals had nothing to swap to,
+  found by a MISSED mutation; the eaten fixture now has "More options", and 6d proves an uneaten meal's sheet offers
+  Swap; the mutation is now caught).
+  (N13, part) FIXED: the shopping list printed "1000ml" beside "1kg"; millilitres now round like grams, in litres from
+  1,000 ("1L", "~1.2L"), with the stepper reading the same. `test:grocery-display` (+3; 2 mutations caught). NOT
+  changed: lower-case food names (they are the food table's names; capitalising them is cosmetic and touches every
+  reader), the aisle chip cut-off and the "~80g" rice line (both need a screen look).
+  (T14, part) FIXED: a one-round timer block was logged as "1 × 10s, 10s rest", a rest that never runs (rest is only
+  ever between rounds). `test:circuit-log` (+1; mutation caught).
+  FULL SWEEP on `38ab0efe` (503): 498 passed; the five failures were the three that cannot reach a database
+  (`test:meal-quality`, `test:schema-parity`, `verify:rls`), `test:coach-exam-fresh` (the coach changed since the last
+  exam, by design until it is re-run on her machine), and `verify:live-set-count`, the third driver found ticking
+  movement prep as if it were a working set (after `verify:cardio-shows` and `verify:chat-2b`). Each exercise card now
+  says whether it is movement prep (`data-movement-prep`), and that driver ticks the first working card. 49 derived
+  gates and drivers green after this batch.
 - [x] **WHOLE-APP QA WALK, TRAINING: EIGHT DEFECTS FOUND AND FIXED, 7 NOV 2026** (Ashley: "I want you to test and fix",
   then "Keep testing and keep fixing"). Five testers walked the app at phone size against the browser harness; each
   finding was re-measured on a real screen before it was fixed. Found by me, none reported by her. Each fix has its

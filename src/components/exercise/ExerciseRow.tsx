@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isMovementPrepRow } from '@/lib/session-duration'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ArrowDown, ArrowRightLeft, ArrowUp, Ban, BookOpen, History, Info, MoreVertical, Trash2 } from 'lucide-react'
@@ -187,7 +188,7 @@ export function ExerciseRow({
     // same ⋮ as the open card — every change to an exercise lives in it (her
     // 14 Sep ruling), so it is on every row, not only the open one.
     return (
-      <div data-exercise-name={ex.name} className={allSetsLogged ? 'opacity-80' : undefined}>
+      <div data-exercise-name={ex.name} data-movement-prep={isMovementPrepRow(ex) ? '' : undefined} className={allSetsLogged ? 'opacity-80' : undefined}>
         <ExerciseLine
           ex={ex}
           supersetLabel={supersetLabel}
@@ -218,6 +219,9 @@ export function ExerciseRow({
   return (
     <div
       data-exercise-name={ex.name}
+      // Movement prep is a warm-up, never a working set (the counts' rule, isMovementPrepRow): said on the card so a
+      // check that ticks "a working set" can find one without guessing.
+      data-movement-prep={isMovementPrepRow(ex) ? '' : undefined}
       data-exercise-open
       className="relative overflow-clip rounded-[20px] px-3 pb-2 pt-3.5"
       style={{ background: 'var(--surface-raised)', border: '1px solid rgba(var(--glow-rgb), .22)' }}

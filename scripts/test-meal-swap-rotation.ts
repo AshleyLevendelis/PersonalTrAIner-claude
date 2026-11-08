@@ -198,6 +198,27 @@ console.log('\n6b. "Swap my breakfast" with no dish named (whole-app QA walk, 7 
   check('the chat hands the swap what each day serves', /servedByDate: \{/.test(src))
 }
 
+console.log('\n6c. A meal already eaten is not swapped (whole-app QA walk, 7 Nov 2026)')
+{
+  // The log is what the day counts and shows; a swap of an eaten meal changed nothing she could see except re-sizing
+  // her dinner around a dish she never ate. Moving it to another day and moving its calories already refuse.
+  const { buildMealSwapProposal } = await import('../src/lib/meal-swap-proposal')
+  const { REBALANCE } = await import('../src/lib/coach-voice')
+  const today = '2026-11-07'
+  const eaten = await buildMealSwapProposal({ rawArgs: { meal_slot: 'Breakfast' }, profileId: 'p', today, eatenSlotsToday: ['breakfast'] })
+  check('today\'s eaten breakfast is not swapped, in the sentence moving it already says',
+    !eaten.ok && eaten.reason === REBALANCE.refusals.eaten('breakfast'), eaten.ok ? eaten.payload : eaten.reason)
+  const other = await buildMealSwapProposal({ rawArgs: { meal_slot: 'breakfast' }, profileId: 'p', today, eatenSlotsToday: ['lunch'] })
+  check('...while an uneaten one still swaps', other.ok, other.ok ? '' : other.reason)
+  const upcoming = await buildMealSwapProposal({ rawArgs: { meal_slot: 'breakfast', date: '2026-11-08' }, profileId: 'p', today,
+    eatenSlotsToday: ['breakfast'], upcomingDays: [{ date: '2026-11-08', dayName: 'Sunday' }] })
+  check('...and tomorrow\'s breakfast is not today\'s', upcoming.ok, upcoming.ok ? '' : upcoming.reason)
+  const chat = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
+  check('the chat hands the swap today\'s eaten meals', /eatenSlotsToday: await slotsEatenToday\(\)/.test(chat))
+  const screen = readFileSync(join(ROOT, 'src/components/MealPlan.tsx'), 'utf8').replace(/\/\/.*$/gm, '')
+  check('the Nutrition sheet offers no Swap on an eaten meal', /const canSwap = !isLogged && \(/.test(screen))
+}
+
 console.log('\n7. Finding new options ADDS, it never replaces')
 {
   // persistPools deletes a slot's rows before inserting. Reaching for it here

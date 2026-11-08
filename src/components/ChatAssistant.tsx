@@ -2259,6 +2259,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     } catch { return false }
   }
 
+  /** Every meal of today's already logged as eaten. An unreadable ledger reads as none, as slotEatenToday does. */
+  const slotsEatenToday = async (): Promise<string[]> => {
+    if (!profile?.id || !macros) return []
+    try {
+      const logged = loggedEventsBySlot((await getTodayLedger(profile.id, getSessionDateContext(profile.id).date, macros)).events)
+      return Object.keys(logged).filter(s => (logged[s as MealSlotName]?.length ?? 0) > 0)
+    } catch { return [] }
+  }
+
   /** The knock-on trial for a meal card, or null when there is none to run or it failed (the card then says it could not check). */
   const mealKnockOn = async (payload: MealAdditionPayload) => {
     if (!onMealKnockOn) return null
@@ -5745,6 +5754,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           dietaryPreferences: profile.dietary_preferences ?? [],
           today: getSessionDateContext(profile.id).date,
           upcomingDays: (upcomingMeals ?? []).map(d => ({ date: d.date, dayName: d.dayName })),
+          eatenSlotsToday: await slotsEatenToday(),
           servedByDate: {
             [getSessionDateContext(profile.id).date]: Object.fromEntries(mealPlan.map(m => [m.meal.toLowerCase(), m.items[0]?.name ?? ''])),
             ...Object.fromEntries((upcomingMeals ?? []).map(d => [d.date, d.meals])),
