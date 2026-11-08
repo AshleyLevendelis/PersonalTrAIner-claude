@@ -2,6 +2,11 @@
 
 Newest first. One line each.
 
+- [x] **A REMOVAL OFFER'S DECLINE SAID "KEEP 7 EXERCISES", 8 NOV 2026** (QA round 3, chat finding 7). Mechanical: his
+  31 Oct "Mix" ruling has the decline name what he keeps ("Keep Leg Extensions"). The coach's removal offer built its
+  one row from counts ("7 exercises → 6 exercises"), so the preview named nothing and the decline read "Keep 7
+  exercises". The row is now the exercise itself, going ("Leg Extensions → removed"). CHECKS: `test:offer-text` (+2).
+  Mutations: 1 of 1 caught. The screen was driven after the full sweep finished (it holds the browser ports).
 - [x] **"BREAKFAST CAME TO 0 KCAL LESS THAN PLANNED, SO DINNER AND SNACK ARE 1% SMALLER", 8 NOV 2026** (QA round 3,
   meals finding 11). Mechanical: a false reason. When the rest of a day is re-fitted around what was eaten, the line
   named the eaten meal as the cause even when it came to exactly what was planned; the re-fit was then for the day's

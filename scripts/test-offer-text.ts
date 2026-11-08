@@ -108,6 +108,14 @@ console.log('\n§4 The offer is the coach\'s bubble, with nothing of the card')
   check('no "Proposed change" heading and no "Keep" button anywhere it can print', !printed.some(t => /Proposed change/i.test(t) || t === 'Keep'), printed.filter(t => /Proposed change|^Keep$/i.test(t)))
   // RE-ANCHORED 31 Oct 2026, her "Mix": the decline is said by rejectLabel, which names what she keeps on a scoped
   // exercise offer ("Keep RDL") and is "Not now" everywhere else. Still never a bare "Keep".
+  // A REMOVAL NAMES THE EXERCISE (8 Nov 2026, QA round 3): its row was "7 exercises → 6 exercises", so the decline read
+  // "Keep 7 exercises". The row is built from the exercise, and so the decline names it.
+  {
+    const { rejectLabel, offerChanges: oc } = await import('../src/lib/offer-text')
+    const removeBuild = chat.slice(chat.indexOf("lead: ask(`take **${target.exerciseName}** out of"), chat.indexOf("lead: ask(`take **${target.exerciseName}** out of") + 400)
+    check('a removal\'s row is the exercise itself, going', /rows: \[\{ field: on\.sayDay, before: target\.exerciseName, after: '— removed' \}\]/.test(removeBuild), removeBuild.slice(0, 200))
+    check('...so its decline is "Keep Leg Extensions", never "Keep 7 exercises"', rejectLabel(oc([{ field: 'Wednesday', before: 'Leg Extensions', after: '— removed' }]), true) === 'Keep Leg Extensions')
+  }
   {
     const { rejectLabel, offerChanges: oc } = await import('../src/lib/offer-text')
     const swapOne = oc([{ field: 'Exercise', before: 'RDL', after: 'Hip Thrust' }])

@@ -3088,7 +3088,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       preImage: mesocycle,
       diff: {
         lead: ask(`take **${target.exerciseName}** out of ${on.sayDay}`),
-        rows: [{ field: on.sayDay, before: `${day.exercises.length} exercises`, after: `${day.exercises.length - 1} exercises` }],
+        // THE EXERCISE, NOT A COUNT (8 Nov 2026, QA round 3): "7 exercises → 6 exercises" named nothing, and the decline
+        // read "Keep 7 exercises" where his 31 Oct "Mix" ruling has it name what he keeps ("Keep Leg Extensions").
+        rows: [{ field: on.sayDay, before: target.exerciseName, after: '— removed' }],
         unchanged: [`Everything else on ${on.sayDay}`],
         implications: [
           { severity: 'info', text: 'The session gets shorter. Weights on the rest of it are re-checked when you confirm.' },
