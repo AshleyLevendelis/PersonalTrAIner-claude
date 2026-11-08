@@ -561,10 +561,15 @@ export function ActiveSessionProvider({
     // the other end: the app must not record work off an action that logged
     // nothing.
     if (!result) return null
+    // A SET AFTER FINISH IS ADDED TO THE FINISHED SESSION — her ruling 8 Nov 2026, "Add to it" (over reopening it and
+    // over asking each time). A forgotten set is a correction, not a new workout: the day stays Done on every screen
+    // and its count goes up. It used to reopen the session here while Home went on saying Done.
+    if (statusRef.current === 'finished') {
+      refresh()
+      return result
+    }
     // Forgiving by design: a logged set with no session open silently opens
-    // one, starting now (there is no earlier moment to recover). Also
-    // transparently reopens a session the user had already explicitly
-    // finished, if they keep logging afterward — keeping the start it had.
+    // one, starting now (there is no earlier moment to recover).
     //
     // THE SAME STAMP THE BUTTON MAKES (sessionStartStamp), and mirrored into
     // state. This wrote the start time to storage only, so the dock's clock —

@@ -67,6 +67,11 @@ const tapSelector = async sel => {
   if (at) { await pointAt(at); await wait(700) }
   return !!at
 }
+const tapSelectorExpr = async expr => {
+  const at = await ev(`(() => { const n = ${expr}; if (!n) return null; n.scrollIntoView({ block: 'center' }); const r = n.getBoundingClientRect(); return r.width ? { x: r.x + r.width / 2, y: r.y + r.height / 2 } : null })()`)
+  if (at) { await pointAt(at); await wait(700) }
+  return !!at
+}
 let load = 0
 const open = async (query, tab) => {
   load++
@@ -91,6 +96,26 @@ check('T1a. the Exercise hero offers no "Start session" on a day the server hold
 check('T1b. ...it shows the day as finished instead', t1.finished === true, t1)
 check('T1c. ...and the saved session keeps its time', t1.minutes.length > 0 && t1.minutes.every(m => m > 1), t1.minutes)
 await shoot('qa-t1-done-day')
+
+console.log('\nT2. A set logged after Finish is added to the finished day, which stays Done (her ruling 8 Nov 2026, "Add to it")\n')
+// The same finished day as T1. She forgot one set and ticks it now.
+const workTick2 = `[...document.querySelectorAll('[data-exercise-name]:not([data-movement-prep]) button[aria-label^="Save set "]')][0]`
+const setsBefore = await ev(`(window.__fakeDb?.exercise_set_logs || []).length`)
+// The fixture's day was finished with every set saved, so she adds the one she forgot ("Add set") and ticks it.
+await tapSelectorExpr(`[...document.querySelectorAll('[data-exercise-name]:not([data-movement-prep])')][1]?.querySelector('[role="button"]')`)
+await wait(800)
+await tapSelectorExpr(`[...(document.querySelector('[data-exercise-open]')?.querySelectorAll('button') ?? [])].find(b => b.textContent.trim() === 'Add set')`)
+await wait(800)
+const t2tapped = await tapSelectorExpr(workTick2)
+await wait(1200)
+const t2 = await ev(`(() => ({
+  sets: (window.__fakeDb?.exercise_set_logs || []).length,
+  finished: !!document.querySelector('[data-testid="session-finished"]'),
+  finishBtn: [...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Finish session'),
+  start: !!document.querySelector('[data-testid="hero-start"]'),
+}))()`)
+check('T2a. the set is saved', t2tapped && t2.sets === setsBefore + 1, { t2tapped, before: setsBefore, after: t2.sets })
+check('T2b. ...and the day stays finished: no "Finish session" (it did not reopen), no "Start session"', t2.finished === true && t2.finishBtn === false && t2.start === false, t2)
 
 console.log('\nT9. A day she swapped for something else: Home says so and offers no Start\n')
 await open('swapped=1', 'dashboard')

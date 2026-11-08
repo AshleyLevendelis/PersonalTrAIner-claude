@@ -2,6 +2,13 @@
 
 Newest first. One line each.
 
+- [x] **A SET LOGGED AFTER FINISH IS ADDED TO THE FINISHED DAY; HER RULING "ADD TO IT", 8 NOV 2026** (QA walk T2,
+  asked as one question with three options: add it to the finished workout, my recommendation; reopen the workout
+  until Finish is tapped again; or ask each time). Before: a set ticked after Finish quietly reopened the session on
+  Exercise ("Finish session" back) while Home still said Done. Now the set is saved to the finished day, which stays
+  Done on every screen, and its set count goes up (every count reads the logs). The session's saved time is untouched.
+  `verify:qa-training` T2 (2 checks: the finished day, "Add set", tick; mutation caught). 18 derived gates and drivers
+  green. CSCS: none (how a log is recorded, not what is prescribed).
 - [x] **WHOLE-APP QA WALK, CHAT AND NUTRITION WORDING: THREE SENTENCES THAT READ WRONG, 7 NOV 2026** (her "keep
   testing and keep fixing"; found by the walk, none reported by her). (N10) The hello listed a session as "Pull-Ups,
   Rows, Shrugs.... Feeling good for it?": a hand-built "..." met the sentence's own full stop, in three places. One

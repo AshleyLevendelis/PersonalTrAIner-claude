@@ -549,6 +549,8 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   nothing else. It does now, through the shared tail
 - Change its sets, reps or weight for today — via logging only (extra sets,
   typed numbers); the plan itself is not edited
+- **A set logged after Finish is added to the finished day: her ruling 8 Nov 2026, "Add to it"** (over reopening the
+  workout and over asking each time). The day stays Done everywhere and its count goes up. `verify:qa-training` T2
 - **Log the build-up as well as the working sets** — `screen only`, since
   17 Sep 2026. Ashley's ruling that day, from three options, standing in the
   gym: **a box for every set, labelled** — Warm-up 1, 2, 3 then Set 1, 2, 3,
