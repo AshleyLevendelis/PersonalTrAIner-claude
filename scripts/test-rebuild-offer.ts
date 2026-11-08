@@ -239,6 +239,19 @@ console.log('\n2. And nothing else does')
     { training_days: [{ day: 'Tuesday', available: true }, { day: 'Monday', available: true }] } as Partial<UserProfile>)
   check('...but re-saving the same days in another order does not', reordered === null, reordered)
 
+  // QA round 2, 8 Nov 2026: a week with NO training day was offered a rebuild, and the rebuild crashed on Home.
+  const noDays = detectPlanInvalidation(
+    base({ training_days: [{ day: 'Monday', available: true }, { day: 'Tuesday', available: true }] }),
+    { training_days: [{ day: 'Monday', available: false }, { day: 'Tuesday', available: false }] } as Partial<UserProfile>)
+  check('a week with no training day left is never offered a rebuild', noDays === null, noDays)
+
+  // The equipment sentence follows which way the kit moved (QA round 2): more kit is not "equipment you do not have".
+  const gainedKit = detectPlanInvalidation(base({ equipment_access: 'home_gym' }), { equipment_access: 'full_gym' })
+  check('gaining kit says the plan leaves out what you can now do',
+    !!gainedKit && /less kit than you have now/.test(gainedKit.detail) && !/do not have/.test(gainedKit.detail), gainedKit?.detail)
+  const lostKit = detectPlanInvalidation(base({ equipment_access: 'full_gym' }), { equipment_access: 'home_gym' })
+  check('...while losing kit still says it asks for equipment you do not have', !!lostKit && /do not have/.test(lostKit.detail), lostKit?.detail)
+
   const styleChanged = detectPlanInvalidation(base(), { training_style: 'bodybuilding' })
   check('changing training style offers a rebuild', styleChanged?.field === 'training_style', styleChanged)
   check('...and says the exercises and rep ranges change, not just a label',

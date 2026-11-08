@@ -3478,6 +3478,11 @@ function App() {
       <Suspense fallback={null}>
       <ProfileScreen
         exercisePlan={exercisePlan}
+        planBan={{
+          mesocycle,
+          loadGuard: () => loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at).then(c => c.isProtected),
+          ban: handleBanExercise,
+        }}
         open={profileInfoOpen}
         onOpenChange={setProfileInfoOpen}
         profile={profile}

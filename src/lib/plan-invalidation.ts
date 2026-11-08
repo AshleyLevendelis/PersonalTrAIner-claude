@@ -181,7 +181,9 @@ export function detectPlanInvalidation(
   if ('training_days' in patch) {
     const dayKey = (days: UserProfile['training_days'] | undefined) =>
       (days ?? []).filter(d => d.available).map(d => d.day).sort().join('|')
-    if (dayKey(before.training_days) !== dayKey(patch.training_days)) {
+    // No plan can be built around zero days, so a week with none is never offered a rebuild (QA round 2, 8 Nov 2026:
+    // it was, and the rebuild crashed on Home). The Profile editor keeps the last day ticked; this is the backstop.
+    if (dayKey(patch.training_days) !== '' && dayKey(before.training_days) !== dayKey(patch.training_days)) {
       return {
         field: 'training_days',
         title: 'Rebuild your plan around these days?',
@@ -194,13 +196,20 @@ export function detectPlanInvalidation(
   }
 
   if ('equipment_access' in patch && patch.equipment_access !== before.equipment_access) {
+    // WHICH WAY THE KIT MOVED (QA round 2, 8 Nov 2026): the one sentence said "it still asks for equipment you have
+    // just told me you do not have" to someone who had just said they have MORE. Ordered from most kit to least.
+    const RANK: Record<string, number> = { full_gym: 3, home_gym: 2, minimalist: 1, bodyweight: 0 }
+    const gained = (RANK[patch.equipment_access ?? ''] ?? 0) > (RANK[before.equipment_access ?? ''] ?? 0)
     return {
       field: 'equipment_access',
       title: 'Rebuild your plan for this equipment?',
-      detail:
-        'Your current plan was built for what you had before, so it still asks for equipment ' +
-        'you have just told me you do not have. I can rebuild it from this week onwards. ' +
-        'Everything you have already logged stays exactly as it is.',
+      detail: gained
+        ? 'Your current plan was built for less kit than you have now, so it leaves out exercises ' +
+          'you can do. I can rebuild it from this week onwards to use what you have. ' +
+          'Everything you have already logged stays exactly as it is.'
+        : 'Your current plan was built for what you had before, so it still asks for equipment ' +
+          'you have just told me you do not have. I can rebuild it from this week onwards. ' +
+          'Everything you have already logged stays exactly as it is.',
     }
   }
 

@@ -44,6 +44,8 @@ import { compileKitStatements, kitFactsIn } from '@/lib/fact-compiler'
 import type { UserFactRow } from '@/lib/memory-store'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { planDaysInWindow } from '@/lib/plan-guard'
+import { banOnScreen } from '@/lib/screen-ban'
+import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import { AppearanceProvider } from '@/hooks/useAppearance'
 import type { UserProfile, MesocycleWeek } from '@/lib/types'
 import { setDevClockOverride } from '@/lib/dev-clock'
@@ -189,6 +191,7 @@ function Harness() {
   // stale screen. real.tsx makes the same move for its mesocycle.
   const [profile, setProfile] = useState<UserProfile>(baseProfile)
   const [mesocycle, setMesocycle] = useState<MesocycleWeek[]>(MESO)
+  ;(window as unknown as { __meso: MesocycleWeek[] }).__meso = mesocycle
   const [receipt, setReceipt] = useState<string | null>(null)
   // App holds this in a dialog; here it is a plain element, for the same
   // reason the receipt is: this page reproduces App's plumbing so the SCREEN
@@ -262,6 +265,12 @@ function Harness() {
         })()}
         <ProfileScreen
           exercisePlan={mesocycle[0].days}
+          // App's ban, through the app's own function (screen-ban.ts); __meso lets a driver read what the plan holds.
+          planBan={{
+            mesocycle,
+            loadGuard: () => loadPlanEditContext(shown, mesocycle, shown.created_at).then(c => c.isProtected),
+            ban: name => banOnScreen({ profile: shown, mesocycle, exerciseName: name, exclusions: [], planCreatedAt: shown.created_at, show: m => { setMesocycle(m); (window as unknown as { __meso: MesocycleWeek[] }).__meso = m }, reloadMemory: async () => { setFacts(readFacts()) } }),
+          }}
           open={open}
           onOpenChange={setOpen}
           profile={shown}

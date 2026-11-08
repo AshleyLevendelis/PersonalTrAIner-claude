@@ -1855,6 +1855,7 @@ export function TodayPanel({
         profileId={profileId}
         onMesocycleUpdated={onMesocycleUpdated}
         onPutBack={() => { weekTrain.refresh(); onLogsUpdated?.() }}
+        loggedToday={loggedWorkingToday}
         bottom={`calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockHeightPx > 0 ? dockHeightPx + 12 : 0}px + ${
           !peekWorkout && !isRestDay && !isActiveRecovery && workout && (status === 'running' || (status === 'idle' && !heroStartInView)) ? 96 : 12
         }px)`}

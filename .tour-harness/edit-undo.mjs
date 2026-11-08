@@ -175,6 +175,39 @@ check('4a. two changes in a row show one line, for the newer one', !!opened4b &&
 await wait(9000)
 check('4b. the line has gone after a few seconds', !(await has('[data-testid="screen-edit-undo-line"]')))
 
+// --- 5. QA ROUND 2 (8 Nov 2026) ----------------------------------------------------
+console.log('\n5. The line stays gone, and a set logged since refuses the Undo\n')
+// The 8 seconds ran inside the component, so every return to the tab mounted a fresh line for the same change.
+await tripTab()
+await wait(1200)
+check('5a. after its seconds are up, a trip away and back does not bring the line back', !(await has('[data-testid="screen-edit-undo-line"]')), await lineText())
+// Left within its seconds and back after them: the line must not start its 8 seconds again on the return.
+const before5a = (await order()) ?? []
+const opened5a = (await openRowMenu(before5a[0])) === 'open' && await tap('[data-testid="move-down"]')
+await untilOrder(o => !!o && o.join('|') !== before5a.join('|'))
+const shown5a = await until(lineText, 10)
+await ev(`location.hash = '#/tab/home'`); await wait(9500); await ev(`location.hash = '#/tab/exercise'`); await wait(2500)
+check('5a2. a line left before its seconds were up is gone when you come back after them', !!opened5a && !!shown5a && !(await has('[data-testid="screen-edit-undo-line"]')), { shown5a, now: await lineText() })
+// A change, then a set logged, then Undo: the day is not as the change left it, so nothing is put back.
+const before5 = (await order()) ?? []
+const opened5 = (await openRowMenu(before5[before5.length - 1])) === 'open' && await tap('[data-testid="move-up"]')
+const moved5 = await untilOrder(o => !!o && o.join('|') !== before5.join('|'))
+check('5b. a move happened (the fixture binds)', !!opened5 && !!moved5 && moved5.join('|') !== before5.join('|'), { before5, moved5 })
+const workTick = `[...document.querySelectorAll('[data-exercise-name]:not([data-movement-prep]) button[aria-label^="Save set "]')][0]`
+const openWork = `[...document.querySelectorAll('[data-exercise-name]:not([data-movement-prep])')][0]?.querySelector('[role="button"]')`
+const clickAt = async expr => { const r = await ev(`(() => { const n = ${expr}; if (!n) return null; n.scrollIntoView({ block: 'center' }); const b = n.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 } })()`); if (!r) return false; await wait(150); for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 }); return true }
+if (await has('[data-testid="start-bar"] button')) { await tap('[data-testid="start-bar"] button'); await wait(900) }
+if (!(await ev(`!!${workTick}`))) { await clickAt(openWork); await wait(600) }
+const ticked = await clickAt(workTick)
+await wait(900)
+const loggedNow = await ev(`(window.__fakeDb?.exercise_set_logs ?? []).filter(l => !l.is_warmup).length`)
+check('5c. a working set was logged after the change (the fixture binds)', !!ticked && loggedNow > 0, { ticked, loggedNow })
+check('5d. tapping Undo...', await tapFixed('[data-testid="screen-edit-undo"]'))
+const t5 = await until(async () => { const x = await lineText(); return x && /logged a set/.test(x) ? x : null }, 12)
+check('5e. ...refuses, saying a set has been logged since', t5 === "You've logged a set since, so nothing was changed.", await lineText())
+check('5f. ...and the order is still the moved one, on screen and saved', (await order())?.join('|') === moved5?.join('|') && await savedAs(moved5 ?? ['NONE']), { now: await order(), moved5 })
+await shoot('edit-undo-5-logged')
+
 console.log(`\n${ran} checks ran`)
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASSED')
 chrome.kill(); server.close(); ws.close()

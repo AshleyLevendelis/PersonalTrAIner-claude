@@ -30,7 +30,7 @@
 // third thing for someone to get wrong.
 // ---------------------------------------------------------------------------
 import type { MesocycleWeek, Exercise, UserProfile, ExerciseTier } from './types'
-import type { ExerciseEntry } from './exercise-db'
+import { getExerciseEntry, type ExerciseEntry } from './exercise-db'
 import type { LoadPrescription } from './load-prescription'
 import { settleWeek } from './settle-week'
 import { applyReplacement, type SwapScope } from './mesocycle-edit'
@@ -60,6 +60,20 @@ function targetWeekNumbers(mesocycle: MesocycleWeek[], weekNumber: number, scope
   return mesocycle
     .filter(w => w.block_number === current.block_number && w.week_number >= weekNumber)
     .map(w => w.week_number)
+}
+
+/**
+ * THE SAME SLOT IN A LATER WEEK (QA round 2, 8 Nov 2026). The block rotates a slot through variants of one movement
+ * (Dumbbell Curls in week 2, Hammer Curls in weeks 3-4), so "Whole block" removal, which checked the NAME, took the slot
+ * out of this week only while saying it was gone for the block; the swap, which goes by position, did replace it. The
+ * position must hold the same movement: the same name, or a variant of it (one catalogue substitution group). A
+ * different movement at that index is never removed.
+ */
+function sameSlot(slot: Exercise, target: Exercise): boolean {
+  if (slot.name === target.name) return true
+  const a = getExerciseEntry(slot.name)?.substitution_group
+  const b = getExerciseEntry(target.name)?.substitution_group
+  return !!a && a === b
 }
 
 export interface RemoveExerciseParams {
@@ -104,7 +118,7 @@ export function removeExerciseFromSession(params: RemoveExerciseParams): Session
     // to a different exercise, and removing whatever happens to sit at index 3
     // is not what anyone asked for.
     const slot = d?.exercises[exIndex]
-    if (!d || !slot || slot.name !== target.name) return w
+    if (!d || !slot || !sameSlot(slot, target)) return w
     if (d.exercises.length - 1 < MIN_EXERCISES_PER_SESSION) return w
     changed = true
     const trimmed = { ...d, exercises: d.exercises.filter((_, i) => i !== exIndex) }
@@ -410,6 +424,14 @@ export function reorderWithSupersets(exercises: Exercise[], fromIndex: number, t
   // front (<=); moving UP it does not (<). Getting this backwards lands a
   // downward move one short — the off-by-one the gate caught.
   const down = toIndex > fromIndex
+  // A SUPERSET IN THE WAY IS STEPPED OVER WHOLE (QA round 2, 8 Nov 2026): "Move later" on the exercise in front of a
+  // pair landed it BETWEEN A1 and A2 in the saved plan, while the card, which draws a pair together, looked right.
+  // The destination is widened to the far edge of the block it falls in, so a move passes the pair, never splits it.
+  const destLetter = exercises[toIndex]?.superset_label?.[0]
+  if (destLetter && destLetter !== letter) {
+    const destBlock = exercises.map((ex, i) => (ex.superset_label?.[0] === destLetter ? i : -1)).filter(i => i >= 0)
+    toIndex = down ? Math.max(...destBlock) : Math.min(...destBlock)
+  }
   const at = restIdx.filter(i => (down ? i <= toIndex : i < toIndex)).length
   const next = [...rest.slice(0, at), ...block, ...rest.slice(at)]
   if (next.every((ex, i) => ex === exercises[i])) return null

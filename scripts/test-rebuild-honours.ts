@@ -221,7 +221,7 @@ async function main() {
     check('ending never reports success when it could not run', !/return null\s*\n\s*setEndingAdaptationId/.test(end) && /if \(endingAdaptationId\) return '/.test(end))
     const fn = code('supabase/functions/chat-gemini/index.ts')
     check('the coach is told its tool ends a temporary change early', /'end the two-week knee adjustment early'\) is ENDED TODAY/.test(fn) && /Never answer "I couldn't find that" for this/.test(fn))
-    check('an undone card says so, not the old title', /title: RECEIPTS_UNDONE\.title, rows: \[\{ label: RECEIPTS_UNDONE\.label, detail: RECEIPTS_UNDONE\.detail\(m\.receipt\.title\) \}\]/.test(chat) && RECEIPTS_UNDONE.detail('Rescheduled') === 'Rescheduled was taken back. Everything is as it was before.')
+    check('an undone card says so, not the old title', /title: RECEIPTS_UNDONE\.title, rows: \[\{ label: RECEIPTS_UNDONE\.label, detail: RECEIPTS_UNDONE\.detail\(m\.receipt\.title\) \}\]/.test(chat) && RECEIPTS_UNDONE.detail('Rescheduled') === 'That change was taken back. Everything is as it was before.')
     // RUN 7, M53: an old card's Undo was tapped after its ten minutes; the handler returned with nothing on screen
     // and the card went on reading "Rescheduled". Every way out of the undo now names its outcome.
     const coreAt = chat.indexOf('const undoReceiptCore = async')

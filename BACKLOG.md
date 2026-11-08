@@ -2,6 +2,48 @@
 
 Newest first. One line each.
 
+- [x] **QA ROUND 2, PROFILE AND THE EXERCISE SCREEN'S CHANGES: TWELVE DEFECTS FIXED, 8 NOV 2026** (Ashley: "keep testing
+  and fixing issues"). Three testers walked Profile, Home and Tools, and the Exercise screen's changes with the new Undo
+  line, at 390px on the harness; each finding below was re-measured before it was fixed. Found by the walk, none
+  reported by him. Mechanical except where a CSCS basis is given.
+  PROFILE. (A1) Every training day could be unticked: zero days were stored, a rebuild was offered without its preview,
+  and "Rebuild my plan" put "Cannot read properties of undefined (reading 'exercises')" on Home. The last day now stays
+  ticked with "Your plan needs at least one training day…", and a week with no day is never offered a rebuild (the
+  backstop). The coach's schedule card already refused an empty week. (A2) "Exercises to avoid" wrote the preference and
+  left the exercise in every session, while the ⋮ menu's ban and the coach's both take it out: one wish, two outcomes by
+  door. An avoid the plan holds now opens the ⋮ menu's own "Stop giving you X?" sheet and runs the same ban (typed or
+  picked from "Which … do you mean?"); one the plan does not hold is saved as before. (A4, food path) "mushrooms" and
+  "button mushrooms" were accepted as likes beside "mushroom" on foods to avoid, because the refusal compared names
+  exactly; it now also asks the avoid filter's own matcher and names the entry ("…is caught by "mushroom" on your foods
+  to avoid"). That matcher also catches "pineapple" for "apple": the like is refused because the meal filter would never
+  serve it, and the sentence says which entry caught it. (A5) Gaining kit was told "it still asks for equipment you have
+  just told me you do not have"; more kit now reads "built for less kit than you have now, so it leaves out exercises you
+  can do". (A7) Injury and diet chips were 32px and a list's Add button 28px; all 44px. (A8) A number out of range (500 kg
+  dumbbells, age 12) snapped back silently; it now says the range. (A9) Known lifts showed "Bench 60 kg" with a squat and
+  deadlift stored; it names all three.
+  THE UNDO LINE (my own T7 work, found wanting). (C1) Undo after logging a set on the swapped-in exercise put the old
+  exercise back, filed the set as extra work and pre-filled the old exercise with its numbers; a set logged since the
+  change now refuses ("You've logged a set since, so nothing was changed."). (C2) The line's 8 seconds lived in the
+  component, so every return to the tab showed the same line again, for ever, even past the 10 minutes; the seconds now
+  run from the change and a spent line is let go. (C3) A "Whole block" put-back whose second week failed to save left the
+  first week put back in the database while saying nothing changed; the weeks already written are written again as the
+  change left them, and if even that fails it says only part went back. (C6) The coach card's Undo read "Swapped was
+  taken back"; a bare title now reads "That change was taken back."
+  THE EXERCISE SCREEN. (C4) "Move later" on the exercise in front of a superset landed it BETWEEN A1 and A2 in the saved
+  plan while the card, which draws a pair together, looked right; a move now steps over a pair whole. (C5, CSCS) "Whole
+  block" removal checked the NAME in later weeks, so a slot the block rotates (Dumbbell Curls, then Hammer Curls) was
+  removed this week only while the line said it was gone; it now follows the slot through variants of the same movement
+  (one catalogue substitution group) and still never removes a different movement at that index. CSCS basis: the
+  request was to drop that slot's work for the block, and a rotation is the block's own way of varying one slot; the
+  session floor of three exercises still refuses a removal that would go under it, so no pattern is lost unasked.
+  CHECKS: two existing ones re-anchored to the new behaviour (`test:rebuild-honours` pinned "Rescheduled was taken back"; `verify:setup-answers` 7h now says yes to the ban sheet). `test:screen-edit-undo` (+8; 4 mutations caught), `test:session-edit` (+6; 4 caught), `test:rebuild-offer`
+  (+3; 2 caught), `verify:edit-undo` (+7, 40 checks; 3 caught, and one EQUIVALENT mutant recorded: deleting the "spent
+  line" early return changes nothing visible because the timer's own clear does the same job; the check that binds is
+  the leave-early-come-back-late one, which catches the original bug), new `verify:profile-fixes` (22 checks; 9 of 9
+  caught, one only after the ask-which path got its own check). NOT DONE, named: (A3) changing the goal back to the
+  original offers a rebuild for a plan that already fits (the app does not record what a plan was built for; harmless
+  extra offer); (A6) Experience, Recovery capacity and Conditioning change silently — whether they should offer a
+  rebuild is his to say; (A10) the Reminders row shows no level. The Home and Tools findings (B1-B10) are the next entry.
 - [x] **A DIFFERENT OFFER FOR THE SAME THING REPLACES THE OPEN ONE, 8 NOV 2026** (QA walk N1, the part named as not
   fixed: "old offers stay tappable"). Mechanical. The database holds one open offer per thing (a partial unique index,
   there since Aug). Asking for a different dinner while the first offer was still open was refused by it, and the app

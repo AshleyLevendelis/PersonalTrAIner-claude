@@ -36,6 +36,7 @@ import { describeBalanceCost, weekBalance } from '../src/lib/session-balance-cos
 import { weeksTouchedByScope } from '../src/lib/mesocycle-persistence'
 import { settleWeek } from '../src/lib/settle-week'
 import type { UserProfile, MesocycleWeek, Exercise } from '../src/lib/types'
+import { getExerciseEntry, EXERCISE_DATABASE } from '../src/lib/exercise-db'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -146,23 +147,31 @@ console.log('\n2. Scope reaches the weeks it says, and no others')
     check('...and never the next block', names(block2.mesocycle, otherBlock).join('|') === names(MESO, otherBlock).join('|'))
   }
 
-  // A later week whose slot has rotated to something else must NOT lose that
-  // something else — the index is positional, so the name is checked too.
-  const rotated = laterSameBlock.filter(w => names(MESO, w)[1] !== victim)
-  if (rotated.length > 0) {
-    check('a rotated slot in a later week is left alone, not removed by index',
-      rotated.every(w => names(block2.mesocycle, w).join('|') === names(MESO, w).join('|')), rotated)
-  } else {
-    // Build the case rather than skip it: rename the slot in a later week.
-    const w = laterSameBlock[0]
-    const forged = MESO.map(week => week.week_number !== w ? week : {
-      ...week,
-      days: week.days.map(d => d.day !== DAY ? d : { ...d, exercises: d.exercises.map((e, i) => i === 1 ? { ...e, name: 'Something Else Entirely' } : e) }),
-    })
-    const r = removeExerciseFromSession({ mesocycle: forged, profile, weekNumber: WEEK, dayName: DAY, exIndex: 1, scope: 'permanent' })
-    check('a rotated slot in a later week is left alone, not removed by index',
-      names(r.mesocycle, w).includes('Something Else Entirely'), names(r.mesocycle, w))
-  }
+  // A later week whose slot holds a DIFFERENT MOVEMENT must not lose it — the index is positional, so what sits there
+  // is checked. But a VARIANT of the same movement (the block's rotation: Dumbbell Curls, then Hammer Curls) is the
+  // same slot and goes too (QA round 2, 8 Nov 2026: "Whole block" removal left Hammer Curls in weeks 3-4 while saying
+  // the slot was gone). Both cases are built, so neither depends on what the generator happened to rotate.
+  const w = laterSameBlock[0]
+  const forge = (name: string) => MESO.map(week => week.week_number !== w ? week : {
+    ...week,
+    days: week.days.map(d => d.day !== DAY ? d : { ...d, exercises: d.exercises.map((e, i) => i === 1 ? { ...e, name } : e) }),
+  })
+  const rOther = removeExerciseFromSession({ mesocycle: forge('Something Else Entirely'), profile, weekNumber: WEEK, dayName: DAY, exIndex: 1, scope: 'permanent' })
+  check('a different movement in that slot in a later week is left alone, not removed by index',
+    names(rOther.mesocycle, w).includes('Something Else Entirely'), names(rOther.mesocycle, w))
+  const group = getExerciseEntry(victim)?.substitution_group
+  const variant = EXERCISE_DATABASE.find(e => e.substitution_group === group && e.name !== victim && !e.log_only)?.name
+  check('fixture: the removed exercise has a catalogue variant to rotate to', !!group && !!variant, { victim, group, variant })
+  const rVariant = removeExerciseFromSession({ mesocycle: forge(variant ?? 'NONE'), profile, weekNumber: WEEK, dayName: DAY, exIndex: 1, scope: 'permanent' })
+  // The same name is the same slot even for a lift the catalogue has no group for (an exercise added by name).
+  const custom = MESO.map(week => !laterSameBlock.concat(WEEK).includes(week.week_number) ? week : {
+    ...week,
+    days: week.days.map(d => d.day !== DAY ? d : { ...d, exercises: d.exercises.map((e, i) => i === 1 ? { ...e, name: 'Customer Lift' } : e) }),
+  })
+  const rCustom = removeExerciseFromSession({ mesocycle: custom, profile, weekNumber: WEEK, dayName: DAY, exIndex: 1, scope: 'permanent' })
+  check('the same name in a later week goes too, even with no catalogue group', !names(rCustom.mesocycle, w).includes('Customer Lift'), names(rCustom.mesocycle, w))
+  check('...while a VARIANT of it in that slot is the same slot, and goes too',
+    !!variant && !names(rVariant.mesocycle, w).includes(variant) && names(rVariant.mesocycle, w).length === names(MESO, w).length - 1, names(rVariant.mesocycle, w))
 }
 
 // ---------------------------------------------------------------------------
@@ -339,6 +348,14 @@ console.log('\n4. Moving reorders, and a superset travels as one')
     return !!fromSecond && fromSecond.map(e => e.name).slice(0, 2).join('|') === 'Bench|Row'
   })(), reorderWithSupersets(withPair, 2, 0)?.map(e => e.name))
   check('a no-op reorder returns null rather than a fresh array', reorderWithSupersets([ex('A'), ex('B')], 0, 0) === null)
+  // A SUPERSET IN THE WAY IS STEPPED OVER WHOLE (QA round 2, 8 Nov 2026): "Move later" on the exercise in front of a
+  // pair landed it between A1 and A2. Down one from in front of the pair goes past both; up one from behind it too.
+  const past = reorderWithSupersets(withPair, 0, 1)
+  check('moving one later past a superset steps over the whole pair, never between its halves',
+    past?.map(e => e.name).join('|') === 'Bench|Row|Squat|Curl', past?.map(e => e.name))
+  const earlier = reorderWithSupersets(withPair, 3, 2)
+  check('...and moving one earlier past it does the same',
+    earlier?.map(e => e.name).join("|") === "Squat|Curl|Bench|Row", earlier?.map(e => e.name))
 
   // A MOVE CHANGES NO SET COUNT, ANYWHERE IN THE WEEK (1 Nov 2026, whole-app test #4). Order carries no volume, and
   // the week-balance pass in the shared tail used to rebalance any week it found outside its band: measured, 420 of

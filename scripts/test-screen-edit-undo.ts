@@ -107,7 +107,39 @@ console.log('\n3. It refuses, writing nothing')
   check('a save that fails says so, and keeps the button', !out.ok && out.refusal === RECEIPTS_UNDONE.failed && out.keep === true, out)
 }
 
+console.log('\n3b. QA round 2 (8 Nov 2026): a set logged since, and a put-back that fails midway')
+{
+  const s = saver()
+  const out = await undoScreenEdit(rToday, clone(todayAfter), T0 + 1000, s.save, true)
+  check('a set logged since the change refuses, in its own words, no button, nothing written',
+    !out.ok && out.refusal === RECEIPTS_UNDONE.loggedSince && out.keep === false && s.wrote.length === 0, out)
+  const ok = await undoScreenEdit(rToday, clone(todayAfter), T0 + 1000, saver().save, false)
+  check('...while with nothing logged since it goes ahead (the flag binds)', ok.ok === true, ok)
+}
+{
+  // The second week's save fails: the first week, already put back, is written again as the change left it.
+  const wrote: MesocycleWeek[] = []
+  let calls = 0
+  const save = async (w: MesocycleWeek) => { calls++; if (calls === 2) throw new Error('offline'); wrote.push(w) }
+  const live = clone(blockAfter)
+  const out = await undoScreenEdit(rBlock, live, T0 + 1000, save)
+  const first = blockWeeks[0]
+  const lastWrite = [...wrote].reverse().find(w => w.week_number === first)
+  check('a "Whole block" put-back that fails midway says nothing was changed, button kept',
+    !out.ok && out.refusal === RECEIPTS_UNDONE.failed && out.keep === true, out)
+  check('...and that is TRUE: the week already put back is written again as the change left it',
+    !!lastWrite && json(lastWrite) === json(live.find(w => w.week_number === first)), wrote.map(w => w.week_number))
+}
+{
+  let calls = 0
+  const save = async (_w: MesocycleWeek) => { calls++; if (calls >= 2) throw new Error('offline') }
+  const out = await undoScreenEdit(rBlock, clone(blockAfter), T0 + 1000, save)
+  check('...and when even that fails, it says only part went back', !out.ok && out.refusal === RECEIPTS_UNDONE.halfDone, out)
+}
+
 console.log('\n4. The words')
+check('a coach receipt\'s bare title is not "Swapped was taken back" (QA round 2)', RECEIPTS_UNDONE.detail('Swapped') === 'That change was taken back. Everything is as it was before.', RECEIPTS_UNDONE.detail('Swapped'))
+check('...while a sentence names the change', RECEIPTS_UNDONE.detail('Removed Face Pull.') === 'Removed Face Pull was taken back. Everything is as it was before.')
 check('swap', screenEditText('swap', 'Lat Pulldown', 'Seated Cable Row') === 'Swapped Lat Pulldown for Seated Cable Row.')
 check('remove', screenEditText('remove', 'Face Pull') === 'Removed Face Pull.')
 check('add', screenEditText('add', 'Face Pull') === 'Added Face Pull.')

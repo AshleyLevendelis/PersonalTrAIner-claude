@@ -571,6 +571,14 @@ check('7g. ...with the candidates as buttons to tap, not a question with nothing
 await shoot('setup-answers-6b-exercise-avoid-ask')
 const avoidPicked = ask?.choices?.[0] ?? '@@'
 await ev(`document.querySelector('[data-testid="exercise-avoid-choice"]')?.click()`)
+// AN AVOID THE PLAN HOLDS GOES THROUGH THE BAN (QA round 2, 8 Nov 2026): the ⋮ menu's own sheet asks first, and the
+// tag is the ban's record. Said yes to here; verify:profile-fixes holds the sheet itself.
+if (await until(() => ev(`!!document.querySelector('[data-testid="ban-confirm-yes"]')`), v => v, 12)) {
+  await ev(`document.querySelector('[data-testid="ban-confirm-yes"]')?.click()`)
+  await until(() => ev(`!!document.querySelector('[data-testid="ban-done"]')`), v => v)
+  await ev(`document.querySelector('[data-testid="ban-done"]')?.click()`)
+  await wait(600)
+}
 const tagRead = () => ev(`(() => { const l = [...document.querySelectorAll('span')].find(s => /^Exercises to avoid$/.test((s.textContent||'').trim())); const box = l ? l.parentElement : null; return { tags: [...(box?.querySelectorAll('[data-slot="badge"]') ?? [])].map(b => b.textContent.trim()), input: box?.querySelector('input')?.value ?? null, ask: !!document.querySelector('[data-testid="exercise-avoid-ask"]') } })()`)
 const tagged = (await until(tagRead, v => !!v && v.tags.some(t => t.includes(avoidPicked)) && v.input === '')) ?? { tags: [], input: null, ask: null }
 check('7h. ...tapping one saves THAT exercise as a tag', tagged.tags.some(t => t.includes(avoidPicked)), { avoidPicked, tagged })

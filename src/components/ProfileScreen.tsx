@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { splitFoodList } from '@/lib/food-list'
+import { containsPhrase } from '@/lib/meal-ingredients'
 import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
@@ -56,7 +57,9 @@ import { ActiveAdaptationLines } from '@/components/exercise/ActiveAdaptationLin
 import { activeChangeLines } from '@/lib/effective-constraints'
 import { getAppNow } from '@/lib/dev-clock'
 import { getShopDay, setShopDay, defaultShopDay, DAY_NAMES, type DayName } from '@/lib/shop-day-store'
-import type { UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay, StartPreference, FitnessGoal } from '@/lib/types'
+import type { BanOutcome } from '@/lib/screen-ban'
+import type { DayGuard } from '@/lib/plan-guard'
+import type { MesocycleWeek, UserProfile, TrainingDay, TrainingExperience, EquipmentAccess, TrainingStyle, WorkoutDay, StartPreference, FitnessGoal } from '@/lib/types'
 import { describeActivity } from '@/lib/concurrent-activity'
 import { resolveExerciseName } from '@/lib/set-parse'
 import { resolveExerciseDislike } from '@/lib/fact-compiler'
@@ -69,6 +72,7 @@ import { checkWeighIn, profileWeightQuestionText, weighInYesLabel, WEIGH_IN_NO_L
 // LOADED WHEN PROFILE OPENS, not with the app: the reminders screen and its
 // push plumbing are needed by nobody on first paint (test:bundle holds the
 // main chunk to a budget, and this was the kilobyte that crossed it).
+const BanExerciseSheet = lazyWithReload(() => import('@/components/exercise/BanExerciseSheet').then(m => ({ default: m.BanExerciseSheet })))
 const RemindersSection = lazyWithReload(() => import('@/components/RemindersSection').then(m => ({ default: m.RemindersSection })))
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
@@ -119,6 +123,13 @@ interface ProfileScreenProps {
    * explicit confirm changes a plan.
    */
   onPlanInvalidated?: (invalidation: PlanInvalidation) => void
+  /**
+   * AN EXERCISE TO AVOID THAT IS IN THE PLAN GOES THROUGH THE BAN (QA round 2, 8 Nov 2026). Adding one here wrote the
+   * preference and left every session holding it untouched, while the ⋮ menu's ban and the coach's both take it out:
+   * one wish, two outcomes depending on the door. With this, an add that names an exercise the plan holds opens the
+   * ⋮ menu's own "Stop giving you X?" sheet and runs the same ban; one the plan does not hold is saved as before.
+   */
+  planBan?: { mesocycle: MesocycleWeek[]; loadGuard: () => Promise<DayGuard>; ban: (exerciseName: string) => Promise<BanOutcome | void> }
   /** Temporary changes to the plan running now — listed under Injuries with "End now" (M25). */
   activeAdaptations?: PlanAdaptationRow[]
   endingAdaptationId?: string | null
@@ -241,14 +252,20 @@ function EditableTextField({
      /** Shown when nothing is set — used by Daily steps to display the value the field would take from elsewhere, so an empty box reads as a default rather than a gap. */
      placeholder?: string }) {
   const [input, setInput] = useState(value == null ? '' : String(value))
+  // A NUMBER OUTSIDE THE RANGE SAYS WHY IT WENT BACK (QA round 2, 8 Nov 2026): 500 kg dumbbells or age 12 snapped
+  // back to the old value without a word, which reads as a field that did not take the typing.
+  const [outOfRange, setOutOfRange] = useState(false)
   useEffect(() => { setInput(value == null ? '' : String(value)) }, [value])
   const commit = () => {
     const n = Number(input)
-    if (Number.isFinite(n) && (min == null || n >= min) && (max == null || n <= max) && n !== value) onSave(n)
+    const inRange = Number.isFinite(n) && (min == null || n >= min) && (max == null || n <= max)
+    setOutOfRange(input.trim() !== '' && !inRange)
+    if (inRange && n !== value) onSave(n)
     else setInput(value == null ? '' : String(value))
   }
+  const range = min != null && max != null ? `between ${min} and ${max}` : min != null ? `at least ${min}` : max != null ? `at most ${max}` : ''
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center justify-end gap-1">
       <Input
         type="number"
         value={input}
@@ -270,6 +287,11 @@ function EditableTextField({
         className={placeholder ? 'h-11 w-44 text-sm text-right' : 'h-11 w-20 text-sm text-right'}
       />
       {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
+      {outOfRange && range && (
+        <p role="status" data-testid="number-out-of-range" className="basis-full text-right text-[0.6875rem] text-muted-foreground">
+          That has to be {range}{unit ? ` ${unit}` : ''}, so it wasn't changed.
+        </p>
+      )}
     </div>
   )
 }
@@ -406,7 +428,7 @@ function EditableTagList({
           className="h-11 text-xs flex-1 min-w-0"
           data-testid={inputTestId}
         />
-        <Button size="icon" variant="outline" aria-label="Add" className="size-7 shrink-0" onClick={() => void add()} disabled={!input.trim() || saving}>
+        <Button size="icon" variant="outline" aria-label="Add" className="size-11 shrink-0" onClick={() => void add()} disabled={!input.trim() || saving}>
           <Plus className="size-3.5" />
         </Button>
       </div>
@@ -416,19 +438,31 @@ function EditableTagList({
 
 function TrainingDaysEditor({ days, onSave }: { days: TrainingDay[]; onSave: (next: TrainingDay[]) => void }) {
   const available = days.filter(d => d.available).map(d => d.day)
+  // A plan needs at least one training day (QA round 2, 8 Nov 2026): unticking the last one stored zero days, offered
+  // a rebuild, and the rebuild crashed with a raw error on Home. The last day stays ticked and the screen says why.
+  const [needsOne, setNeedsOne] = useState(false)
   return (
-    <ToggleGroup
-      type="multiple"
-      value={available}
-      onValueChange={(next: string[]) => {
-        onSave(DAY_ORDER.map(day => ({ day, available: next.includes(day) })))
-      }}
-      className="flex-wrap"
-    >
-      {DAY_ORDER.map(day => (
-        <ToggleGroupItem key={day} value={day} className="text-[0.625rem] px-2 h-11 min-w-11">{day.slice(0, 3)}</ToggleGroupItem>
-      ))}
-    </ToggleGroup>
+    <div className="space-y-1.5">
+      <ToggleGroup
+        type="multiple"
+        value={available}
+        onValueChange={(next: string[]) => {
+          if (next.length === 0) { setNeedsOne(true); return }
+          setNeedsOne(false)
+          onSave(DAY_ORDER.map(day => ({ day, available: next.includes(day) })))
+        }}
+        className="flex-wrap"
+      >
+        {DAY_ORDER.map(day => (
+          <ToggleGroupItem key={day} value={day} className="text-[0.625rem] px-2 h-11 min-w-11">{day.slice(0, 3)}</ToggleGroupItem>
+        ))}
+      </ToggleGroup>
+      {needsOne && (
+        <p role="status" data-testid="days-need-one" className="text-[0.75rem] text-muted-foreground">
+          Your plan needs at least one training day. Pick another day first, then untick this one.
+        </p>
+      )}
+    </div>
   )
 }
 
@@ -471,7 +505,7 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, activeAdaptations, endingAdaptationId, onEndAdaptation, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan, backLabel = 'Back', calorieTarget, kit, onEquipmentChoiceChanged }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, activeAdaptations, endingAdaptationId, onEndAdaptation, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan, planBan, backLabel = 'Back', calorieTarget, kit, onEquipmentChoiceChanged }: ProfileScreenProps) {
   // Read once on mount: the store is the owner, this is the control's echo of
   // it. `null` means she has not chosen, which the picker shows as automatic.
   const [shopDayChoice, setShopDayChoice] = useState<string>(() => readShopDayChoice())
@@ -668,8 +702,17 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const [exerciseAvoidAsk, setExerciseAvoidAsk] = useState<{ typed: string; reason: string; candidates: string[] } | null>(null)
   const [exerciseAvoidReset, setExerciseAvoidReset] = useState(0)
   /** The name she tapped, for the word she typed: saved exactly as a resolved add is. */
+  // The exercise whose ban sheet is open (an avoid added here that the plan holds).
+  const [avoidBanTarget, setAvoidBanTarget] = useState<string | null>(null)
+  const planHolds = (name: string) => !!planBan && planBan.mesocycle.some(w => w.days.some(d => d.exercises.some(e => e.name.toLowerCase() === name.toLowerCase())))
   const pickExerciseDislike = async (typed: string, name: string) => {
     if (!profileId) return
+    if (!exerciseDislikeValues.includes(name) && planHolds(name)) {
+      setExerciseAvoidAsk(null)
+      setExerciseAvoidReset(k => k + 1)
+      setAvoidBanTarget(name)
+      return
+    }
     try {
       if (!exerciseDislikeValues.includes(name)) {
         await createFact({
@@ -719,9 +762,12 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       throw new Error('unresolved exercise dislike')
     }
 
+    // One in the plan goes to the ban sheet (planBan above); the sheet's ban records the preference itself.
+    const toBan = resolutions.find(r => planHolds(r.name))
+    const toSave = resolutions.filter(r => r !== toBan)
     try {
       await Promise.all([
-        ...resolutions.map(({ typed, name }) => createFact({
+        ...toSave.map(({ typed, name }) => createFact({
           profileId, kind: 'exercise_preference', source: 'manual',
           rawPhrase: typed, displayText: `won't do ${name}`,
           polarity: 'dislike', hardness: 'hard', resolvedRefs: [name],
@@ -742,6 +788,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     setSaveError(null)
     await reload()
     await onMemoryChanged()
+    if (toBan) { setExerciseAvoidReset(k => k + 1); setAvoidBanTarget(toBan.name) }
   }
 
   /**
@@ -778,6 +825,17 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     if (clash) {
       setLikeRefusal(`${clash} is on your foods to avoid. Take it off that list first if you've changed your mind.`)
       throw new Error('like conflicts with a food to avoid')
+    }
+    // AND THROUGH THE AVOID FILTER'S OWN MATCHER (QA round 2, 8 Nov 2026): "mushrooms" and "button mushrooms" were
+    // accepted beside "mushroom" on foods to avoid, because the check above compares names exactly. The meal filter
+    // matches the word, so such a like could never be served; it is refused, naming the entry that catches it.
+    const avoided = hardFoodDislikeValues
+    for (const v of added) {
+      const by = avoided.find(a => a.trim() && containsPhrase('', [v], a))
+      if (by) {
+        setLikeRefusal(`${v} is caught by "${by}" on your foods to avoid, so it can't be in your meals. Take "${by}" off that list first if you've changed your mind.`)
+        throw new Error('like caught by a food to avoid')
+      }
     }
     setLikeRefusal(null)
     try {
@@ -1021,9 +1079,14 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const nowKg = latestWeightKg != null && latestWeightKg > 0 ? Number(latestWeightKg.toFixed(1)) : profile.weight_kg ?? null
   const goalKg = goals.find(g => g.metric === 'body_weight_kg' && g.status === 'active')?.target_value ?? null
   const availableDays = (profile.training_days ?? []).filter(d => d.available).map(d => d.day.slice(0, 3))
-  const knownLift = profile.known_bench_kg != null ? `Bench ${profile.known_bench_kg} kg`
-    : profile.known_squat_kg != null ? `Squat ${profile.known_squat_kg} kg`
-    : profile.known_deadlift_kg != null ? `Deadlift ${profile.known_deadlift_kg} kg` : 'Not set'
+  // EVERY LIFT KNOWN, not only the first (QA round 2, 8 Nov 2026: "Bench 60 kg" with a squat and deadlift stored too
+  // read as if the bench were the only one). Short names, so three fit the row at phone width.
+  const knownLiftParts = [
+    profile.known_squat_kg != null ? `Squat ${profile.known_squat_kg}` : null,
+    profile.known_bench_kg != null ? `Bench ${profile.known_bench_kg}` : null,
+    profile.known_deadlift_kg != null ? `Deadlift ${profile.known_deadlift_kg}` : null,
+  ].filter((x): x is string => x != null)
+  const knownLift = knownLiftParts.length === 0 ? 'Not set' : `${knownLiftParts.join(' · ')} kg`
   const rememberedCount = grouped.reduce((n, g) => n + g.items.length, 0) + contextFacts.length
   const listOrNone = (xs: string[], none: string) => xs.length === 0 ? none : xs.length <= 2 ? xs.join(', ') : `${xs.slice(0, 2).join(', ')} +${xs.length - 2}`
 
@@ -1247,7 +1310,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 <ToggleGroupItem
                   key={o.value}
                   value={o.value}
-                  className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary-text"
+                  className="h-11 rounded-full border px-3 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary-text"
                 >
                   {o.icon} {o.label}
                 </ToggleGroupItem>
@@ -1479,6 +1542,17 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               <span className="text-muted-foreground">Exercises to avoid</span>
               <p className="text-[0.6875rem] leading-snug text-muted-foreground">Anything you'd rather never see in a session.</p>
               <EditableTagList values={exerciseDislikeValues} onSave={saveDislikedExercises} placeholder="e.g. burpees" resetKey={exerciseAvoidReset} inputTestId="exercise-avoid-input" />
+              {planBan && avoidBanTarget && (
+                <Suspense fallback={null}>
+                  <BanExerciseSheet
+                    exerciseName={avoidBanTarget}
+                    mesocycle={planBan.mesocycle}
+                    loadGuard={planBan.loadGuard}
+                    onConfirm={planBan.ban}
+                    onClose={() => { setAvoidBanTarget(null); void reload().then(() => onMemoryChanged()) }}
+                  />
+                </Suspense>
+              )}
               {exerciseAvoidAsk && (
                 <div className="space-y-2 pt-1" data-testid="exercise-avoid-ask" role="status">
                   <p className="text-xs leading-snug">{exerciseAvoidAsk.candidates.length > 0 ? `Which "${exerciseAvoidAsk.typed}" do you mean?` : exerciseAvoidAsk.reason}</p>
@@ -1518,7 +1592,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   <ToggleGroupItem
                     key={o.value}
                     value={o.value}
-                    className="h-8 rounded-full border px-2.5 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary-text"
+                    className="h-11 rounded-full border px-3 text-[0.6875rem] data-[state=on]:border-primary data-[state=on]:text-primary-text"
                   >
                     {o.icon} {o.label}
                   </ToggleGroupItem>

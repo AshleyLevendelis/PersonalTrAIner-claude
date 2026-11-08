@@ -87,15 +87,32 @@ export async function undoScreenEdit(
   live: MesocycleWeek[],
   now: number,
   save: (week: MesocycleWeek) => Promise<void>,
+  /** True when a set has been logged on the screen since the change (QA round 2): the day is no longer as it was left. */
+  loggedSince = false,
 ): Promise<ScreenUndoOutcome> {
   if (now - record.at > SCREEN_UNDO_WINDOW_MS) return { ok: false, refusal: RECEIPTS_UNDONE.tooLate, keep: false }
+  if (loggedSince) return { ok: false, refusal: RECEIPTS_UNDONE.loggedSince, keep: false }
   if (!undoStillFits(record.after, live, record.weeks)) return { ok: false, refusal: RECEIPTS_UNDONE.changedSince, keep: true }
   const back = record.before.filter(w => record.weeks.includes(w.week_number))
   if (back.length !== record.weeks.length) return { ok: false, refusal: RECEIPTS_UNDONE.cannot, keep: false }
+  // BOTH OR NEITHER (QA round 2, 8 Nov 2026): a "Whole block" put-back writes several weeks, and one failing midway left
+  // the earlier weeks put back in the database while the screen said nothing was changed. The weeks already written
+  // are written again as the change left them (`live`, which undoStillFits has just shown is that), so "nothing was
+  // changed" stays true; if even that fails, the sentence says so.
+  const written: MesocycleWeek[] = []
   try {
-    for (const w of back) await save(w)
+    for (const w of back) { await save(w); written.push(w) }
   } catch (err) {
     console.error('[screen-edit-undo] put-back failed', err)
+    try {
+      for (const w of written) {
+        const asLeft = live.find(l => l.week_number === w.week_number)
+        if (asLeft) await save(asLeft)
+      }
+    } catch (rollbackErr) {
+      console.error('[screen-edit-undo] could not restore the weeks already put back', rollbackErr)
+      return { ok: false, refusal: RECEIPTS_UNDONE.halfDone, keep: true }
+    }
     return { ok: false, refusal: RECEIPTS_UNDONE.failed, keep: true }
   }
   const restored = new Map(back.map(w => [w.week_number, w]))
@@ -115,6 +132,9 @@ export function publishScreenEdit(record: ScreenEditRecord | null): void {
   current = record
   emit()
 }
+
+/** The newest change's id, read outside React (the line's timer), so it clears only its own record. */
+export function currentScreenEditId(): number | null { return current?.id ?? null }
 
 export function useScreenEdit(): ScreenEditRecord | null {
   return useSyncExternalStore(

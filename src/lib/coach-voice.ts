@@ -1226,7 +1226,11 @@ export interface ReceiptTitles {
 export const RECEIPTS_UNDONE = {
   title: 'Put back',
   label: 'Undone',
-  detail: (was: string) => `${was.replace(/[.!]+$/, '')} was taken back. Everything is as it was before.`,
+  // A bare receipt title ("Swapped") is a verb, not a thing that can be taken back (QA round 2, 8 Nov 2026: "Swapped was
+  // taken back"); a sentence ("Swapped Lat Pulldown for Seated Cable Row.") names the change itself.
+  detail: (was: string) => /\s/.test(was.trim())
+    ? `${was.replace(/[.!]+$/, '')} was taken back. Everything is as it was before.`
+    : 'That change was taken back. Everything is as it was before.',
   // AN UNDO THAT DID NOT HAPPEN SAYS SO ON THE CARD (run 7, 15 Oct 2026, M53). Each is a statement of fact: nothing
   // was changed, and whether a second tap can work.
   refusedLabel: "Couldn't undo",
@@ -1236,6 +1240,12 @@ export const RECEIPTS_UNDONE = {
   // IT WAS CHANGED AGAIN SINCE (29 Oct 2026): putting this card's version back would wipe the newer change. The
   // button stays, because undoing the newer change first makes this one fit again.
   changedSince: "It's been changed again since, so nothing was changed. Undo the newer change first.",
+  // A SET LOGGED SINCE (QA round 2, 8 Nov 2026): the day is not as the change left it, and putting the old exercise
+  // back would file the set as extra work and offer its numbers to an exercise that was never done.
+  loggedSince: "You've logged a set since, so nothing was changed.",
+  // Some weeks went back and putting them forward again failed too: the honest state is "partly", and reopening the
+  // app reads what was saved.
+  halfDone: "Only part of that went back, and I couldn't put the rest as it was. Reopen the app to see your plan as saved.",
 } as const
 
 /**
