@@ -2,15 +2,15 @@
 
 Newest first. One line each.
 
-- [x] **AN EXERCISE CHANGED ON THE EXERCISE SCREEN CAN BE PUT BACK, 8 NOV 2026** (QA walk T7; her 2 Nov list "every
-  change previews and can be undone", in the shape of her two 8 Nov "Undo line" rulings, so not asked again). Swapping,
+- [x] **AN EXERCISE CHANGED ON THE EXERCISE SCREEN CAN BE PUT BACK, 8 NOV 2026** (QA walk T7; his 2 Nov list "every
+  change previews and can be undone", in the shape of his two 8 Nov "Undo line" rulings, so not asked again). Swapping,
   removing, moving or adding an exercise on the Exercise screen changed the plan with no way back but doing the opposite
   by hand, while the coach's card for the same change has had an Undo since September (a one-sided capability, rule 4).
   Now each shows one line above the tab bar for eight seconds, "Swapped Lat Pulldown for Seated Cable Row." / "Removed
   Face Pull." / "Moved Face Pull later." / "Added Face Pull.", with Undo. The words are the coach receipts' own
   ("Swapped", "Removed", "Added"), and so is the put-back, rule for rule: it writes back exactly the weeks the change
   wrote (one for "Just today", the rest of the block for "Whole block"), from the plan before it, only while those weeks
-  still read as the change left them (her 29 Oct rule; else the card's "It's been changed again since, so nothing was
+  still read as the change left them (his 29 Oct rule; else the card's "It's been changed again since, so nothing was
   changed"), within the coach's ten minutes, and a failed save says so and keeps the button. The line sits above the
   Start bar or the running log button, never over it. A swap made from the program view gets the same line. The ban
   and the day-wide changes (lighter, a different kind of session) already had their own put-backs and are unchanged.
@@ -21,33 +21,33 @@ Newest first. One line each.
   harness keeps the plan in memory across a tab trip, so a tab trip proves nothing about a save. The driver now reads
   the saved plan from the database the app wrote to. `verify:session-edit` 2e and 5h ("survives leaving the tab") have
   the same blind spot and are named here, not yet changed.
-- [x] **PICKING 3, 7 OR 14 DAYS REBUILDS THE SHOPPING LIST FOR IT; HER RULING "REBUILD AT ONCE", 8 NOV 2026** (QA walk
+- [x] **PICKING 3, 7 OR 14 DAYS REBUILDS THE SHOPPING LIST FOR IT; HIS RULING "REBUILD AT ONCE", 8 NOV 2026** (QA walk
   N5, asked with three options: rebuild at once, my recommendation; a "tap Rebuild" line; leave it). The picker only
   changed its label; the list stayed built from the old number until Rebuild, and nothing said so. Now a NEW number
   rebuilds at once (ticks and hand-added lines stay, as on every rebuild), with the "List rebuilt from your meals ·
   Undo" toast; Undo puts the list, the "built from N days" note and the picker back. Picking the number already
-  chosen does nothing. Her standing "never built behind her back" holds: the pick is her tap. `verify:grocery` [6]
+  chosen does nothing. His standing "never built behind him back" holds: the pick is his tap. `verify:grocery` [6]
   re-anchored (2 mutations caught). 27 grocery gates and drivers green.
-- [x] **THE SHOPPING LIST'S CLEAR AND REBUILD SAY SO, WITH AN UNDO; HER RULING "UNDO LINE", 8 NOV 2026** (QA walk N6,
-  asked with three options: an Undo line, my recommendation; ask first; leave them). CORRECTION, said to her at the
+- [x] **THE SHOPPING LIST'S CLEAR AND REBUILD SAY SO, WITH AN UNDO; HIS RULING "UNDO LINE", 8 NOV 2026** (QA walk N6,
+  asked with three options: an Undo line, my recommendation; ask first; leave them). CORRECTION, said to him at the
   time: my question described the buttons wrongly. "Clear" removes only the ticked items (the trolley), not the whole
-  list, and "Rebuild" keeps her ticks and the lines she added by hand, redoing only the meal-based lines. I had read
-  the QA finding's words and not the store's code. Her choice fits both as they really are. Now: Clear says "4 ticked
+  list, and "Rebuild" keeps his ticks and the lines he added by hand, redoing only the meal-based lines. I had read
+  the QA finding's words and not the store's code. His choice fits both as they really are. Now: Clear says "4 ticked
   items cleared · Undo" and Undo puts each back exactly as it stood (same row, ticked); Rebuild of a list that had
   lines says "List rebuilt from your meals · Undo" and Undo puts every row back as it stood, takes the new lines off
   and returns the "built from N days" note. One toast now carries a tick, a Clear or a Rebuild. `verify:grocery`
   (+4 checks; 4 mutations caught, after the harness was taught that this driver prints "FAIL:"),
   `test:grocery-shopping` re-anchored. 27 grocery gates and drivers green.
-- [x] **TAKING A MEAL OFF "EATEN" SAYS SO, WITH AN UNDO; HER RULING "UNDO LINE", 8 NOV 2026** (QA walk N7, asked as
+- [x] **TAKING A MEAL OFF "EATEN" SAYS SO, WITH AN UNDO; HIS RULING "UNDO LINE", 8 NOV 2026** (QA walk N7, asked as
   one question with three options: an Undo line, my recommendation; ask first; leave it silent). Before: tapping a
-  meal's "✓ Logged" took it off what she had eaten with no message and no way back except logging it again, which
-  logs the plan's CURRENT dish, not what she ate. Now the tap still un-logs at once, and the sheet says "Lunch taken
+  meal's "✓ Logged" took it off what he had eaten with no message and no way back except logging it again, which
+  logs the plan's CURRENT dish, not what he ate. Now the tap still un-logs at once, and the sheet says "Lunch taken
   off what you ate · Undo" beside the button; Undo puts back exactly what was taken off, its own name and numbers
   (never the plan's dish). A failed un-log keeps the existing warning and shows no Undo. `verify:diary-preservation`
   8a-8b (2 mutations caught: no line, and an Undo that logs the plan's dish). 45 Nutrition gates and drivers green;
-  `test:bundle` crossed by 0 kB and both near-full budgets were raised 25 kB on her 15 Sep "room to grow" ruling,
+  `test:bundle` crossed by 0 kB and both near-full budgets were raised 25 kB on his 15 Sep "room to grow" ruling,
   measured that day (app chunk 1304, total 2679).
-- [x] **A SET LOGGED AFTER FINISH IS ADDED TO THE FINISHED DAY; HER RULING "ADD TO IT", 8 NOV 2026** (QA walk T2,
+- [x] **A SET LOGGED AFTER FINISH IS ADDED TO THE FINISHED DAY; HIS RULING "ADD TO IT", 8 NOV 2026** (QA walk T2,
   asked as one question with three options: add it to the finished workout, my recommendation; reopen the workout
   until Finish is tapped again; or ask each time). Before: a set ticked after Finish quietly reopened the session on
   Exercise ("Finish session" back) while Home still said Done. Now the set is saved to the finished day, which stays

@@ -2,6 +2,9 @@
 
 These apply to every session in this repo. They exist so they stop being restated per-prompt.
 
+**Ashley is a man: he / him / his.** Earlier notes here and in BACKLOG called him "she"; that was wrong (his correction,
+8 Nov 2026). This file is corrected; older BACKLOG entries and code comments still say "she" and are not to be copied.
+
 ## Product vision
 
 - Full product vision, standards, and shipping bar: see [VISION.md](VISION.md). Safety-adjacent and architecture-level decisions should be checked against it.
@@ -31,19 +34,19 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - Blocks and phases; a calibration week when weights are unknown; a deload
   lighter than the week before — `block-phases`, `frozen-weeks`,
   `calibration-search`, `starting-out`
-- **EVERY "THIS WEEK" COUNT IS MONDAY TO SUNDAY — her ruling 15 Oct 2026 (run 7, M54)**, from three options,
+- **EVERY "THIS WEEK" COUNT IS MONDAY TO SUNDAY — his ruling 15 Oct 2026 (run 7, M54)**, from three options,
   over the training week from the start day and over a strip that follows it. It PARTIALLY REVERSES the line
   below: the tally on Home, the Exercise strip, the pace tip and the coach's week review all count Monday to
   Sunday (one reader, `readTrainingWeeks`). What still turns on the start day is the PLAN's position — "Week N
   of 16", blocks, phases and the calibration week — and the "Week 2 starts Thursday" mark that says so.
   `test:dashboard` §8, `test:coach-week-review`
-- **A food that can't be counted is asked about before any card — her rule, 15 Oct 2026 (run 7, M51)**, in her
+- **A food that can't be counted is asked about before any card — his rule, 15 Oct 2026 (run 7, M51)**, in his
   words: "if a food can't be counted, ask before showing the card; never show a total that quietly leaves it
   out." Both halves: the card builder refuses, the coach's log_meal asks in the same words. `test:meal-amounts`,
   `verify:meal-log-card` §4
 - **A training week runs from the day the plan began, and every screen agrees
   where it changes** — since 6 Oct 2026, on Ashley's "make sure the app knows
-  where one week ends and the other begins". Her ruling, from three options: **the
+  where one week ends and the other begins". His ruling, from three options: **the
   day you started**, every week, changing at LOCAL MIDNIGHT, over always-Monday
   weeks and over the strip itself running from the start day. The Home and
   Exercise strips stay Monday to Sunday, show each day's own session, and mark
@@ -65,7 +68,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   weeks?". The answer had been: the plan runs on by date and the first session back is last time's
   weight PLUS an increment (no age limit on the lookup). Now, from the last working session before
   today: under 10 days nothing; 10-20 repeat last time, no increment; 3-6 weeks about 90%; 6-12
-  weeks about 80%; 12+ weeks 80% and **her ruling B: OFFER a restart from week 1 with a
+  weeks about 80%; 12+ weeks 80% and **his ruling B: OFFER a restart from week 1 with a
   calibration week, one tap, never automatic**. Today-only and derived (no stored flag): the
   weight, its chips and warm-up, the boxes (last time's numbers step aside so a blank tick cannot
   log the pre-break weight) and the label ("eased after your break") all move together; the coach
@@ -75,7 +78,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
 - Every loaded lift has a weight, in its implement's unit, under a ceiling
   that warns before it clamps — and a movement-prep move that needs an
   implement gets one too, at **half the working load**, read off the app's own
-  warm-up ladder rather than invented (18 Sep 2026, CSCS delegation; her 17 Sep
+  warm-up ladder rather than invented (18 Sep 2026, CSCS delegation; his 17 Sep
   ruling gave it a number, this is the "kept light" half) — `primer-load`,
   `load-ceilings`, `load-ceiling-units`,
   `per-side-load`, `single-implement`, `load-display`, `loadless-notes`
@@ -100,15 +103,15 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   or less and 29.1% of second-tier compounds — a class prescribed 75s by the
   style's own table — were at or under 30. Nothing was miscalculating; the
   session did not fit and the generator paid for it out of rest.
-  **Her ruling that day, from four options: protect the rest, do less.** Every
+  **His ruling that day, from four options: protect the rest, do less.** Every
   exercise keeps a rest that suits it and the session sheds an accessory or a
   set instead — but **never the last exercise covering a movement pattern**,
-  decided 18 Sep 2026 under her CSCS delegation once the cost of "do less"
+  decided 18 Sep 2026 under his CSCS delegation once the cost of "do less"
   turned out to include weeks holding no squat pattern at all (22 of 9,216, now
   0). A shorter session is fewer sets, not a missing pattern: push, pull, hinge
   and squat are protected, accessory volume is the adjustable part.
-  `pattern-floor`. She rejected keeping the work at short rests, a flat one-minute
-  middle floor, and being told to train longer. Her reason, in her own words:
+  `pattern-floor`. He rejected keeping the work at short rests, a flat one-minute
+  middle floor, and being told to train longer. His reason, in his own words:
   30 seconds on a lat pulldown is not a short rest, it is a different exercise,
   and the reps printed beside it stop being reachable.
   Now 0.0% of second-tier compounds rest 30s or less, median 60s.
@@ -120,7 +123,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   deliberately wants — and `restFloorFor` returns `min(unbudgeted, tierFloor)`
   precisely so it gets 40. The app was right and the number was a measurement.
   **The floor is now DERIVED in the gate from the style's own rest row and the
-  deepest phase shift, and printed on every run**, with her report kept beside
+  deepest phase shift, and printed on every run**, with his report kept beside
   it as an absolute: no second-tier compound at 30s or less, whatever the
   tables say. `rest-floors` (24 checks, 4 mutations), `session-length`,
   `today-only`
@@ -134,9 +137,9 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   the card** (a per-hand or per-leg figure is half the load; 181 of 1,024 plans had a cable or machine lift held under
   its own price), and a clamp that lowers a weight records why (`coherence`). `test:machine-pack` §5,
   `test:movement-families` §4, `test:frozen-weeks` §7, `docs/plans/machine-pack.md`
-- **More exercises, from her lists** — since 3 Nov 2026 (`docs/plans/exercise-library.md`): only a different
+- **More exercises, from his lists** — since 3 Nov 2026 (`docs/plans/exercise-library.md`): only a different
   exercise is prescribable; a lighter variant takes a FRACTION of its parent's price (`price_fraction`, only ever
-  lowers, `docs/plans/variant-pricing.md`); her rulings "Known kit + a few" (five new kit ticks) and "Searchable,
+  lowers, `docs/plans/variant-pricing.md`); his rulings "Known kit + a few" (five new kit ticks) and "Searchable,
   log-only" (near-copies are found and logged under their own name, never prescribed). `test:exercise-library`,
   `test:variant-pricing`
 - Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
@@ -147,7 +150,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   relationship nothing enforced, and widening it turns every plan back into the
   coin flip that put a band in 906 loaded slots.
 - **Say what feels tight before a session and the warm-up prepares it** — added
-  15 Sep 2026 from a suggestion list Ashley asked me to assess, on her "build
+  15 Sep 2026 from a suggestion list Ashley asked me to assess, on his "build
   all that you think is good". Eight areas as taps; up to three mobility drills
   go in at the front of TODAY's warm-up, with a line saying why and an honest
   account of anything it could not cover. It adds warm-up and nothing else — no
@@ -198,7 +201,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   protein, carbs and fat rather than calories alone, and comes from the shared
   phrasebook instead of two hand-written copies.
 - **And the meals FOLLOW the targets when those move — both surfaces since
-  17 Sep 2026.** Her two rulings that day: **tell her and offer to refit**
+  17 Sep 2026.** His two rulings that day: **tell him and offer to refit**
   (from four options — not silently, not automatically, not by swapping the
   meals out), and **stay quiet until the drift is real, then resize** (from
   three) — same meals, adjusted amounts, so the shopping list stays valid and
@@ -224,14 +227,14 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`, and since 11 Oct 2026 an ingredient line is costed and tagged only when
   every word in it is accounted for (a dish is a miss, never one of its
   ingredients) — `ingredient-lookup`. **And counted in the state the card
-  tells her to weigh it, since 15 Oct 2026 (H32)**: a STORED meal's numbers are
+  tells him to weigh it, since 15 Oct 2026 (H32)**: a STORED meal's numbers are
   worked out again from its own lines on every read, because the card, the day
   and the day search had been reading numbers stored before the table knew
   "raw" and "dry" ("177g raw chicken breast" costed as cooked breast). Kept
   whole when the lines cannot be costed as well as a new meal, never mixed; a
   line naming a state the food has no figures for is a miss, never the wrong
   state. Library as written: 0 of 290 affected; written raw/dry the way the
-  meal writer is told to, 149 of 290, median 15% off. Her own pools are
+  meal writer is told to, 149 of 290, median 15% off. His own pools are
   unmeasured (no database here). `meals-costed-as-weighed` (20 checks, 17
   mutations), `verify:meal-costed` (8 checks, 8 mutations),
   `measure:meals-costed-as-weighed`
@@ -273,7 +276,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   scored 4.3-5.5 of 7. Measured by DISH (`measure:meal-repeats`): about 10.5
   dishes in 28 servings a week, and 7.8 back the very next day with
   leftovers off. The ranking now avoids yesterday's dish first, then the
-  last three days, then her likes, then prefers the longest rested across
+  last three days, then his likes, then prefers the longest rested across
   six days: 6.2 next-day repeats, and a 5-dinner week uses all 5. 74% of
   what remains is forced by the targets, and only deeper pools cure that; at
   7 options a slot the on-phone search is about 3.5x slower, so that is not
@@ -286,14 +289,14 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   back to back 601 times in 1,080 days against 524 without it, while the count
   of identical names FELL to 395: variety scored better and got worse. Dishes
   now have an identity (`meal-dish-identity.ts`): a copy shares its base's,
-  found by name so it reaches the plan she already has, and only for options
+  found by name so it reaches the plan he already has, and only for options
   tagged `user-requested` with an edit connector after the base's name, so two
   GENERATED dishes named alike stay two. `docs/plans/dish-identity.md`.
   `meal-variety` (122 checks; the identity section has 12 mutations),
   `measure:meal-variety`, `measure:meal-repeats`
 - **Upcoming days: see, swap, shop** — both surfaces since 27 Sep 2026.
   Ashley: *"I can only see today's meal ... I can't add things to the grocery
-  list for future meals so I can plan ahead."* Her ruling, from three options:
+  list for future meals so I can plan ahead."* His ruling, from three options:
   a day strip across the top of Nutrition. Every day is the SAME derivation as
   today (one hook, `useMealDays`, shared with the browser harness so a driver
   runs the app's code), a swap pins that date only, and adding a day to the
@@ -302,17 +305,17 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   its swap, and has `add_day_to_grocery_list`. `meal-days` (49 checks, 18
   mutations), `verify:meal-days` (40 checks, 8 mutations), `coach-parity`.
   Needs the `chat-gemini` deploy for chat
-- **And what she likes comes first** — both surfaces since 27 Sep 2026.
-  Her ruling, from three options: **a likes list plus hearts**. "Foods and
+- **And what he likes comes first** — both surfaces since 27 Sep 2026.
+  His ruling, from three options: **a likes list plus hearts**. "Foods and
   meals I like" sits on Profile above "Foods to avoid". The coach records the
   same row, and a hearted meal counts as a like. Nothing is learnt from logs or
-  swaps: she ruled that out. A like is a SORT KEY, ranked after variety and
+  swaps: he ruled that out. A like is a SORT KEY, ranked after variety and
   before the resize, so among correct days one with a like wins. It can never
   buy an off-target day or the same day twice. The old 0.01 penalty it
   replaced could only win a tie, the variety defect's shape, still sitting in
-  the likes path. New meals are steered by it. A like that clashes with her
+  the likes path. New meals are steered by it. A like that clashes with his
   diet or a dislike is left out before the generator sees it, and verification
-  is unchanged. **And a like never picks a meal she now avoids**: kept meals
+  is unchanged. **And a like never picks a meal he now avoids**: kept meals
   survive a regenerate unchecked, so every pool the app assembles from is
   marked by the meal card's own restriction check, once, and a marked meal is
   never liked. Every like counts whatever hardness the coach filed it at, and
@@ -320,8 +323,8 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   checks, 34 mutations), `verify:meal-likes` (20 checks, 9 mutations),
   `soft-preferences` §4 (real-food fixtures, 11 mutations). Needs the
   `generate-meals` deploy for the steering; the ranking works without it
-- **A kept meal she now avoids is not served** — both surfaces since 27 Sep
-  2026. Her ruling, from three options: **stop serving it**, over keeping it
+- **A kept meal he now avoids is not served** — both surfaces since 27 Sep
+  2026. His ruling, from three options: **stop serving it**, over keeping it
   on the plan with the card's warning and over asking when the restriction is
   added. A heart or a meal asked for by name survives a regenerate unchecked,
   so the day's pick never serves one that breaks a CURRENT restriction. A pick
@@ -333,7 +336,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `kept-meal-restriction` (22 checks, 12 mutations), `verify:kept-meal`
   (17 checks, 5 mutations)
 - **Seven options a meal, and more for a plan that already exists** — since
-  28 Sep 2026, her two rulings that day, each from three options: **seven**
+  28 Sep 2026, his two rulings that day, each from three options: **seven**
   (over five and ten) and **"Button, keep today"** (over re-picking
   everything, and over no button). New plans ask for seven, in requests of at
   most 28 dishes, because a reply cut off mid-dish loses the whole round. A
@@ -345,27 +348,27 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   10% drift carry a dish the search resized, and a name brings back the
   stored portion. A leftover lunch now always comes from the dinner actually
   served the night before, which also fixed a swap leaving "Last night's
-  dinner" on a dish nobody cooked. **Both surfaces since 29 Sep 2026** (she
+  dinner" on a dish nobody cooked. **Both surfaces since 29 Sep 2026** (he
   asked for the coach's half the day after the button): `propose_meal_top_up`
   runs the same function as the button, App works out what is short once and
   hands it to both, and the card names what stays and the day the new meals
   start before the tap. A complaint ("it's the same dinners") gets a reply and
-  an offer; the card comes on her yes. Needs the `chat-gemini` deploy for chat.
+  an offer; the card comes on his yes. Needs the `chat-gemini` deploy for chat.
   **And seven dishes of which two fit is not seven options — both surfaces
-  since 30 Sep 2026**, on her "all the days' meals look very similar". A meal
+  since 30 Sep 2026**, on his "all the days' meals look very similar". A meal
   can hold seven dishes and serve two, because the rest no longer land a day
-  on her numbers (targets move after meals are made): measured, a dinner with
+  on his numbers (targets move after meals are made): measured, a dinner with
   fewer than three that fit served 2.7 different dinners a week against 4.0.
-  Her ruling, from three options: **speak when fewer than three fit**, the
+  His ruling, from three options: **speak when fewer than three fit**, the
   same button and promise, never unasked. "Fit" is the assembler's own test
   (the dish pinned, the day it would serve inside the bands). Mine: the ask
   aims at five that fit, and a pool is never taken past ten (the search costs
   a week about 3.4x more at ten than at seven). One `TopUpPlan` is worked out
-  once and handed to the offer and the coach's card. NOT confirmed on her own
-  plan: her saved meals cannot be read from a cloud session, so the cause of
-  HER week is the likeliest one, not a proven one. Needs the `chat-gemini`
+  once and handed to the offer and the coach's card. NOT confirmed on his own
+  plan: his saved meals cannot be read from a cloud session, so the cause of
+  HIS week is the likeliest one, not a proven one. Needs the `chat-gemini`
   deploy for chat.
-  **And a NEW plan's dishes are held to the same day test, since 2 Nov 2026**, on her "why are the meals not fitting
+  **And a NEW plan's dishes are held to the same day test, since 2 Nov 2026**, on his "why are the meals not fitting
   when that's just what the app prescribed": each round's dishes that cannot land a day are dropped and replaced
   while a round is left; never when nothing in a meal fits, never in the last round. `test:meal-fresh-fit`,
   `measure:meal-fresh-fit` (66% -> 86.5% of a new plan's dishes land a day).
@@ -373,7 +376,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   mutations in section 8), `verify:meal-top-up` (44 checks, 7 mutations),
   `verify:chat-top-up` (55 checks, 7 mutations), `meal-days` §3b
 - **A library of our own meals behind "more options"** — both surfaces since
-  30 Sep 2026, on her "search the Internet for hundreds of meals". Her ruling,
+  30 Sep 2026, on his "search the Internet for hundreds of meals". His ruling,
   from three options: **write our own and check them**, over an open recipe
   dataset and over copying sites (this cloud session cannot reach recipe sites
   at all, the app recomputes every macro from its own food database and never
@@ -392,10 +395,10 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   servable from 73-87% (model only) to 94-99%. Named limit: high-energy,
   lower-protein targets get few good dishes; more low-density dishes fix that.
   **AND EVERY DIET GETS A DEEP POOL, since 3 Nov 2026**: 59 everyday-cuisine plant dishes and dairy-free snacks took
-  meals under seven dishes that land her day from 32 of 192 (vegan, vegetarian, dairy-free) to 0, because the pool's
+  meals under seven dishes that land his day from 32 of 192 (vegan, vegetarian, dairy-free) to 0, because the pool's
   one-adventurous-cuisine cap had left a vegan five lunches. `test:meal-library-depth`, `measure:meal-library-depth`.
-  Not built: the model-driven builder script (her machine, key needed), seeding
-  fresh plans (hers), a "from our library" label, and the ingredient-amount
+  Not built: the model-driven builder script (his machine, key needed), seeding
+  fresh plans (his), a "from our library" label, and the ingredient-amount
   reader, which must land before any OUTSIDE recipe text is accepted.
   **LEAN DISHES, 1 Oct 2026:** the 188 were all protein-dense (leanest 7.1 g per
   100 kcal), so 3,040 kcal / 160 g (5.2 g per 100 kcal) had 6 good lunches; the
@@ -407,9 +410,9 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `verify:meal-top-up` §8, `verify:chat-top-up` §8.
   `docs/plans/meal-library.md`. Frontend only: no edge function, no migration
 - **An amount is understood or it is asked about — both surfaces since 1 Oct
-  2026**, on her "the unit fix", with two rulings from her "ask me, then build
+  2026**, on him "the unit fix", with two rulings from his "ask me, then build
   it", each from options: **a line the app cannot read, typed into an own meal or
-  told to the coach, is asked about** ("how many grams?", nothing saved until she
+  told to the coach, is asked about** ("how many grams?", nothing saved until he
   answers), over refusing and over estimating; and **"understood" now means the
   food AND the amount**, over leaving the meaning alone. MEASURED first: 31 of 53
   ordinary recipe lines were costed more than 25% wrong while coverage read
@@ -422,7 +425,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   carrot) to the food's own table, which is understood or flagged. Nothing is
   guessed: pint, knob, "some", "to taste", juice of a lemon, and a cup, can or
   handful of a food with no such weight are unread. `verifyProposal` refuses a
-  dish with an unread line in EVERY mode, including her own portions; the coach's
+  dish with an unread line in EVERY mode, including his own portions; the coach's
   `log_meal` asks before it adds up; the meal writer's and the coach's prompts no
   longer ask for ounces or cups. The coach's food-database copy had silently
   drifted (3 eggs: 5 kcal there, 233 here) and is now byte-identical, held by a
@@ -436,7 +439,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   mutations). The coach's half is held by source checks only until `chat-gemini`
   is deployed. Needs the `chat-gemini` AND `generate-meals` deploys
 - **The shopping list: picking 3, 7 or 14 days rebuilds it at once ("Rebuild at once"), and Clear and Rebuild each
-  say so with an Undo ("Undo line")** — her rulings 8 Nov 2026. `verify:grocery` [5]-[6]
+  say so with an Undo ("Undo line")** — his rulings 8 Nov 2026. `verify:grocery` [5]-[6]
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
   the ones the tab will actually SHOW: both surfaces and the resize trial read
   one rotation from one pure builder, so the list cannot shop for a week the
@@ -461,7 +464,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `meal-method` (31 checks, 19 mutations), `verify:meal-method`. Needs the
   `generate-meals` deploy; until then new meals arrive with no method, which is
   the honest empty state. **And since 11 Oct 2026 the steps are checked like the
-  ingredients**: a method naming a food she must not eat, or a food the dish
+  ingredients**: a method naming a food he must not eat, or a food the dish
   does not have, is not shown (the whole method, never one sentence), at
   verification and again on the card — `meal-method-check`, `verify:meal-method` §4
 - **A diet that filters food but not the numbers SAYS SO where it is picked** —
@@ -496,22 +499,22 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   Measured that day: 31 of the catalogue's 45 machine and cable entries carry
   no functional tag, so it is a convention and not a slip — retagging them
   would change what every functional trainee is PRESCRIBED.
-  **Her ruling, from three options: show them, marked**, over retagging the
+  **His ruling, from three options: show them, marked**, over retagging the
   machines and over leaving the search box as the only route to one. Style is
   the only one of the four filter stages that may be relaxed, and
   `stageStyleFilter`'s own comment says why: *"style is a preference, not a
   safety constraint"*. Equipment, injuries and skill still remove.
-  **AND HER SECOND RULING THE SAME DAY, because the first broke an earlier one
-  of hers.** Sinking off-style options put a matching SLIDER above a
+  **AND HIS SECOND RULING THE SAME DAY, because the first broke an earlier one
+  of his.** Sinking off-style options put a matching SLIDER above a
   non-matching MACHINE — a loaded lift offered bodyweight replacements first,
-  which is exactly what her 10 Sep rule exists to prevent (measured: 8
+  which is exactly what his 10 Sep rule exists to prevent (measured: 8
   movements in the hybrid catalogue). From three options: **weight always
   wins.** For a lift carrying a number, every loaded alternative comes first
   whatever its style, each marked on its own row; the unloaded ones follow.
   So the sort keys, outermost first: loaded, style, stated likes, implement
   quality, the ranker. `swap-style` (28 checks, 14 mutations),
   `verify:session-edit` §8, `single-implement`
-- **A machine at her gym is a swap option: her ruling 4 Nov 2026, "Machines swappable only"** (from four options; it
+- **A machine at his gym is a swap option: his ruling 4 Nov 2026, "Machines swappable only"** (from four options; it
   partly REVERSES "Searchable, log-only" below for machine, cable and Smith versions): 477 versions are found by the swap
   and add search and the coach, priced as the machine they are a version of (one-sided ones per side), never generated.
   Free-weight versions stay log-only; no "add your own"; lever squats stay log-only (no price category). Eight gym
@@ -531,9 +534,9 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   last thing a screen could do that chat could not. The 11 Sep correction that
   stood here was right when written and was never revisited after the fix
 - Add one to a session AS PART OF THE PLAN — both surfaces since 13 Sep 2026.
-  Her ruling that day, from three options: **add it and say the session is now
+  His ruling that day, from three options: **add it and say the session is now
   longer** — you asked for the exercise, so you get it, and the app never
-  quietly removes work to pay for work you requested. And her second, on the
+  quietly removes work to pay for work you requested. And his second, on the
   picker: **show everything, warn me** — the suggested list is the constrained
   pool, the search box beside it reaches the whole catalogue and states the
   clash on the row, which is what swap already did. Logging extra work
@@ -542,7 +545,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   a reorder; the card states the balance cost instead). `exercise-add`, `edit-keeps-the-bar`, `session-edit`,
   `coach-volume-schedule`, `verify:exercise-add`
 - Remove it from one session without banning it — both surfaces since 11 Sep
-  2026; asks whether to drop it or put something else there (her ruling);
+  2026; asks whether to drop it or put something else there (his ruling);
   `session-edit`, `verify:session-edit`
 - Move it earlier or later within the session — both surfaces since 11 Sep
   2026, a superset's halves travelling together; `session-edit`,
@@ -551,41 +554,41 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   nothing else. It does now, through the shared tail
 - Change its sets, reps or weight for today — via logging only (extra sets,
   typed numbers); the plan itself is not edited
-- **A set logged after Finish is added to the finished day: her ruling 8 Nov 2026, "Add to it"** (over reopening the
+- **A set logged after Finish is added to the finished day: his ruling 8 Nov 2026, "Add to it"** (over reopening the
   workout and over asking each time). The day stays Done everywhere and its count goes up. `verify:qa-training` T2
 - **Log the build-up as well as the working sets** — `screen only`, since
   17 Sep 2026. Ashley's ruling that day, from three options, standing in the
   gym: **a box for every set, labelled** — Warm-up 1, 2, 3 then Set 1, 2, 3,
   the build-up marked so it never counts toward the weight going up. **It
-  REVERSES her 7 Sep ruling** ("tick them off, don't record them"), which was
+  REVERSES his 7 Sep ruling** ("tick them off, don't record them"), which was
   made about a strip of chips before anyone had watched a real lifter run out
-  of rows; she was told it was a reversal and chose it anyway. The tickable
+  of rows; he was told it was a reversal and chose it anyway. The tickable
   strip is gone from today's card and survives read-only on browse and peek.
   A warm-up row is filtered out of volume, personal bests, progression and
   history by construction, so logging one changes no number the app shows
   back. `working-sets`, `ramp-visibility`, `set-plausibility`,
   `verify:warmup-rows`, `verify:ramp-readonly`.
-  **And all of a lift's warm-ups in one tap: her ruling 2 Nov 2026, "One tap for all"**, from three options (over one
+  **And all of a lift's warm-ups in one tap: his ruling 2 Nov 2026, "One tap for all"**, from three options (over one
   tap each and over unrecorded warm-ups): "Log all N warm-ups" logs every open row as written; the boxes stay.
   `verify:warmups-one-tap`, `measure:tap-count` (26 → 23 taps for a 19-set session)
 - **The faint numbers in the boxes say whose they are** — `screen only`, since
-  18 Sep 2026. Ashley, reading her own dumbbell rows: *"Last sets prescribed
+  18 Sep 2026. Ashley, reading his own dumbbell rows: *"Last sets prescribed
   were sets of 11 reps. Is thay correct at the end of a exercise?"* Nothing had
-  prescribed 11. The 9, 11, 11 were her OWN last session, drawn in exactly the
+  prescribed 11. The 9, 11, 11 were his OWN last session, drawn in exactly the
   grey the app uses for a suggestion on a row with no history — two different
-  things, one appearance. **Her ruling that day, from three options: mark them
+  things, one appearance. **His ruling that day, from three options: mark them
   "last time"**, over moving them out of the boxes to a line above the sets and
   over emptying the boxes; both of those cost the one-tap repeat, which is the
   reason the numbers are there. The marker is on the row, only where history is
   actually driving the boxes, never once the row is saved and never on a
   build-up row. `last-time`, `verify:one-number` §8
 
-**And every change to an exercise made on the screen can be put back** — since 8 Nov 2026 (QA walk T7, her "every change
-previews and can be undone" in the shape of her "Undo line" rulings): a swap, removal, move or addition shows one line
+**And every change to an exercise made on the screen can be put back** — since 8 Nov 2026 (QA walk T7, him "every change
+previews and can be undone" in the shape of his "Undo line" rulings): a swap, removal, move or addition shows one line
 with an Undo that follows the coach card's put-back rules (only while the weeks are as the change left them, ten
 minutes). `test:screen-edit-undo`, `verify:edit-undo`
 
-**Every change to an exercise lives in one menu** — her ruling, 14 Sep 2026,
+**Every change to an exercise lives in one menu** — his ruling, 14 Sep 2026,
 from three options, after reporting that swapping sat outside the "⋮" while
 moving, removing and banning sat inside it: **all of them behind the ⋮**, over
 making them all inline and over keeping swap in both places. The line is
@@ -602,7 +605,7 @@ menu" stays true when a copy is also left outside it.
   `moved-session-stuck`, `what-happened`, `verify:session-move`,
   `verify:moved-session`, `verify:what-happened`
 - Say "I missed it" and have that recorded as fact, distinct from a rest —
-  both surfaces since 10 Sep 2026 (her ruling: a missed day stays missed);
+  both surfaces since 10 Sep 2026 (his ruling: a missed day stays missed);
   `what-happened`, `training-week`, `verify:what-happened`. Needs migration
   `20260910160000_add_marked_missed` pushed
 - Say "I did it, not in the app" — both; the screen logs real sets for a
@@ -611,18 +614,18 @@ menu" stays true when a copy is also left outside it.
 - Make today a rest day — both; `what-happened`, `verify:rest-day-race`,
   `verify:what-happened`
 - Swap the session for an activity — both, and **it asks first from 15 Sep
-  2026**. Her ruling that day, from three options: **ask, like the others** —
-  the coach shows a confirm card and nothing is written until she taps it. She
+  2026**. His ruling that day, from three options: **ask, like the others** —
+  the coach shows a confirm card and nothing is written until he taps it. He
   rejected "do it and offer Undo" and "do it silently but honestly". This was
   the only day-verb that wrote immediately: it was built 25 Aug, six days
-  before her "record it, but confirm first" ruling, and never came back for it.
+  before his "record it, but confirm first" ruling, and never came back for it.
   CORRECTED: this line listed `what-happened`, `verify:swapped-day` and
   `verify:what-happened` as if they covered both surfaces. All three drive the
   DAY MENU only — none opens a coach conversation. SCREEN: those three. COACH:
   `coach-promises` §2, `chat-actions` §5 and `verify:activity-swap`, which
   drives the real chat to the card, taps it, and checks nothing was written
   before the tap
-- Shorten or lighten TODAY only — both surfaces since 13 Sep 2026. Her ruling
+- Shorten or lighten TODAY only — both surfaces since 13 Sep 2026. His ruling
   that day, from three options: **protect the main lift and drop accessories**
   — you still squat and squat properly, and the accessory work at the end goes,
   from the bottom up, until it fits. Never below three exercises. And before
@@ -636,8 +639,8 @@ menu" stays true when a copy is also left outside it.
   that one.
 - **Put a cardio session on a day, as part of the plan** — both surfaces since
   15 Sep 2026. Ashley: *"know when to suggest adding a session and when
-  something is mentioned in passing"*. Her ruling that day, from three options:
-  **offer it only when she sounds DEFINITE** — over asking every time (my
+  something is mentioned in passing"*. His ruling that day, from three options:
+  **offer it only when he sounds DEFINITE** — over asking every time (my
   recommendation) and over never offering.
   **THE RULING IS ENFORCED IN ONE DIRECTION ONLY, and that is the part to
   remember.** A hedge ("I might ride Wednesday") cannot produce a card — the
@@ -651,33 +654,33 @@ menu" stays true when a copy is also left outside it.
   `cardio-session`, `verify:cardio-session`, `coach-parity`
 - **Swap the session for a circuit of timer blocks, block by block** — both surfaces since
   8 Oct 2026. Ashley, from the gym: rope, push-ups, sit-ups and the bike off the round timer could
-  only be logged as "Intervals". Her ruling, from three options: **A, one workout made of blocks**.
+  only be logged as "Intervals". His ruling, from three options: **A, one workout made of blocks**.
   A finished round asks what the block was (names as chips, the timer's minutes, effort asked, the
   shape as the note); "Count this as today's workout" on Tools and Today makes the day swap named
   for the blocks, only while the session is still due; the coach's `propose_circuit_log` is built
-  only from rounds, times and an effort SHE stated. `circuit-log` (61 checks, 18 mutations),
+  only from rounds, times and an effort HE stated. `circuit-log` (61 checks, 18 mutations),
   `verify:circuit-log`, `verify:round-presets` §26-33. Needs the `chat-gemini` deploy for chat
 - **Log extra cardio already done, as extra, with distance** — both surfaces since 22 Oct 2026 (Sam live test).
-  Her words: a past-tense run on a lifting day is logged as additional work with effort, and "count it as today's
-  workout" is the option, never the default. Distance is a real field (her ruling, 22 Oct, "a proper field"). A
+  His words: a past-tense run on a lifting day is logged as additional work with effort, and "count it as today's
+  workout" is the option, never the default. Distance is a real field (his ruling, 22 Oct, "a proper field"). A
   run while a temporary knee, ankle or hip ease-off is running is ASKED about once, never blocked.
   `extra-cardio` (45 checks, 24 mutations), `verify:extra-cardio` (37 checks, 8 mutations). Needs the `chat-gemini`
   deploy and the `cardio_logs.distance_km` migration
-- **Changes in combination, and offline** — since 27 Oct 2026, on her "thorough testing ... under various
+- **Changes in combination, and offline** — since 27 Oct 2026, on his "thorough testing ... under various
   different scenarios". Single changes were all gated; their SEQUENCES, the walk/planned-cardio day, the
   part-trained day and failed saves were not, and eight defects were there (BACKLOG). A chosen rest is transparent
   to the streak; a started session is never redrawn; a walk is a session (`dayHasSession`); every coach confirm
   draws the plan as SAVED (`planAsSaved`); an Undo or Apply that cannot save says so and keeps its button.
   `workout-scenarios` (52 checks, 18 mutations), `verify:workout-scenarios` (17, 3),
-  `verify:workout-scenarios-chat` (41, 10). And since 29 Oct 2026 (her "fix them"): **a coach offer is checked
+  `verify:workout-scenarios-chat` (41, 10). And since 29 Oct 2026 (his "fix them"): **a coach offer is checked
   against the day and the plan at the tap** (`offerStillHolds`; a card that no longer fits turns stale), and **an
   Undo puts back only what is still as the card left it** (weeks fingerprinted on landing; a moved or swapped day
-  re-read), her 30 Sep meal-Undo rule applied to the plan. Apply uses the scope that was TAPPED
+  re-read), his 30 Sep meal-Undo rule applied to the plan. Apply uses the scope that was TAPPED
 - Rebuild today's session as a whole, for today — **both surfaces since 16 Sep
-  2026**. Her ruling that day, from three options: **keep the main lift and
+  2026**. His ruling that day, from three options: **keep the main lift and
   rebuild around it** — you still do today's main lift at the weight and sets
   prescribed, so the progression thread is untouched, and everything else
-  changes. It matches her 13 Sep ruling for shortening, so the app holds ONE
+  changes. It matches his 13 Sep ruling for shortening, so the app holds ONE
   position on the main lift rather than two; and if the main lift is the thing
   you want gone, swapping it alone already works.
   `session-rebuild`, `verify:session-rebuild`, `coach-parity`.
@@ -702,11 +705,11 @@ menu" stays true when a copy is also left outside it.
   work out its ingredients is a model call, not a lookup. There is no list of
   dishes to search the way there is a list of foods. `meal-addition`
 - Remove or replace one food within it — both surfaces since 12 Sep 2026;
-  a removal states what it costs and offers 2-3 verified swaps (her ruling);
+  a removal states what it costs and offers 2-3 verified swaps (his ruling);
   `meal-food-edit`, `verify:meal-food-edit`
 - Build a custom meal from what is in the fridge — `coach only`; `custom-meal`
 - Log what was eaten — both; `meal-log`, `meal-ledger-snapshot`,
-  `diary-preservation`. **Taking one off says so, with an Undo: her ruling 8 Nov 2026, "Undo line"**
+  `diary-preservation`. **Taking one off says so, with an Undo: his ruling 8 Nov 2026, "Undo line"**
   (over asking first and over silence); Undo puts back exactly what was logged. `verify:diary-preservation` 8
 - Move a meal to another SLOT — both surfaces since 14 Sep 2026, with the two
   rulings it was waiting on. **"Resize it to fit"** (13 Sep), over refusing and
@@ -716,11 +719,11 @@ menu" stays true when a copy is also left outside it.
   `meal-move`, `verify:meal-move`, `coach-parity`.
   Meals per day and snacks — `screen only` (Profile)
 - **Swap a meal with the same meal on another day** — both surfaces since
-  29 Sep 2026, her list's item 2 ("Moving a meal to another day. Neither the
-  screen nor the coach can do this yet."). Her ruling, from three options:
+  29 Sep 2026, his list's item 2 ("Moving a meal to another day. Neither the
+  screen nor the coach can do this yet."). His ruling, from three options:
   **they swap places** (Monday's dinner goes to Wednesday and Wednesday's
   comes to Monday), over a fresh dinner for the emptied day and over the same
-  dish on both. Her 14 Sep slot-move ruling, across days.
+  dish on both. His 14 Sep slot-move ruling, across days.
   CORRECTED, and the correction is why this was cheap: it was `MISSING` on the
   reason that no screen renders another day's meals, which stopped being true
   on 27 Sep when the strip shipped. A day's meals are not stored at all
@@ -736,10 +739,10 @@ menu" stays true when a copy is also left outside it.
   change a meal on a day nobody named. Before the tap the card says: each
   day's dish, every OTHER meal that changes and WHY (the leftovers of the
   dinner, cooked fresh instead, a different dish so the day still fits, or the
-  same dish at a size she would notice), any day the move took off target (a
+  same dish at a size he would notice), any day the move took off target (a
   day already off is not blamed on it), and that the shopping list needs
-  rebuilding when a changed day is on it. The list is not rebuilt behind her
-  back (her refit and top-up rulings) and an unreadable list is said, never
+  rebuilding when a changed day is on it. The list is not rebuilt behind him
+  back (his refit and top-up rulings) and an unreadable list is said, never
   passed off as empty. Refused in plain words: a day outside today plus six,
   the same dish on both days, a **leftover lunch** (move the dinner and the
   leftovers are worked out again), and **today's meal once it is logged as
@@ -756,17 +759,17 @@ menu" stays true when a copy is also left outside it.
   gate was taught that a hook App wires to the tabs is part of the screen path
   (comments stripped from the hooks it counts, mutation-tested).
   **And a DIFFERENT meal on the other day, and an Undo — both surfaces since
-  30 Sep 2026**, her "finish the day swap" (Monday's dinner with Wednesday's
-  lunch). Her 14 Sep slot-move ruling across days: they swap places and EACH
+  30 Sep 2026**, his "finish the day swap" (Monday's dinner with Wednesday's
+  lunch). His 14 Sep slot-move ruling across days: they swap places and EACH
   IS RESIZED to fit the meal it lands in, both new sizes on the card. The two
   picks are the same two picks; what is new is two resized copies ("X (as
   lunch)") made by the slot move's own function, held until the strip ends so
   no other day moves. The sheet shows the other day's meals as chips (the same
   meal already picked); the coach's tool takes `to_meal_slot`. **Undo** puts the
   picks back only when BOTH days still hold what the swap wrote (else it says
-  so and touches nothing), leaves a meal of today's she has since logged as
+  so and touches nothing), leaves a meal of today's he has since logged as
   eaten alone, and removes a copy only once no pick names it. The sheet's Undo
-  lives on the row and goes when she taps another day; the coach receipt's
+  lives on the row and goes when he taps another day; the coach receipt's
   stays on screen. Same controller for both (`plan`, `confirm`, `undo`).
   `docs/plans/moving-a-meal-to-another-day.md`. Needs the `chat-gemini` deploy.
   `test:meal-day-move` (169 checks; 44 mutations on the swap, 33 more on the
@@ -858,14 +861,14 @@ menu" stays true when a copy is also left outside it.
   CORRECTED 13 Sep, again 14 Sep, closed 17 Sep:
   - The three implement ceilings — **now editable**, in "You" beside Equipment,
     and correcting one re-prices the running plan from this week onward with
-    the exercises untouched (her ruling that day, from four options). Shown
+    the exercises untouched (his ruling that day, from four options). Shown
     only when the kit is limited, because a full-gym answer discards them.
     `setup-answers`, `verify:setup-answers`. **A CHANGE RECEIPT NAMES THE WEEK
-    THE CHANGE STARTS** — her ruling 13 Sep 2026, from three options, and it
+    THE CHANGE STARTS** — his ruling 13 Sep 2026, from three options, and it
     generalises beyond this one screen: "from this week" was ASSERTED while the
     weight quoted came from week 7, because a correction only bites where the
     old number was actually binding. If the app quotes a number, it says which
-    week that number is in, or she cannot go and look at it.
+    week that number is in, or he cannot go and look at it.
   - Exercise dislikes — **was never locked**: it is not a profile column at
     all, it becomes `user_facts` rows, the same shape a "never give me
     burpees" chat turn produces. CORRECTED 14 Sep 2026, measured: the line here
@@ -894,7 +897,7 @@ menu" stays true when a copy is also left outside it.
     `rebuildAgainstProfile` regenerates FROM the profile, so a corrected lift
     flows straight through it. They went on the rebuild road with goal, style
     and the starting point.
-    **Her ruling, 14 Sep 2026, from three options: "rebuild only when it
+    **His ruling, 14 Sep 2026, from three options: "rebuild only when it
     matters"** — and the condition is the point, not an optimisation.
     `knownWorkingWeights` is packed from these three ONLY when the calibration
     week was skipped; after a real calibration week the plan is anchored to what
@@ -959,7 +962,7 @@ menu" stays true when a copy is also left outside it.
 - A changed plan is re-scored like a generated one — `edit-keeps-the-bar`
   §7 since 13 Sep 2026: four profiles across the goal/experience/equipment
   spread, every edit path applied to each, re-scored with the same `scorePlan`
-  and held to the same 7.2 floor `quality` holds generated plans to. Her
+  and held to the same 7.2 floor `quality` holds generated plans to. His
   ruling the same day: the score stays behind the scenes as a guarantee we
   check, never a number on screen — what a person reads is the specific thing
   that changed, in plain words.
@@ -973,7 +976,7 @@ menu" stays true when a copy is also left outside it.
   score is NOT comparable to the 7.2 floor (the denominator inside
   goalAlignment changes), so the app can know a change made the plan worse and
   can never know it fell below the bar. That residue is Ashley's, ruled on
-  twice, and should not be reopened without her
+  twice, and should not be reopened without him
 - When a change works AGAINST the goal, the app asks first, then allows — it
   never refuses anything that is not unsafe. DECIDED 14 Sep 2026 by the
   session on Ashley's explicit delegation (*"You decide what you think is best
@@ -993,7 +996,7 @@ menu" stays true when a copy is also left outside it.
   ONCE per block per thing; never for a "today" change mid-session; never on
   the starting-out plan. The sentences are the app's, from one phrasebook
   shared by both surfaces, so the exam can grade them.
-  **BUILT 14 Sep 2026** on her "Build it" — `edit-tradeoff.ts`, wired into the
+  **BUILT 14 Sep 2026** on his "Build it" — `edit-tradeoff.ts`, wired into the
   coach's swap, remove and add cards; `edit-tradeoff`, `coach-promises` and
   `verify:tradeoff` hold it. Live: *"That would take your chest from 3 sets a
   week down to 0 for the rest of the block. Just today, or is there something
@@ -1105,23 +1108,23 @@ menu" stays true when a copy is also left outside it.
   (`coach-exam-fresh`, `coach-exam-judge`). Measured first in
   `docs/audits/the-coachs-own-words-2026-09-15.md`: three grammars for one
   job, eight wordings of one failure, three narrators in one file
-- **The coach is a warm coach who teaches — her rulings 6 Nov 2026**, each from three options: "Warm coach" (earned
+- **The coach is a warm coach who teaches — his rulings 6 Nov 2026**, each from three options: "Warm coach" (earned
   praise tied to a fact, never empty praise), "A why on every answer" (plus lessons that build, never repeated),
   "Coach writes, app checks" (reminders and the opener written fresh from the app's facts, a warm fixed sentence when
   a check fails), and "Add two new marks" (`warm` and `teaches` in the exam; the six are unchanged). It REPLACES the
   old "warmth is attention, not praise" rule. `docs/plans/coach-persona.md`. Needs the `chat-gemini` and
-  `coach-reach-out` deploys and an exam run on her machine before anything is known
-- **The second pass: her ruling 6 Nov 2026, "Second pass + checks"** (over checks only and over a stronger model):
+  `coach-reach-out` deploys and an exam run on his machine before anything is known
+- **The second pass: his ruling 6 Nov 2026, "Second pass + checks"** (over checks only and over a stronger model):
   advice replies are edited by a separate short call into two to four short lines, one option, one question at most,
   and the edit is checked (markers, numbers, foods, claims, shape) or the draft stands; safety and medical wording is
-  never edited. **Measured 7 Nov 2026 and narrowed**: "safety" is read off what SHE said (pain, a symptom, an
-  injury, an allergy, medical, eating very little) or a draft referring her to a professional; a warning sentence
+  never edited. **Measured 7 Nov 2026 and narrowed**: "safety" is read off what HE said (pain, a symptom, an
+  injury, an allergy, medical, eating very little) or a draft referring him to a professional; a warning sentence
   inside an edited reply comes back word for word or the edit is refused ("numb" had matched "numbers": 19 skips, 9
   of them plain advice). And a save is never a silent turn: the coach answers beside it, and its note is never a
-  clinical label about her (her "fix the save note wording too": her own words replace one) (`test:save-reply`,
+  clinical label about his (his "fix the save note wording too": his own words replace one) (`test:save-reply`,
   `verify:chat-save-reply`). `test:voice-pass`, `chat-gemini/voice-pass.ts`. Needs the `chat-gemini` deploy and an exam re-run
-- **Setup is a conversation, not a form: her ruling 7 Nov 2026, "Up to 3, then back"** (over one follow-up and over no
-  limit): what she volunteers gets up to three follow-ups, noted as it goes, before the coach steers back; the app steps
+- **Setup is a conversation, not a form: his ruling 7 Nov 2026, "Up to 3, then back"** (over one follow-up and over no
+  limit): what he volunteers gets up to three follow-ups, noted as it goes, before the coach steers back; the app steps
   in on the fourth reply with nothing recorded, asks itself when a reply asks nothing, and the setup summary lists
   "What I'll remember" with Forget. `test:setup-follow-ups`, `verify:onboarding-turns` §27. Needs the `onboarding-chat`
   deploy; whether the model follows up is unproven until a real setup
@@ -1132,14 +1135,14 @@ menu" stays true when a copy is also left outside it.
   a "Full form guide" button for the rest, and a message that asks several
   things gets one line per thing, each starting with what it answers — no
   headers, no bold, everything else still speech. (2) **A question only when
-  the answer matters**, from three options — it REVERSES her 15 Sep "end every
+  the answer matters**, from three options — it REVERSES his 15 Sep "end every
   response with exactly one question", which had turned into padding ("Have
   you noticed the RPE targets…?"); never more than one, tap buttons where the
-  answers are obvious. (3) **No new cards for suggestions**, in her words: *"I
+  answers are obvious. (3) **No new cards for suggestions**, in his words: *"I
   want it to feel like a text conversation with a coach. A coach wouldn't send
-  a card."* Offered a card for a suggested meal change, she declined; the
-  existing Apply cards for changes she ASKS for are untouched and were not
-  what she was ruling on. The essays had a findable cause: the prompt's
+  a card."* Offered a card for a suggested meal change, he declined; the
+  existing Apply cards for changes he ASKS for are untouched and were not
+  what he was ruling on. The essays had a findable cause: the prompt's
   trigger list said "provide step-by-step form cues, target muscles, common
   mistakes, and coaching tips" while §1 said "offer the rest", and the model
   obeyed the more specific line. `coach-promises` (source only — whether the
@@ -1180,7 +1183,7 @@ menu" stays true when a copy is also left outside it.
   the days and the wording differ so a coach keying on "swap" or "move" cannot
   pass by accident; 27 and 49 the same day, for the top-up card: an ASK
   gets it and a complaint alone gets none, the direction no code can enforce;
-  26 and 47 since 24 Sep 2026, with two voice cases for her "short steps" and
+  26 and 47 since 24 Sep 2026, with two voice cases for his "short steps" and
   "question only when it matters" rulings; 23 and 43 on 20 Sep, up from 20 and
   37): the exam was written on
   13 Sep and the coach has gained tools since, so it was measuring a surface
@@ -1274,7 +1277,7 @@ menu" stays true when a copy is also left outside it.
   the exam's own message with its answer, and the graded reply copied its
   labels. The other is the allergy few-shot, which is word for word the
   allergen case. `coach-promises` now fails on any exam question in the
-  prompt. The allergy one was reworded on her ruling the same day ("reword the
+  prompt. The allergy one was reworded on his ruling the same day ("reword the
   allergy exam question"): the example stays in the prompt as safety wording,
   and the exam case asks the same thing in words the coach has never seen.
   No exceptions remain. **An exam case edit does NOT make the scores stale on
@@ -1325,13 +1328,13 @@ menu" stays true when a copy is also left outside it.
   NOT browser-driven: the case needs a loaded lift on today's card and the
   harness's today is all bodyweight
 - **A NEW RULING CAN BREAK AN OLD ONE, AND THE COLLISION IS THE FINDING.**
-  18 Sep 2026: Ashley ruled that swap options outside her training style should
+  18 Sep 2026: Ashley ruled that swap options outside his training style should
   be shown below the ones that match. Building it re-created the report that
-  produced her 10 Sep ruling — an unloaded option above a loaded one for a
+  produced his 10 Sep ruling — an unloaded option above a loaded one for a
   lift that carries weight — because the new key was outermost and the old one
   was not. A gate caught it, which is the argument for gating a ruling rather
   than only obeying it. **Do not resolve it by picking the newer one: put both
-  in front of her, say which broke, and let her order them.** She chose the
+  in front of him, say which broke, and let him order them.** He chose the
   older rule and the newer one moved inward, which also changed the SHAPE of
   what had just been built — a grouped layout could no longer express the
   order, so the marker moved onto the row.
@@ -1352,32 +1355,32 @@ menu" stays true when a copy is also left outside it.
   `personalBest(metric, value)` in the phrasebook, one place, so the exam and
   the gates can grade it. Any field that can hold two kinds of quantity needs
   the same treatment
-- **The coach speaks first every day: her ruling 7 Nov 2026, "Hello + more moments"** (over a daily hello alone and
-  over more moments alone; it REVERSES her 7 Sep "training and wins" in-app scope). The day's first unprompted
-  message greets her (an event due IS the hello, else the opener's pick), kept in the chat; the phone's time-of-day
-  moments are said in the chat too, same words and shortcut; her Light/Normal/Lots caps every unprompted message,
+- **The coach speaks first every day: his ruling 7 Nov 2026, "Hello + more moments"** (over a daily hello alone and
+  over more moments alone; it REVERSES his 7 Sep "training and wins" in-app scope). The day's first unprompted
+  message greets him (an event due IS the hello, else the opener's pick), kept in the chat; the phone's time-of-day
+  moments are said in the chat too, same words and shortcut; his Light/Normal/Lots caps every unprompted message,
   chat and phone together (each is a chat row with the reminder marker, which the phone reads). `test:coach-nudge` §9,
   `test:reach-out` §5c, `verify:coach-hello`. Needs the `coach-reach-out` deploy for the phone half
 - Accountability is active — the coach opens, asks how it went, follows up
   — `coach-opener`, `coach-nudge`, `session-feel`, `verify:coach-speaks-first`.
   **And from outside the app: BUILT 24 Sep 2026, NOT LIVE.** Seven switchable
-  phone notifications (her 17 Sep ruling), at most one a day, 8am-9pm on her
-  clock, the permission asked only from her own tap — `reach-out`,
+  phone notifications (his 17 Sep ruling), at most one a day, 8am-9pm on his
+  clock, the permission asked only from his own tap — `reach-out`,
   `verify:reminders`, `verify:reach-out-function`. Live only once the
-  migration, the function deploy and the keys are done on her machine; until
+  migration, the function deploy and the keys are done on his machine; until
   then Profile says "Not live yet" and offers no switch.
-  **Up to 3 a day, at least 3 hours apart — her ruling 4 Nov 2026, "Up to 3,
+  **Up to 3 a day, at least 3 hours apart — his ruling 4 Nov 2026, "Up to 3,
   spaced"** (over one a day and over no limit), REPLACING the one-a-day cap
   above, with three more of the ten switches: a training-day morning reminder,
   a "log your meals" nudge (only for someone who logs) and a "behind on
   protein" nudge, both from 7pm. `test:coach-moments` §4b, `test:reach-out` §4,
   §5b, `verify:reach-out-function` 13-16, `verify:reminders` 2a-2c. Needs the
   new migration and the `coach-reach-out` deploy.
-  **The coach TEXTS you — her rulings 6 Nov 2026, "Chat, with a shortcut" and
+  **The coach TEXTS you — his rulings 6 Nov 2026, "Chat, with a shortcut" and
   "Three levels".** A reminder is a real coach message in the chat ("Hey Ashley,
   are you ready for your session today?"), titled "Trainer", and a tap opens the
   chat where it sits, session and food ones with a small shortcut button. A coach
-  REPLY pings like a text when she has left the app and is saved in the chat; it
+  REPLY pings like a text when he has left the app and is saved in the chat; it
   never counts against the reminders and has its own switch. How often: Light 1,
   Normal up to 3 (default), Lots up to 5 a day. The coach's server writes only
   into a fresh coach row the app made (it cannot see who is asking).
@@ -1436,20 +1439,20 @@ menu" stays true when a copy is also left outside it.
   (avatar, "Coach", "Personal TrAIner", clear, the gear, with App's floating
   gear hidden meanwhile) replaces the per-group name. The composer is the
   page's last row on the tab bar, and the tab bar's chat button lies flat on
-  that tab only. **Coach bubbles are a SOFT TINT — her ruling 16 Oct 2026**, "the chat bubbles
+  that tab only. **Coach bubbles are a SOFT TINT — his ruling 16 Oct 2026**, "the chat bubbles
   colour is too bright", from three options (over a muted mint and over plain like yours): the
   card colour with 14% of the main colour, the card's own text and a mint hairline. Text reads
   10:1 or better in all 81 theme x accent pairs, so the coral/rose shortfall named below is GONE;
   the tint sits close to your panel by design (1.1:1 at closest, gold on Linen), and the hairline,
   side and avatar say who spoke. It REPLACES the next sentence. `verify:chat-bubbles` (64 checks).
   WAS: **Coach bubbles are the flat main colour** — Ashley's ruling,
-  27 Sep 2026, from three options. Her brief first gave them the avatar's mint
+  27 Sep 2026, from three options. His brief first gave them the avatar's mint
   fade; measured, the fade's lighter top and darker bottom put long messages
-  under 4.5:1 in Graphite, Midnight and Frost, and she chose one solid colour
+  under 4.5:1 in Graphite, Midnight and Frost, and he chose one solid colour
   over the fade and over a per-theme split. The avatar keeps the fade. Coach
   text is 5.2:1 or better in every theme on its own colours, and 2.27:1 or
   more clear of the page, which also closed the 26 Sep question about faint
-  light-theme bubbles. **Your bubbles are PLAIN** — her ruling 28 Sep 2026,
+  light-theme bubbles. **Your bubbles are PLAIN** — his ruling 28 Sep 2026,
   from three options, once both being mint left the side alone to say who
   spoke: the panel colour, its own text and the panels' hairline. Your text
   is 13.97:1 or better in all 81 theme × accent pairs; your fill and the
@@ -1460,7 +1463,7 @@ menu" stays true when a copy is also left outside it.
   white on the default mint is 1.5:1. Across 81 pairs, 75 reach 4.5:1. Coral
   and rose on the three light themes are 3.4-3.9:1 with the app's OWN pair,
   the same one every main button uses there. That is named, held to 3:1, and
-  hers to change.
+  his to change.
   `chat-groups`, `chat-page`, `verify:chat-bubbles`, `verify:chat-shell`
 - **The grocery list is a full page too (design 3a/3b, 27 Sep 2026)** —
   Ashley's brief, presentation only, every write through the store's own
@@ -1480,9 +1483,9 @@ menu" stays true when a copy is also left outside it.
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
 
-### Her rulings of 31 Oct 2026, the five-tab polish (`docs/plans/tab-polish-oct31.md`)
+### His rulings of 31 Oct 2026, the five-tab polish (`docs/plans/tab-polish-oct31.md`)
 - **"Build, keep my rulings"**: the handoff (Home 2c, Nutrition 3a+3b, Exercise 2a, Tools 2a, Chat 2b) as drawn, except where
-  an earlier ruling of hers says otherwise; the plan lists each. Layout only, nothing removed. `test:home-2c`,
+  an earlier ruling of his says otherwise; the plan lists each. Layout only, nothing removed. `test:home-2c`,
   `test:nutrition-3a`, `test:exercise-2a`, `test:tools-2a`, `test:chat-2b` and their `verify:` drivers
 - **Voice: "Option 1, add a listen button"**, over voice-note bubbles and over not now: each coach bubble reads aloud with
   the phone's own voice, one at a time, a second tap stops it, never drawn where the phone cannot speak. No voice
@@ -1491,45 +1494,45 @@ menu" stays true when a copy is also left outside it.
   mint outline for a choice that applies, grey hairline for the decline. `verify:chat-2b` 4h
 - **A rest day shows the dash on BOTH week strips: "Dash on both"** (1 Nov 2026): Exercise no longer draws the mint dot
   on a selected rest day, so a dot only ever means a session. `verify:missed-day` B5, `test:home-week-strip`
-- **Tab icons: her Tab Icons board, option 2a** (4 Nov 2026): Home a layout grid, Nutrition a knife and fork, Exercise a
-  flame, Tools a timer, and **no bar above the selected tab** (her "Remove that", the same day). And **active
+- **Tab icons: his Tab Icons board, option 2a** (4 Nov 2026): Home a layout grid, Nutrition a knife and fork, Exercise a
+  flame, Tools a timer, and **no bar above the selected tab** (his "Remove that", the same day). And **active
   recovery wears the rest day's violet** (option 4b): amber is for warnings.
   `verify:grocery` [10], `test:rest-day-card`
-- **The message box has ONE round button, the WhatsApp way** (her request 6 Nov 2026, with screenshots): the mic while
+- **The message box has ONE round button, the WhatsApp way** (his request 6 Nov 2026, with screenshots): the mic while
   the box is empty, send once there is text, the mic (as stop) while dictating. `verify:chat-composer` §2
 - **The chat names the coach "Trainer": "Both say Trainer"** (1 Nov 2026, from three options): the header and each
   message's label, one name. `verify:chat-2b` 1g, `verify:chat-bubbles`
 - **The chat's session pill counts sets DONE: "Sets done"** (1 Nov 2026, over the design's "set 3 of 20"): "Legs · 2 of 20
   sets", the one count every screen says. `test:chat-2b`
-- **Offer words: "Mix"** — "Just today" / "Whole block" / "Keep <the exercise>" (the decline names what she keeps only on a
+- **Offer words: "Mix"** — "Just today" / "Whole block" / "Keep <the exercise>" (the decline names what he keeps only on a
   swap or a removal; elsewhere "Not now"). And **"Match the coach"**: the Exercise screen's swap, add and remove sheets
   use the same "Just today" / "Whole block". `test:offer-text`, `test:coach-kit-names`, `verify:offer-text`
 
-### Opening the app (31 Oct 2026, her "make it load quicker, and not show that loading")
+### Opening the app (31 Oct 2026, his "make it load quicker, and not show that loading")
 - **A re-open draws the app from the copy kept on the phone** (`boot-cache.ts`) and swaps the server's answers in
   behind it, only where the screen still shows the kept value. **A failed read is never "no profile"**: the stored
-  profile id is never removed on one (it was: opening with no signal sent her to setup). The start asks everything at
+  profile id is never removed on one (it was: opening with no signal sent him to setup). The start asks everything at
   once; Home draws its saved day at once and its layout, never a "Loading" box, on the first open of a day.
   `verify:app-boot` (the only page that boots the WHOLE app, with a delay on every answer), `test:boot-cache`.
   **When reading anything the start does, run `verify:app-boot`: no other harness page runs App.tsx's start.**
 
-### Her ruling of 30 Oct 2026, "less is more" (BACKLOG, the declutter entry)
+### His ruling of 30 Oct 2026, "less is more" (BACKLOG, the declutter entry)
 - **"Move things"**, over removing them for good: Home, Nutrition and Exercise say each thing once, the coach note is
   one line, and secondary parts sit one tap away (Progress on Home, the planned macros on Nutrition, "＋ Add" on
   Exercise). Nothing the app can do was removed. The settings gear scrolls with the page. `test:one-page` §6,
   `verify:one-page`
 
-### Her rulings of 20 Oct 2026, from the 19 Oct live test (`docs/audits/live-test-2026-10-19-findings.md`)
+### His rulings of 20 Oct 2026, from the 19 Oct live test (`docs/audits/live-test-2026-10-19-findings.md`)
 - **Coach offers: "Text + small buttons always."** Every change the coach offers is a chat bubble with small Apply /
   Not now buttons; a rebuild's list goes into the text. REVERSES the 24 Sep line keeping Apply cards for asked
   changes. Buttons keep the 44px tap floor. The rows are said through one function (`offer-text.ts`), a change
   repeated over days said once, naming them. `test:offer-text`, `verify:offer-text`
 - **A different KIND of session today: "Drop it, today only."** Cardio or functional today replaces the whole day;
-  the main lift returns next time at the same weight. Her 16 Sep "keep the main lift" still holds for a different
+  the main lift returns next time at the same weight. His 16 Sep "keep the main lift" still holds for a different
   session of the same kind.
 - **An ease-off on a non-leg day: "Work for that day instead."** A knee-loading move knocked out of a non-leg day is
   replaced by the day's own kind of work; no knee-rehab move is added to a non-leg day.
-  **And knee rehab goes on leg days only, always: her ruling 2 Nov 2026, "B"**, from three options (over every day
+  **And knee rehab goes on leg days only, always: his ruling 2 Nov 2026, "B"**, from three options (over every day
   for a lasting injury and every day always). It partly REVERSES the older "rehab in every session" for the knee
   alone: a knee on the injuries list, or a running knee ease-off, gets its rehab drill on leg and full-body days and
   none on a day not about legs. Every other joint keeps rehab on every day. `test:rehab-prescribed` §1,
@@ -1542,56 +1545,56 @@ menu" stays true when a copy is also left outside it.
 - **A food the app cannot identify, against a restriction: "Can't confirm it's nut-free"** (allergen band). Still
   blocked; never worded as "contains".
 
-### Her rulings of 17 Oct 2026, the one-page Home, Nutrition and Exercise (`docs/plans/one-page-tabs.md`)
+### His rulings of 17 Oct 2026, the one-page Home, Nutrition and Exercise (`docs/plans/one-page-tabs.md`)
 - **"Build this one"**: design 5c·5 / 5c·6 / 5c·4, layout only, nothing removed. Rings live on Home only.
 - **Nutrition's day strip: "Keep it on top."** **The streak pill: "12 in a row"** (never "days": it counts
   sessions). **Logging: "Tap the steps ring"** — steps from Home's key, water from Nutrition's water cell;
   Home logs no water any more. `test:one-page`, `verify:one-page`, `test:tab-ownership`, `test:app-tour`,
   `test:chat-app-reality` (the coach's app map; needs the `chat-gemini` deploy)
 
-### Her rulings of 9 Oct 2026, from the test-log fixes (`docs/test-log-2026-10-09/HANDOVER.md`)
-- **Every ingredient is counted, shown and shopped raw or dry — her ruling 18 Oct 2026 (runs 7-10, H36/M64), "Dry,
+### His rulings of 9 Oct 2026, from the test-log fixes (`docs/test-log-2026-10-09/HANDOVER.md`)
+- **Every ingredient is counted, shown and shopped raw or dry — his ruling 18 Oct 2026 (runs 7-10, H36/M64), "Dry,
   plus cooked hint"**: "70g dry rice (about 200g cooked)". A cooked line becomes its raw or dry twin at the weight
   holding the same protein (meat, fish) or starch (grains, potatoes, lentils), in kitchen steps, wherever lines come in
   (the stored-meal read and verification); the hint is drawn beside the line, never in it; the list buys by the same
   factor; our own library is written as bought. Energy moves a few percent at most, except chicken thigh, whose USDA
   cooked and raw figures disagree (named). And a resized copy of a plan dish ("X (as lunch)") is the plan's own for
-  her 10 Oct hold rule. `test:one-state`, `verify:meal-costed`, `test:meal-day-move` §13. Needs the `chat-gemini` and
+  his 10 Oct hold rule. `test:one-state`, `verify:meal-costed`, `test:meal-day-move` §13. Needs the `chat-gemini` and
   `generate-meals` deploys for the coach's food table and the writer's rule
-- **"On target" means every number inside its band, and the bands are tighter — her rulings 18 Oct 2026 (runs 7-10,
-  M59)**, "Tighter meals too" and then, with the measured cost in front of her, "Tighter meals, 10%": carbs and fat
+- **"On target" means every number inside its band, and the bands are tighter — his rulings 18 Oct 2026 (runs 7-10,
+  M59)**, "Tighter meals too" and then, with the measured cost in front of him, "Tighter meals, 10%": carbs and fat
   ±10% (were ±25%), protein 0.95-1.10x (was 1.15x), calories ±5%; protein's floor kept at 0.95. Measured at 100%
   pool: days on target 89% -> 52.5%, different days a week 4.45 -> 3.34. **Every on-target count and variety figure
   in this file from before 18 Oct is NOT comparable.** A sentence about a day's miss names it through ONE function
   (`namedMiss`): calories when they are off, else the macro furthest out. `test:day-verdict`, `test:meal-day-move`,
   `test:meal-knock-on`
   
-- **Kit in setup: "Show ticks once"** — her ruling 18 Oct 2026 (runs 7-10, H34), from three options, partly
+- **Kit in setup: "Show ticks once"** — his ruling 18 Oct 2026 (runs 7-10, H34), from three options, partly
   REVERSING the "no new setup question" below: every home equipment choice gets one setup screen of the nine kit
   ticks, pre-ticked with the choice's guess; what is left ticked is the first plan's kit. The swap and remove sheets'
   "I haven't got the kit" also opens the same ticks, for good. `test:setup-kit-ticks`, `verify:setup-kit`,
   `verify:kit-for-good`
-- **An allergen named to the coach is refused in her words** — her rulings 18 Oct 2026 (H41): "Say 'nut-free'" and
+- **An allergen named to the coach is refused in his words** — his rulings 18 Oct 2026 (H41): "Say 'nut-free'" and
   "Refuse and say if they dont have an allergy they should go to the settings": *"Almond butter has tree nuts in it,
   and your profile says nut-free, so I won't suggest it or add it to your meals. If you don't have a nut allergy,
   change it on Profile, under Food, Diet."* That turn's reply is the app's, never the coach's; no card puts it on the
   plate. `test:named-food-clash`, `verify:named-food-clash`. Needs the `chat-gemini` deploy for the prompt half
 - **Kit: "Remember what they say."** Asked how someone should tell the app what kit they have
-  (revisiting her 9 Sep "fix the words"), from options: keep the four equipment choices AND remember
+  (revisiting his 9 Sep "fix the words"), from options: keep the four equipment choices AND remember
   the specifics people say in setup or to the coach ("I've got dumbbells and a bench", "I don't own
   bands"), shown as ticks on Profile. No new setup question; nobody's plan changes unless they say
-  something. **BUILT, all three doors, since 11 Oct 2026 (her "Build it")**: Profile → Equipment →
+  something. **BUILT, all three doors, since 11 Oct 2026 (his "Build it")**: Profile → Equipment →
   "What you have" (nine ticks; a change is priced and shown before Save), the coach's
   `propose_kit_change` card, and setup's never-asked `kitList` slot. Stored as existing `user_facts`
   rows, no migration; one controller (`makeKitController`) handed to Profile and the coach. Read
   through ONE function each: `allowedEquipmentFor` (the pool, so every swap, add, rebuild and
   substitution), `equipmentTierFor` (every engine read of the tier), the warm-up's drills and the
-  ceilings. Setup and the coach record a statement only when every item is in her own words, the
+  ceilings. Setup and the coach record a statement only when every item is in his own words, the
   right way round (`kitStatementInUserWords`). Changing the equipment choice starts the list again.
   MEASURED: the 9,216-plan quality grid is identical before and after (11.64), and seeded plans with
   no kit rows are byte-identical. NOT in it: the dumbbell pack (an honest dumbbells-and-bench kit
   with a shoulder flag loses its triceps work and most of its pressing — every grid plan still clears
-  7.2, and the pack is the fix), and her two open questions (the swap sheet's "I don't own it" vs
+  7.2, and the pack is the fix), and his two open questions (the swap sheet's "I don't own it" vs
   "not this week"; asking "new dumbbells?" after a log above a stated limit). `test:kit-list`, `verify:chat-kit`,
   `verify:kit-ticks`, `docs/plans/kit-list.md`. Needs the `chat-gemini` and `onboarding-chat` deploys
 - **A surprising weigh-in: "Ask, and hold the target."** More than about 3% from the last one is
@@ -1611,13 +1614,13 @@ menu" stays true when a copy is also left outside it.
   promise about the plan — `test:food-exclusions` §4/§7. (3) every word in an ingredient line is
   accounted for or it is a miss; dry/raw lines reach their own entries; bare words keep today's answer
   only for a reviewed tag-safe list; a latte has its own dairy row, and an oat latte is a miss — `test:ingredient-lookup`, `test:food-db-parity` §6. (4) a method
-  naming a food she must not eat, or one the dish lacks, is not shown, at verification and on the
-  card — `test:meal-method-check`, `verify:meal-method` §4. NOT proven: her real stored pools through
-  the new lookup (plan §5 steps 2-3, her machine) and whether the deployed coaches obey their new lines
-  (the exam). Open questions of hers: unlisted seasonings in steps, what an avoided food in a step does,
+  naming a food he must not eat, or one the dish lacks, is not shown, at verification and on the
+  card — `test:meal-method-check`, `verify:meal-method` §4. NOT proven: his real stored pools through
+  the new lookup (plan §5 steps 2-3, his machine) and whether the deployed coaches obey their new lines
+  (the exam). Open questions of his: unlisted seasonings in steps, what an avoided food in a step does,
   M17 steps after an edit, bare "chicken" assume-or-ask, the two Greek yoghurts, oats and gluten-free
 
-### Her rulings of 10 Oct 2026, from runs 3-4 of the live-app test (`docs/test-log-2026-10-09/runs-3-4-trace.md`)
+### His rulings of 10 Oct 2026, from runs 3-4 of the live-app test (`docs/test-log-2026-10-09/runs-3-4-trace.md`)
 - **A logged meal stays as eaten; the rest of the day fits around it: "A, with two
   conditions."** (1) When other meals are re-sized, ONE line says so, with an Undo; (2) only the
   SAME dishes, by about 25% either way; beyond that the meals are left alone and the line says
@@ -1627,17 +1630,17 @@ menu" stays true when a copy is also left outside it.
 - **Toast counts as bread now.** French toast is its own food and keeps its egg and milk.
   `meal-amounts`
 - **The heaviest logged set carries into the next block, under the stated kit limit, adjusted
-  for the new rep range.** It collided with her 1 Sep "offer, never apply" and her three-session
-  bar, and was put to her the same day: **"Offer it"**, from three options (over applying it
+  for the new rep range.** It collided with his 1 Sep "offer, never apply" and his three-session
+  bar, and was put to him the same day: **"Offer it"**, from three options (over applying it
   automatically, and over applying it only after three sessions). Block start says "last block
-  you did 18 kg x 11, that's 19 kg for 6-8, use it?" and nothing changes until she taps yes.
+  you did 18 kg x 11, that's 19 kg for 6-8, use it?" and nothing changes until he taps yes.
   `beat-target` §6
 - **A swap keeps the day's other dishes: "Resize, else leave."** Swapping a meal (or moving one
   between days) for one of the plan's own dishes leaves every other meal of that day on the dish
   it showed; they re-size together, about 25% either way, with one line and an Undo, and beyond
   that they are left alone and the line says how far over or under. **Scope, the same day, from
   three options: "Plan's own dishes only"** — a meal asked for by name, built from the fridge or
-  edited still re-plans the rest of the day, so her 1 Sep "plan the rest of my meals" stands.
+  edited still re-plans the rest of the day, so his 1 Sep "plan the rest of my meals" stands.
   `docs/plans/swap-keeps-the-other-meals.md`, `hold-around-pins`, `verify:swap-knock-on`
 - **A session finished short is "Done, with the count".** Still a tick, and the day says "5 of 18
   sets" beside it, over a separate part-done mark and over keeping it as it was. One count for the
@@ -1648,25 +1651,25 @@ menu" stays true when a copy is also left outside it.
   carrying a swap into later blocks, and a third "from now on" choice. `block-swap-until`,
   `verify:moved-edit`
 
-### Her layout pass of 10 Oct 2026 (`docs/plans/layout-revamp-oct10.md`), merged to `main` 11 Oct 2026
+### His layout pass of 10 Oct 2026 (`docs/plans/layout-revamp-oct10.md`), merged to `main` 11 Oct 2026
 - **"Build all six, then show me"**, and **"Personal TrAIner" stays** over the brief's "Coach".
   Home, Nutrition, Exercise, Profile, setup and the round-timer sheet, layout only: every control
   moved, none removed. `test:layout-revamp`, `test:exercise-layout`, `test:round-setup`,
   `test:profile-groups`, `test:onboarding-style`, and the browser drivers re-anchored to the new
-  screens. Shown to her as screenshots; merged on her "Merge", 11 Oct 2026.
+  screens. Shown to him as screenshots; merged on his "Merge", 11 Oct 2026.
 - **The Exercise tab's running button presses the tick it describes**: "Log set 3 · Bench 80 kg ×
   6" is read off the set row's own tick, so it can never promise one weight and save another; with
   no weight to take it opens the box instead. `test:exercise-layout`
-- **Setup is one question per screen**, and a card she has not answered holds the screen open.
+- **Setup is one question per screen**, and a card he has not answered holds the screen open.
   Skip is the old "Prefer not to say", moved to the header, never on a multi-select. One tap
-  answers a single-choice question: her ruling 11 Oct 2026, **"Move straight on"**, over the
+  answers a single-choice question: his ruling 11 Oct 2026, **"Move straight on"**, over the
   brief's select-then-Next. `test:onboarding-style`
 - **Profile is a page of rows**; every editor it had is in exactly one row's sheet, and a deep link
   opens the sheet holding its section. `test:profile-groups`
 - **Home's coach note rotates, and stops**: held while touched or focused, never moving under
   reduced motion; an adaptation question is never rotated away. `test:layout-revamp`
 
-### Her rulings of 11 Oct 2026, from run 5 of the live-app test
+### His rulings of 11 Oct 2026, from run 5 of the live-app test
 - **Every rebuild honours the date asked for, never touches a day already trained or a session in
   progress, carries bans, swaps, active temporary changes and logged weights through, and its card
   lists everything else it will change.** Every rebuild path, both surfaces. Built through the one
@@ -1702,9 +1705,9 @@ menu" stays true when a copy is also left outside it.
 
 ## Asking
 
-- Work autonomously by default. When a decision genuinely is Ashley's to make, ask her directly in the conversation — don't guess and don't wait for it to arrive secondhand.
+- Work autonomously by default. When a decision genuinely is Ashley's to make, ask him directly in the conversation — don't guess and don't wait for it to arrive secondhand.
 - **EVERY CHANGE IS VIEWED THROUGH THE LENS OF A CERTIFIED CSCS COACH, and
-  training questions are ANSWERED here rather than brought to her.** Ashley,
+  training questions are ANSWERED here rather than brought to him.** Ashley,
   18 Sep 2026, twice: *"Ask the questions you ask me regarding how the app
   should act should be answered from a cscs perspective. So with that in mind
   you should be able to answer them as a cscs coach would"*, and then, widening
@@ -1726,10 +1729,10 @@ menu" stays true when a copy is also left outside it.
     population level the app already works at — protein targets, deficit rate,
     macro split logic, meal timing.
   - STILL HERS, because the training science is neutral and the question is
-    what her app is like: what the app SAYS and how it sounds; when it speaks
+    what his app is like: what the app SAYS and how it sounds; when it speaks
     and how often; how much it asks before doing something; what it is allowed
     to CLAIM about itself; anything reaching live users, money or data. "Ask
-    every time or only when she sounds definite" is hers. "Sixty seconds or
+    every time or only when he sounds definite" is his. "Sixty seconds or
     forty-five between sets" is mine.
   - NEITHER, and this is a real professional boundary rather than caution: a
     CSCS does not diagnose, treat, rehabilitate, or write clinical nutrition.
@@ -1768,7 +1771,7 @@ menu" stays true when a copy is also left outside it.
     warm-up where they had held three. Every gate was green and the number
     three had not changed. Measured with a constructed over-budget day, not
     reasoned about.
-- ASK when the decision is about how the app behaves in the ways left to her above: what the app is allowed to claim, what a user should see or be told, a trade-off between two defensible behaviours where the training science does not pick a winner, or anything in the medical/clinical band (allergens, diagnosis, mental health).
+- ASK when the decision is about how the app behaves in the ways left to him above: what the app is allowed to claim, what a user should see or be told, a trade-off between two defensible behaviours where the training science does not pick a winner, or anything in the medical/clinical band (allergens, diagnosis, mental health).
 - PROCEED WITHOUT ASKING on anything mechanical: bugs, tests, refactors, measurement, data consistency, performance — anything that has a right answer.
 - How to ask, which matters as much as when:
   - Ashley is non-technical. Never ask about a function, field, or file.
@@ -1776,23 +1779,23 @@ menu" stays true when a copy is also left outside it.
   - Give 2-4 concrete options and a recommendation with a one-line reason.
   - Say what happens either way, in plain terms.
   - One question at a time. Don't batch several and stall.
-  - If she picks something that seems wrong, say so once, then do it.
-- Keep a decision log, and keep it in TWO places so it survives: the BACKLOG.md entry for that piece of work (options, what was chosen, why, and whether she answered or it was decided unprompted), and the commit message. Not in the conversation — that dies. Not only in a code comment — nobody reads those looking for a decision. A ruling that will apply again beyond this one change goes in THIS file as well.
+  - If he picks something that seems wrong, say so once, then do it.
+- Keep a decision log, and keep it in TWO places so it survives: the BACKLOG.md entry for that piece of work (options, what was chosen, why, and whether he answered or it was decided unprompted), and the commit message. Not in the conversation — that dies. Not only in a code comment — nobody reads those looking for a decision. A ruling that will apply again beyond this one change goes in THIS file as well.
 - Still stop and wait, even with a good default in hand: anything affecting live users, anything that changes what a metric measures, anything in the allergen or safety path.
 
 ## Writing to Ashley
 
-Her ruling, 9 Sep 2026: *"at the end of each message going forwards I want a few
+His ruling, 9 Sep 2026: *"at the end of each message going forwards I want a few
 short sentences summary. because you always go into too much detail that takes
 too long to read. give me short punchy answer"*.
 
 - **Every message ends with a summary**: two or three short sentences, plainly
-  headed, covering what happened, what's next, and what's needed from her. This
+  headed, covering what happened, what's next, and what's needed from him. This
   is not optional and not only for long messages.
 - Short and punchy above the summary too. Answer the question asked, then stop.
-  If the detail matters, it goes in a file she can open, not in the reply.
+  If the detail matters, it goes in a file he can open, not in the reply.
 - No jargon. No file names, function names, table names, or commit hashes unless
-  she asked for them. Say what changes on her phone, not what changed in the code.
+  he asked for them. Say what changes on his phone, not what changed in the code.
 - Prefer one sentence over a paragraph, a paragraph over a table, and a table
   only when the shape of the answer genuinely is a comparison.
 - This is about how to write, not what to check. It never shortens the
@@ -1809,7 +1812,7 @@ building phase. So just update the weight. No message."*
   and let the new value stand.
 - This is about USER-FACING transitions only. It relaxes nothing else: the
   production database is still select-only, `main` and every production deploy
-  still need her explicit word each time, and the safety rules on allergens,
+  still need his explicit word each time, and the safety rules on allergens,
   injuries and load prescription are unchanged — those exist because the
   numbers must be right, not because someone is watching them change.
 - Re-ask if this ever stops being true. "No live users" is a fact about today,
@@ -1851,8 +1854,8 @@ building phase. So just update the weight. No message."*
 
 ## Handing work to Ashley's machine
 
-Ashley runs Claude Code in VS Code against her local clone. Her ruling, 1 Sep
-2026: **when something has to happen on her machine, hand her a
+Ashley runs Claude Code in VS Code against his local clone. His ruling, 1 Sep
+2026: **when something has to happen on his machine, hand him a
 copy-pasteable prompt for that session, not a list of commands.** Written
 after a production deploy reported success while shipping code three merges
 old — the commands were right and the context was missing.
@@ -1870,7 +1873,7 @@ old — the commands were right and the context was missing.
   date" and a named deploy target both print identically whether the work
   happened or the file was absent from the checkout. Name the specific thing
   that proves it worked.
-- Keep it in one fenced block she can copy without editing.
+- Keep it in one fenced block he can copy without editing.
 
 ## Database
 
@@ -2483,17 +2486,17 @@ old — the commands were right and the context was missing.
 - **A RECORD THAT GAINS A MEANING INHERITS EVERY OLD WRITER OF IT.** 27 Sep
   2026: hearts became likes, and a week-old line in the coach's swap confirm
   hearted every meal it swapped in. It had been a harmless bookkeeping write;
-  the moment a heart meant "she likes this", it became the app learning
-  behind her back, against her ruling, and nothing new had been written to
+  the moment a heart meant "he likes this", it became the app learning
+  behind his back, against his ruling, and nothing new had been written to
   cause it. Found by a review, not by any gate. **When a stored thing starts
   to mean more, grep every WRITER of it and ask whether each still says what
-  she meant**, the writer half of "a new column is a change to every reader
+  he meant**, the writer half of "a new column is a change to every reader
   and writer".
 - **A MESSAGE IS ONLY SHOWN IF IT IS ON SCREEN WHERE THE TAP WAS.** The same
   day: a driver found the refusal sentence in the page and passed, while the
   screenshot showed a + button that did nothing, because the sentence was in
   the sheet's banner a scroll away. A driver checking that a message exists
-  is checking the DOM; the claim is that she can SEE it. Assert where it is
+  is checking the DOM; the claim is that he can SEE it. Assert where it is
   and that it is inside the viewport.
 - **A FAKE THAT IGNORES FILTERS CANNOT SEE A MISSING FILTER — and on a
   service key, the filter IS the privacy.** 24 Sep 2026: the reach-out smoke
@@ -2802,7 +2805,7 @@ than one not started, because it looks finished in the log.
   eases that area off for a few days and reverts on its own; something that has
   been there a while goes on the injuries list so every future plan avoids it;
   **sharp, one-sided or worsening names a professional and changes nothing —
-  not the plan, not the record.** She rejected acting today-only and recording
+  not the plan, not the record.** He rejected acting today-only and recording
   nothing ("the app never learns"), and treating every ache as an injury ("one
   sore session rewrites the block").
   This is a rule about the APP, not about one screen: any surface that lets
