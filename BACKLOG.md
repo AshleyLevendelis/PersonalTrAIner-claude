@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **A FOOD WAS OFFERED AS A SWAP FOR ITSELF, COOKED: APPLIED, IT RENAMED THE MEAL AND CHANGED NOTHING, 8 NOV
+  2026** (QA round 3, meals finding 9). Mechanical. Taking "350g raw potato" out of a dinner offered "305g potato
+  boiled — same carbs"; applied, the meal became "Salmon and potatoes with potato boiled instead of raw potato", still
+  listed 350g raw potato, and the day's other meals were re-planned around a change that was not one: every line is
+  weighed raw or dry (his 18 Oct ruling), so the boiled potato reads back as the raw one. A food's own raw, dry or
+  cooked twin is no longer offered as its replacement; a different food (sweet potato, parsnip) still is. CHECKS:
+  `test:meal-food-edit` §T (+3, the detector proved on the tester's own line). Mutations: 1 of 1 caught (the list
+  came back exactly as the tester saw it).
 - [x] **"…SO THE DAY STILL FITS" WAS SAID OVER DAYS THAT DID NOT FIT, 8 NOV 2026** (QA round 3, the meals tester's
   finding 4). Mechanical: a false claim. A swap, a day move, a meal moved between slots, an amount changed or a food
   added re-plans the day's other meals, and each changed meal was announced "…becomes X, so the day still fits" or

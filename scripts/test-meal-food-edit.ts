@@ -348,5 +348,20 @@ console.log('\n10. Every screen edit offers Undo, back to what the slot showed (
   }
 }
 
+console.log('\nT. A food is never offered as a swap for itself in another state (8 Nov 2026, QA round 3)')
+{
+  // "350g raw potato" was offered "305g potato boiled — same carbs"; applied, the meal was renamed and nothing in it
+  // changed, because every line is weighed raw (the boiled potato reads back as the raw one).
+  const { lookupIngredient, weighedTwinOf, cookedTwinOf } = await import('../src/lib/food-db')
+  const potatoLines = ['170g salmon', '350g raw potato', '80g broccoli']
+  const r = buildMealFoodRemoveProposal({ ...base({ currentMeal: { name: 'Salmon and potatoes', ingredients: potatoLines, macros: macrosOf(potatoLines) } }), rawArgs: { meal_slot: 'dinner', food: 'potato' } })
+  const alts = r.ok ? (r.diff.alternatives ?? []) : []
+  const potato = lookupIngredient('raw potato')!
+  const isPotato = (label: string) => { const e = lookupIngredient(label.replace(/^\d+g /, '')); return !!e && (e.name === potato.name || weighedTwinOf(e)?.name === potato.name || cookedTwinOf(potato)?.name === e.name) }
+  check('T1. taking the potato out still offers swaps (the fixture binds)', r.ok && alts.length >= 1, r.ok ? alts : r)
+  check('T2. ...and none of them is potato, raw or cooked', alts.every(a => !isPotato(a.label)), alts.map(a => a.label))
+  check('T3. the tester\'s exact case is a potato (the detector is real)', isPotato('305g potato boiled') && !isPotato('300g sweet potato raw'))
+}
+
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
 console.log('\nOne food in a meal can be taken out, swapped or resized — through the same checks as everything else.\n')

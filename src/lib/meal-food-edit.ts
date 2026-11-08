@@ -1,7 +1,7 @@
 import { verifyProposal, computeSlotBudgets, type RawProposal } from './meal-generation'
 import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, type MealAdditionPayload } from './meal-addition'
 import { parseIngredientLines, withQuantity } from './portion-scaler'
-import { FOOD_DB, lookupIngredient, unitToGrams, type FoodEntry, type Macros100g } from './food-db'
+import { FOOD_DB, lookupIngredient, unitToGrams, weighedTwinOf, cookedTwinOf, type FoodEntry, type Macros100g } from './food-db'
 import { swapGroupOf } from './food-swap-groups'
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
@@ -309,8 +309,13 @@ function suggestReplacements(input: BuildMealFoodEditInput, slot: MealSlotName, 
   // nothing is offered for it and it is never offered for anything.
   const group = swapGroupOf(entry.name)
   if (!group) return []
+  // NOT THE SAME FOOD IN ANOTHER STATE (8 Nov 2026, QA round 3): "350g raw potato" was offered "305g potato boiled —
+  // same carbs", and applying it renamed the meal and changed nothing in it, because every line is weighed raw or dry
+  // (as-weighed.ts) and the boiled potato reads back as the raw one. A food and its cooked or raw twin are one food.
+  const sameFood = (f: FoodEntry) => f.name === entry.name || weighedTwinOf(f)?.name === entry.name || weighedTwinOf(entry)?.name === f.name
+    || cookedTwinOf(f)?.name === entry.name || cookedTwinOf(entry)?.name === f.name
   const candidates = FOOD_DB
-    .filter(f => swapGroupOf(f.name) === group && f.name !== entry.name && f.per100g[key] > 0)
+    .filter(f => swapGroupOf(f.name) === group && !sameFood(f) && f.per100g[key] > 0)
     .sort((a, b) => (inPantry(b) ? 1 : 0) - (inPantry(a) ? 1 : 0) || distance(a) - distance(b))
     .slice(0, MAX_CANDIDATES_TRIED)
 
