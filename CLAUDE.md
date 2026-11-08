@@ -580,6 +580,11 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   actually driving the boxes, never once the row is saved and never on a
   build-up row. `last-time`, `verify:one-number` §8
 
+**And every change to an exercise made on the screen can be put back** — since 8 Nov 2026 (QA walk T7, her "every change
+previews and can be undone" in the shape of her "Undo line" rulings): a swap, removal, move or addition shows one line
+with an Undo that follows the coach card's put-back rules (only while the weeks are as the change left them, ten
+minutes). `test:screen-edit-undo`, `verify:edit-undo`
+
 **Every change to an exercise lives in one menu** — her ruling, 14 Sep 2026,
 from three options, after reporting that swapping sat outside the "⋮" while
 moving, removing and banning sat inside it: **all of them behind the ⋮**, over

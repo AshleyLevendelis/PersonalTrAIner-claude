@@ -28,6 +28,8 @@ import type { WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
 import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import type { PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { ActiveAdaptationLines } from './ActiveAdaptationLines'
+import { ScreenEditUndoLine } from './ScreenEditUndoLine'
+import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 
 // ---------------------------------------------------------------------------
 // LAYOUT-DESIGN.md §5.1 — the view switcher: 'today' (TodayPanel, the
@@ -281,6 +283,14 @@ export function ExerciseTab({
           onBanExercise={requestBan}
           onOpenHistory={(id, name) => setDetailTarget({ exerciseName: name, exerciseId: id, tab: 'history' })}
           onOpenDetail={(name: string) => setDetailTarget({ exerciseName: name, tab: 'howto' })}
+        />
+        {/* A swap made from the program view gets the same Undo line as one made on today's card (QA walk T7). */}
+        <ScreenEditUndoLine
+          mesocycle={mesocycle}
+          profileId={profileId}
+          onMesocycleUpdated={onMesocycleUpdated}
+          onPutBack={onLogsUpdated}
+          bottom={`calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + 12px)`}
         />
         <Suspense fallback={null}><SwapDialog
           target={swapTarget}

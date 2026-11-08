@@ -44,6 +44,7 @@ import { PeekPanel, PeekWhatYouDid } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
 import { WarmupSection } from './WarmupSection'
 import { NextSetButton } from './NextSetButton'
+import { ScreenEditUndoLine } from './ScreenEditUndoLine'
 // DEFERRED, the same trade the two nutrition sheets took on 14 Sep: a sheet
 // nobody has opened yet has no business in the chunk that has to arrive before
 // the first pixel. It costs one extra chunk header in the total and takes its
@@ -78,6 +79,7 @@ import { settleWeek } from '@/lib/settle-week'
 import { sessionRefFromCell, sessionRefForPlanDay, editTarget, sayDayIn, type SessionRef } from '@/lib/session-ref'
 import { planLighterToday, undoLighterToday, type LighterPlan } from '@/lib/lighter-today'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
+import { publishScreenEdit, recordScreenEdit, screenEditText } from '@/lib/screen-edit-undo'
 import { executeCardioSession } from '@/lib/pending-action-executor'
 import { recomputeLoad, type SwapScope } from '@/lib/mesocycle-edit'
 import type { ExerciseEntry } from '@/lib/exercise-db'
@@ -432,6 +434,8 @@ export function TodayPanel({
   const applySessionEdit = async (
     next: SessionEditResult,
     scope: SwapScope,
+    /** The Undo line's words, for the four exercise edits (QA walk T7); the day-wide verbs have their own put-backs. */
+    undoText?: string,
   ): Promise<string | null> => {
     if (!profileId || !mesocycle) return 'No plan to edit.'
     if (!next.changed) return say(next.refusal ?? "That couldn't be changed.")
@@ -443,6 +447,7 @@ export function TodayPanel({
       onMesocycleUpdated?.(mesocycle)
       return "That didn't save — try again in a moment."
     }
+    if (undoText) publishScreenEdit(recordScreenEdit(mesocycle, next.mesocycle, liveWeek, scope, undoText, Date.now()))
     weekTrain.refresh()
     onLogsUpdated?.()
     return null
@@ -478,13 +483,19 @@ export function TodayPanel({
     return null
   }
 
+  /** The plan row's name for an exercise on this week's day, for the Undo line. */
+  const planExerciseName = (planDayName: string, exIndex: number): string =>
+    mesocycle?.find(w => w.week_number === liveWeek)?.days.find(d => d.day === planDayName)?.exercises[exIndex]?.name ?? 'that exercise'
+
   const dropExercise = async (exIndex: number, scope: SwapScope): Promise<string | null> => {
     if (!profile || !mesocycle) return 'No plan to edit.'
     const target = editTarget(todayRef)
     if (!target.ok) return target.refusal
+    const name = planExerciseName(target.planDayName, exIndex)
     return applySessionEdit(
       removeExerciseFromSession({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, exIndex, scope }),
       scope,
+      screenEditText('remove', name),
     )
   }
 
@@ -654,6 +665,7 @@ export function TodayPanel({
       await applySessionEdit(
         moveExerciseInSession({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, fromIndex: exIndex, toIndex: exIndex + direction, scope: 'today' }),
         'today',
+        screenEditText('reorder', planExerciseName(target.planDayName, exIndex), direction < 0 ? 'earlier' : 'later'),
       ),
     )
   }
@@ -692,6 +704,7 @@ export function TodayPanel({
     return applySessionEdit(
       addExerciseToSession({ mesocycle, profile, weekNumber: liveWeek, dayName: priced.planDay, entry, load: priced.load, scope }),
       scope,
+      screenEditText('add', entry.name),
     )
   }
 
@@ -1834,6 +1847,18 @@ export function TodayPanel({
           bottom={`calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockHeightPx > 0 ? dockHeightPx + 12 : 0}px)`}
         />
       )}
+
+      {/* THE UNDO LINE (QA walk T7): after a swap, a removal, a move or an addition. It sits ABOVE whichever fixed
+          bar is showing (Start, or the running log button), so it never covers the one control the screen is for. */}
+      <ScreenEditUndoLine
+        mesocycle={mesocycle}
+        profileId={profileId}
+        onMesocycleUpdated={onMesocycleUpdated}
+        onPutBack={() => { weekTrain.refresh(); onLogsUpdated?.() }}
+        bottom={`calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockHeightPx > 0 ? dockHeightPx + 12 : 0}px + ${
+          !peekWorkout && !isRestDay && !isActiveRecovery && workout && (status === 'running' || (status === 'idle' && !heroStartInView)) ? 96 : 12
+        }px)`}
+      />
 
       {/* STEPS MOVED TO HOME, 6 Sep 2026 — design_handoff_app_polish's
           "Today so far" grid, which logs them in place. The row is REMOVED

@@ -411,7 +411,7 @@ async function main() {
   check('the screen has an entry point', /data-testid="add-exercise"/.test(panel))
   check('...which mounts the sheet', /<AddExerciseSheet/.test(panel))
   check('...and saves through the one shared saver, like remove and move',
-    /addExerciseToSession\([\s\S]{0,400}?\),\s*scope,\s*\)/.test(panel)
+    /applySessionEdit\(\s*addExerciseToSession\([\s\S]{0,400}?\),\s*scope,/.test(panel)
     && /applySessionEdit/.test(panel))
   check('the sheet asks rather than decides the scope',
     /data-scope="today"/.test(sheet) && /data-scope="permanent"/.test(sheet))

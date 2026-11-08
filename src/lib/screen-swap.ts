@@ -19,6 +19,7 @@ import type { ExerciseEntry } from './exercise-db'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
 import { saveScopedEdit } from './mesocycle-persistence'
 import { sweepStaleForTarget } from './pending-actions-store'
+import { publishScreenEdit, recordScreenEdit, screenEditText } from './screen-edit-undo'
 
 export const SWAP_CHANGED_NOTHING = "That swap didn't go through — nothing has changed. Try it again from the exercise's menu."
 export const SWAP_DID_NOT_SAVE = "That swap didn't save — check your connection and try again."
@@ -50,6 +51,10 @@ export async function swapOnScreen(input: {
     // the same target so nobody confirms a card their own tap invalidated.
     // Same key the chat's swap card is filed under: the PLAN ROW and index.
     await sweepStaleForTarget(profile.id, `${profile.id}:propose_exercise_swap:${dayName}:${exIndex}`)
+    // THE UNDO LINE (QA walk T7): the plan as it was, filed for the Exercise tab's one line.
+    const was = mesocycle.find(w => w.week_number === weekNumber)?.days.find(d => d.day === dayName)?.exercises[exIndex]?.name
+    publishScreenEdit(recordScreenEdit(mesocycle, updated, weekNumber, scope,
+      screenEditText('swap', was ?? 'that exercise', newExercise.name), Date.now()))
     return null
   } catch (err) {
     console.error('Persisting swap failed:', err)

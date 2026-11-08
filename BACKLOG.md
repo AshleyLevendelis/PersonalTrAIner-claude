@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **AN EXERCISE CHANGED ON THE EXERCISE SCREEN CAN BE PUT BACK, 8 NOV 2026** (QA walk T7; her 2 Nov list "every
+  change previews and can be undone", in the shape of her two 8 Nov "Undo line" rulings, so not asked again). Swapping,
+  removing, moving or adding an exercise on the Exercise screen changed the plan with no way back but doing the opposite
+  by hand, while the coach's card for the same change has had an Undo since September (a one-sided capability, rule 4).
+  Now each shows one line above the tab bar for eight seconds, "Swapped Lat Pulldown for Seated Cable Row." / "Removed
+  Face Pull." / "Moved Face Pull later." / "Added Face Pull.", with Undo. The words are the coach receipts' own
+  ("Swapped", "Removed", "Added"), and so is the put-back, rule for rule: it writes back exactly the weeks the change
+  wrote (one for "Just today", the rest of the block for "Whole block"), from the plan before it, only while those weeks
+  still read as the change left them (her 29 Oct rule; else the card's "It's been changed again since, so nothing was
+  changed"), within the coach's ten minutes, and a failed save says so and keeps the button. The line sits above the
+  Start bar or the running log button, never over it. A swap made from the program view gets the same line. The ban
+  and the day-wide changes (lighter, a different kind of session) already had their own put-backs and are unchanged.
+  NOT CSCS-reviewed: it prescribes nothing; an Undo restores what was prescribed before.
+  `test:screen-edit-undo` (new, 25 checks, 6 mutations caught), `verify:edit-undo` (new, 33 checks at 390px: move,
+  remove, swap and add, each undone, on screen, clear of the Start bar, and saved; 6 mutations caught). FOUND ON THE
+  WAY, by a MISSED mutation: "an Undo that never saved" passed every check that left the tab and came back, because the
+  harness keeps the plan in memory across a tab trip, so a tab trip proves nothing about a save. The driver now reads
+  the saved plan from the database the app wrote to. `verify:session-edit` 2e and 5h ("survives leaving the tab") have
+  the same blind spot and are named here, not yet changed.
 - [x] **PICKING 3, 7 OR 14 DAYS REBUILDS THE SHOPPING LIST FOR IT; HER RULING "REBUILD AT ONCE", 8 NOV 2026** (QA walk
   N5, asked with three options: rebuild at once, my recommendation; a "tap Rebuild" line; leave it). The picker only
   changed its label; the list stayed built from the old number until Rebuild, and nothing said so. Now a NEW number
