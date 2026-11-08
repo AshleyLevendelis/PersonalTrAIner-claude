@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **THE PROFILE "REMINDERS" ROW SAYS THE LEVEL, AND A FAILED READ IS NOT "NOT LIVE YET", 8 NOV 2026** (QA round 2,
+  A10, named as not done). Mechanical. The row read blank, so how often the coach may message him was one tap away on a
+  row that said nothing. It now says the sheet's own words ("Normal, up to 3 a day", "Light, 1 a day") and follows a
+  change at once, without a reload. Found while building it: the settings read answered "not live yet" on ANY error,
+  so offline the sheet said reminders did not exist yet; it now says "Couldn't load your reminder settings just now"
+  and the row states no level it did not read. The row reads the setting itself rather than the profile object, which
+  App reshapes on the way in (the first attempt read the object and the harness showed "Not live yet" for a live
+  profile: a reading that depends on how the object was built is the wrong source). CHECKS: `verify:reminders` +7 (44
+  checks; 5 mutations, 5 caught). Derived gates: 42 of 42.
 - [x] **PRE-MERGE SWEEP OF 8 NOV 2026: THREE FAILURES BEYOND THE FOUR ENVIRONMENTAL ONES, NONE IN THE APP.** 508 gates on
   `a2311e51`: 501 passed; `test:meal-quality`, `test:schema-parity`, `verify:rls` and `test:coach-exam-fresh` failed as
   always. (1) `test:cardio-reader`, the intermittent named on 30 Oct and NOT then known, is now PROVEN: its two sets were

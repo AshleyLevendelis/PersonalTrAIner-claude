@@ -17,7 +17,7 @@
 
 import { supabase } from './supabase'
 import { isMissingColumnError } from './missing-column'
-import { MOMENT_KEYS, dailyCap, type MomentKey, type NotificationSettings, type ReminderFrequency } from './coach-moments'
+import { MOMENT_KEYS, DEFAULT_FREQUENCY, REMINDER_FREQUENCIES, dailyCap, type MomentKey, type NotificationSettings, type ReminderFrequency } from './coach-moments'
 
 /**
  * WHAT EACH SWITCH DOES, in the words the plan asked for ("Remind me if I
@@ -58,6 +58,23 @@ export function frequencyLabel(f: ReminderFrequency): { name: string; detail: st
   return { name, detail: cap === 1 ? '1 a day' : `up to ${cap} a day` }
 }
 
+/** The level a person chose. Absent or unknown means the default, Normal: a person never asked has not said less. */
+export function frequencyOf(switches: NotificationSettings): ReminderFrequency {
+  return (REMINDER_FREQUENCIES as readonly unknown[]).includes(switches.frequency) ? switches.frequency as ReminderFrequency : DEFAULT_FREQUENCY
+}
+
+/**
+ * WHAT THE PROFILE ROW SAYS (QA round 2, A10, 8 Nov 2026): it said nothing, so how often the coach may message him was
+ * one tap away on a row that read blank. The same words the sheet's chosen chip says, and "Not live yet" until the
+ * column exists, never a level that cannot be saved. `row` is the profile as read with select('*').
+ */
+export function remindersSummary(row: Record<string, unknown> | null | undefined): string {
+  if (!row || !('notification_switches' in row)) return 'Not live yet'
+  const sw = row.notification_switches
+  const { name, detail } = frequencyLabel(frequencyOf(sw && typeof sw === 'object' ? sw as NotificationSettings : {}))
+  return `${name}, ${detail}`
+}
+
 // --- 1. The switches ----------------------------------------------------------------
 
 /**
@@ -71,7 +88,10 @@ export function frequencyLabel(f: ReminderFrequency): { name: string; detail: st
  * a switch that could not save.
  */
 export async function loadSwitches(profileId: string): Promise<{ switches: NotificationSettings; live: boolean }> {
-  const { data } = await supabase.from('fitness_profiles').select('*').eq('id', profileId).maybeSingle()
+  const { data, error } = await supabase.from('fitness_profiles').select('*').eq('id', profileId).maybeSingle()
+  // A FAILED READ IS NOT "NOT LIVE YET" (8 Nov 2026): offline, the sheet and the Profile row both said reminders
+  // did not exist yet. It throws, and each caller says what it could not read or keeps what it had.
+  if (error) throw error
   const row = data as Record<string, unknown> | null
   const sw = row?.notification_switches
   return {

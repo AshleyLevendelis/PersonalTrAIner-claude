@@ -22,11 +22,11 @@
 // ---------------------------------------------------------------------------
 import { useEffect, useState } from 'react'
 import {
-  MOMENT_LABELS, SWITCH_ORDER, COACH_REPLY_LABEL, frequencyLabel, loadSwitches, saveSwitches,
+  MOMENT_LABELS, SWITCH_ORDER, COACH_REPLY_LABEL, frequencyLabel, frequencyOf, remindersSummary, loadSwitches, saveSwitches,
   currentPushState, turnOnPush, turnOffPush, type PushState,
 } from '@/lib/coach-reach-out'
 import {
-  DEFAULT_MOMENT_SWITCHES, DEFAULT_FREQUENCY, REMINDER_FREQUENCIES, QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, MIN_HOURS_BETWEEN, dailyCap,
+  DEFAULT_MOMENT_SWITCHES, REMINDER_FREQUENCIES, QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, MIN_HOURS_BETWEEN, dailyCap,
   type MomentKey, type NotificationSettings, type ReminderFrequency,
 } from '@/lib/coach-moments'
 
@@ -72,17 +72,22 @@ function hourLabel(h: number): string {
   return h < 12 ? `${h}am` : `${h - 12}pm`
 }
 
-export function RemindersSection({ profileId }: { profileId: string }) {
+export function RemindersSection({ profileId, onSummary }: { profileId: string; onSummary?: (summary: string) => void }) {
   const [switches, setSwitches] = useState<NotificationSettings>({})
   const [live, setLive] = useState<boolean | null>(null)
   const [phone, setPhone] = useState<PushState | null>(null)
   const [phoneNote, setPhoneNote] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [saveNote, setSaveNote] = useState<string | null>(null)
+  const [readFailed, setReadFailed] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    loadSwitches(profileId).then(r => { if (!cancelled) { setSwitches(r.switches); setLive(r.live) } })
+    loadSwitches(profileId).then(r => {
+      if (cancelled) return
+      setSwitches(r.switches); setLive(r.live)
+      onSummary?.(remindersSummary(r.live ? { notification_switches: r.switches } : null))
+    }).catch(() => { if (!cancelled) setReadFailed(true) })
     currentPushState().then(s => { if (!cancelled) setPhone(s) }).catch(() => { if (!cancelled) setPhone('unsupported') })
     return () => { cancelled = true }
   }, [profileId])
@@ -90,8 +95,7 @@ export function RemindersSection({ profileId }: { profileId: string }) {
   const isOn = (k: MomentKey) => switches[k] ?? DEFAULT_MOMENT_SWITCHES[k]
 
   // ABSENT MEANS THE DEFAULT, for the frequency as for every switch: Normal.
-  const frequency: ReminderFrequency = (REMINDER_FREQUENCIES as readonly unknown[]).includes(switches.frequency)
-    ? switches.frequency as ReminderFrequency : DEFAULT_FREQUENCY
+  const frequency: ReminderFrequency = frequencyOf(switches)
   const replyOn = switches.coach_reply ?? true
 
   async function toggleMoment(k: MomentKey | 'coach_reply' | 'frequency', next: boolean | ReminderFrequency) {
@@ -100,10 +104,10 @@ export function RemindersSection({ profileId }: { profileId: string }) {
     setSwitches(after)
     setSaveNote(null)
     const outcome = await saveSwitches(profileId, after)
-    if (outcome === 'saved') return
+    if (outcome === 'saved') { onSummary?.(remindersSummary({ notification_switches: after })); return }
     // Never leave a switch showing a choice that did not save.
     setSwitches(before)
-    if (outcome === 'not_live_yet') setLive(false)
+    if (outcome === 'not_live_yet') { setLive(false); onSummary?.(remindersSummary(null)) }
     else setSaveNote("Couldn't save that — try again.")
   }
 
@@ -133,7 +137,11 @@ export function RemindersSection({ profileId }: { profileId: string }) {
   return (
     <div className="space-y-2" data-testid="reminders-section">
       <h3 className="ds-label">Coach reminders</h3>
-      {live === null ? (
+      {live === null && readFailed ? (
+        <p className="text-[0.6875rem] leading-snug text-muted-foreground/70" data-testid="reminders-read-failed">
+          Couldn't load your reminder settings just now. Check your connection and open this again.
+        </p>
+      ) : live === null ? (
         <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">Loading…</p>
       ) : !live ? (
         <p className="text-[0.6875rem] leading-snug text-muted-foreground/70" data-testid="reminders-not-live">

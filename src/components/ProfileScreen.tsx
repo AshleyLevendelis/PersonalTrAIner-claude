@@ -10,6 +10,7 @@
 // not retire — see that file's original doc comment for why).
 // ---------------------------------------------------------------------------
 
+import { loadSwitches, remindersSummary } from '@/lib/coach-reach-out'
 import { splitFoodList } from '@/lib/food-list'
 import { containsPhrase } from '@/lib/meal-ingredients'
 import { isStartingOut } from '@/lib/starting-out'
@@ -1056,6 +1057,18 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // before, on a page of their own. A deep link (initialSection) opens the
   // sheet holding the section it scrolls to, so the scroll still lands.
   const [sheet, setSheet] = useState<ProfileSheet | null>(null)
+  // The Reminders row's words once the sheet has read or changed them; before that, the profile as loaded.
+  const [remindersValue, setRemindersValue] = useState<string | null>(null)
+  // Read the setting itself rather than trusting the profile object, which App reshapes on the way in: the row and
+  // the sheet must say the same thing. A failed read leaves the row blank, never a level it did not read.
+  useEffect(() => {
+    if (!profile.id) return
+    let cancelled = false
+    loadSwitches(profile.id)
+      .then(r => { if (!cancelled) setRemindersValue(v => v ?? remindersSummary(r.live ? { notification_switches: r.switches } : null)) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [profile.id])
 
   // A SHEET OPENS AT ITS TOP (1 Nov 2026, whole-app test): a sheet replaces the page of rows in the same scroller, so
   // one opened from a row far down (Appearance) kept the rows' scroll and opened halfway down, title and back button
@@ -1848,7 +1861,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       )
       case 'reminders': return (
         <>
-        {profile.id && <Suspense fallback={null}><RemindersSection profileId={profile.id} /></Suspense>}
+        {profile.id && <Suspense fallback={null}><RemindersSection profileId={profile.id} onSummary={setRemindersValue} /></Suspense>}
         </>
       )
     }
@@ -1965,7 +1978,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               <SheetRow label="Reply speed" value={revealSpeed[0].toUpperCase() + revealSpeed.slice(1)} onOpen={() => setSheet('tone')} />
               <SheetRow label="Remembers" value={loading ? '…' : `${rememberedCount} thing${rememberedCount === 1 ? '' : 's'}`} onOpen={() => setSheet('remembers')} />
               <SheetRow label="Appearance" value={THEME_PREVIEWS[appearance.theme]?.label ?? ''} onOpen={() => setSheet('appearance')} />
-              {profile.id && <SheetRow label="Reminders" value="" onOpen={() => setSheet('reminders')} />}
+              {profile.id && <SheetRow label="Reminders" value={remindersValue ?? ''} onOpen={() => setSheet('reminders')} />}
             </ProfileGroup>
 
         {/* Audit §1.4 — there was neither of these. "New Plan" cleared the

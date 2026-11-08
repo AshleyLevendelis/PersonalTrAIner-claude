@@ -94,13 +94,16 @@ const navigate = async (path, stub) => {
   if (stub) stubId = (await stubPush(stub)).result?.identifier ?? null
   await send('Page.navigate', { url: `http://127.0.0.1:${port}${path}` })
   await until(() => ev(`!!document.querySelector('[data-slot="dialog-content"]')`), v => v)
-  await ev(`(() => { document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click(); setTimeout(() => document.querySelector('[data-profile-row="Reminders"]')?.click(), 200) })()`)
+  await ev(`(() => { document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click(); setTimeout(() => { const r = document.querySelector('[data-profile-row="Reminders"]'); window.__rowAtLoad = (r?.textContent ?? '').replace(/\\s+/g, ' ').trim(); r?.click() }, 200) })()`)
   await wait(300)
   await wait(300)
 }
 const SECTION = '[data-testid="reminders-section"]'
 const switches = () => ev(`[...document.querySelectorAll('${SECTION} [role="switch"]')].map(s => ({ id: s.id, label: s.getAttribute('aria-label'), on: s.getAttribute('aria-checked') === 'true', disabled: s.disabled }))`)
 const sectionText = () => ev(`(document.querySelector('${SECTION}')?.textContent ?? '').replace(/\\s+/g, ' ').trim()`)
+const rowValue = () => ev(`(document.querySelector('[data-profile-row="Reminders"]')?.textContent ?? '').replace(/\\s+/g, ' ').trim()`)
+const backToRows = async () => { await ev(`document.querySelector('[data-profile-back]')?.click()`); await wait(500) }
+const openReminders = async () => { await ev(`document.querySelector('[data-profile-row="Reminders"]')?.click()`); await wait(700) }
 const db = expr => ev(`(() => { const db = window.__fakeDb; return ${expr} })()`)
 
 console.log('\nCOACH REMINDERS, AT 390px\n')
@@ -113,6 +116,13 @@ check('1a. the section is there, in the App group', /Coach reminders/.test(notLi
 check('1b. ...and says it is not live yet', /Not live yet/.test(notLive), notLive)
 const sw0 = await switches()
 check('1c. ...offering no switch that could not save', Array.isArray(sw0) && sw0.length === 0, sw0)
+// A10 (QA round 2, 8 Nov 2026): the Profile row said nothing about reminders at all.
+const rowAtLoadNotLive = await ev('window.__rowAtLoad')
+check('1d0. at load the row never claims a level (blank while reading, or "Not live yet")', /^Reminders(\s*Not live yet)?$/.test(rowAtLoadNotLive ?? ''), rowAtLoadNotLive)
+await backToRows()
+const rowNotLive = await rowValue()
+check('1d. the Profile row says "Not live yet", never a level that could not save', /^Reminders\s*Not live yet/.test(rowNotLive), rowNotLive)
+await openReminders()
 await ev(`document.querySelector('${SECTION}')?.scrollIntoView({ block: 'center' })`)
 await shoot('reminders-not-live')
 
@@ -159,6 +169,10 @@ const freq = () => ev(`[...document.querySelectorAll('${SECTION} [data-testid="r
 const f0 = await until(freq, v => Array.isArray(v) && v.length === 3)
 check('2j. three choices: Light (1 a day), Normal (up to 3 a day), Lots (up to 5 a day)',
   JSON.stringify((f0 ?? []).map(x => x.text)) === JSON.stringify(['Light1 a day', 'Normalup to 3 a day', 'Lotsup to 5 a day']), f0)
+await backToRows()
+const rowLive = await until(rowValue, v => /,/.test(v ?? ''))
+check('2j0. live, the Profile row says the level: "Normal, up to 3 a day"', /^Reminders\s*Normal, up to 3 a day$/.test(rowLive ?? ''), rowLive)
+await openReminders()
 check('2k. ...Normal chosen to begin with, each a 44px tap target', (f0 ?? []).find(x => x.on)?.f === 'normal' && (f0 ?? []).filter(x => x.on).length === 1 && (f0 ?? []).every(x => x.h >= 44), f0)
 await tap('[data-frequency="light"]')
 const f1 = await until(freq, v => v?.find(x => x.on)?.f === 'light')
@@ -170,6 +184,10 @@ check('2n. ...without touching a switch she set', storedLight?.missed_yesterday 
 await tap('[data-frequency="lots"]')
 const storedLots = await until(() => db(`db.fitness_profiles[0].notification_switches`), v => v && v.frequency === 'lots')
 check('2o. Lots: saved, and said as "up to 5 a day"', storedLots?.frequency === 'lots' && /up to 5 a day, at least 3 hours apart/.test(await sectionText()), await sectionText())
+await backToRows()
+const rowLots = await rowValue()
+check('2o2. ...and the Profile row says the level just chosen, "Lots, up to 5 a day", without a reload', /Lots, up to 5 a day/.test(rowLots), rowLots)
+await openReminders()
 await ev(`document.querySelector('${SECTION} [data-testid="reminders-frequency"]')?.scrollIntoView({ block: 'center' })`)
 await wait(200)
 await shoot('reminders-frequency')
@@ -217,6 +235,18 @@ check('4f. ...and it says to add the app to the home screen first', /home screen
 await ev(`document.querySelector('[data-testid="reminders-phone-note"]')?.scrollIntoView({ block: 'center' })`)
 await shoot('reminders-iphone')
 await send('Emulation.setUserAgentOverride', { userAgent: '' })
+
+// --- 4n. Offline --------------------------------------------------------------------------------
+// A failed read was taken for "not live yet" (8 Nov 2026): the sheet said reminders did not exist yet, and the
+// Profile row would have said so too. Every check runs every time.
+console.log('  4n. A connection that is up but dead')
+await navigate('/?reminders=live&netdown=1', null)
+const offText = await until(sectionText, s => s.length > 20 && !/Loading/.test(s))
+check('4n1. offline, the sheet says it could not load the settings', /Couldn.t load your reminder settings/.test(offText ?? ''), offText)
+check('4n2. ...and never that reminders are not live yet', !/Not live yet/.test(offText ?? ''), offText)
+await backToRows()
+const offRow = await rowValue()
+check('4n3. ...nor does the Profile row: it states no level it did not read', /^Reminders$/.test(offRow ?? ''), offRow)
 
 // --- 5. Home sends the facts ahead ------------------------------------------------------------
 console.log('  5. Home tells the server what only the plan knows')
