@@ -9,7 +9,7 @@ const SCREEN_UNDO_LINE_MS = 8000
 
 /**
  * "Swapped Lat Pulldown for Seated Cable Row. · Undo" (QA walk T7, 8 Nov 2026), above the tab bar after an exercise
- * is swapped, removed, moved or added on the Exercise screen. Her "Undo line" shape, the shopping list's bar. Undo
+ * is swapped, removed, moved or added on the Exercise screen. His "Undo line" shape, the shopping list's bar. Undo
  * puts back only what is still as the change left it (screen-edit-undo.ts), and a refusal says so in the coach
  * card's words.
  */

@@ -3,14 +3,14 @@
 //
 // Swapping, removing, moving or adding an exercise from the Exercise screen changed the plan and said nothing, with no
 // way back but doing the opposite by hand, while the coach's card for the very same change has had an Undo since
-// September. Her standing list "every change previews and can be undone" (2 Nov) and her two "Undo line" rulings of
+// September. His standing list "every change previews and can be undone" (2 Nov) and his two "Undo line" rulings of
 // 8 Nov (a meal taken off "eaten", the shopping list's Clear and Rebuild) say what it looks like: one line saying what
 // happened, with an Undo beside it.
 //
 // The put-back is the coach's, rule for rule:
 //   - the weeks the change wrote are written back from the plan as it was before it (one week for "Just today",
 //     the rest of the block for "Whole block"), through the same week saver;
-//   - only while those weeks still read as the change left them (her 29 Oct rule: an Undo puts back only what is
+//   - only while those weeks still read as the change left them (his 29 Oct rule: an Undo puts back only what is
 //     still as it was left, else says so and touches nothing). The words are the coach card's own (RECEIPTS_UNDONE);
 //   - for ten minutes, the coach's window, measured on the real clock (a dev override of "today" must not move it).
 //
