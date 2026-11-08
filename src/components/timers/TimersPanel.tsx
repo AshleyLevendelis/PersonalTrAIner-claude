@@ -52,13 +52,13 @@ export function StopwatchPanel() {
       <div className="flex gap-2">
         {timers.running ? (
           <>
-            <Button onClick={timers.lap}>Lap</Button>
-            <Button variant="outline" onClick={timers.stop}>Stop</Button>
+            <Button className="h-11" onClick={timers.lap}>Lap</Button>
+            <Button variant="outline" className="h-11" onClick={timers.stop}>Stop</Button>
           </>
         ) : (
-          <Button onClick={timers.start}>{timers.elapsedMs > 0 ? 'Resume' : 'Start'}</Button>
+          <Button className="h-11" onClick={timers.start}>{timers.elapsedMs > 0 ? 'Resume' : 'Start'}</Button>
         )}
-        <Button variant="outline" onClick={timers.reset} disabled={timers.running && timers.elapsedMs === 0}>
+        <Button variant="outline" className="h-11" onClick={timers.reset} disabled={timers.running && timers.elapsedMs === 0}>
           Reset
         </Button>
       </div>

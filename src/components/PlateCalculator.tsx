@@ -54,7 +54,12 @@ export function PlateCalculator({ open, onOpenChange, initialWeight = 0, initial
   const [barWeight, setBarWeight] = useState(String(initialBarKg))
 
   const target = parseFloat(targetWeight) || 0
-  const bar = parseFloat(barWeight) || 20
+  // AN EMPTY BOX IS NOT A NUMBER, AND 0 IS ONE (QA round 2, 8 Nov 2026): `parseFloat(...) || 20` turned a typed 0 (plates
+  // only, no bar) into a 20 kg bar, and an empty box into one with no word said. Empty now counts the lift's own bar and
+  // says so under the box; a typed number, 0 included, is used as typed.
+  const barTyped = parseFloat(barWeight)
+  const barAssumed = barWeight.trim() === '' || !Number.isFinite(barTyped)
+  const bar = barAssumed ? initialBarKg : Math.max(0, barTyped)
   // Both ends, because the bar is an input too and a 9000kg bar makes the
   // remainder negative rather than huge — wrong answer, not a hang, but still
   // an answer to a question nobody asked.
@@ -116,7 +121,7 @@ export function PlateCalculator({ open, onOpenChange, initialWeight = 0, initial
                 step="0.5"
                 value={targetWeight}
                 onChange={e => setTargetWeight(e.target.value)}
-                className="h-9"
+                className="h-11"
                 autoFocus
               />
             </div>
@@ -129,8 +134,9 @@ export function PlateCalculator({ open, onOpenChange, initialWeight = 0, initial
                 step="0.5"
                 value={barWeight}
                 onChange={e => setBarWeight(e.target.value)}
-                className="h-9"
+                className="h-11"
               />
+              {barAssumed && <p className="text-[0.6875rem] text-muted-foreground" data-testid="plate-bar-assumed">Counting a {initialBarKg} kg bar.</p>}
             </div>
           </div>
 

@@ -72,10 +72,21 @@ export function rpeToStore(chosen: EffortKey, prescribedRpe?: number | null): nu
  * The effort clause disappears rather than printing a word the app does not
  * have, the same rule prescriptionLine keeps for an unstated target.
  */
-export function cardioReadback(p: { activity: string; minutes: number; rpe?: number | null; distanceKm?: number | null }): string {
+export function cardioReadback(p: { activity: string; minutes: number; rpe?: number | null; distanceKm?: number | null; shape?: string | null }): string {
   const key = effortForRpe(p.rpe)
   const km = p.distanceKm != null && p.distanceKm > 0 ? ` · ${distanceText(p.distanceKm)}` : ''
-  return `${p.activity} · ${p.minutes} min${key ? ` · ${effortLabel(key)}` : ''}${km}`
+  const length = p.shape?.trim() || `${p.minutes} min`
+  return `${p.activity} · ${length}${key ? ` · ${effortLabel(key)}` : ''}${km}`
+}
+
+/**
+ * A TIMER BLOCK'S SHAPE, when its note is one ("1 × 10s", "5 × 3 min"). A block is stored in whole minutes, so a
+ * 10-second one reads back "1 min" unless its shape is shown instead (QA round 2, 8 Nov 2026). Any other note is
+ * hers and is not a length.
+ */
+export function roundShapeOf(notes: string | null | undefined): string | null {
+  const n = (notes ?? '').trim()
+  return /^\d+\s*×\s*\d/.test(n) ? n : null
 }
 
 /** "6 km", "5.5 km", "21.1 km": a distance the way the app prints one, with its unit (no trailing ".0"). */

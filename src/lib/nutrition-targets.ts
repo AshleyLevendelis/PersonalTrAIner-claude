@@ -107,7 +107,7 @@ export async function getEarliestWeightKg(profileId: string): Promise<number | n
 }
 
 /** Recent weigh-ins for the Nutrition tab's history list (newest first). */
-async function getRecentWeighIns(profileId: string, limit = 7): Promise<{ date: string; weight_kg: number }[]> {
+async function getRecentWeighIns(profileId: string, limit = 7, strict = false): Promise<{ date: string; weight_kg: number }[]> {
   const { data, error } = await supabase
     .from('daily_metrics')
     .select('date, weight_kg')
@@ -115,6 +115,9 @@ async function getRecentWeighIns(profileId: string, limit = 7): Promise<{ date: 
     .order('date', { ascending: false })
     .limit(limit)
 
+  // A FAILED READ IS NOT "NO WEIGH-INS" for a caller that asks (QA round 2, 8 Nov 2026: the card's history vanished
+  // when the connection dropped). The other callers keep the old answer until they are traced one by one.
+  if (error && strict) throw error
   if (error || !data) return []
   return data.map(row => ({ date: row.date, weight_kg: Number(row.weight_kg) }))
 }
@@ -199,11 +202,11 @@ export interface WeighInPicture {
   heldLatest: HeldWeighIn | null
 }
 
-export async function getWeighInPicture(profileId: string): Promise<WeighInPicture> {
+export async function getWeighInPicture(profileId: string, opts: { strict?: boolean } = {}): Promise<WeighInPicture> {
   const today = targetsToday(profileId)
-  // Both at once (31 Oct 2026, app start): neither read needs the other. A failed weigh-in read still throws, as before.
+  // Both at once (31 Oct 2026, app start): neither read needs the other. `strict` makes a failed weigh-in read throw.
   const targetRowsP = getNutritionTargets(profileId, '1970-01-01', today).catch(() => [])
-  const recent = await getRecentWeighIns(profileId, 14)
+  const recent = await getRecentWeighIns(profileId, 14, opts.strict === true)
   const targetRows = await targetRowsP
   const anchors = targetRows
     .filter(r => r.calculated_weight_kg != null && Number(r.calculated_weight_kg) > 0)

@@ -8,7 +8,7 @@ import {
   MAX_PLAUSIBLE_CARDIO_MINUTES, isPlausibleDistanceKm, MAX_PLAUSIBLE_DISTANCE_KM, getCardioLogsForDateMerged, subscribeCardioLogStore,
   type CardioLogView,
 } from '@/lib/cardio-log-store'
-import { EFFORTS, effortForRpe, rpeToStore, cardioReadback, type EffortKey } from '@/lib/cardio-effort'
+import { EFFORTS, effortForRpe, rpeToStore, cardioReadback, roundShapeOf, type EffortKey } from '@/lib/cardio-effort'
 import { splitActivity, unclaimedCardio } from '@/lib/cardio-lines'
 import { prescriptionLine } from '@/lib/activity-day'
 import { easeOffQuestion, type EaseOffQuestion } from '@/lib/cardio-ease-off'
@@ -142,6 +142,7 @@ export function CardioReadback({
     minutes: log.duration_minutes,
     rpe: log.intensity_rpe,
     distanceKm: log.distance_km == null ? null : Number(log.distance_km),
+    shape: roundShapeOf(log.notes),
   })
 
   const handleUndo = async () => {
@@ -430,6 +431,9 @@ export interface CardioPick {
   activity: string
   /** The suggested minutes. */
   minutes: number
+  /** What the chip says under the name instead of "N min": a timer block's own shape ("1 × 10s"), because a block
+   * shorter than a minute is stored as 1 whole minute and "1 min" was a length nobody did (QA round 2, 8 Nov 2026). */
+  detail?: string
   /** The suggested effort, as an RPE so an exact preset number survives (see rpeToStore). */
   rpe?: number
   Icon?: typeof Check
@@ -577,7 +581,7 @@ export function UnplannedCardioEntry({
             >
               {Icon && <Icon className="size-4" />}
               <span className="text-xs leading-none truncate max-w-full px-1">{p.label}</span>
-              <span className={`text-[0.625rem] leading-none ${on ? 'text-primary-text/80' : 'text-muted-foreground'}`}>{p.minutes} min</span>
+              <span className={`text-[0.625rem] leading-none ${on ? 'text-primary-text/80' : 'text-muted-foreground'}`}>{p.detail ?? `${p.minutes} min`}</span>
             </button>
           )
         })}
@@ -595,6 +599,9 @@ export function UnplannedCardioEntry({
       {pick === 'other' && (
         <Input
           aria-label="Other activity"
+          // A NAME, NOT A PARAGRAPH (QA round 2, 8 Nov 2026): a 115-character name became an eight-line headline on
+          // Home and was printed again beneath it. Forty letters holds "Kettlebell complex and battle ropes".
+          maxLength={40}
           data-field="activity"
           placeholder="What did you do? e.g. run, class, row"
           value={otherName}

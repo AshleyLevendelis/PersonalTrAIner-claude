@@ -263,8 +263,10 @@ const blockAsk = await ev(`(() => {
     intervals: /Intervals/.test(box?.innerText ?? ''),
   }
 })()`)
-check('27. ...asking what the block was, by name, with the minutes the timer counted',
-  blockAsk.title && /Skipping/.test(blockAsk.rope) && /1 min/.test(blockAsk.rope) && blockAsk.chosen === 0 && !blockAsk.intervals, blockAsk)
+// RE-ANCHORED 8 Nov 2026 (QA round 2): the chip says the block's own shape ("2 × 10s, 5s rest"), not the whole minute
+// a short block is stored as.
+check('27. ...asking what the block was, by name, with the shape the timer ran',
+  blockAsk.title && /Skipping/.test(blockAsk.rope) && /\d+ × \d+s/.test(blockAsk.rope) && !/1 min/.test(blockAsk.rope) && blockAsk.chosen === 0 && !blockAsk.intervals, blockAsk)
 await tap('[data-testid="unplanned-work-sheet"] [data-testid="quick-log-skipping"]')
 await wait(400)
 const effortAfterPick = await ev(`[...(document.querySelector('[data-testid="unplanned-work-sheet"]')?.querySelectorAll('[data-effort]') ?? [])].map(b => b.getAttribute('aria-checked'))`)

@@ -43,13 +43,22 @@ export function WeighInCard({ profileId, onWeightLogged }: { profileId: string; 
   const [lastVerdict, setLastVerdict] = useState<'ok' | 'surprising' | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // A READ THAT FAILS KEEPS WHAT WAS SHOWN AND SAYS SO (QA round 2, 8 Nov 2026): the past weigh-ins vanished offline,
+  // which read as never having weighed in.
+  const [readFailed, setReadFailed] = useState(false)
   const refresh = useCallback(async () => {
-    const next = await getWeighInPicture(profileId)
-    setPicture(next)
-    return next
+    try {
+      const next = await getWeighInPicture(profileId, { strict: true })
+      setPicture(next)
+      setReadFailed(false)
+      return next
+    } catch (err) {
+      setReadFailed(true)
+      throw err
+    }
   }, [profileId])
 
-  useEffect(() => { void refresh() }, [refresh])
+  useEffect(() => { refresh().catch(() => {}) }, [refresh])
 
   const history = (picture?.recent ?? []).slice(0, 7)
 
@@ -61,7 +70,8 @@ export function WeighInCard({ profileId, onWeightLogged }: { profileId: string; 
       await upsertDailyMetric({ profile_id: profileId, date: targetsToday(profileId), weight_kg: kg })
       setInput('')
       setAsking(null)
-      await refresh()
+      // Saved: a re-read that fails afterwards is said by the card's own line, never as a failed save.
+      await refresh().catch(() => {})
       await onWeightLogged?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Save failed — try again')
@@ -81,7 +91,10 @@ export function WeighInCard({ profileId, onWeightLogged }: { profileId: string; 
     // logged a weigh-in since, and "the last one" has to be the last one.
     setSaving(true)
     let current: WeighInPicture
-    try { current = await refresh() } finally { setSaving(false) }
+    try { current = await refresh() } catch {
+      setError("Couldn't check your last weigh-in, so this wasn't saved. Check your connection and try again.")
+      return
+    } finally { setSaving(false) }
     const question = weighInQuestion(kg, current.today, current.recent.map(w => ({ date: w.date, kg: w.weight_kg })), current.anchors)
     setLastVerdict(question ? 'surprising' : 'ok')
     if (question) { setAsking({ kg, question }); return }
@@ -134,7 +147,7 @@ export function WeighInCard({ profileId, onWeightLogged }: { profileId: string; 
         <button
           onClick={handleSave}
           disabled={saving || !input || asking != null}
-          className="shrink-0 text-[0.8125rem] font-semibold text-primary-text glow-mint disabled:opacity-40 disabled:[text-shadow:none]"
+          className="hit-slop-44 shrink-0 text-[0.8125rem] font-semibold text-primary-text glow-mint disabled:opacity-40 disabled:[text-shadow:none]"
         >
           {saving ? 'Saving…' : 'Save'}
         </button>
@@ -156,6 +169,7 @@ export function WeighInCard({ profileId, onWeightLogged }: { profileId: string; 
       {held && !asking && (
         <p className="text-[0.75rem] leading-snug text-foreground/90" data-testid="weigh-in-held">{weighInHeldNote(held.kg)}</p>
       )}
+      {readFailed && <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]" data-testid="weigh-in-read-failed">{history.length > 0 ? 'Couldn\u2019t load your weigh-ins just now — the ones below are from earlier.' : 'Couldn\u2019t load your weigh-ins just now.'}</p>}
       <p className="text-[0.6875rem] text-muted-foreground/85" data-testid="weigh-in-average">{averageLine}</p>
       {history.length > 0 && (
         <div className="space-y-1">

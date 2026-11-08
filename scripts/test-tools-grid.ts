@@ -128,7 +128,7 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   // 4c: under a running round the preview gives way to the running card and
   // the steppers lock, so nothing she can change is left standing under it.
   check('...and a running round shows the running card, not the setup preview', /\{live \? \([\s\S]{0,120}<RoundCard live/.test(sheetSrc))
-  check('...with the steppers locked while it runs', (sheetSrc.match(/disabled=\{live\}/g) ?? []).length === 2)
+  check('...with the steppers locked while it runs', (sheetSrc.match(/disabled=\{live(?: \|\| atEnd\(field, -?1\))?\}/g) ?? []).length === 2)
   // THE TAB STRIP IS GONE WITH IT (4a). Round is this tab's own content, so a
   // tab labelled "Round" beside it was the surface competing with itself.
   const panelSrc = read('src/components/timers/TimersPanel.tsx').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')

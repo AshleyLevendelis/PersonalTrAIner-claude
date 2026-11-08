@@ -409,9 +409,12 @@ export function chipNumbers(config: RoundConfig, label?: string): string {
 }
 
 export function describeRoundPreset(p: RoundPreset): string {
+  // A REST THAT NEVER RUNS IS NOT NAMED (QA round 2, 8 Nov 2026): rest only ever falls between rounds, so one round, or
+  // no rest, read "1 × 10s / 10s" on Tools' last-round line — the logged block already says "1 × 10s" (T14).
+  const restRuns = p.config.rounds > 1 && p.config.restSeconds > 0
   return roundStyleOf(p.config) === 'emom'
     ? `${p.config.rounds} × every ${p.config.workSeconds}s`
-    : `${p.config.rounds} × ${p.config.workSeconds}s / ${p.config.restSeconds}s`
+    : restRuns ? `${p.config.rounds} × ${p.config.workSeconds}s / ${p.config.restSeconds}s` : `${p.config.rounds} × ${p.config.workSeconds}s`
 }
 
 // ---------------------------------------------------------------------------

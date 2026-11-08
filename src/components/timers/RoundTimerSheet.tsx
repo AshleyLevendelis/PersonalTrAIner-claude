@@ -70,6 +70,8 @@ export function RoundTimerSheet({ todaysConfig, live, selected, todaysSessionNam
     if (prefs.openFullScreenOnStart) timers.setRoundFullScreen(true)
   }
 
+  // A STEP THAT CHANGES NOTHING IS GREYED (QA round 2, 8 Nov 2026): Rounds' minus stayed live at 1, its floor.
+  const atEnd = (field: 'rounds' | 'work' | 'rest', dir: 1 | -1) => JSON.stringify(stepConfig(config, field, dir)) === JSON.stringify(config)
   const stepRow = (field: 'rounds' | 'work' | 'rest', label: string, sub: string, value: string, isNone = false) => (
     <div className="flex min-h-[66px] items-center gap-2 py-2" style={{ borderBottom: '1px solid var(--hairline)' }} data-step-row={field}>
       <div className="min-w-0 flex-1">
@@ -81,7 +83,7 @@ export function RoundTimerSheet({ todaysConfig, live, selected, todaysSessionNam
         data-step={field}
         data-dir="down"
         aria-label={`Less ${label.toLowerCase()}`}
-        disabled={live}
+        disabled={live || atEnd(field, -1)}
         onClick={() => step(field, -1)}
         className="flex size-11 shrink-0 items-center justify-center rounded-full disabled:opacity-40"
         style={{ background: 'var(--surface-raised)' }}
@@ -100,7 +102,7 @@ export function RoundTimerSheet({ todaysConfig, live, selected, todaysSessionNam
         data-step={field}
         data-dir="up"
         aria-label={`More ${label.toLowerCase()}`}
-        disabled={live}
+        disabled={live || atEnd(field, 1)}
         onClick={() => step(field, 1)}
         className="flex size-11 shrink-0 items-center justify-center rounded-full disabled:opacity-40"
         style={{ background: 'var(--surface-raised)' }}
@@ -232,6 +234,13 @@ export function RoundTimerSheet({ todaysConfig, live, selected, todaysSessionNam
 
       {!live && (
         <div className="shrink-0 px-[18px] pb-[calc(env(safe-area-inset-bottom,0px)+18px)] pt-3" style={{ borderTop: '1px solid var(--hairline)', background: 'var(--background)' }}>
+          {/* ONE TIMER RUNS AT A TIME, AND STARTING THIS ONE SAYS WHAT IT STOPS (QA round 2, 8 Nov 2026): a stopwatch at
+              0:09 vanished, unasked and unsaid, the moment a round started. */}
+          {timers.mode !== 'round' && timers.isActive && timers.elapsedMs > 0 && (
+            <p className="mb-2 text-[0.75rem] leading-snug text-[color:var(--role-warn-text)]" data-testid="round-stops-stopwatch">
+              Starting this stops your {timers.mode === 'lap' ? 'lap timer' : 'stopwatch'} at {clock(timers.elapsedMs / 1000)}.
+            </p>
+          )}
           <button
             type="button"
             data-round-sheet-start

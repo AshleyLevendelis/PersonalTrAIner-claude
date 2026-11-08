@@ -331,7 +331,10 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     // box replaced the day's steps with 0. The last count shows as the placeholder, which reads like a filled box.
     if (stepsInput.trim() === '') return
     const n = Number(stepsInput)
-    if (!profile.id || !activeSession.date || !Number.isFinite(n) || n < 0) return
+    // A NUMBER THAT CANNOT BE STEPS SAYS SO (QA round 2, 8 Nov 2026): "-500" did nothing and said nothing, while a
+    // number over the limit and a failed save each got a sentence.
+    if (!Number.isFinite(n) || n < 0) { setStepsError('Steps are a count from 0 up — type the number on your phone or watch.'); return }
+    if (!profile.id || !activeSession.date) return
     const rounded = Math.round(n)
     if (!isPlausibleStepCount(rounded)) {
       setStepsError(`That's more steps than anyone walks in a day — the most this takes is ${MAX_PLAUSIBLE_DAILY_STEPS.toLocaleString()}.`)

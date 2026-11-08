@@ -147,9 +147,12 @@ export function BottomDock() {
         // EMOM has no rest phase, so the "Work / Rest" half is dropped for one
         // — a chip reading "Minute 3/10 · Work" would name a phase that has
         // no opposite.
+        // THE COUNTDOWN BEFORE ROUND 1 IS NOT REST, AND A PAUSE SAYS SO (QA round 2, 8 Nov 2026): the chip read
+        // "Round 1/8 · Rest · 0:08" while getting ready, and froze on "Rest · 0:06" when paused with nothing saying why.
         ? `${roundHeadline(timers.roundConfig, timers.currentRound).replace(' of ', '/')}${
-            roundStyleOf(timers.roundConfig) === 'emom' ? '' : ` · ${timers.currentPhase === 'work' ? 'Work' : 'Rest'}`
-          } · ${formatDuration(timers.phaseRemainingMs ?? 0)}`
+            timers.currentPhase === 'lead_in' ? ' · Get ready'
+              : roundStyleOf(timers.roundConfig) === 'emom' ? '' : ` · ${timers.currentPhase === 'work' ? 'Work' : 'Rest'}`
+          } · ${formatDuration(timers.phaseRemainingMs ?? 0)}${!timers.running && !timers.isRoundComplete ? ' · Paused' : ''}`
         : 'Round timer')
       : `${timers.mode === 'lap' ? 'Lap' : 'Stopwatch'} · ${formatDuration(timers.elapsedMs)}`
     return (

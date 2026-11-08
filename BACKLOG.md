@@ -2,6 +2,32 @@
 
 Newest first. One line each.
 
+- [x] **QA ROUND 2, HOME AND TOOLS: NINE DEFECTS FIXED, ONE QUESTION FOR HIM, 8 NOV 2026** (the same walk as the entry
+  below). Mechanical. (B2) Starting a round timer wiped a running stopwatch without a word; the round sheet now says
+  "Starting this stops your stopwatch at 0:09." above Start. (B3) The weigh-in Save (31×20), the stopwatch's buttons and the
+  plate calculator's boxes (36px), and the block sheet's Lift/Cardio switch, lift box and buttons (28-32px) all reach
+  44px now. The block's save tick was reported as 28px with no reach and was WRONG: every icon button carries a 44px
+  reach in its own variant; the tester measured the box. My change there was reverted and the check kept. (B4) Offline, the weigh-in card's past weigh-ins vanished, which read as never having
+  weighed in: the read said "no weigh-ins" on any error. The card now asks a read that fails loudly, keeps what it
+  showed and says "Couldn't load your weigh-ins just now"; a weigh-in typed while the last one cannot be read is not
+  saved, because the check for a surprising number needs it. NOT CHANGED, and a lead worth tracing before anyone acts
+  on it: the same silent "no weigh-ins" still feeds the calorie target's weight elsewhere (start, after a weigh-in),
+  where a failed read could fall back to the profile weight. (B5) The floating round chip read "Rest" during the
+  countdown before round 1 and never said "Paused"; it now says "Get ready" and "Paused". (B6) A 115-letter "Other"
+  activity became an eight-line headline on Home; the name is capped at 40 letters where it is typed. (B7) A 10-second
+  block was offered on chips as "1 min" and read back on Home as "Skipping rope · 1 min · Hard": minutes are stored
+  whole, so a block shorter than one is 1. The chips and every read-back now show the block's shape ("1 × 10s"), which
+  is already stored in its note. (B8) The plate calculator treated an empty bar box as 20 kg without saying so, and a
+  typed 0 as 20 kg too; empty now says "Counting a 20 kg bar." and 0 means plates only. (B9) Tools' Last round line read
+  "1 × 10s / 10s" for one round, a rest that never runs (the T14 rule, one line over), and Rounds' minus stayed live at
+  its floor of 1; both fixed. (B10) "-500" steps did nothing and said nothing; it now says steps are a count from 0 up.
+  ASKED, NOT BUILT (B1, his: it changes what the streak and the week's count measure): "Count it as today's workout"
+  after a timer block took the streak from 2 to 1 and the week from "Session 2 of 4" to "0 of 3", because a day swapped
+  for an activity is left out of both by the 9 Oct streak rule, while the logged block alone had counted.
+  CHECKS: new `verify:home-tools-fixes` (19 checks; 12 mutations, 12 caught, plus one EQUIVALENT: removing the save
+  tick's added reach changed nothing, which is how the tester's error was found). Three existing checks pinned the old
+  behaviour and were re-anchored on the property: `test:round-logging` (the picks call), `test:tools-grid` (the
+  steppers' lock now also greys an end stop) and `verify:round-presets` 27 (the chip shows the block's shape).
 - [x] **QA ROUND 2, PROFILE AND THE EXERCISE SCREEN'S CHANGES: TWELVE DEFECTS FIXED, 8 NOV 2026** (Ashley: "keep testing
   and fixing issues"). Three testers walked Profile, Home and Tools, and the Exercise screen's changes with the new Undo
   line, at 390px on the harness; each finding below was re-measured before it was fixed. Found by the walk, none

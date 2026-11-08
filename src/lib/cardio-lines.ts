@@ -19,7 +19,7 @@
 // A LEAF: types and the effort phrasebook only, so Home can import it without
 // pulling the exercise screens into first paint.
 // ---------------------------------------------------------------------------
-import { cardioReadback } from './cardio-effort'
+import { cardioReadback, roundShapeOf } from './cardio-effort'
 import type { CardioLog } from './types'
 
 /**
@@ -32,11 +32,11 @@ export function splitActivity(activity: string): { name: string; protocol: strin
   return m ? { name: m[1], protocol: m[2] } : { name: activity.trim(), protocol: null }
 }
 
-type Loggish = Pick<CardioLog, 'activity_name' | 'duration_minutes' | 'intensity_rpe'> & Partial<Pick<CardioLog, 'distance_km'>>
+type Loggish = Pick<CardioLog, 'activity_name' | 'duration_minutes' | 'intensity_rpe'> & Partial<Pick<CardioLog, 'distance_km' | 'notes'>>
 
 /** One log as its line. The short name: a protocol is an instruction for doing it, not a record of having done it. */
 export function cardioLine(log: Loggish): string {
-  return cardioReadback({ activity: splitActivity(log.activity_name).name, minutes: log.duration_minutes, rpe: log.intensity_rpe, distanceKm: log.distance_km == null ? null : Number(log.distance_km) })
+  return cardioReadback({ activity: splitActivity(log.activity_name).name, minutes: log.duration_minutes, rpe: log.intensity_rpe, distanceKm: log.distance_km == null ? null : Number(log.distance_km), shape: roundShapeOf(log.notes) })
 }
 
 /**

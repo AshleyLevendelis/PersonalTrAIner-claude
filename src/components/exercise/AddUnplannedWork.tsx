@@ -34,8 +34,8 @@ import { getExerciseCompatibilityWarnings } from '@/lib/exercise-plan'
 // offered a treadmill, a heavy bag and an assault bike.
 
 /** The timer's chips: what a block usually is, at the minutes the timer counted, effort left to her. */
-function timerBlockPicks(minutes: number): CardioPick[] {
-  return BLOCK_NAMES.map(name => ({ label: blockChipLabel(name), activity: name, minutes }))
+function timerBlockPicks(minutes: number, shape?: string): CardioPick[] {
+  return BLOCK_NAMES.map(name => ({ label: blockChipLabel(name), activity: name, minutes, detail: shape?.trim() || undefined }))
 }
 
 export function AddUnplannedWork({
@@ -177,7 +177,7 @@ export function AddUnplannedWork({
     return (
       <>
         {easeOffAsk}
-        <Button variant="outline" size="sm" className="w-full text-xs h-8" onClick={() => setMode('lift')}>
+        <Button variant="outline" size="sm" className="w-full text-xs h-11" onClick={() => setMode('lift')}>
           <Plus className="size-3 mr-1" />
           Add unplanned work
         </Button>
@@ -192,7 +192,7 @@ export function AddUnplannedWork({
           <Button
             variant={mode === 'lift' ? 'default' : 'ghost'}
             size="sm"
-            className="h-7 text-xs gap-1"
+            className="h-11 text-xs gap-1"
             onClick={() => setMode('lift')}
           >
             <Dumbbell className="size-3" />
@@ -201,7 +201,7 @@ export function AddUnplannedWork({
           <Button
             variant={mode === 'cardio' ? 'default' : 'ghost'}
             size="sm"
-            className="h-7 text-xs gap-1"
+            className="h-11 text-xs gap-1"
             onClick={() => setMode('cardio')}
           >
             <Activity className="size-3" />
@@ -223,11 +223,11 @@ export function AddUnplannedWork({
             placeholder="Lift name (e.g. Shrugs, Bicep Curls)"
             value={liftName}
             onChange={e => setLiftName(e.target.value)}
-            className="h-8 text-sm"
+            className="h-11 text-sm"
             onKeyDown={e => { if (e.key === 'Enter' && liftName.trim()) handleAddLift() }}
             autoFocus
           />
-          <Button size="sm" className="h-8 shrink-0" disabled={!liftName.trim()} onClick={handleAddLift}>
+          <Button size="sm" className="h-11 shrink-0" disabled={!liftName.trim()} onClick={handleAddLift}>
             Add
           </Button>
         </div>
@@ -269,7 +269,7 @@ export function AddUnplannedWork({
           // 2026): the chips are what a block usually is, each carrying the
           // timer's own minutes and no effort, and Other keeps the minutes too.
           // Otherwise the quick picks fit the kit (cardio-presets.ts, 9 Oct 2026).
-          picks={prefill ? timerBlockPicks(prefill.durationMinutes) : cardioPresetsFor(equipmentAccess)}
+          picks={prefill ? timerBlockPicks(prefill.durationMinutes, prefill.notes) : cardioPresetsFor(equipmentAccess)}
           defaultMinutes={prefill?.durationMinutes}
           // "5 × 3 min" — what the timer actually ran, so the log says more
           // than a name and a minute count when she reads it back.

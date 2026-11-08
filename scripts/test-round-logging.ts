@@ -119,7 +119,7 @@ console.log('\n4. It reaches the places she looked')
   // the row the timer's minutes and a chip per block name, and the row asks which one it was.
   check('the sheet hands the timer\'s minutes to the row', /defaultMinutes=\{prefill\?\.durationMinutes\}/.test(sheet), null)
   check('...and offers block names, not "Intervals", when the timer sent it',
-    /picks=\{prefill \? timerBlockPicks\(prefill\.durationMinutes\)/.test(sheet) && !/Intervals/.test(sheet), null)
+    /picks=\{prefill \? timerBlockPicks\(prefill\.durationMinutes[,)]/.test(sheet) && !/Intervals/.test(sheet), null)
   check('...the minutes carry over to Other too',
     /hint = chosen\?\.minutes \?\? \(pick === 'other' \? defaultMinutes/.test(entry), null)
   check('...and never the effort, which only she knows',
