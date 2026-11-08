@@ -339,6 +339,20 @@ const Y1 = await page(`
   return { trolley: !!q('[data-testid="grocery-trolley"]'), stillStored: ['Peanut butter', 'Frozen berries', 'Banana', 'Sweet potato'].filter(n => ids.includes(n)) }
 `)
 check('Clear empties the trolley and takes those items out of the store', !Y1.trolley && Y1.stillStored.length === 0, Y1)
+// UNDO AFTER CLEAR — her ruling 8 Nov 2026, "Undo line": the toast says what left, and Undo puts each item back as it
+// stood (in the trolley, ticked). Then Clear again, so the page goes on from the state it always had.
+const Y2 = await page(`
+  const toast = q('[data-testid="grocery-toast"]')?.textContent.replace(/\\s+/g, ' ').trim() ?? null
+  q('[data-testid="grocery-undo"]')?.click()
+  for (let i = 0; i < 20; i++) { await new Promise(r => setTimeout(r, 100)); if (q('[data-testid="grocery-trolley"]')) break }
+  const rows = (window.__fakeDb?.grocery_items ?? [])
+  const back = ['Peanut butter', 'Frozen berries', 'Banana', 'Sweet potato'].filter(n => rows.some(r => r.display_name === n && r.checked))
+  const trolley = !!q('[data-testid="grocery-trolley"]')
+  q('[data-testid="grocery-clear"]')?.click(); await new Promise(r => setTimeout(r, 500))
+  return { toast, back, trolley }
+`)
+check('Clear says what left, with an Undo: "4 ticked items cleared"', /^4 ticked items cleared\s?Undo$/.test(Y2.toast ?? ''), Y2.toast)
+check('...and Undo puts all four back in the trolley, ticked, through the store', Y2.back.length === 4 && Y2.trolley, Y2)
 
 console.log('\n[6] The horizon pill, Rebuild, and what the note claims')
 const note0 = await page(`return q('[data-testid="grocery-note"]')?.textContent.trim() ?? null`)
@@ -363,6 +377,23 @@ const RB = await page(`
 `)
 check('Rebuild builds the list from the meals, through the store (tuna arrives)', RB.tuna && RB.storedTuna, RB)
 check('...and the note now says 14 days, remembered with the day it was built', /next 14 days/.test(RB.note || '') && RB.memo?.days === 14 && RB.memo?.startDate === '2026-09-16', RB)
+// UNDO AFTER REBUILD: the list back as it stood (no tuna), and the note back to the 7 days it was built from. Then
+// rebuild again, so what follows sees the list it always saw.
+const RU = await page(`
+  const toast = q('[data-testid="grocery-toast"]')?.textContent.replace(/\\s+/g, ' ').trim() ?? null
+  q('[data-testid="grocery-undo"]')?.click()
+  const tunaStored = () => (window.__fakeDb?.grocery_items ?? []).some(r => /tuna/i.test(r.display_name))
+  for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 200)); if (!tunaStored()) break }
+  await new Promise(r => setTimeout(r, 400))
+  const out = { toast, tuna: tunaStored(), note: q('[data-testid="grocery-note"]')?.textContent.trim() ?? null }
+  q('[data-testid="grocery-rebuild"]')?.click()
+  for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 200)); if (tunaStored()) break }
+  await new Promise(r => setTimeout(r, 400))
+  for (let i = 0; i < 40 && q('[data-testid="grocery-toast"]'); i++) await new Promise(r => setTimeout(r, 200))
+  return out
+`)
+check('Rebuild says so, with an Undo: "List rebuilt from your meals"', /^List rebuilt from your meals\s?Undo$/.test(RU.toast ?? ''), RU.toast)
+check('...and Undo puts the list back as it stood: the new lines gone, built from 7 days again', RU.tuna === false && /next 7 days/.test(RU.note || ''), RU)
 
 console.log('\n[7] The add bar, with the keyboard shut and open')
 const A1 = await page(`

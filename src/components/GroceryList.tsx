@@ -22,11 +22,11 @@ import {
   ShoppingCart, Loader2, RefreshCw, Plus, Minus, Trash2, Check, ChevronDown, ChevronUp, CheckCircle2,
 } from 'lucide-react'
 import {
-  getAllItems, addItemLocal, editItemLocal, setCheckedLocal, deleteItemLocal, clearCheckedLocal, generateGroceryList,
+  getAllItems, addItemLocal, editItemLocal, setCheckedLocal, deleteItemLocal, clearCheckedLocal, restoreRowsLocal, generateGroceryList,
   DEFAULT_HORIZON_DAYS, type GroceryItemRow, type GroceryCategory,
 } from '@/lib/grocery-store'
 import {
-  GROCERY_AISLE_LABEL, trolleyToast, buildListLabel,
+  GROCERY_AISLE_LABEL, trolleyToast, clearedToast, REBUILT_TOAST, buildListLabel,
   MAX_GROCERY_QUANTITY, formatShoppingQuantity, stepperReadout, exactLabel, stepQuantity, purposeLine, mealRefLines,
   coverageSentence, readGroceryBuildMemo, writeGroceryBuildMemo, typedGroceryAmount, type GroceryBuildMemo,
 } from '@/lib/grocery-display'
@@ -71,6 +71,9 @@ const AISLE_GAP_PX = 12
 
 export function GroceryList({ profileId, mealPools, targets, softLikedFoods, todaysPicks, pinsByDate, refreshToken, mealShape, header }: GroceryListProps) {
   const [items, setItems] = useState<GroceryItemRow[]>([])
+  // The tick's Undo runs from the toast seconds later: it reads the list as it is THEN, not as it was at the tick.
+  const itemsRef = useRef(items)
+  itemsRef.current = items
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [built, setBuilt] = useState<GroceryBuildMemo | null>(() => readGroceryBuildMemo(profileId))
@@ -85,7 +88,9 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
   const [allRefs, setAllRefs] = useState(false)
   const [trolleyOpen, setTrolleyOpen] = useState(false)
   const [leaving, setLeaving] = useState<Set<string>>(new Set())
-  const [toast, setToast] = useState<{ id: string; name: string; key: number } | null>(null)
+  // ONE TOAST, three kinds: a tick (into the trolley), a Clear and a Rebuild, each with its own Undo (the last two are
+  // her ruling 8 Nov 2026, "Undo line").
+  const [toast, setToast] = useState<{ key: number; text: string; undo: () => void } | null>(null)
   const [heroHidden, setHeroHidden] = useState(false)
   const [activeAisle, setActiveAisle] = useState<GroceryCategory | null>(null)
   const [addBarH, setAddBarH] = useState(0)
@@ -135,11 +140,23 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
       // writes (it doesn't await the network) — reload picks up the merged
       // pending state immediately, no round-trip wait.
       const input = { profileId, mealPools, targets, softLikedFoods, days: horizonDays, todaysPicks, pinsByDate, mealShape, startDate: getSessionDateContext(profileId).date }
+      const beforeRows = await getAllItems(profileId)
+      const beforeMemo = built
       await generateGroceryList(input)
       const memo = { startDate: input.startDate, days: horizonDays }
       writeGroceryBuildMemo(profileId, memo)
       setBuilt(memo)
       await reload()
+      // A REBUILD OF A LIST THAT HAD LINES IS UNDOABLE: every row back as it stood, the new lines off again.
+      if (beforeRows.some(r => r.source === 'generated')) {
+        showToast(REBUILT_TOAST, () => {
+          void (async () => {
+            restoreRowsLocal(beforeRows, await getAllItems(profileId))
+            if (beforeMemo) { writeGroceryBuildMemo(profileId, beforeMemo); setBuilt(beforeMemo) }
+            await reload()
+          })()
+        })
+      }
     } finally {
       setGenerating(false)
     }
@@ -205,15 +222,24 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
     }, LEAVE_AFTER_MS))
     // A NEWER TICK REPLACES THE TOAST, and restarts its clock.
     if (toastTimer.current) clearTimeout(toastTimer.current)
-    setToast({ id: item.id, name: item.display_name, key: Date.now() })
-    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
+    showToast(trolleyToast(item.display_name), () => undoTick(item.id))
   }
 
-  const undoTick = () => {
-    if (!toast) return
-    const current = items.find(i => i.id === toast.id)
+  const showToast = (text: string, undo: () => void) => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToast({ key: Date.now(), text, undo })
+    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
+  }
+  const runUndo = () => {
+    if (!toast) return
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    const { undo } = toast
     setToast(null)
+    undo()
+  }
+
+  const undoTick = (id: string) => {
+    const current = itemsRef.current.find(i => i.id === id)
     if (!current || !current.checked) return
     const row = setCheckedLocal(current, false)
     setItems(prev => prev.map(i => (i.id === current.id ? row : i)))
@@ -229,9 +255,14 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
   }
 
   const handleClearChecked = () => {
+    const cleared = items.filter(i => i.checked)
     clearCheckedLocal(items)
     setItems(prev => prev.filter(i => !i.checked))
-    setToast(null)
+    if (cleared.length === 0) { setToast(null); return }
+    showToast(clearedToast(cleared.length), () => {
+      restoreRowsLocal(cleared)
+      setItems(prev => [...prev.filter(i => !cleared.some(c => c.id === i.id)), ...cleared])
+    })
   }
 
   // CHECKED ITEMS LEAVE THE AISLES — design handoff 2b ›, kept. A list you are
@@ -584,11 +615,11 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
           style={{ bottom: addBarH + 12 }}
         >
           <CheckCircle2 className="size-4 shrink-0 text-primary-text" aria-hidden />
-          <span className="min-w-0 flex-1 truncate text-[0.8125rem]">{trolleyToast(toast.name)}</span>
+          <span className="min-w-0 flex-1 truncate text-[0.8125rem]">{toast.text}</span>
           <button
             type="button"
             data-testid="grocery-undo"
-            onClick={undoTick}
+            onClick={runUndo}
             className="hit-slop-44 h-9 shrink-0 px-3 text-[0.8125rem] font-semibold text-primary-text"
           >
             Undo

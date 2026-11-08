@@ -34,6 +34,14 @@ export const GROCERY_AISLE_LABEL: Record<GroceryCategory, string> = {
  * It was "{name} is in the trolley", which is wrong for every plural on the
  * list ("blueberries is"). No verb, so it is right for one egg and for eggs.
  */
+/** The Undo toast after "Clear" (her ruling 8 Nov 2026, "Undo line"): how many ticked items left the list. */
+export function clearedToast(n: number): string {
+  return `${n} ticked item${n === 1 ? '' : 's'} cleared`
+}
+
+/** The Undo toast after a rebuild: the list was worked out again from the meals. */
+export const REBUILT_TOAST = 'List rebuilt from your meals'
+
 export function trolleyToast(name: string): string {
   const n = name.trim()
   return `${n.charAt(0).toUpperCase()}${n.slice(1)} — in the trolley`

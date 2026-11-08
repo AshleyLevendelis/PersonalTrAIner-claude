@@ -615,6 +615,26 @@ export function deleteItemLocal(current: GroceryItemRow): void {
   enqueueUpsert(item)
 }
 
+function pendingFromRow(row: GroceryItemRow): PendingItem {
+  return {
+    id: row.id, profileId: row.profile_id, canonicalKey: row.canonical_key, displayName: row.display_name,
+    quantity: row.quantity, unit: row.unit, category: row.category, source: row.source,
+    mealRefs: row.meal_refs, checked: row.checked, needsReview: row.needs_review, createdAt: row.created_at,
+    attempts: 0, dismissed: row.dismissed, userEdited: row.user_edited,
+  }
+}
+
+/**
+ * PUT ROWS BACK EXACTLY AS THEY WERE — the Undo after "Clear" and after "Rebuild" (her ruling 8 Nov 2026, "Undo line").
+ * `before` are the rows as they stood; any row in `after` that `before` did not hold (a line the rebuild added) is
+ * taken off again. Every row keeps its id, so a put-back is the same row, ticks and amounts included.
+ */
+export function restoreRowsLocal(before: GroceryItemRow[], after: GroceryItemRow[] = []): void {
+  const had = new Set(before.map(r => r.id))
+  for (const row of after) if (!had.has(row.id)) enqueueDelete(row.id, row.profile_id)
+  for (const row of before) enqueueUpsert(pendingFromRow(row))
+}
+
 export function clearCheckedLocal(currentItems: GroceryItemRow[]): void {
   for (const item of currentItems) {
     if (item.checked) enqueueDelete(item.id, item.profile_id)

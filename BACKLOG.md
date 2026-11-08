@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **THE SHOPPING LIST'S CLEAR AND REBUILD SAY SO, WITH AN UNDO; HER RULING "UNDO LINE", 8 NOV 2026** (QA walk N6,
+  asked with three options: an Undo line, my recommendation; ask first; leave them). CORRECTION, said to her at the
+  time: my question described the buttons wrongly. "Clear" removes only the ticked items (the trolley), not the whole
+  list, and "Rebuild" keeps her ticks and the lines she added by hand, redoing only the meal-based lines. I had read
+  the QA finding's words and not the store's code. Her choice fits both as they really are. Now: Clear says "4 ticked
+  items cleared · Undo" and Undo puts each back exactly as it stood (same row, ticked); Rebuild of a list that had
+  lines says "List rebuilt from your meals · Undo" and Undo puts every row back as it stood, takes the new lines off
+  and returns the "built from N days" note. One toast now carries a tick, a Clear or a Rebuild. `verify:grocery`
+  (+4 checks; 4 mutations caught, after the harness was taught that this driver prints "FAIL:"),
+  `test:grocery-shopping` re-anchored. 27 grocery gates and drivers green.
 - [x] **TAKING A MEAL OFF "EATEN" SAYS SO, WITH AN UNDO; HER RULING "UNDO LINE", 8 NOV 2026** (QA walk N7, asked as
   one question with three options: an Undo line, my recommendation; ask first; leave it silent). Before: tapping a
   meal's "✓ Logged" took it off what she had eaten with no message and no way back except logging it again, which

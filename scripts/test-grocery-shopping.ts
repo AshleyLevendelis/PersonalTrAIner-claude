@@ -176,7 +176,10 @@ async function main() {
   // Source only — verify:grocery reads the button's words off the real screen.
   check('the screen prints the label in both places (the button and the empty list), and no fixed "Rebuild" of its own',
     (screen.match(/\{buildListLabel\(items\)\}/g) ?? []).length === 2 && !/^\s*Rebuild\s*$/m.test(screen) && !/tap Rebuild above/.test(screen))
-  check('the toast is the phrasebook\'s', /\{trolleyToast\(toast\.name\)\}/.test(screen) && !/is in the trolley/.test(screen))
+  // RE-ANCHORED 8 Nov 2026: one toast now carries a tick, a Clear or a Rebuild (her "Undo line"), each with its words
+  // from the phrasebook; the toast prints what it was handed.
+  check('the toast is the phrasebook\'s', /showToast\(trolleyToast\(item\.display_name\)/.test(screen) && /showToast\(clearedToast\(/.test(screen)
+    && /showToast\(REBUILT_TOAST/.test(screen) && /\{toast\.text\}/.test(screen) && !/is in the trolley/.test(screen))
   // Her ruling: the list is never built behind her back. Nothing but her tap calls the builder.
   const calls = screen.match(/generateGroceryList\(/g) ?? []
   const handler = /const handleGenerate = [\s\S]*?\n {2}\}/.exec(screen)?.[0] ?? ''
