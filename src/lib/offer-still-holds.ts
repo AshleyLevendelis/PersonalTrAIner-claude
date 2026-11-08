@@ -96,6 +96,8 @@ export interface OfferCheckContext {
   weekOf: (date: string) => number
   /** The live plan, for the cards that point at a slot in it. */
   mesocycle: MesocycleWeek[]
+  /** Today's meals logged as eaten; null when the day cannot be read (which answers "holds", as below). */
+  loggedMealSlotsToday?: () => Promise<string[] | null>
 }
 
 /**
@@ -105,6 +107,16 @@ export interface OfferCheckContext {
 export async function offerStillHolds(kind: string, payload: Record<string, unknown>, ctx: OfferCheckContext): Promise<boolean> {
   const slot = (dayName: unknown, weekNumber: unknown) => ctx.mesocycle.find(w => w.week_number === Number(weekNumber))?.days.find(d => d.day === dayName)
   switch (kind) {
+    // A MEAL ALREADY EATEN IS NOT SWAPPED (8 Nov 2026, QA round 3): an offer to swap tonight's dinner, tapped after
+    // the dinner was logged as eaten, wrote a pick, said "Swapped" and changed nothing on Nutrition, which shows what
+    // was eaten. The day swap already refused it; the meal swap now turns stale the same way. Today only: a pick on
+    // another day is never eaten yet.
+    case 'propose_meal_swap': {
+      const date = typeof payload.date === 'string' && payload.date ? payload.date : ctx.today
+      if (date !== ctx.today || !ctx.loggedMealSlotsToday) return true
+      const eaten = await ctx.loggedMealSlotsToday().catch(() => null)
+      return !eaten || !eaten.includes(String(payload.slot))
+    }
     case 'propose_exercise_swap':
       return slot(payload.dayName, payload.weekNumber)?.exercises[Number(payload.exIndex)]?.name === payload.oldExerciseName
     case 'propose_exercise_remove':

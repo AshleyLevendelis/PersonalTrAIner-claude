@@ -6827,6 +6827,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       planForDate,
       weekOf: (d: string) => getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, new Date(`${d}T12:00:00`), mesocycle.length > 0 ? mesocycle.length : 4),
       mesocycle,
+      loggedMealSlotsToday: async () => {
+        if (!profile.id || !macros) return null
+        const ledger = await getTodayLedger(profile.id, getSessionDateContext(profile.id).date, macros)
+        return Object.entries(loggedEventsBySlot(ledger.events)).filter(([, ev]) => (ev?.length ?? 0) > 0).map(([slot]) => slot)
+      },
     }))
 
     // EVERY non-claimed outcome has to change the card. This used to handle
@@ -7734,7 +7739,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       await onWaterChanged?.()
       bumpOwnWrites()
     } else {
-      const row = await getPendingAction(receipt.undoToken)
+      // A read that FAILED keeps the Undo (8 Nov 2026, QA round 3): it was taken for "no such change", so the button
+      // went for good on a dead connection. Only a row that is really not there cannot be undone.
+      const row = await getPendingAction(receipt.undoToken).catch(() => undefined)
+      if (row === undefined) return { refused: RECEIPTS_UNDONE.failed, keep: true }
       if (!row) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
       if (!isWithinUndoWindow(row.resolved_at)) return { refused: RECEIPTS_UNDONE.tooLate, keep: false }
       // PUT BACK ONLY WHAT IS STILL AS THIS CARD LEFT IT (29 Oct 2026). Undo writes whole weeks back, and a later change
@@ -8438,7 +8446,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                           key={option}
                           type="button"
                           onClick={() => handleQuickReply(option)}
-                          className="hit-slop-44 min-h-[40px] shrink-0 whitespace-nowrap rounded-full border px-[15px] text-[0.8125rem] font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80"
+                          className="hit-slop-44 min-h-[40px] max-w-full rounded-full border px-[15px] py-1.5 text-left text-[0.8125rem] font-medium text-foreground transition-colors hover:bg-accent hover:text-accent-foreground active:bg-accent/80"
                           style={{ borderColor: 'color-mix(in oklab, var(--role-ai-accent) 45%, transparent)' }}
                         >
                           {option}

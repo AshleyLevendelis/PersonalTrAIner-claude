@@ -2,6 +2,24 @@
 
 Newest first. One line each.
 
+- [x] **QA ROUND 3, THE CHAT: AN UNDO TAPPED WITH NO SIGNAL WAS LOST FOR GOOD, AND A MEAL SWAP APPLIED OVER A MEAL
+  ALREADY EATEN, 8 NOV 2026.** Mechanical. Found by the round-3 chat tester on the whole app at 390px. (1) Tapping Undo
+  on a coach card with no connection said "This one can't be undone from here, so nothing was changed" and removed
+  the button, so once the signal came back there was nothing to tap and the change stayed. The Undo's first read
+  answered "no such change" on any error; it now throws, and a failed read says "That didn't undo, so nothing was
+  changed. Try again in a moment." and keeps the button (every plan card's Undo goes through it). (2) An offer to swap
+  tonight's dinner, tapped after the dinner was logged as eaten, wrote a pick, said "Swapped" with an Undo, and
+  Nutrition (which shows what was eaten) did not change. The offer is now checked at the tap against today's eaten
+  meals, as the day swap already was, and turns stale; another day's swap is never held to today's meals, and a day
+  that cannot be read lets the tap through (the write behind it fails honestly). Also: the receipt after an Undo read
+  "Put back · Undone That change was taken back." and now reads "Put back · That change was taken back."; and a long
+  quick-reply chip ran off the screen's right edge, and now wraps its words inside the screen. NOT DONE, from the same
+  report, named for later: the rebuild card's preview line cuts the NEW days to "M.."; the welcome after Clear chat
+  names an exercise already swapped out (and says "welcome aboard" in week 2); a removal's decline says "Keep 7
+  exercises" instead of the exercise; "hamstrings goes"; small chat controls under 44px (Listen, gear, Clear, retry);
+  "leg curl" for a full gym offers only the dumbbell version first (not traced).
+  CHECKS: `verify:workout-scenarios-chat` +4 (45), `test:workout-scenarios` §7 +5 (one re-anchored: it held a meal swap
+  up as "a card that touches no day", which was the defect), `test:chat-2b` +1. Mutations: 6 of 6 caught.
 - [x] **QA ROUND 3, MEALS AND THE SHOPPING LIST: AN OFFLINE REBUILD DOUBLED THE LIST, A TICK SURVIVED NINETEEN TIMES
   THE AMOUNT, AND AN OFFLINE MEAL LOG DROPPED THE MEALS ALREADY EATEN, 8 NOV 2026.** Mechanical. Found by the round-3
   meals tester on the whole app at 390px, each re-measured before fixing. (1) Rebuild with no connection said "List

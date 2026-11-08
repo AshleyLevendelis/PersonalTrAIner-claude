@@ -139,6 +139,14 @@ const ctx = (chat.match(/const buildContext = [\s\S]*?\n  \}\n/) || [''])[0]
 check('the line is on the header', /data-testid="chat-header-live"[\s\S]{0,300}Sees today&apos;s session, meals and logs/.test(chat))
 check('...and the coach is sent today\'s session, the day\'s meals and the logs', /buildCoachExerciseSummary\(\{[\s\S]*?today: \{/.test(ctx) && /buildCoachMealSummary\(mealPlan\)/.test(ctx) && /workout_log_history: workoutLogHistory/.test(ctx) && /logs: activeSession\.logs/.test(ctx), ctx.length)
 
+// A LONG QUICK REPLY WRAPS INSIDE THE SCREEN (8 Nov 2026, QA round 3): "Swap Leg Extensions for Banded Terminal Knee
+// Extension" ran off the right edge (it ended at x=405 on a 390px screen) because each chip was held to one line.
+{
+  const row = chat.slice(chat.indexOf('data-testid="chat-quick-replies"'), chat.indexOf('data-testid="chat-quick-replies"') + 800)
+  const cls = row.match(/className="(hit-slop-44 min-h-\[40px\][^"]*)"/)?.[1] ?? ''
+  check('a quick-reply chip may wrap its words and never grows past the screen', /\bmax-w-full\b/.test(cls) && !/\bwhitespace-nowrap\b/.test(cls) && !/\bshrink-0\b/.test(cls), cls)
+}
+
 console.log(`\n${ran} checks ran`)
 if (failed > 0) { console.error(`${failed} check(s) failed`); process.exit(1) }
 console.log('chat 2b: all checks passed')

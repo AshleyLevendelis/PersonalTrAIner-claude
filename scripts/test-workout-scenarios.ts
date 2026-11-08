@@ -380,7 +380,19 @@ async function main() {
   check('...AND NOT ONCE THAT SLOT WAS CHANGED (it would have swapped whatever was there now)',
     await holds.offerStillHolds('propose_exercise_swap', { weekNumber: 2, dayName: 'Monday', exIndex: 0, oldExerciseName: 'Upper A' }, { ...ctx(MON), mesocycle: changed }) === false)
   check('...and the same for a removal', await holds.offerStillHolds('propose_exercise_remove', { weekNumber: 2, dayName: 'Monday', exIndex: 0, exerciseName: 'Upper A' }, { ...ctx(MON), mesocycle: changed }) === false)
-  check('a card that touches no day always holds', await holds.offerStillHolds('propose_meal_swap', {}, ctx(MON)) === true)
+  // RE-ANCHORED 8 Nov 2026 (QA round 3): a meal swap DOES touch a day, the one whose meal is eaten. A card touching
+  // nothing on the plan (a water log) holds; a meal swap holds only while that meal is not logged as eaten today.
+  check('a card that touches no day always holds', await holds.offerStillHolds('propose_water_log', {}, ctx(MON)) === true)
+  const eatenSlots = (slots: string[] | null) => ({ ...ctx(MON), loggedMealSlotsToday: async () => slots })
+  check('a swap of tonight\'s dinner holds while dinner is not eaten', await holds.offerStillHolds('propose_meal_swap', { slot: 'dinner' }, eatenSlots(['breakfast'])) === true)
+  check('...AND NOT ONCE DINNER IS LOGGED AS EATEN (it wrote a pick and said "Swapped" over a meal already eaten)', await holds.offerStillHolds('propose_meal_swap', { slot: 'dinner' }, eatenSlots(['breakfast', 'dinner'])) === false)
+  check('...a swap on ANOTHER day is not held to today\'s meals', await holds.offerStillHolds('propose_meal_swap', { slot: 'dinner', date: THU }, eatenSlots(['dinner'])) === true)
+  check('...and a day that cannot be read holds (the write behind it fails honestly)', await holds.offerStillHolds('propose_meal_swap', { slot: 'dinner' }, eatenSlots(null)) === true)
+  {
+    const { readFileSync } = await import('fs')
+    const chatSrc = readFileSync(new URL('../src/components/ChatAssistant.tsx', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+    check('...and the chat hands the check today\'s eaten meals, read off the day\'s own ledger', /offerStillHolds\(pending\.kind[\s\S]{0,600}loggedMealSlotsToday: async \(\) =>[\s\S]{0,300}getTodayLedger\(/.test(chatSrc))
+  }
 
   // ---------------------------------------------------------------------------------------------------------------
   console.log('\n[8] AN UNDO PUTS BACK ONLY WHAT IS STILL AS THE CARD LEFT IT')

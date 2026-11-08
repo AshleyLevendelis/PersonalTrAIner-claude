@@ -1225,7 +1225,8 @@ export interface ReceiptTitles {
  */
 export const RECEIPTS_UNDONE = {
   title: 'Put back',
-  label: 'Undone',
+  // No label (QA round 3, 8 Nov 2026): "Put back · Undone That change was taken back." said it twice, run together.
+  label: '',
   // A bare receipt title ("Swapped") is a verb, not a thing that can be taken back (QA round 2, 8 Nov 2026: "Swapped was
   // taken back"); a sentence ("Swapped Lat Pulldown for Seated Cable Row.") names the change itself.
   detail: (was: string) => /\s/.test(was.trim())

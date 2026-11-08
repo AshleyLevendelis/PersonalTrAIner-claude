@@ -147,7 +147,7 @@ export function ReceiptCard({
         {icon}
         <p className="min-w-0 flex-1 text-[0.78125rem] leading-snug text-[color:var(--text-tertiary)]">
           <span className="font-semibold text-foreground">{title}</span>
-          {inline && <span data-receipt-detail>{` · ${inline.label} ${inline.detail}`}</span>}
+          {inline && <span data-receipt-detail>{` · ${[inline.label, inline.detail].filter(Boolean).join(' ')}`}</span>}
         </p>
         {buttons}
       </div>

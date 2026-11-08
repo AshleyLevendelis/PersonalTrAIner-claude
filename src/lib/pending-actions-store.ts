@@ -205,8 +205,11 @@ async function getOpenPendingActionForScope(profileId: string, scopeKey: string)
   return (data as PendingActionRow | null) ?? null
 }
 
+/** The row, or null when there is none. A FAILED read throws (8 Nov 2026): it was null, so an Undo tapped with no
+ * signal said "can't be undone" and threw its button away for good. */
 export async function getPendingAction(id: string): Promise<PendingActionRow | null> {
-  const { data } = await supabase.from('pending_actions').select('*').eq('id', id).maybeSingle()
+  const { data, error } = await supabase.from('pending_actions').select('*').eq('id', id).maybeSingle()
+  if (error) throw error
   return (data as PendingActionRow | null) ?? null
 }
 

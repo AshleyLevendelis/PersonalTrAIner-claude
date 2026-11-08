@@ -109,6 +109,15 @@ check('A1. "take today off" offers a rest day', !!(await until(`document.querySe
 check('A2. Apply', await clickLast('Apply'))
 check('A3. ...today is a rest day she chose', !!(await until(`(window.__fakeDb?.workout_sessions ?? []).some(r => r.date === ${J(TODAY)} && r.deliberate_rest === true)`)), await restRow())
 await until(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo')`)
+// NO SIGNAL AT ALL (8 Nov 2026, QA round 3): the Undo's first READ failed, was taken for "no such change", and the
+// card said "can't be undone from here" and threw its button away for good. A dead connection keeps the Undo.
+await ev(`window.__netDown = true`)
+check('A3a. Undo is tapped with no signal at all', await clickLast('Undo'))
+await wait(1500)
+const afterDead = await lastText()
+check('A3b. ...the card says it did not undo, never that it CAN\'T be undone', /didn't undo/i.test(afterDead) && !/can't be undone/i.test(afterDead), afterDead)
+check('A3c. ...and the Undo button is still there', await ev(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo')`))
+await ev(`window.__netDown = undefined`)
 // The connection drops for exactly this write: the day's row cannot be changed.
 await ev(`window.__failWrite = (t) => t === 'workout_sessions'`)
 check('A4. Undo is tapped while the save cannot land', await clickLast('Undo'))
@@ -121,6 +130,7 @@ await shoot('workout-scenarios-chat-undo-failed')
 await ev(`window.__failWrite = undefined`)
 check('A8. with the connection back, Undo works', await clickLast('Undo') && !!(await until(`(window.__fakeDb?.workout_sessions ?? []).some(r => r.date === ${J(TODAY)} && r.deliberate_rest === false)`)), await restRow())
 check('A9. ...and only now says it was put back', !!(await until(`/was taken back/i.test(document.body.innerText)`)), await lastText())
+check('A9b. ...in one plain line: "Put back · That change was taken back", never "Undone That change"', !!(await until(`[...document.querySelectorAll('[data-receipt-line]')].some(l => /^Put back · \\S/.test(l.textContent.trim()) && !/Undone/.test(l.textContent))`)), await ev(`[...document.querySelectorAll('[data-receipt-line]')].map(l => l.textContent.trim()).slice(-2)`))
 
 // ---- B. The coach reads the week she is in ------------------------------------------------------------------------
 console.log('\n  B. THE COACH READS THE WEEK SHE IS IN (training days changed from week 2)')
