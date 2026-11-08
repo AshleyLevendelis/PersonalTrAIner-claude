@@ -2831,3 +2831,12 @@ than one not started, because it looks finished in the log.
 - **A WRITTEN FINDING IS A LEAD, NOT A FACT. Re-measure before fixing from it.** BACKLOG said `verify:tap-targets` failed on Home with "2 of 87 controls under 44px". Re-run 9 Sep 2026: 5 of 87, across three tabs, only one of them on Home — the "28px numeric input" was on Exercise. Fixing from the note would have fixed the wrong screen and left three real ones. When a note turns out wrong, correct it where it sits AND say so in the new entry; a stale line that nobody contradicts gets believed twice.
 - If a metric's scale, denominator, or threshold changes, say so — prior numbers stop being comparable.
 - If you retract or correct an earlier claim, say how you reached the wrong one — which file you read, what you skimmed, what you assumed. The correction is worth more than the retraction: it tells us whether the same error shape is sitting in other conclusions.
+
+## MCP tools
+
+- Docs: before writing code against Supabase, Gemini, React, Vite or any npm package, fetch current docs with Context7 (resolve-library-id, then get-library-docs). Never rely on memory for API shapes.
+- Database: use the supabase-test MCP for schema questions and read-only data checks instead of asking Ashley to run SQL. Say which project you queried. Never request write access through MCP; schema changes go through migrations and db:push-both as before.
+- Testing: after any UI or flow change, verify it in the browser with the Playwright MCP against the Vercel preview URL before reporting done. Screenshot the result. If a screen looks wrong, read the console with Chrome DevTools MCP before hypothesising a cause.
+- Deploys: when a deploy fails or the live app misbehaves, read Vercel build and runtime logs via the Vercel MCP first.
+- Errors: when Sentry is connected, check it for matching issues before guessing at a production bug.
+- Report which MCP tools you used and what they returned; do not infer from memory what a tool could have told you.
