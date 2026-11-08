@@ -2,6 +2,13 @@
 
 Newest first. One line each.
 
+- [x] **PICKING 3, 7 OR 14 DAYS REBUILDS THE SHOPPING LIST FOR IT; HER RULING "REBUILD AT ONCE", 8 NOV 2026** (QA walk
+  N5, asked with three options: rebuild at once, my recommendation; a "tap Rebuild" line; leave it). The picker only
+  changed its label; the list stayed built from the old number until Rebuild, and nothing said so. Now a NEW number
+  rebuilds at once (ticks and hand-added lines stay, as on every rebuild), with the "List rebuilt from your meals ·
+  Undo" toast; Undo puts the list, the "built from N days" note and the picker back. Picking the number already
+  chosen does nothing. Her standing "never built behind her back" holds: the pick is her tap. `verify:grocery` [6]
+  re-anchored (2 mutations caught). 27 grocery gates and drivers green.
 - [x] **THE SHOPPING LIST'S CLEAR AND REBUILD SAY SO, WITH AN UNDO; HER RULING "UNDO LINE", 8 NOV 2026** (QA walk N6,
   asked with three options: an Undo line, my recommendation; ask first; leave them). CORRECTION, said to her at the
   time: my question described the buttons wrongly. "Clear" removes only the ticked items (the trolley), not the whole

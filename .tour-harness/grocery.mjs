@@ -363,37 +363,36 @@ await wait(400)
 const menu = await page(`return qa('[role="menuitem"]').map(m => { const b = box(m); return { text: m.textContent.trim(), x: b.left + b.width / 2, y: b.top + b.height / 2 } })`)
 check('the pill opens a menu of 3, 7 and 14 days', menu.map(m => m.text).join() === '3 days,7 days,14 days', menu.map(m => m.text))
 const fourteen = menu.find(m => m.text === '14 days')
+// RE-ANCHORED 8 Nov 2026 — her ruling "Rebuild at once": picking a number rebuilds for it (it only changed the label).
 if (fourteen) await tapAt(fourteen.x, fourteen.y)
-await wait(400)
-const H1 = await page(`return { pill: q('[data-testid="grocery-horizon"]')?.textContent.trim() ?? null, note: q('[data-testid="grocery-note"]')?.textContent.trim() ?? null }`)
-check('choosing 14 sets the pill, and the note still says 7 until the list is rebuilt', H1.pill === '14 days' && /next 7 days/.test(H1.note || ''), H1)
+const tunaStoredJs = `(window.__fakeDb?.grocery_items ?? []).some(r => /tuna/i.test(r.display_name))`
 const RB = await page(`
-  q('[data-testid="grocery-rebuild"]')?.click()
   const tunaRow = () => qa('[data-testid="grocery-row"]').find(r => /tuna/i.test(r.dataset.item)) || null
   for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 200)); if (tunaRow()) break }
   await new Promise(r => setTimeout(r, 400))
   let memo = null; try { memo = JSON.parse(localStorage.getItem('fitplan_grocery_built_v1:00000000-0000-4000-8000-000000000003') || 'null') } catch {}
-  return { tuna: tunaRow()?.dataset.item ?? null, storedTuna: !!(window.__fakeDb?.grocery_items ?? []).find(r => /tuna/i.test(r.display_name)), note: q('[data-testid="grocery-note"]')?.textContent.trim() ?? null, memo }
+  return { pill: q('[data-testid="grocery-horizon"]')?.textContent.trim() ?? null, tuna: tunaRow()?.dataset.item ?? null, storedTuna: ${tunaStoredJs}, note: q('[data-testid="grocery-note"]')?.textContent.trim() ?? null, memo, toast: q('[data-testid="grocery-toast"]')?.textContent.replace(/\\s+/g, ' ').trim() ?? null }
 `)
-check('Rebuild builds the list from the meals, through the store (tuna arrives)', RB.tuna && RB.storedTuna, RB)
+check('picking 14 days rebuilds the list for 14 at once, through the store (tuna arrives), no Rebuild tap needed', RB.pill === '14 days' && !!RB.tuna && RB.storedTuna, RB)
 check('...and the note now says 14 days, remembered with the day it was built', /next 14 days/.test(RB.note || '') && RB.memo?.days === 14 && RB.memo?.startDate === '2026-09-16', RB)
-// UNDO AFTER REBUILD: the list back as it stood (no tuna), and the note back to the 7 days it was built from. Then
-// rebuild again, so what follows sees the list it always saw.
+// UNDO AFTER REBUILD (her "Undo line"): the list back as it stood (no tuna), the note and the picker back to 7 days.
+check('it says so, with an Undo: "List rebuilt from your meals"', /^List rebuilt from your meals\s?Undo$/.test(RB.toast ?? ''), RB.toast)
 const RU = await page(`
-  const toast = q('[data-testid="grocery-toast"]')?.textContent.replace(/\\s+/g, ' ').trim() ?? null
   q('[data-testid="grocery-undo"]')?.click()
-  const tunaStored = () => (window.__fakeDb?.grocery_items ?? []).some(r => /tuna/i.test(r.display_name))
-  for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 200)); if (!tunaStored()) break }
+  for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 200)); if (!${tunaStoredJs}) break }
   await new Promise(r => setTimeout(r, 400))
-  const out = { toast, tuna: tunaStored(), note: q('[data-testid="grocery-note"]')?.textContent.trim() ?? null }
-  q('[data-testid="grocery-rebuild"]')?.click()
-  for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 200)); if (tunaStored()) break }
-  await new Promise(r => setTimeout(r, 400))
-  for (let i = 0; i < 40 && q('[data-testid="grocery-toast"]'); i++) await new Promise(r => setTimeout(r, 200))
-  return out
+  return { tuna: ${tunaStoredJs}, note: q('[data-testid="grocery-note"]')?.textContent.trim() ?? null, pill: q('[data-testid="grocery-horizon"]')?.textContent.trim() ?? null }
 `)
-check('Rebuild says so, with an Undo: "List rebuilt from your meals"', /^List rebuilt from your meals\s?Undo$/.test(RU.toast ?? ''), RU.toast)
-check('...and Undo puts the list back as it stood: the new lines gone, built from 7 days again', RU.tuna === false && /next 7 days/.test(RU.note || ''), RU)
+check('...and Undo puts the list back as it stood: the new lines gone, built from 7 days, the picker on 7', RU.tuna === false && /next 7 days/.test(RU.note || '') && RU.pill === '7 days', RU)
+// Rebuild by its button, at 14, so what follows sees the list it always saw.
+const pill2 = await page(`const p = q('[data-testid="grocery-horizon"]'); p?.scrollIntoView({ block: 'center' }); const b = box(p); return b ? { x: b.left + b.width / 2, y: b.top + b.height / 2 } : null`)
+if (pill2) await tapAt(pill2.x, pill2.y)
+await wait(400)
+const menu2 = await page(`return qa('[role="menuitem"]').map(m => { const b = box(m); return { text: m.textContent.trim(), x: b.left + b.width / 2, y: b.top + b.height / 2 } })`)
+const f2 = menu2.find(m => m.text === '14 days'); if (f2) await tapAt(f2.x, f2.y)
+await page(`for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 200)); if (${tunaStoredJs}) break } for (let i = 0; i < 40 && q('[data-testid="grocery-toast"]'); i++) await new Promise(r => setTimeout(r, 200)); return true`)
+const again = await page(`return { tuna: ${tunaStoredJs}, rebuild: !!q('[data-testid="grocery-rebuild"]') }`)
+check('the Rebuild button is still there beside the picker, and the list is back on 14 days', again.tuna && again.rebuild, again)
 
 console.log('\n[7] The add bar, with the keyboard shut and open')
 const A1 = await page(`

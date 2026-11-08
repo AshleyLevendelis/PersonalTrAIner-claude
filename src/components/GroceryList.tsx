@@ -132,18 +132,18 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
     ? coverageSentence(items.filter(r => r.source === 'generated').flatMap(r => (r.meal_refs ?? []).map(ref => ref.date).filter((d): d is string => !!d)), getSessionDateContext(profileId).date)
     : null
 
-  const handleGenerate = async () => {
+  const handleGenerate = async (days: number = horizonDays) => {
     if (!profileId || !targets) return
     setGenerating(true)
     try {
       // generateGroceryList reads the current merged view then enqueues local
       // writes (it doesn't await the network) — reload picks up the merged
       // pending state immediately, no round-trip wait.
-      const input = { profileId, mealPools, targets, softLikedFoods, days: horizonDays, todaysPicks, pinsByDate, mealShape, startDate: getSessionDateContext(profileId).date }
+      const input = { profileId, mealPools, targets, softLikedFoods, days, todaysPicks, pinsByDate, mealShape, startDate: getSessionDateContext(profileId).date }
       const beforeRows = await getAllItems(profileId)
       const beforeMemo = built
       await generateGroceryList(input)
-      const memo = { startDate: input.startDate, days: horizonDays }
+      const memo = { startDate: input.startDate, days }
       writeGroceryBuildMemo(profileId, memo)
       setBuilt(memo)
       await reload()
@@ -152,7 +152,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
         showToast(REBUILT_TOAST, () => {
           void (async () => {
             restoreRowsLocal(beforeRows, await getAllItems(profileId))
-            if (beforeMemo) { writeGroceryBuildMemo(profileId, beforeMemo); setBuilt(beforeMemo) }
+            if (beforeMemo) { writeGroceryBuildMemo(profileId, beforeMemo); setBuilt(beforeMemo); setHorizonDays(beforeMemo.days) }
             await reload()
           })()
         })
@@ -399,7 +399,10 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
                     {DAY_PRESETS.map(d => (
-                      <DropdownMenuItem key={d} data-days={d} onSelect={() => setHorizonDays(d)}>
+                      // PICKING A NUMBER REBUILDS FOR IT AT ONCE — her ruling 8 Nov 2026, "Rebuild at once" (over a "tap
+                      // Rebuild" line and over leaving it). It only changed the label before; ticks and hand-added
+                      // lines stay, and the Rebuild toast's Undo puts the old list back.
+                      <DropdownMenuItem key={d} data-days={d} onSelect={() => { const changed = d !== horizonDays; setHorizonDays(d); if (changed) void handleGenerate(d) }}>
                         {d} days
                         {d === horizonDays && <Check className="ml-auto size-3.5" aria-hidden />}
                       </DropdownMenuItem>
@@ -409,7 +412,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
                 <button
                   type="button"
                   data-testid="grocery-rebuild"
-                  onClick={handleGenerate}
+                  onClick={() => void handleGenerate()}
                   disabled={generating || !targets}
                   className="hit-slop-44 flex items-center gap-1.5 text-xs font-medium text-primary-text disabled:opacity-50"
                 >

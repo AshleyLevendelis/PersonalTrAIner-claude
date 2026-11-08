@@ -435,6 +435,8 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   caught, eight only after a case where the thing binds was added), `verify:unit-ask` (15 checks, 10
   mutations). The coach's half is held by source checks only until `chat-gemini`
   is deployed. Needs the `chat-gemini` AND `generate-meals` deploys
+- **The shopping list: picking 3, 7 or 14 days rebuilds it at once ("Rebuild at once"), and Clear and Rebuild each
+  say so with an Undo ("Undo line")** — her rulings 8 Nov 2026. `verify:grocery` [5]-[6]
 - Grocery list follows the meals — `grocery`, and since 19 Sep 2026 it follows
   the ones the tab will actually SHOW: both surfaces and the resize trial read
   one rotation from one pure builder, so the list cannot shop for a week the
