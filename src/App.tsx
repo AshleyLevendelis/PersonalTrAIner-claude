@@ -1022,7 +1022,8 @@ function App() {
     // profile has answered (its fallback waits on both), so it is not a second round trip after it.
     const effectiveTargetWeightP = quiet(getEffectiveTargetWeightKg(
       ownedId,
-      Promise.all([latestWeightP, profileP]).then(([w, { data: row }]) => w ?? (row?.weight_kg == null ? undefined : Number(row.weight_kg))),
+      // quiet(): a failed weigh-in read rejects this, and it is awaited only on the branch that uses it.
+      quiet(Promise.all([latestWeightP, profileP]).then(([w, { data: row }]) => w ?? (row?.weight_kg == null ? undefined : Number(row.weight_kg)))),
     ))
     const { data: profileRow, error: profileError } = await profileP
 
@@ -1294,7 +1295,7 @@ function App() {
     // phone kept none. With neither, the anchor is unknown until a read succeeds.
     else if (!boot && effectiveTargetWeight.weightKg != null) setTargetWeightAnchorKg(effectiveTargetWeight.weightKg)
     anchorUnknownRef.current = targetsUnread && boot?.targetWeightAnchorKg == null && effectiveTargetWeight.weightKg == null
-    setMacros(cur => (stillAsKept(cur, boot?.macros) && !(targetsUnread && boot?.macros) ? liveTargets : cur))
+    if (!(targetsUnread && boot?.macros)) setMacros(cur => (stillAsKept(cur, boot?.macros) ? liveTargets : cur))
     if (!(restoredPools.failed && boot)) setMealPools(cur => (stillAsKept(cur, boot?.pools) ? restoredPools.pools : cur))
     // A read that FAILED must not render as "No meal plan generated yet" — that
     // sends someone whose meals exist to regenerate them, and the button they
