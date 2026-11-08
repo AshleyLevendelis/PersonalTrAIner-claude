@@ -131,8 +131,22 @@ async function main() {
   const FINISHER = 'Brisk Walk or Light Cycling'
 
   // ---- The tester's Thursday ------------------------------------------------
-  sets.saveSet({ userId, date: THU, weekNumber: 1, day: 'Thursday', exerciseId: 'goblet-squat', exerciseName: 'Goblet Squat', setNumber: 1, weightKg: 16, repsCompleted: 10 })
-  sets.saveSet({ userId, date: THU, weekNumber: 1, day: 'Thursday', exerciseId: 'goblet-squat', exerciseName: 'Goblet Squat', setNumber: 2, weightKg: 16, repsCompleted: 10 })
+  // The two sets are logged at FIXED moments two and a half minutes apart. Logged back to back they could land in
+  // the same millisecond, and one moment is honestly no duration at all (null): the gate failed on fast runs only
+  // (sweep of 8 Nov 2026, reproduced by freezing the clock). A check must give the same answer every run.
+  const at = (iso: string, fn: () => void) => {
+    const RealDate = Date
+    const fixed = new RealDate(iso).getTime()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(globalThis as any).Date = class extends RealDate {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      constructor(...a: any[]) { if (a.length) super(...(a as [any])); else super(fixed) }
+      static now() { return fixed }
+    }
+    try { fn() } finally { (globalThis as { Date: DateConstructor }).Date = RealDate }
+  }
+  at(`${THU}T18:00:00`, () => sets.saveSet({ userId, date: THU, weekNumber: 1, day: 'Thursday', exerciseId: 'goblet-squat', exerciseName: 'Goblet Squat', setNumber: 1, weightKg: 16, repsCompleted: 10 }))
+  at(`${THU}T18:02:30`, () => sets.saveSet({ userId, date: THU, weekNumber: 1, day: 'Thursday', exerciseId: 'goblet-squat', exerciseName: 'Goblet Squat', setNumber: 2, weightKg: 16, repsCompleted: 10 }))
   await sets.flushPending()
   cardio.saveCardioLog({ userId, date: THU, activityName: FINISHER, durationMinutes: 30, intensityRpe: 4 })
   cardio.saveCardioLog({ userId, date: THU, activityName: 'skipping rope', durationMinutes: 12, intensityRpe: 5 })

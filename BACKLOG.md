@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [x] **PRE-MERGE SWEEP OF 8 NOV 2026: THREE FAILURES BEYOND THE FOUR ENVIRONMENTAL ONES, NONE IN THE APP.** 508 gates on
+  `a2311e51`: 501 passed; `test:meal-quality`, `test:schema-parity`, `verify:rls` and `test:coach-exam-fresh` failed as
+  always. (1) `test:cardio-reader`, the intermittent named on 30 Oct and NOT then known, is now PROVEN: its two sets were
+  logged back to back, and when both land in the same millisecond one moment is honestly no duration (null), so the
+  check read "got null" on fast runs only. Reproduced every time by freezing the clock for the two saves; the fixture now
+  logs them at fixed moments 2 min 30 s apart. Still catches the defect it guards (cardio minutes folded in: got 45).
+  (2) `verify:tools-timer` 8e still expected "1 min" on the block chips, the wording the B7 fix deliberately removed; it
+  was the fourth gate pinning that wording and the derivation missed it (a driver names the screen, not the file).
+  Re-anchored: the shape under the title AND on the chips, never "1 min"; putting the minutes back is caught.
+  (3) `verify:small-targets` 4a/4b (the rest timer's buttons not found) passed twice alone: load timing during the
+  sweep, not re-investigated further. Test files only; no app change.
 - [x] **EXPERIENCE, RECOVERY AND CONDITIONING OFFER A REBUILD: HIS RULING, 8 NOV 2026** ("Offer a rebuild", from three
   options, over "next block only, with a line saying so" and "leave it"). QA round 2 (A6): changing one on Profile saved
   it with no rebuild offer and no message, while the plan generator reads all three: the 16 Sep session-length defect
