@@ -376,10 +376,11 @@ let chips = []
 for (let i = 0; i < 20 && chips.length < 2; i++) {
   await wait(250)
   chips = await call(() => [...document.querySelectorAll('button')].filter(b => /^(Sounds good|What weight\?)$/.test((b.textContent || '').trim()))
-    .map(b => { const s = getComputedStyle(b); return { h: b.getBoundingClientRect().height, minH: parseFloat(s.minHeight), padL: parseFloat(s.paddingLeft), border: parseFloat(s.borderTopWidth), nowrap: s.whiteSpace === 'nowrap' } }))
+    .map(b => { const s = getComputedStyle(b); const r = b.getBoundingClientRect(); return { h: r.height, minH: parseFloat(s.minHeight), padL: parseFloat(s.paddingLeft), border: parseFloat(s.borderTopWidth), right: r.right, vw: innerWidth } }))
 }
-// 2b: 15px sides, a violet hairline, one line each.
-check('the reply\'s tap-to-answer chips are 40px tall with 15px sides, a 1px hairline, never wrapped', chips.length === 2 && chips.every(c => c.minH === 40 && c.h >= 40 && c.padL === 15 && c.border === 1 && c.nowrap), chips)
+// 2b: 15px sides, a violet hairline, one line each. RE-ANCHORED 8 Nov 2026 (QA round 3): "never wrapped" let a chip
+// longer than the screen run off its edge; a chip that fits is still one 40px line, and none goes past the screen.
+check('the reply\'s tap-to-answer chips are 40px tall with 15px sides, a 1px hairline, one line each, inside the screen', chips.length === 2 && chips.every(c => c.minH === 40 && c.h === 40 && c.padL === 15 && c.border === 1 && c.right <= c.vw), chips)
 // FOUND HERE, 26 Sep 2026, NOT FIXED: tap "Jump to latest" while a reply is
 // still arriving and the thread stops short when the reply's chips appear —
 // the jump scrolls SMOOTHLY, the scroll handler reads "not near the bottom"
