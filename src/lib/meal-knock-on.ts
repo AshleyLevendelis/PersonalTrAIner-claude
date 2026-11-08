@@ -137,10 +137,11 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
     const day = dayLabel(c.date, today)
     const nowOption = after.find(d => d.date === c.date)?.day.chosen[c.slot]
     const wasOption = before.find(d => d.date === c.date)?.day.chosen[c.slot]
-    const text = c.kind === 'size' ? DAY_MOVE.alsoResized(day, c.slot, c.fromKcal ?? 0, c.toKcal)
+    const fits = after.find(d => d.date === c.date)?.day.withinTolerance === true
+    const text = c.kind === 'size' ? DAY_MOVE.alsoResized(day, c.slot, c.fromKcal ?? 0, c.toKcal, fits)
       : nowOption?.leftoverFrom === 'dinner' ? DAY_MOVE.alsoLeftover(day, c.slot, c.to)
       : wasOption?.leftoverFrom === 'dinner' ? DAY_MOVE.alsoFresh(day, c.slot, c.to)
-      : DAY_MOVE.alsoRefit(day, c.slot, c.to)
+      : DAY_MOVE.alsoRefit(day, c.slot, c.to, fits)
     lines.push({ severity: 'info', text })
   }
   if (changes.length > MAX_LISTED_CHANGES) lines.push({ severity: 'info', text: DAY_MOVE.andMore(changes.length - MAX_LISTED_CHANGES) })

@@ -403,6 +403,19 @@ async function main() {
     const oilWarn = ok2.lines.filter(l => l.severity === 'warn').map(l => l.text)
     check('...and the card says fat, by how much, not "about N under"', !!oilV && oilWarn.length === 1 && oilWarn[0].includes(`but fat ${oilV.off[0].delta} g over your target.`) && !/about [\d,]+ (over|under)/.test(oilWarn[0]), oilWarn)
     check('the ordinary banana, which the day absorbs, carries no warning', !k.lines.some(l => l.severity === 'warn') && k.after?.find(d => d.date === today)?.day.withinTolerance === true, k.lines.filter(l => l.severity === 'warn'))
+    // "SO THE DAY STILL FITS" ONLY WHEN IT DOES (8 Nov 2026, QA round 3): it was printed beside a day 21 g of protein
+    // over. The day the banana takes off target changes its other meals, and none of those lines may say it fits.
+    const bigChanged = bk.lines.filter(l => l.severity === 'info' && /^Today's (breakfast|lunch|dinner|snack) (goes from|becomes)/.test(l.text)).map(l => l.text)
+    check('the off-target day\'s other meals change (the fixture binds)', bigChanged.length > 0, bk.lines.map(l => l.text))
+    check('...and not one of those lines says the day still fits', bigChanged.every(t => !/still fits/.test(t)), bigChanged)
+    const okChanged = k.lines.filter(l => l.severity === 'info' && /(goes from|becomes)/.test(l.text) && /^Today's/.test(l.text)).map(l => l.text)
+    check('...while a day that does land says so', okChanged.length === 0 || okChanged.every(t => /still fits/.test(t)), okChanged)
+    // The day swap and the calorie move say the same line; each hands it that day's own verdict.
+    const { readFileSync: rf } = await import('fs')
+    for (const f of ['src/lib/meal-day-move.ts', 'src/lib/meal-rebalance.ts']) {
+      const src = rf(new URL(`../${f}`, import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+      check(`${f.split('/').pop()} says "still fits" only off the day's own verdict`, /const fits = after\.find\(a => a\.date === c\.date\)\?\.day\.withinTolerance === true/.test(src) && /alsoResized\([^\n]{0,160}?, fits\)/.test(src) && /alsoRefit\([^\n]{0,80}?, fits\)/.test(src))
+    }
   }
 
   // ---------------------------------------------------------------------------

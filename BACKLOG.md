@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [x] **"…SO THE DAY STILL FITS" WAS SAID OVER DAYS THAT DID NOT FIT, 8 NOV 2026** (QA round 3, the meals tester's
+  finding 4). Mechanical: a false claim. A swap, a day move, a meal moved between slots, an amount changed or a food
+  added re-plans the day's other meals, and each changed meal was announced "…becomes X, so the day still fits" or
+  "…goes from A to B kcal so the day still fits" whatever the day came to. Measured by the tester on seven cases, one
+  where the change took the day from 20 g of protein over to 46 g over. The clause is now said only when that day's
+  own verdict after the change is on target (the warning beside it already names how far off a day is). One sentence
+  in the phrasebook, three callers (the swap and edit card, the day swap, the calorie move), each handing it the
+  day's verdict. NOT DONE from the same report, named: "came to 0 kcal less than planned, so dinner and snack are 1%
+  smaller" after meals logged as planned (a resize below what anyone would notice is still announced); swapping a food
+  for "the same food cooked" renames the meal and changes nothing in it; editing a meal already eaten previews one
+  size and lands another; a heart, and a future day's swap, change other days' meals unannounced; a today swap that
+  changes two other dishes has no Undo. CHECKS: `test:meal-knock-on` §6 (+5: the off-target day says nothing fits, a
+  day that lands says it does, the two other callers pass the verdict). Mutations: 3 of 3 caught.
 - [x] **QA ROUND 3, SETUP: THE RESUME HEADLINE, "NONE" FILED UNDER CUISINES, A DUMBBELL LIMIT WITHOUT DUMBBELLS, AND
   "TAP ONE" WITH NOTHING TO TAP, 8 NOV 2026.** Mechanical. Found by the round-3 setup tester at 390px. (1) Reopening
   setup partway through made "Welcome back — picking up right where we left off. Say anything and we'll carry on." the

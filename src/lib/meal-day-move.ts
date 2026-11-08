@@ -370,11 +370,12 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
   changes.sort((x, y) => Number(x.resized) - Number(y.resized))
   for (const c of changes.slice(0, MAX_LISTED_CHANGES)) {
     const day = dayLabel(c.date, today)
+    const fits = after.find(a => a.date === c.date)?.day.withinTolerance === true
     const text = c.resized
-      ? DAY_MOVE.alsoResized(day, c.slot, Math.round(c.was!.macros.calories), Math.round(c.to.macros.calories))
+      ? DAY_MOVE.alsoResized(day, c.slot, Math.round(c.was!.macros.calories), Math.round(c.to.macros.calories), fits)
       : c.to.leftoverFrom === 'dinner' ? DAY_MOVE.alsoLeftover(day, c.slot, c.to.name)
       : c.was?.leftoverFrom === 'dinner' ? DAY_MOVE.alsoFresh(day, c.slot, c.to.name)
-      : DAY_MOVE.alsoRefit(day, c.slot, c.to.name)
+      : DAY_MOVE.alsoRefit(day, c.slot, c.to.name, fits)
     implications.push({ severity: 'info', text })
   }
   if (changes.length > MAX_LISTED_CHANGES) {

@@ -352,11 +352,13 @@ export const DAY_MOVE = {
     `${cap(poss(day))} ${slot} becomes ${to}, the leftovers of the dinner the night before.`,
   alsoFresh: (day: string, slot: string, to: string) =>
     `${cap(poss(day))} ${slot} becomes ${to}, cooked fresh instead of leftovers.`,
-  alsoRefit: (day: string, slot: string, to: string) =>
-    `${cap(poss(day))} ${slot} becomes ${to}, so the day still fits.`,
+  // "SO THE DAY STILL FITS" ONLY WHEN IT DOES (8 Nov 2026, QA round 3): it was said over a day 21 g of protein over, and
+  // over one a change took from 20 g over to 46 g over. `fits` is that day's own verdict after the change.
+  alsoRefit: (day: string, slot: string, to: string, fits = true) =>
+    `${cap(poss(day))} ${slot} becomes ${to}${fits ? ', so the day still fits' : ''}.`,
   /** ...or the same dish at a different size. */
-  alsoResized: (day: string, slot: string, from: number, to: number) =>
-    `${cap(poss(day))} ${slot} goes from ${grouped(from)} to ${grouped(to)} kcal so the day still fits.`,
+  alsoResized: (day: string, slot: string, from: number, to: number, fits = true) =>
+    `${cap(poss(day))} ${slot} goes from ${grouped(from)} to ${grouped(to)} kcal${fits ? ' so the day still fits' : ''}.`,
   andMore: (n: number) => `${n} more ${n === 1 ? 'meal changes' : 'meals change'} too.`,
   listStale: (days: string[]) =>
     `${cap(days.join(' and '))} ${days.length === 1 ? 'is' : 'are'} on your shopping list, so rebuild the list afterwards to match.`,

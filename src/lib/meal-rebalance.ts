@@ -264,12 +264,13 @@ export function buildMealRebalanceProposal(input: BuildMealRebalanceInput): Meal
   changes.sort((x, y) => Number(x.resized) - Number(y.resized))
   for (const c of changes.slice(0, 4)) {
     const d = dayLabel(c.date, today)
+    const fits = after.find(a => a.date === c.date)?.day.withinTolerance === true
     implications.push({
       severity: 'info',
-      text: c.resized ? DAY_MOVE.alsoResized(d, c.slot, Math.round(c.was!.macros.calories), Math.round(c.to.macros.calories))
+      text: c.resized ? DAY_MOVE.alsoResized(d, c.slot, Math.round(c.was!.macros.calories), Math.round(c.to.macros.calories), fits)
         : c.to.leftoverFrom === 'dinner' ? DAY_MOVE.alsoLeftover(d, c.slot, c.to.name)
         : c.was?.leftoverFrom === 'dinner' ? DAY_MOVE.alsoFresh(d, c.slot, c.to.name)
-        : DAY_MOVE.alsoRefit(d, c.slot, c.to.name),
+        : DAY_MOVE.alsoRefit(d, c.slot, c.to.name, fits),
     })
   }
   if (changes.length > 4) implications.push({ severity: 'info', text: DAY_MOVE.andMore(changes.length - 4) })
