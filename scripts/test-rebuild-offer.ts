@@ -147,8 +147,20 @@ console.log('\n2. And nothing else does')
   // would have let this through unread. Suspect a blocking check; do not
   // assume it is wrong.
   check('the invalidating list is exactly the fields that change what the plan contains',
-    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'equipment_access,fitness_goal,injuries,known_bench_kg,known_deadlift_kg,known_squat_kg,session_duration_preference,start_preference,training_days,training_style',
+    // + experience, recovery and conditioning, his ruling 8 Nov 2026 "Offer a rebuild".
+    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'conditioning_preference,equipment_access,fitness_goal,injuries,known_bench_kg,known_deadlift_kg,known_squat_kg,recovery_capacity,session_duration_preference,start_preference,training_days,training_experience,training_style',
     PLAN_INVALIDATING_FIELDS)
+  // HIS RULING, 8 Nov 2026, "Offer a rebuild": each of the three offers one, in words about what it shapes, and only
+  // when it actually changed.
+  for (const [field, from, to, words] of [
+    ['training_experience', 'intermediate', 'beginner', /exercises, how many sets and the starting weights/],
+    ['recovery_capacity', 'moderate', 'low', /how much work each week holds/],
+    ['conditioning_preference', 'tolerate', 'enjoy', /how much cardio each week holds/],
+  ] as const) {
+    const offer = detectPlanInvalidation(base({ [field]: from }), { [field]: to } as Partial<UserProfile>)
+    check(`changing ${field} offers a rebuild, saying what it shapes`, offer?.field === field && words.test(offer.detail), offer)
+    check(`...and re-saving the same ${field} does not`, detectPlanInvalidation(base({ [field]: from }), { [field]: from } as Partial<UserProfile>) === null)
+  }
 
   // BOTH DIRECTIONS, because the copy differs and only one of them is the
   // obvious case: easing-in -> training is someone getting fitter, and

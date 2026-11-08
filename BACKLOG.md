@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **EXPERIENCE, RECOVERY AND CONDITIONING OFFER A REBUILD: HIS RULING, 8 NOV 2026** ("Offer a rebuild", from three
+  options, over "next block only, with a line saying so" and "leave it"). QA round 2 (A6): changing one on Profile saved
+  it with no rebuild offer and no message, while the plan generator reads all three: the 16 Sep session-length defect
+  again ("true about the NUMBER and false about the PLAN"). They join the rebuild-offer list, each in words about what
+  it shapes ("the exercises, how many sets and the starting weights", "how much work each week holds", "how much cardio
+  each week holds"); re-saving the same answer offers nothing. `test:rebuild-offer` (+6, and the pinned field list
+  updated: that check exists so a field cannot join silently), `verify:profile-fixes` §8 (+3). 4 mutations, 4 caught.
+  NAMED GAP: `screen only` — the coach has no tool to change these three. 15 derived gates and drivers green.
 - [x] **A SWAPPED DAY WITH THE ACTIVITY LOGGED COUNTS AS A SESSION: HIS RULING, 8 NOV 2026** ("Count it as a session",
   from three options, over "keep the streak, skip the week" and "leave it"). QA round 2 (B1) found "Count it as today's
   workout" after a timer block took the streak from 2 to 1 and the week from "Session 2 of 4" to "0 of 3": the 9 Oct

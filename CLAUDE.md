@@ -843,6 +843,10 @@ menu" stays true when a copy is also left outside it.
   differently depending on where it was made.
   `session-length-change`, `rebuild-offer`, `verify:setup-answers` §6i-6n,
   `coach-parity`. Needs the `chat-gemini` deploy to work by chat
+- **Experience, Recovery capacity and Conditioning offer a rebuild: his ruling 8 Nov 2026, "Offer a rebuild"** (over
+  "next block only" and leaving it): changing one on Profile had saved it and left the plan as it was, with no word,
+  though the generator reads all three. Same road as goal and style; nothing changes until yes. `screen only`: the coach
+  has no tool for these three yet. `test:rebuild-offer`, `verify:profile-fixes` §8
 - **"I only have 45 minutes today" ALREADY WORKS on both surfaces**, and is a
   different thing from the above — `propose_session_shorten`
   (`chat-gemini:810`, takes `minutes`, TODAY-only, main lift protected) and

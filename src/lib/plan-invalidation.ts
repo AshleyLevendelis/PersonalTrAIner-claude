@@ -78,7 +78,10 @@ export const KNOWN_LIFT_FIELDS = ['known_squat_kg', 'known_bench_kg', 'known_dea
 // 60-minute session with its end chopped off is not a session designed for
 // 45) and over waiting for the next block. Being in this list is what makes
 // that happen — everything below reuses the road goal and style already take.
-export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', 'session_duration_preference', ...KNOWN_LIFT_FIELDS] as const
+// EXPERIENCE, RECOVERY AND CONDITIONING ADDED 8 Nov 2026, his ruling "Offer a rebuild" (QA round 2): all three are read
+// by the plan generator, and changing one on Profile saved it and left the plan as it was, with no word, the session-
+// length defect above again. They take the same road goal and style take: an offer, nothing changed until yes.
+export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', 'session_duration_preference', 'training_experience', 'recovery_capacity', 'conditioning_preference', ...KNOWN_LIFT_FIELDS] as const
 export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number] | 'concurrent_activities'
 
 /**
@@ -221,6 +224,25 @@ export function detectPlanInvalidation(
         'Your current plan was built for the style you had before, so the exercises and rep ' +
         'ranges still follow it. I can rebuild it from this week onwards in the new style. ' +
         'Everything you have already logged stays exactly as it is.',
+    }
+  }
+
+  // EXPERIENCE, RECOVERY, CONDITIONING (his ruling 8 Nov 2026, "Offer a rebuild"): each shapes what the plan holds, so
+  // a change to one is offered the same rebuild, in words about what it shapes.
+  const SHAPING: { field: 'training_experience' | 'recovery_capacity' | 'conditioning_preference'; title: string; shapes: string }[] = [
+    { field: 'training_experience', title: 'Rebuild your plan for this experience level?', shapes: 'the exercises, how many sets and the starting weights still follow' },
+    { field: 'recovery_capacity', title: 'Rebuild your plan around this recovery?', shapes: 'how much work each week holds still follows' },
+    { field: 'conditioning_preference', title: 'Rebuild your plan with this conditioning?', shapes: 'how much cardio each week holds still follows' },
+  ]
+  for (const f of SHAPING) {
+    if (f.field in patch && patch[f.field] != null && patch[f.field] !== before[f.field]) {
+      return {
+        field: f.field,
+        title: f.title,
+        detail:
+          `Your current plan was built for your earlier answer, so ${f.shapes} it. I can rebuild it from ` +
+          'this week onwards. Everything you have already logged stays exactly as it is.',
+      }
     }
   }
 

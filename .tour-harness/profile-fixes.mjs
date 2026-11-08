@@ -177,6 +177,27 @@ check('6a. a number outside the range says what the range is', /has to be betwee
 check('6b. ...and nothing was saved', (await profileRow())?.age === ageWas, { ageWas, now: (await profileRow())?.age })
 await shoot('profile-fixes-6-range')
 
+// --- 8. Experience offers a rebuild (his ruling 8 Nov 2026, "Offer a rebuild") ---------------------
+console.log('\n  8. Changing experience or recovery offers a rebuild')
+const pickIn = async (rowLabel, optionRe) => {
+  const opened = await pointAt(`[...document.querySelectorAll('${sheet} span')].find(n => n.textContent.trim() === ${JSON.stringify(rowLabel)})?.parentElement.querySelector('[role="combobox"]')`)
+  await wait(400)
+  const picked = await pointAt(`[...document.querySelectorAll('[role="option"]')].find(o => ${optionRe}.test(o.textContent) && o.getAttribute('data-state') !== 'checked' && o.getAttribute('aria-selected') !== 'true')`)
+  await wait(500)
+  return opened && picked
+}
+await openRow('Goal')
+const expWas = (await profileRow())?.training_experience
+const pickedExp = await pickIn('Experience', '/./')
+const expTitle = await until(() => text('[data-testid="plan-invalidation-title"]').then(t => /experience/.test(t) ? t : null))
+check('8a. changing Experience saves it (the fixture binds)', pickedExp && (await profileRow())?.training_experience !== expWas, { expWas, now: (await profileRow())?.training_experience })
+check('8b. ...and offers a rebuild for the new level', /Rebuild your plan for this experience level\?/.test(expTitle ?? ''), expTitle)
+await openRow('Style & recovery')
+const recWas = (await profileRow())?.recovery_capacity
+const pickedRec = await pickIn('Recovery capacity', '/./')
+const recTitle = await until(() => text('[data-testid="plan-invalidation-title"]').then(t => /recovery/.test(t) ? t : null))
+check('8c. changing Recovery capacity offers a rebuild too', pickedRec && (await profileRow())?.recovery_capacity !== recWas && /Rebuild your plan around this recovery\?/.test(recTitle ?? ''), { recWas, recTitle })
+
 // --- 7. Known lifts ----------------------------------------------------------------------------
 console.log('\n  7. Known lifts names every lift')
 await ev(`document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click()`)
