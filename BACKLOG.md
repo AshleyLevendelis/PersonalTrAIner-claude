@@ -2,6 +2,24 @@
 
 Newest first. One line each.
 
+- [x] **QA ROUND 3, SETUP: THE RESUME HEADLINE, "NONE" FILED UNDER CUISINES, A DUMBBELL LIMIT WITHOUT DUMBBELLS, AND
+  "TAP ONE" WITH NOTHING TO TAP, 8 NOV 2026.** Mechanical. Found by the round-3 setup tester at 390px. (1) Reopening
+  setup partway through made "Welcome back — picking up right where we left off. Say anything and we'll carry on." the
+  big headline, with the question still waiting dropped to small grey text above it: the line went last, and the
+  headline is the last thing the coach said. It now goes just before that question. (2) "none" typed to "Anything
+  else you'd rather I left out?" was filed under favourite cuisines with a tick (the only open question it matched),
+  so cuisines was never asked: an empty answer volunteered is no answer to anything else now. (3) "Heaviest dumbbells:
+  24 kg" stayed on the summary, and was written to the profile, after the dumbbells were unticked or the equipment
+  became "Bodyweight only": a kit weight limit (dumbbells, kettlebell, bag) is now asked, shown and stored only while
+  that kit is in the ticks. CSCS: no prescription change; a plan without dumbbells prescribed none, so the stored
+  number capped nothing, and a full gym still never stores one. (4) A question answered by typing was led in with
+  "Easiest if you just tap one here —" or "Pick whichever is closest", with nothing to tap; it has its own leads.
+  NOT DONE, from the same report: the header naming the wrong section, the step total growing as you go, typing hints
+  cut off by the mic button, 32px summary rows, rough edges changing a number from the summary, and setup having no
+  Back button (his question: it would sit beside his "Move straight on" ruling).
+  CHECKS: new `verify:setup-qa3` (7 checks; the scripted page gained a `none-left` state, input only),
+  `test:kit-list` (+6), `test:setup-follow-ups` (+2, one re-anchored: it pinned the lead's exact call). Mutations: 5 of
+  5 caught.
 - [x] **QA ROUND 3, THE CHAT: AN UNDO TAPPED WITH NO SIGNAL WAS LOST FOR GOOD, AND A MEAL SWAP APPLIED OVER A MEAL
   ALREADY EATEN, 8 NOV 2026.** Mechanical. Found by the round-3 chat tester on the whole app at 390px. (1) Tapping Undo
   on a coach card with no connection said "This one can't be undone from here, so nothing was changed" and removed

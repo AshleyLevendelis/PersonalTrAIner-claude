@@ -73,7 +73,17 @@ check('...a typed answer and a tap count the same: follow-ups 1-3 under the limi
   [[1, 2, 3, 4].map(k => count(before(tangent(typed, k)))), [1, 2, 3, 4].map(k => count(before(tangent(tapped, k))))])
 check('a reply that asks nothing, with something still needed, gets the next question from the app',
   /const coachAsked = responseWs\.newMessages\.some\(m => m\.role === 'assistant' && !m\.isReceipt && \(!!m\.slotCard \|\| m\.content\.includes\('\?'\)\)\)/.test(co) && /if \(\(stuck \|\| !coachAsked\) && !askedThisTurn\) \{/.test(co))
-check('...plainly, with no "let\'s lock this in" lead (that is for a stuck conversation)', /const lead = stuck \? forcedAskLead\(timesSteppedIn, target !== canonicalNext\) : ''/.test(co))
+check('...plainly, with no "let\'s lock this in" lead (that is for a stuck conversation)', /const lead = stuck \? forcedAskLead\(timesSteppedIn, target !== canonicalNext[^)]*\) : ''/.test(co))
+// RE-ANCHORED 8 Nov 2026 (QA round 3): the lead also takes whether the question is typed (no "tap one" over nothing to
+// tap). The property held here is the same: only a STUCK conversation gets a lead.
+
+// NOTHING TO TAP, SO NO "TAP ONE" (8 Nov 2026, QA round 3): a question answered by typing was led in with "Easiest if
+// you just tap one here —" and "Pick whichever is closest". Its own leads never mention tapping or picking.
+{
+  const typedLeads = co.match(/const TYPED_STAY_LEADS = \[([\s\S]*?)\] as const/)?.[1] ?? ''
+  check('a typed question\'s lead never asks for a tap or a pick', typedLeads.length > 20 && !/\b(tap|pick|choose)\b/i.test(typedLeads), typedLeads)
+  check('...and the app passes "this one is typed" to the lead it picks', /forcedAskLead\(timesSteppedIn, target !== canonicalNext, def\.control === 'text'\)/.test(co) && /typed \? TYPED_STAY_LEADS : STAY_LEADS/.test(co))
+}
 
 console.log('\n3. The notes')
 check('the summary lists the notes, each with Forget, and says they do not change the plan by themselves',

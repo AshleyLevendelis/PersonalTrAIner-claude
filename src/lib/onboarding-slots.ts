@@ -629,6 +629,16 @@ function ownsLimitedKit(values: OnboardingSlotValues): boolean {
 }
 
 /**
+ * A CEILING FOR KIT THEY HAVE (8 Nov 2026, QA round 3): "Heaviest dumbbells: 24 kg" stayed on the summary, and was
+ * written to the profile, after the dumbbells were unticked or the equipment became "Bodyweight only". A ceiling is
+ * asked, kept and shown only while its implement is in the kit (the ticks, or the equipment choice's guess). An
+ * unanswered equipment question still keeps it, as ownsLimitedKit does, so one volunteered early is not dropped.
+ */
+function ownsKitItem(item: KitItem) {
+  return (values: OnboardingSlotValues): boolean => ownsLimitedKit(values) && (!values.equipment || kitTicksNow(values).includes(item))
+}
+
+/**
  * Does this person's OWN ANSWERS say they aren't exercising yet?
  *
  * The values-based twin of isStartingOut() in starting-out.ts (which takes a
@@ -996,13 +1006,13 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // for the same reason. Bounds match LOAD_CEILING_MIN_KG/MAX_KG.
   { key: 'maxDumbbellKg', question: 'What are your heaviest dumbbells?',
     inputHint: 'kg per hand…', shortLabel: 'Heaviest dumbbells', control: 'numeric', required: false,
-    min: 1, max: 100, unit: 'kg', requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
+    min: 1, max: 100, unit: 'kg', requiredIf: ownsKitItem('dumbbells'), destination: 'column', validate: isNumberIn(1, 100) },
   { key: 'maxSingleImplementKg', question: 'What is your heaviest kettlebell?',
     inputHint: 'kg…', shortLabel: 'Heaviest kettlebell', control: 'numeric', required: false,
-    min: 1, max: 100, unit: 'kg', requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
+    min: 1, max: 100, unit: 'kg', requiredIf: ownsKitItem('kettlebell'), destination: 'column', validate: isNumberIn(1, 100) },
   { key: 'maxImprovisedKg', question: 'How much can your bag actually hold?',
     inputHint: 'kg, roughly…', shortLabel: 'Loaded bag', control: 'numeric', required: false,
-    min: 1, max: 100, unit: 'kg', requiredIf: ownsLimitedKit, destination: 'column', validate: isNumberIn(1, 100) },
+    min: 1, max: 100, unit: 'kg', requiredIf: ownsKitItem('weighted_bag'), destination: 'column', validate: isNumberIn(1, 100) },
   // THE KIT LIST — Ashley, 9 Oct 2026: "Remember what they say". Keep the four
   // equipment choices AND remember the specifics people say ("I've got
   // dumbbells and a bench", "I don't own bands"). NO NEW SETUP QUESTION: in
@@ -1089,6 +1099,12 @@ export function isSlotRequired(def: SlotDef, values: OnboardingSlotValues): bool
  */
 export function isSlotApplicable(def: SlotDef, values: OnboardingSlotValues): boolean {
   return def.requiredIf ? def.requiredIf(values) : true
+}
+
+/** A kit ceiling as the profile stores it: only where the question applies (never a full gym, never kit they lack). */
+function ceilingFor(key: 'maxDumbbellKg' | 'maxSingleImplementKg' | 'maxImprovisedKg', data: OnboardingSlotValues): number | undefined {
+  const def = getSlotDef(key)
+  return def && isSlotApplicable(def, data) ? numericOrUndefined(data[key]) : undefined
 }
 
 /**
@@ -1334,9 +1350,10 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     // here: someone volunteers a ceiling and then turns out to train at a full
     // gym, where the rack really does reach these numbers. Writing it anyway
     // would clamp a gym trainee to a home number for sixteen weeks.
-    max_dumbbell_kg: data.equipment === 'full_gym' ? undefined : numericOrUndefined(data.maxDumbbellKg),
-    max_single_implement_kg: data.equipment === 'full_gym' ? undefined : numericOrUndefined(data.maxSingleImplementKg),
-    max_improvised_kg: data.equipment === 'full_gym' ? undefined : numericOrUndefined(data.maxImprovisedKg),
+    // ...AND ONE FOR KIT THEY DO NOT HAVE is not written either (8 Nov 2026): the same test that asks it.
+    max_dumbbell_kg: ceilingFor('maxDumbbellKg', data),
+    max_single_implement_kg: ceilingFor('maxSingleImplementKg', data),
+    max_improvised_kg: ceilingFor('maxImprovisedKg', data),
     recovery_capacity: data.recoveryCapacity!,
     injuries: data.injuries,
     display_name: data.displayName.trim(),

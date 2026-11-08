@@ -169,6 +169,26 @@ if (state === 'review' || state === 'review-card' || state === 'review-notes') {
   }
 }
 
+// NONE-LEFT (8 Nov 2026, QA round 3): everything answered but the foods to leave out (a typed question, on screen)
+// and favourite cuisines, the one open question a bare "none" could match. Typed to the foods question, "none" was
+// filed under cuisines with a tick. INPUT only: which questions are answered, and which one is being asked.
+if (state === 'none-left') {
+  const answered = {
+    ...SAM_SO_FAR, recoveryCapacity: 'moderate', age: '31', heightCm: '178', weightKg: '82',
+    gender: 'male', mealsPerDay: 3, dietaryPreferences: ['nut-free'], includeSnacks: true, cookingTime: 'moderate',
+    breakfastStyle: 'cooked',
+  }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Sam' },
+      { role: 'assistant', content: "Anything else you'd rather I left out?", asksSlot: 'dislikedFoods' },
+    ],
+    answered,
+    Object.keys(answered),
+  ))
+}
+
 // JO, a gym lifter at the working-lifts question — the state Ashley was in on
 // 19 Oct 2026 when "I know my numbers" asked her nothing. Barbell-capable and
 // not a beginner, so the question applies; its card is live.

@@ -367,6 +367,10 @@ function tryVolunteeredCapture(
     const matched = tryExactLabelMatch(def, trimmed, true)
     if (matched !== undefined) matches.push({ def, value: matched })
   }
+  // "NONE" ANSWERS ONLY THE QUESTION IT WAS SAID TO (8 Nov 2026, QA round 3): typed to "anything you'd rather I left
+  // out?", it was filed under favourite cuisines (the one open question it matched), ticked, and cuisines was never
+  // asked. An empty answer volunteered is no answer to anything else.
+  if (matches.length === 1 && Array.isArray(matches[0].value) && matches[0].value.length === 0) return undefined
   return matches.length === 1 ? matches[0] : undefined
 }
 
@@ -463,6 +467,13 @@ const STAY_LEADS = [
   "Easiest if you just tap one here —",
   "Pick whichever is closest and we'll move on —",
 ] as const
+// A QUESTION ANSWERED BY TYPING HAS NOTHING TO TAP (8 Nov 2026, QA round 3): "Easiest if you just tap one here —"
+// over a question with no options sent a person looking for buttons that were never there.
+const TYPED_STAY_LEADS = [
+  "Let's lock this one in —",
+  'One quick one before we move on —',
+  'A word or two is plenty —',
+] as const
 const MOVE_ON_LEADS = [
   "Let's leave that one for now and come back to it.",
   "We'll park that one — no rush on it.",
@@ -475,10 +486,10 @@ const MOVE_ON_LEADS = [
  * the transcript is how the next one knows to say something different, so the
  * list and the counter can never drift apart.
  */
-const FORCED_ASK_MARKERS: readonly string[] = [...STAY_LEADS, ...MOVE_ON_LEADS]
+const FORCED_ASK_MARKERS: readonly string[] = [...STAY_LEADS, ...TYPED_STAY_LEADS, ...MOVE_ON_LEADS]
 
-function forcedAskLead(timesSteppedIn: number, movedOn: boolean): string {
-  const leads = movedOn ? MOVE_ON_LEADS : STAY_LEADS
+function forcedAskLead(timesSteppedIn: number, movedOn: boolean, typed = false): string {
+  const leads = movedOn ? MOVE_ON_LEADS : typed ? TYPED_STAY_LEADS : STAY_LEADS
   // Cycle, don't clamp: clamping to the last variant meant every step-in
   // after the first said the same sentence, which is the exact repetition
   // these variants exist to avoid.
@@ -632,12 +643,17 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   const [parkedQuestions, setParkedQuestions] = useState<string[]>(() => draftLoaded?.parkedQuestions ?? [])
   const [messages, setMessages] = useState<ChatMsg[]>(() => {
     if (draftLoaded && draftLoaded.messages.length > 0) {
-      return [
-        ...draftLoaded.messages
-          .filter(m => m.content !== RESUME_BANNER)
-          .map(m => ({ ...m, isReceipt: m.role === 'assistant' && m.content.startsWith(RECEIPT_PREFIX) })),
-        { role: 'assistant', content: RESUME_BANNER },
-      ]
+      const kept = draftLoaded.messages
+        .filter(m => m.content !== RESUME_BANNER)
+        .map(m => ({ ...m, isReceipt: m.role === 'assistant' && m.content.startsWith(RECEIPT_PREFIX) }))
+      // THE OPEN QUESTION STAYS THE HEADLINE (8 Nov 2026, QA round 3): the banner went last, so "Welcome back… Say
+      // anything and we'll carry on" became the big line and the question still waiting dropped to small grey text
+      // above it. It goes just before that question; with no question waiting (her message was last) it goes last.
+      const last = kept[kept.length - 1]
+      const banner: ChatMsg = { role: 'assistant', content: RESUME_BANNER }
+      return last && last.role === 'assistant' && !last.isReceipt
+        ? [...kept.slice(0, -1), banner, last]
+        : [...kept, banner]
     }
     // The intro explaining what the app DOES, before it asks for anything —
     // Ashley's second finding on a real phone. This used to be one paragraph
@@ -1534,7 +1550,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
             if (def && target) {
               const timesSteppedIn = allMsgs.filter(m => FORCED_ASK_MARKERS.some(marker => m.content.startsWith(marker))).length
               // A dead end gets the question alone; only a stuck conversation gets a lead.
-              const lead = stuck ? forcedAskLead(timesSteppedIn, target !== canonicalNext) : ''
+              const lead = stuck ? forcedAskLead(timesSteppedIn, target !== canonicalNext, def.control === 'text') : ''
               responseWs.newMessages.push({
                 role: 'assistant',
                 content: lead ? `${lead} ${def.question}` : def.question,

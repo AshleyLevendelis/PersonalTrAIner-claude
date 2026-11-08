@@ -790,6 +790,25 @@ async function main() {
   check('NO NEW SETUP QUESTION: the slot never blocks and nothing asks it',
     NEVER_BLOCKING_SLOTS.includes('kitList') && !openSlotsInOrder(new Set(), initialSlotValues()).includes('kitList'))
 
+  // ---- A CEILING ONLY FOR KIT THEY HAVE (8 Nov 2026, QA round 3) -------------------------------------------------
+  // "Heaviest dumbbells: 24 kg" stayed on setup's summary and was written to the profile after the dumbbells were
+  // unticked. The same test that asks the question decides whether it is shown and stored.
+  console.log('\n[setup ceilings] a weight limit only for kit they have')
+  {
+    const os = await import('../src/lib/onboarding-slots')
+    const base = { ...os.initialSlotValues(), displayName: 'Sam', fitnessGoal: 'fat_loss', trainingExperience: 'intermediate', activityLevel: 'moderate', equipment: 'minimalist', injuries: [], trainingDays: ['Mon', 'Wed', 'Fri'], sessionDuration: '30-45', trainingStyle: 'functional', conditioningPreference: 'tolerate', recoveryCapacity: 'moderate', age: '31', heightCm: '178', weightKg: '82', gender: 'male', mealsPerDay: 3, dietaryPreferences: [], maxDumbbellKg: '24' } as never as Parameters<typeof os.assembleProfile>[0]
+    const dbDef = os.getSlotDef('maxDumbbellKg')!
+    const withBells = { ...base, kitTicks: ['dumbbells', 'bench'] } as typeof base
+    const without = { ...base, kitTicks: ['bench'] } as typeof base
+    const bodyweight = { ...base, equipment: 'bodyweight', kitTicks: null } as typeof base
+    check('a home trainer with dumbbells ticked is asked, and keeps, the dumbbell limit (the fixture binds)', os.isSlotApplicable(dbDef, withBells) && os.assembleProfile(withBells).max_dumbbell_kg === 24, os.assembleProfile(withBells).max_dumbbell_kg)
+    check('dumbbells unticked: the limit is neither asked nor shown', !os.isSlotApplicable(dbDef, without))
+    check('...nor written to the profile', os.assembleProfile(without).max_dumbbell_kg == null, os.assembleProfile(without).max_dumbbell_kg)
+    check('"Bodyweight only": no dumbbell limit stored', os.assembleProfile(bodyweight).max_dumbbell_kg == null, os.assembleProfile(bodyweight).max_dumbbell_kg)
+    check('a full gym still never stores one', os.assembleProfile({ ...base, equipment: 'full_gym' } as typeof base).max_dumbbell_kg == null)
+    check('an equipment question not yet answered keeps one said early', os.isSlotApplicable(dbDef, { ...base, equipment: undefined } as never))
+  }
+
   console.log(`\n${ran} checks ran, ${failures} failed.`)
   if (failures > 0) { console.error('test:kit-list FAILED'); process.exit(1) }
   console.log('test:kit-list PASSED')
