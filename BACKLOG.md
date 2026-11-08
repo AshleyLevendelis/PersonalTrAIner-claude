@@ -31,8 +31,11 @@ Newest first. One line each.
   remove, swap and add, each undone, on screen, clear of the Start bar, and saved; 6 mutations caught). FOUND ON THE
   WAY, by a MISSED mutation: "an Undo that never saved" passed every check that left the tab and came back, because the
   harness keeps the plan in memory across a tab trip, so a tab trip proves nothing about a save. The driver now reads
-  the saved plan from the database the app wrote to. `verify:session-edit` 2e and 5h ("survives leaving the tab") have
-  the same blind spot and are named here, not yet changed.
+  the saved plan from the database the app wrote to. `verify:session-edit` 2e and 5h ("survives leaving the tab") had
+  the same blind spot: FIXED the same day, with 2e2 and 5h2 reading the saved plan (a mutation that never saves a move
+  or a removal now fails exactly those two, 58 of 58 ran; 2e and 5h stayed green under it, which is the proof).
+  ALSO LOOKED AT, no change: the shopping list's aisle row runs off the right edge because it scrolls sideways (the cut
+  button is the hint), and "~80g" is the rounded amount with the exact figure in the open row (QA walk N13).
 - [x] **PICKING 3, 7 OR 14 DAYS REBUILDS THE SHOPPING LIST FOR IT; HIS RULING "REBUILD AT ONCE", 8 NOV 2026** (QA walk
   N5, asked with three options: rebuild at once, my recommendation; a "tap Rebuild" line; leave it). The picker only
   changed its label; the list stayed built from the old number until Rebuild, and nothing said so. Now a NEW number

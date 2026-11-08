@@ -49,6 +49,9 @@ const clickSel = sel => ev(`(() => { const n = document.querySelector(${JSON.str
 const has = sel => ev(`!!document.querySelector(${JSON.stringify(sel)})`)
 const order = () => ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.getAttribute('data-exercise-name'))`)
 const escape = async () => { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await wait(450) }
+// THE SAVED PLAN, from the database the app wrote to (8 Nov 2026): the page keeps the plan in memory across a tab trip,
+// so "survives leaving the tab" cannot prove a save. Found by a MISSED mutation in verify:edit-undo.
+const savedAs = names => ev(`(window.__fakeDb?.mesocycle_weeks ?? []).some(r => (r.days ?? []).some(d => (d.exercises ?? []).map(e => e.name).join('|') === ${JSON.stringify((names ?? []).join('|'))}))`)
 const untilOrder = async pred => { let o = await order(); for (let i = 0; i < 20 && !pred(o); i++) { await wait(300); o = await order() } return o }
 
 // Expand the row for a named exercise, then open its "⋮". Rows collapse to a
@@ -174,6 +177,7 @@ await ev(`location.hash = '#/tab/home'`); await wait(1500)
 await ev(`location.hash = '#/tab/exercise'`); await wait(2500)
 const afterTrip = await untilOrder(o => o.length === moved.length)
 check('2e. the new order survives leaving the tab and coming back', afterTrip.join('|') === moved.join('|'), { moved, afterTrip })
+check('2e2. ...and was SAVED: the database holds the new order', await savedAs(moved))
 
 // --- removing asks, it does not decide -------------------------------------
 const victim = afterTrip[afterTrip.length - 1]
@@ -243,6 +247,7 @@ await ev(`location.hash = '#/tab/home'`); await wait(1500)
 await ev(`location.hash = '#/tab/exercise'`); await wait(2500)
 const finalOrder = await untilOrder(o => o.length === dropped.length)
 check('5h. the removal survives leaving the tab and coming back', finalOrder.join('|') === dropped.join('|'), { dropped, finalOrder })
+check('5h2. ...and was SAVED: the database holds the session without it', await savedAs(dropped))
 
 // --- 6. WHAT IT COSTS, AND WHAT THE APP WILL DO ABOUT IT --------------------
 //
