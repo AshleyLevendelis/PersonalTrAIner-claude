@@ -1169,6 +1169,12 @@ export const SCOPE = {
 // the PHASE elsewhere and not off this table.
 // ---------------------------------------------------------------------------
 
+/**
+ * THE VERB THAT AGREES WITH A MUSCLE GROUP (8 Nov 2026, QA round 3: "Your hamstrings goes from 12 sets … hamstrings
+ * grows"). Hamstrings, glutes, quads, shoulders, biceps, triceps and calves are plural; chest, back and core are not.
+ */
+export const groupVerb = (group: string, singular: string, plural: string): string => (/s$/.test(group.trim()) ? plural : singular)
+
 export interface GoalTerms {
   /** What they are training for, as they would say it. */
   noun: string
@@ -1183,7 +1189,7 @@ export interface GoalTerms {
 export const GOAL_TERMS: Record<FitnessGoal, GoalTerms> = {
   hypertrophy: {
     noun: 'building muscle',
-    whyVolume: g => `${g} grows from the work you do for it`,
+    whyVolume: g => `${g} ${groupVerb(g, 'grows', 'grow')} from the work you do for it`,
     whyProtein: 'muscle is built from it — under-eating protein wastes the training',
     wrongWay: 'less work for a muscle than the week before',
   },
@@ -1195,13 +1201,13 @@ export const GOAL_TERMS: Record<FitnessGoal, GoalTerms> = {
   },
   functional: {
     noun: 'getting stronger and moving well',
-    whyVolume: g => `${g} carries a lot of what you're training for`,
+    whyVolume: g => `${g} ${groupVerb(g, 'carries', 'carry')} a lot of what you're training for`,
     whyProtein: 'strength work needs something to rebuild with',
     wrongWay: 'dropping the movements that carry the most',
   },
   conditioning: {
     noun: 'your conditioning',
-    whyVolume: g => `it's work your week is built around, and ${g} does a lot of it`,
+    whyVolume: g => `it's work your week is built around, and ${g} ${groupVerb(g, 'does', 'do')} a lot of it`,
     whyProtein: 'it keeps the muscle you have while you work on the engine',
     wrongWay: 'losing the sessions that build the engine',
   },

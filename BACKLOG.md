@@ -2,6 +2,11 @@
 
 Newest first. One line each.
 
+- [x] **"YOUR HAMSTRINGS GOES FROM 12 SETS … HAMSTRINGS GROWS", 8 NOV 2026** (QA round 3, chat finding 9). Wording:
+  the cost line on a swap or removal card agreed every muscle group with a singular verb. Hamstrings, glutes, quads,
+  shoulders, biceps, triceps and calves now "go" and "grow" (and "carry", "do"); chest, back and core still "goes".
+  One helper in the phrasebook, used by the card and by all four goals' sentences. CHECKS: `test:edit-tradeoff` (+4,
+  one existing check widened to accept "go from"). Mutations: 1 of 1 caught.
 - [x] **A REMOVAL OFFER'S DECLINE SAID "KEEP 7 EXERCISES", 8 NOV 2026** (QA round 3, chat finding 7). Mechanical: his
   31 Oct "Mix" ruling has the decline name what he keeps ("Keep Leg Extensions"). The coach's removal offer built its
   one row from counts ("7 exercises → 6 exercises"), so the preview named nothing and the decline read "Keep 7

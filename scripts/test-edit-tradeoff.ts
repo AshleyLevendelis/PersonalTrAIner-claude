@@ -503,9 +503,20 @@ console.log('\n10. More sets is a cost the card can state, not a ceiling it can 
   check('the fixture really doubles a muscle\'s week', moved !== null && moved.direction === 'up' && moved.after === moved.before * 2, moved)
   check('a big rise still costs something on the card', up.tier >= 1 && typeof up.cost === 'string', up)
   check('...stated as the person\'s own numbers, before and after',
-    new RegExp(`goes from ${moved?.before} sets this week to ${moved?.after}\\b`).test(up.cost ?? ''), up.cost)
+    new RegExp(`(goes|go) from ${moved?.before} sets this week to ${moved?.after}\\b`).test(up.cost ?? ''), up.cost)
   check('...and never as a ceiling the app does not hold',
     !/more does more|past the point|too much|too many/i.test(up.cost ?? ''), up.cost)
+}
+
+// THE VERB AGREES WITH THE MUSCLE (8 Nov 2026, QA round 3): "Your hamstrings goes from 12 sets this week to 9 —
+// hamstrings grows from the work you do for it".
+{
+  const { GOAL_TERMS, groupVerb } = await import('../src/lib/coach-voice')
+  check('hamstrings go, and grow', groupVerb('hamstrings', 'goes', 'go') === 'go' && /^hamstrings grow from/.test(GOAL_TERMS.hypertrophy.whyVolume('hamstrings')), GOAL_TERMS.hypertrophy.whyVolume('hamstrings'))
+  check('...the chest goes, and grows', groupVerb('chest', 'goes', 'go') === 'goes' && /^chest grows from/.test(GOAL_TERMS.hypertrophy.whyVolume('chest')))
+  check('...and every goal\'s sentence agrees for a plural group', (Object.keys(GOAL_TERMS) as (keyof typeof GOAL_TERMS)[]).every(g => !/\bhamstrings (grows|carries|does|goes)\b/.test(GOAL_TERMS[g].whyVolume('hamstrings'))), (Object.keys(GOAL_TERMS) as (keyof typeof GOAL_TERMS)[]).map(g => GOAL_TERMS[g].whyVolume('hamstrings')))
+  const src = readFileSync(new URL('../src/lib/edit-tradeoff.ts', import.meta.url), 'utf8')
+  check('...and the card\'s own "goes from" agrees too', !/Your \$\{g\} goes from/.test(src) && /Your \$\{g\} \$\{groupVerb\(g, 'goes', 'go'\)\} from/.test(src))
 }
 
 console.log(failures === 0 ? '\nAll edit trade-off checks passed.\n' : `\n${failures} check(s) FAILED.\n`)

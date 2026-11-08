@@ -1,4 +1,4 @@
-import { GOAL_TERMS } from './coach-voice'
+import { GOAL_TERMS, groupVerb } from './coach-voice'
 import type { MesocycleWeek, UserProfile, WorkoutDay, FitnessGoal } from './types'
 import type { Tradeoff, TradeoffAlternative, EditScope } from './tradeoff-shape'
 import { reasonChipsFor } from './edit-reason'
@@ -447,7 +447,7 @@ export function assessEdit(ctx: EditContext): Tradeoff {
     const g = GROUP_LABEL[volume.group]
     return {
       tier: 1,
-      cost: `Your ${g} goes from ${volume.before} sets this week to ${volume.after} — ${whyVolumeMatters(goal, volume.group)}.`,
+      cost: `Your ${g} ${groupVerb(g, 'goes', 'go')} from ${volume.before} sets this week to ${volume.after} — ${whyVolumeMatters(goal, volume.group)}.`,
       alternatives: scope === 'permanent'
         ? [{ label: 'Just today', note: 'next week is unchanged', prompt: 'do it for today only' }]
         : [],
@@ -470,7 +470,7 @@ export function assessEdit(ctx: EditContext): Tradeoff {
       // muscleVolumeChange explains why the app holds none: its counting is
       // generous and it would fire wrongly. The cost it CAN state is relative,
       // so that is what it says.
-      cost: `Your ${g} goes from ${volume.before} sets this week to ${volume.after} — that's more to recover from before the next session that trains it.`,
+      cost: `Your ${g} ${groupVerb(g, 'goes', 'go')} from ${volume.before} sets this week to ${volume.after} — that's more to recover from before the next session that trains it.`,
       alternatives: [
         { label: 'Swap one out instead', note: `keeps the ${g} work where it was`, prompt: `swap something out for it instead of adding` },
       ],
