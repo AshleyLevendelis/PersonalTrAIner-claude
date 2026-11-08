@@ -182,6 +182,17 @@ console.log('\n6. The screen asks this calculation')
   check('no line promises a re-fit nothing checks', !/re-fitted around it/.test(mp))
 }
 
+console.log('\n7. A meal eaten as planned is not blamed for the re-fit (8 Nov 2026, QA round 3)')
+{
+  // "Breakfast came to 0 kcal less than planned, so dinner and snack are 1% smaller": the re-fit was for the day's own
+  // targets, and the line gave a meal eaten exactly as planned as its reason.
+  const asPlanned = aroundEatenLine({ kind: 'resized', factor: 0.93, slots: ['dinner', 'snack'], eatenVsPlanKcal: 0, eatenSlots: ['breakfast'] })
+  check('7a. eaten as planned: the line gives the day\'s targets as the reason', /^To land today on your targets, dinner and snack are 7% smaller\.$/.test(asPlanned ?? ''), asPlanned)
+  check('7b. ...and never "came to 0 kcal"', !/came to 0 kcal/.test(asPlanned ?? ''), asPlanned)
+  const real = aroundEatenLine({ kind: 'resized', factor: 0.9, slots: ['dinner'], eatenVsPlanKcal: 220, eatenSlots: ['lunch'] })
+  check('7c. a meal that really came to more is still named as the reason', /^Lunch came to 220 kcal more than planned, so dinner is 10% smaller today\.$/.test(real ?? ''), real)
+}
+
 console.log(`\nday-as-shown: ${ran} checks ran`)
 console.log(failures === 0 ? 'All day-as-shown checks passed.\n' : `${failures} day-as-shown check(s) FAILED.\n`)
 process.exit(failures === 0 ? 0 : 1)

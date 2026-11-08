@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **"BREAKFAST CAME TO 0 KCAL LESS THAN PLANNED, SO DINNER AND SNACK ARE 1% SMALLER", 8 NOV 2026** (QA round 3,
+  meals finding 11). Mechanical: a false reason. When the rest of a day is re-fitted around what was eaten, the line
+  named the eaten meal as the cause even when it came to exactly what was planned; the re-fit was then for the day's
+  own targets. Under 10 kcal from the plan, it now says "To land today on your targets, dinner and snack are 7%
+  smaller."; a meal that really came to more or less is still named. CHECKS: `test:day-as-shown` §7 (+3). Mutations:
+  1 of 1 caught.
 - [x] **A FOOD WAS OFFERED AS A SWAP FOR ITSELF, COOKED: APPLIED, IT RENAMED THE MEAL AND CHANGED NOTHING, 8 NOV
   2026** (QA round 3, meals finding 9). Mechanical. Taking "350g raw potato" out of a dinner offered "305g potato
   boiled — same carbs"; applied, the meal became "Salmon and potatoes with potato boiled instead of raw potato", still

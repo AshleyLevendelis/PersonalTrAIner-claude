@@ -699,6 +699,12 @@ export function aroundEatenLine(a:
   if (a.kind === 'too_far') return `Today is ${gap(a.deltaKcal)}: too far to fix by changing portions, so your meals are as planned.`
   const more = a.eatenVsPlanKcal > 0
   const pct = Math.round(Math.abs(a.factor - 1) * 100)
+  // WHEN WHAT WAS EATEN MATCHED THE PLAN, IT IS NOT THE REASON (8 Nov 2026, QA round 3): "Breakfast came to 0 kcal less
+  // than planned, so dinner and snack are 1% smaller" blamed a meal eaten exactly as planned. The re-fit is then for
+  // the day's own targets, and it says that.
+  if (Math.abs(a.eatenVsPlanKcal) < 10) {
+    return `To land today on your targets, ${slotList(a.slots)} ${a.slots.length === 1 ? 'is' : 'are'} ${pct}% ${a.factor < 1 ? 'smaller' : 'bigger'}.`
+  }
   return `${slotList(a.eatenSlots).replace(/^./, c => c.toUpperCase())} came to ${Math.abs(a.eatenVsPlanKcal)} kcal ${more ? 'more' : 'less'} than planned, so ${slotList(a.slots)} ${a.slots.length === 1 ? 'is' : 'are'} ${pct}% ${a.factor < 1 ? 'smaller' : 'bigger'} today.`
 }
 
