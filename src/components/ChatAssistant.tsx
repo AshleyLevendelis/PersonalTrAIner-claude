@@ -6347,6 +6347,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         diff: built.diff,
       })
       const pendingAction: ChatPendingActionView = { id: row.id, kind: row.kind, status: row.status, diff: row.diff, expiresAt: row.expires_at }
+      // THE OFFER THIS ONE REPLACED goes grey now, not at its next tap (QA walk N1): one live offer per thing on screen.
+      if (row.supersededId) {
+        const old = row.supersededId
+        setMessages(prev => prev.map(m => m.pendingAction?.id === old && m.pendingAction.status === 'pending'
+          ? { ...m, pendingAction: { ...m.pendingAction, status: 'stale' } }
+          : m))
+      }
       return { text: describeProposalClientSide(pendingAction), pendingAction }
     }
     if (result.receipt) {

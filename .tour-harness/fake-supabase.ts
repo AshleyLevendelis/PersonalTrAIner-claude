@@ -206,6 +206,17 @@ export function makeFakeSupabase(db: Db, opts: { session?: { user: { id: string;
         const broke = ROW_CHECKS[name]?.(row)
         if (broke) return { data: null, error: { code: '23514', message: `new row for relation "${name}" violates check constraint "${broke}"`, details: null, hint: null } }
       }
+      // THE ONE-OPEN-OFFER INDEX, AS POSTGRES HAS IT (idx_pending_actions_scope_key_open, 8 Nov 2026). Without it the
+      // fake let two open offers for one thing coexist, so no driver could see the chat show the OLD offer again when a
+      // different one was asked for: on the real database the second insert is refused with 23505.
+      if (name === 'pending_actions' && op === 'insert') {
+        const open = (r: Row) => ['pending', 'claimed', 'executing'].includes(String(r.status))
+        for (const raw of payload) {
+          if (open(raw) && rows0.some(r => open(r) && r.profile_id === raw.profile_id && r.scope_key === raw.scope_key)) {
+            return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "idx_pending_actions_scope_key_open"', details: null, hint: null } }
+          }
+        }
+      }
       if (op === 'insert' || op === 'upsert') {
         // RETURN THE STORED ROWS, not the payload. The payload has no `id` —
         // Postgres generates it — so returning it made `.insert().select()

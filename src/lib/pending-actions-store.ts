@@ -129,7 +129,7 @@ export interface CreatePendingActionInput {
  * that as returning the EXISTING open row instead of throwing, so a retry
  * never produces a duplicate card.
  */
-export async function createPendingAction(input: CreatePendingActionInput): Promise<PendingActionRow> {
+export async function createPendingAction(input: CreatePendingActionInput): Promise<PendingActionRow & { supersededId?: string }> {
   // pre_image is mandatory only for kinds whose undo actually restores a
   // snapshot (propose_exercise_swap restores the mesocycle via
   // saveMesocycle/saveMesocycleWeek). propose_meal_swap's "undo" is just
@@ -143,7 +143,7 @@ export async function createPendingAction(input: CreatePendingActionInput): Prom
   }
 
   const expiresAt = new Date(Date.now() + PENDING_WINDOW_MINUTES * 60_000).toISOString()
-  const { data, error } = await supabase
+  const insert = () => supabase
     .from('pending_actions')
     .insert({
       profile_id: input.profileId,
@@ -161,17 +161,37 @@ export async function createPendingAction(input: CreatePendingActionInput): Prom
     })
     .select()
     .single()
+  const { data, error } = await insert()
 
   if (!error) return data as PendingActionRow
 
-  // 23505 = unique_violation on the open-scope_key index: an identical
-  // proposal is already open. Return that row rather than surfacing an
-  // error — the retry's intent is already represented.
+  // 23505 = unique_violation on the open-scope_key index: a proposal for the same thing is already open.
   if (error.code === '23505') {
     const existing = await getOpenPendingActionForScope(input.profileId, input.scopeKey)
-    if (existing) return existing
+    if (existing) {
+      // THE SAME OFFER (a retried model call): return that row, so a retry never makes a second card.
+      if (samePayload(existing.payload, input.payload) || existing.status !== 'pending') return existing
+      // A DIFFERENT OFFER FOR THE SAME THING ("not that one, something else") REPLACES the open one (QA walk N1,
+      // 8 Nov 2026). It returned the open row, so the new card showed the OLD offer again, under the coach's new words,
+      // and the old card kept its buttons. The old one is marked stale (its card says so at the tap, and the chat
+      // greys it at once), and the new one is written.
+      await supabase.from('pending_actions').update({ status: 'stale' }).eq('id', existing.id).eq('status', 'pending')
+      const again = await insert()
+      if (!again.error) return { ...(again.data as PendingActionRow), supersededId: existing.id }
+      throw again.error
+    }
   }
   throw error
+}
+
+/** Two payloads that say the same thing, however their keys were ordered. */
+function samePayload(a: unknown, b: unknown): boolean {
+  const canon = (v: unknown): string => Array.isArray(v)
+    ? `[${v.map(canon).join(',')}]`
+    : v && typeof v === 'object'
+      ? `{${Object.entries(v as Record<string, unknown>).filter(([, x]) => x !== undefined).sort(([x], [y]) => x.localeCompare(y)).map(([k, x]) => `${JSON.stringify(k)}:${canon(x)}`).join(',')}}`
+      : JSON.stringify(v ?? null)
+  return canon(a) === canon(b)
 }
 
 async function getOpenPendingActionForScope(profileId: string, scopeKey: string): Promise<PendingActionRow | null> {

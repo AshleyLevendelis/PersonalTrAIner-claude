@@ -61,6 +61,10 @@ import type { UserFactRow } from '@/lib/memory-store'
 import { planSessionKindToday, type SessionKind } from '@/lib/session-kind'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import '@/index.css'
+import * as pendingStore from '@/lib/pending-actions-store'
+// THE APP'S OWN OFFER STORE, for a driver to ask directly (chat-offer-replace.mjs §4): the fake database behind it
+// holds the one-open-offer index the real one has.
+;(window as unknown as { __pendingStore: typeof pendingStore }).__pendingStore = pendingStore
 
 window.addEventListener('error', e => { (window as never as Record<string, unknown>).__err = String(e.message) })
 
@@ -841,7 +845,9 @@ function Harness() {
               onWeightLogged={noop}
               onMesocycleUpdated={KINDTODAY ? setKindMeso : noop}
               onProfileChanged={noop}
-              onMealSwapApplied={async () => true}
+              // What a confirmed swap asked App to pick, recorded for a driver (chat-offer-replace.mjs §3); App's write itself
+              // is not on this page.
+              onMealSwapApplied={async (slot, name) => { const w = window as unknown as { __mealSwapsApplied?: { slot: string; name: string }[] }; w.__mealSwapsApplied = [...(w.__mealSwapsApplied ?? []), { slot, name }]; return true }}
               onFindMoreMealOptions={async () => ({ added: [] })}
               upcomingMeals={DAYMOVE ? mealDays.upcoming : undefined}
               onUpcomingMealPickApplied={DAYMOVE ? mealDays.applyPick : undefined}

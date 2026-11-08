@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **A DIFFERENT OFFER FOR THE SAME THING REPLACES THE OPEN ONE, 8 NOV 2026** (QA walk N1, the part named as not
+  fixed: "old offers stay tappable"). Mechanical. The database holds one open offer per thing (a partial unique index,
+  there since Aug). Asking for a different dinner while the first offer was still open was refused by it, and the app
+  answered with the FIRST offer's row: the new card showed the old dish again, under the coach's new words, and the old
+  card kept its buttons. Now an IDENTICAL offer (a retried call) still returns the open row, so a retry never makes a
+  second card, and a DIFFERENT one marks the open one stale and is written; the chat greys the old card at once ("This
+  changed since I proposed it — ask me again if you still want it.", the existing words). Apply on the newer card applies
+  its dish. WHY NO CHECK SAW IT: the harness's fake database did not have the index, so two open offers coexisted there
+  and the defect could not happen on any test page. It enforces it now, as Postgres does ("a fake must fill what the
+  database fills"). `verify:chat-offer-replace` (new, 14 checks at 390px; 4 mutations caught, one only after a check was
+  made null-safe so a missing card fails rather than crashes). NOT changed: an offer the coach repeats in its own words
+  beside a card (model wording; the exam's to judge).
 - [x] **AN EXERCISE CHANGED ON THE EXERCISE SCREEN CAN BE PUT BACK, 8 NOV 2026** (QA walk T7; his 2 Nov list "every
   change previews and can be undone", in the shape of his two 8 Nov "Undo line" rulings, so not asked again). Swapping,
   removing, moving or adding an exercise on the Exercise screen changed the plan with no way back but doing the opposite
