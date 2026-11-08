@@ -2,6 +2,29 @@
 
 Newest first. One line each.
 
+- [x] **A FAILED WEIGH-IN READ WAS TAKEN FOR "NEVER WEIGHED IN": THE CALORIE TARGET FELL BACK TO THE SIGN-UP WEIGHT,
+  WAS SAVED AND ANNOUNCED, AND A REAL WEIGH-IN COULD BE OVERWRITTEN, 8 NOV 2026.** Mechanical; safety-adjacent (the
+  calorie target), so traced end to end first (engine-tracer, from QA round 2's B4 lead) and planned before building.
+  WHAT WAS WRONG, traced and then reproduced on the whole app: the weigh-in readers answered "no weigh-ins" on ANY
+  error. At start, with the weigh-ins unreadable while the profile and the targets answered (a connection that drops
+  part of a burst), the target's weight fell back to the weight given at sign-up; that target was SAVED as a move and
+  announced ("Your daily targets moved since you were last here"), and the next good start moved it back with a second
+  notice (or kept the sign-up weight as the anchor when the true average was within 1 kg of it). The same failed read
+  made the start's old "backfill" write the sign-up weight as a weigh-in dated the sign-up day, overwriting a real one
+  typed that day. After a weigh-in whose read-back failed, the targets fell back the same way, the current weight
+  vanished, and the wrong anchor stayed in memory, so a settings change before the next start saved a target worked
+  out from the sign-up weight and blamed the settings change. The phone's kept copy then saved the wrong numbers.
+  WHAT CHANGED: a target-setting read is STRICT (a failure throws) and comes back "unread". Unread at start: the target
+  on screen is the one the phone kept, or, with none, the weight the target was last SET from (a recorded figure);
+  nothing is recorded, announced or written as a weigh-in, and no target is recorded from a settings change until the
+  anchor is known. Unread after a weigh-in: the weigh-in is saved, the targets stay, and the next start that can read
+  it moves them. The display-only readers keep their old answer (Home's trend, the coach's weigh-in card: named, not
+  changed). NAMED, NOT DONE: with no kept copy AND the target history unreadable too, the first screen draws from the
+  sign-up weight (display only, never saved); a partial failure while online does not retry until the next open; the
+  coach's server-side read of the target history still treats a failure as "no history" (it only picks which earlier
+  weigh-in a new one is compared with). CHECKS: `test:weigh-in-targets` §U (+12, 158 checks), new
+  `verify:weigh-in-unread` (10 checks on the whole app; the fake database gained `?fail-read=<table>` and
+  `window.__failRead`, the read twins of `__failWrite`). Mutations: 8 of 8 caught (4 in the targets code, 4 in the app's start and weigh-in handler, 3 of those also by the browser driver; one first crashed the gate rather than failing it, and the check was made to fail cleanly). CSCS review: no prescription changes; the target simply stops moving on a reading nobody could see.
 - [x] **THE PROFILE "REMINDERS" ROW SAYS THE LEVEL, AND A FAILED READ IS NOT "NOT LIVE YET", 8 NOV 2026** (QA round 2,
   A10, named as not done). Mechanical. The row read blank, so how often the coach may message him was one tap away on a
   row that said nothing. It now says the sheet's own words ("Normal, up to 3 a day", "Light, 1 a day") and follows a

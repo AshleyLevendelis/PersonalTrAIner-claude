@@ -73,8 +73,11 @@ export function computeTargets(profile: UserProfile, opts: ComputeTargetsOptions
   return getStaticDailyMacros(eff)
 }
 
-/** Most recent body-weight entry, or null when the user has never weighed in. */
-export async function getLatestWeightKg(profileId: string): Promise<number | null> {
+/**
+ * Most recent body-weight entry, or null when the user has never weighed in. With `strict`, a FAILED read throws
+ * rather than reading as "never weighed in" (8 Nov 2026): every caller that sets the calorie target passes it.
+ */
+export async function getLatestWeightKg(profileId: string, strict = false): Promise<number | null> {
   const { data, error } = await supabase
     .from('daily_metrics')
     .select('weight_kg, date')
@@ -83,6 +86,7 @@ export async function getLatestWeightKg(profileId: string): Promise<number | nul
     .limit(1)
     .maybeSingle()
 
+  if (error && strict) throw error
   if (error || !data) return null
   const kg = Number(data.weight_kg)
   return Number.isFinite(kg) && kg > 0 ? kg : null
@@ -150,6 +154,14 @@ export function targetsToday(profileId: string | undefined): string {
 export interface EffectiveTargetWeight {
   /** The weight to feed into computeTargets — either a fresh 7-day average (the anchor moved) or last time's anchor held flat (the move was inside the noise band). Undefined when the user never gave a weight and has no weigh-ins: there is no anchor, and callers must not invent one. */
   weightKg: number | undefined
+  /**
+   * THE WEIGH-INS COULD NOT BE READ (8 Nov 2026, traced from QA round 2's B4 lead). A failed read had been taken
+   * for "never weighed in", so the target fell back to the weight given at sign-up, was SAVED as a move and
+   * announced ("Your daily targets moved since you were last here"), and moved back with a second notice on the
+   * next good start. When set, `weightKg` is the weight the standing target was last set from (or undefined if
+   * that was unreadable too): a figure to DRAW with, never one to record, announce or write a weigh-in from.
+   */
+  unread?: true
 }
 
 /*
@@ -226,7 +238,14 @@ export async function getEffectiveTargetWeightKg(
   fallbackWeightKg?: number | Promise<number | undefined>,
 ): Promise<EffectiveTargetWeight> {
   const todayStr = targetsToday(profileId)
-  const picture = await getWeighInPicture(profileId)
+  let picture: WeighInPicture
+  try {
+    picture = await getWeighInPicture(profileId, { strict: true })
+  } catch {
+    const rows = await getNutritionTargets(profileId, '1970-01-01', todayStr).catch(() => [])
+    const last = rows.length > 0 ? Number(rows[rows.length - 1].calculated_weight_kg) : NaN
+    return { weightKg: Number.isFinite(last) && last > 0 ? last : undefined, unread: true }
+  }
   // THE AVERAGE IS TAKEN OVER THE WEIGH-INS THE TARGET TRUSTS. A held one —
   // surprising, confirmed, and not yet agreed with by another day — is saved
   // and shown, and is not in this sum.
@@ -244,7 +263,11 @@ export async function getEffectiveTargetWeightKg(
     // the target stays on what last set it — or, with no record of that, on
     // the newest weigh-in it does trust. (Something can only be held AGAINST
     // one of those, so one of them exists.)
-    if (picture.standing.held.length === 0) return { weightKg: await fallbackWeightKg }
+    if (picture.standing.held.length === 0) {
+      // The fallback is the newest weigh-in read by the caller; a caller whose read FAILED rejects it, and that is
+      // the same unread case as above, never the sign-up weight standing in for a weigh-in nobody could see.
+      try { return { weightKg: await fallbackWeightKg } } catch { return { weightKg: lastAnchorKg ?? undefined, unread: true } }
+    }
     const lastTrusted = picture.standing.trusted[picture.standing.trusted.length - 1]
     const lastRecorded = picture.anchors[picture.anchors.length - 1]
     return { weightKg: lastAnchorKg ?? lastTrusted?.kg ?? lastRecorded?.kg }
@@ -378,6 +401,11 @@ export interface WeighInRetarget {
   targets: MacroTargets | null
   /** Settles when the change, if there was one, has been recorded — and says what it replaced, for the notice. */
   recorded: Promise<SnapshotResult>
+  /**
+   * The weigh-ins could not be read just now (8 Nov 2026). Nothing was worked out, recorded or announced, and the
+   * caller keeps the targets it has: the weigh-in itself is saved, and the next start that can read it moves them.
+   */
+  unread?: true
 }
 
 /**
@@ -393,11 +421,17 @@ export async function retargetAfterWeighIn(
   profile: UserProfile,
   exercisePlan?: WorkoutDay[],
 ): Promise<WeighInRetarget> {
-  const latestWeightKg = await getLatestWeightKg(profileId).catch(() => null)
+  const unread = (): WeighInRetarget => ({
+    latestWeightKg: null, anchorKg: null, targets: null, unread: true,
+    recorded: Promise.resolve({ snapshotted: false, changedFromPrior: false, previous: null }),
+  })
+  let latestWeightKg: number | null
+  try { latestWeightKg = await getLatestWeightKg(profileId, true) } catch { return unread() }
   // A fresh weigh-in is exactly the case the anchor threshold exists for —
   // recompute it (it may or may not actually move) rather than assuming this
   // new reading itself is the new anchor.
   const effective = await getEffectiveTargetWeightKg(profileId, latestWeightKg ?? profile.weight_kg)
+  if (effective.unread) return unread()
   const anchorKg = effective.weightKg ?? null
   const targets = computeTargets(profile, { latestWeightKg: anchorKg, exercisePlan })
   return { latestWeightKg, anchorKg, targets, recorded: snapshotTargetsIfChanged(profileId, profile, targets, anchorKg) }

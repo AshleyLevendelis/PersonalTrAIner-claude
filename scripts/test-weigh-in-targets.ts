@@ -68,6 +68,8 @@ const store = new Map<string, string>()
 // --- A fake database (test-dashboard.ts's shape) -------------------------------
 type Row = Record<string, unknown>
 const db: Record<string, Row[]> = {}
+// A TABLE WHOSE READS FAIL (8 Nov 2026): the connection dropping part of a burst. Writes still land.
+const failReads = new Set<string>()
 const cmp = (a: unknown, b: unknown) => (String(a) < String(b) ? -1 : String(a) > String(b) ? 1 : 0)
 function fakeFrom(table: string) {
   db[table] = db[table] ?? []
@@ -87,6 +89,7 @@ function fakeFrom(table: string) {
       }
       return { data: single ? payload[0] ?? null : payload, error: null }
     }
+    if (failReads.has(table)) return { data: null, error: { message: 'TypeError: Failed to fetch' } }
     let rows = db[table].filter(r => filters.every(f => f(r)))
     for (const [col, asc] of [...orders].reverse()) rows = [...rows].sort((a, b) => (asc ? 1 : -1) * cmp(a[col], b[col]))
     if (limitN != null) rows = rows.slice(0, limitN)
@@ -575,6 +578,56 @@ async function main() {
     check('...confirms it through that executor, then refreshes the targets', /row\.kind === 'propose_weigh_in'[\s\S]{0,700}executeWeighIn\([\s\S]{0,500}onWeightLogged\?\.\(\)/.test(chatUi))
     const { RECEIPTS } = await import('../src/lib/coach-voice')
     check('...and its receipt has a title', typeof RECEIPTS.propose_weigh_in?.done === 'string' && typeof RECEIPTS.propose_weigh_in?.failed === 'string')
+  }
+
+
+  // -------------------------------------------------------------------------
+  // A FAILED WEIGH-IN READ IS NOT "NEVER WEIGHED IN" (8 Nov 2026, traced from QA round 2's B4 lead).
+  // Sam signed up at 82 and has weighed in at 77 for days; the target was last set from 77. The weigh-ins then
+  // cannot be read while the targets can. Before: the target fell back to 82, was SAVED and ANNOUNCED.
+  // -------------------------------------------------------------------------
+  console.log('\nU. The weigh-ins cannot be read\n')
+  {
+    const u = sam('unread-1')
+    await signUp(u, '2026-04-01')
+    for (const date of ['2026-04-03', '2026-04-04', '2026-04-05', '2026-04-06', '2026-04-07']) await weighIn(u, date, 77)
+    const rowsOf = () => (db.daily_nutrition_targets ?? []).filter(r => r.profile_id === u.id)
+    const anchorBefore = rowsOf().sort((a, b) => cmp(a.date, b.date)).at(-1)?.calculated_weight_kg
+    check('U0. the fixture binds: the standing target was set from the weigh-ins, well clear of the 82 given at sign-up', Number(anchorBefore) > 0 && Number(anchorBefore) < 80, anchorBefore)
+    const rowsBefore = rowsOf().length
+    setDevClockOverride(u.id!, '2026-04-08')
+    failReads.add('daily_metrics')
+    let threw = false
+    try { await nt.getLatestWeightKg(u.id!, true as never) } catch { threw = true }
+    check('U1. asked strictly, a failed latest-weigh-in read throws', threw)
+    check('U2. ...and asked loosely it still answers null, as the display callers expect', (await nt.getLatestWeightKg(u.id!)) === null)
+    const eff = await nt.getEffectiveTargetWeightKg(u.id!, 82)
+    check('U3. the target\'s weight, unread, is the one the standing target was set from, never the 82 fallback', eff.weightKg === Number(anchorBefore), { eff, anchorBefore })
+    check('U4. ...and says it is unread, so no caller records or announces from it', (eff as { unread?: boolean }).unread === true, eff)
+    const r = await nt.retargetAfterWeighIn(u.id!, u)
+    const rec = await r.recorded
+    check('U5. after a weigh-in whose read-back fails, nothing is worked out: unread, no targets, no anchor', (r as { unread?: boolean }).unread === true && r.targets === null && r.anchorKg === null, { unread: (r as { unread?: boolean }).unread, targets: r.targets, anchorKg: r.anchorKg })
+    check('U6. ...nothing is recorded or announced', rec.snapshotted === false && rec.changedFromPrior === false && rowsOf().length === rowsBefore, { rec, rows: rowsOf().length, rowsBefore })
+    // The fallback is the caller's newest weigh-in; a caller whose read failed hands over a promise that rejects.
+    failReads.delete('daily_metrics')
+    const v = sam('unread-2')
+    setDevClockOverride(v.id!, '2026-04-20')
+    // A throw here is the defect itself (the rejection escaping), so it is caught and FAILS the check, never crashes the gate.
+    const effRejected = await nt.getEffectiveTargetWeightKg(v.id!, Promise.reject(new Error('read failed'))).catch(err => ({ threw: String(err) }))
+    check('U7. with the weigh-in list readable but the caller\'s own read failed, it is unread too, never undefined-as-"no weight"', (effRejected as { unread?: boolean }).unread === true, effRejected)
+    // Control: the same profile, readable, moves as it always did.
+    const ok = await nt.retargetAfterWeighIn(u.id!, u)
+    check('U8. readable again, the same call works the target out from the weigh-ins as before (77)', !(ok as { unread?: boolean }).unread && ok.anchorKg === 77 && ok.targets != null, { anchorKg: ok.anchorKg, unread: (ok as { unread?: boolean }).unread })
+  }
+
+  // App's half: the start and the weigh-in handler act on "unread" (driven in a browser by verify:weigh-in-unread).
+  {
+    const app = strip(raw('src/App.tsx'))
+    check('U9. at start the weigh-in read is strict, and a failure marks it unread rather than "no weigh-ins"',
+      /getLatestWeightKg\(ownedId, true\)/.test(app) && /latestWeightP\.catch\(\(\) => \{ weighInsUnread = true; return null \}\)/.test(app))
+    check('U10. ...the sign-up weight is not written as a weigh-in when the read failed', /if \(!weighInsUnread && restoredWeight == null && restoredProfile\.weight_kg\)/.test(app))
+    check('U11. ...and nothing is recorded at start while unread', /if \(!targetsUnread\) snapshotTargetsIfChanged\(restoredProfile\.id!/.test(app))
+    check('U12. the weigh-in handler leaves the targets alone when unread', /retargetAfterWeighIn\([^)]*\)\s*if \(retarget\.unread\) return/.test(app))
   }
 
   console.log(`\n${ran} checks ran.`)

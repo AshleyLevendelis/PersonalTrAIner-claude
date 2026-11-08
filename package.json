@@ -482,6 +482,7 @@
     "verify:one-page": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/one-page.mjs",
     "verify:nutrition-3a": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/nutrition-3a.mjs",
     "test:boot-cache": "tsx scripts/test-boot-cache.ts",
+    "verify:weigh-in-unread": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/weigh-in-unread.mjs",
     "verify:app-boot": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/app-boot.mjs",
     "test:exercise-layout": "tsx scripts/test-exercise-layout.ts",
     "test:exercise-2a": "tsx scripts/test-exercise-2a.ts",

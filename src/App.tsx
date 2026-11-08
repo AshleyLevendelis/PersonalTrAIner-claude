@@ -232,6 +232,9 @@ function App() {
   const [latestWeightKg, setLatestWeightKg] = useState<number | null>(() => boot?.latestWeightKg ?? null)
   /** The weight that actually drives computeTargets — a threshold-gated 7-day average (getEffectiveTargetWeightKg), not the raw latest reading. Kept separate from latestWeightKg so a noisy day-to-day swing never retunes calories on its own; only a real trend move does. Null until the first target computation resolves it. */
   const [targetWeightAnchorKg, setTargetWeightAnchorKg] = useState<number | null>(() => boot?.targetWeightAnchorKg ?? null)
+  // TRUE WHILE THE ANCHOR IS NOT KNOWN because the weigh-ins could not be read (8 Nov 2026): a target worked out then
+  // is drawn, never recorded, so a settings change on a bad connection cannot save one from the sign-up weight.
+  const anchorUnknownRef = useRef(false)
   const [exercisePlan, setExercisePlan] = useState<WorkoutDay[]>(() => boot?.exercisePlan ?? [])
   // The ring on the chat button. ChatAssistant (force-mounted, so live
   // before the tab is ever opened) reports whether the coach has something
@@ -915,7 +918,7 @@ function App() {
       changed('fitness_goal') ? 'goal' : changed('weight_kg') ? 'weigh_in' : 'settings'
     if (profile.id) {
       const profileId = profile.id
-      snapshotTargetsIfChanged(profileId, profile, targets, targetWeightAnchorKg).then(result => {
+      if (!anchorUnknownRef.current) snapshotTargetsIfChanged(profileId, profile, targets, targetWeightAnchorKg).then(result => {
         const moved = result.previous && targets ? targetsMoved(result.previous, targets, cause) : null
         if (result.changedFromPrior && moved) {
           setAdaptationMessages(prev => [...prev, { text: moved }])
@@ -1013,7 +1016,8 @@ function App() {
         return [] as UserFactRow[]
       }),
     ]))
-    const latestWeightP = quiet(getLatestWeightKg(ownedId).catch(() => null))
+    // STRICT (8 Nov 2026): a failed read rejects, so it can never pass for "never weighed in" below.
+    const latestWeightP = quiet(getLatestWeightKg(ownedId, true))
     // The fallback is the profile's own weight when there is no weigh-in, as it always was. Started before the
     // profile has answered (its fallback waits on both), so it is not a second round trip after it.
     const effectiveTargetWeightP = quiet(getEffectiveTargetWeightKg(
@@ -1234,13 +1238,17 @@ function App() {
     // Living targets (M0): computed on read from the profile + the latest
     // weigh-in, never from the frozen fitness_profiles macro columns (still
     // written at onboarding for back-compat; nothing reads them anymore).
-    let restoredWeight = await latestWeightP
+    // A FAILED WEIGH-IN READ IS NOT "NEVER WEIGHED IN" (8 Nov 2026). It was: the backfill below then wrote the
+    // sign-up weight over a real weigh-in on the sign-up date, and the target fell back to the sign-up weight and was
+    // saved and announced as a move. Unread, nothing here writes, records or announces, and what is on screen stays.
+    let weighInsUnread = false
+    let restoredWeight = await latestWeightP.catch(() => { weighInsUnread = true; return null })
     // Fix 1c (ux-sweep), existing-profile half: a profile from before the
     // onboarding-seed fix above still has zero daily_metrics rows. Lazy
     // check-on-load backfill (matches this app's existing convention, e.g.
     // checkAndRevertExpiredAdaptations) — one dated seed row, same pipeline,
     // so it never needs a standalone migration to reach in-flight accounts.
-    if (restoredWeight == null && restoredProfile.weight_kg) {
+    if (!weighInsUnread && restoredWeight == null && restoredProfile.weight_kg) {
       try {
         await upsertDailyMetric({
           profile_id: restoredProfile.id!,
@@ -1260,8 +1268,11 @@ function App() {
     // weigh-in, else the profile's weight). The one difference is the rare backfill above: its row is now written
     // after the read rather than before, and the figure it writes IS that fallback, so the answer is the same.
     const effectiveTargetWeight = await effectiveTargetWeightP
+    const targetsUnread = weighInsUnread || effectiveTargetWeight.unread === true
+    // Unread, the targets are drawn from the weight they were last SET from, and only where nothing better is on
+    // screen; with that unreadable too, the sign-up weight, for display only (no save, no notice, no anchor).
     const liveTargets = computeTargets(restoredProfile, {
-      latestWeightKg: effectiveTargetWeight.weightKg,
+      latestWeightKg: effectiveTargetWeight.weightKg ?? (targetsUnread ? restoredProfile.weight_kg : undefined),
       exercisePlan: restoredExercises,
     })
 
@@ -1276,9 +1287,14 @@ function App() {
     const freshMesoMissing = restoredMesocycle.length === 0 && keptMeso.length > 0
     setMemoryFacts(cur => (stillAsKept(cur, boot?.facts) ? restoredFacts : cur))
     setProfile(cur => (stillAsKept(cur, boot?.profile) ? savedProfile : cur))
-    setLatestWeightKg(cur => (stillAsKept(cur, boot?.latestWeightKg) ? restoredWeight : cur))
-    setTargetWeightAnchorKg(cur => (stillAsKept(cur, boot?.targetWeightAnchorKg) ? effectiveTargetWeight.weightKg ?? null : cur))
-    setMacros(cur => (stillAsKept(cur, boot?.macros) ? liveTargets : cur))
+    if (!weighInsUnread) setLatestWeightKg(cur => (stillAsKept(cur, boot?.latestWeightKg) ? restoredWeight : cur))
+    // A kept copy's targets beat a guess; with no copy, the anchor is left unset rather than set from a fallback.
+    if (!targetsUnread) setTargetWeightAnchorKg(cur => (stillAsKept(cur, boot?.targetWeightAnchorKg) ? effectiveTargetWeight.weightKg ?? null : cur))
+    // Unread, the weight the target was last SET from is a recorded figure, not a guess: it may stand in where the
+    // phone kept none. With neither, the anchor is unknown until a read succeeds.
+    else if (!boot && effectiveTargetWeight.weightKg != null) setTargetWeightAnchorKg(effectiveTargetWeight.weightKg)
+    anchorUnknownRef.current = targetsUnread && boot?.targetWeightAnchorKg == null && effectiveTargetWeight.weightKg == null
+    setMacros(cur => (stillAsKept(cur, boot?.macros) && !(targetsUnread && boot?.macros) ? liveTargets : cur))
     if (!(restoredPools.failed && boot)) setMealPools(cur => (stillAsKept(cur, boot?.pools) ? restoredPools.pools : cur))
     // A read that FAILED must not render as "No meal plan generated yet" — that
     // sends someone whose meals exist to regenerate them, and the button they
@@ -1511,7 +1527,7 @@ function App() {
     // fire-and-forget; the M3 trend loop reads this history. changedFromPrior
     // (a real move from an EXISTING prior snapshot, not a profile's first
     // one ever) is the one-time "your target changed" notice trigger.
-    snapshotTargetsIfChanged(restoredProfile.id!, restoredProfile, liveTargets, effectiveTargetWeight.weightKg)
+    if (!targetsUnread) snapshotTargetsIfChanged(restoredProfile.id!, restoredProfile, liveTargets, effectiveTargetWeight.weightKg)
       .then(result => {
         // ONE SENTENCE, FROM THE PHRASEBOOK. This and its twin below were two
         // hand-written copies of the same line, naming only calories and only
@@ -2919,7 +2935,7 @@ function App() {
       // After the write, never before: the snapshot is the historical record
       // of what this person's targets WERE, and writing one for a mode change
       // that failed puts a number in that history nothing ever showed them.
-      snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
+      if (!anchorUnknownRef.current) snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
     }
   }
 
@@ -2947,7 +2963,7 @@ function App() {
       // above: this snapshot is the target history, and a revert that leaves
       // one behind records a target the user was shown for a second and never
       // actually had. Both handlers now snapshot only what survived.
-      if (profile.id) snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
+      if (profile.id && !anchorUnknownRef.current) snapshotTargetsIfChanged(profile.id, updated, targets, targetWeightAnchorKg)
     })
   }
 
@@ -2957,6 +2973,9 @@ function App() {
     // One function for the whole chain (nutrition-targets.ts), so the 7-day /
     // 1 kg ruling it carries is run by a gate rather than read off this file.
     const retarget = await retargetAfterWeighIn(profile.id, profile, exercisePlan)
+    // Unread (8 Nov 2026): the weigh-in is saved; the targets stay as they are until a read can see it.
+    if (retarget.unread) return
+    anchorUnknownRef.current = false
     const targets = retarget.targets
     setLatestWeightKg(retarget.latestWeightKg)
     setTargetWeightAnchorKg(retarget.anchorKg)

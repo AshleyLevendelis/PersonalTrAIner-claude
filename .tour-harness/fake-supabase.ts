@@ -69,6 +69,12 @@ const NET_DOWN_AT_START = (() => {
 })()
 if (NET_DOWN_AT_START) (window as unknown as { __netDown?: boolean }).__netDown = true
 const netDown = () => (window as unknown as { __netDown?: boolean }).__netDown === true
+// ONE TABLE'S READS FAIL, the rest answer (8 Nov 2026) — `?fail-read=daily_metrics`. A connection that drops part of
+// a burst of reads is the case a whole-network switch cannot show: the weigh-ins unread while the profile and the
+// targets answered is what turned a blip into a saved, announced target move.
+const FAIL_READ = (() => {
+  try { return new Set((new URLSearchParams(location.search).get('fail-read') ?? '').split(',').filter(Boolean)) } catch { return new Set<string>() }
+})()
 const DEAD = () => ({ data: null, error: { message: 'TypeError: Failed to fetch', details: '', hint: '', code: '' } })
 
 /**
@@ -184,6 +190,9 @@ export function makeFakeSupabase(db: Db, opts: { session?: { user: { id: string;
 
     const exec = () => {
       if (down()) return DEAD()
+      // ...or from a moment a driver chooses: `window.__failRead = table => boolean`, asked on every read.
+      const failRead = (window as unknown as { __failRead?: (t: string) => boolean }).__failRead
+      if (!opts.alwaysUp && op === 'select' && (FAIL_READ.has(name) || failRead?.(name) === true)) return DEAD()
       const rows0 = table(name)
       // A WRITE A DRIVER WANTS TO FAIL. Opt-in: a driver sets window.__failWrite
       // to a predicate over (table, operation, row); nothing sets it by
