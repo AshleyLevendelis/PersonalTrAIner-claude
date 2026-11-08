@@ -1403,6 +1403,9 @@ menu" stays true when a copy is also left outside it.
   warm-up. Ashley's ruling 24 Sep 2026: on those days the words change (type
   the weight, then tap ✓), and the spotlight covers the whole row so the box
   it asks for can actually be reached. `verify:tour-real`, `app-tour`
+- **Sentry sees crashes and timings, never her data: her rulings 8 Nov 2026**, "Errors + speed only" (no replay, user
+  info, cookies, headers, bodies or query strings) and "Just after the app appears" (the SDK off the opening path, early
+  errors held and sent on arrival). Any new Sentry feature is put to her first. `test:sentry-privacy`
 - Safety ships correct or not at all — `injury-adaptation-safety`,
   `joint-tag-states`, `rehab-prescribed`, `food-db-parity`, `diet-tag-sync`,
   `load-ceilings`, `set-plausibility`, `lift-plausibility`, `starting-out`

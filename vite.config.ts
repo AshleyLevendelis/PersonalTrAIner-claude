@@ -5,6 +5,12 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  // Sentry's release and environment tags (src/instrument.ts), read from the variables Vercel sets on every
+  // build: the commit being shipped, and production / preview. Empty locally, where the SDK is off anyway.
+  define: {
+    'import.meta.env.VITE_APP_RELEASE': JSON.stringify(process.env.VERCEL_GIT_COMMIT_SHA ?? ''),
+    'import.meta.env.VITE_APP_ENV': JSON.stringify(process.env.VERCEL_ENV ?? ''),
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -32,6 +38,7 @@ export default defineConfig({
           if (/react-markdown|remark|micromark|mdast|unist|vfile|hast|bail|trough|decode-named|character-entities|property-information|space-separated|comma-separated|zwitch|html-url|devlop|estree|unified/.test(id)) return 'vendor-markdown'
           if (id.includes('@radix-ui') || id.includes('radix-ui')) return 'vendor-radix'
           if (id.includes('lucide-react')) return 'vendor-icons'
+          if (id.includes('@sentry')) return 'vendor-sentry'
           return undefined
         },
       },

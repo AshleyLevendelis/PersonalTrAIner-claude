@@ -51,3 +51,6 @@ volume-report.txt
 # rot the moment a table's shape changes, which is exactly the "gate passing
 # against a fixture nobody maintains" failure this suite avoids.
 scripts/tmp-*
+
+# Playwright MCP snapshots and screenshots
+.playwright-mcp/

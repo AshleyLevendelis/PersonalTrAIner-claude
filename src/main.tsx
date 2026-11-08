@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { reactErrorHook, startSentry } from '@/lib/sentry'
 import './index.css'
 import App from './App'
 import { getAppearance, applyAppearance } from '@/lib/appearance-store'
@@ -21,7 +22,16 @@ installChunkReload()
 // throw in the provider itself — or in anything it reads at mount — would
 // otherwise escape past the boundary to the same blank page it exists to
 // prevent. Outermost is the only position where it catches everything.
-createRoot(document.getElementById('root')!).render(
+// Error monitoring: held from here, sent once Sentry loads just after first paint (lib/sentry.ts).
+startSentry()
+
+// React 19's root hooks report every render error to Sentry, including the ones AppErrorBoundary catches
+// and shows its fallback for (onCaughtError), which window.onerror would never see.
+createRoot(document.getElementById('root')!, {
+  onUncaughtError: reactErrorHook('uncaught'),
+  onCaughtError: reactErrorHook('caught'),
+  onRecoverableError: reactErrorHook('recoverable'),
+}).render(
   <StrictMode>
     <AppErrorBoundary>
       <AppearanceProvider>

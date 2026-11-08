@@ -2,6 +2,29 @@
 
 Newest first. One line each.
 
+- [x] **SENTRY ERROR MONITORING IN THE WEB APP, 8 NOV 2026** (her "help me get started with sentry", org ashtech-73).
+  Three rulings, each from three options: **"The app itself"** first (over app + server functions; the four edge
+  functions are not instrumented); **"Errors + speed only"** (over blanked-out screen recordings and over Sentry's
+  defaults): no replay, no user info, cookies, headers, request or response bodies, URL query strings, and breadcrumb
+  URLs cut at the "?" (Supabase row filters carry user ids); **"Just after the app appears"** (over loading at start):
+  the SDK (57 kB gz, its own chunk) is fetched once the page is idle, and a small holder (`lib/sentry.ts`, no Sentry
+  import) keeps errors from before then and sends them on arrival; a tab closed first loses them. React 19's three root
+  hooks report, so errors AppErrorBoundary catches are sent too. Release = Vercel's commit, environment = Vercel's
+  production/preview (both via vite `define`). Trace headers are NOT sent (`tracePropagationTargets: []`): an extra
+  header on a function call is a CORS preflight the functions were never asked about. Tracing 20% in production.
+  Without VITE_SENTRY_DSN the build drops Sentry entirely. Created the Sentry project `fitplan-pro` (her yes).
+  BUNDLE: every budget had 1-2 kB of room before this (measured on a clean worktree of 2286af67, built WITH the key):
+  deploy 368->369 gz, paint 524->525, total 2654->2822 raw; budgets moved 369->377, 525->533, 2656->2847 on her 15 Sep
+  ruling's room. A namespace import (`import * as Sentry`) kept the whole SDK, 155 kB gz; named imports, 57.
+  VERIFIED LIVE: a real uncaught error from the built app (served locally, tagged local-test) reached Sentry as
+  FITPLAN-PRO-1 with release and environment set; the app opens normally at 390x844 with no console errors.
+  test:sentry-privacy 25 checks (21 mutations, 21 caught; one only after the "loaded later" detector stopped
+  accepting a TYPE that names the same file, and one mutation that first hit the type line instead of the load).
+  FOUND: Sentry still stores a rough LOCATION worked out from the connection (the app sends no IP); the project's
+  "Prevent storing of IP addresses" setting is hers to tick, no tool here can. Stack traces are minified until source
+  maps upload (needs a Sentry auth token on Vercel). NOT RUN on this Windows machine: every verify: driver (hard-coded
+  Linux Chromium path), and test:no-dead-code and test:boot-cache, which fail identically on untouched code (CRLF).
+  NEEDS: VITE_SENTRY_DSN on Vercel (production + preview), then a merge to main. No edge function deploy.
 - [x] **THE COACH STOPS TEACHING THE "ONLY 30-40 g OF PROTEIN AT A TIME" MYTH, 7 NOV 2026** (her machine's second exam
   that day, case teach-protein-spread: "your body can only use 30 to 40 grams of protein at a time ... a lot gets
   oxidized for energy instead"; the judge marked it outdated; her "fix the protein advice too"). The myth came from the

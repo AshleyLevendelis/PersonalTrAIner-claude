@@ -193,8 +193,15 @@ console.log('\n1. The libraries are cached separately from the app')
   //     after    deploy 361 gz   paint 517 gz   app 1249 raw   total 2581 raw   (deploy, paint and total OVER)
   // The catalogue is read by every screen that shows a plan, so its growth is first-paint code by nature. Her 15 Sep
   // ruling, "raise it with room to grow": the same room as every move above, 8 kB gz, 25 kB raw.
-  headroom('a deploy re-downloads', appGzip, 369, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 369, appGzip)
+  // MOVED 8 Nov 2026, Sentry (her "Just after the app appears"): the SDK is fetched after first paint in its own
+  // chunk, and only the small holder that keeps early errors (lib/sentry.ts) is on the opening path. MEASURED through
+  // this gate on a clean worktree of 2286af67 and on the change, both built with VITE_SENTRY_DSN set (without it the
+  // build drops Sentry entirely and measures nothing):
+  //     before   deploy 368 gz   paint 524 gz   app 1289 raw   total 2654 raw   (1, 1, 15 and 2 kB of room)
+  //     after    deploy 369 gz   paint 525 gz   app 1291 raw   total 2822 raw   (deploy, paint and total OVER)
+  // The 166 raw is the Sentry chunk (57 gz), off the opening path. Her 15 Sep ruling, the same room, 8 gz, 25 raw.
+  headroom('a deploy re-downloads', appGzip, 377, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 377, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -277,9 +284,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 22 Oct 2026: 498 -> 506, the Sam live test — see the deploy figure above for both ends.
   // MOVED 31 Oct 2026: 506 -> 517, the five-tab polish — see the deploy figure above for both ends.
   // MOVED 3 Nov 2026: 517 -> 525, the lighter variants — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 525, 'kB gzipped')
+  // MOVED 8 Nov 2026: 525 -> 533, Sentry's early-error holder — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 533, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 525, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 533, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -643,7 +651,9 @@ console.log('\n3. Nothing has crept back up')
   // fetched after the app opens. Measured both ends through this gate: d2853d57 deploy 363 gz, paint 519, app 1255,
   // total 2588; with the change deploy 362, paint 518, app 1252 (the first 85 left the app chunk too), total 2631.
   // Only the total grows, by the chunk nothing on the first screen fetches. Her 15 Sep ruling, 25 raw of room.
-  const TOTAL_BUDGET_KB = 2656
+  // MOVED 8 Nov 2026: 2656 -> 2847, Sentry in its own chunk fetched after the app opens (2822 measured; see the
+  // deploy figure above for both ends). Her 15 Sep ruling, 25 raw of room.
+  const TOTAL_BUDGET_KB = 2847
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
