@@ -369,12 +369,13 @@ export function useMealDays(input: MealDaysInput) {
 
   const addToGrocery = async (date: string): Promise<AddGroceryDaysResult | null> => {
     if (!profileId || !targets) return null
+    // A list that cannot be read is not added to (8 Nov 2026): null is "couldn't, try again" on both surfaces.
     return addGroceryDays({
       profileId, mealPools: pools, targets, softLikedFoods,
       todaysPicks: todaysChosen, pinsByDate, mealShape,
       dates: [date], today,
       legacyStartDate: readGroceryBuildMemo(profileId)?.startDate,
-    })
+    }).catch(() => null)
   }
 
   const removeFromGrocery = async (date: string): Promise<AddGroceryDaysResult | null> => {
@@ -384,7 +385,7 @@ export function useMealDays(input: MealDaysInput) {
       todaysPicks: todaysChosen, pinsByDate, mealShape,
       dates: [date], today,
       legacyStartDate: readGroceryBuildMemo(profileId)?.startDate,
-    })
+    }).catch(() => null)
   }
 
   const isOnGroceryList = async (date: string): Promise<boolean> => {

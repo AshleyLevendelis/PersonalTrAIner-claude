@@ -417,13 +417,16 @@ export async function getTodayLedger(
 ): Promise<TodayLedger> {
   let serverEvents: MealEventRecord[] = []
   try {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('meal_events')
       .select('client_id, date, slot, event_type, meal_name, macros, source, created_at')
       .eq('profile_id', profileId)
       .eq('date', date)
       .is('voided_at', null) // append-only ledger's undo primitive (§2.5) — a voided event never counts
       .order('created_at', { ascending: true })
+    // A FAILED READ IS NOT "NOTHING EATEN" (8 Nov 2026, QA round 3): the error came back as data null, was read as no
+    // events and CACHED, so offline a logged breakfast dropped out of the day ("1 of 4 meals") and showed as Next.
+    if (error) throw error
     serverEvents = (data ?? []).map(row => ({
       profileId,
       date: row.date,
@@ -448,7 +451,8 @@ export async function getTodayLedger(
     // Offline — the pending queue below is still the truth for today, and the
     // cache is LEFT ALONE. Writing an empty server half here would let
     // getLedgerSnapshot start answering "nothing eaten" off a read that never
-    // happened.
+    // happened. What the server last said for this day still counts.
+    serverEvents = serverEventCache.get(cacheKey(profileId, date)) ?? []
   }
 
   const events = mergeEvents(serverEvents, profileId, date)

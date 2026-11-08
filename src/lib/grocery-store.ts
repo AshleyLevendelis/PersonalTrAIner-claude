@@ -453,9 +453,13 @@ async function getAllItemsIncludingDismissed(profileId: string, opts: { strict?:
   }
 }
 
-/** All grocery items for a profile — server + pending merged, dismissed rows hidden. Never throws offline: falls back to the pending-only view. */
-export async function getAllItems(profileId: string): Promise<GroceryItemRow[]> {
-  const items = await getAllItemsIncludingDismissed(profileId)
+/**
+ * All grocery items for a profile — server + pending merged, dismissed rows hidden. Never throws offline: falls back to
+ * the pending-only view. `strict` throws instead (8 Nov 2026): the list screen keeps what it shows rather than drop
+ * every row the server holds, which read as the list being emptied offline.
+ */
+export async function getAllItems(profileId: string, opts: { strict?: boolean } = {}): Promise<GroceryItemRow[]> {
+  const items = await getAllItemsIncludingDismissed(profileId, opts)
   return items.filter(i => !i.dismissed)
 }
 
@@ -950,7 +954,11 @@ async function reconcileGenerated(
   // canonical_key that's still in the aggregate is exactly the "user
   // deleted this, don't bring it back" case this reconciliation has to
   // respect rather than silently re-adding.
-  const currentItems = await getAllItemsIncludingDismissed(profileId)
+  //
+  // STRICT (8 Nov 2026, QA round 3): read loosely, a failed read was the pending queue alone, every key looked new, and
+  // a Rebuild offline gave every line a second copy once the connection came back (36 rows for 18). A rebuild that
+  // cannot see the list does nothing and says so: the caller's error path.
+  const currentItems = await getAllItemsIncludingDismissed(profileId, { strict: true })
   const existingGenerated = new Map(currentItems.filter(r => r.source === 'generated').map(r => [r.canonical_key, r]))
 
   let added = 0
@@ -986,7 +994,10 @@ async function reconcileGenerated(
       enqueueUpsert({
         id: existing.id, profileId: profileId, canonicalKey: agg.canonicalKey, displayName: agg.displayName,
         quantity: amount.quantity, unit: amount.unit, category: agg.category, source: 'generated', mealRefs: agg.mealRefs,
-        checked: existing.checked, needsReview: agg.needsReview, createdAt: existing.created_at, attempts: 0,
+        // A TICK MEANS "BOUGHT ENOUGH" ONLY FOR WHAT WAS ON THE LIST WHEN IT WAS TICKED (8 Nov 2026, QA round 3): a
+        // ticked banana became 19 bananas still in the trolley. More of it, or a different unit, needs buying again.
+        checked: existing.checked && existing.unit === amount.unit && amount.quantity <= Number(existing.quantity),
+        needsReview: agg.needsReview, createdAt: existing.created_at, attempts: 0,
         dismissed: false, userEdited: false,
       })
       updated++

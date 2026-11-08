@@ -2,6 +2,24 @@
 
 Newest first. One line each.
 
+- [x] **QA ROUND 3, MEALS AND THE SHOPPING LIST: AN OFFLINE REBUILD DOUBLED THE LIST, A TICK SURVIVED NINETEEN TIMES
+  THE AMOUNT, AND AN OFFLINE MEAL LOG DROPPED THE MEALS ALREADY EATEN, 8 NOV 2026.** Mechanical. Found by the round-3
+  meals tester on the whole app at 390px, each re-measured before fixing. (1) Rebuild with no connection said "List
+  rebuilt from your meals", hid every row the server held, and once back online every line was there twice (36 rows
+  for 18): the rebuild read the list loosely, a failed read was the pending queue alone, so every line looked new.
+  The rebuild now reads strictly and, unable to see the list, does nothing and says "No connection, so nothing was
+  rebuilt" with no Undo; adding a day from the strip or the coach says it couldn't, as it already did for other
+  failures. Reopening the list offline keeps the rows on screen instead of the pending queue alone. (2) A ticked line
+  kept its tick when a rebuild asked for more (one banana ticked became 19 bananas "in the trolley"): a tick now
+  holds only while the list asks for no more of it, in the same unit. (3) Offline, logging lunch made the breakfast
+  already eaten drop out of the day ("1 of 4 meals", breakfast back to Next): the meal read's error came back as "no
+  events" and was cached as such. It now throws, and offline the day counts what the server last said plus what is
+  waiting on the phone. NOT CHANGED, named: a quantity set by hand still holds through a rebuild (deliberate, though
+  the row's meal count can then disagree with it); the tester's other meal findings are the next entries.
+  CHECKS: `test:grocery` §O (+7), `test:grocery-screen` (+2), `test:meal-ledger-snapshot` §4b (+2), `verify:grocery`
+  (+3, 77 checks).
+  Mutations: 5 of 5 caught (the loose rebuild read by `test:grocery`; the screen also refuses at its own strict read,
+  so on screen that one break is covered twice and the driver alone does not separate them).
 - [x] **A FAILED WEIGH-IN READ WAS TAKEN FOR "NEVER WEIGHED IN": THE CALORIE TARGET FELL BACK TO THE SIGN-UP WEIGHT,
   WAS SAVED AND ANNOUNCED, AND A REAL WEIGH-IN COULD BE OVERWRITTEN, 8 NOV 2026.** Mechanical; safety-adjacent (the
   calorie target), so traced end to end first (engine-tracer, from QA round 2's B4 lead) and planned before building.

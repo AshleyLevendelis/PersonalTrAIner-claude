@@ -394,6 +394,24 @@ await page(`for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 
 const again = await page(`return { tuna: ${tunaStoredJs}, rebuild: !!q('[data-testid="grocery-rebuild"]') }`)
 check('the Rebuild button is still there beside the picker, and the list is back on 14 days', again.tuna && again.rebuild, again)
 
+// OFFLINE (8 Nov 2026, QA round 3): Rebuild with no connection said "List rebuilt", hid every row the server held,
+// and once back, every line was there twice. Now it does nothing and says so, and the rows stay on screen.
+const rowsNow = () => page(`return qa('[data-testid="grocery-row"]').length`)
+const dupes = () => page(`const k = (window.__fakeDb?.grocery_items ?? []).filter(r => r.source === 'generated' && !r.dismissed).map(r => r.canonical_key); return k.length - new Set(k).size`)
+const rowsBeforeOff = await rowsNow()
+await page(`window.__netDown = true; return true`)
+const rb = await page(`const b = q('[data-testid="grocery-rebuild"]'); b?.scrollIntoView({ block: 'center' }); const x = box(b); return x ? { x: x.left + x.width / 2, y: x.top + x.height / 2 } : null`)
+if (rb) await tapAt(rb.x, rb.y)
+await wait(900)
+const OFF = await page(`return { toast: q('[data-testid="grocery-toast"]')?.textContent.trim() ?? null, undo: !!q('[data-testid="grocery-undo"]'), rows: qa('[data-testid="grocery-row"]').length }`)
+await shoot('grocery-offline-rebuild')
+check('offline, Rebuild says nothing was rebuilt, with no Undo (nothing changed)', /^No connection, so nothing was rebuilt$/.test(OFF.toast ?? '') && OFF.undo === false, OFF)
+check('...and every row stays on screen', OFF.rows === rowsBeforeOff && rowsBeforeOff > 5, { rowsBeforeOff, OFF })
+await page(`window.__netDown = false; window.dispatchEvent(new Event('online')); return true`)
+await wait(1500)
+check('...and back online, no line is there twice', (await dupes()) === 0 && (await rowsNow()) === rowsBeforeOff, { dupes: await dupes(), rows: await rowsNow(), rowsBeforeOff })
+await page(`for (let i = 0; i < 40 && q('[data-testid="grocery-toast"]'); i++) await new Promise(r => setTimeout(r, 200)); return true`)
+
 console.log('\n[7] The add bar, with the keyboard shut and open')
 const A1 = await page(`
   const input = q('[data-testid="grocery-addbar"] input'), add = q('[data-testid="grocery-add"]')

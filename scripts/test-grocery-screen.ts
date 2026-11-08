@@ -71,6 +71,15 @@ check('...and never reaches the database, the write queue or its storage key its
   !/from '@\/lib\/supabase'/.test(both) && !/\bsupabase\b/.test(both) && !/fitplan_grocery_pending/.test(both) && !/\bflushPending\b/.test(both),
   [/supabase/.test(both), /fitplan_grocery_pending/.test(both), /flushPending/.test(both)])
 
+// A FAILED READ KEEPS THE ROWS (8 Nov 2026, QA round 3): the loose read was the pending queue alone, so reopening the
+// list offline hid every row the server held. The screen's reload reads strictly and keeps what it shows on a failure.
+{
+  const g = read('src/components/GroceryList.tsx')
+  const reloadFn = g.slice(g.indexOf('const reload = async'), g.indexOf('const reload = async') + 600)
+  check('the list\'s reload reads strictly', /getAllItems\(profileId, \{ strict: true \}\)/.test(reloadFn), reloadFn.slice(0, 200))
+  check('...and a failure leaves the rows on screen (it is caught, and setItems is not called with a fallback)', /\} catch \(err\) \{\s*console\.error\([^)]*\)\s*\}/.test(reloadFn))
+}
+
 console.log(`\n${ran} checks ran`)
 if (failed > 0) { console.error(`${failed} check(s) failed`); process.exit(1) }
 console.log('grocery screen: all checks passed')

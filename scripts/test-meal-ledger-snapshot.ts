@@ -61,6 +61,8 @@ type Row = Record<string, unknown>
 let serverRows: Row[] = []
 let reads = 0
 let readFails = false
+// A read that ANSWERS with an error rather than throwing — how supabase-js reports a failed fetch (8 Nov 2026).
+let readErrors = false
 
 function makeFake() {
   const builder = (table: string) => {
@@ -88,6 +90,7 @@ function makeFake() {
       then: (resolve: (v: unknown) => void, reject?: (e: unknown) => void) => {
         reads++
         if (readFails) return Promise.resolve().then(() => reject ? reject(new Error('offline')) : undefined)
+        if (readErrors) return Promise.resolve().then(() => resolve({ data: null, error: { message: 'TypeError: Failed to fetch' } }))
         return Promise.resolve().then(() => resolve({ data: serverRows.filter(r => r.voided_at == null), error: null }))
       },
     })
@@ -183,6 +186,21 @@ async function main() {
   await getTodayLedger(PROFILE, DATE, TARGETS)
   check('and the server\'s answer puts it back rather than hiding a failed undo',
     getLedgerSnapshot(PROFILE, DATE)?.eaten.kcal === 700, getLedgerSnapshot(PROFILE, DATE)?.eaten)
+
+  console.log('\n4b. A read that answers with an error keeps what was already eaten (8 Nov 2026, QA round 3)\n')
+  {
+    // Lunch (700) is on the server and in the snapshot. Offline, a snack is logged and the next read answers with an
+    // error: lunch dropped out of the day ("1 of 4 meals") because the error read as "no events".
+    navShim.onLine = false
+    logMealEaten(PROFILE, DATE, 'snack', 'Yoghurt', { kcal: 200, protein: 15, carbs: 20, fat: 5 })
+    readErrors = true
+    const offline = await getTodayLedger(PROFILE, DATE, TARGETS)
+    readErrors = false
+    check('4b1. offline, the day still counts the lunch eaten earlier, plus the snack just logged', offline.eaten.kcal === 900, offline.eaten)
+    check('4b2. ...and the snapshot is not overwritten with "nothing on the server"', (getLedgerSnapshot(PROFILE, DATE)?.eaten.kcal ?? 0) >= 700, getLedgerSnapshot(PROFILE, DATE)?.eaten)
+    navShim.onLine = true
+    await flushPending()
+  }
 
   console.log('\n5. Every screen that shows the number uses it\n')
 

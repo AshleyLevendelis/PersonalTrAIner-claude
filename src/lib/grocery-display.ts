@@ -41,6 +41,8 @@ export function clearedToast(n: number): string {
 
 /** The Undo toast after a rebuild: the list was worked out again from the meals. */
 export const REBUILT_TOAST = 'List rebuilt from your meals'
+/** A rebuild that could not read the list did nothing (8 Nov 2026): said so, with no Undo, because nothing changed. */
+export const REBUILD_OFFLINE_TOAST = "No connection, so nothing was rebuilt"
 
 export function trolleyToast(name: string): string {
   const n = name.trim()

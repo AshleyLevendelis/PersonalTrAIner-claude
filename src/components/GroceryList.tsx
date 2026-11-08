@@ -26,7 +26,7 @@ import {
   DEFAULT_HORIZON_DAYS, type GroceryItemRow, type GroceryCategory,
 } from '@/lib/grocery-store'
 import {
-  GROCERY_AISLE_LABEL, trolleyToast, clearedToast, REBUILT_TOAST, buildListLabel,
+  GROCERY_AISLE_LABEL, trolleyToast, clearedToast, REBUILT_TOAST, REBUILD_OFFLINE_TOAST, buildListLabel,
   MAX_GROCERY_QUANTITY, formatShoppingQuantity, stepperReadout, exactLabel, stepQuantity, purposeLine, mealRefLines,
   coverageSentence, readGroceryBuildMemo, writeGroceryBuildMemo, typedGroceryAmount, type GroceryBuildMemo,
 } from '@/lib/grocery-display'
@@ -90,7 +90,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
   const [leaving, setLeaving] = useState<Set<string>>(new Set())
   // ONE TOAST, three kinds: a tick (into the trolley), a Clear and a Rebuild, each with its own Undo (the last two are
   // her ruling 8 Nov 2026, "Undo line").
-  const [toast, setToast] = useState<{ key: number; text: string; undo: () => void } | null>(null)
+  const [toast, setToast] = useState<{ key: number; text: string; undo: (() => void) | null } | null>(null)
   const [heroHidden, setHeroHidden] = useState(false)
   const [activeAisle, setActiveAisle] = useState<GroceryCategory | null>(null)
   const [addBarH, setAddBarH] = useState(0)
@@ -115,7 +115,11 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
     if (!profileId) return
     setLoading(true)
     try {
-      setItems(await getAllItems(profileId))
+      // A failed read keeps the rows on screen (8 Nov 2026): it was the pending queue alone, so every row the server
+      // held vanished offline and a tick looked undone.
+      setItems(await getAllItems(profileId, { strict: true }))
+    } catch (err) {
+      console.error('Reading the shopping list failed; keeping what is on screen', err)
     } finally {
       setLoading(false)
     }
@@ -140,9 +144,11 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
       // writes (it doesn't await the network) — reload picks up the merged
       // pending state immediately, no round-trip wait.
       const input = { profileId, mealPools, targets, softLikedFoods, days, todaysPicks, pinsByDate, mealShape, startDate: getSessionDateContext(profileId).date }
-      const beforeRows = await getAllItems(profileId)
+      // Read strictly, like the rebuild itself: a list that cannot be seen is not rebuilt (it would be doubled).
+      const beforeRows = await getAllItems(profileId, { strict: true }).catch(() => null)
+      if (!beforeRows) { showToast(REBUILD_OFFLINE_TOAST, null); return }
       const beforeMemo = built
-      await generateGroceryList(input)
+      try { await generateGroceryList(input) } catch { showToast(REBUILD_OFFLINE_TOAST, null); return }
       const memo = { startDate: input.startDate, days }
       writeGroceryBuildMemo(profileId, memo)
       setBuilt(memo)
@@ -225,7 +231,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
     showToast(trolleyToast(item.display_name), () => undoTick(item.id))
   }
 
-  const showToast = (text: string, undo: () => void) => {
+  const showToast = (text: string, undo: (() => void) | null) => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
     setToast({ key: Date.now(), text, undo })
     toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
@@ -235,7 +241,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
     if (toastTimer.current) clearTimeout(toastTimer.current)
     const { undo } = toast
     setToast(null)
-    undo()
+    undo?.()
   }
 
   const undoTick = (id: string) => {
@@ -617,16 +623,16 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
           className="absolute inset-x-3 z-20 flex h-12 items-center gap-2.5 rounded-[14px] bg-secondary pl-3.5 pr-1.5 shadow-[0_10px_30px_rgba(0,0,0,.4)]"
           style={{ bottom: addBarH + 12 }}
         >
-          <CheckCircle2 className="size-4 shrink-0 text-primary-text" aria-hidden />
+          {toast.undo && <CheckCircle2 className="size-4 shrink-0 text-primary-text" aria-hidden />}
           <span className="min-w-0 flex-1 truncate text-[0.8125rem]">{toast.text}</span>
-          <button
+          {toast.undo && <button
             type="button"
             data-testid="grocery-undo"
             onClick={runUndo}
             className="hit-slop-44 h-9 shrink-0 px-3 text-[0.8125rem] font-semibold text-primary-text"
           >
             Undo
-          </button>
+          </button>}
         </div>
       )}
     </>

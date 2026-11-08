@@ -30,6 +30,8 @@ Object.defineProperty(globalThis, 'navigator', { value: { onLine: true }, config
 
 type Row = Record<string, unknown>
 const db: Record<string, Row[]> = { grocery_items: [] }
+// READS OF A TABLE THAT FAIL (8 Nov 2026, QA round 3): writes still land, the way a dropped burst looks.
+const failReads = new Set<string>()
 const UNIQUES: Record<string, string[][]> = { grocery_items: [['profile_id', 'canonical_key']] }
 
 function uniqueViolation(table: string, row: Row): boolean {
@@ -83,6 +85,7 @@ function fakeFrom(table: string) {
       db[table] = db[table].filter(r => !filters.every(f => f(r)))
       return { data: null, error: null }
     }
+    if (failReads.has(table)) return { data: null, error: { message: 'TypeError: Failed to fetch' } }
     let rows = db[table].filter(r => filters.every(f => f(r)))
     for (const [col, asc] of [...orders].reverse()) rows = [...rows].sort((a, b) => (asc ? 1 : -1) * cmp(a[col], b[col]))
     const data = single ? (rows[0] ?? null) : rows.map(r => ({ ...r }))
@@ -332,6 +335,50 @@ async function main() {
   check('regenerate still reports the row touched (meal_refs refresh)', regenAfterEdit.updated === 1 && regenAfterEdit.added === 0, regenAfterEdit)
   const editedChickenAfterRegen = (await getAllItems(editProfileId)).find(i => i.id === chickenRow.id)
   check("the user's hand-edited name and quantity survive the regenerate untouched", editedChickenAfterRegen?.display_name === 'Chicken breast (family pack)' && editedChickenAfterRegen?.quantity === 1000, editedChickenAfterRegen)
+
+
+  // ---- O. A rebuild that cannot read the list (8 Nov 2026, QA round 3) ------------------------------------------
+  // Offline, Rebuild said "List rebuilt" and, once back, every line was there twice (36 rows for 18): the read fell
+  // back to the pending queue alone, so every key looked new. And a ticked line kept its tick when a rebuild asked
+  // for nineteen times as much.
+  console.log('\n[O] a rebuild that cannot read the list, and a tick on a line that grows')
+  {
+    const pid = crypto.randomUUID()
+    const pools = { lunch: [{ slot: 'lunch' as const, name: 'Banana Bowl', macros: targets, tags: [], ingredients: [{ name: 'oats', quantity: 50, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }] }] }
+    await generateGroceryList({ profileId: pid, mealPools: pools, targets, startDate: '2026-09-28', days: 1 })
+    await flushPending()
+    const rowsOf = () => db.grocery_items.filter(r => r.profile_id === pid)
+    const before = rowsOf().length
+    check('O0. the fixture binds: one day of the bowl is two lines', before === 2, rowsOf())
+    failReads.add('grocery_items')
+    let threw = false
+    try { await generateGroceryList({ profileId: pid, mealPools: pools, targets, startDate: '2026-09-28', days: 3 }) } catch { threw = true }
+    check('O1. a rebuild that cannot read the list refuses (it throws, so the screen can say so)', threw)
+    failReads.delete('grocery_items')
+    await flushPending()
+    check('O2. ...and nothing was written: still two lines, not four', rowsOf().length === before, rowsOf().map(r => r.canonical_key))
+    let screenThrew = false
+    failReads.add('grocery_items')
+    try { await getAllItems(pid, { strict: true } as never) } catch { screenThrew = true }
+    const loose = await getAllItems(pid)
+    failReads.delete('grocery_items')
+    check('O3. the list screen\'s read fails loudly when asked to, so it can keep what it shows', screenThrew)
+    check('O4. ...while the loose read still answers (the pending view), as its other callers expect', Array.isArray(loose))
+    // The tick.
+    const banana = (await getAllItems(pid)).find(i => i.canonical_key === 'banana')!
+    setCheckedLocal(banana, true)
+    await flushPending()
+    await generateGroceryList({ profileId: pid, mealPools: pools, targets, startDate: '2026-09-28', days: 1 })
+    await flushPending()
+    const same = (await getAllItems(pid)).find(i => i.canonical_key === 'banana')
+    check('O5. a rebuild asking for the same amount keeps the tick', same?.checked === true, same)
+    await generateGroceryList({ profileId: pid, mealPools: pools, targets, startDate: '2026-09-28', days: 5 })
+    await flushPending()
+    const more = (await getAllItems(pid)).find(i => i.canonical_key === 'banana')
+    check('O6. ...one asking for more takes the tick off: what was bought is not enough', more?.checked === false && Number(more?.quantity) > Number(same?.quantity), more)
+    await generateGroceryList({ profileId: pid, mealPools: pools, targets, startDate: '2026-09-28', days: 5 })
+    await flushPending()
+  }
 
   // ---- Summary -------------------------------------------------------------
   if (failures > 0) {
