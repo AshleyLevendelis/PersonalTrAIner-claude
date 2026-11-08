@@ -12,7 +12,7 @@
 // aria-label from dayLabel(d) — the one sentence the Exercise strip and the
 // coach also use — so nothing the old glyphs said is lost to a screen reader.
 // ---------------------------------------------------------------------------
-import { countsTowardWeekTally, type TrainingWeekDay } from '@/hooks/useTrainingWeek'
+import { dayCountsTowardWeek, type TrainingWeekDay } from '@/hooks/useTrainingWeek'
 import { dayLabel, SHORT_DAY, weekBoundaryIndex, weekBoundaryNote } from '@/lib/week-glyphs'
 
 export type WeekCircleLook = 'done' | 'partial' | 'missed' | 'today' | 'due' | 'rest' | 'away'
@@ -107,7 +107,7 @@ export function HomeWeekStrip({ days, todayName, done, planned }: { days: Traini
  * a rest day is never "session N".
  */
 export function sessionOrdinal(days: TrainingWeekDay[], todayDate: string): { n: number; of: number } | null {
-  const counted = days.filter(d => countsTowardWeekTally(d.state))
+  const counted = days.filter(dayCountsTowardWeek)
   const at = counted.findIndex(d => d.date === todayDate)
   return at < 0 ? null : { n: at + 1, of: counted.length }
 }

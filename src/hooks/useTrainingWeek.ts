@@ -43,6 +43,11 @@ export interface TrainingWeekDay {
    * come to disagree (M14 — the strip drew ⇄ and nothing else said what for).
    */
   swappedLine?: string | null
+  /**
+   * A day swapped for an activity that was LOGGED that day (his ruling, 8 Nov 2026, "Count it as a session"): it
+   * counts as a session done in the week's tally and the streak. A swap with nothing logged stays out of both.
+   */
+  swapLogged?: boolean
   /** Set on the ORIGIN of a move — where this day's session went. */
   movedTo?: { date: string; dayName: string } | null
   /** Set on the TARGET of a move — where this day's session came from. */
@@ -117,6 +122,19 @@ function mondayOf(date: Date): Date {
  */
 export function countsTowardWeekTally(state: DayGlyphState): boolean {
   return state !== 'rest' && state !== 'recovery' && state !== 'before_plan' && state !== 'swapped' && state !== 'rest_chosen' && state !== 'moved'
+}
+
+/**
+ * HIS RULING, 8 NOV 2026, "Count it as a session" (asked after QA round 2 found "Count it as today's workout" took the
+ * streak from 2 to 1 and the week from "Session 2 of 4" to "0 of 3"): a day swapped for an activity that was LOGGED
+ * counts in the week and counts as done. The day stays 'swapped' everywhere it is drawn (it was not the lifting
+ * session); only the counts change. A swap with nothing logged is still left out, as the paragraph above says.
+ */
+export function dayCountsTowardWeek(d: Pick<TrainingWeekDay, 'state' | 'swapLogged'>): boolean {
+  return countsTowardWeekTally(d.state) || (d.state === 'swapped' && !!d.swapLogged)
+}
+export function dayCountsAsDone(d: Pick<TrainingWeekDay, 'state' | 'swapLogged'>): boolean {
+  return d.state === 'done' || (d.state === 'swapped' && !!d.swapLogged)
 }
 
 export function classifyDay(
@@ -287,6 +305,7 @@ function buildTrainingWeekDays(input: BuildTrainingWeekInput): TrainingWeekDay[]
       state,
       swappedForActivity: dashboardDay?.session?.swapped_for_activity ?? null,
       swappedLine: swappedActivityLine(dashboardDay?.session?.swapped_for_activity, dashboardDay?.cardioLogs ?? []),
+      swapLogged: state === 'swapped' && (dashboardDay?.cardioLogs?.length ?? 0) > 0,
       markedMissed: !!dashboardDay?.session?.marked_missed,
       deliberateRest: !!dashboardDay?.session?.deliberate_rest,
       movedTo: resolved.movedTo,
@@ -396,10 +415,10 @@ export function useTrainingWeek(
 
 /** The week's "N of M done · K to go", from its days. One function, so no screen counts a second way. */
 export function tallyWeek(days: TrainingWeekDay[], today: string): { sessionsDone: number; sessionsPlanned: number; sessionsLeft: number } {
-  const trainingDays = days.filter(d => countsTowardWeekTally(d.state))
+  const trainingDays = days.filter(dayCountsTowardWeek)
   return {
     sessionsPlanned: trainingDays.length,
-    sessionsDone: trainingDays.filter(d => d.state === 'done').length,
+    sessionsDone: trainingDays.filter(dayCountsAsDone).length,
     // STILL AHEAD, not "planned minus done" (user test 8 Oct 2026, finding 18: "0 of 4 done · 4 to
     // go" on a Thursday with Monday and Wednesday already missed). A missed day is not to go; it is
     // gone. What is left is today's unfinished session and the days after it.

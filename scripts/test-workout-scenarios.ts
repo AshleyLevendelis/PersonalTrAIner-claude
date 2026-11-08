@@ -202,7 +202,16 @@ async function main() {
   check('setup: Monday swapped for a run (screen writer)', await track.setSwappedForActivity(PID, MON, 'Run'))
   db.cardio_logs.push({ id: 'c-run', user_id: PID, date: MON, activity_name: 'Run', duration_minutes: 30, intensity_rpe: 6, completed_at: `${MON}T07:00:00` })
   v = await look(MON)
-  check('Monday reads swapped, and is not owed', v.states[MON] === 'swapped' && v.tally.sessionsPlanned === 3, { s: v.states[MON], t: v.tally })
+  // RE-ANCHORED 8 Nov 2026 on his ruling "Count it as a session": the run is logged, so the swapped Monday counts as a
+  // session done (it read "not owed", 0 of 3). It still reads 'swapped' on the strip: it was not the lifting session.
+  check('Monday reads swapped, and with the run logged it counts as a session done', v.states[MON] === 'swapped' && v.tally.sessionsPlanned === 4 && v.tally.sessionsDone === 1, { s: v.states[MON], t: v.tally })
+  // ...while a swap with NOTHING logged is left out of the week, as before the ruling.
+  fresh()
+  lastWeekAllTrained()
+  await track.setSwappedForActivity(PID, MON, 'Run')
+  const unlogged = await look(MON)
+  check('a swap with nothing logged reads swapped and is not owed', unlogged.states[MON] === 'swapped' && unlogged.tally.sessionsPlanned === 3 && unlogged.tally.sessionsDone === 0, { s: unlogged.states[MON], t: unlogged.tally })
+  db.cardio_logs.push({ id: 'c-run', user_id: PID, date: MON, activity_name: 'Run', duration_minutes: 30, intensity_rpe: 6, completed_at: `${MON}T07:00:00` })
   await exec.undoSwapForActivity(PID, { date: MON, dayName: 'Monday', activityName: 'Run' })
   v = await look(MON)
   check('after Undo, Monday is today\'s session again', v.states[MON] === 'due' && v.home.session.status === 'not_started' && v.home.session.focus === 'Upper', { s: v.states[MON], h: v.home.session.status })

@@ -37,7 +37,7 @@ import { dayLengthParts, formatDayLength } from './session-duration'
 import { readBorrowedDay } from './borrowed-day'
 import { honestSessionMinutes } from './session-derive'
 import { sessionForDate, addDays, dayNameOf, daysBetween, type SessionMove } from './session-move'
-import { readTrainingWeeks, countsTowardWeekTally } from '@/hooks/useTrainingWeek'
+import { readTrainingWeeks, dayCountsTowardWeek, dayCountsAsDone, type TrainingWeekDay } from '@/hooks/useTrainingWeek'
 
 /**
  * 'unknown' IS NOT 'rest', and conflating them is the defect this value
@@ -666,14 +666,14 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // The same span of last week: Monday up to the same weekday as today, today included.
   const span = weeks ? weeks.thisWeek.filter(d => d.date <= todayStr).length : 0
   const lastWeekSameSpan = weeks ? weeks.lastWeek.slice(0, span) : []
-  const isDone = (d: { state: string }) => d.state === 'done'
+  const isDone = (d: { state: TrainingWeekDay['state']; swapLogged?: boolean }) => dayCountsAsDone(d)
   const sessionsThisWeekSoFar = thisWeekSoFar.filter(isDone).length
   const sessionsLastWeekSameSpan = weeks && lastWeekSameSpan.length > 0 && (planStartStr == null || lastWeekSameSpan[0].date >= planStartStr)
     ? lastWeekSameSpan.filter(isDone).length
     : null
 
-  const scheduledSoFarThisWeek = thisWeekSoFar.filter(d => countsTowardWeekTally(d.state)).length
-  const loggedOfScheduledSoFarThisWeek = thisWeekSoFar.filter(d => countsTowardWeekTally(d.state) && isDone(d)).length
+  const scheduledSoFarThisWeek = thisWeekSoFar.filter(dayCountsTowardWeek).length
+  const loggedOfScheduledSoFarThisWeek = thisWeekSoFar.filter(d => dayCountsTowardWeek(d) && isDone(d)).length
 
   // Protein adherence: consecutive PRIOR days (not including in-progress
   // today) hitting >=95% of target, over a 14-day window.

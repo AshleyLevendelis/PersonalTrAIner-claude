@@ -174,13 +174,16 @@ async function main() {
     count({ today, sets: ['2026-10-19', '2026-10-22', '2026-10-24', '2026-10-26', '2026-10-27'], moves: [twoMoves[0]], planStart: '2026-10-19' }) === 5)
   // A swapped day: football instead of Thursday 22nd's session.
   const swappedWeek = ['2026-10-19', '2026-10-20', '2026-10-24', '2026-10-26', '2026-10-27']
-  check('A DAY SWAPPED FOR FOOTBALL KEEPS THE STREAK — the five sessions either side of it still stand: 5',
-    count({ today, sets: swappedWeek, cardio: ['2026-10-22'], swapped: ['2026-10-22'], planStart: '2026-10-19' }) === 5,
+  // RE-ANCHORED 8 Nov 2026 on his ruling "Count it as a session" (QA round 2): a swap with the activity LOGGED counts
+  // as a session done; it REPLACES the 9 Oct CSCS rule that kept it transparent. A swap with nothing logged still is.
+  check('A DAY SWAPPED FOR FOOTBALL, WITH THE FOOTBALL LOGGED, COUNTS AS A SESSION: 6',
+    count({ today, sets: swappedWeek, cardio: ['2026-10-22'], swapped: ['2026-10-22'], planStart: '2026-10-19' }) === 6,
     count({ today, sets: swappedWeek, cardio: ['2026-10-22'], swapped: ['2026-10-22'], planStart: '2026-10-19' }))
-  check('...without counting the football as a planned session done (that would be 6)',
-    count({ today, sets: swappedWeek, cardio: ['2026-10-22'], swapped: ['2026-10-22'], planStart: '2026-10-19' }) !== 6)
+  check('...while a swap with NOTHING logged keeps the streak without counting: 5',
+    count({ today, sets: swappedWeek, swapped: ['2026-10-22'], planStart: '2026-10-19' }) === 5,
+    count({ today, sets: swappedWeek, swapped: ['2026-10-22'], planStart: '2026-10-19' }))
   check('...and without spending the week\'s make-up token: a real miss the same week is still forgiven once',
-    count({ today, sets: ['2026-10-19', '2026-10-24', '2026-10-26', '2026-10-27'], cardio: ['2026-10-22'], swapped: ['2026-10-22'], planStart: '2026-10-19' }) === 4)
+    count({ today, sets: ['2026-10-19', '2026-10-24', '2026-10-26', '2026-10-27'], swapped: ['2026-10-22'], planStart: '2026-10-19' }) === 4)
   check('a swapped day she trained on anyway counts like any other', count({ today, sets: done, swapped: ['2026-10-22'], planStart: '2026-10-19' }) === 6)
   check('a planned WALK logged as cardio is that day\'s session, and counts', count({ today, sets: done.slice(1), cardio: ['2026-10-19'], planStart: '2026-10-19' }) === 6)
   check('nothing before the plan started counts, however much was logged', count({ today: '2026-10-20', sets: ['2026-10-12', '2026-10-13', '2026-10-15', '2026-10-17', '2026-10-19', '2026-10-20'], planStart: '2026-10-19' }) === 2)

@@ -89,7 +89,16 @@ const fake = () => ev(`({
 const tapTestId = id => ev(`(() => { const b = document.querySelector('[data-testid="${id}"]'); if (!b) return false; b.scrollIntoView({ block: 'center' }); b.click(); return true })()`)
 
 console.log('\nA. Two blocks logged, the session still due')
+// HIS RULING, 8 Nov 2026, "Count it as a session": counting the blocks as the workout must not LOWER the streak or the
+// week (QA round 2: the streak went 2 → 1 and the week "Session 2 of 4" → "0 of 3"). Read on Home before and after.
+const homeCounts = async () => {
+  await ev(`location.hash = '#/tab/dashboard'`); await wait(2500)
+  const r = await ev(`(() => { const t = document.body.innerText; const w = t.match(/(\\d+) of (\\d+) sessions? done/); const o = t.match(/Session \\d+ of (\\d+)/i); const s = document.querySelector('[data-testid="home-streak"]')?.innerText.match(/(\\d+)/); return { done: w ? +w[1] : null, of: w ? +w[2] : o ? +o[1] : null, streak: s ? +s[1] : null } })()`)
+  await ev(`location.hash = '#/tab/exercise'`); await wait(1500)
+  return r
+}
 await open('circuit=1')
+const homeBefore = await homeCounts()
 const a = await offerReady()
 check('1. the Today card offers to count them as today\'s workout', a.offer === true, a)
 check('2. ...listing each block with its shape', JSON.stringify(a.blocks) === JSON.stringify(['Skipping rope · 5 × 3 min', 'Assault bike · 5 × 15s, 45s rest']), a.blocks)
@@ -104,6 +113,9 @@ check('5. the offer goes, and the day says what replaced it', !a2.offer && /Circ
 check('6. the day is stored as swapped under the blocks\' name', after.sessions.some(s => s.swapped === 'Circuit: Skipping rope and Assault bike'), after.sessions)
 check('7. ...and no extra cardio row was written for it', after.cardio === before.cardio && before.cardio === 2, { before: before.cardio, after: after.cardio })
 await shoot('circuit-counted-today')
+const homeAfter = await homeCounts()
+check('7b. counting it counts as a session done, of the same number owed (it read "0 of 3")', homeBefore.of != null && homeAfter.of === homeBefore.of && homeAfter.done >= 1, { homeBefore, homeAfter })
+check('7c. ...and the streak does not go down', homeBefore.streak != null && homeAfter.streak != null && homeAfter.streak >= homeBefore.streak, { homeBefore, homeAfter })
 
 console.log('\nB. "Not today"')
 await open('circuit=1')

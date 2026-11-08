@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [x] **A SWAPPED DAY WITH THE ACTIVITY LOGGED COUNTS AS A SESSION: HIS RULING, 8 NOV 2026** ("Count it as a session",
+  from three options, over "keep the streak, skip the week" and "leave it"). QA round 2 (B1) found "Count it as today's
+  workout" after a timer block took the streak from 2 to 1 and the week from "Session 2 of 4" to "0 of 3": the 9 Oct
+  CSCS rule (mine, not his) left a day swapped for another activity out of both, while the logged block alone had
+  counted, so committing more made it count less. Now a swapped day with a cardio log that day counts in the week's
+  "N of M" and as done, and keeps the streak going; it still READS swapped everywhere (it was not the lifting session).
+  A swap with nothing logged (a coach "Muay Thai instead" with no log) stays out of both, as before. CHANGES WHAT TWO
+  NUMBERS MEASURE: streak and week counts from before 8 Nov are not comparable for weeks holding a logged swap.
+  `dayCountsTowardWeek` / `dayCountsAsDone` (one predicate pair, read by the tally, Home's ordinal and the pace), and
+  the streak's day builder. Checks: `test:history-streak` and `test:workout-scenarios` re-anchored (they pinned the old
+  rule) with an unlogged-swap case added; `verify:circuit-log` 7b-7c read Home before and after counting;
+  `verify:history-streak` re-anchored (its logged football now counts: 4 → 5). 7 mutations, 7 caught. 61 derived gates
+  and drivers green bar `test:coach-exam-fresh` (stale until the exam is re-run on his machine).
 - [x] **QA ROUND 2, HOME AND TOOLS: NINE DEFECTS FIXED, ONE QUESTION FOR HIM, 8 NOV 2026** (the same walk as the entry
   below). Mechanical. (B2) Starting a round timer wiped a running stopwatch without a word; the round sheet now says
   "Starting this stops your stopwatch at 0:09." above Start. (B3) The weigh-in Save (31×20), the stopwatch's buttons and the

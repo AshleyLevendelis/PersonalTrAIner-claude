@@ -109,7 +109,8 @@ export function computeStreak(days: StreakDayInput[]): StreakResult {
  *   - the day a session was moved AWAY from: transparent;
  *   - the day it landed on: a planned session, done or missed like any other;
  *   - a day swapped for another activity: transparent — the streak is kept,
- *     the planned session is not claimed as done. Unless she trained anyway;
+ *     the planned session is not claimed as done. Unless she trained anyway,
+ *     or LOGGED the activity (his ruling, 8 Nov 2026: then it counts);
  *   - a rest she CHOSE (What happened? → rest, or the coach's rest card):
  *     transparent the same way (27 Oct 2026, CSCS). Both cards say "it won't
  *     count against your week", and the strip already leaves it out of the
@@ -155,7 +156,9 @@ export function buildStreakDays(input: {
     // already answers that, so it is not asked twice here.)
     const scheduled = planned
       && (input.planStartStr == null || date >= input.planStartStr)
-      && !(input.swappedDates.has(date) && !trained)
+      // A SWAP WITH SOMETHING LOGGED COUNTS (his ruling 8 Nov 2026, "Count it as a session"): "Count it as today's
+      // workout" after a timer block had taken the streak from 2 to 1. A swap with nothing logged stays transparent.
+      && !(input.swappedDates.has(date) && !trained && !input.cardioDates.has(date))
       && !(input.restDates?.has(date) && !trained)
     const logged = trained || input.cardioDates.has(date)
     if (date === input.todayStr && scheduled && !logged) continue

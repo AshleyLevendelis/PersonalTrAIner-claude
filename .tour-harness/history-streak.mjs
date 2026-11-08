@@ -16,7 +16,8 @@
 // THE NUMBERS ARE CHOSEN SO THE OLD RULE AND THE NEW ONE DISAGREE: by weekday
 // pattern this fixture scores 2 (the two moved-from days are two misses in one
 // plan week, and the streak stops at the second) or more with the football and
-// the pre-plan walk counted; by planned sessions on the date they ran, 4.
+// the pre-plan walk counted; by planned sessions on the date they ran, 4, and 5 since his 8 Nov ruling counts the
+// logged football swap.
 // ---------------------------------------------------------------------------
 import { boot } from './session-driver-lib.mjs'
 
@@ -69,7 +70,8 @@ check('0. eight rows are in the sessions table: four workouts and four day notes
 
 console.log('\n  1. HOME — the streak')
 const s1 = await streak()
-check('1a. FOUR: Monday, the two sessions done on the days they were moved to, the first Monday', /^4 /.test(s1 ?? ''), s1)
+// RE-ANCHORED 8 Nov 2026 on his ruling "Count it as a session": Sunday's football, swapped in AND logged, now counts.
+check('1a. FIVE: Monday, the two sessions done on the days they were moved to, Sunday\'s logged football, the first Monday', /^5 /.test(s1 ?? ''), s1)
 // HER 17 OCT RULING, "12 in a row": the pill shows the number and "in a row" (never "days"), and says the
 // whole thing, "N sessions in a row", to a screen reader. The number itself is 1a's to check.
 const s1Label = await ev(`${q('[data-testid="home-streak"]')}?.getAttribute('aria-label') ?? null`)
@@ -110,7 +112,7 @@ for (const n of names) { await ensureOpen(n); if ((await ev(`${rowsExpr(n)}.leng
 check('4a. a set of today\'s session is ticked', !!X && (await tick(X, 0)) === true, names)
 const s2 = await streak()
 // Re-anchored 20 Oct 2026 to her 17 Oct pill ('N in a row'); 1b holds the words, this holds the NUMBER.
-check('4b. FIVE — it sat on the same number after a second day\'s training', s2 === '5 in a row', s2)
+check('4b. SIX — it sat on the same number after a second day\'s training', s2 === '6 in a row', s2)
 const hist2 = (await openHistory()) ?? []
 const todays = hist2.find(h => h.title.includes(D.today))
 check('4c. today is in history, titled by its weekday, with "1 set"', todays?.kind === 'history-session' && /^Wednesday · /.test(todays.title) && /· 1 set( |$)/.test(todays.text), todays)

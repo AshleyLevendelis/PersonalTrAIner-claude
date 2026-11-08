@@ -659,7 +659,12 @@ menu" stays true when a copy is also left outside it.
   shape as the note); "Count this as today's workout" on Tools and Today makes the day swap named
   for the blocks, only while the session is still due; the coach's `propose_circuit_log` is built
   only from rounds, times and an effort HE stated. `circuit-log` (61 checks, 18 mutations),
-  `verify:circuit-log`, `verify:round-presets` §26-33. Needs the `chat-gemini` deploy for chat
+  `verify:circuit-log`, `verify:round-presets` §26-33. Needs the `chat-gemini` deploy for chat.
+  **A swapped day with the activity LOGGED counts as a session done: his ruling 8 Nov 2026, "Count it as a session"**
+  (over keeping the streak only, and over leaving it): "Count it as today's workout" had LOWERED the streak (2 → 1) and
+  the week ("Session 2 of 4" → "0 of 3"). It counts in the week's "N of M" and the streak; the day still reads swapped.
+  A swap with nothing logged stays out of both. It REPLACES the 9 Oct CSCS rule that kept a logged swap transparent.
+  `test:history-streak`, `test:workout-scenarios`, `verify:circuit-log` 7b-7c, `verify:history-streak`
 - **Log extra cardio already done, as extra, with distance** — both surfaces since 22 Oct 2026 (Sam live test).
   His words: a past-tense run on a lifting day is logged as additional work with effort, and "count it as today's
   workout" is the option, never the default. Distance is a real field (his ruling, 22 Oct, "a proper field"). A
