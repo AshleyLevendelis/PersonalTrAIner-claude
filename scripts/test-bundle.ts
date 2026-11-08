@@ -400,7 +400,10 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 4 Nov 2026: 1274 -> 1304, her machine versions (477 names a swap can choose) IN the app chunk on purpose: a
   // plan holding one must resolve on the first screen, so they cannot wait for the lazy chunk the log-only names use.
   // Measured through this gate: 1252 at 56adf296, 1279 with them; first paint 522 of 525 gz. Her 15 Sep ruling, 25 raw.
-  const APP_CHUNK_BUDGET_KB = 1304
+  // MOVED 8 Nov 2026: 1304 -> 1329, the whole-app QA walk's ~20 fixes (set counts, the add list, the swap and eaten
+  // rules, the water sentence, the Undo line...). Measured through this gate: 1304 at f15f69fc, 1304 with the Undo line
+  // (OVER by 0). Her 15 Sep ruling, 25 raw.
+  const APP_CHUNK_BUDGET_KB = 1329
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -653,7 +656,8 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 7 Nov 2026: 2656 -> 2681, the goal fix (a goal is asked for both its numbers before a card). Measured
   // through this gate: 2654 at acf8a7d9 in a separate worktree, 2656 with the change (+2 kB raw); the room had already
   // worn from 25 to 2 since 4 Nov without a move. 25 raw of room again.
-  const TOTAL_BUDGET_KB = 2681
+  // MOVED 8 Nov 2026: 2681 -> 2706, the same QA walk; measured 2679 (2 left). Her 15 Sep ruling, 25 raw.
+  const TOTAL_BUDGET_KB = 2706
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

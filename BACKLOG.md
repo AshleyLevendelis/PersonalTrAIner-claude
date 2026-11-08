@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **TAKING A MEAL OFF "EATEN" SAYS SO, WITH AN UNDO; HER RULING "UNDO LINE", 8 NOV 2026** (QA walk N7, asked as
+  one question with three options: an Undo line, my recommendation; ask first; leave it silent). Before: tapping a
+  meal's "✓ Logged" took it off what she had eaten with no message and no way back except logging it again, which
+  logs the plan's CURRENT dish, not what she ate. Now the tap still un-logs at once, and the sheet says "Lunch taken
+  off what you ate · Undo" beside the button; Undo puts back exactly what was taken off, its own name and numbers
+  (never the plan's dish). A failed un-log keeps the existing warning and shows no Undo. `verify:diary-preservation`
+  8a-8b (2 mutations caught: no line, and an Undo that logs the plan's dish). 45 Nutrition gates and drivers green;
+  `test:bundle` crossed by 0 kB and both near-full budgets were raised 25 kB on her 15 Sep "room to grow" ruling,
+  measured that day (app chunk 1304, total 2679).
 - [x] **A SET LOGGED AFTER FINISH IS ADDED TO THE FINISHED DAY; HER RULING "ADD TO IT", 8 NOV 2026** (QA walk T2,
   asked as one question with three options: add it to the finished workout, my recommendation; reopen the workout
   until Finish is tapped again; or ask each time). Before: a set ticked after Finish quietly reopened the session on

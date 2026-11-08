@@ -471,6 +471,13 @@ export function MealPlan({
               // why it came back instead of leaving the user to guess.
               await reloadLogged()
               setUnlogError(removed ? null : "That meal is still logged — we couldn't reach the server. Try again in a moment.")
+              return removed
+            }}
+            onRelog={async events => {
+              if (!profileId) return
+              // EXACTLY WHAT WAS LOGGED comes back: its own name and numbers, never the plan's current dish.
+              for (const e of events) logMealEaten(profileId, date, slot, e.mealName, e.macros)
+              await reloadLogged()
             }}
           />
   )
@@ -802,6 +809,7 @@ function MealSlotRow({
   restriction,
   onLog,
   onUnlog,
+  onRelog,
   editContextFor,
   moveContext,
   onMealPickApplied,
@@ -856,7 +864,10 @@ function MealSlotRow({
   /** Null when there is no meal to check; ok:true when it passes. */
   restriction: MealRestrictionVerdict | null
   onLog: (option: PoolOption) => Promise<void>
-  onUnlog: (clientIds: string[]) => Promise<void>
+  /** Resolves whether every copy was taken off (false: the write failed and the meal is still logged). */
+  onUnlog: (clientIds: string[]) => Promise<boolean>
+  /** Puts back exactly what an un-log took off, from its own records (her 8 Nov 2026 "Undo line"). */
+  onRelog: (events: MealEventRecord[]) => Promise<void>
   /** Null when the screen cannot finish an edit (no profile, no targets, no pick path) — the row menu then doesn't render at all. */
   editContextFor: (option: PoolOption) => MealFoodEditContext | null
   /** Null for the same reasons editContextFor is — the Move control then doesn't render either. */
@@ -999,6 +1010,15 @@ function MealSlotRow({
   const duplicated = loggedEvents.length > 1
   const loggedKcal = loggedEvents.reduce((sum, e) => sum + (e.macros?.kcal ?? 0), 0)
 
+  // "TAKEN OFF · UNDO" — her ruling 8 Nov 2026, "Undo line" (over asking first and over leaving it silent): a tap on
+  // "Logged" un-logs at once and says so beside the button, with one tap to put back exactly what it took off.
+  const [unlogged, setUnlogged] = useState<MealEventRecord[] | null>(null)
+  const handleRelog = async () => {
+    if (!unlogged) return
+    setBusy(true)
+    try { await onRelog(unlogged); setUnlogged(null) } finally { setBusy(false) }
+  }
+
   const handleLogToggle = async () => {
     if (!option) return
     // A flagged meal cannot be logged as eaten. This is the half that makes
@@ -1011,8 +1031,13 @@ function MealSlotRow({
       // ALL of them. Undo here means "this meal is not logged", and leaving
       // a second copy counting while the button flips back to "Log this
       // meal" is the state that made the double-count invisible.
-      if (isLogged) await onUnlog(loggedEvents.map(e => e.clientId))
-      else await onLog(option)
+      if (isLogged) {
+        const was = loggedEvents
+        if (await onUnlog(was.map(e => e.clientId))) setUnlogged(was)
+      } else {
+        setUnlogged(null)
+        await onLog(option)
+      }
     } finally {
       setBusy(false)
     }
@@ -1609,6 +1634,14 @@ function MealSlotRow({
                   <Check className="size-4" strokeWidth={3} aria-hidden />
                   {isLogged ? (duplicated ? `Clear ${loggedEvents.length} logs` : 'Logged') : 'I ate this'}
                 </button>
+                {unlogged && !isLogged && (
+                  <p className="flex items-center justify-center gap-1 text-[0.8125rem] text-muted-foreground" role="status" data-testid="meal-unlog-undo">
+                    {SLOT_LABEL[slot]} taken off what you ate ·
+                    <button type="button" className="hit-slop-44 font-semibold text-primary-text underline" disabled={busy} onClick={handleRelog} data-testid="meal-unlog-undo-button">
+                      Undo
+                    </button>
+                  </p>
+                )}
               </div>
             )}
           </div>

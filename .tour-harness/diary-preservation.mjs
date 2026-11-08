@@ -120,6 +120,21 @@ check('6d. ...while the uneaten dinner\'s sheet does offer Swap (the check binds
 
 await shoot('diary-preservation-expanded')
 
+// UN-LOGGING SAYS SO, WITH AN UNDO — her ruling 8 Nov 2026, "Undo line". The eaten lunch's sheet: tap "Logged".
+await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`); await wait(600)
+await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /Leftover chilli/.test(x.textContent||'')); if (b) b.click(); return !!b })()`)
+await wait(1200)
+const sheetState = () => ev(`(() => { const sh = document.querySelector('[data-meal-sheet="lunch"]'); if (!sh) return null; const log = sh.querySelector('[data-meal-log]'); const u = sh.querySelector('[data-testid="meal-unlog-undo"]'); const ub = sh.querySelector('[data-testid="meal-unlog-undo-button"]'); const r = ub?.getBoundingClientRect(); return { log: log?.textContent?.trim() ?? null, undo: u?.textContent?.replace(/\\s+/g, ' ').trim() ?? null, undoOnScreen: !!r && r.top >= 0 && r.bottom <= innerHeight, name: sh.querySelector('h3')?.textContent ?? null, kcal: sh.querySelector('[data-testid="meal-sheet-kcal"]')?.textContent?.replace(/\\s+/g, '') ?? null } })()`)
+await ev(`(() => { const b = document.querySelector('[data-meal-sheet="lunch"] [data-meal-log]'); if (b) b.click(); return !!b })()`)
+await wait(1500)
+const unlogged = await sheetState()
+check('8a. tapping "Logged" takes the lunch off and SAYS so, with an Undo, on screen', !!unlogged && /I ate this/.test(unlogged.log ?? '') && /^Lunch taken off what you ate ·\s?Undo$/.test(unlogged.undo ?? '') && unlogged.undoOnScreen, unlogged)
+await ev(`(() => { const b = document.querySelector('[data-testid="meal-unlog-undo-button"]'); if (b) b.click(); return !!b })()`)
+await wait(1500)
+const relogged = await sheetState()
+check('8b. Undo puts back exactly what was eaten: logged again, "Leftover chilli and rice", 610 kcal', !!relogged && /Logged/.test(relogged.log ?? '') && /Leftover chilli/.test(relogged.name ?? '') && /^610/.test(relogged.kcal ?? '') && relogged.undo === null, relogged)
+await shoot('diary-preservation-undo')
+
 const err = await ev('window.__err ?? null')
 check('7. no uncaught error on the page', err === null, err)
 

@@ -699,7 +699,8 @@ menu" stays true when a copy is also left outside it.
   `meal-food-edit`, `verify:meal-food-edit`
 - Build a custom meal from what is in the fridge — `coach only`; `custom-meal`
 - Log what was eaten — both; `meal-log`, `meal-ledger-snapshot`,
-  `diary-preservation`
+  `diary-preservation`. **Taking one off says so, with an Undo: her ruling 8 Nov 2026, "Undo line"**
+  (over asking first and over silence); Undo puts back exactly what was logged. `verify:diary-preservation` 8
 - Move a meal to another SLOT — both surfaces since 14 Sep 2026, with the two
   rulings it was waiting on. **"Resize it to fit"** (13 Sep), over refusing and
   over leaving the portions alone; and on the slot the meal LEAVES, from three
