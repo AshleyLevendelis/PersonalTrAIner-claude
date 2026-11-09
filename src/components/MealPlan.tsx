@@ -1514,6 +1514,7 @@ function MealSlotRow({
                         // driver: nothing saved, and the note still said it had).
                         onDone={(summary, undo) => { setMoveOpen(false); setMoveNote(summary); setMoveUndo(() => undo ?? null) }}
                         onCancel={() => setMoveOpen(false)}
+                        onSwapInstead={canSwap ? () => { setMoveOpen(false); setTab('swap') } : undefined}
                       />
                     </Suspense>
                   )}

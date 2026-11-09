@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **"SWAP IT FOR SOMETHING ELSE INSTEAD?" WITH NOTHING TO TAP, 9 NOV 2026** (QA round 3, meals: the move sheet's
+  dead end). Mechanical, his "no dead ends". A move refused because the meal cannot be resized into the other slot
+  ("Apple and a few almonds can't become lunch — it would have to more than double…") ended in a question with no
+  answer on the screen. It now has a "Swap it instead" tap that puts the move away and opens that meal's swap list;
+  where the meal has nothing to swap to, the question is not asked on this screen (the coach's half keeps it, answered
+  by typing). CHECKS: `verify:meal-move` §7 on a new `?tiny=1` fixture (a 150 kcal breakfast plus a second breakfast to
+  swap to; input only), 2 mutations, 2 caught. NOT CHECKED on a screen: the question dropped where nothing can be
+  swapped (no fixture for it), named.
 - [x] **SETUP'S "ADD IT NOW" WAS A 61x16 LINK, 9 NOV 2026** (QA round 3, setup finding 9, the second half). It gets the
   app's invisible 44px tap area. `verify:setup-qa3` 6e (a thumb's reach, measured after Skip leaves the weight not
   given); 1 mutation, caught.

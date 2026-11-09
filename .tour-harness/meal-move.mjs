@@ -252,6 +252,35 @@ check('6c. ...puts both meals back where they were', !!back && back[FROM] === be
 check('6d. ...and says so, with the Undo gone', /Put back as it was/.test((await textOf('meal-move-note')) ?? '') && !(await ev(`!!document.querySelector('[data-testid="meal-move-undo"]')`)), await textOf('meal-move-note'))
 await shoot('meal-move-6-undone')
 
+// --- 7. A REFUSAL THAT OFFERS A SWAP HAS THE TAP (QA round 3, 8 Nov 2026) ----------------------------------------
+// "…can't become dinner — …. Swap it for something else instead?" was drawn with nothing to tap. Every meal, every
+// destination, until one refuses; its "Swap it instead" opens that meal's swap list.
+let refusedAt = null
+for (const from of slots) {
+  if (refusedAt) break
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&tiny=1&r7=${from}#/tab/nutrition` })
+  await until(slotMeals, v => v && Object.keys(v).length >= 2, 20000)
+  await openSlot(from.charAt(0).toUpperCase() + from.slice(1))
+  if (!(await tapTestId('meal-move-open'))) continue
+  await wait(400)
+  for (const dest of slots) {
+    if (dest === from || !(await tapTestId(`meal-move-to-${dest}`))) continue
+    await wait(700)
+    const said = await textOf('meal-move-refusal')
+    if (said && /Swap it for something else instead\?$/.test(said)) { refusedAt = { from, dest, said }; break }
+    await tapTestId(`meal-move-to-${dest}`); await wait(200)
+  }
+}
+console.log(`  refusal found: ${JSON.stringify(refusedAt)}`)
+check('7a. the fixture binds: some move is refused with "Swap it for something else instead?"', !!refusedAt, refusedAt)
+const swapInstead = await ev(`(() => { const b = document.querySelector('[data-testid="meal-move-swap-instead"]'); if (!b) return null; b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { h: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight } })()`)
+check('7b. ...and the refusal has a "Swap it instead" tap, on screen and 44px tall', !!swapInstead && swapInstead.h >= 44 && swapInstead.top >= 0 && swapInstead.bottom <= swapInstead.vh, swapInstead)
+await shoot('meal-move-7-refused')
+await tapTestId('meal-move-swap-instead')
+await wait(600)
+const onSwap = await ev(`(() => { const t = [...document.querySelectorAll('[role="tab"]')].find(x => x.getAttribute('aria-selected') === 'true'); return { tab: t ? t.textContent.trim() : null, sheetOpen: !!document.querySelector('[data-testid="meal-move-sheet"]') } })()`)
+check('7c. tapping it opens that meal\'s swap list, with the move sheet put away', !!onSwap && /^Swap/.test(onSwap.tab ?? '') && !onSwap.sheetOpen, onSwap)
+
 const pageErr = await ev('window.__err ?? null')
 check('5. no uncaught error on the page', pageErr === null, pageErr)
 

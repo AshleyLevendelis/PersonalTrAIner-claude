@@ -1220,14 +1220,18 @@ const staleDinner = {
   tags: [], prep: '',
 }
 
+// ?tiny=1 — A BREAKFAST TOO SMALL TO BECOME A DINNER (QA round 3, 9 Nov 2026): moving it to dinner needs it several
+// times bigger than a resize may take it, so the move is refused with "Swap it for something else instead?". Input
+// only: the dish is small, and the refusal is the app's.
+const TINY = new URLSearchParams(location.search).get('tiny') === '1'
 const chosen = (REFIT ? refitChosen : {
-  breakfast: ATE ? nuttyBreakfast : meal('breakfast', 'Greek yoghurt, berries and honey', 480, CLEAN_METHOD),
+  breakfast: ATE ? nuttyBreakfast : TINY ? meal('breakfast', 'Apple and a few almonds', 150) : meal('breakfast', 'Greek yoghurt, berries and honey', 480, CLEAN_METHOD),
   lunch: meal('lunch', 'Chicken, rice and roasted peppers', 720, METHOD_WITH_AN_AMOUNT),
   dinner: STALE ? staleDinner : meal('dinner', 'Salmon, new potatoes and green beans', 780),
 }) as never
 const pools = (REFIT
   ? { breakfast: [refitChosen.breakfast], lunch: [refitChosen.lunch], dinner: [refitChosen.dinner], snack: [refitChosen.snack] }
-  : { breakfast: [(chosen as never as Record<string, unknown>).breakfast], lunch: [(chosen as never as Record<string, unknown>).lunch], dinner: [(chosen as never as Record<string, unknown>).dinner] }) as never
+  : { breakfast: [(chosen as never as Record<string, unknown>).breakfast, ...(TINY ? [meal('breakfast', 'Greek yoghurt, berries and honey', 480, CLEAN_METHOD)] : [])], lunch: [(chosen as never as Record<string, unknown>).lunch], dinner: [(chosen as never as Record<string, unknown>).dinner] }) as never
 
 // The leftovers run needs a pool it can actually re-portion, so the dinner is
 // sized for a dinner and the lunch slot is left to the rotation. Quantities

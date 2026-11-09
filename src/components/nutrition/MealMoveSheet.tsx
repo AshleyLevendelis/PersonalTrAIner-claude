@@ -69,7 +69,7 @@ type Preview =
 /** What a finished swap hands back so the row can offer to put it back. */
 export type MealMoveUndo = () => Promise<{ ok: boolean; text: string }>
 
-export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
+export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel, onSwapInstead }: {
   /** Moving to another meal today. Null where that is not offered (another day's row). */
   ctx: MealMoveContext | null
   /** Swapping with another day's. Null where the app has no days to swap between. */
@@ -78,6 +78,8 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
   /** `undo` puts the move back; the row shows it beside the summary. */
   onDone: (summary: string, undo?: MealMoveUndo) => void
   onCancel: () => void
+  /** Opens this meal's swap list. A refusal that offers a swap ("Swap it for something else instead?") gets the tap. */
+  onSwapInstead?: () => void
 }) {
   const [toSlot, setToSlot] = useState<MealSlotName | null>(null)
   const [toDate, setToDate] = useState<string | null>(null)
@@ -437,7 +439,16 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel }: {
       )}
 
       {preview?.kind === 'refused' && (
-        <p className="text-[0.71875rem] text-[color:var(--role-warn)]" data-testid="meal-move-refusal">{preview.reason}</p>
+        // With nothing to swap to, the closing question has no answer on this screen, so it is not asked here.
+        <p className="text-[0.71875rem] text-[color:var(--role-warn)]" data-testid="meal-move-refusal">{onSwapInstead ? preview.reason : preview.reason.replace(/ Swap it for something else instead\?$/, '')}</p>
+      )}
+      {/* A QUESTION GETS ITS ANSWER AS A TAP (QA round 3, 8 Nov 2026): "…can't become dinner. Swap it for something
+          else instead?" was drawn with nothing to tap, a dead end. The swap list is one tap away. */}
+      {preview?.kind === 'refused' && onSwapInstead && /Swap it for something else instead\?$/.test(preview.reason) && (
+        <button type="button" onClick={onSwapInstead} data-testid="meal-move-swap-instead"
+          className="min-h-[44px] rounded-full border border-[color:color-mix(in_oklab,var(--primary)_55%,transparent)] px-4 text-[0.8125rem] font-semibold text-primary-text">
+          Swap it instead
+        </button>
       )}
 
       {/* WHAT IT WILL DO, BEFORE THE TAP. Both new sizes, because the resize
