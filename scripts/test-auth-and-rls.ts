@@ -222,10 +222,15 @@ console.log('\n6. The app signs in BEFORE it reads, and stamps what it writes')
   // The insert policy is `WITH CHECK (owner_id = auth.uid())`. A profile
   // created without it is refused outright — the user finishes onboarding and
   // has nothing saved.
-  const insertAt = app.indexOf(".from('fitness_profiles')\n      .insert({")
-  const insert = app.slice(insertAt, insertAt + 400)
-  check('a new profile is stamped with its owner', /owner_id: signIn\.userId/.test(insert), insert.slice(0, 200))
-  check('...from a sign-in performed first', app.lastIndexOf('ensureSignedIn(', insertAt) > 0)
+  // RE-ANCHORED 9 Nov 2026 on the property: the setup save is built as one object (`profileInsert`) so it can be tried
+  // again without the date of birth before that migration lands; every insert of the profile is that object.
+  const insertAt = app.indexOf('const profileInsert = {')
+  const insert = insertAt >= 0 ? app.slice(insertAt, insertAt + 400) : ''
+  const inserts = [...app.matchAll(/from\('fitness_profiles'\)\.insert\((\w+)\)/g)].map(m => m[1])
+  check('a new profile is stamped with its owner', /owner_id: signIn\.userId/.test(insert)
+    && inserts.length >= 1 && inserts.every(v => v === 'profileInsert' || v === 'withoutBirthday')
+    && /const \{ date_of_birth: _notYet, \.\.\.withoutBirthday \} = profileInsert/.test(app), { insert: insert.slice(0, 200), inserts })
+  check('...from a sign-in performed first', insertAt > 0 && app.lastIndexOf('ensureSignedIn(', insertAt) > 0)
 
   // RE-ANCHORED 15 Sep 2026. This pinned the pronoun: "We couldn't sign you
   // in". The voice work made the app speak as one person throughout ("I"), so
