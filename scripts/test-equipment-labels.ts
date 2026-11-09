@@ -306,7 +306,10 @@ check('unstated stays ABSENT, never a limit of zero', unstated.max_dumbbell_kg =
 // The exact shape that already bit once: a column-by-column profile write that
 // forgets these three (see the header of ceiling-reconcile.ts).
 const appSrc = fs.readFileSync('src/App.tsx', 'utf8')
-const insert = appSrc.slice(appSrc.indexOf("from('fitness_profiles')\n      .insert({"), appSrc.indexOf("from('fitness_profiles')\n      .insert({") + 4000)
+// RE-ANCHORED 9 Nov 2026: the setup save is one object (`profileInsert`), tried again without the date of birth before
+// that migration lands; its columns are read from the object, up to the insert that sends it.
+const insertAt = appSrc.indexOf('const profileInsert = {')
+const insert = insertAt >= 0 ? appSrc.slice(insertAt, appSrc.indexOf(".insert(profileInsert)", insertAt)) : ''
 for (const col of ['max_dumbbell_kg', 'max_single_implement_kg', 'max_improvised_kg']) {
   check(`the onboarding insert names ${col}`, insert.includes(`${col}:`), null)
 }

@@ -105,8 +105,10 @@ check('every typed message is read for a sport, merged with what was said before
     && /const sports = mergeSports\(parseSportsSlot\(ws\.values\.otherSports\) \?\? \[\], saidSports\)\s*if \(applySlot\(ws, 'otherSports', formatSportsSlot\(sports\), ws\.values\)\) immediateCommit = true/.test(onb))
 check('the coach setting it is ignored', /if \(APP_ONLY_SLOTS\.includes\(key\)\) continue/.test(onb))
 const app = strip(readFileSync('src/App.tsx', 'utf8'))
-const ins = app.indexOf(".from('fitness_profiles')\n      .insert({")
-check('the profile insert names the column, or a reload forgets it', ins >= 0 && /concurrent_activities: enrichedProfile\.concurrent_activities \?\? \[\],/.test(app.slice(ins, ins + 6000)))
+// RE-ANCHORED 9 Nov 2026: the setup save is one object (`profileInsert`), read up to the insert that sends it.
+const ins = app.indexOf('const profileInsert = {')
+const insEnd = ins >= 0 ? app.indexOf('.insert(profileInsert)', ins) : -1
+check('the profile insert names the column, or a reload forgets it', ins >= 0 && insEnd > ins && /concurrent_activities: enrichedProfile\.concurrent_activities \?\? \[\],/.test(app.slice(ins, insEnd)))
 
 console.log(`\n${ran} checks ran`)
 if (failures > 0) { console.log(`setup sports: ${failures} check(s) failed`); process.exit(1) }
