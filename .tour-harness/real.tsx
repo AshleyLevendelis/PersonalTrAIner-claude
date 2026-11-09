@@ -41,7 +41,8 @@ import { resolveLoadFields } from '@/lib/warmup'
 import { computeTargets, retargetAfterWeighIn } from '@/lib/nutrition-targets'
 import { targetsMoved } from '@/lib/coach-voice'
 import { getPools, setMealPick, clearMealPick } from '@/lib/meal-store'
-import { persistResizedPools, type PoolOption } from '@/lib/meal-generation'
+import { persistResizedPools, verifyProposal, type PoolOption } from '@/lib/meal-generation'
+import { fitDishToBudget } from '@/lib/meal-library'
 import { checkMealRefit } from '@/lib/meal-refit'
 import { computeMealMacros } from '@/lib/food-db'
 import { useAppRoute, tabHash, type Tab } from '@/lib/app-route'
@@ -1236,7 +1237,23 @@ const pools = (REFIT
 // The leftovers run needs a pool it can actually re-portion, so the dinner is
 // sized for a dinner and the lunch slot is left to the rotation. Quantities
 // only — every macro below is computed by the app from food-db.
-const leftoverPools = (() => {
+// ?deep=1 (with week=1) — A DEEP POOL (9 Nov 2026, his "much deeper pool"): every library dish this profile's checks
+// accept, up to forty a meal. INPUT ONLY: the dishes are the library's own, and each goes through the app's own fit and
+// verifier at this profile's targets, the path a seed takes; what the meal carries is the app's answer.
+const DEEP_POOL = new URLSearchParams(location.search).get('deep') === '1' && macros ? (() => {
+  const budgets = computeSlotBudgets(macros, 3, true)
+  const out: Record<string, PoolOption[]> = {}
+  for (const slot of ['breakfast', 'lunch', 'dinner', 'snack'] as const) {
+    out[slot] = []
+    for (const d of MEAL_LIBRARY) {
+      if (d.slot !== slot || out[slot].length >= 40) continue
+      const o = verifyProposal(fitDishToBudget(d, budgets[slot]!).dish, slot, budgets[slot]!, [], [])
+      if (o) out[slot].push(o)
+    }
+  }
+  return out
+})() : null
+const leftoverPools = DEEP_POOL ?? (() => {
   const dish = (slot: string, name: string, chicken: number, rice: number, oil: number) => {
     const ingredients = [
       { name: 'chicken breast', quantity: chicken, unit: 'g' },
@@ -1314,7 +1331,8 @@ const topUpPools = (() => {
       out[slot] = [...options, variant(options[0], `${options[0].name}, lighter`, 0.95), variant(options[1], `${options[1].name}, larger`, 1.05)]
     }
   }
-  return out
+  // ?deep=1 with daymove=1&regen=1: the deep pool, where a swap is saved for real (week=1 swaps nothing).
+  return DEEP_POOL ?? out
 })()
 if (TOPUP || DAYMOVE) {
   for (const [slot, options] of Object.entries(topUpPools)) {
