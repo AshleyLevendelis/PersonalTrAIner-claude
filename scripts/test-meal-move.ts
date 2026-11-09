@@ -129,7 +129,7 @@ console.log('\n2. Her ruling: they swap places')
 // ---------------------------------------------------------------------------
 const snack = withRealMacros({
   name: 'Greek Yoghurt and Berries',
-  ingredients: ['170g greek yogurt', '80g blueberries', '20g almonds'],
+  ingredients: ['170g greek yoghurt full fat', '80g blueberries', '20g almonds'],
   macros: { calories: 0, protein: 0, carbs: 0, fat: 0 },
 }, 'snack')
 const swap = move({ mealsBySlot: { dinner, snack } })

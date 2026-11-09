@@ -249,7 +249,7 @@ async function main() {
   // (custom-meal's own check, which runs first), an amount that is there but cannot be read gets the "couldn't read it" ask. Without this
   // line a MISSED mutation showed the second would answer the first's case in near-identical words, so the first could be deleted unseen.
   check('a line with no amount at all is asked about in its own words ("how much of the ..., grams or counts"), not the unreadable-amount ask', !customNone.ok && /some rice/.test(customNone.reason) && /how much of the some rice/i.test(customNone.reason) && /grams, or counts/i.test(customNone.reason) && !/couldn't read/i.test(customNone.reason), customNone)
-  const parfait = { name: 'Greek Yoghurt and Honey Berry Parfait', ingredients: ['200g greek yoghurt', '100g blueberries', '20g honey', '30g granola'], macros: { calories: 450, protein: 25, carbs: 60, fat: 10 } }
+  const parfait = { name: 'Greek Yoghurt and Honey Berry Parfait', ingredients: ['200g greek yoghurt 0%', '100g blueberries', '20g honey', '30g granola'], macros: { calories: 450, protein: 25, carbs: 60, fat: 10 } }
   const addBase = { profileId: 'p1', todayDate: '2026-10-01', targets, mealsPerDay: 3, includeSnacks: true, dietaryPreferences: [] as string[], currentMeal: parfait }
   const addOk = buildMealFoodAddProposal({ ...addBase, rawArgs: { meal_slot: 'breakfast', food_lines: ['1 large banana'], origin_verbatim_quote: 'add a banana' } })
   const addAsk = buildMealFoodAddProposal({ ...addBase, rawArgs: { meal_slot: 'breakfast', food_lines: ['1 knob butter'], origin_verbatim_quote: 'add butter' } })

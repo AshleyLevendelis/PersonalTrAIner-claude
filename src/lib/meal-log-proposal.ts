@@ -19,7 +19,8 @@
 // ---------------------------------------------------------------------------
 
 import { MIN_COVERAGE } from './meal-costing'
-import { MAIN_MEAL_MIN_KCAL, assumedLine, tooSmallForMainMeal } from './food-db'
+import { MAIN_MEAL_MIN_KCAL, assumedLine, tooSmallForMainMeal, whichKindQuestion } from './food-db'
+import { parseIngredientLine } from './portion-scaler'
 import type { MealMacros, MealSlotName } from './meal-store'
 
 /** The four the ledger accepts — meal_events' CHECK constraint, no more and no fewer. */
@@ -100,6 +101,12 @@ export function buildMealLogProposal(input: {
   // of about 430. So no card carries a total with a food missing from it: the coach asks how much, or whether to
   // leave it out, and builds the card from the answer.
   const notCounted = (computed.unmatched ?? []).map(u => String(u).trim()).filter(Boolean)
+  // A FOOD NAMED WITHOUT ITS KIND (9 Nov 2026, his "ask which" for Greek yoghurt): the amount is known, the kind is
+  // not, so the question is the kind, never "how much".
+  const kindAsk = notCounted.map(u => whichKindQuestion(parseIngredientLine(u).name) ?? whichKindQuestion(u)).find(q => q != null)
+  if (kindAsk) {
+    return { ok: false, reason: `${kindAsk} I'll add up **${mealName}** once I know.` }
+  }
   if (notCounted.length > 0) {
     const list = notCounted.length === 1 ? `**${notCounted[0]}**` : `${notCounted.slice(0, -1).map(u => `**${u}**`).join(', ')} and **${notCounted[notCounted.length - 1]}**`
     const one = notCounted.length === 1

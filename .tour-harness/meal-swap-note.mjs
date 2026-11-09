@@ -16,7 +16,7 @@ const PATCH = {
   profile: { weight_kg: 68, activity_level: 'light', fitness_goal: 'fat_loss' },
   meals: [
     mk('breakfast', 1, 'Eggs on toast', [g('egg', 150), g('wholemeal bread', 80)], { kcal: 420, protein: 27, carbs: 34, fat: 17 }),
-    mk('breakfast', 2, 'Yoghurt oat bowl', [g('greek yoghurt', 250), g('dry oats', 40), g('blueberries', 80)], { kcal: 450, protein: 30, carbs: 50, fat: 12 }),
+    mk('breakfast', 2, 'Yoghurt oat bowl', [g('greek yoghurt 0%', 250), g('dry oats', 40), g('blueberries', 80)], { kcal: 450, protein: 30, carbs: 50, fat: 12 }),
     mk('lunch', 1, 'Tuna pasta', [g('tuna', 120), g('dry pasta', 80), g('broccoli', 100)], { kcal: 450, protein: 40, carbs: 62, fat: 3 }),
     mk('lunch', 2, 'Chicken, potato and greens', [g('raw chicken breast', 150), g('raw potato', 300), g('broccoli', 100)], { kcal: 440, protein: 42, carbs: 55, fat: 4 }),
     mk('dinner', 1, 'Beef and rice', [g('lean beef mince', 150), g('dry white rice', 75), g('broccoli', 100)], { kcal: 560, protein: 38, carbs: 62, fat: 15 }),

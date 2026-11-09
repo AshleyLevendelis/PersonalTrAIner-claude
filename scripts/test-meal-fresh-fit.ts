@@ -59,11 +59,11 @@ function fakeFrom(table: string) {
 // THE DISHES, found by probing the real checks (2 Nov 2026), not by feel. A good breakfast is balanced; a bad one
 // is salmon, eggs and cheese: it scales to the breakfast's calories and clears the protein floor, so verifyProposal
 // accepts it, and its 15 g of carbs and 47 g of fat leave no day inside the 10% bands. Section 0 re-measures both.
-const GOOD_BREAKFAST = ['90g dry oats', '300ml semi-skimmed milk', '200g greek yoghurt', '100g blueberries', '15g whey protein', '20g almonds']
+const GOOD_BREAKFAST = ['90g dry oats', '300ml semi-skimmed milk', '200g greek yoghurt 0%', '100g blueberries', '15g whey protein', '20g almonds']
 const BAD_BREAKFAST = ['180g salmon', '3 eggs', '30g cheddar cheese', '1 tbsp olive oil', '30g dry oats']
 const LUNCH = ['180g raw chicken breast', '110g dry white rice', '100g broccoli', '1 tbsp olive oil']
 const DINNER = ['160g raw chicken breast', '330g raw potato', '100g green beans', '1 tbsp olive oil']
-const SNACK = ['150g greek yoghurt', '100g banana', '15g almonds']
+const SNACK = ['150g greek yoghurt 0%', '100g banana', '15g almonds']
 
 /** What the fake writer sends for breakfast in each round: 'good' / 'bad' per dish asked. */
 let breakfastPlan: (round: number, i: number) => 'good' | 'bad' = () => 'good'

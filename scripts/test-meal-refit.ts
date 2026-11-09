@@ -59,7 +59,7 @@ const makePools = () => ({
   breakfast: [opt('breakfast', 'Porridge', [{ name: 'oats', quantity: 80, unit: 'g' }, { name: 'milk', quantity: 200, unit: 'ml' }])],
   lunch: [opt('lunch', 'Chicken and rice', [{ name: 'chicken breast', quantity: 150, unit: 'g' }, { name: 'white rice', quantity: 120, unit: 'g' }])],
   dinner: [opt('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'potato', quantity: 200, unit: 'g' }])],
-  snack: [opt('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }])],
+  snack: [opt('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt 0%', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }])],
 })
 const OPTS = { mealsPerDay: 3, includeSnacks: true }
 const scaleTargets = (t: MacroTargets, k: number): MacroTargets => ({
@@ -243,7 +243,7 @@ console.log('\n7b. A GOAL change is the wrong shape, not the wrong size — and 
     // A spoon of oil on the lunch makes it a day that genuinely fits fat loss again (INPUT only).
     lunch: [opt('lunch', 'Chicken and rice', [{ name: 'chicken breast', quantity: 200, unit: 'g' }, { name: 'white rice', quantity: 200, unit: 'g' }, { name: 'olive oil', quantity: 10, unit: 'g' }])],
     dinner: [opt('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 180, unit: 'g' }, { name: 'potato', quantity: 300, unit: 'g' }])],
-    snack: [opt('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 200, unit: 'g' }, { name: 'banana', quantity: 150, unit: 'g' }])],
+    snack: [opt('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt 0%', quantity: 200, unit: 'g' }, { name: 'banana', quantity: 150, unit: 'g' }])],
   }
   check('that day fits the fat-loss target it was built for',
     checkMealRefit(bigger, fl, OPTS).before.withinTolerance === true)

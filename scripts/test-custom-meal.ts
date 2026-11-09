@@ -60,7 +60,7 @@ console.log('\n1. Her portions are facts')
   const r = buildCustomMealProposal({ ...base, rawArgs: {
     meal_slot: 'breakfast',
     name: 'My usual breakfast',
-    food_lines: ['3 eggs', '150g greek yoghurt', '100g blueberries'],
+    food_lines: ['3 eggs', '150g greek yoghurt 0%', '100g blueberries'],
     origin_verbatim_quote: 'I usually have eggs and greek yoghurt and fruit for breakfast',
   } })
   check('the meal is accepted', r.ok, r.ok ? undefined : r.reason)
@@ -88,14 +88,14 @@ console.log('\n2. No amount, no guess')
 {
   const r = buildCustomMealProposal({ ...base, rawArgs: {
     meal_slot: 'breakfast',
-    food_lines: ['eggs', '150g greek yoghurt'],
+    food_lines: ['eggs', '150g greek yoghurt 0%'],
     origin_verbatim_quote: 'eggs and yoghurt',
   } })
   check('a food with no amount is refused', !r.ok)
   check('...by asking how much, in words', !r.ok && /how much/i.test(r.reason), !r.ok ? r.reason : '')
   // "a banana" carries its amount in the article — natural speech must work.
   const ok = buildCustomMealProposal({ ...base, rawArgs: {
-    meal_slot: 'breakfast', food_lines: ['a banana', '150g greek yoghurt'], origin_verbatim_quote: 'x',
+    meal_slot: 'breakfast', food_lines: ['a banana', '150g greek yoghurt 0%'], origin_verbatim_quote: 'x',
   } })
   check('"a banana" counts as an amount', ok.ok, ok.ok ? undefined : ok.reason)
 }
@@ -103,11 +103,11 @@ console.log('\n2. No amount, no guess')
 console.log('\n3. Safety is never traded for autonomy')
 {
   const vegan = buildCustomMealProposal({ ...base, dietaryPreferences: ['vegan'], rawArgs: {
-    meal_slot: 'breakfast', food_lines: ['3 eggs', '150g greek yoghurt'], origin_verbatim_quote: 'x',
+    meal_slot: 'breakfast', food_lines: ['3 eggs', '150g greek yoghurt 0%'], origin_verbatim_quote: 'x',
   } })
   check('a diet clash is refused, not confirmed', !vegan.ok)
   const disliked = buildCustomMealProposal({ ...base, dislikedFoods: ['eggs'], rawArgs: {
-    meal_slot: 'breakfast', food_lines: ['3 eggs', '150g greek yoghurt'], origin_verbatim_quote: 'x',
+    meal_slot: 'breakfast', food_lines: ['3 eggs', '150g greek yoghurt 0%'], origin_verbatim_quote: 'x',
   } })
   check('a recorded dislike is surfaced, not ignored', !disliked.ok)
   const gibberish = buildCustomMealProposal({ ...base, rawArgs: {

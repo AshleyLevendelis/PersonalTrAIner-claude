@@ -818,7 +818,7 @@ const refitChosen = {
   lunch: priced('lunch', 'Chicken and rice', [{ name: 'raw chicken breast', quantity: 205, unit: 'g' }, { name: 'dry white rice', quantity: 55, unit: 'g' },
     ...(new URLSearchParams(location.search).get('spoon') === '1' ? [{ name: 'olive oil', quantity: 1, unit: 'tbsp' }] : [])]),
   dinner: priced('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'raw potato', quantity: 285, unit: 'g' }]),
-  snack: priced('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
+  snack: priced('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt 0%', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
 }
 const refitBase = (['breakfast', 'lunch', 'dinner', 'snack'] as const).reduce(
   (a, sl) => ({

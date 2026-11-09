@@ -44,7 +44,7 @@ const viaPlan = userNamedFood({
   message: "what's in my breakfast today", planText: 'breakfast: Greek yoghurt, berries and honey',
 })
 check('"my breakfast" names the plan\'s breakfast, through the plan', viaPlan.named === true && viaPlan.via === 'plan', viaPlan)
-const noPlanText = userNamedFood({ foodName: 'Greek yoghurt with berries', ingredientNames: ['greek yoghurt'], message: "what's in my breakfast today" })
+const noPlanText = userNamedFood({ foodName: 'Greek yoghurt with berries', ingredientNames: ['greek yoghurt 0%'], message: "what's in my breakfast today" })
 check('...but not when no plan text is in hand', noPlanText.named === false, noPlanText)
 const whey = userNamedFood({ foodName: 'Whey protein shake', ingredientNames: ['whey protein powder', 'milk'], message: 'how much protein should I eat a day' })
 check('"protein" in a general question does not name a protein shake', whey.named === false, whey)

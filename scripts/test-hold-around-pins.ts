@@ -45,7 +45,7 @@ const sum = (c: Partial<Record<MealSlotName, PoolOption>>): MacroTargets => (Obj
 const porridge = opt('breakfast', 'Porridge', [{ name: 'oats', quantity: 80, unit: 'g' }, { name: 'milk', quantity: 200, unit: 'ml' }])
 const chickenRice = opt('lunch', 'Chicken and rice', [{ name: 'chicken breast', quantity: 150, unit: 'g' }, { name: 'white rice', quantity: 120, unit: 'g' }])
 const salmon = opt('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'potato', quantity: 200, unit: 'g' }])
-const yoghurt = opt('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }])
+const yoghurt = opt('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt 0%', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }])
 const planChosen = { breakfast: porridge, lunch: chickenRice, dinner: salmon, snack: yoghurt }
 const targets: MacroTargets = sum(planChosen)
 const planned: AssembledDay = {

@@ -98,7 +98,7 @@ async function main(): Promise<void> {
     check('a food the table does not know, most of the dish: the stored numbers, untouched', !unknown.recosted && JSON.stringify(unknown.macros) === JSON.stringify(stored), unknown)
     // NINE readable lines and one the reader cannot weigh: 90% of the lines, so the coverage floor alone would
     // re-cost it and the unweighed food would simply vanish from the count. The amount rule is what keeps it.
-    const nine = [g('raw chicken breast', 150), g('dry couscous', 60), g('olive oil', 10), g('cucumber', 80), g('tomato', 80), g('red onion', 30), g('greek yoghurt', 60), g('lemon juice', 10), g('spinach', 40)]
+    const nine = [g('raw chicken breast', 150), g('dry couscous', 60), g('olive oil', 10), g('cucumber', 80), g('tomato', 80), g('red onion', 30), g('greek yoghurt 0%', 60), g('lemon juice', 10), g('spinach', 40)]
     const unreadLines = [...nine, { name: 'feta cheese', quantity: 1, unit: 'knob' }]
     const unread = costStoredMeal(unreadLines, stored)
     check('an amount the reader cannot weigh, even in a dish otherwise costed: the stored numbers, untouched',

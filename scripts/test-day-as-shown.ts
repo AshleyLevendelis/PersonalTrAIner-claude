@@ -39,7 +39,7 @@ const chosen: Partial<Record<MealSlotName, PoolOption>> = {
   breakfast: opt('breakfast', 'Porridge', [{ name: 'oats', quantity: 80, unit: 'g' }, { name: 'milk', quantity: 200, unit: 'ml' }]),
   lunch: opt('lunch', 'Chicken and rice', [{ name: 'chicken breast', quantity: 150, unit: 'g' }, { name: 'white rice', quantity: 120, unit: 'g' }]),
   dinner: opt('dinner', 'Salmon and potatoes', [{ name: 'salmon', quantity: 150, unit: 'g' }, { name: 'potato', quantity: 200, unit: 'g' }]),
-  snack: opt('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
+  snack: opt('snack', 'Yoghurt and banana', [{ name: 'greek yoghurt 0%', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
 }
 const SLOTS: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
 const plan = SLOTS.reduce((a, s) => ({ calories: a.calories + chosen[s]!.macros.calories, protein: a.protein + chosen[s]!.macros.protein, carbs: a.carbs + chosen[s]!.macros.carbs, fat: a.fat + chosen[s]!.macros.fat }), { calories: 0, protein: 0, carbs: 0, fat: 0 } as MacroTargets)

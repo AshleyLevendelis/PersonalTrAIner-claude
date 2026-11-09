@@ -229,12 +229,12 @@ async function main() {
     check('the pools every assembly reads are the stored pools with restriction breakers marked',
       /const mealPools = useServablePools\(storedMealPools, profile\?\.dietary_preferences, memoryFacts\)/.test(app))
     check('...and nothing that assembles a day reads the unmarked ones',
-      /buildRotation\(mealPools,/.test(app) && /pools: mealPools,/.test(app) && /checkMealRefit\(mealDays\.today\?\.pools \?\? mealPools,/.test(app) && /mealPools=\{mealPools\}/.test(app)
+      /buildRotation\(menuFor\(poolsServedOn\(mealPools, /.test(app) && /pools: mealPools,/.test(app) && /checkMealRefit\(mealDays\.today\?\.pools \?\? mealPools,/.test(app) && /mealPools=\{mealPools\}/.test(app)
       && !/(buildRotation|assembleRotationDay|checkMealRefit|useMealDays)\([^;]*storedMealPools/.test(app) && !/mealPools=\{storedMealPools\}/.test(app))
     // RE-ANCHORED 28 Sep 2026: today is the first day of the strip's run, so
     // "the day and the strip" are one call and take one likes list.
     check('the day, the strip and the list all take the same likes',
-      /buildRotation\(mealPools, macros, compiledSoftFoodPreferences/.test(app)
+      /buildRotation\(menuFor\(poolsServedOn\(mealPools, mealRotationDate\), mealRotationDate, compiledSoftFoodPreferences\), macros, compiledSoftFoodPreferences/.test(app)
       && /softLikedFoods: compiledSoftFoodPreferences, todaysPins/.test(app)
       && /const assembledMeals = mealDays\.today\?\.day\b/.test(app)
       && /softLikedFoods=\{compiledSoftFoodPreferences\}/.test(app))

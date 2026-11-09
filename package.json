@@ -569,7 +569,8 @@
     "test:first-chat": "tsx scripts/test-first-chat.ts",
     "test:setup-card-question": "tsx scripts/test-setup-card-question.ts",
     "test:meal-menu": "tsx scripts/test-meal-menu.ts",
-    "measure:deep-pool": "tsx scripts/measure-deep-pool.ts"
+    "measure:deep-pool": "tsx scripts/measure-deep-pool.ts",
+    "test:greek-yoghurt-asked": "tsx scripts/test-greek-yoghurt-asked.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

@@ -924,11 +924,11 @@ export async function generateMealPools(params: {
    * whether the library should seed those too is hers to rule.
    */
   const deepLibrary = params.deepLibrary !== false && params.library !== false
-  const libraryPass = async (deep: boolean): Promise<void> => {
+  const libraryPass = async (deep: boolean, slots: MealSlotName[] = activeSlots): Promise<void> => {
     try {
       const library = params.library === false ? [] : (params.library ?? await loadMealLibrary())
       const liked = steeringLikes(params.likedFoods ?? [], params.favouriteMeals ?? [], params.dislikedFoods ?? [], params.dietaryPreferences).foods
-      for (const slot of activeSlots) {
+      for (const slot of slots) {
         const existing = existingBySlot[slot] ?? []
         const candidates = chooseFromLibrary(library, {
           slot,
@@ -1017,9 +1017,14 @@ export async function generateMealPools(params: {
   // A NEW PLAN IS SEEDED FROM THE LIBRARY TOO (9 Nov 2026, his "much deeper pool", which settles his open "seeding
   // fresh plans" question): the writer's dishes first, as the plan's own shape (her cuisines, cooking time, likes),
   // then every library dish that passes her checks and lands a day, up to DEEP_POOL_SIZE a meal.
+  // ONLY WHERE THE WRITER DELIVERED: a meal the writer could not refresh keeps what she had (the 17 Sep rule a
+  // regenerate stands on), so the seed never turns a failed run into a replaced meal.
   if (!params.appendToExisting && deepLibrary) {
-    await libraryPass(true)
-    await commitProgress()
+    const delivered = activeSlots.filter(slot => (accepted[slot]?.length ?? 0) > 0)
+    if (delivered.length > 0) {
+      await libraryPass(true, delivered)
+      await commitProgress()
+    }
   }
 
   const shortfalls = activeSlots

@@ -34,8 +34,8 @@ const kcal = (d: { chosen: Partial<Record<MealSlotName, PoolOption>> }) => Objec
 const targets = { calories: 1689, protein: 162, carbs: 150, fat: 49 }
 const budgets = computeSlotBudgets(targets, 3, true)
 const pools: Partial<Record<MealSlotName, PoolOption[]>> = {
-  breakfast: [meal('breakfast', 'Oats', [['rolled oats', 60], ['greek yoghurt', 200], ['whey protein', 25]])],
-  snack: [meal('snack', 'Yoghurt', [['greek yoghurt', 170]])],
+  breakfast: [meal('breakfast', 'Oats', [['rolled oats', 60], ['greek yoghurt 0%', 200], ['whey protein', 25]])],
+  snack: [meal('snack', 'Yoghurt', [['greek yoghurt 0%', 170]])],
   dinner: [meal('dinner', 'Cod and potatoes', [['cod', 180], ['potato boiled', 300], ['olive oil', 8]])],
 }
 const bigLunch = meal('lunch', 'Bolognese', [['beef mince 5% fat', 240], ['pasta cooked', 330], ['olive oil', 10]])
@@ -77,7 +77,7 @@ console.log('\n§3b A two-meal day is judged as one')
 {
   // Two meals: breakfast 0.45 and dinner 0.55 of the day. Read as a three-meal day, a dinner at its own share would look
   // 1.8x too big and a small resize would be refused.
-  const bf = meal('breakfast', 'Big oats', [['rolled oats', 110], ['greek yoghurt', 350], ['whey protein', 35]])
+  const bf = meal('breakfast', 'Big oats', [['rolled oats', 110], ['greek yoghurt 0%', 350], ['whey protein', 35]])
   const dn = meal('dinner', 'Chicken rice', [['chicken breast', 230], ['white rice cooked', 360], ['olive oil', 15]])
   // Targets made from the two dishes with the dinner at 1.12x, so one resize of the dinner lands the day exactly.
   const at = (k: 'calories' | 'protein' | 'carbs' | 'fat') => Math.round(bf.macros[k] + dn.macros[k] * 1.12)

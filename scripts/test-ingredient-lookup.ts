@@ -119,7 +119,7 @@ console.log('\n5. What did not move')
 {
   const ORDINARY: [string, string][] = [
     ['eggs', 'egg'], ['scrambled egg', 'egg'], ['bread', 'white bread'], ['whole milk', 'milk whole'], ['milk', 'milk whole'],
-    ['rice', 'white rice cooked'], ['tuna', 'tuna canned in water'], ['greek yoghurt', 'greek yoghurt 0%'], ['greek yogurt', 'greek yoghurt full fat'],
+    ['rice', 'white rice cooked'], ['tuna', 'tuna canned in water'], ['greek yoghurt 0%', 'greek yoghurt 0%'], ['full fat greek yogurt', 'greek yoghurt full fat'],
     ['scallions', 'spring onion'], ['butter', 'butter'], ['prawns', 'prawns'], ['rice cakes', 'rice cakes'], ['tinned chickpeas', 'chickpeas'],
     ['pot of natural yoghurt', 'natural yoghurt'], ['glass of whole milk', 'milk whole'], ['garlic cloves', 'garlic'],
     ['seitan-based strips', 'seitan strips'], ['chopped tomatoes', 'chopped tomatoes canned'], ['french toast', 'french toast'],

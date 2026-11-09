@@ -19,6 +19,8 @@
  *      database: a default plan reaches seven a slot, no request is over the
  *      limit, and one request failing costs only its own slots.
  */
+// These checks hold the meal WRITER's round trip, so the library seed (9 Nov 2026, test:meal-library and
+// test:meal-menu hold it) is switched off: a seeded meal would hide what the writer did and did not deliver.
 import {
   DEFAULT_POOL_SIZE,
   MAX_DISHES_PER_REQUEST,
@@ -145,7 +147,7 @@ async function main() {
     calls = 0
     failWhen = () => false
     db.meal_plan_slots = []
-    const result = await generateMealPools({ profileId: 'p1', targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: true })
+    const result = await generateMealPools({ deepLibrary: false, profileId: 'p1', targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: true })
     const sizes = Object.fromEntries((Object.entries(result.accepted) as [MealSlotName, PoolOption[]][]).map(([s, o]) => [s, o.length]))
     check('every slot reaches seven options', Object.keys(sizes).length === 4 && Object.values(sizes).every(n => n === 7), sizes)
     check('...and seven are stored, not just returned', ['breakfast', 'lunch', 'dinner', 'snack'].every(s => db.meal_plan_slots.filter(r => r.profile_id === 'p1' && r.slot === s).length === 7),
@@ -162,7 +164,7 @@ async function main() {
     calls = 0
     db.meal_plan_slots = []
     failWhen = a => a.slots.some(s => s.slot === 'dinner')
-    const result = await generateMealPools({ profileId: 'p2', targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: true })
+    const result = await generateMealPools({ deepLibrary: false, profileId: 'p2', targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: true })
     const dinnerAsked = asked.find(a => a.slots.some(s => s.slot === 'dinner'))
     const lost = (dinnerAsked?.slots ?? []).map(s => s.slot)
     const kept = (['breakfast', 'lunch', 'dinner', 'snack'] as MealSlotName[]).filter(s => !lost.includes(s))

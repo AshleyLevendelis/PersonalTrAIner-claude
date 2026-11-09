@@ -35,7 +35,7 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
 const targets: MacroTargets = { calories: 2000, protein: 150, carbs: 200, fat: 70 }
 const parfait = {
   name: 'Greek Yoghurt and Honey Berry Parfait',
-  ingredients: ['200g greek yoghurt', '100g blueberries', '20g honey', '30g granola'],
+  ingredients: ['200g greek yoghurt 0%', '100g blueberries', '20g honey', '30g granola'],
   macros: { calories: 450, protein: 25, carbs: 60, fat: 10 },
 }
 const base = {

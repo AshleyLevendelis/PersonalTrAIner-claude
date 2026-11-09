@@ -172,11 +172,11 @@ export const FOOD_DB: FoodEntry[] = [
   f('egg', ['eggs', 'whole egg', 'boiled egg', 'fried egg', 'scrambled egg', 'hard boiled egg', 'soft boiled egg', 'poached egg'], { kcal: 155, protein: 13, carbs: 1.1, fat: 11 }, 'protein', { contains_egg: true }, { medium: 50, large: 58, small: 44 }, { avgGrams: 58, label: 'egg' }),
   f('egg white', ['egg whites', 'liquid egg whites', 'liquid egg white'], { kcal: 52, protein: 11, carbs: 0.7, fat: 0.2 }, 'protein', { contains_egg: true }, { medium: 33, large: 38 }),
   f('egg yolk', ['egg yolks'], { kcal: 322, protein: 16, carbs: 3.6, fat: 27 }, 'protein', { contains_egg: true }, { medium: 17, large: 20 }),
-  f('greek yoghurt 0%', ['fat free greek yogurt', 'greek yoghurt fat free', '0% greek yogurt', 'greek yoghurt', 'fat free greek yoghurt', '0% greek yoghurt'], { kcal: 57, protein: 10, carbs: 3.6, fat: 0.2 }, 'dairy', { contains_dairy: true }),
+  f('greek yoghurt 0%', ['fat free greek yogurt', 'greek yoghurt fat free', '0% greek yogurt', 'fat free greek yoghurt', '0% greek yoghurt', 'greek yogurt 0%'], { kcal: 57, protein: 10, carbs: 3.6, fat: 0.2 }, 'dairy', { contains_dairy: true }),
   // Live test, 19 Oct 2026: "low fat greek yoghurt" matched nothing. USDA "Yogurt, Greek, plain, lowfat". Dairy, like
   // both Greek yoghurts beside it. Flavoured ones (vanilla) are NOT added: the sugar differs too much by brand.
   f('greek yoghurt 2%', ['low fat greek yoghurt', 'low fat greek yogurt', '2% greek yoghurt', '2% greek yogurt', 'light greek yoghurt', 'light greek yogurt', 'lowfat greek yogurt', 'greek yogurt 2%'], { kcal: 73, protein: 9.95, carbs: 3.94, fat: 1.92 }, 'dairy', { contains_dairy: true }),
-  f('greek yoghurt full fat', ['greek yogurt', 'full fat greek yoghurt', 'greek style yoghurt'], { kcal: 97, protein: 9, carbs: 4, fat: 5 }, 'dairy', { contains_dairy: true }),
+  f('greek yoghurt full fat', ['full fat greek yoghurt', 'full fat greek yogurt', 'whole milk greek yogurt', 'greek yogurt full fat', 'greek style yoghurt'], { kcal: 97, protein: 9, carbs: 4, fat: 5 }, 'dairy', { contains_dairy: true }),
   f('natural yoghurt', ['plain yoghurt', 'natural yogurt', 'low fat yogurt', 'low fat yoghurt'], { kcal: 61, protein: 4.3, carbs: 4.7, fat: 3.3 }, 'dairy', { contains_dairy: true }),
   f('cottage cheese', [], { kcal: 98, protein: 11, carbs: 3.4, fat: 4.3 }, 'dairy', { contains_dairy: true }),
   f('ricotta cheese', ['ricotta', 'light ricotta cheese', 'light ricotta'], { kcal: 174, protein: 11, carbs: 3, fat: 13 }, 'dairy', { contains_dairy: true }),
@@ -1216,6 +1216,24 @@ function depluralizeToken(token: string): string {
  */
 const LOOKUP_MEMO = new Map<string, FoodEntry | null>()
 const LOOKUP_MEMO_CAP = 5000
+
+// ---------------------------------------------------------------------------
+// A NAME THAT NEEDS ITS KIND, NOT ITS AMOUNT (9 Nov 2026)
+// ---------------------------------------------------------------------------
+// Ashley, 9 Nov 2026, from three options ("ask which", count fat-free, count full-fat): a bare "Greek yoghurt" is
+// ASKED about. Until then the spelling decided: "greek yoghurt" was costed as 0% (57 kcal per 100 g) and "greek
+// yogurt" as full-fat (97), the same words giving two answers. Both are now a miss, so nothing is counted until the
+// kind is known, and the question names the kinds the table holds rather than asking for grams it already has.
+const WHICH_KIND: { pattern: RegExp; question: (said: string) => string }[] = [
+  { pattern: /^greek yogh?urt$/, question: said => `Was the ${said} fat-free (0%), low-fat (2%) or full-fat?` },
+]
+
+/** The question for a food named without its kind ("greek yoghurt"), or null when the name is not one of those. */
+export function whichKindQuestion(name: string): string | null {
+  const said = name.trim().toLowerCase().replace(/\s+/g, ' ')
+  const hit = WHICH_KIND.find(k => k.pattern.test(said))
+  return hit ? hit.question(said.replace(/^greek/, 'Greek')) : null
+}
 
 export function lookupIngredient(name: string): FoodEntry | null {
   const known = LOOKUP_MEMO.get(name)

@@ -667,7 +667,11 @@ console.log('\n3. Nothing has crept back up')
   // worn from 25 to 2 since 4 Nov without a move. 25 raw of room again.
   // MOVED 8 Nov 2026: 2681 -> 2706, the same QA walk; measured 2679 (2 left). Her 15 Sep ruling, 25 raw.
   // MOVED 9 Nov 2026: 2706 -> 2733, the date-of-birth day; measured 2697 before and 2708 after. Her 15 Sep ruling, 25 raw.
-  const TOTAL_BUDGET_KB = 2733
+  // MOVED 9 Nov 2026: 2733 -> 2843, the deep meal pool. Measured through this gate in two worktrees: 2709 at f756a164,
+  // 2818 with the change. Nearly all of it is the 360 new library dishes in the lazily loaded meal-library chunk
+  // (197 kB raw before); first paint moved 536 -> 538 gz and the app chunk 1327 -> 1331 raw (the weekly menu and the
+  // swap list's search). Her 15 Sep ruling, 25 raw of room.
+  const TOTAL_BUDGET_KB = 2843
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

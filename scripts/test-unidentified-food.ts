@@ -37,7 +37,7 @@ console.log('\n§1 A food the app cannot identify: blocked, and said truthfully'
 
 console.log('\n§2 A real clash keeps its sentence')
 {
-  const v = checkMealAgainstRestrictions('Yoghurt bowl', [line('greek yoghurt'), line('granola', 40)], ['nut-free'], [])
+  const v = checkMealAgainstRestrictions('Yoghurt bowl', [line('greek yoghurt 0%'), line('granola', 40)], ['nut-free'], [])
   check('granola under nut-free still reads "Contains granola"', v.ok === false && /^Contains granola, which doesn't fit "nut-free"/.test(v.message ?? ''), v.message)
   check('...and is not marked unidentified', v.issues.every(i => !i.unidentified), v.issues)
 }

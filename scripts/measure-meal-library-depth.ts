@@ -58,11 +58,14 @@ export async function libraryDepth(opts: { library?: unknown; diets?: string[][]
       const short = SLOTS.filter(s => (have[s]?.length ?? 0) < DEPTH_CAP)
       if (short.length === 0) break
       const before = SLOTS.map(s => have[s]?.length ?? 0).join()
+      // deepLibrary false (9 Nov 2026): measured under the pool-level cuisine cap the walk was written for, which a deep
+      // pool moves to the week's menu (meal-menu.ts). So this is a LOWER bound on depth, and its control still
+      // measures what the 3 Nov dishes bought.
       // The app logs every refused dish; a walk of hundreds of asks would bury the result in it.
       const quiet = { log: console.log, warn: console.warn, error: console.error }
       console.log = console.warn = console.error = () => {}
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      try { await generateMealPools({ profileId: id, targets: g.targets, dietaryPreferences: diet, mealsPerDay: 3, includeSnacks: true, poolSize: round === 0 ? 1 : 3, appendToExisting: true, onlySlots: round === 0 ? undefined : short, ...(opts.library ? { library: opts.library as any } : {}) }) } finally { Object.assign(console, quiet) }
+      try { await generateMealPools({ profileId: id, targets: g.targets, dietaryPreferences: diet, mealsPerDay: 3, includeSnacks: true, poolSize: round === 0 ? 1 : 3, appendToExisting: true, deepLibrary: false, onlySlots: round === 0 ? undefined : short, ...(opts.library ? { library: opts.library as any } : {}) }) } finally { Object.assign(console, quiet) }
       const after = await getPools(id) as Partial<Record<MealSlotName, unknown[]>>
       if (SLOTS.map(s => after[s]?.length ?? 0).join() === before) break
     }

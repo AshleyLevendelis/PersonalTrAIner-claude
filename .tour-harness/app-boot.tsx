@@ -85,7 +85,7 @@ const db: Db = {
     meal('breakfast', 0, 'Porridge with berries', [{ name: 'dry oats', quantity: 90, unit: 'g' }, { name: 'whole milk', quantity: 300, unit: 'ml' }, { name: 'blueberries', quantity: 100, unit: 'g' }]),
     meal('lunch', 0, 'Chicken and rice', [{ name: 'raw chicken breast', quantity: 205, unit: 'g' }, { name: 'dry white rice', quantity: 90, unit: 'g' }]),
     meal('dinner', 0, 'Salmon and potatoes', [{ name: 'salmon', quantity: 170, unit: 'g' }, { name: 'raw potato', quantity: 350, unit: 'g' }]),
-    meal('snack', 0, 'Yoghurt and banana', [{ name: 'greek yoghurt', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
+    meal('snack', 0, 'Yoghurt and banana', [{ name: 'greek yoghurt 0%', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
   ],
   daily_metrics: [
     { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 86400000)), weight_kg: WEIGH },

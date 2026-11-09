@@ -448,7 +448,7 @@ async function main() {
     // Case A — every round's call throws (the generator was unreachable).
     let callCount = 0
     globalThis.fetch = (async () => { callCount++; throw new Error('simulated network failure') }) as typeof fetch
-    const unreachable = await generateMealPools({
+    const unreachable = await generateMealPools({ deepLibrary: false,
       profileId: PROFILE_ID, targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: false,
       onlySlots: ['lunch'], poolSize: 1,
     })
@@ -475,7 +475,7 @@ async function main() {
         }),
       } as Response
     }) as typeof fetch
-    const recovered = await generateMealPools({
+    const recovered = await generateMealPools({ deepLibrary: false,
       profileId: PROFILE_ID, targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: false,
       onlySlots: ['lunch'], poolSize: 1,
     })
@@ -487,7 +487,7 @@ async function main() {
     // AI genuinely returned no meals): reached, and honestly exhausted —
     // must NOT be confused with case A's unreachable classification.
     globalThis.fetch = (async () => ({ ok: true, json: async () => ({ meals: [] }) })) as typeof fetch
-    const exhausted = await generateMealPools({
+    const exhausted = await generateMealPools({ deepLibrary: false,
       profileId: PROFILE_ID, targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: false,
       onlySlots: ['lunch'], poolSize: 1,
     })
@@ -523,7 +523,7 @@ async function main() {
         }),
       } as Response
     }) as typeof fetch
-    const interrupted = await generateMealPools({
+    const interrupted = await generateMealPools({ deepLibrary: false,
       profileId: PROFILE_ID, targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: false,
       onlySlots: ['lunch'], poolSize: 3,
     })
@@ -554,7 +554,7 @@ async function main() {
       }),
     })) as typeof fetch
 
-    const result = await generateMealPools({
+    const result = await generateMealPools({ deepLibrary: false,
       profileId: PROFILE_ID, targets, dietaryPreferences: ['not-a-real-restriction'], mealsPerDay: 3, includeSnacks: false,
       onlySlots: ['lunch'], poolSize: 1,
     })

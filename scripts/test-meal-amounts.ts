@@ -398,7 +398,7 @@ console.log('\n9. A typed line: an amount said in words, and the "of" a unit lea
   // Words that are not a count are left exactly as they were.
   const little = parseIngredientLine('a little olive oil')
   check('"a little olive oil" is NOT read as one olive oil', little.name === 'a little olive oil' && little.unit === 'g', little)
-  const typed = appDb.computeMealMacros(['3 eggs', '150g greek yoghurt', 'a banana'].map(parseIngredientLine))
+  const typed = appDb.computeMealMacros(['3 eggs', '150g greek yoghurt 0%', 'a banana'].map(parseIngredientLine))
   check('"3 eggs, 150g greek yoghurt, a banana" comes to over 400 kcal with the banana in it (was 319)', typed.kcal > 400 && typed.kcal < 520 && typed.coverage === 1, typed.kcal)
 }
 {

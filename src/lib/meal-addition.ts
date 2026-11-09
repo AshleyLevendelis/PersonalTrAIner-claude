@@ -21,6 +21,8 @@ import { splitCompoundFoodLine } from './ingredient-units'
 // the model's raw arguments and stores nothing.
 // ---------------------------------------------------------------------------
 
+import { whichKindQuestion } from './food-db'
+import { parseIngredientLine } from './portion-scaler'
 import { computeSlotBudgets, verifyProposal, type PoolOption, type RawProposal } from './meal-generation'
 import type { MealSlotName } from './meal-store'
 import type { MacroTargets } from './types'
@@ -144,6 +146,9 @@ export function explainRejection(log: string[], dishName: string, slot: MealSlot
   }
   if (/coverage/i.test(line)) {
     const unmatched = /unmatched:\s*([^—]*)/.exec(line)?.[1]?.trim()
+    // A FOOD NAMED WITHOUT ITS KIND (9 Nov 2026, his "ask which"): ask the kind, not for a better-known ingredient.
+    const kindAsk = (unmatched ?? '').split(',').map(u => whichKindQuestion(parseIngredientLine(u.trim()).name) ?? whichKindQuestion(u.trim())).find(q => q != null)
+    if (kindAsk) return `${kindAsk} I'll add ${dishName} once I know.`
     // A food the app KNOWS, in an amount it could not read ("2 hummus", "1
     // bowl of pasta"). Saying "I don't have hummus in my food data" would be
     // false, and "more everyday ingredients" would not help: it needs a weight.
