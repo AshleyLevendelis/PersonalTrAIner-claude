@@ -102,7 +102,10 @@ function main() {
 
   console.log('\n5. Nothing searches a deep pool whole')
   const counts = fittingCounts(deep, SLOTS, TARGETS, d0)
-  check('the "how many fit" count behind the more-meals offer is taken on the menu, so no meal counts more than MENU_SIZE', SLOTS.every(s => (counts[s] ?? 0) > 0 && (counts[s] ?? 0) <= MENU_SIZE), counts)
+  check('the "how many fit" count behind the more-meals offer is taken on the menu for a deep pool, so no meal counts more than MENU_SIZE', SLOTS.every(s => (counts[s] ?? 0) > 0 && (counts[s] ?? 0) <= MENU_SIZE), counts)
+  const ten = deepPools(10)
+  const tenCounts = fittingCounts(ten, SLOTS, TARGETS, d0)
+  check('...but a pool of ten or fewer is counted whole (a fitting dish this week\'s menu leaves out still counts)', SLOTS.every(s => (tenCounts[s] ?? 0) > MENU_SIZE), tenCounts)
   const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1')
   const app = strip(readFileSync('src/App.tsx', 'utf8'))
   check('App builds its rotation from this week\'s menu, never the whole pool', /buildRotation\(menuFor\(poolsServedOn\(mealPools, mealRotationDate\), mealRotationDate, compiledSoftFoodPreferences\)/.test(app) && !/buildRotation\(mealPools\b/.test(app))

@@ -355,14 +355,16 @@ async function main() {
     const { getPools } = await import('../src/lib/meal-store')
     const targets = { calories: 2200, protein: 150, carbs: 240, fat: 70 }
     const base = { targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: false, onlySlots: ['lunch' as MealSlotName] }
-    await generateMealPools({ ...base, profileId: 'p', poolSize: 5 })
+    // A five-dish plan, as made before the deep pool (9 Nov 2026): the seed is off so the plan these cases start from
+    // is the shape they were written for; test:meal-menu and test:meal-library hold the seed.
+    await generateMealPools({ ...base, profileId: 'p', deepLibrary: false, poolSize: 5 })
     await generateMealPools({ ...base, profileId: 'p', poolSize: 2, appendToExisting: true, servedFrom: '2026-10-01' })
     const lunch = (await getPools('p')).lunch ?? []
     check('the sanity check: five from the plan and two added', lunch.length === 7, lunch.length)
     check('the two added carry their first day', lunch.filter(o => newFromDate(o) === '2026-10-01').length === 2, lunch.map(o => o.tags))
     check('...and the five already there carry none', lunch.filter(o => newFromDate(o) === null).length === 5)
     await generateMealPools({ ...base, profileId: 'q', poolSize: 2, appendToExisting: true })
-    await generateMealPools({ ...base, profileId: 'r', poolSize: 3, servedFrom: '2026-10-01' })
+    await generateMealPools({ ...base, profileId: 'r', deepLibrary: false, poolSize: 3, servedFrom: '2026-10-01' })
     const q = (await getPools('q')).lunch ?? []
     const r = (await getPools('r')).lunch ?? []
     check('"find more options" (no first day given) stamps nothing: she is choosing for today', q.length > 0 && q.every(o => newFromDate(o) === null), q.map(o => o.tags))
@@ -376,7 +378,7 @@ async function main() {
       category: 'dry_goods', checked: false, dismissed: false, needs_review: false, user_edited: false, client_id: 'g1', created_at: '2026-09-27T00:00:00.000Z',
       meal_refs: [{ day: 0, date: TODAY, slot: 'breakfast', mealName: 'x' }, { day: 1, date: '2026-09-29', slot: 'lunch', mealName: 'y' }],
     })
-    await generateMealPools({ ...base, profileId: 'b', poolSize: 5 })
+    await generateMealPools({ ...base, profileId: 'b', deepLibrary: false, poolSize: 5 })
     const generation = { targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: false }
     const done = await topUpMealPlan({ profileId: 'b', today: TODAY, needs: { lunch: 2 }, generation })
     const bLunch = (await getPools('b')).lunch ?? []
@@ -387,7 +389,7 @@ async function main() {
     // M62: the list is re-worked ONLY on her pick, and only once something landed; the receipt says what happened.
     let refreshed = 0
     const refreshList = async () => { refreshed++ }
-    await generateMealPools({ ...base, profileId: 'e', poolSize: 5 })
+    await generateMealPools({ ...base, profileId: 'e', deepLibrary: false, poolSize: 5 })
     const plain = await topUpMealPlan({ profileId: 'e', today: TODAY, needs: { lunch: 2 }, generation, refreshList })
     check('"Get more options" never touches the list, even with a refresh to hand', plain.added === 2 && refreshed === 0, { added: plain.added, refreshed })
     // A LIST THAT HOLDS DAYS, or "tomorrow" and "after the list" are the same day and the pick cannot be seen.
@@ -396,13 +398,13 @@ async function main() {
       category: 'dry_goods', checked: false, dismissed: false, needs_review: false, user_edited: false, client_id: 'gf', created_at: '2026-09-27T00:00:00.000Z',
       meal_refs: [{ day: 1, date: '2026-09-29', slot: 'lunch', mealName: 'y' }, { day: 3, date: '2026-10-01', slot: 'lunch', mealName: 'y' }],
     })
-    await generateMealPools({ ...base, profileId: 'f', poolSize: 5 })
+    await generateMealPools({ ...base, profileId: 'f', deepLibrary: false, poolSize: 5 })
     const sooner = await topUpMealPlan({ profileId: 'f', today: TODAY, needs: { lunch: 2 }, generation, refreshList, startTomorrow: true })
     const fLunch = (await getPools('f')).lunch ?? []
     check('"start them tomorrow": the new meals are stamped for tomorrow', sooner.added === 2 && fLunch.filter(o => newFromDate(o) === '2026-09-29').length === 2, fLunch.map(o => o.tags))
     check('...the list is re-worked once', refreshed === 1 && sooner.listUpdated === true, { refreshed, listUpdated: sooner.listUpdated })
     check('...and the receipt says they start tomorrow and the list is updated', /^Added 2 new meals\. They start tomorrow, and your shopping list is updated to match\.$/.test(sooner.note.text), sooner.note.text)
-    await generateMealPools({ ...base, profileId: 'h', poolSize: 5 })
+    await generateMealPools({ ...base, profileId: 'h', deepLibrary: false, poolSize: 5 })
     const broken = await topUpMealPlan({ profileId: 'h', today: TODAY, needs: { lunch: 2 }, generation, startTomorrow: true, refreshList: async () => { throw new Error('offline') } })
     check('a list that could not be re-worked is said, never passed off as updated', /couldn't update your shopping list/.test(broken.note.text) && !/updated to match/.test(broken.note.text) && broken.listUpdated === false, broken.note.text)
     refreshed = 0

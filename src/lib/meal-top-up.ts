@@ -18,7 +18,7 @@
 // ---------------------------------------------------------------------------
 
 import { DEFAULT_POOL_SIZE, DEEP_POOL_SIZE, assembleDay, generateMealPools, type PoolOption } from './meal-generation'
-import { MENU_SIZE, menuForSlot, menuWeekOf } from './meal-menu'
+import { menuForSlot, menuWeekOf } from './meal-menu'
 import type { MacroTargets } from './types'
 import { addDays, epochDay, ROTATION_DAYS } from './meal-rotation'
 import { weekdayLong, longDate } from './day-labels'
@@ -98,7 +98,9 @@ export function fittingCounts(
   const week = today ? menuWeekOf(today) : 0
   for (const slot of activeSlots) {
     const servable = (pools[slot] ?? []).filter(servableOption)
-    usable[slot] = servable.length > MENU_SIZE ? menuForSlot(servable, week) : servable
+    // Only past MAX_POOL: up to ten a meal the whole pool is affordable (the 30 Sep cap was set by this very search),
+    // and a count taken on an 8-dish menu would miss a fitting dish this week's menu left out.
+    usable[slot] = servable.length > MAX_POOL ? menuForSlot(servable, week) : servable
   }
   if (activeSlots.length === 0 || activeSlots.some(s => usable[s]!.length === 0)) return {}
   const out: Partial<Record<MealSlotName, number>> = {}

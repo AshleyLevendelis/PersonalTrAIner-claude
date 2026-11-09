@@ -71,6 +71,11 @@ Newest first. One line each.
   SERVED in the three days after a top-up's hold; with the bigger library the chooser picks different dishes and, with
   last night's dinner pinned as lunch, none lands those days on target, though each lands a day of hers. It now holds
   that none appears on a held day and that each is choosable (and served once chosen) from the first new day.
+  FINAL RUN (372 checks): 370 passed; `test:meal-top-up` failed and was fixed: its starting plans are now made with the
+  seed off (the shape its cases were written for), and it caught a real one: the "how many fit" count for a pool of nine
+  or ten was taken on the 8-dish menu, so a fitting dish this week's menu left out went uncounted; the menu now bounds
+  the count only past ten (`test:meal-menu` check added, mutation caught). The 12 checks that read that change: all
+  passed. `verify:rls` needs a database this session cannot reach.
   NOT DONE, named: the remaining audit findings of lower weight (canned vs boiled chickpeas and kidney beans; cooked
   grain yields in the "about N g cooked" hint 10-35% high; mussels in shell; fried calamari; plantain chips; pesto, injera
   and UK cream cheese labels); bare "beef mince" (20% fat) vs bare "mince" (5%) still disagree (his open "assume or
