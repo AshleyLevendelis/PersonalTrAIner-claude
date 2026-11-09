@@ -38,7 +38,7 @@ const localStore: EatenCorrectionDeps['store'] = {
   remove: key => { try { localStorage.removeItem(key) } catch { /* nothing to do */ } },
 }
 
-export const realEatenCorrectionDeps: EatenCorrectionDeps = {
+const realEatenCorrectionDeps: EatenCorrectionDeps = {
   slotEvents: async (profileId, date, slot) => (await getTodayLedger(profileId, date, ZERO)).events
     .filter(e => e.slot === slot && e.eventType === 'confirmed'),
   voidEvent: voidMealEvent,
@@ -49,7 +49,7 @@ export const realEatenCorrectionDeps: EatenCorrectionDeps = {
 const keyFor = (profileId: string, p: MealAdditionPayload) => `eaten-correction:${profileId}:${p.date}:${p.slot}:${p.option.name}`
 
 /** Is this edit a correction of a meal logged as eaten (marked at the edit, today only)? */
-export const correctsEaten = (payload: MealAdditionPayload): boolean => isAfterEaten(payload.option)
+const correctsEaten = (payload: MealAdditionPayload): boolean => isAfterEaten(payload.option)
 
 /**
  * STEP 1, before anything else is written: the slot's eaten entries come off. Returns what came off (empty when the
