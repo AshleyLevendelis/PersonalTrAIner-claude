@@ -155,6 +155,9 @@ export function currentAge(dateOfBirth: string | null | undefined, recordedAge: 
   return fromBirth ?? (recordedAge ?? undefined)
 }
 
+/** A calendar date built with Date.UTC, written YYYY-MM-DD from its own UTC parts (pure date arithmetic; no clock). */
+const ymd = (dt: Date) => `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`
+
 /** Whole years old on `today` for someone born on `dob` (both YYYY-MM-DD); null when either is not a real date or dob is after today. */
 export function ageOn(dob: string, today: string): number | null {
   const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob), t = /^(\d{4})-(\d{2})-(\d{2})$/.exec(today)
@@ -178,7 +181,7 @@ export function ageOn(dob: string, today: string): number | null {
 export function isBirthday(dateOfBirth: string | null | undefined, today: string): boolean {
   if (!dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(today)) return false
   const [y, m, d] = today.split('-').map(Number)
-  const yesterday = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10)
+  const yesterday = ymd(new Date(Date.UTC(y, m - 1, d - 1)))
   const now = ageOn(dateOfBirth, today), before = ageOn(dateOfBirth, yesterday)
   return now != null && before != null && now > before
 }
@@ -188,7 +191,7 @@ export function birthDateBounds(today: string, minAge: number, maxAge: number): 
   const [y, m, d] = today.split('-').map(Number)
   const at = (years: number, plusDay: number) => {
     const dt = new Date(Date.UTC(y - years, m - 1, d + plusDay))
-    return dt.toISOString().slice(0, 10)
+    return ymd(dt)
   }
   // Latest: turned minAge today. Earliest: the day after turning maxAge + 1, so maxAge is still allowed.
   return { max: at(minAge, 0), min: at(maxAge + 1, 1) }
