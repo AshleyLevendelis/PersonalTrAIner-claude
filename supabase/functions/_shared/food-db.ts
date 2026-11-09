@@ -1,16 +1,3 @@
-// ===========================================================================
-// GENERATED FILE — DO NOT EDIT.
-//
-// This is src/lib/food-db.ts, copied here by scripts/sync-shared-code.mjs so the edge
-// functions (Deno, which cannot import from src/) run the SAME code the app
-// does. Change the source, then run:
-//
-//     npm run sync:shared
-//
-// A hand edit here is overwritten by the next sync, and test:food-db-parity
-// fails for as long as this file differs from what the script would write.
-// ===========================================================================
-
 // ---------------------------------------------------------------------------
 // FOOD DATABASE (M1) — the deterministic macro truth source
 // ---------------------------------------------------------------------------
@@ -138,7 +125,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('chicken breast', ['chicken breasts', 'grilled chicken', 'chicken breast (cooked)', 'skinless chicken breast'], { kcal: 165, protein: 31, carbs: 0, fat: 3.6 }, 'protein', { contains_meat: true }),
   f('chicken thigh', ['chicken thighs', 'boneless chicken thigh'], { kcal: 209, protein: 26, carbs: 0, fat: 10.9 }, 'protein', { contains_meat: true }),
   f('chicken drumstick', ['chicken drumsticks', 'chicken legs'], { kcal: 172, protein: 24, carbs: 0, fat: 8.1 }, 'protein', { contains_meat: true }),
-  f('chicken mince', ['ground chicken', 'minced chicken'], { kcal: 143, protein: 21.7, carbs: 0, fat: 6 }, 'protein', { contains_meat: true }),
+  f('chicken mince', ['ground chicken', 'minced chicken'], { kcal: 143, protein: 17.4, carbs: 0, fat: 8.1 }, 'protein', { contains_meat: true }), // USDA 05332 raw (9 Nov 2026: protein and fat were from another source)
   f('turkey breast', ['turkey breasts', 'sliced turkey'], { kcal: 135, protein: 29, carbs: 0, fat: 1.7 }, 'protein', { contains_meat: true }),
   f('turkey mince', ['ground turkey', 'minced turkey'], { kcal: 148, protein: 27, carbs: 0, fat: 4 }, 'protein', { contains_meat: true }),
   // Live test, 19 Oct 2026: "smoked turkey breast" matched nothing, so meals holding it were blocked for every diet.
@@ -154,7 +141,10 @@ export const FOOD_DB: FoodEntry[] = [
   f('pork chop', ['pork chops', 'pork loin chop'], { kcal: 231, protein: 27, carbs: 0, fat: 13 }, 'protein', { contains_meat: true, contains_pork: true }),
   f('pork loin', ['pork tenderloin', 'pork fillet'], { kcal: 143, protein: 26, carbs: 0, fat: 3.5 }, 'protein', { contains_meat: true, contains_pork: true }),
   f('pork mince', ['ground pork', 'minced pork'], { kcal: 200, protein: 20, carbs: 0, fat: 13 }, 'protein', { contains_meat: true, contains_pork: true }),
-  f('bacon', ['bacon rashers', 'streaky bacon', 'back bacon', 'bacon medallions'], { kcal: 337, protein: 25, carbs: 0.5, fat: 26 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
+  f('bacon', ['bacon rashers', 'streaky bacon', 'back bacon'], { kcal: 337, protein: 25, carbs: 0.5, fat: 26 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
+  // MEAL AUDIT, 9 Nov 2026: medallions are back bacon with the fat cut off, and were costed as streaky (337 kcal).
+  // UK pack labels, grilled, as recalled (about 140-160 kcal, protein 25-30, fat 3-5).
+  f('bacon medallions', ['bacon medallion'], { kcal: 150, protein: 28, carbs: 0.5, fat: 4 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
   f('gammon', ['gammon steak', 'ham steak'], { kcal: 145, protein: 24, carbs: 0.5, fat: 5 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
   f('ham', ['sliced ham', 'deli ham'], { kcal: 107, protein: 18, carbs: 1.5, fat: 3 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
   f('chorizo', ['chorizo sausage'], { kcal: 455, protein: 24, carbs: 1.9, fat: 38 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
@@ -164,12 +154,14 @@ export const FOOD_DB: FoodEntry[] = [
   f('salmon', ['salmon fillet', 'baked salmon', 'grilled salmon'], { kcal: 208, protein: 20, carbs: 0, fat: 13 }, 'protein', { contains_fish: true }),
   f('smoked salmon', [], { kcal: 142, protein: 18, carbs: 0, fat: 4.5 }, 'protein', { contains_fish: true, is_processed_meat: false }),
   f('tuna canned in water', ['canned tuna', 'tuna in water', 'tinned tuna', 'tuna in spring water'], { kcal: 116, protein: 26, carbs: 0, fat: 0.8 }, 'protein', { contains_fish: true }),
-  f('tuna steak fresh', ['fresh tuna', 'tuna steak', 'seared tuna'], { kcal: 144, protein: 23.3, carbs: 0, fat: 5 }, 'protein', { contains_fish: true }),
+  f('tuna steak fresh', ['fresh tuna', 'tuna steak', 'seared tuna'], { kcal: 109, protein: 24.4, carbs: 0, fat: 0.5 }, 'protein', { contains_fish: true }), // USDA yellowfin, raw (9 Nov 2026: was bluefin, which shops rarely sell)
   f('cod', ['cod fillet', 'baked cod'], { kcal: 105, protein: 23, carbs: 0, fat: 0.9 }, 'protein', { contains_fish: true }),
   f('haddock', ['haddock fillet'], { kcal: 99, protein: 22.8, carbs: 0, fat: 0.7 }, 'protein', { contains_fish: true }),
   f('tilapia', ['tilapia fillet'], { kcal: 129, protein: 26, carbs: 0, fat: 2.7 }, 'protein', { contains_fish: true }),
   f('sea bass', ['sea bass fillet'], { kcal: 124, protein: 23.5, carbs: 0, fat: 2.6 }, 'protein', { contains_fish: true }),
-  f('mackerel', ['grilled mackerel'], { kcal: 205, protein: 19, carbs: 0, fat: 13.9 }, 'protein', { contains_fish: true }),
+  // MEAL AUDIT, 9 Nov 2026: these were RAW mackerel's figures under a name the app treats as cooked. USDA Atlantic
+  // mackerel, cooked, dry heat, as recalled.
+  f('mackerel', ['grilled mackerel'], { kcal: 262, protein: 23.9, carbs: 0, fat: 17.8 }, 'protein', { contains_fish: true }),
   f('sardines canned', ['sardines', 'canned sardines', 'tinned sardines'], { kcal: 208, protein: 24.6, carbs: 0, fat: 11.5 }, 'protein', { contains_fish: true }),
   f('prawns', ['shrimp', 'king prawns', 'cooked prawns'], { kcal: 99, protein: 24, carbs: 0.2, fat: 0.3 }, 'protein', { contains_shellfish: true }),
   f('crab meat', ['crab', 'white crab meat'], { kcal: 87, protein: 18, carbs: 0, fat: 1.1 }, 'protein', { contains_shellfish: true }),
@@ -198,13 +190,18 @@ export const FOOD_DB: FoodEntry[] = [
   f('milk skimmed', ['skimmed milk', 'skim milk', 'fat free milk'], { kcal: 34, protein: 3.4, carbs: 5, fat: 0.1 }, 'dairy', { contains_dairy: true }),
   f('milk semi skimmed', ['semi skimmed milk', 'semi-skimmed milk', '2% milk'], { kcal: 46, protein: 3.4, carbs: 4.7, fat: 1.7 }, 'dairy', { contains_dairy: true }),
   f('cheddar cheese', ['cheddar', 'grated cheddar'], { kcal: 404, protein: 25, carbs: 0.1, fat: 34 }, 'dairy', { contains_dairy: true }),
-  f('mozzarella', ['mozzarella cheese', 'shredded mozzarella'], { kcal: 280, protein: 28, carbs: 3.1, fat: 17 }, 'dairy', { contains_dairy: true }),
+  // MEAL AUDIT, 9 Nov 2026: one row held protein above every real mozzarella (28 g). The ball a UK recipe means
+  // (fresh, drained; UK labels about 240-255 kcal, protein 18-19, fat 18-19) and the grated, drier part-skim kind
+  // (USDA part-skim, as recalled) are two foods.
+  f('mozzarella', ['mozzarella cheese', 'fresh mozzarella', 'mozzarella ball'], { kcal: 250, protein: 18.5, carbs: 1, fat: 19 }, 'dairy', { contains_dairy: true }),
+  f('mozzarella part skim', ['shredded mozzarella', 'grated mozzarella', 'part skim mozzarella', 'low moisture mozzarella'], { kcal: 254, protein: 24.3, carbs: 2.8, fat: 15.9 }, 'dairy', { contains_dairy: true }),
   f('feta cheese', ['feta'], { kcal: 264, protein: 14, carbs: 4, fat: 21 }, 'dairy', { contains_dairy: true }),
   f('halloumi', ['halloumi cheese', 'grilled halloumi'], { kcal: 321, protein: 21, carbs: 2, fat: 25 }, 'dairy', { contains_dairy: true }),
   f('cream cheese', [], { kcal: 342, protein: 5.9, carbs: 4.1, fat: 34 }, 'dairy', { contains_dairy: true }),
   f('parmesan', ['parmesan cheese', 'grated parmesan'], { kcal: 431, protein: 38, carbs: 4.1, fat: 29 }, 'dairy', { contains_dairy: true }),
   f('butter', ['salted butter', 'unsalted butter'], { kcal: 717, protein: 0.9, carbs: 0.1, fat: 81 }, 'fat', { contains_dairy: true }),
-  f('double cream', ['heavy cream'], { kcal: 449, protein: 1.7, carbs: 2.7, fat: 48 }, 'dairy', { contains_dairy: true }),
+  f('heavy cream', ['heavy whipping cream', 'whipping cream'], { kcal: 340, protein: 2.8, carbs: 2.7, fat: 36 }, 'dairy', { contains_dairy: true }), // USDA heavy whipping cream (9 Nov 2026: was costed as UK double cream, 48% fat)
+  f('double cream', [], { kcal: 449, protein: 1.7, carbs: 2.7, fat: 48 }, 'dairy', { contains_dairy: true }),
   f('single cream', ['light cream'], { kcal: 198, protein: 2.7, carbs: 4.1, fat: 19 }, 'dairy', { contains_dairy: true }),
   f('quark', [], { kcal: 60, protein: 12, carbs: 4, fat: 0.2 }, 'dairy', { contains_dairy: true }),
 
@@ -212,7 +209,12 @@ export const FOOD_DB: FoodEntry[] = [
   f('tofu firm', ['tofu', 'firm tofu', 'extra firm tofu'], { kcal: 144, protein: 15.5, carbs: 3.9, fat: 8.7 }, 'protein', { contains_soy: true }),
   f('tofu silken', ['silken tofu'], { kcal: 55, protein: 5.5, carbs: 1.9, fat: 2.7 }, 'protein', { contains_soy: true }),
   f('tempeh', [], { kcal: 195, protein: 20, carbs: 7.6, fat: 11 }, 'protein', { contains_soy: true }),
-  f('seitan', [], { kcal: 370, protein: 75, carbs: 14, fat: 1.9 }, 'protein', { is_grain: true, contains_gluten: true }),
+  // MEAL AUDIT, 9 Nov 2026: seitan carried VITAL WHEAT GLUTEN's figures (the dry flour it is made from, USDA 370 /
+  // 75.2 / 13.8 / 1.9), so 150 g of seitan strips in a dish was costed at 112 g of protein. Prepared seitan, as
+  // sold ready to cook (UK and US labels, about 120-160 kcal, protein 20-28 g): figures chosen inside that range and
+  // made to add up (4P + 4C + 9F). The flour is its own entry below, so a recipe that names it is still costed.
+  f('seitan', ['prepared seitan'], { kcal: 138, protein: 25, carbs: 5, fat: 2 }, 'protein', { is_grain: true, contains_gluten: true }),
+  f('vital wheat gluten', ['wheat gluten', 'gluten flour'], { kcal: 370, protein: 75.2, carbs: 13.8, fat: 1.9 }, 'protein', { is_grain: true, contains_gluten: true }),
   f('edamame', ['edamame beans', 'shelled edamame'], { kcal: 122, protein: 11, carbs: 8, fat: 5 }, 'protein', { contains_soy: true, is_legume: true }),
   f('chickpeas', ['garbanzo beans', 'cooked chickpeas', 'canned chickpeas'], { kcal: 164, protein: 8.9, carbs: 27, fat: 2.6 }, 'protein', { is_legume: true, is_high_carb: true }),
   f('lentils red', ['red lentils', 'cooked red lentils'], { kcal: 116, protein: 9, carbs: 20, fat: 0.4 }, 'protein', { is_legume: true, is_high_carb: true }),
@@ -223,7 +225,12 @@ export const FOOD_DB: FoodEntry[] = [
   f('butter beans', ['lima beans', 'cooked butter beans'], { kcal: 113, protein: 7.6, carbs: 20, fat: 0.4 }, 'protein', { is_legume: true, is_high_carb: true }),
   f('cannellini beans', ['canned cannellini beans', 'cooked cannellini beans', 'white kidney beans'], { kcal: 118, protein: 8.1, carbs: 20, fat: 0.5 }, 'protein', { is_legume: true, is_high_carb: true }),
   f('brown lentils', ['canned brown lentils', 'cooked brown lentils'], { kcal: 116, protein: 9, carbs: 20, fat: 0.4 }, 'protein', { is_legume: true, is_high_carb: true }),
-  f('soy mince', ['tvp', 'textured vegetable protein', 'soy protein mince'], { kcal: 285, protein: 50, carbs: 30, fat: 1 }, 'protein', { contains_soy: true }),
+  // MEAL AUDIT, 9 Nov 2026: "soy mince" carried DRY textured vegetable protein's figures, so the 120 g in a taco bowl
+  // was 60 g of protein. As cooked with (rehydrated, the way the frozen and ready packs are sold): DERIVED from the
+  // dry row below at the usual one part dry to two parts water, so a third of each figure. The dry granules keep the
+  // old names, and the dry state, so "40g dry TVP" is still costed as dry.
+  f('soy mince', ['soy protein mince', 'soya mince', 'meat free soya mince'], { kcal: 110, protein: 16.7, carbs: 10, fat: 0.3 }, 'protein', { contains_soy: true }),
+  f('soy mince dry', ['tvp', 'textured vegetable protein', 'dry soy mince', 'dried soya mince', 'dry tvp'], { kcal: 329, protein: 50, carbs: 30, fat: 1 }, 'protein', { contains_soy: true }),
   f('quorn mince', ['quorn'], { kcal: 92, protein: 12, carbs: 4.4, fat: 2.7 }, 'protein', { contains_egg: true }),
   f('quorn fillet', ['quorn fillets', 'quorn chicken pieces'], { kcal: 106, protein: 13, carbs: 6.7, fat: 2.9 }, 'protein', { contains_egg: true }),
   // PEANUTS COUNT AS NUTS HERE. Botanically peanuts are legumes, and this
@@ -371,11 +378,13 @@ export const FOOD_DB: FoodEntry[] = [
   f('gravy granules made', ['gravy'], { kcal: 65, protein: 1.2, carbs: 9, fat: 2.6 }, 'condiment', { contains_gluten: true }),
   f('worcestershire sauce', [], { kcal: 78, protein: 0, carbs: 19.5, fat: 0 }, 'condiment', { contains_fish: true }, { tbsp: 17 }),
   f('teriyaki sauce', [], { kcal: 89, protein: 5.9, carbs: 16, fat: 0 }, 'condiment', { contains_soy: true, contains_gluten: true }, { tbsp: 18 }),
-  f('vegetable stock cube', ['stock cube', 'vegetable stock'], { kcal: 233, protein: 8, carbs: 40, fat: 5 }, 'condiment', { contains_celery: true, is_high_fodmap: true }),
+  f('vegetable stock cube', ['stock cube'], { kcal: 233, protein: 8, carbs: 40, fat: 5 }, 'condiment', { contains_celery: true, is_high_fodmap: true }),
   // Soy lecithin is a near-ubiquitous emulsifier in commercial chocolate —
   // brand-dependent, not knowable from the name. Absent reads as safe, so
   // true is the only fail-safe state this schema can express.
-  f('dark chocolate', ['70% dark chocolate'], { kcal: 546, protein: 7.8, carbs: 46, fat: 31 }, 'other', { is_refined_sugar: true, contains_soy: true }),
+  // 9 Nov 2026: the 70% alias pointed at USDA's 45-59% row; a 70-85% bar is its own row (USDA, as recalled).
+  f('dark chocolate 70%', ['70% dark chocolate', '85% dark chocolate', 'dark chocolate 85%', 'high cocoa dark chocolate'], { kcal: 598, protein: 7.8, carbs: 45.9, fat: 42.6 }, 'other', { is_refined_sugar: true, contains_soy: true }),
+  f('dark chocolate', [], { kcal: 546, protein: 7.8, carbs: 46, fat: 31 }, 'other', { is_refined_sugar: true, contains_soy: true }),
   f('milk chocolate', [], { kcal: 535, protein: 7.6, carbs: 59, fat: 30 }, 'other', { contains_dairy: true, is_refined_sugar: true, contains_soy: true }),
   // Brand-dependent, not knowable from the name — protein bars routinely
   // carry a nut or peanut base, whey/milk chocolate coating, soy protein
@@ -398,10 +407,14 @@ export const FOOD_DB: FoodEntry[] = [
   f('scallops', [], { kcal: 88, protein: 16.8, carbs: 2.4, fat: 0.8 }, 'protein', { contains_shellfish: true }),
   f('oysters', [], { kcal: 68, protein: 7.1, carbs: 3.9, fat: 2.5 }, 'protein', { contains_shellfish: true }),
   f('lobster', [], { kcal: 89, protein: 19, carbs: 0.5, fat: 0.9 }, 'protein', { contains_shellfish: true }),
-  f('haricot beans', ['navy beans', 'baked beans'], { kcal: 155, protein: 8.7, carbs: 27, fat: 0.6 }, 'protein', { is_legume: true, is_high_carb: true }),
+  f('haricot beans', ['navy beans'], { kcal: 155, protein: 8.7, carbs: 27, fat: 0.6 }, 'protein', { is_legume: true, is_high_carb: true }),
   f('split peas', ['yellow split peas', 'cooked split peas'], { kcal: 118, protein: 8.3, carbs: 21, fat: 0.4 }, 'protein', { is_legume: true, is_high_carb: true }),
   f('falafel', [], { kcal: 333, protein: 13.3, carbs: 32, fat: 18 }, 'protein', { is_legume: true, is_high_carb: true }),
-  f('seitan strips', ['vegan chicken', 'meat free chicken pieces'], { kcal: 370, protein: 75, carbs: 14, fat: 1.9 }, 'protein', { is_grain: true, contains_gluten: true }),
+  // MEAL AUDIT, 9 Nov 2026: "baked beans" was an alias of plain boiled haricot beans (155 kcal), nearly twice a tin
+  // of beans in tomato sauce. CoFID "baked beans, canned in tomato sauce" as recalled (UK labels 78-84 kcal). Added
+  // sugar, so it carries the refined-sugar tag as well as the bean tags: a stricter answer, never a looser one.
+  f('baked beans', ['baked beans in tomato sauce', 'beans in tomato sauce', 'tinned baked beans'], { kcal: 84, protein: 5.2, carbs: 15.3, fat: 0.6 }, 'protein', { is_legume: true, is_high_carb: true, is_refined_sugar: true }),
+  f('seitan strips', ['vegan chicken', 'meat free chicken pieces'], { kcal: 138, protein: 25, carbs: 5, fat: 2 }, 'protein', { is_grain: true, contains_gluten: true }), // as seitan above (9 Nov 2026)
   f('soy yoghurt', ['soya yoghurt', 'vegan yoghurt'], { kcal: 65, protein: 3.7, carbs: 6.5, fat: 2.8 }, 'dairy', { contains_soy: true }),
   f('soy milk', ['soya milk'], { kcal: 33, protein: 3.3, carbs: 1.8, fat: 1.8 }, 'dairy', { contains_soy: true }),
   f('almond milk', ['unsweetened almond milk'], { kcal: 15, protein: 0.5, carbs: 0.3, fat: 1.2 }, 'dairy', { contains_nuts: true }),
@@ -485,7 +498,8 @@ export const FOOD_DB: FoodEntry[] = [
   f('tzatziki', [], { kcal: 88, protein: 3.8, carbs: 3.6, fat: 6.8 }, 'condiment', { contains_dairy: true, is_high_fodmap: true }),
   f('guacamole', [], { kcal: 155, protein: 2, carbs: 8.5, fat: 13 }, 'condiment', { is_high_fodmap: true }),
   f('sour cream', ['soured cream'], { kcal: 198, protein: 2.4, carbs: 4.6, fat: 19.7 }, 'dairy', { contains_dairy: true }),
-  f('creme fraiche', ['crème fraîche', 'half-fat creme fraiche', 'half-fat crème fraîche'], { kcal: 292, protein: 2.4, carbs: 3.4, fat: 30 }, 'dairy', { contains_dairy: true }),
+  f('half fat creme fraiche', ['half-fat creme fraiche', 'half-fat crème fraîche', 'reduced fat creme fraiche', 'light creme fraiche'], { kcal: 165, protein: 2.7, carbs: 4.1, fat: 15 }, 'dairy', { contains_dairy: true }), // 9 Nov 2026: UK labels, as recalled; was costed as full fat
+  f('creme fraiche', ['crème fraîche'], { kcal: 292, protein: 2.4, carbs: 3.4, fat: 30 }, 'dairy', { contains_dairy: true }),
   f('coleslaw', [], { kcal: 150, protein: 1.2, carbs: 8, fat: 13 }, 'condiment', { contains_egg: true, is_high_fodmap: true }),
   f('vinaigrette dressing', ['salad dressing', 'french dressing'], { kcal: 260, protein: 0.2, carbs: 8, fat: 25 }, 'condiment', {}, { tbsp: 15 }),
   f('ranch dressing', [], { kcal: 460, protein: 1, carbs: 6, fat: 48 }, 'condiment', { contains_dairy: true, contains_egg: true }, { tbsp: 15 }),
@@ -543,7 +557,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('bamboo shoots', ['canned bamboo shoots'], { kcal: 27, protein: 2.6, carbs: 5.2, fat: 0.3 }, 'veg', {}),
   f('taro root', ['taro root cubed', 'taro'], { kcal: 112, protein: 1.5, carbs: 26.5, fat: 0.2 }, 'carb', { is_high_carb: true }),
   f('yellow yam', ['boiled yellow yam', 'yam'], { kcal: 118, protein: 1.5, carbs: 27.9, fat: 0.2 }, 'carb', { is_high_carb: true }),
-  f('plantain', ['yellow plantain sliced thin', 'sweet plantain', 'baked plantain chips'], { kcal: 122, protein: 1.3, carbs: 32, fat: 0.4 }, 'carb', { is_high_carb: true }),
+  f('plantain', ['yellow plantain sliced thin', 'sweet plantain'], { kcal: 122, protein: 1.3, carbs: 32, fat: 0.4 }, 'carb', { is_high_carb: true }),
   f('cornmeal', [], { kcal: 370, protein: 8, carbs: 79, fat: 3.6 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('barley', ['whole barley grains', 'pearl barley'], { kcal: 123, protein: 2.3, carbs: 28.2, fat: 0.4 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
 
@@ -565,6 +579,10 @@ export const FOOD_DB: FoodEntry[] = [
   // MEAT STOCK IS MEAT (11 Oct 2026). Both broths carried no tag at all, so a
   // vegetarian or vegan meal with chicken stock in it passed the diet check.
   // Found by the lookup change's own measurement (the plan's section 10d).
+  // MEAL AUDIT, 9 Nov 2026: "vegetable stock" reached the CUBE (233 kcal per 100 g), so 500 ml of made-up stock was
+  // costed as half a kilo of cubes, about 1,150 kcal. Made-up stock, USDA "vegetable broth, ready to serve" as recalled.
+  // Celery is a usual stock vegetable, so it keeps the cube's celery tag.
+  f('vegetable broth', ['vegetable stock', 'veg stock', 'vegetable bouillon'], { kcal: 6, protein: 0.2, carbs: 1.1, fat: 0.1 }, 'condiment', { contains_celery: true }),
   f('chicken broth', ['chicken stock'], { kcal: 12, protein: 1.5, carbs: 0.9, fat: 0.3 }, 'condiment', { contains_meat: true }),
   f('rice paper wrappers', ['rice paper'], { kcal: 333, protein: 0.7, carbs: 82, fat: 0.2 }, 'carb', { is_grain: true, is_high_carb: true }, { whole: 10 }),
   f('injera flatbread', ['injera'], { kcal: 220, protein: 7, carbs: 45, fat: 1.5 }, 'carb', { is_grain: true, is_high_carb: true }),
@@ -583,7 +601,7 @@ export const FOOD_DB: FoodEntry[] = [
   // the dry grain kcal are the same ones AS_BOUGHT (grocery-store.ts) already
   // uses to turn cooked grams into bag grams, so the two cannot disagree.
   f('pasta dry', ['dry pasta', 'dried pasta', 'uncooked pasta'], { kcal: 371, protein: 13, carbs: 74.7, fat: 1.5 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }), // USDA 20120 pasta, dry, unenriched
-  f('wholewheat pasta dry', ['dry wholewheat pasta', 'dry whole wheat pasta'], { kcal: 348, protein: 14.6, carbs: 75, fat: 1.4 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }), // USDA 20124 spaghetti, whole-wheat, uncooked
+  f('wholewheat pasta dry', ['dry wholewheat pasta', 'dry whole wheat pasta', 'dry wholemeal pasta'], { kcal: 348, protein: 14.6, carbs: 75, fat: 1.4 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }), // USDA 20124 spaghetti, whole-wheat, uncooked
   f('white rice dry', ['dry white rice', 'uncooked white rice', 'uncooked rice', 'dry rice'], { kcal: 365, protein: 7.1, carbs: 80, fat: 0.7 }, 'carb', { is_grain: true, is_high_carb: true }), // USDA 20444 rice, white, long-grain, raw
   f('brown rice dry', ['dry brown rice', 'uncooked brown rice'], { kcal: 367, protein: 7.5, carbs: 76.2, fat: 3.2 }, 'carb', { is_grain: true, is_high_carb: true }), // USDA 20036 rice, brown, long-grain, raw
   f('basmati rice dry', ['dry basmati rice', 'uncooked basmati rice'], { kcal: 356, protein: 8.1, carbs: 78, fat: 0.6 }, 'carb', { is_grain: true, is_high_carb: true }), // UK pack, basmati, dry (Tilda) as recalled
@@ -702,7 +720,7 @@ const HOUSEHOLD_UNITS: Record<string, Record<string, number>> = {
   'bamboo shoots': { can: 225 },
   // fruit
   'lemon': { whole: 58 }, 'lime': { whole: 67 }, 'kiwi': { whole: 69, cup: 180 }, 'peach': { whole: 150, cup: 154 },
-  'plum': { whole: 66, cup: 165 }, 'grapefruit': { whole: 230 }, 'mango': { whole: 336, cup: 165 },
+  'plum': { whole: 66, cup: 165 }, 'grapefruit': { whole: 230 }, 'mango': { whole: 207, cup: 165 },
   'dates': { whole: 24, cup: 147 }, 'figs': { whole: 50 }, 'pomegranate': { whole: 280, cup: 174 }, 'passion fruit': { whole: 18 },
   'strawberries': { whole: 12, cup: 152, handful: 75 }, 'blueberries': { cup: 148, handful: 75 }, 'raspberries': { cup: 123, handful: 60 },
   'blackberries': { cup: 144, handful: 75 }, 'mixed berries': { cup: 140, handful: 75 }, 'grapes': { cup: 151, handful: 80 },
@@ -710,10 +728,13 @@ const HOUSEHOLD_UNITS: Record<string, Record<string, number>> = {
   'dried apricots': { whole: 8, cup: 130 }, 'coconut flesh': { cup: 80 },
   // protein foods: a piece (cooked weight, as the entry's figures are), pulses by the cup and the tin
   // chicken breast: one figure with the piece table's BNF breast (merge of 11 Oct 2026: this said 140).
-  'chicken breast': { whole: 120 }, 'chicken thigh': { whole: 110 }, 'chicken drumstick': { whole: 80 },
-  'pork sausage': { whole: 60 }, 'bacon': { whole: 12, slice: 12 }, 'ham': { slice: 25 }, 'chorizo': { slice: 6 },
-  'salmon': { whole: 150 }, 'cod': { whole: 150 }, 'haddock': { whole: 150 }, 'sea bass': { whole: 130 }, 'tilapia': { whole: 120 },
-  'trout': { whole: 150 }, 'mackerel': { whole: 130 }, 'beef steak sirloin': { whole: 225 }, 'beef rump steak': { whole: 225 },
+  // MEAL AUDIT, 9 Nov 2026: a thigh, a drumstick and a steak were costed at weights that are raw or bone-in, against
+  // COOKED figures. Cooked meat from one boneless thigh fillet (about 100 g raw) is about 75 g; USDA, one roasted
+  // drumstick, meat and skin, 52 g; a UK steak of about 225 g raw is about 160 g cooked.
+  'chicken breast': { whole: 120 }, 'chicken thigh': { whole: 75 }, 'chicken drumstick': { whole: 52 },
+  'pork sausage': { whole: 40 }, 'bacon': { whole: 12, slice: 12 }, 'ham': { slice: 25 }, 'chorizo': { slice: 6 },
+  'salmon': { whole: 125 }, 'cod': { whole: 120 }, 'haddock': { whole: 120 }, 'sea bass': { whole: 130 }, 'tilapia': { whole: 120 },
+  'trout': { whole: 150 }, 'mackerel': { whole: 130 }, 'beef steak sirloin': { whole: 160 }, 'beef rump steak': { whole: 160 },
   'lamb chop': { whole: 90 }, 'pork chop': { whole: 150 }, 'prawns': { whole: 12 }, 'scallops': { whole: 25 }, 'anchovies': { whole: 4 },
   'falafel': { whole: 17 }, 'smoked salmon': { slice: 30 },
   'tuna canned in water': { can: 120 }, 'sardines canned': { can: 90 }, 'crab meat': { can: 145 },
@@ -755,11 +776,7 @@ const HOUSEHOLD_UNITS: Record<string, Record<string, number>> = {
   'oysters': { whole: 15 },
   'coriander': { handful: 20, bunch: 30 }, 'dill': { handful: 20, bunch: 30 }, 'basil': { handful: 15, bunch: 30 },
 }
-for (const [name, extra] of Object.entries(HOUSEHOLD_UNITS)) {
-  const entry = FOOD_DB.find(f => f.name === name)
-  // A name that matches nothing is a typo that would silently do nothing; the gate fails on it, and the loop skips it so the app still loads.
-  if (entry) entry.units = { ...extra, ...(entry.units ?? {}) }
-}
+// Merged below with PIECE_WEIGHTS, in one place (9 Nov 2026): a cited piece weight now wins over a household one.
 
 const LOOKUP = new Map<string, FoodEntry>()
 for (const entry of FOOD_DB) {
@@ -896,6 +913,9 @@ const ENTRY_STATE: Record<string, FoodState> = {
   'salmon': 'raw', 'beef mince 5% fat': 'raw', 'beef mince 20% fat': 'raw', 'chicken mince': 'raw', 'tuna steak fresh': 'raw',
   'trout': 'raw', 'red snapper': 'raw', 'squid': 'raw', 'scallops': 'raw', 'oysters': 'raw', 'chicken liver': 'raw', 'taro root': 'raw',
   'duck breast': 'cooked', 'venison': 'cooked', 'split peas': 'cooked', 'barley': 'cooked',
+  // MEAL AUDIT, 9 Nov 2026: two rows whose figures are the DRY food and whose names did not say so. "200g cooked
+  // protein pasta" was costed as 200 g dry, about two and a half times over; now it is a miss, asked about.
+  'protein pasta': 'dry', 'soy mince dry': 'dry',
 }
 
 /** cooked entry -> its dry and raw twins. The twins' own state is set from this table when the module loads. */
@@ -994,7 +1014,7 @@ const PIECE_WEIGHTS: Record<string, Record<string, number>> = {
   'bacon': { rasher: 25, slice: 25 },                  // FPS: back bacon, one grilled rasher 25 g
   'ham': { slice: 23 },                                // FPS: ham, one average slice 23 g
   'pork sausage': { whole: 40 },                       // FPS: one large sausage, grilled 40 g
-  'salmon': { fillet: 100 },                           // BNF: a cooked fish fillet (salmon or cod), 100-140 g · UK packs sell at about 120 g raw
+  'salmon': { fillet: 125 },                           // pack: UK salmon fillets sell at about 120-130 g RAW, and this entry is raw (9 Nov 2026: was 100)
   'cod': { fillet: 120 },                              // BNF: a cooked fish fillet (salmon or cod), 100-140 g
   'haddock': { fillet: 120 },                          // FPS: as cod
   'tilapia': { fillet: 87 },                           // USDA: tilapia, cooked, 1 fillet 87 g
@@ -1062,9 +1082,16 @@ const PIECE_WEIGHTS: Record<string, Record<string, number>> = {
   'star anise': { whole: 2 },                          // kitchen scale, not a table: one pod is about 2 g
   'vegetable stock cube': { cube: 10 },                // pack: Knorr stock cube 10 g
 }
+// ONE MERGE, IN ORDER OF HOW WELL EACH FIGURE IS KNOWN (9 Nov 2026): a weight written on the entry itself, then the
+// cited piece table above, then the household table. The household table used to be merged first INTO the entry's
+// own units, so wherever the two tables disagreed the uncited household figure won and the cited one was silently
+// ignored (a tin of tuna 120 g against the pack's 102 g drained, a handful of nuts 30 g against the BNF's 20 g, a
+// sausage 60 g against the FPS's 40 g, a cracker 5 g against 7 g).
+// A household or piece name that matches no entry is a typo that would silently do nothing; the gate fails on it.
 for (const entry of FOOD_DB) {
+  const household = HOUSEHOLD_UNITS[entry.name]
   const pieces = PIECE_WEIGHTS[entry.name]
-  if (pieces) entry.units = { ...pieces, ...entry.units }
+  if (household || pieces) entry.units = { ...(household ?? {}), ...(pieces ?? {}), ...(entry.units ?? {}) }
 }
 
 // ---------------------------------------------------------------------------
