@@ -2,6 +2,13 @@
 
 Newest first. One line each.
 
+- [x] **SETUP'S OWN LINE SAID "HOW OLD ARE YOU?" OVER A CARD ASKING AGE, HEIGHT AND WEIGHT, 9 NOV 2026** (QA round 3,
+  setup finding 11). Mechanical. A number card asks every unanswered number of its group at once; the app's own line
+  above it (a turn the coach left silent, the next card, a stepped-in ask, "Next:" after a failed connection) read only
+  the first slot's question. One function now words it from the card: "What's your age, height and weight?", "What's
+  your height and weight?" once age is in, the slot's own question for one number or any other card. CHECKS: new
+  `test:setup-card-question` (6 checks; 4 mutations, 4 caught). Logic and source only: no driver reaches the stepped-in
+  and failed-connection paths with a number card, named.
 - [x] **CHANGING A NUMBER FROM SETUP'S SUMMARY: AN EMPTY BOX, THE GROUP'S HINT, AND NO WAY BACK TO "NOT GIVEN",
   9 NOV 2026** (QA round 3, setup finding 10). Mechanical. Tapping Weight on the summary opened an empty box (a
   single-choice change shows the current pick), the message box read "age, height and weight…" over the one weight,

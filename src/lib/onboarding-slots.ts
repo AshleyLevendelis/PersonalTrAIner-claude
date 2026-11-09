@@ -1470,3 +1470,20 @@ export function buildSlotCatalog(values: OnboardingSlotValues = initialSlotValue
       max: s.max,
     }))
 }
+
+/**
+ * THE QUESTION A CARD ASKS, IN WORDS THAT MATCH THE CARD (QA round 3, setup finding 11): a number card asks every
+ * unanswered number of its group at once (age, height and weight), and the line above it read only the first ("How old
+ * are you?"). Several still to give: "What's your age, height and weight?". One, or any other card: its own question.
+ */
+export function cardQuestion(key: SlotKey, values: OnboardingSlotValues, confirmed: ReadonlySet<string>): string {
+  const def = getSlotDef(key)
+  if (!def) return ''
+  if (def.control !== 'numeric') return def.question
+  const open = (numericGroupFor(key) as SlotKey[])
+    .map(k => getSlotDef(k))
+    .filter((d): d is NonNullable<typeof d> => !!d && d.control === 'numeric' && isSlotApplicable(d, values) && !confirmed.has(d.key))
+  if (open.length <= 1) return def.question
+  const names = open.map(d => d.shortLabel.toLowerCase())
+  return `What's your ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}?`
+}

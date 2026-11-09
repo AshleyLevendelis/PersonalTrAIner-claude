@@ -564,7 +564,8 @@
     "verify:coach-lessons": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-lessons.mjs",
     "verify:coach-opener-words": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-opener-words.mjs",
     "verify:chat-cleared": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-cleared.mjs",
-    "test:first-chat": "tsx scripts/test-first-chat.ts"
+    "test:first-chat": "tsx scripts/test-first-chat.ts",
+    "test:setup-card-question": "tsx scripts/test-setup-card-question.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

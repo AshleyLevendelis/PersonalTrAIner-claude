@@ -33,6 +33,7 @@ import {
   DIETARY_OPTIONS,
   displaySlotValue,
   editPromptFor,
+  cardQuestion,
   type OnboardingSlotValues,
   type SlotKey,
   type SlotDef,
@@ -1126,7 +1127,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       }
       if (host) host.slotCard = cardKey
       // No words at all this turn: render the slot's own question with it.
-      else ws.newMessages.push({ role: 'assistant', content: getSlotDef(cardKey)!.question, slotCard: cardKey })
+      else ws.newMessages.push({ role: 'assistant', content: cardQuestion(cardKey as SlotKey, ws.values, ws.confirmed), slotCard: cardKey })
     } else if (host && presentRequests.length > 0) {
       // Loud on purpose. Every line here is a turn where chips were asked for
       // and withheld; if it shows up often, the patterns are too tight.
@@ -1447,7 +1448,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         if (nextDef) {
           responseWs.newMessages.push({
             role: 'assistant',
-            content: nextDef.question,
+            content: cardQuestion(next as SlotKey, responseWs.values, responseWs.confirmed),
             // Numeric slots get a card as well now — they used to fall through
             // to free text with no bounds check at the point of answering.
             slotCard: nextDef.control === 'text' ? undefined : nextDef.key,
@@ -1553,7 +1554,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
               const lead = stuck ? forcedAskLead(timesSteppedIn, target !== canonicalNext, def.control === 'text') : ''
               responseWs.newMessages.push({
                 role: 'assistant',
-                content: lead ? `${lead} ${def.question}` : def.question,
+                content: lead ? `${lead} ${cardQuestion(target as SlotKey, responseWs.values, responseWs.confirmed)}` : cardQuestion(target as SlotKey, responseWs.values, responseWs.confirmed),
                 slotCard: def.control === 'text' ? undefined : target,
               })
             }
@@ -1572,7 +1573,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       setMessages(prev => [
         ...prev,
         def && next
-          ? { role: 'assistant', content: `${saved} Next: ${def.question}`, slotCard: def.control === 'text' ? undefined : next }
+          ? { role: 'assistant', content: `${saved} Next: ${cardQuestion(next as SlotKey, ws.values, ws.confirmed)}`, slotCard: def.control === 'text' ? undefined : next }
           : answeredThisTurn
             ? { role: 'assistant', content: saved }
             : { role: 'assistant', content: 'I couldn’t reach your coach just then, so that didn’t go through. Your message is back in the box: tap send to try again.' },
