@@ -15,7 +15,12 @@ Newest first. One line each.
   five events" plus the one he asked for), `verify:coach-hello` BD1-BD3 (new: first at noon over today's session,
   greeted; said once; nothing the day before). Mutations: 6 tried, 5 caught; the 6th (a month-and-day shortcut) is
   equivalent, since 29 February never occurs in a year without one, so it was replaced by month-and-day ONLY, which is
-  caught (the 1 March case). Frontend only.
+  caught (the 1 March case). Frontend only. RUN: the 374 checks that read the files these three birthday changes
+  touched (date picker, keep the birthday, the wish): 369 passed; 4 failed on the run and were fixed and re-run green
+  (three checks that read the setup save by its old shape, re-anchored to it; the size budget, raised 8 kB over the
+  measured size; the dates rule, a birthday helper that wrote dates the UTC way); the 5th needs a database this
+  session cannot reach. The three re-anchored setup-save checks, plus the birthday's own, were mutation-tested by
+  deleting one field from the save each: 4 tried, 4 caught.
 
 - [x] **THE BIRTHDAY IS KEPT, SO THE AGE GOES UP ON ITS OWN, 9 NOV 2026. His ruling: option 1, "Keep the birthday"**,
   from three options (over age only, as built that morning, and over age only with a yearly "still 36?" nudge), on
