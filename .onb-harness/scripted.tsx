@@ -192,6 +192,23 @@ if (state === 'none-left') {
   ))
 }
 
+// ?state=freehand-food — QA round 3 (9 Nov 2026): the body questions still open, the conversation on food, and the
+// coach's latest question in its own words (no slot named). The header said "Body" here, the first unanswered slot.
+if (state === 'freehand-food') {
+  const answered = { ...SAM_SO_FAR, mealsPerDay: 3, dietaryPreferences: ['nut-free'] }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Sam' },
+      { role: 'assistant', content: 'Any diet I should know about?', asksSlot: 'dietaryPreferences' },
+      { role: 'user', content: 'nut-free' },
+      { role: 'assistant', content: 'Noted. Is there anything you just never want to see on your plate?' },
+    ],
+    answered,
+    Object.keys(answered),
+  ))
+}
+
 // JO, a gym lifter at the working-lifts question — the state Ashley was in on
 // 19 Oct 2026 when "I know my numbers" asked her nothing. Barbell-capable and
 // not a beginner, so the question applies; its card is live.

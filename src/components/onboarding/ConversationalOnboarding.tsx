@@ -2010,7 +2010,25 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       : [def.key]
     return keys.length > 0 && keys.every(k => { const d = getSlotDef(k); return !!d && canDeclineSlot(d, values) }) ? keys : []
   })()
-  const sectionLabel = setupSectionOf(cardOnScreen ?? (questionIdx >= 0 ? messages[questionIdx].asksSlot : undefined) ?? openSlotsInOrder(confirmed, values)[0] ?? null)
+  // WHERE THE CONVERSATION IS, NOT WHAT IS FIRST ON THE LIST (QA round 3, 8 Nov 2026): a question asked in the
+  // coach's own words names no slot, and the header fell back to the first unanswered one, so the foods question read
+  // "Body · 14 of 18" and the name question "Training · 1 of 17". It now keeps the section of the latest question
+  // that did name one, and before any has, it is the name the coach asks first.
+  const lastNamedSlot = (() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i]
+      if (m.role !== 'assistant' || m.isReceipt) continue
+      const k = m.slotCard ?? m.asksSlot
+      if (k) return k
+    }
+    return null
+  })()
+  const sectionLabel = setupSectionOf(
+    cardOnScreen
+    ?? (questionIdx >= 0 ? messages[questionIdx].asksSlot : undefined)
+    ?? lastNamedSlot
+    ?? (!confirmed.has('displayName') ? 'displayName' : openSlotsInOrder(confirmed, values)[0] ?? null),
+  )
   const stepNow = Math.max(1, Math.min(requiredCount, answeredCount + 1))
 
   const composerBottomStyle = isKeyboardOpen

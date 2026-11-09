@@ -55,6 +55,8 @@ await open('none-left')
 const q = await headline()
 check('2a. the fixture binds: the foods question is on screen and cuisines is not yet answered',
   /left out/i.test(q) && !((await draft())?.confirmedSlots ?? []).includes('favoriteCuisines'), { q, confirmed: (await draft())?.confirmedSlots })
+const head = await ev(`document.querySelector('[data-onboarding-step]')?.textContent.trim() ?? ''`)
+check('2-. the header names the foods question\'s own section, not the first unanswered one ("Food · …")', /^Food · \d+ of \d+$/.test(head), head)
 await ev(`window.__onbQueue.push({ reply: 'Got it.' })`)
 await tapEl(`document.querySelector(${JSON.stringify(INPUT)})`)
 await send('Input.insertText', { text: 'none' })
@@ -105,5 +107,14 @@ await send('Input.insertText', { text: 'eight hours' })
 await wait(200)
 const typed = await buttons()
 check('4c. one round button beside the box: the mic while it is empty, send once there is text', empty?.mic === 1 && empty?.send === 0 && typed?.mic === 0 && typed?.send === 1, { empty, typed })
+
+// --- 5. The header keeps the section the talk is in (QA round 3, setup finding 6) ----------------------------------
+// A question in the coach's own words names no slot; the header fell back to the first unanswered one ("Body" over a
+// food question). The fixture has body questions open and the talk on food.
+await open('freehand-food')
+const free = await ev(`document.querySelector('[data-onboarding-step]')?.textContent.trim() ?? ''`)
+const bodyOpen = await evj(`(() => { const d = JSON.parse(localStorage.getItem('fitplan_onboarding_draft') || 'null'); return !!d && !d.confirmedSlots.includes('age') })()`)
+check('5a. the fixture binds: a body question is still unanswered', bodyOpen === true, bodyOpen)
+check('5b. the header reads "Food" over a food question asked in the coach\'s own words', /^Food · \d+ of \d+$/.test(free), free)
 
 finish('Setup keeps its question on resume, "none" answers only what it was said to, and the summary rows are a thumb tall.')
