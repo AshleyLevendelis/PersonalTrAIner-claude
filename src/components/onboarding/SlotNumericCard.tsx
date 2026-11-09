@@ -38,13 +38,8 @@ import {
  * grouped cards put three fields under one question, so only one of them
  * could ever have taken its unit from the sentence above.
  */
-import { measureParserFor, ageOn, birthDateBounds, weightParts, heightParts, weightText, heightText, sayWeight, sayHeight, type WeightUnit, type HeightUnit } from '@/lib/body-units'
+import { measureParserFor, todayLocal, ageOn, birthDateBounds, weightParts, heightParts, weightText, heightText, sayWeight, sayHeight, type WeightUnit, type HeightUnit } from '@/lib/body-units'
 
-/** Today on this phone's own calendar, YYYY-MM-DD: a date of birth is a local date. */
-const localToday = () => {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
 const WEIGHT_UNITS: { unit: WeightUnit; label: string }[] = [{ unit: 'kg', label: 'kg' }, { unit: 'lb', label: 'lb' }, { unit: 'st', label: 'st & lb' }]
 const HEIGHT_UNITS: { unit: HeightUnit; label: string }[] = [{ unit: 'cm', label: 'cm' }, { unit: 'ft', label: 'ft & in' }]
 
@@ -117,8 +112,9 @@ export function SlotNumericCard({
   // AGE, HEIGHT AND WEIGHT HAVE THEIR OWN CONTROLS (Ashley, 9 Nov 2026): a date picker for the date of birth, and a
   // unit toggle beside the weight and the height boxes. Each writes the text the slot's parser already reads, so the
   // number stored, the receipt ("from 5'10\"") and the bounds are what typing it gave.
-  const today = localToday()
-  const [dob, setDob] = useState('')
+  const today = todayLocal()
+  // Changing the answer from the summary starts from the date of birth already picked.
+  const [dob, setDob] = useState(() => (editing && typeof values.dateOfBirth === 'string' ? values.dateOfBirth : ''))
   const [weightUnit, setWeightUnit] = useState<WeightUnit>('kg')
   const [heightUnit, setHeightUnit] = useState<HeightUnit>('cm')
   const [weightBoxes, setWeightBoxes] = useState<[string, string]>(() => [draft.weightKg ?? '', ''])
@@ -301,11 +297,12 @@ export function SlotNumericCard({
             setShowErrors(true)
             return
           }
-          onResolve(
-            fields
-              .filter(d => rawOf(d.key).trim() !== '')
-              .map(d => ({ key: d.key, raw: rawOf(d.key).trim() })),
-          )
+          const answers = fields
+            .filter(d => rawOf(d.key).trim() !== '')
+            .map(d => ({ key: d.key, raw: rawOf(d.key).trim() }))
+          // THE BIRTHDAY GOES WITH THE AGE IT MADE (his 9 Nov option 1), so the age can go up on its own later.
+          if (dob && answers.some(a => a.key === 'age')) answers.push({ key: 'dateOfBirth', raw: dob })
+          onResolve(answers)
         }}
       >
         Save

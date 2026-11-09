@@ -54,6 +54,11 @@ export interface UserProfile {
    * targets need a weight and offer a way to add one.
    */
   age?: number
+  /**
+   * The date of birth, YYYY-MM-DD, when they picked one (Ashley, 9 Nov 2026, option 1: keep the birthday so the age
+   * goes up on its own). `age` is set from it at load (body-units.ts currentAge); absent when only an age was given.
+   */
+  date_of_birth?: string | null
   gender?: 'male' | 'female'
   height_cm?: number
   weight_kg?: number

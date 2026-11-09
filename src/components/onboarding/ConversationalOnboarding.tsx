@@ -1697,7 +1697,8 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       // substitution must be visible at the moment it can still be corrected.
       const note = conversionNoteFor(def, raw)
       if (applySlot(ws, key, coerceSlotValue(def, raw), values, !!note, note)) {
-        saved.push(`${def.shortLabel.toLowerCase()} ${raw}`)
+        // The date of birth rides with the age it made; the age is what is said back (his 9 Nov option 1).
+        if (key !== 'dateOfBirth') saved.push(`${def.shortLabel.toLowerCase()} ${raw}`)
       }
     }
     if (saved.length === 0) {

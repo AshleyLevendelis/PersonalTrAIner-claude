@@ -1673,10 +1673,12 @@ menu" stays true when a copy is also left outside it.
   Skip is the old "Prefer not to say", moved to the header, never on a multi-select. One tap
   answers a single-choice question: his ruling 11 Oct 2026, **"Move straight on"**, over the
   brief's select-then-Next. `test:onboarding-style`
-  **Age, height and weight have their own controls: his request 9 Nov 2026** — a date picker for the date of birth
-  (the age it makes is what is stored; the birthday itself is not kept), and kg / lb / st & lb and cm / ft & in
-  toggles beside the weight and height boxes. `test:body-units` §7-8, `verify:composer`. Needs the `onboarding-chat`
-  deploy for the coach to ask the date of birth.
+  **Age, height and weight have their own controls: his request 9 Nov 2026** — a date picker for the date of birth,
+  and kg / lb / st & lb and cm / ft & in toggles beside the weight and height boxes. `test:body-units` §7-8,
+  `verify:composer`. Needs the `onboarding-chat` deploy for the coach to ask the date of birth.
+  **And the birthday is kept: his ruling 9 Nov 2026, option 1 "Keep the birthday"** (over age only and over a yearly
+  nudge): the age is worked out from it each time the app opens, so it goes up on its own; Profile's age row is the same
+  picker. `test:date-of-birth`, `verify:profile-fixes` §9. Needs the date-of-birth migration on his machine.
   **And no Back button: his ruling 9 Nov 2026, "A. No back button"** (over a Back in the header and over both): an
   answer is changed from the summary at the end, which taps through to any row. Not built, by decision.
 - **Profile is a page of rows**; every editor it had is in exactly one row's sheet, and a deep link

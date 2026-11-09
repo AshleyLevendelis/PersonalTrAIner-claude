@@ -140,6 +140,21 @@ export function measureParserFor(slotKey: string): ((raw: string) => ParsedMeasu
 export type WeightUnit = 'kg' | 'lb' | 'st'
 export type HeightUnit = 'cm' | 'ft'
 
+/** Today on this phone's own calendar, YYYY-MM-DD: a date of birth is a local date. */
+export function todayLocal(now: Date = new Date()): string {
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+/**
+ * THE AGE TO USE TODAY (Ashley, 9 Nov 2026, option 1: keep the birthday so the age goes up on its own): worked out from
+ * the date of birth when there is one, else the age as recorded. Every reader of the age gets it through the profile,
+ * which is set from this at load, so the calorie maths moves on a birthday without anyone touching it.
+ */
+export function currentAge(dateOfBirth: string | null | undefined, recordedAge: number | null | undefined, today: string = todayLocal()): number | undefined {
+  const fromBirth = dateOfBirth ? ageOn(dateOfBirth, today) : null
+  return fromBirth ?? (recordedAge ?? undefined)
+}
+
 /** Whole years old on `today` for someone born on `dob` (both YYYY-MM-DD); null when either is not a real date or dob is after today. */
 export function ageOn(dob: string, today: string): number | null {
   const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob), t = /^(\d{4})-(\d{2})-(\d{2})$/.exec(today)

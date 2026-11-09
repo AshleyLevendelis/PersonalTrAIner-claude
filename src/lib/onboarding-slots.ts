@@ -132,6 +132,7 @@ export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: st
 import { EQUIPMENT_OPTIONS, INJURY_OPTIONS } from './picker-options'
 import { parseSportsSlot } from './setup-sports'
 import { describeActivity } from './concurrent-activity'
+import { ageOn, todayLocal } from './body-units'
 import { parseKitSlot, describeKitStatement, KIT_ITEMS, KIT_ITEM_LABELS, kitItemsFor, statementsForTicks, isKitItem, type KitItem, type KitStatement } from './kit-list'
 export { EQUIPMENT_OPTIONS, INJURY_OPTIONS }
 
@@ -457,6 +458,11 @@ export interface OnboardingSlotValues {
    */
   kitList: string
   /**
+   * The date of birth picked on the age card, YYYY-MM-DD, '' when the age was typed instead (Ashley, 9 Nov 2026,
+   * option 1: keep the birthday so the age goes up on its own). Never asked on its own: the age card sets it.
+   */
+  dateOfBirth: string
+  /**
    * ANOTHER SPORT they said they do, with its days (Ashley, 7 Nov 2026, "Remember
    * it when they say it"): the activities as JSON, read from their own words
    * by the app (setup-sports.ts sportsIn), '' for none. Never asked, and never
@@ -511,6 +517,7 @@ export function initialSlotValues(): OnboardingSlotValues {
     maxSingleImplementKg: '',
     maxImprovisedKg: '',
     kitList: '',
+    dateOfBirth: '',
     otherSports: '',
     kitTicks: null,
   }
@@ -1027,6 +1034,11 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // their whole kit, "hasnt: bands" for something they lack, "has: bench" for
   // something extra. The client records it only when every item is in their
   // own words, the right way round (kit-list.ts kitStatementInUserWords).
+  // THE DATE OF BIRTH, set by the age card's picker beside the age it makes (his 9 Nov option 1). Never asked as a
+  // question of its own and never shown on the summary (the age is); see APP_ONLY_SLOTS.
+  { key: 'dateOfBirth', question: "What's your date of birth?", inputHint: 'Your date of birth…', shortLabel: 'Date of birth',
+    control: 'text', required: false, destination: 'column',
+    validate: v => v === '' || (typeof v === 'string' && (() => { const a = ageOn(v, todayLocal()); return a != null && a >= 13 && a <= 100 })()) },
   { key: 'kitList', question: 'What kit do you actually have?',
     inputHint: 'only: dumbbells, bench', shortLabel: 'Your kit', control: 'text', required: false,
     destination: 'user_facts', validate: v => v === '' || parseKitSlot(v) !== null },
@@ -1186,6 +1198,8 @@ export const NEVER_BLOCKING_SLOTS: SlotKey[] = [
   'kitList',
   // Another sport: never asked (her 7 Nov "Remember it when they say it").
   'otherSports',
+  // The date of birth: set by the age card, never asked on its own (his 9 Nov option 1).
+  'dateOfBirth',
 ]
 
 /** Required slots whose VALUE must validate before completion, per the current answers (requiredIf-aware). */
@@ -1305,6 +1319,8 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     // fabricated ANSWER into the profile, indistinguishable downstream from
     // one the user actually gave, which also defeated "the slot stays open".
     age: numericOrUndefined(data.age),
+    // Kept so the age goes up on a birthday (his 9 Nov option 1); absent when the age was typed instead.
+    date_of_birth: data.dateOfBirth || undefined,
     gender: data.gender ?? undefined,
     height_cm: numericOrUndefined(data.heightCm),
     weight_kg: numericOrUndefined(data.weightKg),

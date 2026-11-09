@@ -108,6 +108,9 @@ const ASKS: Record<SlotKey, Asks> = {
   kitList: /what kit do you (actually )?(have|own)/i,
   // Never asked and never carded; listed because every slot needs a pattern.
   otherSports: /do you do any other sports?\b/i,
+  // Its own wording, so its question is recognised as itself. It has no card of its own (a text answer), so this can
+  // never put anything under a question: "date of birth" brings the AGE card (above), which sets this beside the age.
+  dateOfBirth: /date of birth|\bborn\b|birthday|\bdob\b/i,
   kitTicks: /which of these do you have|untick anything you don.t have|what (kit|equipment) do you (actually )?(have|own) at home/i,
 }
 

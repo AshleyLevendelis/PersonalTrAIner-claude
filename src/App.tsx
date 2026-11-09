@@ -26,6 +26,8 @@ import { computeBMR, staticTDEEFor, resolveBodyMetrics } from '@/lib/macro-calcu
 import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged, anchorTargetsAtSignUp, retargetAfterWeighIn } from '@/lib/nutrition-targets'
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
+import { currentAge } from '@/lib/body-units'
+import { isMissingColumnError } from '@/lib/missing-column'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, type MealSlotName } from '@/lib/meal-store'
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
@@ -1058,7 +1060,10 @@ function App() {
       // undoing the whole absence fix for every returning user. age/gender
       // pass through as-is (already null | T from Postgres); height/weight
       // need the Number() cast for real values but must skip it for null.
-      age: profileRow.age ?? undefined,
+      // THE AGE IS TODAY'S (his 9 Nov option 1): worked out from the date of birth when one was picked, so it goes up
+      // on a birthday. `select('*')` above needs no column to exist, so this reads the same before the migration.
+      age: currentAge(profileRow.date_of_birth, profileRow.age),
+      date_of_birth: profileRow.date_of_birth ?? undefined,
       gender: profileRow.gender ?? undefined,
       height_cm: profileRow.height_cm == null ? undefined : Number(profileRow.height_cm),
       weight_kg: profileRow.weight_kg == null ? undefined : Number(profileRow.weight_kg),
@@ -1840,11 +1845,12 @@ function App() {
       return
     }
 
-    const { data, error: insertError } = await supabase
-      .from('fitness_profiles')
-      .insert({
+    const profileInsert = {
         owner_id: signIn.userId,
         age: enrichedProfile.age,
+        // Kept so the age goes up on a birthday (his 9 Nov option 1). A database that has not run the migration yet
+        // refuses the whole insert over it, so the insert below is tried once more without it (missing-column.ts).
+        date_of_birth: enrichedProfile.date_of_birth ?? null,
         gender: enrichedProfile.gender,
         height_cm: enrichedProfile.height_cm,
         weight_kg: enrichedProfile.weight_kg,
@@ -1914,9 +1920,12 @@ function App() {
         protein_g: enrichedProfile.protein_g,
         carbs_g: enrichedProfile.carbs_g,
         fat_g: enrichedProfile.fat_g,
-      })
-      .select('id')
-      .maybeSingle()
+    }
+    let { data, error: insertError } = await supabase.from('fitness_profiles').insert(profileInsert).select('id').maybeSingle()
+    if (insertError && isMissingColumnError(insertError, 'date_of_birth')) {
+      const { date_of_birth: _notYet, ...withoutBirthday } = profileInsert
+      ;({ data, error: insertError } = await supabase.from('fitness_profiles').insert(withoutBirthday).select('id').maybeSingle())
+    }
 
     if (insertError) {
       // Surface this rather than swallowing it. The most likely cause after a

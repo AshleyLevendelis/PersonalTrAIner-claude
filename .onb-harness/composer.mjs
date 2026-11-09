@@ -137,6 +137,10 @@ say('178cm was stored and read back', /178/.test(after), after.slice(0, 400))
 say('83.5kg was stored and read back', /83\.5/.test(after), after.slice(0, 400))
 say(`the receipt says where 178 came from`, /from 5'10/.test(after), after.slice(0, 400))
 say('...and where 83.5 came from', /from 13st 2lb/.test(after), after.slice(0, 400))
+// His 9 Nov option 1: the birthday is kept beside the age, so the age can go up on its own.
+const keptDob = await ev(`(() => { const d = JSON.parse(localStorage.getItem('fitplan_onboarding_draft') || 'null'); return d?.values?.dateOfBirth ?? null })()`)
+say('the date of birth is kept with the answers', keptDob === '1990-06-15', keptDob)
+say('...and the raw date is not said back in the chat', !/1990/.test(after), (after.match(/[^\n]*1990[^\n]*/) ?? [''])[0])
 
 console.log(bad === 0 ? '\n  composer matches the question on screen in all cases.\n' : `\n  ${bad} MISMATCHED\n`)
 chrome.kill(); server.close()

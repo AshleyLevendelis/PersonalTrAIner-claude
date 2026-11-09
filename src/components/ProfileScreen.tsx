@@ -20,6 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
+import { ageOn, birthDateBounds, todayLocal } from '@/lib/body-units'
 import { Separator } from '@/components/ui/separator'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -247,6 +248,38 @@ const SHEET_FOR_SECTION: Record<NonNullable<ProfileScreenProps['initialSection']
  * ruling); it just starts empty and shows a "Not set" placeholder rather
  * than pretending to hold a number.
  */
+/**
+ * THE AGE, SET BY A DATE OF BIRTH (Ashley, 9 Nov 2026, option 1: keep the birthday so the age goes up on its own). The
+ * date picker is the control; the age it makes is said beside it and saved with it. With no date of birth yet, the
+ * age recorded at setup is shown and the picker is empty, so picking one is how the age starts keeping itself current.
+ */
+function DateOfBirthField({ dateOfBirth, age, onSave }: { dateOfBirth?: string | null; age?: number; onSave: (dateOfBirth: string, age: number) => void }) {
+  const today = todayLocal()
+  const { min, max } = birthDateBounds(today, 13, 100)
+  const [input, setInput] = useState(dateOfBirth ?? '')
+  const [refused, setRefused] = useState(false)
+  useEffect(() => { setInput(dateOfBirth ?? '') }, [dateOfBirth])
+  const picked = input ? ageOn(input, today) : null
+  const commit = (v: string) => {
+    setInput(v)
+    const a = v ? ageOn(v, today) : null
+    const ok = a != null && a >= 13 && a <= 100
+    setRefused(v !== '' && !ok)
+    if (ok && v !== dateOfBirth) onSave(v, a!)
+  }
+  return (
+    <div className="flex flex-col items-end gap-1" data-testid="profile-dob">
+      <Input id="profile-dob" type="date" min={min} max={max} value={input} aria-label="Date of birth"
+        onChange={e => commit(e.target.value)} className="h-11 w-44 text-sm" />
+      <span className="text-xs text-muted-foreground" data-testid="profile-dob-age">
+        {refused ? 'Pick a date that makes you between 13 and 100.'
+          : picked != null ? `${picked} years`
+          : age != null ? `${age} years. Pick your date of birth to keep it up to date.` : 'Not set'}
+      </span>
+    </div>
+  )
+}
+
 function EditableTextField({
   value, unit, onSave, min, max, placeholder,
 }: { value?: number; unit?: string; onSave: (n: number) => void; min?: number; max?: number
@@ -1112,7 +1145,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
           <h3 className="ds-label">Identity &amp; metrics</h3>
           <div className="text-sm">
             <Row label="Name"><EditableStringField value={profile.display_name} placeholder="Not set" onSave={v => savePatch({ display_name: v })} /></Row>
-            <Row label="Age"><EditableTextField value={profile.age} unit="years" min={13} max={100} onSave={n => savePatch({ age: n })} /></Row>
+            <Row label="Age"><DateOfBirthField dateOfBirth={profile.date_of_birth} age={profile.age} onSave={(d, a) => savePatch({ date_of_birth: d, age: a })} /></Row>
             <Row label="Gender"><EditableSelectField value={profile.gender} options={GENDER_OPTIONS as { value: 'male' | 'female'; label: string }[]} onSave={v => savePatch({ gender: v })} /></Row>
             <Row label="Height"><EditableTextField value={profile.height_cm} unit="cm" min={100} max={250} onSave={n => savePatch({ height_cm: n })} /></Row>
             {/* The same "is this believable?" check the weigh-in card asks

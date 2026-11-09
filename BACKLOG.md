@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **THE BIRTHDAY IS KEPT, SO THE AGE GOES UP ON ITS OWN, 9 NOV 2026. His ruling: option 1, "Keep the birthday"**,
+  from three options (over age only, as built that morning, and over age only with a yearly "still 36?" nudge), on
+  my recommendation: the age is in the calorie maths and should not drift a year out with nobody noticing. Built:
+  setup keeps the date picked on the age card beside the age it makes (never said back in the chat); the app works out
+  today's age from it every time it opens, so calories move on a birthday by themselves; Profile's age row is the same
+  date picker, saving the date and the age together, limits said in words; an age typed instead of a date is kept as
+  it was and stays fixed, as before. Needs a DATABASE CHANGE on his machine (a new date-of-birth column). Until it is
+  run, nothing breaks: the setup save tries once more without the birthday, a Profile save keeps the age and lets the
+  birthday wait, and the read needs no column to exist; only the birthday is not kept. NOT DONE: the coach is not told
+  the date of birth (it is told the age, which is now current); a target that moves on a birthday gets the ordinary
+  "targets changed" note, with no birthday wording. CHECKS: `test:date-of-birth` (new, 17), `verify:composer` (+2: kept,
+  never said back), `verify:profile-fixes` §9 (new, 4) and §6 re-anchored on the height box (the age box it used is a
+  date picker now), `test:onboarding-chip-match` (its own question recognised; it has no card, so it can never put one
+  under a question). Mutations: 12 tried, 11 caught first time; the 12th (no retry before the migration) crashed the check instead of failing it, which the harness rightly would not count, so the check now catches the save's error and it is caught. Needs: the migration (`db:push-both`, his machine), the frontend on
+  merge, and the `onboarding-chat` deploy (from the date-picker change) for the coach's wording.
+
 - [x] **SETUP ASKS THE DATE OF BIRTH WITH A DATE PICKER, AND WEIGHT AND HEIGHT HAVE UNIT TOGGLES, 9 NOV 2026.** His
   request: "During onboarding, make the chat ask for date of birth for the age, with a date picker. And weight be an
   input field with a toggle for different units of measurement, and same for height." Built on setup's age / height /

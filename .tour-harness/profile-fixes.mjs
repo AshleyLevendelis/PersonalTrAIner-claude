@@ -167,14 +167,15 @@ check('5c. a list\'s Add button is 44px', addH >= 44, addH)
 // --- 6. Out of range ---------------------------------------------------------------------------
 console.log('\n  6. A number out of range says why it went back')
 await openRow('Height & weight')
-const ageWas = (await profileRow())?.age
+// RE-ANCHORED 9 Nov 2026: the age is a date picker now (his option 1), so the first number box here is the height.
+const heightWas = (await profileRow())?.height_cm
 const numberBox = `[...document.querySelectorAll('${sheet} input[type="number"]')].filter(n => n.offsetParent !== null)[0]`
 await pointAt(numberBox)
 await typeInto(numberBox, '3')
 await ev(`${numberBox}?.blur()`)
 const note6 = await until(() => text('[data-testid="number-out-of-range"]'))
 check('6a. a number outside the range says what the range is', /has to be between/.test(note6 ?? ''), note6)
-check('6b. ...and nothing was saved', (await profileRow())?.age === ageWas, { ageWas, now: (await profileRow())?.age })
+check('6b. ...and nothing was saved', (await profileRow())?.height_cm === heightWas, { heightWas, now: (await profileRow())?.height_cm })
 await shoot('profile-fixes-6-range')
 
 // --- 8. Experience offers a rebuild (his ruling 8 Nov 2026, "Offer a rebuild") ---------------------
@@ -197,6 +198,29 @@ const recWas = (await profileRow())?.recovery_capacity
 const pickedRec = await pickIn('Recovery capacity', '/./')
 const recTitle = await until(() => text('[data-testid="plan-invalidation-title"]').then(t => /recovery/.test(t) ? t : null))
 check('8c. changing Recovery capacity offers a rebuild too', pickedRec && (await profileRow())?.recovery_capacity !== recWas && /Rebuild your plan around this recovery\?/.test(recTitle ?? ''), { recWas, recTitle })
+
+// --- 9. The age is a date of birth (his 9 Nov 2026 option 1: keep the birthday so the age goes up on its own) -------
+console.log('\n  9. The age row is a date of birth, and both are saved')
+await ev(`document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click()`)
+await wait(400)
+await openRow('Height & weight')
+const setDate = v => ev(`(() => { const el = document.querySelector('#profile-dob'); if (!el) return false
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ${JSON.stringify('X')}.replace('X', ${JSON.stringify(v)}))
+  el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); return true })()`)
+const dobKind = await ev(`document.querySelector('#profile-dob')?.type ?? null`)
+check('9a. the age row is a date picker', dobKind === 'date', dobKind)
+const before9 = await profileRow()
+await setDate('2020-01-01')
+await wait(500)
+const young9 = await text('[data-testid="profile-dob-age"]')
+check('9b. a date making them under 13 says the limits, and nothing is saved', /between 13 and 100/.test(young9 ?? '') && (await profileRow())?.age === before9?.age && !(await profileRow())?.date_of_birth, { young9, row: await profileRow() })
+await setDate('1990-06-15')
+const said9 = await until(() => text('[data-testid="profile-dob-age"]').then(t => /^\d+ years$/.test(t ?? '') ? t : null))
+const age9 = Number((said9 ?? '').match(/^(\d+)/)?.[1] ?? NaN)
+const row9 = await until(async () => { const r = await profileRow(); return r?.date_of_birth === '1990-06-15' ? r : null })
+check('9c. picking a date says the age it makes', Number.isFinite(age9) && age9 >= 30 && age9 <= 40, said9)
+check('9d. ...and saves the date of birth and that age together', row9?.date_of_birth === '1990-06-15' && row9?.age === age9, { row: row9 && { dob: row9.date_of_birth, age: row9.age }, age9 })
+await shoot('profile-fixes-9-dob')
 
 // --- 7. Known lifts ----------------------------------------------------------------------------
 console.log('\n  7. Known lifts names every lift')
