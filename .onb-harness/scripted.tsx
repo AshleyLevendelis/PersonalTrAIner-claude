@@ -20,6 +20,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { ConversationalOnboarding } from '@/components/onboarding/ConversationalOnboarding'
 import { COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
+import { ONBOARDING_SLOTS } from '@/lib/onboarding-slots'
 import '@/index.css'
 
 type Scripted = { reply?: string; actions?: Array<{ name: string; args: Record<string, unknown> }> }
@@ -34,6 +35,8 @@ window.addEventListener('error', e => { w.__err = String(e.message) })
 w.__onbQueue = []
 w.__onbRequests = []
 w.__onbUnscripted = 0
+// Every typing hint the box can show, for verify:setup-qa3's fit check (read only).
+;(window as unknown as { __inputHints: string[] }).__inputHints = ONBOARDING_SLOTS.map(d => d.inputHint).filter((h): h is string => !!h)
 
 const realFetch = window.fetch.bind(window)
 window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {

@@ -3,6 +3,7 @@
 //
 //   1. Reopening setup partway through keeps the open question as the headline; "Welcome back" sits above it.
 //      It was the headline, and the question still waiting dropped to small grey text.
+//   3. The summary's rows are 44px tall (they were 32px).
 //   2. "none" typed to "anything you'd rather I left out?" answers that question only: it was filed under favourite
 //      cuisines (the one open question it matched), with a tick, and cuisines was never asked.
 //
@@ -66,4 +67,30 @@ check('2c. ...and no "Cuisines" tick appears', !/Cuisines/i.test(await ev(`[...d
 check('2d. ...the message itself was sent (the fixture binds)', (await ev(`window.__onbRequests.length`)) >= 1, await ev(`window.__onbRequests.length`))
 await shot('none')
 
-finish('Setup keeps its question on resume, and "none" answers only what it was said to.')
+// --- 3. The summary's rows are a thumb tall ---------------------------------------------------------------------------
+// They were 32px and sit one under the next, so each row must itself be 44px: a hit area larger than the row would land
+// on its neighbour. Read off the summary as drawn.
+await open('review')
+const rows = await evj(`[...document.querySelectorAll('[data-review-row]')].map(b => ({ key: b.getAttribute('data-review-row'), h: Math.round(b.getBoundingClientRect().height) }))`) ?? []
+check('3a. the fixture binds: the summary is open with its rows', rows.length >= 8, rows.length)
+check('3b. every summary row is at least 44px tall', rows.length >= 8 && rows.every(r => r.h >= 44), rows.filter(r => r.h < 44))
+await shot('summary')
+
+// --- 4. Every typing hint fits the box, beside the mic ------------------------------------------------------------------
+// A placeholder cannot wrap, so a hint wider than the box is cut off by the mic button. Measured in the box's own font
+// against the room between its own padding, with the mic drawn (the narrowest the box gets). The mic is drawn only where
+// the phone can listen, so the page is given a listener first.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: 'window.webkitSpeechRecognition = window.webkitSpeechRecognition || function () {}' })
+await open('h14')
+const fit = await evj(`(() => {
+  const input = document.querySelector(${JSON.stringify(INPUT)}); if (!input) return null
+  const mic = !!document.querySelector('button:has(svg.lucide-mic)')
+  const cs = getComputedStyle(input), room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
+  const ctx = document.createElement('canvas').getContext('2d'); ctx.font = cs.font
+  const hints = window.__inputHints || []
+  return { mic, room: Math.round(room), n: hints.length, over: hints.map(h => ({ h, w: Math.round(ctx.measureText(h).width) })).filter(x => x.w > room) }
+})()`)
+check('4a. the fixture binds: the box is drawn beside the mic, and there are hints to measure', !!fit && fit.mic && fit.n >= 10, fit && { mic: fit.mic, n: fit.n, room: fit.room })
+check('4b. every typing hint fits the box, so none is cut off by the mic', !!fit && fit.over.length === 0, fit && { room: fit.room, over: fit.over })
+
+finish('Setup keeps its question on resume, "none" answers only what it was said to, and the summary rows are a thumb tall.')

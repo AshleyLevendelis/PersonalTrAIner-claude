@@ -2212,6 +2212,8 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                   // the plan includes one by default, and a default the
                   // summary does not show is one nobody can turn off.
                   .filter(s => isSlotRequired(s, values) || confirmed.has(s.key) || s.key === 'includeSnacks')
+                  // 44px TALL, a thumb's height (QA round 3, 8 Nov 2026): the rows were 32px and touch each other, so an
+                  // invisible tap area would land on the neighbour; the row itself grows instead.
                   .map(def => (
                   <button
                     key={def.key}
@@ -2219,7 +2221,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                     onClick={() => handleEditSlot(def.key)}
                     disabled={busy}
                     data-review-row={def.key}
-                    className={`w-full text-left min-h-[32px] rounded px-1 -mx-1 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 ${justEdited === def.key ? 'bg-muted' : ''}`}
+                    className={`flex w-full items-center text-left min-h-[44px] rounded px-1 -mx-1 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 ${justEdited === def.key ? 'bg-muted' : ''}`}
                     aria-label={`Change ${def.shortLabel}`}
                   >
                     <span className="font-medium text-foreground">{def.shortLabel}:</span>{' '}
