@@ -23,7 +23,11 @@ Newest first. One line each.
   receipts). Mutations: 14 tried, 12 caught first time; the picker's earliest date was MISSED (its check could not tell
   "exactly 100" from "100 or 101") and now asks that the day before it makes 101, caught; and "feet with no inches
   written as 0 inches" was MISSED because "6'" already reads as 6 ft 0, so that line was removed rather than given a
-  check. Needs the `onboarding-chat` deploy for the coach's wording; the card itself ships with the frontend.
+  check. FOUND BY THE DERIVED CHECKS, and the real catch of the round: the app picks which card goes under the coach's
+  question from its words, and "date of birth" did not count as asking the age, so the coach asking it the new way
+  would have got no card (`test:onboarding-chip-match` red before, green after: "date of birth", "born", "birthday",
+  "DOB" now mark the age). `test:onboarding-chips` re-anchored on the new unit controls. Needs the `onboarding-chat`
+  deploy for the coach's wording; the card itself ships with the frontend.
 - [x] **CORRECTING A MEAL ALREADY EATEN PREVIEWED ONE DAY AND LANDED ANOTHER, 9 NOV 2026** (QA round 3, the meals
   tester's finding 8). Mechanical: his 2 Nov "Same dishes" ruling already calls such an edit a CORRECTION, and the build
   never carried it to the eaten record. Taking the banana out of an eaten breakfast changed the plan's copy only, so

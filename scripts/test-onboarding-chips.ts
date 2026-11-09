@@ -309,9 +309,12 @@ console.log('\n6. Nothing is asked twice, and nothing decorative costs height')
   // them could ever have taken its unit from the question above it.
   const numeric = readFileSync(join(ROOT, 'src/components/onboarding/SlotNumericCard.tsx'), 'utf8')
   check('numeric fields carry their unit', /const UNIT: Record<string, string \| undefined>/.test(numeric))
-  for (const key of ['heightCm', 'weightKg', 'knownSquatKg']) {
-    check(`${key} has a unit`, new RegExp(`${key}: '`).test(numeric))
-  }
+  check('knownSquatKg has a unit', /knownSquatKg: '/.test(numeric))
+  // RE-ANCHORED 9 Nov 2026 (his request: unit toggles): height and weight carry their unit on the toggle beside the box
+  // and inside each box; verify:composer reads both off the screen ("each box saying which it is").
+  check('heightCm and weightKg have a unit: a toggle, and the unit inside each box',
+    /const WEIGHT_UNITS: \{ unit: WeightUnit; label: string \}\[\] = \[\{ unit: 'kg'/.test(numeric) && /const HEIGHT_UNITS: \{ unit: HeightUnit; label: string \}\[\] = \[\{ unit: 'cm'/.test(numeric)
+    && (numeric.match(/withUnit\(/g) ?? []).length >= 4)
 }
 
 // ---------------------------------------------------------------------------

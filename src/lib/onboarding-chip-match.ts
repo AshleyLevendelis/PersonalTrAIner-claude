@@ -84,7 +84,8 @@ const ASKS: Record<SlotKey, Asks> = {
   conditioningPreference: /cardio|conditioning/i,
   recoveryCapacity: /recover|sleep|stress|well rested/i,
   dislikedExercises: /exercises? (you|to)\b.{0,30}(never|avoid|skip|hate|rather)/i,
-  age: /how old|\bage\b/i,
+  // 9 Nov 2026: the age is asked as a date of birth (his request), so the coach's "when were you born?" is the age too.
+  age: /how old|\bage\b|date of birth|\bborn\b|birthday|\bdob\b/i,
   heightCm: /how tall|\bheight\b/i,
   weightKg: [
     /\bweigh\b|\bweight\b|bodyweight/i,
