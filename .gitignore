@@ -4,6 +4,9 @@
 # box hit "Permission denied" running `tsc -b` and exited 126. package-lock.json
 # is committed instead, which reproduces the exact dependency tree on install.
 node_modules/
+# ...and a LINK named node_modules (9 Nov 2026): `node_modules/` matches only a directory, so a worktree's symlink to
+# the main checkout's node_modules was committed, and a fast-forward then replaced the real folder with a looping link.
+node_modules
 
 # Build output
 dist/
