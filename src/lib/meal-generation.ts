@@ -951,7 +951,10 @@ export async function generateMealPools(params: {
       rejectionLog.push(`[library] could not be read: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
-  if (params.appendToExisting && params.library !== false) await libraryPass(deepLibrary)
+  // DEEP ONLY WHEN THE MEALS WILL BE DEEPER THAN A MENU: a pool of MENU_SIZE or fewer IS its own menu (meal-menu.ts),
+  // so the one-adventurous-cuisine cap must stay on the pool there. A small "more options" ask keeps the 30 Sep rules.
+  const willBeDeep = activeSlots.some(slot => (existingBySlot[slot]?.length ?? 0) + poolSize > MENU_SIZE)
+  if (params.appendToExisting && params.library !== false) await libraryPass(deepLibrary && willBeDeep)
 
   for (let round = 0; round < MAX_GENERATION_ROUNDS; round++) {
     const remaining: Partial<Record<MealSlotName, number>> = {}

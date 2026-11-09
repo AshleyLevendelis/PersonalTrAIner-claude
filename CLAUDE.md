@@ -222,6 +222,12 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   when the SHAPE held and the SIZE moved**; a goal change regenerates instead.
   `meal-refit` (91 checks, 16 mutations), `verify:meal-refit` (25 checks, 5
   mutations), `coach-parity`. Needs the `chat-gemini` deploy for chat
+- **A much deeper pool, served from a weekly menu: his request 9 Nov 2026, "much deeper ... not only 14"** (replaces his
+  28 Sep "seven"; settles "seed fresh plans" for seeding): every library dish that suits the person, up to 100 a meal;
+  each rotation week serves from a menu of 8 a meal drawn through the whole pool, so weeks differ. Library 349 -> 709.
+  Measured: 20 different dishes a meal over 4 weeks (was 4.4), 97% of days on target (was 75%). `test:meal-menu`,
+  `verify:deep-pool`, `measure:deep-pool`, `docs/plans/deep-meal-pool.md`. **And a bare "Greek yoghurt" is asked
+  about: his ruling 9 Nov 2026, "Ask which"** (fat-free, low-fat or full-fat), never guessed. `test:greek-yoghurt-asked`
 - Meals hit targets from real foods, dislikes honoured, allergens
   filtered with stated limits — `food-dislike-is-a-ban`, `food-db-parity`,
   `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`, and since 11 Oct 2026 an ingredient line is costed and tagged only when

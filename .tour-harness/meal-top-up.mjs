@@ -307,12 +307,27 @@ check('today and every shopping-list day are exactly as they were', [0, 1, 2, 3]
 const rows8 = await ev(`window.__mealOptions()`)
 const pools8 = rows8.filter(r => libNames8.includes(r.name))
 check('six library dishes were added to her meals, two to each', pools8.length === 6 && ['breakfast', 'lunch', 'dinner'].every(m => pools8.filter(r => r.slot === m).length === 2), pools8)
-const libDay = after8.findIndex((d, i) => i >= HELD && Object.values(d.names).some(n => libNames8.includes(n)))
-check('a library dish is served from the first new day on, and on no earlier day', libDay >= HELD && !after8.slice(0, HELD).some(d => Object.values(d.names).some(n => libNames8.includes(n))), { libDay, served: after8.map(d => Object.values(d.names)) })
+// RE-ANCHORED 9 Nov 2026 (the deep meal pool). This asked that a library dish be SERVED on one of the three days after
+// the hold, which held by luck of which dishes the chooser picked: with 709 dishes it picks a different lunch, and with
+// last night's dinner pinned as lunch none of the six lands those three days on target (each lands a day of hers; the
+// fit test the run applies). What the run promises, and what is held here: none appears on a held day, and every one
+// is hers to choose from the first new day on, in that day's swap list. Served or not is the day picker's to decide.
+check('no library dish appears on a held day', !after8.slice(0, HELD).some(d => Object.values(d.names).some(n => pools8.some(p => p.name === n))), after8.slice(0, HELD).map(d => Object.values(d.names)))
+await tapDay(days8[HELD])
+await ev(`document.querySelector('[data-meal-row="breakfast"] [data-meal-name]')?.closest('button')?.click()`); await wait(400)
+await ev(`document.querySelector('[data-meal-sheet-tab="swap"]')?.click()`); await wait(400)
+const swapNames8 = await ev(`[...document.querySelectorAll('[data-meal-swap-list] > button')].map(b => b.querySelector('p')?.innerText.trim()).filter(Boolean)`) ?? []
+const newBreakfasts = pools8.filter(p => p.slot === 'breakfast').map(p => p.name)
+check('from the first new day on, the new breakfasts are hers to choose, in that day\'s swap list', newBreakfasts.length === 2 && newBreakfasts.every(n => swapNames8.includes(n)), { newBreakfasts, swapNames8 })
+// Chosen, it is served: the swap pins it for that date, through the app's own swap.
+await ev(`[...document.querySelectorAll('[data-meal-swap-list] > button')].find(b => b.querySelector('p')?.innerText.trim() === ${JSON.stringify(newBreakfasts[0] ?? '')})?.click()`)
+await wait(900)
+const servedNow = await ev(`document.querySelector('[data-meal-name="breakfast"]')?.innerText.trim() ?? ''`)
+const libDay = servedNow === newBreakfasts[0] ? HELD : -1
+check('...and chosen, it is that day\'s breakfast', libDay === HELD, { servedNow, wanted: newBreakfasts[0] })
 // A LIBRARY DISH, OPENED: its method is shown, and the app's bookkeeping is not.
-const libSlot = libDay >= 0 ? Object.entries(after8[libDay].names).find(([, n]) => libNames8.includes(n))?.[0] : null
-if (libDay >= 0) await tapDay(days8[libDay])
-if (libSlot) { await ev(`document.querySelector('[data-meal-name="${libSlot}"]')?.closest('button')?.click()`); await wait(400) }
+// The swap leaves its sheet open on the new dish's recipe, so it is read where it is.
+const libSlot = libDay >= 0 ? 'breakfast' : null
 const libCard = await ev(`document.querySelector('[data-meal-name="${libSlot}"]')?.closest('[data-meal-row]')?.innerText ?? ''`)
 const method = await ev(`document.querySelector('[data-meal-method]')?.innerText ?? ''`)
 check('opened, a library dish shows how to cook it', !!libSlot && method.length > 20, { libSlot, method })

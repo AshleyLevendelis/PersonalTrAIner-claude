@@ -113,7 +113,9 @@ check('3d. her edited lunch is still stored', optionsAfter.includes(`lunch|${edi
 const w2 = await week()
 check('3e. AND IT IS STILL TODAY\'S LUNCH ON SCREEN — it did not vanish until a reload', w2?.[today]?.lunch === edited && (await ev(`document.body.innerText`)).includes(edited), w2?.[today])
 check('3f. ...with its pick still saved, so a reload would show the same', (await picks()).includes(`${today}|lunch|${edited}`), await picks())
-check('3g. the dinner, which was the app\'s own, is a new dish', !!w2?.[today]?.dinner && w2[today].dinner !== dinnerBefore && /^Fresh dinner plate/.test(w2[today].dinner), { before: dinnerBefore, after: w2?.[today]?.dinner })
+// 9 Nov 2026 (his "much deeper pool"): a refresh is the writer's dishes AND every library dish that suits her, so the
+// day's new dinner may be either; what matters is that it is a new dish from the refreshed pool, not the old one.
+check('3g. the dinner, which was the app\'s own, is a new dish from the refreshed pool', !!w2?.[today]?.dinner && w2[today].dinner !== dinnerBefore && optionsAfter.includes(`dinner|${w2[today].dinner}`) && !optionsBefore.includes(`dinner|${w2[today].dinner}`), { before: dinnerBefore, after: w2?.[today]?.dinner })
 check('3h. nothing is reported as failed', !/couldn't|could not|unchanged — try again/i.test((await ev(`document.querySelector('[data-tour="meals"]')?.innerText ?? ''`))), (await ev(`document.querySelector('[data-tour="meals"]')?.innerText ?? ''`)).slice(0, 300))
 await ev(`window.scrollTo(0, 0)`)
 await wait(300)

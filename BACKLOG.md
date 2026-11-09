@@ -2,6 +2,82 @@
 
 Newest first. One line each.
 
+- [x] **MEALS: A MUCH DEEPER POOL, ACCURATE FIGURES, AND A WEEK THAT CHANGES, 9 NOV 2026.** His request: "Lets work on
+  the meal plans. We need a deeper pool of meals and need to make sure macros are accurate. Test and fix." Then, asked
+  7 / 10 / 14 a meal with measured costs: **"We need a much deeper pool of meals to choose from not only 14"**. That
+  REPLACES his 28 Sep "seven", and settles his open "seed fresh plans from the library" question in favour of seeding.
+  And **"Ask which"** (from three options) for a bare "Greek yoghurt".
+  WHAT WAS WRONG, MEASURED:
+  (1) THE FOOD TABLE. An independent audit of all 369 foods against USDA / CoFID (as recalled, no network) flagged 35.
+  Fixed the ones that move a day: seitan carried vital wheat gluten's DRY figures (150 g of seitan strips costed at
+  112 g protein; 14 library dishes used it); soy mince carried dry TVP's (120 g = 60 g protein); "baked beans" was plain
+  boiled haricot (155 kcal, a tin is about 84); "vegetable stock" was the CUBE (500 ml = about 1,150 kcal); mackerel was
+  raw figures under a name the app treats as cooked; bacon medallions were streaky (337 kcal, about 150); chicken mince,
+  yellowfin tuna, mozzarella (now fresh ball and part-skim), 70% chocolate, half-fat creme fraiche, US heavy cream;
+  protein pasta and dry soy mince marked dry. PIECE WEIGHTS: the uncited household table was merged INTO each food's own
+  units first, so wherever it disagreed with the cited piece table the cited figure silently lost (tuna can 120 vs
+  102 drained, a handful of nuts 30 vs BNF 20, a sausage 60 vs 40, a cracker 5 vs 7); one merge now, own > cited >
+  household. A thigh, drumstick and steak were raw or bone-in weights against cooked figures; mango was with skin and
+  stone. Spelling split: "greek yoghurt" was 0% and "greek yogurt" full-fat (his ruling below).
+  (2) THE WEEK NEVER CHANGED. The rotation is a 7-day cycle built from the pool alone, so any pool served the same seven
+  days every week; at 7 a meal, measured, 4.4 different dishes a meal over four weeks and 75% of days on target.
+  (3) THE DAY PICKER CANNOT TAKE A DEEP POOL: every combination of one dish a meal, N^4 (10^8 at 100 a meal), on the
+  render path, plus a fit count of 4N^4 behind the more-meals offer (traced end to end before building).
+  WHAT CHANGED:
+  - The pool is what you have; each rotation week's MENU (8 a meal, `meal-menu.ts`) is what is served. Successive weeks
+    take successive dishes in a fixed shuffled order, so the whole pool comes round; likes on every menu; a dish that
+    breaks a restriction never; an edited copy and its base never both; one adventurous cuisine a meal per menu (the
+    cap moved from the pool to the menu). A pool of 8 or fewer IS its menu, so today's plans serve exactly as before.
+    Everything combinatorial runs on the menu: serveDates (strip, today, list, every Apply trial), App's rotation, the fit
+    count, the fit test while adding. MENU SIZE IS MINE, measured: 7 gave 94.3% of days on target, 8 99.1%, 10 99.6% at
+    twice the cost of 8.
+  - New plans and a refresh: the writer's dishes first (her cuisines, likes, cooking time), then every library dish that
+    passes her checks and lands a day, up to 100 a meal, ONLY in meals the writer delivered (a failed refresh keeps
+    what she had). A small "more options" ask keeps the 30 Sep rules, cuisine cap included: the cap moves to the menu
+    only once a meal will be deeper than a menu.
+    Existing plans: the more-options offer now offers the library ("I can add every dish from our own meal library that
+    suits you, so each week brings different meals"; WORDS MINE, his to change), never unasked; today and the
+    shopping-list days held as before; the writer is asked only to bring a thin meal up to seven, never for a hundred.
+    The library offer is a flag App passes, so the count-and-fit offer of 28-30 Sep is unchanged wherever else it is
+    asked for.
+  - The swap list: a search box over all options, the first 8, and "Show all N options". Refit writes 8 rows at a time.
+  - The library: 349 -> 709 dishes (vegan breakfasts 15 -> 62, vegan snacks 19 -> 60), 360 new ones written by six
+    writers in our own words, each through a checker (every line a food the app can count, written as bought, no amount
+    in the method, no food in the method the dish lacks, and landing on the target grid through the real verifier).
+    Four older dishes re-portioned where the corrected figures exposed them (gnocchi, soy mince peppers and taco salad,
+    tomato-mozzarella toast).
+  - Greek yoghurt, his "Ask which": both bare spellings are a miss; the coach's meal log and adding a meal ask "Was the
+    Greek yoghurt fat-free (0%), low-fat (2%) or full-fat?" instead of how much; the coach's instruction asks rather than
+    assuming. Fixtures that wrote a bare one keep the meaning they had.
+  MEASURED AFTER (`measure:deep-pool`, 5 targets x 4 diets, 28 days): pool 80 a meal; different dishes a meal over four
+  weeks 4.4 -> 20.0; days on target 75.0% -> 97.1%; about 45 ms a week here (a phone several times slower; today's
+  7-pool built one rotation for all four weeks at 5 ms). A full deep pool is about 224 kB of the 1.5 MB start-up copy.
+  CHECKS: `test:meal-menu` (19, 11 mutations, 11 caught), `test:greek-yoghurt-asked` (20, 7 mutations, 7 caught);
+  re-anchored to the new rule, not loosened: `test:meal-library` (fresh plans now seeded; the "as written" binding floor
+  1.25 -> 1.2, measured), `test:meal-library-depth` (control removes the deep dishes too; walk under the strict cap),
+  `test:ingredient-units` (merge order, reference weights now the cited ones), `test:food-db-parity`, `test:food-swaps`,
+  `test:meal-likes`, `test:meal-roundtrip` and `test:meal-pool-size` (writer mechanics, seed off), `test:bundle` (total
+  2733 -> 2843, 2818 measured: the lazily loaded library chunk; first paint +2 gz). RUN: the 371 checks that read what changed, in a separate
+  worktree: first pass 173 passed before the run broke (below); the 203 re-run gave 197, and the 5 real failures were
+  fixed and re-run green (a new dish written with cooked lentils, now dry; the library offer replacing the old one too
+  widely, now App's flag; a refresh's new dinner may be a library dish, check re-anchored; the more-meals driver, see
+  NAMED); the 6th needs a database. `verify:deep-pool` (new, 11 checks at 390px, 6 mutations, 6 caught; its first
+  mutation round read every catch as a miss because the harness counted only "FAIL:" and the driver prints a cross).
+  WHAT WENT WRONG ON MY SIDE: the worktree's `node_modules` symlink was committed (`node_modules/` in .gitignore matches
+  a directory, not a link), pushed, and fast-forwarded into the main checkout, where it replaced the real folder with a
+  link to itself; every tsx gate then exited 216 with no output. Untracked, `.gitignore` now lists the bare name too,
+  dependencies reinstalled. Also once mutated a source file for a minute in the tree a run was using; the four checks
+  that ran in that minute were re-run. NAMED, A WEAKER PROMISE: `verify:meal-top-up` [8] asked that a library dish be
+  SERVED in the three days after a top-up's hold; with the bigger library the chooser picks different dishes and, with
+  last night's dinner pinned as lunch, none lands those days on target, though each lands a day of hers. It now holds
+  that none appears on a held day and that each is choosable (and served once chosen) from the first new day.
+  NOT DONE, named: the remaining audit findings of lower weight (canned vs boiled chickpeas and kidney beans; cooked
+  grain yields in the "about N g cooked" hint 10-35% high; mussels in shell; fried calamari; plantain chips; pesto, injera
+  and UK cream cheese labels); bare "beef mince" (20% fat) vs bare "mince" (5%) still disagree (his open "assume or
+  ask" question); foods writers asked for and did not have (gram flour, smoked tofu, oatcakes, burger buns, risotto rice,
+  kimchi, cocoa, herbs). Needs the `chat-gemini` deploy (coach's food table and the yoghurt question) and the
+  `generate-meals` deploy (its food table copy). No migration.
+
 - [x] **THE COACH WISHES HIM HAPPY BIRTHDAY, 9 NOV 2026.** His request: "the chat should also be able to proactively
   wish you happy birthday." On the day the age goes up (from the date of birth he picked; never for an age typed
   instead), the coach's first unprompted message of the day is "Hey Ashley — happy birthday! Hope it's a good one."
