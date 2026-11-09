@@ -78,17 +78,17 @@ const TABLE: [string, number, string][] = [
   ['1 cup spinach', 30, 'was 240 g'], ['1 cup milk whole', 244, ''], ['1 cup quinoa cooked', 185, ''], ['1 cup blueberries', 148, ''], ['2 cups chickpeas', 328, ''],
   ['1 cup hummus', 246, ''], ['1 cup cheddar cheese', 113, 'shredded'], ['1 cup water', 237, ''],
   // tins and cans (drained weight where a tin is drained), and a stated size
-  ['1 can chickpeas', 240, ''], ['1 tin kidney beans', 240, ''], ['2 cans chickpeas', 480, ''], ['1 can tuna canned in water', 120, ''], ['1 tin tuna', 120, 'did not resolve at all'],
+  ['1 can chickpeas', 240, ''], ['1 tin kidney beans', 240, ''], ['2 cans chickpeas', 480, ''], ['1 can tuna canned in water', 102, 'pack: drained (9 Nov 2026 audit; was 120)'], ['1 tin tuna', 102, 'did not resolve at all'],
   ['1 can chopped tomatoes', 400, ''], ['1 tin sweetcorn', 160, ''], ['1 (14 oz) can coconut milk canned', 397, 'a stated size is the weight'],
   ['1 can (400g) chopped tomatoes canned', 400, ''], ['2 tins (400g) chopped tomatoes canned', 800, ''],
   ['1 can (800g) chopped tomatoes canned', 800, 'a stated size beats the typical tin'], ['2 cans (200g) chickpeas', 400, 'a small tin: the stated weight, not the usual 240'],
   // loose amounts
   ['a pinch of black pepper', 0.4, ''], ['1 dash worcestershire sauce', 0.6, ''], ['1 splash olive oil', 5, ''],
-  ['a handful of rocket', 20, ''], ['1 handful almonds', 28, ''], ['a handful of spinach', 30, ''],
+  ['a handful of rocket', 20, ''], ['1 handful almonds', 20, 'BNF palmful, the cited figure (9 Nov 2026; was 28)'], ['a handful of spinach', 30, ''],
   // counts: a piece, a size, a half
   ['2 large egg', 116, ''], ['3 egg', 150, 'the case that was 3 g'], ['3 eggs', 150, ''], ['1 medium banana', 118, ''], ['a banana', 118, 'was 1 g'], ['1 large banana', 136, 'was 1 g'],
   ['half an avocado', 75, ''], ['1 half avocado', 75, 'was 150 g: the add-food sheet writes this'], ['1 avocado', 150, ''],
-  ['2 carrots', 122, 'was 2 g'], ['1 onion', 110, ''], ['1 chicken breast', 120, 'BNF cooked breast, one figure with the piece table'], ['4 chicken thighs', 440, ''], ['2 tomatoes', 246, ''], ['a lemon', 58, ''],
+  ['2 carrots', 122, 'was 2 g'], ['1 onion', 110, ''], ['1 chicken breast', 120, 'BNF cooked breast, one figure with the piece table'], ['4 chicken thighs', 300, 'cooked meat of a boneless thigh, 75 g: the entry is cooked (9 Nov 2026; was 110 each)'], ['2 tomatoes', 246, ''], ['a lemon', 58, ''],
   ['2 slices wholemeal bread', 76, ''], ['1 slice white bread', 36, ''], ['3 cloves garlic', 9, ''], ['1 bunch spring onion', 90, ''], ['1 stick celery', 40, ''],
   ['1 head broccoli', 300, ''], ['2 heads cauliflower', 1200, ''], ['1 medium onion, finely diced', 110, 'a prep note after the name'], ['6 cherry tomatoes', 102, ''], ['1 scoop whey protein powder', 30, ''],
   // the amount written LAST: still one exact answer (the meal-tradeoff driver's fixture wrote its meals this way and every line cost 1 g)
@@ -301,8 +301,12 @@ async function main() {
   // MEASURED 1 Oct 2026: no food names a unit in BOTH places yet (10 name their own, none of them one the table also names),
   // so which wins is not visible in any data today and a behavioural check could not fail. The ORDER is pinned in the source so
   // the first overlapping row cannot override a food's own, hand-checked weight.
-  const mergeLine = stripComments(fdSrc).match(/entry\.units = \{[^}]*\}/)?.[0] ?? ''
-  check('the household table is spread BEFORE the food\'s own units, so an own unit always wins (equivalent today: no food names a unit in both)', /\.\.\.extra[\s\S]*\.\.\.\(entry\.units/.test(mergeLine), mergeLine)
+  // The whole line: a spread of `(x ?? {})` holds a brace of its own, so the match runs to the line's end.
+  const mergeLine = stripComments(fdSrc).match(/entry\.units = \{.*/)?.[0] ?? ''
+  // 9 Nov 2026: one merge for both tables, in the order of how well each figure is known: household, then the cited
+  // piece table, then the entry's own. The property is unchanged: an own unit is spread LAST, so it always wins.
+  check('the household table is spread BEFORE the food\'s own units, so an own unit always wins (equivalent today: no food names a unit in both)', /\.\.\.\(household[\s\S]*\.\.\.\(entry\.units/.test(mergeLine), mergeLine)
+  check('...and the cited piece table is spread AFTER the household one, so a cited weight beats an uncited one (9 Nov 2026: the tuna can, the handful, the sausage and the cracker had been losing)', /\.\.\.\(household[\s\S]*\.\.\.\(pieces[\s\S]*\.\.\.\(entry\.units/.test(mergeLine), mergeLine)
 
   console.log('\n9. Code that rewrites a line to a new amount cannot change the unit under it')
   // THE DEFECT, found 3 Oct 2026 reading meal-move: withQuantity keeps the WRITTEN unit, and the callers handed it the PARSED amount.

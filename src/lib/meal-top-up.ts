@@ -17,12 +17,13 @@
 // thing without a network and App keeps its own wiring.
 // ---------------------------------------------------------------------------
 
-import { DEFAULT_POOL_SIZE, assembleDay, generateMealPools, type PoolOption } from './meal-generation'
+import { DEFAULT_POOL_SIZE, DEEP_POOL_SIZE, assembleDay, generateMealPools, type PoolOption } from './meal-generation'
+import { MENU_SIZE, menuForSlot, menuWeekOf } from './meal-menu'
 import type { MacroTargets } from './types'
 import { addDays, epochDay, ROTATION_DAYS } from './meal-rotation'
 import { weekdayLong, longDate } from './day-labels'
 import { readGroceryCoverage } from './grocery-store'
-import { moreMealOptionsOffer, moreMealFitOffer, moreMealOptionsDone, moreMealOptionsWhy } from './coach-voice'
+import { moreMealOptionsOffer, moreMealLibraryOffer, moreMealFitOffer, moreMealOptionsDone, moreMealOptionsWhy } from './coach-voice'
 import type { MealSlotName } from './meal-store'
 import { isPinOnly } from './meal-new-from'
 
@@ -88,9 +89,17 @@ export function fittingCounts(
   pools: Partial<Record<MealSlotName, PoolOption[]>>,
   activeSlots: MealSlotName[],
   targets: MacroTargets,
+  /** The date whose week's menu a deep meal is judged on (9 Nov 2026). */
+  today?: string,
 ): Partial<Record<MealSlotName, number>> {
   const usable: Partial<Record<MealSlotName, PoolOption[]>> = {}
-  for (const slot of activeSlots) usable[slot] = (pools[slot] ?? []).filter(servableOption)
+  // A DEEP MEAL IS COUNTED ON ITS MENU (9 Nov 2026): one search per dish, each a product over the other meals, is
+  // 4N^4 over a whole deep pool. On a menu it is what a seven-dish pool cost, and a menu is what is served.
+  const week = today ? menuWeekOf(today) : 0
+  for (const slot of activeSlots) {
+    const servable = (pools[slot] ?? []).filter(servableOption)
+    usable[slot] = servable.length > MENU_SIZE ? menuForSlot(servable, week) : servable
+  }
   if (activeSlots.length === 0 || activeSlots.some(s => usable[s]!.length === 0)) return {}
   const out: Partial<Record<MealSlotName, number>> = {}
   for (const slot of activeSlots) {
@@ -111,6 +120,11 @@ export interface TopUpPlan {
   fewFit: Partial<Record<MealSlotName, number>>
   /** Meals with too few that fit but already at MAX_POOL: the app will not add more there. */
   crowded: MealSlotName[]
+  /**
+   * True when the offer is the deep one (9 Nov 2026): a meal holds no more than MAX_POOL dishes, so it has not been
+   * given the library yet, and `needs` asks for up to DEEP_POOL_SIZE. The run adds what suits her, never a count.
+   */
+  deep: boolean
 }
 
 export function topUpPlan(
@@ -118,9 +132,15 @@ export function topUpPlan(
   activeSlots: MealSlotName[],
   targets: MacroTargets,
   size = DEFAULT_POOL_SIZE,
+  today?: string,
 ): TopUpPlan {
-  const short = topUpNeeds(pools, activeSlots, size)
-  const fitting = fittingCounts(pools, activeSlots, targets)
+  // THE DEEP OFFER (9 Nov 2026, his "much deeper pool"): a meal of MAX_POOL dishes or fewer has not had the library,
+  // so it is short of everything the library holds for her. Asked for up to DEEP_POOL_SIZE; the run adds what suits.
+  const short = topUpNeeds(pools, activeSlots, MAX_POOL + 1)
+  const deep = Object.keys(short).length > 0
+  for (const slot of Object.keys(short) as MealSlotName[]) short[slot] = DEEP_POOL_SIZE - (MAX_POOL + 1 - short[slot]!)
+  void size
+  const fitting = fittingCounts(pools, activeSlots, targets, today)
   const have: TopUpPlan['have'] = {}
   for (const slot of activeSlots) {
     const n = (pools[slot] ?? []).filter(servableOption).length
@@ -137,7 +157,7 @@ export function topUpPlan(
     fewFit[slot] = f
     needs[slot] = Math.max(needs[slot] ?? 0, Math.min(FITTING_GOAL - f, room))
   }
-  return { needs, short, have, fewFit, crowded }
+  return { needs, short, have, fewFit, crowded, deep }
 }
 
 /**
@@ -241,7 +261,8 @@ export function topUpStartLabel(today: string, from: string): string {
 export type TopUpOfferKind = 'count' | 'fit'
 const dismissKey = (profileId: string, kind: TopUpOfferKind, targets?: MacroTargets) =>
   kind === 'count'
-    ? `meal-top-up-dismissed:${profileId}:${DEFAULT_POOL_SIZE}`
+    // Keyed on the deep size since 9 Nov 2026: a "Not now" to the old top-up-to-seven is not a "Not now" to the library.
+    ? `meal-top-up-dismissed:${profileId}:deep-${DEEP_POOL_SIZE}`
     : `meal-top-up-dismissed-fit:${profileId}:${targets ? `${Math.round(targets.calories)}:${Math.round(targets.protein)}` : ''}`
 
 export function isTopUpDismissed(profileId: string, kind: TopUpOfferKind = 'count', targets?: MacroTargets): boolean {
@@ -268,7 +289,9 @@ export function topUpOffer(
   }
   const short = Object.keys(plan.short) as MealSlotName[]
   if (short.length > 0 && !dismissed.count) {
-    return { kind: 'count', text: moreMealOptionsOffer(short.map(s => DEFAULT_POOL_SIZE - plan.short[s]!), DEFAULT_POOL_SIZE) }
+    return { kind: 'count', text: plan.deep
+      ? moreMealLibraryOffer(short.map(s => plan.have[s] ?? 0))
+      : moreMealOptionsOffer(short.map(s => DEFAULT_POOL_SIZE - plan.short[s]!), DEFAULT_POOL_SIZE) }
   }
   return null
 }
@@ -338,6 +361,8 @@ export async function topUpMealPlan(input: {
   startTomorrow?: boolean
   /** Re-works the days on the shopping list from the meals as they now are. Throws when it cannot. */
   refreshList?: () => Promise<unknown>
+  /** The deep offer (TopUpPlan.deep): the run adds what suits her, so a receipt never says "fewer than I asked for". */
+  deep?: boolean
 }): Promise<TopUpOutcome> {
   const unrecognised = new Set<string>()
   try {
@@ -377,7 +402,7 @@ export async function topUpMealPlan(input: {
       unrecognised: [...unrecognised],
       note: {
         text: moreMealOptionsDone({
-          added, asked, reached: result.reached, listUnreadable: result.listUnreadable, startLabel, listUpdated,
+          added, asked, reached: result.reached, listUnreadable: result.listUnreadable, startLabel, listUpdated, deep: input.deep,
         }),
         failed: added === 0,
       },

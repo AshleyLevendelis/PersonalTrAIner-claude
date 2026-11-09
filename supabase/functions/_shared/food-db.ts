@@ -1,3 +1,16 @@
+// ===========================================================================
+// GENERATED FILE — DO NOT EDIT.
+//
+// This is src/lib/food-db.ts, copied here by scripts/sync-shared-code.mjs so the edge
+// functions (Deno, which cannot import from src/) run the SAME code the app
+// does. Change the source, then run:
+//
+//     npm run sync:shared
+//
+// A hand edit here is overwritten by the next sync, and test:food-db-parity
+// fails for as long as this file differs from what the script would write.
+// ===========================================================================
+
 // ---------------------------------------------------------------------------
 // FOOD DATABASE (M1) — the deterministic macro truth source
 // ---------------------------------------------------------------------------

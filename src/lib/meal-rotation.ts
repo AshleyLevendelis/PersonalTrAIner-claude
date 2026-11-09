@@ -38,6 +38,7 @@ import { scaleToTarget, meetsProteinFloor } from './portion-scaler'
 import { costStoredMeal } from './meal-costing'
 import { USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { holdAroundPins } from './hold-around-pins'
+import { menuFor } from './meal-menu'
 import type { MacroTargets } from './types'
 import { sameDish, resizedCopyBase, editedFrom, RESIZED_COPY_SUFFIX } from './meal-dish-identity'
 
@@ -536,8 +537,10 @@ export function serveDates(input: {
   // Reused only when it was built from these very inputs; anything else and
   // the whole pool builds its own, exactly as a held-back pool does.
   const given = input.rotation?.builtFrom
-  if (input.rotation && given && given.pools === pools && given.targets === targets && given.softLikedFoods === softLikedFoods && given.shape === shape) {
-    rotations.set(pools, input.rotation)
+  // Since 9 Nov 2026 a rotation is built from a WEEK'S MENU (meal-menu.ts), so the one given may have been built from
+  // a menu rather than the whole pool: it is reused for whichever date's menu it was built from.
+  if (input.rotation && given && given.targets === targets && given.softLikedFoods === softLikedFoods && given.shape === shape) {
+    rotations.set(given.pools, input.rotation)
   }
   // Pools held back on different dates are different objects with the same
   // contents; keyed by what they hold so each distinct pool builds once.
@@ -556,7 +559,8 @@ export function serveDates(input: {
   dates.forEach((date, i) => {
     // Only a CONSECUTIVE run chains; after a gap, last night is unknown.
     if (i > 0 && addDays(dates[i - 1], 1) !== date) previousDinner = undefined
-    const dayPools = canonical(poolsServedOn(pools, date))
+    // The pool as it stood that day, then that week's menu out of it (the same object when the pool is not deep).
+    const dayPools = canonical(menuFor(poolsServedOn(pools, date), date, softLikedFoods))
     let rotation = rotations.get(dayPools)
     if (!rotation) {
       rotation = buildRotation(dayPools, targets, softLikedFoods, shape)

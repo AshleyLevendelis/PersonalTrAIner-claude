@@ -35,8 +35,8 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   // --- protein ---
   'lean meat': ['chicken breast', 'turkey breast', 'pork loin', 'venison', 'beef rump steak', 'beef steak sirloin', 'chicken drumstick', 'chicken breast raw', 'turkey breast raw', 'pork loin raw'],
   'richer meat': ['chicken thigh', 'duck breast', 'lamb chop', 'pork chop', 'beef brisket', 'pork belly', 'chicken thigh raw'],
-  'mince': ['chicken mince', 'turkey mince', 'beef mince 5% fat', 'beef mince 20% fat', 'lamb mince', 'pork mince', 'soy mince', 'quorn mince', 'vegan mince'],
-  'cured meat and sausages': ['bacon', 'ham', 'smoked turkey breast', 'gammon', 'chorizo', 'pepperoni', 'salami', 'pork sausage', 'vegan sausage'],
+  'mince': ['chicken mince', 'turkey mince', 'beef mince 5% fat', 'beef mince 20% fat', 'lamb mince', 'pork mince', 'soy mince', 'quorn mince', 'vegan mince', 'soy mince dry'],
+  'cured meat and sausages': ['bacon', 'ham', 'smoked turkey breast', 'gammon', 'chorizo', 'pepperoni', 'salami', 'pork sausage', 'vegan sausage', 'bacon medallions'],
   'white fish': ['cod', 'haddock', 'tilapia', 'sea bass', 'red snapper', 'tuna steak fresh', 'cod raw', 'haddock raw'],
   'oily fish': ['salmon', 'mackerel', 'trout'],
   'tinned and smoked fish': ['tuna canned in water', 'sardines canned', 'smoked salmon'],
@@ -44,13 +44,13 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   'eggs': ['egg', 'egg white'],
   'protein powder': ['whey protein powder', 'vegan protein powder'],
   'tofu and meat-free pieces': ['tofu firm', 'tofu silken', 'tempeh', 'seitan', 'seitan strips', 'quorn fillet', 'falafel'],
-  'beans and pulses': ['chickpeas', 'lentils red', 'lentils green', 'brown lentils', 'red lentils dry', 'green lentils dry', 'black beans', 'kidney beans', 'pinto beans', 'butter beans', 'cannellini beans', 'haricot beans', 'split peas', 'edamame'],
+  'beans and pulses': ['chickpeas', 'lentils red', 'lentils green', 'brown lentils', 'red lentils dry', 'green lentils dry', 'black beans', 'kidney beans', 'pinto beans', 'butter beans', 'cannellini beans', 'haricot beans', 'baked beans', 'split peas', 'edamame'],
   // --- dairy and its stand-ins ---
   'yoghurt': ['greek yoghurt 0%', 'greek yoghurt 2%', 'greek yoghurt full fat', 'natural yoghurt', 'skyr', 'quark', 'cottage cheese', 'cottage cheese low fat', 'soy yoghurt', 'coconut yoghurt'],
   'soft cheese': ['ricotta cheese', 'cream cheese', 'cream cheese light'],
-  'cheese': ['cheddar cheese', 'mozzarella', 'mozzarella light', 'feta cheese', 'halloumi', 'parmesan', 'paneer', 'sulguni cheese'],
+  'cheese': ['cheddar cheese', 'mozzarella', 'mozzarella part skim', 'mozzarella light', 'feta cheese', 'halloumi', 'parmesan', 'paneer', 'sulguni cheese'],
   'milk': ['milk whole', 'milk semi skimmed', 'milk skimmed', 'soy milk', 'almond milk', 'oat milk'],
-  'cream': ['double cream', 'single cream', 'sour cream', 'creme fraiche', 'coconut cream', 'coconut milk canned', 'coconut milk light'],
+  'cream': ['double cream', 'single cream', 'sour cream', 'creme fraiche', 'half fat creme fraiche', 'heavy cream', 'coconut cream', 'coconut milk canned', 'coconut milk light'],
   // --- fats ---
   'cooking fat': ['olive oil', 'vegetable oil', 'coconut oil', 'sesame oil', 'peanut oil', 'safflower oil', 'ghee', 'butter'],
   'nut butter': ['peanut butter', 'almond butter', 'tahini'],
@@ -80,9 +80,9 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   'sweetener': ['honey', 'maple syrup', 'sugar white', 'brown sugar', 'jam'],
   'soy sauce': ['soy sauce', 'tamari'],
   'tomato base': ['tomato passata', 'chopped tomatoes canned', 'marinara sauce'],
-  'broth': ['beef broth', 'chicken broth'],
+  'broth': ['beef broth', 'chicken broth', 'vegetable broth'],
   'dips': ['hummus', 'tzatziki', 'salsa'],
-  'chocolate': ['dark chocolate', 'milk chocolate'],
+  'chocolate': ['dark chocolate', 'dark chocolate 70%', 'milk chocolate'],
   'snack bars': ['protein bar generic', 'greek yoghurt bar'],
 }
 
@@ -95,7 +95,7 @@ export const NO_SWAP: readonly string[] = [
   'lemon', 'lime', 'calamansi juice', 'onion', 'garlic', 'spring onion', 'shallots',
   // sauces, pastes and dressings
   'mayonnaise', 'mayonnaise light', 'ketchup', 'mustard', 'bbq sauce', 'sriracha', 'balsamic vinegar', 'pesto', 'curry paste',
-  'gravy granules made', 'worcestershire sauce', 'teriyaki sauce', 'vegetable stock cube', 'rice vinegar', 'fish sauce',
+  'gravy granules made', 'worcestershire sauce', 'teriyaki sauce', 'vegetable stock cube', 'vital wheat gluten', 'rice vinegar', 'fish sauce',
   'miso paste', 'gochujang', 'harissa', 'coleslaw', 'vinaigrette dressing', 'ranch dressing', 'apple cider vinegar',
   'oyster sauce', 'hoisin sauce', 'sweet chili sauce', 'tamarind paste', 'white vinegar', 'jerk seasoning paste',
   // herbs, spices and baking bits

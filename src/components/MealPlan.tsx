@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, Suspense } from 'react'
+import { useEffect, useRef, useState, Suspense, useMemo } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import type { HeldAround } from '@/lib/meal-generation'
 import { Button } from '@/components/ui/button'
@@ -37,6 +37,7 @@ import { dayAsShown, eatenMacrosBySlot, aroundEatenKeptKey, readAroundEatenKept 
 import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { watchFavouriteNames, markFavourite, unmarkFavourite, favouriteInputFromOption } from '@/lib/favourite-meals'
 import { displayTags } from '@/lib/meal-new-from'
+import { menuForSlot, menuWeekOf } from '@/lib/meal-menu'
 import { cookedHint } from '@/lib/as-weighed'
 import { methodSteps } from '@/lib/method-steps'
 import { revealBelowTap } from '@/components/nutrition/reveal'
@@ -926,13 +927,31 @@ function MealSlotRow({
   // near-identical macro reading, or a count that doesn't match what's
   // actually listed, until their next regenerate flushes the old pool.
   const seenNames = new Set<string>()
-  const otherOptions = alternatives.filter(o => {
+  const allOtherOptions = alternatives.filter(o => {
     const key = o.name.trim().toLowerCase()
     if (key === option?.name.trim().toLowerCase()) return false
     if (seenNames.has(key)) return false
     seenNames.add(key)
     return true
   })
+  // A DEEP POOL IS A LONG LIST (9 Nov 2026, his "much deeper pool"): every option stays choosable, but the list
+  // opens on a short one, this week's dishes first, with a search over all of them and a button for the rest. The
+  // order is the week's menu order (meal-menu.ts), so the dishes the week is drawn from lead; nothing is hidden.
+  const [swapQuery, setSwapQuery] = useState('')
+  const [showAllSwaps, setShowAllSwaps] = useState(false)
+  const SWAP_SHORT_LIST = 8
+  const longSwapList = allOtherOptions.length > SWAP_SHORT_LIST + 4
+  const orderedOptions = useMemo(() => {
+    if (!longSwapList) return allOtherOptions
+    const first = menuForSlot(allOtherOptions, menuWeekOf(date))
+    const firstSet = new Set(first)
+    return [...first, ...allOtherOptions.filter(o => !firstSet.has(o))]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alternatives, option?.name, date, longSwapList])
+  const query = swapQuery.trim().toLowerCase()
+  const otherOptions = !longSwapList ? allOtherOptions
+    : query ? orderedOptions.filter(o => o.name.toLowerCase().includes(query))
+    : showAllSwaps ? orderedOptions : orderedOptions.slice(0, SWAP_SHORT_LIST)
 
   // WHAT ELSE A SWAP CHANGED, said after the tap (runs 3-4, M34: swapping
   // lunch changed the snack recipe and nothing said so). The same trial the
@@ -1080,7 +1099,7 @@ function MealSlotRow({
   // NOT ONCE EATEN (whole-app QA walk, 7 Nov 2026): the log is what the day counts and shows, so a swap changed nothing
   // she could see except re-sizing the rest of the day around a dish she never ate. Moving a meal to another day and
   // moving calories between meals already refuse an eaten meal; the coach's swap says the same sentence.
-  const canSwap = !isLogged && (otherOptions.length > 0 || !!onFindMore)
+  const canSwap = !isLogged && (allOtherOptions.length > 0 || !!onFindMore)
   const kcalShown = Math.round(isLogged ? loggedKcal : (option?.macros.calories ?? 0))
   // THE ROW'S P · C · F (3a) is what its kcal is: what was logged when it was, the plan's dish when not.
   const rowMacros = isLogged
@@ -1270,7 +1289,7 @@ function MealSlotRow({
                       style={tab === t ? { background: 'var(--secondary)', color: 'var(--foreground)', fontWeight: 600 } : { color: 'var(--muted-foreground)' }}
                       data-meal-sheet-tab={t}
                     >
-                      {t === 'recipe' ? 'Recipe' : otherOptions.length > 0 ? `Swap · ${otherOptions.length}` : 'Swap'}
+                      {t === 'recipe' ? 'Recipe' : allOtherOptions.length > 0 ? `Swap · ${allOtherOptions.length}` : 'Swap'}
                     </button>
                   ))}
                 </div>
@@ -1560,6 +1579,21 @@ function MealSlotRow({
 
               {tab === 'swap' && canSwap && (
                 <div className="flex flex-col gap-1" data-meal-swap-list>
+                  {longSwapList && (
+                    <input
+                      type="search"
+                      id={`meal-swap-search-${slot}`}
+                      data-meal-swap-search
+                      value={swapQuery}
+                      onChange={e => setSwapQuery(e.target.value)}
+                      placeholder={`Search all ${allOtherOptions.length} options`}
+                      aria-label={`Search all ${allOtherOptions.length} options`}
+                      className="mb-1 min-h-[44px] w-full rounded-xl border border-[color:var(--hairline)] bg-transparent px-3 text-sm"
+                    />
+                  )}
+                  {longSwapList && query && otherOptions.length === 0 && (
+                    <p className="px-3 py-2 text-xs text-muted-foreground" data-meal-swap-none>No option matches "{swapQuery.trim()}".</p>
+                  )}
                   {otherOptions.map(alt => {
                     const calDelta = Math.round(alt.macros.calories - option.macros.calories)
                     const proteinDelta = Math.round(alt.macros.protein - option.macros.protein)
@@ -1595,6 +1629,16 @@ function MealSlotRow({
                       </button>
                     )
                   })}
+                  {longSwapList && !query && !showAllSwaps && (
+                    <button
+                      type="button"
+                      data-meal-swap-show-all
+                      onClick={() => setShowAllSwaps(true)}
+                      className="min-h-[44px] rounded-xl px-3 py-2.5 text-left text-xs font-medium text-primary-text"
+                    >
+                      Show all {allOtherOptions.length} options
+                    </button>
+                  )}
                   {onFindMore && (
                     <button
                       type="button"

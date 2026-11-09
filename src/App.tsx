@@ -33,7 +33,8 @@ import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, ty
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
 import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, isTopUpDismissed, dismissTopUp, type TopUpOutcome } from '@/lib/meal-top-up'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
-import { buildRotation, rotationIndexFor, pinsFromPicks, type MealShape } from '@/lib/meal-rotation'
+import { buildRotation, rotationIndexFor, pinsFromPicks, poolsServedOn, type MealShape } from '@/lib/meal-rotation'
+import { menuFor } from '@/lib/meal-menu'
 import { useMealDays } from '@/hooks/useMealDays'
 import { useMealPlanActions } from '@/hooks/useMealPlanActions'
 import { watchFavouriteNames } from '@/lib/favourite-meals'
@@ -486,8 +487,10 @@ function App() {
     batchCooking: profile?.batch_cooking,
   }), [profile?.meals_per_day, profile?.include_snacks, profile?.batch_cooking])
   const mealRotation = useMemo(
-    () => (macros ? buildRotation(mealPools, macros, compiledSoftFoodPreferences, mealShape) : null),
-    [mealPools, macros, compiledSoftFoodPreferences, mealShape],
+    // Built from THIS WEEK'S MENU (9 Nov 2026, meal-menu.ts): a deep pool is never searched whole. The same object
+    // serveDates draws for today, so the strip finds this rotation again rather than building its own.
+    () => (macros ? buildRotation(menuFor(poolsServedOn(mealPools, mealRotationDate), mealRotationDate, compiledSoftFoodPreferences), macros, compiledSoftFoodPreferences, mealShape) : null),
+    [mealPools, macros, compiledSoftFoodPreferences, mealShape, mealRotationDate],
   )
   // THE STRIP'S DAYS (Ashley, 27 Sep 2026) — one hook, shared with the browser
   // harness so a driver runs this code and not a copy of it. TODAY IS ONE OF
@@ -599,8 +602,8 @@ function App() {
   // Nutrition offer and to the coach, so neither can offer what the other's
   // button would not.
   const mealTopUpPlan = useMemo(
-    () => (macros ? topUpPlan(mealPools, activeMealSlots, macros) : null),
-    [mealPools, activeMealSlots, macros],
+    () => (macros ? topUpPlan(mealPools, activeMealSlots, macros, undefined, mealRotationDate) : null),
+    [mealPools, activeMealSlots, macros, mealRotationDate],
   )
   const mealTopUpNeeds = mealTopUpPlan?.needs ?? {}
   const [mealTopUpBusy, setMealTopUpBusy] = useState(false)
@@ -1564,6 +1567,7 @@ function App() {
       profileId,
       today: mealRotationDate,
       needs: mealTopUpNeeds,
+      deep: mealTopUpPlan?.deep ?? false,
       legacyStartDate: readGroceryBuildMemo(profileId)?.startDate,
       // M62, her pick only: start tomorrow, then re-work the list's days from the meals as they now are (the new
       // ones included, read back from the store, not the stale pools in this closure).

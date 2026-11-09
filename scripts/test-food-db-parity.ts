@@ -124,7 +124,7 @@ console.log('\n4. The same words resolve to the same food')
   // each resolved differently in the two copies on 9 Oct 2026.
   const PHRASES: [string, string | null | undefined][] = [
     ['crème fraîche', 'creme fraiche'],          // accents: only the app copy folded them
-    ['half-fat crème fraîche', 'creme fraiche'],
+    ['half-fat crème fraîche', 'half fat creme fraiche'], // its own row since the 9 Nov 2026 meal audit (was costed as full fat)
     ['coffee', 'black coffee'],                  // one of 9 foods the coach lacked
     ['rye crispbreads', 'rye crispbread'],
     ['mixed berries', 'mixed berries'],

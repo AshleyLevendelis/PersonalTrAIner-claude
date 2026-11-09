@@ -181,6 +181,19 @@ export function moreMealOptionsOffer(counts: number[], target: number): string {
   return `${have} I can top each one up to ${target}, so your week repeats less. Today, and any day on your shopping list, stay exactly as they are.`
 }
 
+/**
+ * THE OFFER FOR A DEEP POOL (9 Nov 2026, his "much deeper pool"): every dish of the app's own library that suits her,
+ * not a number to top up to, because how many suit her is only known once each is checked. The same promise as the
+ * offer above, which is what makes the tap safe (his 28 Sep "Button, keep today").
+ */
+export function moreMealLibraryOffer(counts: number[]): string {
+  const fewest = Math.min(...counts)
+  const have = counts.every(c => c === counts[0])
+    ? `Your meals have ${fewest} options each.`
+    : `Some of your meals have only ${fewest} options.`
+  return `${have} I can add every dish from our own meal library that suits you, so each week brings different meals. Today, and any day on your shopping list, stay exactly as they are.`
+}
+
 const MEAL_PLURAL: Record<string, string> = { breakfast: 'breakfasts', lunch: 'lunches', dinner: 'dinners', snack: 'snacks' }
 const joinPlain = (items: string[]) =>
   items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`
@@ -221,7 +234,7 @@ export function moreMealOptionsWhy(r: { reached: boolean; listUnreadable: boolea
   return r.reached ? "I couldn't find new meals that fit your targets" : "I couldn't reach the meal generator just then"
 }
 
-export function moreMealOptionsDone(r: { added: number; asked: number; reached: boolean; listUnreadable: boolean; startLabel: string; listUpdated?: boolean | null }): string {
+export function moreMealOptionsDone(r: { added: number; asked: number; reached: boolean; listUnreadable: boolean; startLabel: string; listUpdated?: boolean | null; deep?: boolean }): string {
   if (r.added === 0) {
     // Every failure says nothing changed, and the two that are about a
     // connection say to try again; "no meal fits" would not get better.
@@ -236,7 +249,7 @@ export function moreMealOptionsDone(r: { added: number; asked: number; reached: 
       : `Added ${r.added} new ${r.added === 1 ? 'meal' : 'meals'}. They start ${r.startLabel}; every day before then stays as it was.`
   // "There's room to try again" holds on both surfaces: the screen still
   // offers it, and the coach can be asked. Neither has to point at a control.
-  return r.added < r.asked ? `${lead} That's fewer than I asked for, so there's room to try again.` : lead
+  return r.added < r.asked && !r.deep ? `${lead} That's fewer than I asked for, so there's room to try again.` : lead
 }
 
 /**
@@ -268,7 +281,10 @@ export const MORE_MEALS = {
    * there are just few, "2 of your 2 fit" reads as a complaint about dishes that are fine, so the row counts options,
    * as the screen's offer does ("You only have 2 lunches").
    */
-  row: (fitting: number | undefined, have: number, add: number) => (fitting !== undefined && fitting < have
+  row: (fitting: number | undefined, have: number, add: number, deep = false) => (deep
+    // THE DEEP OFFER (9 Nov 2026): how many suit her is known only once each is checked, so the row names a ceiling.
+    ? { before: `${have} option${have === 1 ? '' : 's'}`, after: `up to ${have + add} options from our library` }
+    : fitting !== undefined && fitting < have
     ? { before: `${fitting} of ${have} fit`, after: `up to ${fitting + add} of ${have + add} fit` }
     : { before: `${have} option${have === 1 ? '' : 's'}`, after: `${have + add} option${have + add === 1 ? '' : 's'}` }),
   /** No card, and why: the three days the request cannot be met. */

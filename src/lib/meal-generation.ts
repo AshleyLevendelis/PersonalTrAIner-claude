@@ -42,6 +42,7 @@ import { tagsNewFrom } from './meal-new-from'
 import { dishKeysFor, dishKeyOf } from './meal-dish-identity'
 import { chooseFromLibrary, loadMealLibrary } from './meal-library'
 import { MIN_COVERAGE } from './meal-costing'
+import { MENU_SIZE, menuForSlot } from './meal-menu'
 /**
  * SEVEN OPTIONS A MEAL — Ashley's ruling, 28 Sep 2026, from three options
  * (keep five, seven, ten). At five, a week of 28 servings was 11 dishes and
@@ -53,6 +54,18 @@ import { MIN_COVERAGE } from './meal-costing'
  */
 export const DEFAULT_POOL_SIZE = 7
 export const MAX_GENERATION_ROUNDS = 3
+
+/**
+ * HOW DEEP A MEAL'S POOL GROWS FROM THE LIBRARY (9 Nov 2026; Ashley: "We need a much deeper pool of meals to choose
+ * from not only 14"). Every library dish that passes her checks and lands a day, up to this many a meal. A ceiling,
+ * not a target, set by what a phone carries: the start-up copy (boot-cache.ts) is dropped whole past 1.5 MB, and a
+ * full deep pool is about 224 kB of it (measured 9 Nov 2026: 400 dishes, about 560 characters each). The day
+ * picker never searches the pool, only a week's menu (meal-menu.ts), so this number costs nothing at serving time.
+ */
+export const DEEP_POOL_SIZE = 100
+
+/** How many pool rows a refit re-portions at once (persistResizedPools). */
+const RESIZE_WRITES_AT_ONCE = 8
 
 const ALL_SLOTS: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -734,6 +747,11 @@ export async function generateMealPools(params: {
    * list to use instead of the real library (a gate's small fixture).
    */
   library?: readonly RawProposal[] | false
+  /**
+   * Seed the pool from the library up to DEEP_POOL_SIZE a meal, on a new plan as well as when asking for more
+   * (9 Nov 2026, his "much deeper pool"). On by default; a gate that pins the old seven-dish shape passes false.
+   */
+  deepLibrary?: boolean
 }): Promise<GenerateMealPoolsResult> {
   const poolSize = params.poolSize ?? DEFAULT_POOL_SIZE
   const budgets = computeSlotBudgets(params.targets, params.mealsPerDay, params.includeSnacks)
@@ -805,13 +823,17 @@ export async function generateMealPools(params: {
     const usable: Partial<Record<MealSlotName, PoolOption[]>> = {}
     for (const s of daySlots) usable[s] = [...(existingBySlot[s] ?? []), ...(accepted[s] ?? [])].filter(o => !o.breaksRestriction)
     if (daySlots.some(s => s !== slot && usable[s]!.length === 0)) return null
+    // A DEEP POOL IS JUDGED AGAINST A MENU (9 Nov 2026): the search is a product over the meals, so the other meals
+    // are a menu's worth each (the first week's), never the whole pool; the dish being judged is pinned anyway.
+    for (const s of daySlots) if (s !== slot && usable[s]!.length > MENU_SIZE) usable[s] = menuForSlot(usable[s]!, 0)
     return assembleDay(usable, params.targets, {}, [], { [slot]: option }).withinTolerance
   }
 
-  const considerProposal = (proposal: RawProposal, mustFit = false): void => {
+  const considerProposal = (proposal: RawProposal, mustFit = false, cap = poolSize, deep = false): void => {
     const slot = proposal.slot as MealSlotName
     if (!activeSlots.includes(slot)) return
-    if ((accepted[slot]?.length ?? 0) >= poolSize) return
+    // A deep pass counts what she already has as well: DEEP_POOL_SIZE is a ceiling on the meal, not on one run.
+    if ((deep ? (existingBySlot[slot]?.length ?? 0) : 0) + (accepted[slot]?.length ?? 0) >= cap) return
 
     const budget = budgets[slot]
     if (!budget) return
@@ -819,7 +841,8 @@ export async function generateMealPools(params: {
     const existing = existingBySlot[slot] ?? []
     const isExoticProposal = EXOTIC_CUISINES.has(proposal.cuisine)
     const poolAlreadyHasExotic = (accepted[slot]?.some(isExoticOption) ?? false) || existing.some(isExoticOption)
-    if (isExoticProposal && poolAlreadyHasExotic) {
+    // A deep pool is not capped here: its MENU is (meal-menu.ts, one adventurous cuisine a meal on a week's menu).
+    if (isExoticProposal && poolAlreadyHasExotic && !deep) {
       rejectionLog.push(`[${slot}] "${proposal.name}": pool already has an exotic-cuisine option — cuisine coherence cap (${proposal.cuisine})`)
       return
     }
@@ -900,9 +923,10 @@ export async function generateMealPools(params: {
    * whose steering (cuisines, cooking time, likes) is the plan's first shape;
    * whether the library should seed those too is hers to rule.
    */
-  if (params.appendToExisting && params.library !== false) {
+  const deepLibrary = params.deepLibrary !== false && params.library !== false
+  const libraryPass = async (deep: boolean): Promise<void> => {
     try {
-      const library = params.library ?? await loadMealLibrary()
+      const library = params.library === false ? [] : (params.library ?? await loadMealLibrary())
       const liked = steeringLikes(params.likedFoods ?? [], params.favouriteMeals ?? [], params.dislikedFoods ?? [], params.dietaryPreferences).foods
       for (const slot of activeSlots) {
         const existing = existingBySlot[slot] ?? []
@@ -917,18 +941,25 @@ export async function generateMealPools(params: {
           rotation: existing.length,
           budget: budgets[slot],
         })
-        for (const dish of candidates) considerProposal(dish, true)
+        // A run asks for `poolSize` more (the top-up asks for up to DEEP_POOL_SIZE less what she has); a new plan's
+        // seed asks for the whole DEEP_POOL_SIZE. Never past DEEP_POOL_SIZE a meal either way.
+        const cap = !deep ? poolSize : params.appendToExisting ? Math.min(DEEP_POOL_SIZE, existing.length + poolSize) : DEEP_POOL_SIZE
+        for (const dish of candidates) considerProposal(dish, true, cap, deep)
       }
     } catch (err) {
       // The library is a convenience. Without it the meal writer is asked for everything, as before.
       rejectionLog.push(`[library] could not be read: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
+  if (params.appendToExisting && params.library !== false) await libraryPass(deepLibrary)
 
   for (let round = 0; round < MAX_GENERATION_ROUNDS; round++) {
     const remaining: Partial<Record<MealSlotName, number>> = {}
     for (const slot of activeSlots) {
-      const need = poolSize - (accepted[slot]?.length ?? 0)
+      let need = poolSize - (accepted[slot]?.length ?? 0)
+      // ASKING FOR MORE, WITH THE LIBRARY DEEP: the writer is asked only to bring a meal the library left thin up to
+      // the plan's usual size, never for the deep count (that would be a hundred dishes from a model call).
+      if (params.appendToExisting && deepLibrary) need = Math.min(need, DEFAULT_POOL_SIZE - (existingBySlot[slot]?.length ?? 0) - (accepted[slot]?.length ?? 0))
       if (need > 0) remaining[slot] = need
     }
     if (Object.keys(remaining).length === 0) break
@@ -981,6 +1012,14 @@ export async function generateMealPools(params: {
     // goes out, so losing the page from here on costs the REST of the plan
     // rather than all of it. Skipped for the append path — see below.
     if (!params.appendToExisting) await commitProgress()
+  }
+
+  // A NEW PLAN IS SEEDED FROM THE LIBRARY TOO (9 Nov 2026, his "much deeper pool", which settles his open "seeding
+  // fresh plans" question): the writer's dishes first, as the plan's own shape (her cuisines, cooking time, likes),
+  // then every library dish that passes her checks and lands a day, up to DEEP_POOL_SIZE a meal.
+  if (!params.appendToExisting && deepLibrary) {
+    await libraryPass(true)
+    await commitProgress()
   }
 
   const shortfalls = activeSlots
@@ -1276,27 +1315,30 @@ export async function persistResizedPools(
       if (!indexByName.has(row.name)) indexByName.set(row.name, row.pool_index)
     }
 
-    for (const option of options) {
-      const poolIndex = indexByName.get(option.name)
+    // A FEW AT A TIME, NOT ONE AFTER ANOTHER (9 Nov 2026): a deep pool holds up to DEEP_POOL_SIZE dishes a meal, and
+    // one awaited update each was 400 round trips in a row on a phone. Each row is still its own update (a partial
+    // upsert would trip the table's required columns), so the count of what landed and what did not is unchanged.
+    const work = options
+      .map(option => ({ option, poolIndex: indexByName.get(option.name) }))
       // An option that is not in the database is one assembly invented or one
       // added since the read. Skipped rather than inserted: this function
       // re-portions, and quietly growing the pool would be a different verb.
-      if (poolIndex === undefined) continue
-      const { error: updateError } = await supabase
-        .from('meal_plan_slots')
-        .update({
-          ingredients: option.ingredients,
-          macros: { kcal: option.macros.calories, protein: option.macros.protein, carbs: option.macros.carbs, fat: option.macros.fat },
-        })
-        .eq('profile_id', profileId)
-        .eq('slot', slot)
-        .eq('pool_index', poolIndex)
-      if (updateError) {
-        console.error(`Couldn't resize ${option.name} in slot ${slot}:`, updateError)
-        failed += 1
-      } else {
-        updated += 1
-      }
+      .filter((w): w is { option: PoolOption; poolIndex: number } => w.poolIndex !== undefined)
+    for (let i = 0; i < work.length; i += RESIZE_WRITES_AT_ONCE) {
+      const results = await Promise.all(work.slice(i, i + RESIZE_WRITES_AT_ONCE).map(async ({ option, poolIndex }) => {
+        const { error: updateError } = await supabase
+          .from('meal_plan_slots')
+          .update({
+            ingredients: option.ingredients,
+            macros: { kcal: option.macros.calories, protein: option.macros.protein, carbs: option.macros.carbs, fat: option.macros.fat },
+          })
+          .eq('profile_id', profileId)
+          .eq('slot', slot)
+          .eq('pool_index', poolIndex)
+        if (updateError) console.error(`Couldn't resize ${option.name} in slot ${slot}:`, updateError)
+        return !updateError
+      }))
+      for (const ok of results) { if (ok) updated += 1; else failed += 1 }
     }
   }
   return { updated, failed }
@@ -1527,7 +1569,7 @@ export function macroDistanceScore(totals: MacroTargets, targets: MacroTargets):
  * An option that breaks a current restriction never counts as liked — a like
  * must not be the reason a meal she now avoids gets served (breaksRestriction).
  */
-function optionMatchesLikedFood(option: PoolOption, liked: string[]): boolean {
+export function optionMatchesLikedFood(option: PoolOption, liked: string[]): boolean {
   if (liked.length === 0 || option.breaksRestriction) return false
   const ingredientNames = option.ingredients.map(i => i.name)
   return liked.some(food => containsPhrase(option.name, ingredientNames, food))

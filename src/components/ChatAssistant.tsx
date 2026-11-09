@@ -4734,7 +4734,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         lead: ask(slots.some(s => mealTopUp.fewFit[s] !== undefined && mealTopUp.fewFit[s]! < (mealTopUp.have[s] ?? 0)) ? MORE_MEALS.leadFit : MORE_MEALS.lead),
         // A meal short on fit reads "2 of 7 fit" to "up to 5 of 10 fit"; one
         // short only on count reads "5 options" to "7 options", as before.
-        rows: slots.map(slot => ({ field: REFIT_SLOT_LABEL[slot], ...MORE_MEALS.row(mealTopUp.fewFit[slot], mealTopUp.have[slot] ?? 0, mealTopUp.needs[slot] ?? 0) })),
+        rows: slots.map(slot => ({ field: REFIT_SLOT_LABEL[slot], ...MORE_MEALS.row(mealTopUp.fewFit[slot], mealTopUp.have[slot] ?? 0, mealTopUp.needs[slot] ?? 0, mealTopUp.deep) })),
         unchanged: [MORE_MEALS.unchanged],
         implications: [
           { severity: 'info', text: start.beyondStrip ? MORE_MEALS.startsLate(start.label) : MORE_MEALS.starts(start.label) },

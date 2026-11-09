@@ -231,7 +231,10 @@ async function main() {
   const good = (x: { p: number; c: number; f: number }) => x.p <= 1.2 && Math.abs(x.c - 1) <= 0.3 && Math.abs(x.f - 1) <= 0.3
   const mainstream = TARGET_GRID.find(g => g.label === '2300kcal/160g')!
   const medians = (['lunch', 'dinner'] as MealSlotName[]).map(sl => ({ sl, raw: median(shapeAt(sl, mainstream, false).map(x => x.p)), fit: median(shapeAt(sl, mainstream, true).map(x => x.p)) }))
-  check('at a mainstream target the typical lunch and dinner carry under 1.2x the meal\'s protein once fitted, and more than 1.25x as written', medians.every(m => m.fit <= 1.2 && m.raw >= 1.25), medians)
+  // The "as written" half only proves the case binds (the fit has protein to take away). 9 Nov 2026: the 360 deep-pool
+  // dishes were written leaner on purpose (5.5-9 g per 100 kcal), so the typical lunch as written fell from about 1.3x
+  // to 1.23-1.25x. Measured, so the binding floor is 1.2: still well clear of the fitted 1.12.
+  check('at a mainstream target the typical lunch and dinner carry under 1.2x the meal\'s protein once fitted, and more than 1.2x as written', medians.every(m => m.fit <= 1.2 && m.raw >= 1.2 && m.raw - m.fit >= 0.08), medians)
   const coverage = TARGET_GRID.map(g => {
     const per = (sl: MealSlotName) => { const r = shapeAt(sl, g, true); return { n: r.length, good: r.filter(good).length } }
     return { t: g.label, kcal: g.targets.calories, bre: per('breakfast'), lun: per('lunch'), din: per('dinner'), sna: per('snack') }
@@ -340,7 +343,13 @@ async function main() {
 
   requests = 0
   const r4 = await generateMealPools({ ...base, profileId: 'w4', poolSize: 2, library: fixture })
-  check('a fresh plan (not "more") never draws from the library, even when one is offered', requests >= 1 && r4.accepted.lunch?.every(o => o.name.startsWith('Writer')), r4.accepted.lunch?.map(o => o.name))
+  // REVERSED 9 Nov 2026 (his "much deeper pool", which settled his open "seeding fresh plans" question): a fresh plan
+  // is the writer's dishes FIRST, as the plan's own shape, then the library's; switched off, only the writer's.
+  const r4Names = r4.accepted.lunch?.map(o => o.name) ?? []
+  check('a fresh plan is the writer\'s dishes first, then the library\'s (the writer is still asked, and still leads)', requests >= 1 && r4Names.length > 2 && r4Names.slice(0, 2).every(n => n.startsWith('Writer')) && r4Names.slice(2).some(n => n.startsWith('Fixture')), r4Names)
+  requests = 0
+  const r4b = await generateMealPools({ ...base, profileId: 'w4b', poolSize: 2, library: fixture, deepLibrary: false })
+  check('...and with the deep seed switched off a fresh plan never draws from the library', requests >= 1 && (r4b.accepted.lunch?.length ?? 0) === 2 && r4b.accepted.lunch!.every(o => o.name.startsWith('Writer')), r4b.accepted.lunch?.map(o => o.name))
 
   // A DISH SHE ALREADY HAS IS NOT OFFERED AGAIN.
   await generateMealPools({ ...base, profileId: 'w5', poolSize: 1, appendToExisting: true, library: [fixture[0]] })
@@ -450,17 +459,22 @@ async function main() {
 
   // -------------------------------------------------------------------------
   console.log('\n5. What the source must keep true')
+  const stripComments = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1')
   const gen = read('src/lib/meal-generation.ts')
   const fn = gen.slice(gen.indexOf('export async function generateMealPools'))
   const loopAt = fn.indexOf('for (let round = 0; round < MAX_GENERATION_ROUNDS')
   const libAt = fn.indexOf('chooseFromLibrary(')
   check('the library round comes before the rounds that ask the writer', libAt > 0 && loopAt > 0 && libAt < loopAt, [libAt, loopAt])
   const libBlock = fn.slice(Math.max(0, fn.lastIndexOf('if (params.appendToExisting', libAt)), libAt)
-  check('...and only when she is asking for more, and only when not switched off', /params\.appendToExisting\s*&&\s*params\.library\s*!==\s*false/.test(libBlock), libBlock.slice(0, 120))
+  // 9 Nov 2026 (his "much deeper pool", docs/plans/deep-meal-pool.md): the library pass is one function, run before
+  // the writer when she asks for more and AFTER the writer on a new plan, and never when switched off.
+  const passCalls = stripComments(fn)
+  check('...and runs before the writer when she is asking for more, and only when not switched off', /if \(params\.appendToExisting\s*&&\s*params\.library\s*!==\s*false\)\s*await libraryPass\(/.test(passCalls), passCalls.slice(passCalls.indexOf('libraryPass'), passCalls.indexOf('libraryPass') + 200))
+  check('...and seeds a new plan after the writer\'s rounds, unless switched off (deepLibrary false, or no library)', /if \(!params\.appendToExisting\s*&&\s*deepLibrary\)\s*\{\s*await libraryPass\(true\)/.test(passCalls) && passCalls.indexOf('await libraryPass(true)') > passCalls.indexOf('for (let round = 0; round < MAX_GENERATION_ROUNDS') && /const deepLibrary = params\.deepLibrary !== false && params\.library !== false/.test(passCalls))
   check('...and each slot is asked for with that slot\'s own budget, so the dishes are fitted to the meal they are offered for', /budget:\s*budgets\[slot\]/.test(fn.slice(libAt, libAt + 900)), fn.slice(libAt, libAt + 900))
   const askBlock = fn.slice(libAt, libAt + 900)
   check('...and is told what she already has and the exotic cap; considerProposal enforces both as well, so only the order would show a slip, and order is all this pins', /haveNames:\s*existing\.map\(o\s*=>\s*o\.name\)/.test(askBlock) && /exoticCuisines:\s*EXOTIC_CUISINES/.test(askBlock), askBlock)
-  check('...every library dish goes through the one function every proposal goes through', /for \(const dish of candidates\) considerProposal\(dish, true\)/.test(fn) && /for \(const proposal of proposals\) considerProposal\(proposal\)/.test(fn))
+  check('...every library dish goes through the one function every proposal goes through', /for \(const dish of candidates\) considerProposal\(dish, true, cap, deep\)/.test(fn) && /for \(const proposal of proposals\) considerProposal\(proposal\)/.test(fn))
   check('...and that function is the only place a proposal is verified', (fn.match(/verifyProposal\(/g) ?? []).length === 1, (fn.match(/verifyProposal\(/g) ?? []).length)
   const chooser = read('src/lib/meal-library.ts')
   check('the chooser is deterministic: no Math.random', !/Math\.random/.test(chooser))
