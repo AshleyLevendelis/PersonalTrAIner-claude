@@ -1925,7 +1925,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
           return v === null || v === undefined || v === ''
         })
         const names = (outstanding.length > 0 ? outstanding : group)
-          .map(k => getSlotDef(k)?.shortLabel?.toLowerCase())
+          .map(k => { const d = getSlotDef(k); return d?.askLabel ?? d?.shortLabel?.toLowerCase() })
           .filter(Boolean) as string[]
         if (names.length > 1) {
           return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}…`

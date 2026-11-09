@@ -2,6 +2,28 @@
 
 Newest first. One line each.
 
+- [x] **SETUP ASKS THE DATE OF BIRTH WITH A DATE PICKER, AND WEIGHT AND HEIGHT HAVE UNIT TOGGLES, 9 NOV 2026.** His
+  request: "During onboarding, make the chat ask for date of birth for the age, with a date picker. And weight be an
+  input field with a toggle for different units of measurement, and same for height." Built on setup's age / height /
+  weight card: a date picker labelled "Date of birth" that says "That makes you 36." as soon as a date is picked (only
+  ages 13 to 100 can be picked, the same limits as before); a weight box with kg / lb / st & lb, and a height box with
+  cm / ft & in (stone and feet get two boxes, each with its unit inside it). Switching unit carries what is in the box
+  across, converted (82 kg reads 181 lb, then 12 st 13 lb). The app's own line asks "What's your date of birth, height
+  and weight?", and the setup coach is told to ask for the date of birth, never "how old are you". MECHANICAL CHOICE,
+  said so it can be changed: the controls write the same text the setup reader already understood ("5'10", "13st 2",
+  "180lb", the age as a number), so the number stored, its receipt ("178 cm, from 5'10"") and the limits are exactly
+  what typing it gave. NOT DONE, named: the date of birth itself is not kept, only the age it makes (keeping it needs a
+  new database column, a migration, which is his to approve; without it the age does not move on a birthday, as before);
+  the unit picked is not remembered, so a change from the summary opens in kg and cm; Profile's own age, height and
+  weight boxes are unchanged (he said onboarding). CHECKS: `test:body-units` §7-8 (+22: the age on and either side of a
+  birthday, 29 February, impossible and future dates, the picker's limits, every unit both ways, the stone carry, the
+  limits said in the unit picked), `test:setup-card-question` (+1, re-anchored), `test:onboarding-conversational`
+  (re-anchored on the coach's new line), `verify:composer` (re-written for the controls: picker, toggles, 44px buttons,
+  conversion on switch, an under-13 date refused, the age shown is the age stored, 5'10 and 13 st 2 stored with their
+  receipts). Mutations: 14 tried, 12 caught first time; the picker's earliest date was MISSED (its check could not tell
+  "exactly 100" from "100 or 101") and now asks that the day before it makes 101, caught; and "feet with no inches
+  written as 0 inches" was MISSED because "6'" already reads as 6 ft 0, so that line was removed rather than given a
+  check. Needs the `onboarding-chat` deploy for the coach's wording; the card itself ships with the frontend.
 - [x] **CORRECTING A MEAL ALREADY EATEN PREVIEWED ONE DAY AND LANDED ANOTHER, 9 NOV 2026** (QA round 3, the meals
   tester's finding 8). Mechanical: his 2 Nov "Same dishes" ruling already calls such an edit a CORRECTION, and the build
   never carried it to the eaten record. Taking the banana out of an eaten breakfast changed the plan's copy only, so

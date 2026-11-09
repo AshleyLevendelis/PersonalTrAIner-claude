@@ -544,6 +544,11 @@ export interface SlotDef {
    * made the conversation read like a form being filled in.
    */
   shortLabel: string
+  /**
+   * The words used when this answer is ASKED for, where they differ from what it is recorded as. Age is asked as a
+   * date of birth (Ashley, 9 Nov 2026: setup asks for the date of birth with a date picker) and recorded as an age.
+   */
+  askLabel?: string
   control: 'single' | 'multi' | 'text' | 'numeric' | 'boolean'
   /**
    * required=true means the value must be non-empty/valid before completion.
@@ -953,7 +958,7 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // bought. In the catalogue, though, the model can record it the moment
   // someone volunteers it, which is exactly the case this exists for.
   { key: 'dislikedExercises', question: "Any exercises you'd rather never see?", inputHint: 'Exercises to skip…', shortLabel: 'Exercises to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
-  { key: 'age', question: 'How old are you?', inputHint: 'Your age…', shortLabel: 'Age', control: 'numeric', required: false, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
+  { key: 'age', question: "What's your date of birth?", inputHint: 'Your date of birth, or your age…', shortLabel: 'Age', askLabel: 'date of birth', control: 'numeric', required: false, min: 13, max: 100, destination: 'column', validate: isNumberIn(13, 100) },
   { key: 'heightCm', question: 'How tall are you?', inputHint: 'cm, or 5\'10…', shortLabel: 'Height', control: 'numeric', required: false, min: 100, max: 250, unit: 'cm', destination: 'column', validate: isNumberIn(100, 250) },
   { key: 'weightKg', question: 'What do you weigh right now?', inputHint: 'kg, or 13st…', shortLabel: 'Weight', control: 'numeric', required: false, min: 25, max: 350, unit: 'kg', destination: 'column', validate: isNumberIn(25, 350) },
   { key: 'gender', question: 'Which should I use for your calorie and starting-weight maths?', inputHint: 'Whichever fits…', shortLabel: 'Sex', control: 'single', required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
@@ -1484,6 +1489,6 @@ export function cardQuestion(key: SlotKey, values: OnboardingSlotValues, confirm
     .map(k => getSlotDef(k))
     .filter((d): d is NonNullable<typeof d> => !!d && d.control === 'numeric' && isSlotApplicable(d, values) && !confirmed.has(d.key))
   if (open.length <= 1) return def.question
-  const names = open.map(d => d.shortLabel.toLowerCase())
+  const names = open.map(d => d.askLabel ?? d.shortLabel.toLowerCase())
   return `What's your ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}?`
 }

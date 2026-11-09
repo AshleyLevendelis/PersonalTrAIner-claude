@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactElement } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -38,12 +38,17 @@ import {
  * grouped cards put three fields under one question, so only one of them
  * could ever have taken its unit from the sentence above.
  */
-import { measureParserFor } from '@/lib/body-units'
+import { measureParserFor, ageOn, birthDateBounds, weightParts, heightParts, weightText, heightText, sayWeight, sayHeight, type WeightUnit, type HeightUnit } from '@/lib/body-units'
+
+/** Today on this phone's own calendar, YYYY-MM-DD: a date of birth is a local date. */
+const localToday = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const WEIGHT_UNITS: { unit: WeightUnit; label: string }[] = [{ unit: 'kg', label: 'kg' }, { unit: 'lb', label: 'lb' }, { unit: 'st', label: 'st & lb' }]
+const HEIGHT_UNITS: { unit: HeightUnit; label: string }[] = [{ unit: 'cm', label: 'cm' }, { unit: 'ft', label: 'ft & in' }]
 
 const UNIT: Record<string, string | undefined> = {
-  age: 'years',
-  heightCm: 'cm or 5\'10',
-  weightKg: 'kg or 13st',
   // kg, or pounds when they type "lb" (19 Oct 2026). A bare number is kg.
   knownSquatKg: 'kg or lb',
   knownBenchKg: 'kg or lb',
@@ -65,14 +70,12 @@ const UNIT: Record<string, string | undefined> = {
  * bounds still apply after conversion, so nothing is loosened — only the
  * browser's character filter, which was the thing in the way.
  */
-const ACCEPTS_UNITS = new Set(['heightCm', 'weightKg', 'knownSquatKg', 'knownBenchKg', 'knownDeadliftKg'])
+const ACCEPTS_UNITS = new Set(['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg'])
 
 // No example number on a lift box: a figure there is one somebody might copy
 // onto the bar, and these numbers set the starting weight.
 const LIFT_PLACEHOLDER = 'In kg, or add lb'
 const PLACEHOLDER: Record<string, string> = {
-  heightCm: "178 or 5'10",
-  weightKg: '87 or 13st 2',
   knownSquatKg: LIFT_PLACEHOLDER,
   knownBenchKg: LIFT_PLACEHOLDER,
   knownDeadliftKg: LIFT_PLACEHOLDER,
@@ -111,9 +114,35 @@ export function SlotNumericCard({
     : {})
   const [showErrors, setShowErrors] = useState(false)
 
+  // AGE, HEIGHT AND WEIGHT HAVE THEIR OWN CONTROLS (Ashley, 9 Nov 2026): a date picker for the date of birth, and a
+  // unit toggle beside the weight and the height boxes. Each writes the text the slot's parser already reads, so the
+  // number stored, the receipt ("from 5'10\"") and the bounds are what typing it gave.
+  const today = localToday()
+  const [dob, setDob] = useState('')
+  const [weightUnit, setWeightUnit] = useState<WeightUnit>('kg')
+  const [heightUnit, setHeightUnit] = useState<HeightUnit>('cm')
+  const [weightBoxes, setWeightBoxes] = useState<[string, string]>(() => [draft.weightKg ?? '', ''])
+  const [heightBoxes, setHeightBoxes] = useState<[string, string]>(() => [draft.heightCm ?? '', ''])
+  /** Switching unit carries what is in the boxes across, converted, rather than emptying them. */
+  const switchWeight = (u: WeightUnit) => {
+    const parsed = measureParserFor('weightKg')?.(weightText(weightUnit, weightBoxes))
+    setWeightUnit(u)
+    setWeightBoxes(parsed ? weightParts(parsed.value, u) : ['', ''])
+  }
+  const switchHeight = (u: HeightUnit) => {
+    const parsed = measureParserFor('heightCm')?.(heightText(heightUnit, heightBoxes))
+    setHeightUnit(u)
+    setHeightBoxes(parsed ? heightParts(parsed.value, u) : ['', ''])
+  }
+
   if (!def || def.control !== 'numeric' || resolved || fields.length === 0) return null
 
-  const rawOf = (k: SlotKey) => draft[k] ?? ''
+  const rawOf = (k: SlotKey): string => {
+    if (k === 'age') { const a = dob ? ageOn(dob, today) : null; return dob ? (a == null ? 'x' : String(a)) : (draft.age ?? '') }
+    if (k === 'weightKg') return weightText(weightUnit, weightBoxes)
+    if (k === 'heightCm') return heightText(heightUnit, heightBoxes)
+    return draft[k] ?? ''
+  }
   // Blank is allowed only where the answer isn't required — a known-lift
   // number can be left out, an age cannot.
   const isOk = (d: (typeof fields)[number]) => {
@@ -136,10 +165,84 @@ export function SlotNumericCard({
   const declinable = fields.every(d => canDeclineSlot(d, values))
   const allBlank = fields.every(d => rawOf(d.key).trim() === '')
 
+  // ONE BODY ANSWER: the date picker, or a box (two for stone and for feet) with its unit toggle. A plain function, not
+  // a component declared in here: a component made fresh each render remounts its boxes and drops the keyboard per key.
+  const bodyField = (d: (typeof fields)[number], bad: boolean, off: boolean, blank: boolean) => {
+    const box = 'h-11 min-w-0 flex-1'
+    const toggle = <U extends string>(units: { unit: U; label: string }[], current: U, pick: (u: U) => void) => (
+      <div role="group" aria-label={`${d.shortLabel} unit`} className="flex shrink-0 overflow-hidden rounded-xl border border-border">
+        {units.map(u => (
+          <button key={u.unit} type="button" data-unit={u.unit} aria-pressed={current === u.unit} disabled={off}
+            onClick={() => { if (current !== u.unit) pick(u.unit) }}
+            className={`min-h-[44px] min-w-[44px] px-2.5 text-xs font-semibold ${current === u.unit ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>
+            {u.label}
+          </button>
+        ))}
+      </div>
+    )
+    // Each box says its own unit inside it, so "13" and "2" still read as stone and pounds once the hints are gone.
+    const withUnit = (unit: string, input: ReactElement) => (
+      <div className="relative min-w-0 flex-1">
+        {input}
+        <span aria-hidden data-box-unit={unit} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">{unit}</span>
+      </div>
+    )
+    let control: ReactElement
+    let hint: string | null = null
+    let limits = ''
+    if (d.key === 'age') {
+      const { min, max } = birthDateBounds(today, d.min ?? 13, d.max ?? 100)
+      const age = dob ? ageOn(dob, today) : null
+      hint = age != null ? `That makes you ${age}.` : (editing && draft.age ? `Recorded as ${draft.age}. Pick your date of birth to change it.` : null)
+      limits = `Pick a date of birth that makes you between ${d.min} and ${d.max}.`
+      control = (
+        <Input id="slot-age" type="date" min={min} max={max} value={dob} disabled={off} aria-describedby="slot-age-hint"
+          onChange={e => setDob(e.target.value)} className={`${box} ${bad ? 'border-destructive' : ''}`} />
+      )
+    } else if (d.key === 'weightKg') {
+      const two = weightUnit === 'st'
+      limits = `Give a weight between ${sayWeight(d.min ?? 25, weightUnit)} and ${sayWeight(d.max ?? 350, weightUnit)}.`
+      control = (
+        <div className="flex items-center gap-2">
+          {withUnit(two ? 'st' : weightUnit, <Input id="slot-weightKg" type="number" inputMode="decimal" value={weightBoxes[0]} disabled={off} aria-label={two ? 'Weight, stone' : `Weight, ${weightUnit}`}
+            placeholder={weightUnit === 'kg' ? '87' : weightUnit === 'lb' ? '192' : '13'}
+            onChange={e => setWeightBoxes([e.target.value, weightBoxes[1]])} className={`${box} pr-9 ${bad ? 'border-destructive' : ''}`} />)}
+          {two && withUnit('lb', <Input id="slot-weightKg-lb" type="number" inputMode="numeric" value={weightBoxes[1]} disabled={off} aria-label="Weight, pounds" placeholder="2"
+            onChange={e => setWeightBoxes([weightBoxes[0], e.target.value])} className={`${box} pr-9 ${bad ? 'border-destructive' : ''}`} />)}
+          {toggle(WEIGHT_UNITS, weightUnit, switchWeight)}
+        </div>
+      )
+    } else {
+      const two = heightUnit === 'ft'
+      limits = `Give a height between ${sayHeight(d.min ?? 100, heightUnit)} and ${sayHeight(d.max ?? 250, heightUnit)}.`
+      control = (
+        <div className="flex items-center gap-2">
+          {withUnit(two ? 'ft' : 'cm', <Input id="slot-heightCm" type="number" inputMode="numeric" value={heightBoxes[0]} disabled={off} aria-label={two ? 'Height, feet' : 'Height, cm'}
+            placeholder={two ? '5' : '178'}
+            onChange={e => setHeightBoxes([e.target.value, heightBoxes[1]])} className={`${box} pr-9 ${bad ? 'border-destructive' : ''}`} />)}
+          {two && withUnit('in', <Input id="slot-heightCm-in" type="number" inputMode="numeric" value={heightBoxes[1]} disabled={off} aria-label="Height, inches" placeholder="10"
+            onChange={e => setHeightBoxes([heightBoxes[0], e.target.value])} className={`${box} pr-9 ${bad ? 'border-destructive' : ''}`} />)}
+          {toggle(HEIGHT_UNITS, heightUnit, switchHeight)}
+        </div>
+      )
+    }
+    return (
+      <div key={d.key} className="space-y-1" data-body-field={d.key}>
+        <label className="text-xs text-muted-foreground" htmlFor={`slot-${d.key}`}>{d.key === 'age' ? 'Date of birth' : d.shortLabel}</label>
+        {control}
+        {hint && !bad && <p id="slot-age-hint" className="text-[0.6875rem] text-muted-foreground" data-testid="slot-age-hint">{hint}</p>}
+        {bad && <p className="text-[0.6875rem] text-destructive">{blank ? `${d.key === 'age' ? 'Your date of birth' : d.shortLabel} is needed to build your plan.` : limits}</p>}
+      </div>
+    )
+  }
+
   return (
     <div data-slot-card={def.key} className={`mt-2 space-y-2 ${busy ? 'pointer-events-none opacity-60' : ''}`}>
       {fields.map(d => {
         const bad = showErrors && !isOk(d)
+        if (d.key === 'age' || d.key === 'weightKg' || d.key === 'heightCm') {
+          return bodyField(d, bad, busy, rawOf(d.key).trim() === '')
+        }
         return (
           <div key={d.key} className="space-y-1">
             {/* The unit lives on the LABEL, not only in the coach's sentence.

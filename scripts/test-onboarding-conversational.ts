@@ -111,8 +111,10 @@ console.log('\n3. The guard that made the reversal safe is untouched')
   // RE-ANCHORED 19 Oct 2026. This pinned "Numeric asks (age/height/weight)
   // have no chips at all", the line that steered the coach to ask them as a
   // bare sentence. The property is the opposite: one card, asked for.
-  check('age, height and weight are asked as ONE card with present_slot("age")',
-    /Age, height and weight are ONE card of three labelled boxes: ask them together in one question and call present_slot\("age"\)/.test(fn)
+  // RE-ANCHORED 9 Nov 2026 (Ashley: setup asks the date of birth with a date picker): still ONE card asked for, and the
+  // coach asks for the DATE OF BIRTH, never "how old are you".
+  check('age, height and weight are asked as ONE card with present_slot("age"), the age as a date of birth',
+    /Age, height and weight are ONE card:[^\n]*Ask for the DATE OF BIRTH, never "how old are you", together with height and weight in one question, and call present_slot\("age"\)/.test(fn)
     && !/have no chips at all/.test(fn))
   check('after "I know my numbers" the lift boxes come next and the coach asks nothing else that turn',
     /RIGHT AFTER THEY SAY THEY KNOW THEIR NUMBERS \(knowsWorkingLifts = true\), THE LIFT BOXES COME NEXT/.test(fn)

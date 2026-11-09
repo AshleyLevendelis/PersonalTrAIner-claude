@@ -129,3 +129,88 @@ export function measureParserFor(slotKey: string): ((raw: string) => ParsedMeasu
   if (slotKey === 'knownSquatKg' || slotKey === 'knownBenchKg' || slotKey === 'knownDeadliftKg') return parseLiftWeight
   return null
 }
+
+// ---------------------------------------------------------------------------
+// THE SETUP CARD'S OWN CONTROLS (Ashley, 9 Nov 2026): "ask for date of birth for the age, with a date picker. And
+// weight an input field with a toggle for different units of measurement, and the same for height." The controls write
+// the same text the parsers above already read ("5'10", "13st 2", "180lb", "34"), so what is stored, the receipts and
+// the bounds are exactly what typing it gave.
+// ---------------------------------------------------------------------------
+
+export type WeightUnit = 'kg' | 'lb' | 'st'
+export type HeightUnit = 'cm' | 'ft'
+
+/** Whole years old on `today` for someone born on `dob` (both YYYY-MM-DD); null when either is not a real date or dob is after today. */
+export function ageOn(dob: string, today: string): number | null {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dob), t = /^(\d{4})-(\d{2})-(\d{2})$/.exec(today)
+  if (!d || !t) return null
+  const [dy, dm, dd] = [Number(d[1]), Number(d[2]), Number(d[3])]
+  const [ty, tm, td] = [Number(t[1]), Number(t[2]), Number(t[3])]
+  // A real calendar date: 2000-02-30 is a typo, not 1 March.
+  const real = new Date(Date.UTC(dy, dm - 1, dd))
+  if (real.getUTCFullYear() !== dy || real.getUTCMonth() !== dm - 1 || real.getUTCDate() !== dd) return null
+  if (dob > today) return null
+  // Born on 29 February: in a year without one, the birthday is counted from 1 March.
+  const hadBirthday = tm > dm || (tm === dm && td >= dd)
+  return ty - dy - (hadBirthday ? 0 : 1)
+}
+
+/** The picker's earliest and latest dates of birth for an age between `minAge` and `maxAge` on `today` (YYYY-MM-DD). */
+export function birthDateBounds(today: string, minAge: number, maxAge: number): { min: string; max: string } {
+  const [y, m, d] = today.split('-').map(Number)
+  const at = (years: number, plusDay: number) => {
+    const dt = new Date(Date.UTC(y - years, m - 1, d + plusDay))
+    return dt.toISOString().slice(0, 10)
+  }
+  // Latest: turned minAge today. Earliest: the day after turning maxAge + 1, so maxAge is still allowed.
+  return { max: at(minAge, 0), min: at(maxAge + 1, 1) }
+}
+
+const round1 = (n: number) => Math.round(n * 10) / 10
+
+/** A weight in kg as the boxes of `unit` show it: kg and lb in one box, stone in two (stone, pounds). */
+export function weightParts(kg: number, unit: WeightUnit): [string, string] {
+  if (unit === 'kg') return [String(round1(kg)), '']
+  const lb = kg / KG_PER_LB
+  if (unit === 'lb') return [String(Math.round(lb)), '']
+  let st = Math.floor(lb / LB_PER_STONE)
+  let rem = Math.round(lb - st * LB_PER_STONE)
+  if (rem === LB_PER_STONE) { st += 1; rem = 0 }
+  return [String(st), String(rem)]
+}
+
+/** A height in cm as the boxes of `unit` show it: cm in one box, feet and inches in two. */
+export function heightParts(cm: number, unit: HeightUnit): [string, string] {
+  if (unit === 'cm') return [String(Math.round(cm)), '']
+  const inches = Math.round(cm / CM_PER_INCH)
+  return [String(Math.floor(inches / INCHES_PER_FOOT)), String(inches % INCHES_PER_FOOT)]
+}
+
+/** The boxes' answer written the way parseWeight reads it; '' when nothing is in the first box. */
+export function weightText(unit: WeightUnit, [a, b]: [string, string]): string {
+  const x = a.trim(), y = b.trim()
+  if (x === '') return ''
+  if (unit === 'kg') return x
+  if (unit === 'lb') return `${x}lb`
+  return y === '' ? `${x}st` : `${x}st ${y}`
+}
+
+/** The boxes' answer written the way parseHeight reads it; '' when nothing is in the first box. */
+export function heightText(unit: HeightUnit, [a, b]: [string, string]): string {
+  const x = a.trim(), y = b.trim()
+  if (x === '') return ''
+  if (unit === 'cm') return x
+  return `${x}'${y}`
+}
+
+/** A weight in kg said in `unit` ("82 kg", "181 lb", "12st 13lb"), for the card's limits. */
+export function sayWeight(kg: number, unit: WeightUnit): string {
+  const [a, b] = weightParts(kg, unit)
+  return unit === 'st' ? `${a}st ${b}lb` : `${a} ${unit}`
+}
+
+/** A height in cm said in `unit` ("178 cm", "5'10\""), for the card's limits. */
+export function sayHeight(cm: number, unit: HeightUnit): string {
+  const [a, b] = heightParts(cm, unit)
+  return unit === 'cm' ? `${a} cm` : `${a}'${b}"`
+}

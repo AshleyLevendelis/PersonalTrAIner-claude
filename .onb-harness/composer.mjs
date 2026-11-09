@@ -2,7 +2,7 @@
 // Ashley reported it describing a different question than the one on screen;
 // this is what turns "it says the wrong thing" into a before/after.
 import { createServer } from 'http'
-import { readFileSync, existsSync, readdirSync, statSync } from 'fs'
+import { readFileSync, existsSync, readdirSync, statSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
 const DIST = new URL('./dist/', import.meta.url).pathname
@@ -70,48 +70,73 @@ for (const [state, what, expected] of CASES) {
 }
 
 // ---------------------------------------------------------------------------
-// THE UNIT CONVERSION, END TO END, THROUGH THE REAL FIELD.
-//
-// The parser has its own table gate. This asks the question that gate cannot:
-// can the INPUT even hold "5'10"? It could not — the field was type="number",
-// which discards the apostrophe and the letters, so every unit test passed
-// while the field they feed could not receive a single one of those strings.
+// AGE, HEIGHT AND WEIGHT, THROUGH THE REAL CONTROLS (Ashley, 9 Nov 2026): a date picker for the date of birth, and a
+// unit toggle beside the weight and the height. Driven as a person would: pick the unit, fill the boxes, Save, and
+// read what was stored back off the screen. The receipts ("from 5'10") prove the boxes reached the same converter
+// that typing did, so the stored numbers are the ones the parser gives.
 // ---------------------------------------------------------------------------
+const shoot = async name => { const r = await send('Page.captureScreenshot', { format: 'png' }); writeFileSync(new URL(`./${name}.png`, import.meta.url).pathname, Buffer.from(r.result.data, 'base64')) }
+const say = (label, ok, extra) => {
+  if (ok) console.log('  ✓ ' + label)
+  else { bad++; console.log('  ✗ ' + label + (extra !== undefined ? ' — ' + JSON.stringify(extra).slice(0, 300) : '')) }
+}
+const setVal = (sel, v) => ev(`(() => { const el = document.querySelector(${JSON.stringify(sel)}); if (!el) return false
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(el, ${JSON.stringify(v)})
+  el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); return true })()`)
+const tapUnit = (field, unit) => ev(`(() => { const b = document.querySelector('[data-body-field="${field}"] [data-unit="${unit}"]'); if (!b) return false; b.click(); return true })()`)
+const val = sel => ev(`document.querySelector(${JSON.stringify(sel)})?.value ?? null`)
+const tapSave = () => ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === 'Save'); if (!b) return false; b.click(); return true })()`)
+const bodyText = () => ev(`document.body.innerText`)
+
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?state=bodygroup` })
 await wait(1800)
-const conv = await ev(`(async () => {
-  const setVal = (el, v) => {
-    const proto = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
-    Object.getOwnPropertyDescriptor(proto, 'value').set.call(el, v)
-    el.dispatchEvent(new Event('input', { bubbles: true }))
-  }
-  const height = document.querySelector('#slot-heightCm')
-  const weight = document.querySelector('#slot-weightKg')
-  if (!height || !weight) return JSON.stringify({ error: 'fields not found' })
-  const typed = { heightType: height.getAttribute('type'), weightType: weight.getAttribute('type') }
-  setVal(height, "5'10")
-  setVal(weight, '13st 2')
-  await new Promise(r => setTimeout(r, 60))
-  const held = { height: height.value, weight: weight.value }
-  const save = [...document.querySelectorAll('button')].find(b => b.textContent.trim() === 'Save')
-  if (save) save.click()
-  await new Promise(r => setTimeout(r, 600))
-  return JSON.stringify({ ...typed, held, body: document.body.innerText.slice(0, 1200) })
-})()`)
-const c = JSON.parse(conv)
-const say = (label, ok, extra) => {
-  if (ok) console.log('  \u2713 ' + label)
-  else { bad++; console.log('  \u2717 ' + label + (extra !== undefined ? ' \u2014 ' + JSON.stringify(extra).slice(0, 200) : '')) }
-}
-console.log('\n  the height/weight fields accept a unit expression:')
-say('height is not type="number" (a number input cannot hold an apostrophe)', c.heightType === 'text', c.heightType)
-say('weight is not type="number"', c.weightType === 'text', c.weightType)
-say(`the field actually held "5'10"`, c.held && c.held.height === "5'10", c.held)
-say('the field actually held "13st 2"', c.held && c.held.weight === '13st 2', c.held)
-say('178cm was stored and read back', /178/.test(c.body || ''), (c.body || '').slice(0, 300))
-say('83.5kg was stored and read back', /83\.5/.test(c.body || ''), (c.body || '').slice(0, 300))
-say(`the receipt says where 178 came from`, /from 5'10/.test(c.body || ''), (c.body || '').slice(0, 400))
-say('...and where 83.5 came from', /from 13st 2lb/.test(c.body || ''), (c.body || '').slice(0, 400))
+console.log('\n  age, height and weight have their own controls:')
+const kinds = JSON.parse(await ev(`JSON.stringify({ age: document.querySelector('#slot-age')?.type ?? null, h: document.querySelector('#slot-heightCm')?.type ?? null, w: document.querySelector('#slot-weightKg')?.type ?? null,
+  label: document.querySelector('label[for="slot-age"]')?.textContent.trim() ?? null,
+  units: [...document.querySelectorAll('[data-body-field] [data-unit]')].map(b => b.dataset.unit),
+  small: [...document.querySelectorAll('[data-body-field] [data-unit]')].filter(b => { const r = b.getBoundingClientRect(); return r.width < 44 || r.height < 44 }).length })`))
+say('the age is a date picker, labelled "Date of birth"', kinds.age === 'date' && kinds.label === 'Date of birth', kinds)
+say('height and weight are number boxes', kinds.h === 'number' && kinds.w === 'number', kinds)
+say('weight toggles kg / lb / st, height toggles cm / ft', JSON.stringify(kinds.units) === JSON.stringify(['cm', 'ft', 'kg', 'lb', 'st']) || JSON.stringify([...kinds.units].sort()) === JSON.stringify(['cm', 'ft', 'kg', 'lb', 'st']), kinds.units)
+say('every unit button is a thumb\'s size (44px)', kinds.small === 0, kinds.small)
+
+// Switching unit carries what is in the box across, converted.
+await setVal('#slot-weightKg', '82')
+await tapUnit('weightKg', 'lb'); await wait(150)
+const lb = await val('#slot-weightKg')
+await tapUnit('weightKg', 'st'); await wait(150)
+const st = [await val('#slot-weightKg'), await val('#slot-weightKg-lb')]
+say('82 kg switched to lb reads 181', lb === '181', lb)
+say('...and to stone reads 12 st 13 lb, in two boxes', JSON.stringify(st) === JSON.stringify(['12', '13']), st)
+const boxUnits = await ev(`[...document.querySelectorAll('[data-body-field="weightKg"] [data-box-unit]')].map(e => e.textContent).join(',')`)
+say('...each box saying which it is (st, lb)', boxUnits === 'st,lb', boxUnits)
+
+// An under-13 date of birth is refused with the limits, and nothing is saved.
+const young = (() => { const d = new Date(); return `${d.getFullYear() - 10}-01-01` })()
+await setVal('#slot-age', young)
+await wait(150)
+const hintYoung = await ev(`document.querySelector('[data-testid="slot-age-hint"]')?.textContent ?? null`)
+say('picking a date shows the age it makes', /That makes you (9|10)\./.test(hintYoung ?? ''), hintYoung)
+await tapSave(); await wait(300)
+const youngText = await bodyText()
+say('a date making them under 13 is refused, with the limits said', /between 13 and 100/.test(youngText) && (await ev(`!!document.querySelector('#slot-age')`)) === true, youngText.slice(0, 300))
+
+// The real answers: 5'10, 13 st 2, born 15 June 1990.
+await setVal('#slot-age', '1990-06-15'); await wait(120)
+const hint = await ev(`document.querySelector('[data-testid="slot-age-hint"]')?.textContent ?? null`)
+const ageShown = Number((hint ?? '').match(/That makes you (\d+)/)?.[1] ?? NaN)
+await tapUnit('heightCm', 'ft'); await wait(150)
+await setVal('#slot-heightCm', '5'); await setVal('#slot-heightCm-in', '10')
+await setVal('#slot-weightKg', '13'); await setVal('#slot-weightKg-lb', '2')
+await wait(150)
+await shoot('body-controls')
+await tapSave(); await wait(1500)
+const after = await bodyText()
+say('the age the picker showed is the age stored', Number.isFinite(ageShown) && ageShown >= 30 && new RegExp(`\\b${ageShown}\\b`).test(after), { ageShown, after: after.slice(0, 400) })
+say('178cm was stored and read back', /178/.test(after), after.slice(0, 400))
+say('83.5kg was stored and read back', /83\.5/.test(after), after.slice(0, 400))
+say(`the receipt says where 178 came from`, /from 5'10/.test(after), after.slice(0, 400))
+say('...and where 83.5 came from', /from 13st 2lb/.test(after), after.slice(0, 400))
 
 console.log(bad === 0 ? '\n  composer matches the question on screen in all cases.\n' : `\n  ${bad} MISMATCHED\n`)
 chrome.kill(); server.close()
