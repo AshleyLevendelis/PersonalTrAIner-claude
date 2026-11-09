@@ -52,7 +52,7 @@ const check = (label: string, ok: boolean, extra?: unknown) => {
 type Slot = 'breakfast' | 'lunch' | 'dinner' | 'snack'
 type Opt = import('../src/lib/meal-generation').PoolOption
 type Line = { severity: 'info' | 'warn'; text: string }
-type KnockOn = { changes: { date: string; slot: Slot; kind: 'dish' | 'size'; from: string | null; to: string; fromKcal: number | null; toKcal: number }[]; lines: Line[]; after?: { date: string; day: { chosen: Partial<Record<Slot, Opt>>; withinTolerance: boolean; totals: { calories: number } } }[] }
+type KnockOn = { elsewhere?: string[]; changes: { date: string; slot: Slot; kind: 'dish' | 'size'; from: string | null; to: string; fromKcal: number | null; toKcal: number }[]; lines: Line[]; after?: { date: string; day: { chosen: Partial<Record<Slot, Opt>>; withinTolerance: boolean; totals: { calories: number } } }[] }
 
 async function main() {
   const { datesFrom, buildRotation, serveMealWeek, pinsFromPicks } = await import('../src/lib/meal-rotation')
@@ -191,6 +191,7 @@ async function main() {
     // nobody named: the edited copy joined the pool and later days' searches served it. Now it is made for today, so
     // with no leftovers chain (this fixture) every other day is exactly as it was. The chain case is [3b].
     check('no meal on a day nobody named changes (the edit is for today only)', k.changes.length > 0 && k.changes.every(c => c.date === today) && real.diff.every(d => d.startsWith(`${today}|`)), { changes: k.changes, real: real.diff })
+    check('...so the trial names no other day for the swap sheet: a change on the edited day is the sheet\'s own to say', k.changes.length > 0 && ((k as KnockOn).elsewhere ?? ['missing']).length === 0, (k as KnockOn).elsewhere)
     // BOTH KINDS ON ONE CARD: chicken added to Tuesday's breakfast moves one of
     // Tuesday's meals to a different dish and resizes another. (A banana did this
     // under the old 25% bands; under the 10% bands, runs 7-10 M59, it only
@@ -339,6 +340,17 @@ async function main() {
     const day1 = dayLabel(dates[1], today)
     const truth = !left ? '' : nowLeft ? DAY_MOVE.alsoLeftover(day1, 'lunch', left.to) : wasLeft ? DAY_MOVE.alsoFresh(day1, 'lunch', left.to) : DAY_MOVE.alsoRefit(day1, 'lunch', left.to)
     check('...and says WHY in the words that are true of it (leftovers of the new dinner, or cooked fresh instead of leftovers)', !!left && (wasLeft || nowLeft) && text(kk).includes(truth), { wasLeft, nowLeft, truth, said: text(kk) })
+    // THE SWAP SHEET NAMES OTHER DAYS TOO (QA round 3, 9 Nov 2026): it filtered the trial to the edited day, so
+    // tomorrow's leftover lunch changed with nothing said on the screen while the coach's card listed it.
+    const otherDays = kk.changes.filter(c => c.date !== today).length
+    check('the trial hands back a sentence for each meal changed on ANOTHER day, the same words as the card',
+      otherDays >= 1 && (kk.elsewhere ?? []).length >= 1 && !!left && (kk.elsewhere ?? []).includes(truth), { otherDays, elsewhere: kk.elsewhere })
+    const listedElsewhere = kk.changes.slice(0, 4).filter(c => c.date !== today).length + (kk.changes.slice(4).some(c => c.date !== today) ? 1 : 0)
+    check('...exactly one per other-day change, and none for the edited day itself (the sheet says those in its own words)',
+      (kk.elsewhere ?? []).length === listedElsewhere, { listedElsewhere, elsewhere: kk.elsewhere, changes: kk.changes.map(c => c.date + '|' + c.slot) })
+    const sheet = readFileSync('src/components/MealPlan.tsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+    const choose = sheet.slice(sheet.indexOf('const handleChoose = async'), sheet.indexOf('const handleFavouriteToggle'))
+    check('the swap sheet shows them beside the day\'s own lines', /\.\.\.\(trial\?\.elsewhere \?\? \[\]\)/.test(choose) && /setSwapNote\(notes\.length > 0 \? notes : null\)/.test(choose), choose.slice(-500))
     check('more than four changes are folded into one line that counts the rest', kk.changes.length <= 4 ? !text(kk).some(t => /more meals? changes? too/.test(t)) : text(kk).includes(DAY_MOVE.andMore(kk.changes.length - 4)), { n: kk.changes.length, said: text(kk) })
   }
 

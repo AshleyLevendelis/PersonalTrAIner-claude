@@ -161,7 +161,9 @@ export function useMealDays(input: MealDaysInput) {
   /**
    * A swap on an upcoming day: the pool's own swap, then the pick saved for
    * THAT date before the screen shows it — exactly the order today's swap
-   * keeps — and it pins that one date, so no other day moves.
+   * keeps — and it pins that one date. CORRECTED 9 Nov 2026: that does not hold every other day still. With
+   * leftovers on, the next day's lunch is re-made from the dinner now served, and that day can re-plan; the swap
+   * sheet names those changes from its trial (meal-knock-on's `elsewhere`).
    */
   const swap = async (date: string, slot: MealSlotName, chooseName: string, currentName: string | undefined) => {
     if (!profileId) return

@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [x] **A MEAL SWAP THAT CHANGED ANOTHER DAY SAID NOTHING ON THE SCREEN; SETUP'S SUMMARY ROWS 32PX, 9 NOV 2026** (QA
+  round 3, meals finding "a future day's swap changes other days unannounced", and setup's "32px summary rows").
+  Mechanical, against his "no silent meal changes" ruling. Traced first: the swap sheet already runs the whole-week
+  trial before the tap, and then kept only the swapped day's lines (`c.date === date`). With leftovers on, a dinner swap
+  re-makes the next day's lunch from the dinner now served, and that day can re-plan; the coach's card for the same swap
+  listed it, the screen did not. The trial now hands back its own sentences for other days (`elsewhere`), and the sheet
+  shows them after the day's own. Today's swap goes through the same sheet, so it is covered too. Also corrected: the
+  hook's comment "pins that one date, so no other day moves" is false with leftovers on (the leftover chain carries it).
+  NOT DONE, named: (1) a heart changes later days BY DESIGN (a like is a sort key, his 27 Sep ruling) and nothing says
+  so; saying it needs a likes trial (the pin trial cannot model a likes change), and the harness page fixes likes at
+  none, so a screen check needs a fixture switch first. (2) The note still comes after the tap, not before it, and a
+  swap still has no Undo (named 8 Nov). Setup: the summary rows were 32px and stacked, so a tap area larger than the
+  row would land on its neighbour; each row is 44px now.
+  CHECKS: `test:meal-knock-on` (+4; 3 mutations, 3 caught, one only after a case where the edited day has changes and
+  no other day does), `verify:swap-knock-on` §3 (a dinner swap with leftovers on that changes the next day; its note
+  names the dish), `verify:setup-qa3` §3 (rows 44px) and §4 (every typing hint fits beside the mic). `test:coach-knows`
+  re-anchored: it pinned the old one-line note (the day's own lines only), and now holds both kinds being drawn.
 - [x] **"WELCOME ABOARD" AFTER CLEAR CHAT IN WEEK 2, A PREVIEW CUT TO "M…", AND "LEG CURL" OFFERED AS THE DUMBBELL
   ONE AT A FULL GYM, 9 NOV 2026** (QA round 3, chat findings 2, 3 and 11). Mechanical, plus one CSCS call (mine).
   (1) An empty chat was read as a brand-new account, so somebody in week 2 who tapped Clear chat came back to "welcome

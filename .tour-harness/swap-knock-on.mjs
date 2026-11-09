@@ -165,6 +165,41 @@ if (found) {
 }
 check('2d. "Fit around my swap" re-sizes them again, to the same sizes', !!found && refit?.held?.kind === 'resized' && found.resized.every(k => refit.meals[k]?.kcal === found.after[k].kcal), refit?.held)
 // The Undo is for that date only: today's meals are untouched by it.
+
+// --- 3. A swap that changes ANOTHER day says so (QA round 3, 9 Nov 2026) ---------------------------------------------
+// With leftovers on, each lunch is last night's dinner, so swapping a dinner re-makes the next day's lunch. The sheet
+// read only the swapped day's changes off its trial and said nothing about the next day, while the coach's card for
+// the same swap listed it. Walk dinners until a swap changes the next day's lunch; its note must name that dish.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&leftovers=1&n=3#/tab/nutrition` })
+for (let i = 0; i < 60; i++) { if (await ev(`!!document.querySelector('[data-testid="meal-day-strip"]')`)) break; await wait(200) }
+await wait(800)
+const days3 = await ev(`[...document.querySelectorAll('[data-meal-day]')].map(b => b.dataset.mealDay)`) ?? []
+let cross = null, tried3 = 0
+for (let d = 1; d < days3.length - 1 && !cross; d++) {
+  const date = days3[d], next = days3[d + 1]
+  for (let opt = 0; opt < 3 && !cross; opt++) {
+    await openDay(next); const nextBefore = await ev(MEALS)
+    await openDay(date)
+    const opened = await ev(`(() => { const r = document.querySelector('[data-meal-name="dinner"]')?.closest('[data-meal-row]'); const head = r?.querySelector('button'); if (!head) return false; head.click(); return true })()`)
+    await wait(350)
+    const swapBtn = opened && await ev(`(() => { const r = document.querySelector('[data-meal-name="dinner"]').closest('[data-meal-row]'); const b = [...r.querySelectorAll('button')].find(x => /^Swap/.test(x.textContent.trim())); if (!b) return false; b.click(); return true })()`)
+    if (!swapBtn) break
+    await wait(300)
+    const picked = await ev(`(() => { const r = document.querySelector('[data-meal-name="dinner"]').closest('[data-meal-row]'); const bs = [...r.querySelectorAll('button')].filter(x => x.querySelector('p.line-clamp-2') && !x.disabled); const b = bs[${opt}]; if (!b) return null; const t = b.querySelector('p').textContent.trim(); b.click(); return t })()`)
+    if (!picked) break
+    await wait(1400)
+    tried3++
+    const note = await ev(`document.querySelector('[data-testid="swap-knock-on"]')?.textContent.trim() ?? ''`)
+    await openDay(next); const nextAfter = await ev(MEALS)
+    const moved = Object.keys(nextBefore).filter(k => nextBefore[k].name !== nextAfter[k]?.name)
+    if (moved.length > 0) cross = { date, next, picked, moved, to: moved.map(k => nextAfter[k].name), note }
+  }
+}
+console.log(`  ${tried3} dinner swaps tried; ${cross ? `${cross.date} -> ${cross.picked} changed ${cross.next}'s ${cross.moved.join(', ')}` : 'none changed the next day'}`)
+check('3a. the fixture binds: a dinner swap changed the next day\'s meals (the leftovers follow the dinner)', !!cross, { tried3 })
+check('3b. ...and the swap\'s note names each dish it changed on that day', !!cross && cross.to.every(n => cross.note.includes(n)), cross)
+if (cross) await shoot('swap-knock-on-other-day')
+
 console.log(`\n${ran} checks ran.`)
 console.log(failures === 0 ? '\nA swap keeps the other dishes and says what it re-sized.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()

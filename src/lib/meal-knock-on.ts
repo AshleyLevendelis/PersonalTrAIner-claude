@@ -59,6 +59,13 @@ export interface MealKnockOn {
   after?: ServedDay[]
   /** The week as the screen serves it now, before the edit. Absent when no trial could run. */
   before?: ServedDay[]
+  /**
+   * The sentences for meals that changed on OTHER days, in the trial's own words ("Friday's lunch is now …").
+   * The swap sheet names the day's own changes in its words and these beside them (QA round 3, 9 Nov 2026: it named
+   * the edited day only, so a swap that changed tomorrow's leftover lunch said nothing about it on the screen, while
+   * the coach's card for the same swap listed it).
+   */
+  elsewhere?: string[]
 }
 
 export type MealKnockOnFn = (date: string, slot: MealSlotName, option: PoolOption, existing?: boolean) => Promise<MealKnockOn>
@@ -132,6 +139,7 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
   changes.sort((x, y) => Number(x.kind === 'size') - Number(y.kind === 'size'))
 
   const lines: NonNullable<ProposalDiff['implications']> = []
+  const elsewhere: string[] = []
   if (changes.length === 0) lines.push({ severity: 'info', text: KNOCK_ON.none })
   for (const c of changes.slice(0, MAX_LISTED_CHANGES)) {
     const day = dayLabel(c.date, today)
@@ -143,8 +151,11 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
       : wasOption?.leftoverFrom === 'dinner' ? DAY_MOVE.alsoFresh(day, c.slot, c.to)
       : DAY_MOVE.alsoRefit(day, c.slot, c.to, fits)
     lines.push({ severity: 'info', text })
+    if (c.date !== date) elsewhere.push(text)
   }
   if (changes.length > MAX_LISTED_CHANGES) lines.push({ severity: 'info', text: DAY_MOVE.andMore(changes.length - MAX_LISTED_CHANGES) })
+  const elsewhereNotListed = changes.slice(MAX_LISTED_CHANGES).filter(c => c.date !== date).length
+  if (elsewhereNotListed > 0) elsewhere.push(DAY_MOVE.andMore(elsewhereNotListed))
 
   // A DAY THE EDIT TOOK OFF TARGET. One that was already off is not blamed on it.
   for (const served of after) {
@@ -171,5 +182,5 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
     const onList = touched.filter(d => listDates.includes(d))
     if (onList.length > 0) lines.push({ severity: 'info', text: DAY_MOVE.listStale(onList.map(d => dayLabel(d, today))) })
   }
-  return { changes, lines, after, before }
+  return { changes, lines, after, before, elsewhere }
 }

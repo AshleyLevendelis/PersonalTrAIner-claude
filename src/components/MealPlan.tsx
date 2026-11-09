@@ -946,7 +946,10 @@ function MealSlotRow({
       // Back to the recipe, where the knock-on line and the new dish are.
       setTab('recipe')
       const sameDay = trial?.changes.filter(c => c.date === date && c.slot !== slot && c.kind === 'dish') ?? []
-      setSwapNote(sameDay.length > 0 ? sameDay.map(swapKnockOnLine) : null)
+      // AND EVERY OTHER DAY IT CHANGED (QA round 3, 9 Nov 2026): a swap re-makes tomorrow's leftover lunch from the
+      // dinner now served, and that day can then re-plan; the trial knew and the sheet filtered it out.
+      const notes = [...sameDay.map(swapKnockOnLine), ...(trial?.elsewhere ?? [])]
+      setSwapNote(notes.length > 0 ? notes : null)
     } finally {
       setBusy(false)
     }
