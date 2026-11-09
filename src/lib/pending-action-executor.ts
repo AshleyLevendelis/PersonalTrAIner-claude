@@ -33,6 +33,7 @@ import { saveCardioLog, deleteCardioLogsMatching } from './cardio-log-store'
 import { cardioReadback } from './cardio-effort'
 import { alsoDoingIsLoggable, type AlsoDoing } from './session-move'
 import type { MealAdditionPayload } from './meal-addition'
+import { takeOffEaten, putBackEaten, logCorrected, undoEatenCorrection } from './eaten-correction'
 import type { MealMovePayload } from './meal-move'
 import type { MealDayMovePayload, MealDayMoveLeg } from './meal-day-move'
 import { STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from './onboarding-slots'
@@ -596,17 +597,23 @@ export async function applyMealOptionToSlot(
   payload: MealAdditionPayload,
   pick: (payload: MealAdditionPayload) => Promise<boolean>,
 ): Promise<{ receipt: PendingActionReceipt; poolIndex: number | null }> {
+  // A CORRECTION OF A MEAL ALREADY EATEN reaches the eaten record too (eaten-correction.ts): the old entry comes off
+  // first, so a change that cannot finish never leaves the meal counted twice or under the old numbers.
+  const tookOff = await takeOffEaten(profileId, payload)
+  if (tookOff === false) return { receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('That change') }] }, poolIndex: null }
+
   const result = await executeMealAddition(profileId, payload)
-  if (result.receipt.failed.length > 0) return result
+  if (result.receipt.failed.length > 0) { putBackEaten(profileId, payload, tookOff); return result }
 
   const picked = await pick(payload)
-  if (picked) return result
+  if (picked) { logCorrected(profileId, payload, tookOff); return result }
 
   // Roll the pool write back rather than leaving a meal in the plan that the
   // receipt is about to say couldn't be added. The exact pool_index came back
   // from the insert, so this removes the row it wrote and never a same-named
   // meal that was already there.
   await undoMealAddition(profileId, payload, result.poolIndex)
+  putBackEaten(profileId, payload, tookOff)
   return { receipt: { landed: [], failed: [{ op: 'save', error: didNotSave('The meal') }] }, poolIndex: null }
 }
 
@@ -627,6 +634,8 @@ export async function undoMealEdit(
   undo: MealEditUndo,
   pick: (slot: MealAdditionPayload['slot'], name: string) => Promise<boolean>,
 ): Promise<boolean> {
+  // What was logged as eaten goes back first (eaten-correction.ts); a correction of no eaten meal has nothing here.
+  if (!(await undoEatenCorrection(profileId, undo.payload))) return false
   const removed = await undoMealAddition(profileId, undo.payload, undo.poolIndex)
   if (!removed) return false
   return pick(undo.payload.slot, undo.previous ?? '')

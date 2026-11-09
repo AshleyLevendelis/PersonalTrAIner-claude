@@ -266,6 +266,48 @@ async function main() {
   }
 
   // ---------------------------------------------------------------------------
+  // QA round 3, 9 Nov 2026 (the meals tester's finding 8): editing a meal already eaten previewed "lunch goes from 822
+  // to 957" and lunch landed at 894, because the card read the PLAN while the screen fits the meals left around what
+  // was eaten (day-as-shown.ts) and, before this, around the eaten meal's OLD numbers. The card now reads today as the
+  // screen draws it, with the corrected meal eaten as edited.
+  console.log('\n[2e] Today, with meals eaten: the card names the sizes the screen will draw')
+  {
+    const { dayAsShown } = await import('../src/lib/day-as-shown')
+    const week = serveMealWeek(serving)
+    const todayServed = week.find(d => d.date === today)!.day.chosen
+    const lunch = todayServed.lunch, breakfast = todayServed.breakfast
+    const edit = buildMealFoodAddProposal({
+      rawArgs: { meal_slot: 'lunch', food_lines: ['250g banana'], date: today },
+      currentMeal: lunch ? { name: lunch.name, ingredients: lunch.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`), macros: lunch.macros } : null,
+      profileId: 'p1', todayDate: today, targets, mealsPerDay: 3, includeSnacks: false, dietaryPreferences: [], dislikedFoods: [],
+      afterEating: true,
+    } as never)
+    const option = edit.ok ? edit.payload.option : null
+    const em = (o: Opt | undefined) => ({ kcal: o?.macros.calories ?? 0, protein: o?.macros.protein ?? 0, carbs: o?.macros.carbs ?? 0, fat: o?.macros.fat ?? 0 })
+    const slots = ['breakfast', 'lunch', 'dinner'] as Slot[]
+    // Breakfast and lunch logged as served; lunch is then corrected.
+    const todayShown = { slots, eatenBySlot: { breakfast: em(breakfast), lunch: em(lunch) }, keepAsPlanned: false }
+    // INDEPENDENT OF THE TRIAL: apply as the app does, then draw today the way Nutrition does, the corrected lunch eaten as edited.
+    const applied = option ? reallyApply(serving, today, 'lunch', option) : null
+    const drawn = applied ? dayAsShown({ slots, chosen: applied.now.find(d => d.date === today)!.day.chosen, eatenBySlot: { breakfast: em(breakfast), lunch: em(option!) }, targets, keepAsPlanned: false }) : null
+    check('the fixture binds: the screen resizes the meal left around what was eaten', drawn?.aroundEaten.kind === 'resized', drawn?.aroundEaten)
+    const withToday = option && lib?.knockOnOfPin ? lib.knockOnOfPin({ serving, date: today, slot: 'lunch', option, listDates: [], todayShown } as never) : { changes: [], lines: [] }
+    const planOnly = option ? trial(serving, today, 'lunch', option) : { changes: [], lines: [] }
+    const dinnerDrawn = drawn?.slots.find(r => r.slot === 'dinner')?.option
+    const dinnerCard = withToday.changes.find(c => c.date === today && c.slot === 'dinner')
+    check('the card names dinner at the size the screen draws it', !!dinnerDrawn && !!dinnerCard && dinnerCard.toKcal === Math.round(dinnerDrawn.macros.calories),
+      { card: dinnerCard, drawn: dinnerDrawn ? Math.round(dinnerDrawn.macros.calories) : null })
+    check('...which the plan alone does not (the defect, same fixture)', !planOnly.changes.some(c => c.date === today && c.slot === 'dinner' && c.toKcal === dinnerCard?.toKcal), planOnly.changes)
+    check('a meal already eaten and not edited is never listed as changing', !withToday.changes.some(c => c.date === today && c.slot === 'breakfast'), withToday.changes)
+    // A MEAL EATEN WHOSE PLAN MOVES UNDER IT: the plain edit re-plans dinner to another dish ([0]); with dinner eaten,
+    // the screen still shows the dinner eaten, so the card must not say it changes.
+    const dinnerEaten = bananaOption && lib?.knockOnOfPin ? lib.knockOnOfPin({ serving, date: today, slot: 'lunch', option: bananaOption, listDates: [], todayShown: { slots, eatenBySlot: { dinner: em(todayServed.dinner) }, keepAsPlanned: false } } as never) : { changes: [], lines: [] }
+    const plainDinner = bananaOption ? trial(serving, today, 'lunch', bananaOption).changes.some(c => c.date === today && c.slot === 'dinner') : false
+    check('a meal eaten whose plan moves under it is not listed as changing (the plan alone lists it: the case binds)', plainDinner && !dinnerEaten.changes.some(c => c.date === today && c.slot === 'dinner'), { plainDinner, changes: dinnerEaten.changes })
+    check('another day is read off the plan as before', JSON.stringify(withToday.changes.filter(c => c.date !== today)) === JSON.stringify(planOnly.changes.filter(c => c.date !== today)))
+  }
+
+  // ---------------------------------------------------------------------------
   console.log('\n[2d] A meal moved to another slot: both legs pinned at once, and the day\'s total read off the trial')
   {
     const { buildMealMoveProposal } = await import('../src/lib/meal-move')
@@ -474,6 +516,10 @@ async function main() {
     check('...and so does the coach, on its add card and its edit card', (chat.match(/afterEating: await slotEatenToday\(slotName\)/g) ?? []).length === 2 && /const slotEatenToday = async[\s\S]{0,400}getTodayLedger\(/.test(chat))
     check('...through the prop, never a second copy of the trial', /const mealKnockOn = async[\s\S]{0,300}onMealKnockOn\(payload\.date, payload\.slot, payload\.option\)/.test(chat) && !/knockOnOfPin/.test(chat))
     check('the harness pages hand over the hook\'s function too, not a copy', /onMealKnockOn=\{mealDays\.dayMove\.knockOn\}/.test(read('.tour-harness/chat.tsx')) && /dayMove=\{mealDays\.dayMove\}/.test(read('.tour-harness/real.tsx')))
+    // 9 Nov 2026 (QA round 3, finding 8): the card reads today as Nutrition draws it, so the hook hands the trial what
+    // is logged (the screen's own ledger read) and whether the fit-around was undone. Behaviour: [2e].
+    check('the hook hands the trial today as the screen draws it', /const ledger = await getTodayLedger\(profileId, today, targets\)[\s\S]{0,300}eatenBySlot: eatenMacrosBySlot\(loggedEventsBySlot\(ledger\.events\)\)[\s\S]{0,200}keepAsPlanned: readAroundEatenKept\(aroundEatenKeptKey\(profileId, today\)\)/.test(hook)
+      && /alsoPinned: pins\.slice\(1\), sayDayTotal: opts\.sayDayTotal, todayShown,/.test(hook))
     const libSrc = read('src/lib/meal-knock-on.ts')
     check('the trial stores the option the way the executor does: tagged as hers', /USER_REQUESTED_TAG/.test(libSrc) && /tags: \[\.\.\.\(option\.tags \?\? \[\]\), USER_REQUESTED_TAG\]/.test(read('src/lib/pending-action-executor.ts')))
   }

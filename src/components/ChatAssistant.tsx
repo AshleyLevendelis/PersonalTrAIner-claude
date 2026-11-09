@@ -38,6 +38,7 @@ import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from
 import { buildWeighInProposal, executeWeighIn, WEIGH_IN_RECEIPT_HOLD_DETAIL, type WeighInPayload } from '@/lib/weigh-in-proposal'
 import { getWeighInPicture } from '@/lib/nutrition-targets'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
+import { undoEatenCorrection } from '@/lib/eaten-correction'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
   executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioLog, undoCardioLog, type CardioLogPayload, executeCardioSession, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload, planAsSaved } from '@/lib/pending-action-executor'
 import { planSessionKindToday, sessionKindFrom, buildSessionKindTodayProposal, SESSION_KINDS } from '@/lib/session-kind'
@@ -7979,6 +7980,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // undoMealAddition finds the appended row itself. If the delete
         // doesn't land, keep the Undo button so the user can try again,
         // exactly as the meal swap above does.
+        // A correction of a meal already eaten puts back what was logged first (eaten-correction.ts).
+        if (!(await undoEatenCorrection(profile.id, payload))) return { refused: RECEIPTS_UNDONE.failed, keep: true }
         const removed = await undoMealAddition(profile.id, payload)
         if (!removed) return { refused: RECEIPTS_UNDONE.failed, keep: true }
         // Nothing to restore as the on-screen pick: the slot had whatever

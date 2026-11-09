@@ -200,6 +200,9 @@ async function main() {
     check('4b2. ...and the snapshot is not overwritten with "nothing on the server"', (getLedgerSnapshot(PROFILE, DATE)?.eaten.kcal ?? 0) >= 700, getLedgerSnapshot(PROFILE, DATE)?.eaten)
     navShim.onLine = true
     await flushPending()
+    // 9 Nov 2026 (QA round 3): leaving the queue on sync took the snack out of the snapshot until the next read, so a
+    // screen reading the snapshot on that very notification showed the meal it had just logged as not eaten.
+    check('4b3. once the snack syncs, the snapshot still counts it, with no read in between', getLedgerSnapshot(PROFILE, DATE)?.eaten.kcal === 900, getLedgerSnapshot(PROFILE, DATE)?.eaten)
   }
 
   console.log('\n5. Every screen that shows the number uses it\n')
@@ -215,6 +218,8 @@ async function main() {
   // satisfied by the import line alone — which is exactly what happened when
   // this check was first mutation-tested.
   const reload = meals.slice(meals.indexOf('const reloadLogged'), meals.indexOf('void reloadLogged()'))
+  check('the meal rows follow a log written elsewhere (a correction made in an edit, or by the coach)',
+    /subscribeMealStore\(\(\) => \{\s*const snap = getLedgerSnapshot\(profileId, date\)\s*if \(snap\) setLoggedBySlot\(loggedEventsBySlot\(snap\.events\)\)/.test(meals))
   check('the meal row flips before its own read resolves',
     /getLedgerSnapshot\(profileId, date\)[\s\S]{0,200}?setLoggedBySlot/.test(reload)
     && reload.indexOf('getLedgerSnapshot') < reload.indexOf('return getTodayLedger'), reload.slice(0, 200))

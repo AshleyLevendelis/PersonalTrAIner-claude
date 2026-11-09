@@ -2,6 +2,29 @@
 
 Newest first. One line each.
 
+- [x] **CORRECTING A MEAL ALREADY EATEN PREVIEWED ONE DAY AND LANDED ANOTHER, 9 NOV 2026** (QA round 3, the meals
+  tester's finding 8). Mechanical: his 2 Nov "Same dishes" ruling already calls such an edit a CORRECTION, and the build
+  never carried it to the eaten record. Taking the banana out of an eaten breakfast changed the plan's copy only, so
+  the day saw two breakfasts: the held dishes grew to cover the smaller plan breakfast (the card: "lunch goes from 822
+  to 957"), and then the screen shrank them for a breakfast that "came to 134 kcal more than planned" (lunch landed at
+  894, under a line saying "smaller"). TRACED on the harness: the 957 → 894 is exactly the two compensations stacked.
+  Three changes. (1) The correction reaches the record (`eaten-correction.ts`), through the one function every edit
+  lands by, screen and coach alike: the old entry comes off FIRST, then the plan, then the edited meal goes on as eaten;
+  an entry that will not come off (no signal) writes nothing and says it did not save, so the meal is never counted twice.
+  Undo, on the sheet and in the chat, puts back exactly what was logged; the record of it is kept on the phone, and a
+  retried Undo never logs it twice. (2) The card reads today as Nutrition draws it (logged meals, the fit-around, its
+  Undo), with the corrected meal eaten as edited, so "lunch goes from 1,207 to 1,362" lands at 1,362; it had read the
+  plan alone, which also missed the fit-around on any edit made on a day with a meal eaten. (3) Two display faults found
+  on the way: the meal rows did not follow a log written from anywhere but their own button (the eaten total moved,
+  the row kept the old number), and a logged meal dropped out of the phone's quick copy the moment it synced until the
+  next read, which showed a meal just eaten as "Next". Both are fixed at the source. CSCS: no prescription change; the
+  day is held to the same bands. CHECKS: `test:eaten-correction` (new, 18), `test:meal-knock-on` [2e] (5, with the
+  plan-only contrast proving the fixture binds) and [7] (+1), `test:meal-ledger-snapshot` 4b3 and the rows check (+2),
+  `verify:meal-food-edit` §9 (9, on `?leftovers=1&poolrows=1`: log, correct, card vs rows vs eaten, Undo). Mutations:
+  14 tried, 13 caught first time; the 14th (an eaten meal listed as changing on the card) was MISSED because the
+  fixture's eaten breakfast never moved under it, so [2e] gained a case where the plan re-plans an eaten dinner (the
+  plan-only trial lists it), and it is now caught. NOT DONE: the coach's card for the same edit reads the same trial (it is the hook's function), but no
+  chat driver logs a meal then corrects it by chat; named.
 - [x] **"SWAP IT FOR SOMETHING ELSE INSTEAD?" WITH NOTHING TO TAP, 9 NOV 2026** (QA round 3, meals: the move sheet's
   dead end). Mechanical, his "no dead ends". A move refused because the meal cannot be resized into the other slot
   ("Apple and a few almonds can't become lunch — it would have to more than double…") ended in a question with no

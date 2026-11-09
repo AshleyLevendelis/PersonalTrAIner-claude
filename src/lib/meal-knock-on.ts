@@ -31,7 +31,10 @@ import { dayLabel } from './day-labels'
 import { DAY_MOVE, KNOCK_ON } from './coach-voice'
 import { isNoticeableResize, type MealDayMoveServing } from './meal-day-move'
 import { USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
-import { namedMiss, type PoolOption } from './meal-generation'
+import { dayVerdict, namedMiss, type PoolOption } from './meal-generation'
+import { dayAsShown, type EatenMacros } from './day-as-shown'
+import { isAfterEaten } from './meal-new-from'
+import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 
 const SLOTS: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
@@ -91,10 +94,20 @@ export interface MealKnockOnInput {
   alsoPinned?: { slot: MealSlotName; option: PoolOption }[]
   /** Say what the edit does to the day's total, read off the trial (the move's card used to compute it from the two meals alone). */
   sayDayTotal?: boolean
+  /**
+   * TODAY AS THE SCREEN SHOWS IT (9 Nov 2026, QA round 3): what is logged as eaten, and whether the fit-around was
+   * undone, so the trial compares today the way Nutrition draws it (day-as-shown.ts). Without it the card read the
+   * plan and the screen then grew or shrank the meals left around what was eaten: "No other meal changes" over a
+   * lunch that came out 11% bigger. Absent: the plan alone, as before.
+   */
+  todayShown?: { slots: MealSlotName[]; eatenBySlot: Partial<Record<MealSlotName, EatenMacros>>; keepAsPlanned: boolean }
 }
 
+/** One served day as the card compares it: the plan's own, or today as the screen shows it. */
+interface DayView { chosen: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets; withinTolerance: boolean; eaten: Set<MealSlotName> }
+
 export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
-  const { serving, date, slot, option, listDates, existing, alsoPinned = [], sayDayTotal } = input
+  const { serving, date, slot, option, listDates, existing, alsoPinned = [], sayDayTotal, todayShown } = input
   const { today, dates, targets, pools } = serving
   // No targets, or a day the strip does not serve: there is no week to try it
   // on. Said, not guessed.
@@ -121,13 +134,39 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
   // the options back.
   const after = serveMealWeek({ ...serving, pools: afterPools, todaysPins, pinsByDate, rotation: existing ? serving.rotation : null })
 
+  // TODAY, AS DRAWN. A meal logged as eaten shows what was eaten, whatever the plan does under it, so it is never a
+  // change; the meals left are fitted around it. An edit correcting an eaten meal is eaten as edited (eaten-correction.ts).
+  const view = (served: ServedDay | undefined, side: 'before' | 'after'): DayView | undefined => {
+    if (!served) return undefined
+    if (served.date !== today || !todayShown || !targets) {
+      return { chosen: served.day.chosen, totals: served.day.totals, withinTolerance: served.day.withinTolerance, eaten: new Set() }
+    }
+    const eatenBySlot = { ...todayShown.eatenBySlot }
+    if (side === 'after' && date === today) {
+      for (const p of pinned) {
+        if (eatenBySlot[p.slot] && isAfterEaten(p.stored)) {
+          const m = p.stored.macros
+          eatenBySlot[p.slot] = { kcal: m.calories, protein: m.protein, carbs: m.carbs, fat: m.fat }
+        }
+      }
+    }
+    const shown = dayAsShown({ slots: todayShown.slots, chosen: served.day.chosen, eatenBySlot, targets, keepAsPlanned: todayShown.keepAsPlanned })
+    const chosen: Partial<Record<MealSlotName, PoolOption>> = {}
+    for (const r of shown.slots) if (r.option) chosen[r.slot] = r.option
+    return { chosen, totals: shown.totals, withinTolerance: dayVerdict(shown.totals, targets).onTarget, eaten: new Set(Object.keys(eatenBySlot) as MealSlotName[]) }
+  }
+  const beforeViews = new Map(before.map(b => [b.date, view(b, 'before')]))
+  const afterViews = new Map(after.map(a => [a.date, view(a, 'after')]))
+
   const changes: MealKnockOnChange[] = []
   for (const served of after) {
-    const wasDay = before.find(b => b.date === served.date)
+    const nowDay = afterViews.get(served.date)
+    const wasDay = beforeViews.get(served.date)
     for (const s of SLOTS) {
       if (served.date === date && pinnedSlots.has(s)) continue
-      const now = served.day.chosen[s]
-      const was = wasDay?.day.chosen[s]
+      if (nowDay?.eaten.has(s)) continue
+      const now = nowDay?.chosen[s]
+      const was = wasDay?.chosen[s]
       if (!now) continue
       if (was?.name !== now.name) {
         changes.push({ date: served.date, slot: s, kind: 'dish', from: was?.name ?? null, to: now.name, fromKcal: was ? Math.round(was.macros.calories) : null, toKcal: Math.round(now.macros.calories) })
@@ -143,9 +182,9 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
   if (changes.length === 0) lines.push({ severity: 'info', text: KNOCK_ON.none })
   for (const c of changes.slice(0, MAX_LISTED_CHANGES)) {
     const day = dayLabel(c.date, today)
-    const nowOption = after.find(d => d.date === c.date)?.day.chosen[c.slot]
-    const wasOption = before.find(d => d.date === c.date)?.day.chosen[c.slot]
-    const fits = after.find(d => d.date === c.date)?.day.withinTolerance === true
+    const nowOption = afterViews.get(c.date)?.chosen[c.slot]
+    const wasOption = beforeViews.get(c.date)?.chosen[c.slot]
+    const fits = afterViews.get(c.date)?.withinTolerance === true
     const text = c.kind === 'size' ? DAY_MOVE.alsoResized(day, c.slot, c.fromKcal ?? 0, c.toKcal, fits)
       : nowOption?.leftoverFrom === 'dinner' ? DAY_MOVE.alsoLeftover(day, c.slot, c.to)
       : wasOption?.leftoverFrom === 'dinner' ? DAY_MOVE.alsoFresh(day, c.slot, c.to)
@@ -159,16 +198,17 @@ export function knockOnOfPin(input: MealKnockOnInput): MealKnockOn {
 
   // A DAY THE EDIT TOOK OFF TARGET. One that was already off is not blamed on it.
   for (const served of after) {
-    const was = before.find(b => b.date === served.date)
-    if (was?.day.withinTolerance && !served.day.withinTolerance) {
-      lines.push({ severity: 'warn', text: DAY_MOVE.offTarget(dayLabel(served.date, today), Math.round(served.day.totals.calories), Math.round(served.day.totals.calories - targets.calories), namedMiss(served.day.totals, targets) ?? undefined) })
+    const was = beforeViews.get(served.date)
+    const now = afterViews.get(served.date)
+    if (was?.withinTolerance && now && !now.withinTolerance) {
+      lines.push({ severity: 'warn', text: DAY_MOVE.offTarget(dayLabel(served.date, today), Math.round(now.totals.calories), Math.round(now.totals.calories - targets.calories), namedMiss(now.totals, targets) ?? undefined) })
     }
   }
 
   // THE DAY'S TOTAL, as served after the tap against as served now (the move's card).
   if (sayDayTotal) {
-    const was = before.find(b => b.date === date)?.day.totals.calories
-    const now = after.find(a => a.date === date)?.day.totals.calories
+    const was = beforeViews.get(date)?.totals.calories
+    const now = afterViews.get(date)?.totals.calories
     if (was != null && now != null) lines.push({ severity: 'info', text: KNOCK_ON.dayTotal(dayLabel(date, today), Math.round(was), Math.round(now)) })
   }
 

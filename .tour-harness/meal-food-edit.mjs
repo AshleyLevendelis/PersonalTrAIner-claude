@@ -291,6 +291,52 @@ if (Array.isArray(results) && results.length > 0) {
   await shoot('meal-food-add-preview')
 }
 
+// --- 9. correcting a meal ALREADY EATEN (QA round 3, 9 Nov 2026, finding 8) ---------------------------------------
+// The tester took the banana out of an eaten breakfast: the card said "lunch goes from 822 to 957", lunch landed at
+// 894, and the line said the others were 7% smaller. The correction now reaches the eaten record, and the card reads
+// today the way this screen draws it. A fixture where the correction moves another meal, so the claim has something
+// to be wrong about (9b's lunch line).
+console.log('\n9. Correcting a meal already eaten: the card, the eaten number and the rows agree, and Undo puts it all back\n')
+{
+  const pageErr0 = await ev('window.__err ?? null')
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&leftovers=1&poolrows=1&load=9#/tab/nutrition` })
+  await timeUntil(hero, '0', 40000)
+  await wait(800)
+  const rowsKcal = () => ev(`Object.fromEntries([...document.querySelectorAll('[data-testid="meal-row-kcal"]')].map(e => [e.getAttribute('data-slot'), Number(e.textContent.trim().replace(/,/g, ''))]))`)
+  const before = await rowsKcal()
+  await openBreakfast()
+  await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^I ate this$/.test((x.textContent||'').trim())); if (b) b.click() })()`)
+  await wait(1200)
+  check('9a. breakfast is logged as eaten, at its own size', Number(await hero()) === before.breakfast && before.breakfast > 0, { hero: await hero(), before })
+  const oil = ((await rows()) ?? []).find(l => /olive oil/.test(l)) ?? null
+  await tapRow(oil ?? '')
+  await wait(400)
+  await tapVerb('remove')
+  for (let i = 0; i < 40 && /Checking what else/.test((await sheetText()) ?? ''); i++) await wait(250)
+  const card = (await sheetText()) ?? ''
+  const lunchLine = card.match(/lunch goes from ([\d,]+) to ([\d,]+)/i)
+  const cardTo = lunchLine ? Number(lunchLine[2].replace(/,/g, '')) : null
+  const afterKcal = (() => { const m = card.match(/Calories\s*([\d,]+) kcal\s*([\d,]+) kcal/); return m ? Number(m[2].replace(/,/g, '')) : null })()
+  check('9b. the card says what happens to lunch (the fixture binds)', cardTo !== null && cardTo !== before.lunch, { card: card.slice(0, 600), before })
+  await shoot('meal-food-edit-eaten-card')
+  await tapApply()
+  await wait(2500)
+  const after = await rowsKcal()
+  const eatenNow = Number(await hero())
+  check('9c. the eaten number is the corrected meal, not the old one', afterKcal !== null && eatenNow === afterKcal && eatenNow < before.breakfast, { eatenNow, afterKcal, before: before.breakfast })
+  check('9d. ...and so is the breakfast row', after.breakfast === eatenNow, after)
+  check('9e. lunch lands where the card said', cardTo !== null && after.lunch === cardTo, { card: cardTo, row: after.lunch })
+  const page = (await ev('document.body.innerText')) ?? ''
+  check('9f. breakfast is still eaten, never "next"', !/breakfast · next/i.test(page), page.match(/breakfast · \w+/gi))
+  check('9g. no line about breakfast coming to more or less than planned', !/than planned/.test(page), page.match(/[^\n]*than planned[^\n]*/))
+  await shoot('meal-food-edit-eaten-after')
+  const undone = await ev(`(() => { const b = document.querySelector('[data-testid="meal-edit-undo"]'); if (!b) return false; b.click(); return true })()`)
+  await wait(2500)
+  const back = await rowsKcal()
+  check('9h. Undo puts back what was eaten, and the day as it was', undone === true && Number(await hero()) === before.breakfast && back.breakfast === before.breakfast && back.lunch === before.lunch, { undone, hero: await hero(), back, before })
+  check('9i. no uncaught error in this section', (await ev('window.__err ?? null')) === pageErr0, await ev('window.__err ?? null'))
+}
+
 const err = await ev('window.__err ?? null')
 check('4. no uncaught error on the page', err === null, err)
 

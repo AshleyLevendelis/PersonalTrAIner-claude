@@ -230,6 +230,14 @@ async function syncPass(): Promise<void> {
     if (!error || error.code === '23505') {
       // Synced — or already synced by an earlier retry (unique client_id
       // rejected the duplicate), which is the idempotency working.
+      // AND STILL COUNTED (9 Nov 2026, QA round 3): leaving the queue took the event out of the instant snapshot
+      // until the next server read, because the snapshot is the last server answer plus the queue. A screen reading
+      // the snapshot on this very notification dropped the meal it had just logged ("Next" under a meal eaten).
+      const cached = serverEventCache.get(cacheKey(next.profileId, next.date))
+      if (cached && !cached.some(e => e.clientId === next.clientId)) {
+        const { attempts: _attempts, ...synced } = next
+        serverEventCache.set(cacheKey(next.profileId, next.date), [...cached, synced])
+      }
       savePending(loadPending().filter(e => e.clientId !== next.clientId))
       consecutiveFailures = 0
       notifyListeners()

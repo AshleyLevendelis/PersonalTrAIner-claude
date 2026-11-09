@@ -13,6 +13,7 @@ import type { MealRebalanceArgs, MealRebalanceController, MealRebalancePayload, 
 import type { MealKnockOn } from '@/lib/meal-knock-on'
 import type { MacroTargets } from '@/lib/types'
 import { readKeptHeldSizes, writeKeptHeldSize } from '@/lib/held-sizes-kept'
+import { eatenMacrosBySlot, aroundEatenKeptKey, readAroundEatenKept } from '@/lib/day-as-shown'
 
 // ---------------------------------------------------------------------------
 // THE NUTRITION STRIP'S DAYS — Ashley, 27 Sep 2026: "I can only see today's
@@ -275,11 +276,24 @@ export function useMealDays(input: MealDaysInput) {
         listDates = await readGroceryCoverage(profileId, today, readGroceryBuildMemo(profileId)?.startDate, { strict: true })
       } catch { /* stays null: the card says the list could not be checked */ }
     }
+    // TODAY AS NUTRITION DRAWS IT: what is logged, and whether the fit-around was undone (the screen's own reads).
+    // Unreadable, the card compares the plan alone, as it did before.
+    let todayShown: Parameters<typeof knockOnOfPin>[0]['todayShown']
+    if (profileId && targets) {
+      try {
+        const ledger = await getTodayLedger(profileId, today, targets)
+        todayShown = {
+          slots: (['breakfast', 'lunch', 'dinner', 'snack'] as MealSlotName[]).filter(s => (pools[s]?.length ?? 0) > 0),
+          eatenBySlot: eatenMacrosBySlot(loggedEventsBySlot(ledger.events)),
+          keepAsPlanned: readAroundEatenKept(aroundEatenKeptKey(profileId, today)),
+        }
+      } catch { /* stays undefined */ }
+    }
     try {
       return knockOnOfPin({
         serving,
         date, slot: pins[0].slot, option: pins[0].option, listDates, existing: opts.existing,
-        alsoPinned: pins.slice(1), sayDayTotal: opts.sayDayTotal,
+        alsoPinned: pins.slice(1), sayDayTotal: opts.sayDayTotal, todayShown,
       })
     } catch (err) {
       console.error('useMealDays: the knock-on trial failed', err)

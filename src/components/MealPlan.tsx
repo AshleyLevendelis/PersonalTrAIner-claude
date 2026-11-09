@@ -16,7 +16,7 @@ import {
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { FitnessGoal, MacroTargets } from '@/lib/types'
 import { undoMealEdit, type MealEditUndo } from '@/lib/pending-action-executor'
-import { getTodayLedger, getLedgerSnapshot, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
+import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { mealSections } from '@/lib/meal-sections'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import { methodToShow, dayVerdictLabel, macroOnTarget, type PoolOption } from '@/lib/meal-generation'
@@ -263,6 +263,16 @@ export function MealPlan({
   }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void reloadLogged() }, [profileId, date])
+  // A LOG WRITTEN FROM ANYWHERE ELSE MOVES THE ROWS TOO (9 Nov 2026, QA round 3): correcting a meal already eaten
+  // swaps its eaten entry from inside the edit (eaten-correction.ts), and the coach can do it from the chat, so the
+  // header's eaten total moved while the row went on showing the old meal's numbers. The store's own snapshot, no request.
+  useEffect(() => {
+    if (!profileId || !date) return
+    return subscribeMealStore(() => {
+      const snap = getLedgerSnapshot(profileId, date)
+      if (snap) setLoggedBySlot(loggedEventsBySlot(snap.events))
+    })
+  }, [profileId, date])
 
   // TODAY AS THE SCREEN SHOWS IT (runs 3-4, H24): one calculation feeds the
   // header and every row, so they cannot disagree, and the un-eaten meals fit
