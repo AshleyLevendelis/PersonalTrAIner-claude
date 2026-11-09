@@ -990,6 +990,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     return el.scrollHeight - el.scrollTop - el.clientHeight < 120
   }, [])
 
+  // WHERE THE CHAT LAST SCROLLED ITSELF TO (9 Nov 2026). The scroll event from its own jump to the bottom can arrive
+  // after the next message has already made the thread longer, and was then read as her scrolling away: the coach's
+  // evening message stopped 201px short, its shortcut button under the composer and "Jump to latest" showing, two
+  // runs in three of verify:coach-hello. An event that lands where the chat put it is the chat's own; she has not
+  // moved, so she is still following. Any scroll of hers moves the position and is judged as before.
+  const selfScrollTopRef = useRef<number | null>(null)
   const scrollToBottom = useCallback((smooth = false) => {
     requestAnimationFrame(() => {
       if (scrollRef.current) {
@@ -997,6 +1003,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           top: scrollRef.current.scrollHeight,
           behavior: smooth ? 'smooth' : 'instant',
         })
+        if (!smooth) selfScrollTopRef.current = scrollRef.current.scrollTop
       }
     })
   }, [])
@@ -1031,6 +1038,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   }, [messages.length, historyLoaded, scrollToBottom])
 
   const handleScroll = useCallback(() => {
+    const el = scrollRef.current
+    if (el && selfScrollTopRef.current !== null && Math.abs(el.scrollTop - selfScrollTopRef.current) < 1) {
+      isNearBottomRef.current = true
+      setShowScrollPill(false)
+      return
+    }
+    selfScrollTopRef.current = null
     const nearBottom = checkIfNearBottom()
     isNearBottomRef.current = nearBottom
     if (nearBottom) setShowScrollPill(false)

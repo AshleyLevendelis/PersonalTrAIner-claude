@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH'S EVENING MESSAGE COULD STOP SHORT OF THE BOTTOM OF THE CHAT, ITS SHORTCUT BUTTON UNDER THE
+  COMPOSER, 9 NOV 2026.** Mechanical. Found by the full sweep (`verify:coach-hello` B4 red); NOT caused by the day's
+  changes: the version before them failed the same check 3 runs in 4, and the earlier sweep's pass was luck. Measured
+  when it failed: the thread sat 201px above its bottom with "Jump to latest" showing, though nobody had scrolled. The
+  chat's own jump to the bottom fires a scroll event that can arrive after the next message has already made the
+  thread longer, and that event was read as her scrolling away, so the new message was not followed. The chat now
+  remembers where it scrolled itself to; an event that lands there is its own and keeps her following. Any scroll of
+  hers moves the position and is judged as before: `verify:chat-bubbles`' "Jump to latest" after scrolling up still
+  passes. Also: the check read the button once, and now polls up to two seconds for the layout to settle, so it fails
+  only on a button that STAYS off screen. HONEST LIMIT: the check is timing-dependent. Unfixed it failed 6 runs in 12
+  (3 of 4, 1 of 4 when mutated back, 2 of 4 on the version before); fixed it passed 6 in 6. One mutation, caught on 1
+  run in 4: a catch that relies on luck, named as such.
 - [x] **A MEAL SWAP THAT CHANGED ANOTHER DAY SAID NOTHING ON THE SCREEN; SETUP'S SUMMARY ROWS 32PX, 9 NOV 2026** (QA
   round 3, meals finding "a future day's swap changes other days unannounced", and setup's "32px summary rows").
   Mechanical, against his "no silent meal changes" ruling. Traced first: the swap sheet already runs the whole-week

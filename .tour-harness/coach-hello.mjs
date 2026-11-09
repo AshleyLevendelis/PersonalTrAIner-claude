@@ -134,12 +134,17 @@ check('B1. one coach message arrives on its own', b.added.length === 1 && moment
 check('B2. it is one of the phone\'s evening moments, marked as such', MOMENTS.includes(moment?.marker?.moment), moment?.marker)
 check('B3. it does not greet again (the day\'s hello was at 3pm) beyond the phone\'s own words', !/^Hey\b[^,]* — /.test(moment?.text ?? ''), moment?.text)
 const label = moment?.marker?.shortcut === 'exercise' ? "Open today's session" : moment?.marker?.shortcut === 'nutrition' ? 'Open Nutrition' : null
-const button = label ? await ev(`(() => {
+// AFTER THE LAYOUT SETTLES (9 Nov 2026): the chat scrolls to the bottom on the frame after the button is drawn, and
+// this read once could land between the two (top 848 at 844, one run in two). The property is that it ENDS on screen,
+// so the read is polled for up to two seconds; a button that stays below the fold still fails.
+const readButton = () => ev(`(() => {
   const b = [...document.querySelectorAll('button')].find(x => (x.textContent || '').trim() === ${JSON.stringify(label)})
   if (!b) return null
   const r = b.getBoundingClientRect()
   return { h: Math.round(r.height), top: Math.round(r.top), vh: window.innerHeight }
-})()`) : null
+})()`)
+let button = label ? await readButton() : null
+for (let i = 0; label && i < 20 && !(button && button.top >= 0 && button.top < button.vh); i++) { await wait(100); button = await readButton() }
 check('B4. its small shortcut button is drawn under it, on screen', !!label && !!button && button.top >= 0 && button.top < button.vh, { label, button })
 await shoot('coach-hello-evening')
 await wait(4000)
