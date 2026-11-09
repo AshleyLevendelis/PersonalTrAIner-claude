@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [x] **SETUP'S TYPING HINTS WERE CUT OFF BY THE MIC, AND MY CHECK SAID THEY FIT, 9 NOV 2026** (QA round 3, setup
+  finding 8). Mechanical, and a CORRECTION. The entry below ("every typing hint fits beside the mic") was FALSE when
+  written: `verify:setup-qa3` §4 measured each hint on a canvas set to the input's computed `font`, which is the EMPTY
+  STRING for an input in Chromium, so the canvas stayed on its default 10px and every hint measured about half its
+  real width. It passed while seven hints were cut ("How long do you want to cook?" 238px in a 192px box). Its one
+  mutation (wider padding) was caught only because it shrank the room below even the halved widths: a catch that
+  proved the check could fail, not that it measured the right thing. How I reached the wrong claim: I read the tick
+  and the mutation result and never printed the numbers behind them; printing them showed `font: ""`.
+  FIXED, both halves: the check builds the font from its parts (style, weight, size, family) and asserts the canvas
+  took it; and the box gets his 6 Nov chat ruling, ONE ROUND BUTTON the WhatsApp way (the mic while the box is empty,
+  send once there is text), instead of a mic and a dim send side by side. Room 192 -> 254px; widest hint 238px.
+  CHECKS: `verify:setup-qa3` 4a (measured in its own font), 4b (every hint fits), 4c (one button either way); 2
+  mutations, 2 caught.
 - [x] **A MEAL SWAP HAD NO UNDO, 9 NOV 2026** (QA round 3, meals: "a today swap that changes two other dishes has no
   Undo"). Mechanical: his 2 Nov "every change previews and can be undone" and the shape of his 8 Nov "Undo line". The
   swap's line now carries an Undo that swaps back to the dish it replaced, through the same swap (so the pick, the
@@ -39,7 +52,8 @@ Newest first. One line each.
   row would land on its neighbour; each row is 44px now.
   CHECKS: `test:meal-knock-on` (+4; 3 mutations, 3 caught, one only after a case where the edited day has changes and
   no other day does), `verify:swap-knock-on` §3 (a dinner swap with leftovers on that changes the next day; its note
-  names the dish), `verify:setup-qa3` §3 (rows 44px) and §4 (every typing hint fits beside the mic). `test:coach-knows`
+  names the dish), `verify:setup-qa3` §3 (rows 44px) and §4 (every typing hint fits beside the mic: FALSE, see the 9 Nov
+  entry above, the check measured at 10px). `test:coach-knows`
   re-anchored: it pinned the old one-line note (the day's own lines only), and now holds both kinds being drawn.
   FOUND BY THE NEW SCREEN CHECK, the same day: on the leftovers page every swap failed (its meals were never rows in
   the fake database, so the pool swap found nothing), and the note STILL drew the trial's lines ("Friday's lunch becomes

@@ -86,11 +86,24 @@ const fit = await evj(`(() => {
   const input = document.querySelector(${JSON.stringify(INPUT)}); if (!input) return null
   const mic = !!document.querySelector('button:has(svg.lucide-mic)')
   const cs = getComputedStyle(input), room = input.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)
-  const ctx = document.createElement('canvas').getContext('2d'); ctx.font = cs.font
+  // THE BOX'S OWN FONT, built from its parts: an input's computed shorthand is "" in Chromium, and a canvas left on its
+  // default 10px measured every hint at about half its width, so this check passed while hints were cut (9 Nov 2026).
+  const ph = getComputedStyle(input, '::placeholder')
+  const font = [ph.fontStyle, ph.fontWeight, ph.fontSize, ph.fontFamily].join(' ')
+  const ctx = document.createElement('canvas').getContext('2d'); ctx.font = font
   const hints = window.__inputHints || []
-  return { mic, room: Math.round(room), n: hints.length, over: hints.map(h => ({ h, w: Math.round(ctx.measureText(h).width) })).filter(x => x.w > room) }
+  return { mic, room: Math.round(room), n: hints.length, over: hints.map(h => ({ h, w: Math.round(ctx.measureText(h).width) })).filter(x => x.w > room), widest: hints.map(h => ({ h, w: Math.round(ctx.measureText(h).width) })).sort((a, b) => b.w - a.w).slice(0, 3), font, iw: input.clientWidth, fontOk: ctx.font.includes(ph.fontSize) }
 })()`)
-check('4a. the fixture binds: the box is drawn beside the mic, and there are hints to measure', !!fit && fit.mic && fit.n >= 10, fit && { mic: fit.mic, n: fit.n, room: fit.room })
+check('4a. the fixture binds: the box is drawn beside the mic, there are hints to measure, and they are measured in its own font', !!fit && fit.mic && fit.n >= 10 && fit.fontOk, fit && { mic: fit.mic, n: fit.n, room: fit.room })
 check('4b. every typing hint fits the box, so none is cut off by the mic', !!fit && fit.over.length === 0, fit && { room: fit.room, over: fit.over })
+// ONE ROUND BUTTON (his 6 Nov chat ruling, applied to setup): the mic alone while the box is empty, send alone once
+// there is text. Two side by side were what left the box too narrow.
+const buttons = () => evj(`({ mic: document.querySelectorAll('button:has(svg.lucide-mic)').length, send: document.querySelectorAll('button:has(svg.lucide-send)').length })`)
+const empty = await buttons()
+await tapEl(`document.querySelector(${JSON.stringify(INPUT)})`)
+await send('Input.insertText', { text: 'eight hours' })
+await wait(200)
+const typed = await buttons()
+check('4c. one round button beside the box: the mic while it is empty, send once there is text', empty?.mic === 1 && empty?.send === 0 && typed?.mic === 0 && typed?.send === 1, { empty, typed })
 
 finish('Setup keeps its question on resume, "none" answers only what it was said to, and the summary rows are a thumb tall.')

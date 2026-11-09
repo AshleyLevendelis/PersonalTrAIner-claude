@@ -1875,6 +1875,8 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     return !def || isSlotApplicable(def, values)
   }
 
+  /** The box's one round button: the mic while it is empty (where the phone can listen), send once there is text. */
+  const showMic = !!speechRecognizer() && !input.trim()
   const pendingHint = (() => {
     // A text answer being changed from the summary is typed here, so say which.
     const editingDef = editingKey ? getSlotDef(editingKey) : undefined
@@ -2398,7 +2400,10 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
             // now marks the field you are IN, so it means something.
             className={`ob-input h-auto rounded-full px-5 py-[15px] text-[1rem] text-foreground placeholder:text-muted-foreground focus-visible:ring-0 ${busy ? 'opacity-60' : ''}`}
           />
-          {speechRecognizer() && !input.trim() && (
+          {/* ONE ROUND BUTTON, THE WHATSAPP WAY (9 Nov 2026), his 6 Nov ruling for the chat's message box applied to
+              setup's: the mic while the box is empty, send once there is text. Both side by side left the box 192px
+              wide, and seven of its typing hints ("How long do you want to cook?", 238px) were cut off mid-word. */}
+          {showMic && (
             <Button
               type="button"
               size="icon"
@@ -2426,7 +2431,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
               <Mic className="size-[22px]" />
             </Button>
           )}
-          <Button
+          {!showMic && <Button
             size="icon"
             // v2: a 52px CIRCLE that stays dim until there is something to
             // send, then lights up. The disabled state is the point — it is
@@ -2453,7 +2458,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
             }}
           >
             <Send className="size-[22px]" />
-          </Button>
+          </Button>}
         </div>
         </div>
       </div>
