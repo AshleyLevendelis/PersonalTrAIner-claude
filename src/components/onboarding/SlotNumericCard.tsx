@@ -104,7 +104,11 @@ export function SlotNumericCard({
   const fields = (editing ? (def ? [def] : []) : (def ? numericGroupFor(def.key) : []).map(k => getSlotDef(k)!))
     .filter(d => d.control === 'numeric' && isSlotApplicable(d, values) && (editing || !confirmed.has(d.key)))
 
-  const [draft, setDraft] = useState<Record<string, string>>({})
+  // CHANGING AN ANSWER STARTS FROM THE ANSWER (QA round 3, 8 Nov 2026): a row tapped on the summary opened an empty
+  // box, while a single-choice change shows the current pick. The box holds what is recorded, ready to edit.
+  const [draft, setDraft] = useState<Record<string, string>>(() => editing
+    ? Object.fromEntries(fields.map(d => [d.key, values[d.key] == null || values[d.key] === '' ? '' : String(values[d.key])]))
+    : {})
   const [showErrors, setShowErrors] = useState(false)
 
   if (!def || def.control !== 'numeric' || resolved || fields.length === 0) return null

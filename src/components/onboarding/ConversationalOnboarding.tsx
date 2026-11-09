@@ -1881,6 +1881,8 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     // A text answer being changed from the summary is typed here, so say which.
     const editingDef = editingKey ? getSlotDef(editingKey) : undefined
     if (editingDef?.control === 'text' && editingDef.inputHint) return editingDef.inputHint
+    // One number being changed is that number's own hint, never its group's ("age, height and weight…" over weight).
+    if (editingDef?.control === 'numeric') return editingDef.inputHint ?? 'Say anything…'
     // Indices, not just the message, because WHICH IS NEWER decides it.
     // Fourth failure in this block, reported by Ashley: correct an answer and
     // the coach's next question arrives with no card of its own, so this
@@ -2005,8 +2007,10 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   const skipKeys: SlotKey[] = (() => {
     const def = cardOnScreen ? getSlotDef(cardOnScreen) : undefined
     if (!def || (def.control !== 'single' && def.control !== 'numeric')) return []
+    // A number being CHANGED from the summary can be taken back to "Not given" (QA round 3: once a weight was
+    // given, nothing could undo it). A first ask offers the group's unanswered ones, as before.
     const keys = def.control === 'numeric'
-      ? (numericGroupFor(def.key) as SlotKey[]).filter(k => !confirmed.has(k))
+      ? (editingKey === def.key ? [def.key] : (numericGroupFor(def.key) as SlotKey[]).filter(k => !confirmed.has(k)))
       : [def.key]
     return keys.length > 0 && keys.every(k => { const d = getSlotDef(k); return !!d && canDeclineSlot(d, values) }) ? keys : []
   })()

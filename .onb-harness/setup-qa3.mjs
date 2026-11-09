@@ -117,4 +117,26 @@ const bodyOpen = await evj(`(() => { const d = JSON.parse(localStorage.getItem('
 check('5a. the fixture binds: a body question is still unanswered', bodyOpen === true, bodyOpen)
 check('5b. the header reads "Food" over a food question asked in the coach\'s own words', /^Food · \d+ of \d+$/.test(free), free)
 
+// --- 6. Changing a number from the summary (QA round 3, setup finding 10) ------------------------------------------
+// It opened an empty box under the hint "age, height and weight…", with no Skip, so a weight once given could not be
+// taken back to "Not given".
+await open('review')
+await ev(`document.querySelector('[data-review-row="weightKg"]')?.scrollIntoView({ block: 'center' })`)
+await tapEl(`document.querySelector('[data-review-row="weightKg"]')`)
+await wait(900)
+const edit = await evj(`({
+  box: document.querySelector('#slot-weightKg')?.value ?? null,
+  hint: document.querySelector(${JSON.stringify(INPUT)})?.placeholder ?? null,
+  skip: [...document.querySelectorAll('button')].some(b => (b.textContent || '').trim() === 'Skip'),
+})`)
+check('6a. the weight box opens holding the weight recorded (82), ready to change', edit?.box === '82', edit)
+check('6b. the message box hint is the weight\'s own, not the group\'s "age, height and weight…"', !!edit?.hint && !/age|height/i.test(edit.hint), edit)
+check('6c. Skip is offered, so a weight once given can go back to "Not given"', edit?.skip === true, edit)
+await shot('edit-weight')
+await ev(`window.__onbQueue.push({ reply: 'No problem.' })`)
+await tapEl(`[...document.querySelectorAll('button')].find(b => (b.textContent || '').trim() === 'Skip')`)
+await wait(1500)
+const row = await ev(`document.querySelector('[data-review-row="weightKg"]')?.textContent.trim() ?? ''`)
+check('6d. ...and Skip takes it back: the summary reads "Weight: Not given"', /Weight:\s*Not given/.test(row), row)
+
 finish('Setup keeps its question on resume, "none" answers only what it was said to, and the summary rows are a thumb tall.')

@@ -2,6 +2,13 @@
 
 Newest first. One line each.
 
+- [x] **CHANGING A NUMBER FROM SETUP'S SUMMARY: AN EMPTY BOX, THE GROUP'S HINT, AND NO WAY BACK TO "NOT GIVEN",
+  9 NOV 2026** (QA round 3, setup finding 10). Mechanical. Tapping Weight on the summary opened an empty box (a
+  single-choice change shows the current pick), the message box read "age, height and weight…" over the one weight,
+  and with no Skip a weight once given could never be taken back to "Not given". Now the box holds the number recorded,
+  the hint is that number's own ("kg, or 13st…"), and Skip is offered for a number that can be declined, settling the
+  edit and returning to the summary. CHECKS: `verify:setup-qa3` §6 (6a-6d, on the summary as drawn); 3 mutations, 3
+  caught.
 - [x] **SETUP'S HEADER NAMED THE WRONG SECTION, 9 NOV 2026** (QA round 3, setup finding 6). Mechanical. A question
   asked in the coach's own words names no slot, and the header fell back to the first unanswered question, so the
   foods question read "Body · 14 of 18" (here, "Training · 13 of 18") and the name question "Training · 1 of 17". It
