@@ -932,8 +932,22 @@ function MealSlotRow({
   // only a DIFFERENT dish is named here: the rare day the hold could not keep
   // (one dish would be on the plate twice) and the plan's search stood.
   const [swapNote, setSwapNote] = useState<string[] | null>(null)
+  // A SWAP CAN BE PUT BACK (QA round 3, 9 Nov 2026; his "every change previews and can be undone", the shape of his
+  // 8 Nov "Undo line"): the dish it replaced, offered while the meal still shows the dish the swap put there.
+  const [swapUndo, setSwapUndo] = useState<{ from: string; to: string } | null>(null)
+  const runSwapUndo = async () => {
+    if (!swapUndo) return
+    setUndoBusy(true)
+    const saved = await onSwap(slot, swapUndo.from)
+    setUndoBusy(false)
+    // SAID EITHER WAY: a put-back that did not happen keeps its button, so it can be tried again.
+    if (saved === false) { setSwapNote(["Couldn't put that back just now. Try again in a moment"]); return }
+    setSwapUndo(null)
+    setSwapNote(['Put back as it was'])
+  }
   const handleChoose = async (name: string) => {
     setBusy(true)
+    const from = option?.name ?? null
     try {
       const picked = alternatives.find(o => o.name === name)
       const trial = picked && dayMove?.knockOn && date
@@ -948,7 +962,8 @@ function MealSlotRow({
       // A SWAP THAT DID NOT SAVE CHANGED NOTHING, so it names nothing it changed (QA round 3, 9 Nov 2026: the trial's
       // lines were drawn under a dinner that had not moved). `false` is the swap saying so; nothing returned is a
       // caller that does not report, read as before.
-      if (saved === false) { setSwapNote([didNotSave('That swap')]); return }
+      if (saved === false) { setSwapNote([didNotSave('That swap')]); setSwapUndo(null); return }
+      setSwapUndo(from && from !== name ? { from, to: name } : null)
       const sameDay = trial?.changes.filter(c => c.date === date && c.slot !== slot && c.kind === 'dish') ?? []
       // AND EVERY OTHER DAY IT CHANGED (QA round 3, 9 Nov 2026): a swap re-makes tomorrow's leftover lunch from the
       // dinner now served, and that day can then re-plan; the trial knew and the sheet filtered it out.
@@ -1250,8 +1265,13 @@ function MealSlotRow({
                   ))}
                 </div>
               )}
-              {swapNote && (
-                <p className="text-[0.71875rem] text-muted-foreground" data-testid="swap-knock-on">{swapNote.join(' ')}</p>
+              {(swapNote || (swapUndo && option?.name === swapUndo.to && !isLogged)) && (
+                <div className="flex items-start gap-3">
+                  <p className="min-w-0 flex-1 text-[0.71875rem] text-muted-foreground" data-testid="swap-knock-on">{swapNote ? swapNote.join(' ') : `Swapped to ${swapUndo?.to}.`}</p>
+                  {swapUndo && option?.name === swapUndo.to && !isLogged && (
+                    <button type="button" className="hit-slop-44 shrink-0 text-[0.75rem] font-semibold text-primary-text" disabled={undoBusy} onClick={() => void runSwapUndo()} data-testid="swap-undo">Undo</button>
+                  )}
+                </div>
               )}
 
               {tab === 'recipe' && (

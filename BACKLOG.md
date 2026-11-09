@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **A MEAL SWAP HAD NO UNDO, 9 NOV 2026** (QA round 3, meals: "a today swap that changes two other dishes has no
+  Undo"). Mechanical: his 2 Nov "every change previews and can be undone" and the shape of his 8 Nov "Undo line". The
+  swap's line now carries an Undo that swaps back to the dish it replaced, through the same swap (so the pick, the
+  pool order and every meal re-made from it on other days come back too). Offered only while the meal still shows the
+  dish the swap put there and is not logged as eaten; "Put back as it was" when it lands, "Couldn't put that back just
+  now. Try again in a moment" with the button kept when it does not (the edit Undo's own words). Today's swap and an
+  upcoming day's both. A swap with nothing else to say reads "Swapped to <dish>." beside its Undo.
+  CHECKS: `verify:swap-knock-on` §5 (swap a dinner with leftovers on, Undo: the dinner and the next day's lunch are
+  back, the line says so, the button goes); 2 mutations, 2 caught. NOT DONE: the Undo lasts while the sheet is open
+  (no ten-minute window across a reload), as the food-edit Undo beside it.
 - [x] **THE COACH'S EVENING MESSAGE COULD STOP SHORT OF THE BOTTOM OF THE CHAT, ITS SHORTCUT BUTTON UNDER THE
   COMPOSER, 9 NOV 2026.** Mechanical. Found by the full sweep (`verify:coach-hello` B4 red); NOT caused by the day's
   changes: the version before them failed the same check 3 runs in 4, and the earlier sweep's pass was luck. Measured

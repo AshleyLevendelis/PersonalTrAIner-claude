@@ -200,6 +200,36 @@ check('3a. the fixture binds: a dinner swap changed the next day\'s meals (the l
 check('3b. ...and the swap\'s note names each dish it changed on that day', !!cross && cross.to.every(n => cross.note.includes(n)), cross)
 if (cross) await shoot('swap-knock-on-other-day')
 
+// --- 5. A swap can be put back (QA round 3, 9 Nov 2026: "a swap has no Undo") ----------------------------------------
+// The same page with rows: swap a dinner, tap Undo on its line straight away, and the dinner AND the next day's meals
+// (re-made from it) are as they were before.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&leftovers=1&poolrows=1&n=5#/tab/nutrition` })
+for (let i = 0; i < 60; i++) { if (await ev(`!!document.querySelector('[data-testid="meal-day-strip"]')`)) break; await wait(200) }
+await wait(800)
+const days5 = await ev(`[...document.querySelectorAll('[data-meal-day]')].map(b => b.dataset.mealDay)`) ?? []
+let undo5 = null
+if (days5.length >= 3) {
+  const [d5, n5] = [days5[1], days5[2]]
+  await openDay(n5); const nextWas = await ev(MEALS)
+  await openDay(d5); const dayWas = await ev(MEALS)
+  await ev(`(() => { const r = document.querySelector('[data-meal-name="dinner"]')?.closest('[data-meal-row]'); r?.querySelector('button')?.click() })()`); await wait(350)
+  await ev(`(() => { const r = document.querySelector('[data-meal-name="dinner"]')?.closest('[data-meal-row]'); [...(r?.querySelectorAll('button') ?? [])].find(x => /^Swap/.test(x.textContent.trim()))?.click() })()`); await wait(300)
+  const picked = await ev(`(() => { const r = document.querySelector('[data-meal-name="dinner"]').closest('[data-meal-row]'); const b = [...r.querySelectorAll('button')].filter(x => x.querySelector('p.line-clamp-2') && !x.disabled)[0]; if (!b) return null; const t = b.querySelector('p').textContent.trim(); b.click(); return t })()`)
+  await wait(1400)
+  const offered = await ev(`(() => { const u = document.querySelector('[data-testid="swap-undo"]'); if (!u) return null; u.scrollIntoView({ block: 'center' }); const r = u.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight } })()`)
+  await shoot('swap-knock-on-undo-offered')
+  await ev(`document.querySelector('[data-testid="swap-undo"]')?.click()`)
+  await wait(1400)
+  const said = await ev(`document.querySelector('[data-testid="swap-knock-on"]')?.textContent.trim() ?? ''`)
+  const undoLeft = await ev(`!!document.querySelector('[data-testid="swap-undo"]')`)
+  await openDay(d5); const dayNow = await ev(MEALS)
+  await openDay(n5); const nextNow = await ev(MEALS)
+  undo5 = { picked, was: dayWas.dinner?.name, offered, said, undoLeft, dayNow: dayNow.dinner?.name, nextWas: nextWas.lunch?.name, nextNow: nextNow.lunch?.name }
+}
+check('5a. the fixture binds: a different dinner was picked, and the swap line offers Undo on screen', !!undo5?.picked && undo5.picked !== undo5.was && !!undo5.offered && undo5.offered.top >= 0 && undo5.offered.bottom <= undo5.offered.vh, undo5)
+check('5b. Undo puts the dinner back, says so, and the Undo goes', !!undo5 && undo5.dayNow === undo5.was && undo5.said === 'Put back as it was' && !undo5.undoLeft, undo5)
+check('5c. ...and the next day\'s lunch (re-made from that dinner) is back as it was', !!undo5 && !!undo5.nextWas && undo5.nextNow === undo5.nextWas, undo5)
+
 // --- 4. A swap that does not save names nothing it changed (QA round 3, 9 Nov 2026) ---------------------------------
 // The same page with no pool rows: the pool swap cannot find its meal, so nothing is saved. The note had drawn the
 // trial's lines ("Friday's lunch becomes ...") under a dinner that had not moved. Now it says the swap did not save.
