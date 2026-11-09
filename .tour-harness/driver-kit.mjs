@@ -16,7 +16,7 @@
 // No clock: nothing here asks the machine what day or time it is.
 // ---------------------------------------------------------------------------
 import { createServer } from 'http'
-import { readFileSync, existsSync, writeFileSync, mkdtempSync } from 'fs'
+import { readFileSync, existsSync, writeFileSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
@@ -44,6 +44,10 @@ export async function startDriver(o) {
   const busy = await fetch(`http://127.0.0.1:${port}/json/version`).then(() => true, () => false)
   if (busy) { console.error(`    ✗ port ${port} already has a browser on it — another run of this driver is still alive`); process.exit(1) }
   const profileDir = mkdtempSync(join(tmpdir(), `${name}-`))
+  // THE PROFILE GOES WHEN THE RUN DOES (9 Nov 2026): every run left its ~15 MB browser profile in the temp folder, and
+  // a full sweep's worth (2,700 of them, 15.8 GB) filled the session's disk mid-sweep, failing ~200 checks on "no space
+  // left". `exit` covers every way out (finish, giveUp, a throw); the browser is killed first so nothing holds the files.
+  process.on('exit', () => { try { chrome.kill('SIGKILL') } catch {} ; try { rmSync(profileDir, { recursive: true, force: true }) } catch {} })
   const flags = ['--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profileDir}`, '--no-sandbox', '--disable-gpu']
   // A desktop window draws real scrollbars that take up room (15px here). No
   // phone-size driver can see anything that depends on them.

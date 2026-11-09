@@ -24,7 +24,7 @@
 // PORT 9651.
 // ---------------------------------------------------------------------------
 import { createServer } from 'http'
-import { readFileSync, existsSync, writeFileSync, mkdtempSync } from 'fs'
+import { readFileSync, existsSync, writeFileSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, extname } from 'path'
 import { spawn, execFileSync } from 'child_process'
@@ -103,6 +103,8 @@ if (portBusy) { console.error('    ✗ port 9651 already has a browser on it —
 // driver finishes. Found 9 Oct 2026 with several checkouts driving at once:
 // this driver stopped part-way, on correct code, with nothing on its port.
 const profileDir = mkdtempSync(join(tmpdir(), 'meal-log-card-'))
+// The throwaway profile goes when the run does (9 Nov 2026: left behind, a sweep's worth filled the disk).
+process.on('exit', () => { try { rmSync(profileDir, { recursive: true, force: true }) } catch {} })
 const chrome = spawn('/opt/pw-browsers/chromium', ['--headless=new', '--remote-debugging-port=9651', `--user-data-dir=${profileDir}`, '--no-sandbox', '--disable-gpu', 'about:blank'], { stdio: 'ignore' })
 // A driver that waits for ever reads as a slow one, and a browser that dies
 // mid-run leaves every pending question unanswered. Both end the run loudly.

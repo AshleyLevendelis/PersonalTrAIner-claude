@@ -28,7 +28,7 @@
 // PORT 9652.
 // ---------------------------------------------------------------------------
 import { createServer } from 'http'
-import { readFileSync, existsSync, writeFileSync, mkdtempSync } from 'fs'
+import { readFileSync, existsSync, writeFileSync, mkdtempSync, rmSync } from 'fs'
 import { tmpdir } from 'os'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
@@ -51,6 +51,8 @@ if (portBusy) { console.error('    ✗ port 9652 already has a browser on it —
 // Its own profile directory: on the default one, a browser started while
 // another driver's is up hands its window to THAT browser and exits.
 const profileDir = mkdtempSync(join(tmpdir(), 'weigh-in-'))
+// The throwaway profile goes when the run does (9 Nov 2026: left behind, a sweep's worth filled the disk).
+process.on('exit', () => { try { rmSync(profileDir, { recursive: true, force: true }) } catch {} })
 const chrome = spawn('/opt/pw-browsers/chromium', ['--headless=new', '--remote-debugging-port=9652', `--user-data-dir=${profileDir}`, '--no-sandbox', '--disable-gpu', 'about:blank'], { stdio: 'ignore' })
 const giveUp = why => { console.error(`    ✗ ${why}`); try { chrome.kill('SIGKILL') } catch {} ; process.exit(1) }
 // A stopwatch on the run, not a clock: it never decides what "today" is.
