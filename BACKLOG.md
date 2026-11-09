@@ -105,6 +105,9 @@ Newest first. One line each.
   NOT DONE, from the same report: the header naming the wrong section, the step total growing as you go, typing hints
   cut off by the mic button, 32px summary rows, rough edges changing a number from the summary, and setup having no
   Back button (his question: it would sit beside his "Move straight on" ruling).
+  RULED 9 Nov 2026, from three options (no Back button / a Back in the header / both), his answer "A. No back
+  button", my recommendation: any answer is changed from the summary at the end, and a Back would sit oddly beside
+  "Move straight on". Not built, by decision; recorded in CLAUDE.md.
   CHECKS: new `verify:setup-qa3` (7 checks; the scripted page gained a `none-left` state, input only),
   `test:kit-list` (+6), `test:setup-follow-ups` (+2, one re-anchored: it pinned the lead's exact call). Mutations: 5 of
   5 caught.

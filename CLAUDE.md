@@ -1673,6 +1673,8 @@ menu" stays true when a copy is also left outside it.
   Skip is the old "Prefer not to say", moved to the header, never on a multi-select. One tap
   answers a single-choice question: his ruling 11 Oct 2026, **"Move straight on"**, over the
   brief's select-then-Next. `test:onboarding-style`
+  **And no Back button: his ruling 9 Nov 2026, "A. No back button"** (over a Back in the header and over both): an
+  answer is changed from the summary at the end, which taps through to any row. Not built, by decision.
 - **Profile is a page of rows**; every editor it had is in exactly one row's sheet, and a deep link
   opens the sheet holding its section. `test:profile-groups`
 - **Home's coach note rotates, and stops**: held while touched or focused, never moving under
