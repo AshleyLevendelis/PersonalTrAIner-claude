@@ -2325,7 +2325,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                       type="button"
                       onClick={() => handleEditSlot('weightKg')}
                       disabled={busy}
-                      className="underline underline-offset-2 font-medium text-foreground disabled:opacity-60"
+                      className="hit-slop-44 underline underline-offset-2 font-medium text-foreground disabled:opacity-60"
                     >
                       Add it now
                     </button>

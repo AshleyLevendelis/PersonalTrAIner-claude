@@ -2,6 +2,9 @@
 
 Newest first. One line each.
 
+- [x] **SETUP'S "ADD IT NOW" WAS A 61x16 LINK, 9 NOV 2026** (QA round 3, setup finding 9, the second half). It gets the
+  app's invisible 44px tap area. `verify:setup-qa3` 6e (a thumb's reach, measured after Skip leaves the weight not
+  given); 1 mutation, caught.
 - [x] **SETUP'S OWN LINE SAID "HOW OLD ARE YOU?" OVER A CARD ASKING AGE, HEIGHT AND WEIGHT, 9 NOV 2026** (QA round 3,
   setup finding 11). Mechanical. A number card asks every unanswered number of its group at once; the app's own line
   above it (a turn the coach left silent, the next card, a stepped-in ask, "Next:" after a failed connection) read only

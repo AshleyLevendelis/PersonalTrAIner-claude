@@ -138,5 +138,11 @@ await tapEl(`[...document.querySelectorAll('button')].find(b => (b.textContent |
 await wait(1500)
 const row = await ev(`document.querySelector('[data-review-row="weightKg"]')?.textContent.trim() ?? ''`)
 check('6d. ...and Skip takes it back: the summary reads "Weight: Not given"', /Weight:\s*Not given/.test(row), row)
+// "Add it now", shown once the weight is not given, was a 61x16 link (QA round 3, setup finding 9). A thumb's reach:
+// a point 21px above, below, left and right of its centre lands on it (or off the screen).
+const addNow = await ev(`(() => { const el = [...document.querySelectorAll('button')].find(b => (b.textContent || '').trim() === 'Add it now'); if (!el) return null
+  el.scrollIntoView({ block: 'center', behavior: 'instant' }); const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2
+  return [[0, -21], [0, 21], [-21, 0], [21, 0]].every(([dx, dy]) => { const x = cx + dx, y = cy + dy; if (x < 0 || x > innerWidth || y < 0 || y > innerHeight) return true; const h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)) }) })()`)
+check('6e. "Add it now" is there once the weight is not given, and a thumb reaches it', addNow === true, addNow)
 
 finish('Setup keeps its question on resume, "none" answers only what it was said to, and the summary rows are a thumb tall.')
