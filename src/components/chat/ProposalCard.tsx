@@ -191,13 +191,16 @@ export function ProposalCard({
         <p
           data-testid="offer-preview"
           data-offer-line="change"
-          className="mt-1.5 flex w-full min-w-0 items-center gap-2.5 rounded-2xl px-3.5 py-2.5 text-[0.875rem]"
+          className="mt-1.5 flex w-full min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 rounded-2xl px-3.5 py-2.5 text-[0.875rem]"
           style={{ background: 'var(--surface-raised)' }}
         >
+          {/* WRAPS, NEVER CUTS (QA round 3, 8 Nov 2026): both halves were `truncate`, so a change of training days
+              read "Mon, Wed, Fri → M…" and the one thing the offer changes was the part cut off. One line when it
+              fits; the words wrap when it does not. */}
           {preview.label && <span className="sr-only">{preview.label}: </span>}
-          <span className="min-w-0 truncate text-[0.8125rem] text-muted-foreground line-through">{preview.from}</span>
+          <span className="min-w-0 break-words text-[0.8125rem] text-muted-foreground line-through">{preview.from}</span>
           <span className="shrink-0 text-primary-text">{' → '}</span>
-          <span className="min-w-0 flex-1 truncate font-semibold text-foreground">{preview.to}</span>
+          <span className="min-w-0 flex-1 break-words font-semibold text-foreground">{preview.to}</span>
           {preview.note && <span className="shrink-0 font-mono text-[0.71875rem] text-[color:var(--text-tertiary)]">{' ('}{preview.note}{')'}</span>}
         </p>
       )}

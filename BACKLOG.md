@@ -2,6 +2,32 @@
 
 Newest first. One line each.
 
+- [x] **"WELCOME ABOARD" AFTER CLEAR CHAT IN WEEK 2, A PREVIEW CUT TO "M…", AND "LEG CURL" OFFERED AS THE DUMBBELL
+  ONE AT A FULL GYM, 9 NOV 2026** (QA round 3, chat findings 2, 3 and 11). Mechanical, plus one CSCS call (mine).
+  (1) An empty chat was read as a brand-new account, so somebody in week 2 who tapped Clear chat came back to "welcome
+  aboard. Your plan's built" and the app tour. A first chat now needs no chat rows AND nothing trained (no session row,
+  no cardio row); a count that cannot be read is not a first chat, so the returning opener still speaks. Somebody who
+  set up and never trained still gets the welcome. (2) The welcome's session was read off week 1, so a block swap made
+  since was named back as today's exercise; each date is now looked up in its own week, as the returning greeting
+  already was. (3) The one-change preview under an offer truncated both halves, so a change of training days read
+  "Mon, Wed, Fri → M…"; it wraps now, one line when it fits. (4) "Leg curl" matches seven entries and the name search
+  sorts A to Z, so the coach's nearest-name fallback offered Dumbbell Leg Curl to a full gym ahead of the lying and
+  seated machines (traced: `searchExerciseCatalog`'s alphabetical sort, equipment never consulted for order). CSCS
+  basis: the dedicated, finely loaded tool is what a coach gives somebody who has it; the dumbbell leg curl exists for
+  somebody with "nothing but a dumbbell and a floor" (its own note). Among lookalikes the one fewer kit levels can do
+  comes first, then the plainer name; an implement he names still wins, and what he cannot do is still filtered out.
+  Measured: full gym Lying Leg Curl, home gym and minimalist Dumbbell Leg Curl, bodyweight Sliding Leg Curl. Rehab-
+  indicated entries are ranked like the rest here: the generator's exemption protects a prescription, and a typed
+  name is not one. NOT changed: the screen's search box keeps its A-to-Z list (it shows every match, under an
+  equipment-aware shortlist). (5) Small chat controls: of the four the tester measured under 44px, only the "tap to
+  retry" links were real; Listen, Clear and the settings gear already carry an invisible 44px tap area (the gear
+  through its button size), and the tester measured the drawn box. The two retry links have one now. Measured the way a
+  thumb asks it (a point 21px each side of the centre lands on the control).
+  CHECKS: `test:first-chat` (14), `test:swap-name-fallback` §4b (+6), new `verify:chat-cleared` (7, on a real screen:
+  the cleared chat opens with "Hey — how's the day been so far?"), `verify:chat-errors` 2f, `verify:small-targets`
+  (the gear), `verify:moved-edit` 9d (the removal's decline reads "Keep Cable Front Raise" on screen, closing the 8 Nov
+  entry below, which was proven by test only). Mutations: 8 of 8 on the logic checks; 5 of 5 on the screen checks (one
+  first came back MISSED, which is how the gear was found to need no change).
 - [x] **"YOUR HAMSTRINGS GOES FROM 12 SETS … HAMSTRINGS GROWS", 8 NOV 2026** (QA round 3, chat finding 9). Wording:
   the cost line on a swap or removal card agreed every muscle group with a singular verb. Hamstrings, glutes, quads,
   shoulders, biceps, triceps and calves now "go" and "grow" (and "carry", "do"); chest, back and core still "goes".

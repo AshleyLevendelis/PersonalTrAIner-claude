@@ -184,6 +184,21 @@ export interface FirstRunSessionBrief {
  * function was mutated to a hardcoded 16 — the string it searched for also
  * appears in unrelated wiring 400 lines away.
  */
+/**
+ * IS THIS SOMEBODY'S FIRST CHAT, OR A CHAT THEY CLEARED? (QA round 3, 8 Nov 2026)
+ *
+ * An empty chat was read as a brand-new account, so somebody in week 2 who tapped Clear chat came back to
+ * "welcome aboard. Your plan's built" and a tour of an app they had been training on. No chat rows is not
+ * enough on its own: a cleared chat has none either. What a cleared chat still has is TRAINING — a session
+ * started or finished, a set logged. So the first-chat welcome needs both: nothing said yet AND nothing
+ * trained yet. Somebody who set up a week ago and never trained or talked still gets the welcome, which
+ * is right for them; somebody who has trained gets the returning opener, which reads where they are.
+ * Either count unknown (a failed read) is not a first chat: the returning opener still speaks.
+ */
+export function isFirstChat(chatRows: number | null | undefined, trainingRows: number | null | undefined): boolean {
+  return chatRows === 0 && trainingRows === 0
+}
+
 export function planShapeFromMesocycle(
   mesocycle: {
     week_number?: number

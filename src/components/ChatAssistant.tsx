@@ -119,7 +119,7 @@ import { dayHasSession } from '@/lib/day-verbs'
 import { addDays, daysBetween, dayNameOf, sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
 import { normalizeExternalUrl } from '@/lib/chat-links'
-import { buildFirstRunIntro, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
+import { buildFirstRunIntro, isFirstChat, planShapeFromMesocycle, type FirstRunSessionBrief } from '@/lib/first-run-intro'
 import { buildCoachExerciseSummary, buildCoachPhaseBrief, nextSessionAfter, partOfDay, stampTurnTime, stampTurnOutcome, outcomeOfCard, summariseTodayWork, type TurnOutcome } from '@/lib/chat-plan-context'
 import { createFact, createGoal, createContextFact, retireFact, retireContextFact, abandonGoal, type UserFactRow, type UserGoalRow, type UserContextFactRow } from '@/lib/memory-store'
 import { resolveExerciseTarget, resolveFoodTarget } from '@/lib/fact-compiler'
@@ -646,7 +646,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // of today and this is now part of it.
     const now = getAppNow(profile.id)
     const nameOfDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long' })
-    const sessionOn = (d: Date) => exercisePlan.find(x => x.day === nameOfDay(d))
+    // THE WEEK THAT DATE IS IN, never the plan's first (QA round 3, 8 Nov 2026): this read `exercisePlan`, which is
+    // week 1, so a swap made since (stored on the live weeks) was named back as today's session. The same lookup
+    // the returning greeting makes, per date, because "tomorrow" can be in the next week.
+    const weeks = mesocycle.length > 0 ? mesocycle.length : 4
+    const daysOf = (d: Date) => mesocycle.find(w => w.week_number === getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, d, weeks))?.days ?? exercisePlan
+    const sessionOn = (d: Date) => daysOf(d).find(x => x.day === nameOfDay(d))
     // A walk day carries its whole prescription in plannedActivity and has
     // no exercises to list, so mapping the (empty) exercise list produced
     // "Day one is today: Walk — ." in the app's very first message.
@@ -1722,7 +1727,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         })
         setHasMoreMessages((count ?? 0) > PAGE_SIZE)
       }
-      setIsFirstEverChat((count ?? 0) === 0)
+      // An empty chat is a FIRST chat only for somebody who has not trained yet (isFirstChat): a chat
+      // cleared in week 2 has no rows either, and was welcomed aboard. Asked only when the chat is empty.
+      let trainingRows: number | null = 0
+      if ((count ?? 0) === 0) {
+        const head = { count: 'exact' as const, head: true }
+        // A logged set always hangs off a session row, so sessions cover lifting; a walk or a run is a
+        // cardio row of its own (the starting-out plan logs walks there).
+        const [sessions, cardio] = await Promise.all([
+          supabase.from('workout_sessions').select('id', head).eq('profile_id', profile.id),
+          supabase.from('cardio_logs').select('id', head).eq('user_id', profile.id),
+        ])
+        trainingRows = sessions.error || cardio.error ? null : (sessions.count ?? 0) + (cardio.count ?? 0)
+      }
+      setIsFirstEverChat(isFirstChat(count ?? 0, trainingRows))
       setHistoryLoaded(true)
     } catch (err) {
       console.error('Failed to load chat history:', err)
@@ -8274,7 +8292,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                               {stripStreamingTags(msg.content)}
                             </ReactMarkdown>
                             <button
-                              className="mt-2 flex items-center gap-1.5 text-xs text-primary-text font-medium hover:underline"
+                              className="hit-slop-44 mt-2 flex items-center gap-1.5 text-xs text-primary-text font-medium hover:underline"
                               onClick={() => retryMessage(i)}
                               disabled={isLoading}
                             >
@@ -8417,7 +8435,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                               {/* Retry button for interrupted messages without content */}
                               {isInterrupted(msg) && !msg.content && !isLoading && (
                                 <button
-                                  className="mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
+                                  className="hit-slop-44 mt-2 flex items-center gap-1.5 text-xs text-[color:var(--role-warn)] hover:underline"
                                   onClick={() => retryMessage(i)}
                                 >
                                   <RotateCcw className="size-3" />

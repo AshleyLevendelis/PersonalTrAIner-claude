@@ -367,6 +367,12 @@ check(`9a. "…out of my ${FROM_NAME} session" — its old name`, await sayToCoa
 const takeReply = await settled(TAKE_SAID)
 check('9b. it finds the exercise (no "rest day", no "nothing on … to change")', takeReply.length > 0 && !/is a rest day/i.test(takeReply) && !/nothing (left )?on \w+ to change/i.test(takeReply), takeReply.slice(0, 260))
 check(`9c. ...and speaks of ${TODAY_NAME}, where the session now is`, takeReply.includes(TODAY_NAME), takeReply.slice(0, 260))
+// THE DECLINE NAMES WHAT HE KEEPS (QA round 3, 8 Nov 2026): it read "Keep 7 exercises", the day's count, because the
+// removal's row named no exercise. It is the exercise the offer is about, in the offer's own words.
+const keep = await ev(`[...([...document.querySelectorAll('[data-testid="proposal-card"]')].pop()?.querySelectorAll('button') ?? [])].map(b => (b.textContent || '').trim()).find(t => t.startsWith('Keep ')) ?? null`)
+check('9d. the decline is "Keep <the exercise>", named in the offer, never a count of exercises',
+  !!keep && !/^Keep \d+ exercises?$/.test(keep) && takeReply.includes(keep.slice(5)), { keep, said: takeReply.slice(0, 200) })
+await ev(`[...document.querySelectorAll('[data-testid="proposal-card"]')].pop()?.scrollIntoView({ block: 'end' })`); await wait(400)
 await shoot('moved-edit-9-coach-remove')
 
 // --- what the coach was TOLD on that last turn (H22.1 / H23) ---------------

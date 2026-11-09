@@ -148,6 +148,21 @@ const profile: UserProfile = {
 
 setRandomSource(seededRngFromKey('chat-shell'))
 const mesocycle = generateMesocycle(profile)
+// ?trained=1 — A CHAT CLEARED AFTER TRAINING (QA round 3, 8 Nov 2026): with ?seed=opener&rows=0 the chat has no rows,
+// as after Clear chat, and this adds the one thing a cleared chat still has: a session trained last week.
+const TRAINED_BEFORE = new URLSearchParams(location.search).get('trained') === '1'
+// ?swapLive=1 — A SWAP MADE FOR THE BLOCK: from the live week on, each day's first exercise is replaced, the way a
+// whole-block swap writes the live weeks. Week 1 (what `exercisePlan` holds) keeps its own. Input only: the app
+// decides what the welcome names.
+const SWAP_LIVE = new URLSearchParams(location.search).get('swapLive') === '1'
+if (SWAP_LIVE) {
+  const live = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  for (const w of mesocycle) if (w.week_number >= live) for (const d of w.days) {
+    const i = d.exercises.findIndex(e => !isMovementPrepRow(e))
+    if (i >= 0) d.exercises[i] = { ...d.exercises[i], name: 'Seated Leg Curl' }
+  }
+  ;(window as unknown as Record<string, unknown>).__week1First = mesocycle[0].days.map(d => d.exercises.find(e => !isMovementPrepRow(e))?.name ?? null)
+}
 resetRandomSource()
 const macros: MacroTargets | null = computeTargets(profile)
 
@@ -671,7 +686,7 @@ const dayStateSeed = (() => {
 
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
-  daily_metrics: [], exercise_set_logs: [...dayStateSeed.sets, ...finishedSets], workout_sessions: [...finishedSession, ...movedInSession, ...movedAwaySession, ...dayStateSeed.sessions], cardio_logs: [],
+  daily_metrics: [], exercise_set_logs: [...dayStateSeed.sets, ...finishedSets], workout_sessions: [...(TRAINED_BEFORE ? [{ id: 'ws-lastweek', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 6 * 86400000)), is_completed: true, felt: null }] : []), ...finishedSession, ...movedInSession, ...movedAwaySession, ...dayStateSeed.sessions], cardio_logs: [],
   daily_steps: [], meal_events: [...dayStateSeed.meals, ...mealYesterday], meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
   favorite_meals: [], grocery_items: topUpSeed.list, load_suggestions: [], pending_actions: [],
   plan_adaptations: KNEE_EASE ? [kneeEaseRow(PROFILE_ID)] : [], user_facts: [], user_context_facts: [], user_goals: [],

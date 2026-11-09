@@ -9,7 +9,7 @@
 // docs/plans/runs-7-10-batch-1-safety.md.
 // ---------------------------------------------------------------------------
 import type { ExerciseResolution } from './set-parse'
-import type { UserProfile } from './types'
+import type { EquipmentAccess, UserProfile } from './types'
 import { searchExerciseCatalogByWords, getExerciseEntry } from './exercise-db'
 import { getReplacementCandidates } from './mesocycle-edit'
 import { getConstrainedPool, isEquipmentAllowed } from './exercise-plan'
@@ -50,6 +50,23 @@ export interface SwapNameFallback {
   ruledOutBy: 'kit' | 'injuries' | null
 }
 
+/**
+ * THE DEDICATED TOOL FIRST (QA round 3, 8 Nov 2026; CSCS, mine). "Leg curl" matches seven entries and the search
+ * hands them back A to Z, so a full gym was offered Dumbbell Leg Curl, the version written for somebody with
+ * nothing but a dumbbell and a floor, ahead of the lying and seated machines. Among names that all match, the one
+ * that needs the MOST kit is the one a coach gives somebody who has that kit: fewer equipment tiers can do it, so
+ * it comes first. Only ever an order among lookalikes: what he cannot do is still filtered out below, so a home
+ * trainee still gets the dumbbell one. Then the plainer name ("Lying Leg Curl" before "Iso-Lateral Kneeling Leg
+ * Curl"). Every entry is ranked, rehab-indicated ones included: the generator's exemption (a band leg curl kept for a
+ * knee) protects a PRESCRIPTION, and a typed "leg curl" with a gym full of machines is not a rehab request.
+ */
+const TIERS: EquipmentAccess[] = ['bodyweight', 'minimalist', 'home_gym', 'full_gym']
+function toolOrder(name: string): { tiers: number; words: number } {
+  const e = getExerciseEntry(name)
+  if (!e) return { tiers: TIERS.length, words: name.split(/\s+/).length }
+  return { tiers: TIERS.filter(t => isEquipmentAllowed(e, t)).length, words: name.split(/\s+/).length }
+}
+
 export function swapNameFallback(input: {
   typed: string
   oldExercise: string
@@ -76,8 +93,8 @@ export function swapNameFallback(input: {
   ].filter((n, i, all) => all.findIndex(m => m.toLowerCase() === n.toLowerCase()) === i)
     .filter(n => n.toLowerCase() !== oldExercise.toLowerCase())
     // Stable: the search's own order survives within each half.
-    .map((n, i) => ({ n, i, kit: usesNamedKit(n) ? 0 : 1 }))
-    .sort((a, b) => a.kit - b.kit || a.i - b.i)
+    .map((n, i) => ({ n, i, kit: usesNamedKit(n) ? 0 : 1, tool: toolOrder(n) }))
+    .sort((a, b) => a.kit - b.kit || a.tool.tiers - b.tool.tiers || a.tool.words - b.tool.words || a.i - b.i)
     .map(x => x.n)
 
   // A lookalike he CAN do is offered first even when it is a different movement: he asked for it by name, and the

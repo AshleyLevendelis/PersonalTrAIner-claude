@@ -42,6 +42,12 @@ check('2c. she reads a plain sentence instead', /Something went wrong on my side
 check('2d. ...which never tells her to tap a button called "Retry"', !/tap "Retry"|tap Retry/i.test(crashed || ''), (crashed || '').slice(-300))
 const r1 = await retries()
 check('2e. exactly ONE "tap to retry" control', r1 === 1, r1)
+// A thumb reaches it (QA round 3, 8 Nov 2026): a 16px line of text with no tap area round it. A point 21px above,
+// below, left and right of its centre must land on it (or off the screen), so a hit-slop counts and a box alone does not.
+const retryReach = await ev(`(() => { const el = [...document.querySelectorAll('button')].find(b => /tap to retry/i.test(b.textContent || '')); if (!el) return null
+  el.scrollIntoView({ block: 'center', behavior: 'instant' }); const b = el.getBoundingClientRect(), cx = b.left + b.width / 2, cy = b.top + b.height / 2
+  return [[0, -21], [0, 21], [-21, 0], [21, 0]].every(([dx, dy]) => { const x = cx + dx, y = cy + dy; if (x < 0 || x > innerWidth || y < 0 || y > innerHeight) return true; const h = document.elementFromPoint(x, y); return !!h && (h === el || el.contains(h)) }) })()`)
+check('2f. ...and a thumb reaches it', retryReach === true, retryReach)
 await shoot('chat-errors-crash')
 
 console.log('\n3. Retrying, now that it works')

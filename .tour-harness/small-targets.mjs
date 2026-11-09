@@ -80,6 +80,9 @@ await shoot('small-targets-rest')
 
 // --- 5. Profile: a sheet's boxes and dropdowns ------------------------------------------------------------------
 const named = re => `[...document.querySelectorAll('button,[role=menuitem]')].find(b => ${re}.test((b.getAttribute('aria-label') || '').trim()) || ${re}.test(b.textContent.trim()))`
+// The gear itself (QA round 3, 8 Nov 2026): a 32px icon with no tap area round it.
+const gear = await reach('button[aria-label="Profile and settings"]')
+check('5-. the settings gear is there, and a thumb reaches it', (gear ?? []).length >= 1 && small(gear).length === 0, gear)
 await clickAt(named('/Profile and settings/')); await wait(600)
 await clickAt(named('/^Profile$/')); await wait(1500)
 const opened = await clickAt(`[...document.querySelectorAll('[data-profile-page] button')].find(b => b.textContent.trim().startsWith('Height & weight'))`)

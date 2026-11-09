@@ -24,7 +24,7 @@ const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:]
 async function main() {
   const { swapNameFallback, KIT_CHIP } = await import('../src/lib/swap-name-fallback')
   const { resolveExerciseName } = await import('../src/lib/set-parse')
-  const { getExerciseEntry } = await import('../src/lib/exercise-db')
+  const { getExerciseEntry, EXERCISE_DATABASE } = await import('../src/lib/exercise-db')
   const { getReplacementCandidates } = await import('../src/lib/mesocycle-edit')
   const { isEquipmentAllowed } = await import('../src/lib/exercise-plan')
 
@@ -86,11 +86,24 @@ async function main() {
     check(`...each name resolves exactly in the catalogue (${r.offered.join(', ')})`, r.offered.every(n => { const x = resolveExerciseName(n, []); return x.resolution === 'resolved' && x.exerciseName === n }))
     check('...and the kit tap is last', chips[chips.length - 1] === KIT_CHIP, chips)
   }
-  const { EXERCISE_DATABASE } = await import('../src/lib/exercise-db')
   check('no catalogue name holds "]" or "|", so no tap can break the tag', EXERCISE_DATABASE.length >= 200 && !EXERCISE_DATABASE.some(e => /[\]|]/.test(e.name)), EXERCISE_DATABASE.filter(e => /[\]|]/.test(e.name)).map(e => e.name))
   check('the reply text before the taps says nothing about "try another name"', [bss, goblet, gym].every(r => !/try another name|exercise library/i.test(r.text)))
   const amb = swapNameFallback({ typed: 'press', oldExercise: 'Goblet Squats', resolution: resolveExerciseName('press', []), profile: GYM, exclusions: [] })
   check('an ambiguous name says so and still offers taps', resolveExerciseName('press', []).resolution === 'ambiguous' ? /could be a few things/.test(amb.text) && amb.offered.length > 0 : true, amb)
+
+  console.log('\n4b. The dedicated tool first (QA round 3, 8 Nov 2026): "leg curl" matches seven entries, A to Z')
+  // A full gym was offered Dumbbell Leg Curl ahead of the lying and seated machines, because the name search sorts
+  // alphabetically. Several candidates are on the table for every kit level, so the order is what is tested.
+  const curl = (equipment_access: string) => ask('Romanian Deadlift', 'leg curl', { ...base, equipment_access }).offered[0]
+  const lookalikes = EXERCISE_DATABASE.filter(e => /leg curl/i.test(e.name) && !e.log_only).map(e => e.name)
+  check('the fixture binds: a dumbbell, a band, a slider and two machine leg curls are all in the catalogue',
+    ['Dumbbell Leg Curl', 'Seated Band Leg Curl', 'Sliding Leg Curl', 'Lying Leg Curl', 'Seated Leg Curl'].every(n => lookalikes.includes(n)), lookalikes)
+  check('a full gym is offered a machine leg curl first, never the dumbbell one', ['Lying Leg Curl', 'Seated Leg Curl'].includes(curl('full_gym')), curl('full_gym'))
+  check('...the plain machine, not the iso-lateral kneeling one', curl('full_gym') !== 'Iso-Lateral Kneeling Leg Curl', curl('full_gym'))
+  check('a home gym (no machines) is offered the dumbbell leg curl, not the band', curl('home_gym') === 'Dumbbell Leg Curl', curl('home_gym'))
+  check('bodyweight only is offered a sliding leg curl', /Sliding Leg Curl/.test(curl('bodyweight') ?? ''), curl('bodyweight'))
+  const named = ask('Romanian Deadlift', 'band leg curl', GYM).offered[0]
+  check('...and an implement he names still wins over the order ("band leg curl" at a full gym)', named === 'Seated Band Leg Curl', named)
 
   console.log('\n5. The chat uses it')
   const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
