@@ -170,6 +170,19 @@ export function ageOn(dob: string, today: string): number | null {
   return ty - dy - (hadBirthday ? 0 : 1)
 }
 
+/**
+ * Is today the birthday (Ashley, 9 Nov 2026: "the chat should also be able to proactively wish you happy birthday")?
+ * The day the age goes up, by ageOn's own rule, so the wish and the age can never disagree: someone born on 29 February
+ * is wished on 1 March in a year without one, the day they turn a year older here.
+ */
+export function isBirthday(dateOfBirth: string | null | undefined, today: string): boolean {
+  if (!dateOfBirth || !/^\d{4}-\d{2}-\d{2}$/.test(today)) return false
+  const [y, m, d] = today.split('-').map(Number)
+  const yesterday = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10)
+  const now = ageOn(dateOfBirth, today), before = ageOn(dateOfBirth, yesterday)
+  return now != null && before != null && now > before
+}
+
 /** The picker's earliest and latest dates of birth for an age between `minAge` and `maxAge` on `today` (YYYY-MM-DD). */
 export function birthDateBounds(today: string, minAge: number, maxAge: number): { min: string; max: string } {
   const [y, m, d] = today.split('-').map(Number)

@@ -145,6 +145,15 @@ const profile: UserProfile = {
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
   created_at: new Date(anchorNowMs() - 9 * 86400000).toISOString(),
 } as UserProfile
+// ?bday=today / ?bday=tomorrow (9 Nov 2026, the birthday wish): a date of birth 30 years before the harness's today, or
+// the day after it. INPUT only: whether today is the birthday is the app's to decide.
+{
+  const which = new URLSearchParams(location.search).get('bday')
+  if (which === 'today' || which === 'tomorrow') {
+    const d = anchorDate(); d.setFullYear(d.getFullYear() - 30); if (which === 'tomorrow') d.setDate(d.getDate() + 1)
+    profile.date_of_birth = isoOf(d)
+  }
+}
 
 setRandomSource(seededRngFromKey('chat-shell'))
 const mesocycle = generateMesocycle(profile)

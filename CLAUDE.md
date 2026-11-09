@@ -1370,6 +1370,9 @@ menu" stays true when a copy is also left outside it.
   moments are said in the chat too, same words and shortcut; his Light/Normal/Lots caps every unprompted message,
   chat and phone together (each is a chat row with the reminder marker, which the phone reads). `test:coach-nudge` §9,
   `test:reach-out` §5c, `verify:coach-hello`. Needs the `coach-reach-out` deploy for the phone half
+- **The coach wishes him happy birthday: his request 9 Nov 2026** — on the day the age goes up (from the date of birth
+  he picked), the day's first unprompted message is the wish, ranked first, said once, within his Light / Normal /
+  Lots limit. Chat only (no phone notification yet). `test:coach-nudge` §10, `verify:coach-hello` BD1-BD3
 - Accountability is active — the coach opens, asks how it went, follows up
   — `coach-opener`, `coach-nudge`, `session-feel`, `verify:coach-speaks-first`.
   **And from outside the app: BUILT 24 Sep 2026, NOT LIVE.** Seven switchable

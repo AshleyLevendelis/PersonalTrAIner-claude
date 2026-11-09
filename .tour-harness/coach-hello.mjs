@@ -125,6 +125,22 @@ const noon = await settle(1)
 check('A7. one message: today\'s session, greeted, marked as the phone\'s session reminder',
   noon.added.length === 1 && /^Hey\b[^—]* — today's /.test(noon.added[0]?.text ?? '') && noon.added[0]?.marker?.moment === 'workout_today', noon.added)
 
+console.log('\nBD. His birthday (his 9 Nov request): the coach wishes him happy birthday, first, once\n')
+await ev(`Object.keys(localStorage).filter(k => k.startsWith('coach_nudge_')).forEach(k => localStorage.removeItem(k))`)
+await open('seed=hello&bday=today&clock=12:00')
+const bd = await settle(1)
+check('BD1. at noon on a training day the first message is the birthday wish, not the session, greeted',
+  bd.added.length === 1 && /^Hey\b[^—]* — happy birthday!/.test(bd.added[0]?.text ?? '') && bd.added[0]?.marker?.moment === 'birthday', bd.added)
+await shoot('coach-hello-birthday')
+await wait(4000)
+check('BD2. said once: nothing more straight after it', (await read()).added.length === 1, (await read()).added.map(r => r.text))
+await ev(`Object.keys(localStorage).filter(k => k.startsWith('coach_nudge_')).forEach(k => localStorage.removeItem(k))`)
+await open('seed=hello&bday=tomorrow&clock=12:00')
+const notYet = await settle(1)
+check('BD3. the day before the birthday: no wish (the session is the hello, as on any day)',
+  notYet.added.length === 1 && !/birthday/i.test(notYet.added[0]?.text ?? '') && notYet.added[0]?.marker?.moment === 'workout_today', notYet.added)
+await ev(`Object.keys(localStorage).filter(k => k.startsWith('coach_nudge_')).forEach(k => localStorage.removeItem(k))`)
+
 console.log('\nB. The evening: the hello was at 3pm, she logs meals, nothing logged today\n')
 await open('seed=hello&said=hello&meals=1&clock=19:30')
 const b = await settle(1)

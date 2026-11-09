@@ -43,6 +43,7 @@
 import { recordPhrase, streakLabel, whenSaid, type RecordFact } from './coach-voice'
 
 export type NudgeKind =
+  | 'birthday'
   | 'session_feel'
   | 'missed_yesterday'
   | 'personal_best'
@@ -88,6 +89,8 @@ export interface NudgeInput {
   todaySession: NudgeSession | null
   /** Any set logged today. */
   todayLogged: boolean
+  /** Today is their birthday, from the date of birth they picked (body-units.ts isBirthday). Absent: not known. */
+  birthdayToday?: boolean
 }
 
 export interface CoachNudge {
@@ -109,6 +112,7 @@ export interface CoachNudge {
 
 /** The event key for each thing that could be said right now, or null. */
 export function nudgeKeys(input: NudgeInput): {
+  birthday: string | null
   feel: string | null
   missed: string | null
   pr: string | null
@@ -117,6 +121,7 @@ export function nudgeKeys(input: NudgeInput): {
 } {
   const milestone = STREAK_MILESTONES.includes(input.streak) ? input.streak : null
   return {
+    birthday: input.birthdayToday ? `birthday:${input.today}` : null,
     feel: input.awaitingFeel ? `feel:${input.awaitingFeel.date}` : null,
     missed: input.missedYesterday ? `missed:${input.missedYesterday.date}` : null,
     pr: input.recentPR
@@ -166,6 +171,15 @@ export function keysCoveredByOpener(
 export function pickNudge(input: NudgeInput, said: string[]): CoachNudge | null {
   const keys = nudgeKeys(input)
   const unsaid = (k: string | null): k is string => k != null && !said.includes(k)
+
+  // 0. THEIR BIRTHDAY (Ashley, 9 Nov 2026: "the chat should also be able to proactively wish you happy birthday").
+  //    First, because it is true only today and is the one thing here that asks nothing of them; everything else is
+  //    still said later, a key stays unburnt until it is spoken. As the day's first message it is the hello and is
+  //    greeted by name ("Hey Ashley — happy birthday!"). It counts towards their Light / Normal / Lots limit like any
+  //    other message. No chips, and no word about training: it is a wish, not a nudge.
+  if (unsaid(keys.birthday)) {
+    return { kind: 'birthday', keys: [keys.birthday], text: "Happy birthday! Hope it's a good one.", chips: [] }
+  }
 
   // 1. A finished session nobody has asked about. Outranks everything for the
   //    reason session-feel.ts records: affect during exercise predicts whether
@@ -350,6 +364,7 @@ export function rememberWithoutSpeaking(store: NudgeStore, keys: string[]): Nudg
 
 /** The phone's moment name for each event above, so the phone never repeats what the chat already said. */
 const NUDGE_MOMENT: Record<NudgeKind, string> = {
+  birthday: 'birthday',
   session_feel: 'session_feel',
   missed_yesterday: 'missed_yesterday',
   personal_best: 'personal_best',

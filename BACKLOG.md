@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH WISHES HIM HAPPY BIRTHDAY, 9 NOV 2026.** His request: "the chat should also be able to proactively
+  wish you happy birthday." On the day the age goes up (from the date of birth he picked; never for an age typed
+  instead), the coach's first unprompted message of the day is "Hey Ashley — happy birthday! Hope it's a good one."
+  Ranked first of the coach's moments because it is true only today and asks nothing of him; everything else is still
+  said later. Said once (keyed to the day), counted in his Light / Normal / Lots limit like any message, no buttons and
+  no word about training. Born on 29 February: wished on 1 March in a year without one, the day the age goes up, so the
+  wish and the age agree (MY CALL, said so it can be changed: many people mark 28 February). The WORDS are mine and his
+  to change. NOT DONE: the phone does not send it as a notification (the chat says it when he opens the app; the phone
+  half needs the `coach-reach-out` deploy and a new moment there), and the coach is not told in conversation that it is
+  his birthday beyond the wish itself. CHECKS: `test:coach-nudge` §10 (new, 11) and its scope check re-anchored ("the
+  five events" plus the one he asked for), `verify:coach-hello` BD1-BD3 (new: first at noon over today's session,
+  greeted; said once; nothing the day before). Mutations: 6 tried, 5 caught; the 6th (a month-and-day shortcut) is
+  equivalent, since 29 February never occurs in a year without one, so it was replaced by month-and-day ONLY, which is
+  caught (the 1 March case). Frontend only.
+
 - [x] **THE BIRTHDAY IS KEPT, SO THE AGE GOES UP ON ITS OWN, 9 NOV 2026. His ruling: option 1, "Keep the birthday"**,
   from three options (over age only, as built that morning, and over age only with a yearly "still 36?" nudge), on
   my recommendation: the age is in the calorie maths and should not drift a year out with nobody noticing. Built:

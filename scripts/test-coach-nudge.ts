@@ -35,6 +35,7 @@ import {
 } from '../src/lib/coach-nudge'
 import { momentsToRaise, dailyCap, type MomentFacts } from '../src/lib/coach-moments'
 import { hasUnreadCoachMessage } from '../src/lib/chat-unread'
+import { isBirthday } from '../src/lib/body-units'
 import type { ChatMessage } from '../src/lib/types'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -143,9 +144,11 @@ console.log('\n3. Ashley\'s rulings, 7 Sep 2026')
   // this module must not reach for them.
   const kinds = [...nudgeSrc.matchAll(/kind: '([a-z_]+)'/g)].map(m => m[1])
   const unique = [...new Set(kinds)].sort()
-  check('exactly the five events she chose',
+  // RE-ANCHORED 9 Nov 2026: his request "the chat should also be able to proactively wish you happy birthday" adds a
+  // sixth, and nothing else (no food, water or weigh-in still).
+  check('exactly the events he chose: the five, and the birthday he asked for',
     JSON.stringify(unique) === JSON.stringify(
-      ['missed_yesterday', 'personal_best', 'session_due', 'session_feel', 'streak_milestone']),
+      ['birthday', 'missed_yesterday', 'personal_best', 'session_due', 'session_feel', 'streak_milestone']),
     unique)
   // Checked two ways, because one alone is weak. `weightKg` legitimately
   // appears (a PR is a weight), so this cannot be a bare search for "weight".
@@ -431,6 +434,27 @@ console.log('\n9. Hello + more moments (her ruling 7 Nov 2026): one decision ove
   check('the empty-chat opener counts as today\'s hello', /rememberWithoutSpeaking\([\s\S]{0,200}helloKey\(nudgeInputRef\.current\.today\)/.test(chat))
   check('a failed history read no longer silences the coach for the visit', /Failed to load chat history[\s\S]{0,400}setIsFirstEverChat\(prev => prev \?\? false\)/.test(chat))
   check('the clock is checked again while the app sits open', /setInterval\(bump, 10 \* 60 \* 1000\)/.test(chat) && /clockTick, reminderSettings, logsMeals\]\)/.test(chat))
+}
+
+console.log('\n10. Happy birthday (his request, 9 Nov 2026): the coach wishes him, first, once, on the right day')
+{
+  check('the birthday itself', isBirthday('1990-06-15', '2026-06-15'))
+  check('...not the day before, nor the day after', !isBirthday('1990-06-15', '2026-06-14') && !isBirthday('1990-06-15', '2026-06-16'))
+  check('born 29 February: wished on 1 March in a year without one, the day the age goes up', isBirthday('2000-02-29', '2027-03-01') && !isBirthday('2000-02-29', '2027-02-28'))
+  check('...and on 29 February in a year with one', isBirthday('2000-02-29', '2028-02-29') && !isBirthday('2000-02-29', '2028-03-01'))
+  check('no date of birth (an age typed instead): never', !isBirthday(null, '2026-06-15') && !isBirthday(undefined, '2026-06-15') && !isBirthday('', '2026-06-15'))
+  const all: NudgeInput = { ...base, birthdayToday: true, awaitingFeel: FEEL, missedYesterday: MISSED, recentPR: PR, streak: 30 }
+  const first = pickNudge(all, [])
+  check('on the day it comes first, ahead of a session to ask about', first?.kind === 'birthday' && /happy birthday/i.test(first.text), first)
+  check('...and it is a wish: no chips, no training in it', first?.chips.length === 0 && !/session|train|workout|lift/i.test(first?.text ?? ''), first?.text)
+  const key = nudgeKeys(all).birthday
+  check('it is keyed to the day, so it is said once', key === `birthday:${all.today}` && pickNudge(all, [key!])?.kind === 'session_feel', { key, next: pickNudge(all, [key!])?.kind })
+  check('not the birthday: never said', nudgeKeys({ ...base, birthdayToday: false }).birthday === null && pickNudge({ ...base }, [])?.kind !== 'birthday')
+  const hello = pickUnprompted({ now: 10 * 3600000, today: all.today, cap: 1, unpromptedToday: 0, lastUnpromptedAt: 0, momentsSaidToday: [], said: [],
+    event: first, greeting: 'Hey Ashley', hello: () => null, moments: [] })
+  check('as the day\'s first message it is the hello, greeted by name, and fits within Light\'s one a day',
+    hello?.text === "Hey Ashley — happy birthday! Hope it's a good one." && hello?.moment === 'birthday' && hello.keys.includes(helloKey(all.today)), hello)
+  check('the chat works it out from the date of birth he picked', /birthdayToday: isBirthday\(profile\.date_of_birth, activeSession\.date\)/.test(chat))
 }
 
 console.log(failures === 0 ? '\nAll coach-nudge checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
