@@ -199,8 +199,15 @@ console.log('\n1. The libraries are cached separately from the app')
   //     after    deploy 371 gz   paint 527 gz   app 1298 raw   total 2664 raw   (deploy and paint OVER by 2)
   // Setup's slots are read by the app as it starts, so the reader is first-paint code by nature. Her 15 Sep ruling,
   // "raise it with room to grow": 8 kB gz of room over today's numbers, the shape of every move above.
-  headroom('a deploy re-downloads', appGzip, 379, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 379, appGzip)
+  // MOVED 9 Nov 2026, the date of birth and unit toggles, keeping the birthday, the birthday wish and the eaten-meal
+  // correction (his requests and rulings that day). MEASURED through this gate on a clean worktree of 7e5f1443 and on
+  // the change:
+  //     before   deploy 378 gz   paint 534 gz   app 1319 raw   total 2697 raw   (1, 1, 10 and 9 kB of room)
+  //     after    deploy 380 gz   paint 536 gz   app 1326 raw   total 2708 raw   (deploy, paint and total OVER)
+  // Setup's card, the profile restore and the coach's moments all run as the app starts, so this is first-paint code
+  // by nature. Her 15 Sep ruling, "raise it with room to grow": 8 kB gz and 25 kB raw over today's numbers.
+  headroom('a deploy re-downloads', appGzip, 388, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 388, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -284,9 +291,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 31 Oct 2026: 506 -> 517, the five-tab polish — see the deploy figure above for both ends.
   // MOVED 3 Nov 2026: 517 -> 525, the lighter variants — see the deploy figure above for both ends.
   // MOVED 7 Nov 2026: 525 -> 535, another sport said in setup — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 535, 'kB gzipped')
+  // MOVED 9 Nov 2026: 535 -> 544, the date-of-birth day — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 544, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 535, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 544, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -403,7 +411,8 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 8 Nov 2026: 1304 -> 1329, the whole-app QA walk's ~20 fixes (set counts, the add list, the swap and eaten
   // rules, the water sentence, the Undo line...). Measured through this gate: 1304 at f15f69fc, 1304 with the Undo line
   // (OVER by 0). Her 15 Sep ruling, 25 raw.
-  const APP_CHUNK_BUDGET_KB = 1329
+  // MOVED 9 Nov 2026: 1329 -> 1351, the date-of-birth day; measured 1319 before and 1326 after (see the deploy figure).
+  const APP_CHUNK_BUDGET_KB = 1351
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -657,7 +666,8 @@ console.log('\n3. Nothing has crept back up')
   // through this gate: 2654 at acf8a7d9 in a separate worktree, 2656 with the change (+2 kB raw); the room had already
   // worn from 25 to 2 since 4 Nov without a move. 25 raw of room again.
   // MOVED 8 Nov 2026: 2681 -> 2706, the same QA walk; measured 2679 (2 left). Her 15 Sep ruling, 25 raw.
-  const TOTAL_BUDGET_KB = 2706
+  // MOVED 9 Nov 2026: 2706 -> 2733, the date-of-birth day; measured 2697 before and 2708 after. Her 15 Sep ruling, 25 raw.
+  const TOTAL_BUDGET_KB = 2733
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
