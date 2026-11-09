@@ -75,7 +75,7 @@ export interface OpenMealDay {
   totals: MacroTargets
   /** What a swap did to this day's other meals (M34), when one was made. */
   heldAround?: HeldAround
-  onSwap: (slot: MealSlotName, chooseName: string) => Promise<void>
+  onSwap: (slot: MealSlotName, chooseName: string) => Promise<boolean>
   onAddToGrocery: () => Promise<AddGroceryDaysResult | null>
   onRemoveFromGrocery: () => Promise<AddGroceryDaysResult | null>
   isOnGroceryList: () => Promise<boolean>
@@ -165,11 +165,11 @@ export function useMealDays(input: MealDaysInput) {
    * leftovers on, the next day's lunch is re-made from the dinner now served, and that day can re-plan; the swap
    * sheet names those changes from its trial (meal-knock-on's `elsewhere`).
    */
-  const swap = async (date: string, slot: MealSlotName, chooseName: string, currentName: string | undefined) => {
-    if (!profileId) return
+  const swap = async (date: string, slot: MealSlotName, chooseName: string, currentName: string | undefined): Promise<boolean> => {
+    if (!profileId) return false
     const applied = await swapPoolMeal(profileId, slot, currentName, chooseName)
-    if (!applied) return
-    await applyPick(date, slot, applied.name)
+    if (!applied) return false
+    return applyPick(date, slot, applied.name)
   }
 
   /**

@@ -96,7 +96,7 @@ export interface NutritionDisplayProps {
   /** Surfacing round — a dietary_preferences value the app can't enforce. Distinct from mealRegenerateError: not dismissable, routes to Profile instead of offering a retry. */
   unrecognisedDietaryRestrictions?: string[] | null
   onFixDietaryRestrictions?: () => void
-  onSwapMealSlot: (slot: MealSlotName, chooseName: string) => Promise<void>
+  onSwapMealSlot: (slot: MealSlotName, chooseName: string) => Promise<boolean>
   onRegenerateMealSlot: (slot: MealSlotName) => Promise<void>
   /** "More options" in the swap panel — the same append-only generator the chat's pool-refresh offer uses. Ashley's depth ruling holds: it only ever runs when SHE taps it. */
   onFindMoreOptions?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
@@ -130,7 +130,7 @@ export interface NutritionDisplayProps {
     chosen: Partial<Record<MealSlotName, PoolOption>>
     totals: MacroTargets
     heldAround?: HeldAround
-    onSwap: (slot: MealSlotName, chooseName: string) => Promise<void>
+    onSwap: (slot: MealSlotName, chooseName: string) => Promise<boolean>
   } & UpcomingMealDay | null
   mealRefitBusy?: boolean
   mealRefitError?: string | null

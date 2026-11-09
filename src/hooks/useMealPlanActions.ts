@@ -32,7 +32,7 @@ export function useMealPlanActions(input: MealPlanActionsInput) {
     regeneratingAll,
     swap: async (slot: MealSlotName, chooseName: string) => {
       const ctx = context()
-      if (ctx) await swapMealSlot(ctx, slot, chooseName)
+      return ctx ? swapMealSlot(ctx, slot, chooseName) : false
     },
     regenerateSlot: async (slot: MealSlotName) => {
       const ctx = context()

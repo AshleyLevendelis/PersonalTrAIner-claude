@@ -88,9 +88,10 @@ async function readBack(profileId: string): Promise<Pools | null> {
  * Picking a specific alternative records the choice as today's pick — the pool
  * itself doesn't change, only which option is "today's".
  */
-export async function swapMealSlot(ctx: MealPlanActionContext, slot: MealSlotName, chooseName: string): Promise<void> {
+/** True when the swap saved and is on screen; false when it did not (the sheet says so rather than naming what it changed). */
+export async function swapMealSlot(ctx: MealPlanActionContext, slot: MealSlotName, chooseName: string): Promise<boolean> {
   const applied = await swapPoolMeal(ctx.profileId, slot, ctx.showingName(slot), chooseName)
-  if (!applied) return
+  if (!applied) return false
   // Persist BEFORE updating the on-screen pick (UX-sweep fix) — this used
   // to update React state first, so a confirmed swap could look applied
   // on screen even when the write below never landed.
@@ -98,11 +99,12 @@ export async function swapMealSlot(ctx: MealPlanActionContext, slot: MealSlotNam
     await setMealPick(ctx.profileId, ctx.today, slot, applied.name)
   } catch (err) {
     console.error('swapMealSlot: setMealPick failed — not applying the swap on screen', err)
-    return
+    return false
   }
   ctx.setPicks(prev => ({ ...prev, [slot]: applied.name }))
   // §2.3 — same sweep as the exercise swap path, same scope_key prefix propose_meal_swap uses.
   await sweepStaleForTarget(ctx.profileId, `${ctx.profileId}:propose_meal_swap:${slot}`)
+  return true
 }
 
 export async function regenerateMealSlot(ctx: MealPlanActionContext, slot: MealSlotName): Promise<void> {

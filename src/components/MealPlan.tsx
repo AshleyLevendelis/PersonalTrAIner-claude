@@ -127,7 +127,7 @@ interface MealPlanProps {
    * control.
    */
   onMealPickApplied?: (slot: MealSlotName, chosenName: string) => Promise<boolean>
-  onSwapSlot: (slot: MealSlotName, chooseName: string) => Promise<void>
+  onSwapSlot: (slot: MealSlotName, chooseName: string) => Promise<boolean>
   onRegenerateSlot: (slot: MealSlotName) => Promise<void>
   onFindMoreOptions?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   onRegenerateAll: () => Promise<void>
@@ -846,7 +846,7 @@ function MealSlotRow({
   alternatives: PoolOption[]
   expanded: boolean
   onToggle: () => void
-  onSwap: (slot: MealSlotName, chooseName: string) => Promise<void>
+  onSwap: (slot: MealSlotName, chooseName: string) => Promise<boolean | void>
   onRegenerate: (slot: MealSlotName) => Promise<void>
   onFindMore?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   /**
@@ -942,9 +942,13 @@ function MealSlotRow({
         // dinner change the swap never made (1 Nov 2026, whole-app test, swap sheet).
         ? await dayMove.knockOn(date, slot, picked, true).catch(() => null)
         : null
-      await onSwap(slot, name)
+      const saved = await onSwap(slot, name)
       // Back to the recipe, where the knock-on line and the new dish are.
       setTab('recipe')
+      // A SWAP THAT DID NOT SAVE CHANGED NOTHING, so it names nothing it changed (QA round 3, 9 Nov 2026: the trial's
+      // lines were drawn under a dinner that had not moved). `false` is the swap saying so; nothing returned is a
+      // caller that does not report, read as before.
+      if (saved === false) { setSwapNote([didNotSave('That swap')]); return }
       const sameDay = trial?.changes.filter(c => c.date === date && c.slot !== slot && c.kind === 'dish') ?? []
       // AND EVERY OTHER DAY IT CHANGED (QA round 3, 9 Nov 2026): a swap re-makes tomorrow's leftover lunch from the
       // dinner now served, and that day can then re-plan; the trial knew and the sheet filtered it out.

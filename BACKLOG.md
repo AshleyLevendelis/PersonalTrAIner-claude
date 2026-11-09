@@ -19,6 +19,14 @@ Newest first. One line each.
   no other day does), `verify:swap-knock-on` §3 (a dinner swap with leftovers on that changes the next day; its note
   names the dish), `verify:setup-qa3` §3 (rows 44px) and §4 (every typing hint fits beside the mic). `test:coach-knows`
   re-anchored: it pinned the old one-line note (the day's own lines only), and now holds both kinds being drawn.
+  FOUND BY THE NEW SCREEN CHECK, the same day: on the leftovers page every swap failed (its meals were never rows in
+  the fake database, so the pool swap found nothing), and the note STILL drew the trial's lines ("Friday's lunch becomes
+  Warm grain salad") under a dinner that had not moved. A real defect behind the harness gap: the swap returned
+  nothing, so the sheet could not tell a failed swap from a saved one. Both swaps (today's and an upcoming day's) now
+  return whether they saved, and a swap that did not save says "That swap didn't save. Check your connection and give
+  it another go." and names nothing. The leftovers page gained `?poolrows=1` (input only, the rows ?week=1 writes) so a
+  swap there lands. `verify:swap-knock-on` §3 (the next day's lunch, on screen and in the note) and §4 (the failed
+  swap); 3 mutations on the screen, 3 caught.
 - [x] **"WELCOME ABOARD" AFTER CLEAR CHAT IN WEEK 2, A PREVIEW CUT TO "M…", AND "LEG CURL" OFFERED AS THE DUMBBELL
   ONE AT A FULL GYM, 9 NOV 2026** (QA round 3, chat findings 2, 3 and 11). Mechanical, plus one CSCS call (mine).
   (1) An empty chat was read as a brand-new account, so somebody in week 2 who tapped Clear chat came back to "welcome

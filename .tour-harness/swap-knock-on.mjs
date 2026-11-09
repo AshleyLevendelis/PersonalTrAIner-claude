@@ -170,7 +170,7 @@ check('2d. "Fit around my swap" re-sizes them again, to the same sizes', !!found
 // With leftovers on, each lunch is last night's dinner, so swapping a dinner re-makes the next day's lunch. The sheet
 // read only the swapped day's changes off its trial and said nothing about the next day, while the coach's card for
 // the same swap listed it. Walk dinners until a swap changes the next day's lunch; its note must name that dish.
-await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&leftovers=1&n=3#/tab/nutrition` })
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&leftovers=1&poolrows=1&n=3#/tab/nutrition` })
 for (let i = 0; i < 60; i++) { if (await ev(`!!document.querySelector('[data-testid="meal-day-strip"]')`)) break; await wait(200) }
 await wait(800)
 const days3 = await ev(`[...document.querySelectorAll('[data-meal-day]')].map(b => b.dataset.mealDay)`) ?? []
@@ -199,6 +199,28 @@ console.log(`  ${tried3} dinner swaps tried; ${cross ? `${cross.date} -> ${cross
 check('3a. the fixture binds: a dinner swap changed the next day\'s meals (the leftovers follow the dinner)', !!cross, { tried3 })
 check('3b. ...and the swap\'s note names each dish it changed on that day', !!cross && cross.to.every(n => cross.note.includes(n)), cross)
 if (cross) await shoot('swap-knock-on-other-day')
+
+// --- 4. A swap that does not save names nothing it changed (QA round 3, 9 Nov 2026) ---------------------------------
+// The same page with no pool rows: the pool swap cannot find its meal, so nothing is saved. The note had drawn the
+// trial's lines ("Friday's lunch becomes ...") under a dinner that had not moved. Now it says the swap did not save.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&leftovers=1&n=4#/tab/nutrition` })
+for (let i = 0; i < 60; i++) { if (await ev(`!!document.querySelector('[data-testid="meal-day-strip"]')`)) break; await wait(200) }
+await wait(800)
+const failDate = (await ev(`[...document.querySelectorAll('[data-meal-day]')].map(b => b.dataset.mealDay)`) ?? [])[1]
+let failed = null
+if (failDate) {
+  await openDay(failDate); const was = await ev(MEALS)
+  await ev(`(() => { const r = document.querySelector('[data-meal-name="dinner"]')?.closest('[data-meal-row]'); r?.querySelector('button')?.click() })()`); await wait(350)
+  await ev(`(() => { const r = document.querySelector('[data-meal-name="dinner"]')?.closest('[data-meal-row]'); [...(r?.querySelectorAll('button') ?? [])].find(x => /^Swap/.test(x.textContent.trim()))?.click() })()`); await wait(300)
+  const picked = await ev(`(() => { const r = document.querySelector('[data-meal-name="dinner"]').closest('[data-meal-row]'); const b = [...r.querySelectorAll('button')].filter(x => x.querySelector('p.line-clamp-2') && !x.disabled)[0]; if (!b) return null; const t = b.querySelector('p').textContent.trim(); b.click(); return t })()`)
+  await wait(1400)
+  const note = await ev(`document.querySelector('[data-testid="swap-knock-on"]')?.textContent.trim() ?? ''`)
+  await openDay(failDate); const now = await ev(MEALS)
+  failed = { picked, was: was?.dinner?.name, now: now?.dinner?.name, note }
+}
+await shoot('swap-knock-on-not-saved')
+check('4a. the fixture binds: a dinner was picked and the swap did not land (no pool rows to swap in)', !!failed?.picked && failed.picked !== failed.was && failed.now === failed.was, failed)
+check('4b. ...so the note says it did not save, and names no meal it changed', !!failed && /didn't save/.test(failed.note) && !/becomes|changed too|is now/.test(failed.note), failed)
 
 console.log(`\n${ran} checks ran.`)
 console.log(failures === 0 ? '\nA swap keeps the other dishes and says what it re-sized.\n' : `\n${failures} check(s) FAILED.\n`)

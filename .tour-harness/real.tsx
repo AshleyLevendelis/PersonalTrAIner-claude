@@ -1340,7 +1340,11 @@ const weekRotation = WEEK && macros
 const weekToday = weekRotation && macros
   ? assembleRotationDay(weekRotation, today, servableAtStart, macros, [], {})
   : null
-if (WEEK) {
+// ?poolrows=1 with ?leftovers=1 — the leftovers pool as ROWS too, so a swap on that page goes through meal-store against
+// this database and lands (9 Nov 2026, verify:swap-knock-on 3: without rows every swap there failed, and that is how a
+// note naming changes for a swap that never saved was found). Input only, the same rows ?week=1 writes.
+const POOL_ROWS = LEFTOVERS && new URLSearchParams(location.search).get('poolrows') === '1'
+if (WEEK || POOL_ROWS) {
   for (const [slot, options] of Object.entries(leftoverPools)) {
     options.forEach((o, i) => db.meal_plan_slots.push({
       profile_id: PROFILE_ID, slot, pool_index: i, name: o.name, ingredients: o.ingredients,
@@ -1363,7 +1367,7 @@ const leftoverDay = leftoverRotation && macros
  * halves go through meal-store against this database. A screen whose meals
  * live only in a prop cannot be edited by the code that ships.
  */
-if (!WEEK && !TOPUP && !DAYMOVE) for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number }; prep?: string }>)) {
+if (!WEEK && !POOL_ROWS && !TOPUP && !DAYMOVE) for (const [slot, option] of Object.entries(chosen as Record<string, { name: string; ingredients: { name: string; quantity: number; unit: string }[]; macros: { calories: number; protein: number; carbs: number; fat: number }; prep?: string }>)) {
   db.meal_plan_slots.push({
     profile_id: PROFILE_ID, slot, pool_index: 0, name: option.name,
     ingredients: option.ingredients,
