@@ -149,12 +149,14 @@ console.log('\n8. A meal swap says what else it changed (M34)')
   check('the swap runs the same trial as add-food BEFORE it writes', fn.indexOf('dayMove.knockOn(date, slot, picked') > -1 && fn.indexOf('await onSwap(slot, name)') > -1 && fn.indexOf('dayMove.knockOn(date, slot, picked') < fn.indexOf('await onSwap(slot, name)'))
   // Re-anchored 10 Oct 2026 (M34, her "Resize, else leave"): a re-size now has
   // its own line on the day, so this note names only a DIFFERENT dish.
-  check('...names the OTHER meals of THAT day in its own words, and only a different dish', /trial\?\.changes\.filter\(c => c\.date === date && c\.slot !== slot && c\.kind === 'dish'\)/.test(fn))
+  // RE-ANCHORED 9 Nov 2026: the function grew (the swap's Undo), so it is read whole rather than its first 700 characters.
+  const fnWhole = mp.slice(mp.indexOf('const handleChoose = async'), mp.indexOf('const handleFavouriteToggle'))
+  check('...names the OTHER meals of THAT day in its own words, and only a different dish', /trial\?\.changes\.filter\(c => c\.date === date && c\.slot !== slot && c\.kind === 'dish'\)/.test(fnWhole))
   // RE-ANCHORED 9 Nov 2026 (QA round 3): the day's own changes are joined by the trial's lines for OTHER days, which
   // it filtered out before (test:meal-knock-on holds those lines; this holds that the sheet draws both).
   const fnLong = mp.slice(mp.indexOf('const handleChoose = async'), mp.indexOf('const handleFavouriteToggle'))
   check('...each changed meal becomes its line, then the other days\' lines, and the note is drawn under the row',
-    /const notes = \[\.\.\.sameDay\.map\(swapKnockOnLine\), \.\.\.\(trial\?\.elsewhere \?\? \[\]\)\]/.test(fnLong) && /setSwapNote\(notes\.length > 0 \? notes : null\)/.test(fnLong) && /data-testid="swap-knock-on">\{swapNote\.join\(' '\)\}/.test(mp))
+    /const notes = \[\.\.\.sameDay\.map\(swapKnockOnLine\), \.\.\.\(trial\?\.elsewhere \?\? \[\]\)\]/.test(fnLong) && /setSwapNote\(notes\.length > 0 \? notes : null\)/.test(fnLong) && /data-testid="swap-knock-on">\{swapNote \? swapNote\.join\(' '\)/.test(mp))
 }
 
 console.log(`\ncoach-knows: ${ran} checks ran`)
