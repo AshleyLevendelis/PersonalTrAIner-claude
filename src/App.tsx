@@ -602,7 +602,7 @@ function App() {
   // Nutrition offer and to the coach, so neither can offer what the other's
   // button would not.
   const mealTopUpPlan = useMemo(
-    () => (macros ? topUpPlan(mealPools, activeMealSlots, macros, undefined, mealRotationDate) : null),
+    () => (macros ? topUpPlan(mealPools, activeMealSlots, macros, undefined, mealRotationDate, true) : null),
     [mealPools, activeMealSlots, macros, mealRotationDate],
   )
   const mealTopUpNeeds = mealTopUpPlan?.needs ?? {}

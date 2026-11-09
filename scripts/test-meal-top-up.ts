@@ -440,14 +440,14 @@ async function main() {
     check('L47: ...and a meal short only on count counts options, one said as one', JSON.stringify(MORE_MEALS.row(undefined, 1, 0)) === JSON.stringify({ before: '1 option', after: '1 option' }), MORE_MEALS.row(undefined, 1, 0))
     const chatSrc = read('src/components/ChatAssistant.tsx')
     check('L47: the card builds every row through that one function, and leads with fit only when some do not fit',
-      /rows: slots\.map\(slot => \(\{ field: REFIT_SLOT_LABEL\[slot\], \.\.\.MORE_MEALS\.row\(mealTopUp\.fewFit\[slot\], mealTopUp\.have\[slot\] \?\? 0, mealTopUp\.needs\[slot\] \?\? 0\) \}\)\)/.test(chatSrc)
+      /rows: slots\.map\(slot => \(\{ field: REFIT_SLOT_LABEL\[slot\], \.\.\.MORE_MEALS\.row\(mealTopUp\.fewFit\[slot\], mealTopUp\.have\[slot\] \?\? 0, mealTopUp\.needs\[slot\] \?\? 0, mealTopUp\.deep\) \}\)\)/.test(chatSrc)
       && /mealTopUp\.fewFit\[s\] !== undefined && mealTopUp\.fewFit\[s\]! < \(mealTopUp\.have\[s\] \?\? 0\)\) \? MORE_MEALS\.leadFit/.test(chatSrc))
 
     const app = read('src/App.tsx')
     const grocery = read('src/lib/grocery-store.ts')
-    check('the offer counts only the meals she can be served (the marked pools)', /topUpPlan\(mealPools, activeMealSlots, macros\)/.test(app) && /const mealPools = useServablePools\(/.test(app))
+    check('the offer counts only the meals she can be served (the marked pools)', /topUpPlan\(mealPools, activeMealSlots, macros, undefined, mealRotationDate, true\)/.test(app) && /const mealPools = useServablePools\(/.test(app))
     check('...waits while the first plan is being built, and respects "Not now"', /const mealTopUpOfferNow = !initialMealBuild && mealTopUpPlan \? topUpOffer\(mealTopUpPlan, mealTopUpDismissed\) : null/.test(app))
-    const nothingShort: TopUpPlan = { needs: {}, short: {}, have: {}, fewFit: {}, crowded: [] }
+    const nothingShort: TopUpPlan = { needs: {}, short: {}, have: {}, fewFit: {}, crowded: [], deep: false }
     check('...and there is no offer when nothing is short', topUpOffer(nothingShort) === null
       && topUpOffer({ ...nothingShort, needs: { dinner: 2 }, short: { dinner: 2 }, have: { dinner: 5 } })?.text === moreMealOptionsOffer([5], 7))
     // RE-ANCHORED 29 Sep 2026: the run moved into runMealTopUpNow so the

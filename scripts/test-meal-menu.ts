@@ -9,7 +9,8 @@
 import { readFileSync } from 'fs'
 import { MENU_SIZE, menuFor, menuForSlot, menuWeekOf } from '../src/lib/meal-menu'
 import { serveDates, rotationIndexFor, addDays } from '../src/lib/meal-rotation'
-import { fittingCounts } from '../src/lib/meal-top-up'
+import { fittingCounts, topUpPlan, topUpOffer } from '../src/lib/meal-top-up'
+import { DEEP_POOL_SIZE } from '../src/lib/meal-generation'
 import { isExoticOption, type PoolOption } from '../src/lib/meal-generation'
 import { USER_REQUESTED_TAG, type MealSlotName } from '../src/lib/meal-store'
 import type { MacroTargets } from '../src/lib/types'
@@ -109,6 +110,17 @@ function main() {
   check('serveDates draws each date\'s pool through the menu, after the pool as it stood that day', /canonical\(menuFor\(poolsServedOn\(pools, date\), date, softLikedFoods\)\)/.test(rot))
   const gen = strip(readFileSync('src/lib/meal-generation.ts', 'utf8'))
   check('the fit test while adding dishes judges the other meals on a menu, never the whole pool', /usable\[s\]!?\.length > MENU_SIZE\) usable\[s\] = menuForSlot\(usable\[s\]!, 0\)/.test(gen))
+
+  console.log('\n6. The offer of the library, on a plan that has not had it')
+  const seven = deepPools(7)
+  const offered = topUpPlan(seven, SLOTS, TARGETS, undefined, d0, true)
+  check('a plan of seven a meal is offered the library: each meal asked for up to DEEP_POOL_SIZE less what it has', offered.deep && SLOTS.every(s => offered.needs[s] === DEEP_POOL_SIZE - 7), offered.needs)
+  const offerText = topUpOffer(offered)?.text ?? ''
+  check('...in the library\'s own words, keeping the promise about today and the shopping list', /every dish from our own meal library that suits you/.test(offerText) && /Today, and any day on your shopping list, stay exactly as they are/.test(offerText), offerText)
+  const old = topUpPlan(seven, SLOTS, TARGETS, undefined, d0)
+  check('...and only when App asks for it: without the flag the plan is the old count-and-fit one (seven is not short)', !old.deep && Object.keys(old.needs).length === 0, old)
+  const deepAlready = topUpPlan(deep, SLOTS, TARGETS, undefined, d0, true)
+  check('a plan that already has a deep pool is offered nothing', !deepAlready.deep && Object.keys(deepAlready.needs).length === 0 && topUpOffer(deepAlready) === null, deepAlready.needs)
 
   console.log(`\n${ran} checks ran.`)
   if (failures > 0) { console.log(`${failures} meal-menu check(s) FAILED.`); process.exit(1) }

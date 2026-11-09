@@ -133,13 +133,17 @@ export function topUpPlan(
   targets: MacroTargets,
   size = DEFAULT_POOL_SIZE,
   today?: string,
+  /**
+   * THE DEEP OFFER (9 Nov 2026, his "much deeper pool"), which App asks for: a meal of MAX_POOL dishes or fewer has
+   * not had the library, so it is short of everything the library holds for her, and is asked for up to
+   * DEEP_POOL_SIZE (the run adds what suits). Off, the plan is the 28 Sep / 30 Sep count-and-fit one, unchanged.
+   */
+  deepOffer = false,
 ): TopUpPlan {
-  // THE DEEP OFFER (9 Nov 2026, his "much deeper pool"): a meal of MAX_POOL dishes or fewer has not had the library,
-  // so it is short of everything the library holds for her. Asked for up to DEEP_POOL_SIZE; the run adds what suits.
-  const short = topUpNeeds(pools, activeSlots, MAX_POOL + 1)
-  const deep = Object.keys(short).length > 0
-  for (const slot of Object.keys(short) as MealSlotName[]) short[slot] = DEEP_POOL_SIZE - (MAX_POOL + 1 - short[slot]!)
-  void size
+  const deepShort = deepOffer ? topUpNeeds(pools, activeSlots, MAX_POOL + 1) : {}
+  const deep = Object.keys(deepShort).length > 0
+  const short = deep ? deepShort : topUpNeeds(pools, activeSlots, size)
+  if (deep) for (const slot of Object.keys(short) as MealSlotName[]) short[slot] = DEEP_POOL_SIZE - (MAX_POOL + 1 - short[slot]!)
   const fitting = fittingCounts(pools, activeSlots, targets, today)
   const have: TopUpPlan['have'] = {}
   for (const slot of activeSlots) {
