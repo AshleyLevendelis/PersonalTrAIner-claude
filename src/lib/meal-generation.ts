@@ -38,7 +38,7 @@ import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsPro
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
 import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, type MealSlotName } from './meal-store'
 import { isMissingColumnError } from './missing-column'
-import { tagsNewFrom } from './meal-new-from'
+import { tagsNewFrom, tagsPinOnly } from './meal-new-from'
 import { dishKeysFor, dishKeyOf } from './meal-dish-identity'
 import { chooseFromLibrary, loadMealLibrary } from './meal-library'
 import { MIN_COVERAGE } from './meal-costing'
@@ -750,6 +750,12 @@ export async function generateMealPools(params: {
    */
   servedFrom?: string
   /**
+   * With appendToExisting: the added meals are MADE FOR ONE DAY (meal-new-from.ts, pin-only). No day's search can
+   * find them; only a pick that names one serves it. "Regenerate" on one meal (his ruling 10 Nov 2026, "Only that
+   * meal") adds its new dish this way, so no other meal of the week moves.
+   */
+  madeForOneDay?: boolean
+  /**
    * The library of original dishes (meal-library-data.ts) is used first when
    * appendToExisting is set. Pass `false` to ask only the meal writer, or a
    * list to use instead of the real library (a gate's small fixture).
@@ -886,9 +892,11 @@ export async function generateMealPools(params: {
       return
     }
     if (option) {
-      accepted[slot]!.push(params.appendToExisting && params.servedFrom
-        ? { ...option, tags: tagsNewFrom(option.tags, params.servedFrom) }
-        : option)
+      accepted[slot]!.push(params.appendToExisting && params.madeForOneDay
+        ? { ...option, tags: tagsPinOnly(option.tags) }
+        : params.appendToExisting && params.servedFrom
+          ? { ...option, tags: tagsNewFrom(option.tags, params.servedFrom) }
+          : option)
     }
   }
 

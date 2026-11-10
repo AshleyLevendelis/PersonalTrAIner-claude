@@ -462,6 +462,7 @@
     "verify:meal-knock-on": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-knock-on.mjs",
     "test:meal-regenerate": "tsx scripts/test-meal-regenerate.ts",
     "verify:meal-regenerate": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-regenerate.mjs",
+    "verify:meal-regenerate-one": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-regenerate-one.mjs",
     "verify:chat-bubbles": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-bubbles.mjs",
     "verify:chat-2b": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-2b.mjs",
     "test:chat-2b": "tsx scripts/test-chat-2b.ts",

@@ -100,6 +100,8 @@ export interface NutritionDisplayProps {
   /** Puts the last swap of a meal back as it was (its earlier pick, or none). */
   onUndoMealSwap?: (slot: MealSlotName) => Promise<boolean>
   onRegenerateMealSlot: (slot: MealSlotName) => Promise<void>
+  /** One new dish for today's meal, for the row to swap to (his ruling 10 Nov 2026, "Only that meal"). Absent: the row regenerates the old way. */
+  onMakeOneNewMeal?: (slot: MealSlotName) => Promise<{ option: PoolOption } | { error: string }>
   /** "More options" in the swap panel — the same append-only generator the chat's pool-refresh offer uses. Ashley's depth ruling holds: it only ever runs when SHE taps it. */
   onFindMoreOptions?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   onRegenerateAllMeals: () => Promise<void>
@@ -166,7 +168,7 @@ export function NutritionDisplay({
   profile, macros, exercisePlan = [], latestWeightKg, targetWeightKg, onMacroModeChange, onMacroSplitChange,
   profileId, date, planCreatedAt, pools, chosen, mealTotals, isGeneratingMeals, mealsRegeneratingAll = false, mealRegenerateError, onDismissRegenerateError, avoidFoods = [], onMealPickApplied,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
-  onSwapMealSlot, onUndoMealSwap, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
+  onSwapMealSlot, onUndoMealSwap, onRegenerateMealSlot, onMakeOneNewMeal, onFindMoreOptions, onRegenerateAllMeals,
   mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
   mealTopUp = null, mealTopUpBusy = false, mealTopUpNote = null, onMealTopUp, onMealTopUpDecline, onDismissMealTopUpNote, mealTopUpStart = null,
   mealStrip, upcomingDay = null, dayMove, heldAround, onKeepHeldSizes,
@@ -640,6 +642,7 @@ export function NutritionDisplay({
         onSwapSlot={onSwapMealSlot}
         onUndoSwap={onUndoMealSwap}
         onRegenerateSlot={onRegenerateMealSlot}
+        onMakeOneNew={onMakeOneNewMeal}
         onFindMoreOptions={onFindMoreOptions}
         onRegenerateAll={onRegenerateAllMeals}
         dayMove={dayMove}

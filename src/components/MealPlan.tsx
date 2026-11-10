@@ -132,6 +132,11 @@ interface MealPlanProps {
   /** Puts the last swap of a meal back as it was: its earlier pick, or no pick at all. */
   onUndoSwap?: (slot: MealSlotName) => Promise<boolean>
   onRegenerateSlot: (slot: MealSlotName) => Promise<void>
+  /**
+   * ONE NEW DISH FOR TODAY'S MEAL (his ruling 10 Nov 2026, "Only that meal"): made and stored, then the row swaps to it
+   * through the swap's own road. Absent, a row's Regenerate rebuilds the meal's whole list, as it did.
+   */
+  onMakeOneNew?: (slot: MealSlotName) => Promise<{ option: PoolOption } | { error: string }>
   onFindMoreOptions?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   onRegenerateAll: () => Promise<void>
   /** Set when this list is an upcoming day from the strip rather than today. See UpcomingMealDay. */
@@ -173,7 +178,7 @@ export function MealPlan({
   profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
   mealsPerDay, includeSnacks, onMealPickApplied,
-  onSwapSlot, onUndoSwap, onRegenerateSlot, onFindMoreOptions, onRegenerateAll, upcoming, dayMove, regeneratingAll = false,
+  onSwapSlot, onUndoSwap, onRegenerateSlot, onMakeOneNew, onFindMoreOptions, onRegenerateAll, upcoming, dayMove, regeneratingAll = false,
   heldAround, onKeepHeldSizes,
 }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
@@ -467,6 +472,7 @@ export function MealPlan({
             date={date}
             dayMove={dayMove}
             onRegenerate={onRegenerateSlot}
+            onMakeOneNew={upcoming ? undefined : onMakeOneNew}
             onFindMore={upcoming ? undefined : onFindMoreOptions}
             checkAlternative={alt => checkMealAgainstRestrictions(alt.name, alt.ingredients, dietaryPreferences, avoidFoods)}
             loggedEvents={loggedBySlot[slot] ?? []}
@@ -818,6 +824,7 @@ function MealSlotRow({
   onSwap,
   onUndoSwap,
   onRegenerate,
+  onMakeOneNew,
   onFindMore,
   checkAlternative,
   loggedEvents,
@@ -864,6 +871,7 @@ function MealSlotRow({
   onSwap: (slot: MealSlotName, chooseName: string) => Promise<boolean | void>
   onUndoSwap?: (slot: MealSlotName) => Promise<boolean>
   onRegenerate: (slot: MealSlotName) => Promise<void>
+  onMakeOneNew?: (slot: MealSlotName) => Promise<{ option: PoolOption } | { error: string }>
   onFindMore?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   /**
    * The swap panel's own restriction re-check. The CHOSEN meal has been
@@ -981,11 +989,12 @@ function MealSlotRow({
     setSwapUndo(null)
     setSwapNote(['Put back as it was'])
   }
-  const handleChoose = async (name: string) => {
+  const handleChoose = (name: string) => swapTo(name, alternatives.find(o => o.name === name))
+  /** Swaps this meal to `name`: the trial first (what else moves), then the write, then the line and its Undo. */
+  const swapTo = async (name: string, picked: PoolOption | undefined) => {
     setBusy(true)
     const from = option?.name ?? null
     try {
-      const picked = alternatives.find(o => o.name === name)
       const trial = picked && dayMove?.knockOn && date
         // `true`: picked is ALREADY one of the meal's options, pinned as the real swap pins it (the coach's swap trial
         // passes the same). Without it the trial added a tagged copy, which re-planned the day, and the sheet named a
@@ -1026,13 +1035,23 @@ function MealSlotRow({
     }
   }
 
+  // ONLY THIS MEAL (his ruling 10 Nov 2026, over a warning first and over leaving it): Regenerate used to rebuild the
+  // meal's whole list of options, and the week's menu is drawn from that list, so other days' meals changed with no
+  // word. Now one new dish is made for today and the meal is SWAPPED to it, down the swap's own road: the same trial,
+  // the same line under the meal, the same Undo, and the day's other dishes kept.
   const handleRegenerate = async () => {
-    setBusy(true)
-    try {
-      await onRegenerate(slot)
-    } finally {
-      setBusy(false)
+    if (!onMakeOneNew) {
+      setBusy(true)
+      try { await onRegenerate(slot) } finally { setBusy(false) }
+      return
     }
+    setBusy(true)
+    let made: { option: PoolOption } | { error: string }
+    try { made = await onMakeOneNew(slot) } catch { made = { error: "I couldn't make a new one just now. Yours is as it was." } } finally { setBusy(false) }
+    // NOTHING MADE: said here, in the meal's own sheet, where the tap was. The page's error line is behind the sheet,
+    // and a tap that changes nothing and says nothing in view reads as a dead button (read off a screenshot).
+    if ('error' in made) { setTab('recipe'); setSwapUndo(null); setSwapNote([made.error]); return }
+    await swapTo(made.option.name, made.option)
   }
 
   const blocked = restriction != null && !restriction.ok

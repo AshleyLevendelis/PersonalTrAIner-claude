@@ -317,6 +317,99 @@ async function main() {
     check('...and the old meals cannot be tapped meanwhile', /inert=\{regeneratingAll\}/.test(mealPlan))
   }
 
+  // ---------------------------------------------------------------------------
+  // HIS RULING, 10 Nov 2026, "Only that meal" (over a warning before re-planning the week, and over leaving it).
+  // "Regenerate" on a meal rebuilt that meal's whole list ([3] above, kept for a meal with no options at all), and
+  // the week's menu is drawn from the list, so other days moved with no word. The row now asks for ONE new dish made
+  // for one day and swaps to it down the swap's own road.
+  console.log('\n[6] Regenerate on one meal: one new dish, made for one day, and nothing else touched')
+  {
+    const { poolsServedOn } = await import('../src/lib/meal-rotation')
+    type One = { option: Opt } | { error: string }
+    const one = async (c: unknown, slot: Slot): Promise<One | null> => {
+      const fn = (actions as unknown as Record<string, (...a: unknown[]) => Promise<One>> | null)?.makeOneNewMeal
+      if (typeof fn !== 'function') return null
+      try { return await fn(c, slot) } catch (err) { console.error(`  (makeOneNewMeal threw: ${String(err).slice(0, 200)})`); return null }
+    }
+    const realGenerate = (await import('../src/lib/meal-generation')).generateMealPools
+    const writerOnly = <T extends { generation: object }>(c: T) => ({ ...c, generation: { ...c.generation, library: false as const } })
+    {
+      const { screen, ctx } = fresh({ dinner: 'Rice pot' })
+      model()
+      const before = await getPools(P)
+      const asked: Record<string, unknown>[] = []
+      const callsBefore = calls
+      const got = await one({ ...writerOnly(ctx()), generate: async (params: Parameters<typeof realGenerate>[0]) => { asked.push(params as never); return realGenerate(params) } }, 'lunch')
+      const stored = await getPools(P)
+      const made = got && 'option' in got ? got.option : null
+      check('a new lunch comes back', !!made && /^Fresh lunch plate/.test(made.name), got)
+      check('...the generator was asked to ADD one dish to that meal, made for one day', asked.length >= 1 && asked.every(a => a.appendToExisting === true && a.madeForOneDay === true && a.poolSize === 1 && JSON.stringify(a.onlySlots) === '["lunch"]'), asked.map(a => ({ append: a.appendToExisting, one: a.madeForOneDay, n: a.poolSize, slots: a.onlySlots })))
+      check('...the meal writer really was asked', calls > callsBefore, { callsBefore, calls })
+      check('NOTHING THE PLAN HELD WAS DELETED (the old button deleted the meal\'s list)', (Object.keys(before) as Slot[]).every(sl => (before[sl] ?? []).every(o => (stored[sl] ?? []).some(x => x.name === o.name))), { before: namesOf(before), stored: namesOf(stored) })
+      check('...exactly one dish was added, to that meal only', (stored.lunch ?? []).length === (before.lunch ?? []).length + 1 && (stored.breakfast ?? []).length === (before.breakfast ?? []).length && (stored.dinner ?? []).length === (before.dinner ?? []).length, namesOf(stored))
+      const row = db.meal_plan_slots.find(r => r.name === made?.name)
+      check('...stored as made for one day', Array.isArray(row?.tags) && (row!.tags as string[]).includes('pin-only'), row?.tags)
+      const days = [today, '2026-03-05', '2026-03-09', '2026-04-20']
+      check('NO DAY\'S SEARCH CAN FIND IT: on every date the meals to choose from are the ones they were', days.every(dt => JSON.stringify(namesOf(poolsServedOn(stored, dt) as Pools)) === JSON.stringify(namesOf(before))), days.map(dt => namesOf(poolsServedOn(stored, dt) as Pools).lunch))
+      check('the screen holds what storage holds', JSON.stringify(namesOf(screen.pools)) === JSON.stringify(namesOf(stored)), namesOf(screen.pools))
+      check('NO PICK IS WRITTEN HERE: the swap does that, with its own trial and Undo', JSON.stringify(storedPicks()) === JSON.stringify({ dinner: 'Rice pot' }) && JSON.stringify(screen.picks) === JSON.stringify({ dinner: 'Rice pot' }), { stored: storedPicks(), screen: screen.picks })
+      check('the working state went on, then off, and nothing is on the page\'s error line', screen.generating[0] === true && screen.generating[screen.generating.length - 1] === false && screen.error === null, { generating: screen.generating, error: screen.error })
+      const swapped = made ? await (actions as unknown as { swapMealSlot: (c: unknown, s: Slot, n: string) => Promise<boolean> }).swapMealSlot(ctx(), 'lunch', made.name) : false
+      check('the swap then makes it today\'s lunch, and saves the pick', swapped === true && storedPicks().lunch === made?.name && screen.picks.lunch === made?.name, { swapped, picks: storedPicks() })
+      check('...leaving the other pick alone', storedPicks().dinner === 'Rice pot', storedPicks())
+    }
+    {
+      // Our own library first: no model call when it has a dish.
+      const { ctx } = fresh({})
+      model('down')
+      const callsBefore = calls
+      const got = await one(ctx(), 'dinner')
+      const made = got && 'option' in got ? got.option : null
+      check('our own library is used first: a new dinner with the meal writer unreachable', !!made && !/^Fresh /.test(made.name) && calls === callsBefore, { got, calls: calls - callsBefore })
+      check('...also stored as made for one day', (db.meal_plan_slots.find(r => r.name === made?.name)?.tags as string[] | undefined)?.includes('pin-only') === true)
+    }
+    {
+      // The library has nothing new: the writer is asked for one.
+      const { ctx } = fresh({})
+      model()
+      const c = ctx()
+      const callsBefore = calls
+      const got = await one({ ...c, generation: { ...c.generation, library: [] } }, 'dinner')
+      check('when the library has nothing new, the meal writer is asked for one', !!got && 'option' in got && /^Fresh dinner plate/.test(got.option.name) && calls > callsBefore, got)
+    }
+    {
+      const { screen, ctx } = fresh({ lunch: 'Rice and greens' })
+      model('none')
+      const before = JSON.stringify(db.meal_plan_slots)
+      const got = await one(writerOnly(ctx()), 'lunch')
+      check('nothing fits: it says so, as a reason for the meal\'s own sheet', !!got && 'error' in got && /couldn't fit a new lunch to your numbers/i.test(got.error) && /Yours is as it was/.test(got.error), got)
+      check('...and nothing was stored, deleted or picked', JSON.stringify(db.meal_plan_slots) === before && storedPicks().lunch === 'Rice and greens' && screen.picks.lunch === 'Rice and greens', storedPicks())
+      check('...and the working state still went off', screen.generating[screen.generating.length - 1] === false, screen.generating)
+    }
+    {
+      const { ctx } = fresh({})
+      model('down')
+      const before = JSON.stringify(db.meal_plan_slots)
+      const got = await one(writerOnly(ctx()), 'lunch')
+      check('the meal writer unreachable: "try again", and nothing changed', !!got && 'error' in got && /couldn't make a new lunch/i.test(got.error) && /Try again in a moment/.test(got.error) && JSON.stringify(db.meal_plan_slots) === before, got)
+    }
+    {
+      const { screen, ctx } = fresh({})
+      model()
+      const c = ctx()
+      const got = await one({ ...c, generation: { ...c.generation, dietaryPreferences: ['zorb-free'], library: false as const } }, 'lunch')
+      check('a restriction the app cannot check: no dish, the reason names Profile, and the page is told', !!got && 'error' in got && /zorb-free/.test(got.error) && /Profile/.test(got.error) && JSON.stringify(screen.unrecognised) === '["zorb-free"]', { got, unrecognised: screen.unrecognised })
+    }
+    const mealPlan = read('src/components/MealPlan.tsx')
+    const handler = mealPlan.slice(mealPlan.indexOf('const handleRegenerate = async'), mealPlan.indexOf('const blocked = '))
+    check('the row\'s Regenerate makes one dish and SWAPS to it (the swap\'s trial, line and Undo)', /made = await onMakeOneNew\(slot\)/.test(handler) && /await swapTo\(made\.option\.name, made\.option\)/.test(handler), handler.slice(0, 300))
+    check('...and a dish that could not be made is said in the meal\'s own sheet, with no Undo', /if \('error' in made\) \{ setTab\('recipe'\); setSwapUndo\(null\); setSwapNote\(\[made\.error\]\); return \}/.test(handler))
+    check('...only today: another day\'s row is not handed it', /onMakeOneNew=\{upcoming \? undefined : onMakeOneNew\}/.test(mealPlan))
+    check('a meal with NO options still builds its list the old way (there is nothing else to disturb)', /<EmptySlotRow key=\{slot\} slot=\{slot\} isGenerating=\{isGenerating\} onRegenerate=\{onRegenerateSlot\} \/>/.test(mealPlan))
+    const hook = read('src/hooks/useMealPlanActions.ts')
+    check('the hook hands it out, and App and the harness page pass it to the Nutrition tab', /makeOneNewMeal\(ctx, slot\)/.test(hook) && /onMakeOneNewMeal=\{mealActions\.makeOneNew\}/.test(read('src/App.tsx')) && /onMakeOneNewMeal=\{REGEN \? mealActions\.makeOneNew : undefined\}/.test(read('.tour-harness/real.tsx')))
+  }
+
   globalThis.fetch = realFetch
   console.log(`\n${ran} checks ran.`)
   if (failed > 0) { console.error(`${failed} check(s) failed\n`); process.exit(1) }

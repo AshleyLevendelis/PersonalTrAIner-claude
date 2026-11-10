@@ -1173,6 +1173,9 @@ const DAYMOVE = new URLSearchParams(location.search).get('daymove') === '1'
 // between the tap and the screen — the generator's verification, what storage
 // keeps, the read back, the picks — is the app's own.
 const REGEN = new URLSearchParams(location.search).get('regen') === '1'
+// ?nolibrary=1: INPUT only. The app's own dishes are not used, so every new dish must come from the meal writer
+// (which ?topupfail=1 makes fail): the one way a driver can reach "no new dish could be made".
+const NO_LIBRARY = new URLSearchParams(location.search).get('nolibrary') === '1'
 const REGEN_WAIT_MS = Number(new URLSearchParams(location.search).get('regenwait') ?? '0')
 const NO_PINS = {}
 if (TOPUP || REGEN) {
@@ -1480,7 +1483,7 @@ function Harness() {
     pools: livePools as never,
     picks: dayMovePicks as never,
     showingName: slot => (mealDays.today?.day.chosen as Record<string, PoolOption> | undefined)?.[slot]?.name,
-    generation: driftedMacros ? { profileId: PROFILE_ID, targets: driftedMacros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: mealShape.mealsPerDay, includeSnacks: mealShape.includeSnacks } : null,
+    generation: driftedMacros ? { profileId: PROFILE_ID, targets: driftedMacros, dietaryPreferences: profile.dietary_preferences, mealsPerDay: mealShape.mealsPerDay, includeSnacks: mealShape.includeSnacks, ...(NO_LIBRARY ? { library: false as const } : {}) } : null,
     slotLabel: MEAL_SLOT_LABEL,
     setPools: setLivePools as never,
     setPicks: setDayMovePicks as never,
@@ -1783,7 +1786,7 @@ function Harness() {
             onSwapMealSlot={REGEN ? mealActions.swap : noop} onUndoMealSwap={REGEN ? mealActions.undoSwap : undefined}
             // ?ate=1: a "More options" route, so every meal's sheet CAN offer a swap and the eaten one's having none is
             // the app's rule, not a pool with nothing else in it (whole-app QA walk, 7 Nov 2026). Finds nothing.
-            onFindMoreOptions={ATE ? async () => ({ added: [] }) : undefined} onRegenerateMealSlot={REGEN ? mealActions.regenerateSlot : noop} onRegenerateAllMeals={REGEN ? mealActions.regenerateAll : noop}
+            onFindMoreOptions={ATE ? async () => ({ added: [] }) : undefined} onRegenerateMealSlot={REGEN ? mealActions.regenerateSlot : noop} onMakeOneNewMeal={REGEN ? mealActions.makeOneNew : undefined} onRegenerateAllMeals={REGEN ? mealActions.regenerateAll : noop}
             mealTopUp={topUpShown} mealTopUpBusy={topUpBusy} mealTopUpNote={topUpNote}
             onMealTopUp={(startTomorrow?: boolean) => { void handleTopUp(startTomorrow) }}
             mealTopUpStart={topUpStart}

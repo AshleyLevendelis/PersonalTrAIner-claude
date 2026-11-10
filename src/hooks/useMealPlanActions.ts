@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { swapMealSlot, unswapMealSlot, regenerateMealSlot, regenerateAllMeals, type MealPlanActionContext } from '@/lib/meal-plan-actions'
+import { swapMealSlot, unswapMealSlot, regenerateMealSlot, makeOneNewMeal, regenerateAllMeals, type MealPlanActionContext } from '@/lib/meal-plan-actions'
 import type { MealSlotName } from '@/lib/meal-store'
 
 // ---------------------------------------------------------------------------
@@ -51,6 +51,11 @@ export function useMealPlanActions(input: MealPlanActionsInput) {
     regenerateSlot: async (slot: MealSlotName) => {
       const ctx = context()
       if (ctx) await regenerateMealSlot(ctx, slot)
+    },
+    /** One new dish for today's meal, stored and handed back for the row to swap to (his "Only that meal"). */
+    makeOneNew: async (slot: MealSlotName) => {
+      const ctx = context()
+      return ctx ? makeOneNewMeal(ctx, slot) : { error: "I couldn't make a new one just now. Yours is as it was." }
     },
     regenerateAll: async () => {
       const ctx = context()

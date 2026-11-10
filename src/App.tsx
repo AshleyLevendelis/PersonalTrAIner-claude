@@ -3357,6 +3357,7 @@ function App() {
               onUndoMealSwap={mealActions.undoSwap}
               onMealPickApplied={handleMealPickApplied}
               onRegenerateMealSlot={handleRegenerateMealSlot}
+              onMakeOneNewMeal={mealActions.makeOneNew}
               onFindMoreOptions={handleFindMoreMealOptions}
               onRegenerateAllMeals={handleRegenerateAllMeals}
               mealsRegeneratingAll={mealActions.regeneratingAll}

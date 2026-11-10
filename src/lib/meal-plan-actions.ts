@@ -181,6 +181,56 @@ export async function regenerateMealSlot(ctx: MealPlanActionContext, slot: MealS
   }
 }
 
+/**
+ * ONE NEW DISH FOR ONE MEAL, TODAY — his ruling, 10 Nov 2026, "Only that meal" (over a warning before re-planning the
+ * week, and over leaving it). "Regenerate" on a meal used to rebuild that meal's whole list of options
+ * (regenerateMealSlot, above), and the week's menu is drawn from that list: every other day's lunch changed, and
+ * other meals moved to fit, with no word. He tapped one meal.
+ *
+ * So this ADDS one dish, made for one day (pin-only: no day's search can find it), and hands it back for the caller
+ * to swap today's meal to, through the swap's own road: its trial, its pick, its Undo, and the day's other dishes held
+ * around the pin (hold-around-pins.ts). Nothing here writes a pick. The dish he regenerated away from stays one of
+ * the plan's own and can come round again; he asked for a different meal today, not never to see it.
+ *
+ * Our own library first (a dish there is proved to land a day), then the meal writer for one when the library has
+ * nothing new. When no dish could be made, the reason comes back as `error` for the meal's own sheet to say, where
+ * the tap was (the page's error line sits behind an open sheet), and nothing has changed.
+ */
+export async function makeOneNewMeal(ctx: MealPlanActionContext, slot: MealSlotName): Promise<{ option: PoolOption } | { error: string }> {
+  const label = ctx.slotLabel[slot].toLowerCase()
+  const notNow = `${couldNot(`make a new ${label}`)} Yours is as it was. Try again in a moment.`
+  if (!ctx.generation) return { error: notNow }
+  ctx.setGenerating(true)
+  try {
+    const generate = ctx.generate ?? generateMealPools
+    const ask = (writerOnly: boolean) => generate({
+      ...ctx.generation!, onlySlots: [slot], appendToExisting: true, madeForOneDay: true, poolSize: 1,
+      ...(writerOnly ? { library: false as const } : {}),
+    })
+    let result = await ask(false)
+    if (result.unrecognisedPreferences.length === 0 && (result.accepted[slot]?.length ?? 0) === 0) result = await ask(true)
+    if (result.unrecognisedPreferences.length > 0) {
+      ctx.setUnrecognised(result.unrecognisedPreferences)
+      return { error: `I can't check a new ${label} against "${result.unrecognisedPreferences.join('", "')}". That needs fixing in Profile first.` }
+    }
+    ctx.setUnrecognised(null)
+    const made = result.accepted[slot]?.[0]
+    if (!made) {
+      return { error: result.generatorReached
+        ? `${couldNot(`fit a new ${label} to your numbers`)} Yours is as it was. Loosening a restriction or widening your calorie range would give me more to work with.`
+        : notNow }
+    }
+    // READ BACK, as the other two handlers do: the screen holds what storage holds.
+    const stored = await readBack(ctx.profileId)
+    ctx.setPools(prev => stored ?? ({ ...prev, [slot]: [...(prev[slot] ?? []), made] }))
+    return { option: stored?.[slot]?.find(o => o.name === made.name) ?? made }
+  } catch {
+    return { error: notNow }
+  } finally {
+    ctx.setGenerating(false)
+  }
+}
+
 export async function regenerateAllMeals(ctx: MealPlanActionContext): Promise<void> {
   if (!ctx.generation) return
   ctx.setGenerating(true)

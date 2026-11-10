@@ -39,8 +39,11 @@ const PLAIN = ['150g grilled calamari', '150g plain calamari', '150g boiled cala
 for (const line of PLAIN) check(`"${line}" is plain squid`, found(line) === 'squid', found(line))
 const COATED = ['150g fried calamari', '150g breaded calamari', '150g battered calamari', '150g crispy calamari', '150g pan-fried calamari', '150g salt and pepper calamari', '150g calamari rings, breaded', '150g breaded squid']
 for (const line of COATED) check(`"${line}" is the fried, floured entry`, found(line) === 'calamari fried', found(line))
-const squid = lookupIngredient('squid')!
-const fried = lookupIngredient('fried calamari')!
+// NULL-SAFE (mutation c2, 10 Nov 2026): with "fried" no longer read as coated this lookup is null, and a bare `!`
+// threw before a single check ran, which a mutation harness rightly calls a crash, not a catch.
+const NO_ENTRY = { name: '(not found)', tags: {} as Record<string, boolean | undefined> }
+const squid = lookupIngredient('squid') ?? NO_ENTRY
+const fried = lookupIngredient('fried calamari') ?? NO_ENTRY
 check('the two kinds are both shellfish, and differ on gluten (the reason the kind is asked)', squid.tags.contains_shellfish === true && fried.tags.contains_shellfish === true && !squid.tags.contains_gluten && fried.tags.contains_gluten === true, { squid: squid.tags, fried: fried.tags })
 check('every tag plain squid carries, the fried one carries too: "true of every kind" is squid\'s own tags', Object.entries(squid.tags).every(([k, v]) => !v || (fried.tags as Record<string, boolean | undefined>)[k] === true), { squid: squid.tags, fried: fried.tags })
 const m = computeMealMacros(['150g calamari', '70g dry basmati rice'].map(parseIngredientLine))
@@ -71,7 +74,7 @@ check('gluten-free with the kind said: grilled passes, fried is a definite "cont
 check('an ordinary unknown food is still refused for EVERY restriction (the fail-closed rule is untouched)', (() => { const v = validateMealAgainstDiet(dish('150g zorblefruit'), ['nut-free', 'gluten-free']); return !v.ok && v.violations.length === 2 && v.violations.every(x => x.unidentified === true) })())
 check('kindsItCouldBe names two kinds for the bare word and none otherwise', kindsItCouldBe('calamari')?.map(k => k.name).join() === 'squid,calamari fried' && kindsItCouldBe('grilled calamari') === null && kindsItCouldBe('squid') === null && kindsItCouldBe('chicken breast') === null, kindsItCouldBe('calamari')?.map(k => k.name))
 // The premise, for every restriction the app has: no restriction is broken by plain squid and NOT by the fried one.
-const worse = Object.keys(FORBIDDEN_TAGS).filter(p => FORBIDDEN_TAGS[p as keyof typeof FORBIDDEN_TAGS].some(t => squid.tags[t]) && !FORBIDDEN_TAGS[p as keyof typeof FORBIDDEN_TAGS].some(t => fried.tags[t]))
+const worse = Object.keys(FORBIDDEN_TAGS).filter(p => FORBIDDEN_TAGS[p as keyof typeof FORBIDDEN_TAGS].some(t => (squid.tags as Record<string, boolean | undefined>)[t]) && !FORBIDDEN_TAGS[p as keyof typeof FORBIDDEN_TAGS].some(t => (fried.tags as Record<string, boolean | undefined>)[t]))
 check('no restriction is broken by plain squid and not by fried: "breaded" is always the stricter answer', worse.length === 0, worse)
 
 console.log('\n4. Said in the chat: the shellfish block is kept, and the kind is asked off his words')
