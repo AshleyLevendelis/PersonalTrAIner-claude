@@ -2,6 +2,7 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
+import { assetManifest } from '../vite-asset-manifest'
 const repo = path.resolve(__dirname, '..')
 export default defineConfig({
   // Root is the REPO, not this folder. Tailwind v4 auto-detects its sources
@@ -10,7 +11,8 @@ export default defineConfig({
   // the overlay rendered unpositioned. The harness has to be built the way the
   // app is or its verdict is about the harness.
   root: repo,
-  plugins: [react(), tailwindcss()],
+  // The app's own list of built files (vite-asset-manifest.ts), so verify:gym-offline can run the real service worker.
+  plugins: [react(), tailwindcss(), assetManifest()],
   resolve: { alias: { '@': path.resolve(repo, 'src') } },
   build: {
     outDir: path.resolve(__dirname, 'dist'),

@@ -688,7 +688,30 @@ export function deleteSet(params: {
 // Session resolution (Part 5 — auto-create today's workout_sessions row)
 // ---------------------------------------------------------------------------
 
-export async function ensureSessionSynced(
+/** One resolve per (person, date) at a time: see ensureSessionSynced. */
+const sessionResolves = new Map<string, Promise<string>>()
+
+/**
+ * ONE ASK AT A TIME FOR A DAY'S SESSION ROW (10 Nov 2026). The moment a phone gets its signal back, the set queue and
+ * a finish that could not be saved both come here for the same date. Each read "no row yet" and each inserted one;
+ * the database's one-session-a-day rule refuses the second and the loser re-reads, which is correct and costs two
+ * wasted requests on the weakest connection of the day. Callers for the same day now share the first one's answer.
+ */
+export function ensureSessionSynced(
+  userId: string,
+  date: string,
+  splitType: string = 'training',
+  known?: { startedAt: string; weekNumber: number; day: string },
+): Promise<string> {
+  const key = `${userId}|${date}`
+  const running = sessionResolves.get(key)
+  if (running) return running
+  const mine = resolveSessionRow(userId, date, splitType, known).finally(() => { sessionResolves.delete(key) })
+  sessionResolves.set(key, mine)
+  return mine
+}
+
+async function resolveSessionRow(
   userId: string,
   date: string,
   splitType: string = 'training',
@@ -1215,6 +1238,19 @@ export interface SetsForDateRead {
 export function getLocalSetsForDate(userId: string, date: string): { rows: ExerciseSetLog[]; lastKnown: boolean } {
   const day = loadLastKnown()[dayKey(userId, date)]
   return { rows: localViewForDate(userId, date, day?.rows ?? []), lastKnown: !!day?.complete }
+}
+
+/**
+ * A day's sets for a reader that holds its own server rows (the WEEK read), with this phone's unsent work on top:
+ * the view the session screen draws, so the week's count and the card's cannot disagree (Ashley, 10 Nov 2026, a gym
+ * with no signal: the card said 18 of 18 while the week said 0/68 and "Done · 0 of 18 sets"). `serverRows` null means
+ * the read failed: the phone's last full answer for the day stands in, or `fallbackRows` when it never had one.
+ * Refused sets are left out, as getSetsForDate leaves them out: a count is of what was saved.
+ */
+export function weekViewForDate(userId: string, date: string, serverRows: ExerciseSetLog[] | null, fallbackRows: ExerciseSetLog[] = []): ExerciseSetLog[] {
+  if (serverRows) return localViewForDate(userId, date, serverRows, false)
+  const day = loadLastKnown()[dayKey(userId, date)]
+  return localViewForDate(userId, date, day?.complete ? day.rows : fallbackRows, false)
 }
 
 /**

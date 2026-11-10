@@ -226,6 +226,16 @@ export function makeFakeSupabase(db: Db, opts: { session?: { user: { id: string;
           }
         }
       }
+      // ONE SESSION A DAY, AS POSTGRES HAS IT (unique_profile_date_session, 10 Nov 2026). Without it two writers that
+      // both found no row for a date (the set queue and a finish retried as the signal came back) each inserted one,
+      // and every later `.maybeSingle()` on that day failed for good: a duplicate the real database refuses.
+      if (name === 'workout_sessions' && op === 'insert') {
+        for (const raw of payload) {
+          if (rows0.some(r => r.profile_id === raw.profile_id && r.date === raw.date)) {
+            return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "unique_profile_date_session"', details: null, hint: null } }
+          }
+        }
+      }
       if (op === 'insert' || op === 'upsert') {
         // RETURN THE STORED ROWS, not the payload. The payload has no `id` —
         // Postgres generates it — so returning it made `.insert().select()

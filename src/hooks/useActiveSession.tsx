@@ -201,6 +201,10 @@ export interface ActiveSessionProviderProps {
  * every tab and the chat composer rides above it, so a prompt nobody
  * dismissed is a chat box permanently pushed up the screen.
  */
+/** How often a session finished offline knocks again while the app stays open (its close is one small write). */
+const UNCLOSED_RETRY_MS = 20_000
+/** Fired on the window when a session finished offline has been marked finished on the server. */
+export const SESSION_CLOSE_SYNCED_EVENT = 'session-close-synced'
 export const REST_OVERRUN_GRACE_MS = 5 * 60 * 1000
 
 /**
@@ -692,6 +696,8 @@ export function ActiveSessionProvider({
     }
     const fresh = getActiveSessionRecord(profileId, record.date)
     if (fresh) saveActiveSessionRecord({ ...fresh, serverCloseFailedAt: undefined })
+    // Said once, for the one line on screen that claimed otherwise: the summary's "hasn't synced yet" (10 Nov 2026).
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(SESSION_CLOSE_SYNCED_EVENT))
   }, [])
 
   // Auto-close a stale "running" session left open past D7's 6h grace
@@ -741,10 +747,22 @@ export function ActiveSessionProvider({
     document.addEventListener('visibilitychange', handler)
     window.addEventListener('focus', handler)
     window.addEventListener('pageshow', handler)
+    // AND WHEN THE SIGNAL COMES BACK WITH THE APP STILL OPEN (Ashley, 10 Nov 2026, a gym with no Wi-Fi). A session
+    // finished offline was only ever closed on the next open or return to the app: walk out of the gym with the
+    // screen on and the sets synced while the day stayed "not finished" for as long as the app stayed in front.
+    // The phone's own "online" event, plus a slow knock while a close is owed, because a connection can come back
+    // without that event ever firing (sets-reconnect's whole subject).
+    const retryOnly = () => { void retryUnclosedSession(profileId) }
+    window.addEventListener('online', retryOnly)
+    const knock = window.setInterval(() => {
+      if (getMostRecentActiveSessionRecord(profileId)?.serverCloseFailedAt) retryOnly()
+    }, UNCLOSED_RETRY_MS)
     return () => {
       document.removeEventListener('visibilitychange', handler)
       window.removeEventListener('focus', handler)
       window.removeEventListener('pageshow', handler)
+      window.removeEventListener('online', retryOnly)
+      window.clearInterval(knock)
     }
   }, [identity.profileId, identity.date, resolveStaleSession, retryUnclosedSession])
 

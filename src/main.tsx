@@ -47,5 +47,14 @@ createRoot(document.getElementById('root')!).render(
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
+    // SAVE THE WHOLE APP TO THE PHONE once the page is idle (10 Nov 2026, a gym with no Wi-Fi): the worker fetches
+    // every file this version is made of, so a sheet never opened at home still opens with no signal. Asked on
+    // every open, because the worker file itself does not change with a release; it skips what it already holds.
+    void navigator.serviceWorker.ready.then(registration => {
+      const ask = () => registration.active?.postMessage('warm-assets')
+      const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }
+      if (w.requestIdleCallback) w.requestIdleCallback(ask, { timeout: 6000 })
+      else setTimeout(ask, 3000)
+    }).catch(() => {})
   })
 }

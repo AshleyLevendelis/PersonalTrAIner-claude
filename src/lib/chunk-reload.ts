@@ -20,6 +20,7 @@
 // ---------------------------------------------------------------------------
 
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
+import { partNotLoaded } from '@/components/PartNotLoaded'
 
 /** A reload for this reason within this long of the last one is refused (a broken deploy, not an old page). */
 export const RELOAD_GUARD_MS = 20_000
@@ -41,6 +42,9 @@ export function isChunkLoadError(error: unknown): boolean {
  * a reload was started. Storage that cannot be read refuses the reload: without the stamp there is no loop guard.
  */
 export function reloadOnce(now: number = Date.now()): boolean {
+  // NEVER WITH NO SIGNAL (Ashley, 10 Nov 2026, a gym with no Wi-Fi): a reload is the cure for an out-of-date page,
+  // and offline it cures nothing. It restarts the app mid-workout, and the second miss used to be the crash screen.
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return false
   try {
     const last = Number(window.sessionStorage.getItem(STAMP_KEY) ?? 0)
     if (Number.isFinite(last) && last > 0 && now - last < RELOAD_GUARD_MS) return false
@@ -54,7 +58,9 @@ export function reloadOnce(now: number = Date.now()): boolean {
 
 /**
  * React.lazy, plus: when the file is gone because a new version went live, reload once and keep the screen's
- * Suspense fallback up meanwhile (a promise that never settles), instead of throwing into the error screen.
+ * Suspense fallback up meanwhile (a promise that never settles), instead of throwing into the error screen. When
+ * the file cannot be fetched and a reload would not help (offline, or just tried), the part draws a one-line
+ * notice in its own place (PartNotLoaded) and the screen around it carries on.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the same constraint React.lazy itself uses
 export function lazyWithReload<T extends ComponentType<any>>(
@@ -62,6 +68,9 @@ export function lazyWithReload<T extends ComponentType<any>>(
 ): LazyExoticComponent<T> {
   return lazy(() => factory().catch((error: unknown) => {
     if (isChunkLoadError(error) && reloadOnce()) return new Promise<{ default: T }>(() => {})
+    // No reload to be had (no signal, or one was just tried): the part says it is not on the phone, in its own
+    // place, and the rest of the screen keeps working. It loads itself when the connection is back.
+    if (isChunkLoadError(error)) return { default: partNotLoaded(factory, reloadOnce) as unknown as T }
     throw error
   }))
 }

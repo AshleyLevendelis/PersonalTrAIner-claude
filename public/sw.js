@@ -8,9 +8,9 @@
 // error page, because nothing was cached — the careful offline write path had
 // no offline read path in front of it.
 //
-// WHAT THIS DELIBERATELY IS NOT. Not a precache manifest. Vite hashes asset
-// filenames at build time, so a hand-written precache list would either be
-// wrong or need a build plugin to inject. Instead:
+// WHAT THIS DELIBERATELY IS NOT. Not a hand-written precache list. Vite hashes
+// asset filenames at build time, so one would be wrong by the next build.
+// Instead:
 //
 //   - Navigations are NETWORK-FIRST, falling back to the cached shell. Online,
 //     you always get the current index.html, so a deploy is never masked by a
@@ -19,6 +19,15 @@
 //   - Same-origin GET assets are STALE-WHILE-REVALIDATE. Hashed filenames make
 //     this safe: a given URL's bytes never change, so serving the cached copy
 //     while refreshing in the background can't serve stale code.
+//
+//   - THE WHOLE APP IS SAVED TO THE PHONE IN THE BACKGROUND (10 Nov 2026).
+//     Ashley, from a gym with no Wi-Fi: "Something went wrong on this
+//     screen", mid-workout. Caching on fetch saved only the screens already
+//     opened, so a sheet never opened at home did not exist in the gym. The
+//     build now writes the list of its own files (/asset-manifest.json,
+//     vite-asset-manifest.ts) and the page asks for them once it is idle
+//     ("warm-assets"). Files of versions no longer listed are removed, or the
+//     cache would grow by a whole app with every release.
 //
 // WHAT IT MUST NEVER TOUCH. Anything cross-origin, and anything that isn't a
 // GET. That means every Supabase call — the profile, the logs, the coach —
@@ -60,7 +69,58 @@ self.addEventListener('message', event => {
   // Lets the page trigger an immediate takeover after an update is found,
   // rather than waiting for every tab to close.
   if (event.data === 'skip-waiting') self.skipWaiting()
+  // The page is up and idle: save every file of this version to the phone.
+  if (event.data === 'warm-assets') event.waitUntil(warmAssets())
 })
+
+const ASSET_MANIFEST_URL = '/asset-manifest.json'
+const WARM_AT_ONCE = 4
+let warming = null
+
+/**
+ * Fetch every file the build lists that the phone does not hold yet, then
+ * drop the files of versions the list no longer names. One run at a time. Any
+ * failure simply stops: the next open asks again, and what was saved stays.
+ */
+function warmAssets() {
+  if (warming) return warming
+  warming = (async () => {
+    let files
+    try {
+      const response = await fetch(ASSET_MANIFEST_URL, { cache: 'no-store' })
+      if (!response.ok) return
+      files = (await response.json()).files
+    } catch { return }
+    if (!Array.isArray(files) || files.length === 0) return
+    const wanted = new Set(files.filter(f => typeof f === 'string' && f.startsWith('/')))
+    const cache = await caches.open(ASSET_CACHE)
+    const queue = [...wanted]
+    let failed = false
+    const worker = async () => {
+      while (queue.length > 0 && !failed) {
+        const path = queue.shift()
+        try {
+          if (await cache.match(path)) continue
+          const response = await fetch(path)
+          // A real file only. An HTML page answering for a missing script,
+          // saved here, would be served back as that script for ever.
+          const type = response.headers.get('content-type') || ''
+          if (response.ok && response.type === 'basic' && !/text\/html/i.test(type)) await cache.put(path, response)
+        } catch { failed = true }
+      }
+    }
+    await Promise.all(Array.from({ length: WARM_AT_ONCE }, worker))
+    // ONLY ONCE EVERYTHING LISTED IS HELD are older versions' files removed:
+    // a half-saved new version must not cost the old one that still works.
+    if (failed) return
+    for (const path of wanted) { if (!(await cache.match(path))) return }
+    for (const request of await cache.keys()) {
+      const { pathname } = new URL(request.url)
+      if (pathname.startsWith('/assets/') && !wanted.has(pathname)) await cache.delete(request)
+    }
+  })().finally(() => { warming = null })
+  return warming
+}
 
 self.addEventListener('fetch', event => {
   const { request } = event

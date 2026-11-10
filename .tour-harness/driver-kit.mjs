@@ -22,7 +22,7 @@ import { join, extname } from 'path'
 import { spawn } from 'child_process'
 
 const DIST = new URL('./dist/', import.meta.url).pathname
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
+const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json' }
 
 /**
  * @param {{ port: number, page: string, name: string, width?: number, height?: number, mobile?: boolean, timeoutMs?: number }} o
@@ -30,7 +30,12 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
  */
 export async function startDriver(o) {
   const { port, page, name, width = 390, height = 844, mobile = true, timeoutMs = 240_000 } = o
+  // NO NETWORK AT ALL, for the page and for a service worker alike (10 Nov 2026, verify:gym-offline): while `down`,
+  // every request dies on the wire. A page-level "offline" switch leaves a worker's own fetches working, so it cannot
+  // show that a file came from the phone's cache; nothing answering can.
+  let down = false
   const server = createServer((req, res) => {
+    if (down) { req.socket.destroy(); return }
     const p = req.url.split('?')[0]
     const f = join(DIST, p === '/' ? `/.tour-harness/${page}` : p)
     if (!existsSync(f)) { res.writeHead(404); res.end('nf'); return }
@@ -111,5 +116,7 @@ export async function startDriver(o) {
     console.log(`${okSentence}\n`)
     process.exit(0)
   }
-  return { origin, send, ev, shoot, check, until, wait, go, clickAt, finish }
+  /** Take the server away, or bring it back. Loads already in the page are untouched. */
+  const network = up => { down = !up }
+  return { origin, send, ev, shoot, check, until, wait, go, clickAt, finish, network }
 }

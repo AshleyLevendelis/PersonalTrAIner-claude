@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getWeeklyDashboard, getSessionMovesInRange, type WeeklyDashboardDay } from '@/lib/daily-tracking'
 import { subscribeSetLogView } from '@/lib/set-log-store'
+import { weekWithLocalWork } from '@/lib/week-local-work'
 import { sessionForDate, type SessionMove } from '@/lib/session-move'
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { planDaysForDate } from '@/lib/plan-week'
@@ -383,8 +384,11 @@ export function useTrainingWeek(
         return [] as SessionMove[]
       }),
     ])
-      .then(([week, wk]) => { setDashboard(week); setMoves(wk) })
-      .catch(console.error)
+      // WITH THIS PHONE'S OWN WORK ON TOP (week-local-work.ts): sets still waiting to send and a session finished
+      // offline are part of the week the moment they are logged. A read that FAILS no longer leaves the week as it
+      // was before the workout: the phone's own copy is laid over what the screen held.
+      .then(([week, wk]) => { setDashboard(weekWithLocalWork(profileId, week, from, to, true)); setMoves(wk) })
+      .catch(err => { console.error(err); setDashboard(prev => weekWithLocalWork(profileId, prev, from, to, false)) })
       .finally(() => setLoading(false))
     // refreshToken is intentionally a dependency and intentionally unused
     // in the body — it exists to force this callback (and the effect below
@@ -454,7 +458,7 @@ export async function readTrainingWeeks(
   const from = getLocalDateString(lastMonday)
   const to = getLocalDateString(sunday)
   const [dashboard, readMoves] = await Promise.all([
-    getWeeklyDashboard(profileId, from, to),
+    getWeeklyDashboard(profileId, from, to).then(week => weekWithLocalWork(profileId, week, from, to, true)),
     getSessionMovesInRange(profileId, from, to).catch(() => [] as SessionMove[]),
   ])
   const moves = [...readMoves, ...knownMoves.filter(m => !readMoves.some(r => r.fromDate === m.fromDate))]

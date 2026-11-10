@@ -4,7 +4,7 @@ import { sessionSetCount, shortOfPlan } from '@/lib/session-count'
 import { ChevronRight, Clock, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useWakeLock } from '@/hooks/useWakeLock'
-import { useActiveSession } from '@/hooks/useActiveSession'
+import { useActiveSession, SESSION_CLOSE_SYNCED_EVENT } from '@/hooks/useActiveSession'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
 import { useDeadlineTick } from '@/hooks/useDeadlineTick'
 import { exerciseCoachLine } from '@/lib/exercise-coach-line'
@@ -91,7 +91,9 @@ const RemoveExerciseSheet = lazyWithReload(() => import('./RemoveExerciseSheet')
 // Same bargain as the two above: a sheet reached from one button at the foot
 // of the list, carrying the whole exercise catalogue's search with it.
 const AddExerciseSheet = lazyWithReload(() => import('./AddExerciseSheet').then(m => ({ default: m.AddExerciseSheet })))
-const FinishCheckSheet = lazyWithReload(() => import('./FinishCheckSheet').then(m => ({ default: m.FinishCheckSheet })))
+// PART OF THE SCREEN, NOT A FILE FETCHED ON THE TAP (10 Nov 2026, a gym with no signal): this is the one sheet between
+// "Finish session" and a session finished short, and 1.3 kB. A finish must never wait on the network.
+import { FinishCheckSheet } from './FinishCheckSheet'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove, setMarkedMissed, setDeliberateRest } from '@/lib/daily-tracking'
 import { missedDayView, runItLabel } from '@/lib/missed-day'
@@ -250,6 +252,12 @@ export function TodayPanel({
   useEffect(() => { setSummaryData(readSessionSummary(profileId, today)) }, [profileId, today])
   const [summaryNothingLogged, setSummaryNothingLogged] = useState(false)
   const [summaryCloseFailed, setSummaryCloseFailed] = useState(false)
+  // The finish reached the server after all (the signal came back): the summary stops saying it has not.
+  useEffect(() => {
+    const synced = () => setSummaryCloseFailed(false)
+    window.addEventListener(SESSION_CLOSE_SYNCED_EVENT, synced)
+    return () => window.removeEventListener(SESSION_CLOSE_SYNCED_EVENT, synced)
+  }, [])
   const [summarySavedCardio, setSummarySavedCardio] = useState<string[]>([])
 
   // THE QUESTION BEFORE FINISHING (M12). Finish ended the session on one tap,
