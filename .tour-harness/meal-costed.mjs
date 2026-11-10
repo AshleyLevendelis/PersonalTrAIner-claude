@@ -116,7 +116,8 @@ const dinnerLines = await lineTexts()
 const chick = (dinnerLines ?? []).find(l => /raw chicken breast/.test(l.text))
 const cous = (dinnerLines ?? []).find(l => /dry couscous/.test(l.text))
 check('4a. a raw line carries its cooked weight beside it: "177g raw chicken breast (about 130g cooked)"', chick?.text.startsWith('177g raw chicken breast (about 130g cooked)') === true, dinnerLines)
-check('4b. ...and a dry one: "53g dry couscous (about 180g cooked)"', cous?.text.startsWith('53g dry couscous (about 180g cooked)') === true, cous)
+// 10 Nov 2026: couscous cooks up 2.5x at home (food-db.ts HOME_YIELD), so 53 g dry is about 130 g cooked (was 180 on USDA's 3.4x).
+check('4b. ...and a dry one: "53g dry couscous (about 130g cooked)"', cous?.text.startsWith('53g dry couscous (about 130g cooked)') === true, cous)
 check('4c. the hint is drawn beside the line, never part of the line the edit builders are handed', !!chick && chick.row === '177g raw chicken breast' && !/cooked/.test(chick.row ?? ''), chick)
 check('4d. a food with no cooked twin has no hint (tzatziki, olive oil)', (dinnerLines ?? []).filter(l => /tzatziki|olive oil/.test(l.text)).length === 2 && (dinnerLines ?? []).filter(l => /tzatziki|olive oil/.test(l.text)).every(l => l.hint === null), dinnerLines)
 // Close the dinner, open the lunch.
@@ -127,7 +128,8 @@ await wait(700)
 const lunchLines = await lineTexts()
 await shoot('meal-costed-lunch-raw-dry')
 check('5a. a lunch stored cooked reads raw: "250g raw chicken breast (about 180g cooked)"', (lunchLines ?? []).some(l => l.text.startsWith('250g raw chicken breast (about 180g cooked)')), lunchLines)
-check('5b. ...and dry: "40g dry basmati rice (about 120g cooked)"', (lunchLines ?? []).some(l => l.text.startsWith('40g dry basmati rice (about 120g cooked)')), lunchLines)
+// 10 Nov 2026: basmati 2.7x at home, so the stored 120 g cooked is 45 g dry (was 40 on USDA's 3.1x), and it reads back as 120.
+check('5b. ...and dry: "45g dry basmati rice (about 120g cooked)"', (lunchLines ?? []).some(l => l.text.startsWith('45g dry basmati rice (about 120g cooked)')), lunchLines)
 check('5c. no line on it is still written cooked', (lunchLines ?? []).length === 2 && !(lunchLines ?? []).some(l => /^\d+g (chicken breast|basmati rice)\b/.test(l.row ?? '')), lunchLines)
 
 console.log(`\n${ran} checks ran, ${failures} failed.`)

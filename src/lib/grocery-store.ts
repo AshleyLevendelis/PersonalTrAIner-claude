@@ -303,11 +303,12 @@ function categoryForEntry(entry: { name: string; category: FoodCategory; tags: {
 export const AS_BOUGHT: Record<string, { name: string; perCooked: number; key?: string }> = {
   'white rice cooked': { name: 'white rice', perCooked: 0.35 },
   'brown rice cooked': { name: 'brown rice', perCooked: 0.33 },
-  'basmati rice cooked': { name: 'basmati rice', perCooked: 0.32 },
+  // 10 Nov 2026: basmati and couscous follow the home cooking yields in food-db.ts (HOME_YIELD), as the card does.
+  'basmati rice cooked': { name: 'basmati rice', perCooked: 0.37 },
   'pasta cooked': { name: 'pasta', perCooked: 0.42 },
   'wholewheat pasta cooked': { name: 'wholewheat pasta', perCooked: 0.4 },
   'gluten free pasta': { name: 'gluten free pasta', perCooked: 0.45 },
-  'couscous cooked': { name: 'couscous', perCooked: 0.3 },
+  'couscous cooked': { name: 'couscous', perCooked: 0.4 },
   'quinoa cooked': { name: 'quinoa', perCooked: 0.33 },
   'egg noodles cooked': { name: 'egg noodles', perCooked: 0.35 },
   'rice noodles cooked': { name: 'rice noodles', perCooked: 0.31 },

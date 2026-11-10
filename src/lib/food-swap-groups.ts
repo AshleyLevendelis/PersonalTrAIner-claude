@@ -40,14 +40,14 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   'white fish': ['cod', 'haddock', 'tilapia', 'sea bass', 'red snapper', 'tuna steak fresh', 'cod raw', 'haddock raw'],
   'oily fish': ['salmon', 'mackerel', 'trout'],
   'tinned and smoked fish': ['tuna canned in water', 'sardines canned', 'smoked salmon'],
-  'shellfish': ['prawns', 'crab meat', 'mussels', 'squid', 'scallops', 'lobster', 'oysters', 'prawns raw'],
+  'shellfish': ['mussels in shell', 'calamari fried', 'prawns', 'crab meat', 'mussels', 'squid', 'scallops', 'lobster', 'oysters', 'prawns raw'],
   'eggs': ['egg', 'egg white'],
   'protein powder': ['whey protein powder', 'vegan protein powder'],
-  'tofu and meat-free pieces': ['tofu firm', 'tofu silken', 'tempeh', 'seitan', 'seitan strips', 'quorn fillet', 'falafel'],
-  'beans and pulses': ['chickpeas', 'lentils red', 'lentils green', 'brown lentils', 'red lentils dry', 'green lentils dry', 'black beans', 'kidney beans', 'pinto beans', 'butter beans', 'cannellini beans', 'haricot beans', 'baked beans', 'split peas', 'edamame'],
+  'tofu and meat-free pieces': ['tofu firm', 'smoked tofu', 'tofu silken', 'tempeh', 'seitan', 'seitan strips', 'quorn fillet', 'falafel'],
+  'beans and pulses': ['chickpeas canned', 'kidney beans canned', 'chickpeas', 'lentils red', 'lentils green', 'brown lentils', 'red lentils dry', 'green lentils dry', 'black beans', 'kidney beans', 'pinto beans', 'butter beans', 'cannellini beans', 'haricot beans', 'baked beans', 'split peas', 'edamame'],
   // --- dairy and its stand-ins ---
-  'yoghurt': ['greek yoghurt 0%', 'greek yoghurt 2%', 'greek yoghurt full fat', 'natural yoghurt', 'skyr', 'quark', 'cottage cheese', 'cottage cheese low fat', 'soy yoghurt', 'coconut yoghurt'],
-  'soft cheese': ['ricotta cheese', 'cream cheese', 'cream cheese light'],
+  'yoghurt': ['greek style yoghurt', 'greek yoghurt 0%', 'greek yoghurt 2%', 'greek yoghurt full fat', 'natural yoghurt', 'skyr', 'quark', 'cottage cheese', 'cottage cheese low fat', 'soy yoghurt', 'coconut yoghurt'],
+  'soft cheese': ['ricotta light', 'ricotta cheese', 'cream cheese', 'cream cheese light'],
   'cheese': ['cheddar cheese', 'mozzarella', 'mozzarella part skim', 'mozzarella light', 'feta cheese', 'halloumi', 'parmesan', 'paneer', 'sulguni cheese'],
   'milk': ['milk whole', 'milk semi skimmed', 'milk skimmed', 'soy milk', 'almond milk', 'oat milk'],
   'cream': ['double cream', 'single cream', 'sour cream', 'creme fraiche', 'half fat creme fraiche', 'heavy cream', 'coconut cream', 'coconut milk canned', 'coconut milk light'],
@@ -58,16 +58,16 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   'seeds': ['chia seeds', 'flaxseed', 'sunflower seeds', 'pumpkin seeds', 'sesame seeds', 'hemp seeds'],
   'avocado and olives': ['avocado', 'guacamole', 'olives'],
   // --- starches ---
-  'rice and grains': ['white rice cooked', 'brown rice cooked', 'basmati rice cooked', 'couscous cooked', 'quinoa cooked', 'bulgur wheat cooked', 'millet cooked', 'buckwheat cooked', 'barley', 'polenta cooked',
+  'rice and grains': ['risotto rice', 'white rice cooked', 'brown rice cooked', 'basmati rice cooked', 'couscous cooked', 'quinoa cooked', 'bulgur wheat cooked', 'millet cooked', 'buckwheat cooked', 'barley', 'polenta cooked',
     'white rice dry', 'brown rice dry', 'basmati rice dry', 'couscous dry', 'quinoa dry'],
   'pasta and noodles': ['pasta cooked', 'wholewheat pasta cooked', 'gluten free pasta', 'protein pasta', 'egg noodles cooked', 'rice noodles cooked', 'gnocchi',
     'pasta dry', 'wholewheat pasta dry', 'egg noodles dry', 'rice noodles dry'],
-  'bread': ['white bread', 'wholemeal bread', 'gluten free bread', 'bagel', 'brioche', 'croissant', 'french toast'],
+  'bread': ['burger bun', 'white bread', 'wholemeal bread', 'gluten free bread', 'bagel', 'brioche', 'croissant', 'french toast'],
   'wraps and flatbreads': ['tortilla wrap', 'corn tortilla', 'pitta bread', 'naan bread', 'chapati', 'injera flatbread'],
   'starchy veg': ['potato boiled', 'potato baked', 'potato raw', 'mashed potato', 'sweet potato baked', 'sweet potato raw', 'taro root', 'yellow yam', 'plantain', 'parsnip', 'butternut squash'],
   'breakfast cereal': ['oats', 'granola', 'muesli', 'cornflakes', 'weetabix'],
-  'crackers and crisp snacks': ['rice cakes', 'chocolate rice cakes', 'crackers', 'rye crispbread', 'popcorn', 'tortilla chips'],
-  'flour': ['plain flour', 'cornmeal', 'lupin flour', 'oat flour', 'almond flour', 'coconut flour', 'rice flour'],
+  'crackers and crisp snacks': ['oatcakes', 'plantain chips', 'rice cakes', 'chocolate rice cakes', 'crackers', 'rye crispbread', 'popcorn', 'tortilla chips'],
+  'flour': ['wholemeal flour', 'gram flour', 'plain flour', 'cornmeal', 'lupin flour', 'oat flour', 'almond flour', 'coconut flour', 'rice flour'],
   // --- fruit ---
   'berries': ['strawberries', 'blueberries', 'raspberries', 'blackberries', 'mixed berries', 'cherries'],
   'sweet fruit': ['banana', 'apple', 'orange', 'grapes', 'mango', 'pineapple', 'kiwi', 'watermelon', 'pear', 'peach', 'plum', 'grapefruit', 'passion fruit', 'papaya', 'pomegranate', 'figs'],
@@ -91,6 +91,8 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
  * lime that started this), then the one-offs.
  */
 export const NO_SWAP: readonly string[] = [
+  // 10 Nov 2026: herbs and cocoa flavour a dish (seasonings), and kimchi is a pickle with nothing that does its job.
+  'cocoa powder', 'parsley', 'mint', 'chives', 'rosemary', 'thyme', 'dried oregano', 'kimchi', 'vegan kimchi',
   // citrus used as seasoning, and aromatics
   'lemon', 'lime', 'calamansi juice', 'onion', 'garlic', 'spring onion', 'shallots',
   // sauces, pastes and dressings

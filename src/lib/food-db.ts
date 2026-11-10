@@ -277,7 +277,9 @@ export const FOOD_DB: FoodEntry[] = [
   // ===== CARB: grains, bread, potato ==================================
   f('white rice cooked', ['white rice', 'cooked rice', 'boiled rice', 'jasmine rice'], { kcal: 130, protein: 2.7, carbs: 28, fat: 0.3 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('brown rice cooked', ['brown rice', 'cooked brown rice'], { kcal: 123, protein: 2.7, carbs: 25, fat: 1 }, 'carb', { is_grain: true, is_high_carb: true }),
-  f('basmati rice cooked', ['basmati rice', 'cooked basmati'], { kcal: 121, protein: 2.9, carbs: 25, fat: 0.4 }, 'carb', { is_grain: true, is_high_carb: true }),
+  // 10 Nov 2026: basmati and couscous cooked are their dry figures at the home yield (HOME_YIELD below), not USDA's
+  // wetter cooked rows (121 and 112 kcal), so the cooked line and the dry one it is shown as carry the same food.
+  f('basmati rice cooked', ['basmati rice', 'cooked basmati'], { kcal: 132, protein: 3, carbs: 28.9, fat: 0.2 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('pasta cooked', ['pasta', 'penne', 'fusilli', 'spaghetti', 'cooked pasta'], { kcal: 158, protein: 5.8, carbs: 31, fat: 0.9 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
   f('wholewheat pasta cooked', ['wholewheat pasta', 'whole wheat pasta', 'wholemeal pasta'], { kcal: 149, protein: 6.3, carbs: 30, fat: 1.1 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
   // TOAST IS BREAD (Ashley, 10 Oct 2026: "make toast count as bread now rather
@@ -294,7 +296,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('tortilla wrap', ['flour tortilla', 'wrap', 'tortilla', 'wholemeal wrap', 'wholemeal tortilla', 'whole wheat tortilla'], { kcal: 310, protein: 8.4, carbs: 50, fat: 8 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 60 }),
   f('corn tortilla', [], { kcal: 218, protein: 5.7, carbs: 44, fat: 2.8 }, 'carb', { is_grain: true, is_high_carb: true }, { whole: 26 }),
   f('pitta bread', ['pita bread', 'pitta'], { kcal: 275, protein: 9.1, carbs: 56, fat: 1.2 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 60 }),
-  f('couscous cooked', ['couscous'], { kcal: 112, protein: 3.8, carbs: 23, fat: 0.2 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
+  f('couscous cooked', ['couscous'], { kcal: 150, protein: 5.1, carbs: 31, fat: 0.2 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
   f('quinoa cooked', ['quinoa'], { kcal: 120, protein: 4.4, carbs: 21, fat: 1.9 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('oats', ['rolled oats', 'porridge oats', 'oatmeal'], { kcal: 379, protein: 13.5, carbs: 67.7, fat: 6.9 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('potato boiled', ['potato', 'boiled potato', 'new potatoes'], { kcal: 87, protein: 1.9, carbs: 20, fat: 0.1 }, 'carb', { is_high_carb: true }),
@@ -572,8 +574,8 @@ export const FOOD_DB: FoodEntry[] = [
   f('parsley', ['fresh parsley', 'flat leaf parsley', 'curly parsley', 'chopped parsley'], { kcal: 36, protein: 3, carbs: 6.3, fat: 0.8 }, 'condiment', {}, { tbsp: 4, tsp: 1.3 }),
   f('mint', ['fresh mint', 'mint leaves'], { kcal: 44, protein: 3.3, carbs: 8.4, fat: 0.7 }, 'condiment', {}, { tbsp: 4, tsp: 1.3 }),
   f('chives', ['fresh chives', 'chopped chives'], { kcal: 30, protein: 3.3, carbs: 4.4, fat: 0.7 }, 'condiment', {}, { tbsp: 3, tsp: 1 }),
-  f('rosemary', ['fresh rosemary'], { kcal: 131, protein: 3.3, carbs: 20.7, fat: 5.9 }, 'condiment', {}, { tbsp: 2, tsp: 0.7 }),
-  f('thyme', ['fresh thyme', 'thyme leaves'], { kcal: 101, protein: 5.6, carbs: 24.5, fat: 1.7 }, 'condiment', {}, { tbsp: 2.4, tsp: 0.8 }),
+  f('rosemary', ['fresh rosemary'], { kcal: 131, protein: 3.3, carbs: 20.7, fat: 5.9 }, 'condiment', {}, { tbsp: 2, tsp: 0.7, sprig: 1 }),
+  f('thyme', ['fresh thyme', 'thyme leaves'], { kcal: 101, protein: 5.6, carbs: 24.5, fat: 1.7 }, 'condiment', {}, { tbsp: 2.4, tsp: 0.8, sprig: 1 }),
   f('dried oregano', ['oregano', 'dried mixed herbs', 'mixed herbs', 'italian seasoning', 'dried thyme', 'dried basil'], { kcal: 265, protein: 9, carbs: 68.9, fat: 4.3 }, 'condiment', {}, { tbsp: 3, tsp: 1 }),
   // Kimchi is made with fish sauce and often salted shrimp, so it carries both; a vegan one is said as vegan.
   f('kimchi', ['cabbage kimchi'], { kcal: 15, protein: 1.1, carbs: 2.4, fat: 0.5 }, 'veg', { contains_fish: true, contains_shellfish: true }),
@@ -1012,14 +1014,17 @@ export function weighedTwinOf(entry: FoodEntry): FoodEntry | null {
  * where they do not (USDA's roasted and raw chicken thigh), it is the one closer to a real cooking yield, and energy
  * is what moves. One factor for the card, its cooked hint and the shopping list (18 Oct 2026, runs 7-10, H36/M64).
  */
-// HOME COOKING YIELDS, 10 Nov 2026 (food audit). For four foods USDA's cooked figures are wetter than a home pan:
+// HOME COOKING YIELDS, 10 Nov 2026 (food audit). For two foods USDA's cooked figures are wetter than a home pan:
 // couscous made as the packet says takes about one and a half times its weight in water and keeps nearly all of it
-// (about 2.5x, USDA's figures imply 3.4x); lentils boiled and drained, about 2.5x (USDA 3.1x); basmati by
-// absorption, about 2.7x (3.1x). Worked out from the water each one takes up, as recalled, not measured here. The
-// rest (white and brown rice, pasta, quinoa, noodles) already sit inside a home cook's range and keep the ratio.
-// This is the one factor for the "about N g cooked" hint, a cooked weight he types, and the shopping list.
+// (about 2.5x; USDA's figures imply 3.4x), and basmati by absorption about 2.7x (USDA 3.1x; CoFID's boiled rice,
+// as recalled, implies about 2.6x). Their COOKED entries above are worked out from the dry ones at that yield, so a
+// cooked line and its dry twin carry the same food (test:one-state). LENTILS WERE IN THIS LIST AND CAME OUT the same
+// day: CoFID's boiled lentils (about 100 kcal per 100 g, as recalled) imply about 3x, close to USDA's, so the
+// audit's "2.3-2.6x" did not survive a second source. The rest (rice, pasta, quinoa, noodles, lentils) keep the
+// ratio of their own figures. This is the one factor for the "about N g cooked" hint, a typed cooked weight and
+// the shopping list.
 const HOME_YIELD: Record<string, number> = {
-  'couscous cooked': 2.5, 'lentils red': 2.5, 'lentils green': 2.5, 'basmati rice cooked': 2.7,
+  'couscous cooked': 2.5, 'basmati rice cooked': 2.7,
 }
 
 export function weighedFactor(cooked: FoodEntry, twin: FoodEntry): number | null {

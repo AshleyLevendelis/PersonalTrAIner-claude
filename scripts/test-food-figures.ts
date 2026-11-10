@@ -57,15 +57,16 @@ const off = CHANGED.map(n => { const m = entry(n)?.per100g; if (!m) return `${n}
 // USDA counts fibre in carbs and gives these few their own lower energy: cocoa (37 g fibre), the fresh herbs, both kimchis.
 check(`all ${CHANGED.length} add up, bar the six whose USDA energy leaves out a lot of fibre`, off.length === 6 && off.every(o => /^(cocoa powder|parsley|mint|chives|kimchi|vegan kimchi):/.test(String(o))), off)
 
-console.log('\n5. Home cooking yields for couscous, lentils and basmati')
+console.log('\n5. Home cooking yields for couscous and basmati (lentils keep their ratio: CoFID agrees with USDA)')
 const hint = (l: string) => Number(/about (\d+)g cooked/.exec(cookedHint(parseIngredientLine(l)) ?? '')?.[1] ?? NaN)
 check('60 g dry couscous is about 150 g cooked (2.5x; USDA\'s 3.4x said 200)', hint('60g dry couscous') === 150, hint('60g dry couscous'))
-check('70 g dry red lentils about 180 g (2.5x), basmati about 190 g (2.7x)', hint('70g dry red lentils') === 180 && hint('70g dry basmati rice') === 190, [hint('70g dry red lentils'), hint('70g dry basmati rice')])
+check('70 g dry basmati about 190 g (2.7x), and red lentils keep about 3x (220 g)', hint('70g dry basmati rice') === 190 && hint('70g dry red lentils') === 220, [hint('70g dry basmati rice'), hint('70g dry red lentils')])
 check('...and the foods already in range keep their ratio (white rice 200 g, pasta 180 g)', hint('70g dry white rice') === 200 && hint('75g dry pasta') === 180, [hint('70g dry white rice'), hint('75g dry pasta')])
 const back = asWeighed(parseIngredientLine('150g cooked couscous'))
 check('ONE factor: the hint\'s cooked weight typed back as cooked is the same dry weight (150 g cooked couscous = 60 g dry)', back.quantity === 60 && /dry|couscous/.test(back.name), back)
-const lentilEntry = entry('lentils red')!
-check('the factor is the home yield only between a food and its own twin', Math.abs(weighedFactor(lentilEntry, weighedTwinOf(lentilEntry)!)! - 1 / 2.5) < 1e-9 && weighedFactor(lentilEntry, entry('white rice dry')!) !== 1 / 2.5)
+const cous = entry('couscous cooked')!
+check('the factor is the home yield only between a food and its own twin', Math.abs(weighedFactor(cous, weighedTwinOf(cous)!)! - 1 / 2.5) < 1e-9 && weighedFactor(cous, entry('white rice dry')!) !== 1 / 2.5)
+check('...and the cooked figure IS the dry one at that yield, so both ways of writing it count the same food', Math.abs(cous.per100g.kcal * 2.5 - weighedTwinOf(cous)!.per100g.kcal) <= 3 && Math.abs(entry('basmati rice cooked')!.per100g.kcal * 2.7 - entry('basmati rice dry')!.per100g.kcal) <= 3)
 
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} food-figure check(s) FAILED.`); process.exit(1) }

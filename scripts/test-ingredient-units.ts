@@ -139,7 +139,8 @@ async function main() {
   for (const food of foods) for (const u of UNIT_WORDS) for (const q of ['1', '2', '1/2', '1 1/2']) {
     const p = parseIngredientLine(`${q} ${u} ${food}`)
     const first = p.name.split(/\s+/)[0].toLowerCase()
-    if (UNIT_WORDS.includes(first) || p.quantity <= 0 || !Number.isFinite(p.quantity)) stuck.push(`${q} ${u} ${food} -> ${JSON.stringify(p)}`)
+    // A food whose OWN name starts with a unit word ("gram flour", 10 Nov 2026) keeps it: that word is the food.
+    if ((UNIT_WORDS.includes(first) && !food.toLowerCase().startsWith(`${first} `)) || p.quantity <= 0 || !Number.isFinite(p.quantity)) stuck.push(`${q} ${u} ${food} -> ${JSON.stringify(p)}`)
   }
   check(`a unit word is never left inside a food's name (the old failure: "oz chicken breast"): ${foods.length} foods x ${UNIT_WORDS.length} units x 4 amounts`, stuck.length === 0, stuck.slice(0, 5))
   const inexact: string[] = []
@@ -194,8 +195,9 @@ async function main() {
   check('...while her own meal in ounces, cups and counts is accepted and costed right: 227 g of chicken (315 g raw), 160 g of rice (55 g dry), two carrots', !!ownGood && ownGood.ingredients.map(i => `${i.quantity}${i.unit} ${i.name}`).join(', ') === '315g raw chicken breast, 55g dry white rice, 2whole carrots' && ownGood.macros.protein > 60, ownGood && { ing: ownGood.ingredients, macros: ownGood.macros })
   const demo = computeMealMacros(['150g basmati rice cooked', '8 oz chicken breast', '1 tin tuna', 'a pinch of black pepper', '100g broccoli', '1 tbsp olive oil'].map(parseIngredientLine))
   check('THE MEAL THAT SCORED COVERAGE 0.993 WITH 10 G OF PROTEIN (8 oz chicken, a tin of tuna): it now carries the chicken and the tuna, about 100 g, and every amount is understood', demo.protein > 80 && demo.amountsUnderstood, { protein: demo.protein, coverage: demo.coverage })
-  const unmatchedOk = computeMealMacros(['2 sprigs thyme', '1 cup dragonfruit'].map(parseIngredientLine))
-  check('a food the database does not know is NOT an unread amount: coverage and the diet check already handle it, and a sprig of thyme is not refused', unmatchedOk.amountsUnderstood && unmatchedOk.unmatched.length === 2, unmatchedOk.unreadAmounts)
+  // Tarragon, not thyme, since 10 Nov 2026: thyme is in the table now (with a sprig's weight), so it is no longer unknown.
+  const unmatchedOk = computeMealMacros(['2 sprigs tarragon', '1 cup dragonfruit'].map(parseIngredientLine))
+  check('a food the database does not know is NOT an unread amount: coverage and the diet check already handle it, and a sprig of tarragon is not refused', unmatchedOk.amountsUnderstood && unmatchedOk.unmatched.length === 2, unmatchedOk.unreadAmounts)
   const libUnread = MEAL_LIBRARY.filter(d => !computeMealMacros(d.ingredients.map(parseIngredientLine)).amountsUnderstood).map(d => d.name)
   check('every dish in the meal library is fully understood: the library can never be refused by this rule', libUnread.length === 0, libUnread)
 
