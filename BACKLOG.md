@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [x] **FULL SWEEP ON THE THREE RULINGS (532 GATES), THEN MERGED TO `main` ON HIS "merge", 10 NOV 2026.** Run in the
+  separate worktree at `5a482bd8`. THE RUN WAS STOPPED AT ITS TWO-HOUR LIMIT with 521 of 532 reached: 515 passed, 6
+  failed. Two of the six were the source checks the `swapTo` rename broke (entry below), fixed in `ca896b81`. The
+  other four are the standing ones, each read for its own sentence: `test:meal-quality` ("must be set"),
+  `test:schema-parity` ("Failed to link to TEST"), `verify:rls` ("No database to read"), and `test:coach-exam-fresh`
+  (the coach's prompt changed for the calamari rule, so the scores are stale until the exam is run on his machine).
+  THE 11 NEVER REACHED (all `verify:` drivers, `unit-ask` to `workout-scenarios-chat`) and the 4 gates reading files
+  changed since the sweep's commit were then run on `ca896b81`: 15 of 15 passed. So 528 of 532 pass and 4 cannot run
+  here. NOT ONE RUN OF ONE COMMIT: 517 results are for `5a482bd8` and 15 for `ca896b81`; the difference between the
+  two is two test scripts, one driver and this file, and every gate reading those was in the second run. Typecheck
+  clean (`src` only, as always). `main` fast-forwarded from `25b834e4`, 35 commits.
+  NEEDS ON HIS MACHINE: the `chat-gemini` and `generate-meals` deploys again (the calamari rule and the 10 Nov food
+  figures; his deploys earlier today ran before this merge and `generate-meals` was not among them), and the coach
+  exam. No migration since `25b834e4`. NOT KNOWN FROM HERE: which version his earlier deploys shipped.
+
 - [x] **REGENERATE-ONE: THE MUTATION ROUND, AND TWO GATES THE RENAME BROKE, 10 NOV 2026.** 19 mutations of the new
   Regenerate, on `test:meal-regenerate` and `verify:meal-regenerate-one`. 16 caught as written. THREE READ:
   r6 MISSED on both (the writer-only second ask removed): with two dinners the FIRST ask already reaches the writer,
