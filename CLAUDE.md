@@ -1517,6 +1517,18 @@ menu" stays true when a copy is also left outside it.
   the reps climb (asked of the rep rule itself), deload 70% of the last loading week. CSCS, basis in BACKLOG.
   `test:block-swap-reach`
 
+- **"Regenerate" on one meal changes that meal only: his ruling 10 Nov 2026, "Only that meal"** (over a warning before
+  re-planning the week, and over leaving it). One new dish made for that day, swapped in down the swap's own road (its
+  trial, its line, its Undo, the day's other dishes held); nothing the plan held is deleted. The one meal that may
+  follow is tomorrow's leftovers lunch after a regenerated dinner, and the line names it. A meal with no options still
+  builds its list. `test:meal-regenerate` §6, `verify:meal-regenerate-one`
+- **The fit-around line says "your change", always: his ruling 10 Nov 2026** (over matching the words to what he did,
+  and over leaving "your swap"): it also follows an edit to a meal already eaten. `test:hold-around-pins`
+- **Bare "calamari" is asked about, breaded or plain: his ruling 10 Nov 2026, "Ask which"** (over "can't confirm it's
+  gluten-free" and over leaving it as plain squid). The kind changes an allergen, so what is true of every kind stays
+  definite: shellfish-free is a "contains", nut-free is not blocked, gluten-free is "can't confirm" until he says.
+  In the chat the APP asks, off his words, and no food card is built from the coach's guess. `test:calamari-asked`,
+  `verify:named-food-clash` §7-9, `docs/plans/calamari-asked.md`. Needs the `chat-gemini` and `generate-meals` deploys
 - **A workout with no signal: his words 10 Nov 2026**, from a gym with no Wi-Fi and the whole-app error screen:
   "we should be able to do as much as possible in the app without network". The whole app is saved to the phone in
   the background (the build lists its own files, the service worker saves them); a part still missing says so in its

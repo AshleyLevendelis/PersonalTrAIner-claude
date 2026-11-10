@@ -28,6 +28,10 @@
 // NOT CHANGED, because they are owner decisions still open: there is no
 // confirm step, and a meal already LOGGED today is regenerated like any other
 // (its record is untouched; the plan beneath it changes).
+//
+// DECIDED SINCE (10 Nov 2026, his "Only that meal"): Regenerate on ONE meal no longer rebuilds that meal's list. It
+// makes one new dish for the day and swaps to it (makeOneNewMeal, below). regenerateMealSlot is kept for a meal with
+// no options at all, where there is nothing else to disturb. "Regenerate all" is unchanged.
 // ---------------------------------------------------------------------------
 
 import { generateMealPools, type PoolOption } from './meal-generation'
