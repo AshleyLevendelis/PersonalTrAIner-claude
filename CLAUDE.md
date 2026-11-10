@@ -228,6 +228,8 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   Measured: 20 different dishes a meal over 4 weeks (was 4.4), 97% of days on target (was 75%). `test:meal-menu`,
   `verify:deep-pool`, `measure:deep-pool`, `docs/plans/deep-meal-pool.md`. **And a bare "Greek yoghurt" is asked
   about: his ruling 9 Nov 2026, "Ask which"** (fat-free, low-fat or full-fat), never guessed. `test:greek-yoghurt-asked`
+  **And plain beef mince is asked about: his ruling 10 Nov 2026, "Ask"** (5, 10, 12, 15 or 20% fat, "it says on the
+  pack"), never guessed; the meal writer names the fat of both. `test:mince-asked`, `test:food-figures`
 - Meals hit targets from real foods, dislikes honoured, allergens
   filtered with stated limits — `food-dislike-is-a-ban`, `food-db-parity`,
   `diet-tag-sync`, `meal-swap-rotation`, `meal-addition`, `meal-food-add`, and since 11 Oct 2026 an ingredient line is costed and tagged only when

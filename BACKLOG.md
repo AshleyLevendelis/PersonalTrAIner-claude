@@ -2,6 +2,39 @@
 
 Newest first. One line each.
 
+- [x] **PLAIN MINCE IS ASKED ABOUT, AND THE FOOD AUDIT'S REST, 10 NOV 2026.** His ruling: **"Ask"** (from three
+  options: ask / assume 5% / assume 20%), then "fix the food figures". WHAT WAS WRONG: the words decided the fat of beef
+  mince ("beef mince" and "ground beef" were 20%, 254 kcal per 100 g; a bare "mince" 5%, 137), and the audit's lower
+  findings were open (previous entry, NOT DONE).
+  WHAT CHANGED: (1) MINCE, both surfaces: every bare name is a miss; 10%, 12% and 15% entries added beside 5% and 20%
+  (USDA raw rows as recalled; 12% is the 60/40 blend of the 10% and 15% rows, which IS 12% mince); the coach's meal log
+  and adding a meal ask "What fat was the beef mince: 5%, 10%, 12%, 15% or 20%? It says on the pack." (WORDS MINE, his
+  to change); the coach's log_meal asks instead of assuming; the meal writer is told to name the fat of Greek yoghurt
+  and beef mince, because a bare one now drops its dish. THAT LAST HALF WAS MISSING SINCE 9 NOV for the yoghurt: the
+  writer's own protein list says "Greek yoghurt", so any writer dish with a bare one was being refused. Found by
+  re-running the yoghurt work's derivation against mince (CLAUDE.md, "re-run a derivation against the cases it was not
+  written for"). (2) FOOD FIGURES: a tin of chickpeas or kidney beans is the tin (CoFID drained, about 30% lighter than
+  home-boiled) and "1 tin chickpeas" reaches it; the library's 42 pulse lines are written as tins; mussels in the shell
+  are a quarter meat; fried calamari is fried and floured (gluten); light ricotta, UK Greek-style yoghurt and wholemeal
+  flour have their own figures; cream cheese is a UK tub (230, was the US block's 342) and the light tub UK too (155,
+  was 201); pesto a UK jar (430, was 303); injera moist bread (145, was 220); plantain chips exist. HOME COOKING
+  YIELDS for couscous, red and green lentils (2.5x) and basmati (2.7x) replace USDA's wetter ratios (3.4x, 3.1x,
+  3.1x) in the ONE factor behind the cooked hint, a typed cooked weight and the shopping list (60 g dry couscous now
+  "about 150 g cooked", was 200): mine, from the water each one takes up, as recalled. White and brown rice, pasta,
+  quinoa and noodles were already in a home range and keep the ratio. (3) MISSING FOODS the library's writers asked
+  for: gram flour, smoked tofu, oatcakes, burger bun, risotto rice (weighed dry), cocoa powder, parsley, mint, chives,
+  rosemary, thyme, dried herbs, kimchi (fish and shellfish, for fish sauce and salted shrimp) and vegan kimchi.
+  MEASURED AFTER (`measure:deep-pool`): 20.2 different dishes a meal over four weeks (was 20.0), 97.0% of days on
+  target (was 97.1%): the figure fixes moved no week.
+  CHECKS: `test:mince-asked` (33 checks, 14 mutations, 13 caught; the 14th is equivalent: the 10% pack is still found
+  by its other names), `test:food-figures` (37 checks, 16 mutations, 16 caught). Derived gates: 117 for mince, all
+  passed; RUN for the figures: see the commit. A duplicate "cream cheese light" I added was caught by
+  `test:food-db-parity` before push and merged into the existing entry.
+  NOT DONE, named: black beans, cannellini and butter beans in tins (not flagged, same shape); bare "calamari" stays raw
+  squid and so untagged for gluten (a breaded one said as "calamari" is not caught: his call if it matters); UK cooked
+  prawns (labels about 30% under the USDA cooked figure, low confidence); "oatmeal" still means dry oats (UK sense);
+  "part skim mozzarella" names two entries (older, the first wins). Needs the `chat-gemini` and `generate-meals`
+  deploys. No migration.
 - [x] **MEALS: A MUCH DEEPER POOL, ACCURATE FIGURES, AND A WEEK THAT CHANGES, 9 NOV 2026.** His request: "Lets work on
   the meal plans. We need a deeper pool of meals and need to make sure macros are accurate. Test and fix." Then, asked
   7 / 10 / 14 a meal with measured costs: **"We need a much deeper pool of meals to choose from not only 14"**. That
