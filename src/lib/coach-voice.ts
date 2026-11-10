@@ -724,11 +724,16 @@ export function aroundEatenLine(a:
   return `${slotList(a.eatenSlots).replace(/^./, c => c.toUpperCase())} came to ${Math.abs(a.eatenVsPlanKcal)} kcal ${more ? 'more' : 'less'} than planned, so ${slotList(a.slots)} ${a.slots.length === 1 ? 'is' : 'are'} ${pct}% ${a.factor < 1 ? 'smaller' : 'bigger'} today.`
 }
 
+/** What the fit-around line calls what he did: one word for a swap and for an edit (his ruling, below). */
+const WHAT_HE_DID = 'your change'
 /**
  * THE ONE LINE WHEN A SWAP HELD THE DAY'S OTHER DISHES (runs 3-4, M34;
  * Ashley 10 Oct 2026, "Resize, else leave"): the same promise as the logged-
  * meal line above, one line, an Undo beside a resize, and the gap said
  * plainly when the dishes could not fit. Null when there is nothing to say.
+ *
+ * "YOUR CHANGE", ALWAYS (his ruling 10 Nov 2026, over matching the words to what he did and over leaving it): the
+ * same line follows an EDIT to a meal already eaten, where nothing was swapped, and it said "your swap" there too.
  */
 export function heldAroundLine(h:
   | { kind: 'none'; slots: string[] }
@@ -738,8 +743,8 @@ export function heldAroundLine(h:
   const gap = (d: number) => missGap(d, h.kind === 'kept' || h.kind === 'too_far' ? h.miss : null)
   const yours = `your ${slotList(h.slots)}`
   if (h.kind === 'none') return null
-  if (h.kind === 'kept') return `Kept ${yours} as planned after your swap. The day is ${gap(h.deltaKcal)}.`
-  if (h.kind === 'too_far') return `Kept ${yours} as planned: fitting ${h.slots.length === 1 ? 'it' : 'them'} around your swap would take more than a 25% change. The day is ${gap(h.deltaKcal)}.`
+  if (h.kind === 'kept') return `Kept ${yours} as planned after ${WHAT_HE_DID}. The day is ${gap(h.deltaKcal)}.`
+  if (h.kind === 'too_far') return `Kept ${yours} as planned: fitting ${h.slots.length === 1 ? 'it' : 'them'} around ${WHAT_HE_DID} would take more than a 25% change. The day is ${gap(h.deltaKcal)}.`
   // WHAT EACH MEAL REALLY CAME TO (live test, 19 Oct 2026): one factor, rounded per ingredient, lands each meal
   // differently, so the line names each meal's own change rather than the factor asked for.
   if (h.sizes && h.sizes.length > 0) {
@@ -752,11 +757,11 @@ export function heldAroundLine(h:
       return pct === 0 ? `your ${z.slot} is the same size` : `your ${z.slot} is ${pct}% ${z.toKcal < z.fromKcal ? 'smaller' : 'bigger'}`
     })
     const list = each.length === 1 ? each[0] : `${each.slice(0, -1).join(', ')} and ${each[each.length - 1]}`
-    return `To fit around your swap, ${list}. Same ${h.slots.length === 1 ? 'dish' : 'dishes'}.`
+    return `To fit around ${WHAT_HE_DID}, ${list}. Same ${h.slots.length === 1 ? 'dish' : 'dishes'}.`
   }
   const pct = Math.round(Math.abs(h.factor - 1) * 100)
   if (pct === 0) return null
-  return `To fit around your swap, ${yours} ${h.slots.length === 1 ? 'is' : 'are'} ${pct}% ${h.factor < 1 ? 'smaller' : 'bigger'}. Same ${h.slots.length === 1 ? 'dish' : 'dishes'}.`
+  return `To fit around ${WHAT_HE_DID}, ${yours} ${h.slots.length === 1 ? 'is' : 'are'} ${pct}% ${h.factor < 1 ? 'smaller' : 'bigger'}. Same ${h.slots.length === 1 ? 'dish' : 'dishes'}.`
 }
 
 /**

@@ -95,7 +95,7 @@ console.log('\n2. Re-sized together, within about 25%, and the day lands')
     return pct === 0 ? `your ${s} is the same size` : `your ${s} is ${pct}% ${to < from ? 'smaller' : 'bigger'}`
   })
   check('one line says so, naming each meal and the size it REALLY came to',
-    line === `To fit around your swap, ${real[0]}, ${real[1]} and ${real[2]}. Same dishes.`, { line, real })
+    line === `To fit around your change, ${real[0]}, ${real[1]} and ${real[2]}. Same dishes.`, { line, real })
   check('...which is not one rounded factor for all three on this fixture (the case the live test caught)',
     new Set(real).size > 1, real)
 }
@@ -107,7 +107,7 @@ console.log('\n3. Beyond 25%: left as planned, and the gap said')
   const h = far?.heldAround
   const gap = Math.round(sum(far!.chosen).calories - targets.calories)
   check('it says too far, with the real gap', h?.kind === 'too_far' && h.deltaKcal === gap, { h, gap })
-  check('the line says how far over, plainly', heldAroundLine(h!) === `Kept your breakfast, dinner and snack as planned: fitting them around your swap would take more than a 25% change. The day is ${Math.abs(gap)} kcal over your target.`, heldAroundLine(h!))
+  check('the line says how far over, plainly', heldAroundLine(h!) === `Kept your breakfast, dinner and snack as planned: fitting them around your change would take more than a 25% change. The day is ${Math.abs(gap)} kcal over your target.`, heldAroundLine(h!))
   check('the day is honestly off target', far?.withinTolerance === false)
   // THE SAME MISS AS THE HEADER (1 Nov 2026, whole-app test): the held line carries the day's named miss, and says it.
   check('the held day carries the header\'s own miss', !!h && 'miss' in h && JSON.stringify(h.miss) === JSON.stringify(namedMiss(sum(far!.chosen), targets)), h)
@@ -132,7 +132,7 @@ console.log('\n4. Undo keeps the planned sizes')
   const kept = holdAroundPins({ planned, fixed: { lunch: tunaPasta }, targets, keepSizes: true })
   check('every held dish is the plan\'s own, unsized', !!kept && ['breakfast', 'dinner', 'snack'].every(s => kept.chosen[s as MealSlotName] === planChosen[s as keyof typeof planChosen]))
   check('it says kept, with the gap', kept?.heldAround?.kind === 'kept' && kept.heldAround.deltaKcal === Math.round(sum(kept.chosen).calories - targets.calories), kept?.heldAround)
-  check('...and the line offers the way back', /^Kept your breakfast, dinner and snack as planned after your swap\. The day is \d+ kcal (over|under) your target\.$/.test(heldAroundLine(kept!.heldAround!) ?? ''), heldAroundLine(kept!.heldAround!))
+  check('...and the line offers the way back', /^Kept your breakfast, dinner and snack as planned after your change\. The day is \d+ kcal (over|under) your target\.$/.test(heldAroundLine(kept!.heldAround!) ?? ''), heldAroundLine(kept!.heldAround!))
 }
 
 console.log('\n5. Nothing to say when the swap already fits')
@@ -256,7 +256,20 @@ console.log('\nNothing said when nothing moved (QA walk, 10 Nov 2026)')
 check('every meal rounding to the same size says nothing (no "the same size, the same size" line, no Undo)',
   heldAroundLine({ kind: 'resized', factor: 1.002, slots: ['breakfast', 'lunch'], deltaKcal: 2, sizes: [{ slot: 'breakfast', fromKcal: 500, toKcal: 501 }, { slot: 'lunch', fromKcal: 700, toKcal: 702 }] }) === null)
 check('...and a factor that rounds to 0% says nothing either', heldAroundLine({ kind: 'resized', factor: 1.003, slots: ['dinner'], deltaKcal: 2 }) === null)
-check('...while one meal that really moved is still said, beside the one that did not', heldAroundLine({ kind: 'resized', factor: 0.9, slots: ['breakfast', 'lunch'], deltaKcal: -60, sizes: [{ slot: 'breakfast', fromKcal: 500, toKcal: 450 }, { slot: 'lunch', fromKcal: 700, toKcal: 701 }] }) === 'To fit around your swap, your breakfast is 10% smaller and your lunch is the same size. Same dishes.')
+check('...while one meal that really moved is still said, beside the one that did not', heldAroundLine({ kind: 'resized', factor: 0.9, slots: ['breakfast', 'lunch'], deltaKcal: -60, sizes: [{ slot: 'breakfast', fromKcal: 500, toKcal: 450 }, { slot: 'lunch', fromKcal: 700, toKcal: 701 }] }) === 'To fit around your change, your breakfast is 10% smaller and your lunch is the same size. Same dishes.')
+
+console.log('\n"Your change", always (his ruling 10 Nov 2026): the same line follows an edit, where nothing was swapped')
+{
+  const every = [
+    heldAroundLine({ kind: 'kept', slots: ['lunch'], deltaKcal: 120 }),
+    heldAroundLine({ kind: 'too_far', slots: ['lunch', 'dinner'], deltaKcal: -300 }),
+    heldAroundLine({ kind: 'resized', factor: 0.9, slots: ['dinner'], deltaKcal: -60 }),
+    heldAroundLine({ kind: 'resized', factor: 0.9, slots: ['breakfast', 'lunch'], deltaKcal: -60, sizes: [{ slot: 'breakfast', fromKcal: 500, toKcal: 450 }, { slot: 'lunch', fromKcal: 700, toKcal: 630 }] }),
+  ]
+  check('all four sentences exist', every.every(l => typeof l === 'string' && l.length > 20), every)
+  check('...each says "your change"', every.every(l => /\byour change\b/.test(l ?? '')), every)
+  check('...and none says "swap" (it was "your swap" after an edit to an eaten meal)', every.every(l => !/swap/i.test(l ?? '')), every)
+}
 
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} hold-around-pins check(s) FAILED`); process.exit(1) }

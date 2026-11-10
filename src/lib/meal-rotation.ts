@@ -379,7 +379,7 @@ export function assembleRotationDay(
      * undefined when it does not (today, whose yesterday is not worked out).
      */
     previousDinner?: PoolOption | null
-    /** Undo was tapped on this date's "resized to fit around your swap": hold at the planned sizes. */
+    /** Undo was tapped on this date's "resized to fit around your change": hold at the planned sizes. */
     keepHeldSizes?: boolean
   } = {},
 ): AssembledDay {

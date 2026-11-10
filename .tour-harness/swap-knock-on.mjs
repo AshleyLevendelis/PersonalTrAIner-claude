@@ -142,7 +142,7 @@ const realLines = found ? found.resized.map(k => {
   return pct === 0 ? `your ${k} is the same size` : `your ${k} is ${pct}% ${to < from ? 'smaller' : 'bigger'}`
 }) : []
 check('1c. ...and one line says so, naming each meal with the size it REALLY came to on screen',
-  !!found && /^To fit around your swap, .+\. Same dish(es)?\.$/.test(found.held.text) && realLines.every(l => found.held.text.includes(l)), { line: found?.held?.text, real: realLines })
+  !!found && /^To fit around your change, .+\. Same dish(es)?\.$/.test(found.held.text) && realLines.every(l => found.held.text.includes(l)), { line: found?.held?.text, real: realLines })
 if (found) await openDay(found.date)
 check('1d. the line is on screen with its Undo', !!found && await ev(`(() => { const u = document.querySelector('[data-testid="held-around-undo"]'); if (!u) return false; u.scrollIntoView({ block: 'center' }); const r = u.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight })()`))
 await shoot('swap-knock-on')
@@ -157,7 +157,7 @@ if (found) {
 }
 const plannedSizes = found ? found.resized.every(k => undone?.meals[k]?.kcal === found.before[k].kcal) : false
 check('2a. Undo puts every re-sized meal back to its planned size', !!found && plannedSizes, found && found.resized.map(k => [k, found.before[k].kcal, undone?.meals[k]?.kcal]))
-check('2b. ...says the day as it now is, over or under', undone?.held?.kind === 'kept' && /^Kept your .+ as planned after your swap\. The day is \d+ kcal (over|under) your target\.$/.test(undone.held.text), undone?.held)
+check('2b. ...says the day as it now is, over or under', undone?.held?.kind === 'kept' && /^Kept your .+ as planned after your change\. The day is \d+ kcal (over|under) your target\.$/.test(undone.held.text), undone?.held)
 check('2c. ...and offers the way back', !!found && await ev(`!!document.querySelector('[data-testid="held-around-refit"]')`))
 if (found) {
   await ev(`document.querySelector('[data-testid="held-around-refit"]').click()`); await wait(700)
@@ -254,7 +254,7 @@ check('4b. ...so the note says it did not save, and names no meal it changed', !
 
 // --- 6. TODAY's swap put back puts the DAY back (QA walk, 10 Nov 2026) -----------------------------------------------
 // On the deep pool, swapping a meal re-sized the others; Undo brought the dish back PINNED, so the others stayed
-// re-sized and a new "to fit around your swap" line appeared over a swap that had just been undone.
+// re-sized and a new "to fit around your change" line appeared over a swap that had just been undone.
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&daymove=1&regen=1&deep=1&n=6#/tab/nutrition` })
 for (let i = 0; i < 60; i++) { if (await ev(`!!document.querySelector('[data-meal-name]')`)) break; await wait(200) }
 await wait(1200)
@@ -279,7 +279,7 @@ for (const slot of ['breakfast', 'lunch', 'dinner', 'snack']) {
 }
 check('6a. the fixture binds: a swap of today\'s meal that re-sized the others was found', !!six, todayWas)
 check('6b. Undo puts the WHOLE DAY back: every meal\'s dish and size as before the swap', !!six && JSON.stringify(six.now) === JSON.stringify(six.was), six && { was: six.was, now: six.now })
-check('6c. ...and no "to fit around your swap" line over a swap that was undone', !!six && !six.held, six?.held)
+check('6c. ...and no "to fit around your change" line over a swap that was undone', !!six && !six.held, six?.held)
 await shoot('swap-knock-on-today-undo')
 
 // --- 7. No Regenerate on a meal already eaten (QA walk, 10 Nov 2026) ------------------------------------------------

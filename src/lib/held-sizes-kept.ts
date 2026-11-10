@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// THE DATES WHERE "UNDO" WAS TAPPED on "resized to fit around your swap"
+// THE DATES WHERE "UNDO" WAS TAPPED on "resized to fit around your change"
 // (runs 3-4, M34). Kept on the phone, per person, and read by every place a
 // day is served (the Nutrition tab, its trials and the shopping list), so the
 // screen and the list cannot disagree about a portion. A convenience, like
