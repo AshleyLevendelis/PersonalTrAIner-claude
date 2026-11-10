@@ -30,9 +30,20 @@ export interface NextSet {
   repsBox: string
 }
 
-/** The first set still to log in this list, or null when no open row has one. */
+/**
+ * THE TICK THE BUTTON PRESSES: the next set of the exercise marked NOW where its card is open, else the first set still
+ * to log in the list. QA walk, 10 Nov 2026: with Seated Machine Row marked "NOW" and its set 1 ticked, the button read
+ * "Log set 1 · Chin-Ups × 10" (the first open card in the list) and one tap saved a Chin-Up set never done. One
+ * function for the label and the press, so the button can only ever press the tick it names.
+ */
+export function nextSetTick(root: ParentNode): HTMLElement | null {
+  return root.querySelector<HTMLElement>('[data-exercise-now] [data-next-set]')
+    ?? root.querySelector<HTMLElement>('[data-next-set]')
+}
+
+/** The set the running button would log (nextSetTick), or null when no open row has one. */
 export function readNextSet(root: ParentNode): NextSet | null {
-  const tick = root.querySelector<HTMLElement>('[data-next-set]')
+  const tick = nextSetTick(root)
   if (!tick) return null
   const name = tick.closest<HTMLElement>('[data-exercise-name]')?.dataset.exerciseName ?? ''
   return {

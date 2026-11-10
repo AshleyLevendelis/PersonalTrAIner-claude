@@ -188,7 +188,7 @@ export function ExerciseRow({
     // same ⋮ as the open card — every change to an exercise lives in it (her
     // 14 Sep ruling), so it is on every row, not only the open one.
     return (
-      <div data-exercise-name={ex.name} data-movement-prep={isMovementPrepRow(ex) ? '' : undefined} className={allSetsLogged ? 'opacity-80' : undefined}>
+      <div data-exercise-name={ex.name} data-exercise-now={isCurrent ? '' : undefined} data-movement-prep={isMovementPrepRow(ex) ? '' : undefined} className={allSetsLogged ? 'opacity-80' : undefined}>
         <ExerciseLine
           ex={ex}
           supersetLabel={supersetLabel}
@@ -219,6 +219,8 @@ export function ExerciseRow({
   return (
     <div
       data-exercise-name={ex.name}
+      // THE LIFT SHE IS ON: the running button logs THIS card's next set when it is open (nextSetTick).
+      data-exercise-now={isCurrent ? '' : undefined}
       // Movement prep is a warm-up, never a working set (the counts' rule, isMovementPrepRow): said on the card so a
       // check that ticks "a working set" can find one without guessing.
       data-movement-prep={isMovementPrepRow(ex) ? '' : undefined}
