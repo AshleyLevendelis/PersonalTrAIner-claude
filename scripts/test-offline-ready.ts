@@ -307,7 +307,7 @@ async function main() {
   check('the screen\'s swap asks to be kept', /saveScopedEdit\(profile\.id, updated, weekNumber, scope, \{ keepOffline: true \}\)/.test(swapSrc))
   check('...and a sweep of old offers that threw could not put the old exercise back (a precaution: it does not throw today)', /sweepStaleForTarget\([^)]*\)\s*\n?\s*\.catch\(/.test(swapSrc))
   check('so do remove, move and add', /saveScopedEdit\(profileId, next\.mesocycle, liveWeek, scope, \{ keepOffline: true \}\)/.test(today))
-  check('...and their Undo', /saveWeekFor = \(profileId: string\) => \(week: MesocycleWeek\) => saveWeekKeepingOffline\(profileId, week\)/.test(strip(readFileSync('src/lib/screen-edit-undo.ts', 'utf8'))))
+  check('...and their Undo', /saveWeekFor = \(profileId: string\) => \(week: MesocycleWeek\) => saveWeekKeepingOffline\(profileId, week\)\.then\(\(\) => undefined\)\s*$/m.test(strip(readFileSync('src/lib/screen-edit-undo.ts', 'utf8'))) && !/saveMesocycleWeek/.test(strip(readFileSync('src/lib/screen-edit-undo.ts', 'utf8'))))
   check('the coach\'s cards do NOT (it cannot be reached offline; a card that "applied" on the phone alone would lie)', !/keepOffline/.test(strip(readFileSync('src/lib/pending-action-executor.ts', 'utf8'))))
   const sender = strip(readFileSync('src/hooks/useKeptPlanSender.ts', 'utf8'))
   check('the sender knocks when the app opens, when the signal returns, and while anything waits', /\n\s*send\(\)\n/.test(sender) && /addEventListener\('online', send\)/.test(sender) && /setInterval\(send, KNOCK_MS\)/.test(sender))
