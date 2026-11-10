@@ -30,7 +30,7 @@
 
 import { checkMethod, type MethodRules } from './meal-method-check'
 import { supabase, resolveEnv } from './supabase'
-import { computeMealMacros, lookupIngredient, type Macros100g } from './food-db'
+import { computeMealMacros, kindsItCouldBe, lookupIngredient, type Macros100g } from './food-db'
 import { asWeighedLines } from './as-weighed'
 import { validateMealAgainstDiet } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
@@ -576,6 +576,14 @@ export function verifyProposal(
     return null
   }
   if (computed.coverage < MIN_COVERAGE) {
+    // A FOOD ASKED ABOUT FOR ITS KIND THAT IS OUT WHATEVER THE ANSWER (10 Nov 2026, bare "calamari" for someone
+    // shellfish-free). The uncounted line would be reported as a coverage gap and he would be asked "breaded or
+    // plain?" about a food neither answer lets him eat. The definite clash is the reason, so it is the one logged.
+    const outEitherWay = validateMealAgainstDiet(parsed, dietaryPreferences).violations.filter(v => !v.unidentified && kindsItCouldBe(v.ingredient) != null)
+    if (outEitherWay.length > 0) {
+      rejectLog.push(`[${slot}] "${proposal.name}": diet violation(s) — ${outEitherWay.map(v => v.reason).join('; ')}`)
+      return null
+    }
     // Two different gaps, kept apart so the sentence built from this line can
     // tell them apart: a food the table does not know, and a known food whose
     // AMOUNT could not be read ("2 hummus", "1 bowl pasta").

@@ -17,7 +17,7 @@
 // to a vegan because an ingredient string didn't resolve) is not.
 // ---------------------------------------------------------------------------
 
-import { lookupIngredient, type FoodTags } from './food-db'
+import { kindsItCouldBe, lookupIngredient, type FoodTags } from './food-db'
 import type { MealIngredientLine } from './food-db'
 
 export type DietaryPreference =
@@ -225,7 +225,25 @@ export function validateMealAgainstDiet(
     const entry = lookupIngredient(line.name)
 
     if (!entry) {
+      // A FOOD ASKED ABOUT FOR ITS KIND (bare "calamari", 10 Nov 2026) is still known in part. A restriction EVERY
+      // kind breaks is a definite violation, said as "contains" (shellfish); one NO kind breaks is not broken
+      // (nut-free), so the line goes on to be asked about rather than blocked; and one the kinds disagree on (gluten)
+      // is "can't confirm", refused until the kind is said.
+      const kinds = kindsItCouldBe(line.name)
+      if (kinds) {
+        if (kinds.some(k => k.tags.contains_meat || k.tags.contains_pork)) sawMeatOrPork = true
+        if (kinds.some(k => k.tags.contains_dairy)) sawDairy = true
+      }
       for (const pref of activePrefs) {
+        if (kinds) {
+          const breaks = (k: (typeof kinds)[number]) => FORBIDDEN_TAGS[pref].find(tag => k.tags[tag])
+          const everyKind = kinds.every(k => breaks(k) != null)
+          if (everyKind) {
+            violations.push({ ingredient: line.name, preference: pref, reason: `"${line.name}" is tagged ${breaks(kinds[0])}, which ${pref} forbids.` })
+            continue
+          }
+          if (!kinds.some(k => breaks(k) != null)) continue
+        }
         violations.push({
           ingredient: line.name,
           preference: pref,

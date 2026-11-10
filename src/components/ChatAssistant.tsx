@@ -78,7 +78,7 @@ import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options'
 import { compileFoodDislikes, compileSoftExercisePreferences } from '@/lib/fact-compiler'
 import { coachSwapPick, swapOptionsBlock } from '@/lib/coach-swap-pick'
-import { namedFoodClash, clashSentence, allergyRefusal } from '@/lib/named-food-clash'
+import { namedFoodClash, namedFoodKindAsk, clashSentence, allergyRefusal } from '@/lib/named-food-clash'
 import { detectFoodExclusions, mergeFoodsToAvoid } from '@/lib/food-exclusions'
 import { exercisesThatFit } from '@/lib/exercise-shortlist'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
@@ -5766,7 +5766,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    */
   const processResponse = async (result: ChatApiResponse, userSaid = ''): ReturnType<typeof processResponseInner> => {
     const clash = namedFoodClash(userSaid, profile.dietary_preferences ?? [], [...compileFoodDislikes(memoryFacts), ...(profile.disliked_foods ?? [])])
-    if (!clash) return processResponseInner(result, userSaid)
+    if (!clash) {
+      // A FOOD WHOSE KIND DECIDES IT (his ruling 10 Nov 2026, "Ask which": a gluten-free person's bare "calamari").
+      // The app asks; no card that would put it on his plate is built from the coach's guess at the answer, and on a
+      // turn that is only talk the app's question is the reply. A log of something eaten is a record and is left alone.
+      const kindAsk = namedFoodKindAsk(userSaid, profile.dietary_preferences ?? [])
+      if (kindAsk && result.proposal && FOOD_OFFER_KINDS.has(result.proposal.kind)) return { text: kindAsk }
+      const plain = await processResponseInner(result, userSaid)
+      return kindAsk && !result.proposal && !plain.pendingAction && !plain.receipt && !plain.action && !plain.clarification ? { ...plain, text: kindAsk } : plain
+    }
     const refusal = allergyRefusal(clash) ?? clashSentence(clash)
     if (result.proposal && FOOD_OFFER_KINDS.has(result.proposal.kind)) {
       return { text: refusal, outcome: 'refused' }

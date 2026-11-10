@@ -11,7 +11,7 @@
 // way, so the sentence says what is stored ("your profile says nut-free"), never "you're allergic", which would be
 // untrue for someone who avoids nuts by choice. docs/plans/runs-7-10-batch-1-safety.md.
 // ---------------------------------------------------------------------------
-import { findFoodsNamedIn, foodTextWords, type FoodEntry } from './food-db'
+import { calamariSaid, findFoodsNamedIn, foodTextWords, kindsItCouldBe, lookupIngredient, type FoodEntry } from './food-db'
 import { FORBIDDEN_TAGS, type DietaryPreference } from './diet-rules'
 import { ALLERGEN_FOOD_PATTERNS } from './allergen-words'
 import { containsPhrase } from './meal-ingredients'
@@ -55,6 +55,36 @@ function clashingRestriction(entry: FoodEntry, prefs: DietaryPreference[]): Diet
   return null
 }
 
+/** The words around a food the message names: where a word for its kind sits ("salt and pepper calamari", "calamari, breaded"). */
+function aroundHit(words: string[], hit: { from: number; to: number }): string {
+  return words.slice(Math.max(0, hit.from - 3), hit.to + 2).join(' ')
+}
+
+/**
+ * A FOOD HE NAMES WHOSE KIND DECIDES WHETHER HE CAN EAT IT (his ruling 10 Nov 2026, "Ask which": a gluten-free
+ * person's bare "calamari", which is often breaded). The app's question, or null. Asked only when one of his
+ * restrictions depends on the answer: a restriction every kind breaks is namedFoodClash's refusal, and one no kind
+ * breaks is no reason to ask here. Read off HIS message, like the clash: the coach writing "grilled calamari" into a
+ * card for him would be the app guessing the answer.
+ */
+export function namedFoodKindAsk(message: string, dietaryPreferences: string[]): string | null {
+  const text = message ?? ''
+  if (!text.trim()) return null
+  const prefs = dietaryPreferences.filter((p): p is DietaryPreference => p in FORBIDDEN_TAGS)
+  const words = foodTextWords(text)
+  for (const hit of findFoodsNamedIn(text)) {
+    if (NOT_ASKING.test(`${words.slice(Math.max(0, hit.from - 4), hit.from).join(' ')} `) || words[hit.to] === 'free') continue
+    const kinds = kindsItCouldBe(aroundHit(words, hit))
+    if (!kinds) continue
+    const breaks = (k: FoodEntry, p: DietaryPreference) => (FORBIDDEN_TAGS[p] ?? []).some(t => (k.tags as Record<string, boolean | undefined>)[t])
+    const depends = prefs.find(p => kinds.some(k => breaks(k, p)) && !kinds.every(k => breaks(k, p)))
+    if (!depends) continue
+    const what = CONTAINS_WORDS[depends] ?? 'something you avoid'
+    return `Is the calamari breaded or fried in flour, or plain (grilled or boiled)? Breaded or floured calamari has ${what} in it, and your profile says ${depends}, so I need to know before I suggest it or add it to your meals.`
+  }
+  return null
+}
+
 /** The first food her message names that one of her restrictions or avoids keeps out; null when there is none. */
 export function namedFoodClash(message: string, dietaryPreferences: string[], dislikedFoods: string[] = []): FoodClash | null {
   const text = message ?? ''
@@ -70,7 +100,9 @@ export function namedFoodClash(message: string, dietaryPreferences: string[], di
   for (const hit of hits) {
     // "nut-free" / "dairy free" name the restriction, not a food she wants.
     if (notAsking(hit.from) || words[hit.to] === 'free') continue
-    const p = clashingRestriction(hit.entry, ordered)
+    // "Calamari, breaded" names the plain word and says the kind beside it: judged as the floured entry (10 Nov 2026).
+    const coated = calamariSaid(aroundHit(words, hit)) === 'coated' ? lookupIngredient('fried calamari') : null
+    const p = clashingRestriction(coated ?? hit.entry, ordered)
     if (p) return { food: hit.words.join(' '), restriction: p, allergen: ALLERGEN_RESTRICTIONS.includes(p) }
   }
   // 2. Allergen words the database has no entry for ("macadamia"), from the one shared word list.

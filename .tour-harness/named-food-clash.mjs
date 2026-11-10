@@ -167,6 +167,42 @@ check('6b. said it', await say("can you swap today's lunch for almond butter on 
 b = await last()
 check('6c. a card is drawn (so 1e is not passing on a harness that cannot draw one)', b.cards > 0, b)
 
+// ---------------------------------------------------------------------------
+// BARE "CALAMARI" FOR SOMEONE GLUTEN-FREE IS ASKED ABOUT, NEVER CARDED FROM A GUESS (his ruling 10 Nov 2026, "Ask
+// which"). Calamari is often breaded; the coach writing "grilled calamari" into a card would be answering for him.
+// The same stubbed coach: it cards the swap, then offers to build it. What is driven is the app's half.
+// ---------------------------------------------------------------------------
+const ASK = 'Is the calamari breaded or fried in flour, or plain (grilled or boiled)? Breaded or floured calamari has gluten in it, and your profile says gluten-free, so I need to know before I suggest it or add it to your meals.'
+
+console.log('\n7. Gluten-free: a swap card for bare calamari is not built; the app asks which kind\n')
+check('7a. the chat is up, gluten-free', await open('diet=gluten-free&daymove=1'))
+check('7b. said it', await say("can you swap today's lunch for calamari?"))
+b = await last()
+check('7c. the bubble is the question, word for word', b.text === ASK, b)
+check('7d. ...on screen where the reply is', b.inView, b)
+check('7e. no card: nothing to tap that would put it on his plate before he answers', b.cards === 0, b)
+await shoot('named-food-clash-calamari-ask')
+
+console.log('\n8. A prose reply offering to build it is replaced by the question\n')
+check('8a. said it', await say('why not the calamari?'))
+b = await last()
+check('8b. the reply is the question, word for word', b.text === ASK, b)
+check("8c. ...the coach's offer to build it never reaches him", typeof b.text === 'string' && !/custom dish/i.test(b.text), b)
+
+console.log('\n9. Once the kind is said, or where the kind cannot matter, nothing is asked\n')
+check('9a. said the kind: plain', await say('why not the grilled calamari?'))
+b = await last()
+check("9b. the coach's words, unchanged (grilled is plain squid: no gluten)", b.text === 'I can add it as a custom dish if you like.', b)
+check('9c. the chat is up, nut-free', await open('diet=nut-free&daymove=1'))
+check('9d. said it', await say('why not the calamari?'))
+b = await last()
+check("9e. nut-free: the coach's words, unchanged (neither kind has nuts)", b.text === 'I can add it as a custom dish if you like.', b)
+check('9f. the chat is up, shellfish-free', await open('diet=shellfish-free&daymove=1'))
+check('9g. said it', await say('why not the calamari?'))
+b = await last()
+check('9h. shellfish-free: refused outright, not asked (it is out whatever the answer)', typeof b.text === 'string' && /^Calamari has shellfish in it, and your profile says shellfish-free/.test(b.text) && !/breaded/.test(b.text), b)
+await shoot('named-food-clash-calamari-shellfish')
+
 console.log(`\n${ran} checks ran.`)
 ws.close(); chrome.kill(); server.close()
 if (failures > 0) { console.error(`${failures} check(s) failed.`); process.exit(1) }

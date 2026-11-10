@@ -116,6 +116,12 @@ export function explainRejection(log: string[], dishName: string, slot: MealSlot
     // English, falling back to the plain sentence if the shape ever changes.
     const detail = line.split('—').slice(1).join('—')
     const foods = [...detail.matchAll(/"([^"]+)"/g)].map(m => m[1])
+    // A FOOD WHOSE KIND DECIDES IT (his ruling 10 Nov 2026, "Ask which"): calamari that could not be confirmed for a
+    // restriction is asked about, breaded or plain, rather than refused. Only when nothing in the dish is a definite
+    // clash: a dish that is out anyway is not worth a question.
+    const definite = /is tagged /.test(detail)
+    const kindAsk = definite ? null : foods.map(f => whichKindQuestion(f)).find(q => q != null)
+    if (kindAsk) return `${kindAsk} I'll add ${dishName} once I know.`
     const restriction = /which ([a-z-]+) forbids/i.exec(detail)?.[1]
     const foodList = foods.length > 0
       ? foods.slice(0, 3).join(', ').replace(/, ([^,]*)$/, ' and $1')

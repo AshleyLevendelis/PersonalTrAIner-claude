@@ -179,10 +179,12 @@ export const FOOD_DB: FoodEntry[] = [
   // about 1,700 kcal. A kilo in the shell gives about 250 g of cooked meat (a fishmonger's quarter, as recalled), so
   // in-shell figures are a quarter of the meat's. Only when the shell is SAID: a bare "mussels" stays the meat.
   f('mussels in shell', ['mussels in their shells', 'mussels in shells', 'live mussels', 'fresh mussels in shell', 'whole mussels'], { kcal: 43, protein: 6, carbs: 1.9, fat: 1.1 }, 'protein', { contains_shellfish: true }),
-  f('squid', ['calamari'], { kcal: 92, protein: 15.6, carbs: 3.1, fat: 1.4 }, 'protein', { contains_shellfish: true }),
+  // BARE "CALAMARI" IS ASKED ABOUT (his ruling 10 Nov 2026, "Ask which"; see calamariNeedsKind). The alias stays so
+  // every reader of the table still knows calamari is shellfish; the ingredient lookup refuses the bare word.
+  f('squid', ['calamari', 'calamari tubes', 'squid tubes', 'calamares', 'chargrilled calamari', 'chargrilled squid', 'griddled calamari', 'barbecued calamari', 'bbq calamari', 'poached calamari', 'braised calamari', 'stewed calamari', 'uncoated calamari', 'unbreaded calamari'], { kcal: 92, protein: 15.6, carbs: 3.1, fat: 1.4 }, 'protein', { contains_shellfish: true }),
   // FOOD AUDIT, 10 Nov 2026: fried calamari was costed as raw squid (92 kcal). USDA squid, fried in flour, as
-  // recalled. Floured, so gluten. A bare "calamari" stays raw squid (what a recipe buys).
-  f('calamari fried', ['fried calamari', 'fried squid', 'breaded calamari', 'calamari rings fried', 'salt and pepper squid', 'salt and pepper calamari'], { kcal: 175, protein: 17.9, carbs: 7.8, fat: 7.5 }, 'protein', { contains_shellfish: true, contains_gluten: true }),
+  // recalled. Floured, so gluten. A bare "calamari" is asked about (10 Nov 2026).
+  f('calamari fried', ['fried calamari', 'fried squid', 'breaded calamari', 'calamari rings fried', 'salt and pepper squid', 'salt and pepper calamari', 'battered calamari', 'crispy calamari', 'crumbed calamari', 'floured calamari', 'breaded squid', 'battered squid', 'crispy squid', 'fried calamari rings', 'breaded calamari rings', 'battered calamari rings', 'calamares fritos'], { kcal: 175, protein: 17.9, carbs: 7.8, fat: 7.5 }, 'protein', { contains_shellfish: true, contains_gluten: true }),
 
   // ===== PROTEIN: eggs & dairy protein ================================
   f('egg', ['eggs', 'whole egg', 'boiled egg', 'fried egg', 'scrambled egg', 'hard boiled egg', 'soft boiled egg', 'poached egg'], { kcal: 155, protein: 13, carbs: 1.1, fat: 11 }, 'protein', { contains_egg: true }, { medium: 50, large: 58, small: 44 }, { avgGrams: 58, label: 'egg' }),
@@ -1304,17 +1306,62 @@ const LOOKUP_MEMO_CAP = 5000
 // ASKED about. Until then the spelling decided: "greek yoghurt" was costed as 0% (57 kcal per 100 g) and "greek
 // yogurt" as full-fat (97), the same words giving two answers. Both are now a miss, so nothing is counted until the
 // kind is known, and the question names the kinds the table holds rather than asking for grams it already has.
-const WHICH_KIND: { pattern: RegExp; question: (said: string) => string }[] = [
-  { pattern: /^greek yogh?urt$/, question: said => `Was the ${said} fat-free (0%), low-fat (2%) or full-fat?` },
+// ---------------------------------------------------------------------------
+// BARE "CALAMARI" IS ASKED ABOUT: BREADED OR PLAIN (his ruling 10 Nov 2026, "Ask which", from three options: ask /
+// "can't confirm it's gluten-free" / leave it as plain squid).
+//
+// Measured that day: "150g calamari" resolved to plain squid, so a gluten-free person's calamari passed the diet
+// check, and calamari is very often floured or breaded. The other two foods asked about (Greek yoghurt, mince) change
+// the NUMBERS with their kind; this one changes an ALLERGEN TAG, so two things differ from them:
+//   - the word stays in the table as squid, because the prose scanner and the named-food check read the table to know
+//     calamari is shellfish (the shellfish word list does not name it). Only the INGREDIENT lookup refuses it;
+//   - what is true of every kind is still known (kindsItCouldBe): shellfish stays a definite "contains", a
+//     restriction neither kind breaks (nut-free) is not broken, and only what depends on the answer (gluten) is
+//     "can't confirm".
+// A word that says the kind settles it: grilled, plain, boiled... is squid; fried, breaded, battered, crispy... is the
+// fried entry, which carries gluten. "Fried" with no more said is read as floured: the stricter reading.
+// ---------------------------------------------------------------------------
+const CALAMARI = /\bcalamar(?:i|es)\b/
+const CALAMARI_PLAIN = /\b(?:plain|tubes?|grilled|chargrilled|griddled|barbecued|bbq|boiled|steamed|poached|braised|stewed|uncoated|unbreaded)\b/
+const CALAMARI_COATED = /\b(?:fried|fritos|breaded|battered|crispy|crumbed|floured|salt and pepper)\b/
+/**
+ * What a phrase naming calamari says about its kind: 'coated' (floured, breaded, fried), 'plain', or 'ask' when it
+ * says neither. Null when the phrase does not name calamari. A phrase saying both is read as coated, the stricter.
+ */
+export function calamariSaid(phrase: string): 'plain' | 'coated' | 'ask' | null {
+  const said = normalize(phrase)
+  if (!CALAMARI.test(said)) return null
+  if (CALAMARI_COATED.test(said)) return 'coated'
+  return CALAMARI_PLAIN.test(said) ? 'plain' : 'ask'
+}
+function calamariNeedsKind(said: string): boolean {
+  return calamariSaid(said) === 'ask'
+}
+
+const WHICH_KIND: { matches: (said: string) => boolean; question: (said: string) => string }[] = [
+  { matches: said => /^greek yogh?urt$/.test(said), question: said => `Was the ${said} fat-free (0%), low-fat (2%) or full-fat?` },
   // His "Ask" for plain mince, 10 Nov 2026: the pack says the fat, and the five are the levels UK packs carry.
-  { pattern: /^(?:raw )?(?:beef mince|minced beef|mince beef|ground beef|beef steak mince|steak mince|minced steak|mince)(?: raw)?$/, question: () => 'What fat was the beef mince: 5%, 10%, 12%, 15% or 20%? It says on the pack.' },
+  { matches: said => /^(?:raw )?(?:beef mince|minced beef|mince beef|ground beef|beef steak mince|steak mince|minced steak|mince)(?: raw)?$/.test(said), question: () => 'What fat was the beef mince: 5%, 10%, 12%, 15% or 20%? It says on the pack.' },
+  { matches: calamariNeedsKind, question: () => 'Was the calamari breaded or fried in flour, or plain (grilled or boiled)?' },
 ]
 
 /** The question for a food named without its kind ("greek yoghurt"), or null when the name is not one of those. */
 export function whichKindQuestion(name: string): string | null {
   const said = name.trim().toLowerCase().replace(/\s+/g, ' ')
-  const hit = WHICH_KIND.find(k => k.pattern.test(said))
+  const hit = WHICH_KIND.find(k => k.matches(said) || k.matches(normalize(said)))
   return hit ? hit.question(said.replace(/^greek/, 'Greek')) : null
+}
+
+/**
+ * THE KINDS A NAME COULD BE, for a name the ingredient lookup refuses until its kind is said (bare "calamari": plain
+ * squid, or the fried, floured entry). Null for every other name. The diet check reads it so that what is true of
+ * EVERY kind stays a definite answer (shellfish: contains; nuts: none), and only what the kinds disagree on (gluten)
+ * is "can't confirm".
+ */
+export function kindsItCouldBe(name: string): FoodEntry[] | null {
+  if (!calamariNeedsKind(normalize(name))) return null
+  const kinds = [LOOKUP.get('squid'), LOOKUP.get('calamari fried')].filter((e): e is FoodEntry => e != null)
+  return kinds.length === 2 ? kinds : null
 }
 
 export function lookupIngredient(name: string): FoodEntry | null {
@@ -1448,6 +1495,8 @@ function inState(entry: FoodEntry, asked: 'dry' | 'raw' | 'uncooked' | 'cooked')
 function lookupIngredientUncached(name: string): FoodEntry | null {
   const key = normalize(name)
   if (!key) return null
+  // Calamari with no word for its kind is not costed and not tagged from a guess: it is asked about (see above).
+  if (calamariNeedsKind(key)) return null
   const tokens = key.split(' ').filter(Boolean)
   const whole = resolveWords(tokens)
   if (whole) return whole

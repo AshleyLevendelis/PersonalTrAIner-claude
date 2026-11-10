@@ -582,6 +582,7 @@
     "measure:deep-pool": "tsx scripts/measure-deep-pool.ts",
     "test:greek-yoghurt-asked": "tsx scripts/test-greek-yoghurt-asked.ts",
     "test:mince-asked": "tsx scripts/test-mince-asked.ts",
+    "test:calamari-asked": "tsx scripts/test-calamari-asked.ts",
     "test:food-figures": "tsx scripts/test-food-figures.ts",
     "verify:deep-pool": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/deep-pool.mjs"
   },
