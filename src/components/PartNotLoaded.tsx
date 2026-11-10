@@ -21,21 +21,40 @@ type AnyProps = Record<string, unknown>
 type Factory = () => Promise<{ default: ComponentType<any> }>
 
 export const PART_NOT_LOADED_OFFLINE = 'This part of the app isn\'t saved on your phone yet, so it needs a connection. Everything you log is still being saved.'
-export const PART_NOT_LOADED_ONLINE = 'This part of the app didn\'t load. Check your connection and try again.'
+export const PART_NOT_LOADED_ONLINE = 'This part of the app didn\'t load. Reloading the app fetches it again; everything you log is saved.'
+export const PART_NOT_LOADED_RELOAD = 'Reload the app'
 
 const CLOSERS = ['onOpenChange', 'onClose', 'onCancel', 'onDismiss', 'onDone'] as const
 
 /** A sheet or dialog: something the screen opens over itself and expects to be told is shut. */
 function isSheetLike(props: AnyProps): boolean {
-  return 'open' in props || CLOSERS.some(k => typeof props[k] === 'function')
+  return 'open' in props || 'target' in props || CLOSERS.some(k => typeof props[k] === 'function')
 }
 
 /**
- * `reload` is chunk-reload's guarded page reload. A browser that has failed to fetch a file once may refuse to ask for
- * it again for as long as the page lives (Chrome keeps the failure), so once the phone is online and a fresh try still
- * fails, loading the page again is the only thing that can fetch it. Only ever from the person's own tap.
+ * NOBODY HAS ASKED FOR IT YET. Several sheets stay mounted while shut, and say so in one of two ways: `open={false}`,
+ * or a `target` of null (what happened, add, remove, swap). A notice for a sheet nobody opened is noise: it would
+ * float over the Exercise screen the moment the app started with one file missing.
  */
-export function partNotLoaded(factory: Factory, reload: () => boolean = () => false): ComponentType<AnyProps> {
+function isShut(props: AnyProps): boolean {
+  return ('open' in props && props.open === false) || ('target' in props && props.target == null)
+}
+
+export interface PartNotLoadedOptions {
+  /**
+   * A part nobody asked for by tapping (a card that appears on its own day): with its file missing it draws nothing,
+   * and arrives by itself when it can. A notice is for something the person reached for.
+   */
+  ambient?: boolean
+}
+
+/**
+ * A browser that has failed to fetch a file once may refuse to ask for it again for as long as the page lives (Chrome
+ * keeps the failure), so once the phone is online, loading the page again is the only thing that can fetch it. That
+ * is offered as what it is ("Reload the app"), and only ever from the person's own tap: an unguarded reload, because
+ * a tap is not a loop (the automatic reload's guard would refuse it for twenty seconds and leave a dead button).
+ */
+export function partNotLoaded(factory: Factory, options: PartNotLoadedOptions = {}): ComponentType<AnyProps> {
   return function PartNotLoaded(props: AnyProps) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the real part, once it arrives
     const [Real, setReal] = useState<ComponentType<any> | null>(null)
@@ -47,7 +66,9 @@ export function partNotLoaded(factory: Factory, reload: () => boolean = () => fa
       setTrying(true)
       factory()
         .then(m => setReal(() => m.default))
-        .catch(() => { if (byTap && navigator.onLine !== false) reload() })
+        // Tapped with the phone saying it is online, and the file still would not come: the page has to be loaded
+        // again (see above). Never from the signal returning by itself.
+        .catch(() => { if (byTap && navigator.onLine !== false) window.location.reload() })
         .finally(() => setTrying(false))
     }, [])
 
@@ -62,13 +83,14 @@ export function partNotLoaded(factory: Factory, reload: () => boolean = () => fa
     }, [tryAgain])
 
     // A sheet opened again after OK says so again.
-    const open = props.open
-    useEffect(() => { if (open) setDismissed(false) }, [open])
+    const shut = isShut(props)
+    useEffect(() => { if (!shut) setDismissed(false) }, [shut])
 
     if (Real) return <Real {...props} />
+    if (options.ambient) return null
 
     const sheet = isSheetLike(props)
-    if (sheet && (props.open === false || dismissed)) return null
+    if (sheet && (shut || dismissed)) return null
 
     const close = () => {
       setDismissed(true)
@@ -89,14 +111,25 @@ export function partNotLoaded(factory: Factory, reload: () => boolean = () => fa
           {online ? PART_NOT_LOADED_ONLINE : PART_NOT_LOADED_OFFLINE}
         </p>
         <div className="mt-2 flex gap-2">
-          <button
-            type="button"
-            onClick={() => tryAgain(true)}
-            disabled={trying}
-            className="min-h-[44px] rounded-full border border-border px-4 text-[0.8125rem] font-semibold text-foreground disabled:opacity-60"
-          >
-            {trying ? 'Trying…' : 'Try again'}
-          </button>
+          {online ? (
+            // WITH SIGNAL the only cure is the page loaded again, so the button says so and does it.
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="min-h-[44px] rounded-full border border-border px-4 text-[0.8125rem] font-semibold text-foreground"
+            >
+              {PART_NOT_LOADED_RELOAD}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => tryAgain(true)}
+              disabled={trying}
+              className="min-h-[44px] rounded-full border border-border px-4 text-[0.8125rem] font-semibold text-foreground disabled:opacity-60"
+            >
+              {trying ? 'Trying…' : 'Try again'}
+            </button>
+          )}
           {sheet && (
             <button
               type="button"

@@ -53,9 +53,11 @@ export async function swapOnScreen(input: {
     // VISION-ARCHITECTURE.md §2.3 — after a tap, sweep pending proposals on
     // the same target so nobody confirms a card their own tap invalidated.
     // Same key the chat's swap card is filed under: the PLAN ROW and index.
-    // ITS OWN FAILURE IS NOT THE SWAP'S: the swap is saved (or kept) by now, and a sweep that could not reach the
-    // server used to land in the catch below and put the old exercise back ON SCREEN over a plan that had changed.
-    // An offer left open is checked against the plan again at its own tap (offerStillHolds).
+    // ITS OWN FAILURE IS NOT THE SWAP'S: the swap is saved (or kept) by now, so a sweep that THREW must not land in
+    // the catch below and put the old exercise back on screen over a plan that changed. A PRECAUTION, NOT A MEASURED
+    // DEFECT: the client resolves with an error on a dead network rather than throwing, and with no signal this
+    // line was observed to pass quietly (verify:gym-offline is unchanged without it). An offer left open is checked
+    // against the plan again at its own tap (offerStillHolds).
     await sweepStaleForTarget(profile.id, `${profile.id}:propose_exercise_swap:${dayName}:${exIndex}`)
       .catch(err => console.error('Sweeping stale swap offers failed (the swap itself is saved):', err))
     // THE UNDO LINE (QA walk T7): the plan as it was, filed for the Exercise tab's one line.

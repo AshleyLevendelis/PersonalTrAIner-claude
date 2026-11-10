@@ -116,11 +116,25 @@ const b = await settle()
 await wait(4000)
 const loadsAfterWait = pageLoads
 check('B1. a deploy that stays broken reloads once and then STOPS (no loop)', loadsAfterWait === 2, { pageLoads: loadsAfterWait })
-check('B2. ...and says so on the error screen, with "Reload the app"', !!b && b.crashed === true && b.buttons.includes('Reload the app'), b)
-check('B3. ...without a "Try again" that could never work (the failed file stays failed)', !!b && !b.buttons.includes('Try again'), b?.buttons)
+// SINCE 10 NOV 2026 (a gym with no signal) a part that cannot be fetched no longer takes the whole app: it used to
+// stop at the error screen here. Now the Exercise tab stays up and usable, nothing is said about a sheet nobody has
+// opened, and opening it says the part did not load and offers the one thing that can fetch it. The old B3 stands:
+// no "Try again" that could never work.
+check('B2. ...and the Exercise tab is UP and usable, not the error screen', !!b && b.crashed === false && b.exercise === true && b.buttons.includes('Start session'), b)
+check('B2b. ...with no notice floating over it for a sheet nobody opened', (await has('[data-testid="part-not-loaded"]')) === false)
+await tap('button[aria-label="More options"]'); await wait(500)
+await tap('[data-testid="what-happened-item"]'); await wait(900)
+const said = await ev(`(() => { const n = document.querySelector('[data-testid="part-not-loaded"]'); return n ? { text: n.innerText, buttons: [...n.querySelectorAll('button')].map(x => x.textContent.trim()) } : null })()`)
+check('B2c. asked for, the sheet says it did not load, in place', !!said && /didn't load/.test(said.text) && /everything you log is saved/i.test(said.text), said)
+check('B3. ...offering "Reload the app", without a "Try again" that could never work (the failed file stays failed)', !!said && said.buttons.includes('Reload the app') && !said.buttons.includes('Try again'), said?.buttons)
 await shoot('chunk-reload-broken-deploy')
+const loadsBeforeTap = pageLoads
+await ev(`[...document.querySelectorAll('[data-testid="part-not-loaded"] button')].find(x => x.textContent.trim() === 'Reload the app')?.click()`)
+await wait(5000)
+check('B4. her tap reloads the app, inside the twenty seconds the automatic reload is refused for', pageLoads === loadsBeforeTap + 1, { before: loadsBeforeTap, after: pageLoads })
+check('B5. ...and that reload does not start a loop', await (async () => { await wait(4000); return pageLoads === loadsBeforeTap + 1 })(), { pageLoads })
 
 console.log(`\n${ran} checks ran.`)
-console.log(failures === 0 ? 'A missing file reloads once, and a broken deploy stops at the error screen.\n' : `${failures} check(s) FAILED.\n`)
+console.log(failures === 0 ? 'A missing file reloads once; a broken deploy leaves the app usable and says so where the part was asked for.\n' : `${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

@@ -62,9 +62,11 @@ await setOffline(false)
 const backOnline = await until(() => ev(`document.querySelector('[data-testid="part-not-loaded"]')?.getAttribute('data-online') ?? (document.querySelector('[data-testid="program-calendar"]') ? 'loaded' : null)`), v => v === 'true' || v === 'loaded', 40)
 check('the signal comes back: the notice stops saying the phone has no connection, or the calendar is simply there', backOnline === 'true' || backOnline === 'loaded', backOnline)
 check('...and nothing reloaded by itself', (await ev(`window.__sameLoad`)) === 'yes')
-if (backOnline === 'true') await clickAt(`[...document.querySelectorAll('[data-testid="part-not-loaded"] button')].find(x => /Try again/.test(x.textContent))`)
+const onlineButtons = backOnline === 'true' ? await ev(`[...document.querySelectorAll('[data-testid="part-not-loaded"] button')].map(x => x.textContent.trim())`) : ['Reload the app']
+check('...and with signal the button says what it does: "Reload the app", no "Try again" that cannot work', onlineButtons.includes('Reload the app') && !onlineButtons.includes('Try again'), onlineButtons)
+if (backOnline === 'true') await clickAt(`[...document.querySelectorAll('[data-testid="part-not-loaded"] button')].find(x => /Reload the app/.test(x.textContent))`)
 const cal = await until(() => ev(`!!document.querySelector('[data-testid="program-calendar"]')`), v => v === true, 80)
-check('Try again brings the calendar', cal === true)
+check('her tap brings the calendar', cal === true)
 check('...and the notice is gone', (await ev(`!!document.querySelector('[data-testid="part-not-loaded"]')`)) === false)
 
 // A SHEET, which has no place in the page: its notice floats, and OK tells the screen the sheet is shut. "Feeling

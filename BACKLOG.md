@@ -2,6 +2,66 @@
 
 Newest first. One line each.
 
+- [x] **A WORKOUT WITH NO SIGNAL, 10 NOV 2026 (Ashley, from a gym with no Wi-Fi): NO CRASH SCREEN, THE WHOLE APP ON THE
+  PHONE, THE WEEK COUNTS WHAT THE PHONE HOLDS, A SWAP KEPT AND SENT LATER.** His words: the whole-app "Something went
+  wrong on this screen" mid-workout (screenshot), then "gyms often don't have WiFi and I noticed it's not possible to
+  log a workout without Internet. We should be able to do as much as possible in the app without network." Decided
+  unprompted (mechanical; his instruction was to work through it without asking). Plan and what is not done:
+  `docs/plans/offline-in-the-gym.md`.
+  WHAT WAS WRONG, each reproduced first. (1) The app's screens are files fetched on first use, and the service worker
+  saved a file only when the page fetched it: a sheet never opened at home did not exist in the gym; the fetch failed,
+  the app reloaded itself (the cure for an old page, useless offline) and the second miss was the error screen.
+  (2) A session trained offline read as not trained: the card said 18 of 18 over "Done · 0 of 18 sets" and "0 of 4
+  sessions · 0/68 sets", because the week read the server alone. (3) A session finished offline was never marked
+  finished while the app stayed open: measured, the 20 sets synced and the day was still unfinished 46 seconds after
+  the signal returned (the close was retried only on the next open). (4) A swap could not be made: drawn, not saved,
+  put back.
+  WHAT CHANGED. The build lists its own files and the worker saves all of them in the background, clearing older
+  versions' once the new one is whole (measured on the real build: 43 of 43 held, an offline reload drew the app). A
+  part still missing draws one line in its own place (never the error screen, never a reload with no signal, nothing
+  at all for a sheet nobody opened or a card nobody tapped); with signal its button is "Reload the app", because
+  Chrome keeps a failed file fetch for the life of the page and a second ask cannot work. The finish check is part of
+  the screen. The week lays the phone's own unsent sets and offline finish over a read that worked AND one that
+  failed. A finish made offline is sent on the `online` event and a 20-second knock. Plan changes made on the Exercise
+  screen (swap, remove, move, add, their Undo) are kept on the phone when the failure is the network's and sent
+  later; a refusal still throws; a read lays kept weeks over the server's; a newer save drops the kept copy; the badge
+  reads "Plan change waiting to send". Tools reads the plan week on the app's clock like every other tab.
+  CSCS REVIEW (the offline swap changes how a prescription is SAVED, not chosen): same replacement list, checks and
+  pricing functions; what it takes away is the logged-history price for the swapped-in lift and the "last time"
+  hints, both server reads, so the lift takes the plan's own unverified price, the conservative one; no floor or
+  ceiling moves; in scope.
+  THREE THINGS I GOT WRONG ON THE WAY, and how. (a) I reported the offline swap as failing SILENTLY: the harness page
+  does not draw App's banner, and the app does say "didn't save". The harness is not the app, again; I checked which
+  file renders the message before writing it down, and only after having told Ashley. (b) I wrote that a failed sweep
+  of old offers "used to put the old exercise back" over a saved swap. REASONED, NOT MEASURED: the client resolves
+  with an error rather than throwing, and the mutation removing my catch came back MISSED on the driver. The catch
+  stays as a labelled precaution; the claim is withdrawn here, in the code and in the plan. (c) My first recovery
+  design retried the file when the signal returned; the driver showed Chrome will not fetch it again in the same
+  page, so the button became "Reload the app".
+  A FAKE MUST ENFORCE WHAT THE DATABASE ENFORCES: the harness's fake let two sessions exist for one day, so the set
+  queue and the finish retry each inserted one and every later read of that day failed; Postgres has
+  unique_profile_date_session and the app already handles the refusal. The fake now refuses too, and the app asks
+  once at a time for a day's session row.
+  NOT DONE, named: opening the app cold with no signal is measured on the real build and in the whole-app harness with
+  the database down, not held by a registered check of the real shell; day changes (rest, missed, moved, swapped for an
+  activity), shorten/rebuild today, a different kind of session, meal swaps, weigh-ins, Profile and the coach still
+  need a signal and say so; never run on a real phone.
+  VERIFIED: verify:gym-offline (50 checks at f2311a9f, the server taken away for page and worker), test:offline-ready
+  (76), verify:chunk-reload re-anchored (12: a broken deploy now leaves the app usable and says so where the part was
+  asked for), 312 of 313 logic gates that read the changed files (the one failure, a comment that repeated the Finish
+  button's words, fixed). MUTATIONS, round 1 at f3bdc1dc: 23 tried, 21 caught; the 2 MISSED were redundant safeguards
+  (a "did a fetch fail" flag beside a test of what is held; a dead ?? in the week overlay) and were deleted rather
+  than given checks. Round 2 (the kept plan changes, the week list) and a short round 3 (the quieter notice) are
+  recorded in the next entry. NOT YET RE-RUN on the final tree: verify:gym-offline after the notice's button became
+  "Reload the app", and the full sweep.
+- [x] **THE WEEK LIST: A WORKOUT'S NAME IS THE HEADLINE, 10 NOV 2026.** Ashley: "not very clearly visible at first glance
+  which are a title of a workout and which are the exercises themselves." Measured on the screen first: the name was
+  15.5px semibold over a 13px near-white main-lift line, and an opened day's exercise names were 15px in full white
+  starting 13px to the LEFT of the title they belong to. Now the name is 17px bold with its last word in the accent
+  (as Home's and Exercise's session cards draw a workout's name), the line under it is 12px in the quiet colour and
+  says "Main lift", and an opened day's exercises hang off a rail to the right of the name under "Exercises N".
+  Layout only; nothing removed. Decided unprompted and shown to him in the report (how it looks is his to change).
+  verify:program-titles (16 checks at 390 and 320px).
 - [x] **FULL SWEEP OF THE LONG-FLIGHT BATCH, 10 NOV 2026: 15 REAL FAILURES, ALL FIXED; TWO WERE THE APP.** 527 gates at
   ce49bfa7, 508 passed; four environmental (meal-quality, schema-parity, rls, coach-exam-fresh, the last waiting on an
   exam run on his machine). Mechanical; no ruling needed.

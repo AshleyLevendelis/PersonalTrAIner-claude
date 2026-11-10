@@ -153,13 +153,17 @@ async function main() {
   setOnline(true)
   check('with signal it reloads once, as before', reloadOnce(1_000_000) === true && reloads === 1, { reloads })
   const chunk = strip(readFileSync('src/lib/chunk-reload.ts', 'utf8'))
-  check('a part that cannot be fetched draws its own notice, where it used to throw to the error screen', /if \(isChunkLoadError\(error\)\) return \{ default: partNotLoaded\(factory, reloadOnce\)/.test(chunk))
-  check('...and a real error still throws (only a missing file is softened)', /partNotLoaded\(factory, reloadOnce\)[^\n]*\n\s*throw error/.test(chunk))
+  check('a part that cannot be fetched draws its own notice, where it used to throw to the error screen', /if \(isChunkLoadError\(error\)\) return \{ default: partNotLoaded\(factory, options\)/.test(chunk))
+  check('...and a real error still throws (only a missing file is softened)', /partNotLoaded\(factory, options\)[^\n]*\n\s*throw error/.test(chunk))
   const part = readFileSync('src/components/PartNotLoaded.tsx', 'utf8')
   const { PART_NOT_LOADED_OFFLINE, PART_NOT_LOADED_ONLINE } = await import('../src/components/PartNotLoaded')
   check('the notice says what is true: not on the phone, needs a connection, logging is saved', /isn't saved on your phone yet/.test(PART_NOT_LOADED_OFFLINE) && /needs a connection/.test(PART_NOT_LOADED_OFFLINE) && /still being saved/.test(PART_NOT_LOADED_OFFLINE), PART_NOT_LOADED_OFFLINE)
   check('...promises nothing ("yet" names the download, not a feature) and blames nobody', !/sorry|error|crash|oops/i.test(PART_NOT_LOADED_OFFLINE + PART_NOT_LOADED_ONLINE))
-  check('the reload is from her tap only, never from the signal coming back', /tryAgain\(false\)/.test(strip(part)) && /if \(byTap && navigator\.onLine !== false\) reload\(\)/.test(strip(part)))
+  check('the reload is from her tap only, never from the signal coming back', /const up = \(\) => \{ setOnline\(true\); tryAgain\(false\) \}/.test(strip(part)) && /if \(byTap && navigator\.onLine !== false\) window\.location\.reload\(\)/.test(strip(part)) && (strip(part).match(/location\.reload\(\)/g) ?? []).length === 2 && /onClick=\{\(\) => window\.location\.reload\(\)\}/.test(strip(part)))
+  const { PART_NOT_LOADED_RELOAD } = await import('../src/components/PartNotLoaded')
+  check('with signal the button is named for what it does', PART_NOT_LOADED_RELOAD === 'Reload the app' && /\{online \? \(/.test(strip(part)))
+  check('a sheet that is mounted but shut says nothing (open false, or a target of nothing)', /\('open' in props && props\.open === false\) \|\| \('target' in props && props\.target == null\)/.test(strip(part)) && /if \(sheet && \(shut \|\| dismissed\)\) return null/.test(strip(part)))
+  check('a part nobody tapped to open draws nothing while it is missing (the shopping card on Home)', /if \(options\.ambient\) return null/.test(strip(part)) && /import\('@\/components\/ShopDayCard'\)[^\n]*\{ ambient: true \}/.test(strip(readFileSync('src/components/Dashboard.tsx', 'utf8'))))
   const today = strip(readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8'))
   check('the finish check is part of the screen, never fetched on the tap', /import \{ FinishCheckSheet \} from '\.\/FinishCheckSheet'/.test(today) && !/lazyWithReload\(\(\) => import\('\.\/FinishCheckSheet'\)/.test(today))
 
@@ -240,13 +244,16 @@ async function main() {
   const plan = (labels: Record<number, string>) => [1, 2, 3, 4].map(n => wk(n, labels[n] ?? `week ${n}`))
   const reset = () => { server.clear(); ls.clear(); net = 'up'; downFor = () => true }
   const serverLabel = (id: string, n: number) => server.get(`${id}|${n}`)?.label ?? null
+  // A CALL THAT THROWS IS AN ANSWER ('threw'), not the end of the run: a break that makes a save throw must FAIL the
+  // checks that follow, every one of them still counted (a gate that stops early reads as a crash, not a catch).
+  const safe = async <T,>(fn: () => Promise<T>): Promise<T | 'threw'> => { try { return await fn() } catch { return 'threw' } }
 
   reset()
-  check('with signal the edit is saved and nothing is kept', (await P.saveScopedEdit('p1', plan({ 2: 'swapped' }), 2, 'today', { keepOffline: true })) === 'saved' && serverLabel('p1', 2) === 'swapped' && P.keptPlanWeeks('p1').size === 0 && !P.hasKeptPlanWeeks())
+  check('with signal the edit is saved and nothing is kept', (await safe(() => P.saveScopedEdit('p1', plan({ 2: 'swapped' }), 2, 'today', { keepOffline: true }))) === 'saved' && serverLabel('p1', 2) === 'swapped' && P.keptPlanWeeks('p1').size === 0 && !P.hasKeptPlanWeeks())
   let told = 0
   const offKept = P.subscribeKeptPlanWeeks(() => { told++ })
   net = 'down'
-  const keptAnswer = await P.saveScopedEdit('p1', plan({ 2: 'swapped offline' }), 2, 'today', { keepOffline: true })
+  const keptAnswer = await safe(() => P.saveScopedEdit('p1', plan({ 2: 'swapped offline' }), 2, 'today', { keepOffline: true }))
   check('WITH NO SIGNAL it is kept on the phone, not thrown away', keptAnswer === 'kept' && (P.keptPlanWeeks('p1').get(2) as { label?: string } | undefined)?.label === 'swapped offline' && P.hasKeptPlanWeeks() && serverLabel('p1', 2) === 'swapped', { keptAnswer, kept: [...P.keptPlanWeeks('p1').keys()] })
   check('...only the week the edit touched', P.keptPlanWeeks('p1').size === 1)
   check('...and the "waiting to send" line is told', told >= 1, told)
@@ -259,45 +266,46 @@ async function main() {
   check('a REFUSAL from the database is never kept: it throws, and the screen puts the plan back', threw && P.keptPlanWeeks('p3').size === 0)
 
   net = 'up'
-  const laid = await P.restoreMesocycle('p1')
-  check('a read of the plan lays the kept week over the server\'s older one', laid?.weeks.find(w => w.week_number === 2)?.label === 'swapped offline', laid?.weeks.map(w => w.label))
+  const laidRead = await safe(() => P.restoreMesocycle('p1'))
+  const laid = laidRead === 'threw' ? null : laidRead
+  check('a read of the plan lays the kept week over the server\'s older one', laid?.weeks?.find(w => w.week_number === 2)?.label === 'swapped offline', laid?.weeks?.map(w => w.label))
   server.set('p9|2', { profile_id: 'p9', week_number: 2, label: 'someone else', days: [] })
-  check('...and never over another person\'s plan', (await P.restoreMesocycle('p9'))?.weeks[0]?.label === 'someone else')
+  check('...and never over another person\'s plan', (await safe(() => P.restoreMesocycle('p9')).then(r => (r === 'threw' ? null : r)))?.weeks?.[0]?.label === 'someone else')
   net = 'down'
-  check('still no signal: sending keeps it and says one is waiting', (await P.sendKeptPlanWeeks('p1')) === 1 && P.keptPlanWeeks('p1').size === 1)
+  check('still no signal: sending keeps it and says one is waiting', (await safe(() => P.sendKeptPlanWeeks('p1'))) === 1 && P.keptPlanWeeks('p1').size === 1)
   net = 'up'
-  check('the signal is back: it is sent, and nothing is left on the phone', (await P.sendKeptPlanWeeks('p1')) === 0 && serverLabel('p1', 2) === 'swapped offline' && !P.hasKeptPlanWeeks())
+  check('the signal is back: it is sent, and nothing is left on the phone', (await safe(() => P.sendKeptPlanWeeks('p1'))) === 0 && serverLabel('p1', 2) === 'swapped offline' && !P.hasKeptPlanWeeks())
 
   reset(); net = 'down'
-  await P.saveScopedEdit('p1', plan({ 2: 'old offline edit' }), 2, 'today', { keepOffline: true })
+  await safe(() => P.saveScopedEdit('p1', plan({ 2: 'old offline edit' }), 2, 'today', { keepOffline: true }))
   net = 'up'
-  await P.saveMesocycleWeek('p1', wk(2, 'newer edit, saved'))
+  await safe(() => P.saveMesocycleWeek('p1', wk(2, 'newer edit, saved')))
   check('a newer save of the same week drops the kept copy', P.keptPlanWeeks('p1').size === 0)
-  await P.sendKeptPlanWeeks('p1')
+  await safe(() => P.sendKeptPlanWeeks('p1'))
   check('...so the older edit is never sent over the newer one', serverLabel('p1', 2) === 'newer edit, saved')
 
   reset(); net = 'down'; downFor = n => n === 3
-  const halfSent = await P.saveScopedEdit('p1', plan({ 2: 'b2', 3: 'b3', 4: 'b4' }), 2, 'permanent', { keepOffline: true })
+  const halfSent = await safe(() => P.saveScopedEdit('p1', plan({ 2: 'b2', 3: 'b3', 4: 'b4' }), 2, 'permanent', { keepOffline: true }))
   check('a whole-block edit that half arrived: the weeks that reached the server are saved, the one that did not is kept', halfSent === 'kept' && [...P.keptPlanWeeks('p1').keys()].join() === '3' && serverLabel('p1', 2) === 'b2' && serverLabel('p1', 4) === 'b4', { halfSent, kept: [...P.keptPlanWeeks('p1').keys()] })
   net = 'up'
-  await P.saveMesocycle('p1', plan({ 1: 'new plan' }))
+  await safe(() => P.saveMesocycle('p1', plan({ 1: 'new plan' })))
   check('a whole new plan drops everything kept from the old one', P.keptPlanWeeks('p1').size === 0)
 
   reset(); net = 'down'
-  await P.saveWeekKeepingOffline('p1', wk(2, 'will be refused'))
-  await P.saveWeekKeepingOffline('p7', wk(2, 'another person'))
+  await safe(() => P.saveWeekKeepingOffline('p1', wk(2, 'will be refused')))
+  await safe(() => P.saveWeekKeepingOffline('p7', wk(2, 'another person')))
   net = 'refuse'
-  check('a kept change the server REFUSES is dropped, not knocked for ever', (await P.sendKeptPlanWeeks('p1')) === 0 && P.keptPlanWeeks('p1').size === 0)
+  check('a kept change the server REFUSES is dropped, not knocked for ever', (await safe(() => P.sendKeptPlanWeeks('p1'))) === 0 && P.keptPlanWeeks('p1').size === 0)
   check('...leaving another person\'s kept change alone', P.keptPlanWeeks('p7').size === 1)
 
-  check('the network\'s failure is told from a refusal', P.isNetworkFailure(dead) && P.isNetworkFailure(new TypeError('Failed to fetch')) && P.isNetworkFailure({ message: 'Load failed' }) && !P.isNetworkFailure(refusal) && !P.isNetworkFailure({ message: 'JWT expired', code: 'PGRST301' }) && !P.isNetworkFailure(null) && !P.isNetworkFailure(new Error('cannot read kg')))
+  check('the network\'s failure is told from a refusal', P.isNetworkFailure(dead) && P.isNetworkFailure(new TypeError('Failed to fetch')) && P.isNetworkFailure({ message: 'Load failed' }) && !P.isNetworkFailure(refusal) && !P.isNetworkFailure({ message: 'JWT expired', code: 'PGRST301' }) && !P.isNetworkFailure({ message: 'network request failed upstream: could not reach the database', code: 'PGRST002' }) && !P.isNetworkFailure(null) && !P.isNetworkFailure(new Error('cannot read kg')))
   setOnline(false)
   check('...and while the phone says it is offline, any failure is the network\'s', P.isNetworkFailure(new Error('anything')))
   setOnline(true)
 
   const swapSrc = strip(readFileSync('src/lib/screen-swap.ts', 'utf8'))
   check('the screen\'s swap asks to be kept', /saveScopedEdit\(profile\.id, updated, weekNumber, scope, \{ keepOffline: true \}\)/.test(swapSrc))
-  check('...and a sweep of old offers that cannot reach the server no longer puts the old exercise back', /sweepStaleForTarget\([^)]*\)\s*\n?\s*\.catch\(/.test(swapSrc))
+  check('...and a sweep of old offers that threw could not put the old exercise back (a precaution: it does not throw today)', /sweepStaleForTarget\([^)]*\)\s*\n?\s*\.catch\(/.test(swapSrc))
   check('so do remove, move and add', /saveScopedEdit\(profileId, next\.mesocycle, liveWeek, scope, \{ keepOffline: true \}\)/.test(today))
   check('...and their Undo', /saveWeekFor = \(profileId: string\) => \(week: MesocycleWeek\) => saveWeekKeepingOffline\(profileId, week\)/.test(strip(readFileSync('src/lib/screen-edit-undo.ts', 'utf8'))))
   check('the coach\'s cards do NOT (it cannot be reached offline; a card that "applied" on the phone alone would lie)', !/keepOffline/.test(strip(readFileSync('src/lib/pending-action-executor.ts', 'utf8'))))

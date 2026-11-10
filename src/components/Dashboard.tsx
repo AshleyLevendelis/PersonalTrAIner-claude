@@ -38,7 +38,8 @@ import { dayNameOf } from '@/lib/session-move'
 const SessionSummaryDialog = lazyWithReload(() => import('@/components/exercise/SessionSummaryDialog').then(m => ({ default: m.SessionSummaryDialog })))
 // ITS OWN CHUNK (run 5, 11 Oct 2026): the card reads the list's dates and the
 // meals now, and is up one day a week; first paint does not wait for it.
-const ShopDayCard = lazyWithReload(() => import('@/components/ShopDayCard').then(m => ({ default: m.ShopDayCard })))
+// AMBIENT: it appears on its own day, nobody taps to open it, so with its file missing Home draws nothing in its place.
+const ShopDayCard = lazyWithReload(() => import('@/components/ShopDayCard').then(m => ({ default: m.ShopDayCard })), { ambient: true })
 import { personalBest, bestReadingOf, streakLabel, STREAK_PILL_WORDS } from '@/lib/coach-voice'
 import { useCardioLogsToday } from '@/components/exercise/CardioSetRow'
 import { cardioLine } from '@/lib/cardio-lines'

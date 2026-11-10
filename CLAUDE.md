@@ -1517,6 +1517,20 @@ menu" stays true when a copy is also left outside it.
   the reps climb (asked of the rep rule itself), deload 70% of the last loading week. CSCS, basis in BACKLOG.
   `test:block-swap-reach`
 
+- **A workout with no signal: his words 10 Nov 2026**, from a gym with no Wi-Fi and the whole-app error screen:
+  "we should be able to do as much as possible in the app without network". The whole app is saved to the phone in
+  the background (the build lists its own files, the service worker saves them); a part still missing says so in its
+  own place, never the error screen, and never reloads with no signal; the week counts the phone's own unsent sets and
+  an offline finish; a finish made offline is sent when the signal returns with the app open; a swap, removal, move or
+  addition made on the Exercise screen (and its Undo) is kept on the phone and sent later, the badge reading "Plan
+  change waiting to send". NOT offline, each saying it did not save: day changes (rest, missed, moved, swapped for an
+  activity), shorten or rebuild today, meal swaps, weigh-ins, Profile, the coach. `verify:gym-offline`,
+  `test:offline-ready`, `docs/plans/offline-in-the-gym.md`. Never run on a real phone
+- **On the week list a workout's name is the headline: his words 10 Nov 2026**, "not very clearly visible at first
+  glance which are a title of a workout and which are the exercises themselves". The name is larger and bold with its
+  last word in the accent (as Home and Exercise draw it), the line under it is quiet and says "Main lift", and an
+  opened day's exercises hang off a rail to the right of the name under "Exercises N". `verify:program-titles`
+
 ### His rulings of 31 Oct 2026, the five-tab polish (`docs/plans/tab-polish-oct31.md`)
 - **"Build, keep my rulings"**: the handoff (Home 2c, Nutrition 3a+3b, Exercise 2a, Tools 2a, Chat 2b) as drawn, except where
   an earlier ruling of his says otherwise; the plan lists each. Layout only, nothing removed. `test:home-2c`,

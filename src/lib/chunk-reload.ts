@@ -20,7 +20,7 @@
 // ---------------------------------------------------------------------------
 
 import { lazy, type ComponentType, type LazyExoticComponent } from 'react'
-import { partNotLoaded } from '@/components/PartNotLoaded'
+import { partNotLoaded, type PartNotLoadedOptions } from '@/components/PartNotLoaded'
 
 /** A reload for this reason within this long of the last one is refused (a broken deploy, not an old page). */
 export const RELOAD_GUARD_MS = 20_000
@@ -65,12 +65,14 @@ export function reloadOnce(now: number = Date.now()): boolean {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- the same constraint React.lazy itself uses
 export function lazyWithReload<T extends ComponentType<any>>(
   factory: () => Promise<{ default: T }>,
+  /** `ambient`: a part nobody tapped to open draws nothing while its file is missing (PartNotLoaded). */
+  options: PartNotLoadedOptions = {},
 ): LazyExoticComponent<T> {
   return lazy(() => factory().catch((error: unknown) => {
     if (isChunkLoadError(error) && reloadOnce()) return new Promise<{ default: T }>(() => {})
     // No reload to be had (no signal, or one was just tried): the part says it is not on the phone, in its own
     // place, and the rest of the screen keeps working. It loads itself when the connection is back.
-    if (isChunkLoadError(error)) return { default: partNotLoaded(factory, reloadOnce) as unknown as T }
+    if (isChunkLoadError(error)) return { default: partNotLoaded(factory, options) as unknown as T }
     throw error
   }))
 }
