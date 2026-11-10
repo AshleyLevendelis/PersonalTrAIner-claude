@@ -147,6 +147,16 @@ await say(`I missed ${nameOf(trainsNow ?? 0)} ${iso(trainsNow ?? 0)}`)
 await wait(2500)
 check(`B2. "I missed ${nameOf(trainsNow ?? 0)}" (a day she trains now) is offered as missed`, (await offers()) > before && /as missed/i.test(await lastText()), await lastText())
 await shoot('workout-scenarios-chat-reschedule')
+// THE CARD OFFERS THE MOVE IT TALKS ABOUT (10 Nov 2026, Ashley: "it asks if I want it later. But doesn't offer that, I
+// can only apply to mark it missed"). A button names a day later this week with no session of its own, and tapping it
+// asks for that move in words, so the move comes back as its own card.
+const moveBtn = await ev(`(() => { const box = [...document.querySelectorAll('[data-testid="offer-alternatives"]')].pop(); const b = box && [...box.querySelectorAll('button')].find(b => /^Move it to /.test(b.textContent.trim())); return b ? b.textContent.trim().replace(/^Move it to /, '') : null })()`)
+const trainedNow = r?.week2 ?? []
+check('B2a. the missed card offers "Move it to <day>", and the day has no session of its own', !!moveBtn && !trainedNow.includes(moveBtn), { moveBtn, trainedNow })
+check('B2b. ...the card says so in a sentence, never "tell me which day" with nothing to tap', /Or I can move it to \w+day instead/.test(await lastText()) && !/Tell me which day/i.test(await lastText()), await lastText())
+const sentBefore = await ev(`document.body.innerText.split('Move ').length`)
+check('B2c. tapping it sends the move request', await ev(`(() => { const box = [...document.querySelectorAll('[data-testid="offer-alternatives"]')].pop(); const b = box && [...box.querySelectorAll('button')].find(b => /^Move it to /.test(b.textContent.trim())); if (!b) return false; b.click(); return true })()`) && !!(await until(`/to ${moveBtn} instead of marking it missed/.test(document.body.innerText)`)), { sentBefore, tail: await lastText() })
+await wait(1200)
 await clickLast('Not now')
 await wait(600)
 const before2 = await offers()

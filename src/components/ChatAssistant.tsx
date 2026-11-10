@@ -4255,6 +4255,23 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     }
   }
 
+  /** The next day a session on `fromDate` could move to this training week, by the move card's own rules, or null. */
+  const missedMoveOffer = (fromDate: string): { date: string; dayName: string } | null => {
+    const target = resolveMoveTarget({
+      fromDate,
+      requestedDate: null,
+      todayDate: activeSession.date,
+      plan: planForDate(fromDate),
+      weekOf: (d: string) => getActiveMesocycleWeek(
+        planCreatedAt ?? profile.created_at,
+        new Date(`${d}T12:00:00`),
+        mesocycle.length > 0 ? mesocycle.length : 4,
+      ),
+      existing: trainingWeek.moves,
+    })
+    return target.ok ? { date: target.date, dayName: target.dayName } : null
+  }
+
   /**
    * Builds propose_missed_session's card — "I missed it".
    *
@@ -4282,6 +4299,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const session = resolvedDay.day
     if (!dayHasSession(session)) return null
     const reason = typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined
+    // THE CARD OFFERED A MOVE IN WORDS AND NOTHING TO TAP (Ashley, 10 Nov 2026, on his phone: "it asks if I want it
+    // later. But doesn't offer that, I can only apply to mark it missed"). The day it could go is the move's own
+    // answer (resolveMoveTarget, the same call the move card makes), so the button names a day the move will accept,
+    // and tapping it asks for that move: its own card, its own Apply. No free day left, no button, and the sentence
+    // says so instead of promising one.
+    const moveTo = missedMoveOffer(raw)
     return {
       scopeKey: `${profile.id}:propose_missed_session:${raw}`,
       preconditions: { date: raw, dayName },
@@ -4291,10 +4314,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         rows: [{ field: dayName, before: session.focus, after: 'Missed' }],
         implications: [
           { severity: 'info', text: "It counts as a missed session this week. That's the honest record, not a punishment." },
-          { severity: 'info', text: 'The session itself stays on the plan. Want it later this week? Tell me which day and I\'ll move it.' },
+          moveTo
+            ? { severity: 'info', text: `Or I can move it to ${moveTo.dayName} instead, so it still gets done this week.` }
+            : { severity: 'info', text: "There's no free day left this training week to move it to." },
         ],
         rationale: reason,
         reversible: true,
+        ...(moveTo ? {
+          alternativesLead: 'Or instead',
+          alternatives: [{ label: `Move it to ${moveTo.dayName}`, note: '', prompt: `Move ${dayName}'s ${session.focus} to ${moveTo.dayName} instead of marking it missed` }],
+        } : {}),
       },
     }
   }

@@ -269,7 +269,7 @@ export function ProposalCard({
           prompt, so it comes back as its own offer. */}
       {showAlternatives && (
         <div data-testid="offer-alternatives" className="flex flex-wrap items-center gap-x-1.5">
-          <span className="mr-0.5 text-[0.71875rem] text-muted-foreground">Or swap in</span>
+          <span className="mr-0.5 text-[0.71875rem] text-muted-foreground">{diff.alternativesLead ?? 'Or swap in'}</span>
           {(diff.alternatives ?? []).map(alt => (
             <button
               key={alt.label}

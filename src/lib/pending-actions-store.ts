@@ -56,6 +56,8 @@ export interface ProposalDiff {
    * verification the confirm will run — see meal-food-edit.ts.
    */
   alternatives?: { label: string; note: string; prompt: string }[]
+  /** The words before the alternatives ("Or swap in" when unset, the food swaps' own). */
+  alternativesLead?: string
   reversible?: boolean
 }
 
