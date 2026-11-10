@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ArrowRightLeft, BookOpen, Ban, History, Info, MoreVertical } from 'lucide-react'
-import { formatRampSets, groupExercises, mainLiftGroupIndex, type ExerciseGroup } from '@/lib/session-derive'
+import { formatRampSets, groupExercises, isConditioningDay, mainLiftGroupIndex, type ExerciseGroup } from '@/lib/session-derive'
 import { getExerciseId } from '@/lib/exercise-db'
 import { RampStrip } from './RampStrip'
 import { LoadChip, type LoadSource } from './LoadChip'
@@ -208,7 +208,7 @@ export function ReadOnlyDayList({
           style={i > 0 ? { borderTop: '1px solid var(--hairline)' } : undefined}
         >
           <SectionLabel
-            text={sectionLabelFor(g, i === firstMainLiftGroupIndex)}
+            text={sectionLabelFor(g, i === firstMainLiftGroupIndex, isConditioningDay(workout.exercises))}
             expanded={isGroupExpanded(g)}
           />
           {/* Via the SAME shell today's supersets use — the rail, the A1/A2

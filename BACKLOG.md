@@ -2,6 +2,31 @@
 
 Newest first. One line each.
 
+- [x] **A CARDIO DAY CHOSEN FOR TODAY CAN BE LOGGED TO THE END, AND SAYS WHAT IT IS, 10 NOV 2026.** Found by the
+  training-screens QA walk (no ruling needed: mechanical, plus one CSCS call). WHAT WAS WRONG: on "a different kind of
+  session today -> Cardio" (1) the running Log-set button stuck for good on the steady block ("Elliptical × 1200"),
+  because the box's ceiling was the REPS ceiling of 999 and that box holds seconds; (2) the trunk work could be a
+  weighted machine (Cable Crunch, Rotary Torso Machine) under a picker that says "no weights"; (3) the trunk move was
+  labelled MAIN LIFT and every interval block FINISHER; (4) the steady block read "1 × 1200s".
+  WHAT CHANGED: a timed, interval or steady box takes up to three hours of seconds (reps stay at 999); a cardio day's
+  trunk block takes only unloaded moves (CSCS: the session's job is conditioning, and its own picker promises no
+  weights; a plank or crunch does the trunk work as well for it); a day whose work is all conditioning (no tier-1 or
+  tier-2 lift) names no main lift and calls its blocks "Conditioning", while a lifting day keeps "Finisher"; one steady
+  block reads in minutes ("20 min") on both rows, through one shared formatter. CSCS review: (1) training effect
+  unchanged, the same conditioning blocks; (2) takes away a loaded core move on a cardio day only; (3) fundamentals:
+  no strength pattern was on the day to protect; (4) no floor or ceiling redefined (the reps ceiling is untouched, the
+  seconds one is new); (5) in scope.
+  VERIFIED: test:session-kind (126 checks; 3 new on the screen's promise, 5 on a constructed conditioning day with a
+  REPS core move, the case where the main-lift rule binds; 2 + 5 mutations, all caught); verify:session-kind drives the
+  real screen (6f-6h labels and minutes, 9a the running button logs every block of the cardio day without stalling; 4
+  mutations, 3 caught on screen, the fourth is the main-lift guard, which cannot bind on this fixture because its core
+  move is a hold, and is held by the constructed day instead). 71 derived gates: 3 red, all mended: test:bundle at its
+  total ceiling (moved 2843 -> 2868, measured), test:machine-versions' "the last eight entries" re-anchored to "each
+  after its nearest lift" (it went red when the third exercise batch was appended after them, earlier today, and was
+  red at the branch head until now), test:one-day-one-look taught that the shared dose line reads sets and reps (an
+  empty map is caught). NOT DONE: cardio blocks still draw as set rows with a Duration box, not the finisher's
+  Minutes / How hard row; making every exercise-list cardio block a cardio row is its own change (the generator's own
+  conditioning days draw the same way).
 - [x] **PLAIN MINCE IS ASKED ABOUT, AND THE FOOD AUDIT'S REST, 10 NOV 2026.** His ruling: **"Ask"** (from three
   options: ask / assume 5% / assume 20%), then "fix the food figures". WHAT WAS WRONG: the words decided the fat of beef
   mince ("beef mince" and "ground beef" were 20%, 254 kcal per 100 g; a bare "mince" 5%, 137), and the audit's lower

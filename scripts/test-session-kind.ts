@@ -9,7 +9,10 @@ import { isMainLiftSlot } from '../src/lib/mesocycle-edit'
 import { EXERCISE_DATABASE, isContraindicatedFor, type ExerciseEntry } from '../src/lib/exercise-db'
 import { isExternallyLoaded, categorize } from '../src/lib/load-prescription'
 import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds } from '../src/lib/session-duration'
-import type { UserProfile, MesocycleWeek, WorkoutDay } from '../src/lib/types'
+import type { UserProfile, MesocycleWeek, WorkoutDay, Exercise } from '../src/lib/types'
+import { groupExercises, isConditioningDay, mainLiftGroupIndex, prescribedDose } from '../src/lib/session-derive'
+import { sectionLabelFor } from '../src/components/exercise/ExerciseLine'
+import { maxCountFor } from '../src/components/exercise/SetGrid'
 
 // ---------------------------------------------------------------------------
 // A DIFFERENT KIND OF SESSION TODAY — "let's do a cardio workout today".
@@ -147,7 +150,10 @@ for (const [label, o] of [['cardio', cardio], ['functional', functional], ['body
   // NOT TOMORROW'S WORK EARLY: in a full gym every block has something else to
   // fill it, so nothing on today's new session is also on another day this week.
   const elsewhere = new Set(M_FULL.find(w => w.week_number === 2)!.days.filter(d => d.day !== 'Monday').flatMap(d => d.exercises.map(e => e.name)))
-  const repeats = [cardio, functional, bodybuilding].flatMap(o => o?.session ?? []).filter(e => elsewhere.has(e.name)).map(e => e.name)
+  // A move she NAMED is hers whatever the rest of the week holds (functional asks for box jumps), so only the app's
+  // own picks are held to it.
+  const named = new Set(['Box Jumps'])
+  const repeats = [cardio, functional, bodybuilding].flatMap(o => o?.session ?? []).filter(e => elsewhere.has(e.name) && !named.has(e.name)).map(e => e.name)
   check('full gym: nothing in today\'s new session is also on another day this week', repeats.length === 0 && elsewhere.size > 5, repeats)
   // AND WHERE THE BLOCK'S OWN FIRST CHOICE IS ON ANOTHER DAY: Farmer's Walk is
   // the carry block's first pick, so put it on Wednesday and it must step aside.
@@ -177,6 +183,9 @@ for (const [label, o] of [['full gym', cardio], ['minimalist', miniCardio], ['kn
   check(`${label}: at least two conditioning blocks`, cardioBlocks.length >= 2, cardioBlocks.map(e => e?.name))
   check(`${label}: no exercise twice`, new Set(ex.map(e => e.name)).size === ex.length, ex.map(e => e.name))
   check(`${label}: at most one high-impact block`, cardioBlocks.filter(e => e?.joint_stress === 'high').length <= 1, cardioBlocks.map(e => [e?.name, e?.joint_stress]))
+  // ITS PICKER SAYS "no weights" (QA walk, 10 Nov 2026: a full-gym cardio day held a Cable Crunch).
+  const loaded = entries.filter(e => !!e && isExternallyLoaded(e))
+  check(`${label}: no weights, as the picker promises (the trunk work is unloaded too)`, ex.length > 0 && loaded.length === 0, loaded.map(e => e?.name))
 }
 {
   const first = cardio?.session.map(e => entryOf(e.name)).find(e => e?.mechanics_tier === 'cardio')
@@ -399,6 +408,21 @@ console.log('\n13. What is offered')
   check('combat is never offered (her August ruling)', ['functional', 'bodybuilding', 'hybrid', 'combat'].every(s => !kinds({ training_style: s as never }).includes('combat' as SessionKind)))
   check('the coach\'s words map to kinds', sessionKindFrom('Cardio') === 'cardio' && sessionKindFrom('HIIT') === 'cardio' && sessionKindFrom('athletic') === 'functional' && sessionKindFrom('bodybuilding') === 'bodybuilding')
   check('...and an unknown word is null, never a guess', sessionKindFrom('yoga') === null && sessionKindFrom('') === null)
+}
+
+console.log('\n14. A day of conditioning: no main lift, its blocks "Conditioning", a steady block in minutes')
+{
+  const iv = (name: string) => ({ name, sets: 6, reps: '45s', rest: '40s', tier: 'tier_4_finisher', prescription_type: 'intervals' })
+  // A REPS core move is the case the anchor could promote (a hold never can), so it is the case that binds.
+  const crunch = { name: 'Reverse Crunch', sets: 3, reps: '12', rest: '45s', tier: 'tier_3_isolation', prescription_type: 'reps' }
+  const cardioDay = [iv('Rowing Machine Intervals'), iv('Stationary Bike Intervals'), crunch] as unknown as Exercise[]
+  const g = groupExercises(cardioDay)
+  check('a cardio day with a reps core move names no main lift', mainLiftGroupIndex(g, cardioDay) === -1, mainLiftGroupIndex(g, cardioDay))
+  check('...and its interval blocks read "Conditioning"', g.filter(x => x.kind === 'single' && x.ex.tier === 'tier_4_finisher').every(x => sectionLabelFor(x, false, isConditioningDay(cardioDay)) === 'Conditioning'))
+  const liftDay = [{ name: 'Goblet Squat', sets: 3, reps: '10', rest: '90s', tier: 'tier_2_secondary', prescription_type: 'reps' }, iv('Rowing Machine Intervals')] as unknown as Exercise[]
+  check('a lifting day with intervals at the end keeps "Finisher" for them', !isConditioningDay(liftDay) && sectionLabelFor(groupExercises(liftDay)[1], false, isConditioningDay(liftDay)) === 'Finisher')
+  check('one steady block reads in minutes; intervals keep rounds', prescribedDose({ sets: 1, reps: '1200s', prescription_type: 'steady_state' }) === '20 min' && prescribedDose({ sets: 6, reps: '45s', prescription_type: 'intervals' }) === '6 × 45s' && prescribedDose({ sets: 3, reps: '8', prescription_type: 'reps' }) === '3 × 8')
+  check('a timed box takes up to three hours of seconds; a reps box stays at 999', maxCountFor('steady_state') === 10800 && maxCountFor('intervals') === 10800 && maxCountFor('time') === 10800 && maxCountFor('reps') === 999)
 }
 
 console.log(`\n${ran} checks ran`)

@@ -671,7 +671,10 @@ console.log('\n3. Nothing has crept back up')
   // 2818 with the change. Nearly all of it is the 360 new library dishes in the lazily loaded meal-library chunk
   // (197 kB raw before); first paint moved 536 -> 538 gz and the app chunk 1327 -> 1331 raw (the weekly menu and the
   // swap list's search). Her 15 Sep ruling, 25 raw of room.
-  const TOTAL_BUDGET_KB = 2843
+  // MOVED 10 Nov 2026: 2843 -> 2868, the long-flight QA fixes (the food table's new foods, the third exercise batch, the
+  // calendar, and the cardio-day labels). Measured through this gate: 2841 at a1fada11 (2 left, worn by the earlier
+  // commits that day), 2843 with the cardio-day change. Her 15 Sep ruling, 25 raw of room.
+  const TOTAL_BUDGET_KB = 2868
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

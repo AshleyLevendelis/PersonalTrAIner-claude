@@ -269,7 +269,10 @@ console.log('\n8. The gym machines with nothing to be a version of: priced and e
     if (a == null ? b != null : b == null || Math.abs(a - b) > 0.1 * b + 2.5) wrong.push(`${n}: ${a} kg on the body vs ${near} ${b}`)
   }
   check('each is in its nearest lift\'s price category and pattern, its tier, excluded for the same injuries, within 10% of its load on the body', wrong.length === 0, wrong)
-  check('...appended at the END of the catalogue, so a tie still goes to an entry the app already had', PAIRS.every(([n]) => EXERCISE_DATABASE.findIndex(e => e.name === n) >= EXERCISE_DATABASE.length - PAIRS.length))
+  // RE-ANCHORED 10 Nov 2026: "the last eight entries" stopped being true the moment a later batch was appended after
+  // them. What it protects is that each one sits AFTER the lift it copies, so a tie goes to the one the app already had.
+  const idx = (n: string) => EXERCISE_DATABASE.findIndex(e => e.name === n)
+  check('...each placed AFTER its nearest lift in the catalogue, so a tie still goes to an entry the app already had', PAIRS.every(([n, near]) => idx(n) > 0 && idx(near) >= 0 && idx(n) > idx(near)), PAIRS.map(([n, near]) => [n, idx(n), near, idx(near)]))
   const found = ['smith romanian', 'pullover machine', 'ab crunch machine', 'smith shrug'].map(w => [w, searchExerciseCatalogByWords(w, 20).map(e => e.name)] as const)
   check('...and found by the words on the machine', found.every(([, r]) => r.length > 0) && found[1][1].includes('Machine Pullover') && found[2][1].includes('Ab Crunch Machine'), found)
   check('her abdominal machines are versions of it', getExerciseEntry('Abdominal Crunch Machine (Pin-Selected)')?.parent === 'Ab Crunch Machine')

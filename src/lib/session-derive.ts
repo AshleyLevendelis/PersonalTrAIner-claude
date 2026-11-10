@@ -504,7 +504,32 @@ export function dayAnchorExercise(exercises: Exercise[]): Exercise | undefined {
  * superset chrome drift between those two screens until a screenshot caught
  * it; one definition means the promotion cannot land on one screen only.
  */
+/**
+ * WHAT IS PRESCRIBED, as the row says it: "3 × 8", "6 × 45s", and one steady block as minutes ("20 min", never
+ * "1 × 1200s": QA walk, 10 Nov 2026).
+ */
+export function prescribedDose(ex: { sets: number; reps: string; prescription_type?: string }): string {
+  if (ex.prescription_type === 'steady_state' && ex.sets === 1) {
+    const m = /^(\d+)\s*s$/.exec(String(ex.reps).trim())
+    if (m && Number(m[1]) >= 60 && Number(m[1]) % 60 === 0) return `${Number(m[1]) / 60} min`
+  }
+  return `${ex.sets} × ${ex.reps}`
+}
+
+/**
+ * A DAY OF CONDITIONING: its work is intervals and steady efforts, with no strength lift (no tier-1 or tier-2 work).
+ * A "Cardio" day chosen for today is one (QA walk, 10 Nov 2026: its trunk work was labelled MAIN LIFT and every
+ * interval block FINISHER). On such a day nothing is the main lift and its blocks are the conditioning itself, not a
+ * finisher after it.
+ */
+export function isConditioningDay(exercises: Exercise[]): boolean {
+  const work = exercises.filter(ex => ex.tier !== 'tier_0_primer')
+  if (!work.some(ex => ex.tier === 'tier_4_finisher')) return false
+  return !work.some(ex => ex.tier === 'tier_1_primary' || ex.tier === 'tier_2_secondary')
+}
+
 export function mainLiftGroupIndex(groups: ExerciseGroup[], exercises: Exercise[]): number {
+  if (isConditioningDay(exercises)) return -1
   const real = groups.findIndex(g => g.kind === 'single' && g.ex.tier === 'tier_1_primary')
   if (real !== -1) return real
   const anchor = dayAnchorExercise(exercises)

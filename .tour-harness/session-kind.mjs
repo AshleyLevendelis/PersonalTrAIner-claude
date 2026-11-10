@@ -118,6 +118,13 @@ await shoot('session-kind-cardio-card')
 // The rows themselves, drawn as the app draws interval work.
 await ev(`document.querySelector('[data-exercise-name]')?.scrollIntoView({ block: 'start' })`); await wait(400)
 await shoot('session-kind-cardio-rows')
+// QA walk, 10 Nov 2026: the cardio day's trunk work was labelled MAIN LIFT, every interval block FINISHER, a weighted
+// machine stood in for "no weights", and the steady block read "1 × 1200s".
+const eyebrows = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(c => [c.getAttribute('data-exercise-name'), c.querySelector('[data-testid="exercise-eyebrow"]')?.textContent.trim() ?? ''])`)
+check('6f. nothing on a cardio day is called the main lift', Array.isArray(eyebrows) && eyebrows.length > 0 && !eyebrows.some(([, e]) => /^Main lift/.test(e)), eyebrows)
+check('6g. its interval blocks are "Conditioning", never "Finisher"', eyebrows.filter(([, e]) => /^Conditioning/.test(e)).length >= 2 && !eyebrows.some(([, e]) => /^Finisher/.test(e)), eyebrows)
+const doses = await ev(`document.querySelector('[data-testid="exercise-card"]') ? '' : [...document.querySelectorAll('[data-exercise-name]')].map(c => c.innerText.replace(/\\s+/g, ' ')).join(' | ')`)
+check('6h. a steady block reads in minutes, not "1 × 1200s"', /\d+ min\b/.test(doses) && !/1 × \d{3,}s/.test(doses), doses.slice(0, 400))
 
 // --- 7. a started session is not redrawn -------------------------------------
 // Log one working set of today's (cardio) session with the row's own tick.
@@ -139,6 +146,21 @@ const undoNow = await click('[data-testid="kind-today-undo"]')
 const undoErr = await until(() => text('[data-testid="kind-today-error"]'), t => t.length > 0, 20)
 check('7d. and the put-back is refused once a set is logged, so the logged set keeps its session', undoNow && /logged sets/.test(undoErr), undoErr)
 await shoot('session-kind-started')
+
+// --- 9. the running button logs the whole cardio session (QA walk, 10 Nov 2026: it stuck on "Elliptical × 1200",
+// refused as more than 999 reps). Press it until nothing is left; it must never stall on a refusal.
+let presses = 0, stalled = null
+for (let i = 0; i < 40; i++) {
+  const before = await ev(`document.querySelector('[data-next-set-button]')?.getAttribute('aria-label') ?? null`)
+  if (!before) break
+  if (/type the/.test(before)) { stalled = before; break }
+  await clickAt(`document.querySelector('[data-next-set-button]')`)
+  presses++
+  const after = await until(() => ev(`document.querySelector('[data-next-set-button]')?.getAttribute('aria-label') ?? null`), v => v !== before, 20)
+  if (after === before) { stalled = before + ' :: ' + (await ev(`[...document.querySelectorAll('[role="alert"], .text-destructive')].map(n => n.textContent.trim()).filter(Boolean).join(' / ')`)); break }
+}
+await shoot('session-kind-cardio-logged')
+check('9a. the running button logs every block of the cardio day, the steady one included, without stalling', stalled === null && presses >= 3, { presses, stalled })
 
 check('8. no uncaught error on the page', (await ev('window.__err ?? null')) === null, await ev('window.__err ?? null'))
 await finish('verify:session-kind PASSED')

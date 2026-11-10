@@ -149,12 +149,17 @@ console.log('\n4. The two rows say the same things about an exercise')
   // something about an exercise that the other does not show.
   const ALLOWED: Record<string, string> = {
     per_set_load: 'feeds SetGrid\'s per-set weights; a read-only surface has no set grid',
-    prescription_type: 'labels SetGrid\'s log column (Hold/Distance/Work); same reason',
     load_source: 'today\'s row takes it as a prop from TodayPanel instead of off the exercise',
     load_hold: 'chooses the calibration cue\'s words at a stated limit (run 5, M48); a read-only surface has no calibration cue',
   }
+  // A field read THROUGH a shared formatter is still shown: prescribedDose(ex) is the dose line ("3 × 8", "20 min"),
+  // so it reads sets, reps and the prescription type (10 Nov 2026, when the shared line stopped reading ex.reps itself).
+  const VIA: Record<string, string[]> = { prescribedDose: ['sets', 'reps', 'prescription_type'] }
   const fieldsIn = (...srcs: string[]) =>
-    new Set(srcs.flatMap(s => [...s.matchAll(/\bex\.([a-z_]+)\b/g)].map(m => m[1])))
+    new Set(srcs.flatMap(s => [
+      ...[...s.matchAll(/\bex\.([a-z_]+)\b/g)].map(m => m[1]),
+      ...Object.entries(VIA).flatMap(([fn, fields]) => new RegExp(`\\b${fn}\\(ex\\)`).test(s) ? fields : []),
+    ]))
   const session = fieldsIn(rowSession, line)
   const browse = fieldsIn(rowBrowse, line)
 

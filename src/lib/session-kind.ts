@@ -110,6 +110,8 @@ interface Block {
   patterns: MovementPattern[]
   groups?: string[]
   tiers: MechanicsTier[]
+  /** A further test a move must pass to fill this block at all. */
+  accepts?: (e: ExerciseEntry) => boolean
   /** Lower ranks ahead within the block (after tier). */
   rank?: (e: ExerciseEntry) => number
   job: string
@@ -131,10 +133,13 @@ const CONDITIONING_BLOCK = (id: string): Block => ({
 /** The nearest real thing to a sled: loaded locomotion and bracing, the heaviest first. */
 const CARRY_RANK = ["Farmer's Walk", 'Suitcase Carry', 'Trap Bar Carry', 'Loaded Backpack Walk']
 const CORE_BLOCK: Block = { id: 'core', patterns: ['core'], tiers: [T3, T2], job: 'the trunk work' }
+// A CARDIO DAY CARRIES NO WEIGHTS, which is what its picker says ("Intervals and steady work, no weights"). Its trunk
+// work is a plank or a crunch, never a cable crunch or a weighted sit-up (QA walk, 10 Nov 2026).
+const CORE_BLOCK_UNLOADED: Block = { ...CORE_BLOCK, accepts: e => !isExternallyLoaded(e) }
 
 const RECIPES: Record<SessionKind, { order: Block[]; priority: string[]; minWorking: number }> = {
   cardio: {
-    order: ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'].map(CONDITIONING_BLOCK).concat(CORE_BLOCK),
+    order: ['c1', 'c2', 'c3', 'c4', 'c5', 'c6'].map(CONDITIONING_BLOCK).concat(CORE_BLOCK_UNLOADED),
     priority: ['c1', 'c2', 'core', 'c3', 'c4', 'c5', 'c6'],
     minWorking: 2,
   },
@@ -200,6 +205,7 @@ const GROUP_LIMIT = 2
 
 function blockAccepts(b: Block, e: ExerciseEntry): boolean {
   if (!b.tiers.includes(e.mechanics_tier)) return false
+  if (b.accepts && !b.accepts(e)) return false
   return b.patterns.includes(e.movement_pattern) || (b.groups ?? []).includes(e.substitution_group ?? '')
 }
 

@@ -3,7 +3,7 @@ import { isUnverifiedLoadSource } from '@/lib/load-prescription'
 import { describeExerciseTempo } from '@/lib/periodization'
 import type { LoadSource } from './LoadChip'
 import type { Exercise } from '@/lib/types'
-import type { ExerciseGroup } from '@/lib/session-derive'
+import { prescribedDose, type ExerciseGroup } from '@/lib/session-derive'
 
 // ---------------------------------------------------------------------------
 // The collapsed exercise line, shared by today's list and the upcoming-day
@@ -119,7 +119,7 @@ export function ExerciseLine({
               <span className="text-primary-text glow-mint">✓ {loggedSummary}</span>
             ) : (
               <>
-                {ex.sets} × {ex.reps}{tempo ? ` · ${tempo}` : ''}
+                {prescribedDose(ex)}{tempo ? ` · ${tempo}` : ''}
                 {chip && (
                   // Accent with an up-arrow only when the load progressed.
                   <span className={progressing ? 'text-primary-text' : undefined} data-load-chip={progressing ? 'up' : 'hold'}>
@@ -191,10 +191,11 @@ export function SectionLabel({ text, expanded }: { text: string; expanded: boole
  * briefly had its own copy of this function, which is precisely how the two
  * surfaces diverged in the first place.
  */
-export function sectionLabelFor(group: ExerciseGroup, isFirstMainLift: boolean): string {
+export function sectionLabelFor(group: ExerciseGroup, isFirstMainLift: boolean, conditioningDay = false): string {
   if (group.kind === 'superset') return `Superset ${group.label}`
   if (isFirstMainLift) return 'Main lift'
   if (group.ex.tier === 'tier_0_primer') return 'Primer'
-  if (group.ex.tier === 'tier_4_finisher') return 'Finisher'
+  // On a day of conditioning the intervals ARE the session, not a finisher after it.
+  if (group.ex.tier === 'tier_4_finisher') return conditioningDay ? 'Conditioning' : 'Finisher'
   return 'Accessory'
 }

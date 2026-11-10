@@ -11,7 +11,7 @@ import { exerciseCoachLine } from '@/lib/exercise-coach-line'
 import { carriedWeightFor } from '@/lib/set-row'
 import { isExternallyLoaded, splitLoadDisplay } from '@/lib/load-prescription'
 import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
-import { groupExercises, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, normalizeWarmup, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
+import { groupExercises, isConditioningDay, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, normalizeWarmup, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { reconnectingLine } from '@/lib/coach-voice'
@@ -2017,6 +2017,7 @@ function ExerciseList({
   // See PeekPanel for the reasoning — one definition, so a promoted main lift
   // can never appear on one screen and not the other.
   const firstMainLiftGroupIndex = mainLiftGroupIndex(groups, workout!.exercises)
+  const conditioningDay = isConditioningDay(workout!.exercises)
 
   const isGroupExpanded = (g: ExerciseGroup) =>
     g.kind === 'single'
@@ -2031,7 +2032,7 @@ function ExerciseList({
     <div className="flex flex-col">
       {groups.map((g, i) => {
         const expanded = isGroupExpanded(g)
-        const label = sectionLabelFor(g, i === firstMainLiftGroupIndex)
+        const label = sectionLabelFor(g, i === firstMainLiftGroupIndex, conditioningDay)
         return (
           <div
             key={i}

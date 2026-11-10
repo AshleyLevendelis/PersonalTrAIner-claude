@@ -5,7 +5,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ArrowDown, ArrowRightLeft, ArrowUp, Ban, BookOpen, History, Info, MoreVertical, Trash2 } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
-import { formatRampSets, formatCompletedSummary, setProgress } from '@/lib/session-derive'
+import { formatRampSets, prescribedDose, formatCompletedSummary, setProgress } from '@/lib/session-derive'
 import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChip'
 import { ExerciseLine, StatusCircle } from './ExerciseLine'
 import { isExternallyLoaded, isUnverifiedLoadSource, splitLoadDisplay, unloadedLoadLabel } from '@/lib/load-prescription'
@@ -246,7 +246,7 @@ export function ExerciseRow({
               as visible TEXT, not only a prop into the grid (one-day-one-look
               §4b): it is what she reads before she has trained. */}
           <p className="mt-0.5 font-mono text-[0.75rem] text-muted-foreground" data-testid="exercise-meta">
-            {ex.sets} × {ex.reps}
+            {prescribedDose(ex)}
             {loadText && <> · <span data-testid="exercise-load">{loadText}</span></>}
             {unloadedLabel && <> · <span data-testid="bodyweight-load">{unloadedLabel}</span></>}
             {ex.rest && <> · rest <span className="tabular-mono">{ex.rest === 'alternate' ? 'alternate — no rest between' : ex.rest}</span></>}

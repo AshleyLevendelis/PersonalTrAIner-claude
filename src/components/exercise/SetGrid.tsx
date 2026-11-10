@@ -34,6 +34,15 @@ import type { UserProfile } from '@/lib/types'
 // constant here was 9999.99 — the width of the database column, not a claim
 // about lifting — so 500kg on a 24kg dumbbell passed it without comment.
 const MAX_REPS = 999
+/**
+ * A TIMED set's box holds SECONDS, not reps (QA, 10 Nov 2026: a 20-minute elliptical in a swapped-in cardio session is
+ * "1200", and the reps ceiling of 999 refused it for good, so the session could not be logged past it). Three hours.
+ */
+const MAX_SECONDS = 3 * 60 * 60
+/** The box's ceiling for this kind of set: seconds for a hold, an interval or steady cardio, reps otherwise. */
+export function maxCountFor(prescriptionType: string | undefined): number {
+  return prescriptionType === 'time' || prescriptionType === 'intervals' || prescriptionType === 'steady_state' ? MAX_SECONDS : MAX_REPS
+}
 
 /** Keeps the row a lifter is actively editing above the soft keyboard (LAYOUT-DESIGN.md §7.6) — scrollIntoView on focus, not on every keystroke. */
 function scrollRowIntoView(e: React.FocusEvent<HTMLInputElement>) {
@@ -614,8 +623,10 @@ export function SetGrid({
       setRowErrors(prev => ({ ...prev, [k]: 'Enter reps to log this set' }))
       return
     }
-    if (reps > MAX_REPS) {
-      setRowErrors(prev => ({ ...prev, [k]: `Reps must be a whole number from 1 to ${MAX_REPS}` }))
+    if (reps > maxCountFor(prescriptionType)) {
+      setRowErrors(prev => ({ ...prev, [k]: maxCountFor(prescriptionType) === MAX_REPS
+        ? `Reps must be a whole number from 1 to ${MAX_REPS}`
+        : 'That’s longer than three hours: check the seconds' }))
       return
     }
 
@@ -1114,7 +1125,7 @@ export function SetGrid({
               id={`setgrid-reps-${exerciseId}-${k}`}
               type="number"
               min="0"
-              max={MAX_REPS}
+              max={maxCountFor(prescriptionType)}
               step="1"
               /* Never '0' as a fallback: that suggested the exact value the
                  save refuses, on the one session where the fallback applies. */
