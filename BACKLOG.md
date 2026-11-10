@@ -51,9 +51,17 @@ Newest first. One line each.
   asked for), 312 of 313 logic gates that read the changed files (the one failure, a comment that repeated the Finish
   button's words, fixed). MUTATIONS, round 1 at f3bdc1dc: 23 tried, 21 caught; the 2 MISSED were redundant safeguards
   (a "did a fetch fail" flag beside a test of what is held; a dead ?? in the week overlay) and were deleted rather
-  than given checks. Round 2 (the kept plan changes, the week list) and a short round 3 (the quieter notice) are
-  recorded in the next entry. NOT YET RE-RUN on the final tree: verify:gym-offline after the notice's button became
-  "Reload the app", and the full sweep.
+  than given checks. ROUND 2 at f2311a9f (the kept plan changes, the week list): 26 tried, 22 caught outright. The
+  other four, each read rather than counted: one made test:offline-ready THROW at check 47 of 73, which the harness
+  rightly called a crash and not a catch, so every save in that section now answers 'threw' and the checks after it
+  still run and fail; one (a coded error read as the network's) was MISSED because no case had a code AND network
+  words, and one was added; one was the swap's sweep catch, MISSED on the driver because the sweep does not throw,
+  which is how the claim in (b) above was found false; one (the badge's condition) cannot bind in the driver, where
+  the phone is offline whenever a change is waiting, and is held by the source check. A fifth MISSED was my own bad
+  mutant (it threw AFTER keeping, which a prefix match let through); the check now pins the whole saver. ROUND 3 at
+  5b3646a9: those re-run plus the quieter notice, 10 tried on three gates, all caught, and verify:gym-offline green
+  on the final tree (51 checks). Across the three rounds 59 mutations; every one is caught or accounted for above.
+  The week list's seven were all caught (verify:program-titles).
 - [x] **THE WEEK LIST: A WORKOUT'S NAME IS THE HEADLINE, 10 NOV 2026.** Ashley: "not very clearly visible at first glance
   which are a title of a workout and which are the exercises themselves." Measured on the screen first: the name was
   15.5px semibold over a 13px near-white main-lift line, and an opened day's exercise names were 15px in full white
