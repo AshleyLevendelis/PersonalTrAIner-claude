@@ -467,7 +467,7 @@ console.log('\n6. One saver, two surfaces — and the coach on the proposal rail
 
   const panel = strip(read('src/components/exercise/TodayPanel.tsx'))
   const executor = strip(read('src/lib/pending-action-executor.ts'))
-  check('the screen saves through it', /saveScopedEdit\(profileId, next\.mesocycle, liveWeek, scope\)/.test(panel))
+  check('the screen saves through it', /saveScopedEdit\(profileId, next\.mesocycle, liveWeek, scope[,)]/.test(panel))
   // RE-ANCHORED 13 Sep 2026, from "there are exactly two of these calls" to
   // "every session-edit executor makes one". The count was a mechanism: adding
   // a third session edit (putting an exercise IN) broke a check whose subject

@@ -29,6 +29,7 @@
 // ---------------------------------------------------------------------------
 
 import { swapOnScreen } from '@/lib/screen-swap'
+import { useKeptPlanSender } from '@/hooks/useKeptPlanSender'
 import { banOnScreen } from '@/lib/screen-ban'
 import { StrictMode, useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -1639,6 +1640,9 @@ function Harness() {
   // The app was wired correctly and the harness could not show it. App.tsx
   // owns this state and hands setMesocycle down (App.tsx:2547); so does this.
   const [editedMeso, setEditedMeso] = useState(mesocycle)
+  // THE APP'S OWN SENDER for plan changes kept with no signal (App mounts the same hook), so verify:gym-offline
+  // watches the app send a swap, not a harness doing it for it.
+  useKeptPlanSender(profile.id)
   const readKitFacts = () => ((db.user_facts ?? []) as unknown as UserFactRow[]).filter(f => f.status === 'active')
   const [kitFacts, setKitFacts] = useState<UserFactRow[]>(readKitFacts)
   const kitProfile = KIT ? profileWithKit(profile, compileKitStatements(kitFacts)) : profile

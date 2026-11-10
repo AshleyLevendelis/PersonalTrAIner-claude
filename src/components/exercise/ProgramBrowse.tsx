@@ -571,13 +571,25 @@ export function ProgramBrowse({
                 </span>
                 <div className="flex-1 min-w-0 flex flex-col gap-[3px]">
                   <div className="flex items-baseline gap-2 flex-wrap">
+                    {/* THE WORKOUT'S NAME IS THE ROW'S ONE HEADLINE (Ashley, 10 Nov 2026: "not very clearly visible at first
+                        glance which are a title of a workout and which are the exercises themselves"). It was 15.5px
+                        semibold over a 13px near-white exercise name, and the opened exercises were 15px in the same
+                        white, further LEFT than the title they belong to. Now: larger and bold, its last word in the
+                        accent as Home's and Exercise's own session cards draw a workout's name; the line under it
+                        reads as detail; the exercises hang off a rail to its right (below). */}
                     <span
-                      className={trains ? 'text-[0.96875rem] font-semibold tracking-[-.012em]' : 'text-[0.8125rem]'}
+                      className={trains ? 'text-[1.0625rem] font-bold leading-tight tracking-[-.015em]' : 'text-[0.8125rem]'}
+                      data-program-title={trains ? 'workout' : 'rest'}
                       // A DAY ALREADY DONE RECEDES BY ITS TITLE'S COLOUR, not by fading the row (2 Nov 2026, the UX pass): the
                       // row at 55% put its small print at 2.9-3.7:1. verify:small-print.
                       style={trains ? (dim ? { color: 'var(--muted-foreground)' } : undefined) : { color: 'var(--muted-foreground)' }}
                     >
-                      {movedTo ? (leftBehind?.focus ?? 'Rest') : (workout?.focus ?? 'Rest')}
+                      {(() => {
+                        const title = movedTo ? (leftBehind?.focus ?? 'Rest') : (workout?.focus ?? 'Rest')
+                        const cut = title.lastIndexOf(' ')
+                        if (!trains || dim || cut <= 0) return title
+                        return <>{title.slice(0, cut + 1)}<span style={{ color: 'var(--primary-text)' }}>{title.slice(cut + 1)}</span></>
+                      })()}
                     </span>
                     {/* SAID ON THE ROW, not left to be inferred from an empty
                         day. The badge is the same shape the week strip uses,
@@ -601,9 +613,11 @@ export function ProgramBrowse({
                   {trains && (
                     <div className="flex flex-col gap-[5px]">
                       {main && (
-                        <span className="text-[0.8125rem]" style={{ color: 'color-mix(in srgb, var(--foreground) 76%, transparent)' }}>
+                        // DETAIL, NOT A SECOND HEADLINE: said to be the main lift, and in the quiet colour throughout.
+                        <span className="text-[0.75rem] leading-snug" style={{ color: 'var(--muted-foreground)' }} data-program-main>
+                          <span className="text-[0.5625rem] font-semibold uppercase tracking-[.12em]">Main lift</span>{' '}
                           {main.name}{' '}
-                          <span className="tabular-mono text-[0.6875rem]" style={{ color: 'var(--muted-foreground)' }}>
+                          <span className="tabular-mono text-[0.6875rem]">
                             {main.summary}
                           </span>
                         </span>
@@ -648,7 +662,17 @@ export function ProgramBrowse({
               </div>
 
               {open && workout && (
-                <div style={{ padding: '4px 2px 18px 46px' }} className="flex flex-col gap-3">
+                // UNDER THE TITLE AND TO ITS RIGHT, on a rail: the exercises belong to the workout above them. They used
+                // to start 13px LEFT of its name (46px against the title's 59).
+                <div
+                  style={{ margin: '2px 2px 18px 59px', paddingLeft: 12, borderLeft: '2px solid color-mix(in srgb, var(--primary) 28%, transparent)' }}
+                  className="flex flex-col gap-3"
+                  data-program-day-body
+                >
+                  <p className="flex items-baseline justify-between pt-1 text-[0.625rem] font-semibold uppercase tracking-[.12em] text-text-tertiary" data-testid="program-exercises-heading">
+                    <span>Exercises</span>
+                    <span className="tabular-mono font-normal normal-case tracking-normal">{workout.exercises.length}</span>
+                  </p>
                   {/* Day-level notes the old cards carried — kept, quietly. */}
                   {workout.recommendedCardio && (
                     <p className="text-xs text-muted-foreground" data-testid="program-day-cardio">

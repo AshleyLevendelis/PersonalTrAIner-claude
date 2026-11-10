@@ -61,6 +61,8 @@ export async function saveMesocycle(profileId: string, weeks: MesocycleWeek[], p
     .eq('profile_id', profileId)
     .gt('week_number', highestWeek)
   if (trimError) console.error('Trimming stale mesocycle weeks failed (plan itself saved):', trimError)
+  // A WHOLE PLAN SAVED replaces every week: nothing kept on the phone from before it may be laid back over it.
+  dropKeptWeeks(profileId)
 }
 
 export interface RestoredMesocycle {
@@ -89,7 +91,10 @@ export async function restoreMesocycle(profileId: string): Promise<RestoredMesoc
     .map(r => r.created_at)
     .filter((c): c is string => !!c)
     .sort()[0] ?? null
-  return { weeks: rows.map(fromRow), createdAt }
+  // WITH THE PHONE'S OWN UNSENT CHANGES ON TOP (keptPlanWeeks, below): a swap made with no signal is part of the plan
+  // the moment it is made, and a read that lands before it has been sent must not draw the plan without it.
+  const kept = keptPlanWeeks(profileId)
+  return { weeks: rows.map(fromRow).map(w => kept.get(w.week_number) ?? w), createdAt }
 }
 
 /** Upserts a single week — used by targeted mesocycle edits (swap/ban) so a full resave isn't needed for a one-week patch. */
@@ -109,9 +114,20 @@ export async function saveScopedEdit(
   mesocycle: MesocycleWeek[],
   weekNumber: number,
   scope: 'today' | 'permanent',
-): Promise<void> {
+  /**
+   * THE SCREEN'S OWN EDITS pass `keepOffline` (10 Nov 2026): with no signal the touched weeks are kept on the phone
+   * and sent later, and the answer is 'kept'. Without it a failed save throws, as it always has (the coach's cards).
+   */
+  options: { keepOffline?: boolean } = {},
+): Promise<'saved' | 'kept'> {
   const touched = weeksTouchedByScope(mesocycle, weekNumber, scope)
-  await Promise.all(touched.map(w => saveMesocycleWeek(profileId, w)))
+  if (!options.keepOffline) {
+    await Promise.all(touched.map(w => saveMesocycleWeek(profileId, w)))
+    return 'saved'
+  }
+  // Each week on its own terms: one that reached the server is saved, one that could not is kept. A refusal throws.
+  const results = await Promise.all(touched.map(w => saveWeekKeepingOffline(profileId, w)))
+  return results.includes('kept') ? 'kept' : 'saved'
 }
 
 /**
@@ -145,4 +161,118 @@ export async function saveMesocycleWeek(profileId: string, week: MesocycleWeek):
     .from('mesocycle_weeks')
     .upsert(toRow(profileId, week), { onConflict: 'profile_id,week_number' })
   if (error) throw error
+  // The newest saved version of a week is the week: an older copy still waiting on the phone is dropped, never sent
+  // over it later.
+  dropKeptWeeks(profileId, week.week_number)
+}
+
+// ---------------------------------------------------------------------------
+// A PLAN CHANGE MADE WITH NO SIGNAL IS KEPT ON THE PHONE AND SENT LATER.
+//
+// Ashley, 10 Nov 2026: "gyms often don't have WiFi ... We should be able to do as much as possible in the app without
+// network." Sets, water, meals, cardio and the shopping list were local-first already. A change to the PLAN was not:
+// with no signal, "the machine is taken, swap it" drew the swap, failed to save, put the old exercise back and said
+// to check the connection. The one edit a gym floor asks for most was the one a gym with no signal refused.
+//
+// The weeks an edit touched are whole rows, so keeping them is keeping the edit. For the screen's own edits only
+// (swap, remove, move, add, and their Undo): the coach cannot be reached offline at all, and the app's automatic
+// re-pricing has no business queuing behind a connection it cannot see.
+//
+//   - Kept ONLY when the failure is the network's. A refusal from the database is a real error and still throws.
+//   - A read of the plan lays kept weeks over what the server holds (restoreMesocycle).
+//   - Any later save of the same week that SUCCEEDS drops the kept copy (saveMesocycleWeek), so an older edit is
+//     never sent over a newer one. A whole new plan drops them all (saveMesocycle).
+//   - Keyed by person and week; a New Plan makes a new person, so an old plan's weeks can never reach a new one.
+// ---------------------------------------------------------------------------
+const KEPT_PLAN_KEY = 'fitplan_plan_pending_v1'
+interface KeptWeek { profileId: string; week: MesocycleWeek; keptAt: string }
+const keptKey = (profileId: string, weekNumber: number) => `${profileId}|${weekNumber}`
+
+function loadKept(): Record<string, KeptWeek> {
+  try {
+    const raw = typeof localStorage === 'undefined' ? null : localStorage.getItem(KEPT_PLAN_KEY)
+    const parsed = raw ? JSON.parse(raw) : {}
+    return parsed && typeof parsed === 'object' ? parsed as Record<string, KeptWeek> : {}
+  } catch { return {} }
+}
+const keptListeners = new Set<() => void>()
+function storeKept(map: Record<string, KeptWeek>): void {
+  try {
+    if (Object.keys(map).length === 0) localStorage.removeItem(KEPT_PLAN_KEY)
+    else localStorage.setItem(KEPT_PLAN_KEY, JSON.stringify(map))
+  } catch { /* storage full or blocked: the caller's save has already thrown or succeeded on its own terms */ }
+  for (const l of keptListeners) l()
+}
+/** Told when the kept weeks change (one kept, one sent), for the line that says something is waiting. */
+export function subscribeKeptPlanWeeks(listener: () => void): () => void {
+  keptListeners.add(listener)
+  return () => { keptListeners.delete(listener) }
+}
+function dropKeptWeeks(profileId: string, weekNumber?: number): void {
+  const map = loadKept()
+  let changed = false
+  for (const key of Object.keys(map)) {
+    if (map[key].profileId !== profileId) continue
+    if (weekNumber != null && map[key].week.week_number !== weekNumber) continue
+    delete map[key]; changed = true
+  }
+  if (changed) storeKept(map)
+}
+/** Whether anything at all is waiting (the "waiting to send" pill, which knows no person). */
+export function hasKeptPlanWeeks(): boolean {
+  return Object.keys(loadKept()).length > 0
+}
+/** This person's plan weeks changed on the phone and not yet sent, by week number. */
+export function keptPlanWeeks(profileId: string): Map<number, MesocycleWeek> {
+  const out = new Map<number, MesocycleWeek>()
+  for (const kept of Object.values(loadKept())) if (kept.profileId === profileId) out.set(kept.week.week_number, kept.week)
+  return out
+}
+
+/**
+ * The network's own failure, as the Supabase client reports it (a resolved `{ error }` whose message is the
+ * browser's fetch error and whose code is empty) or as a thrown fetch error; or anything at all while the phone says
+ * it is offline. A Postgres or API refusal carries a code and is NOT one.
+ */
+export function isNetworkFailure(error: unknown): boolean {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
+  if (!error || typeof error !== 'object') return false
+  const e = error as { message?: unknown; code?: unknown; name?: unknown }
+  if (typeof e.code === 'string' && e.code.length > 0) return false
+  const text = `${typeof e.name === 'string' ? e.name : ''} ${typeof e.message === 'string' ? e.message : ''}`
+  return /Failed to fetch|NetworkError|Load failed|network request failed|fetch failed|ERR_INTERNET_DISCONNECTED/i.test(text)
+}
+
+/** One week, saved now or kept for later. Throws only on a real refusal. */
+export async function saveWeekKeepingOffline(profileId: string, week: MesocycleWeek): Promise<'saved' | 'kept'> {
+  try {
+    await saveMesocycleWeek(profileId, week)
+    return 'saved'
+  } catch (error) {
+    if (!isNetworkFailure(error)) throw error
+    const map = loadKept()
+    map[keptKey(profileId, week.week_number)] = { profileId, week, keptAt: new Date().toISOString() }
+    storeKept(map)
+    return 'kept'
+  }
+}
+
+/**
+ * Send what is waiting. Each week that saves drops its own kept copy (saveMesocycleWeek); one that fails stays for
+ * the next knock. Never throws. Returns how many are still waiting.
+ */
+let flushing: Promise<number> | null = null
+export function sendKeptPlanWeeks(profileId: string): Promise<number> {
+  if (flushing) return flushing
+  flushing = (async () => {
+    for (const week of keptPlanWeeks(profileId).values()) {
+      try { await saveMesocycleWeek(profileId, week) } catch (error) {
+        // A refusal will be refused again: drop it rather than knock for ever. The screen already shows the edit, and
+        // the next read brings back what the server holds.
+        if (!isNetworkFailure(error)) { console.error('A plan change kept offline was refused and is dropped:', error); dropKeptWeeks(profileId, week.week_number) }
+      }
+    }
+    return keptPlanWeeks(profileId).size
+  })().finally(() => { flushing = null })
+  return flushing
 }

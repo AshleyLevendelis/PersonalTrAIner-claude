@@ -449,7 +449,8 @@ export function TodayPanel({
     if (!next.changed) return say(next.refusal ?? "That couldn't be changed.")
     onMesocycleUpdated?.(next.mesocycle)
     try {
-      await saveScopedEdit(profileId, next.mesocycle, liveWeek, scope)
+      // Kept on the phone and sent later when there is no signal (mesocycle-persistence, 10 Nov 2026).
+      await saveScopedEdit(profileId, next.mesocycle, liveWeek, scope, { keepOffline: true })
     } catch (err) {
       console.error('[session-edit] save failed', err)
       onMesocycleUpdated?.(mesocycle)

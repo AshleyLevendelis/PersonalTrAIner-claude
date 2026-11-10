@@ -21,7 +21,7 @@
 import { useSyncExternalStore } from 'react'
 import type { MesocycleWeek } from './types'
 import { fingerprintWeeks, undoStillFits } from './offer-still-holds'
-import { saveMesocycleWeek, weeksTouchedByScope } from './mesocycle-persistence'
+import { saveWeekKeepingOffline, weeksTouchedByScope } from './mesocycle-persistence'
 import { RECEIPTS, RECEIPTS_UNDONE } from './coach-voice'
 
 /** The coach's Undo window (isWithinUndoWindow), so the two surfaces keep one promise. */
@@ -120,7 +120,8 @@ export async function undoScreenEdit(
 }
 
 /** The app's week saver, bound to a person. */
-export const saveWeekFor = (profileId: string) => (week: MesocycleWeek) => saveMesocycleWeek(profileId, week)
+/* An Undo is a screen edit too: with no signal it is kept on the phone and sent later, as the change it undoes was. */
+export const saveWeekFor = (profileId: string) => (week: MesocycleWeek) => saveWeekKeepingOffline(profileId, week).then(() => undefined)
 
 // --- The store: the newest change only. A second change replaces the first's line, as the coach's newest card does.
 let seq = 0

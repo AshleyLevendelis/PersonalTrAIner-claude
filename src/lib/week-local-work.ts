@@ -61,7 +61,7 @@ export function weekWithLocalWork(
       session = {
         ...(session ?? { profile_id: profileId, date, split_type: 'training', duration_minutes: 0 }),
         is_completed: true,
-        finished_at: session?.finished_at ?? finishedAt,
+        finished_at: finishedAt,
       }
     }
     out.push({ ...day, session, workingLogs, warmupLogs })

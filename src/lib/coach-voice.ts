@@ -1147,6 +1147,14 @@ export function noSetsButCardio(activities: string[]): string {
 export function setsWaitingToSend(count: number): string {
   return `${count} set${count === 1 ? '' : 's'} waiting to send`
 }
+/**
+ * The same badge when a change to the PLAN is waiting too (a swap made with no signal, 10 Nov 2026). No count for the
+ * plan: one swap for a whole block is several stored weeks and one change to the person who made it.
+ */
+export function waitingToSend(sets: number, planChange: boolean): string {
+  if (!planChange) return setsWaitingToSend(sets)
+  return sets > 0 ? `${sets} set${sets === 1 ? '' : 's'} and a plan change waiting to send` : 'Plan change waiting to send'
+}
 
 export const FIRST_LOG_NOTE = 'First time logged — this is your baseline'
 /** Under a set row the server refused, beside its Retry. */

@@ -46,11 +46,18 @@ export async function swapOnScreen(input: {
   try {
     // 'today' is one week, 'permanent' is the rest of that week's block — the
     // one saver the coach's swap uses too (test:silent-writes §6).
-    await saveScopedEdit(profile.id, updated, weekNumber, scope)
+    // WITH NO SIGNAL THE SWAP IS KEPT ON THE PHONE AND SENT LATER (10 Nov 2026, a gym with no Wi-Fi): "the machine is
+    // taken" is the edit a gym floor asks for most, and it used to be drawn, fail, and be put back. A refusal from
+    // the database still throws, and the plan still goes back.
+    await saveScopedEdit(profile.id, updated, weekNumber, scope, { keepOffline: true })
     // VISION-ARCHITECTURE.md §2.3 — after a tap, sweep pending proposals on
     // the same target so nobody confirms a card their own tap invalidated.
     // Same key the chat's swap card is filed under: the PLAN ROW and index.
+    // ITS OWN FAILURE IS NOT THE SWAP'S: the swap is saved (or kept) by now, and a sweep that could not reach the
+    // server used to land in the catch below and put the old exercise back ON SCREEN over a plan that had changed.
+    // An offer left open is checked against the plan again at its own tap (offerStillHolds).
     await sweepStaleForTarget(profile.id, `${profile.id}:propose_exercise_swap:${dayName}:${exIndex}`)
+      .catch(err => console.error('Sweeping stale swap offers failed (the swap itself is saved):', err))
     // THE UNDO LINE (QA walk T7): the plan as it was, filed for the Exercise tab's one line.
     const was = mesocycle.find(w => w.week_number === weekNumber)?.days.find(d => d.day === dayName)?.exercises[exIndex]?.name
     publishScreenEdit(recordScreenEdit(mesocycle, updated, weekNumber, scope,

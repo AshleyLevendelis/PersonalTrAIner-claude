@@ -347,6 +347,7 @@
     "verify:session-rebuild": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-rebuild.mjs",
     "verify:next-set-now": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/next-set-now.mjs",
     "verify:gym-offline": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/gym-offline.mjs",
+    "verify:program-titles": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/program-titles.mjs",
     "verify:session-kind": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-kind.mjs",
     "verify:shorten-today": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/shorten-today.mjs",
     "verify:planned-activity": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/planned-activity.mjs",

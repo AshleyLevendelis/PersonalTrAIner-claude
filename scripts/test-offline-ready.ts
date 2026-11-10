@@ -211,6 +211,103 @@ async function main() {
   const setStore = strip(readFileSync('src/lib/set-log-store.ts', 'utf8'))
   check('two askers for one day\'s session share one request', /const running = sessionResolves\.get\(key\)\s*\n\s*if \(running\) return running/.test(setStore) && /\.finally\(\(\) => \{ sessionResolves\.delete\(key\) \}\)/.test(setStore))
 
+  console.log('\n6. A plan change made with no signal is kept on the phone and sent later')
+  const ls = new Map<string, string>()
+  ;(globalThis as unknown as { localStorage: unknown }).localStorage = { getItem: (k: string) => ls.get(k) ?? null, setItem: (k: string, v: string) => { ls.set(k, v) }, removeItem: (k: string) => { ls.delete(k) } }
+  setOnline(true)
+  // A server that can be taken away, or told to refuse: the three calls the plan's saver and reader make.
+  const server = new Map<string, { profile_id: string; week_number: number; label: string; days: unknown[]; created_at?: string }>()
+  let net: 'up' | 'down' | 'refuse' = 'up'
+  let downFor: (weekNumber: number) => boolean = () => true
+  const dead = { message: 'TypeError: Failed to fetch', details: '', hint: '', code: '' }
+  const refusal = { message: 'new row violates check constraint', details: null, hint: null, code: '23514' }
+  const { setSupabaseClient } = await import('../src/lib/supabase')
+  setSupabaseClient({
+    from: () => ({
+      upsert: async (rows: unknown) => {
+        const list = (Array.isArray(rows) ? rows : [rows]) as { profile_id: string; week_number: number; label: string; days: unknown[] }[]
+        if (net === 'refuse') return { error: refusal }
+        if (net === 'down' && list.some(r => downFor(r.week_number))) return { error: dead }
+        for (const r of list) server.set(`${r.profile_id}|${r.week_number}`, r)
+        return { error: null }
+      },
+      select: () => ({ eq: (_c: string, id: string) => ({ order: async () => (net === 'down' ? { data: null, error: dead } : { data: [...server.values()].filter(r => r.profile_id === id).sort((a, b) => a.week_number - b.week_number), error: null }) }) }),
+      delete: () => ({ eq: () => ({ gt: async () => ({ error: null }) }) }),
+    }),
+  } as never)
+  const P = await import('../src/lib/mesocycle-persistence')
+  const wk = (n: number, label: string, block = 1) => ({ week_number: n, block_number: block, label, days: [{ day: 'Monday', focus: label, exercises: [] }] }) as never
+  const plan = (labels: Record<number, string>) => [1, 2, 3, 4].map(n => wk(n, labels[n] ?? `week ${n}`))
+  const reset = () => { server.clear(); ls.clear(); net = 'up'; downFor = () => true }
+  const serverLabel = (id: string, n: number) => server.get(`${id}|${n}`)?.label ?? null
+
+  reset()
+  check('with signal the edit is saved and nothing is kept', (await P.saveScopedEdit('p1', plan({ 2: 'swapped' }), 2, 'today', { keepOffline: true })) === 'saved' && serverLabel('p1', 2) === 'swapped' && P.keptPlanWeeks('p1').size === 0 && !P.hasKeptPlanWeeks())
+  let told = 0
+  const offKept = P.subscribeKeptPlanWeeks(() => { told++ })
+  net = 'down'
+  const keptAnswer = await P.saveScopedEdit('p1', plan({ 2: 'swapped offline' }), 2, 'today', { keepOffline: true })
+  check('WITH NO SIGNAL it is kept on the phone, not thrown away', keptAnswer === 'kept' && (P.keptPlanWeeks('p1').get(2) as { label?: string } | undefined)?.label === 'swapped offline' && P.hasKeptPlanWeeks() && serverLabel('p1', 2) === 'swapped', { keptAnswer, kept: [...P.keptPlanWeeks('p1').keys()] })
+  check('...only the week the edit touched', P.keptPlanWeeks('p1').size === 1)
+  check('...and the "waiting to send" line is told', told >= 1, told)
+  offKept()
+  let threw = false
+  try { await P.saveScopedEdit('p2', plan({ 2: 'coach edit' }), 2, 'today') } catch { threw = true }
+  check('an edit that did not ask to be kept still throws with no signal (the coach\'s cards)', threw && P.keptPlanWeeks('p2').size === 0)
+  net = 'refuse'; threw = false
+  try { await P.saveScopedEdit('p3', plan({ 2: 'refused' }), 2, 'today', { keepOffline: true }) } catch { threw = true }
+  check('a REFUSAL from the database is never kept: it throws, and the screen puts the plan back', threw && P.keptPlanWeeks('p3').size === 0)
+
+  net = 'up'
+  const laid = await P.restoreMesocycle('p1')
+  check('a read of the plan lays the kept week over the server\'s older one', laid?.weeks.find(w => w.week_number === 2)?.label === 'swapped offline', laid?.weeks.map(w => w.label))
+  server.set('p9|2', { profile_id: 'p9', week_number: 2, label: 'someone else', days: [] })
+  check('...and never over another person\'s plan', (await P.restoreMesocycle('p9'))?.weeks[0]?.label === 'someone else')
+  net = 'down'
+  check('still no signal: sending keeps it and says one is waiting', (await P.sendKeptPlanWeeks('p1')) === 1 && P.keptPlanWeeks('p1').size === 1)
+  net = 'up'
+  check('the signal is back: it is sent, and nothing is left on the phone', (await P.sendKeptPlanWeeks('p1')) === 0 && serverLabel('p1', 2) === 'swapped offline' && !P.hasKeptPlanWeeks())
+
+  reset(); net = 'down'
+  await P.saveScopedEdit('p1', plan({ 2: 'old offline edit' }), 2, 'today', { keepOffline: true })
+  net = 'up'
+  await P.saveMesocycleWeek('p1', wk(2, 'newer edit, saved'))
+  check('a newer save of the same week drops the kept copy', P.keptPlanWeeks('p1').size === 0)
+  await P.sendKeptPlanWeeks('p1')
+  check('...so the older edit is never sent over the newer one', serverLabel('p1', 2) === 'newer edit, saved')
+
+  reset(); net = 'down'; downFor = n => n === 3
+  const halfSent = await P.saveScopedEdit('p1', plan({ 2: 'b2', 3: 'b3', 4: 'b4' }), 2, 'permanent', { keepOffline: true })
+  check('a whole-block edit that half arrived: the weeks that reached the server are saved, the one that did not is kept', halfSent === 'kept' && [...P.keptPlanWeeks('p1').keys()].join() === '3' && serverLabel('p1', 2) === 'b2' && serverLabel('p1', 4) === 'b4', { halfSent, kept: [...P.keptPlanWeeks('p1').keys()] })
+  net = 'up'
+  await P.saveMesocycle('p1', plan({ 1: 'new plan' }))
+  check('a whole new plan drops everything kept from the old one', P.keptPlanWeeks('p1').size === 0)
+
+  reset(); net = 'down'
+  await P.saveWeekKeepingOffline('p1', wk(2, 'will be refused'))
+  await P.saveWeekKeepingOffline('p7', wk(2, 'another person'))
+  net = 'refuse'
+  check('a kept change the server REFUSES is dropped, not knocked for ever', (await P.sendKeptPlanWeeks('p1')) === 0 && P.keptPlanWeeks('p1').size === 0)
+  check('...leaving another person\'s kept change alone', P.keptPlanWeeks('p7').size === 1)
+
+  check('the network\'s failure is told from a refusal', P.isNetworkFailure(dead) && P.isNetworkFailure(new TypeError('Failed to fetch')) && P.isNetworkFailure({ message: 'Load failed' }) && !P.isNetworkFailure(refusal) && !P.isNetworkFailure({ message: 'JWT expired', code: 'PGRST301' }) && !P.isNetworkFailure(null) && !P.isNetworkFailure(new Error('cannot read kg')))
+  setOnline(false)
+  check('...and while the phone says it is offline, any failure is the network\'s', P.isNetworkFailure(new Error('anything')))
+  setOnline(true)
+
+  const swapSrc = strip(readFileSync('src/lib/screen-swap.ts', 'utf8'))
+  check('the screen\'s swap asks to be kept', /saveScopedEdit\(profile\.id, updated, weekNumber, scope, \{ keepOffline: true \}\)/.test(swapSrc))
+  check('...and a sweep of old offers that cannot reach the server no longer puts the old exercise back', /sweepStaleForTarget\([^)]*\)\s*\n?\s*\.catch\(/.test(swapSrc))
+  check('so do remove, move and add', /saveScopedEdit\(profileId, next\.mesocycle, liveWeek, scope, \{ keepOffline: true \}\)/.test(today))
+  check('...and their Undo', /saveWeekFor = \(profileId: string\) => \(week: MesocycleWeek\) => saveWeekKeepingOffline\(profileId, week\)/.test(strip(readFileSync('src/lib/screen-edit-undo.ts', 'utf8'))))
+  check('the coach\'s cards do NOT (it cannot be reached offline; a card that "applied" on the phone alone would lie)', !/keepOffline/.test(strip(readFileSync('src/lib/pending-action-executor.ts', 'utf8'))))
+  const sender = strip(readFileSync('src/hooks/useKeptPlanSender.ts', 'utf8'))
+  check('the sender knocks when the app opens, when the signal returns, and while anything waits', /\n\s*send\(\)\n/.test(sender) && /addEventListener\('online', send\)/.test(sender) && /setInterval\(send, KNOCK_MS\)/.test(sender))
+  check('...and the app mounts it', /useKeptPlanSender\(profile\?\.id\)/.test(strip(readFileSync('src/App.tsx', 'utf8'))))
+  const voice = await import('../src/lib/coach-voice')
+  check('the badge says a plan change is waiting, with the sets or alone', voice.waitingToSend(3, true) === '3 sets and a plan change waiting to send' && voice.waitingToSend(1, true) === '1 set and a plan change waiting to send' && voice.waitingToSend(0, true) === 'Plan change waiting to send' && voice.waitingToSend(2, false) === '2 sets waiting to send')
+  check('...and shows it even with signal, until it has gone', /if \(!state\.isOnline \|\| state\.queuedCount > 0 \|\| planWaiting\)/.test(strip(readFileSync('src/components/OfflineStatusIndicator.tsx', 'utf8'))))
+
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.log(`${failures} FAILED`); process.exit(1) }
   console.log('The whole app is saved to the phone, a missing part never takes the screen, and the week counts what the phone holds.')

@@ -19,6 +19,7 @@ import { TimersProvider } from '@/hooks/useTimers'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
 import { AppTour, replayAppTour } from '@/components/AppTour'
 import { isDevAccount, getSessionDateContext, getAppNow, getLocalDateString } from '@/lib/dev-clock'
+import { useKeptPlanSender } from '@/hooks/useKeptPlanSender'
 import { useAppRoute, tabHash, groceryHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
 
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
@@ -230,6 +231,8 @@ function App() {
     const t = setTimeout(warm, 2500)
     return () => clearTimeout(t)
   }, [profile?.id])
+  // PLAN CHANGES MADE WITH NO SIGNAL are sent when it returns (mesocycle-persistence's kept weeks, 10 Nov 2026).
+  useKeptPlanSender(profile?.id)
   const [macros, setMacros] = useState<MacroTargets | null>(() => boot?.macros ?? null)
   /** Latest daily_metrics weigh-in — DISPLAY only ("your current weight is X"). Null until the user first weighs in. Target computation uses targetWeightAnchorKg instead (see its own doc comment) — the two intentionally diverge: this always shows the real latest reading, the anchor only moves once that reading's 7-day average has shifted enough to matter. */
   const [latestWeightKg, setLatestWeightKg] = useState<number | null>(() => boot?.latestWeightKg ?? null)
@@ -3412,7 +3415,7 @@ function App() {
           </TabsContent>
 
           <TabsContent value="tools">
-            <ToolsTab profileId={profile.id} equipmentAccess={profile.equipment_access} exercisePlan={exercisePlan} mesocycle={mesocycle} liveWeek={getActiveMesocycleWeek(mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4)} planCreatedAt={mesocycleCreatedAt ?? profile.created_at} logsVersion={logsVersion} onLogsUpdated={() => setLogsVersion(v => v + 1)} />
+            <ToolsTab profileId={profile.id} equipmentAccess={profile.equipment_access} exercisePlan={exercisePlan} mesocycle={mesocycle} liveWeek={getActiveMesocycleWeek(mesocycleCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length || 4)} planCreatedAt={mesocycleCreatedAt ?? profile.created_at} logsVersion={logsVersion} onLogsUpdated={() => setLogsVersion(v => v + 1)} />
           </TabsContent>
 
           <TabsContent value="chat" forceMount className="data-[state=inactive]:hidden">

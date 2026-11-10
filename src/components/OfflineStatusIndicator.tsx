@@ -8,7 +8,8 @@ import {
   getAllFailedItems, retryFailedItem, discardFailedItem, subscribeAllQueues,
   QUEUE_LABEL, plainSyncError, type FailedItem,
 } from '@/lib/queue-health'
-import { STILL_ON_THIS_DEVICE, setsWaitingToSend } from '@/lib/coach-voice'
+import { STILL_ON_THIS_DEVICE, waitingToSend } from '@/lib/coach-voice'
+import { hasKeptPlanWeeks, subscribeKeptPlanWeeks } from '@/lib/mesocycle-persistence'
 
 // ---------------------------------------------------------------------------
 // THE COLOURS ARE THE THEME'S OWN — H20, 9 Oct 2026.
@@ -60,6 +61,9 @@ export function OfflineStatusIndicator() {
   const [failedItems, setFailedItems] = useState<FailedItem[]>([])
 
   const refreshFailures = useCallback(() => setFailedItems(getAllFailedItems()), [])
+  // A CHANGE TO THE PLAN kept on the phone (a swap made with no signal) is waiting to send as surely as a set is.
+  const [planWaiting, setPlanWaiting] = useState(() => hasKeptPlanWeeks())
+  useEffect(() => subscribeKeptPlanWeeks(() => setPlanWaiting(hasKeptPlanWeeks())), [])
 
   useEffect(() => {
     const unsubSync = subscribeSyncState((newState) => {
@@ -194,12 +198,12 @@ export function OfflineStatusIndicator() {
     )
   }
 
-  if (!state.isOnline || state.queuedCount > 0) {
+  if (!state.isOnline || state.queuedCount > 0 || planWaiting) {
     return (
       <Badge variant="secondary" data-testid="saved-offline-badge" className="gap-1.5" style={chip('role-warn')}>
         <Zap className="h-3 w-3" />
         <span>
-          {state.queuedCount > 0 ? setsWaitingToSend(state.queuedCount) : 'Offline'}
+          {state.queuedCount > 0 || planWaiting ? waitingToSend(state.queuedCount, planWaiting) : 'Offline'}
         </span>
       </Badge>
     )

@@ -112,7 +112,8 @@ function warmAssets() {
     await Promise.all(Array.from({ length: WARM_AT_ONCE }, worker))
     // ONLY ONCE EVERYTHING LISTED IS HELD are older versions' files removed:
     // a half-saved new version must not cost the old one that still works.
-    if (failed) return
+    // (One test, of what is held. A separate "did a fetch fail" test stood
+    // here too and could be deleted without changing any outcome.)
     for (const path of wanted) { if (!(await cache.match(path))) return }
     for (const request of await cache.keys()) {
       const { pathname } = new URL(request.url)

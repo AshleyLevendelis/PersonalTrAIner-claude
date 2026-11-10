@@ -99,6 +99,11 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   // LIST OR CALENDAR on the Full Program (10 Nov 2026, his "option to see my training weeks as a calendar view"). A
   // way of LOOKING at a plan, not part of one: a new plan is shown the way he last chose to look, as a theme is.
   'program-view': { clear: false, why: 'how he likes to view the program (list or calendar) — a display choice, not plan state' },
+
+  // PLAN CHANGES KEPT WITH NO SIGNAL (10 Nov 2026), waiting to be sent. Kept like the queues above and for their
+  // reason: each entry carries its person and week, a New Plan makes a new person, and a whole plan saved for the
+  // SAME person drops them itself (saveMesocycle). Clearing them here would throw away a swap not yet sent.
+  fitplan_plan_pending_v1: { clear: false, why: 'plan weeks changed offline and not yet sent, keyed per person — dropped by the save that replaces them' },
 }
 
 /** Resolve `const SOME_KEY = 'literal'` across src/, so a key named by a constant is still found. */
