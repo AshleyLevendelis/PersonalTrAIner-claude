@@ -43,13 +43,21 @@ await clickAt(`document.querySelector('button[aria-label^="Save warm-up 1"]')`);
 const label1 = await allButton()
 check('4. after one is ticked by hand it offers the three still open', label1 === 'Log all 3 warm-ups', label1)
 
+// THE ROWS' OWN NUMBERS, read off the screen before the tap (RE-ANCHORED 10 Nov 2026: the four were pinned as
+// 20/25/32.5/40, and went stale when a catalogue batch moved this plan's squat weight; the check is "as written").
+const shown = await ev(`[...document.querySelectorAll('button[aria-label^="Save warm-up"]')].map(b => {
+  let row = b; for (let i = 0; i < 6 && row.parentElement && row.querySelectorAll('input').length < 2; i++) row = row.parentElement
+  const n = [...row.querySelectorAll('input')].map(x => parseFloat(String(x.value || x.placeholder).replace(/[^\\d.]/g, '')))
+  return { label: b.getAttribute('aria-label'), n }
+})`)
 const working0 = await workingRows()
 check('4b. (the sets before the squat are the only working sets so far)', before >= 1 && working0 === before, { working0, before })
 const tapped = await clickAt(`document.querySelector('[data-testid="log-all-warmups"]')`)
 await wait(1500)
 const rows = await until(warmRows, v => (v ?? []).length >= 4, 20)
 check('5. one tap logs the rest: four warm-ups stored', tapped && (rows ?? []).length === 4, rows)
-check('6. ...as written: 20 x 10, 25 x 5, 32.5 x 3, 40 x 2 (the rows\' own numbers)', JSON.stringify((rows ?? []).map(r => [r.kg, r.reps])) === JSON.stringify([[20, 10], [25, 5], [32.5, 3], [40, 2]]), rows)
+const want = [[20, 10], ...(shown ?? []).map(r => r.n.slice(0, 2))]
+check('6. ...as written: each the numbers its own row showed (the first, ticked by hand, at the bar)', (shown ?? []).length === 3 && JSON.stringify((rows ?? []).map(r => [r.kg, r.reps])) === JSON.stringify(want), { stored: (rows ?? []).map(r => [r.kg, r.reps]), want, shown })
 check('7. ...all filed as warm-ups on the squat, none as a working set', (rows ?? []).every(r => /squat/i.test(r.ex)) && (await workingRows()) === working0, { working0, now: await workingRows() })
 check('8. the button goes once nothing is left to log', (await allButton()) === null)
 const next = await ev(`document.querySelector('[data-next-set-button]')?.textContent.trim() ?? null`)
