@@ -315,6 +315,12 @@ export interface ExerciseEntry {
   demo_image_credit?: string
 }
 
+/** Kettlebell Deadlift's share of a barbell deadlift's price (batch 3, 10 Nov 2026). MEASURED: at 0.28 it lands at about
+ * the goblet squat's weight (33 / 8 / 24 / 15 kg for four of the gate's people; the bell's 48 kg cap for a big lifter),
+ * at or above the heavy swing (a slow grind takes more than a ballistic swing) and under the Romanian deadlift on the
+ * body (64 / 16 / 48 / 28). */
+const PRICE_FRACTION_KB_DEADLIFT = 0.28
+
 export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // HORIZONTAL PUSH
   {
@@ -5979,6 +5985,247 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     substitution_group: 'front_delt',
     unilateral: false,
     avg_duration_seconds: 26,
+  },
+  // -------------------------------------------------------------------------
+  // EXERCISE LIBRARY BATCH 3: KETTLEBELL AND BODYWEIGHT (10 Nov 2026, docs/plans/exercise-library.md; his "Known kit +
+  // a few" and the CSCS rules there). Each is a DIFFERENT exercise a coach prescribes, copies its nearest entry's
+  // exclusions (a reason beside any it adds), is priced no heavier than its model, and is appended at the end so a tie
+  // still goes to an entry the app already had. test:exercise-library-batch3.
+  // -------------------------------------------------------------------------
+  // The grinding hinge a kettlebell owner learns BEFORE the swing (the swing is ballistic and needs this pattern
+  // first). Copies the Romanian deadlift's exclusions. Its name says "deadlift", which prices it as a barbell
+  // deadlift, so it carries a fraction of that, measured to land at or under the heavy swing (the plan names it).
+  {
+    name: 'Kettlebell Deadlift',
+    id: 'kettlebell-deadlift',
+    movement_pattern: 'hip_hinge',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['glutes', 'hamstrings', 'erectors'],
+    equipment: ['kettlebell'],
+    joint_stress: 'low',
+    form_cues: ['Bell on the floor between the feet, feet hip-width', 'Push the hips back and grip the handle with a flat back', 'Stand by driving the feet into the floor, bell close to the body', 'Lower it by pushing the hips back again, not by bending forward'],
+    coach_note_swap: 'The hinge with one bell, slow and heavy: the pattern the swing is built on, with nothing to time.',
+    loads_joints: ['lower_back_axial'],
+    contraindicated_joints: ['hip', 'lower_back_axial', 'wrist'],
+    price_fraction: PRICE_FRACTION_KB_DEADLIFT,
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'hip_hinge',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
+  // A kettlebell owner with no dumbbells had no press. One arm, as the half-kneeling dumbbell press, so priced per hand
+  // in the overhead category exactly as that is. Copies the dumbbell shoulder press's exclusions.
+  {
+    name: 'Single-Arm Kettlebell Press',
+    id: 'single-arm-kettlebell-press',
+    movement_pattern: 'vertical_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['anterior deltoid', 'lateral deltoid', 'triceps', 'obliques'],
+    equipment: ['kettlebell'],
+    joint_stress: 'low',
+    form_cues: ['Bell in the rack: handle in the palm, bell resting on the forearm', 'Squeeze the glutes and brace before you press', 'Press straight up until the arm is locked beside the ear', 'Lower back to the rack under control; finish one side, then the other'],
+    coach_note_swap: 'One arm overhead with a bell: the shoulder works and the trunk stops you leaning away from it.',
+    loads_joints: ['shoulder'],
+    contraindicated_joints: ['shoulder'],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'overhead_press',
+    unilateral: true,
+    avg_duration_seconds: 38,
+  },
+  // And no row without a bench. Bent over with the free hand on the knee, as the bent-over dumbbell row, so it copies
+  // that row's lower-back exclusion; priced per hand in the row category.
+  {
+    name: 'Single-Arm Kettlebell Row',
+    id: 'single-arm-kettlebell-row',
+    movement_pattern: 'horizontal_pull',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['lats', 'rhomboids', 'rear deltoid', 'biceps'],
+    equipment: ['kettlebell'],
+    joint_stress: 'moderate',
+    form_cues: ['Staggered stance, free hand on the front knee, back flat', 'Let the bell hang under the shoulder', 'Pull the elbow back towards the hip', 'Lower until the arm is long; finish one side, then the other'],
+    coach_note_swap: 'A one-arm row with nothing but the bell: the back works and the trunk holds you square.',
+    loads_joints: ['lower_back_axial'],
+    contraindicated_joints: ['lower_back_axial'],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'row',
+    unilateral: true,
+    avg_duration_seconds: 32,
+  },
+  // Bodyweight: a stepping-back lunge is kinder to the knee than a forward one and needs no kit. Copies the dumbbell
+  // reverse lunge's exclusions (the stricter of its two models: a step back is balanced on one ankle).
+  {
+    name: 'Reverse Lunge (Bodyweight)',
+    id: 'reverse-lunge-bodyweight',
+    movement_pattern: 'single_leg',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'vertical',
+    primary_muscles: ['quadriceps', 'glutes', 'hamstrings'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Stand tall, hands on hips', 'Step one foot back and lower until the back knee nearly touches the floor', 'Front shin stays close to upright', 'Push through the front foot to stand; alternate legs'],
+    coach_note_swap: 'A lunge stepping backwards: the same legs, and an easier ride for the front knee.',
+    loads_joints: ['knee'],
+    contraindicated_joints: ['ankle', 'hip', 'knee'],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'single_leg',
+    unilateral: true,
+    avg_duration_seconds: 34,
+  },
+  // Sideways single-leg work for someone with no kit; the Cossack squat is its harder, intermediate cousin.
+  {
+    name: 'Lateral Lunge (Bodyweight)',
+    id: 'lateral-lunge-bodyweight',
+    movement_pattern: 'single_leg',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'lateral',
+    primary_muscles: ['quadriceps', 'glutes', 'adductors'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Stand tall with the feet together', 'Take a wide step to one side and sit the hips back over that foot', 'Keep the other leg straight and both feet flat', 'Push off the bent leg to return; alternate sides'],
+    coach_note_swap: 'Single-leg work sideways: the inner thighs and hips through a range forward lunges never reach.',
+    loads_joints: ['knee', 'hip'],
+    contraindicated_joints: ['ankle', 'hip', 'knee'],
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'single_leg',
+    unilateral: true,
+    avg_duration_seconds: 36,
+  },
+  // Triceps for someone with no kit (chair dips load the front of the shoulder). The narrow hands load the elbows, so
+  // it adds the elbow to the push-up's exclusions, exactly as the close-grip bench press does.
+  {
+    name: 'Close-Grip Push-Ups',
+    id: 'close-grip-push-ups',
+    movement_pattern: 'horizontal_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['triceps', 'chest', 'anterior deltoid', 'core'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Hands under the shoulders, a little narrower than a normal push-up', 'Body in one straight line from head to heels', 'Elbows brush the ribs on the way down', 'Press the floor away until the arms are straight'],
+    coach_note_swap: 'Push-ups with the hands in: the triceps do more of the work.',
+    loads_joints: ['shoulder', 'wrist', 'elbow'],
+    contraindicated_joints: ['shoulder', 'wrist', 'elbow'],
+    capability_requirement: { minExperience: 'novice', regression: 'Push-Ups' },
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'bench_press',
+    unilateral: false,
+    avg_duration_seconds: 30,
+  },
+  // Feet raised: more of the body's weight on the hands, the progression after the push-up for someone with no kit.
+  {
+    name: 'Decline Push-Ups',
+    id: 'decline-push-ups',
+    movement_pattern: 'horizontal_push',
+    mechanics_tier: 'tier2_compound',
+    prescription_type: 'reps',
+    angle_vector: 'horizontal',
+    primary_muscles: ['chest', 'anterior deltoid', 'triceps', 'core'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Feet up on a step, chair or sofa, hands on the floor', 'Body in one straight line, hips not sagging', 'Lower the chest to just above the floor', 'Press back up until the arms are straight'],
+    coach_note_swap: 'Push-ups with the feet raised: more of your weight on your hands, so harder without adding kit.',
+    loads_joints: ['shoulder', 'wrist'],
+    contraindicated_joints: ['shoulder', 'wrist'],
+    capability_requirement: { minExperience: 'novice', regression: 'Push-Ups' },
+    style_tags: ['bodybuilding', 'functional', 'combat', 'hybrid'],
+    substitution_group: 'bench_press',
+    unilateral: false,
+    avg_duration_seconds: 32,
+  },
+  // Core, no kit. The hollow hold works the front of the trunk harder than a plank; done badly it arches the lower
+  // back, so a bad back is excluded (the plank has no exclusion; this is stricter on purpose).
+  {
+    name: 'Hollow Body Hold',
+    id: 'hollow-body-hold',
+    movement_pattern: 'core',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'time',
+    angle_vector: 'anti_extension',
+    primary_muscles: ['rectus abdominis', 'transverse abdominis', 'hip flexors'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['Lie on your back and press the lower back into the floor', 'Lift the shoulders and the legs a few inches off the floor', 'Arms reach past the ears, or by the sides to make it easier', 'Hold, breathing, without letting the lower back lift'],
+    coach_note_swap: 'A plank on your back: the front of the trunk works harder, and the lower back stays on the floor.',
+    loads_joints: ['lower_back_axial'],
+    contraindicated_joints: ['lower_back_axial'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'core_stability',
+    unilateral: false,
+    avg_duration_seconds: 40,
+  },
+  // Anti-rotation with no band or cable (the Pallof press needs one). The plank position loads the wrists and
+  // shoulders, so it copies the push-up's exclusions.
+  {
+    name: 'Plank Shoulder Taps',
+    id: 'plank-shoulder-taps',
+    movement_pattern: 'core',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'anti_rotation',
+    primary_muscles: ['obliques', 'transverse abdominis', 'shoulders'],
+    equipment: ['bodyweight'],
+    joint_stress: 'low',
+    form_cues: ['High plank, hands under the shoulders, feet wider than the hips', 'Lift one hand and touch the opposite shoulder', 'Hips stay level: no rocking side to side', 'Alternate hands slowly'],
+    coach_note_swap: 'A plank that fights twisting: the trunk work a cable or band would give, with nothing but the floor.',
+    loads_joints: ['shoulder', 'wrist'],
+    contraindicated_joints: ['shoulder', 'wrist'],
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'core_stability',
+    unilateral: false,
+    avg_duration_seconds: 35,
+  },
+  // A side plank with the top leg on a bench: the inner thigh holds the body up. Long lever on the knee and the groin,
+  // so it adds the hip and knee to the side plank's (empty) exclusions, and waits for intermediate with the side plank
+  // as its regression.
+  {
+    name: 'Copenhagen Plank',
+    id: 'copenhagen-plank',
+    movement_pattern: 'core',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'time',
+    angle_vector: 'lateral',
+    primary_muscles: ['adductors', 'obliques'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Side plank on the forearm, top leg resting on a bench or sofa', 'Knee on the bench to make it easier, ankle to make it harder', 'Lift the hips into a straight line and lift the bottom leg', 'Hold, then switch sides'],
+    coach_note_swap: 'A side plank held up by the inner thigh: the groin strength runners and footballers are told to build.',
+    loads_joints: ['hip', 'knee'],
+    contraindicated_joints: ['hip', 'knee'],
+    capability_requirement: { minExperience: 'intermediate', regression: 'Side Plank' },
+    style_tags: ['functional', 'combat', 'hybrid'],
+    substitution_group: 'core_stability',
+    unilateral: true,
+    avg_duration_seconds: 40,
+  },
+  // Lower abs with no machine or bar (hanging leg raises need a bar and an intermediate). Curls the spine, so it copies
+  // the cable crunch's lower-back exclusion.
+  {
+    name: 'Reverse Crunch',
+    id: 'reverse-crunch',
+    movement_pattern: 'core',
+    mechanics_tier: 'tier3_isolation',
+    prescription_type: 'reps',
+    angle_vector: 'anti_extension',
+    primary_muscles: ['rectus abdominis', 'obliques'],
+    equipment: ['bodyweight'],
+    joint_stress: 'moderate',
+    form_cues: ['Lie on your back, knees bent at ninety degrees above the hips', 'Curl the hips off the floor, bringing the knees towards the chest', 'Lower slowly until the hips touch down', 'No swinging: the stomach does the lifting'],
+    coach_note_swap: 'A crunch from the bottom up: the lower stomach works, with nothing to hang from.',
+    loads_joints: [],
+    contraindicated_joints: ['lower_back_axial'],
+    style_tags: ['bodybuilding', 'functional', 'hybrid'],
+    substitution_group: 'core_dynamic',
+    unilateral: false,
+    avg_duration_seconds: 30,
   },
 
 ]

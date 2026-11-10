@@ -544,6 +544,7 @@
     "verify:profile-sheet-top": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-sheet-top.mjs",
     "verify:chat-send-scroll": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-send-scroll.mjs",
     "test:exercise-library": "tsx scripts/test-exercise-library.ts",
+    "test:exercise-library-batch3": "tsx scripts/test-exercise-library-batch3.ts",
     "test:variant-pricing": "tsx scripts/test-variant-pricing.ts",
     "test:near-copies": "tsx scripts/test-near-copies.ts",
     "test:machine-versions": "tsx scripts/test-machine-versions.ts",
