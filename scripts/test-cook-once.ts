@@ -48,13 +48,15 @@ console.log('\n§1 Cook X, keep Y')
   check('the same food in another unit is a different line, never added across units', cookAndKeep(dinner.ingredients, [{ name: 'chicken breast', quantity: 1, unit: 'piece' }]) === null)
 }
 
+// RE-ANCHORED 10 Nov 2026: rice trimmed about 6% (240/320/245 -> 225/300/230) when cooked basmati's corrected figures
+// (food audit) put these days outside the calorie band, so the week stopped choosing the leftover lunch.
 // A week with batch cooking on, sized so dishes land inside the bands (the "comfortable fixture inverted" trap that
 // test:leftovers §4 records: dishes a third of the budget miss tolerance and test the wrong branch).
 const targets: MacroTargets = { calories: 2200, protein: 165, carbs: 220, fat: 73 }
 const pools: Partial<Record<MealSlotName, PoolOption[]>> = {
-  breakfast: [0, 1, 2].map(i => meal('breakfast', `breakfast-${i}`, 200 + i * 8, 240 + i * 12)),
-  lunch: [0, 1, 2].map(i => meal('lunch', `lunch-${i}`, 270 + i * 8, 320 + i * 12)),
-  dinner: [0, 1, 2].map(i => meal('dinner', `dinner-${i}`, 205 + i * 8, 245 + i * 12)),
+  breakfast: [0, 1, 2].map(i => meal('breakfast', `breakfast-${i}`, 200 + i * 8, 225 + i * 12)),
+  lunch: [0, 1, 2].map(i => meal('lunch', `lunch-${i}`, 270 + i * 8, 300 + i * 12)),
+  dinner: [0, 1, 2].map(i => meal('dinner', `dinner-${i}`, 205 + i * 8, 230 + i * 12)),
 }
 const shape: MealShape = { mealsPerDay: 3, includeSnacks: false, batchCooking: true }
 const dates = datesFrom('2026-09-28', 7)

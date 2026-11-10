@@ -160,7 +160,10 @@ console.log('\n3b. Rounding is never what takes a dish under its protein floor')
   // 252g: to the nearest 5 that is 250g, and 250g of chicken is under the floor.
   const dinner: MealIngredientLine[] = [{ name: 'chicken breast', quantity: 200, unit: 'g' }, { name: 'cooked basmati rice', quantity: 220, unit: 'g' }]
   const dm = computeMealMacros(dinner)
-  const budget = { kcal: Math.round(dm.kcal) * 1.26, protein: Math.round(Math.round(dm.protein) * 1.26), carbs: 0, fat: 0 }
+  // RE-ANCHORED 10 Nov 2026: the floor was built from the dinner's protein ROUNDED (68.6 -> 69) and then x1.26, so once
+  // cooked basmati's figures were corrected (food audit) the floor (87) sat above even the exact dish (86.4), and the
+  // rule rightly found rounding was not the cause. The case this pins is the exact dish ON the floor: built from it.
+  const budget = { kcal: Math.round(dm.kcal) * 1.26, protein: Math.floor(dm.protein * 1.26), carbs: 0, fat: 0 }
   const r = scaleToTarget(dinner, { kcal: dm.kcal, protein: dm.protein, carbs: dm.carbs, fat: dm.fat }, budget)
   const after = computeMealMacros(r.ingredients)
   const plain = scaleIngredients(dinner, r.scaleFactor)

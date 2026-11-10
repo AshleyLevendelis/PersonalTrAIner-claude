@@ -2,6 +2,44 @@
 
 Newest first. One line each.
 
+- [x] **FOUR MORE FROM THE TRAINING QA WALK, AND A WORDING SWEEP, 10 NOV 2026.** No ruling needed: mechanical. Each
+  is its own commit on the branch.
+  (1) HOME QUOTED THE PLAN'S WEIGHT FROM BEFORE A BREAK ("Bench from 30 kg" while the card eased it to 27.5). One
+  function now holds the card's break easing (from last time's weight where the lift has history, else the printed
+  figure eased) and Home's lead lift reads it with the same break status the card reads. test:layoff (+5 checks, 3
+  mutations caught), verify:layoff A2 (Home's weight against the fixture, the old code fails it). NOT DONE: with no
+  break, Home still quotes the printed figure where the card shows the progression engine's (week 2 on); named.
+  (2) THE RUNNING "LOG SET" BUTTON LOGGED THE WRONG LIFT: with a later exercise open and marked NOW, it named and
+  pressed the first open card's set (a Chin-Up never done). One function picks the tick for the label and the press:
+  the NOW card's when open, else the first. New verify:next-set-now on the whole app (8 checks). The QA also saw two
+  taps 250 ms apart log two sets; on the whole app it did NOT reproduce at 100, 300 or 450 ms with no guard (the
+  tick's own save already holds), so the lockout I wrote was removed rather than kept unproven, and check 2 holds the
+  behaviour.
+  (3) "I MISSED IT" THEN "MOVE IT TO THURSDAY" COUNTED ONE SESSION TWICE (0 of 5 on a 4-session week; Home "Session 2
+  of 5"). The day still says missed (his 10 Sep ruling) and is counted once, where the session now runs: one rule,
+  dayCountsTowardWeek, which the strip, Home and the week tally all read. test:workout-scenarios (+5 checks; the rule
+  removed fails 2).
+  (4) HOME IGNORED "I MISSED IT" AND "MAKE IT A REST DAY" FOR TODAY: full session card and Start, while Exercise said
+  otherwise. Home now says "Marked missed" / "Rest day, your choice" with "(session) is still on Exercise if you want
+  it", and offers no Start, as it already did for a swapped day (WORDS MINE, his to change). verify:workout-scenarios
+  section C (4 checks; the rule removed fails all 4).
+  (5) WORDING: the meal day's verdict says "345 kcal under" (a bare number had lost its unit when the line moved beside
+  the planned total); ingredient lines read as a cook says them ("3 eggs", "7 corn tortillas", "2 garlic cloves", were
+  "3 whole egg", "2 clove garlic"; display only, the stored line is unchanged); extra work's badge says "1 set"; a
+  bodyweight session's summary says "Bodyweight" where it showed "0kg" volume. New test:qa-wording (4 checks, 4
+  mutations caught); test:day-verdict and verify:day-verdict re-anchored.
+  (6) verify:warmups-one-tap was RED BEFORE these fixes (reproduced on 740cfbe2): it pinned the squat's warm-ups as
+  20/25/32.5/40 and the fixture plan's squat weight moved with a catalogue batch. Re-anchored to read each row's own
+  numbers before the tap, which is what "logged as written" means.
+  (7) THREE MORE GATES WERE RED FROM THE FOOD AUDIT EARLIER TODAY (reproduced on 26c19cf1, before any of the above):
+  test:kitchen-amounts built its protein floor from a ROUNDED figure that, with cooked basmati corrected, sat above even
+  the exact dish (re-anchored to the exact dish, which is the case it pins; removing the round-up rescue still fails it,
+  2 checks); test:cook-once's week left the calorie band and stopped choosing the leftover lunch (rice trimmed about 6%);
+  and test:layout-revamp counted Home's branches (5 now, each still excluding a finished day).
+  NOT DONE from the same walk (named, not forgotten): cardio blocks drawn as set rows (above); shorten and rebuild
+  have no put-back; "I also did" accepts a lift already planned and any text; a past day's "It was a rest day" commits
+  silently; the Program screen's week bars and "‹ Today" are under 44 px; the phase label is cut to "HYPERTROP…";
+  the circuit log offers distance for push-ups; implausibly low weights are not questioned; minor 320 px wrapping.
 - [x] **A "WHOLE BLOCK" SWAP NO LONGER REACHES A LIFT IT DID NOT SWAP, AND ITS WEEKS PROGRESS, 10 NOV 2026.** Found by
   the training-screens QA walk, traced end to end before building (engine trace in the session). WHAT WAS WRONG:
   (1) REACH: the swap rewrote the same POSITION in every remaining week of the block and never checked the position
