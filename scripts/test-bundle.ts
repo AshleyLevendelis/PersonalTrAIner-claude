@@ -206,8 +206,14 @@ console.log('\n1. The libraries are cached separately from the app')
   //     after    deploy 380 gz   paint 536 gz   app 1326 raw   total 2708 raw   (deploy, paint and total OVER)
   // Setup's card, the profile restore and the coach's moments all run as the app starts, so this is first-paint code
   // by nature. Her 15 Sep ruling, "raise it with room to grow": 8 kB gz and 25 kB raw over today's numbers.
-  headroom('a deploy re-downloads', appGzip, 388, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 388, appGzip)
+  // MOVED 10 Nov 2026, the long-flight batch (the food table's new foods and the mince ask, the third exercise batch,
+  // the cardio day, the whole-block swap reach, the meal-swap Undo, the training QA fixes). MEASURED through this gate:
+  //     after the 9 Nov move   deploy 380 gz   paint 536 gz
+  //     at c3e382a9            deploy 388 gz   paint 544 gz   (both OVER by 0)
+  // The food table, the catalogue and the day's session reader are read by every screen as it draws, so this is
+  // first-paint code by nature (the calendar itself is split out). Her 15 Sep ruling, "raise it with room to grow": 8 kB gz.
+  headroom('a deploy re-downloads', appGzip, 396, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 396, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -292,9 +298,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 3 Nov 2026: 517 -> 525, the lighter variants — see the deploy figure above for both ends.
   // MOVED 7 Nov 2026: 525 -> 535, another sport said in setup — see the deploy figure above for both ends.
   // MOVED 9 Nov 2026: 535 -> 544, the date-of-birth day — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 544, 'kB gzipped')
+  // MOVED 10 Nov 2026: 544 -> 552, the long-flight batch — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 552, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 544, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 552, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))

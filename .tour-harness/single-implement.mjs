@@ -194,7 +194,9 @@ const headerFor = async name => {
   })()`.replace('NAME', name))
 }
 
-const total = await headerFor('Barbell Squats')
+// A barbell squat measured as a total. 10 Nov 2026: the third exercise batch grew the catalogue and the seeded day
+// opens on the Front Squat where it had Barbell Squats; either is a two-handed barbell total.
+const total = (await headerFor('Barbell Squats')) ?? (await headerFor('Front Squat'))
 check('6. a lift measured as a TOTAL asks for a plain weight, with no qualifier',
   !!total && total.boxes > 0 && !total.label.some(h => /per hand|single side/i.test(h)), total)
 

@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import { lazyWithReload } from '@/lib/chunk-reload'
 import { ChevronDown, ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { tabHash } from '@/lib/app-route'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -95,7 +96,7 @@ interface ProgramBrowseProps {
 
 const PROGRAM_VIEW_KEY = 'program-view'
 // Loaded when it is first asked for: most visits never open it, and the app's first download has a budget (test:bundle).
-const ProgramCalendar = lazy(() => import('./ProgramCalendar').then(m => ({ default: m.ProgramCalendar })))
+const ProgramCalendar = lazyWithReload(() => import('./ProgramCalendar').then(m => ({ default: m.ProgramCalendar })))
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const DAY_ABBR: Record<string, string> = {
   Monday: 'MON', Tuesday: 'TUE', Wednesday: 'WED', Thursday: 'THU',

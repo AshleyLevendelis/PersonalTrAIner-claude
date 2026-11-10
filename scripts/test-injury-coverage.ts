@@ -284,8 +284,16 @@ console.log('\n5. How MUCH each injury removes, frozen')
     //   wrists     37->38  Smith Machine Romanian Deadlift
     //   hips       29->30  Smith Machine Romanian Deadlift
     //   ankles     26->27  Smith Machine Calf Raise (as Standing Calf Raise Machine)
-    lower_back: 30, knees: 47, shoulders: 83, neck: 9, wrists: 38,
-    hips: 30, ankles: 27, elbows: 27,
+    // 10 Nov 2026, the exercise library's batch 3 (kettlebell and bodyweight), each tagged as its nearest entry:
+    //   lower_back 30->34  Kettlebell Deadlift, Single-Arm Kettlebell Row, Hollow Body Hold, Reverse Crunch (loaded flexion)
+    //   knees      47->50  Reverse Lunge (Bodyweight), Lateral Lunge (Bodyweight), Copenhagen Plank
+    //   shoulders  83->87  Single-Arm Kettlebell Press, Close-Grip Push-Ups, Decline Push-Ups, Plank Shoulder Taps
+    //   wrists     38->42  Kettlebell Deadlift, Close-Grip Push-Ups, Decline Push-Ups, Plank Shoulder Taps
+    //   hips       30->34  Kettlebell Deadlift, Reverse Lunge (Bodyweight), Lateral Lunge (Bodyweight), Copenhagen Plank
+    //   ankles     27->29  Reverse Lunge (Bodyweight), Lateral Lunge (Bodyweight)
+    //   elbows     27->28  Close-Grip Push-Ups (the narrow hand position)
+    lower_back: 34, knees: 50, shoulders: 87, neck: 9, wrists: 42,
+    hips: 34, ankles: 29, elbows: 28,
   }
   const drift: string[] = []
   for (const code of CODES) {

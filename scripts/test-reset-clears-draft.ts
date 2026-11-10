@@ -95,6 +95,10 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   // sixty of cardio — and replaced by every read that lands.
   fitplan_setlog_lastknown_v1: { clear: false, why: 'last-known sets per profile and date — a new profile never matches an old entry; ten days kept' },
   fitplan_cardio_lastknown_v1: { clear: false, why: 'last-known cardio per profile — a new profile never matches an old entry; sixty days kept' },
+
+  // LIST OR CALENDAR on the Full Program (10 Nov 2026, his "option to see my training weeks as a calendar view"). A
+  // way of LOOKING at a plan, not part of one: a new plan is shown the way he last chose to look, as a theme is.
+  'program-view': { clear: false, why: 'how he likes to view the program (list or calendar) — a display choice, not plan state' },
 }
 
 /** Resolve `const SOME_KEY = 'literal'` across src/, so a key named by a constant is still found. */

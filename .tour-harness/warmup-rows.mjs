@@ -135,7 +135,6 @@ await wait(5000)
 
 // A DRIVER THAT CANNOT FIND ITS SUBJECT SAYS SO. Reporting PASSED over a
 // screen that never rendered is the failure mode verify:rls exists to shame.
-const LOADED = 'Barbell Squats'
 // Any bodyweight lift counted in reps will do: the plan is really generated, so
 // which one the day holds moves when generation does (9 Oct 2026, H4: a day
 // named for a body part now trains it, and the Cossack squat left this day).
@@ -146,6 +145,11 @@ const LOADED = 'Barbell Squats'
 // Quad Set (`equipment: ['bodyweight']`, `prescription_type: 'reps'`, a working tier, not a primer).
 const BODYWEIGHT_CANDIDATES = ['Cossack Squat (Bodyweight)', 'Chair Leg Extension', 'Bird Dog', 'Seated Short-Arc Quad Set']
 const present = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(r => r.getAttribute('data-exercise-name'))`)
+// The loaded lift the build-up is read on: a barbell squat. 10 Nov 2026: the third exercise batch grew the catalogue
+// and the seeded day now opens on the Front Squat (a barbell squat with a full warm-up ladder) where it had Barbell
+// Squats; either is the subject this driver needs.
+const LOADED_CANDIDATES = ['Barbell Squats', 'Front Squat']
+const LOADED = LOADED_CANDIDATES.find(n => (present ?? []).includes(n)) ?? LOADED_CANDIDATES[0]
 const BODYWEIGHT = BODYWEIGHT_CANDIDATES.find(n => (present ?? []).includes(n)) ?? BODYWEIGHT_CANDIDATES[0]
 check('the fixture still carries a loaded lift to read', (present ?? []).includes(LOADED), present)
 check(`...and a bodyweight one beside it (${BODYWEIGHT})`, (present ?? []).includes(BODYWEIGHT), present)
@@ -229,8 +233,12 @@ const warmKg = (loaded.warm ?? []).map(r => parseFloat(r.weight?.placeholder ?? 
 const workKg = (loaded.work ?? []).map(r => parseFloat(r.weight?.placeholder ?? ''))
 check('the build-up boxes carry the prescribed numbers, not blanks',
   warmKg.length > 0 && warmKg.every(n => Number.isFinite(n) && n > 0), (loaded.warm ?? []).map(r => r.weight?.placeholder))
+// NEVER DOWN, and a step may repeat (10 Nov 2026): the ladder's empty-bar rung and its 50% rung both land on the bar
+// when the working weight is under twice the bar (a 37.5 kg front squat: 20, 20, 27.5, 32.5), because below the bar
+// the app prescribes the bar. Two bar sets is an ordinary light build-up. A rung LOWER than the one before, or one at
+// the working weight, is still the defect.
 check('...and they climb, every step lighter than the working weight',
-  warmKg.every((n, i) => i === 0 || n > warmKg[i - 1]) && Number.isFinite(workKg[0]) && warmKg[warmKg.length - 1] < workKg[0],
+  warmKg.every((n, i) => i === 0 || n >= warmKg[i - 1]) && warmKg[warmKg.length - 1] > warmKg[0] && Number.isFinite(workKg[0]) && warmKg[warmKg.length - 1] < workKg[0],
   { warmKg, workKg })
 
 // ---- 4. Adding a step ----------------------------------------------------

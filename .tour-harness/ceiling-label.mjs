@@ -5,6 +5,10 @@
 // this app — one real notch would be over 12% of it — gets its own line on the
 // card, because unlike the other two it ends on its own.
 //
+// ON SAM'S PROFILE since 10 Nov 2026 (?sam=1: minimalist kit, light dumbbells, a real tester's setup). The default
+// harness plan lost every held-for-a-jump slot when the third exercise batch reshuffled it (bisected: green at
+// 3af1af26, red at 1bd263be), and a light-dumbbell plan is where one notch is genuinely too big, so it is the profile
+// this label is FOR. Still no hand-built row: the plan is the generator's own.
 // NO FIXTURE. The harness's own generated plan already contains the case: the
 // audit's sweep found 423 stamped slots across eight profiles, and this
 // profile's week 14 Monday has Front Raises at 6kg with the rep bump capped.
@@ -53,7 +57,7 @@ const check = (name, ok, detail) => {
 
 console.log('\nA WEIGHT HELD BECAUSE THE NEXT ONE IS TOO BIG A JUMP\n')
 
-await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off#/exercise/program` })
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&sam=1#/exercise/program` })
 await wait(4500)
 for (let i = 0; i < 20; i++) { if (await ev(`/FULL PROGRAM/i.test(document.body.innerText)`)) break; await wait(500) }
 
