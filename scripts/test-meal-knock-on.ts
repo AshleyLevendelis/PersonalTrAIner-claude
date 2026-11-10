@@ -391,7 +391,7 @@ async function main() {
     check('...exactly one per other-day change, and none for the edited day itself (the sheet says those in its own words)',
       (kk.elsewhere ?? []).length === listedElsewhere, { listedElsewhere, elsewhere: kk.elsewhere, changes: kk.changes.map(c => c.date + '|' + c.slot) })
     const sheet = readFileSync('src/components/MealPlan.tsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
-    const choose = sheet.slice(sheet.indexOf('const handleChoose = async'), sheet.indexOf('const handleFavouriteToggle'))
+    const choose = sheet.slice(sheet.indexOf('const swapTo = async'), sheet.indexOf('const handleFavouriteToggle'))
     check('the swap sheet shows them beside the day\'s own lines', /\.\.\.\(trial\?\.elsewhere \?\? \[\]\)/.test(choose) && /setSwapNote\(notes\.length > 0 \? notes : null\)/.test(choose), choose.slice(-500))
     check('more than four changes are folded into one line that counts the rest', kk.changes.length <= 4 ? !text(kk).some(t => /more meals? changes? too/.test(t)) : text(kk).includes(DAY_MOVE.andMore(kk.changes.length - 4)), { n: kk.changes.length, said: text(kk) })
   }

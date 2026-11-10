@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **REGENERATE-ONE: THE MUTATION ROUND, AND TWO GATES THE RENAME BROKE, 10 NOV 2026.** 19 mutations of the new
+  Regenerate, on `test:meal-regenerate` and `verify:meal-regenerate-one`. 16 caught as written. THREE READ:
+  r6 MISSED on both (the writer-only second ask removed): with two dinners the FIRST ask already reaches the writer,
+  because a meal under seven dishes is topped up by it, so my "library has nothing new" check passed with the second
+  ask gone. A check on a branch must use a case where the branch binds: a meal eight dishes deep with nothing new in
+  the library; then caught. m5 MISSED on the driver (the swap's trial skipped): the page's week has no leftovers
+  lunch, so tomorrow's lunch never moves and the knock-on line is never drawn there. NOT REACHED on a screen for the
+  regenerate route, said so in the driver; held by the source check that Regenerate calls the swap's own function and
+  by the swap's own gates. m1 (the row regenerating the old way) was missed by the source gate and caught by the driver
+  with 13 failures, the standing "a test gate cannot prove a branch is reached". r9 was missed on the driver only (its
+  failure case is the writer unreachable, a different branch) and caught by the gate.
+  THE SWEEP then found `test:coach-knows` (3) and `test:meal-knock-on` (1) red: both slice MealPlan from the text
+  `const handleChoose = async`, and the swap's body is `swapTo` now (Regenerate swaps down the same road). Re-anchored
+  on the function that holds the body. MISSED BEFORE PUSHING because I derived the gates for the calamari commit and
+  ran only the nearest ten for the Regenerate one: the derivation is per commit, and I skipped it for the second.
+
 - [x] **HIS THREE RULINGS OF 10 NOV 2026, ASKED AS MULTIPLE CHOICE ON HIS "give me the multiple choice questions", EACH
   FROM THREE OPTIONS, ALL BUILT.** He answered; nothing here was decided unprompted except the wording of the two new
   sentences (marked, his to change).

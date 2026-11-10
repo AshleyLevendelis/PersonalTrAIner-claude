@@ -378,6 +378,21 @@ async function main() {
       check('when the library has nothing new, the meal writer is asked for one', !!got && 'option' in got && /^Fresh dinner plate/.test(got.option.name) && calls > callsBefore, got)
     }
     {
+      // THE CASE WHERE THE SECOND ASK BINDS (mutation r6, 10 Nov 2026: with two dinners the FIRST ask already reaches the
+      // writer, because a meal under seven dishes is topped up by it; the check above passed with the second ask gone).
+      // A meal with eight dishes and nothing new in the library is not topped up, so only the writer-only ask finds one.
+      const { ctx } = fresh({})
+      for (let i = 0; i < 6; i++) {
+        const o = dish('dinner', `Extra dinner ${i + 1}`, 165 + i, 225 + i, 13)
+        db.meal_plan_slots.push({ id: `dinner-x${i}`, profile_id: P, slot: 'dinner', pool_index: 2 + i, name: o.name, ingredients: o.ingredients, macros: { kcal: o.macros.calories, protein: o.macros.protein, carbs: o.macros.carbs, fat: o.macros.fat }, tags: [], prep: '' })
+      }
+      model()
+      const c = ctx()
+      const asked: Record<string, unknown>[] = []
+      const got = await one({ ...c, generation: { ...c.generation, library: [] }, generate: async (params: Parameters<typeof realGenerate>[0]) => { asked.push(params as never); return realGenerate(params) } }, 'dinner')
+      check('a meal already eight dishes deep, library with nothing new: the writer is asked on a SECOND, writer-only ask', (db.meal_plan_slots.filter(r => r.slot === 'dinner').length === 9) && !!got && 'option' in got && /^Fresh dinner plate/.test(got.option.name) && asked.length === 2 && asked[1].library === false, { got, asks: asked.map(a => a.library), dinners: db.meal_plan_slots.filter(r => r.slot === 'dinner').length })
+    }
+    {
       const { screen, ctx } = fresh({ lunch: 'Rice and greens' })
       model('none')
       const before = JSON.stringify(db.meal_plan_slots)

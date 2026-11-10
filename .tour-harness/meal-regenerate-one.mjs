@@ -93,7 +93,10 @@ const except3 = [`${today}|dinner`, `${tomorrow}|lunch`]
 check('3c. every meal but tonight\'s dinner and tomorrow\'s lunch is the dish it was', JSON.stringify(others(w3 ?? {}, except3)) === JSON.stringify(others(w0, except3)), others(w3 ?? {}, except3).filter(l => !others(w0, except3).includes(l)))
 const s3 = await sheet()
 const lunchMoved = w3?.[tomorrow]?.lunch !== leftoverTomorrow
-check('3d. tomorrow\'s lunch either stayed, or changed AND the line under the dinner names it', !lunchMoved || (!!s3?.note && /lunch/i.test(s3.note)), { lunchMoved, was: leftoverTomorrow, now: w3?.[tomorrow]?.lunch, note: s3?.note })
+// NOT REACHED HERE, said plainly (mutation m5, 10 Nov 2026): this page's week has no leftovers lunch, so tomorrow's
+// lunch stays and the knock-on line is never drawn. That a regenerate goes through the swap's own trial is held by
+// test:meal-regenerate (it calls swapTo) and the trial itself by verify:swap-knock-on and test:meal-knock-on.
+check('3d. tomorrow\'s lunch stayed (no leftovers lunch on this page\'s week); had it changed, the line must name it', !lunchMoved || (!!s3?.note && /lunch/i.test(s3.note)), { lunchMoved, was: leftoverTomorrow, now: w3?.[tomorrow]?.lunch, note: s3?.note })
 check('3e. the dinner has its Undo', s3?.undo === true, s3)
 await shoot('meal-regenerate-one-dinner')
 await closeSheet()
