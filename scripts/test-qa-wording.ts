@@ -3,10 +3,12 @@
  *   1. An ingredient line as a cook says it: "3 eggs", "7 corn tortillas", "2 garlic cloves" (was "3 whole egg").
  *   2. Extra work's badge: "1 set", "2 sets" (was "1 sets").
  *   3. A bodyweight session's summary: no "0kg" volume.
+ *   4. Fresh potatoes, sweet potatoes, plantain and yam are produce on the shopping list, not dry goods.
  * (The meal day's "345 kcal under" is test:day-verdict's.)
  */
 import { readFileSync } from 'fs'
 import { kitchenLine } from '../src/lib/portion-scaler'
+import { resolveGroceryTarget } from '../src/lib/grocery-store'
 
 let ran = 0, failures = 0
 function check(label: string, ok: boolean, extra?: unknown) {
@@ -37,6 +39,13 @@ console.log('\n3. A bodyweight session\'s volume')
 const summary = strip(readFileSync('src/components/exercise/SessionSummaryDialog.tsx', 'utf8'))
 check('the volume tile shows kg only when there is load moved, and says Bodyweight otherwise',
   /totalVolumeKg > 0\s*\?[\s\S]{0,200}kg[\s\S]{0,120}:\s*<span[^>]*>Bodyweight<\/span>/.test(summary))
+
+console.log('\n4. The shopping list files fresh potatoes with the vegetables')
+const aisle = (n: string) => resolveGroceryTarget(n).category
+const fresh = ['potato raw', 'sweet potato raw', 'plantain', 'yellow yam'].map(n => [n, aisle(n)])
+check('potatoes, sweet potatoes, plantain and yam are produce', fresh.every(([, a]) => a === 'produce'), fresh)
+const dry = ['plantain chips', 'cornflakes', 'basmati rice cooked', 'pasta cooked'].map(n => [n, aisle(n)])
+check('...while plantain chips, cereal, rice and pasta stay dry goods', dry.every(([, a]) => a === 'dry_goods'), dry)
 
 console.log(`\n${ran} checks ran`)
 if (failures > 0) { console.error(`${failures} qa-wording check(s) FAILED`); process.exit(1) }

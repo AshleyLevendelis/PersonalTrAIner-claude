@@ -743,14 +743,19 @@ export function heldAroundLine(h:
   // WHAT EACH MEAL REALLY CAME TO (live test, 19 Oct 2026): one factor, rounded per ingredient, lands each meal
   // differently, so the line names each meal's own change rather than the factor asked for.
   if (h.sizes && h.sizes.length > 0) {
+    const pctOf = (z: { fromKcal: number; toKcal: number }) => z.fromKcal > 0 ? Math.round(Math.abs(z.toKcal / z.fromKcal - 1) * 100) : 0
+    // NOTHING TO SAY WHEN NOTHING MOVED (QA walk, 10 Nov 2026): every meal rounding to 0% printed "your breakfast is
+    // the same size, your lunch is the same size and your snack is the same size", with an Undo for nothing.
+    if (h.sizes.every(z => pctOf(z) === 0)) return null
     const each = h.sizes.map(z => {
-      const pct = z.fromKcal > 0 ? Math.round(Math.abs(z.toKcal / z.fromKcal - 1) * 100) : 0
+      const pct = pctOf(z)
       return pct === 0 ? `your ${z.slot} is the same size` : `your ${z.slot} is ${pct}% ${z.toKcal < z.fromKcal ? 'smaller' : 'bigger'}`
     })
     const list = each.length === 1 ? each[0] : `${each.slice(0, -1).join(', ')} and ${each[each.length - 1]}`
     return `To fit around your swap, ${list}. Same ${h.slots.length === 1 ? 'dish' : 'dishes'}.`
   }
   const pct = Math.round(Math.abs(h.factor - 1) * 100)
+  if (pct === 0) return null
   return `To fit around your swap, ${yours} ${h.slots.length === 1 ? 'is' : 'are'} ${pct}% ${h.factor < 1 ? 'smaller' : 'bigger'}. Same ${h.slots.length === 1 ? 'dish' : 'dishes'}.`
 }
 

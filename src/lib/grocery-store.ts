@@ -266,8 +266,14 @@ function categoryForEntry(entry: { name: string; category: FoodCategory; tags: {
     return 'dry_goods'
   }
   if (entry.category === 'fat' && t.contains_dairy) return 'dairy'
+  // FRESH STARCH IS PRODUCE (QA walk, 10 Nov 2026): potatoes, sweet potatoes, plantain and the like are `carb` in the
+  // food table and were filed under Dry goods. By name: the table has no fresh/dry flag. Crisps and flakes stay dry.
+  if (entry.category === 'carb' && FRESH_STARCH.test(entry.name) && !/\b(chips?|crisps?|flakes?|flour|instant|dried)\b/.test(entry.name)) return 'produce'
   return CATEGORY_MAP[entry.category]
 }
+
+/** Starchy foods bought fresh, from the vegetable aisle. */
+const FRESH_STARCH = /\b(potato(es)?|sweet potato(es)?|plantains?|yams?|cassava|parsnips?|butternut squash|squash|corn on the cob|sweetcorn cob)\b/
 
 /**
  * WHAT YOU BUY, NOT WHAT IS ON THE PLATE.

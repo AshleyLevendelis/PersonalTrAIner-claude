@@ -252,6 +252,51 @@ await shoot('swap-knock-on-not-saved')
 check('4a. the fixture binds: a dinner was picked and the swap did not land (no pool rows to swap in)', !!failed?.picked && failed.picked !== failed.was && failed.now === failed.was, failed)
 check('4b. ...so the note says it did not save, and names no meal it changed', !!failed && /didn't save/.test(failed.note) && !/becomes|changed too|is now/.test(failed.note), failed)
 
+// --- 6. TODAY's swap put back puts the DAY back (QA walk, 10 Nov 2026) -----------------------------------------------
+// On the deep pool, swapping a meal re-sized the others; Undo brought the dish back PINNED, so the others stayed
+// re-sized and a new "to fit around your swap" line appeared over a swap that had just been undone.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&daymove=1&regen=1&deep=1&n=6#/tab/nutrition` })
+for (let i = 0; i < 60; i++) { if (await ev(`!!document.querySelector('[data-meal-name]')`)) break; await wait(200) }
+await wait(1200)
+const todayWas = await ev(MEALS)
+let six = null
+for (const slot of ['breakfast', 'lunch', 'dinner', 'snack']) {
+  if (!todayWas?.[slot]) continue
+  await ev(`(() => { const r = document.querySelector('[data-meal-name="${slot}"]')?.closest('[data-meal-row]'); r?.querySelector('button')?.click() })()`); await wait(350)
+  await ev(`(() => { const r = document.querySelector('[data-meal-name="${slot}"]')?.closest('[data-meal-row]'); [...(r?.querySelectorAll('button') ?? [])].find(x => /^Swap/.test(x.textContent.trim()))?.click() })()`); await wait(300)
+  const picked = await ev(`(() => { const r = document.querySelector('[data-meal-name="${slot}"]')?.closest('[data-meal-row]'); const b = r && [...r.querySelectorAll('button')].filter(x => x.querySelector('p.line-clamp-2') && !x.disabled)[0]; if (!b) return null; const t = b.querySelector('p').textContent.trim(); b.click(); return t })()`)
+  await wait(1500)
+  const after = await ev(MEALS)
+  const others = Object.keys(todayWas).filter(k => k !== slot)
+  const resized = others.some(k => after?.[k]?.kcal !== todayWas[k]?.kcal || after?.[k]?.name !== todayWas[k]?.name)
+  if (!picked || !resized) { await ev(`document.querySelector('[data-testid="swap-undo"]')?.click()`); await wait(1200); continue }
+  await ev(`document.querySelector('[data-testid="swap-undo"]')?.click()`)
+  await wait(1500)
+  const now = await ev(MEALS)
+  const held = await ev(HELD)
+  six = { slot, picked, resized, was: todayWas, now, held, said: await ev(`document.querySelector('[data-testid="swap-knock-on"]')?.textContent.trim() ?? ''`) }
+  break
+}
+check('6a. the fixture binds: a swap of today\'s meal that re-sized the others was found', !!six, todayWas)
+check('6b. Undo puts the WHOLE DAY back: every meal\'s dish and size as before the swap', !!six && JSON.stringify(six.now) === JSON.stringify(six.was), six && { was: six.was, now: six.now })
+check('6c. ...and no "to fit around your swap" line over a swap that was undone', !!six && !six.held, six?.held)
+await shoot('swap-knock-on-today-undo')
+
+// --- 7. No Regenerate on a meal already eaten (QA walk, 10 Nov 2026) ------------------------------------------------
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&daymove=1&regen=1&deep=1&n=7#/tab/nutrition` })
+for (let i = 0; i < 60; i++) { if (await ev(`!!document.querySelector('[data-meal-name]')`)) break; await wait(200) }
+await wait(1200)
+const openSheet7 = async slot => { await ev(`(() => { const r = document.querySelector('[data-meal-name="${slot}"]')?.closest('[data-meal-row]'); r?.querySelector('button')?.click() })()`); await wait(500) }
+await openSheet7('breakfast')
+const regenBefore = await ev(`!!document.querySelector('[data-meal-sheet-root] [data-meal-regenerate]')`)
+await ev(`document.querySelector('[data-meal-sheet-root] [data-meal-log]')?.click()`); await wait(1500)
+if (!(await ev(`!!document.querySelector('[data-meal-sheet-root]')`))) await openSheet7('breakfast')
+const logged7 = await ev(`/Logged/.test(document.querySelector('[data-meal-sheet-root] [data-meal-log]')?.textContent ?? '')`)
+const regenAfter = await ev(`!!document.querySelector('[data-meal-sheet-root] [data-meal-regenerate]')`)
+check('7a. an uneaten meal offers Regenerate (the control)', regenBefore === true)
+check('7b. once eaten, its sheet offers no Regenerate', logged7 === true && regenAfter === false, { logged7, regenAfter })
+await shoot('swap-knock-on-eaten-no-regenerate')
+
 console.log(`\n${ran} checks ran.`)
 console.log(failures === 0 ? '\nA swap keeps the other dishes and says what it re-sized.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()

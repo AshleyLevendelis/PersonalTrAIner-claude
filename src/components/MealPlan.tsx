@@ -129,6 +129,8 @@ interface MealPlanProps {
    */
   onMealPickApplied?: (slot: MealSlotName, chosenName: string) => Promise<boolean>
   onSwapSlot: (slot: MealSlotName, chooseName: string) => Promise<boolean>
+  /** Puts the last swap of a meal back as it was: its earlier pick, or no pick at all. */
+  onUndoSwap?: (slot: MealSlotName) => Promise<boolean>
   onRegenerateSlot: (slot: MealSlotName) => Promise<void>
   onFindMoreOptions?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   onRegenerateAll: () => Promise<void>
@@ -171,7 +173,7 @@ export function MealPlan({
   profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
   mealsPerDay, includeSnacks, onMealPickApplied,
-  onSwapSlot, onRegenerateSlot, onFindMoreOptions, onRegenerateAll, upcoming, dayMove, regeneratingAll = false,
+  onSwapSlot, onUndoSwap, onRegenerateSlot, onFindMoreOptions, onRegenerateAll, upcoming, dayMove, regeneratingAll = false,
   heldAround, onKeepHeldSizes,
 }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
@@ -421,6 +423,7 @@ export function MealPlan({
             expanded={expandedSlot === slot}
             onToggle={() => setExpandedSlot(prev => (prev === slot ? null : slot))}
             onSwap={onSwapSlot}
+            onUndoSwap={onUndoSwap}
             onMealPickApplied={upcoming ? undefined : onMealPickApplied}
             upcoming={!!upcoming}
             editContextFor={o => (profileId && targets && onMealPickApplied && !upcoming)
@@ -813,6 +816,7 @@ function MealSlotRow({
   expanded,
   onToggle,
   onSwap,
+  onUndoSwap,
   onRegenerate,
   onFindMore,
   checkAlternative,
@@ -858,6 +862,7 @@ function MealSlotRow({
   expanded: boolean
   onToggle: () => void
   onSwap: (slot: MealSlotName, chooseName: string) => Promise<boolean | void>
+  onUndoSwap?: (slot: MealSlotName) => Promise<boolean>
   onRegenerate: (slot: MealSlotName) => Promise<void>
   onFindMore?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
   /**
@@ -967,7 +972,9 @@ function MealSlotRow({
   const runSwapUndo = async () => {
     if (!swapUndo) return
     setUndoBusy(true)
-    const saved = await onSwap(slot, swapUndo.from)
+    // AS IT WAS, not the old dish pinned (QA walk, 10 Nov 2026): the action knows whether the meal had a pick before the
+    // swap, and clears it if not, so the day's other meals go back too. Today only; another day's row swaps back.
+    const saved = onUndoSwap && !upcoming ? await onUndoSwap(slot) : await onSwap(slot, swapUndo.from)
     setUndoBusy(false)
     // SAID EITHER WAY: a put-back that did not happen keeps its button, so it can be tried again.
     if (saved === false) { setSwapNote(["Couldn't put that back just now. Try again in a moment"]); return }
@@ -1516,7 +1523,10 @@ function MealSlotRow({
                           <ArrowLeftRight className="size-3.5" aria-hidden /> Move
                         </button>
                       )}
-                      {!upcoming && (
+                      {/* NOT ON A MEAL ALREADY EATEN (QA walk, 10 Nov 2026): it replaced the plan's dish under the logged
+                          one, so the sheet showed one meal's title and another's ingredients, and the day's other meals
+                          moved. Move already refuses an eaten meal; this follows it. */}
+                      {!upcoming && !isLogged && (
                         <button
                           type="button"
                           onClick={handleRegenerate}

@@ -3351,6 +3351,7 @@ function App() {
               unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}
               onFixDietaryRestrictions={() => { setProfileInfoSection('dietary'); setProfileInfoOpen(true) }}
               onSwapMealSlot={handleSwapMealSlot}
+              onUndoMealSwap={mealActions.undoSwap}
               onMealPickApplied={handleMealPickApplied}
               onRegenerateMealSlot={handleRegenerateMealSlot}
               onFindMoreOptions={handleFindMoreMealOptions}

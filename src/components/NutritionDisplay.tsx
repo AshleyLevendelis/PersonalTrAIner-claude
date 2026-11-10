@@ -97,6 +97,8 @@ export interface NutritionDisplayProps {
   unrecognisedDietaryRestrictions?: string[] | null
   onFixDietaryRestrictions?: () => void
   onSwapMealSlot: (slot: MealSlotName, chooseName: string) => Promise<boolean>
+  /** Puts the last swap of a meal back as it was (its earlier pick, or none). */
+  onUndoMealSwap?: (slot: MealSlotName) => Promise<boolean>
   onRegenerateMealSlot: (slot: MealSlotName) => Promise<void>
   /** "More options" in the swap panel — the same append-only generator the chat's pool-refresh offer uses. Ashley's depth ruling holds: it only ever runs when SHE taps it. */
   onFindMoreOptions?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
@@ -164,7 +166,7 @@ export function NutritionDisplay({
   profile, macros, exercisePlan = [], latestWeightKg, targetWeightKg, onMacroModeChange, onMacroSplitChange,
   profileId, date, planCreatedAt, pools, chosen, mealTotals, isGeneratingMeals, mealsRegeneratingAll = false, mealRegenerateError, onDismissRegenerateError, avoidFoods = [], onMealPickApplied,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
-  onSwapMealSlot, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
+  onSwapMealSlot, onUndoMealSwap, onRegenerateMealSlot, onFindMoreOptions, onRegenerateAllMeals,
   mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
   mealTopUp = null, mealTopUpBusy = false, mealTopUpNote = null, onMealTopUp, onMealTopUpDecline, onDismissMealTopUpNote, mealTopUpStart = null,
   mealStrip, upcomingDay = null, dayMove, heldAround, onKeepHeldSizes,
@@ -636,6 +638,7 @@ export function NutritionDisplay({
         includeSnacks={profile.include_snacks}
         onMealPickApplied={onMealPickApplied}
         onSwapSlot={onSwapMealSlot}
+        onUndoSwap={onUndoMealSwap}
         onRegenerateSlot={onRegenerateMealSlot}
         onFindMoreOptions={onFindMoreOptions}
         onRegenerateAll={onRegenerateAllMeals}

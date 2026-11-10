@@ -252,6 +252,12 @@ console.log('\n9. The wiring')
   check('App hands today\'s held state and the switch to the screen', /heldAround=\{mealDays\.today\?\.day\.heldAround\}/.test(app) && /onKeepHeldSizes=\{mealDays\.keepHeldSizes\}/.test(app))
 }
 
+console.log('\nNothing said when nothing moved (QA walk, 10 Nov 2026)')
+check('every meal rounding to the same size says nothing (no "the same size, the same size" line, no Undo)',
+  heldAroundLine({ kind: 'resized', factor: 1.002, slots: ['breakfast', 'lunch'], deltaKcal: 2, sizes: [{ slot: 'breakfast', fromKcal: 500, toKcal: 501 }, { slot: 'lunch', fromKcal: 700, toKcal: 702 }] }) === null)
+check('...and a factor that rounds to 0% says nothing either', heldAroundLine({ kind: 'resized', factor: 1.003, slots: ['dinner'], deltaKcal: 2 }) === null)
+check('...while one meal that really moved is still said, beside the one that did not', heldAroundLine({ kind: 'resized', factor: 0.9, slots: ['breakfast', 'lunch'], deltaKcal: -60, sizes: [{ slot: 'breakfast', fromKcal: 500, toKcal: 450 }, { slot: 'lunch', fromKcal: 700, toKcal: 701 }] }) === 'To fit around your swap, your breakfast is 10% smaller and your lunch is the same size. Same dishes.')
+
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} hold-around-pins check(s) FAILED`); process.exit(1) }
 console.log('All hold-around-pins checks passed.')

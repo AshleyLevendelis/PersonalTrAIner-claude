@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { swapMealSlot, regenerateMealSlot, regenerateAllMeals, type MealPlanActionContext } from '@/lib/meal-plan-actions'
+import { useRef, useState } from 'react'
+import { swapMealSlot, unswapMealSlot, regenerateMealSlot, regenerateAllMeals, type MealPlanActionContext } from '@/lib/meal-plan-actions'
 import type { MealSlotName } from '@/lib/meal-store'
 
 // ---------------------------------------------------------------------------
@@ -24,6 +24,8 @@ export type MealPlanActionsInput = Omit<MealPlanActionContext, 'profileId' | 'to
 
 export function useMealPlanActions(input: MealPlanActionsInput) {
   const [regeneratingAll, setRegeneratingAll] = useState(false)
+  // The pick each meal had before its last swap (none: it showed the plan's own), so Undo can put the day back.
+  const priorPicks = useRef<Partial<Record<MealSlotName, string | null>>>({})
   const context = (): MealPlanActionContext | null =>
     input.profileId ? { ...input, profileId: input.profileId, today: input.today() } : null
 
@@ -32,7 +34,19 @@ export function useMealPlanActions(input: MealPlanActionsInput) {
     regeneratingAll,
     swap: async (slot: MealSlotName, chooseName: string) => {
       const ctx = context()
-      return ctx ? swapMealSlot(ctx, slot, chooseName) : false
+      if (!ctx) return false
+      const prior = ctx.picks[slot] ?? null
+      const ok = await swapMealSlot(ctx, slot, chooseName)
+      if (ok) priorPicks.current[slot] = prior
+      return ok
+    },
+    /** Puts the last swap of this meal back as it was: its earlier pick, or no pick (unswapMealSlot). */
+    undoSwap: async (slot: MealSlotName) => {
+      const ctx = context()
+      if (!ctx || !(slot in priorPicks.current)) return false
+      const ok = await unswapMealSlot(ctx, slot, priorPicks.current[slot] ?? null)
+      if (ok) delete priorPicks.current[slot]
+      return ok
     },
     regenerateSlot: async (slot: MealSlotName) => {
       const ctx = context()

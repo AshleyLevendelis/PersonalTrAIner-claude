@@ -1774,7 +1774,7 @@ function Harness() {
             // The app's own handlers in the one mode that holds picks the way App
             // does (?daymove=1&regen=1); `noop` elsewhere, as every driver written
             // before 9 Oct 2026 was built on.
-            onSwapMealSlot={REGEN ? mealActions.swap : noop}
+            onSwapMealSlot={REGEN ? mealActions.swap : noop} onUndoMealSwap={REGEN ? mealActions.undoSwap : undefined}
             // ?ate=1: a "More options" route, so every meal's sheet CAN offer a swap and the eaten one's having none is
             // the app's rule, not a pool with nothing else in it (whole-app QA walk, 7 Nov 2026). Finds nothing.
             onFindMoreOptions={ATE ? async () => ({ added: [] }) : undefined} onRegenerateMealSlot={REGEN ? mealActions.regenerateSlot : noop} onRegenerateAllMeals={REGEN ? mealActions.regenerateAll : noop}

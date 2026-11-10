@@ -85,6 +85,20 @@ async function readBack(profileId: string): Promise<Pools | null> {
 }
 
 /**
+ * PUTS A SWAP BACK AS IT WAS (QA walk, 10 Nov 2026). A swap pins its dish, and the day holds its other meals around a
+ * pin; putting the old dish back by swapping to it pinned THAT, so the other meals stayed resized and the line said
+ * "Put back as it was" over a day that was not. Where the meal had no pick before the swap, the put-back clears the
+ * pick, so the whole day is the plan's own again; where it had one, that pick is restored. True when it saved.
+ */
+export async function unswapMealSlot(ctx: MealPlanActionContext, slot: MealSlotName, priorPick: string | null): Promise<boolean> {
+  if (priorPick) return swapMealSlot(ctx, slot, priorPick)
+  const cleared = await clearMealPick(ctx.profileId, ctx.today, slot).catch(() => false)
+  if (!cleared) return false
+  ctx.setPicks(prev => { const next = { ...prev }; delete next[slot]; return next })
+  return true
+}
+
+/**
  * Picking a specific alternative records the choice as today's pick — the pool
  * itself doesn't change, only which option is "today's".
  */
