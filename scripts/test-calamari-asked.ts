@@ -120,6 +120,11 @@ check('for a shellfish-free person the same dish is refused, not asked about', /
 const bothLog: string[] = []
 verifyProposal(proposal, 'dinner', budget, ['gluten-free', 'shellfish-free'], bothLog)
 check('...and with both, refused: a dish that is out anyway is not worth a question', /^I can't add Calamari salad/.test(explainRejection(bothLog, 'Calamari salad', 'dinner')), explainRejection(bothLog, 'Calamari salad', 'dinner'))
+// SCOPE: only a food asked about for its kind jumps the queue. An ordinary unknown food beside a known clash is
+// reported as it always was (the uncounted food first), so this change moves nothing else (mutation g2).
+const mixedLog: string[] = []
+verifyProposal({ ...proposal, name: 'Zorble bowl', ingredients: ['300g zorblefruit', '30g peanut butter', '50g dry basmati rice'] } as typeof proposal, 'dinner', budget, ['nut-free'], mixedLog)
+check('an ordinary unknown food beside a known clash is still reported as before (coverage first)', /coverage/.test(mixedLog[mixedLog.length - 1] ?? '') && !/diet violation/.test(mixedLog[mixedLog.length - 1] ?? ''), mixedLog)
 const openLog: string[] = []
 const openDish = verifyProposal(proposal, 'dinner', budget, [], openLog)
 check('with no restriction the dish is still not accepted with calamari uncounted, and the kind is asked', openDish === null && explainRejection(openLog, 'Calamari salad', 'dinner').startsWith(QUESTION), { openLog, said: explainRejection(openLog, 'Calamari salad', 'dinner') })
