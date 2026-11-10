@@ -2,6 +2,60 @@
 
 Newest first. One line each.
 
+- [x] **NUTRITION QA WALK, 10 NOV 2026: A SWAP'S UNDO PUTS THE DAY BACK, AND THREE SMALLER FIXES.** Found by the
+  nutrition-screens QA walk (390px, the app's own meal actions over a deep pool). Mechanical; no ruling needed.
+  (1) UNDO ON TODAY'S SWAP DID NOT PUT THE DAY BACK, while saying "Put back as it was": it re-pinned the old dish, and a
+  pinned dish holds the other meals around it, so breakfast stayed 829 -> 723 kcal and a new "to fit around your swap"
+  line appeared over a swap just undone. The swap now remembers the meal's earlier pick; Undo restores it, or clears
+  the pick so the whole day is the plan's own again. verify:swap-knock-on §6 (3 checks; the old Undo reproduces the
+  QA's exact line, 10% and 13%).
+  (2) No line, and no Undo for nothing, when every meal rounds to the size it was ("your breakfast is the same size,
+  your lunch is the same size..."). test:hold-around-pins (+3 checks, 2 mutations caught).
+  (3) Regenerate is not offered on a meal already eaten (it put another dish's ingredients under the eaten meal's
+  title and moved the day's other meals; Move already refused). verify:swap-knock-on §7 (2 checks, 1 mutation caught).
+  (4) Fresh potatoes, sweet potatoes, plantain and yam are produce on the shopping list, not dry goods (plantain chips,
+  cereal, rice and pasta stay dry). test:qa-wording §4 (1 mutation caught).
+  ALSO, setup and Profile: the browser's own controls follow the theme (the date picker's calendar icon was black on
+  the dark themes), and the reply-speed and Appearance chips reach 44 px by the app's hit area. test:qa-wording §5-6.
+  NOT DONE, and some of it is his: "Regenerate" on one meal re-plans the whole week's menu with no warning (the pool
+  is regenerated, and the weekly menu is drawn from it): a confirm sentence, or regenerating only the one meal, is a
+  choice about what the button should do (his); after "Regenerate all", a day already on the shopping list says so
+  though its meals changed (the list checks dates only); the Move and Add-food panels can open behind the "I ate this"
+  bar; the eaten meal's "Logged" button does not say a tap takes it back; the slot move has no Undo; the day swap's
+  preview leaves out a snack it then resizes; "To fit around your swap" also appears after editing an eaten meal (the
+  WORDS are his: "your change" would be true in both cases); absurd portions after the fit at high targets (360 g of
+  bread in a toastie) and grains with no dry figures (bulgur, split peas) shown cooked; the deep pool at 3,040 kcal /
+  160 g lands few days on target (named before, high-energy lower-protein targets).
+- [x] **THE REST OF 10 NOV 2026 (THE LONG-FLIGHT BATCH, BEFORE THE QA FIXES ABOVE).** His "work through as many fixes
+  ... add exercise and meal variations ... do as much as you can". Each is its own commit; details in each message.
+  (1) EXERCISE LIBRARY BATCH 3, kettlebell and bodyweight, 11 exercises, under his 3 Nov "Known kit + a few": Kettlebell
+  Deadlift, Single-Arm Kettlebell Press and Row, Reverse and Lateral Lunge (bodyweight), Close-Grip and Decline Push-Ups,
+  Hollow Body Hold, Plank Shoulder Taps, Copenhagen Plank, Reverse Crunch. CSCS REVIEW (decided under the delegation):
+  (1) training effect: a kettlebell owner gets a press, a row and a slow hinge to learn before the swing; a no-kit
+  trainee gets triceps, a harder push, sideways and knee-kinder single-leg work, and core needing no kit; (2) takes
+  nothing away (catalogue entries, ranked like the rest; test:calibration-search had to exclude two from one fixture
+  plan because they now win its slots: 0 of 60 seeds kept its RDL otherwise); (3) pattern coverage and progression
+  unchanged (each sits in an existing pattern, harder ones have a regression that exists and wait for novice or
+  intermediate); (4) the kettlebell deadlift's NAME priced it as a barbell deadlift, so it carries a measured 0.28 of
+  that (about a goblet squat; it was the bell's 48 kg cap for an 85 kg lifter): a new price, not a redefined one;
+  (5) in scope; each copies its nearest entry's injury exclusions and adds the elbow, lower back, hip or knee where it
+  loads them. All 11 are prescribed somewhere in 54 seeded bodyweight and minimalist plans. test:exercise-library-batch3
+  (50 checks, 9 mutations caught).
+  (2) THE "MARK IT MISSED" CARD OFFERS THE MOVE IT TALKS ABOUT (his question from his phone: "it asks if I want it
+  later. But doesn't offer that"). "Or instead: Move it to Thursday", the next free day by the move card's own rules;
+  no button when no day is free. verify:workout-scenarios-chat B2a-B2c (2 mutations caught). Needs no deploy.
+  (3) THE FULL PROGRAM AS A CALENDAR (his request; the phase strip kept exactly as it is). List / Calendar beside the
+  title, List the default; real dates Monday to Sunday, each date read in the plan week it is in (his 6 Oct ruling);
+  deload weeks amber, today outlined, logged days ticked, this week's moves and swaps as the list reads them; a tap
+  opens the day in the list. test:program-calendar (21 checks, runs in New Zealand time, 9 mutations caught),
+  verify:program-calendar (16 checks, 3 mutations caught).
+  (4) SETUP, from the setup QA walk: one age (the date-of-birth row beside Age is gone, and a recorded birthday sets
+  the age); half pounds and inches read; switching units never silently empties a box or drifts 80 kg to 79.8; a long
+  name is asked again in words; "Age: 31" spaced. verify:setup-fixes (10 checks, 6 mutations caught), test:body-units.
+  NOT DONE from the setup/chat walk: a double tap on Send can start the microphone; avoiding a liked food is allowed
+  silently; the setup progress count repeats and grows; the coach's tables read their pipes aloud; the header
+  subtitle has no ellipsis; the steps total resets. (The date picker's icon and the 38 px Profile chips are fixed,
+  in the Profile entry above.)
 - [x] **FOUR MORE FROM THE TRAINING QA WALK, AND A WORDING SWEEP, 10 NOV 2026.** No ruling needed: mechanical. Each
   is its own commit on the branch.
   (1) HOME QUOTED THE PLAN'S WEIGHT FROM BEFORE A BREAK ("Bench from 30 kg" while the card eased it to 27.5). One

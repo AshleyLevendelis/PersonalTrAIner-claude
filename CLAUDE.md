@@ -1503,6 +1503,20 @@ menu" stays true when a copy is also left outside it.
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
 
+### His requests of 10 Nov 2026 (the long-flight batch)
+- **The Full Program as a calendar, the phase strip kept as it is.** List / Calendar beside the title (List the
+  default); real dates, each read in the plan week it is in; a tap opens the day in the list. `test:program-calendar`,
+  `verify:program-calendar`
+- **"Mark it missed" offers the move it talks about**, as a button ("Or instead: Move it to Thursday").
+  `verify:workout-scenarios-chat` B2
+- **More exercise variations: batch 3**, kettlebell and bodyweight (11), under his "Known kit + a few".
+  `test:exercise-library-batch3`
+- **A "Whole block" swap writes only the weeks that still hold the lift** (a hypertrophy plan rotates an accessory at
+  week 3; the swap had overwritten the plan's own pick at half its price), and the sheet's "until" names where it really
+  stops. Its later weeks progress as the plan's own untested lifts do: one step a loading week, or the weight held while
+  the reps climb (asked of the rep rule itself), deload 70% of the last loading week. CSCS, basis in BACKLOG.
+  `test:block-swap-reach`
+
 ### His rulings of 31 Oct 2026, the five-tab polish (`docs/plans/tab-polish-oct31.md`)
 - **"Build, keep my rulings"**: the handoff (Home 2c, Nutrition 3a+3b, Exercise 2a, Tools 2a, Chat 2b) as drawn, except where
   an earlier ruling of his says otherwise; the plan lists each. Layout only, nothing removed. `test:home-2c`,
