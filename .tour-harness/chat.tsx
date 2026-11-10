@@ -638,7 +638,9 @@ const topUpSeed = (() => {
   // protein, carbs and fat for THIS profile (3040 kcal, 160g P, 411g C, 84g F,
   // three meals): solved from the food database, not guessed, because
   // "roughly right" dishes are the ones no day can land on target with.
-  const SIZED_BASE: Record<string, [number, number, number]> = { breakfast: [109, 492, 19], lunch: [145, 656, 26], dinner: [109, 492, 19] }
+  // RE-SOLVED 10 Nov 2026, when cooked basmati became its dry figures at a home yield (132 kcal / 28.9 g carbs per 100 g,
+  // was USDA's 121 / 25): the old amounts were solved against the old figures and no longer fitted these budgets.
+  const SIZED_BASE: Record<string, [number, number, number]> = { breakfast: [114, 426, 20], lunch: [152, 567, 27], dinner: [114, 426, 20] }
   const sized = (slot: string, name: string, i: number, factor: number) => {
     const k = (0.94 + i * 0.02) * factor
     const [c, r, o] = SIZED_BASE[slot]

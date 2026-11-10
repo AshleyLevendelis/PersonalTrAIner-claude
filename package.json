@@ -545,6 +545,8 @@
     "verify:chat-send-scroll": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-send-scroll.mjs",
     "test:exercise-library": "tsx scripts/test-exercise-library.ts",
     "test:exercise-library-batch3": "tsx scripts/test-exercise-library-batch3.ts",
+    "test:program-calendar": "tsx scripts/test-program-calendar.ts",
+    "verify:program-calendar": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/program-calendar.mjs",
     "test:variant-pricing": "tsx scripts/test-variant-pricing.ts",
     "test:near-copies": "tsx scripts/test-near-copies.ts",
     "test:machine-versions": "tsx scripts/test-machine-versions.ts",

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, Check } from 'lucide-react'
 import { tabHash } from '@/lib/app-route'
 import { useActiveSession } from '@/hooks/useActiveSession'
@@ -14,6 +14,7 @@ import { weekRole } from '@/lib/week-role'
 import { prescriptionLine } from '@/lib/activity-day'
 import { shortPhaseLabel } from '@/lib/periodization'
 import { ReadOnlyDayList } from './ReadOnlyDayList'
+import { buildProgramCalendar } from '@/lib/program-calendar'
 import { WarmupSection } from './WarmupSection'
 import type { MesocycleWeek, UserProfile, WorkoutDay } from '@/lib/types'
 
@@ -63,6 +64,8 @@ interface ProgramBrowseProps {
   poolProfile?: UserProfile
   /** From the route hash (`#/exercise/program/{n}`) — where paging starts. */
   initialWeek?: number
+  /** When the plan began: the calendar view lays every date out in the plan week it is in (program-calendar.ts). */
+  planCreatedAt?: string
   /**
    * App's logsVersion. ExerciseTab has had it all along and did not pass it
    * on, which is half of why this screen never showed a move: with no refresh
@@ -90,6 +93,9 @@ interface ProgramBrowseProps {
   onOpenDetail?: (exerciseName: string) => void
 }
 
+const PROGRAM_VIEW_KEY = 'program-view'
+// Loaded when it is first asked for: most visits never open it, and the app's first download has a budget (test:bundle).
+const ProgramCalendar = lazy(() => import('./ProgramCalendar').then(m => ({ default: m.ProgramCalendar })))
 const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 const DAY_ABBR: Record<string, string> = {
   Monday: 'MON', Tuesday: 'TUE', Wednesday: 'WED', Thursday: 'THU',
@@ -127,6 +133,7 @@ export function ProgramBrowse({
   injuries,
   poolProfile,
   initialWeek,
+  planCreatedAt,
   refreshToken,
   onOpenSwap,
   onBanExercise,
@@ -145,6 +152,17 @@ export function ProgramBrowse({
   const [openDay, setOpenDay] = useState<string | null>(null)
   const [warmupOpen, setWarmupOpen] = useState(false)
   const [banBusy, setBanBusy] = useState<string | null>(null)
+  // LIST OR CALENDAR (10 Nov 2026, his "the option to see my training weeks as a calendar view"). The list stays the
+  // default and the place every change lives; the calendar is a way to look, remembered on this phone only.
+  const [view, setViewState] = useState<'list' | 'calendar'>(() => {
+    try { return window.localStorage.getItem(PROGRAM_VIEW_KEY) === 'calendar' ? 'calendar' : 'list' } catch { return 'list' }
+  })
+  const setView = (v: 'list' | 'calendar') => {
+    setViewState(v)
+    try { window.localStorage.setItem(PROGRAM_VIEW_KEY, v) } catch { /* a private window keeps the choice for this visit */ }
+  }
+  /** A day picked on the calendar, opened once the list has drawn its week. */
+  const pickedDay = useRef<string | null>(null)
 
   const weekObj = hasMesocycle ? mesocycle.find(w => w.week_number === browseWeek) : undefined
   const days = weekObj?.days ?? plan
@@ -187,6 +205,14 @@ export function ProgramBrowse({
   // training day otherwise.
   useEffect(() => {
     const fallback = DAY_ORDER.find(d => (days.find(x => x.day === d)?.exercises.length ?? 0) > 0) ?? null
+    if (pickedDay.current) {
+      const picked = pickedDay.current
+      pickedDay.current = null
+      setOpenDay(picked)
+      setWarmupOpen(false)
+      requestAnimationFrame(() => document.querySelector(`[data-program-day="${picked}"]`)?.scrollIntoView({ block: 'center' }))
+      return
+    }
     setOpenDay(browseWeek === liveWeek
       ? (days.find(x => x.day === todayName)?.exercises.length ? todayName : fallback)
       : fallback)
@@ -237,6 +263,24 @@ export function ProgramBrowse({
   // in week-note.ts / week-delta.ts, where they can be tested against real
   // generated plans rather than eyeballed on a screenshot. See those files
   // for the defects that put them there.
+  const calendarRows = useMemo(() => buildProgramCalendar(mesocycle, planCreatedAt), [mesocycle, planCreatedAt])
+  const liveCells = useMemo(
+    () => new Map(trainingWeek.loading ? [] : trainingWeek.days.map(d => [d.date, d] as const)),
+    [trainingWeek.days, trainingWeek.loading],
+  )
+  const openFromCalendar = (week: number, dayName: string) => {
+    pickedDay.current = dayName
+    setView('list')
+    if (week === browseWeek) {
+      // Same week: the effect that opens a day will not run again, so open it here.
+      pickedDay.current = null
+      setOpenDay(dayName)
+      setWarmupOpen(false)
+      requestAnimationFrame(() => document.querySelector(`[data-program-day="${dayName}"]`)?.scrollIntoView({ block: 'center' }))
+    } else {
+      setBrowseWeek(clampWeek(week))
+    }
+  }
   const note = weekNoteText(weekObj)
   const deltaChip = hasMesocycle && weekObj ? weekDelta(weekObj, mesocycle) : null
 
@@ -251,6 +295,28 @@ export function ProgramBrowse({
           ‹ Today
         </button>
         <span className="ds-label">Full program</span>
+        {hasMesocycle && calendarRows.length > 0 && (
+          <div role="group" aria-label="Show the program as" className="ml-auto flex items-center" data-testid="program-view-toggle">
+            {(['list', 'calendar'] as const).map(v => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={view === v}
+                onClick={() => setView(v)}
+                className="inline-flex min-h-[44px] items-center border-0 bg-transparent px-0.5"
+              >
+                <span
+                  className="inline-flex h-8 items-center rounded-full px-3 text-[0.75rem] font-semibold"
+                  style={view === v
+                    ? { background: 'color-mix(in srgb, var(--primary) 16%, transparent)', color: 'var(--primary-text)' }
+                    : { color: 'var(--muted-foreground)' }}
+                >
+                  {v === 'list' ? 'List' : 'Calendar'}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {/* LEAD WITH THE WEEK. Ashley's ruling, 1 Sep 2026, on a mockup she
           drew: the biggest text on the page is what THIS WEEK is for, and the
@@ -344,6 +410,18 @@ export function ProgramBrowse({
         </div>
       )}
 
+      {view === 'calendar' && calendarRows.length > 0 ? (
+        <Suspense fallback={<div className="mt-5 h-40" aria-busy="true" />}>
+          <ProgramCalendar
+            rows={calendarRows}
+            todayDate={todayDate}
+            liveCells={liveCells}
+            loggedDays={loggedDays}
+            browseWeek={browseWeek}
+            onPick={openFromCalendar}
+          />
+        </Suspense>
+      ) : (<>
       {/* Week bar */}
       <div
         className="mt-5 flex items-center justify-between gap-2 px-1 py-2.5"
@@ -619,6 +697,7 @@ export function ProgramBrowse({
           )
         })}
       </div>
+      </>)}
       {/* "Compare to W{n}" from the handoff is deliberately NOT built —
           unspecified in the design; logged in BACKLOG as its own piece. */}
     </div>

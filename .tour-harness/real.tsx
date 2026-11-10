@@ -1253,11 +1253,16 @@ const DEEP_POOL = new URLSearchParams(location.search).get('deep') === '1' && ma
   }
   return out
 })() : null
+// COOKED BASMATI GOT DENSER ON 10 NOV 2026 (132 kcal and 28.9 g carbs per 100 g, from the dry figures at a home yield,
+// was USDA's 121 and 25), so these days were no longer the plausible whole they were sized to be: the knock-on driver
+// found no food that moved another dish. The rice is scaled by 0.89, which holds the days' energy and carbs within 3%
+// of what they were. Input only: the app still costs every line itself.
+const RICE_SCALE = 0.89
 const leftoverPools = DEEP_POOL ?? (() => {
   const dish = (slot: string, name: string, chicken: number, rice: number, oil: number) => {
     const ingredients = [
       { name: 'chicken breast', quantity: chicken, unit: 'g' },
-      { name: 'cooked basmati rice', quantity: rice, unit: 'g' },
+      { name: 'cooked basmati rice', quantity: Math.round(rice * RICE_SCALE), unit: 'g' },
       { name: 'olive oil', quantity: oil, unit: 'g' },
     ]
     const m = computeMealMacros(ingredients)
@@ -1290,7 +1295,7 @@ const leftoverPools = DEEP_POOL ?? (() => {
     dinner: [dish('dinner', 'Roast chicken tray bake', 118, 440, 20), dish('dinner', 'Chicken and rice pot', 124, 430, 21), dish('dinner', 'Baked chicken and rice', 112, 450, 19),
       ...(KEPT ? [(() => {
         const ingredients = [
-          { name: 'chicken breast', quantity: 115, unit: 'g' }, { name: 'cooked basmati rice', quantity: 420, unit: 'g' },
+          { name: 'chicken breast', quantity: 115, unit: 'g' }, { name: 'cooked basmati rice', quantity: Math.round(420 * RICE_SCALE), unit: 'g' },
           { name: 'olive oil', quantity: 19, unit: 'g' }, { name: 'mushrooms', quantity: 100, unit: 'g' },
         ]
         const m = computeMealMacros(ingredients)
@@ -1300,7 +1305,7 @@ const leftoverPools = DEEP_POOL ?? (() => {
       // fat greek yoghurt, which doesn't fit nut-free"). With &nutfree=1 the app must block it and say it can't confirm.
       ...(new URLSearchParams(location.search).get('unknownfood') === '1' ? [(() => {
         const ingredients = [
-          { name: 'chicken breast', quantity: 120, unit: 'g' }, { name: 'cooked basmati rice', quantity: 400, unit: 'g' },
+          { name: 'chicken breast', quantity: 120, unit: 'g' }, { name: 'cooked basmati rice', quantity: Math.round(400 * RICE_SCALE), unit: 'g' },
           { name: 'vanilla greek yoghurt', quantity: 100, unit: 'g' },
         ]
         const m = computeMealMacros(ingredients)

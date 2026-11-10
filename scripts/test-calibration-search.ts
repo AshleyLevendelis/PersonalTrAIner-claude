@@ -372,7 +372,11 @@ console.log('\n6. The sentence and the plan agree, when the person has said what
       .map(d => ({ day: d, available: ['Monday', 'Tuesday', 'Thursday', 'Saturday'].includes(d) })),
   } as unknown as UserProfile
   console.log = () => {}
-  const samPlan = generateMesocycle(sam)
+  // THE OTHER HINGES ARE EXCLUDED, AS AN INPUT (10 Nov 2026): the kettlebell batch gave a minimalist plan a Kettlebell
+  // Deadlift, and with it and the one-leg dumbbell RDL in the pool the week-to-week rotation traded his Romanian
+  // Deadlifts away before the deload (0 of 60 seeds kept them). This check is about the RDL's anchor, so the plan is
+  // made with the RDL as his only hinge, as it was until then.
+  const samPlan = generateMesocycle(sam, undefined, ['Kettlebell Deadlift', 'Single-Leg Dumbbell RDL'])
   console.log = quiet
   resetRandomSource()
   // THE DAY IS FOUND, never named (3 Nov 2026): the exercise library re-rolled his Thursday onto a one-leg dumbbell RDL
@@ -437,7 +441,8 @@ console.log('\n6. The sentence and the plan agree, when the person has said what
   // pair rightly beats a bag at; the bag row is brought back by excluding it (an INPUT, not the output).
   setRandomSource(seededRngFromKey('sam:2'))
   console.log = () => {}
-  const bagPlan = generateMesocycle(sam, undefined, ['Bent-Over Dumbbell Row'])
+  // ...and since the kettlebell batch (10 Nov 2026), the one-arm kettlebell row too, for the same reason.
+  const bagPlan = generateMesocycle(sam, undefined, ['Bent-Over Dumbbell Row', 'Single-Arm Kettlebell Row'])
   console.log = quiet
   resetRandomSource()
   const tue = bagPlan[0].days.find(d => d.day === 'Tuesday')!

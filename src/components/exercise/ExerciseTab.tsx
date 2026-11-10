@@ -274,6 +274,7 @@ export function ExerciseTab({
           injuries={storedProfile?.injuries ?? profile?.injuries}
           poolProfile={profile}
           initialWeek={route.kind === 'program' ? route.week : undefined}
+          planCreatedAt={planCreatedAt}
           // WIRED, not merely available. ExerciseTab has had logsVersion since
           // the week strip needed it and never passed it down, so the program
           // view could not learn about a move confirmed in chat while it was on
