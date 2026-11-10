@@ -92,7 +92,7 @@ const RemoveExerciseSheet = lazyWithReload(() => import('./RemoveExerciseSheet')
 // of the list, carrying the whole exercise catalogue's search with it.
 const AddExerciseSheet = lazyWithReload(() => import('./AddExerciseSheet').then(m => ({ default: m.AddExerciseSheet })))
 // PART OF THE SCREEN, NOT A FILE FETCHED ON THE TAP (10 Nov 2026, a gym with no signal): this is the one sheet between
-// "Finish session" and a session finished short, and 1.3 kB. A finish must never wait on the network.
+// the Finish button and a session finished short, and 1.3 kB. A finish must never wait on the network.
 import { FinishCheckSheet } from './FinishCheckSheet'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { setSessionMove, setMarkedMissed, setDeliberateRest } from '@/lib/daily-tracking'
