@@ -2,6 +2,56 @@
 
 Newest first. One line each.
 
+- [x] **HIS THREE RULINGS OF 10 NOV 2026, ASKED AS MULTIPLE CHOICE ON HIS "give me the multiple choice questions", EACH
+  FROM THREE OPTIONS, ALL BUILT.** He answered; nothing here was decided unprompted except the wording of the two new
+  sentences (marked, his to change).
+  (1) **"REGENERATE" ON ONE MEAL: "Only that meal"** (over "warn first, then all" and "leave it"). TRACED FIRST: the
+  row's button rebuilt that meal's whole list of options, and the week's menu is drawn from the list, so other days'
+  meals changed and today's others moved to fit, with no word. NOW one new dish is made FOR ONE DAY (the pin-only mark
+  edited copies already use: no day's search can find it) and the meal is swapped to it down the swap's own road: its
+  trial, its line, its Undo, the day's other dishes held (10 Oct "Resize, else leave"). Nothing the plan held is
+  deleted; our library first, then the writer for one. The dish regenerated AWAY from stays the plan's own and can come
+  round again (he asked for a different meal today, not never to see it): mine, named. The one meal that may follow is
+  tomorrow's leftovers lunch after a regenerated dinner, and the line names it. A meal with no options still builds
+  its list the old way. FOUND BY READING A SCREENSHOT, not by a check: when no dish could be made the reason was on the
+  page BEHIND the open meal sheet, so the tap looked dead (the driver had found the words in the page and passed); it is
+  said in the sheet now, and the driver asserts it is in view there. `test:meal-regenerate` §6 (66 checks),
+  `verify:meal-regenerate-one` (25: a breakfast regenerated and all 20 other meals of the week unchanged; Undo puts the
+  week back; a dinner; the writer failing).
+  (2) **THE FIT-AROUND LINE: "'your change' always"** (over matching the words to what he did, and over leaving "your
+  swap"). All four sentences of the line. `test:hold-around-pins` (61), `verify:swap-knock-on`.
+  (3) **BARE "CALAMARI": "Ask which"** (over "can't confirm it's gluten-free" and over leaving it plain). Allergen
+  path, so a plan: `docs/plans/calamari-asked.md`. MEASURED FIRST: "150g calamari" was plain squid, so a gluten-free
+  person's calamari PASSED the diet check and the chat was free to card it. The kind changes an ALLERGEN TAG, unlike
+  yoghurt and mince, so the word was not removed from the table (the shellfish word list does not name squid or
+  calamari; the table is what knows it is shellfish): only the ingredient lookup refuses the bare word, and the diet
+  check keeps what is true of EVERY kind (shellfish-free, vegan, vegetarian: a definite "contains"; nut-free: not
+  blocked; gluten-free: "can't confirm"). In the chat the APP asks off his words; no food card is built that turn from
+  the coach's guess, and talk offering to build it is replaced. The chat sentence is MINE, his to change.
+  THE GATE FOUND A REAL GAP ON ITS FIRST RUN: the verifier checks coverage before diet, so a shellfish-free person
+  would have been asked "breaded or plain?" about a food neither answer lets him eat. The definite clash is logged
+  first now, for a kind-needed food only. ALSO FIXED ON THE WAY: adding a meal with a bare Greek yoghurt or mince for
+  someone with ANY restriction said "it's got greek yoghurt in it, which is on your avoid list" (untrue); it asks the
+  kind now. `test:calamari-asked` (72), `verify:named-food-clash` §7-9 (37 in all, screenshot read).
+  MUTATIONS. Calamari and wording: 27 written. 23 caught first time on the gate. c2 CRASHED the gate (a `!` on a
+  lookup the mutation made null: it threw before any check ran; made null-safe, then caught, 9 failures of 71). a1 did
+  NOT APPLY (my old-text was wrong); re-applied by hand, caught. g2 MISSED: dropping the "only a food asked about for
+  its kind" filter changed nothing a check saw; the filter is deliberate, so a check now binds it (an ordinary unknown
+  food beside a known clash is reported as before), then caught. Two were MISSED ON THE DRIVER ONLY and caught by the
+  gate, each read: d1 (the diet check blocks nut-free too) is a card path the chat driver never builds; n1 (the chat
+  ask fires for shellfish) is equivalent in the app, where the refusal is tested before the ask. Regenerate: round
+  running at the time of writing; result in the next entry.
+  CSCS REVIEW: no prescription changes. Nutrition scope: an allergen filter is made STRICTER for one food and no
+  looser for any (checked: no restriction is broken by plain squid and not by the fried entry).
+  NOT DONE, named: "squid rings" and bare "squid" stay plain; octopus and cuttlefish are not in the shellfish word
+  list (not looked at); stored meals with a bare calamari line are not repaired (no live users); whether the deployed
+  coach asks by itself is the exam's; the regenerated-away dish is not hidden from later weeks; "Regenerate all" is
+  unchanged (it still replaces every meal, with its working state). DEPLOYS: frontend on merge; `chat-gemini` and
+  `generate-meals` for the calamari rule (and the 10 Nov food figures, which they did not have either).
+  HIS COMMANDS OF THE SAME DAY (`db:push-both`, and deploys of `onboarding-chat`, `chat-gemini`, `coach-reach-out`):
+  RELAYED, NOT MEASURED FROM HERE. `main` was still at the 9 Nov commit when he ran them, so whichever branch his
+  machine was on decides what went live; `generate-meals` was not in his list.
+
 - [x] **FULL SWEEP ON THE OFFLINE AND WEEK-LIST WORK, 10 NOV 2026: 530 RAN, 525 PASSED, ONE REAL FAILURE, FIXED.**
   Run in a separate worktree on the settled tree. Four are the standing environmental ones, each read for its own "I
   could not reach it" wording (`test:meal-quality`, `test:schema-parity`, `verify:rls`) plus `test:coach-exam-fresh`
