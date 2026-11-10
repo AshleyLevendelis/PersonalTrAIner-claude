@@ -24,7 +24,8 @@
  *
  * What a test cannot prove is that the card USES any of this — that is verify:layoff.
  */
-import { layoffStatus, easeWeightKg, easeAddedKg, layoffWeightFrom, easesWeights, NO_LAYOFF, type LayoffStatus } from '../src/lib/layoff'
+import { readFileSync } from 'fs'
+import { layoffStatus, easeWeightKg, easeAddedKg, layoffWeightFrom, easesWeights, breakDayKg, NO_LAYOFF, type LayoffStatus } from '../src/lib/layoff'
 import { layoffCardLine, layoffLiftNote, layoffRestartOffer, welcomeBackOpener, PLAN_RESTART } from '../src/lib/coach-voice'
 import { pickOpener, type OpenerInput } from '../src/lib/coach-opener'
 import { buildCoachExerciseSummary } from '../src/lib/chat-plan-context'
@@ -222,6 +223,19 @@ console.log('\n7. The coach is told what the card shows')
   check('...and tells the coach to quote the card, not the printed weights', /quotes the card/.test(withBreak))
   check('no break: the plan text is exactly as before', buildCoachExerciseSummary({ days: [day], breakLine: null }) === buildCoachExerciseSummary({ days: [day] }))
   check('an empty plan still returns exactly "" (a prompt rule keys on it)', buildCoachExerciseSummary({ days: [], breakLine: layoffCardLine(e90) }) === '')
+}
+
+console.log('\nHome says the card\'s weight (QA walk, 10 Nov 2026): one function for both')
+{
+  const bench = getExerciseEntry('Barbell Bench Press')
+  const away30 = layoffStatus('2026-08-01', '2026-08-31')
+  const away12 = layoffStatus('2026-08-19', '2026-08-31')
+  check('no break: the printed figure', breakDayKg(30, 27.5, NO_LAYOFF, bench) === 30)
+  check('a break, the lift has history: eased from LAST time\'s weight (as the card eases the engine\'s answer)', breakDayKg(40, 30, away30, bench) === layoffWeightFrom(30, away30, bench) && breakDayKg(40, 30, away30, bench) < 30)
+  check('a break, no history: the printed figure eased', breakDayKg(30, null, away30, bench) === easeWeightKg(30, away30, bench) && breakDayKg(30, null, away30, bench) < 30)
+  check('held (10-20 days): last time\'s weight, no increment and no easing', away12.band === 'hold' && breakDayKg(40, 30, away12, bench) === 30 && breakDayKg(30, null, away12, bench) === 30)
+  const home = readFileSync('src/lib/dashboard-data.ts', 'utf8')
+  check('Home\'s lead lift is priced through it (the driver, verify:layoff A2, reads the screen)', /breakDayKg\(e\.suggested_load_kg/.test(home))
 }
 
 console.log(`\n${ran} checks ran`)

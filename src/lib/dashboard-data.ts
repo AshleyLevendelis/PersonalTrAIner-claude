@@ -20,6 +20,9 @@ import { getTotalForDate as getWaterTotalForDate } from './water-store'
 import { getPRCache, getRecordsBeaten, refreshPRCacheFromDB, type PRMetric, type RecordBeaten } from './pr-engine'
 import { formatLoad, labelModeForEntry, isPerSideLoad, type LoadLabelMode } from './load-prescription'
 import { getExerciseEntry } from './exercise-db'
+import { breakDayKg, layoffStatus, NO_LAYOFF, type LayoffStatus } from './layoff'
+import { getLastWorkingSessionDate } from './set-log-store'
+import { getDoubleProgressionRecommendation } from './progression-engine'
 import { getActiveGoals } from './memory-store'
 import { computeStreak, buildStreakDays, type StreakDayInput } from './streak'
 import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
@@ -467,11 +470,26 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // RANKED BY WHAT IS ACTUALLY MOVED: a pair of 16kg dumbbells is 32, and
   // sorting the per-hand 16 against a bar's total put it below lifts it
   // outweighs.
-  const leadLift: LeadLift | null = (todayWorkoutDay?.exercises ?? [])
-    .filter(e => typeof e.suggested_load_kg === 'number' && (e.suggested_load_kg ?? 0) > 0)
+  //
+  // AFTER A BREAK, THE CARD'S WEIGHT (QA walk, 10 Nov 2026): Home said "Bench from 30 kg" while the card eased it to
+  // 27.5. The same break status the card reads (the last working session before today), and the same easing
+  // (breakDayKg): from last time's weight where the lift has one (week 2 on, as the card asks), else from the printed
+  // figure. A failed read eases nothing, as on the card.
+  const loadedToday = (todayWorkoutDay?.exercises ?? []).filter(e => typeof e.suggested_load_kg === 'number' && (e.suggested_load_kg ?? 0) > 0)
+  const breakStatus: LayoffStatus = loadedToday.length === 0
+    ? NO_LAYOFF
+    : await getLastWorkingSessionDate(profileId, todayStr).then(last => layoffStatus(last, todayStr)).catch(() => NO_LAYOFF)
+  const lastLogged = new Map<string, number>()
+  if (breakStatus.band !== 'none' && liveWeek > 1) {
+    await Promise.all(loadedToday.map(async e => {
+      const rec = await getDoubleProgressionRecommendation(profileId, e.name, todayStr, repsHighOf(e.reps)).catch(() => null)
+      if (rec && rec.lastWeightKg > 0) lastLogged.set(e.name, rec.lastWeightKg)
+    }))
+  }
+  const leadLift: LeadLift | null = loadedToday
     .map(e => {
       const entry = getExerciseEntry(e.name)
-      const kg = e.suggested_load_kg as number
+      const kg = breakDayKg(e.suggested_load_kg as number, lastLogged.get(e.name) ?? null, breakStatus, entry)
       const logged = nonWarmupToday
         .filter(l => l.exercise_name === e.name && !l.is_bodyweight && (l.drop_index ?? 0) === 0 && Number(l.weight_kg) > 0)
         .map(l => Number(l.weight_kg))
@@ -832,3 +850,11 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
 }
 
 export type { MealMacros }
+
+/** The top of a rep range ("8-12" -> 12, "10" -> 10), as the card asks the progression engine with it. */
+function repsHighOf(reps: string): number {
+  const range = /^(\d+)\s*-\s*(\d+)$/.exec(reps)
+  if (range) return parseInt(range[2])
+  const single = parseInt(reps)
+  return isNaN(single) ? 12 : single
+}

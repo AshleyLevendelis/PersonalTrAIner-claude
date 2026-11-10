@@ -93,3 +93,15 @@ export function easeAddedKg(kg: number, s: LayoffStatus): number {
 export function layoffWeightFrom(lastWeightKg: number, s: LayoffStatus, entry: ExerciseEntry | null | undefined): number {
   return s.band === 'none' ? lastWeightKg : easeWeightKg(lastWeightKg, s, entry)
 }
+
+/**
+ * TODAY'S WORKING WEIGHT OF ONE LIFT AFTER A BREAK, as the Exercise card works it out (TodayPanel: the progression
+ * engine's answer eased by layoffWeightFrom where the lift has history, else the printed figure eased by easeWeightKg).
+ * One place, so Home's "Bench from 27.5 kg" is the card's 27.5 and not the plan's 30 from before the break (QA walk,
+ * 10 Nov 2026). With no break it is the printed figure: Home does not ask the progression engine (named in BACKLOG).
+ */
+export function breakDayKg(printedKg: number, lastLoggedKg: number | null, s: LayoffStatus, entry: ExerciseEntry | null | undefined): number {
+  if (s.band === 'none') return printedKg
+  if (lastLoggedKg != null && lastLoggedKg > 0) return layoffWeightFrom(lastLoggedKg, s, entry)
+  return easeWeightKg(printedKg, s, entry)
+}

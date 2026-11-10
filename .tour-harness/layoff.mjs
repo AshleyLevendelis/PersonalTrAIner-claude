@@ -126,6 +126,18 @@ if (other) { await openLift(other.name); await wait(1500) }
 const o30 = other ? await readLift(other.name) : { found: false, headline: [] }
 check('9. a lift with no history shows less than the plan printed (the calendar ramp kept climbing)', o30.found && o30.headline.length > 0 && o30.headline.every(kg => kg < (other?.planKg ?? 0)), { headline: o30.headline, plan: other?.planKg })
 
+// --- A2. Home says the card's weight, not the plan's from before the break (QA walk, 10 Nov 2026) --------------
+await open('away=30', 'home')
+const homeText = (await ev(`document.body.innerText`)) ?? ''
+const lead = /([A-Z][A-Za-z' -]+?) from ~?([\d.]+)\s?kg/.exec(homeText)
+const fixtureLifts = [{ name: t30?.name, planKg: t30?.planKg ?? null, lastKg: t30?.lastKg }, ...(t30?.others ?? [])].filter(x => x?.name)
+const leadLift = lead ? fixtureLifts.find(x => x.name.toLowerCase().includes(lead[1].trim().toLowerCase()) || lead[1].trim().toLowerCase().includes(x.name.toLowerCase())) : null
+const leadKg = lead ? parseFloat(lead[2]) : NaN
+const from = leadLift ? (leadLift.lastKg ?? leadLift.planKg) : null
+check('A2a. Home names a lead lift with a weight, and it is one of today\'s loaded lifts', !!lead && !!leadLift, { lead: lead?.[0], fixtureLifts: fixtureLifts.map(x => x.name) })
+check('A2b. ...at the eased weight the card shows (below the plan\'s figure from before the break, about 90% of it)', from != null && leadKg < from && leadKg >= from * 0.9 - 2.5, { leadKg, from, lead: lead?.[0] })
+await shoot('layoff-home-30')
+
 // --- B. 12 days away: held, no increment ------------------------------------
 console.log('\nB. Twelve days away')
 await open('away=12')
