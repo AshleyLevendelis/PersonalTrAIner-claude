@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [x] **FULL SWEEP ON THE OFFLINE AND WEEK-LIST WORK, 10 NOV 2026: 530 RAN, 525 PASSED, ONE REAL FAILURE, FIXED.**
+  Run in a separate worktree on the settled tree. Four are the standing environmental ones, each read for its own "I
+  could not reach it" wording (`test:meal-quality`, `test:schema-parity`, `verify:rls`) plus `test:coach-exam-fresh`
+  (the exam has not been re-run since the coach changed: his machine). The real one: `test:coach-voice` §4, "every
+  export is called". Adding the badge's plan-change wording left the old sets-only phrase exported and called only by
+  the new one, so nothing outside the phrasebook used it. Folded into the one function the badge calls; the words on
+  screen are unchanged. HOW IT WAS MISSED: I derived the gates from the files I changed, and `coach-voice.ts` was among
+  them, but I ran `test:finish-check` and `test:offline-ready` (which I had edited) and not the phrasebook's own gate.
+  The derivation is over every reader of every changed file, and I ran the ones I remembered. Re-run after the fix:
+  every gate and driver that reads the phrasebook or the badge's words, and `verify:gym-offline`.
+
 - [x] **A WORKOUT WITH NO SIGNAL, 10 NOV 2026 (Ashley, from a gym with no Wi-Fi): NO CRASH SCREEN, THE WHOLE APP ON THE
   PHONE, THE WEEK COUNTS WHAT THE PHONE HOLDS, A SWAP KEPT AND SENT LATER.** His words: the whole-app "Something went
   wrong on this screen" mid-workout (screenshot), then "gyms often don't have WiFi and I noticed it's not possible to

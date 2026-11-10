@@ -1143,17 +1143,15 @@ export function noSetsButCardio(activities: string[]): string {
   return `No sets logged — your ${what} is saved.`
 }
 
-/** The sync badge, in the words the waiting row itself uses ("on this phone, waiting to send"). It read "Saved Offline (2 sets queued)". */
-export function setsWaitingToSend(count: number): string {
-  return `${count} set${count === 1 ? '' : 's'} waiting to send`
-}
 /**
- * The same badge when a change to the PLAN is waiting too (a swap made with no signal, 10 Nov 2026). No count for the
- * plan: one swap for a whole block is several stored weeks and one change to the person who made it.
+ * The sync badge, in the words the waiting row itself uses ("on this phone, waiting to send"). It read "Saved Offline
+ * (2 sets queued)". A change to the PLAN can be waiting too (a swap made with no signal, 10 Nov 2026): no count for
+ * the plan, because one swap for a whole block is several stored weeks and one change to the person who made it.
  */
 export function waitingToSend(sets: number, planChange: boolean): string {
-  if (!planChange) return setsWaitingToSend(sets)
-  return sets > 0 ? `${sets} set${sets === 1 ? '' : 's'} and a plan change waiting to send` : 'Plan change waiting to send'
+  const counted = `${sets} set${sets === 1 ? '' : 's'}`
+  if (!planChange) return `${counted} waiting to send`
+  return sets > 0 ? `${counted} and a plan change waiting to send` : 'Plan change waiting to send'
 }
 
 export const FIRST_LOG_NOTE = 'First time logged — this is your baseline'

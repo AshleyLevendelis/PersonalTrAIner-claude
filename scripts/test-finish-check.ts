@@ -160,9 +160,9 @@ async function main() {
   const dialog = strip(read('src/components/exercise/SessionSummaryDialog.tsx'))
   check('the finish card labels the fraction "Planned sets" and puts the extras on their own line', /Planned sets</.test(dialog) && /extraSetsNote\(data\.summary\.extraSets\)/.test(dialog) && voice.extraSetsNote(1) === '+1 extra' && voice.extraSetsNote(0) === '')
   check('the finish card says it instead of "Nothing logged"', /noSetsButCardio\(/.test(dialog) && /savedCardio/.test(dialog))
-  check('the badge counts what is waiting in the row\'s own words', voice.setsWaitingToSend(2) === '2 sets waiting to send' && voice.setsWaitingToSend(1) === '1 set waiting to send' && voice.setsWaitingToSend(2).endsWith(voice.SET_WAITING_TO_SEND.replace('on this phone, ', '')))
+  check('the badge counts what is waiting in the row\'s own words', voice.waitingToSend(2, false) === '2 sets waiting to send' && voice.waitingToSend(1, false) === '1 set waiting to send' && voice.waitingToSend(2, false).endsWith(voice.SET_WAITING_TO_SEND.replace('on this phone, ', '')))
   const badge = strip(read('src/components/OfflineStatusIndicator.tsx'))
-  check('...and the badge prints that, not "Saved Offline (2 sets queued)"', /waitingToSend\(state\.queuedCount, planWaiting\)/.test(badge) && voice.waitingToSend(2, false) === voice.setsWaitingToSend(2) && !/queued\)`/.test(badge) && !/Saved Offline/.test(badge))
+  check('...and the badge prints that, not "Saved Offline (2 sets queued)"', /waitingToSend\(state\.queuedCount, planWaiting\)/.test(badge) && !/queued\)`/.test(badge) && !/Saved Offline/.test(badge))
 
   console.log(`\n${ran} checks ran. ${failures === 0 ? 'All passed.' : `${failures} FAILED.`}`)
   if (failures > 0) process.exit(1)
