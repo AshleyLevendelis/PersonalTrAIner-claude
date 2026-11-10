@@ -23,7 +23,7 @@ export function mulberry32(seed: number): () => number {
 }
 
 type Food = readonly [name: string, lo: number, hi: number, unit?: string]
-export const PROTEIN: Food[] = [['chicken breast', 100, 200], ['salmon', 100, 180], ['tuna', 80, 160], ['beef mince', 100, 180], ['greek yoghurt full fat', 150, 300], ['eggs', 2, 4, 'whole'], ['tofu', 120, 220], ['turkey breast', 100, 200], ['cottage cheese', 100, 250]]
+export const PROTEIN: Food[] = [['chicken breast', 100, 200], ['salmon', 100, 180], ['tuna', 80, 160], ['beef mince 20% fat', 100, 180], ['greek yoghurt full fat', 150, 300], ['eggs', 2, 4, 'whole'], ['tofu', 120, 220], ['turkey breast', 100, 200], ['cottage cheese', 100, 250]]
 // "mashed potato" and "red lentils" are what "potatoes" and "lentils" resolved
 // to when these pools were measured. On 11 Oct 2026 the lookup stopped
 // guessing ("potatoes" is boiled potato now, and a bare "lentils" names no one

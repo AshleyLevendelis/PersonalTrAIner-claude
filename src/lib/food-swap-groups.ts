@@ -35,7 +35,7 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   // --- protein ---
   'lean meat': ['chicken breast', 'turkey breast', 'pork loin', 'venison', 'beef rump steak', 'beef steak sirloin', 'chicken drumstick', 'chicken breast raw', 'turkey breast raw', 'pork loin raw'],
   'richer meat': ['chicken thigh', 'duck breast', 'lamb chop', 'pork chop', 'beef brisket', 'pork belly', 'chicken thigh raw'],
-  'mince': ['chicken mince', 'turkey mince', 'beef mince 5% fat', 'beef mince 20% fat', 'lamb mince', 'pork mince', 'soy mince', 'quorn mince', 'vegan mince', 'soy mince dry'],
+  'mince': ['chicken mince', 'turkey mince', 'beef mince 5% fat', 'beef mince 10% fat', 'beef mince 12% fat', 'beef mince 15% fat', 'beef mince 20% fat', 'lamb mince', 'pork mince', 'soy mince', 'quorn mince', 'vegan mince', 'soy mince dry'],
   'cured meat and sausages': ['bacon', 'ham', 'smoked turkey breast', 'gammon', 'chorizo', 'pepperoni', 'salami', 'pork sausage', 'vegan sausage', 'bacon medallions'],
   'white fish': ['cod', 'haddock', 'tilapia', 'sea bass', 'red snapper', 'tuna steak fresh', 'cod raw', 'haddock raw'],
   'oily fish': ['salmon', 'mackerel', 'trout'],

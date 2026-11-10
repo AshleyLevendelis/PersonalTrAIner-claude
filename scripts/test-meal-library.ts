@@ -88,7 +88,7 @@ async function main() {
   check('vegetarians have at least eight dishes in each of breakfast, lunch and dinner', dietCounts[0].slice(0, 3).every(n => n >= 8), dietCounts[0])
 
   // The line check must be able to FAIL: ounces, pounds, kilos, tins and pinches read as a count of something and cost a few grams.
-  const badLines = ['8 oz chicken breast', '1 lb beef mince', '1 kg potatoes', '1 tin tuna', '2 cans chickpeas', '1 pinch salt', '150g chicken breast', '2 egg', '1 tbsp olive oil']
+  const badLines = ['8 oz chicken breast', '1 lb beef mince 5% fat', '1 kg potatoes', '1 tin tuna', '2 cans chickpeas', '1 pinch salt', '150g chicken breast', '2 egg', '1 tbsp olive oil']
   check('the line reader refuses the units the app misreads, and accepts the plain ones it was built for', badLines.slice(0, 6).every(l => strictLineProblems(l).length > 0) && badLines.slice(6).every(l => strictLineProblems(l).length === 0), badLines.map(l => [l, strictLineProblems(l).length]))
 
   const served = MEAL_LIBRARY.map(d => ({ d, ...servability(d) }))

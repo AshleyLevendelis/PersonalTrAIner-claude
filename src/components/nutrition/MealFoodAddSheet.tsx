@@ -74,7 +74,7 @@ export function MealFoodAddSheet({ ctx, knockOn, onPick, onDone, onCancel }: {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // NAME AND ALIASES BOTH, because "ground beef" is how it is said and "beef
+  // NAME AND ALIASES BOTH, because "lean ground beef" is how it is said and "beef
   // mince 5% fat" is how it is filed. Matching the filed name only would make
   // half the database unfindable by the words people use.
   const matches = useMemo(() => {

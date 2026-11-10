@@ -145,8 +145,17 @@ export const FOOD_DB: FoodEntry[] = [
   // A typical UK pre-sliced cooked turkey breast label (a label figure, not USDA). Meat and processed meat, like ham.
   // "sliced turkey" stays on roast turkey breast above: an existing answer is not changed here.
   f('smoked turkey breast', ['smoked turkey', 'deli turkey', 'turkey slices', 'sliced turkey breast', 'wafer thin turkey'], { kcal: 104, protein: 23, carbs: 1, fat: 1 }, 'protein', { contains_meat: true, is_processed_meat: true }),
-  f('beef mince 5% fat', ['lean beef mince', 'extra lean beef mince', '5% beef mince', 'lean ground beef', 'lean minced beef'], { kcal: 137, protein: 22, carbs: 0, fat: 5 }, 'protein', { contains_meat: true }),
-  f('beef mince 20% fat', ['beef mince', 'ground beef', '20% beef mince', 'regular beef mince'], { kcal: 254, protein: 17.2, carbs: 0, fat: 20 }, 'protein', { contains_meat: true }),
+  // PLAIN MINCE IS ASKED ABOUT (Ashley, 10 Nov 2026, "Ask", from three options: ask / assume 5% / assume 20%). A bare
+  // "beef mince" or "ground beef" was the 20% entry and a bare "mince" the 5% one, the same food two ways about 100 kcal
+  // per 100 g apart. Neither bare name is listed now (see WHICH_KIND), and every UK pack's fat level is: 5%, 10%, 12%,
+  // 15% and 20%. RAW figures (USDA SR Legacy, as recalled: 95/5, 90/10, 85/15, 80/20 raw). 12% is not a USDA row: it is
+  // 60% of the 10% mince and 40% of the 15% mince by weight, which IS 12% mince, so it is arithmetic on two measured
+  // rows rather than an invented figure.
+  f('beef mince 5% fat', ['lean beef mince', 'extra lean beef mince', '5% beef mince', '5% fat beef mince', 'lean ground beef', 'lean minced beef', 'lean mince', 'lean steak mince', '5% mince', 'ground beef 95/5'], { kcal: 137, protein: 22, carbs: 0, fat: 5 }, 'protein', { contains_meat: true }),
+  f('beef mince 10% fat', ['10% beef mince', '10% fat beef mince', '10% mince', 'ground beef 90/10'], { kcal: 176, protein: 20, carbs: 0, fat: 10 }, 'protein', { contains_meat: true }),
+  f('beef mince 12% fat', ['12% beef mince', '12% fat beef mince', '12% mince'], { kcal: 192, protein: 19.4, carbs: 0, fat: 12 }, 'protein', { contains_meat: true }),
+  f('beef mince 15% fat', ['15% beef mince', '15% fat beef mince', '15% mince', 'ground beef 85/15'], { kcal: 215, protein: 18.6, carbs: 0, fat: 15 }, 'protein', { contains_meat: true }),
+  f('beef mince 20% fat', ['20% beef mince', '20% fat beef mince', '20% mince', 'ground beef 80/20', 'regular beef mince'], { kcal: 254, protein: 17.2, carbs: 0, fat: 20 }, 'protein', { contains_meat: true }),
   f('beef steak sirloin', ['sirloin steak', 'beef steak', 'steak', 'lean beef sirloin', 'beef sirloin strips', 'beef eye round', 'thin beef eye round slices'], { kcal: 183, protein: 27, carbs: 0, fat: 7.7 }, 'protein', { contains_meat: true }),
   f('beef rump steak', ['rump steak'], { kcal: 173, protein: 28, carbs: 0, fat: 6.5 }, 'protein', { contains_meat: true }),
   f('lamb mince', ['ground lamb', 'minced lamb'], { kcal: 218, protein: 25, carbs: 0, fat: 13 }, 'protein', { contains_meat: true }),
@@ -840,9 +849,11 @@ for (const [key, entry] of [...LOOKUP]) {
 // cream, nuts, beans, burger, turkey/beef/pork/lamb on their own. Those are a
 // miss, which the coach asks about. Whether the app should assume the
 // commonest kind and SAY so, or ask, is Ashley's open question (plan, 10c).
+// "mince" WAS here (as 5%) until 10 Nov 2026: his "Ask" for plain mince took
+// it out, so it is asked about with the other bare beef mince names.
 const GENERIC_NAMES: Record<string, string> = {
   chicken: 'chicken breast', rice: 'white rice cooked', milk: 'milk whole', tuna: 'tuna canned in water',
-  mince: 'beef mince 5% fat', oil: 'olive oil', whey: 'whey protein powder',
+  oil: 'olive oil', whey: 'whey protein powder',
 }
 for (const [word, target] of Object.entries(GENERIC_NAMES)) {
   const entry = FOOD_DB.find(f => f.name === target)
@@ -923,7 +934,7 @@ const ENTRY_STATE: Record<string, FoodState> = {
   // whose state cannot be read off their figures with confidence (turkey,
   // lamb and pork mince, brisket, pork belly, lobster), and foods whose state
   // moves their numbers by under about 10% (yam, plantain, potato).
-  'salmon': 'raw', 'beef mince 5% fat': 'raw', 'beef mince 20% fat': 'raw', 'chicken mince': 'raw', 'tuna steak fresh': 'raw',
+  'salmon': 'raw', 'beef mince 5% fat': 'raw', 'beef mince 10% fat': 'raw', 'beef mince 12% fat': 'raw', 'beef mince 15% fat': 'raw', 'beef mince 20% fat': 'raw', 'chicken mince': 'raw', 'tuna steak fresh': 'raw',
   'trout': 'raw', 'red snapper': 'raw', 'squid': 'raw', 'scallops': 'raw', 'oysters': 'raw', 'chicken liver': 'raw', 'taro root': 'raw',
   'duck breast': 'cooked', 'venison': 'cooked', 'split peas': 'cooked', 'barley': 'cooked',
   // MEAL AUDIT, 9 Nov 2026: two rows whose figures are the DRY food and whose names did not say so. "200g cooked
@@ -1239,6 +1250,8 @@ const LOOKUP_MEMO_CAP = 5000
 // kind is known, and the question names the kinds the table holds rather than asking for grams it already has.
 const WHICH_KIND: { pattern: RegExp; question: (said: string) => string }[] = [
   { pattern: /^greek yogh?urt$/, question: said => `Was the ${said} fat-free (0%), low-fat (2%) or full-fat?` },
+  // His "Ask" for plain mince, 10 Nov 2026: the pack says the fat, and the five are the levels UK packs carry.
+  { pattern: /^(?:raw )?(?:beef mince|minced beef|mince beef|ground beef|beef steak mince|steak mince|minced steak|mince)(?: raw)?$/, question: () => 'What fat was the beef mince: 5%, 10%, 12%, 15% or 20%? It says on the pack.' },
 ]
 
 /** The question for a food named without its kind ("greek yoghurt"), or null when the name is not one of those. */
