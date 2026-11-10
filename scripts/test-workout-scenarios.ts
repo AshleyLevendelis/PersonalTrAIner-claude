@@ -185,6 +185,17 @@ async function main() {
   check('Wednesday reads missed, Monday still moved', v.states[WED] === 'missed' && v.states[MON] === 'moved', v.states)
   check('...and the week still owes four, not five (the missed session is counted once)', v.tally.sessionsPlanned === 4, v.tally)
 
+  // MARKED MISSED, THEN MOVED (QA walk, 10 Nov 2026: "0 of 5 sessions" on a 4-session week, Home "Session 2 of 5").
+  fresh()
+  lastWeekAllTrained()
+  check('setup: Monday marked missed', await track.setMarkedMissed(PID, MON, true))
+  check('setup: ...then moved to Wednesday', await track.setSessionMove(PID, MON, WED))
+  v = await look(WED)
+  check('Monday still SAYS missed (a missed day stays missed) and Wednesday holds the session', v.states[MON] === 'missed' && v.states[WED] === 'due', v.states)
+  check('...and the week owes four sessions, not five: the moved session is counted once, where it now runs', v.tally.sessionsPlanned === 4, v.tally)
+  const { sessionOrdinal } = await import('../src/components/HomeWeekStrip')
+  check('...and Home\'s "Session N of M" says of 4', sessionOrdinal(v.weeks.thisWeek, WED)?.of === 4, sessionOrdinal(v.weeks.thisWeek, WED))
+
   // Marked missed, then logged as done somewhere else after all.
   fresh()
   lastWeekAllTrained()

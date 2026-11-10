@@ -98,4 +98,22 @@ check('B9. a walk marked missed stays missed and says so', (await openSheet()) =
   await ev(`(window.__fakeDb?.workout_sessions ?? []).map(r => ({ d: r.date, m: r.marked_missed }))`))
 await escape()
 
+// ---- C. Today said missed, or made a rest day: Home says so too (QA walk, 10 Nov 2026) ---------------------------
+console.log('  C. HOME AGREES WITH A MISSED OR RESTED TODAY')
+for (const [verb, title] of [['missed', /Marked missed/], ['rest', /Rest day, your choice/]]) {
+  await beforeLoad(`window.__seedDb = undefined`)
+  await load('')
+  await ready()
+  const opened = (await openSheet()) === 'open'
+  const tapped = opened && await ev(`(() => { const n = ${q(`[data-verb="${verb}"]`)}; if (!n) return false; n.click(); return true })()`)
+  await wait(1200)
+  await escape()
+  await ev(`location.hash = '#/tab/home'`)
+  const hero = await until(`(() => { const h = document.querySelector('[data-home-hero]'); return h && h.innerText.length > 0 ? h.innerText.replace(/\\s+/g, ' ') : null })()`, 12000)
+  check(`C-${verb}a. "${verb}" on today's menu, then Home says so`, tapped && title.test(hero ?? ''), hero)
+  check(`C-${verb}b. ...and Home offers no Start for the session`, (await ev(`!!document.querySelector('[data-home-cta]')`)) === false)
+  await shoot(`workout-scenarios-home-${verb}`)
+  await ev(`location.hash = '#/tab/exercise'`); await wait(800)
+}
+
 finish()

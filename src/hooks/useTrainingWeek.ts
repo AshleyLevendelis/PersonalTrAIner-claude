@@ -130,7 +130,11 @@ export function countsTowardWeekTally(state: DayGlyphState): boolean {
  * counts in the week and counts as done. The day stays 'swapped' everywhere it is drawn (it was not the lifting
  * session); only the counts change. A swap with nothing logged is still left out, as the paragraph above says.
  */
-export function dayCountsTowardWeek(d: Pick<TrainingWeekDay, 'state' | 'swapLogged'>): boolean {
+export function dayCountsTowardWeek(d: Pick<TrainingWeekDay, 'state' | 'swapLogged'> & { movedTo?: TrainingWeekDay['movedTo'] }): boolean {
+  // A MISSED DAY WHOSE SESSION WAS MOVED is one session, counted where it now runs (QA walk, 10 Nov 2026: "I missed
+  // it" then "Move it to Thursday" read 0 of 5 on a 4-session week). The day still SAYS missed (his 10 Sep ruling:
+  // a missed day stays missed); it is just not a second session in the count.
+  if (d.state === 'missed' && d.movedTo) return false
   return countsTowardWeekTally(d.state) || (d.state === 'swapped' && !!d.swapLogged)
 }
 export function dayCountsAsDone(d: Pick<TrainingWeekDay, 'state' | 'swapLogged'>): boolean {

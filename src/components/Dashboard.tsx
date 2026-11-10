@@ -501,7 +501,10 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // Muay Thai while Home still invited her to start the session. The swap is said here too, and Start is not offered
   // on a day she has already replaced; Exercise keeps its own way to train it anyway.
   const swappedFor = todayCell?.state === 'swapped' ? (todayCell.swappedLine || todayCell.swappedForActivity || 'something else') : null
-  const showCta = homeOffersStart(status, swappedFor)
+  // ...AND A DAY SHE SAID SHE MISSED, OR MADE A REST DAY (QA walk, 10 Nov 2026): Exercise said so with "Train it
+  // anyway" while Home still showed the full session and its Start button. Said here too, and Start is not offered.
+  const declaredToday = todayCell?.state === 'missed' || todayCell?.state === 'rest_chosen' ? todayCell.state : null
+  const showCta = homeOffersStart(status, swappedFor) && !declaredToday
 
   const recentCount = data.recentPRs.length
   const tomorrowSub = tomorrow && !tomorrow.rest && tomorrow.minutes != null ? `Tomorrow · ~${tomorrow.minutes} min` : 'Tomorrow'
@@ -544,6 +547,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         setsPlanned={setsPlanned}
         prCount={prCount}
         swappedFor={swappedFor}
+        declaredToday={declaredToday}
         topPr={prCount > 0 && topPr ? `${topPrLift ?? ''} ${topPr}`.trim() : null}
         onSummary={card ? () => setSummaryOpen(true) : undefined}
         cta={showCta && (
@@ -827,7 +831,7 @@ export function RingCell({ k, share, color, glow, icon, value, label, onClick, a
  * the week under a hairline. Every state the old row had is here: not yet planned, moved, rest, done (with its
  * time, PRs and the summary), and the session itself. data-tour and data-home-hero keep their names.
  */
-export function SessionHero({ status, data, week, sessionGlance, done, minutes, setsLogged, setsPlanned, prCount, topPr, onSummary, cta, footer, swappedFor = null }: {
+export function SessionHero({ status, data, week, sessionGlance, done, minutes, setsLogged, setsPlanned, prCount, topPr, onSummary, cta, footer, swappedFor = null, declaredToday = null }: {
   status: DashboardData['session']['status']
   data: DashboardData
   week: ReturnType<typeof useTrainingWeek>
@@ -843,6 +847,8 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
   footer?: React.ReactNode
   /** What she swapped today's session for, when she did. */
   swappedFor?: string | null
+  /** Today said missed, or made a rest day, on the day menu: Home says so, as Exercise does. */
+  declaredToday?: 'missed' | 'rest_chosen' | null
 }) {
   const weekCount = `${week.sessionsDone} of ${week.sessionsPlanned} session${week.sessionsPlanned === 1 ? '' : 's'} done`
   const ordinal = sessionOrdinal(week.days, data.today)
@@ -862,6 +868,10 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
     // calls "Active Recovery + Cardio"). A day with no plan entry is the plain rest day.
     title = data.session.recoveryLine && data.session.focus ? data.session.focus : 'Rest day'
     sub = data.session.recoveryLine ?? 'Recovery is part of the program'
+    right = weekCount
+  } else if (declaredToday && !done) {
+    title = declaredToday === 'missed' ? 'Marked missed' : 'Rest day, your choice'
+    sub = `${data.session.focus ?? "Today's session"} is still on Exercise if you want it`
     right = weekCount
   } else if (swappedFor && !done) {
     title = `Swapped for ${swappedFor}`
