@@ -73,6 +73,7 @@
     "test:injury-adaptation-safety": "tsx scripts/test-injury-adaptation-safety.ts",
     "test:adaptations-respect-trained": "tsx scripts/test-adaptations-respect-trained.ts",
     "verify:adaptation-line": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/adaptation-line.mjs",
+    "test:qa-wording": "tsx scripts/test-qa-wording.ts",
     "test:quality": "NODE_ENV=production tsx scripts/run-quality-score.ts",
     "measure:volume": "NODE_ENV=production tsx scripts/measure-volume.ts",
     "test:differentiation": "tsx scripts/run-differentiation-audit.ts",

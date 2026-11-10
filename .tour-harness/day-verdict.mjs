@@ -153,7 +153,7 @@ console.log('\n2. The days are not the same day (one candidate cannot test a cho
   const on = seen[0].h, off = seen[1].h
   check('2a. the plan sized to its own targets reads "on target"', on?.label === 'on target' && engine[0].onTarget === true, on)
   check('2b. with targets 60% higher the same plan is NOT on target', off?.label !== 'on target' && engine[1].onTarget === false, off)
-  check('2c. ...and the header says by how much, in words with a number in them', !!off && /^\d+ (over|under)$|^(protein|carbs|fat) \d+ g (over|under)$/.test(off.label), off?.label)
+  check('2c. ...and the header says by how much, in words with a number in them', !!off && /^\d+ kcal (over|under)$|^(protein|carbs|fat) \d+ g (over|under)$/.test(off.label), off?.label)
   check('2d. the two headers really show different targets', !!on && !!off && on.targets.calories !== off.targets.calories, [on?.targets, off?.targets])
   const over = seen[2].h
   check('2e. on the day with too MUCH protein for its target, protein is above target and NOT lit', !!over && over.totals.protein > over.targets.protein * 1.15 && over.proteinLit === false && engine[2].protein === false, over)

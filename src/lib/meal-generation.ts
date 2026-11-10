@@ -1526,7 +1526,9 @@ export function dayVerdictLabel(totals: MacroTargets, targets: MacroTargets): st
   if (!named) return 'on target'
   const amount = Math.abs(named.delta)
   const direction = named.delta > 0 ? 'over' : 'under'
-  return named.macro === 'calories' ? `${amount} ${direction}` : `${named.macro} ${amount} g ${direction}`
+  // WITH ITS UNIT (QA walk, 10 Nov 2026): "345 under" was written to sit beside "target N"; it now sits beside the
+  // planned total, where a bare number is no unit at all. A number never reaches a screen without its unit.
+  return named.macro === 'calories' ? `${amount} kcal ${direction}` : `${named.macro} ${amount} g ${direction}`
 }
 
 /**

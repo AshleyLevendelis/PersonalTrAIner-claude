@@ -88,7 +88,13 @@ export function SessionSummaryDialog({
                 <p className="ds-label-compact mt-0.5">Training time</p>
               </div>
               <div className="rounded-lg bg-[color:var(--surface-deep)] p-2.5">
-                <p className="tabular-mono text-lg font-bold">{Math.round(data.summary.totalVolumeKg).toLocaleString()}<span className="text-xs font-normal text-muted-foreground">kg</span></p>
+                {/* NO "0kg" FOR A BODYWEIGHT SESSION (QA walk, 10 Nov 2026): volume is the load moved, and a session with
+                    no load moved has none to show, which a zero beside "kg" reads as a measurement of. */}
+                <p className="tabular-mono text-lg font-bold" data-testid="summary-volume">
+                  {data.summary.totalVolumeKg > 0
+                    ? <>{Math.round(data.summary.totalVolumeKg).toLocaleString()}<span className="text-xs font-normal text-muted-foreground">kg</span></>
+                    : <span className="text-sm font-semibold">Bodyweight</span>}
+                </p>
                 <p className="ds-label-compact mt-0.5">Volume</p>
               </div>
               <div className="rounded-lg bg-[color:var(--surface-deep)] p-2.5">

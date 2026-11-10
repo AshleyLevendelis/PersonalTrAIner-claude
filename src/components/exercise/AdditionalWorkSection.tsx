@@ -66,7 +66,7 @@ export function AdditionalWorkSection({
                 <Badge variant="outline" className="text-[0.625rem] px-1.5 py-0.5 bg-background">+</Badge>
                 <span className="font-medium truncate">{item.name}</span>
                 {completedSets > 0 && (
-                  <Badge variant="secondary" className="text-[0.625rem] font-mono">{completedSets} sets</Badge>
+                  <Badge variant="secondary" className="text-[0.625rem] font-mono">{completedSets} {completedSets === 1 ? 'set' : 'sets'}</Badge>
                 )}
               </div>
               {item.source === 'declared' && completedSets === 0 && (

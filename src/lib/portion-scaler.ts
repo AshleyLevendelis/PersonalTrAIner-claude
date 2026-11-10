@@ -150,6 +150,44 @@ export function formatKitchenQuantity(quantity: number, unit: string): string {
   return whole > 0 ? `${whole}${glyph}` : glyph
 }
 
+/** Words that do not take an "s" ("2 whole star anise", not "anises"). */
+const UNCOUNTED = /(anise|fish|salmon|tuna|cod|haddock|trout|sheep|deer|rice|bread|tofu|tempeh|feta|cheese|lettuce|chard|spinach|kale|asparagus|broccoli|couscous|quinoa|oats|granola|muesli|hummus|houmous|yoghurt|yogurt|milk|butter|honey|jam|sugar|salt|pepper|garlic|ginger|parsley|coriander|basil|mint|dill|chives|rosemary|thyme|oregano|sage)$/i
+
+/** One word made plural, the ordinary English way ("egg" -> "eggs", "berry" -> "berries", "peach" -> "peaches"). */
+function pluralWord(word: string): string {
+  if (UNCOUNTED.test(word) || /s$/i.test(word)) return word
+  if (/[^aeiou]y$/i.test(word)) return `${word.slice(0, -1)}ies`
+  if (/(ch|sh|x|z|o)$/i.test(word) && !/(avocado|kiwi)$/i.test(word)) return `${word}es`
+  return `${word}s`
+}
+
+/** A name made plural on its last word ("corn tortilla" -> "corn tortillas"). */
+function pluralName(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 0) return name
+  // A qualifier after a comma or in brackets stays where it is: "egg, beaten" -> "eggs, beaten".
+  const m = /^([^,(]+?)(\s*[,(].*)?$/.exec(name.trim())
+  if (!m) return name
+  const head = m[1].trim().split(/\s+/)
+  head[head.length - 1] = pluralWord(head[head.length - 1])
+  return `${head.join(' ')}${m[2] ?? ''}`
+}
+
+/**
+ * AN INGREDIENT LINE AS A COOK SAYS IT (QA walk, 10 Nov 2026: the card read "3 whole egg", "7 whole corn tortilla",
+ * "2 clove garlic"). A counted food is written "3 eggs" and "1 egg"; cloves are "2 garlic cloves"; grams and spoons are
+ * unchanged ("150g chicken breast", "1½ tbsp olive oil"). DISPLAY ONLY: the stored line keeps its own words, which is
+ * what the ingredient reader parses.
+ */
+export function kitchenLine(quantity: number, unit: string, name: string): string {
+  const q = formatKitchenQuantity(quantity, unit)
+  const u = unit.trim().toLowerCase()
+  if (u === 'g' || u === 'ml') return `${q}${u} ${name}`
+  if (u === 'whole' || u === '') return `${q} ${quantity === 1 ? name : pluralName(name)}`
+  if (u === 'clove' || u === 'cloves') return `${q} ${name} ${quantity === 1 ? 'clove' : 'cloves'}`
+  return `${q} ${unit} ${name}`
+}
+
 /**
  * Scales every ingredient line's quantity by scaleFactor and rounds each to
  * an amount somebody can measure (kitchenRound, above). A scaleFactor within

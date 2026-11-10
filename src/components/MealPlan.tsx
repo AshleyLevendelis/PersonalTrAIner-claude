@@ -21,7 +21,7 @@ import { mealSections } from '@/lib/meal-sections'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import { methodToShow, dayVerdictLabel, macroOnTarget, type PoolOption } from '@/lib/meal-generation'
 import type { MethodRules } from '@/lib/meal-method-check'
-import { formatKitchenQuantity } from '@/lib/portion-scaler'
+import { formatKitchenQuantity, kitchenLine } from '@/lib/portion-scaler'
 import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
 // DEFERRED, NOT BUNDLED. Both sheets only exist once somebody taps Move or
@@ -789,7 +789,7 @@ function formatIngredient(ing: { name: string; quantity: number; unit: string })
 
 /** The line as she READS it: the same words, with spoons in quarters (1¼ tsp, ½ tbsp). */
 function displayIngredient(ing: { name: string; quantity: number; unit: string }): string {
-  return `${formatKitchenQuantity(ing.quantity, ing.unit)}${ing.unit === 'g' || ing.unit === 'ml' ? ing.unit : ` ${ing.unit}`} ${ing.name}`
+  return kitchenLine(ing.quantity, ing.unit, ing.name)
 }
 
 /**

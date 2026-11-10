@@ -119,12 +119,12 @@ async function main() {
     check('fat 20 g over: "fat 20 g over"', say(T(1697, 164, 150, 69), SAM) === 'fat 20 g over', say(T(1697, 164, 150, 69), SAM))
     // Calories are the number this line sits beside ("target 1697 · 120 over"),
     // so when they are off they are what is named, as they always were.
-    check('calories 120 over: "120 over", as before', say(T(1817, 164, 150, 49), SAM) === '120 over', say(T(1817, 164, 150, 49), SAM))
-    check('calories 200 under: "200 under"', say(T(1497, 164, 150, 49), SAM) === '200 under', say(T(1497, 164, 150, 49), SAM))
+    check('calories 120 over: "120 kcal over", with its unit (10 Nov 2026)', say(T(1817, 164, 150, 49), SAM) === '120 kcal over', say(T(1817, 164, 150, 49), SAM))
+    check('calories 200 under: "200 kcal under"', say(T(1497, 164, 150, 49), SAM) === '200 kcal under', say(T(1497, 164, 150, 49), SAM))
     // Calories 5.5% over (half a point past their band), protein 34% over
     // (19 points past its own): protein is by far the worse miss, and the
     // calories are still what is named.
-    check('calories AND protein off: the calories are named, even when protein is the bigger miss', say(T(1790, 220, 150, 49), SAM) === '93 over', say(T(1790, 220, 150, 49), SAM))
+    check('calories AND protein off: the calories are named, even when protein is the bigger miss', say(T(1790, 220, 150, 49), SAM) === '93 kcal over', say(T(1790, 220, 150, 49), SAM))
     // Two macros off with calories fine: the one furthest outside its own band.
     // Protein 205 g is 25% over (10 points past its +15%); fat 62 g is 26.5%
     // over (1.5 points past its 25%). Protein is the worse miss.
