@@ -51,7 +51,8 @@ export function parseHeight(raw: string): ParsedMeasure | null {
   // `1` — both are word characters — so `ft\b` refused the single most likely
   // way someone types this. Longest alternatives first, so `feet`/`foot` are
   // never half-eaten by `ft`.
-  const ftIn = /^(\d{1,2})\s*(?:'|’|feet|foot|ft)\s*(\d{1,2})?\s*(?:"|”|''|inches|inch|ins|in)?$/.exec(t)
+  // Half inches are real answers (QA, 10 Nov 2026: 5ft 10.5in was refused with a range it was inside).
+  const ftIn = /^(\d{1,2})\s*(?:'|’|feet|foot|ft)\s*(\d{1,2}(?:\.\d+)?)?\s*(?:"|”|''|inches|inch|ins|in)?$/.exec(t)
   if (ftIn) {
     const feet = Number(ftIn[1])
     const inches = ftIn[2] === undefined ? 0 : Number(ftIn[2])
@@ -84,7 +85,8 @@ export function parseWeight(raw: string): ParsedMeasure | null {
   if (!t) return null
 
   // 13st, 13 st 2, 13 stone 2 lb — stones with optional pounds.
-  const stone = /^(\d{1,2})\s*(?:st\b|stone[s]?\b)\s*(\d{1,2})?\s*(?:lb[s]?\b|pound[s]?\b)?$/.exec(t)
+  // Half pounds too (QA, 10 Nov 2026: 12st 13.5lb was refused with a range it was inside).
+  const stone = /^(\d{1,2})\s*(?:st\b|stone[s]?\b)\s*(\d{1,2}(?:\.\d+)?)?\s*(?:lb[s]?\b|pound[s]?\b)?$/.exec(t)
   if (stone) {
     const st = Number(stone[1])
     const lb = stone[2] === undefined ? 0 : Number(stone[2])

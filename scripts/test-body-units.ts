@@ -161,5 +161,15 @@ console.log('\n8. The unit toggles write what the parsers read, and convert both
     [sayWeight(25, 'lb'), sayHeight(250, 'ft'), sayWeight(350, 'kg'), sayHeight(100, 'cm')])
 }
 
+// HALF UNITS ARE ANSWERS (QA, 10 Nov 2026): 12 st 13.5 lb and 5 ft 10.5 in were refused with a range they were inside.
+{
+  const st = parseWeight('12st 13.5')
+  check('12 st 13.5 lb reads as a weight (about 82.3 kg)', !!st && Math.abs(st.value - 82.3) <= 0.1, st)
+  const ft = parseHeight("5'10.5")
+  check('5 ft 10.5 in reads as a height (about 179 cm)', !!ft && Math.abs(ft.value - 179.1) <= 0.6, ft)
+  check('...the same through the boxes the toggles write', parseWeight(weightText('st', ['12', '13.5'])) !== null && parseHeight(heightText('ft', ['5', '10.5'])) !== null)
+  check('...and a whole stone or foot of overflow is still refused (13.5 lb is fine, 14 lb is not)', parseWeight('12st 14') === null && parseHeight("5'12") === null)
+}
+
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
 console.log('\nAll body-unit checks passed.\n')

@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useRef, useState, type ReactElement } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -119,17 +119,38 @@ export function SlotNumericCard({
   const [heightUnit, setHeightUnit] = useState<HeightUnit>('cm')
   const [weightBoxes, setWeightBoxes] = useState<[string, string]>(() => [draft.weightKg ?? '', ''])
   const [heightBoxes, setHeightBoxes] = useState<[string, string]>(() => [draft.heightCm ?? '', ''])
-  /** Switching unit carries what is in the boxes across, converted, rather than emptying them. */
+  /**
+   * Switching unit carries what is in the boxes across, converted, rather than emptying them. QA, 10 Nov 2026, two more
+   * rules: (1) a box that does not read as a weight is NOT emptied by a switch (it was, silently); the unit stays and a
+   * line says why; (2) flicking through the units does not drift the number (80 kg came back 79.8 via lb and st): while
+   * the boxes still hold what the last switch wrote, the next switch converts the number they were converted FROM.
+   */
+  const [unitNote, setUnitNote] = useState<{ key: 'weightKg' | 'heightCm'; text: string } | null>(null)
+  const exact = useRef<{ weight?: { boxes: string; value: number }; height?: { boxes: string; value: number } }>({})
   const switchWeight = (u: WeightUnit) => {
-    const parsed = measureParserFor('weightKg')?.(weightText(weightUnit, weightBoxes))
+    const typed = weightText(weightUnit, weightBoxes)
+    const kept = exact.current.weight
+    const value = kept && kept.boxes === `${weightUnit}|${weightBoxes.join('|')}` ? kept.value : measureParserFor('weightKg')?.(typed)?.value
+    if (value == null && typed !== '') { setUnitNote({ key: 'weightKg', text: 'That weight doesn’t read right yet — fix it, then change the unit.' }); return }
+    setUnitNote(null)
+    const next = value == null ? ['', ''] as [string, string] : weightParts(value, u)
     setWeightUnit(u)
-    setWeightBoxes(parsed ? weightParts(parsed.value, u) : ['', ''])
+    setWeightBoxes(next)
+    if (value != null) exact.current.weight = { boxes: `${u}|${next.join('|')}`, value }
   }
   const switchHeight = (u: HeightUnit) => {
-    const parsed = measureParserFor('heightCm')?.(heightText(heightUnit, heightBoxes))
+    const typed = heightText(heightUnit, heightBoxes)
+    const kept = exact.current.height
+    const value = kept && kept.boxes === `${heightUnit}|${heightBoxes.join('|')}` ? kept.value : measureParserFor('heightCm')?.(typed)?.value
+    if (value == null && typed !== '') { setUnitNote({ key: 'heightCm', text: 'That height doesn’t read right yet — fix it, then change the unit.' }); return }
+    setUnitNote(null)
+    const next = value == null ? ['', ''] as [string, string] : heightParts(value, u)
     setHeightUnit(u)
-    setHeightBoxes(parsed ? heightParts(parsed.value, u) : ['', ''])
+    setHeightBoxes(next)
+    if (value != null) exact.current.height = { boxes: `${u}|${next.join('|')}`, value }
   }
+  /** Digits and one decimal point only: a number box also takes "e" and "-", and "1e2" was stored as text. */
+  const digits = (v: string) => v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1')
 
   if (!def || def.control !== 'numeric' || resolved || fields.length === 0) return null
 
@@ -202,9 +223,9 @@ export function SlotNumericCard({
         <div className="flex items-center gap-2">
           {withUnit(two ? 'st' : weightUnit, <Input id="slot-weightKg" type="number" inputMode="decimal" value={weightBoxes[0]} disabled={off} aria-label={two ? 'Weight, stone' : `Weight, ${weightUnit}`}
             placeholder={weightUnit === 'kg' ? '87' : weightUnit === 'lb' ? '192' : '13'}
-            onChange={e => setWeightBoxes([e.target.value, weightBoxes[1]])} className={`${box} pr-9 ${bad ? 'border-destructive' : ''}`} />)}
-          {two && withUnit('lb', <Input id="slot-weightKg-lb" type="number" inputMode="numeric" value={weightBoxes[1]} disabled={off} aria-label="Weight, pounds" placeholder="2"
-            onChange={e => setWeightBoxes([weightBoxes[0], e.target.value])} className={`${box} pr-9 ${bad ? 'border-destructive' : ''}`} />)}
+            onChange={e => { setUnitNote(null); setWeightBoxes([digits(e.target.value), weightBoxes[1]]) }} className={`${box} pr-9 ${bad ? 'border-destructive' : ''}`} />)}
+          {two && withUnit('lb', <Input id="slot-weightKg-lb" type="number" inputMode="decimal" value={weightBoxes[1]} disabled={off} aria-label="Weight, pounds" placeholder="2"
+            onChange={e => { setUnitNote(null); setWeightBoxes([weightBoxes[0], digits(e.target.value)]) }} className={`${box} pr-9 ${bad ? 'border-destructive' : ''}`} />)}
           {toggle(WEIGHT_UNITS, weightUnit, switchWeight)}
         </div>
       )
@@ -215,9 +236,9 @@ export function SlotNumericCard({
         <div className="flex items-center gap-2">
           {withUnit(two ? 'ft' : 'cm', <Input id="slot-heightCm" type="number" inputMode="numeric" value={heightBoxes[0]} disabled={off} aria-label={two ? 'Height, feet' : 'Height, cm'}
             placeholder={two ? '5' : '178'}
-            onChange={e => setHeightBoxes([e.target.value, heightBoxes[1]])} className={`${box} pr-9 ${bad ? 'border-destructive' : ''}`} />)}
-          {two && withUnit('in', <Input id="slot-heightCm-in" type="number" inputMode="numeric" value={heightBoxes[1]} disabled={off} aria-label="Height, inches" placeholder="10"
-            onChange={e => setHeightBoxes([heightBoxes[0], e.target.value])} className={`${box} pr-9 ${bad ? 'border-destructive' : ''}`} />)}
+            onChange={e => { setUnitNote(null); setHeightBoxes([digits(e.target.value), heightBoxes[1]]) }} className={`${box} pr-9 ${bad ? 'border-destructive' : ''}`} />)}
+          {two && withUnit('in', <Input id="slot-heightCm-in" type="number" inputMode="decimal" value={heightBoxes[1]} disabled={off} aria-label="Height, inches" placeholder="10"
+            onChange={e => { setUnitNote(null); setHeightBoxes([heightBoxes[0], digits(e.target.value)]) }} className={`${box} pr-9 ${bad ? 'border-destructive' : ''}`} />)}
           {toggle(HEIGHT_UNITS, heightUnit, switchHeight)}
         </div>
       )
@@ -227,6 +248,7 @@ export function SlotNumericCard({
         <label className="text-xs text-muted-foreground" htmlFor={`slot-${d.key}`}>{d.key === 'age' ? 'Date of birth' : d.shortLabel}</label>
         {control}
         {hint && !bad && <p id="slot-age-hint" className="text-[0.6875rem] text-muted-foreground" data-testid="slot-age-hint">{hint}</p>}
+        {unitNote?.key === d.key && <p className="text-[0.6875rem] text-destructive" data-testid="unit-note">{unitNote.text}</p>}
         {bad && <p className="text-[0.6875rem] text-destructive">{blank ? `${d.key === 'age' ? 'Your date of birth' : d.shortLabel} is needed to build your plan.` : limits}</p>}
       </div>
     )

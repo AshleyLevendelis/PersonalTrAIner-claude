@@ -191,6 +191,7 @@
     "verify:parked-question": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/parked-question.mjs",
     "verify:setup-qa3": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/setup-qa3.mjs",
     "verify:onboarding-turns": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/turns.mjs",
+    "verify:setup-fixes": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/setup-fixes.mjs",
     "test:coach-logs-steps": "tsx scripts/test-coach-logs-steps.ts",
     "test:coach-injuries-context": "tsx scripts/test-coach-injuries-context.ts",
     "test:coach-water-context": "tsx scripts/test-coach-water-context.ts",

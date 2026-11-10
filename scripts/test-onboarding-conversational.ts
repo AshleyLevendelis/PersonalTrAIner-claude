@@ -287,8 +287,10 @@ console.log('\n6. Nothing that was actually load-bearing was removed')
   check('...and still works', detectAllergenTags('allergic to peanuts').includes('nut-free' as never))
   check('...and still does not fire on a mere mention', detectAllergenTags('I love peanuts').length === 0)
 
-  check('a value that fails validation still re-asks with chips',
-    /Fail LOUD[\s\S]{0,400}slotCard: key/.test(ui))
+  // A TYPED answer that fails is asked again in words (QA, 10 Nov 2026: a long name met "tap the option" with no options);
+  // a chip answer still gets its chips. Both halves.
+  check('a value that fails validation still re-asks with chips, and a typed one in words',
+    /Fail LOUD[\s\S]{0,1200}def\.control === 'text'[\s\S]{0,600}slotCard: key/.test(ui))
   check('the dead-air guard still renders the next question with its card',
     /Dead-air guard[\s\S]{0,1400}slotCard: nextDef\.control === 'text' \? undefined : nextDef\.key/.test(ui))
   check('the stuck-slot breaker still steps in', /pickSlotToForce\(/.test(ui))

@@ -38,7 +38,7 @@ import {
   type SlotKey,
   type SlotDef,
 } from '@/lib/onboarding-slots'
-import { measureParserFor } from '@/lib/body-units'
+import { measureParserFor, ageOn, todayLocal } from '@/lib/body-units'
 import { detectFoodExclusions, mergeFoodsToAvoid, isFoodToAvoid } from '@/lib/food-exclusions'
 import { splitFoodList, isPlainNone } from '@/lib/food-list'
 import { allergenFilterReceipt } from '@/lib/coach-voice'
@@ -1009,12 +1009,18 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
           : undefined
         if (!applySlot(ws, key, coerced, ws.values, true, conversionNoteFor(def, String(action.args.value ?? '')), storedNote)) {
           // Fail LOUD: the mapped value didn't validate — never store it,
-          // re-ask with the real chips instead.
-          ws.newMessages.push({
-            role: 'assistant',
-            content: 'I didn’t quite catch that one — tap the option that fits:',
-            slotCard: key,
-          })
+          // re-ask with the real chips instead. A TYPED answer has no chips (QA, 10 Nov 2026: a 53-letter name met
+          // "tap the option that fits" with nothing to tap), so it is asked again in words, saying what fits.
+          ws.newMessages.push(def.control === 'text'
+            ? { role: 'assistant', content: key === 'displayName'
+                ? 'That’s a long one for me to keep — what should I call you? Up to 30 letters.'
+                : 'I couldn’t save that one — could you put it another way?' }
+            : { role: 'assistant', content: 'I didn’t quite catch that one — tap the option that fits:', slotCard: key })
+        } else if (key === 'dateOfBirth') {
+          // THE AGE FOLLOWS THE BIRTHDAY (QA, 10 Nov 2026: a date the coach recorded left the age it replaced, and the
+          // summary showed both, disagreeing). The age card already sends both; a date recorded from words does too.
+          const age = ageOn(String(coerced), todayLocal())
+          if (age != null) applySlot(ws, 'age', coerceSlotValue(getSlotDef('age')!, String(age)), ws.values, false)
         }
       } else if (action.name === 'present_slot') {
         // DEFERRED to after the loop rather than handled here. Actions arrive
@@ -2238,6 +2244,8 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                   // the plan includes one by default, and a default the
                   // summary does not show is one nobody can turn off.
                   .filter(s => isSlotRequired(s, values) || confirmed.has(s.key) || s.key === 'includeSnacks')
+                  // The date of birth is never a row (its own slot says so): the AGE row is it, and opens the picker.
+                  .filter(s => s.key !== 'dateOfBirth')
                   // 44px TALL, a thumb's height (QA round 3, 8 Nov 2026): the rows were 32px and touch each other, so an
                   // invisible tap area would land on the neighbour; the row itself grows instead.
                   .map(def => (
@@ -2247,7 +2255,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                     onClick={() => handleEditSlot(def.key)}
                     disabled={busy}
                     data-review-row={def.key}
-                    className={`flex w-full items-center text-left min-h-[44px] rounded px-1 -mx-1 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 ${justEdited === def.key ? 'bg-muted' : ''}`}
+                    className={`flex w-full items-center gap-1 text-left min-h-[44px] rounded px-1 -mx-1 hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-60 ${justEdited === def.key ? 'bg-muted' : ''}`}
                     aria-label={`Change ${def.shortLabel}`}
                   >
                     <span className="font-medium text-foreground">{def.shortLabel}:</span>{' '}
