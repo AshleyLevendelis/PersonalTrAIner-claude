@@ -62,7 +62,10 @@ function realDinner(chickenG: number, riceG: number): PoolOption {
 console.log('\n1. Last night\'s dinner, re-portioned as lunch')
 // ===========================================================================
 {
-  const dinner = realDinner(200, 220)
+  // RE-ANCHORED 10 Nov 2026: 200 g chicken with 220 g rice put the dinner's protein at 68.6, stored as 69, so the
+  // 1.26x lunch asked 87 g of a dish that holds 86.4 and the protein floor refused it, correctly. That fixture sat on a
+  // rounding edge once cooked basmati's figures were corrected (food audit); this one holds protein that rounds down.
+  const dinner = realDinner(250, 150)
   check('the fixture is a real meal, costed from real food', dinner.macros.calories > 0 && dinner.macros.protein > 0, dinner.macros)
 
   // A lunch budget deliberately BIGGER than the dinner, the way a three-meal
@@ -119,7 +122,7 @@ console.log('\n1. Last night\'s dinner, re-portioned as lunch')
 console.log('\n2. It refuses rather than forcing')
 // ===========================================================================
 {
-  const dinner = realDinner(200, 220)
+  const dinner = realDinner(250, 150)
   // A lunch budget demanding far more protein than the dish can carry at any
   // sane portion — the 6.7% case, and the only one measurement found.
   const proteinHungry: MacroTargets = {

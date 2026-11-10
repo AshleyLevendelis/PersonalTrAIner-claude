@@ -1,8 +1,10 @@
+import { blockSwapWeeks } from './block-swap-until'
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import type { DayGuard } from './plan-guard'
 import { getSmartReplacements, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, getExerciseEntry} from './exercise-db'
 import { getConstrainedPool, getFlaggedJoints, daysOwnPatterns, mapMovementPattern, mapTier, deriveFatigueCost, fixedUnitPrescription, isTempoEligible, repRangeForIncomingExercise, EQUIPMENT_QUALITY_TIERS, hasBetterLoadingPeer, POOL_WIDE_IMPLEMENT_TIERS } from './exercise-plan'
 import { prescribeLoad, type LoadPrescription, isExternallyLoaded, DELOAD_LOAD_FRACTION } from './load-prescription'
+import { getGoalPolicy } from './goal-policies'
 import { resolveLoadFields } from './warmup'
 import { PHASE_CONFIGS, getPhaseTempo, formatTempo, stepHoldSeconds } from './periodization'
 // Dynamically imported inside recomputeLoad(), not statically here — importing
@@ -363,6 +365,8 @@ export async function recomputeLoad(
    * calibration never discounted its unverified lifts, and neither does this. Ignored where a logged number exists.
    */
   planCalibrates = false,
+  /** See buildReplacementSlot's previousLoadingWeek: with no logged number, step up from it (never past the estimate) or hold it. */
+  previousLoadingWeek?: { kg: number; step: boolean },
 ): Promise<LoadPrescription> {
   if (isMainLiftReset) {
     // NOTE, 9 Oct 2026: `isFirstBlock` below is accepted by prescribeLoad and
@@ -389,8 +393,10 @@ export async function recomputeLoad(
     isFirstBlock: false,
     sets,
     repRangeLabel: reps,
-    forceStartingWeightKg: recommendation?.weightKg,
-    isCalibrationWeek: isCalibrationWeek || (planCalibrates && recommendation?.weightKg == null),
+    // A logged number wins; else a held weight holds; else (below) a stepping one steps from last week's.
+    forceStartingWeightKg: recommendation?.weightKg ?? (!isCalibrationWeek && previousLoadingWeek && !previousLoadingWeek.step ? previousLoadingWeek.kg : undefined),
+    isCalibrationWeek: isCalibrationWeek || (planCalibrates && recommendation?.weightKg == null && previousLoadingWeek == null),
+    unverifiedPreviousLoadingWeekKg: recommendation?.weightKg == null && !isCalibrationWeek && previousLoadingWeek?.step ? previousLoadingWeek.kg : undefined,
   })
 }
 
@@ -501,9 +507,16 @@ export async function buildReplacementSlot(
   isMainLiftReset: boolean,
   /** The plan being edited has a calibration week: see recomputeLoad. Every caller holds the plan and says so. */
   planCalibrates = false,
+  /**
+   * The weight this same swap wrote in the loading week before this one (a whole-block swap, written week by week), and
+   * whether this lift climbs by weight (swapStepsLoad). With no logged number, this week steps up from it as
+   * generation's unverified ramp does, or holds it while the reps climb, rather than restarting at the calibration
+   * price; and a deload is 70% of it. Undefined for a one-off edit, which prices as before.
+   */
+  previousLoadingWeek?: { kg: number; step: boolean },
 ): Promise<Exercise> {
   const programming = replacementProgramming(slot, entry, profile, week)
-  const fresh = await recomputeLoad(entry, profile, slot.intensity || '', programming.sets, programming.reps, isMainLiftReset, week.isCalibrationWeek === true, planCalibrates)
+  const fresh = await recomputeLoad(entry, profile, slot.intensity || '', programming.sets, programming.reps, isMainLiftReset, week.isCalibrationWeek === true, planCalibrates, week.is_deload ? undefined : previousLoadingWeek)
   // A DELOAD STAYS A DELOAD. recomputeLoad prices a lift at its full working
   // weight whatever the week, so a swap made "for the rest of the block" used
   // to write the recovery week at the same weight as the weeks before it —
@@ -520,7 +533,9 @@ export async function buildReplacementSlot(
         isFirstBlock: false,
         sets: programming.sets,
         repRangeLabel: programming.reps,
-        forceStartingWeightKg: fresh.starting_weight_kg * DELOAD_LOAD_FRACTION,
+        // Off the LAST LOADING WEEK where this swap wrote one, as generation backs a deload off its week 3; off the
+        // fresh estimate otherwise (a one-off edit of a deload week).
+        forceStartingWeightKg: (previousLoadingWeek?.kg ?? fresh.starting_weight_kg) * DELOAD_LOAD_FRACTION,
       })
     : fresh
   return applyReplacement(slot, entry, load, profile, programming)
@@ -732,23 +747,35 @@ export async function swapExerciseInMesocycle(params: SwapExerciseParams): Promi
   if (!currentWeek || !oldSlot) return mesocycle
 
   const isMainLift = isMainLiftSlot(oldSlot)
-  const targetWeekNumbers = new Set(
-    scope === 'today'
-      ? [currentWeekNumber]
-      : mesocycle
-          .filter(w => w.block_number === currentWeek.block_number && w.week_number >= currentWeekNumber)
-          .map(w => w.week_number)
-  )
+  // ONLY THE WEEKS THAT STILL HOLD THE LIFT BEING SWAPPED (QA walk, 10 Nov 2026): an accessory rotates mid-block, and
+  // writing the slot by position alone overwrote the plan's own week-3 pick, a lift she never swapped. The swap
+  // sheet's "until" line reads the same weeks (blockSwapWeeks), so the two cannot disagree.
+  const targetWeekNumbers = scope === 'today' ? [currentWeekNumber] : blockSwapWeeks(mesocycle, currentWeekNumber, dayName, exIndex)
+  const planCalibrates = calibrates(mesocycle)
 
-  return Promise.all(mesocycle.map(async week => {
-    if (!targetWeekNumbers.has(week.week_number)) return week
-    const day = week.days.find(d => d.day === dayName)
+  // IN ORDER, because each week's weight follows the one before it. A whole-block swap of a lift with no logged number
+  // in a plan that calibrates used to sit at the calibration price in EVERY week (half the estimate for an
+  // intermediate), while the plan's own unverified lifts climb one step a loading week toward the estimate. The swapped
+  // lift now climbs the same way (CSCS, 10 Nov 2026: progressive overload, never past the estimate), and its deload is
+  // 70% of the last loading week, as generation does it.
+  const replacedByWeek = new Map<number, MesocycleWeek>()
+  let previousLoadingKg: number | undefined
+  for (const weekNumber of [...targetWeekNumbers].sort((a, b) => a - b)) {
+    const week = mesocycle.find(w => w.week_number === weekNumber)
+    const day = week?.days.find(d => d.day === dayName)
     const slot = day?.exercises[exIndex]
-    if (!day || !slot) return week
+    if (!week || !day || !slot) continue
 
     // HER CHOICE IS RECORDED ON THE ROW (swapped_for), so a rebuild of these weeks can carry it through. A swap of
     // a swap keeps the name of the lift she first moved away from.
-    const replaced: Exercise = { ...(await buildReplacementSlot(slot, newExercise, profile, week, isMainLift, calibrates(mesocycle))), swapped_for: slot.swapped_for ?? slot.name }
+    const previous = previousLoadingKg != null
+      ? { kg: previousLoadingKg, step: swapStepsLoad(newExercise, profile, week, slot.intensity) }
+      : undefined
+    const built = await buildReplacementSlot(slot, newExercise, profile, week, isMainLift, planCalibrates, previous)
+    const replaced: Exercise = { ...built, swapped_for: slot.swapped_for ?? slot.name }
+    if (!week.is_deload && typeof replaced.suggested_load_kg === 'number' && replaced.suggested_load_kg > 0) {
+      previousLoadingKg = replaced.suggested_load_kg
+    }
     const exercises = clearOrphanedSupersetLabels(
       day.exercises.map((e, i) => (i === exIndex ? replaced : e))
     )
@@ -758,8 +785,27 @@ export async function swapExerciseInMesocycle(params: SwapExerciseParams): Promi
     // CLEARS the incoming lift's ramp (see its comment), so the day shipped
     // with a warm-up still preparing for the exercise that just left. BACKLOG's
     // 11 Sep entry named this as the next job and it sat open until now.
-    return settleWeek({ ...week, days }, dayName, profile).week
-  }))
+    replacedByWeek.set(weekNumber, settleWeek({ ...week, days }, dayName, profile).week)
+  }
+  return mesocycle.map(week => replacedByWeek.get(week.week_number) ?? week)
+}
+
+/**
+ * DOES A SWAPPED-IN LIFT CLIMB BY WEIGHT, or hold its weight while its reps climb? Generation's own rule (exercise-plan,
+ * `rampLoad`): weight moves where the goal progresses by load, or for a main lift or a carry, and only when one real
+ * step of the implement is affordable; otherwise the weight holds and the reps carry the progression. The rep half is
+ * already decided for an incoming lift (repRangeForIncomingExercise), so this asks THAT function rather than repeating
+ * its arithmetic: where its reps climb across the block the weight holds, and where they do not the weight climbs.
+ * The two can never disagree, which a second copy did on its first run (10 Nov 2026: judged against the discounted
+ * week-1 price, a dumbbell bench neither climbed by weight nor by reps).
+ */
+export function swapStepsLoad(entry: ExerciseEntry, profile: UserProfile, week: Pick<MesocycleWeek, 'phase_label'>, intensity?: string): boolean {
+  if (!isExternallyLoaded(entry)) return false
+  const isCarry = entry.movement_pattern === 'carry'
+  const policy = getGoalPolicy((profile.fitness_goal || 'hypertrophy') as Parameters<typeof getGoalPolicy>[0])
+  if (!(policy.progressionEmphasis === 'load' || isCarry || entry.mechanics_tier === 'tier1_compound')) return false
+  const at = (n: number) => repRangeForIncomingExercise(entry, profile, { phase_label: week.phase_label, week_in_block: n, is_deload: false }, intensity)
+  return at(1) === at(3)
 }
 
 export interface BanExerciseParams {

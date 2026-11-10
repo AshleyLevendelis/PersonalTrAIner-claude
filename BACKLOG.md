@@ -2,6 +2,45 @@
 
 Newest first. One line each.
 
+- [x] **A "WHOLE BLOCK" SWAP NO LONGER REACHES A LIFT IT DID NOT SWAP, AND ITS WEEKS PROGRESS, 10 NOV 2026.** Found by
+  the training-screens QA walk, traced end to end before building (engine trace in the session). WHAT WAS WRONG:
+  (1) REACH: the swap rewrote the same POSITION in every remaining week of the block and never checked the position
+  still held the outgoing lift. A hypertrophy plan rotates an accessory's variation at week 3, so swapping Machine Shrug
+  for Shrugs in week 2 overwrote the plan's own week-3 pick: its weight went 26 -> 12 kg a hand, the deload 18 -> 8,
+  then week 5 jumped back to 28; the rows were stamped as her swap, so a rebuild would have replayed it by name. The
+  sheet said "until Mon 5 Oct" when the swap really ended at week 3. (2) PRICE: every week the swap wrote sat at the
+  calibration price (half the estimate for an intermediate), and its deload was 70% of that half: a swapped-in lift
+  never progressed all block. Measured over 60 swaps on a novice plan: about half had NEITHER weight nor reps climbing.
+  WHAT CHANGED (every swap route ends in one function, so the screen, the coach's card and its confirm all move):
+  (1) one function decides the weeks a whole-block swap writes: from this week, while the slot still holds the lift
+  being swapped (by name, or by the lift she first swapped away from), stopping at the first week it holds something
+  else. The sheet's "until" line reads the same weeks, and when the plan moves the slot on before the block ends it
+  says so: "Swaps it until Mon 21 Sep, when your plan moves this slot on to its next exercise." (WORDS MINE, his to
+  change.) (2) The weeks after the first are written in order: an untested lift either steps up one implement step a
+  loading week, never past the estimate (generation's own unverified ramp), or holds its weight while its reps climb,
+  decided by asking the rep rule an incoming lift already follows, so the two can never disagree (a second copy did on
+  its first run: judged against the discounted week-1 price, a dumbbell bench neither climbed by weight nor by reps).
+  The deload is 70% of the last loading week.
+  CSCS REVIEW: (1) training effect: the swapped lift now progresses across the block (weight or reps), as the plan's
+  own lifts do; before, half of them were a flat stimulus for three weeks; (2) takes away nothing: the plan's own
+  rotation is kept rather than overwritten; (3) progressive overload restored, recovery kept (one step a week, the
+  deload still backs off); (4) no floor or ceiling redefined: the same ramp step, capped by the same estimate, the same
+  70% deload; (5) in scope. Decided under the CSCS delegation (the 2 Nov "calibration price in every loading week" rule
+  copied the starting point of the plan's ramp and not the ramp; docs/plans/swap-load-anchor.md, superseded on that
+  point for whole-block swaps).
+  VERIFIED: test:block-swap-reach (new, 23 checks, 10 mutations, all caught: the old position-only reach, no ramp,
+  no deload base, name-only lineage, the until reason, the sentence, no step, no hold, and each half of the
+  step-or-hold rule). Measured: Tricep Pushdowns swapped in hold 7.5 kg while reps go 18-23 -> 20-25; a Dumbbell Bench
+  Press goes 12 -> 14 -> 16, deload 12 (was 12, 12, 12, 8). 75 derived gates: 4 red, all mended: test:replacement-
+  prescription's model taught the ramp for whole-block swaps only (the old flat rule is caught by it),
+  test:block-swap-until's source pattern re-anchored, test:bundle's app chunk at its line (moved 1351 -> 1376,
+  measured), and test:leftovers, which was ALREADY RED at the branch head from the food audit earlier today (cooked
+  basmati's corrected protein put the fixture's 1.26x lunch 0.6 g under the protein floor, which refused it, correctly;
+  the fixture moved off the rounding edge).
+  NOT DONE: a BAN's replacement and the other one-off paths still price each week on its own (calibration price, flat);
+  a "just today" swap after week 1 likewise. The same ramp could reach them; not built, because a ban rewrites every
+  block and wants its own measurement first. And no screen driver yet drives the rotated-slot case end to end (the
+  harness walk that found it, s-scripts in the QA scratchpad, is not a registered gate).
 - [x] **A CARDIO DAY CHOSEN FOR TODAY CAN BE LOGGED TO THE END, AND SAYS WHAT IT IS, 10 NOV 2026.** Found by the
   training-screens QA walk (no ruling needed: mechanical, plus one CSCS call). WHAT WAS WRONG: on "a different kind of
   session today -> Cardio" (1) the running Log-set button stuck for good on the steady block ("Elliptical × 1200"),

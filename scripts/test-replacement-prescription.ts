@@ -36,7 +36,7 @@ import { join } from 'path'
 import { getExerciseEntry } from '../src/lib/exercise-db'
 import { prescribeLoad, isExternallyLoaded, categorize, loadingMode, getEquipmentFloorKg, DELOAD_LOAD_FRACTION } from '../src/lib/load-prescription'
 import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
-import { applyReplacement, banExerciseFromMesocycle, swapExerciseInMesocycle, replacementProgramming, buildReplacementSlot, getReplacementCandidates, calibrates } from '../src/lib/mesocycle-edit'
+import { applyReplacement, banExerciseFromMesocycle, swapExerciseInMesocycle, replacementProgramming, buildReplacementSlot, getReplacementCandidates, calibrates, swapStepsLoad } from '../src/lib/mesocycle-edit'
 import { substituteForInjury } from '../src/lib/plan-adaptations'
 import { rebuildDayAroundMainLift } from '../src/lib/session-rebuild'
 import type { Exercise, MesocycleWeek, UserProfile } from '../src/lib/types'
@@ -203,7 +203,12 @@ async function main() {
     const wrongPrice: string[] = []
     const offPeers: string[] = []
     let seen = 0
-    for (const w of after) {
+    // A WHOLE-BLOCK SWAP progresses week to week (10 Nov 2026, test:block-swap-reach): after its first loading week an
+    // untested lift steps from the week before or holds it while its reps climb (swapStepsLoad), and its deload is 70%
+    // of the last loading week. The other paths still price every week on its own. Keyed by day and lift.
+    const ramps = label.startsWith('swap ')
+    const prevLoading = new Map<string, number>()
+    for (const w of [...after].sort((a, b) => a.week_number - b.week_number)) {
       const was = before.find(x => x.week_number === w.week_number)!
       // What generation gave an untouched lift of each lever class and tier
       // this week — the independent yardstick, read off the plan, not off the
@@ -235,12 +240,19 @@ async function main() {
           // RE-ANCHORED 2 Nov 2026 (docs/plans/swap-load-anchor.md): an unverified swapped-in lift in a plan that
           // calibrates is priced like that plan's own unverified lifts, at the calibration price in every loading week,
           // not only the first. A plan that skipped calibration keeps the estimate.
-          const full = prescribeLoad(entry, p, { targetRpeLabel: e.intensity, isFirstBlock: false, sets: e.sets, repRangeLabel: e.reps, isCalibrationWeek: w.isCalibrationWeek === true || calibrates(after) })
-          // A deload week is 70% of that, floored at the lightest thing that
-          // exists — generation's rule for a slot with no week-3 number.
+          const prev = ramps ? prevLoading.get(`${d.day}|${e.name}`) : undefined
+          const opts = { targetRpeLabel: e.intensity, isFirstBlock: false, sets: e.sets, repRangeLabel: e.reps }
+          const full = prev != null && !w.is_deload && !w.isCalibrationWeek
+            ? (swapStepsLoad(entry, p, w, e.intensity)
+              ? prescribeLoad(entry, p, { ...opts, unverifiedPreviousLoadingWeekKg: prev })
+              : prescribeLoad(entry, p, { ...opts, forceStartingWeightKg: prev }))
+            : prescribeLoad(entry, p, { ...opts, isCalibrationWeek: w.isCalibrationWeek === true || calibrates(after) })
+          // A deload week is 70% of the last loading week where the swap wrote one, else of that price, floored at the
+          // lightest thing that exists — generation's rule for a slot with no week-3 number.
           const priced = w.is_deload && full.starting_weight_kg != null
-            ? prescribeLoad(entry, p, { targetRpeLabel: e.intensity, isFirstBlock: false, sets: e.sets, repRangeLabel: e.reps, forceStartingWeightKg: full.starting_weight_kg * DELOAD_LOAD_FRACTION })
+            ? prescribeLoad(entry, p, { ...opts, forceStartingWeightKg: (prev ?? full.starting_weight_kg) * DELOAD_LOAD_FRACTION })
             : full
+          if (ramps && !w.is_deload && typeof e.suggested_load_kg === 'number' && e.suggested_load_kg > 0) prevLoading.set(`${d.day}|${e.name}`, e.suggested_load_kg)
           if (priced.starting_weight_kg !== (e.suggested_load_kg ?? null)) wrongPrice.push(`${label} wk${w.week_number} ${d.day} ${e.name} ${e.reps}: shows ${e.suggested_load_kg}, priced for its reps ${priced.starting_weight_kg}`)
           if (w.isCalibrationWeek && e.suggested_load_kg != null) {
             // Read off the plan again: the same lift, same place, the week after.

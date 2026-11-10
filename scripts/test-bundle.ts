@@ -412,7 +412,9 @@ console.log('\n3. Nothing has crept back up')
   // rules, the water sentence, the Undo line...). Measured through this gate: 1304 at f15f69fc, 1304 with the Undo line
   // (OVER by 0). Her 15 Sep ruling, 25 raw.
   // MOVED 9 Nov 2026: 1329 -> 1351, the date-of-birth day; measured 1319 before and 1326 after (see the deploy figure).
-  const APP_CHUNK_BUDGET_KB = 1351
+  // MOVED 10 Nov 2026: 1351 -> 1376, the long-flight QA fixes; measured 1349 at 26c19cf1 (2 left, worn by the food
+  // table, the third exercise batch and the cardio-day labels) and 1351 with the whole-block swap fix. 25 raw of room.
+  const APP_CHUNK_BUDGET_KB = 1376
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,

@@ -1,5 +1,5 @@
 import { FailedCardioNotice } from '@/components/exercise/FailedCardioNotice'
-import { blockSwapEndsOn } from '@/lib/block-swap-until'
+import { blockSwapEnd, blockSwapEndsOn } from '@/lib/block-swap-until'
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { useCallback, useState } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
@@ -126,7 +126,12 @@ export function ExerciseTab({
   // WHEN "REST OF BLOCK" ENDS, said on the swap (runs 3-4, M40b; her 10 Oct
   // ruling "Keep to the block, say it").
   const todayStr = getLocalDateString(getAppNow(profile?.id))
-  const swapBlockEndsOn = blockSwapEndsOn(mesocycle ?? [], swapTarget?.weekNumber ?? liveWeek, planCreatedAt)
+  // ...and the day IT stops, which is earlier when the plan rotates this slot's exercise inside the block (QA walk,
+  // 10 Nov 2026): the same weeks the swap writes (blockSwapWeeks).
+  const swapBlockEnd = swapTarget
+    ? blockSwapEnd(mesocycle ?? [], swapTarget.weekNumber ?? liveWeek, planCreatedAt, swapTarget.dayName, swapTarget.exIndex)
+    : null
+  const swapBlockEndsOn = swapBlockEnd?.date ?? blockSwapEndsOn(mesocycle ?? [], swapTarget?.weekNumber ?? liveWeek, planCreatedAt)
   // EVERY BAN ON THIS TAB GOES THROUGH ONE QUESTION (M10, 9 Oct 2026). Today's
   // card, a peeked day and the programme view each called the write directly
   // from a menu item; they now all hand a NAME to this, which opens the
@@ -304,6 +309,7 @@ export function ExerciseTab({
             onReason={handleSwapReason}
           onDislike={requestBan}
           blockEndsOn={swapBlockEndsOn}
+          blockEndsWhy={swapBlockEnd?.why}
           today={todayStr}
           kit={kit}
         /></Suspense>
@@ -371,6 +377,7 @@ export function ExerciseTab({
             onReason={handleSwapReason}
         onDislike={requestBan}
         blockEndsOn={swapBlockEndsOn}
+          blockEndsWhy={swapBlockEnd?.why}
         today={todayStr}
         kit={kit}
       /></Suspense>

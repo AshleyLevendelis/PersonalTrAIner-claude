@@ -781,10 +781,13 @@ export function swapKnockOnLine(c: { slot: string; kind: 'dish' | 'size'; from: 
  * ("Mon 5 Oct", day-labels.ts's shortDate, formatted by the caller so the
  * phrasebook imports nothing); null on the last block.
  */
-export function blockSwapLine(until: string | null): string {
-  return until
-    ? `Swaps it until ${until}, when your next block starts and your plan changes exercises.`
-    : 'Swaps it for the rest of your plan.'
+export function blockSwapLine(until: string | null, why: 'block' | 'rotation' = 'block'): string {
+  if (!until) return 'Swaps it for the rest of your plan.'
+  // The plan changes THIS exercise before the block ends (an accessory's variation rotates mid-block): the swap
+  // stops there, and the line says so rather than naming a block end it never reaches (QA walk, 10 Nov 2026).
+  return why === 'rotation'
+    ? `Swaps it until ${until}, when your plan moves this slot on to its next exercise.`
+    : `Swaps it until ${until}, when your next block starts and your plan changes exercises.`
 }
 
 /**

@@ -47,7 +47,7 @@ console.log('\n2. What the swap says')
 console.log('\n3. The wiring')
 {
   const dlg = code('src/components/exercise/SwapDialog.tsx')
-  check('the "Rest of block" choice says it through blockSwapLine(', /data-testid="swap-block-until"[\s\S]{0,120}blockSwapLine\(blockEndsOn \? shortDate\(blockEndsOn, today\) : null\)/.test(dlg))
+  check('the "Rest of block" choice says it through blockSwapLine(', /data-testid="swap-block-until"[\s\S]{0,120}blockSwapLine\(blockEndsOn \? shortDate\(blockEndsOn, today\) : null, blockEndsWhy\)/.test(dlg))
   check('...and "never give me this one" sits beside it, opening the ban for THIS exercise', /data-testid="swap-never-again"[\s\S]{0,200}onDislike\(name\)/.test(dlg) && /const name = target\.exerciseName; handleClose\(\); onDislike\(name\)/.test(dlg))
   const tab = code('src/components/exercise/ExerciseTab.tsx')
   check('the Exercise tab works the date out from the plan, for the week being swapped', /blockSwapEndsOn\(mesocycle \?\? \[\], swapTarget\?\.weekNumber \?\? liveWeek, planCreatedAt\)/.test(tab))
