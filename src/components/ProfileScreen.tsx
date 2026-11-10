@@ -1793,7 +1793,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   type="button"
                   aria-pressed={revealSpeed === level}
                   onClick={() => onRevealSpeedChange(level)}
-                  className={`h-[38px] flex-1 rounded-[9px] text-[0.8125rem] capitalize transition-colors ${
+                  className={`hit-slop-44 h-[38px] flex-1 rounded-[9px] text-[0.8125rem] capitalize transition-colors ${
                     revealSpeed === level
                       ? 'font-semibold text-[color:var(--primary-foreground)] glow-mint-box'
                       : 'text-muted-foreground'

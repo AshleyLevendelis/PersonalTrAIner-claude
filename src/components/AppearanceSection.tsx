@@ -240,7 +240,7 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
                   type="button"
                   aria-pressed={active}
                   onClick={() => appearance.setAccent(value)}
-                  className="inline-flex min-h-[38px] items-center gap-2 rounded-full px-3 text-[0.75rem]"
+                  className="hit-slop-44 inline-flex min-h-[38px] items-center gap-2 rounded-full px-3 text-[0.75rem]"
                   style={{
                     background: active ? `rgba(${glowRgb},.14)` : 'var(--surface-raised)',
                     border: `1px solid ${active ? `rgba(${glowRgb},.65)` : 'transparent'}`,
@@ -282,7 +282,7 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
                   type="button"
                   aria-pressed={glow === level}
                   onClick={() => appearance.setGlow(level)}
-                  className={`h-[38px] flex-1 rounded-[9px] text-[0.8125rem] capitalize transition-colors ${
+                  className={`hit-slop-44 h-[38px] flex-1 rounded-[9px] text-[0.8125rem] capitalize transition-colors ${
                     glow === level ? 'font-semibold text-[color:var(--primary-foreground)]' : 'text-muted-foreground'
                   }`}
                   style={glow === level ? { background: 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))' } : undefined}
@@ -312,7 +312,7 @@ export function AppearanceSection({ appearance }: { appearance: AppearanceContro
             type="button"
             onClick={appearance.reset}
             disabled={isDefault}
-            className="inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-full px-3 text-[0.75rem] text-muted-foreground disabled:opacity-40"
+            className="hit-slop-44 inline-flex min-h-[38px] shrink-0 items-center gap-1.5 rounded-full px-3 text-[0.75rem] text-muted-foreground disabled:opacity-40"
             style={{ background: 'var(--surface-raised)' }}
           >
             <RotateCcw className="size-3" />

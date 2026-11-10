@@ -1176,3 +1176,7 @@ html body[data-scroll-locked] {
   }
 }
 
+/* THE BROWSER'S OWN CONTROLS FOLLOW THE THEME (QA walk, 10 Nov 2026): on the dark themes the date picker's calendar
+   icon was black on near-black. A dark scheme by default; the three light themes say light. */
+:root { color-scheme: dark; }
+[data-theme="daylight"], [data-theme="linen"], [data-theme="frost"] { color-scheme: light; }

@@ -3,12 +3,14 @@
  *   1. An ingredient line as a cook says it: "3 eggs", "7 corn tortillas", "2 garlic cloves" (was "3 whole egg").
  *   2. Extra work's badge: "1 set", "2 sets" (was "1 sets").
  *   3. A bodyweight session's summary: no "0kg" volume.
+ *   5. The date picker's icon is drawn for the theme (a dark colour scheme, light on the light themes).
  *   4. Fresh potatoes, sweet potatoes, plantain and yam are produce on the shopping list, not dry goods.
  * (The meal day's "345 kcal under" is test:day-verdict's.)
  */
 import { readFileSync } from 'fs'
 import { kitchenLine } from '../src/lib/portion-scaler'
 import { resolveGroceryTarget } from '../src/lib/grocery-store'
+import { LIGHT_THEME_ORDER } from '../src/lib/appearance-palette'
 
 let ran = 0, failures = 0
 function check(label: string, ok: boolean, extra?: unknown) {
@@ -46,6 +48,22 @@ const fresh = ['potato raw', 'sweet potato raw', 'plantain', 'yellow yam'].map(n
 check('potatoes, sweet potatoes, plantain and yam are produce', fresh.every(([, a]) => a === 'produce'), fresh)
 const dry = ['plantain chips', 'cornflakes', 'basmati rice cooked', 'pasta cooked'].map(n => [n, aisle(n)])
 check('...while plantain chips, cereal, rice and pasta stay dry goods', dry.every(([, a]) => a === 'dry_goods'), dry)
+
+console.log('\n5. The browser\'s own controls (the date picker) follow the theme')
+const css = readFileSync('src/index.css', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const lightRule = /((?:\[data-theme="[a-z]+"\],?\s*)+)\{\s*color-scheme:\s*light;?\s*\}/.exec(css)?.[1] ?? ''
+check('the page is a dark scheme by default', /:root\s*\{\s*color-scheme:\s*dark;?\s*\}/.test(css))
+check('...and every light theme says light (derived from the app\'s own list of light themes)', LIGHT_THEME_ORDER.length > 0 && LIGHT_THEME_ORDER.every(t => lightRule.includes(`[data-theme="${t}"]`)), { lightRule, LIGHT_THEME_ORDER })
+
+console.log('\n6. Profile\'s small controls have a 44 px tap area (the reply-speed and Appearance chips were 38 px)')
+const small: string[] = []
+for (const f of ['src/components/ProfileScreen.tsx', 'src/components/AppearanceSection.tsx']) {
+  // Buttons only: a decorative preview swatch is not a control. (Not `[^>]*`: an onClick's `=>` would end the tag.)
+  for (const m of strip(readFileSync(f, 'utf8')).matchAll(/<button\b(?:(?!<\/?[A-Za-z])[\s\S]){0,600}?className=[{"`]+([^"`]*\b(?:min-)?h-\[(?:3[0-9]|2[0-9])px\][^"`]*)/g)) {
+    if (!/\bhit-slop-44\b/.test(m[1])) small.push(`${f}: ${m[1].slice(0, 60)}`)
+  }
+}
+check('every control drawn under 40 px on Profile and Appearance reaches 44 px by its hit area', small.length === 0, small)
 
 console.log(`\n${ran} checks ran`)
 if (failures > 0) { console.error(`${failures} qa-wording check(s) FAILED`); process.exit(1) }
