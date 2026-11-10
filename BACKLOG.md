@@ -2,6 +2,28 @@
 
 Newest first. One line each.
 
+- [x] **FULL SWEEP OF THE LONG-FLIGHT BATCH, 10 NOV 2026: 15 REAL FAILURES, ALL FIXED; TWO WERE THE APP.** 527 gates at
+  ce49bfa7, 508 passed; four environmental (meal-quality, schema-parity, rls, coach-exam-fresh, the last waiting on an
+  exam run on his machine). Mechanical; no ruling needed.
+  THE APP: (1) the Full Program calendar was the one lazily loaded screen without the after-deploy reload
+  (test:chunk-reload); it now loads like the others. (2) My own colour-scheme line (the date picker following the
+  theme) made two red outline buttons on Profile read 3.67:1 in verify:small-print. MEASURED, not assumed: the red was
+  rgb(223,68,101), neither theme's red, i.e. caught mid-fade after the theme switch; the driver now waits for running
+  transitions to land before reading, and a mutation putting the dark theme's red back on the light themes is still
+  caught (3 failures). At rest both buttons are the light themes' #B7264B as before.
+  RE-ANCHORED, with reasons: the eleven batch-3 exercises added to the category, family, injury-count and joint
+  snapshots (no pre-existing entry moved; each injury's new exclusions listed in test:injury-coverage); "program-view"
+  classed as a display choice that survives New Plan; first-paint and deploy budgets +8 kB gz with measured ends
+  (544/388, each OVER by 0). Batch 3 reshuffled the harness's seeded day (Front Squat where Barbell Squats was), so
+  warmup-rows, single-implement and drop-sets accept either barbell squat and read the logged weight instead of a
+  pinned 47.5; warmup-rows' climb now allows a repeated bar rung (a 37.5 kg working weight puts the empty-bar and 50%
+  rungs both on the 20 kg bar, ordinary coaching). verify:ceiling-label lost its subject in the same reshuffle
+  (bisected green 3af1af26, red 1bd263be) and now reads Sam's minimalist plan, where one notch is genuinely too big a
+  jump (a wording mutation is caught, 7 failures). The harness's fake meal writer still wrote 440 g of cooked basmati
+  after the denser figures; at the pools' own 0.89 scale (392 g) a top-up keeps 6 of 6 again. verify:meal-rebalance
+  accepts the card's own rounding sentence ("takes these two meals from 2,123 to 2,150 kcal") and then 40 kcal of
+  slack on dinner, 15 without it (mutation hiding the sentence: caught). The ten drivers sharing that writer re-run
+  green, one at a time.
 - [x] **NUTRITION QA WALK, 10 NOV 2026: A SWAP'S UNDO PUTS THE DAY BACK, AND THREE SMALLER FIXES.** Found by the
   nutrition-screens QA walk (390px, the app's own meal actions over a deep pool). Mechanical; no ruling needed.
   (1) UNDO ON TODAY'S SWAP DID NOT PUT THE DAY BACK, while saying "Put back as it was": it re-pinned the old dish, and a

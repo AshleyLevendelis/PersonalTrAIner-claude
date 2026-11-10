@@ -1195,7 +1195,9 @@ if (TOPUP || REGEN) {
       made++
       return {
         slot, name: `Fresh ${slot} plate ${made}`, cuisine: 'British / Classic', prep: 'Grill the chicken, warm the rice, serve.',
-        ingredients: ['120g chicken breast', '440g cooked basmati rice', '20g olive oil'],
+        // The rice at the pools' RICE_SCALE (10 Nov 2026, cooked basmati denser): 440 x 0.89 = 392 g. A writer still
+        // on 440 g wrote dishes a day could no longer hold, and a top-up kept 2 of 6.
+        ingredients: ['120g chicken breast', '392g cooked basmati rice', '20g olive oil'],
       }
     }))
     return new Response(JSON.stringify({ meals }), { status: 200, headers: { 'Content-Type': 'application/json' } })

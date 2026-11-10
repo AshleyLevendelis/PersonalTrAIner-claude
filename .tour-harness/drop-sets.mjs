@@ -71,7 +71,9 @@ const finish = async () => {
 await send('Page.enable'); await send('Runtime.enable')
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 
-const LOADED = 'Barbell Squats'
+// The barbell squat the drop hangs off. 10 Nov 2026: the third exercise batch grew the catalogue and the seeded day
+// opens on the Front Squat where it had Barbell Squats; either is the subject (set once the page is read, below).
+let LOADED = 'Barbell Squats'
 
 // One pass over the card, so every number below describes the SAME render.
 // EVERY FIELD IS NULL-SAFE AND ALWAYS PRESENT: a missing card returns the same
@@ -182,6 +184,7 @@ await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&legcurl=1
 await wait(5000)
 
 const present = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(r => r.getAttribute('data-exercise-name'))`)
+LOADED = ['Barbell Squats', 'Front Squat'].find(n => (present ?? []).includes(n)) ?? LOADED
 check('the fixture carries a loaded lift to drop from', (present ?? []).includes(LOADED), present)
 await openCard(LOADED)
 
@@ -322,9 +325,10 @@ check('the drop saved, with its own receipt naming it',
 // asserts the parent still reads back the reps and weight IT was logged with
 // — not merely that some line mentioning it exists.
 check('...and the parent set\'s receipt is still its own, untouched',
-  (saved.receipts ?? []).some(t => new RegExp(`^Set ${parentSet}: 9 reps @ 47\\.5kg`).test(t)), saved.receipts)
+  (saved.receipts ?? []).some(t => new RegExp(`^Set ${parentSet}: 9 reps @ ${String(parentKg).replace('.', '\\.')}kg`).test(t)), saved.receipts)
 check('...and so is the set before it',
-  (saved.receipts ?? []).some(t => /^Set 1: 8 reps @ 47\.5kg/.test(t)), saved.receipts)
+  // The weight each set was logged at, read off the row (it was 47.5 kg on Barbell Squats; the Front Squat's is lighter).
+  (saved.receipts ?? []).some(t => new RegExp(`^Set 1: 8 reps @ ${String(parentKg).replace('.', '\\.')}kg`).test(t)), saved.receipts)
 check('the working set count is STILL unchanged after the write',
   baselineWorking >= 3 && (saved.work ?? []).length === baselineWorking, { before: baselineWorking, after: saved.work?.length })
 // THE LOAD-BEARING ONE. Two sets and a drop are logged; the card must say two.

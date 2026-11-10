@@ -44,6 +44,10 @@ const lowIn = async (root) => {
   const by = {}
   for (const t of THEMES) {
     await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', ${JSON.stringify(t)}); if (${JSON.stringify(['daylight', 'linen', 'frost'].includes(t))}) h.setAttribute('data-canvas', 'light'); else h.removeAttribute('data-canvas') })()`); await wait(250)
+    // THE RESTING COLOUR, not one mid-fade (10 Nov 2026): a button's colour eases when the theme changes, and once the
+    // page also told the browser which scheme it is in, the outline buttons were read part-way between the dark
+    // theme's red and the light one's (223,68,101: neither). Wait for every running transition to land first.
+    await ev(`Promise.race([Promise.all(document.getAnimations().map(a => a.finished.catch(() => null))), new Promise(r => setTimeout(r, 2000))]).then(() => true)`)
     const all = await ev(`${MEASURE}(${JSON.stringify(root)})`)
     by[t] = { n: (all ?? []).length, low: (all ?? []).filter(x => x.ratio < 4.5) }
   }
