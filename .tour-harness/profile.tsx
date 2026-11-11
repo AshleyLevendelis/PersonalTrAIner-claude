@@ -30,7 +30,7 @@
 // ABSENT there. assembleProfile discards all three ceilings for a full-gym
 // answer, so offering them would be a control that cannot take effect.
 // ---------------------------------------------------------------------------
-import { StrictMode, useState } from 'react'
+import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { setSupabaseClient } from '@/lib/supabase'
 import { makeFakeSupabase, type Db } from './fake-supabase'
@@ -39,6 +39,16 @@ import { seededRngFromKey } from '@/lib/seeded-random'
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
 import { ProfileScreen } from '@/components/ProfileScreen'
 import { makeKitController, clearKitStatements } from '@/lib/kit-change'
+import type { MyMealsSource } from '@/lib/my-meals'
+import { getPools } from '@/lib/meal-store'
+import { computeTargets } from '@/lib/nutrition-targets'
+import { useServablePools } from '@/hooks/useServablePools'
+import { compileFoodDislikes } from '@/lib/fact-compiler'
+import { computeSlotBudgets, verifyProposal, type PoolOption } from '@/lib/meal-generation'
+import { MEAL_LIBRARY } from '@/lib/meal-library-data'
+import { fitDishToBudget } from '@/lib/meal-library'
+import type { MacroTargets } from '@/lib/types'
+import type { MealSlotName } from '@/lib/meal-store'
 import { profileWithKit } from '@/lib/kit-list'
 import { compileKitStatements, kitFactsIn } from '@/lib/fact-compiler'
 import type { UserFactRow } from '@/lib/memory-store'
@@ -95,6 +105,13 @@ const KIT = new URLSearchParams(location.search).get('kit') === '1'
 // ease-off. A running knee ease-off, a running bodyweight-only week, and a shoulder ease-off that already ENDED, so
 // the driver can see the rows name the running two and not the finished one. Rows shaped as the store writes them.
 const EASE = new URLSearchParams(location.search).get('ease') === '1'
+// ?mymeals=1 — HIS OWN MEALS (Ashley, 11 Nov 2026: "My usual meals first"). INPUT only: a plan seeded the way a
+// new plan is (the app's own library, each dish re-portioned to his meal and passed through the app's own check, up
+// to a hundred a meal, as a plan made since 9 Nov holds), and one food he avoids (mushrooms). What the form reads, refuses, sizes and saves is
+// my-meals.ts through the app's own controller builder. A hand-written pool of two dishes a meal was tried first, then
+// the library's first eight: neither had room in it, so no meal of any size could land a day and the card only ever
+// said "kept at your amounts".
+const MYMEALS = new URLSearchParams(location.search).get('mymeals') === '1'
 const EASE_ROWS = EASE ? [
   { id: 'ease-knee', kind: 'injury', status: 'active', injury_code: 'knees', equipment_override: null, starts_at: new Date(anchorNowMs() - 2 * 86400000).toISOString(), expires_at: new Date(anchorNowMs() + 6 * 86400000).toISOString() },
   { id: 'ease-kit', kind: 'equipment', status: 'active', injury_code: null, equipment_override: 'bodyweight', starts_at: new Date(anchorNowMs() - 1 * 86400000).toISOString(), expires_at: new Date(anchorNowMs() + 3 * 86400000).toISOString() },
@@ -168,6 +185,29 @@ const db: Db = {
       macros: { kcal: 450, protein: 25, carbs: 60, fat: 12 }, tags: ['favourite'], prep: '' },
   ] : [],
 } as unknown as Db
+if (MYMEALS) {
+  const targets = computeTargets(baseProfile)
+  const budgets = computeSlotBudgets(targets, baseProfile.meals_per_day, baseProfile.include_snacks) as Partial<Record<MealSlotName, MacroTargets>>
+  for (const [slot, budget] of Object.entries(budgets) as [MealSlotName, MacroTargets][]) {
+    let i = 0
+    for (const dish of MEAL_LIBRARY) {
+      if (dish.slot !== slot || i >= 100) continue
+      const o = verifyProposal(fitDishToBudget(dish, budget).dish, slot, budget, baseProfile.dietary_preferences ?? [], [], ['mushroom'])
+      if (!o) continue
+      ;(db.meal_plan_slots as unknown as Record<string, unknown>[]).push({
+        id: `mm-${slot}-${i}`, profile_id: PROFILE_ID, slot, pool_index: i, name: o.name, ingredients: o.ingredients,
+        macros: { kcal: o.macros.calories, protein: o.macros.protein, carbs: o.macros.carbs, fat: o.macros.fat }, tags: o.tags ?? [], prep: '',
+        created_at: new Date(anchorNowMs() - 86400000).toISOString(),
+      })
+      i++
+    }
+  }
+  ;(db.user_facts as unknown as Record<string, unknown>[]).push({
+    id: 'fact-avoid-mm', profile_id: PROFILE_ID, kind: 'food_preference', status: 'active', source: 'manual',
+    raw_phrase: 'mushrooms', display_text: "won't eat/do mushrooms", polarity: 'dislike', hardness: 'hard',
+    resolved_refs: ['mushroom'], retired_at: null, created_at: new Date(anchorNowMs() - 86400000).toISOString(),
+  })
+}
 if (LIKES) {
   ;(db.user_facts as unknown as Record<string, unknown>[]).push({
     id: 'fact-like-1', profile_id: PROFILE_ID, kind: 'food_preference', status: 'active', source: 'chat',
@@ -211,6 +251,23 @@ function Harness() {
     profile: shown, mesocycle, planCreatedAt: shown.created_at, exclusions: [], onFile: kitOnFile,
     onSaved: result => { setMesocycle(result.mesocycle); setFacts(readFacts()) },
   }) : null
+
+  // HIS OWN MEALS (?mymeals=1). App's lines, reproduced: the meals as read from the table through the app's own
+  // read and its own restriction marking, and the targets from the app's own calculation. The section builds its
+  // controller from this, as it does in the app.
+  const [storedPools, setStoredPools] = useState<Partial<Record<MealSlotName, PoolOption[]>>>({})
+  const reloadPools = async () => setStoredPools(await getPools(PROFILE_ID))
+  useEffect(() => { if (MYMEALS) void reloadPools() }, [])
+  const servablePools = useServablePools(storedPools, profile.dietary_preferences, facts)
+  const myMeals: MyMealsSource | null = MYMEALS ? {
+    context: {
+      profileId: PROFILE_ID, targets: computeTargets(profile),
+      mealsPerDay: profile.meals_per_day, includeSnacks: profile.include_snacks,
+      dietaryPreferences: profile.dietary_preferences ?? [], dislikedFoods: compileFoodDislikes(facts),
+      todayDate: ANCHOR_ISO, pools: servablePools,
+    },
+    reload: reloadPools,
+  } : null
 
   // App's handler, reproduced — see the header. The two functions it calls are
   // the real ones.
@@ -278,6 +335,7 @@ function Harness() {
           onProfileChanged={patch => setProfile(prev => ({ ...prev, ...patch }))}
           onCeilingsCorrected={onCeilingsCorrected}
           kit={kit}
+          myMeals={myMeals}
           onEquipmentChoiceChanged={KIT ? async () => { await clearKitStatements(kitOnFile); setFacts(readFacts()) } : undefined}
           onPlanInvalidated={setInvalidation}
           onMemoryChanged={() => {}}

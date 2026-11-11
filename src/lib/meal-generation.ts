@@ -36,7 +36,7 @@ import { validateMealAgainstDiet } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
 import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
-import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, type MealSlotName } from './meal-store'
+import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, MY_MEAL_TAG, type MealSlotName } from './meal-store'
 import { isMissingColumnError } from './missing-column'
 import { tagsNewFrom, tagsPinOnly } from './meal-new-from'
 import { dishKeysFor, dishKeyOf } from './meal-dish-identity'
@@ -1598,7 +1598,34 @@ export function macroDistanceScore(totals: MacroTargets, targets: MacroTargets):
 export function optionMatchesLikedFood(option: PoolOption, liked: string[]): boolean {
   if (liked.length === 0 || option.breaksRestriction) return false
   const ingredientNames = option.ingredients.map(i => i.name)
-  return liked.some(food => containsPhrase(option.name, ingredientNames, food))
+  return liked.some(food => {
+    if (containsPhrase(option.name, ingredientNames, food)) return true
+    // A LIKE THAT NAMES SEVERAL FOODS IS A MEAL (11 Nov 2026): "chicken and rice", "porridge with banana". As one
+    // phrase it matched almost nothing, so the like was listed and did nothing. A dish holding EVERY part matches.
+    const parts = likedParts(food)
+    return parts.length > 1 && parts.every(part => containsPhrase(option.name, ingredientNames, part))
+  })
+}
+
+/** The foods a like names: split on "and", "with", "&", "+" and commas. One part means it is one food or one dish name. */
+export function likedParts(like: string): string[] {
+  return like.toLowerCase().split(/\s*(?:,|&|\+|\band\b|\bwith\b)\s*/).map(p => p.trim()).filter(p => p.length > 1)
+}
+
+/**
+ * A FAMILIAR DISH: one he added himself (MY_MEAL_TAG) or hearted. His ruling, 11 Nov 2026, "My usual meals first":
+ * familiar dishes come first on a week's menu and the day's pick works towards about half its meals being familiar
+ * (familiarShortfall). A dish that breaks a current restriction is never familiar, for the reason it is never liked.
+ */
+export function isFamiliarOption(option: PoolOption): boolean {
+  if (option.breaksRestriction) return false
+  const tags = option.tags ?? []
+  return tags.includes(MY_MEAL_TAG) || tags.includes(FAVOURITE_TAG)
+}
+
+/** How many of a day's meals are short of HALF being familiar. Zero when he has no familiar dish at all. */
+export function familiarShortfall(mealsInDay: number, familiarInDay: number, hasAnyFamiliar: boolean): number {
+  return hasAnyFamiliar ? Math.max(0, Math.ceil(mealsInDay / 2) - familiarInDay) : 0
 }
 
 /**
@@ -1646,8 +1673,12 @@ interface ComboRank {
    * 1 when she has said she likes something and the day holds none of it.
    * Behind variety, ahead of the resize: a liked dish is favoured among
    * correct days that repeat equally, and a small resize may be spent on it.
+   *
+   * AND, AHEAD OF THAT WITHIN THIS ONE KEY (11 Nov 2026, his "My usual meals first"): two for every meal the day is
+   * short of half being FAMILIAR (isFamiliarOption). So a day with more of his own meals beats one with fewer, and
+   * between equals the like decides as it always did. With no familiar dish this is 0 or 1 exactly as before.
    */
-  likeMiss: 0 | 1
+  likeMiss: number
   /**
    * How RECENTLY this day's meals were last served, summed across slots: a
    * meal from yesterday weighs VARIETY_MEMORY_DAYS, one from a week ago 1,
@@ -1716,7 +1747,7 @@ interface BestCombo {
 interface VarietyCost { backToBack: number; repeats: number; recency: number }
 const NO_VARIETY_COST: VarietyCost = { backToBack: 0, repeats: 0, recency: 0 }
 
-function rankCombo(inTolerance: boolean, variety: VarietyCost, fit: number, resized: 0 | 1 = 0, likeMiss: 0 | 1 = 0): ComboRank {
+function rankCombo(inTolerance: boolean, variety: VarietyCost, fit: number, resized: 0 | 1 = 0, likeMiss = 0): ComboRank {
   if (inTolerance) return { tier: 0, ...variety, likeMiss, resized, fit }
   return { tier: 1, ...NO_VARIETY_COST, likeMiss: 0, resized: 0, fit }
 }
@@ -2001,13 +2032,15 @@ export function assembleDay(
   const state: { best: BestCombo | null } = { best: null }
   // Every off-target day the search sees, for the margin choice after it —
   // only read when no day at all reaches tolerance.
-  const offTarget: { combo: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets; variety: VarietyCost; likeMiss: 0 | 1; fit: number }[] = []
+  const offTarget: { combo: Partial<Record<MealSlotName, PoolOption>>; totals: MacroTargets; variety: VarietyCost; likeMiss: number; fit: number }[] = []
 
   // WORKED OUT ONCE PER OPTION, not once per combination: whether a dish holds
   // something she likes, and whether it is exotic, depend on the dish alone,
   // and the search visits each dish in every combination it is part of
   // (28 Sep 2026: the like check alone was 0.6 of 2.8 seconds of a week).
   const likedOption = new Map<PoolOption, boolean>()
+  const familiarOption = new Map<PoolOption, boolean>()
+  let hasAnyFamiliar = false
   const exoticOption = new Map<PoolOption, boolean>()
   // WHICH DISH each option is, and which dishes were served lately (29 Sep
   // 2026): an option she edited is a copy of its base and counts as it.
@@ -2018,9 +2051,19 @@ export function assembleDay(
     recentDishes[s] = (recentNames[s] ?? []).map(n => dishKeyOf(keys, n))
     for (const o of pinned[s] != null ? [pinned[s]!] : servable[s] ?? []) {
       likedOption.set(o, softLikedFoods.length > 0 && optionMatchesLikedFood(o, softLikedFoods))
+      const familiar = isFamiliarOption(o)
+      familiarOption.set(o, familiar)
+      if (familiar) hasAnyFamiliar = true
       exoticOption.set(o, isExoticOption(o))
       dishOf.set(o, dishKeyOf(keys, o.name))
     }
+  }
+
+  /** Whether this meal's dish was served there within the rest window the variety keys count (varietyCost's `repeats`). */
+  const servedLately = (s: MealSlotName, o: PoolOption): boolean => {
+    const history = recentDishes[s] ?? []
+    const i = history.lastIndexOf(dishOf.get(o) ?? o.name)
+    return i >= 0 && history.length - i <= VARIETY_REST_DAYS
   }
 
   function search(index: number, combo: Partial<Record<MealSlotName, PoolOption>>): void {
@@ -2037,8 +2080,13 @@ export function assembleDay(
       const exoticPenalty = exoticSlots > 1 ? (exoticSlots - 1) * 0.005 : 0
       // At least ONE liked thing in the day, not as many as possible: someone
       // who says they love salmon wants salmon once, not at every meal.
-      const likeMiss: 0 | 1 = softLikedFoods.length > 0
+      const noLike = softLikedFoods.length > 0
         && !slots.some(s => likedOption.get(combo[s]!)) ? 1 : 0
+      // ABOUT HALF THE DAY HIS OWN MEALS, counted ahead of the like inside the one key (see ComboRank.likeMiss).
+      // A meal of his counts only when it has RESTED (not served in that meal within VARIETY_REST_DAYS). Without this
+      // the key tilts which meal repeats: where some meal has to come back, the day with his dinner again outranked
+      // the day repeating a plan dish, and measured, a usual dinner was served two nights running.
+      const likeMiss = familiarShortfall(slots.length, slots.filter(s => familiarOption.get(combo[s]!) && !servedLately(s, combo[s]!)).length, hasAnyFamiliar) * 2 + noLike
       // The multi-exotic nudge lives INSIDE fit, at the magnitude it has
       // always had. A like is a key of its own — see rankCombo.
       const nudges = exoticPenalty

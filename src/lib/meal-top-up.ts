@@ -76,6 +76,64 @@ export const FITTING_GOAL = 5
 export const MAX_POOL = 10
 
 /**
+ * THE ONE TEST of "this dish fits": pinned in its meal, the search choosing every other meal, is the day it would
+ * SERVE inside the bands. Asked by the count of fitting dishes and of one new dish alike, so they cannot disagree.
+ */
+function landsPinned(usable: Partial<Record<MealSlotName, PoolOption[]>>, targets: MacroTargets, slot: MealSlotName, option: PoolOption): boolean {
+  return assembleDay(usable, targets, {}, [], { [slot]: option }).withinTolerance
+}
+
+/** How many weeks of menus a new dish is tried against before it is called one that will not come up often. */
+const LANDS_WEEKS = 4
+
+/** The dishes a meal is judged against: every servable one, or this week's menu once the meal is deep. */
+function judgedPools(
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+  activeSlots: MealSlotName[],
+  today?: string,
+): Partial<Record<MealSlotName, PoolOption[]>> {
+  const usable: Partial<Record<MealSlotName, PoolOption[]>> = {}
+  // A DEEP MEAL IS COUNTED ON ITS MENU (9 Nov 2026): one search per dish, each a product over the other meals, is
+  // 4N^4 over a whole deep pool. On a menu it is what a seven-dish pool cost, and a menu is what is served.
+  const week = today ? menuWeekOf(today) : 0
+  for (const slot of activeSlots) {
+    const servable = (pools[slot] ?? []).filter(servableOption)
+    // Only past MAX_POOL: up to ten a meal the whole pool is affordable (the 30 Sep cap was set by this very search),
+    // and a count taken on an 8-dish menu would miss a fitting dish this week's menu left out.
+    usable[slot] = servable.length > MAX_POOL ? menuForSlot(servable, week) : servable
+  }
+  return usable
+}
+
+/**
+ * Whether ONE dish, not yet in the plan, could be part of a day that lands on target: the same test fittingCounts
+ * runs (the dish pinned in its meal, the search choosing the rest, the day it would SERVE inside the bands). Null
+ * when it cannot be judged (a meal with nothing to serve beside it).
+ */
+export function dishLandsADay(
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+  activeSlots: MealSlotName[],
+  targets: MacroTargets,
+  slot: MealSlotName,
+  option: PoolOption,
+  today?: string,
+): boolean | null {
+  if (!activeSlots.includes(slot)) return null
+  // A deep meal is served from a different menu each week, so one week's menu is not the whole answer: a dish that
+  // cannot land beside this week's eight may land beside next week's. Asked of the next LANDS_WEEKS menus; a pool
+  // no deeper than a menu is the same every week and is asked once.
+  const deep = activeSlots.some(s => (pools[s] ?? []).filter(servableOption).length > MAX_POOL)
+  let judged = false
+  for (let w = 0; w < (deep && today ? LANDS_WEEKS : 1); w++) {
+    const usable = judgedPools(pools, activeSlots, today ? addDays(today, w * 7) : undefined)
+    if (activeSlots.some(s => s !== slot && usable[s]!.length === 0)) continue
+    judged = true
+    if (landsPinned({ ...usable, [slot]: [...(usable[slot] ?? []), option] }, targets, slot, option)) return true
+  }
+  return judged ? false : null
+}
+
+/**
  * How many of each meal's servable dishes can be part of a day that lands on
  * target today. The app's own test, not a new one: pin the dish in its meal,
  * let the search choose the rest, and ask whether the day it would SERVE is
@@ -92,20 +150,11 @@ export function fittingCounts(
   /** The date whose week's menu a deep meal is judged on (9 Nov 2026). */
   today?: string,
 ): Partial<Record<MealSlotName, number>> {
-  const usable: Partial<Record<MealSlotName, PoolOption[]>> = {}
-  // A DEEP MEAL IS COUNTED ON ITS MENU (9 Nov 2026): one search per dish, each a product over the other meals, is
-  // 4N^4 over a whole deep pool. On a menu it is what a seven-dish pool cost, and a menu is what is served.
-  const week = today ? menuWeekOf(today) : 0
-  for (const slot of activeSlots) {
-    const servable = (pools[slot] ?? []).filter(servableOption)
-    // Only past MAX_POOL: up to ten a meal the whole pool is affordable (the 30 Sep cap was set by this very search),
-    // and a count taken on an 8-dish menu would miss a fitting dish this week's menu left out.
-    usable[slot] = servable.length > MAX_POOL ? menuForSlot(servable, week) : servable
-  }
+  const usable = judgedPools(pools, activeSlots, today)
   if (activeSlots.length === 0 || activeSlots.some(s => usable[s]!.length === 0)) return {}
   const out: Partial<Record<MealSlotName, number>> = {}
   for (const slot of activeSlots) {
-    out[slot] = usable[slot]!.filter(o => assembleDay(usable, targets, {}, [], { [slot]: o }).withinTolerance).length
+    out[slot] = usable[slot]!.filter(o => landsPinned(usable, targets, slot, o)).length
   }
   return out
 }

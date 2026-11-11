@@ -1,4 +1,4 @@
-import { isExoticOption, optionMatchesLikedFood, type PoolOption } from './meal-generation'
+import { isExoticOption, isFamiliarOption, optionMatchesLikedFood, type PoolOption } from './meal-generation'
 import { dishKeysFor, dishKeyOf } from './meal-dish-identity'
 import type { MealSlotName } from './meal-store'
 
@@ -71,7 +71,10 @@ export function menuForSlot(options: readonly PoolOption[], week: number, softLi
   const dishes = [...byDish.entries()].sort((a, b) => shuffleKey(a[0]) - shuffleKey(b[0]) || (a[0] < b[0] ? -1 : 1))
   if (dishes.length <= MENU_SIZE) return dishes.map(([, o]) => o)
 
-  const liked = softLikedFoods.length > 0 ? dishes.filter(([, o]) => optionMatchesLikedFood(o, softLikedFoods as string[])) : []
+  // HIS OWN MEALS FIRST (11 Nov 2026, "My usual meals first"): dishes he added or hearted take the first call on the
+  // liked half, ahead of dishes that merely contain a liked food. Each group keeps the shuffled order within itself.
+  const familiar = dishes.filter(([, o]) => isFamiliarOption(o))
+  const likedOnly = softLikedFoods.length > 0 ? dishes.filter(([, o]) => !isFamiliarOption(o) && optionMatchesLikedFood(o, softLikedFoods as string[])) : []
   const likedRoom = Math.floor(MENU_SIZE / 2)
   const chosen: PoolOption[] = []
   let exotic = false
@@ -81,10 +84,13 @@ export function menuForSlot(options: readonly PoolOption[], week: number, softLi
     chosen.push(o)
     return true
   }
-  // Liked dishes first, rotating among themselves when there are more than half a menu of them.
-  if (liked.length > 0) {
-    const start = (week * likedRoom) % liked.length
-    for (let i = 0; i < liked.length && chosen.length < Math.min(likedRoom, liked.length); i++) take(liked[(start + i) % liked.length][1])
+  // Familiar dishes, then liked ones, each rotating among themselves when there are more than there is room for.
+  for (const group of [familiar, likedOnly]) {
+    const room = likedRoom - chosen.length
+    if (group.length === 0 || room <= 0) continue
+    const start = (week * likedRoom) % group.length
+    const want = chosen.length + Math.min(room, group.length)
+    for (let i = 0; i < group.length && chosen.length < want; i++) take(group[(start + i) % group.length][1])
   }
   // Then the week's window of the shuffled order. Each week starts where a full menu's worth on from the last one,
   // so consecutive weeks do not overlap until the pool is smaller than two menus.

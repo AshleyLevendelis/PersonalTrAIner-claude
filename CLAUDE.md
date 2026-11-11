@@ -1529,7 +1529,15 @@ menu" stays true when a copy is also left outside it.
   dinner and snacks fit around it; with no menu a normal-sized meal is assumed; an estimate is marked as one. NOT BUILT.
 - **Meals he already eats: "My usual meals first"** (over mostly his meals, and over leaving it): setup asks what he
   usually eats, he can add his own meals on Nutrition or by telling the coach (his fridge included), and about half of
-  each week is his own meals resized to his targets, the rest new. NOT BUILT.
+  each week is his own meals resized to his targets, the rest new. PART BUILT: Profile, Foods you like, "My meals"
+  (a name, which meal, its foods; checked by the coach's own builders; re-portioned as the library's dishes are, else
+  kept at his amounts) and the coach's two add routes mark a dish as his; his meals take the first call on each week's
+  menu and a day works towards half its meals being his, counting one only once it has rested three days; variety and
+  the day's targets still come first. And the last day of a week's cycle is told what the next first day serves, so a
+  dish is not served on a Wednesday and again on the Thursday. Measured: with a full set of his meals 48% of servings
+  are his, days on target 140 of 140 before and after. `test:usual-meals`, `verify:usual-meals`,
+  `measure:usual-meals`, `docs/plans/usual-meals-first.md`. NOT BUILT: setup's question, the meal writer's half, a
+  route from Nutrition.
 
 ### His requests of 10 Nov 2026 (the long-flight batch)
 - **The Full Program as a calendar, the phase strip kept as it is.** List / Calendar beside the title (List the
@@ -2194,6 +2202,15 @@ old — the commands were right and the context was missing.
   unrelated behaviours downstream of one band all going quiet together. Check
   the fixture's TOTALS against the targets it will be searched against, not
   just that each part looks real.
+- **A POOL WITH NO ROOM IN IT CANNOT LET ANYTHING NEW FIT, AND THAT READS AS THE NEW THING BEING WRONG.** 11 Nov 2026,
+  three times in one day: a gate's meals each exactly their meal's share, a test page with two dishes a meal, then
+  eight. Each time a correctly sized new dish "could not land a day" and the fault looked like the sizing. A day lands
+  when the OTHER meals can lean the other way, so a fixture for "does this fit" needs leaner and richer dishes in
+  protein AND fat, built on the app's own split of the day (a lunch is 36% here, not 30%), or the real library.
+- **A PAIR OF DAYS WRITTEN INTO A CHECK IS A FIXTURE.** Same day: four checks swapped "day 1 and day 3", chosen for
+  the week the app served when they were written. The week changed, the two days held the same dinner, and all four
+  failed on correct code. Find the pair from the week by the property the check needs, and keep the check that one
+  exists.
 - **A GATE'S CHECK COUNT SHOULD BE THE SAME NUMBER EVERY RUN.** The same day: a
   gate wrapped three checks in `if (thingExists)` and a `for` over a possibly
   empty list, so switching the feature off made those checks VANISH rather than

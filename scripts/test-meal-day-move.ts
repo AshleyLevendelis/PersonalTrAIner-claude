@@ -304,10 +304,22 @@ async function main() {
       }
       return out
     }
-    const r = build(on, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[3] })
+    // WHICH TWO DAYS IS READ OFF THE WEEK, NOT WRITTEN DOWN (11 Nov 2026). The pair was `dates[1]` and `dates[3]`,
+    // chosen for the week the rotation served that day; when the cycle's last day learnt what the next first day
+    // serves, those two held the same dinner and every check below failed on correct code. The property is "a swap
+    // of two different dinners under leftovers", so the pair is the first one in the week that puts it under the
+    // pressure each check needs, and the check that one exists stays.
+    const dinnerPairs = [1, 2, 3, 4, 5, 6].flatMap(i => [1, 2, 3, 4, 5, 6].filter(j => j > i).map(j => [i, j] as [number, number]))
+    const pairWhere = (want: (t: ReturnType<typeof diffOf>) => boolean): [number, number] =>
+      dinnerPairs.find(([i, j]) => {
+        const b = build(on, { meal_slot: 'dinner', from_date: dates[i], to_date: dates[j] })
+        return b.ok && want(diffOf(okOf(b)?.after, [dates[i], dates[j]], 'dinner'))
+      }) ?? [1, 3]
+    const [a1, a2] = pairWhere(t => t.length >= 1 && t.length <= 4 && t.some(x => x.nowLeftover) && t.some(x => x.wasLeftover && !x.nowLeftover))
+    const r = build(on, { meal_slot: 'dinner', from_date: dates[a1], to_date: dates[a2] })
     const o = okOf(r)
     check('the swap is proposed with batch cooking on', r.ok, r)
-    const truth = diffOf(o?.after, [dates[1], dates[3]], 'dinner')
+    const truth = diffOf(o?.after, [dates[a1], dates[a2]], 'dinner')
     const said = (o?.diff.implications ?? []).map(i => i.text).filter(t => /becomes|goes from/.test(t))
     check('the fixture is under pressure: the swap changes meals on other days', truth.length >= 1 && truth.length <= 4, truth)
     check('every meal that changes is on the card, once: a new dish by name, a resized one by its two sizes',
@@ -332,14 +344,20 @@ async function main() {
     // MORE THAN FOUR CHANGES: the first four are listed and the rest folded
     // into one counted line, so a card never becomes a wall of text and never
     // hides that there is more.
-    const many = okOf(build(on, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[4] }))
-    const manyTruth = diffOf(many?.after, [dates[1], dates[4]], 'dinner')
+    const [m1, m2] = pairWhere(t => t.length > 4)
+    const many = okOf(build(on, { meal_slot: 'dinner', from_date: dates[m1], to_date: dates[m2] }))
+    const manyTruth = diffOf(many?.after, [dates[m1], dates[m2]], 'dinner')
     const lines = (many?.diff.implications ?? []).map(i => i.text)
     check('the fixture is under pressure: more than four other meals change', manyTruth.length > 4, manyTruth.length)
     check('the first four are listed', lines.filter(t => /becomes|goes from/.test(t)).length === 4, lines)
     check('...and the rest are counted in one line, not dropped', lines.includes(DAY_MOVE.andMore(manyTruth.length - 4)), { n: manyTruth.length, lines })
+    // A pair with a size-only change among few enough changes that every one is listed (found, not written down: see above).
+    const [z1, z2] = pairWhere(t => t.length <= 4 && t.some(x => x.resized))
+    const sized = okOf(build(on, { meal_slot: 'dinner', from_date: dates[z1], to_date: dates[z2] }))
+    const sizedTruth = diffOf(sized?.after, [dates[z1], dates[z2]], 'dinner')
+    const sizedSaid = (sized?.diff.implications ?? []).map(i => i.text)
     check('a meal that changes only in SIZE is reported with both sizes',
-      manyTruth.some(t => t.resized) && (refitSaid.concat(said).some(x => /goes from [\d,]+ to [\d,]+ kcal/.test(x))), { manyTruth, said })
+      sizedTruth.some(t => t.resized) && sizedSaid.some(x => /goes from [\d,]+ to [\d,]+ kcal/.test(x)), { sizedTruth, sizedSaid })
 
     // WHEN A SIZE CHANGE IS WORTH A LINE, with literals, so the thresholds
     // bind: at least 50 kcal AND a tenth of the meal.
@@ -434,11 +452,15 @@ async function main() {
     // A day the swap changed without being named counts as well.
     const on = servingFor(shapeOn)
     const wk = serveMealWeek(on)
-    const o = okOf(build(on, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[3] }, { list: [] }))
     const names = (d: { day: { chosen: Partial<Record<Slot, Opt>> } }) => JSON.stringify(Object.values(d.day.chosen).map(x => x!.name))
-    const changedOther = o?.after.find(d => d.date !== dates[1] && d.date !== dates[3] && names(d) !== names(wk.find(b => b.date === d.date)!))
+    // The first pair of days whose swap changes a day nobody named, read off the week (11 Nov 2026: it was the
+    // literal pair 1 and 3, which stopped holding two different dinners when the rotation changed).
+    const otherDayOf = (i: number, j: number) => okOf(build(on, { meal_slot: 'dinner', from_date: dates[i], to_date: dates[j] }, { list: [] }))
+      ?.after.find(d => d.date !== dates[i] && d.date !== dates[j] && names(d) !== names(wk.find(b => b.date === d.date)!))
+    const [p1, p2] = [1, 2, 3, 4, 5, 6].flatMap(i => [1, 2, 3, 4, 5, 6].filter(j => j > i).map(j => [i, j] as [number, number])).find(([i, j]) => !!otherDayOf(i, j)) ?? [1, 3]
+    const changedOther = otherDayOf(p1, p2)
     check('the fixture is under pressure: a day nobody named changes', !!changedOther)
-    const r2 = build(on, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[3] }, { list: changedOther ? [changedOther.date] : [] })
+    const r2 = build(on, { meal_slot: 'dinner', from_date: dates[p1], to_date: dates[p2] }, { list: changedOther ? [changedOther.date] : [] })
     check('...and that day being on the list is said too', texts(r2).some(t => /is on your shopping list/.test(t)), texts(r2))
   }
 
@@ -675,7 +697,11 @@ async function main() {
         return across.ok && rev.ok && across.scopeKey === rev.scopeKey && across.scopeKey !== (okOf(build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2] }))?.scopeKey ?? '')
       })())
     check('the confirm sameness includes the meal each day gives up: a card for one pair is not the card for another',
-      !!acrossOk && !sameMealDayMove(acrossOk.payload, okOf(build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[3], to_slot: 'lunch' }))?.payload ?? acrossOk.payload))
+      (() => {
+        // Another day's lunch, whichever later day the swap can be built for (found, not written down).
+        const other = [3, 4, 5, 6].map(j => okOf(build(serving, { meal_slot: 'dinner', from_date: dates[1], to_date: dates[j], to_slot: 'lunch' }))).find(x => !!x)
+        return !!acrossOk && !!other && !sameMealDayMove(acrossOk.payload, other.payload)
+      })())
 
     // REFUSALS, each in the phrasebook's words and each with no card.
     const reason = (r: Proposed) => (r.ok ? 'CARD' : r.reason)

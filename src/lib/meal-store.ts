@@ -589,6 +589,20 @@ export const USER_REQUESTED_TAG = 'user-requested'
 export const FAVOURITE_TAG = 'favourite'
 
 /**
+ * A MEAL HE ALREADY EATS, added by him: typed on Nutrition, asked of the coach by name, or built from his own foods
+ * (his ruling, 11 Nov 2026, "My usual meals first"). Separate from USER_REQUESTED_TAG on purpose: that mark is also
+ * on every edited, moved and resized COPY the app makes, and a copy made for one day is not a meal of his. Read by
+ * `isFamiliarOption`; never shown as a label.
+ */
+export const MY_MEAL_TAG = 'my-meal'
+
+/** A dish's tags with the "my meal" mark on. Written where a meal is ADDED by him, never where the app copies one. */
+export function tagsMyMeal(tags: string[] | undefined): string[] {
+  const list = tags ?? []
+  return list.includes(MY_MEAL_TAG) ? list : [...list, MY_MEAL_TAG]
+}
+
+/**
  * The pools, AND whether the read actually worked.
  *
  * getPools below returns only the pools and answers a failed read with `{}` —

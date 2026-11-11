@@ -2,7 +2,7 @@ import { verifyProposal, computeSlotBudgets, type RawProposal } from './meal-gen
 import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, formatPortion, type MealAdditionPayload } from './meal-addition'
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
-import type { MealSlotName } from './meal-store'
+import { tagsMyMeal, type MealSlotName } from './meal-store'
 import { shareLine } from './meal-food-add'
 import { dayLabel } from './day-labels'
 
@@ -123,7 +123,8 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
     ok: true,
     scopeKey: `${input.profileId}:propose_custom_meal:${slot}:${date}`,
     preconditions: { slot, date, mealName: option.name },
-    payload: { slot, date, option },
+    // HIS OWN MEAL (11 Nov 2026, "My usual meals first"): marked so the week's menu and the day's pick put it first.
+    payload: { slot, date, option: { ...option, tags: tagsMyMeal(option.tags) } },
     diff,
   }
 }

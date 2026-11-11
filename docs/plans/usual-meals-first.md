@@ -5,7 +5,9 @@ enjoy without always prescribing meals they have never had before?"* His ruling 
 **"My usual meals first"**: setup asks what he usually eats, he can add his own meals on Nutrition or by telling the
 coach (his fridge included), and about half of each week is his own meals resized to his targets, the rest new.
 
-Status: **plan, nothing built.** The trace behind it is in BACKLOG (11 Nov, "his four points").
+Status: **the ranking, the mark, the screen's "My meals" and the coach's two add routes are BUILT (11 Nov 2026).
+Setup's question and the meal writer's half are not.** See "What was built" at the end. The trace behind it is in
+BACKLOG (11 Nov, "his four points").
 
 ## What exists today (traced, read from source)
 
@@ -80,3 +82,39 @@ it belongs to; a dish that comes back for a named meal is marked as his. Never b
 ## Not in this plan
 
 Meals cooked for him elsewhere (work, a canteen menu): `docs/plans/meals-cooked-elsewhere.md`, its own ruling.
+
+## What was built (11 Nov 2026), and where it differs from the plan above
+
+- **Familiar is a mark on a dish** (`my-meal`, or a heart), as planned. Both of the coach's add routes write it, so a
+  meal added by telling the coach is one of his with no deploy.
+- **The week's menu** takes his dishes first on the liked half. **The day's pick** works towards half the day's meals
+  being his, as one key after the variety keys. **Changed from the plan:** a meal of his counts towards that only once
+  it has RESTED (not served in that meal in the last three days). Without it the key decided which meal came back
+  when something had to, and brought his back a day early.
+- **A like naming several foods** matches a dish holding all of them, as planned.
+- **Add my own meal is on Profile, under "Foods and meals I like", not on Nutrition's Add sheet.** That is where he
+  already tells the app what he eats, and the two lists read as one thing. Nutrition has no route to it yet.
+- **Three versions of a typed meal are tried, not one**: re-portioned the way the library's own dishes are, then sized
+  by energy alone, then kept exactly as he wrote it. The first that can be part of a day on his targets is kept; when
+  none can, it is kept as written and the card says it will not come up often. Measured before this: sized by energy
+  alone, 150 g of chicken with rice became 350 g to fill a dinner. A usual meal the app cannot size (porridge and a
+  banana) was being REFUSED; now it is kept at his amounts.
+- **Found and fixed on the way: the same dish on a Wednesday and again on the Thursday.** A week's days are worked out
+  as a cycle of seven starting on a Thursday, each day avoiding the days before it, and the first day of a cycle
+  avoided nothing. His meals are on every week's menu, so they were the dishes it happened to most. The cycle's last
+  day is now told what the next first day serves (this cycle's own, or the next week's menu's). It was already
+  happening to ordinary plan dishes.
+- **Measured** (`npm run measure:usual-meals`: 22 ordinary meals as typed, 5 targets, a real-sized plan, 28 days,
+  leftovers off):
+  - typed meals kept: 105 of 110 (5 refused: one food the app has no figures for); 79 of the 105 can be part of a day
+    on target (60 before the three versions).
+  - his own share of what is served: 9.8% with 2 usual dinners, 19.8% with 4, 48% with a full set across the meals
+    (3 breakfasts, 3 lunches, 4 dinners, 2 snacks), on 98% of days.
+  - days on target: 140 of 140 before and after, in every row.
+  - the same dish two days running: 13 in 560 servings with no usual meals (was 18 before the cycle fix); 0 of his in
+    every row but one (1 in 560).
+- **Not built:** setup's question; the meal writer being told his usual meals; a route from Nutrition; an exam case.
+  The coach is not told anything new: its two add tools already do this, and now mark the dish.
+- **Named limits:** with usual dinners only, nearly every dinner served is one of his (four usual dinners: 79% of
+  days), so "about half" is a share of the whole day, not of each meal. A meal of his held as a pick on another date
+  and then removed is unverified. Never run on a real phone or against his own saved meals.

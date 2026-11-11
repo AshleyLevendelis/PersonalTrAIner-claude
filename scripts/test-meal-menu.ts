@@ -108,7 +108,7 @@ function main() {
   check('...but a pool of ten or fewer is counted whole (a fitting dish this week\'s menu leaves out still counts)', SLOTS.every(s => (tenCounts[s] ?? 0) > MENU_SIZE), tenCounts)
   const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1')
   const app = strip(readFileSync('src/App.tsx', 'utf8'))
-  check('App builds its rotation from this week\'s menu, never the whole pool', /buildRotation\(menuFor\(poolsServedOn\(mealPools, mealRotationDate\), mealRotationDate, compiledSoftFoodPreferences\)/.test(app) && !/buildRotation\(mealPools\b/.test(app))
+  check('App builds its rotation from this week\'s menu, never the whole pool', /const menu = menuFor\(poolsServedOn\(mealPools, mealRotationDate\), mealRotationDate, compiledSoftFoodPreferences\)/.test(app) && /buildRotation\(menu, macros, /.test(app) && !/buildRotation\(mealPools\b/.test(app))
   const rot = strip(readFileSync('src/lib/meal-rotation.ts', 'utf8'))
   check('serveDates draws each date\'s pool through the menu, after the pool as it stood that day', /canonical\(menuFor\(poolsServedOn\(pools, date\), date, softLikedFoods\)\)/.test(rot))
   const gen = strip(readFileSync('src/lib/meal-generation.ts', 'utf8'))

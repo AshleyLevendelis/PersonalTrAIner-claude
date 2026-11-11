@@ -91,4 +91,4 @@ export function displayTags(tags: string[]): string[] {
  * (the dish-identity rule reads it), and 'own recipe' is the verifier's mark on a dish costed from her own amounts:
  * both showed as chips on every edited, moved or added-to meal (1 Nov 2026, whole-app test, meal cards).
  */
-const INTERNAL_TAGS = new Set(['slot_appropriate', 'user-requested', 'own recipe'])
+const INTERNAL_TAGS = new Set(['slot_appropriate', 'user-requested', 'own recipe', 'my-meal'])

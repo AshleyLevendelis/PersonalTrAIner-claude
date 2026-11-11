@@ -177,6 +177,46 @@ function extendHistory(
   return next
 }
 
+/**
+ * The history the cycle's LAST day is assembled with: the days before it, with the first day's dishes placed just
+ * behind yesterday's, because the first day is the one served next. See buildRotation.
+ */
+function historyAcrossSeam(
+  history: Partial<Record<MealSlotName, string[]>>,
+  firstDay: Partial<Record<MealSlotName, PoolOption>>,
+): Partial<Record<MealSlotName, string[]>> {
+  const next: Partial<Record<MealSlotName, string[]>> = { ...history }
+  for (const [slot, option] of Object.entries(firstDay) as [MealSlotName, PoolOption][]) {
+    const names = history[slot] ?? []
+    // Still no more than the window every other day remembers: the oldest name makes room.
+    next[slot] = [...names.slice(0, -1), option.name, ...names.slice(-1)].slice(-RECENT_WINDOW)
+  }
+  return next
+}
+
+/**
+ * What the day after `date`'s cycle serves, for buildRotation's `nextFirstDay`: undefined when the same menu simply
+ * comes round again (the cycle's own first day), otherwise the next menu's first day, which is assembled with no
+ * history and no pins, exactly as buildRotation assembles its day 0. Every caller that builds a rotation for a date
+ * passes this, so the screen's rotation and the strip's are the same days.
+ */
+export function firstDayAfter(
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+  date: string,
+  menu: Partial<Record<MealSlotName, PoolOption[]>>,
+  targets: MacroTargets,
+  softLikedFoods: string[] = [],
+): Partial<Record<MealSlotName, PoolOption>> | undefined {
+  const next = addDays(date, ROTATION_DAYS - rotationIndexFor(date))
+  // THE POOL AS IT STOOD ON `date`, not as it will stand next week. A meal added later carries a first day, and every
+  // day before it must be worked out from the pool as it was (28 Sep 2026, "keep today"): reading next week's pool
+  // here would let a top-up move the Wednesday he has already shopped for. The cost is one handover, the first after
+  // new meals start, where the next first day is guessed from the old pool; from the cycle after, it is exact again.
+  const nextMenu = menuFor(poolsServedOn(pools, date), next, softLikedFoods)
+  if (nextMenu === menu) return undefined
+  return assembleDay(nextMenu, targets, {}, softLikedFoods, {}).chosen
+}
+
 const asMacros100g = (t: MacroTargets): Macros100g => ({
   kcal: t.calories, protein: t.protein, carbs: t.carbs, fat: t.fat,
 })
@@ -269,6 +309,12 @@ export function buildRotation(
   targets: MacroTargets,
   softLikedFoods: string[] = [],
   shape: MealShape = {},
+  /**
+   * What is served the day AFTER this cycle's last day, when that is not this cycle's own first day: a deep pool
+   * serves each week from a different menu, so the day after a Wednesday is the NEXT menu's first day (firstDayAfter).
+   * Left out, the cycle comes round to its own first day.
+   */
+  nextFirstDay?: Partial<Record<MealSlotName, PoolOption>>,
 ): Rotation {
   const histories: Partial<Record<MealSlotName, string[]>>[] = []
   const leftovers: Partial<Record<MealSlotName, PoolOption>>[] = []
@@ -284,7 +330,19 @@ export function buildRotation(
   let previousDinner: PoolOption | null = null
 
   for (let i = 0; i < ROTATION_DAYS; i++) {
-    histories.push(history)
+    // THE LAST DAY OF THE CYCLE IS FOLLOWED BY A FIRST DAY (11 Nov 2026). A cycle's first day is assembled with no
+    // history, and nothing told the last day what that first day had chosen, so the same dish could be served on a
+    // Wednesday and again on the Thursday. Measured over 140 served days on deep pools: 6 of 18 next-day repeats sat
+    // on exactly that pair of days, and with a full set of his own meals 10 of 10 did, because his meals are on every
+    // week's menu and a rested one is the first thing a day reaches for. The first day served next (this cycle's own,
+    // or the next menu's: see `nextFirstDay`) is put into the last day's history just behind yesterday's: one of its
+    // dishes then costs what a dish from two days ago costs (varietyCost's `repeats`, the key straight after "not
+    // yesterday's"), which every other preference ranks below. A first day needs no history to work out, so this
+    // looks FORWARD and there is nothing to chase backwards. `histories` holds what the day was really assembled
+    // with, so a caller re-assembling the day gets the same day back.
+    const after = nextFirstDay ?? days[0]?.chosen
+    const dayHistory = i === ROTATION_DAYS - 1 && after ? historyAcrossSeam(history, after) : history
+    histories.push(dayHistory)
     // THE CYCLE HAS A SEAM AT DAY 0, ON PURPOSE. Day 0's "yesterday" is day 6
     // of the previous turn of the rotation, and pinning lunches changes which
     // dinners get chosen — so seeding day 0 from a first pass would promise a
@@ -304,7 +362,7 @@ export function buildRotation(
     if (leftover) pinned.lunch = leftover
     leftovers.push(pinned)
 
-    let day = assembleDay(pools, targets, history, softLikedFoods, pinned)
+    let day = assembleDay(pools, targets, dayHistory, softLikedFoods, pinned)
 
     // COOK ONCE, EAT TWICE — NOT TWICE TODAY.
     //
@@ -332,7 +390,7 @@ export function buildRotation(
     if (leftover && day.chosen.dinner && sameDish(pools.dinner, day.chosen.dinner.name, leftover.name)) {
       delete pinned.lunch
       leftovers[leftovers.length - 1] = {}
-      day = assembleDay(pools, targets, history, softLikedFoods, pinned)
+      day = assembleDay(pools, targets, dayHistory, softLikedFoods, pinned)
     }
     days.push(day)
     history = extendHistory(history, day.chosen)
@@ -563,7 +621,7 @@ export function serveDates(input: {
     const dayPools = canonical(menuFor(poolsServedOn(pools, date), date, softLikedFoods))
     let rotation = rotations.get(dayPools)
     if (!rotation) {
-      rotation = buildRotation(dayPools, targets, softLikedFoods, shape)
+      rotation = buildRotation(dayPools, targets, softLikedFoods, shape, firstDayAfter(pools, date, dayPools, targets, softLikedFoods))
       rotations.set(dayPools, rotation)
     }
     const day = assembleRotationDay(rotation, date, dayPools, targets, softLikedFoods, pinsByDate[date] ?? {}, { previousDinner, keepHeldSizes: kept.has(date) })

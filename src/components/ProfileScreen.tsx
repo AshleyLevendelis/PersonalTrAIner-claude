@@ -69,6 +69,8 @@ import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } f
 import { dietTargetCaveat, WORKING_WEIGHT_LIFTS, workingWeightProfileNote } from '@/lib/coach-voice'
 import { KitTicks } from '@/components/KitTicks'
 import type { KitController } from '@/lib/kit-change'
+import type { MyMealsSource } from '@/lib/my-meals'
+import { MyMealsSection } from '@/components/MyMealsSection'
 import { checkWeighIn, profileWeightQuestionText, weighInYesLabel, WEIGH_IN_NO_LABEL, type WeighInCheck } from '@/lib/weigh-in-check'
 
 // LOADED WHEN PROFILE OPENS, not with the app: the reminders screen and its
@@ -167,6 +169,11 @@ interface ProfileScreenProps {
    * coach's card is handed. Absent before there is a profile to save to.
    */
   kit?: KitController | null
+  /**
+   * His own meals (my-meals.ts): what the list and the add form on "Foods and meals I like" are planned against, the
+   * same targets, diet and avoids App is using. Absent before there are targets to size a meal to.
+   */
+  myMeals?: MyMealsSource | null
   /**
    * A new equipment choice starts the kit list again. Awaited BEFORE the
    * rebuild is offered, so a yes rebuilds around the new choice and not the
@@ -539,7 +546,7 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, activeAdaptations, endingAdaptationId, onEndAdaptation, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan, planBan, backLabel = 'Back', calorieTarget, kit, onEquipmentChoiceChanged }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, activeAdaptations, endingAdaptationId, onEndAdaptation, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan, planBan, backLabel = 'Back', calorieTarget, kit, myMeals, onEquipmentChoiceChanged }: ProfileScreenProps) {
   // Read once on mount: the store is the owner, this is the control's echo of
   // it. `null` means she has not chosen, which the picker shows as automatic.
   const [shopDayChoice, setShopDayChoice] = useState<string>(() => readShopDayChoice())
@@ -1712,6 +1719,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                   shown still says so rather than looking like no hearts. */}
               {heartError && <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]">{heartError}</p>}
             </div>
+            {/* His own meals: under what he likes, because both are "what I already eat". */}
+            <MyMealsSection source={myMeals ?? null} />
         </div>
       )
       case 'avoid': return (

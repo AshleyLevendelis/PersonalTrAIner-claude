@@ -34,7 +34,7 @@ import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, ty
 import { generateMealPools, chosenToMealPlanDays, persistResizedPools, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
 import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, isTopUpDismissed, dismissTopUp, type TopUpOutcome } from '@/lib/meal-top-up'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
-import { buildRotation, rotationIndexFor, pinsFromPicks, poolsServedOn, type MealShape } from '@/lib/meal-rotation'
+import { buildRotation, firstDayAfter, rotationIndexFor, pinsFromPicks, poolsServedOn, type MealShape } from '@/lib/meal-rotation'
 import { menuFor } from '@/lib/meal-menu'
 import { useMealDays } from '@/hooks/useMealDays'
 import { useMealPlanActions } from '@/hooks/useMealPlanActions'
@@ -161,6 +161,7 @@ import { getActiveFacts, getActiveGoals, getActiveContextFacts, createFact, crea
 import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, compileSoftExercisePreferences, compileSoftFoodPreferences, compileTrainingDayOverrides, compileKnownLiftOverrides, compileKitStatements, kitFactsIn, resolveFoodTarget, resolveExerciseTarget } from '@/lib/fact-compiler'
 import { profileWithKit, kitStatementFact, describeKitStatement } from '@/lib/kit-list'
 import { makeKitController, clearKitStatements, type KitController } from '@/lib/kit-change'
+import type { MyMealsSource } from '@/lib/my-meals'
 import { favouritesStillAllowed } from '@/lib/meal-restriction-check'
 import { useServablePools } from '@/hooks/useServablePools'
 import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, refreshGroceryDays, subscribeGroceryStore, type GroceryItemRow } from '@/lib/grocery-store'
@@ -492,7 +493,12 @@ function App() {
   const mealRotation = useMemo(
     // Built from THIS WEEK'S MENU (9 Nov 2026, meal-menu.ts): a deep pool is never searched whole. The same object
     // serveDates draws for today, so the strip finds this rotation again rather than building its own.
-    () => (macros ? buildRotation(menuFor(poolsServedOn(mealPools, mealRotationDate), mealRotationDate, compiledSoftFoodPreferences), macros, compiledSoftFoodPreferences, mealShape) : null),
+    // Its last day is told what the NEXT menu's first day serves (firstDayAfter), as serveDates' own rotations are.
+    () => {
+      if (!macros) return null
+      const menu = menuFor(poolsServedOn(mealPools, mealRotationDate), mealRotationDate, compiledSoftFoodPreferences)
+      return buildRotation(menu, macros, compiledSoftFoodPreferences, mealShape, firstDayAfter(mealPools, mealRotationDate, menu, macros, compiledSoftFoodPreferences))
+    },
     [mealPools, macros, compiledSoftFoodPreferences, mealShape, mealRotationDate],
   )
   // THE STRIP'S DAYS (Ashley, 27 Sep 2026) — one hook, shared with the browser
@@ -774,6 +780,21 @@ function App() {
       await reloadMemory(profile.id!)
     },
   }) : null
+  /**
+   * WHAT HIS OWN MEALS ARE PLANNED AGAINST (my-meals.ts) — his 11 Nov 2026 ruling, "My usual meals first". Profile's
+   * "My meals" sizes and checks a meal against the targets, diet and avoids the rest of the app is using right now,
+   * and re-reads the meals after a save. Only the facts are handed over: the planner itself loads with Profile, so
+   * none of it is downloaded to open the app. Absent until there are targets to size a meal to.
+   */
+  const myMealsSource: MyMealsSource | null = profile?.id && macros ? {
+    context: {
+      profileId: profile.id, targets: macros,
+      mealsPerDay: profile.meals_per_day, includeSnacks: profile.include_snacks,
+      dietaryPreferences: profile.dietary_preferences ?? [], dislikedFoods: effectiveDislikedFoods,
+      todayDate: getSessionDateContext(profile.id).date, pools: mealPools,
+    },
+    reload: async () => { if (profile?.id) setMealPools(await getPools(profile.id)) },
+  } : null
   /**
    * A NEW EQUIPMENT CHOICE STARTS THE LIST AGAIN (kit-change.ts
    * `clearKitStatements`). Awaited by Profile before it offers the rebuild, so
@@ -3532,6 +3553,7 @@ function App() {
         onEndAdaptation={handleEndAdaptation}
         onCeilingsCorrected={handleCeilingsCorrected}
         kit={kitController}
+        myMeals={myMealsSource}
         onEquipmentChoiceChanged={handleEquipmentChoiceChanged}
         onMemoryChanged={() => { if (profile.id) return reloadMemory(profile.id) }}
         initialSection={profileInfoSection}

@@ -2,6 +2,60 @@
 
 Newest first. One line each.
 
+- [x] **HIS OWN MEALS COME FIRST: HIS RULING 11 NOV 2026, "My usual meals first"** (over "mostly his meals" and over
+  leaving it). Plan: `docs/plans/usual-meals-first.md` (its last section says what was built and where it differs).
+  WHAT WAS WRONG, TRACED: a like was one phrase matched against a dish ("chicken and rice" matched almost nothing);
+  a meal the coach added for him was one dish in a hundred and nothing made it come round; the screen could not add a
+  meal at all; setup never asked what he eats.
+  WHAT CHANGED ON THE PHONE: Profile, Foods you like, has "My meals": a list, and "Add a meal" (a name, which meal,
+  its foods one per line with amounts). "Check it" shows the meal as the app costed it before anything is kept; a
+  line it cannot read, a food he avoids, a clash with his diet and plain mince are each said in the form, by the
+  coach's own two builders. A meal added by telling the coach is one of his too (both builders write the mark, in the
+  app, so no deploy). His meals take the first call on each week's menu, and a day works towards half its meals
+  being his.
+  DECIDED BY ME, AND WHY (each his to change):
+  (1) ON PROFILE, NOT NUTRITION'S ADD SHEET, which is where the plan put it. It is where he already says what he
+  eats. Nutrition has no route to it yet.
+  (2) THREE VERSIONS OF A TYPED MEAL, the first that can be part of a day on target: re-portioned as the library's
+  dishes are, sized by energy alone, kept as written. When none can, kept as written and the card says it will not
+  come up often. MEASURED FIRST: sized by energy alone, 150 g of chicken with rice became 350 g to fill a dinner, and
+  porridge with a banana was REFUSED for being leaner than a breakfast.
+  (3) A MEAL OF HIS COUNTS TOWARDS "ABOUT HALF" ONLY ONCE IT HAS RESTED three days in that meal. Without it the key
+  chose WHICH meal came back when one had to, and brought his back a day early.
+  (4) THE CARD SAYS "come first", never a share of the week and never "not two days running": neither is a thing
+  the app can promise. A food held raw says its cooked weight beside it, so the number he typed is on the card.
+  FOUND ON THE WAY, AND FIXED (mechanical): THE SAME DISH ON A WEDNESDAY AND AGAIN ON THE THURSDAY. A week's days are
+  a cycle of seven from a Thursday, each avoiding the days before it, and the first day avoided nothing. With a deep
+  plan the Thursday also starts a new menu, and his meals are on every menu. The cycle's last day is now told what
+  the next first day serves (its own, or the next menu's; a first day needs no history, so this looks forward and
+  there is nothing to chase back). It reads the plan AS IT STOOD THAT DAY, so adding meals still cannot move a day
+  already shopped for (`test:meal-top-up` caught my first version doing exactly that).
+  MEASURED (`npm run measure:usual-meals`: 22 ordinary meals as typed, 5 targets, a real-sized plan, 28 days,
+  leftovers off): 105 of 110 kept (5 refused, one food with no figures); 79 of 105 can be part of a day on target
+  (60 before the three versions). His share of servings: 9.8% with 2 usual dinners, 19.8% with 4, 48% with a full
+  set across the meals, on 98% of days. Days on target 140 of 140 before and after, every row. Next-day repeats: 18
+  in 560 servings before the cycle fix with no usual meals, 13 after; his own, 9 before and 0 or 1 after.
+  THE REVIEW (performance nutrition at the level the app works at is mine): (i) effect: what he already eats is what
+  comes round, and a day is still judged on its targets first; (ii) what it takes away: new dishes, where he has
+  usual meals in one meal only (four usual dinners: one of his on 79% of days); (iii) fundamentals: targets, protein
+  floor and bands untouched, and a lean usual breakfast is allowed because the DAY must land, not the meal;
+  (iv) redefined: nothing reads differently, and the count behind "fewer than three fit" still judges this week's
+  menu alone (the new-dish verdict looks four weeks on, through the same one test); (v) scope: no diagnosis, no
+  clinical diet, and the allergen path is the same code (asked again for nut-free, an avoid, and mince).
+  VERIFIED: `test:usual-meals` (96 checks; 56 mutations over two rounds, 55 caught, and one that makes no difference:
+  whether the next first day or yesterday is the nearer of two adjacent days, where one must repeat either way),
+  `verify:usual-meals` at phone size (39 checks, screenshots read; 16 mutations, all caught, three only after a
+  check was added: each field on its own must clear the last answer),
+  `measure:usual-meals`. Re-anchored, each on its property: `test:meal-day-move` (four checks named day pairs 1 and
+  3; the pair is now found from the week), `test:meal-menu`, `test:meal-likes`, `test:meal-addition` (source lines
+  that moved). `test:bundle`: the total moved 2868 to 2902, measured on a clean copy of the commit before (+9 kB,
+  8 of them loading with Profile; the planner was first built at start and cost the start 2 kB more, so it moved).
+  A LEAD, NOT FIXED: `measure:deep-pool` says "leftovers off" and passes nothing that turns them off, so its printed
+  figures were taken with a lunch that is last night's dinner.
+  NOT BUILT, NAMED: setup's question; the meal writer told his usual meals; a route from Nutrition; an exam case.
+  NOT PROVEN: App's own wiring is held by source (no test page boots the app); his own saved meals; a real phone; a
+  meal of his picked for another date and then removed.
+  NEEDS: the frontend only. No function, no migration.
 - [x] **HOW A LIFT FELT, ONE TAP PER LIFT, AND TODAY'S WEIGHT NOW READS THE PLAN'S WEEK: HIS RULING 11 NOV 2026, "One
   tap per lift"** (over main lift only, and over not asking). Plan first, as load prescription requires:
   `docs/plans/too-easy-weights.md`.

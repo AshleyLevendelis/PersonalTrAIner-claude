@@ -24,7 +24,7 @@ import { splitCompoundFoodLine } from './ingredient-units'
 import { whichKindQuestion } from './food-db'
 import { parseIngredientLine } from './portion-scaler'
 import { computeSlotBudgets, verifyProposal, type PoolOption, type RawProposal } from './meal-generation'
-import type { MealSlotName } from './meal-store'
+import { tagsMyMeal, type MealSlotName } from './meal-store'
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 
@@ -220,7 +220,8 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
     ok: true,
     scopeKey: `${input.profileId}:propose_meal_addition:${slot}:${date}`,
     preconditions: { slot, date, mealName: option.name },
-    payload: { slot, date, option },
+    // HIS OWN MEAL (11 Nov 2026, "My usual meals first"): marked so the week's menu and the day's pick put it first.
+    payload: { slot, date, option: { ...option, tags: tagsMyMeal(option.tags) } },
     diff: {
       rows: [
         { field: 'Adding to', before: slot, after: option.name },

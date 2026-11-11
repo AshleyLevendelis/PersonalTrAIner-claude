@@ -683,7 +683,13 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 10 Nov 2026: 2843 -> 2868, the long-flight QA fixes (the food table's new foods, the third exercise batch, the
   // calendar, and the cardio-day labels). Measured through this gate: 2841 at a1fada11 (2 left, worn by the earlier
   // commits that day), 2843 with the cardio-day change. Her 15 Sep ruling, 25 raw of room.
-  const TOTAL_BUDGET_KB = 2868
+  // MOVED 11 Nov 2026: 2868 -> 2902, his own meals ("My usual meals first": the "My meals" form and its planner, which
+  // load with Profile, never at start). MEASURED through this gate on a clean worktree of 702a90e2 and on the change:
+  //     before   deploy 394 gz   paint 550 gz   app 1372 raw   total 2868 raw   (2, 2, 4 and 0 kB of room)
+  //     after    deploy 395 gz   paint 551 gz   app 1374 raw   total 2877 raw   (total OVER by 9)
+  // 8 of the 9 kB are in the Profile chunk; the planner was first built in App and cost the start 2 kB gz more, so it
+  // was moved to load with Profile. His 15 Sep ruling, "raise it with room to grow": 25 kB raw over today's number.
+  const TOTAL_BUDGET_KB = 2902
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

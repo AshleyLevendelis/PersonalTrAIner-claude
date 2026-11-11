@@ -203,7 +203,7 @@ console.log('\n5. The verification is not optional')
   check('buildMealAdditionProposal calls verifyProposal', /verifyProposal\(proposal, slot, budget/.test(mod))
   check('...and returns null-checks it rather than falling through', /if \(!option\) return \{ ok: false/.test(mod))
   check('the payload carries the VERIFIED option, not the raw args',
-    /payload: \{ slot, date, option \}/.test(mod) && !/payload: \{[^}]*rawArgs/.test(mod))
+    /payload: \{ slot, date, option: \{ \.\.\.option, tags: tagsMyMeal\(option\.tags\) \} \}/.test(mod) && !/payload: \{[^}]*rawArgs/.test(mod))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
