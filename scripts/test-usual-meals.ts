@@ -425,6 +425,21 @@ function main() {
     check('the setup coach is told to record it in his words, whole meals, and to add nothing', /set_slot\(usualFoods = /.test(fn) && /"chicken and rice" is one entry, never two/.test(fn) && /Never add a food they did not say/.test(fn))
   }
 
+  console.log('\n12. The meal writer writes a meal he already eats as itself')
+  {
+    // "without always prescribing meals they have never had before": a like naming a whole meal was only an ingredient
+    // hint, so the writer returned new dishes that happened to hold chicken. Held by source: the writer is a model.
+    const writer = readFileSync('supabase/functions/generate-meals/index.ts', 'utf8')
+    const block = writer.slice(writer.indexOf('function likesBlock'), writer.indexOf('function dislikedFoodsBlock'))
+    const said = block.slice(block.indexOf('const asItself'))
+    check('it is told a whole meal he already eats is written as ONE option that IS that meal', /make ONE option, in the meal it belongs to, that IS that meal/.test(said), said.slice(0, 200))
+    check('...the same main foods, named as he named it, nothing main added', /the same main foods, plainly cooked, named much as they named it/.test(said) && /no extra main ingredient they did not say/.test(said))
+    check('...and not a new dish inspired by it', /Not a new dish inspired by it/.test(said))
+    check('...only when he has told us a food or meal he likes (a favourite alone is a dish the plan already has)', /const asItself = foods\.length > 0\s*\?/.test(said))
+    check('the sentence is in what the writer is sent, after the likes themselves', /\$\{lines\.join\(" "\)\}\$\{asItself\}`;/.test(block))
+    check('...and the rule that a like never breaks another rule still stands', /never break any other rule in this prompt to fit one in/.test(block))
+  }
+
   console.log(`\n${ran} checks ran, ${failures} failed`)
 }
 main()

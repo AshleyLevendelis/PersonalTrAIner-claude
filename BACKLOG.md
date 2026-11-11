@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [x] **THE MEAL WRITER WRITES A MEAL HE ALREADY EATS AS ITSELF** (11 Nov 2026, the writer's half of his "My usual
+  meals first": "without always prescribing meals they have never had before"). A like naming a whole meal ("chicken
+  and rice", "porridge with banana") reached the writer only as an ingredient hint, so new plans held new dishes that
+  happened to contain chicken. The writer is now told: where a like is a whole meal he already eats, make ONE option,
+  in the meal it belongs to, that IS that meal (the same main foods, plainly cooked, named much as he named it, no
+  main ingredient added), and never break another rule to fit it in. Every dish is still verified as before.
+  DECIDED BY ME: one option a meal, not all of them (variety and his targets still come first); only when he has
+  told us a like (a hearted meal is a dish the plan already has).
+  VERIFIED: `test:usual-meals` section 12 (117 checks; 4 mutations, 4 caught), the 14 other checks that read the
+  writer's file. NOT PROVEN: what the writer then writes (model behaviour; no key in a cloud session). NEEDS the
+  `generate-meals` deploy. STILL NOT BUILT from this ruling: a route to "My meals" from Nutrition.
 - [ ] **MEALS COOKED FOR HIM ELSEWHERE: HIS RULING 11 NOV 2026, "Set days + optional menu"**, in
   his words: "I dont want it to stop posing the meals, I want it to incorporate the meals into its plan." Plan:
   `docs/plans/meals-cooked-elsewhere.md` (its last section says what is built and what is not).

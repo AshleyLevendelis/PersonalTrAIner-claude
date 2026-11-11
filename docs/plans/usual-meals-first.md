@@ -6,7 +6,7 @@ enjoy without always prescribing meals they have never had before?"* His ruling 
 coach (his fridge included), and about half of each week is his own meals resized to his targets, the rest new.
 
 Status: **the ranking, the mark, the screen's "My meals", the coach's two add routes and setup's question are BUILT
-(11 Nov 2026). The meal writer's half is not.** See "What was built" at the end. The trace behind it is in
+(11 Nov 2026), and the meal writer's half the same day.** See "What was built" at the end. The trace behind it is in
 BACKLOG (11 Nov, "his four points").
 
 ## What exists today (traced, read from source)
@@ -117,7 +117,11 @@ Meals cooked for him elsewhere (work, a canteen menu): `docs/plans/meals-cooked-
   out. Kept as likes, not as dishes: the meal writer is not yet asked to write a named usual meal as its own dish, so
   a like steers what is written and chosen, and a meal becomes "his" only when he adds it on Profile or through the
   coach. The app keeps his typed reply as the answer when the coach records nothing.
-- **Not built:** the meal writer being told to write his usual meals as dishes; a route from Nutrition; an exam case.
+- **The meal writer's half (11 Nov 2026):** the writer is told that a like naming a whole meal he already eats is
+  written as ONE option that IS that meal, in the meal it belongs to (the same main foods, named as he named it).
+  One option a meal, so variety and his targets still come first. Needs the `generate-meals` deploy; what the writer
+  then writes is model behaviour.
+- **Not built:** a route from Nutrition; an exam case.
   The coach is not told anything new: its two add tools already do this, and now mark the dish.
 - **Named limits:** with usual dinners only, nearly every dinner served is one of his (four usual dinners: 79% of
   days), so "about half" is a share of the whole day, not of each meal. A meal of his held as a pick on another date

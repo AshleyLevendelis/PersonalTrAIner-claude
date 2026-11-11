@@ -184,7 +184,14 @@ function likesBlock(liked: string[], favourites: string[]): string {
   const lines: string[] = [];
   if (foods.length > 0) lines.push(`Foods and dishes they have told us they like: ${foods.join(", ")}.`);
   if (meals.length > 0) lines.push(`Meals they have saved as favourites, for the kind of food they enjoy: ${meals.join("; ")}.`);
-  return `\n\nTHEY LIKE (build roughly a third to a half of each slot's options around these where they genuinely suit that meal — the rest should still vary; never break any other rule in this prompt to fit one in): ${lines.join(" ")}`;
+  // A MEAL HE ALREADY EATS IS WRITTEN AS ITSELF (Ashley, 11 Nov 2026, "My usual meals first": "without always
+  // prescribing meals they have never had before"). A like that names a whole meal ("chicken and rice", "porridge
+  // with banana") was only ever an ingredient hint, so the writer returned new dishes that happened to contain
+  // chicken. One option that IS the meal, in the meal it belongs to; still verified like every other dish.
+  const asItself = foods.length > 0
+    ? ` Where one of those is a whole MEAL they already eat (a dish by name, or foods eaten together, like "chicken and rice" or "porridge with banana"), make ONE option, in the meal it belongs to, that IS that meal: the same main foods, plainly cooked, named much as they named it. Not a new dish inspired by it, and no extra main ingredient they did not say.`
+    : "";
+  return `\n\nTHEY LIKE (build roughly a third to a half of each slot's options around these where they genuinely suit that meal — the rest should still vary; never break any other rule in this prompt to fit one in): ${lines.join(" ")}${asItself}`;
 }
 
 function dislikedFoodsBlock(disliked: string[]): string {

@@ -1552,7 +1552,9 @@ menu" stays true when a copy is also left outside it.
   `measure:usual-meals`, `docs/plans/usual-meals-first.md`. AND SETUP ASKS IT: one typed, optional question after the
   foods to leave out, kept as likes (commas separate meals, "and" does not), the app keeping his reply when the coach
   records nothing; setup is one question longer by his ruling. `test:usual-meals` §11, `verify:onboarding-turns` §28.
-  Needs the `onboarding-chat` deploy for the coach's line. NOT BUILT: the meal writer's half, a route from Nutrition.
+  Needs the `onboarding-chat` deploy for the coach's line. AND THE MEAL WRITER WRITES A MEAL HE ALREADY EATS AS
+  ITSELF: one option, in the meal it belongs to, the same main foods, named as he named it (`test:usual-meals` §12;
+  needs the `generate-meals` deploy; what it then writes is model behaviour). NOT BUILT: a route from Nutrition.
 
 ### His requests of 10 Nov 2026 (the long-flight batch)
 - **The Full Program as a calendar, the phase strip kept as it is.** List / Calendar beside the title (List the
