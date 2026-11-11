@@ -155,7 +155,7 @@ interface ProfileScreenProps {
   /** Fired after any memory (goal/fact/context) edit/delete — same contract MemoryScreen had. */
   onMemoryChanged: () => void | Promise<void>
   /** Chat receipt deep-links land here, scrolled to the relevant memory section. 'dietary' — surfacing round — is where the meal-plan "unrecognised restriction" banner's "Open Profile" button lands. */
-  initialSection?: 'goals' | 'facts' | 'context' | 'dietary'
+  initialSection?: 'goals' | 'facts' | 'context' | 'dietary' | 'myMeals'
   /** What the top bar's "‹" goes back to — the tab Profile was opened from (2d). */
   backLabel?: string
   /** Today's calorie target, for the stat strip — App's own macros, never worked out again here. */
@@ -248,6 +248,8 @@ const SHEET_TITLE: Record<ProfileSheet, string> = {
 /** A deep link names a section; this is the sheet that holds it, so its scroll still lands. */
 const SHEET_FOR_SECTION: Record<NonNullable<ProfileScreenProps['initialSection']>, ProfileSheet> = {
   goals: 'goal', facts: 'remembers', context: 'remembers', dietary: 'diet',
+  // Nutrition's swap list links here: "Add a meal you already eat" (11 Nov 2026).
+  myMeals: 'likes',
 }
 
 /**
@@ -576,6 +578,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const factsRef = useRef<HTMLDivElement>(null)
   const contextRef = useRef<HTMLDivElement>(null)
   const dietaryRef = useRef<HTMLDivElement>(null)
+  const myMealsRef = useRef<HTMLDivElement>(null)
 
   const profileId = profile.id
 
@@ -597,7 +600,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
 
   useEffect(() => {
     if (!open || !initialSection) return
-    const ref = initialSection === 'goals' ? goalsRef : initialSection === 'facts' ? factsRef : initialSection === 'dietary' ? dietaryRef : contextRef
+    const ref = initialSection === 'goals' ? goalsRef : initialSection === 'facts' ? factsRef : initialSection === 'dietary' ? dietaryRef : initialSection === 'myMeals' ? myMealsRef : contextRef
     // Content loads async (reload() above) — give it a tick before scrolling.
     const t = setTimeout(() => ref.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 150)
     return () => clearTimeout(t)
@@ -1721,7 +1724,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               {heartError && <p className="text-[0.6875rem] text-[color:var(--role-warn-text)]">{heartError}</p>}
             </div>
             {/* His own meals: under what he likes, because both are "what I already eat". */}
-            <MyMealsSection source={myMeals ?? null} />
+            <div ref={myMealsRef}><MyMealsSection source={myMeals ?? null} /></div>
         </div>
       )
       case 'avoid': return (

@@ -440,6 +440,22 @@ function main() {
     check('...and the rule that a like never breaks another rule still stands', /never break any other rule in this prompt to fit one in/.test(block))
   }
 
+  console.log('\n13. The way to My meals from Nutrition')
+  {
+    const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    const app = strip(readFileSync('src/App.tsx', 'utf8'))
+    const profile = strip(readFileSync('src/components/ProfileScreen.tsx', 'utf8'))
+    const nutrition = strip(readFileSync('src/components/NutritionDisplay.tsx', 'utf8'))
+    const plan = strip(readFileSync('src/components/MealPlan.tsx', 'utf8'))
+    check('the app opens Profile at My meals when Nutrition asks', /onOpenMyMeals=\{\(\) => \{ setProfileInfoSection\('myMeals'\); setProfileInfoOpen\(true\) \}\}/.test(app))
+    const map = /const SHEET_FOR_SECTION[^=]*= \{([^}]*)\}/.exec(profile)?.[1] ?? ''
+    check('that section is on the sheet My meals is drawn on', /myMeals: 'likes'/.test(map) && /<div ref=\{myMealsRef\}><MyMealsSection /.test(profile) && profile.indexOf("case 'likes':") < profile.indexOf('<div ref={myMealsRef}>') && profile.indexOf('<div ref={myMealsRef}>') < profile.indexOf("case 'avoid':"), map)
+    check('...and Profile scrolls to it', /initialSection === 'myMeals' \? myMealsRef/.test(profile))
+    check('Nutrition hands the link to today\'s list AND an upcoming day\'s', (nutrition.match(/onOpenMyMeals=\{onOpenMyMeals\}/g) ?? []).length === 2, (nutrition.match(/onOpenMyMeals=\{onOpenMyMeals\}/g) ?? []).length)
+    check('the link closes the meal\'s sheet before it opens Profile', /onClick=\{\(\) => \{ onToggle\(\); onOpenMyMeals\(\) \}\}/.test(plan))
+    check('...and is not drawn where nothing would open', /\{onOpenMyMeals && \(\s*<button/.test(plan))
+  }
+
   console.log(`\n${ran} checks ran, ${failures} failed`)
 }
 main()

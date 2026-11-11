@@ -173,4 +173,21 @@ const afterRemove = await rows()
 check('9b. the row is gone from the table, and only that row', afterRemove.length === N + 1 && !afterRemove.some(r => r.name === 'Chicken, rice and veg') && afterRemove.some(r => r.name === 'Morning porridge') && seeded.every(s => afterRemove.some(r => r.name === s.name)), afterRemove.map(r => r.name))
 check('9c. ...and from the list', (await until(listed, l => l.length === 1)).map(l => l.name).join() === 'Morning porridge')
 
+// 10. THE WAY HERE FROM NUTRITION: a meal's swap list has "Add a meal you already eat". On the Nutrition page of the
+// harness (real.html), handed what App hands it: there it opens Profile at My meals, here it only says it was asked.
+// That Profile then opens on the right sheet is held by source (test:usual-meals §13): no page boots App.
+await d.send('Page.navigate', { url: `${d.origin}/.tour-harness/real.html?load=900&tour=off&daymove=1&regen=1#/tab/nutrition` })
+await until(() => ev(`window.__poolsRead === true && document.querySelectorAll('[data-meal-row]').length >= 3`), v => v === true, 80)
+await clickAt(`document.querySelector('[data-meal-row="dinner"] button')`)
+await until(() => has('[data-meal-row="dinner"] [data-meal-sheet-root]'), v => v)
+await clickAt(`document.querySelector('[data-meal-sheet-tab="swap"]')`)
+const linkThere = await until(() => has('[data-testid="meal-open-my-meals"]'), v => v)
+const link = JSON.parse(await ev(`JSON.stringify((() => { const b = document.querySelector('[data-testid="meal-open-my-meals"]'); if (!b) return null; b.scrollIntoView({ block: 'center' }); const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), h: Math.round(r.height), inView: r.top >= 0 && r.bottom <= innerHeight } })())`))
+check('10a. a meal\'s swap list offers "Add a meal you already eat", on screen, a 44px target', linkThere === true && link?.text === 'Add a meal you already eat' && link.h >= 44 && link.inView, link)
+await shoot('usual-meals-from-nutrition')
+await clickAt(`document.querySelector('[data-testid="meal-open-my-meals"]')`)
+await wait(400)
+check('10b. tapping it asks the app to open My meals, once', (await ev(`window.__openedMyMeals ?? 0`)) === 1, await ev(`window.__openedMyMeals ?? 0`))
+check('10c. ...and the meal sheet has closed first, so Profile is not opened over an open sheet', !(await has('[data-meal-sheet-root]')))
+
 await finish('his own meals are added, checked, shown as costed, kept and removed on the screen')

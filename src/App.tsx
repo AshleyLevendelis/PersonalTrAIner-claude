@@ -698,7 +698,7 @@ function App() {
   const [generatingStatus, setGeneratingStatus] = useState('')
   const [exerciseExclusions, setExerciseExclusions] = useState<string[]>(() => boot?.exclusions ?? [])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
-  const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | 'dietary' | undefined>(undefined)
+  const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | 'dietary' | 'myMeals' | undefined>(undefined)
   const [newPlanConfirmOpen, setNewPlanConfirmOpen] = useState(false)
   const [newPlanResetting, setNewPlanResetting] = useState(false)
   /** Injury/equipment plan_adaptations still active when the New Plan dialog opens — New Plan creates a brand-new profile row (see handleReset), which orphans anything tied to the old profile_id, including these. Fetched fresh on open (Part 3, injury-persistence fix) so the loss is named and consented-to rather than silent. */
@@ -3405,6 +3405,8 @@ function App() {
               avoidFoods={effectiveDislikedFoods}
               unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}
               onFixDietaryRestrictions={() => { setProfileInfoSection('dietary'); setProfileInfoOpen(true) }}
+              // "Add a meal you already eat", on a meal's swap list: Profile opens at My meals.
+              onOpenMyMeals={() => { setProfileInfoSection('myMeals'); setProfileInfoOpen(true) }}
               onSwapMealSlot={handleSwapMealSlot}
               onUndoMealSwap={mealActions.undoSwap}
               onMealPickApplied={handleMealPickApplied}

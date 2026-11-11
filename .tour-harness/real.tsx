@@ -1861,6 +1861,8 @@ function Harness() {
             mealTopUpStart={topUpStart}
             onMealTopUpDecline={() => { if (topUpOfferNow) dismissTopUp(PROFILE_ID, topUpOfferNow.kind, driftedMacros ?? undefined); setTopUpDismissTick(t => t + 1) }}
             onDismissMealTopUpNote={() => setTopUpNote(null)}
+            // What App passes: it opens Profile at "My meals". Here it only says it was asked to.
+            onOpenMyMeals={() => { const w = window as unknown as { __openedMyMeals?: number }; w.__openedMyMeals = (w.__openedMyMeals ?? 0) + 1 }}
             mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove}
             // The app's own held state and its Undo (runs 3-4, M34), as App passes them.
             heldAround={TOPUP || DAYMOVE ? mealDays.today?.day.heldAround : undefined} onKeepHeldSizes={mealDays.keepHeldSizes} />

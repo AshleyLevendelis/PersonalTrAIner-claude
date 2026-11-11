@@ -1554,7 +1554,8 @@ menu" stays true when a copy is also left outside it.
   records nothing; setup is one question longer by his ruling. `test:usual-meals` §11, `verify:onboarding-turns` §28.
   Needs the `onboarding-chat` deploy for the coach's line. AND THE MEAL WRITER WRITES A MEAL HE ALREADY EATS AS
   ITSELF: one option, in the meal it belongs to, the same main foods, named as he named it (`test:usual-meals` §12;
-  needs the `generate-meals` deploy; what it then writes is model behaviour). NOT BUILT: a route from Nutrition.
+  needs the `generate-meals` deploy; what it then writes is model behaviour). AND A MEAL'S SWAP LIST ENDS WITH "Add a
+  meal you already eat", which opens Profile at My meals (`test:usual-meals` §13, `verify:usual-meals` §10).
 
 ### His requests of 10 Nov 2026 (the long-flight batch)
 - **The Full Program as a calendar, the phase strip kept as it is.** List / Calendar beside the title (List the

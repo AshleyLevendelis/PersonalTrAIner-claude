@@ -110,6 +110,8 @@ interface MealPlanProps {
    */
   unrecognisedDietaryRestrictions?: string[] | null
   onFixDietaryRestrictions?: () => void
+  /** Opens Profile at "My meals": the swap list's "Add a meal you already eat". Absent: the link is not drawn. */
+  onOpenMyMeals?: () => void
   /**
    * The CURRENT restrictions, re-checked against every meal shown (audit
    * §2.1). Enforcement used to run only when a meal was created, so a
@@ -177,7 +179,7 @@ interface MealPlanProps {
 export function MealPlan({
   fitnessGoal,
   profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
-  unrecognisedDietaryRestrictions, onFixDietaryRestrictions, dietaryPreferences = [], avoidFoods = [],
+  unrecognisedDietaryRestrictions, onFixDietaryRestrictions, onOpenMyMeals, dietaryPreferences = [], avoidFoods = [],
   mealsPerDay, includeSnacks, onMealPickApplied,
   onSwapSlot, onUndoSwap, onRegenerateSlot, onMakeOneNew, onFindMoreOptions, onRegenerateAll, upcoming, dayMove, regeneratingAll = false,
   heldAround, onKeepHeldSizes,
@@ -506,6 +508,7 @@ export function MealPlan({
             onRegenerate={onRegenerateSlot}
             onMakeOneNew={upcoming ? undefined : onMakeOneNew}
             onFindMore={upcoming ? undefined : onFindMoreOptions}
+            onOpenMyMeals={onOpenMyMeals}
             checkAlternative={alt => checkMealAgainstRestrictions(alt.name, alt.ingredients, dietaryPreferences, avoidFoods)}
             loggedEvents={loggedBySlot[slot] ?? []}
             restriction={restrictionBySlot[slot] ?? null}
@@ -858,6 +861,7 @@ function MealSlotRow({
   onRegenerate,
   onMakeOneNew,
   onFindMore,
+  onOpenMyMeals,
   checkAlternative,
   loggedEvents,
   restriction,
@@ -905,6 +909,8 @@ function MealSlotRow({
   onRegenerate: (slot: MealSlotName) => Promise<void>
   onMakeOneNew?: (slot: MealSlotName) => Promise<{ option: PoolOption } | { error: string }>
   onFindMore?: (slot: MealSlotName) => Promise<{ added: string[]; error?: string }>
+  /** Opens Profile at "My meals" (his 11 Nov 2026 "My usual meals first": a route from where he swaps a meal). */
+  onOpenMyMeals?: () => void
   /**
    * The swap panel's own restriction re-check. The CHOSEN meal has been
    * re-checked on display since the almond-butter fix; the ALTERNATIVES
@@ -1723,6 +1729,18 @@ function MealSlotRow({
                     </button>
                   )}
                   {findMoreNote && <p className="px-1 text-[0.65625rem] text-muted-foreground">{findMoreNote}</p>}
+                  {/* HIS OWN MEALS ARE ADDED ON PROFILE; this is the way there from where he is choosing a meal
+                      (11 Nov 2026). The sheet closes first, so Profile is not opened over an open sheet. */}
+                  {onOpenMyMeals && (
+                    <button
+                      type="button"
+                      onClick={() => { onToggle(); onOpenMyMeals() }}
+                      data-testid="meal-open-my-meals"
+                      className="flex min-h-[44px] items-center justify-center px-3 text-xs font-medium text-primary-text"
+                    >
+                      Add a meal you already eat
+                    </button>
+                  )}
                 </div>
               )}
 

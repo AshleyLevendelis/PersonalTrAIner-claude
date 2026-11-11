@@ -96,6 +96,8 @@ export interface NutritionDisplayProps {
   /** Surfacing round — a dietary_preferences value the app can't enforce. Distinct from mealRegenerateError: not dismissable, routes to Profile instead of offering a retry. */
   unrecognisedDietaryRestrictions?: string[] | null
   onFixDietaryRestrictions?: () => void
+  /** Opens Profile at "My meals", from a meal's swap list. */
+  onOpenMyMeals?: () => void
   onSwapMealSlot: (slot: MealSlotName, chooseName: string) => Promise<boolean>
   /** Puts the last swap of a meal back as it was (its earlier pick, or none). */
   onUndoMealSwap?: (slot: MealSlotName) => Promise<boolean>
@@ -167,7 +169,7 @@ export interface MealRefitOffer {
 export function NutritionDisplay({
   profile, macros, exercisePlan = [], latestWeightKg, targetWeightKg, onMacroModeChange, onMacroSplitChange,
   profileId, date, planCreatedAt, pools, chosen, mealTotals, isGeneratingMeals, mealsRegeneratingAll = false, mealRegenerateError, onDismissRegenerateError, avoidFoods = [], onMealPickApplied,
-  unrecognisedDietaryRestrictions, onFixDietaryRestrictions,
+  unrecognisedDietaryRestrictions, onFixDietaryRestrictions, onOpenMyMeals,
   onSwapMealSlot, onUndoMealSwap, onRegenerateMealSlot, onMakeOneNewMeal, onFindMoreOptions, onRegenerateAllMeals,
   mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
   mealTopUp = null, mealTopUpBusy = false, mealTopUpNote = null, onMealTopUp, onMealTopUpDecline, onDismissMealTopUpNote, mealTopUpStart = null,
@@ -607,6 +609,7 @@ export function NutritionDisplay({
           onDismissRegenerateError={onDismissRegenerateError}
           unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}
           onFixDietaryRestrictions={onFixDietaryRestrictions}
+          onOpenMyMeals={onOpenMyMeals}
           dietaryPreferences={profile.dietary_preferences}
           avoidFoods={avoidFoods}
           mealsPerDay={profile.meals_per_day}
@@ -634,6 +637,7 @@ export function NutritionDisplay({
         onDismissRegenerateError={onDismissRegenerateError}
         unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}
         onFixDietaryRestrictions={onFixDietaryRestrictions}
+        onOpenMyMeals={onOpenMyMeals}
         dietaryPreferences={profile.dietary_preferences}
         avoidFoods={avoidFoods}
         mealsPerDay={profile.meals_per_day}
