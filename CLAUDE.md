@@ -1503,6 +1503,25 @@ menu" stays true when a copy is also left outside it.
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
 
+### His rulings of 11 Nov 2026 (each from options; build state is said on each line and corrected as it lands)
+- **Setup's lift numbers: "Weight and reps"** (over one number with an explanation). Setup had asked for "working
+  weights" without saying what the number was or which lifts; the plan reads it as the weight for about 10 reps with 2
+  in reserve, trusts it over its own estimate and skips the calibration week. For each of the barbell back squat, bench
+  press and deadlift he types a recent hard set (a weight and its reps; a one-rep max is 1 rep) and the APP works out
+  the plan's number. The one-number wording with its meaning shipped first (`test:working-weight-words`); the weight
+  and reps boxes are NOT BUILT yet.
+- **A weight that is too easy: "One tap per lift"** (over main lift only, and over not asking): after a lift's last
+  set, Too easy / About right / Too hard. Measured before it: one small step a session, 12 sessions from 40 kg to a
+  true 70 kg, and a session ticked through without typing never rises at all. What each answer does to the next
+  weight is mine (CSCS), in `docs/plans/too-easy-weights.md`. NOT BUILT.
+- **Meals cooked for him elsewhere: "Set days + optional menu", in his words "I dont want it to stop posing the
+  meals, I want it to incorporate the meals into its plan"**: he says once which meals are at work on which days;
+  those meals STAY in the day's plan, shown and counted, never shopped for; a menu told to the coach is estimated and
+  dinner and snacks fit around it; with no menu a normal-sized meal is assumed; an estimate is marked as one. NOT BUILT.
+- **Meals he already eats: "My usual meals first"** (over mostly his meals, and over leaving it): setup asks what he
+  usually eats, he can add his own meals on Nutrition or by telling the coach (his fridge included), and about half of
+  each week is his own meals resized to his targets, the rest new. NOT BUILT.
+
 ### His requests of 10 Nov 2026 (the long-flight batch)
 - **The Full Program as a calendar, the phase strip kept as it is.** List / Calendar beside the title (List the
   default); real dates, each read in the plan week it is in; a tap opens the day in the list. `test:program-calendar`,

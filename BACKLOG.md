@@ -2,6 +2,37 @@
 
 Newest first. One line each.
 
+- [ ] **HIS FOUR POINTS OF 11 NOV 2026, TRACED, AND HIS FOUR RULINGS.** He asked: what setup means by "working
+  weights" and which exercises; whether a too-easy weight ramps up or takes many weeks; whether a too-easy calibration
+  week adjusts; and how meals fit around food he already eats (his example: breakfast and lunch cooked at work Monday
+  to Friday, a menu that varies, his fridge).
+  FOUND (traces by two read-only agents, key lines re-read and one figure measured):
+  (1) SETUP NEVER SAID WHAT THE NUMBER WAS. The plan reads a typed lift as the weight for about 10 reps at two in
+  reserve, for barbell back squat, bench press and deadlift, trusts it over its own estimate and skips the calibration
+  week. MEASURED through the real prescriber: 100 typed is 100 for 10 reps at two in reserve and 115 for 5, so a
+  five-rep weight typed there starts 15% heavy and a one-rep max far worse. FIXED FIRST as wording (commit defabb0a):
+  one phrasebook entry used by the question, the chip, the line over the boxes, each box's label, Profile's rows and a
+  note, and the setup coach's rule. `test:working-weight-words`, 44 checks, 15 mutations, 15 caught. The wording is
+  mine and his to change. 109 gates reading those files: 106 passed; `test:coach-exam-fresh` is the standing one;
+  `test:coach-voice` REAL (two exports of mine used only inside the phrasebook); `verify:onboarding-turns` two checks
+  pinned the old words ("Fill in the ones you know", a label starting "Squat"). Both to be settled with ruling (a).
+  (2) A TOO-EASY WEIGHT DOES NOT RAMP FAST. No effort is asked on the screen and none is read. One step a session, and
+  only when every set is typed at the top of the range: MEASURED 12 sessions from 40 to 70 kg on a barbell squat or
+  bench, 8 on a lat pulldown, 6 on a leg press. A session ticked through without typing records the bottom of the
+  range (his own rule), never rises, can sit under the printed plan, and the next block's review writes it in as a
+  stall. TRACED, to be driven in a browser before anything is changed. Typing a heavier weight is the fast route and
+  nothing says so.
+  (3) THE CALIBRATION WEEK DOES ADJUST: a heavier logged set plus Finish rewrites the rest of block 1. Holes: more reps
+  at the same weight changes nothing, later blocks keep the guess, only Finish triggers it.
+  (4) MEALS: a like is a nudge and setup never asks; the fridge is coach only, one meal; nothing exists for a meal
+  cooked elsewhere (no provided slot, no weekday shape, the list still shops for it); a meal the coach adds joins the
+  options and nothing makes it come round.
+  HIS RULINGS, each from options, 11 Nov 2026: (a) setup lift numbers "Weight and reps"; (b) too easy "One tap per
+  lift"; (c) work meals "Set days + optional menu", amended in his words "I dont want it to stop posing the meals, I
+  want it to incorporate the meals into is plan"; (d) "My usual meals first". In CLAUDE.md with their build state.
+  PLAN for (b): `docs/plans/too-easy-weights.md` (load prescription: plan before build). NOT BUILT: all four.
+  Needs the `onboarding-chat` deploy for the setup coach's half of (1).
+
 - [x] **FULL SWEEP ON THE THREE RULINGS (532 GATES), THEN MERGED TO `main` ON HIS "merge", 10 NOV 2026.** Run in the
   separate worktree at `5a482bd8`. THE RUN WAS STOPPED AT ITS TWO-HOUR LIMIT with 521 of 532 reached: 515 passed, 6
   failed. Two of the six were the source checks the `swapTo` rename broke (entry below), fixed in `ca896b81`. The
