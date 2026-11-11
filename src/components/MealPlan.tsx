@@ -1644,7 +1644,7 @@ function MealSlotRow({
                 </>
               )}
 
-              {tab === 'swap' && canSwap && (
+              {tab === 'swap' && canSwap && (<>
                 <div className="flex flex-col gap-1" data-meal-swap-list>
                   {longSwapList && (
                     <input
@@ -1729,20 +1729,21 @@ function MealSlotRow({
                     </button>
                   )}
                   {findMoreNote && <p className="px-1 text-[0.65625rem] text-muted-foreground">{findMoreNote}</p>}
-                  {/* HIS OWN MEALS ARE ADDED ON PROFILE; this is the way there from where he is choosing a meal
-                      (11 Nov 2026). The sheet closes first, so Profile is not opened over an open sheet. */}
-                  {onOpenMyMeals && (
-                    <button
-                      type="button"
-                      onClick={() => { onToggle(); onOpenMyMeals() }}
-                      data-testid="meal-open-my-meals"
-                      className="flex min-h-[44px] items-center justify-center px-3 text-xs font-medium text-primary-text"
-                    >
-                      Add a meal you already eat
-                    </button>
-                  )}
                 </div>
-              )}
+                {/* HIS OWN MEALS ARE ADDED ON PROFILE; this is the way there from where he is choosing a meal.
+                    UNDER the list, not in it: the list holds dishes, and this is not one
+                    (11 Nov 2026). The sheet closes first, so Profile is not opened over an open sheet. */}
+                {onOpenMyMeals && (
+                  <button
+                    type="button"
+                    onClick={() => { onToggle(); onOpenMyMeals() }}
+                    data-testid="meal-open-my-meals"
+                    className="flex min-h-[44px] w-full items-center justify-center px-3 text-xs font-medium text-primary-text"
+                  >
+                    Add a meal you already eat
+                  </button>
+                )}
+              </>)}
 
               {blocked && !isLogged && restriction?.message && (
                 /* Above the button, not below: it explains why the one under it

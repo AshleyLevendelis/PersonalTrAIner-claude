@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **THE COMPLETE SWEEP ON THE 11 NOV WORK, AND ONE FAILURE IT FOUND** (11 Nov 2026). On a clean copy of the
+  "meals cooked for him" commit: 178 browser tests (176 passed) and 361 logic checks (358 passed), 539 in all.
+  THE FIVE THAT DID NOT PASS, each read for its own reason: `verify:app-boot` failed once while other jobs ran on the
+  machine and passed alone on the same commit, twice (a timing flake under load, not a defect: under load its
+  "nothing kept" opening found a copy an earlier opening had left); `verify:rls`, `test:meal-quality` and
+  `test:schema-parity` each said they could not reach a database (every cloud session); `test:coach-exam-fresh` said
+  the coach has changed since the exam last ran (true: it needs a run on his machine).
+  THEN, on the three small commits after it (the meal writer, the link from Nutrition, the exam case), the 44 meal,
+  Profile and app-start browser tests again: 43 passed and ONE REAL FAILURE, mine. "Add a meal you already eat" sat
+  INSIDE the list of dishes on a meal's swap sheet, so `verify:deep-pool`, which counts that list, counted nine
+  dishes for eight and forty for thirty-nine. The test was right: the list holds dishes. The link now sits just under
+  the list. Re-run on the fix: `verify:deep-pool`, `verify:usual-meals`, `verify:meal-days`, `verify:swap-knock-on`,
+  the 38 logic checks that read the meal list (with the size and dead-code checks), typecheck. All pass.
+  HOW IT WAS MISSED: I ran the checks that read the FILES I changed and my own driver, not the other drivers that
+  look at the same SCREEN. The rule is already in CLAUDE.md ("a browser driver is not found by grepping for the file
+  you changed"); the fuller browser run is what caught it.
 - [x] **"ADD A MEAL YOU ALREADY EAT", FROM NUTRITION** (11 Nov 2026, the last named gap of his "My usual meals
   first"). His own meals are added on Profile; there was no way there from the place he chooses a meal. A meal's swap
   list now ends with "Add a meal you already eat": it closes the meal's sheet and opens Profile on "Foods you like",
