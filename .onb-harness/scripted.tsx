@@ -140,6 +140,8 @@ if (state === 'review' || state === 'review-card' || state === 'review-notes') {
   const all = {
     ...SAM_SO_FAR, recoveryCapacity: 'moderate', age: '31', heightCm: '178', weightKg: '82',
     gender: 'male', mealsPerDay: 3, dietaryPreferences: ['nut-free'], dislikedFoods: 'mushrooms',
+    // What he usually eats (asked since 11 Nov 2026): answered, or the review would not be open.
+    usualFoods: 'porridge, chicken and rice',
     maxDumbbellKg: '24',
   }
   seed(draft(
@@ -179,13 +181,33 @@ if (state === 'none-left') {
   const answered = {
     ...SAM_SO_FAR, recoveryCapacity: 'moderate', age: '31', heightCm: '178', weightKg: '82',
     gender: 'male', mealsPerDay: 3, dietaryPreferences: ['nut-free'], includeSnacks: true, cookingTime: 'moderate',
-    breakfastStyle: 'cooked',
+    // Already answered, so Foods to avoid is still the ONE question left, which is what this state is for.
+    breakfastStyle: 'cooked', usualFoods: '',
   }
   seed(draft(
     [
       { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
       { role: 'user', content: 'Sam' },
       { role: 'assistant', content: "Anything else you'd rather I left out?", asksSlot: 'dislikedFoods' },
+    ],
+    answered,
+    Object.keys(answered),
+  ))
+}
+
+// ?state=usual — "WHAT DO YOU USUALLY EAT?" IS THE QUESTION ON SCREEN (his ruling, 11 Nov 2026, "My usual meals
+// first"). Everything else is answered, and the app has just asked it. INPUT only: what is recorded from the reply,
+// by the coach or by the app when the coach records nothing, is the component's doing.
+if (state === 'usual') {
+  const answered = {
+    ...SAM_SO_FAR, recoveryCapacity: 'moderate', age: '31', heightCm: '178', weightKg: '82',
+    gender: 'male', mealsPerDay: 3, dietaryPreferences: ['nut-free'], dislikedFoods: 'mushrooms',
+  }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Sam' },
+      { role: 'assistant', content: 'What do you usually eat? A few meals or foods you have most weeks.', asksSlot: 'usualFoods' },
     ],
     answered,
     Object.keys(answered),
@@ -233,7 +255,7 @@ if (state === 'review-lifter') {
     ...JO_SO_FAR, knowsWorkingLifts: false, trainingDays: ['Mon', 'Wed', 'Fri'], sessionDuration: '45-60',
     trainingStyle: 'functional', conditioningPreference: 'tolerate', recoveryCapacity: 'moderate',
     age: '34', heightCm: '170', weightKg: '70', gender: 'female', mealsPerDay: 3,
-    dietaryPreferences: [], dislikedFoods: 'none',
+    dietaryPreferences: [], dislikedFoods: 'none', usualFoods: '',
   }
   seed(draft(
     [

@@ -412,7 +412,7 @@ function speechRecognizer(): (new () => SpeechRecognitionLike) | null {
  * Read off the slot order: the training questions, then the body, then food.
  */
 const BODY_SLOTS: string[] = ['age', 'heightCm', 'weightKg', 'gender']
-const FOOD_SLOTS: string[] = ['mealsPerDay', 'dietaryPreferences', 'dislikedFoods', 'cookingTime', 'includeSnacks', 'favoriteCuisines', 'breakfastStyle']
+const FOOD_SLOTS: string[] = ['mealsPerDay', 'dietaryPreferences', 'dislikedFoods', 'usualFoods', 'cookingTime', 'includeSnacks', 'favoriteCuisines', 'breakfastStyle']
 function setupSectionOf(key: string | null): string {
   if (!key) return 'Review'
   if (key === 'displayName') return 'About you'
@@ -539,6 +539,24 @@ function turnsSinceLastConfirmation(msgs: ChatMsg[]): number {
  * message bubble already says exactly what was recorded. A tick-row echoing
  * the question back at them there added nothing but checklist.
  */
+/**
+ * The typed question (no buttons) he is looking at, if any: the latest one the app or the coach asked BY NAME that is
+ * still unanswered, unless the coach has asked something else since. A reply from the coach that asks nothing (an
+ * answer to a question of his own) leaves it where it was, which is the case that matters: he asked what counts,
+ * was told, and his next message is the answer.
+ */
+function textQuestionOnScreen(messages: ChatMsg[], confirmed: Set<string>): string | undefined {
+  let askedIdx = -1
+  let coachQuestionIdx = -1
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (askedIdx < 0 && m.asksSlot && !confirmed.has(m.asksSlot)) askedIdx = i
+    if (coachQuestionIdx < 0 && m.role === 'assistant' && !m.isReceipt && m.content !== RESUME_BANNER && m.content.includes('?')) coachQuestionIdx = i
+    if (askedIdx >= 0 && coachQuestionIdx >= 0) break
+  }
+  return askedIdx >= 0 && coachQuestionIdx <= askedIdx ? messages[askedIdx].asksSlot : undefined
+}
+
 function applySlot(
   ws: WorkingState,
   key: SlotKey,
@@ -1408,6 +1426,14 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       // words is decided in there, and a re-asked question brings its card
       // along whether or not the model asked for one.
       executeActions(responseWs, Array.isArray(result.actions) ? result.actions : [], trimmed)
+      // THE ANSWER TO "WHAT DO YOU USUALLY EAT?" IS WHAT HE TYPED (11 Nov 2026, his "My usual meals first"). The
+      // question has no chips, so the only route for the answer was the coach's own set_slot; when it replies warmly
+      // and records nothing, the question stays open and is asked again. So where the question on screen was this
+      // one and it is still open after the coach's turn, his reply IS the answer. "Nothing really" is an empty
+      // list; a question of his own is not an answer and is left to the coach.
+      if (textQuestionOnScreen(messages, ws.confirmed) === 'usualFoods' && !responseWs.confirmed.has('usualFoods') && !trimmed.includes('?')) {
+        applySlot(responseWs, 'usualFoods', isPlainNone(trimmed) ? '' : trimmed, responseWs.values)
+      }
       // THE COACH CAN ADD TO FOODS TO AVOID, NEVER TAKE ONE OFF. Its set_slot
       // sometimes resends the list from memory and leaves a food out (this
       // turn's catch above, or an earlier one), which would quietly serve her
@@ -1472,6 +1498,9 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
             // Numeric slots get a card as well now — they used to fall through
             // to free text with no bounds check at the point of answering.
             slotCard: nextDef.control === 'text' ? undefined : nextDef.key,
+            // A typed question the APP asks names its question too (11 Nov 2026): without this the re-ask of one
+            // read as a question about nothing, and the typed reply to it had no question to be the answer to.
+            asksSlot: nextDef.control === 'text' ? nextDef.key : undefined,
           })
         } else {
           // Nothing left to ask AND the model said nothing — it simply didn't
@@ -1576,6 +1605,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                 role: 'assistant',
                 content: lead ? `${lead} ${cardQuestion(target as SlotKey, responseWs.values, responseWs.confirmed)}` : cardQuestion(target as SlotKey, responseWs.values, responseWs.confirmed),
                 slotCard: def.control === 'text' ? undefined : target,
+                asksSlot: def.control === 'text' ? target : undefined,
               })
             }
           }
@@ -1593,7 +1623,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       setMessages(prev => [
         ...prev,
         def && next
-          ? { role: 'assistant', content: `${saved} Next: ${cardQuestion(next as SlotKey, ws.values, ws.confirmed)}`, slotCard: def.control === 'text' ? undefined : next }
+          ? { role: 'assistant', content: `${saved} Next: ${cardQuestion(next as SlotKey, ws.values, ws.confirmed)}`, slotCard: def.control === 'text' ? undefined : next, asksSlot: def.control === 'text' ? next : undefined }
           : answeredThisTurn
             ? { role: 'assistant', content: saved }
             : { role: 'assistant', content: 'I couldn’t reach your coach just then, so that didn’t go through. Your message is back in the box: tap send to try again.' },

@@ -28,6 +28,8 @@ import { fitDishToBudget } from '../src/lib/meal-library'
 import { MEAL_LIBRARY } from '../src/lib/meal-library-data'
 import { buildRotation, firstDayAfter, serveDates, addDays, rotationIndexFor } from '../src/lib/meal-rotation'
 import { menuFor, menuWeekOf } from '../src/lib/meal-menu'
+import { splitUsualFoods, splitFoodList } from '../src/lib/food-list'
+import { ONBOARDING_SLOTS, NEVER_BLOCKING_SLOTS } from '../src/lib/onboarding-slots'
 import type { MacroTargets } from '../src/lib/types'
 
 let failures = 0
@@ -384,6 +386,43 @@ function main() {
     check('the dinner is judged over the coming weeks, so it is one that lands', !!start && dishLandsADay(pool, SLOTS, TARGETS, 'dinner', rich, start) === true)
     const never = thursdays.find(d => [0, 1, 2, 3].every(k => !onMenu(addDays(d, k * 7))))
     check('...and four weeks is where it stops: a dish that fits none of them is one that will not come up often', !never || dishLandsADay(pool, SLOTS, TARGETS, 'dinner', rich, never) === false, never)
+  }
+
+  console.log('\n11. Setup asks what he usually eats, and keeps it as likes')
+  {
+    check('one entry per meal or food: commas, semicolons and new lines separate them',
+      splitUsualFoods('Porridge with banana, chicken and rice; Spag bol\n eggs on toast').join('|') === 'porridge with banana|chicken and rice|spag bol|eggs on toast', splitUsualFoods('Porridge with banana, chicken and rice; Spag bol\n eggs on toast'))
+    check('"chicken and rice" is ONE meal here', splitUsualFoods('chicken and rice').join('|') === 'chicken and rice')
+    check('...where on Foods to avoid the same words are two foods (so the two splits are not one function)', splitFoodList('chicken and rice').join('|') === 'chicken|rice', splitFoodList('chicken and rice'))
+    check('"nothing really" and an empty answer are an empty list, and a meal said twice is kept once', splitUsualFoods('nothing really').length === 0 && splitUsualFoods('  ').length === 0 && splitUsualFoods('Porridge, porridge').join() === 'porridge')
+    // What he typed becomes a like that FINDS his meal: the reason the split keeps a meal whole.
+    const chickenRice: PoolOption = { ...dish('dinner', 0), name: 'Chicken with rice and greens', ingredients: [{ name: 'chicken breast raw', quantity: 180, unit: 'g' }, { name: 'white rice dry', quantity: 80, unit: 'g' }, { name: 'broccoli', quantity: 100, unit: 'g' }] }
+    const riceOnly: PoolOption = { ...dish('dinner', 1), name: 'Rice and beans', ingredients: [{ name: 'white rice dry', quantity: 90, unit: 'g' }, { name: 'kidney beans', quantity: 200, unit: 'g' }] }
+    const likes = splitUsualFoods('porridge with banana, chicken and rice')
+    check('the like "chicken and rice" matches a dish holding both, and not one holding only rice', optionMatchesLikedFood(chickenRice, likes) && !optionMatchesLikedFood(riceOnly, likes))
+    const asked = ONBOARDING_SLOTS.findIndex(sd => sd.key === 'usualFoods')
+    const avoid = ONBOARDING_SLOTS.findIndex(sd => sd.key === 'dislikedFoods')
+    const def = ONBOARDING_SLOTS[asked]
+    check('setup has the question, typed, optional, and ASKED (not one of the recorded-if-volunteered ones)', asked >= 0 && def.control === 'text' && def.required === false && !NEVER_BLOCKING_SLOTS.includes('usualFoods') && /usually eat/i.test(def.question), def)
+    check('...straight after the foods to leave out', asked === avoid + 1, { asked, avoid })
+    check('...kept as remembered likes, never a profile column', def?.destination === 'user_facts')
+    const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const slots = strip(readFileSync('src/lib/onboarding-slots.ts', 'utf8'))
+    const app = strip(readFileSync('src/App.tsx', 'utf8'))
+    const prof = strip(readFileSync('src/components/ProfileScreen.tsx', 'utf8'))
+    const onb = strip(readFileSync('src/components/onboarding/ConversationalOnboarding.tsx', 'utf8'))
+    const fn = readFileSync('supabase/functions/onboarding-chat/index.ts', 'utf8')
+    check('the finished profile carries one entry per meal', /usual_foods: splitUsualFoods\(data\.usualFoods\)/.test(slots))
+    // The SAME row Profile writes for a liked food, so it shows there and comes off there.
+    const row = /kind: 'food_preference',[\s\S]{0,160}?displayText: `likes \$\{(\w+)\}`,\s*polarity: 'like',\s*hardness: 'soft',\s*resolvedRefs: resolveFoodTarget\(\1\)/
+    const profRow = /kind: 'food_preference', source: 'manual',\s*rawPhrase: v, displayText: `likes \$\{v\}`,\s*polarity: 'like', hardness: 'soft', resolvedRefs: resolveFoodTarget\(v\)/
+    check('at signup each is written as the row Profile writes for a liked food (a soft like, "likes X")', row.test(app) && profRow.test(prof) && /source: 'onboarding',\s*rawPhrase: meal,/.test(app))
+    check('...except one he also said to leave out: an avoid wins', /usual_foods \?\? \[\]\)\.filter\(meal => !\(enrichedProfile\.disliked_foods \?\? \[\]\)\.some\(avoid => avoid\.trim\(\) && containsPhrase\('', \[meal\], avoid\)\)\)/.test(app))
+    check('the first plan is made with them in mind, before they are rows', /likedFoods: \[\.\.\.new Set\(\[\.\.\.typedFoodLikes, \.\.\.\(forProfile\.usual_foods \?\? \[\]\)\]\)\]/.test(app))
+    check('the app keeps his typed reply as the answer when the coach records nothing, and never a question of his own',
+      /textQuestionOnScreen\(messages, ws\.confirmed\) === 'usualFoods' && !responseWs\.confirmed\.has\('usualFoods'\) && !trimmed\.includes\('\?'\)/.test(onb) && /applySlot\(responseWs, 'usualFoods', isPlainNone\(trimmed\) \? '' : trimmed, responseWs\.values\)/.test(onb))
+    check('a typed question the app asks itself names its question, all three places', (onb.match(/asksSlot: (?:nextDef|def)\.control === 'text' \? (?:nextDef\.key|target|next|key) : undefined/g) ?? []).length === 4, (onb.match(/asksSlot: (?:nextDef|def)\.control === 'text' \? (?:nextDef\.key|target|next|key) : undefined/g) ?? []).length)
+    check('the setup coach is told to record it in his words, whole meals, and to add nothing', /set_slot\(usualFoods = /.test(fn) && /"chicken and rice" is one entry, never two/.test(fn) && /Never add a food they did not say/.test(fn))
   }
 
   console.log(`\n${ran} checks ran, ${failures} failed`)

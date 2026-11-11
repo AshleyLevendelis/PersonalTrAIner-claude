@@ -162,6 +162,7 @@ import { compileExerciseExclusions, compileFoodDislikes, compileTimingRules, com
 import { profileWithKit, kitStatementFact, describeKitStatement } from '@/lib/kit-list'
 import { makeKitController, clearKitStatements, type KitController } from '@/lib/kit-change'
 import type { MyMealsSource } from '@/lib/my-meals'
+import { containsPhrase } from '@/lib/meal-ingredients'
 import { favouritesStillAllowed } from '@/lib/meal-restriction-check'
 import { useServablePools } from '@/hooks/useServablePools'
 import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, refreshGroceryDays, subscribeGroceryStore, type GroceryItemRow } from '@/lib/grocery-store'
@@ -1754,7 +1755,8 @@ function App() {
       favoriteCuisines: forProfile.favorite_cuisines,
       dislikedFoods: forProfile.disliked_foods,
       breakfastStyle: forProfile.breakfast_style,
-      likedFoods: typedFoodLikes,
+      // At signup the likes he gave setup are not rows yet (they are written just after), so they ride on the profile.
+      likedFoods: [...new Set([...typedFoodLikes, ...(forProfile.usual_foods ?? [])])],
       favouriteMeals: steerableFavouriteMeals,
     })
       .then(result => {
@@ -2152,6 +2154,28 @@ function App() {
           await reloadMemory(data.id)
         } catch (err) {
           console.error('Recording onboarding food dislikes failed:', err)
+        }
+      }
+      // WHAT HE USUALLY EATS (setup's usualFoods; his 11 Nov 2026 ruling, "My usual meals first"). One like per meal
+      // or food, the SAME row Profile's "Foods and meals I like" writes (soft like), so it shows there and can be
+      // taken off there. One he also said to leave out is not written: an avoid always wins, and a like of an
+      // avoided food is the contradiction Profile refuses.
+      const usualFoods = (enrichedProfile.usual_foods ?? []).filter(meal => !(enrichedProfile.disliked_foods ?? []).some(avoid => avoid.trim() && containsPhrase('', [meal], avoid)))
+      if (usualFoods.length > 0) {
+        try {
+          await Promise.all(usualFoods.map(meal => createFact({
+            profileId: data.id,
+            kind: 'food_preference',
+            source: 'onboarding',
+            rawPhrase: meal,
+            displayText: `likes ${meal}`,
+            polarity: 'like',
+            hardness: 'soft',
+            resolvedRefs: resolveFoodTarget(meal),
+          })))
+          await reloadMemory(data.id)
+        } catch (err) {
+          console.error('Recording what he usually eats failed:', err)
         }
       }
       // THE KIT THEY SAID THEY HAVE (the kitList slot). The first plan above

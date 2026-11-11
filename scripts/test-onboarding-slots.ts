@@ -537,7 +537,10 @@ const blockingFor = (v: OnboardingSlotValues) =>
 // starting from nothing, so the barbell profile is the worst case.
 const barbell: OnboardingSlotValues = { ...initialSlotValues(), equipment: 'full_gym', trainingExperience: 'intermediate', activityLevel: 'moderate' }
 console.log(`  → questions that can block a plan: ${blockingFor(fresh)} fresh, ${blockingFor(barbell)} for a barbell lifter (was 22 / 23)`)
-check('fresh blocking count is down to 17 or fewer (was 22)', blockingFor(fresh) <= 17, `got ${blockingFor(fresh)}`)
+// MOVED 11 Nov 2026, 17 -> 18 and 18 -> 19: his ruling "My usual meals first" adds ONE asked question, "What do you
+// usually eat?" (optional, skippable). The bar is still a ceiling on setup's length: a second new question fails it.
+check('fresh blocking count is 18 or fewer (was 22; 17 until "what do you usually eat" was added by his ruling)', blockingFor(fresh) <= 18, `got ${blockingFor(fresh)}`)
+check('...and the one that was added is the usual-meals question, asked and never required', ONBOARDING_SLOTS.some(sd => sd.key === 'usualFoods' && sd.required === false && sd.control === 'text') && !NEVER_BLOCKING_SLOTS.includes('usualFoods'))
 // The progress bar's denominator is defined independently in the component
 // as "applicable AND not never-blocking". It MUST equal the blocking count
 // above, or the bar goes back to promising an end that isn't there — which
@@ -547,7 +550,7 @@ const barDenominator = (v: OnboardingSlotValues) =>
 for (const [label, v] of [['fresh', fresh], ['barbell', barbell]] as [string, OnboardingSlotValues][]) {
   check(`${label}: bar denominator matches what can actually block`, barDenominator(v) === blockingFor(v), `${barDenominator(v)} vs ${blockingFor(v)}`)
 }
-check('barbell blocking count is down to 18 or fewer (was 23)', blockingFor(barbell) <= 18, `got ${blockingFor(barbell)}`)
+check('barbell blocking count is 19 or fewer (was 23; 18 until the usual-meals question)', blockingFor(barbell) <= 19, `got ${blockingFor(barbell)}`)
 
 console.log('\n16. detectAllergenTags — deterministic safety backstop, model-independent')
 // A live onboarding transcript disclosed a "severe peanut allergy" and got a

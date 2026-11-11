@@ -1,5 +1,5 @@
 import { ALLERGEN_FOOD_PATTERNS } from './allergen-words'
-import { splitFoodList } from './food-list'
+import { splitFoodList, splitUsualFoods } from './food-list'
 import { DIETARY_PREFERENCES, type DietaryPreference } from '@/lib/diet-rules'
 import { GOALS_THAT_MEAN_TRAIN } from '@/lib/starting-out'
 import { liftSetQuestion, liftAsStored } from './coach-voice'
@@ -443,6 +443,8 @@ export interface OnboardingSlotValues {
   cookingTime: CookingTimePreference | null
   favoriteCuisines: string[]
   dislikedFoods: string
+  /** "What do you usually eat?": meals and foods he has most weeks, as typed. Kept as likes (user_facts), never a column. */
+  usualFoods: string
   dislikedExercises: string
   breakfastStyle: BreakfastStyle | null
   /**
@@ -512,6 +514,7 @@ export function initialSlotValues(): OnboardingSlotValues {
     cookingTime: null,
     favoriteCuisines: [],
     dislikedFoods: '',
+    usualFoods: '',
     dislikedExercises: '',
     breakfastStyle: null,
     maxDumbbellKg: '',
@@ -973,6 +976,11 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'mealsPerDay', question: 'How many meals a day suits you?', inputHint: 'How many meals?', shortLabel: 'Meals a day', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
   { key: 'dietaryPreferences', question: 'Any dietary preferences or restrictions?', inputHint: 'Vegan, gluten-free, an allergy…', shortLabel: 'Diet', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
   { key: 'dislikedFoods', question: 'Anything else you\'d rather I left out?', inputHint: 'Foods to leave out…', shortLabel: 'Foods to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
+  // WHAT HE ALREADY EATS (his ruling, 11 Nov 2026: "My usual meals first"; "setup asks what he usually eats"). Asked,
+  // optional, straight after the foods to leave out, so the two sit together. What he says is kept as LIKES, the
+  // same rows Profile's "Foods and meals I like" writes, so it shows there and can be changed there; a like naming
+  // several foods ("chicken and rice") is one meal and matches a dish holding all of them. It never blocks setup.
+  { key: 'usualFoods', question: 'What do you usually eat? A few meals or foods you have most weeks.', inputHint: 'Porridge, chicken and rice…', shortLabel: 'Usual meals', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
   { key: 'cookingTime', question: 'How much time do you want to spend cooking?', inputHint: 'How long do you want to cook?', shortLabel: 'Cooking time', control: 'single', required: false, options: COOKING_TIME_OPTIONS, destination: 'column', validate: isOneOf(COOKING_TIME_OPTIONS) },
   { key: 'includeSnacks', question: 'Snacks too, or meals only?',
     inputHint: 'Snacks or not?', shortLabel: 'Snacks', control: 'single', required: false, options: SNACKS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
@@ -1336,6 +1344,8 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     // commas only, it was ONE avoid that matched no food at all.
     disliked_foods: splitFoodList(data.dislikedFoods),
     disliked_exercises: data.dislikedExercises.split(',').map(f => f.trim()).filter(Boolean),
+    // One like per meal or food he named: commas separate them, "and" does not (splitUsualFoods).
+    usual_foods: splitUsualFoods(data.usualFoods),
     breakfast_style: data.breakfastStyle ?? undefined,
     fitness_goal: data.fitnessGoal!,
     training_days: trainingDaysFull,

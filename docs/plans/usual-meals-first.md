@@ -5,8 +5,8 @@ enjoy without always prescribing meals they have never had before?"* His ruling 
 **"My usual meals first"**: setup asks what he usually eats, he can add his own meals on Nutrition or by telling the
 coach (his fridge included), and about half of each week is his own meals resized to his targets, the rest new.
 
-Status: **the ranking, the mark, the screen's "My meals" and the coach's two add routes are BUILT (11 Nov 2026).
-Setup's question and the meal writer's half are not.** See "What was built" at the end. The trace behind it is in
+Status: **the ranking, the mark, the screen's "My meals", the coach's two add routes and setup's question are BUILT
+(11 Nov 2026). The meal writer's half is not.** See "What was built" at the end. The trace behind it is in
 BACKLOG (11 Nov, "his four points").
 
 ## What exists today (traced, read from source)
@@ -113,7 +113,11 @@ Meals cooked for him elsewhere (work, a canteen menu): `docs/plans/meals-cooked-
   - days on target: 140 of 140 before and after, in every row.
   - the same dish two days running: 13 in 560 servings with no usual meals (was 18 before the cycle fix); 0 of his in
     every row but one (1 in 560).
-- **Not built:** setup's question; the meal writer being told his usual meals; a route from Nutrition; an exam case.
+- **Setup's question (built the same day, second commit):** one typed, optional question after the foods to leave
+  out. Kept as likes, not as dishes: the meal writer is not yet asked to write a named usual meal as its own dish, so
+  a like steers what is written and chosen, and a meal becomes "his" only when he adds it on Profile or through the
+  coach. The app keeps his typed reply as the answer when the coach records nothing.
+- **Not built:** the meal writer being told to write his usual meals as dishes; a route from Nutrition; an exam case.
   The coach is not told anything new: its two add tools already do this, and now mark the dish.
 - **Named limits:** with usual dinners only, nearly every dinner served is one of his (four usual dinners: 79% of
   days), so "about half" is a share of the whole day, not of each meal. A meal of his held as a pick on another date

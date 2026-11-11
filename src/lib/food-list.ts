@@ -37,3 +37,19 @@ export function splitFoodList(text: string): string[] {
   }
   return out
 }
+
+/**
+ * "What do you usually eat?" → one entry per MEAL OR FOOD he named (his 11 Nov 2026 ruling, "My usual meals first").
+ * Split on commas, semicolons and new lines ONLY: "chicken and rice" is one meal here, where on Foods to avoid
+ * "mushrooms and pork" is two foods. A like naming several foods then matches a dish holding all of them.
+ */
+export function splitUsualFoods(text: string): string[] {
+  const t = String(text ?? '').trim()
+  if (isPlainNone(t)) return []
+  const out: string[] = []
+  for (const part of t.split(/\s*(?:,|;|\n)\s*/)) {
+    const meal = tidy(part)
+    if (meal && !out.includes(meal)) out.push(meal)
+  }
+  return out
+}

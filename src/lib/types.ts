@@ -224,6 +224,8 @@ export interface UserProfile {
   disliked_foods?: string[]
   /** Onboarding's "exercises to avoid" answer. Like disliked_foods this is NOT a profile column — it becomes user_facts rows (kind 'exercise_preference') at signup, the same shape a later "never give me burpees" chat turn produces. Held here only to carry the in-memory answer from onboarding to first generation. */
   disliked_exercises?: string[]
+  /** Setup's "what do you usually eat?" answer, one entry per meal or food. NOT a profile column: it becomes user_facts likes at signup, the rows Profile's "Foods and meals I like" writes. */
+  usual_foods?: string[]
   breakfast_style?: BreakfastStyle
   /**
    * Dashboard round: a plain user-editable daily hydration goal in

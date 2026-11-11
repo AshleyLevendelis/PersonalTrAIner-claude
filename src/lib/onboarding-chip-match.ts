@@ -96,6 +96,7 @@ const ASKS: Record<SlotKey, Asks> = {
   mealsPerDay: /how many meals|meals (a|per|each) day|times a day|how often (do|would) you (like to |want to )?eat|\b(two|three|four|2|3|4) meals/i,
   dietaryPreferences: /dietar|\bdiet\b|allerg|intoleran|vegetarian|vegan|restriction/i,
   dislikedFoods: /won'?t eat|rather i left out|leave (out|off)|foods? (you|to)\b.{0,20}(hate|dislike|avoid|can'?t stand)/i,
+  usualFoods: /usually (eat|have)|(eat|have) most weeks|meals? (you|do you) (already|usually|normally)|normally eat/i,
   cookingTime: /cook|kitchen/i,
   includeSnacks: /snack/i,
   favoriteCuisines: /cuisine|kinds? of food|food do you (like|love|enjoy)/i,

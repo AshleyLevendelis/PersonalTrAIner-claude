@@ -2,6 +2,29 @@
 
 Newest first. One line each.
 
+- [x] **SETUP ASKS WHAT HE USUALLY EATS: the second half of his 11 Nov 2026 ruling, "My usual meals first"** ("setup
+  asks what he usually eats"). One new question, typed, optional, straight after the foods to leave out: "What do
+  you usually eat? A few meals or foods you have most weeks." What he says is kept as LIKES, the same rows Profile's
+  "Foods and meals I like" writes, so it shows there and comes off there, and the first plan's meals are made with
+  them in mind. Commas separate meals and "and" does not: "chicken and rice" is one meal, and matches a dish holding
+  both (the several-foods like built with the first half).
+  DECIDED BY ME: (1) the app keeps his typed reply as the answer when the coach replies and records nothing; a
+  question of his own is not an answer, "nothing really" is an empty list, and what the coach did record is never
+  overwritten. (2) A meal he also said to leave out is not written as a like: an avoid wins, as on Profile.
+  (3) SETUP IS ONE QUESTION LONGER (17 to 18 that can hold a plan up; 18 to 19 for a barbell lifter). The length bar
+  moved by exactly that, and a check says which question it was, so a second one still fails.
+  FOUND ON THE WAY, AND FIXED: A TYPED QUESTION THE APP RE-ASKED DID NOT SAY WHICH QUESTION IT WAS. After a reply from
+  the coach that asked nothing, the app asks the open question again itself; for a question with buttons it carried
+  the buttons, for a typed one it carried nothing, so the box's hint and now the answer had no question to belong
+  to. Seen by dumping the conversation after each reply, not by reading: my first version checked "the last thing
+  the coach said" and recorded nothing, and every check on the code I had written passed.
+  VERIFIED: `test:usual-meals` §11 (111 checks now), `verify:onboarding-turns` §28 at phone size (159 checks; the
+  coach scripted to record nothing), the other eight setup drivers, `test:onboarding-slots`. Mutations in the commit
+  message. Fixtures of a finished setup gained the new answer (a saved draft from before today is simply asked it).
+  NOT PROVEN: whether the real setup coach asks it well or records it (model behaviour; the app's own recording is
+  what is proven). NEEDS the `onboarding-chat` deploy for the coach's line; the question and the app's recording work
+  without it. STILL NOT BUILT from this ruling: the meal writer told to write a named usual MEAL as its own dish; a
+  route from Nutrition.
 - [x] **HIS OWN MEALS COME FIRST: HIS RULING 11 NOV 2026, "My usual meals first"** (over "mostly his meals" and over
   leaving it). Plan: `docs/plans/usual-meals-first.md` (its last section says what was built and where it differs).
   WHAT WAS WRONG, TRACED: a like was one phrase matched against a dish ("chicken and rice" matched almost nothing);

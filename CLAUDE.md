@@ -1536,8 +1536,10 @@ menu" stays true when a copy is also left outside it.
   the day's targets still come first. And the last day of a week's cycle is told what the next first day serves, so a
   dish is not served on a Wednesday and again on the Thursday. Measured: with a full set of his meals 48% of servings
   are his, days on target 140 of 140 before and after. `test:usual-meals`, `verify:usual-meals`,
-  `measure:usual-meals`, `docs/plans/usual-meals-first.md`. NOT BUILT: setup's question, the meal writer's half, a
-  route from Nutrition.
+  `measure:usual-meals`, `docs/plans/usual-meals-first.md`. AND SETUP ASKS IT: one typed, optional question after the
+  foods to leave out, kept as likes (commas separate meals, "and" does not), the app keeping his reply when the coach
+  records nothing; setup is one question longer by his ruling. `test:usual-meals` §11, `verify:onboarding-turns` §28.
+  Needs the `onboarding-chat` deploy for the coach's line. NOT BUILT: the meal writer's half, a route from Nutrition.
 
 ### His requests of 10 Nov 2026 (the long-flight batch)
 - **The Full Program as a calendar, the phase strip kept as it is.** List / Calendar beside the title (List the

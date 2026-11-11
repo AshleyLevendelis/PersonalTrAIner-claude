@@ -214,7 +214,9 @@ async function main() {
       /likedFoods: typedFoodLikes/.test(topUp) && /favouriteMeals: steerableFavouriteMeals/.test(topUp), topUp.slice(0, 80))
     check('...and passes them on to the generator untouched', /\.\.\.input\.generation,/.test(read('src/lib/meal-top-up.ts')))
     check('...and every one of them is told the likes and the hearted meals she can still eat',
-      calls.every(c => /likedFoods: typedFoodLikes/.test(c) && /favouriteMeals: steerableFavouriteMeals/.test(c)), calls.map(c => c.slice(0, 60)))
+      // The first plan's call also carries what he told setup he usually eats (11 Nov 2026): at signup those likes
+      // are not rows yet. Every call must still be handed typedFoodLikes itself, alone or with setup's beside it.
+      calls.every(c => /likedFoods: (typedFoodLikes|\[\.\.\.new Set\(\[\.\.\.typedFoodLikes, )/.test(c) && /favouriteMeals: steerableFavouriteMeals/.test(c)), calls.map(c => c.slice(0, 60)))
     check('...worked out by the shared rule, from the marked pools',
       /const steerableFavouriteMeals = useMemo\(\s*\(\) => favouritesStillAllowed\(mealPools, favouriteMealNames\)/.test(app))
     const opt = (name: string, breaks: boolean) => ({ slot: 'dinner' as const, name, ingredients: [], macros: { calories: 0, protein: 0, carbs: 0, fat: 0 }, tags: [], ...(breaks ? { breaksRestriction: true as const } : {}) })

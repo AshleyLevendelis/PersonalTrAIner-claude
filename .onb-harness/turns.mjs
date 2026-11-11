@@ -540,7 +540,7 @@ await section(16, 'M1 — a parked question is kept, counted, and handed over wh
     const all = { displayName: 'Sam', fitnessGoal: 'fat_loss', trainingExperience: 'intermediate', activityLevel: 'moderate',
       equipment: 'minimalist', kitTicks: ['dumbbells', 'bench'], injuries: [], trainingDays: ['Mon', 'Wed', 'Fri'], sessionDuration: '30-45', trainingStyle: 'functional',
       conditioningPreference: 'tolerate', recoveryCapacity: 'moderate', age: '31', heightCm: '178', weightKg: '82', gender: 'male',
-      mealsPerDay: 3, dietaryPreferences: [], dislikedFoods: '' }
+      mealsPerDay: 3, dietaryPreferences: [], dislikedFoods: '', usualFoods: '' }
     d.values = { ...d.values, ...all }; d.confirmedSlots = Object.keys(all)
     localStorage.setItem('fitplan_onboarding_draft', JSON.stringify(d))
     localStorage.removeItem('fitplan_parked_questions')
@@ -815,6 +815,49 @@ await section(26, 'Her muay thai is kept, with its days and evening, and the coa
   await say('actually muay thai is wednesday evenings now')
   const again = JSON.parse((await evj(`__draft()`))?.values?.otherSports || '[]')
   check('said again with other days, it is corrected, never doubled', again.length === 1 && JSON.stringify(again[0].days) === JSON.stringify(['Wednesday']), again)
+})
+
+// ---------------------------------------------------------------------------
+// "WHAT DO YOU USUALLY EAT?" (his ruling, 11 Nov 2026, "My usual meals first": setup asks). A typed question with no
+// buttons, so the answer's only route was the coach recording it. Here the coach replies and records NOTHING, which
+// is the case that matters: the app keeps the reply as the answer, a meal stays whole, "nothing really" is an answer,
+// a question of his own is not, and the finished profile carries one entry per meal.
+await section(28, 'What he usually eats: asked once, kept as he typed it, by the app when the coach records nothing', async () => {
+  await open('usual')
+  const start = await evj(`__draft()`)
+  check('harness: the usual-meals question is the one on screen, and not yet answered', /What do you usually eat\?/.test(await evj(`__body()`)) && !(start?.confirmedSlots ?? []).includes('usualFoods'), start?.confirmedSlots)
+  check('...with no summary yet: setup is not finished until it is answered or skipped', (await review()).open === false)
+  // A QUESTION OF HIS OWN is not an answer.
+  await queue({ reply: 'Anything you have most weeks: a breakfast, a dinner, a snack.', actions: [] })
+  await say('what counts as a meal?')
+  check('a question of his own is not kept as the answer', !((await evj(`__draft()`))?.confirmedSlots ?? []).includes('usualFoods'), (await evj(`__draft()`))?.values?.usualFoods)
+  // THE ANSWER, and a coach that records nothing.
+  await queue({ reply: 'Lovely, that is a solid base to build on.', actions: [] })
+  await say('porridge with banana, chicken and rice')
+  const kept = await evj(`__draft()`)
+  check('his reply is kept as the answer though the coach recorded nothing', (kept?.confirmedSlots ?? []).includes('usualFoods') && kept?.values?.usualFoods === 'porridge with banana, chicken and rice', kept?.values?.usualFoods)
+  check('...and ticked, so he can see it was taken', (await evj(`__ticks()`)).some(t => /Usual meals/.test(t) && /porridge with banana, chicken and rice/.test(t)), await evj(`__ticks()`))
+  const done = await review()
+  check('the summary opens with it as a row, and the plan can be made', done.open && /porridge with banana, chicken and rice/.test(done.rows.usualFoods ?? '') && done.generate && done.generate.disabled === false, done.rows)
+  // Every check below runs whether or not the button is there: with nothing kept there is no summary and no button,
+  // and a section that stopped here would run ten checks fewer and read as a crash, not as the failure it is.
+  try { await tapButton('Generate My Plan') } catch { /* the two checks below fail on the missing profile */ }
+  const profile = await evj(`window.__onbCompleted`)
+  check('the finished profile holds ONE entry per meal: "chicken and rice" is one meal, not two foods', JSON.stringify(profile?.usual_foods) === JSON.stringify(['porridge with banana', 'chicken and rice']), profile?.usual_foods)
+  check('...and his foods to avoid are untouched by it', JSON.stringify(profile?.disliked_foods) === JSON.stringify(['mushrooms']), profile?.disliked_foods)
+
+  // "NOTHING REALLY" IS AN ANSWER.
+  await open('usual')
+  await queue({ reply: 'No problem, we will build it from scratch.', actions: [] })
+  await say('nothing really')
+  const none = await evj(`__draft()`)
+  check('"nothing really" answers it with an empty list, and is not asked again', (none?.confirmedSlots ?? []).includes('usualFoods') && none?.values?.usualFoods === '' && (await review()).open === true, none?.values?.usualFoods)
+
+  // THE COACH'S OWN RECORDING STANDS when it makes one.
+  await open('usual')
+  await queue({ reply: 'Got it.', actions: [{ name: 'set_slot', args: { slot_key: 'usualFoods', value: 'eggs on toast, spag bol' } }] })
+  await say('eggs on toast and spag bol mostly')
+  check('what the coach recorded is kept as it recorded it, not overwritten by the app', (await evj(`__draft()`))?.values?.usualFoods === 'eggs on toast, spag bol', (await evj(`__draft()`))?.values?.usualFoods)
 })
 
 await section(27, 'Up to 3, then back: a tangent gets three follow-ups before the app steps in, and the notes are shown', async () => {
