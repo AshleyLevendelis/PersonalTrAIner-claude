@@ -158,7 +158,9 @@ console.log('\n6. The model is told the slot exists')
   // catalogue alone is not enough — dislikedFoods gets an explicit rule, and
   // this needs one too, including the instruction NEVER to ask for it.
   const fn = readFileSync(join(ROOT, 'supabase/functions/onboarding-chat/index.ts'), 'utf8')
-  check('set_slot knows it takes literal text', /dislikedFoods\/dislikedExercises, the literal text/.test(fn))
+  // THE PROPERTY, not the neighbours: the sentence listing the literal-text slots names this one. It was pinned on
+  // "dislikedFoods/dislikedExercises", and went red on correct code the day a third text slot joined the list.
+  check('set_slot knows it takes literal text', /For [A-Za-z/]*\bdislikedExercises\b[A-Za-z/]*, the literal text/.test(fn))
   const rule = fn.slice(fn.indexOf("EXERCISES THEY WON'T DO"), fn.indexOf("EXERCISES THEY WON'T DO") + 900)
   check('there is a rule telling the model to record it', rule.length > 100)
   check('...naming the tool call', /set_slot\(dislikedExercises=/.test(rule))
