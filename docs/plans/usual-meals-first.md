@@ -123,7 +123,7 @@ Meals cooked for him elsewhere (work, a canteen menu): `docs/plans/meals-cooked-
   then writes is model behaviour.
 - **The way there from Nutrition (11 Nov 2026):** a meal's swap list ends with "Add a meal you already eat", which
   opens Profile at My meals. A link, not a second form.
-- **Not built:** an exam case.
+- **An exam case** (`usual-meal-ask-then-card`): no amounts, the coach asks once; amounts given, it cards.
   The coach is not told anything new: its two add tools already do this, and now mark the dish.
 - **Named limits:** with usual dinners only, nearly every dinner served is one of his (four usual dinners: 79% of
   days), so "about half" is a share of the whole day, not of each meal. A meal of his held as a pick on another date

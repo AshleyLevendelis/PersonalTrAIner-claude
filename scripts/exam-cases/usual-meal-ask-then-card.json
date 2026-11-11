@@ -1,0 +1,22 @@
+{
+  "name": "usual-meal-ask-then-card",
+  "why": "11 Nov 2026, Ashley's ruling 'My usual meals first': the app should fit meals around what he already eats, and telling the coach is one of the two ways in (the card marks the meal as his, and his meals come first each week). The coach's rule for a meal he describes is older (1 Sep): if any food has no amount, ask how much of each in ONE question, then card with his exact foods and amounts, never guessing a quantity. No code can enforce the first half: a coach that cards on turn 0 has invented his portions, and a coach that never cards has ignored him. Turn 0 must NOT card; turn 1 must. Neither message is in the coach's instructions.",
+  "messages": [
+    "most weeknights I just do salmon with new potatoes and green beans for dinner, can you work that in",
+    "about 150g of salmon, 250g new potatoes and 100g green beans"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      },
+      {
+        "turn": 1,
+        "oneOf": [
+          "propose_custom_meal"
+        ]
+      }
+    ]
+  }
+}

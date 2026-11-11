@@ -10,7 +10,9 @@ Newest first. One line each.
   VERIFIED: `test:usual-meals` section 13 (123 checks) and `verify:usual-meals` section 10 at phone size (42
   checks); 8 mutations, 8 caught; the 96 checks that read the app shell, Profile, Nutrition or the meal list.
   NOT PROVEN: that Profile then opens on the right sheet in a browser (held by source: no test page boots App).
-  Frontend only.
+  Frontend only. AND ONE EXAM QUESTION ADDED, `usual-meal-ask-then-card`: told a meal he already eats with no
+  amounts, the coach asks how much once and cards on the answer (a rule it has had since 1 Sep; no code can hold the
+  asking half). 41 cases now; the exam needs a run on his machine.
 - [x] **THE MEAL WRITER WRITES A MEAL HE ALREADY EATS AS ITSELF** (11 Nov 2026, the writer's half of his "My usual
   meals first": "without always prescribing meals they have never had before"). A like naming a whole meal ("chicken
   and rice", "porridge with banana") reached the writer only as an ingredient hint, so new plans held new dishes that
