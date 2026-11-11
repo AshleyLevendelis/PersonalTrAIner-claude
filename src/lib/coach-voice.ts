@@ -1558,3 +1558,19 @@ export function liftSetProblem(kind: 'weight' | 'reps' | 'too_many' | 'unread'):
   if (kind === 'too_many') return `Use a set of 1 to ${LIFT_SET_MAX_REPS} reps.`
   return 'Give the weight in kg, or add lb.'
 }
+
+/**
+ * HOW A LIFT FELT: his ruling, 11 Nov 2026, "One tap per lift" (Too easy / About right / Too hard), asked once a
+ * lift's sets are done. The three answers are his words; the question and the line under each answer are mine and
+ * his to change. Each line says only what the weight rule does with that answer (progression-engine.ts), and
+ * `test:lift-effort` checks every one against the rule.
+ */
+export const EFFORT_ASK = 'How did that feel?'
+export function effortLabel(effort: 'easy' | 'right' | 'hard'): string {
+  return effort === 'easy' ? 'Too easy' : effort === 'right' ? 'About right' : 'Too hard'
+}
+export function effortLine(effort: 'easy' | 'right' | 'hard'): string {
+  if (effort === 'easy') return 'Next time starts heavier and finds your weight.'
+  if (effort === 'right') return 'Good. Keep this up and the weight goes up.'
+  return 'Next time holds this weight.'
+}

@@ -22,13 +22,14 @@ import { InlineRest, restBelongsToSet } from './InlineRest'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { prescriptionUnit } from '@/lib/set-log-store'
 import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropSets, rowKey, setLabel, setLabelLong, type SetRef } from '@/lib/session-derive'
-import { lastTime, sameAsSet, setReading, loggedSetReading, loggedCountLabel, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE } from '@/lib/coach-voice'
+import { lastTime, sameAsSet, setReading, loggedSetReading, loggedCountLabel, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE, EFFORT_ASK, effortLabel, effortLine } from '@/lib/coach-voice'
 import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, plateBarKg, nextSetRungsKg } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG } from '@/lib/set-plausibility'
 import { blankWeightFor, carriedWeightFor, type BlankWeight } from '@/lib/set-row'
 import type { UserProfile } from '@/lib/types'
+import { EFFORT_RPE, effortFromRpe, type LiftEffort } from '@/lib/lift-effort'
 
 // REPLACED 8 Sep 2026 by set-plausibility.ts's MAX_LOGGABLE_SET_KG. The old
 // constant here was 9999.99 — the width of the database column, not a claim
@@ -119,6 +120,13 @@ export interface SetGridProps {
    */
   calibration?: boolean
   /**
+   * ASK HOW THE LIFT FELT, once its working sets are done (his ruling, 11 Nov 2026, "One tap per lift"). The parent
+   * decides WHEN the answer can mean something (a loaded lift with a number, not a deload or calibration week); the
+   * grid knows when the sets are done. The answer is kept as the effort on the lift's last working set, the column a
+   * set the coach logs already fills, and the weight rule reads it next time (progression-engine.ts).
+   */
+  askEffort?: boolean
+  /**
    * The first session back after a break, with eased weights (layoff.ts, 8 Oct 2026).
    * Last time's numbers are from before the break: shown, they would read as the ask,
    * and a blank tick would log them. So they step aside and the boxes show today's eased
@@ -176,6 +184,7 @@ export function SetGrid({
   rampSets,
   rampKind,
   calibration = false,
+  askEffort = false,
   ignoreLastTime = false,
   profile,
   onSetCompleted,
@@ -256,6 +265,22 @@ export function SetGrid({
     : existingLogs.find(l => l.set_number === ref.setNumber))
 
   const existingLogs = setsFor(exerciseId, exerciseName)
+  // THE LAST WORKING SET CARRIES THE ANSWER. Asked only when every prescribed working set is in.
+  const lastWorkingLog = existingLogs.length >= totalSets && existingLogs.length > 0
+    ? existingLogs.reduce((a, b) => (b.set_number > a.set_number ? b : a))
+    : null
+  const felt = lastWorkingLog ? effortFromRpe(lastWorkingLog.rpe) : null
+  const sayEffort = (effort: LiftEffort) => {
+    if (!lastWorkingLog || !profileId) return
+    logSet({
+      userId: profileId, date: today, weekNumber: liveWeek, day: dayName, exerciseId, exerciseName,
+      setNumber: lastWorkingLog.set_number, weightKg: lastWorkingLog.weight_kg, repsCompleted: lastWorkingLog.reps_completed,
+      unit: lastWorkingLog.unit, isBodyweight: lastWorkingLog.is_bodyweight, addedLoadKg: lastWorkingLog.added_load_kg ?? null,
+      isWarmup: false, dropIndex: 0,
+      // The same answer tapped again takes it back.
+      rpe: felt === effort ? null : EFFORT_RPE[effort],
+    })
+  }
   const ghostValues = ghosts(exerciseId)
   const loggedSetNumbers = existingLogs.map(l => l.set_number)
 
@@ -1408,6 +1433,26 @@ export function SetGrid({
           set. On today's card it sits inside the open ramp (2a); with nothing
           to fold it stays here. VIOLET, because it adds a RAMP row. */}
       {!hasFold && showWarmupControls && addWarmupButton}
+      {askEffort && lastWorkingLog && (
+        <div className="mt-2 space-y-1.5" data-testid="lift-effort">
+          <p className="text-[0.75rem] text-muted-foreground">{EFFORT_ASK}</p>
+          <div role="group" aria-label={EFFORT_ASK} className="flex gap-2">
+            {(['easy', 'right', 'hard'] as const).map(effort => (
+              <button
+                key={effort}
+                type="button"
+                data-effort={effort}
+                aria-pressed={felt === effort}
+                onClick={() => sayEffort(effort)}
+                className={`min-h-[44px] flex-1 rounded-full border px-2 text-[0.8125rem] font-medium ${felt === effort ? 'border-primary text-primary-text' : 'border-border text-muted-foreground'}`}
+              >
+                {effortLabel(effort)}
+              </button>
+            ))}
+          </div>
+          {felt && <p className="text-[0.75rem] text-muted-foreground" data-testid="lift-effort-line">{effortLine(felt)}</p>}
+        </div>
+      )}
       <button
         type="button"
         className="hit-slop-44 mt-1 flex min-h-9 items-center gap-1.5 px-0.5 text-[0.75rem] text-muted-foreground"

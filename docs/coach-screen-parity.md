@@ -83,9 +83,10 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**Six screen-only, as of 30 Sep 2026** — the pre-session tightness check,
-macro mode, macro split, logging a build-up set, logging a drop set, and
-"Train anyway" on a rest day. The calorie target below is a seventh entry but
+**Seven screen-only, as of 11 Nov 2026** — the pre-session tightness check,
+macro mode, macro split, logging a build-up set, logging a drop set,
+"Train anyway" on a rest day, and saying how a lift felt on a set already
+logged (re-derived from the bullets that day, when the seventh was added). The calorie target below is a seventh entry but
 a different kind: it is on NEITHER surface and cannot be, because it is
 derived rather than set.
 CORRECTED 22 Sep 2026: this said "Four... as of 17 Sep 2026" while the
@@ -160,6 +161,17 @@ the difference.
   be unable to READ it back or correct it — a one-way door for the one surface
   whose whole job is conversation. Closing it means giving the coach the
   filtered-out half too, which is a bigger change than a flag.
+- **Saying how a lift felt.** `screen only` FOR A SET ALREADY LOGGED, added
+  11 Nov 2026 the day it was built (his ruling "One tap per lift": Too easy,
+  About right, Too hard, once a lift's sets are done). The answer is kept as
+  the effort on the lift's last working set, which is the SAME column the
+  coach's `log_workout_set` fills when he tells it an effort, and one rule
+  reads both (progression-engine.ts). So an effort said while the coach logs
+  the set counts exactly as a tap does. What the coach cannot do is add or
+  change the answer on a set that is already in the log: it has no tool that
+  edits one field of a logged set, and "that bench felt easy" said afterwards
+  goes to the session's feel, which the weight rule does not read. Named, not
+  built.
 - **Logging a DROP set.** `screen only`, added 19 Sep 2026 the day the rows
   were built, and written here by the person adding it rather than found later.
   It is the build-up entry above with one extra reason on top.

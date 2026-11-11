@@ -2,6 +2,68 @@
 
 Newest first. One line each.
 
+- [x] **HOW A LIFT FELT, ONE TAP PER LIFT, AND TODAY'S WEIGHT NOW READS THE PLAN'S WEEK: HIS RULING 11 NOV 2026, "One
+  tap per lift"** (over main lift only, and over not asking). Plan first, as load prescription requires:
+  `docs/plans/too-easy-weights.md`.
+  WHAT CHANGED ON THE PHONE: under a lift whose working sets are all logged, "How did that feel?" with Too easy,
+  About right, Too hard (his words; the question and the line under each answer are mine and his to change). The
+  answer shows as chosen, the same answer tapped again takes it back, and one line says what it does. Never asked in
+  a deload week or the calibration week, or on a lift with no weight.
+  THE RULE, MINE (CSCS), WITH THE BASIS:
+  (1) TOO EASY (four or more reps left) makes the next session a FIND-YOUR-WEIGHT session: it starts 10% up, never
+  less than one real step, runs the calibration week's own search on that one lift (probe, go up while it is easy),
+  and its heaviest set becomes the weight. Basis: four reps in reserve is about 13% of load on the app's own
+  rep-to-load curve, so a 10% start is under what was just shown; and a load that far out is re-tested, not crept
+  towards. MEASURED through the rule: 40 kg to a true 70 kg in 2 sessions after the answer, against 12.
+  (2) ABOUT RIGHT: the top of the range on every set still earns a step, and so do two sessions running at one
+  weight, every set done, both about right. Basis: the standards' 2-for-2 idea (two sessions running at the target
+  effort); without it somebody who ticks and never types reps could not progress however well it went, because a
+  tick records the bottom of the range (his own rule, unchanged).
+  (3) TOO HARD, or a working set under the bottom of the range: hold; twice running at that weight, down one step
+  and never under the lightest loadable weight. Basis: repeated limit sets with no progress are a cue to come down
+  5-10%, and one step is 3.5-7.5%.
+  THE ANSWER IS KEPT AS THE EFFORT ON THE LIFT'S LAST WORKING SET (5, 8, 10), the column a set the coach logs already
+  fills, so there is NO MIGRATION and one rule reads both surfaces' efforts.
+  FOUND ON THE WAY, AND FIXED IN THE SAME PLACE (`cardLoadFor`, pure, so checks can ask it): today's card took the
+  log's answer whatever the plan week was. (a) IN A DELOAD WEEK IT SHOWED LAST WEEK'S FULL WEIGHT: the promise "a
+  deload lighter than the week before" held for the printed plan and not for the card anyone trains from. Now the
+  plan's deload number for somebody on the plan to the kilo, otherwise 70% of what was actually lifted (60 kg: 42.5).
+  (b) THE FIRST SESSION AFTER A DELOAD WAS HELD AT THE DELOAD'S WEIGHT. Now the block's number, never more than a
+  step over where the lift was before the deload, never above the plan. (c) A SESSION DONE AS WRITTEN SAT UNDER THE
+  PLAN'S OWN NEXT WEEK. Now it takes this week's number when it kept up (at or over the plan for its week, not short,
+  not too hard). A session lifted UNDER the plan stays on the log: her 14 Sep one-number ruling, kept and checked.
+  All three were read in code, then SEEN on a real screen with the fix switched off (the driver's mutation round).
+  THE FIVE-QUESTION REVIEW: (i) training effect: a load far under the working weight is found in sessions, not
+  months, and the deload is a deload again; (ii) what it takes away: the protection of small steps, bounded by the
+  10% start, by climbing only on his own sets, by holding on "too hard", and by the cap after a deload; and one more
+  tap per loaded lift, which he chose; (iii) fundamentals: overload becomes reachable for someone who only ticks, and
+  recovery weeks are restored; (iv) a floor or ceiling redefined: "never record more work than was done" is
+  untouched; the effort column now also holds a tapped answer as 5, 8 or 10, so a reader treating it as a measured
+  effort sees a bucket (the coach's history view shows it; nothing computes from it but this rule); (v) in scope.
+  VERIFIED: `test:lift-effort` 65 checks through the real rule over a fake database that honours its filters (the
+  rule reads the session before the last, so a fake that ignored them could not see it); 30 mutations, 29 caught, the
+  30th an EQUIVALENT (a second floor on the deload share that plate rounding already supplied: measured, deleted).
+  `verify:lift-effort` 37 checks at phone size, screenshots read; eight of the thirty replayed on the driver, eight
+  caught, including the three card faults with their fix switched off (a deload showing last week's weight, the
+  session after one held at the deload's, a session done as written left under the plan).
+  ALSO RE-ANCHORED, found by the sweep on the weight-and-reps commit (149 of 152 passed): `test:coach-voice` (it
+  asserted the phrasebook imported NOTHING, the state on the day; the property is that everything it reaches is a
+  leaf), `test:onboarding-conversational` and `test:onboarding-receipts` (both pinned the bare-number wording). Each
+  re-anchored check was broken once on purpose and failed.
+  `test:working-sets` re-anchored (its guard check pinned one line that became a block; the property is unchanged
+  and the behaviour both ways round is test:lift-effort 6a and 6b).
+  A HARNESS FINDING, NOT AN APP ONE: the test page's server is rebuilt on every load while the phone's storage
+  survives, so a second load believed in a session the server no longer had and each newly saved set replaced the
+  last on screen. No real server forgets a session on reload; the driver now starts every scenario from an empty
+  phone. Recorded because it first read as "sets vanish after a reload".
+  NOT DONE, NAMED: the printed plan is not rewritten after a find-your-weight session outside the calibration week
+  (the card follows the log, the Program view keeps old numbers); the calibration week's holes (more reps at the same
+  weight, later blocks, Finish-only); the block review and load suggestion writing a full weight into a deload week
+  (a lead, not verified); the session summary's "next time" line and Home's lead lift read the rule without the
+  plan's week, so they can disagree with the card in a deload week; the coach cannot add an answer to a set already
+  logged (`docs/coach-screen-parity.md`, a seventh screen-only entry). Whether any of it is right for a real lifter
+  is a coaching judgement with its basis above, not a measurement. Frontend only: no deploy, no migration.
+
 - [x] **SETUP ASKS EACH LIFT AS A WEIGHT AND ITS REPS, AND THE APP WORKS OUT THE PLAN'S NUMBER: HIS RULING 11 NOV 2026,
   "Weight and reps"** (over one number with an explanation, which shipped an hour earlier and this replaces in setup).
   WHAT CHANGED ON THE PHONE: after "I know my numbers" each of the barbell back squat, barbell bench press and barbell

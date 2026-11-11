@@ -102,8 +102,14 @@ const controlGraph: string[] = []
 }
 check('...and the walker works, proved on a module that really does import things',
   controlGraph.length > 0, controlGraph.length)
-check('...so the phrasebook importing nothing at runtime is a fact, not a broken read',
-  graph.length === 0, graph)
+// RE-ANCHORED 11 Nov 2026 ON THE PROPERTY. This asserted the graph was EMPTY, which was the state on the day and
+// never the requirement (the note at the top of this section says so: "TRANSITIVE WEIGHT, not no imports"). The
+// phrasebook now reads the reps a lift is kept at from working-weight.ts, a file with no imports of its own, so the
+// words and the weight rule cannot drift. What must hold: everything it reaches is a LEAF, so its weight is the few
+// lines it names and nothing behind them. A leaf that grows an import fails here, and so does anything heavy above.
+const notLeaves = graph.filter(g => runtimeImportsOf(g).length > 0)
+check('...and everything it does import at runtime is a leaf with no imports of its own', notLeaves.length === 0, { graph, notLeaves })
+check('...of which there are at most two (a literal: a third is a decision, not a drift)', graph.length <= 2, graph)
 
 // ---------------------------------------------------------------------------
 console.log('\n[2] EVERY proposal card asks — none is silent\n')

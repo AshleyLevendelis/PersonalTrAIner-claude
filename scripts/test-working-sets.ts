@@ -181,8 +181,18 @@ console.log('\n[5] The engine asks its questions of the working sets only')
   // carrying no added weight at all.
   // THE GUARD THE MEASUREMENT IN §1 DEMANDS: a session with fewer working sets
   // than it prescribed cannot move the weight, in either direction.
-  check('a session short of its prescribed working sets is not judged at all',
-    /if \(ctx\.prescribedSets != null && working\.length < ctx\.prescribedSets\) return null/.test(src))
+  // RE-ANCHORED 11 Nov 2026. The guard was one line ending `return null`; it is a block now, because a session that
+  // climbs ON PURPOSE (the find-your-weight session after a "too easy") looks short of working sets too, and its
+  // heaviest set is the answer it went looking for. The property is unchanged for everything else: the ONLY way past
+  // the guard is that the session before said "too easy", and every other exit is `return null`. The behaviour, both
+  // ways round, is test:lift-effort 6a (the search sticks) and 6b (the same climb with no "too easy" is not judged).
+  const guardAt = src.indexOf('if (ctx.prescribedSets != null && working.length < ctx.prescribedSets) {')
+  const guard = guardAt > -1 ? src.slice(guardAt, src.indexOf('const lastWeight = maxWorkingWeight(working)', guardAt)) : ''
+  check('a session short of its prescribed working sets is not judged at all, unless it is a search that followed a "too easy"',
+    guard.length > 0
+    && /if \(sessionSets\.length < ctx\.prescribedSets \|\| !searchDate\) return null/.test(guard)
+    && /if \(sessionEffort\(before\) !== 'easy'\) return null/.test(guard)
+    && guard.indexOf("!== 'easy') return null") < guard.indexOf('const found ='), guard.slice(0, 200))
   check('...and the screen tells it how many were prescribed', /prescribedSets: ex\.sets/.test(readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8')))
   check('the added-load rule judges only the sets that carried the belt',
     /const topAdded = withAdded\.filter\(/.test(src) && /topAdded\.every\(s => s\.reps_completed >= prescribedRepRangeHigh\)/.test(src))

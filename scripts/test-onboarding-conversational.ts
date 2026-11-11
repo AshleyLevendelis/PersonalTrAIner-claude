@@ -119,8 +119,10 @@ console.log('\n3. The guard that made the reversal safe is untouched')
   check('after "I know my numbers" the lift boxes come next and the coach asks nothing else that turn',
     /RIGHT AFTER THEY SAY THEY KNOW THEIR NUMBERS \(knowsWorkingLifts = true\), THE LIFT BOXES COME NEXT/.test(fn)
     && /asks nothing else; the next question waits until the boxes are filled in or skipped/.test(fn))
-  check('a lift in pounds goes to set_slot with its unit, and a bare number is kg',
-    /A lift given in pounds goes in set_slot WITH its unit \("225 lb"\)/.test(fn) && /a bare number is kg/.test(fn))
+  // RE-ANCHORED 11 Nov 2026 (his ruling "Weight and reps"): a lift is a SET now, so the example carries its reps,
+  // and "a bare number is kg" became "a weight with no unit is kg" (a bare number is no longer a lift at all).
+  check('a lift in pounds goes to set_slot with its unit and its reps, and a weight with no unit is kg',
+    /A lift given in pounds goes in set_slot WITH its unit \("225 lb x 3"\)/.test(fn) && /a weight with no unit is kg/.test(fn))
   check('the coach may not claim a number is recorded without the set_slot in the same turn',
     /NEVER SAY A NUMBER IS NOTED, RECORDED, LOGGED OR "GOT" UNLESS YOUR set_slot FOR THAT NUMBER IS IN THIS SAME TURN/.test(fn))
 }

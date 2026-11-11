@@ -1,9 +1,10 @@
 import { supabase } from './supabase'
 import { sessionDeclaresWarmups } from './session-derive'
 import { getExerciseEntry, getExerciseId } from './exercise-db'
-import { categorize, getLoadIncrementKg, isExternallyLoaded, getLoadingCeilingKg, loadingMode, roundToPlate, labelModeForEntry, formatLoad, effectiveLoadingCeilingKg } from './load-prescription'
+import { categorize, getLoadIncrementKg, isExternallyLoaded, getLoadingCeilingKg, loadingMode, roundToPlate, labelModeForEntry, formatLoad, effectiveLoadingCeilingKg, getEquipmentFloorKg, DELOAD_LOAD_FRACTION } from './load-prescription'
 import { getLastSessionSets, getSetsForDate, isMalformedZeroWeight } from './set-log-store'
 import type { ExerciseTier, ExerciseSetLog, Exercise, UserProfile } from './types'
+import { effortFromRpe, type LiftEffort } from './lift-effort'
 
 // ---------------------------------------------------------------------------
 // All progression reads run against the unified store (exercise_set_logs via
@@ -233,6 +234,59 @@ export interface DoubleProgressionRecommendation {
   /** True when every logged set from the last session hit the top of the rep range and the weight bumped up. */
   didProgress: boolean
   note: string
+  /** How the lift felt last time, when that was said (the one tap, or an effort the coach logged). */
+  effort?: LiftEffort | null
+  /** Last time fell short: a working set under the bottom of the rep range. */
+  fellShort?: boolean
+  /** Last time was too easy, so today FINDS the weight: the calibration week's own search, on this one lift. */
+  findWeight?: boolean
+  /** The date of the session this was worked out from. */
+  lastDate?: string
+}
+
+// ---------------------------------------------------------------------------
+// HOW A LIFT FELT, AND WHAT THAT DOES TO THE NEXT WEIGHT
+//
+// Ashley, 11 Nov 2026: "If it prescribed a weight and I complete it and find it
+// too easy and have lots left on reserve, will it ramp up accordingly or will
+// it take many weeks". Measured: one small step a session, and only when every
+// set was TYPED at the top of the range, so 40 kg to a true 70 kg took twelve
+// sessions and a session ticked through never rose at all. Nothing asked how
+// it felt. His ruling, from three options: "One tap per lift" (Too easy, About
+// right, Too hard), after the lift's last set.
+//
+// The answer is kept as an effort on that lift's last working set, the same
+// 1-10 scale a set the coach logs already carries, so an effort said to the
+// coach and one tapped on the screen are read by one rule.
+//
+// WHAT EACH ANSWER DOES is a coaching decision (CSCS delegation; basis in
+// BACKLOG and docs/plans/too-easy-weights.md):
+//   easy  - four or more reps were left. By the app's own rep-to-load curve
+//           that is about 13% of load, so the next session STARTS 10% up (at
+//           least one step) and is a find-your-weight session: go up again
+//           while it is easy, and the heaviest good set becomes the weight.
+//           A load that far out is re-tested, not crept towards.
+//   right - the existing rule (the top of the range on every set earns a
+//           step); and two sessions running at one weight, every set done,
+//           both about right, earn a step too. A tick records the bottom of
+//           the range, so without this somebody who never types reps never
+//           progresses however well it is going.
+//   hard  - or any working set under the bottom of the range: hold. Two such
+//           sessions running: down one step, to get the reps back.
+// ---------------------------------------------------------------------------
+
+/** How the lift felt: the effort on its LAST working set, where the question is asked and where fatigue shows. */
+export function sessionEffort(working: ExerciseSetLog[]): LiftEffort | null {
+  const last = [...working].sort((a, b) => b.set_number - a.set_number)[0]
+  return last ? effortFromRpe(last.rpe) : null
+}
+
+/** One search step up from a weight that was too easy: 10%, and never less than one real step. */
+export function findWeightStartKg(lastWeightKg: number, exerciseName: string): number {
+  const entry = getExerciseEntry(exerciseName)
+  if (!entry || !isExternallyLoaded(entry)) return lastWeightKg + calculateIncrement(lastWeightKg)
+  const oneStep = lastWeightKg + getLoadIncrementKg(entry, categorize(entry), lastWeightKg)
+  return Math.max(oneStep, roundToPlate(lastWeightKg * 1.1, loadingMode(entry)))
 }
 
 /**
@@ -352,29 +406,158 @@ export async function getDoubleProgressionRecommendation(
   // the next session's ramp would be scaled from it. Returning null leaves the
   // plan's own prescription standing, which is the honest answer to "I have no
   // complete session to judge".
-  if (ctx.prescribedSets != null && working.length < ctx.prescribedSets) return null
-  const lastWeight = maxWorkingWeight(working)
-  const hitTopOnAllSets = working.every(s => s.reps_completed >= prescribedRepRangeHigh)
-
-  if (!hitTopOnAllSets) {
-    return {
-      weightKg: lastWeight,
-      lastWeightKg: lastWeight,
-      didProgress: false,
-      note: `Held at ${lastWeight}kg — didn't hit ${prescribedRepRangeHigh} reps on every set last time. Aim for more reps before adding load.`,
+  if (ctx.prescribedSets != null && working.length < ctx.prescribedSets) {
+    // A FIND-YOUR-WEIGHT SESSION CLIMBS ON PURPOSE, so its early sets look like build-up and the guard above would
+    // throw the whole session away and hand back the plan's stale number. When every set was logged and the session
+    // before it was the "too easy" one, the heaviest set IS the answer that session went looking for.
+    const searchDate = sessionSets[0]?.date
+    if (sessionSets.length < ctx.prescribedSets || !searchDate) return null
+    const before = workingSetsOf(await getLastSessionSets(profileId, exerciseId, searchDate), ctx)
+    if (sessionEffort(before) !== 'easy') return null
+    const found = maxWorkingWeight(sessionSets)
+    const feltAfter = sessionEffort(sessionSets)
+    if (feltAfter === 'easy') {
+      const weightKg = findWeightStartKg(found, exerciseName)
+      return { weightKg, lastWeightKg: found, didProgress: true, findWeight: true, effort: feltAfter, fellShort: false, lastDate: searchDate,
+        note: `Still too easy at ${found}kg, so today starts at ${weightKg}kg. Go up again if it's still easy: your heaviest good set becomes your weight.` }
     }
+    return { weightKg: found, lastWeightKg: found, didProgress: found > maxWorkingWeight(before), effort: feltAfter, fellShort: false, lastDate: searchDate,
+      note: `You found ${found}kg last time: that's your weight today.` }
   }
+  const lastWeight = maxWorkingWeight(working)
+  const lastDate = working[0]?.date
+  const fellShortOf = (sets: ExerciseSetLog[]) => ctx.repRangeLow != null && sets.some(s => s.reps_completed < ctx.repRangeLow!)
+  const effort = sessionEffort(working)
+  const fellShort = fellShortOf(working)
+  const said = { effort, fellShort, lastDate }
 
   const entry = getExerciseEntry(exerciseName)
   const increment = entry && isExternallyLoaded(entry) ? getLoadIncrementKg(entry, categorize(entry), lastWeight) : calculateIncrement(lastWeight)
-  const weightKg = lastWeight + increment
-
-  return {
-    weightKg,
-    lastWeightKg: lastWeight,
-    didProgress: true,
-    note: `Hit ${prescribedRepRangeHigh} reps on every set last time — up to ${weightKg}kg. Reps reset toward the bottom of the range.`,
+  /** The session before the last one, read only where a rule needs two running. */
+  const sessionBefore = async (): Promise<ExerciseSetLog[]> => {
+    if (!lastDate) return []
+    const before = workingSetsOf(await getLastSessionSets(profileId, exerciseId, lastDate), ctx)
+    return ctx.prescribedSets != null && before.length < ctx.prescribedSets ? [] : before
   }
+
+  // HARD, OR SHORT OF THE RANGE: hold, and never add. Two such sessions running come down one step.
+  if (effort === 'hard' || fellShort) {
+    const before = await sessionBefore()
+    const hardBefore = before.length > 0 && maxWorkingWeight(before) >= lastWeight && (sessionEffort(before) === 'hard' || fellShortOf(before))
+    if (hardBefore) {
+      const floor = entry && isExternallyLoaded(entry) ? getEquipmentFloorKg(entry) : 0
+      const weightKg = Math.max(floor, lastWeight - increment)
+      if (weightKg < lastWeight) {
+        return { ...said, weightKg, lastWeightKg: lastWeight, didProgress: false,
+          note: `Hard two sessions running, so down to ${weightKg}kg to get the reps back.` }
+      }
+    }
+    return { ...said, weightKg: lastWeight, lastWeightKg: lastWeight, didProgress: false,
+      note: effort === 'hard'
+        ? `Hard last time, so holding at ${lastWeight}kg.`
+        : `Held at ${lastWeight}kg — short of ${ctx.repRangeLow} reps on a set last time. Get the reps before adding load.` }
+  }
+
+  // TOO EASY: today finds the weight.
+  if (effort === 'easy') {
+    const weightKg = findWeightStartKg(lastWeight, exerciseName)
+    return { ...said, weightKg, lastWeightKg: lastWeight, didProgress: true, findWeight: true,
+      note: `Too easy last time, so today starts at ${weightKg}kg. Go up again if it's still easy: your heaviest good set becomes your weight.` }
+  }
+
+  const hitTopOnAllSets = working.every(s => s.reps_completed >= prescribedRepRangeHigh)
+  if (hitTopOnAllSets) {
+    const weightKg = lastWeight + increment
+    return { ...said, weightKg, lastWeightKg: lastWeight, didProgress: true,
+      note: `Hit ${prescribedRepRangeHigh} reps on every set last time — up to ${weightKg}kg. Reps reset toward the bottom of the range.` }
+  }
+
+  // ABOUT RIGHT, TWICE RUNNING AT ONE WEIGHT, every set done both times: a step.
+  if (effort === 'right') {
+    const before = await sessionBefore()
+    if (before.length > 0 && maxWorkingWeight(before) === lastWeight && sessionEffort(before) === 'right' && !fellShortOf(before)) {
+      const weightKg = lastWeight + increment
+      return { ...said, weightKg, lastWeightKg: lastWeight, didProgress: true,
+        note: `About right two sessions running at ${lastWeight}kg — up to ${weightKg}kg.` }
+    }
+  }
+
+  return { ...said, weightKg: lastWeight, lastWeightKg: lastWeight, didProgress: false,
+    note: `Held at ${lastWeight}kg — didn't hit ${prescribedRepRangeHigh} reps on every set last time. Aim for more reps before adding load.` }
+}
+
+// ---------------------------------------------------------------------------
+// TODAY'S WEIGHT: WHAT THE LOG EARNED, READ AGAINST THE PLAN'S OWN WEEK
+//
+// The card took the log's answer whatever the plan week was (traced 11 Nov
+// 2026 for his question above). Three things followed, none of them a rule
+// anybody chose:
+//   - a DELOAD week showed last week's full weight, because the log said so;
+//   - the first session AFTER a deload was held at the deload weight;
+//   - a session done exactly as written (ticks, no typing) records the bottom
+//     of the range, never earns a step, and so sat UNDER the plan's own next
+//     week for as long as it was done properly.
+// This is the one place that reads the log's answer against the plan's week.
+// It is a pure function so the checks can ask it rather than read a screen.
+//
+// CSCS basis (BACKLOG): a deload is a planned drop in load and the log of a
+// loading week says nothing about it; a deload's own log says nothing about a
+// working weight; and completing the prescribed work is the standard for
+// taking the plan's next step, where falling short of it, or lifting less than
+// was asked, is not.
+// ---------------------------------------------------------------------------
+
+export interface PlanWeekContext {
+  /** The plan's number for this lift today. */
+  printedKg: number
+  /** The plan's number for this lift in the plan week of the last session. Absent when the lift was not in that week. */
+  printedThenKg?: number
+  todayIsDeload: boolean
+  /** The last session fell in a deload week. */
+  lastWasDeload: boolean
+}
+
+export interface CardLoad {
+  weightKg: number
+  note: string
+  didProgress: boolean
+  /** Today this lift runs the find-your-weight search. */
+  findWeight: boolean
+}
+
+export function cardLoadFor(rec: DoubleProgressionRecommendation, plan: PlanWeekContext, exerciseName: string): CardLoad {
+  const entry = getExerciseEntry(exerciseName)
+  const loaded = !!entry && isExternallyLoaded(entry)
+  const last = rec.lastWeightKg
+  const plate = (kg: number) => (loaded ? roundToPlate(kg, loadingMode(entry!)) : kg)
+
+  if (plan.todayIsDeload) {
+    // A second deload session repeats the first; a plan followed to the kilo gets the plan's own deload number;
+    // anybody else gets the same share of what they actually lifted.
+    if (plan.lastWasDeload) return { weightKg: last, note: `Deload week: the same lighter weight as last time.`, didProgress: false, findWeight: false }
+    if (plan.printedThenKg != null && last === plan.printedThenKg) {
+      return { weightKg: plan.printedKg, note: `Deload week: lighter on purpose.`, didProgress: false, findWeight: false }
+    }
+    // Plate rounding already stops at the lightest thing that can be loaded (measured: a second floor here bound nothing).
+    const weightKg = Math.min(last, plate(last * DELOAD_LOAD_FRACTION))
+    return { weightKg, note: `Deload week: lighter on purpose, from the ${last}kg you lifted last time.`, didProgress: false, findWeight: false }
+  }
+
+  if (plan.lastWasDeload) {
+    // Back from a deload. Never above the plan, and never more than a step over where they were before it.
+    const before = plate(last / DELOAD_LOAD_FRACTION)
+    const step = loaded ? getLoadIncrementKg(entry!, categorize(entry!), before) : calculateIncrement(before)
+    const weightKg = Math.min(plan.printedKg, before + step)
+    return { weightKg, note: weightKg === plan.printedKg ? `Back from your deload: this block's weight.` : `Back from your deload: picking up from about where you were.`,
+      didProgress: false, findWeight: false }
+  }
+
+  // Did the last session keep up with the plan? Only then may the plan's own next number raise today's.
+  const keptUp = plan.printedThenKg != null && last >= plan.printedThenKg && !rec.fellShort && rec.effort !== 'hard'
+  if (keptUp && plan.printedKg > rec.weightKg) {
+    return { weightKg: plan.printedKg, note: `Last session done as planned — this week's ${plan.printedKg}kg.`, didProgress: plan.printedKg > last, findWeight: !!rec.findWeight }
+  }
+  return { weightKg: rec.weightKg, note: rec.note, didProgress: rec.didProgress, findWeight: !!rec.findWeight }
 }
 
 /**

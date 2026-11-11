@@ -54,7 +54,9 @@ console.log('\n1. L2 — a number is shown with its unit')
   // the one number that needs no unit to be understood.
   const bare = ONBOARDING_SLOTS
     .filter(s => s.control === 'numeric' && s.key !== 'age')
-    .filter(s => !/^\d+ (kg|cm)$/.test(displaySlotValue(s, { ...initialSlotValues(), [s.key]: '50' } as OnboardingSlotValues)))
+    // A LIFT says its unit AND what the number is ("50 kg for about 10 reps": his ruling, 11 Nov 2026). The rule
+    // here is unchanged: no number without its unit. The unit must come straight after the number either way.
+    .filter(s => !/^\d+ (kg|cm)(?:$| for about \d+ reps$)/.test(displaySlotValue(s, { ...initialSlotValues(), [s.key]: '50' } as OnboardingSlotValues)))
     .map(s => s.key)
   check('...and so is every other numeric answer the app stores', bare.length === 0, bare)
   check('there are enough of them for that to mean something',

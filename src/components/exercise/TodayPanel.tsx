@@ -10,7 +10,7 @@ import { useDeadlineTick } from '@/hooks/useDeadlineTick'
 import { exerciseCoachLine } from '@/lib/exercise-coach-line'
 import { carriedWeightFor } from '@/lib/set-row'
 import { isExternallyLoaded, splitLoadDisplay } from '@/lib/load-prescription'
-import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
+import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, cardLoadFor, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
 import { groupExercises, isConditioningDay, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, normalizeWarmup, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
@@ -18,6 +18,7 @@ import { reconnectingLine } from '@/lib/coach-voice'
 import { readCardioLogsForDate } from '@/lib/cardio-log-store'
 import { cardioLine, splitActivity } from '@/lib/cardio-lines'
 import { calibrationCueText } from './CalibrationCue'
+import { planDaysForDate } from '@/lib/plan-week'
 import { readBorrowedDay, writeBorrowedDay, trainAnywayOptions } from '@/lib/borrowed-day'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId, getExerciseEntry } from '@/lib/exercise-db'
@@ -793,7 +794,7 @@ export function TodayPanel({
   // Its own map, never merged with progressedLoads: one is the weight of the
   // bar and the other is what you hang off yourself.
   const [progressedAddedLoads, setProgressedAddedLoads] = useState<Record<string, number>>({})
-  const [progressionNotes, setProgressionNotes] = useState<Record<string, { note: string; didProgress: boolean }>>({})
+  const [progressionNotes, setProgressionNotes] = useState<Record<string, { note: string; didProgress: boolean; findWeight?: boolean }>>({})
   // Answered or dismissed THIS session. The durable record is on the profile;
   // this only stops the card lingering after a tap, since `profile` is a prop
   // and does not refetch mid-session.
@@ -864,7 +865,7 @@ export function TodayPanel({
       if (cancelled) return
       const nextLoads: Record<string, number> = {}
       const nextAdded: Record<string, number> = {}
-      const nextNotes: Record<string, { note: string; didProgress: boolean }> = {}
+      const nextNotes: Record<string, { note: string; didProgress: boolean; findWeight?: boolean }> = {}
       for (const [name, rec, kind] of results) {
         if (!rec) continue
         // Kept in separate maps on purpose: one is the weight of the bar,
@@ -887,16 +888,33 @@ export function TodayPanel({
           }
           continue
         }
-        if (kind === 'added') nextAdded[name] = (rec as { addedKg: number }).addedKg
-        else nextLoads[name] = (rec as { weightKg: number }).weightKg
-        nextNotes[name] = { note: rec.note, didProgress: rec.didProgress }
+        if (kind === 'added') {
+          nextAdded[name] = (rec as { addedKg: number }).addedKg
+          nextNotes[name] = { note: rec.note, didProgress: rec.didProgress }
+          continue
+        }
+        // THE LOG'S ANSWER, READ AGAINST THE PLAN'S OWN WEEK (11 Nov 2026): a deload stays a deload, the session
+        // after one does not start from the deload's weight, and a session done as written follows the plan.
+        const load = rec as DoubleProgressionRecommendation
+        const printed = workout.exercises.find(e => e.name === name)?.suggested_load_kg
+        if (printed == null) { nextLoads[name] = load.weightKg; nextNotes[name] = { note: load.note, didProgress: load.didProgress }; continue }
+        const then = load.lastDate ? planDaysForDate(load.lastDate, today, liveWeekPlan, mesocycle, planCreatedAt) : null
+        const thenWeek = then?.week != null ? mesocycle?.find(w => w.week_number === then.week) : undefined
+        const card = cardLoadFor(load, {
+          printedKg: printed,
+          printedThenKg: then?.days.flatMap(d => d.exercises).find(e => e.name === name)?.suggested_load_kg ?? undefined,
+          todayIsDeload: !!currentMesoWeekObj?.is_deload,
+          lastWasDeload: !!thenWeek?.is_deload,
+        }, name)
+        nextLoads[name] = card.weightKg
+        nextNotes[name] = { note: card.note, didProgress: card.didProgress, findWeight: card.findWeight }
       }
       setProgressedAddedLoads(nextAdded)
       setProgressedLoads(nextLoads)
       setProgressionNotes(nextNotes)
     }).catch(() => {})
     return () => { cancelled = true }
-  }, [profileId, liveWeek, workout, today, layoff])
+  }, [profileId, liveWeek, workout, today, layoff, liveWeekPlan, mesocycle, planCreatedAt, currentMesoWeekObj])
 
   const tomorrowIdx = (DAY_ORDER.indexOf(todayName) + 1) % 7
   const tomorrowName = DAY_ORDER[tomorrowIdx]
@@ -1908,7 +1926,7 @@ function ExerciseList({
   currentMesoWeekObj?: MesocycleWeek
   progressedLoads: Record<string, number>
   progressedAddedLoads: Record<string, number>
-  progressionNotes: Record<string, { note: string; didProgress: boolean }>
+  progressionNotes: Record<string, { note: string; didProgress: boolean; findWeight?: boolean }>
   /** The first session back after a break (layoff.ts): eases every number on the row. */
   layoff: LayoffStatus
   /** Reaches SetGrid via ExerciseRow, to judge a typed weight — see set-plausibility.ts. */
@@ -1977,6 +1995,7 @@ function ExerciseList({
       ? recentExIndex
       : flatExIndexes.find(partway) ?? firstIncompleteExIndex
 
+  const findsWeight = (name: string) => !easesWeights(layoff) && !!progressionNotes[name]?.findWeight
   const rowProps = (ex: WorkoutDay['exercises'][number], exIndex: number) => {
     const defaultExpanded = exIndex === firstIncompleteExIndex
     const expanded = exIndex in expandOverrides ? expandOverrides[exIndex] : defaultExpanded
@@ -1996,12 +2015,18 @@ function ExerciseList({
         : ex.block_hold_note ? { note: ex.block_hold_note, didProgress: false } : progressionNotes[ex.name],
       // The faint "last time" numbers would offer (and a blank tick would log) the
       // weight from before the break, so they step aside while weights are eased.
-      easedForBreak: easesWeights(layoff),
-      showCalibrationCue: calibrationAnchorIndex === exIndex,
+      // ...and while a lift is finding its weight: last time's numbers are the ones that were too easy.
+      easedForBreak: easesWeights(layoff) || findsWeight(ex.name),
+      // A LIFT THAT WAS TOO EASY LAST TIME FINDS ITS WEIGHT TODAY (his ruling, 11 Nov 2026, "One tap per lift"): the
+      // calibration week's own search, on that one row. Never while weights are eased after a break.
+      showCalibrationCue: calibrationAnchorIndex === exIndex || findsWeight(ex.name),
       // Every row of a calibration week, not just the anchor: the cue lands
       // once, but the chip above the number has to say the same thing on all
       // of them.
-      isCalibrationWeek: !!currentMesoWeekObj?.isCalibrationWeek,
+      isCalibrationWeek: !!currentMesoWeekObj?.isCalibrationWeek || findsWeight(ex.name),
+      // ASK HOW IT FELT, once the lift's sets are done: a loaded lift with a number, in a week where the answer
+      // can mean something. Not a deload (light on purpose), not the calibration week (already a search).
+      askEffort: ex.suggested_load_kg != null && !currentMesoWeekObj?.is_deload && !currentMesoWeekObj?.isCalibrationWeek,
       onOpenPlateCalc,
       onOpenHistory,
       onOpenDetail,

@@ -189,6 +189,21 @@ const availableIdx = new Set(FREE_TODAY
 // strip does with the wrong week could be told from the right one. The INPUT is chosen here; what the
 // strip makes of it is the app's.
 const THURSDAY = new URLSearchParams(location.search).get('thursday') === '1'
+// ?effort=easy|kept|deload|ask — HOW A LIFT FELT, AND TODAY'S WEIGHT AGAINST THE PLAN'S WEEK (11 Nov 2026, his ruling
+// "One tap per lift"). The INPUT is one earlier session of a loaded lift that is on today's card, seven days ago (so
+// it sits in the plan week BEFORE today's), and the plan's age; what the card makes of it is the app's.
+//   easy   - that session at the plan's own number for its week, every set at the bottom of the range, "too easy"
+//            kept on its last set. Today must start heavier and run the find-your-weight search.
+//   kept   - the same session with no answer, in a plan 37 days old: weeks 5 and 6, two loading weeks whose numbers
+//            differ on today's lifts (weeks 1 and 2 do not, on this plan). Done as written, so today takes the
+//            plan's number for THIS week.
+//   deload - the plan is 23 days old, so today is its deload week; the session, in week 3, is 5 kg over the plan.
+//            Today must be lighter than that session, and must not ask how it felt.
+//   back   - the plan is 30 days old: today is the first week of the next block and the session was in the deload
+//            week, at the deload's own number. Today must be this block's weight, not the deload's.
+//   ask    - no earlier session: the page for logging a lift's sets and answering the question.
+const EFFORT = new URLSearchParams(location.search).get('effort')
+const EFFORT_PLAN_AGE = EFFORT === 'deload' ? 23 : EFFORT === 'back' ? 30 : EFFORT === 'kept' ? 37 : 0
 // ?away=N — COMING BACK AFTER N DAYS AWAY (8 Oct 2026, layoff.ts). The last working
 // session is N days before today, on a loaded lift of today's own session, logged at the
 // plan's weight with EVERY set at the top of the range — so without the break the card
@@ -303,7 +318,7 @@ const profile: UserProfile = {
   // NINE DAYS OLD, not today: a plan created today has no elapsed
   // scheduled days, so the consistency score correctly shows nothing and the
   // harness could never see it render.
-  created_at: AWAY > 0 ? (() => { const d = daysAgo(AWAY + 9); d.setHours(8, 0, 0, 0); return d.toISOString() })() : THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - (JOINED_TODAY ? 0 : 9) * 86400000).toISOString(),
+  created_at: EFFORT_PLAN_AGE > 0 ? (() => { const d = daysAgo(EFFORT_PLAN_AGE); d.setHours(8, 0, 0, 0); return d.toISOString() })() : AWAY > 0 ? (() => { const d = daysAgo(AWAY + 9); d.setHours(8, 0, 0, 0); return d.toISOString() })() : THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - (JOINED_TODAY ? 0 : 9) * 86400000).toISOString(),
   ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
 } as UserProfile
 
@@ -525,6 +540,29 @@ const loggedTarget = (() => {
   return { name: ex.name, planKg: ex.suggested_load_kg as number, liftedKg, sets: ex.sets }
 })()
 ;(window as unknown as { __loggedTarget: unknown }).__loggedTarget = loggedTarget
+const effortTarget = (() => {
+  if (!EFFORT) return null
+  const liveWeekNo = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const nowWeek = mesocycle.find(w => w.week_number === liveWeekNo)
+  const thenWeek = mesocycle.find(w => w.week_number === liveWeekNo - 1)
+  const day = nowWeek?.days.find(d => d.day === DAYS[todayIdx])
+  if (!day || !nowWeek) return null
+  const before = (name: string) => thenWeek?.days.flatMap(d => d.exercises).find(e => e.name === name)?.suggested_load_kg ?? null
+  // A loaded lift on today's card that the week before also held, and (where there is one) whose number MOVED
+  // between the two weeks: without a difference "follows this week's plan" could not be told from "held".
+  const loaded = day.exercises.filter(e => (e.suggested_load_kg ?? 0) > 10 && before(e.name) != null)
+  const ex = loaded.find(e => before(e.name) !== e.suggested_load_kg) ?? loaded[0]
+  if (!ex) return null
+  const printedThenKg = before(ex.name) as number
+  const repsLow = Number(/\d+/.exec(ex.reps)?.[0] ?? 8)
+  return {
+    kind: EFFORT, name: ex.name, sets: ex.sets, repsLow, liveWeek: liveWeekNo, isDeload: !!nowWeek.is_deload, lastWasDeload: !!thenWeek?.is_deload,
+    printedNowKg: ex.suggested_load_kg as number, printedThenKg,
+    lastKg: EFFORT === 'deload' ? printedThenKg + 5 : printedThenKg,
+    seeded: EFFORT !== 'ask',
+  }
+})()
+;(window as unknown as { __effortTarget: unknown }).__effortTarget = effortTarget
 // ?bwpr=1's lift, READ OFF TODAY'S CARD (4 Nov 2026): the bodyweight vertical pull the session holds. It was named
 // "Pull-Ups", and when the catalogue grew the seeded plan rotated to Chin-Ups, so the history sat on a lift that was
 // not on the card and verify:bodyweight-progress found no row. The fixture chooses the input, never a name to hope for.
@@ -952,6 +990,19 @@ const db: Db = {
         })
       : []),
     ...(doneSeed?.sets ?? []),
+    ...(effortTarget?.seeded
+      ? Array.from({ length: effortTarget.sets }, (_, i) => {
+          const at = daysAgo(7); at.setHours(10, i, 0, 0)
+          return {
+            id: `eff${i}`, user_id: PROFILE_ID, session_id: 'sess-effort',
+            exercise_id: getExerciseId(effortTarget.name), exercise_name: effortTarget.name,
+            set_number: i + 1, weight_kg: effortTarget.lastKg, reps_completed: effortTarget.repsLow,
+            is_bodyweight: false, is_warmup: false, drop_index: 0,
+            rpe: effortTarget.kind === 'easy' && i === effortTarget.sets - 1 ? 5 : null,
+            completed_at: at.toISOString(), date: isoOf(at),
+          }
+        })
+      : []),
     ...(loggedTarget
       ? Array.from({ length: Math.min(3, loggedTarget.sets) }, (_, i) => ({
           id: `lg${i}`, user_id: PROFILE_ID, session_id: 'sess-logged',

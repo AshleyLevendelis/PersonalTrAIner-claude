@@ -1512,10 +1512,17 @@ menu" stays true when a copy is also left outside it.
   to 15 reps. A weight with no reps is asked about, never kept; the coach's route keeps a lift only from a set in his
   own words. BUILT. `test:working-weight-words`, `verify:onboarding-turns` §20-23. Needs the `onboarding-chat` deploy
   for the coach's half. Profile's rows still take the kept number directly, with its meaning beside them.
-- **A weight that is too easy: "One tap per lift"** (over main lift only, and over not asking): after a lift's last
-  set, Too easy / About right / Too hard. Measured before it: one small step a session, 12 sessions from 40 kg to a
-  true 70 kg, and a session ticked through without typing never rises at all. What each answer does to the next
-  weight is mine (CSCS), in `docs/plans/too-easy-weights.md`. NOT BUILT.
+- **A weight that is too easy: "One tap per lift"** (over main lift only, and over not asking): once a lift's sets
+  are done, Too easy / About right / Too hard, kept as the effort on its last working set (the column a set the coach
+  logs already fills, so one rule reads both). Measured before it: one small step a session, 12 sessions from 40 kg to
+  a true 70 kg, and a session ticked through without typing never rose at all. What each answer does is mine (CSCS):
+  too easy makes the next session a find-your-weight session starting 10% up (2 sessions to 70 kg, measured); about
+  right twice running earns a step; too hard holds, and twice running comes down a step. Never asked in a deload or
+  calibration week. **And today's weight reads the plan's week**: a deload week is lighter on today's card (it had
+  shown last week's full weight), the session after a deload starts from the block's number (it had been held at the
+  deload's), and a session done as written follows the plan, while one lifted under the plan stays on the log (her
+  14 Sep one-number ruling). BUILT. `test:lift-effort`, `verify:lift-effort`, `docs/plans/too-easy-weights.md`. Not
+  built: the printed plan after a find-your-weight session, and the calibration week's holes (plan D and E).
 - **Meals cooked for him elsewhere: "Set days + optional menu", in his words "I dont want it to stop posing the
   meals, I want it to incorporate the meals into its plan"**: he says once which meals are at work on which days;
   those meals STAY in the day's plan, shown and counted, never shopped for; a menu told to the coach is estimated and

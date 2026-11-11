@@ -5,8 +5,9 @@ reserve, will it ramp up accordingly or will it take many weeks to get to a weig
 challenging and beneficial. What if the calibration week feels too easy so the user logs heavier weights than
 prescribed, will the plan adjust accordingly?"*
 
-Load prescription is safety-adjacent, so this is the plan before any build. Status: **traced and partly measured,
-nothing built.** Everything marked TRACED is read from source by a trace on 11 Nov and is a lead until driven in a
+Load prescription is safety-adjacent, so this is the plan before any build. Status: **A and C BUILT 11 Nov 2026**
+(see "What was built" at the end); B folded into C's lines; D and E not built. Written when it was **traced and
+partly measured, nothing built.** Everything marked TRACED is read from source by a trace on 11 Nov and is a lead until driven in a
 browser; MEASURED was run.
 
 ## What happens today
@@ -92,3 +93,30 @@ never looks at the top of the range.
 
 Whether to ask at all, and whether on every lift or the main lift only (C) is his. Everything else above is a
 coaching decision under his 18 Sep delegation, recorded in BACKLOG with its basis when built.
+
+## What was built (11 Nov 2026)
+
+His ruling on C: **"One tap per lift"**.
+
+- **The tap.** Under a lift whose working sets are all in: "How did that feel?" with Too easy, About right, Too hard.
+  Kept as the effort on the lift's last working set (5, 8, 10 on the 1-10 scale the coach's logged sets already use),
+  taken back by tapping it again. Asked only for a loaded lift with a number, never in a deload or calibration week.
+- **The rule** (`progression-engine.ts`, `test:lift-effort`):
+  - too easy: the next session starts 10% up (never less than one real step) and is a find-your-weight session, the
+    calibration week's own search on that one lift; its heaviest set becomes the weight even when the climb was steep.
+    MEASURED through the rule: 40 kg to 70 kg in 2 sessions after the answer, against 12.
+  - about right: the top of the range on every set still earns a step; so do two sessions running at one weight,
+    every set done, both about right.
+  - too hard, or a set under the bottom of the range: hold; twice running at that weight, down one step, never
+    under the lightest loadable weight.
+- **Today's weight reads the plan's week** (`cardLoadFor`), which is A and two faults A's trace found:
+  - a session done as written (at or over the plan's number for its week, not short, not too hard) takes the plan's
+    number for this week when that is higher; a session lifted UNDER the plan stays on the log (her 14 Sep ruling);
+  - a DELOAD week is lighter: the plan's number for somebody on the plan to the kilo, otherwise the deload share of
+    what was actually lifted. Before, the card showed last week's full weight;
+  - the first session AFTER a deload starts from this block's number, never more than a step over where the lift
+    was before the deload. Before, it was held at the deload's weight.
+- **Not built:** the printed plan is not rewritten after a find-your-weight session outside the calibration week
+  (the card follows the log; the Program view keeps its old numbers); D (the calibration week's three holes); E
+  (the block review and the load suggestion in a deload week, and the suggestion's sentence); the session summary's
+  "next time" and Home's lead lift still read the rule without the plan's week.

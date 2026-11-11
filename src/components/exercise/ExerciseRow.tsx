@@ -42,6 +42,8 @@ export interface ExerciseRowProps {
    * were prescribed and others estimated.
    */
   isCalibrationWeek?: boolean
+  /** Ask how the lift felt once its sets are done (his ruling, 11 Nov 2026, "One tap per lift"). */
+  askEffort?: boolean
   /** The first session back after a break, with eased weights: the boxes ignore last time's numbers (layoff.ts). */
   easedForBreak?: boolean
   onOpenPlateCalc: (weightKg: number, barKg?: number) => void
@@ -78,6 +80,7 @@ export function ExerciseRow({
   progressionNote,
   showCalibrationCue,
   isCalibrationWeek,
+  askEffort,
   easedForBreak = false,
   onOpenPlateCalc,
   onSwap,
@@ -343,6 +346,7 @@ export function ExerciseRow({
           rampSets={ramp && ramp.kind !== 'stale' ? ramp.sets.map(r => ({ setNumber: r.setNumber, kg: 'kg' in r ? r.kg : undefined, reps: r.reps })) : undefined}
           rampKind={ramp?.kind}
           calibration={isCalibrationWeek}
+          askEffort={askEffort}
           ignoreLastTime={easedForBreak}
           profile={profile}
           // THE PLATE BUTTON LIVES IN EACH WEIGHT BOX (2a), and only on a
