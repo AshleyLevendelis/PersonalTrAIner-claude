@@ -1526,7 +1526,20 @@ menu" stays true when a copy is also left outside it.
 - **Meals cooked for him elsewhere: "Set days + optional menu", in his words "I dont want it to stop posing the
   meals, I want it to incorporate the meals into its plan"**: he says once which meals are at work on which days;
   those meals STAY in the day's plan, shown and counted, never shopped for; a menu told to the coach is estimated and
-  dinner and snacks fit around it; with no menu a normal-sized meal is assumed; an estimate is marked as one. NOT BUILT.
+  dinner and snacks fit around it; with no menu a normal-sized meal is assumed; an estimate is marked as one.
+  BUILT, except as named: Profile, Meals & shopping, "Meals cooked for me" (a button a weekday, a "Mon to Fri"
+  shortcut, every tap saved before it is believed); on a covered day the meal is in Nutrition's list as "Lunch cooked
+  for you", badged "Assumed", at that meal's own share, counted, loggable, and "Cooking my own today" puts one of his
+  plan's meals there for that day; the shopping list leaves them out and says how many. Told WHAT such a meal is, the
+  coach's card (`propose_custom_meal` with `cooked_for_me`) keeps it as an "Estimate" for that one day: the coach
+  supplies ordinary portions, the app costs and checks it as it does his own meal, and it is never one of his meals,
+  never served on another day, never shopped for. The kitchen's portion is never re-sized or moved, and no sentence
+  says anything about what is on the plate or whether it suits his diet. The answer rides on the meal shape, so every
+  surface that builds a week gets it. `test:meals-elsewhere`, `verify:meals-elsewhere`,
+  `docs/plans/meals-cooked-elsewhere.md`. NEEDS the meals-elsewhere migration on his machine (until then the grid
+  says the setting is not switched on yet) and the `chat-gemini` deploy for the coach's half. NOT BUILT: a week's
+  menu in one card (one meal a call), the coach's card for the standing answer (`screen only`, in the parity list),
+  setup recording it when volunteered.
 - **Meals he already eats: "My usual meals first"** (over mostly his meals, and over leaving it): setup asks what he
   usually eats, he can add his own meals on Nutrition or by telling the coach (his fridge included), and about half of
   each week is his own meals resized to his targets, the rest new. PART BUILT: Profile, Foods you like, "My meals"

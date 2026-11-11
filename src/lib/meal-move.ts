@@ -81,6 +81,12 @@ export type MealMoveResult =
 /** Plain words for a slot, because "snack" reads oddly with "your". */
 const slotWords = (slot: MealSlotName) => (slot === 'snack' ? 'your snack' : slot)
 
+/** Why a meal cooked for him elsewhere cannot be moved, or moved into (meals-elsewhere.ts). */
+export const MOVE_REFUSALS = {
+  elsewhereFrom: (slot: MealSlotName) => `Today's ${slot} is cooked for you, so it isn't a meal of yours to move.`,
+  elsewhereTo: (slot: MealSlotName) => `Today's ${slot} is cooked for you, so there's no meal of yours there to trade places with.`,
+}
+
 /**
  * THE RESIZE ITSELF — every line's number moved by one factor, everything
  * after the number preserved exactly.
@@ -219,6 +225,9 @@ export function buildMealMoveProposal(input: BuildMealMoveInput): MealMoveResult
   const moving = input.mealsBySlot[fromSlot]
   if (!moving) return { ok: false, reason: `There's no ${slotWords(fromSlot)} on your plan today to move.` }
   const displaced = input.mealsBySlot[toSlot]
+  // A MEAL COOKED FOR HIM ELSEWHERE IS NOT HIS TO MOVE (11 Nov 2026), and no meal of his trades places with one.
+  if (moving.cookedElsewhere) return { ok: false, reason: MOVE_REFUSALS.elsewhereFrom(fromSlot) }
+  if (displaced?.cookedElsewhere) return { ok: false, reason: MOVE_REFUSALS.elsewhereTo(toSlot) }
   const date = normaliseDate(input.rawArgs.date, input.todayDate)
 
   const out = legFor(input, moving, fromSlot, toSlot, toBudget, date)

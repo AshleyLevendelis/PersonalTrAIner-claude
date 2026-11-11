@@ -1224,6 +1224,7 @@ const DAYMOVE = new URLSearchParams(location.search).get('daymove') === '1'
 // between the tap and the screen — the generator's verification, what storage
 // keeps, the read back, the picks — is the app's own.
 const REGEN = new URLSearchParams(location.search).get('regen') === '1'
+const AT_WORK = new URLSearchParams(location.search).get('atwork') === '1'
 // ?nolibrary=1: INPUT only. The app's own dishes are not used, so every new dish must come from the meal writer
 // (which ?topupfail=1 makes fail): the one way a driver can reach "no new dish could be made".
 const NO_LIBRARY = new URLSearchParams(location.search).get('nolibrary') === '1'
@@ -1405,6 +1406,18 @@ if (TOPUP || DAYMOVE) {
     }))
   }
 }
+// ?estimate=1: A WORK LUNCH HE TOLD THE COACH ABOUT, as the coach's card stores it (custom-meal.ts with
+// cooked_for_me): one lunch row carrying the two marks, and the pick that makes it Thursday's lunch. INPUT only.
+// What Thursday then shows, what the rest of that day does and what the list buys are the app's.
+if (DAYMOVE && new URLSearchParams(location.search).get('estimate') === '1') {
+  db.meal_plan_slots.push({
+    profile_id: PROFILE_ID, slot: 'lunch', pool_index: 90, name: 'Canteen chicken curry',
+    ingredients: [{ name: 'chicken breast raw', quantity: 150, unit: 'g' }, { name: 'white rice dry', quantity: 70, unit: 'g' }, { name: 'broccoli', quantity: 100, unit: 'g' }, { name: 'olive oil', quantity: 10, unit: 'g' }],
+    macros: { kcal: 610, protein: 45, carbs: 62, fat: 17 },
+    tags: ['own recipe', 'cooked-elsewhere', 'pin-only', 'user-requested'], prep: '',
+  })
+  db.meal_plan_picks.push({ profile_id: PROFILE_ID, date: '2026-09-17', slot: 'lunch', meal_name: 'Canteen chicken curry' })
+}
 // What the app's hook would make of these pools for today, for the day's
 // first render. The hook itself runs in the page below.
 const servableAtStart = markRestrictionBreakers(leftoverPools as never, [], compileFoodDislikes(AVOID_FACTS))
@@ -1506,7 +1519,12 @@ function Harness() {
   }, [])
   // THE APP'S OWN HOOK for the strip, not a copy of its wiring: the rotation
   // the app would build from these pools, and the fake database underneath.
-  const mealShape = useMemo(() => ({ mealsPerDay: 3, includeSnacks: false, batchCooking: LEFTOVERS || TOPUP || DAYMOVE }), [])
+  // ?atwork=1: breakfast and lunch are cooked for him, Monday to Friday (meals-elsewhere.ts). INPUT only: the answer
+  // rides on the shape, as App puts it there, and the app's own week builder decides what each day then holds.
+  const mealShape = useMemo(() => ({
+    mealsPerDay: 3, includeSnacks: false, batchCooking: LEFTOVERS || TOPUP || DAYMOVE,
+    ...(AT_WORK ? { elsewhere: { breakfast: [1, 2, 3, 4, 5], lunch: [1, 2, 3, 4, 5] } as never } : {}),
+  }), [])
   const servablePools = useServablePools(livePools as never, profile.dietary_preferences, AVOID_FACTS)
   const stripRotation = useMemo(
     () => (driftedMacros ? buildRotation(servablePools, driftedMacros, [], mealShape) : null),

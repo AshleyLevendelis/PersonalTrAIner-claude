@@ -35,7 +35,7 @@ it is wrong.
 | `log_workout_session` | SCREEN | Exercise → finish session. |
 | `log_workout_set` | SCREEN | Exercise → the set grid's tick. |
 | `propose_concurrent_activity` | SCREEN | Profile → other sports. |
-| `propose_custom_meal` | EXCEPTION | Coach-only FOR A NAMED DAY. NARROWED AGAIN 11 Nov 2026 (his "My usual meals first"): the screen can now add a meal he describes (a name, which meal, its foods with amounts) to that meal's options, on Profile → Foods you like → My meals, through this tool's own builder and `propose_meal_addition`'s, so it is checked by the same code; it can then be chosen for a day from the meal's swap list. What stays coach-only is doing both in one step, "make this my lunch today". NARROWED 14 Sep 2026: the "no free-text entry" half of this reason is gone — the food search built for `propose_meal_food_add` could serve here too. What is left is the real reason: a custom meal is an open-ended list of foods AND a dish name AND a decision about what the rest of the day does around it, which is a screen someone has to design, not a control to bolt onto a row. |
+| `propose_custom_meal` | EXCEPTION | Coach-only FOR A NAMED DAY. NARROWED AGAIN 11 Nov 2026 (his "My usual meals first"): the screen can now add a meal he describes (a name, which meal, its foods with amounts) to that meal's options, on Profile → Foods you like → My meals, through this tool's own builder and `propose_meal_addition`'s, so it is checked by the same code; it can then be chosen for a day from the meal's swap list. What stays coach-only is doing both in one step, "make this my lunch today", and (11 Nov 2026) a meal SOMEBODY ELSE COOKS: with `cooked_for_me` the coach supplies ordinary portions and the app keeps it as an ESTIMATE for that one day, never one of his options and never shopped for (`meals-elsewhere.ts`); the screen has no form for that. NARROWED 14 Sep 2026: the "no free-text entry" half of this reason is gone — the food search built for `propose_meal_food_add` could serve here too. What is left is the real reason: a custom meal is an open-ended list of foods AND a dish name AND a decision about what the rest of the day does around it, which is a screen someone has to design, not a control to bolt onto a row. |
 | `propose_equipment_adaptation` | SCREEN | Profile → Equipment. |
 | `propose_kit_change` | SCREEN | Profile → Equipment → "What you have", the ticks, since 11 Oct 2026 (Ashley's 9 Oct ruling, "Remember what they say"). **By construction, the `meal-refit` pattern**: App builds one kit controller (kit-change.ts `plan` / `apply`) and hands the same object to the ticks and to the coach, so the same change is priced against the same plan and saved by one function on both. Both show what changes on the plan before anything is saved. The coach's card is refused before it is built when the kit is not in her own words (`kitStatementInUserWords`). Distinct from `propose_equipment_adaptation`, which is a trip and reverts on its own; this is the kit she owns. |
 | `propose_exercise_add` | SCREEN | The session's "Add an exercise" row. Both surfaces since 13 Sep 2026. |
@@ -83,10 +83,11 @@ it is wrong.
 
 ## Things the screen can do that the coach cannot
 
-**Seven screen-only, as of 11 Nov 2026** — the pre-session tightness check,
+**Eight screen-only, as of 11 Nov 2026** — the pre-session tightness check,
 macro mode, macro split, logging a build-up set, logging a drop set,
-"Train anyway" on a rest day, and saying how a lift felt on a set already
-logged (re-derived from the bullets that day, when the seventh was added). The calorie target below is a seventh entry but
+"Train anyway" on a rest day, saying how a lift felt on a set already
+logged, and which meals are cooked for him on which days (re-derived from the
+bullets that day, when the seventh and then the eighth were added). The calorie target below is a seventh entry but
 a different kind: it is on NEITHER surface and cannot be, because it is
 derived rather than set.
 CORRECTED 22 Sep 2026: this said "Four... as of 17 Sep 2026" while the
@@ -102,6 +103,17 @@ been wrong twice — "None" while tightness shipped, then "One" while three more
 sat listed underneath it. Both times somebody edited a bullet and left the
 header alone. Count what is below before trusting what is here.
 
+- **Which meals are cooked for him, on which days.** `screen only`, added
+  11 Nov 2026 with the feature (his ruling, "Set days + optional menu"):
+  Profile → Meals & shopping → "Meals cooked for me", a button a weekday. The
+  coach cannot set it and is told to say so plainly and name where it is,
+  never to claim it recorded it. NOT BUILT rather than decided against: the
+  plan (`docs/plans/meals-cooked-elsewhere.md`) has a coach card for it, and
+  it would be the kit card's shape (one controller handed to Profile and the
+  coach). What the coach CAN do is the other half: told WHAT such a meal is,
+  `propose_custom_meal` with `cooked_for_me` makes it that day's estimate.
+  And a day he cooks his own is a swap (`propose_meal_swap` on the coach's
+  side, "Cooking my own today" on the row).
 - **"Train anyway" on a rest day** — recorded 30 Sep 2026, NOT RULED. The rest-day
   card offers "Borrow another day's session — today only", and the coach cannot
   say the same thing ("train today, just this once"). Found re-checking the

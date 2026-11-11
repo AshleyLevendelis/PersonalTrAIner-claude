@@ -401,6 +401,9 @@ export const DAY_MOVE = {
     leftover: (day: string) =>
       `${cap(poss(day))} lunch is leftovers of the dinner the night before, so it can't be moved on its own. Move that dinner and the leftovers are worked out again from it.`,
     eaten: (slot: string) => `You've already logged today's ${slot} as eaten, so it can't move.`,
+    /** A meal somebody else cooks for him (meals-elsewhere.ts) is not a dish of his to move. */
+    elsewhere: (slot: string, day: string) =>
+      `${cap(poss(day))} ${slot} is cooked for you, so there's no meal of yours there to swap. If you're cooking your own that day, pick a meal on that day's ${slot} first.`,
     ledgerUnreadable: "I couldn't check what you've eaten today just then, so I can't move today's meals. Try again in a moment.",
     notInPlan: (day: string, slot: string) => `${cap(poss(day))} ${slot} isn't one of your saved options any more, so I can't move it.`,
     wouldNotHold: "I can't make that swap fit your plan.",
@@ -490,6 +493,9 @@ export const REBALANCE = {
     nothingThere: (slot: string, day: string) => `There's no ${slot} planned for ${day}.`,
     outOfRange: 'I can only change meals for today and the next six days — which day did you mean?',
     eaten: (slot: string) => `You've already logged today's ${slot} as eaten, so it stays as you ate it.`,
+    /** A meal somebody else cooks for him: the portion is the kitchen's, not his to change. */
+    elsewhere: (slot: string, day: string) =>
+      `${cap(poss(day))} ${slot} is cooked for you, so its size isn't yours to change. I can move calories between the meals you cook yourself.`,
     ledgerUnreadable: "I couldn't check what you've eaten today just then, so I can't change today's meals. Try again in a moment.",
     tooSmall: (kcal: number) => `${grouped(kcal)} kcal is too small to notice on the plate — that much is just the rounding.`,
     noRoom: (from: string, to: string) => `There's no room to move calories from ${from} to ${to} without one of them stopping being a sensible meal.`,

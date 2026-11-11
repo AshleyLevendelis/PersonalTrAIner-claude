@@ -2653,6 +2653,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (pendingAction.kind === 'propose_meal_addition') return `I can add **${rows[0].after}** to your ${rows[0].before}:`
     // The inverse promise of the addition headline: their food, their
     // amounts, and the day bends around it rather than the other way.
+    // A MEAL COOKED FOR HIM (11 Nov 2026): the amounts are the coach's ordinary portions, never "as you have it".
+    if (pendingAction.kind === 'propose_custom_meal' && /cooked for you$/.test(rows[0].field)) return `Here's my estimate of **${rows[0].after}**:`
     if (pendingAction.kind === 'propose_custom_meal') return `Here's **${rows[0].after}**, exactly as you have it:`
     if (pendingAction.kind === 'propose_meal_food_add') return `I can add **${rows[0].after}** to your ${rows[0].before}, at the amount you said:`
     // CHANGING ONE FOOD, THREE WAYS. Each names the food and nothing else —
@@ -5955,7 +5957,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         if (!macros) {
           refusal = "I need your height, weight, age and sex before I can move a meal around — you can add them in Profile."
         } else {
-          const mealsBySlot: Partial<Record<MealSlotName, { name: string; ingredients: string[]; macros: MacroTargets }>> = {}
+          const mealsBySlot: Partial<Record<MealSlotName, { name: string; ingredients: string[]; macros: MacroTargets; cookedElsewhere?: boolean }>> = {}
           for (const day of mealPlan) {
             const slot = day.meal.toLowerCase() as MealSlotName
             const item = day.items[0]
@@ -5964,6 +5966,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
               name: item.name,
               ingredients: item.ingredients ?? [],
               macros: { calories: item.calories, protein: item.protein, carbs: item.carbs, fat: item.fat },
+              // A meal cooked for him elsewhere: the builder refuses to move it or to move a meal into it.
+              cookedElsewhere: item.cooked_elsewhere === true,
             }
           }
           const moved = buildMealMoveProposal({

@@ -305,7 +305,7 @@ function main() {
     })())
     const app = strip(readFileSync('src/App.tsx', 'utf8'))
     const rot = strip(readFileSync('src/lib/meal-rotation.ts', 'utf8'))
-    check('both places that build a week\'s rotation tell it what the next first day serves', /buildRotation\(menu, macros, compiledSoftFoodPreferences, mealShape, firstDayAfter\(/.test(app) && /buildRotation\(dayPools, targets, softLikedFoods, shape, firstDayAfter\(pools, date, dayPools, targets, softLikedFoods\)\)/.test(rot))
+    check('both places that build a week\'s rotation tell it what the next first day serves', /buildRotation\(menu, macros, compiledSoftFoodPreferences, mealShape, firstDayAfter\(/.test(app) && /buildRotation\(dayPools, targets, softLikedFoods, shape, firstDayAfter\(pools, date, dayPools, targets, softLikedFoods[^)]*\)\)/.test(rot))
     const section = strip(readFileSync('src/components/MyMealsSection.tsx', 'utf8'))
     check('App hands Profile the facts a meal is planned against, and the section builds the planner from them',
       /myMeals=\{myMealsSource\}/.test(app) && /pools: mealPools,\s*\},\s*reload: /.test(app) && /makeMyMealsController\(source\.context, source\.reload\)/.test(section))

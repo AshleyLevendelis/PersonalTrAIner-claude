@@ -200,6 +200,13 @@ export interface UserProfile {
    * reads as TRUE everywhere rather than as off.
    */
   batch_cooking?: boolean
+  /**
+   * Meals somebody else cooks for him, by weekday (Ashley, 11 Nov 2026, "Set days + optional menu"): each meal maps
+   * to the weekdays it is cooked for him, Monday = 1. They stay in the day's plan, counted, and are never shopped
+   * for (meals-elsewhere.ts). Absent or `{}`: nothing is. A json column added by migration 20261111120000; before it
+   * lands the app reads nothing and the setting says it cannot be saved yet.
+   */
+  meals_elsewhere?: Partial<Record<'breakfast' | 'lunch' | 'dinner' | 'snack', (1 | 2 | 3 | 4 | 5 | 6 | 7)[]>>
   cooking_time_preference?: CookingTimePreference
   /**
    * Meal-realism round: onboarding's optional (skippable) food-preference
@@ -683,6 +690,8 @@ export interface Meal {
   substitution: string
   ingredients?: string[]
   is_verified?: boolean
+  /** Somebody else cooks this meal for him (meals-elsewhere.ts): the kitchen's portion, not his to move or re-size. */
+  cooked_elsewhere?: boolean
   sub_calories?: number
   sub_protein?: number
   sub_carbs?: number

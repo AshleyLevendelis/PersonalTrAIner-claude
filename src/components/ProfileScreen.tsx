@@ -41,7 +41,7 @@ import { supabase } from '@/lib/supabase'
 import { computeGoalProgress } from '@/lib/goal-progress'
 import { GoalWeightSetter } from '@/components/GoalWeightSetter'
 import { derivedStepsTargetFor } from '@/lib/steps-target'
-import { updateProfileField } from '@/lib/profile-store'
+import { updateProfileField, saveMealsElsewhere } from '@/lib/profile-store'
 import { useAppearance } from '@/hooks/useAppearance'
 import { AppearanceSection } from '@/components/AppearanceSection'
 import { THEME_PREVIEWS } from '@/lib/appearance-palette'
@@ -71,6 +71,7 @@ import { KitTicks } from '@/components/KitTicks'
 import type { KitController } from '@/lib/kit-change'
 import type { MyMealsSource } from '@/lib/my-meals'
 import { MyMealsSection } from '@/components/MyMealsSection'
+import { MealsElsewhereSection } from '@/components/MealsElsewhereSection'
 import { checkWeighIn, profileWeightQuestionText, weighInYesLabel, WEIGH_IN_NO_LABEL, type WeighInCheck } from '@/lib/weigh-in-check'
 
 // LOADED WHEN PROFILE OPENS, not with the app: the reminders screen and its
@@ -1768,6 +1769,19 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 {(profile.batch_cooking ?? true) ? 'Yes' : 'No'}
               </Button>
             </Row>
+            {/* MEALS COOKED FOR HIM ELSEWHERE (Ashley, 11 Nov 2026). Saved before it is believed, on its own road:
+                a tap that did not save is put back and says so (saveMealsElsewhere), never the quiet savePatch. */}
+            <MealsElsewhereSection
+              answer={profile.meals_elsewhere}
+              mealsPerDay={profile.meals_per_day}
+              includeSnacks={profile.include_snacks}
+              onSave={async next => {
+                if (!profileId) throw new Error('no profile')
+                const result = await saveMealsElsewhere(profileId, next)
+                if (result === 'saved') onProfileChanged({ meals_elsewhere: next })
+                return result
+              }}
+            />
             {/* WHICH DAY SHE SHOPS — design handoff 2d. The Home card is
                 driven by it, and a card that appears on a day the app chose
                 for her with no way to move it is the app being confidently

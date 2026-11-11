@@ -1,4 +1,5 @@
 import { serveMealWeek, addDays, type ServedDay } from './meal-rotation'
+import { isCookedElsewhere } from './meals-elsewhere'
 import { dayLabel } from './day-labels'
 import { ask, DAY_MOVE, REBALANCE } from './coach-voice'
 import { computeSlotBudgets, namedMiss, type PoolOption } from './meal-generation'
@@ -174,6 +175,9 @@ export function buildMealRebalanceProposal(input: BuildMealRebalanceInput): Meal
   const optTo = day?.day.chosen[to]
   if (!day || !optFrom) return refuse(REBALANCE.refusals.nothingThere(from, label))
   if (!optTo) return refuse(REBALANCE.refusals.nothingThere(to, label))
+  // A MEAL COOKED FOR HIM ELSEWHERE IS THE KITCHEN'S PORTION (11 Nov 2026): neither made smaller nor bigger.
+  if (isCookedElsewhere(optFrom)) return refuse(REBALANCE.refusals.elsewhere(from, label))
+  if (isCookedElsewhere(optTo)) return refuse(REBALANCE.refusals.elsewhere(to, label))
 
   const fromKcal = Math.round(optFrom.macros.calories)
   const toKcal = Math.round(optTo.macros.calories)

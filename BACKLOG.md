@@ -2,6 +2,85 @@
 
 Newest first. One line each.
 
+- [ ] **MEALS COOKED FOR HIM ELSEWHERE: HIS RULING 11 NOV 2026, "Set days + optional menu"**, in
+  his words: "I dont want it to stop posing the meals, I want it to incorporate the meals into its plan." Plan:
+  `docs/plans/meals-cooked-elsewhere.md` (its last section says what is built and what is not).
+  WHAT CHANGES ON THE PHONE: Profile, Meals & shopping, has "Meals cooked for me": a row a meal, a button a weekday,
+  and a "Mon to Fri" shortcut (his own example is two taps). On a covered day the meal STAYS in the day's list on
+  Nutrition as "Breakfast cooked for you", labelled "Cooked for you" and badged "Assumed", at that meal's own share of
+  his day; it is counted in the day's total, the meals he cooks are chosen around it, it can be logged with one tap,
+  and "Cooking my own today" puts one of his plan's meals there for that one day. The shopping list leaves these
+  meals out and says once how many ("10 meals are cooked for you, so they are not on this list.").
+  HOW IT IS BUILT: the answer rides on the one object every surface that builds a week already passes (the meal
+  shape), so the tab, the strip, the shopping list, the coach's view of the week and every trial card get it by
+  construction. The week builder pins an ASSUMED meal (no foods, the meal's own share) on each covered weekday;
+  nothing is stored for it, so changing the answer changes every future day and leaves no orphan.
+  DECIDED BY ME (each his to change): (1) THE WORDS: "Cooked for you", "Assumed", "Estimate", "Breakfast cooked for
+  you", and the note "A normal-sized lunch, assumed. The app doesn't know what's on the plate." The plan named the
+  labels as his. (2) A MEAL HE PICKS FOR A DATE WINS over the standing answer, for that date only (he is at home).
+  (3) THE KITCHEN'S PORTION IS NEVER RE-SIZED: not when a swap holds the day's other dishes, not when today's meals fit
+  around what he ate, not by a calorie move. A gap his own open meals cannot close inside the app's 25% is left and
+  said. (4) NOT HIS TO MOVE: a swap with another day, a move between meals and a calorie move each refuse in plain
+  words, and the Move sheet does not offer a meal cooked for him as a destination. (5) A lunch cooked for him is never
+  last night's leftovers, and a dinner cooked for him never becomes tomorrow's lunch. (6) EVERY TAP ON PROFILE IS SAVED
+  BEFORE IT IS BELIEVED: a tap that did not save is put back and says so; before the database step it says "this
+  setting isn't switched on for your account yet". (7) The list is never rebuilt behind his back: the saved line
+  tells him to rebuild it.
+  THE ALLERGEN PATH: nothing was loosened. An assumed meal has no foods, so it has no diet or allergen verdict and no
+  sentence gives it one (a check reads every sentence for "safe", "suits", "free of").
+  FOUND ON THE WAY: (a) the first run of the browser test drew NO ROWS in the grid: the meals were worked out from
+  the app's split of a 1-calorie day, whose shares round to nothing. Every logic check passed. (b) A meal cooked for
+  him was being remembered as "a dish served lately" at the week's seam (found by a check written for the ordinary
+  days). (c) A setup check pinned the exact neighbours of a word in the setup coach's tool description and went red
+  on correct code when a third slot joined the list; re-anchored on the property (its own commit).
+  CSCS REVIEW (performance nutrition at population level, which is mine): (1) training effect: none on training;
+  for food, the day still lands on his numbers, measured below. (2) what it takes away: variety and a fitted
+  portion at those meals, by his choice; the assumed size is honest only as "a normal-sized meal". (3) fundamentals:
+  protein and energy for the day are held by the meals he cooks, which is why a real menu matters and stage 3 exists.
+  (4) no floor or band was redefined: "on target" is the same test. (5) in scope: no claim about the plate.
+  THE MENU, TOLD TO THE COACH (the lean version of the plan's stage 3): the coach's existing "this is what I'm
+  having" card takes one new flag, `cooked_for_me`. Told what a work meal is ("the canteen has chicken curry and rice
+  tomorrow"), the coach writes the dish as everyday foods at ordinary portions (the one case it may supply amounts);
+  the APP costs it from its own table and checks it exactly as it checks his own meal; the card says "Here's my
+  estimate of ...", "An estimate, at ordinary portions", and "Kept as Thursday's lunch only. It isn't added to your
+  own meals and is never on your shopping list." Stored as a dish made for that one day and marked as cooked
+  elsewhere, so it is never one of "his meals" (which come first every week), never served on another day, never
+  re-sized, never shopped for, and the row shows it badged "Estimate" with its foods. Today's meal, already eaten, is
+  the coach's ordinary meal log: the row then shows what was logged, by its own name and size.
+  THE ALLERGEN PATH, AGAIN: the same path. A canteen dish with a food that clashes with his profile is refused in
+  the SAME words as his own meal would be (a check compares the two sentences), a line the app cannot read is asked
+  about, and a dish given only by name ("300g chicken curry") is refused, never costed from its name. The coach is
+  told never to say such a meal fits his diet or is free of anything.
+  FOUND ON THE WAY: a canteen meal logged through the old card would have become one of "his meals" and been served
+  on a Sunday (the mark is what stops it). And the coach's view of the day called every meal "verified", including
+  an assumed size; it now says so only of a dish the app costed and checked.
+  SEEN ON THE SCREEN, AND HIS TO KNOW: when the estimated work lunch is much smaller than a normal lunch (558 kcal
+  against a 1,216 share on the test page's 3,040 day), the day reads "626 kcal under": dinner is the only meal of his
+  left to grow and it grew as far as the plan's dinners go. The app says so and does not invent a snack.
+  VERIFIED: `test:meals-elsewhere` (140 checks) and `verify:meals-elsewhere` at phone size (70 checks: Profile,
+  Nutrition, shopping list). MUTATIONS: 81 (61 against the logic gate, 20 against the screens), all caught, SEVEN
+  only after a check where the thing binds was added: a meal with no share of the day (the mutant crashed the gate
+  rather than failing it), a lunch of his own on a day lunch is cooked for him (the hold-around path masked it), the
+  cook-once re-plan, the estimate's default name, a meal logged under another name, the week's seam (held by source:
+  36 weeks agreed with the defect in), and "an estimate is served on one day only" (a 500 kcal lunch is never the
+  search's best fit, so nothing could see the search reach it until the estimate was the ONLY lunch in the pool).
+  Measured in the gate, on the real library at 2,400 kcal: every day of a week with ten meals cooked for him is
+  still on target.
+  THREE SIZE LIMITS MOVED, measured on a clean copy before and on the change: the app's main download 1,375 to
+  1,386 kB (395 to 398 gzipped), first paint 551 to 554 gzipped. Each had 1 kB of room. Moved under his 15 Sep
+  "raise it with room to grow" with both ends noted in the gate. TWO OLDER CHECKS RE-ANCHORED: each pinned the exact
+  text of the line that builds a week's rotation, which gained the meal shape as an argument.
+  NOT PROVEN: App's own wiring in a browser (no test page boots App; held by source in the gate's section 9). The
+  coach's half end to end: no test page drives a coach card for a meal cooked for him, and whether the real coach
+  breaks a dish into sensible foods, sets the flag only for somebody else's cooking and takes one meal at a time is
+  model behaviour (one exam question added, `meal-cooked-for-me`; the exam needs a run on his machine). Not run on a
+  real phone.
+  NEEDS: his word and his machine for the database step (one new column on the profile); until then the grid says
+  the setting is not switched on yet and no day changes. The `chat-gemini` deploy for the coach's half.
+  NOT BUILT: a whole week's menu in ONE card (the coach takes one meal a call); the coach's card for the standing
+  answer (it says plainly it cannot set it and where it is; recorded as screen-only in the parity list); setup
+  recording it when volunteered; a screen form for the estimate (the coach's route only, under the existing
+  custom-meal exception).
 - [x] **SETUP ASKS WHAT HE USUALLY EATS: the second half of his 11 Nov 2026 ruling, "My usual meals first"** ("setup
   asks what he usually eats"). One new question, typed, optional, straight after the foods to leave out: "What do
   you usually eat? A few meals or foods you have most weeks." What he says is kept as LIKES, the same rows Profile's

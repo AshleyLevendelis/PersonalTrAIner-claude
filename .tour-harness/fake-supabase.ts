@@ -204,6 +204,14 @@ export function makeFakeSupabase(db: Db, opts: { session?: { user: { id: string;
       if (failWrite && (op === 'insert' || op === 'upsert' || op === 'delete' || op === 'update') && (op === 'delete' ? failWrite(name, op, {}) : op === 'update' ? failWrite(name, op, updateObj) : payload.some(r => failWrite(name, op, r)))) {
         return { data: null, error: { code: '08006', message: 'simulated write failure' } }
       }
+      // A COLUMN THE DATABASE HAS NOT GOT YET (11 Nov 2026). Opt-in: a driver sets window.__missingColumns to the
+      // names; a write naming one is refused the way PostgREST refuses it (missing-column.ts), so a screen's "not
+      // switched on yet" path can be driven. Nothing sets it by default.
+      const missing = (window as unknown as { __missingColumns?: string[] }).__missingColumns
+      if (missing?.length) {
+        const named = (op === 'insert' || op === 'upsert' ? payload : op === 'update' ? [updateObj] : []).flatMap(r => Object.keys(r ?? {})).find(k => missing.includes(k))
+        if (named) return { data: null, error: { code: 'PGRST204', message: `Could not find the '${named}' column of '${name}' in the schema cache`, details: null, hint: null } }
+      }
       // A DECIMAL IN A WHOLE-NUMBER COLUMN IS REFUSED, AS POSTGRES REFUSES IT
       // (INTEGER_COLUMNS above). Before anything is stored: a rejected insert
       // leaves no row, and a rejected update changes none.

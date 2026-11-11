@@ -1,4 +1,5 @@
 import { serveMealWeek, pinsFromPicks, addDays, type ServedDay } from './meal-rotation'
+import { isCookedElsewhere } from './meals-elsewhere'
 import { weekdayLong, dayLabel } from './day-labels'
 import { ask, DAY_MOVE } from './coach-voice'
 import { computeSlotBudgets, namedMiss, type PoolOption } from './meal-generation'
@@ -249,6 +250,9 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
   // A LEFTOVER LUNCH IS NOT A DISH OF ITS OWN: it is last night's dinner,
   // re-made each day from whatever dinner was actually served. It follows the
   // dinner; moving the dinner is how to move it.
+  // A MEAL COOKED FOR HIM ELSEWHERE IS NOT HIS TO MOVE (11 Nov 2026): the kitchen serves it on its own day.
+  if (isCookedElsewhere(optA)) return refuse(DAY_MOVE.refusals.elsewhere(slotA, labelA))
+  if (isCookedElsewhere(optB)) return refuse(DAY_MOVE.refusals.elsewhere(slotB, labelB))
   if (slotA === 'lunch' && optA.leftoverFrom === 'dinner') return refuse(DAY_MOVE.refusals.leftover(labelA))
   if (slotB === 'lunch' && optB.leftoverFrom === 'dinner') return refuse(DAY_MOVE.refusals.leftover(labelB))
   if (!across && optA.name === optB.name) return refuse(DAY_MOVE.refusals.sameDish(slotA, labelA, labelB))

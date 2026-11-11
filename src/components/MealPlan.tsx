@@ -1,3 +1,4 @@
+import { ELSEWHERE_WORDS, elsewhereState, isCookedElsewhere } from '@/lib/meals-elsewhere'
 import { useEffect, useRef, useState, Suspense, useMemo } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import type { HeldAround } from '@/lib/meal-generation'
@@ -413,7 +414,37 @@ export function MealPlan({
 
   // The same two lists the display-time restriction re-check reads (restrictionBySlot above).
   const methodRules: MethodRules = { dietaryPreferences, avoidFoods }
-  const rowFor = (slot: MealSlotName, variant: 'upnext' | 'later' | 'eaten') => (
+  const rowFor = (slot: MealSlotName, variant: 'upnext' | 'later' | 'eaten') => isCookedElsewhere(shownOption(slot)) ? (
+    // A MEAL COOKED FOR HIM ELSEWHERE (11 Nov 2026) is its own row: it stays in the day and is counted, and has none
+    // of a plan dish's controls (no recipe, no foods to edit, no heart, no move), because none of them is true of it.
+    <ElsewhereMealRow
+      key={slot}
+      slot={slot}
+      variant={variant}
+      option={shownOption(slot)!}
+      upcoming={!!upcoming}
+      expanded={expandedSlot === slot}
+      onToggle={() => setExpandedSlot(prev => (prev === slot ? null : slot))}
+      loggedEvents={loggedBySlot[slot] ?? []}
+      hasOwnMeals={(pools[slot] ?? []).some(o => !o.breaksRestriction && !isCookedElsewhere(o))}
+      listOwnMeals={() => (pools[slot] ?? []).filter(o => !o.breaksRestriction && !isCookedElsewhere(o)
+        && checkMealAgainstRestrictions(o.name, o.ingredients, dietaryPreferences, avoidFoods).ok).slice(0, 6)}
+      onCookMyOwn={name => onSwapSlot(slot, name)}
+      onLog={async option => {
+        if (!profileId) return
+        logMealEaten(profileId, date, slot, option.name, {
+          kcal: option.macros.calories, protein: option.macros.protein, carbs: option.macros.carbs, fat: option.macros.fat,
+        })
+        await reloadLogged()
+      }}
+      onUnlog={async clientIds => {
+        const removed = await voidMealEvents(clientIds)
+        await reloadLogged()
+        setUnlogError(removed ? null : "That meal is still logged — we couldn't reach the server. Try again in a moment.")
+        return removed
+      }}
+    />
+  ) : (
     <MealSlotRow
             key={slot}
             variant={variant}
@@ -461,7 +492,8 @@ export function MealPlan({
                   // back the other way — Ashley's ruling that they swap places
                   // rather than one of them vanishing.
                   mealsBySlot: Object.fromEntries(SLOT_ORDER
-                    .filter(sl => chosen[sl])
+                    // A meal cooked for him elsewhere is no destination: there is no dish of his there to trade places with.
+                    .filter(sl => chosen[sl] && !isCookedElsewhere(chosen[sl]))
                     .map(sl => [sl, {
                       name: chosen[sl]!.name,
                       ingredients: chosen[sl]!.ingredients.map(formatIngredient),
@@ -1766,6 +1798,122 @@ function MealSlotRow({
  * THE STATUS CIRCLE (3a), 26px: eaten is a filled tick, next a glowing ring, later a faint ring. A shape and a
  * fill, never an opacity, so it reads the same on every theme.
  */
+/**
+ * A MEAL COOKED FOR HIM ELSEWHERE — Ashley's ruling, 11 Nov 2026: "I dont want it to stop posing the meals, I want it
+ * to incorporate the meals into its plan." Drawn in the day's list like any meal, with a quiet label, its numbers and
+ * a badge saying where they come from (assumed, or an estimate of a menu he gave). It can be logged as eaten, and on
+ * a day he is cooking for himself he picks one of his plan's meals instead, for that day only.
+ */
+function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle, loggedEvents, hasOwnMeals, listOwnMeals, onCookMyOwn, onLog, onUnlog }: {
+  slot: MealSlotName
+  variant: 'upnext' | 'later' | 'eaten'
+  option: PoolOption
+  upcoming: boolean
+  expanded: boolean
+  onToggle: () => void
+  loggedEvents: MealEventRecord[]
+  /** Whether his plan has a meal of its own for this slot at all (cheap: asked on every draw). */
+  hasOwnMeals: boolean
+  /** Up to six of his plan's meals for this slot that he may eat, checked against his restrictions when he asks. */
+  listOwnMeals: () => PoolOption[]
+  onCookMyOwn: (name: string) => Promise<boolean | void>
+  onLog: (option: PoolOption) => Promise<void>
+  onUnlog: (clientIds: string[]) => Promise<boolean>
+}) {
+  const [busy, setBusy] = useState(false)
+  const [ownMeals, setOwnMeals] = useState<PoolOption[] | null>(null)
+  const picking = ownMeals !== null
+  const setPicking = (on: boolean) => setOwnMeals(on ? listOwnMeals() : null)
+  const [note, setNote] = useState<string | null>(null)
+  const state = elsewhereState(option) ?? 'assumed'
+  const isLogged = loggedEvents.length > 0
+  // WHAT HE ATE, when it is logged (he may have told the coach what was really on the plate), else the meal's own numbers.
+  const shown = isLogged
+    ? loggedEvents.reduce((sum, e) => ({ kcal: sum.kcal + (e.macros?.kcal ?? 0), protein: sum.protein + (e.macros?.protein ?? 0), carbs: sum.carbs + (e.macros?.carbs ?? 0), fat: sum.fat + (e.macros?.fat ?? 0) }), { kcal: 0, protein: 0, carbs: 0, fat: 0 })
+    : { kcal: option.macros.calories, protein: option.macros.protein, carbs: option.macros.carbs, fat: option.macros.fat }
+  const name = isLogged && loggedEvents[0]?.mealName ? loggedEvents[0].mealName : option.name
+  const soft = variant === 'later' && !upcoming
+  const run = async (work: () => Promise<void>) => { setBusy(true); setNote(null); try { await work() } finally { setBusy(false) } }
+  return (
+    <div data-meal-row={slot} data-variant={variant} data-elsewhere={state} style={{ borderBottom: '1px solid var(--hairline)' }}>
+      <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex min-h-[62px] w-full items-center gap-3 py-1.5 text-left">
+        <MealStatus variant={upcoming ? 'later' : variant} />
+        <span className="min-w-0 flex-1">
+          <span className={`block text-[0.625rem] uppercase tracking-[.12em] ${variant === 'upnext' ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
+            {SLOT_LABEL[slot]}{variant === 'upnext' ? ' · next' : ''} · <span data-testid="elsewhere-label">{ELSEWHERE_WORDS.label}</span>
+          </span>
+          <span data-meal-name={slot} className="mt-0.5 block line-clamp-2 text-[0.90625rem] font-medium leading-[1.3]" style={{ color: soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
+            {name}
+          </span>
+          <span className="mt-[5px] flex flex-wrap items-center gap-x-3 gap-y-1">
+            <MacroLine protein={shown.protein} carbs={shown.carbs} fat={shown.fat} />
+            {!isLogged && (
+              <span data-testid="elsewhere-badge" className="rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[.08em] text-muted-foreground">
+                {state === 'assumed' ? ELSEWHERE_WORDS.assumedBadge : ELSEWHERE_WORDS.estimateBadge}
+              </span>
+            )}
+          </span>
+        </span>
+        <span className="flex shrink-0 items-center gap-1.5">
+          <span className="flex min-w-[44px] flex-col items-end">
+            <span data-testid="meal-row-kcal" data-slot={slot} className="tabular-mono text-[1rem] font-bold leading-none tracking-[-.02em]" style={{ color: variant === 'eaten' ? 'var(--primary-text)' : soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
+              {Math.round(shown.kcal)}
+            </span>
+            <span className="mt-1 text-[0.5625rem] font-semibold uppercase leading-none tracking-[.12em] text-muted-foreground">kcal</span>
+          </span>
+          <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
+        </span>
+      </button>
+      {expanded && (
+        <div className="space-y-2.5 pb-3 pl-[38px]" data-testid="elsewhere-panel">
+          <p className="text-[0.75rem] leading-snug text-muted-foreground" data-testid="elsewhere-note">
+            {state === 'assumed' ? ELSEWHERE_WORDS.assumedNote(slot) : ELSEWHERE_WORDS.estimateNote}
+          </p>
+          {state === 'estimate' && option.ingredients.length > 0 && (
+            <ul className="space-y-0.5 text-[0.75rem] text-muted-foreground" data-testid="elsewhere-foods">
+              {option.ingredients.map((ing, i) => <li key={i}>{displayIngredient(ing)}</li>)}
+            </ul>
+          )}
+          {!upcoming && (
+            isLogged ? (
+              <Button variant="outline" disabled={busy} className="min-h-[44px] w-full" data-testid="elsewhere-unlog"
+                onClick={() => void run(async () => { const ok = await onUnlog(loggedEvents.map(e => e.clientId)); if (ok) setNote('Taken off.') })}>
+                Logged. Take it off
+              </Button>
+            ) : (
+              <Button disabled={busy} className="min-h-[44px] w-full" data-testid="elsewhere-log" onClick={() => void run(() => onLog(option))}>
+                I ate this
+              </Button>
+            )
+          )}
+          {!isLogged && hasOwnMeals && (
+            picking ? (
+              <div className="space-y-1.5" data-testid="elsewhere-own-list">
+                <p className="text-[0.75rem] text-muted-foreground">{ELSEWHERE_WORDS.ownPrompt(upcoming)}</p>
+                {(ownMeals ?? []).length === 0 && <p className="text-[0.75rem] text-muted-foreground" data-testid="elsewhere-own-none">{ELSEWHERE_WORDS.ownNone}</p>}
+                {(ownMeals ?? []).map(o => (
+                  <button key={o.name} type="button" disabled={busy} data-elsewhere-own={o.name}
+                    onClick={() => void run(async () => { const ok = await onCookMyOwn(o.name); if (ok === false) setNote(ELSEWHERE_WORDS.ownNotSaved); else setPicking(false) })}
+                    className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-xl border border-border px-3 text-left text-[0.8125rem]">
+                    <span className="min-w-0 flex-1 truncate">{o.name}</span>
+                    <span className="shrink-0 tabular-nums text-muted-foreground">{Math.round(o.macros.calories)} kcal</span>
+                  </button>
+                ))}
+                <button type="button" className="min-h-[44px] text-[0.8125rem] font-medium text-muted-foreground" onClick={() => setPicking(false)}>Cancel</button>
+              </div>
+            ) : (
+              <button type="button" disabled={busy} className="min-h-[44px] text-[0.8125rem] font-medium text-primary-text" data-testid="elsewhere-own" onClick={() => { setPicking(true); setNote(null) }}>
+                {ELSEWHERE_WORDS.ownOffer(upcoming)}
+              </button>
+            )
+          )}
+          {note && <p role="status" className="text-[0.75rem] text-muted-foreground" data-testid="elsewhere-row-note">{note}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MealStatus({ variant }: { variant: 'upnext' | 'later' | 'eaten' }) {
   if (variant === 'eaten') {
     return (

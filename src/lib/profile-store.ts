@@ -19,3 +19,16 @@ export async function updateProfileField(profileId: string, patch: Partial<UserP
   }
   throw error
 }
+
+/**
+ * MEALS COOKED FOR HIM ELSEWHERE (Ashley, 11 Nov 2026), saved on its own because a failure has to be SAID: this
+ * setting changes what every future day holds, so "it looked saved and was not" is the one outcome it must not have.
+ * 'not-yet' is the database not having the column (its migration is run by hand, missing-column.ts): nothing was
+ * written, and the screen says the setting is not switched on yet. Any other failure throws.
+ */
+export async function saveMealsElsewhere(profileId: string, answer: NonNullable<UserProfile['meals_elsewhere']>): Promise<'saved' | 'not-yet'> {
+  const { error } = await supabase.from('fitness_profiles').update({ meals_elsewhere: answer }).eq('id', profileId)
+  if (!error) return 'saved'
+  if (isMissingColumnError(error, 'meals_elsewhere')) return 'not-yet'
+  throw error
+}

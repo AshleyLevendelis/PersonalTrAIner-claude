@@ -109,7 +109,8 @@ function Harness() {
           targets={targets}
           softLikedFoods={[]}
           todaysPicks={{}}
-          mealShape={{ mealsPerDay: 3, includeSnacks: false, batchCooking: false }}
+          // ?atwork=1: breakfast and lunch are cooked for him, Monday to Friday. Input only.
+          mealShape={{ mealsPerDay: 3, includeSnacks: false, batchCooking: false, ...(params.get('atwork') === '1' ? { elsewhere: { breakfast: [1, 2, 3, 4, 5], lunch: [1, 2, 3, 4, 5] } } : {}) }}
           onClose={() => { (window as never as Record<string, unknown>).__closed = true; setTick(t => t + 1) }}
           headerAction={<ProfileMenu onOpenProfile={() => {}} onReplayTour={() => {}} />}
         />

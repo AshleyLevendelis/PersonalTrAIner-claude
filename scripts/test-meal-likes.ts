@@ -237,7 +237,8 @@ async function main() {
     // "the day and the strip" are one call and take one likes list.
     check('the day, the strip and the list all take the same likes',
       /const menu = menuFor\(poolsServedOn\(mealPools, mealRotationDate\), mealRotationDate, compiledSoftFoodPreferences\)/.test(app)
-      && /buildRotation\(menu, macros, compiledSoftFoodPreferences, mealShape, firstDayAfter\(mealPools, mealRotationDate, menu, macros, compiledSoftFoodPreferences\)\)/.test(app)
+      // (The likes are what this asks about; the call gained the meal shape as a further argument on 11 Nov 2026.)
+      && /buildRotation\(menu, macros, compiledSoftFoodPreferences, mealShape, firstDayAfter\(mealPools, mealRotationDate, menu, macros, compiledSoftFoodPreferences[^)]*\)\)/.test(app)
       && /softLikedFoods: compiledSoftFoodPreferences, todaysPins/.test(app)
       && /const assembledMeals = mealDays\.today\?\.day\b/.test(app)
       && /softLikedFoods=\{compiledSoftFoodPreferences\}/.test(app))

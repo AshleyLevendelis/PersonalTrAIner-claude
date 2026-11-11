@@ -40,6 +40,8 @@ export interface CurrentMealForSlot {
   /** Ingredient lines in the app's own format — "122g raw chicken breast" — as chosenToMealPlanDays emits them. */
   ingredients: string[]
   macros: MacroTargets
+  /** Cooked for him elsewhere (meals-elsewhere.ts): never moved between meals, and never a destination. */
+  cookedElsewhere?: boolean
 }
 
 export interface BuildMealFoodAddInput {

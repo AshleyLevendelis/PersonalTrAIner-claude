@@ -1,0 +1,25 @@
+{
+  "name": "meal-cooked-for-me",
+  "why": "11 Nov 2026, Ashley's ruling 'Set days + optional menu': meals somebody else cooks for him stay in his day ('Lunch cooked for you', assumed) and are never shopped for. The coach has ONE half of this and not the other, and the two sound alike. Told WHAT such a meal is, it makes that day's estimate (propose_custom_meal with cooked_for_me, supplying ordinary portions itself, the one case it may). Told WHICH meals are cooked for him on WHICH days, it has no tool: that setting is on Profile, and the honest answer is to say so and say where, never to claim it was recorded and never to card it. Turn 0 must card; turn 1 must NOT. Neither message is in the coach's instructions.",
+  "contextOverrides": {
+    "upcoming_meal_summary": "Wednesday (2026-09-16): breakfast Breakfast cooked for you · lunch Lunch cooked for you · dinner Beef chilli with rice\nThursday (2026-09-17): breakfast Breakfast cooked for you · lunch Lunch cooked for you · dinner Baked salmon with potatoes\nFriday (2026-09-18): breakfast Breakfast cooked for you · lunch Lunch cooked for you · dinner Chicken stir fry\nSaturday (2026-09-19): breakfast Greek yoghurt with berries · lunch Tuna pasta salad · dinner Turkey meatballs with pasta"
+  },
+  "messages": [
+    "the staff restaurant is doing beef lasagne with a side salad for lunch tomorrow",
+    "oh and from now on my Sunday dinners get cooked for me at my mum's"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_custom_meal"
+        ]
+      },
+      {
+        "turn": 1,
+        "oneOf": []
+      }
+    ]
+  }
+}

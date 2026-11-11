@@ -41,6 +41,7 @@ import { holdAroundPins } from './hold-around-pins'
 import { menuFor } from './meal-menu'
 import type { MacroTargets } from './types'
 import { sameDish, resizedCopyBase, editedFrom, RESIZED_COPY_SUFFIX } from './meal-dish-identity'
+import { assumedMealsOn, isCookedElsewhere, weekdayOfRotationIndex, hasMealsElsewhere, type MealsElsewhere } from './meals-elsewhere'
 
 /**
  * How many days the rotation runs before it comes round again. Seven because
@@ -163,6 +164,12 @@ export interface Rotation {
    * same answer the rotation already reached.
    */
   leftoverFor(index: number): Partial<Record<MealSlotName, PoolOption>>
+  /**
+   * The meals cooked for him elsewhere on this day (meals-elsewhere.ts): assumed meals, as a pin map, empty on most
+   * profiles. Kept apart from the leftovers because the two are told apart everywhere a day is re-assembled: a
+   * leftover is re-made from the dinner actually served, a meal cooked elsewhere never is.
+   */
+  elsewhereFor(index: number): Partial<Record<MealSlotName, PoolOption>>
 }
 
 function extendHistory(
@@ -172,6 +179,8 @@ function extendHistory(
   const next: Partial<Record<MealSlotName, string[]>> = {}
   for (const [slot, names] of Object.entries(history) as [MealSlotName, string[]][]) next[slot] = names
   for (const [slot, option] of Object.entries(chosen) as [MealSlotName, PoolOption][]) {
+    // A meal cooked for him elsewhere is not one of the plan's dishes: it takes no place in what was served lately.
+    if (isCookedElsewhere(option)) continue
     next[slot] = [...(next[slot] ?? []), option.name].slice(-RECENT_WINDOW)
   }
   return next
@@ -187,6 +196,7 @@ function historyAcrossSeam(
 ): Partial<Record<MealSlotName, string[]>> {
   const next: Partial<Record<MealSlotName, string[]>> = { ...history }
   for (const [slot, option] of Object.entries(firstDay) as [MealSlotName, PoolOption][]) {
+    if (isCookedElsewhere(option)) continue
     const names = history[slot] ?? []
     // Still no more than the window every other day remembers: the oldest name makes room.
     next[slot] = [...names.slice(0, -1), option.name, ...names.slice(-1)].slice(-RECENT_WINDOW)
@@ -206,6 +216,8 @@ export function firstDayAfter(
   menu: Partial<Record<MealSlotName, PoolOption[]>>,
   targets: MacroTargets,
   softLikedFoods: string[] = [],
+  /** The shape the rotation is built with: a first day holding a meal cooked elsewhere is assembled around it. */
+  shape: MealShape = {},
 ): Partial<Record<MealSlotName, PoolOption>> | undefined {
   const next = addDays(date, ROTATION_DAYS - rotationIndexFor(date))
   // THE POOL AS IT STOOD ON `date`, not as it will stand next week. A meal added later carries a first day, and every
@@ -214,8 +226,24 @@ export function firstDayAfter(
   // new meals start, where the next first day is guessed from the old pool; from the cycle after, it is exact again.
   const nextMenu = menuFor(poolsServedOn(pools, date), next, softLikedFoods)
   if (nextMenu === menu) return undefined
-  return assembleDay(nextMenu, targets, {}, softLikedFoods, {}).chosen
+  return assembleDay(nextMenu, targets, {}, softLikedFoods, elsewhereByIndex(nextMenu, targets, shape)(0)).chosen
 }
+
+/**
+ * The assumed meals of each rotation day (meals-elsewhere.ts), for buildRotation and for anything that must assemble
+ * a day exactly as it does. Nothing cooked for him: every day is the same empty map, and no budget is worked out.
+ */
+function elsewhereByIndex(
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+  targets: MacroTargets,
+  shape: MealShape,
+): (index: number) => Partial<Record<MealSlotName, PoolOption>> {
+  if (!hasMealsElsewhere(shape.elsewhere)) return () => NO_PINS
+  const budgets = computeSlotBudgets(targets, shape.mealsPerDay, shape.includeSnacks)
+  const planSlots = (Object.keys(pools) as MealSlotName[]).filter(s => (pools[s]?.length ?? 0) > 0)
+  return index => assumedMealsOn(shape.elsewhere, weekdayOfRotationIndex(index), budgets, planSlots)
+}
+const NO_PINS: Partial<Record<MealSlotName, PoolOption>> = Object.freeze({})
 
 const asMacros100g = (t: MacroTargets): Macros100g => ({
   kcal: t.calories, protein: t.protein, carbs: t.carbs, fat: t.fat,
@@ -236,6 +264,12 @@ export interface MealShape {
    * column has no value stored.
    */
   batchCooking?: boolean
+  /**
+   * Meals cooked for him elsewhere, by weekday (Ashley, 11 Nov 2026). HERE, on the shape, because every surface that
+   * builds a week already passes this one object: the tab, the shopping list and every trial card get the answer by
+   * construction. Undefined or empty: nothing is cooked for him.
+   */
+  elsewhere?: MealsElsewhere
 }
 
 /** Is batch cooking on for this shape? Undefined means yes. */
@@ -269,6 +303,8 @@ export function leftoverLunchFrom(
 ): PoolOption | null {
   if (!dinner || !lunchBudget || lunchBudget.calories <= 0) return null
   if (dinner.ingredients.length === 0 || dinner.macros.calories <= 0) return null
+  // A dinner somebody else cooked leaves nothing in his own pan: never the source of tomorrow's lunch.
+  if (isCookedElsewhere(dinner)) return null
 
   const scaled = scaleToTarget(dinner.ingredients, asMacros100g(dinner.macros), asMacros100g(lunchBudget))
   if (scaled.rejectedReason) return null
@@ -318,6 +354,8 @@ export function buildRotation(
 ): Rotation {
   const histories: Partial<Record<MealSlotName, string[]>>[] = []
   const leftovers: Partial<Record<MealSlotName, PoolOption>>[] = []
+  const elsewheres: Partial<Record<MealSlotName, PoolOption>>[] = []
+  const elsewhereAt = elsewhereByIndex(pools, targets, shape)
   const days: AssembledDay[] = []
   let history: Partial<Record<MealSlotName, string[]>> = {}
 
@@ -357,10 +395,14 @@ export function buildRotation(
     // doing exactly that came back MISSED and was right to. It stays because
     // the seam is a decision, and a decision the code does not state is one
     // the next reader will "tidy away" the moment previousDinner gains a seed.
-    const pinned: Partial<Record<MealSlotName, PoolOption>> = {}
-    const leftover = i === 0 ? null : leftoverLunchFrom(previousDinner, lunchBudget)
+    // MEALS COOKED FOR HIM ELSEWHERE ARE PART OF THE DAY (11 Nov 2026): pinned like a leftover, so the free meals are
+    // chosen around them. A lunch cooked for him takes the lunch, so that day has no leftover lunch at all.
+    const away = elsewhereAt(i)
+    elsewheres.push(away)
+    const pinned: Partial<Record<MealSlotName, PoolOption>> = { ...away }
+    const leftover = i === 0 || away.lunch ? null : leftoverLunchFrom(previousDinner, lunchBudget)
     if (leftover) pinned.lunch = leftover
-    leftovers.push(pinned)
+    leftovers.push(leftover ? { lunch: leftover } : {})
 
     let day = assembleDay(pools, targets, dayHistory, softLikedFoods, pinned)
 
@@ -411,6 +453,10 @@ export function buildRotation(
       const w = wrap(index)
       return w < 0 ? {} : leftovers[w]
     },
+    elsewhereFor(index: number) {
+      const w = wrap(index)
+      return w < 0 ? {} : elsewheres[w]
+    },
   }
 }
 
@@ -452,6 +498,8 @@ export function assembleRotationDay(
   // re-made: a day it planned fresh (the weekly seam, batch cooking off) stays
   // fresh.
   const planned = rotation.leftoverFor(index)
+  // Cooked for him elsewhere on this day. A meal he picked himself for the date still wins (he is at home that day).
+  const away = rotation.elsewhereFor(index)
   let leftover = planned
   // A dinner made bigger or smaller (a calorie move, 20 Oct 2026) is still the dish the lunch is the leftovers of, so
   // the lunch is not re-made under the copy's name: compared by the dish a copy was made from.
@@ -469,7 +517,7 @@ export function assembleRotationDay(
   // USER pinned still wins — their choice outranks the plan's, which is the
   // rule everywhere else in the app.
   const dayFor = (pinned: Partial<Record<MealSlotName, PoolOption>>): AssembledDay => {
-    const withLeftover = { ...leftover, ...pinned }
+    const withLeftover = { ...leftover, ...away, ...pinned }
     // THE SAME CALCULATION, NOT A SECOND PATH (28 Sep 2026). With no pin of the
     // caller's own and the very inputs the rotation was built from, assembleDay
     // would be handed exactly what buildRotation handed it for this index, and
@@ -488,7 +536,7 @@ export function assembleRotationDay(
     // a dinner she swapped to the very dish her lunch is — which served it
     // twice in one day before 28 Sep 2026.
     if (leftover.lunch && !pinned.lunch && day.chosen.dinner && sameDish(pools.dinner, day.chosen.dinner.name, leftover.lunch.name)) {
-      day = assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, { ...pinned })
+      day = assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, { ...away, ...pinned })
     }
     return day
   }
@@ -510,6 +558,8 @@ export function assembleRotationDay(
     // it is. Taken from the day WITH her pin, which already knows whether the
     // leftover yields to a dinner of the same dish (cook once, not twice today).
     if (!fixed.lunch && day.chosen.lunch?.leftoverFrom === 'dinner') fixed.lunch = day.chosen.lunch
+    // A meal cooked for him is the kitchen's portion, not his: it is never one of the meals re-sized around a swap.
+    for (const [s, o] of Object.entries(away) as [MealSlotName, PoolOption][]) if (!fixed[s]) fixed[s] = o
     const held = holdAroundPins({ planned: plannedDay, fixed, targets, keepSizes: opts.keepHeldSizes })
     if (held) day = held
   }
@@ -621,7 +671,7 @@ export function serveDates(input: {
     const dayPools = canonical(menuFor(poolsServedOn(pools, date), date, softLikedFoods))
     let rotation = rotations.get(dayPools)
     if (!rotation) {
-      rotation = buildRotation(dayPools, targets, softLikedFoods, shape, firstDayAfter(pools, date, dayPools, targets, softLikedFoods))
+      rotation = buildRotation(dayPools, targets, softLikedFoods, shape, firstDayAfter(pools, date, dayPools, targets, softLikedFoods, shape))
       rotations.set(dayPools, rotation)
     }
     const day = assembleRotationDay(rotation, date, dayPools, targets, softLikedFoods, pinsByDate[date] ?? {}, { previousDinner, keepHeldSizes: kept.has(date) })

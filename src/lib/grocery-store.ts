@@ -24,6 +24,7 @@ import { readKeptHeldSizes } from './held-sizes-kept'
 import { supabase } from './supabase'
 import { lookupIngredient, unitToGrams, type FoodCategory } from './food-db'
 import type { PoolOption } from './meal-generation'
+import { isCookedElsewhere } from './meals-elsewhere'
 import { serveDates, datesFrom, epochDay, addDays, type MealShape } from './meal-rotation'
 import type { MealSlotName } from './meal-store'
 import type { MacroTargets } from './types'
@@ -822,6 +823,23 @@ function assembleDates(
     .map(s => ({ date: s.date, chosen: s.day.chosen }))
 }
 
+/**
+ * HOW MANY MEALS THE LIST LEFT OUT because they are cooked for him elsewhere (meals-elsewhere.ts), as of the last time
+ * its lines were worked out. A note about the list, kept on the phone beside it like the build memo: the number is what
+ * that build did, so it cannot claim meals are off a list that was built before the setting existed.
+ */
+const elsewhereNoteKey = (profileId: string) => `fitplan_grocery_elsewhere_v1:${profileId}`
+export function readGroceryElsewhereCount(profileId?: string): number {
+  if (!profileId) return 0
+  try {
+    const n = Number(localStorage.getItem(elsewhereNoteKey(profileId)))
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+  } catch { return 0 }
+}
+export function writeGroceryElsewhereCount(profileId: string, count: number): void {
+  try { localStorage.setItem(elsewhereNoteKey(profileId), String(Math.max(0, Math.floor(count)))) } catch { /* private window: the line is simply not shown */ }
+}
+
 interface AggregatedIngredient {
   canonicalKey: string
   displayName: string
@@ -874,6 +892,8 @@ export interface GenerateGroceryListResult {
   added: number
   updated: number
   removed: number
+  /** Meals on the listed days that are cooked for him elsewhere, and so were left off (meals-elsewhere.ts). */
+  cookedElsewhere?: number
 }
 
 /**
@@ -911,6 +931,7 @@ async function reconcileGenerated(
 ): Promise<GenerateGroceryListResult> {
   const aggregate = new Map<string, AggregatedIngredient>()
   const listed = new Set(planned.map(p => p.date))
+  let cookedElsewhere = 0
   for (const { date, chosen } of planned) {
     const day = epochDay(date) - epochDay(base)
     // Last night's dinner is shopped for when it is on the list, or was cooked before the list began.
@@ -919,6 +940,9 @@ async function reconcileGenerated(
     // dated tonight, so a portion bought for the batch never makes the list claim a day it does not cover.
     const tomorrowListed = listed.has(addDays(date, 1))
     for (const option of Object.values(chosen) as PoolOption[]) {
+      // A MEAL COOKED FOR HIM ELSEWHERE IS NEVER SHOPPED FOR (Ashley, 11 Nov 2026), assumed or estimated: somebody
+      // else buys it. Counted, so the list can say once why it is shorter than the week.
+      if (isCookedElsewhere(option)) { cookedElsewhere++; continue }
       // A LEFTOVER IS BOUGHT WITH THE DINNER IT IS COOKED FROM (runs 7-10, H37, 20 Oct 2026): one batch, cooked once
       // (cook-once.ts). Counted on the lunch, the list bought today's lunch again (its dinner was cooked yesterday,
       // before the list began) and missed the last day's batch (its lunch falls after the list ends).
@@ -1029,7 +1053,9 @@ async function reconcileGenerated(
     removed++
   }
 
-  return { added, updated, removed }
+  // What the list AS BUILT left out, kept beside it so the screen can say so (and so an Undo can put it back).
+  writeGroceryElsewhereCount(profileId, cookedElsewhere)
+  return { added, updated, removed, cookedElsewhere }
 }
 
 /**

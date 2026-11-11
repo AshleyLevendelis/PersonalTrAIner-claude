@@ -163,6 +163,7 @@ import { profileWithKit, kitStatementFact, describeKitStatement } from '@/lib/ki
 import { makeKitController, clearKitStatements, type KitController } from '@/lib/kit-change'
 import type { MyMealsSource } from '@/lib/my-meals'
 import { containsPhrase } from '@/lib/meal-ingredients'
+import { readMealsElsewhere, isCookedElsewhere } from '@/lib/meals-elsewhere'
 import { favouritesStillAllowed } from '@/lib/meal-restriction-check'
 import { useServablePools } from '@/hooks/useServablePools'
 import { getAllItems as getAllGroceryItems, flushPending as flushGroceryPending, refreshGroceryDays, subscribeGroceryStore, type GroceryItemRow } from '@/lib/grocery-store'
@@ -490,7 +491,9 @@ function App() {
     mealsPerDay: profile?.meals_per_day,
     includeSnacks: profile?.include_snacks,
     batchCooking: profile?.batch_cooking,
-  }), [profile?.meals_per_day, profile?.include_snacks, profile?.batch_cooking])
+    // Meals cooked for him elsewhere ride on the shape, so every surface that builds a week is handed them.
+    elsewhere: profile?.meals_elsewhere,
+  }), [profile?.meals_per_day, profile?.include_snacks, profile?.batch_cooking, profile?.meals_elsewhere])
   const mealRotation = useMemo(
     // Built from THIS WEEK'S MENU (9 Nov 2026, meal-menu.ts): a deep pool is never searched whole. The same object
     // serveDates draws for today, so the strip finds this rotation again rather than building its own.
@@ -498,7 +501,7 @@ function App() {
     () => {
       if (!macros) return null
       const menu = menuFor(poolsServedOn(mealPools, mealRotationDate), mealRotationDate, compiledSoftFoodPreferences)
-      return buildRotation(menu, macros, compiledSoftFoodPreferences, mealShape, firstDayAfter(mealPools, mealRotationDate, menu, macros, compiledSoftFoodPreferences))
+      return buildRotation(menu, macros, compiledSoftFoodPreferences, mealShape, firstDayAfter(mealPools, mealRotationDate, menu, macros, compiledSoftFoodPreferences, mealShape))
     },
     [mealPools, macros, compiledSoftFoodPreferences, mealShape, mealRotationDate],
   )
@@ -574,6 +577,8 @@ function App() {
         // week and quoted totals for a day that was not in front of her.
         pinned: {
           ...(assembledMeals.chosen.lunch?.leftoverFrom === 'dinner' ? { lunch: assembledMeals.chosen.lunch } : {}),
+          // A meal cooked for him elsewhere is a fact about today as well: the kitchen's portion, never re-sized.
+          ...Object.fromEntries(Object.entries(assembledMeals.chosen).filter(([, o]) => isCookedElsewhere(o))),
           ...pinnedMeals,
         },
         softLikedFoods: compiledSoftFoodPreferences,
@@ -1116,6 +1121,8 @@ function App() {
       meals_per_day: profileRow.meals_per_day ?? 3,
       include_snacks: profileRow.include_snacks ?? true,
       batch_cooking: profileRow.batch_cooking ?? true,
+      // Read through its own reader: a json column, absent before its migration (`select('*')` needs no column).
+      meals_elsewhere: readMealsElsewhere(profileRow.meals_elsewhere),
       cooking_time_preference: profileRow.cooking_time_preference || 'moderate',
       // Meal-realism round, part 3: onboarding's optional food-preference
       // answers — see the field docs on UserProfile in types.ts.

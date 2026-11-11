@@ -193,6 +193,13 @@ export interface PoolOption {
    * "about 25% either way" of the dish as planned.
    */
   heldBy?: number
+  /**
+   * COOKED FOR HIM ELSEWHERE (Ashley, 11 Nov 2026, meals-elsewhere.ts): 'assumed' is that meal's own share of his day
+   * with no foods, derived and never stored; 'estimate' is a menu he told the coach. Either way the meal is fixed:
+   * never resized, never shopped for, never the source of a leftover. Read through elsewhereState, which also knows
+   * a stored estimate by its tag.
+   */
+  elsewhere?: 'assumed' | 'estimate'
 }
 
 export interface RawProposal {
@@ -2214,7 +2221,9 @@ export function chosenToMealPlanDays(chosen: Partial<Record<MealSlotName, PoolOp
         // was fictional), true here is honest: this macro figure passed the
         // real food-db + diet-rules + portion-scaler pipeline. This adapter
         // output is chat-context-only, never persisted or shown as a badge.
-        is_verified: true,
+        // ...and so it is NOT claimed for a meal cooked for him elsewhere: an assumed size has been through nothing.
+        is_verified: !option.elsewhere && !option.tags?.includes('cooked-elsewhere'),
+        ...(option.elsewhere || option.tags?.includes('cooked-elsewhere') ? { cooked_elsewhere: true } : {}),
       }],
     }
   })

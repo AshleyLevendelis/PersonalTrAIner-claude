@@ -9,8 +9,8 @@ So: he says once which meals are cooked for him on which days. Those meals STAY 
 counted. They are never shopped for. If he tells the coach the menu, each meal is estimated and his dinner and
 snacks fit around it; if he says nothing, a normal-sized meal is assumed. An estimate is marked as one.
 
-Status: **plan, nothing built.** This one touches the allergen path and needs a database step, so it is written
-out before any build.
+Status: **built except as named (11 Nov 2026); see "What is built" at the end.** This one touches the allergen
+path and needs a database step, so it was written out before any build.
 
 ## What exists today (traced, read from source)
 
@@ -85,3 +85,33 @@ column and says the setting could not be saved yet (the pattern the reminders sw
 
 - The wording of the two labels ("assumed", "estimate") and the "At work" label (it may not be work).
 - Whether setup should ask about it. This plan does not: it records it only when volunteered.
+
+## What is built (11 Nov 2026), and where it differs from the plan above
+
+Built: the standing answer (section 1, Profile half), the assumed meal in the day (section 2, first state), shopping
+(section 5), logging (section 6), the database step's file and both sides of it.
+
+- **Where the answer lives in the code.** On the meal shape, the one object every surface that builds a week already
+  passes, so the tab, the strip, the list, the coach's view and every trial card get it by construction. The week
+  builder pins the assumed meal on each covered weekday; nothing is stored for it.
+- **Profile, not Food.** The grid is on Profile's "Meals & shopping" sheet, beside meals per day and batch cooking,
+  which is where the shape of his day is already set.
+- **A day he cooks his own.** The plan did not say. A meal he picks for a date wins over the standing answer for that
+  date: the row offers "Cooking my own today" and lists his plan's meals for that slot.
+- **The kitchen's portion is fixed everywhere.** Not re-sized around a swap, around what he ate, or by a calorie move;
+  not moved to another day or meal. Each refusal says why. The plan only said "the rest of the day fits around it".
+- **The "list left N out" line** counts what the list AS BUILT left out, kept beside the list, so it cannot claim
+  meals are off a list built before the setting existed.
+- **Words** (his to change): "Cooked for you", "Assumed", "Estimate", "Breakfast cooked for you".
+
+- **The menu told to the coach (section 3), the lean way.** Not a new card: the coach's existing "this is what I'm
+  having" card takes one flag, `cooked_for_me`. The coach supplies ordinary portions (the one case it may); the app
+  costs the foods from its own table and checks them exactly as it checks his own meal; the dish is stored made for
+  that one day and marked as cooked elsewhere. ONE MEAL A CALL: a whole week's menu in one card is not built.
+- **Section 4's allergen cases** are the existing path, unchanged: a clash is refused in the same words as for his own
+  meal; an unread line is asked about; a dish given only by name is refused. Where the plan said an unconfirmable
+  dish "stays in the normal-sized, assumed state", that is what a refusal leaves: nothing is written.
+
+Not built: a week's menu in one card; the coach's card for the standing answer (the coach says it cannot set it and
+where it is; `screen only` in `docs/coach-screen-parity.md`); setup recording it when volunteered; a screen form for
+the estimate.

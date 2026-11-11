@@ -212,8 +212,15 @@ console.log('\n1. The libraries are cached separately from the app')
   //     at c3e382a9            deploy 388 gz   paint 544 gz   (both OVER by 0)
   // The food table, the catalogue and the day's session reader are read by every screen as it draws, so this is
   // first-paint code by nature (the calendar itself is split out). Her 15 Sep ruling, "raise it with room to grow": 8 kB gz.
-  headroom('a deploy re-downloads', appGzip, 396, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 396, appGzip)
+  // MOVED 11 Nov 2026, meals cooked for him elsewhere (his ruling that day, "Set days + optional menu"). MEASURED
+  // through this gate on a clean worktree of 9d5133d0 and on the change:
+  //     before   deploy 395 gz   paint 551 gz   app 1375 raw   total 2879 raw   (1, 1, 1 and 23 kB of room)
+  //     after    deploy 398 gz   paint 554 gz   app 1386 raw   total 2894 raw   (deploy, paint and app OVER)
+  // The week builder, the day's list on Nutrition and today's fit-around all read it as the app draws its first
+  // screen, and the row is part of that list, so this is first-paint code by nature (the Profile grid is in Profile's
+  // own chunk). Her 15 Sep ruling, "raise it with room to grow": 8 kB gz and 25 kB raw over today's numbers.
+  headroom('a deploy re-downloads', appGzip, 406, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 406, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -299,9 +306,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 7 Nov 2026: 525 -> 535, another sport said in setup — see the deploy figure above for both ends.
   // MOVED 9 Nov 2026: 535 -> 544, the date-of-birth day — see the deploy figure above for both ends.
   // MOVED 10 Nov 2026: 544 -> 552, the long-flight batch — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 552, 'kB gzipped')
+  // MOVED 11 Nov 2026: 552 -> 562, meals cooked for him elsewhere — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 562, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 552, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 562, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -421,7 +429,9 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 9 Nov 2026: 1329 -> 1351, the date-of-birth day; measured 1319 before and 1326 after (see the deploy figure).
   // MOVED 10 Nov 2026: 1351 -> 1376, the long-flight QA fixes; measured 1349 at 26c19cf1 (2 left, worn by the food
   // table, the third exercise batch and the cardio-day labels) and 1351 with the whole-block swap fix. 25 raw of room.
-  const APP_CHUNK_BUDGET_KB = 1376
+  // MOVED 11 Nov 2026: 1376 -> 1411, meals cooked for him elsewhere; measured 1375 before (1 left) and 1386 after
+  // (see the deploy figure above for both ends). 25 raw of room.
+  const APP_CHUNK_BUDGET_KB = 1411
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,

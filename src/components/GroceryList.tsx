@@ -13,6 +13,7 @@
 // because a mis-tap in a shop is the commonest mistake there is.
 // ---------------------------------------------------------------------------
 
+import { ELSEWHERE_WORDS } from '@/lib/meals-elsewhere'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Input } from '@/components/ui/input'
 import {
@@ -23,6 +24,7 @@ import {
 } from 'lucide-react'
 import {
   getAllItems, addItemLocal, editItemLocal, setCheckedLocal, deleteItemLocal, clearCheckedLocal, restoreRowsLocal, generateGroceryList,
+  readGroceryElsewhereCount, writeGroceryElsewhereCount,
   DEFAULT_HORIZON_DAYS, type GroceryItemRow, type GroceryCategory,
 } from '@/lib/grocery-store'
 import {
@@ -77,6 +79,8 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
   const [loading, setLoading] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [built, setBuilt] = useState<GroceryBuildMemo | null>(() => readGroceryBuildMemo(profileId))
+  /** Meals the list as built left out because they are cooked for him elsewhere. Re-read with the rows. */
+  const [elsewhereCount, setElsewhereCount] = useState(() => readGroceryElsewhereCount(profileId))
   const [horizonDays, setHorizonDays] = useState(() => readGroceryBuildMemo(profileId)?.days ?? DEFAULT_HORIZON_DAYS)
   const [quickAdd, setQuickAdd] = useState('')
   // ONE ROW OPEN AT A TIME, replacing the old separate edit mode and "from N
@@ -118,6 +122,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
       // A failed read keeps the rows on screen (8 Nov 2026): it was the pending queue alone, so every row the server
       // held vanished offline and a tick looked undone.
       setItems(await getAllItems(profileId, { strict: true }))
+      setElsewhereCount(readGroceryElsewhereCount(profileId))
     } catch (err) {
       console.error('Reading the shopping list failed; keeping what is on screen', err)
     } finally {
@@ -148,6 +153,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
       const beforeRows = await getAllItems(profileId, { strict: true }).catch(() => null)
       if (!beforeRows) { showToast(REBUILD_OFFLINE_TOAST, null); return }
       const beforeMemo = built
+      const beforeElsewhere = readGroceryElsewhereCount(profileId)
       try { await generateGroceryList(input) } catch { showToast(REBUILD_OFFLINE_TOAST, null); return }
       const memo = { startDate: input.startDate, days }
       writeGroceryBuildMemo(profileId, memo)
@@ -159,6 +165,8 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
           void (async () => {
             restoreRowsLocal(beforeRows, await getAllItems(profileId))
             if (beforeMemo) { writeGroceryBuildMemo(profileId, beforeMemo); setBuilt(beforeMemo); setHorizonDays(beforeMemo.days) }
+            // The list is the one from before again, so what it left out is too.
+            writeGroceryElsewhereCount(profileId, beforeElsewhere)
             await reload()
           })()
         })
@@ -582,6 +590,11 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
                 : built
                   ? `Built from your next ${built.days} days of meals. `
                   : 'Built from the meals on your Nutrition tab. '}
+              {/* MEALS COOKED FOR HIM ARE NOT ON IT (11 Nov 2026), said once so a short list is not a surprise. Only
+                  while the list still has lines built from meals: the count is about those. */}
+              {elsewhereCount > 0 && items.some(r => r.source === 'generated') && (
+                <span data-testid="grocery-elsewhere">{ELSEWHERE_WORDS.listLine(elsewhereCount)} </span>
+              )}
               <span className="text-text-tertiary" data-testid="allergen-limit">Ingredients are filtered, not verified. Check labels if you have an allergy.</span>
             </p>
           )}

@@ -5,6 +5,11 @@ import type { ProposalDiff } from './pending-actions-store'
 import { tagsMyMeal, type MealSlotName } from './meal-store'
 import { shareLine } from './meal-food-add'
 import { dayLabel } from './day-labels'
+import { tagsPinOnly } from './meal-new-from'
+import { ELSEWHERE_TAG, assumedMealName } from './meals-elsewhere'
+
+/** "today's", "Tuesday's": a day label as an owner, in the card's sentence about which day's meal this is. */
+const poss = (day: string) => `${day}'s`
 
 // ---------------------------------------------------------------------------
 // "I usually have eggs and greek yoghurt and fruit for breakfast" — the
@@ -68,9 +73,13 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
     return { ok: false, reason: `How much ${missingAmounts.length === 1 ? 'of the ' + missingAmounts[0] : 'of each — ' + missingAmounts.join(', ')}? Grams, or counts like "3 eggs", both work.` }
   }
 
+  // COOKED FOR HIM BY SOMEBODY ELSE (Ashley, 11 Nov 2026, meals-elsewhere.ts): the same foods, the same checks, and
+  // the app's own costing, but kept as an ESTIMATE for that one day. It is never one of his own meals (which come
+  // first every week) and never shopped for. Only the coach sets this, on his word that the meal is cooked for him.
+  const cookedForMe = rawArgs.cooked_for_me === true || rawArgs.cooked_for_me === 'true'
   const name = typeof rawArgs.name === 'string' && rawArgs.name.trim()
     ? rawArgs.name.trim()
-    : `My ${slot}`
+    : cookedForMe ? assumedMealName(slot) : `My ${slot}`
 
   const budgets = computeSlotBudgets(input.targets, input.mealsPerDay, input.includeSnacks)
   const budget = budgets[slot]
@@ -99,7 +108,9 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
 
   const diff: ProposalDiff = {
     rows: [
-      { field: 'Your ' + slot, before: 'as you described it', after: option.name },
+      cookedForMe
+        ? { field: assumedMealName(slot), before: `a normal-sized ${slot}, assumed`, after: option.name }
+        : { field: 'Your ' + slot, before: 'as you described it', after: option.name },
       { field: 'Calories', before: `${Math.round(budget.calories)} kcal budgeted`, after: `${Math.round(m.calories)} kcal` },
       { field: 'Protein', before: `${Math.round(budget.protein)}g budgeted`, after: `${Math.round(m.protein)}g` },
       { field: 'Carbs', before: `${Math.round(budget.carbs)}g budgeted`, after: `${Math.round(m.carbs)}g` },
@@ -108,12 +119,16 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
     implications: [
       // The inverse of the addition card's "portions adjusted" line, and
       // the whole point of the feature: nothing was adjusted.
-      { severity: 'info', text: `Your portions, untouched — ${option.ingredients.map(formatPortion).join(', ')}.` },
+      cookedForMe
+        ? { severity: 'info', text: `An estimate, at ordinary portions: ${option.ingredients.map(formatPortion).join(', ')}.` }
+        : { severity: 'info', text: `Your portions, untouched — ${option.ingredients.map(formatPortion).join(', ')}.` },
       // What the rest of the plan does is read off a trial by the caller and
       // added to this card (withKnockOn in meal-food-add.ts) — this line used
       // to assert "The rest of the day re-fits around it" (test log H9).
       ...(vsBudget !== 0 ? [{ severity: 'info' as const, text: shareLine(slot, vsBudget) }] : []),
-      { severity: 'info', text: `Joins your ${slot} options, and becomes your ${slot} for ${dayLabel(date, input.todayDate)}.` },
+      cookedForMe
+        ? { severity: 'info', text: `Kept as ${poss(dayLabel(date, input.todayDate))} ${slot} only. It isn't added to your own meals and is never on your shopping list.` }
+        : { severity: 'info', text: `Joins your ${slot} options, and becomes your ${slot} for ${dayLabel(date, input.todayDate)}.` },
     ],
     rationale: typeof rawArgs.origin_verbatim_quote === 'string' && rawArgs.origin_verbatim_quote.trim() ? rawArgs.origin_verbatim_quote.trim() : undefined,
     reversible: true,
@@ -124,7 +139,9 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
     scopeKey: `${input.profileId}:propose_custom_meal:${slot}:${date}`,
     preconditions: { slot, date, mealName: option.name },
     // HIS OWN MEAL (11 Nov 2026, "My usual meals first"): marked so the week's menu and the day's pick put it first.
-    payload: { slot, date, option: { ...option, tags: tagsMyMeal(option.tags) } },
+    // A MEAL COOKED FOR HIM is the opposite on both counts: made for one day (only the pick that names it serves it)
+    // and marked as cooked elsewhere, which is what keeps it fixed, off the shopping list and out of "his meals".
+    payload: { slot, date, option: { ...option, tags: cookedForMe ? tagsPinOnly([...option.tags, ELSEWHERE_TAG]) : tagsMyMeal(option.tags) } },
     diff,
   }
 }

@@ -22,6 +22,7 @@
 // is one the app has not costed. Nothing is saved: today's screen changes, the
 // stored meals and the shopping list do not.
 // ---------------------------------------------------------------------------
+import { isCookedElsewhere } from './meals-elsewhere'
 import { scaleToTarget } from './portion-scaler'
 import { computeMealMacros } from './food-db'
 import { dayVerdict, namedMiss, type PoolOption } from './meal-generation'
@@ -112,7 +113,10 @@ export function dayAsShown(input: {
   const base = plain()
   const baseTotals = sum(base)
   const logged = base.filter(r => r.eaten)
-  const open = base.filter(r => !r.eaten && r.option)
+  // A MEAL COOKED FOR HIM ELSEWHERE IS THE KITCHEN'S PORTION (11 Nov 2026, meals-elsewhere.ts): not his to re-size.
+  // It is counted as it stands, like a meal already eaten, and only his own open dishes fit around the rest.
+  const away = base.filter(r => !r.eaten && r.option && isCookedElsewhere(r.option))
+  const open = base.filter(r => !r.eaten && r.option && !isCookedElsewhere(r.option))
   if (!targets || logged.length === 0 || open.length === 0) return { slots: base, totals: baseTotals, aroundEaten: { kind: 'none' } }
 
   // QUIET UNTIL IT MATTERS: a day already inside the app's own bands is left
@@ -123,8 +127,9 @@ export function dayAsShown(input: {
   if (keepAsPlanned) return { slots: base, totals: baseTotals, aroundEaten: { kind: 'kept', deltaKcal, miss: namedMiss(baseTotals, targets) } }
 
   const eatenKcal = logged.reduce((s, r) => s + r.macros.calories, 0)
+  const awayKcal = away.reduce((s, r) => s + r.macros.calories, 0)
   const openKcal = open.reduce((s, r) => s + r.macros.calories, 0)
-  const factor = openKcal > 0 ? Math.max(0, targets.calories - eatenKcal) / openKcal : 1
+  const factor = openKcal > 0 ? Math.max(0, targets.calories - eatenKcal - awayKcal) / openKcal : 1
   // NOTHING TO SAY WHEN NOTHING MOVES (1 Nov 2026, whole-app test): a day off on protein, with the meal eaten as
   // planned, came out at a factor a hair from 1 and printed "0 kcal less ... 0% smaller" with an Undo. A re-fit that
   // rounds to no change is not one.
@@ -136,12 +141,12 @@ export function dayAsShown(input: {
     return { slots: base, totals: baseTotals, aroundEaten: { kind: 'too_far', deltaKcal, miss: namedMiss(baseTotals, targets) } }
   }
   const rows = base.map(r => {
-    if (r.eaten || !r.option) return r
+    if (r.eaten || !r.option || isCookedElsewhere(r.option)) return r
     const next = resizeDish(r.option, factor)
     return next ? { ...r, option: next, macros: next.macros, resizedBy: factor } : r
   })
   // Every open dish or none: a half-resized day would describe a fit it did not make.
-  if (rows.some(r => !r.eaten && r.option && r.resizedBy == null)) {
+  if (rows.some(r => !r.eaten && r.option && !isCookedElsewhere(r.option) && r.resizedBy == null)) {
     return { slots: base, totals: baseTotals, aroundEaten: { kind: 'too_far', deltaKcal, miss: namedMiss(baseTotals, targets) } }
   }
   return {
