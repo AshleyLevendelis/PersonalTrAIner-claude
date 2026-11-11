@@ -1516,3 +1516,36 @@ export function logOnlyRefusal(entry: { name: string; parent?: string }): string
     : `${entry.name} is one to log, not to plan.`
 }
 
+/**
+ * WHAT A "WORKING WEIGHT" IS (Ashley, 11 Nov 2026: "not clear to the user what it means. Did it want my 1 rep max or a
+ * couple in reserve etc. Also which exercises exactly"). The plan reads a typed lift as the weight for about 10 reps
+ * with 2 in reserve (load-prescription's known-weight reference), skips the calibration week on it and trusts it over
+ * its own estimate, so a one-rep max typed here would start a block far too heavy. Setup, Profile and the setup coach
+ * say what the number is in these words, from this one place. `test:working-weight-words` feeds the reps and the
+ * reserve this sentence NAMES to the prescriber and checks the number typed is the number prescribed, so the words and
+ * the engine cannot drift apart.
+ */
+export const WORKING_WEIGHT_REPS = 10
+export const WORKING_WEIGHT_IN_RESERVE = 2
+/** The three lifts the number is asked for, by the name on the bar. */
+export const WORKING_WEIGHT_LIFTS = {
+  knownSquatKg: 'Barbell back squat',
+  knownBenchKg: 'Barbell bench press',
+  knownDeadliftKg: 'Barbell deadlift',
+} as const
+/** "the weight you'd lift for about 10 good reps with about 2 left in the tank" */
+export function workingWeightMeans(): string {
+  return `the weight you'd lift for about ${WORKING_WEIGHT_REPS} good reps with about ${WORKING_WEIGHT_IN_RESERVE} left in the tank`
+}
+/** The line over the three boxes in setup. */
+export function workingWeightBoxesAsk(): string {
+  return `For each lift, put ${workingWeightMeans()}. Not your one-rep max. In kg, or add lb. Leave a box empty if you're not sure of that one.`
+}
+/** One lift's own question ("What do you back squat for about 10 reps with about 2 left in the tank (kg)?"). */
+export function workingWeightQuestion(verb: string): string {
+  return `What do you ${verb} for about ${WORKING_WEIGHT_REPS} reps with about ${WORKING_WEIGHT_IN_RESERVE} left in the tank (kg)?`
+}
+/** The line under the three lifts on Profile. */
+export function workingWeightProfileNote(): string {
+  return `Each is ${workingWeightMeans()}, not a one-rep max.`
+}

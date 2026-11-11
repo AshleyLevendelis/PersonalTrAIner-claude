@@ -184,6 +184,7 @@
     "probe:swap-depth": "tsx scripts/probe-swap-depth.ts",
     "probe:swap-delta": "tsx scripts/probe-swap-delta.ts",
     "test:onboarding-slots": "tsx scripts/test-onboarding-slots.ts",
+    "test:working-weight-words": "tsx scripts/test-working-weight-words.ts",
     "test:onboarding-corrections": "tsx scripts/test-onboarding-corrections.ts",
     "test:onboarding-chip-match": "tsx scripts/test-onboarding-chip-match.ts",
     "test:onboarding-receipts": "tsx scripts/test-onboarding-receipts.ts",

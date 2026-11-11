@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactElement } from 'react'
+import { WORKING_WEIGHT_LIFTS } from '@/lib/coach-voice'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -66,6 +67,10 @@ const UNIT: Record<string, string | undefined> = {
  * browser's character filter, which was the thing in the way.
  */
 const ACCEPTS_UNITS = new Set(['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg'])
+
+// WHICH LIFT, BY THE NAME ON THE BAR (his report, 11 Nov 2026: "which exercises exactly"): a box labelled "Squat"
+// did not say back squat on a barbell, and the number sets that lift's starting weight.
+const CARD_LABEL: Record<string, string | undefined> = WORKING_WEIGHT_LIFTS
 
 // No example number on a lift box: a figure there is one somebody might copy
 // onto the bar, and these numbers set the starting weight.
@@ -273,7 +278,7 @@ export function SlotNumericCard({
               {/* The slot's own unit where this card has nothing richer to
                   say — the three load ceilings were missing from the map
                   above and so asked for "Heaviest dumbbells" in no unit. */}
-              {d.shortLabel}{(UNIT[d.key] ?? d.unit) ? <span className="text-muted-foreground/70"> ({UNIT[d.key] ?? d.unit})</span> : null}
+              {CARD_LABEL[d.key] ?? d.shortLabel}{(UNIT[d.key] ?? d.unit) ? <span className="text-muted-foreground/70"> ({UNIT[d.key] ?? d.unit})</span> : null}
             </label>
             <Input
               id={`slot-${d.key}`}

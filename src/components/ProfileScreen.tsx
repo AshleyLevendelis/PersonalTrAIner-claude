@@ -66,7 +66,7 @@ import { describeActivity } from '@/lib/concurrent-activity'
 import { resolveExerciseName } from '@/lib/set-parse'
 import { resolveExerciseDislike } from '@/lib/fact-compiler'
 import { buildDataExport, downloadExport, summariseExport, deleteAllUserData } from '@/lib/user-data'
-import { dietTargetCaveat } from '@/lib/coach-voice'
+import { dietTargetCaveat, WORKING_WEIGHT_LIFTS, workingWeightProfileNote } from '@/lib/coach-voice'
 import { KitTicks } from '@/components/KitTicks'
 import type { KitController } from '@/lib/kit-change'
 import { checkWeighIn, profileWeightQuestionText, weighInYesLabel, WEIGH_IN_NO_LABEL, type WeighInCheck } from '@/lib/weigh-in-check'
@@ -1518,21 +1518,21 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 same rule the weight caps above follow for a full-gym profile. */}
             {(profile.skip_calibration_week || knownLiftsAnswered) && (
               <div data-testid="known-lifts" className="space-y-1">
-                <Row label="Your squat">
+                <Row label={WORKING_WEIGHT_LIFTS.knownSquatKg}>
                   <EditableTextField
                     value={profile.known_squat_kg ?? undefined}
                     unit="kg" min={20} max={400}
                     onSave={n => savePatch({ known_squat_kg: n })}
                   />
                 </Row>
-                <Row label="Your bench press">
+                <Row label={WORKING_WEIGHT_LIFTS.knownBenchKg}>
                   <EditableTextField
                     value={profile.known_bench_kg ?? undefined}
                     unit="kg" min={20} max={300}
                     onSave={n => savePatch({ known_bench_kg: n })}
                   />
                 </Row>
-                <Row label="Your deadlift">
+                <Row label={WORKING_WEIGHT_LIFTS.knownDeadliftKg}>
                   <EditableTextField
                     value={profile.known_deadlift_kg ?? undefined}
                     unit="kg" min={20} max={500}
@@ -1545,6 +1545,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                     numbers are a record and correcting one changes no weight.
                     Saying so is the difference between "nothing happened" and
                     "nothing happened, and here is why". */}
+                {/* WHAT THE NUMBER IS (his report, 11 Nov 2026): the same words setup asks in. */}
+                <p className="pt-1 text-xs text-muted-foreground" data-testid="known-lifts-meaning">{workingWeightProfileNote()}</p>
                 {!profile.skip_calibration_week && (
                   <p className="pt-1 text-xs text-muted-foreground" data-testid="known-lifts-record-only">
                     Your plan follows what you've actually lifted since your first week, so correcting

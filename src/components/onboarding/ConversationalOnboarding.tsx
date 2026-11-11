@@ -41,7 +41,7 @@ import {
 import { measureParserFor, ageOn, todayLocal } from '@/lib/body-units'
 import { detectFoodExclusions, mergeFoodsToAvoid, isFoodToAvoid } from '@/lib/food-exclusions'
 import { splitFoodList, isPlainNone } from '@/lib/food-list'
-import { allergenFilterReceipt } from '@/lib/coach-voice'
+import { allergenFilterReceipt, workingWeightBoxesAsk } from '@/lib/coach-voice'
 import { implausibleLifts } from '@/lib/lift-plausibility'
 import { ceilingIsInUserWords, isCeilingSlot } from '@/lib/onboarding-ceiling-capture'
 import { parseKitSlot, kitStatementInUserWords } from '@/lib/kit-list'
@@ -270,7 +270,8 @@ const LIFT_SLOT_WORDS: Partial<Record<SlotKey, RegExp>> = {
  * knows her numbers (19 Oct 2026, her live test: the coach said "Got those
  * numbers down." and asked nothing). Leaving a box empty is an answer.
  */
-const LIFT_BOXES_ASK = "Fill in the ones you know — in kg, or add lb. Leave a box empty if you're not sure of that one."
+// SAYS WHAT NUMBER IS WANTED (his report, 11 Nov 2026): the plan reads each as a ten-rep weight, never a max.
+const LIFT_BOXES_ASK = workingWeightBoxesAsk()
 
 /** Every slot a card has been put on screen for, answered or not. */
 const cardedSlots = (msgs: readonly { slotCard?: string }[]) => msgs.flatMap(m => (m.slotCard ? [m.slotCard] : []))
