@@ -639,9 +639,11 @@ await section(20, '"I know my numbers" is answered with the three lift boxes, by
   const boxes = await liftBoxes()
   check('the three lift boxes are on screen straight after the tap', boxes.shown && LIFTS.every(k => boxes.fields.includes(k)) && boxes.inView, boxes)
   check('...each labelled with its lift and its units (kg or lb)',
-    boxes.labels.length === 3 && boxes.labels.every(l => /\(kg or lb\)/.test(l)) && /Squat/.test(boxes.labels[0]) && /Bench/.test(boxes.labels[1]) && /Deadlift/.test(boxes.labels[2]), boxes.labels)
+    boxes.labels.length === 3 && boxes.labels.every(l => /\(kg or lb\)/.test(l)) && /^Barbell back squat/.test(boxes.labels[0]) && /^Barbell bench press/.test(boxes.labels[1]) && /^Barbell deadlift/.test(boxes.labels[2]), boxes.labels)
+  check('...and each lift has a weight box AND a reps box (his "Weight and reps")',
+    LIFTS.every(k => boxes.fields.includes(k) && boxes.fields.includes(`${k}-reps`)) && boxes.fields.length === 6, boxes.fields)
   check('...under the app\'s own line, not a coach sentence claiming numbers it was never given',
-    (await evj(`__cards('knownSquatKg')`)).some(c => /Fill in the ones you know/.test(c.under)) && !/Got those numbers/i.test(await ev(`__body()`)))
+    (await evj(`__cards('knownSquatKg')`)).some(c => /a recent hard set: the weight, and how many reps you got/.test(c.under) && /A one-rep max counts, put 1 rep/.test(c.under)) && !/Got those numbers/i.test(await ev(`__body()`)))
   check('...with no trip to the coach for it', (await ev(`window.__onbRequests.length`)) === before, { before, after: await ev(`window.__onbRequests.length`) })
   check('...her answer is in the conversation as her own words', !!(await evj(`__bubble('I know my numbers')`)))
   check('...and Skip is offered, because every box can be left out', await ev(`!!document.querySelector('[data-onboarding-skip]')`))
@@ -651,19 +653,34 @@ await section(20, '"I know my numbers" is answered with the three lift boxes, by
   await queue({ reply: 'That gives me something real to start you from. How do you feel about cardio?', actions: [{ name: 'present_slot', args: { slot_key: 'conditioningPreference' } }] })
   // Only when the boxes are there to type into, so a broken tap fails the
   // checks below rather than ending the section early (one count every run).
+  const saveLifts = `[...document.querySelectorAll('[data-slot-card="knownSquatKg"] button')].find(b => b.textContent.trim() === 'Save')`
+  // A WEIGHT WITH NO REPS IS ASKED ABOUT, NEVER KEPT: that was the old box, and it is what his ruling replaced.
   if (boxes.shown) {
     await typeInto('slot-knownSquatKg', '225 lb')
+    await tapEl(saveLifts, 'Save')
+    await wait(500)
+  }
+  const refused = await evj(`(() => { const p = document.querySelector('[data-lift-field="knownSquatKg"] [data-testid="lift-problem"]'); const r = p?.getBoundingClientRect(); return { text: p?.textContent ?? null, inView: !!r && r.top >= 0 && r.bottom <= innerHeight } })()`)
+  check('a weight with no reps is not saved: the squat asks for the reps, where it was typed',
+    refused.text === 'How many reps did you get at that weight?' && refused.inView, refused)
+  check('...and nothing went to the coach', (await ev(`window.__onbRequests.length`)) === before, { before, now: await ev(`window.__onbRequests.length`) })
+  check('...and the boxes are still there', (await liftBoxes()).shown)
+  await shot('lifts-no-reps')
+  if (boxes.shown) {
+    await typeInto('slot-knownSquatKg-reps', '3')
     await typeInto('slot-knownBenchKg', '80')
-    await tapEl(`[...document.querySelectorAll('[data-slot-card="knownSquatKg"] button')].find(b => b.textContent.trim() === 'Save')`, 'Save')
+    await typeInto('slot-knownBenchKg-reps', '8')
+    await tapEl(saveLifts, 'Save')
     await wait(900)
   }
   const req = await lastRequest()
   check('Save sends ONE turn to the coach', (await ev(`window.__onbRequests.length`)) === before + 1)
-  check('...with the squat converted from pounds to kg (225 lb is 102.1 kg)', /102\.1 kg/.test(req?.state?.filled?.knownSquatKg ?? ''), req?.state?.filled)
-  check('...the bench as typed, in kg', /^80 kg$/.test(req?.state?.filled?.knownBenchKg ?? ''), req?.state?.filled)
+  check('...in her own numbers, weight and reps', /squat 225 lb x 3/.test(req?.message ?? '') && /bench 80 x 8/.test(req?.message ?? ''), req?.message)
+  check('...with the squat worked out from the set (225 lb for 3 is 79.5 kg for about 10 reps)', /^79\.5 kg for about 10 reps$/.test(req?.state?.filled?.knownSquatKg ?? ''), req?.state?.filled)
+  check('...and the bench (80 kg for 8 is 72 kg for about 10 reps)', /^72 kg for about 10 reps$/.test(req?.state?.filled?.knownBenchKg ?? ''), req?.state?.filled)
   check('...and the empty deadlift box answered as "not given", never asked again',
     /not given/.test(req?.state?.filled?.knownDeadliftKg ?? '') && !LIFTS.some(k => (req?.state?.remaining ?? []).includes(k)), { filled: req?.state?.filled?.knownDeadliftKg, remaining: req?.state?.remaining })
-  check('the tick shows what she typed beside what was stored', (await evj(`__ticks()`)).some(t => /Squat.*102\.1 kg.*from 225lb/.test(t)), await evj(`__ticks()`))
+  check('the tick shows what she typed beside what was stored', (await evj(`__ticks()`)).some(t => /Squat.*79\.5 kg for about 10 reps.*from 225lb for 3/.test(t)), await evj(`__ticks()`))
   check('the lift boxes are gone once answered', !(await liftBoxes()).shown)
   await shot('lifts-saved')
 })
@@ -694,7 +711,7 @@ await section(22, '"I know my numbers" TYPED, and the coach asks about cardio an
   })
   await say('yeah I know them roughly')
   const boxes = await liftBoxes()
-  check('the lift boxes are on screen after the coach\'s turn', boxes.shown && boxes.fields.length === 3 && boxes.inView, boxes)
+  check('the lift boxes are on screen after the coach\'s turn', boxes.shown && boxes.fields.length === 6 && boxes.inView, boxes)
   check('...and the cardio chips are not stacked beside them', (await evj(`__cards('conditioningPreference')`)).length === 0, await evj(`__cards()`))
 })
 
@@ -707,18 +724,19 @@ await section(23, 'An edit from the summary to "I know my numbers" asks for the 
   await wait(400)
   const now = await review()
   const boxes = await liftBoxes()
-  check('the lift boxes are on screen', boxes.shown && boxes.fields.length === 3 && boxes.inView, boxes)
+  check('the lift boxes are on screen', boxes.shown && boxes.fields.length === 6 && boxes.inView, boxes)
   check('...and the summary waits for them', !now.open, now.rows)
   await shot('lifts-from-summary')
   // Answering the boxes settles the edit like any other: no trip to the
   // coach, and the summary comes back with the number in it.
   if (boxes.shown) {
     await typeInto('slot-knownSquatKg', '100')
+    await typeInto('slot-knownSquatKg-reps', '5')
     await tapEl(`[...document.querySelectorAll('[data-slot-card="knownSquatKg"] button')].find(b => b.textContent.trim() === 'Save')`, 'Save')
     await wait(900)
   }
   const after = await review()
-  check('saving them brings the summary back, with the squat in its row', after.open && /100 kg/.test(after.rows.knownSquatKg ?? ''), after.rows)
+  check('saving them brings the summary back, with the squat in its row', after.open && /83 kg for about 10 reps/.test(after.rows.knownSquatKg ?? ''), after.rows)
   check('...and "Working lifts" now reads "I know my numbers"', /I know my numbers/.test(after.rows.knowsWorkingLifts ?? ''), after.rows.knowsWorkingLifts)
   check('...with no trip to the coach for any of it', after.requests === start.requests, { before: start.requests, after: after.requests })
   check('...and Generate live', after.generate && after.generate.disabled === false, after.generate)

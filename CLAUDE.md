@@ -1508,8 +1508,10 @@ menu" stays true when a copy is also left outside it.
   weights" without saying what the number was or which lifts; the plan reads it as the weight for about 10 reps with 2
   in reserve, trusts it over its own estimate and skips the calibration week. For each of the barbell back squat, bench
   press and deadlift he types a recent hard set (a weight and its reps; a one-rep max is 1 rep) and the APP works out
-  the plan's number. The one-number wording with its meaning shipped first (`test:working-weight-words`); the weight
-  and reps boxes are NOT BUILT yet.
+  the plan's number, reading the set as taken to the limit (CSCS, the lowest and so the safest reading), for sets of 1
+  to 15 reps. A weight with no reps is asked about, never kept; the coach's route keeps a lift only from a set in his
+  own words. BUILT. `test:working-weight-words`, `verify:onboarding-turns` §20-23. Needs the `onboarding-chat` deploy
+  for the coach's half. Profile's rows still take the kept number directly, with its meaning beside them.
 - **A weight that is too easy: "One tap per lift"** (over main lift only, and over not asking): after a lift's last
   set, Too easy / About right / Too hard. Measured before it: one small step a session, 12 sessions from 40 kg to a
   true 70 kg, and a session ticked through without typing never rises at all. What each answer does to the next

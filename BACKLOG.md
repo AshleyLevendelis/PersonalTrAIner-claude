@@ -2,6 +2,40 @@
 
 Newest first. One line each.
 
+- [x] **SETUP ASKS EACH LIFT AS A WEIGHT AND ITS REPS, AND THE APP WORKS OUT THE PLAN'S NUMBER: HIS RULING 11 NOV 2026,
+  "Weight and reps"** (over one number with an explanation, which shipped an hour earlier and this replaces in setup).
+  WHAT CHANGED ON THE PHONE: after "I know my numbers" each of the barbell back squat, barbell bench press and barbell
+  deadlift has a weight box and a reps box, under "For each lift, a recent hard set: the weight, and how many reps you
+  got. A one-rep max counts, put 1 rep. I'll work out your starting weights from them. Leave a lift empty if you're not
+  sure of it." The tick and the summary say what was kept and from what: "Squat — 79.5 kg for about 10 reps (from 225lb
+  for 3)". A weight with no reps is asked about in place ("How many reps did you get at that weight?") and nothing is
+  saved. Profile keeps the kept number, with its meaning under the three rows. Wording is mine and his to change.
+  ONE PLACE FOR THE MEANING: `working-weight.ts` (no imports) holds the reps and effort the plan's number stands for
+  (10 reps, two in reserve), the rep-to-load curve, and the conversion; the prescriber imports them from there, so the
+  words, the conversion and the plan cannot drift.
+  CSCS DECISIONS, MINE, WITH THE BASIS: (1) THE SET IS READ AS TAKEN TO THE LIMIT. The app is not told how many reps
+  were left, and of every reading "none" gives the lowest number. Somebody with two in reserve starts about 6% light
+  (100 for 5: 83 kg kept at the limit, 88 at two in reserve), which the too-easy tap corrects in a session; the other
+  error starts a block too heavy with no calibration week to catch it. (2) SETS OF 1 TO 15 REPS. Rep-max prediction is
+  at its best at ten reps or fewer and degrades above; a one-rep max is taken, as he asked. (3) KEPT TO THE HALF KILO.
+  THE FIVE-QUESTION REVIEW: (i) training effect: the first block now starts at or under what was actually lifted
+  instead of up to 15% over it for a five-rep lifter; (ii) what it takes away: nothing prescribed is removed; a person
+  who knew only a ten-rep weight types it as "x 10" and starts about 5% lighter than before, by the limit reading;
+  (iii) fundamentals: overload is unchanged, the starting point is safer; (iv) no floor or ceiling is redefined, the
+  kept column means what it always meant; (v) in scope.
+  THE COACH'S ROUTE: a lift is kept only from a set whose weight and reps are both in the person's own message ("my
+  max is 140" names one rep in words); a bare weight, an invented rep count or a number the model worked out records
+  nothing and shows the boxes. The setup coach's instructions say the same and its older line that took a named bare
+  number is gone.
+  VERIFIED: `test:working-weight-words` rewritten, 72 checks: across seven sets and three lifts the real prescriber
+  never asks for more than was lifted at the reps typed. 20 mutations, 19 caught by it; the 20th (the card never says
+  what is wrong) is the driver's, and was caught there. Four of the twenty replayed on the driver, four caught. `verify:onboarding-turns` 149 checks at phone size, screenshots read (the refusal
+  with no reps, the ticks, the summary). `test:body-units` re-anchored on the set reader.
+  NOT DONE, NAMED: Profile's three rows still take the kept number directly (with its meaning beside them), not a set;
+  an edit from the summary starts from empty boxes with "Recorded as 83 kg for about 10 reps" under them, because the
+  typed set is not kept. Whether the deployed setup coach passes sets as told is unproven until a real setup.
+  Needs the `onboarding-chat` deploy for the coach's half; the boxes work without it.
+
 - [ ] **HIS FOUR POINTS OF 11 NOV 2026, TRACED, AND HIS FOUR RULINGS.** He asked: what setup means by "working
   weights" and which exercises; whether a too-easy weight ramps up or takes many weeks; whether a too-easy calibration
   week adjusts; and how meals fit around food he already eats (his example: breakfast and lunch cooked at work Monday

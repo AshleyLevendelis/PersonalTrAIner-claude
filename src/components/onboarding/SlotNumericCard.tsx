@@ -1,5 +1,6 @@
 import { useRef, useState, type ReactElement } from 'react'
-import { WORKING_WEIGHT_LIFTS } from '@/lib/coach-voice'
+import { WORKING_WEIGHT_LIFTS, liftAsStored, liftSetProblem } from '@/lib/coach-voice'
+import { LIFT_SET_MAX_REPS } from '@/lib/working-weight'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -74,7 +75,7 @@ const CARD_LABEL: Record<string, string | undefined> = WORKING_WEIGHT_LIFTS
 
 // No example number on a lift box: a figure there is one somebody might copy
 // onto the bar, and these numbers set the starting weight.
-const LIFT_PLACEHOLDER = 'In kg, or add lb'
+const LIFT_PLACEHOLDER = 'Weight: kg, or add lb'
 const PLACEHOLDER: Record<string, string> = {
   knownSquatKg: LIFT_PLACEHOLDER,
   knownBenchKg: LIFT_PLACEHOLDER,
@@ -113,6 +114,10 @@ export function SlotNumericCard({
     ? Object.fromEntries(fields.map(d => [d.key, values[d.key] == null || values[d.key] === '' ? '' : String(values[d.key])]))
     : {})
   const [showErrors, setShowErrors] = useState(false)
+  // A LIFT IS A SET: a weight box and a reps box (his ruling, 11 Nov 2026, "Weight and reps"). The two are written
+  // as the text the lift reader already takes ("100 x 5"), so the card, the coach's route and the receipt agree.
+  const [liftBoxes, setLiftBoxes] = useState<Record<string, [string, string]>>({})
+  const liftBoxesOf = (k: SlotKey): [string, string] => liftBoxes[k] ?? ['', '']
 
   // AGE, HEIGHT AND WEIGHT HAVE THEIR OWN CONTROLS (Ashley, 9 Nov 2026): a date picker for the date of birth, and a
   // unit toggle beside the weight and the height boxes. Each writes the text the slot's parser already reads, so the
@@ -163,6 +168,10 @@ export function SlotNumericCard({
     if (k === 'age') { const a = dob ? ageOn(dob, today) : null; return dob ? (a == null ? 'x' : String(a)) : (draft.age ?? '') }
     if (k === 'weightKg') return weightText(weightUnit, weightBoxes)
     if (k === 'heightCm') return heightText(heightUnit, heightBoxes)
+    if (ACCEPTS_UNITS.has(k)) {
+      const [w, r] = liftBoxesOf(k).map(v => v.trim())
+      return w === '' && r === '' ? '' : `${w} x ${r}`
+    }
     return draft[k] ?? ''
   }
   // Blank is allowed only where the answer isn't required — a known-lift
@@ -178,7 +187,19 @@ export function SlotNumericCard({
     // found any of them, because the parser's own tests all passed throughout.
     const measure = measureParserFor(d.key)
     const parsed = measure?.(raw)
+    // A lift is only ever taken from a set the reader understood: a weight with no reps is asked about, never kept.
+    if (ACCEPTS_UNITS.has(d.key) && !parsed) return false
     return d.validate(parsed ? String(parsed.value) : raw)
+  }
+  /** What is wrong with one lift's two boxes, said where it happened. Null when they are fine or both empty. */
+  const liftProblem = (d: (typeof fields)[number]): string | null => {
+    const [w, r] = liftBoxesOf(d.key).map(v => v.trim())
+    if (w === '' && r === '') return null
+    if (w === '') return liftSetProblem('weight')
+    if (r === '') return liftSetProblem('reps')
+    const reps = Number(r)
+    if (!Number.isInteger(reps) || reps < 1 || reps > LIFT_SET_MAX_REPS) return liftSetProblem('too_many')
+    return isOk(d) ? null : liftSetProblem('unread')
   }
   const allOk = fields.every(isOk)
   // Every field on this card can be refused, so the card can offer a refusal.
@@ -265,6 +286,32 @@ export function SlotNumericCard({
         const bad = showErrors && !isOk(d)
         if (d.key === 'age' || d.key === 'weightKg' || d.key === 'heightCm') {
           return bodyField(d, bad, busy, rawOf(d.key).trim() === '')
+        }
+        if (ACCEPTS_UNITS.has(d.key)) {
+          const [w, r] = liftBoxesOf(d.key)
+          const problem = showErrors ? liftProblem(d) : null
+          const name = CARD_LABEL[d.key] ?? d.shortLabel
+          const stored = editing && values[d.key] != null && values[d.key] !== '' ? liftAsStored(values[d.key] as number | string) : null
+          return (
+            <div key={d.key} className="space-y-1" data-lift-field={d.key}>
+              <label className="text-xs text-muted-foreground" htmlFor={`slot-${d.key}`}>
+                {name}<span className="text-muted-foreground/70"> ({UNIT[d.key]})</span>
+              </label>
+              <div className="flex items-center gap-2">
+                <Input id={`slot-${d.key}`} type="text" inputMode="text" value={w} disabled={busy} placeholder={PLACEHOLDER[d.key]}
+                  aria-label={`${name}, weight`}
+                  onChange={e => setLiftBoxes(prev => ({ ...prev, [d.key]: [e.target.value, liftBoxesOf(d.key)[1]] }))}
+                  className={`h-11 min-w-0 flex-1 ${problem ? 'border-destructive' : ''}`} />
+                <span aria-hidden className="text-sm text-muted-foreground">×</span>
+                <Input id={`slot-${d.key}-reps`} type="number" inputMode="numeric" min={1} max={LIFT_SET_MAX_REPS} value={r} disabled={busy} placeholder="Reps"
+                  aria-label={`${name}, reps`}
+                  onChange={e => setLiftBoxes(prev => ({ ...prev, [d.key]: [liftBoxesOf(d.key)[0], digits(e.target.value).replace(/\..*$/, '')] }))}
+                  className={`h-11 w-24 shrink-0 ${problem ? 'border-destructive' : ''}`} />
+              </div>
+              {stored && !problem && <p className="text-[0.6875rem] text-muted-foreground" data-testid="lift-stored">Recorded as {stored}. Type a set to change it.</p>}
+              {problem && <p className="text-[0.6875rem] text-destructive" data-testid="lift-problem">{problem}</p>}
+            </div>
+          )
         }
         return (
           <div key={d.key} className="space-y-1">

@@ -2,7 +2,7 @@ import { ALLERGEN_FOOD_PATTERNS } from './allergen-words'
 import { splitFoodList } from './food-list'
 import { DIETARY_PREFERENCES, type DietaryPreference } from '@/lib/diet-rules'
 import { GOALS_THAT_MEAN_TRAIN } from '@/lib/starting-out'
-import { WORKING_WEIGHT_REPS, workingWeightQuestion } from './coach-voice'
+import { liftSetQuestion, liftAsStored } from './coach-voice'
 import type {
   UserProfile,
   FitnessGoal,
@@ -740,7 +740,7 @@ const KNOWS_LIFTS_OPTIONS: SlotOption[] = [
   // saying. Beginners no longer see this question at all, so the people
   // reading it are experienced lifters who simply haven't tested lately.
   { value: 'false', icon: '❓', label: 'Not sure', description: 'Start with a calibration week to find my numbers' },
-  { value: 'true', icon: '🎯', label: 'I know my numbers', description: `Enter what I lift for about ${WORKING_WEIGHT_REPS} reps` },
+  { value: 'true', icon: '🎯', label: 'I know my numbers', description: 'Enter a recent hard set for each' },
 ]
 const SNACKS_OPTIONS: SlotOption[] = [
   { value: 'true', icon: '🍎', label: 'Snacks too', description: 'Include a snack slot' },
@@ -911,13 +911,13 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // AFTER injuries, which must stay in the opening block (her ruling: the only question whose absence can hurt),
   // and still right behind equipment: the ticks start from that answer (picksHomeKit, defaultKitTicks).
   { key: 'kitTicks', question: 'Which of these do you have?', inputHint: "Untick anything you don't have", shortLabel: 'Your kit', control: 'multi', required: false, requiredIf: picksHomeKit, options: KIT_TICK_OPTIONS, destination: 'user_facts', validate: isSubsetOf(KIT_TICK_OPTIONS) },
-  { key: 'knowsWorkingLifts', question: 'Do you know your working weights for the barbell back squat, bench press and deadlift?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', required: true, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
+  { key: 'knowsWorkingLifts', question: 'Do you know what you lift on the barbell back squat, bench press and deadlift?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', required: true, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Only meaningful once someone has said they DO know their numbers.
-  { key: 'knownSquatKg', question: workingWeightQuestion('back squat'),
+  { key: 'knownSquatKg', question: liftSetQuestion('back squat'),
     inputHint: 'Your squat, in kg…', shortLabel: 'Squat', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, unit: 'kg', destination: 'column', validate: isNumberIn(1, 500) },
-  { key: 'knownBenchKg', question: workingWeightQuestion('bench press'),
+  { key: 'knownBenchKg', question: liftSetQuestion('bench press'),
     inputHint: 'Your bench, in kg…', shortLabel: 'Bench', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 400, unit: 'kg', destination: 'column', validate: isNumberIn(1, 400) },
-  { key: 'knownDeadliftKg', question: workingWeightQuestion('deadlift'),
+  { key: 'knownDeadliftKg', question: liftSetQuestion('deadlift'),
     inputHint: 'Your deadlift, in kg…', shortLabel: 'Deadlift', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, unit: 'kg', destination: 'column', validate: isNumberIn(1, 500) },
   { key: 'trainingDays', question: 'Which days can you actually train?', inputHint: 'Which days?', shortLabel: 'Training days', control: 'multi', required: true, options: DAY_OPTIONS, destination: 'column', validate: v => isSubsetOf(DAY_OPTIONS)(v) && Array.isArray(v) && v.length > 0 },
   { key: 'sessionDuration', question: 'How long can your sessions usually run?', inputHint: 'How long have you got?', shortLabel: 'Session length', control: 'single', required: true, options: DURATION_OPTIONS, destination: 'column', validate: isOneOf(DURATION_OPTIONS) },
@@ -1081,6 +1081,8 @@ export function displaySlotValue(def: SlotDef, values: OnboardingSlotValues): st
   }
   if (def.key === 'kitList') { const s = parseKitSlot(v); if (s) return describeKitStatement(s).replace(/^Kit: /, '') }
   if (def.key === 'otherSports') { const a = parseSportsSlot(v); if (a) return a.map(describeActivity).join('; ') }
+  // A LIFT IS KEPT AS THE PLAN'S NUMBER, SO IT IS SAID WITH WHAT THAT NUMBER MEANS (his ruling, 11 Nov 2026).
+  if (isKnownLiftSlot(def.key)) return liftAsStored(v as number | string)
   return def.unit ? `${v} ${def.unit}` : String(v)
 }
 

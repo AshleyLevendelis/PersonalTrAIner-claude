@@ -15,7 +15,7 @@
  * bare 70 means centimetres or inches would be the same offence one field
  * over, so it is asserted as a REFUSAL, not left to judgement.
  */
-import { parseHeight, parseWeight, parseLiftWeight, measureParserFor, ageOn, birthDateBounds, weightParts, heightParts, weightText, heightText, sayWeight, sayHeight } from '../src/lib/body-units'
+import { parseHeight, parseWeight, parseLiftWeight, parseLiftSet, measureParserFor, ageOn, birthDateBounds, weightParts, heightParts, weightText, heightText, sayWeight, sayHeight } from '../src/lib/body-units'
 
 let failures = 0
 const check = (l: string, ok: boolean, extra?: unknown) => {
@@ -110,7 +110,7 @@ console.log('\n5. A parser is only ever paired with the slot it belongs to')
   check('age gets none', measureParserFor('age') === null)
   // 19 Oct 2026: the lift boxes take pounds too, when the pounds are SAID.
   for (const k of ['knownSquatKg', 'knownBenchKg', 'knownDeadliftKg']) {
-    check(`${k} gets the lift parser`, measureParserFor(k) === parseLiftWeight)
+    check(`${k} gets the lift parser (a set since 11 Nov 2026: a weight and its reps)`, measureParserFor(k) === parseLiftSet)
   }
 }
 

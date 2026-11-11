@@ -52,6 +52,7 @@
 // ---------------------------------------------------------------------------
 
 import type { FitnessGoal, MacroTargets } from './types'
+import { KNOWN_WEIGHT_REFERENCE_REPS, KNOWN_WEIGHT_REFERENCE_IN_RESERVE, LIFT_SET_MAX_REPS } from './working-weight'
 
 // ---------------------------------------------------------------------------
 // TARGETS THAT MOVED ON THEIR OWN
@@ -1517,35 +1518,43 @@ export function logOnlyRefusal(entry: { name: string; parent?: string }): string
 }
 
 /**
- * WHAT A "WORKING WEIGHT" IS (Ashley, 11 Nov 2026: "not clear to the user what it means. Did it want my 1 rep max or a
- * couple in reserve etc. Also which exercises exactly"). The plan reads a typed lift as the weight for about 10 reps
- * with 2 in reserve (load-prescription's known-weight reference), skips the calibration week on it and trusts it over
- * its own estimate, so a one-rep max typed here would start a block far too heavy. Setup, Profile and the setup coach
- * say what the number is in these words, from this one place. `test:working-weight-words` feeds the reps and the
- * reserve this sentence NAMES to the prescriber and checks the number typed is the number prescribed, so the words and
- * the engine cannot drift apart.
+ * A LIFT AT SETUP (Ashley, 11 Nov 2026: "not clear to the user what it means. Did it want my 1 rep max or a couple in
+ * reserve etc. Also which exercises exactly", then his ruling "Weight and reps"). Setup asks for a recent hard set and
+ * the app works out the plan's own number: the weight for about 10 reps with 2 in reserve (working-weight.ts, which
+ * the prescriber reads too). Every sentence about it is here, so setup, its summary, Profile and the checks say one
+ * thing. `test:working-weight-words` feeds the reps and the reserve these sentences NAME to the prescriber and checks
+ * the number stored is the number prescribed.
  */
-export const WORKING_WEIGHT_REPS = 10
-export const WORKING_WEIGHT_IN_RESERVE = 2
-/** The three lifts the number is asked for, by the name on the bar. */
+/** The three lifts, by the name on the bar. */
 export const WORKING_WEIGHT_LIFTS = {
   knownSquatKg: 'Barbell back squat',
   knownBenchKg: 'Barbell bench press',
   knownDeadliftKg: 'Barbell deadlift',
 } as const
-/** "the weight you'd lift for about 10 good reps with about 2 left in the tank" */
-export function workingWeightMeans(): string {
-  return `the weight you'd lift for about ${WORKING_WEIGHT_REPS} good reps with about ${WORKING_WEIGHT_IN_RESERVE} left in the tank`
+/** The line over the three lifts in setup. */
+export function liftSetsAsk(): string {
+  return "For each lift, a recent hard set: the weight, and how many reps you got. A one-rep max counts, put 1 rep. I'll work out your starting weights from them. Leave a lift empty if you're not sure of it."
 }
-/** The line over the three boxes in setup. */
-export function workingWeightBoxesAsk(): string {
-  return `For each lift, put ${workingWeightMeans()}. Not your one-rep max. In kg, or add lb. Leave a box empty if you're not sure of that one.`
+/** One lift's own question, for a change from the summary and for the setup coach. */
+export function liftSetQuestion(lift: string): string {
+  return `What's a recent hard set on the ${lift}: the weight, and how many reps?`
 }
-/** One lift's own question ("What do you back squat for about 10 reps with about 2 left in the tank (kg)?"). */
-export function workingWeightQuestion(verb: string): string {
-  return `What do you ${verb} for about ${WORKING_WEIGHT_REPS} reps with about ${WORKING_WEIGHT_IN_RESERVE} left in the tank (kg)?`
+/** What is kept for a lift, said with what it means: "83 kg for about 10 reps". */
+export function liftAsStored(kg: number | string): string {
+  return `${kg} kg for about ${KNOWN_WEIGHT_REFERENCE_REPS} reps`
 }
-/** The line under the three lifts on Profile. */
+/** The line under the three lifts on Profile, where the kept number is shown and changed. */
 export function workingWeightProfileNote(): string {
-  return `Each is ${workingWeightMeans()}, not a one-rep max.`
+  return `Each is the weight you'd lift for about ${KNOWN_WEIGHT_REFERENCE_REPS} good reps with about ${KNOWN_WEIGHT_REFERENCE_IN_RESERVE} left in the tank, not a one-rep max.`
+}
+/** The setup coach passed a lift with no set behind it: nothing is kept and the boxes are shown. */
+export function liftNeedsASet(): string {
+  return 'For a lift I need a set: the weight, and the reps you got. Fill in the ones you know:'
+}
+/** Why a lift's two boxes cannot be saved yet, in the place it happened. */
+export function liftSetProblem(kind: 'weight' | 'reps' | 'too_many' | 'unread'): string {
+  if (kind === 'weight') return 'What weight was that set?'
+  if (kind === 'reps') return 'How many reps did you get at that weight?'
+  if (kind === 'too_many') return `Use a set of 1 to ${LIFT_SET_MAX_REPS} reps.`
+  return 'Give the weight in kg, or add lb.'
 }

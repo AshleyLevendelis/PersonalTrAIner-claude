@@ -18,6 +18,8 @@
  * field over.
  */
 
+import { referenceWeightFromSet } from './working-weight'
+
 const CM_PER_INCH = 2.54
 const INCHES_PER_FOOT = 12
 const KG_PER_LB = 0.45359237
@@ -124,11 +126,49 @@ export function parseLiftWeight(raw: string): ParsedMeasure | null {
   return null
 }
 
+/**
+ * A LIFT AT SETUP IS A SET: a weight and the reps it was lifted for (Ashley's ruling, 11 Nov 2026, "Weight and reps").
+ * "100 x 5", "100kg for 5", "225 lb x 3 reps", "140 x 1" (a one-rep max is one rep). The value is the plan's own number
+ * for that lift (working-weight.ts), and `from` is what was typed, so the receipt shows both.
+ *
+ * A WEIGHT WITH NO REPS IS NOT READ. That was the old box, and it is the whole defect: a bare 100 was taken as a
+ * ten-rep weight whatever it was. Null means ask for the reps, never assume them.
+ */
+export function parseLiftSet(raw: string): ParsedMeasure | null {
+  const t = raw.trim().toLowerCase().replace(/\s+/g, ' ')
+  const m = /^(.+?)\s*(?:x|×|\*|for)\s*(\d{1,2})\s*(?:reps?)?$/.exec(t)
+  if (!m) return null
+  const weight = parseLiftWeight(m[1])
+  const reps = Number(m[2])
+  if (!weight) return null
+  const value = referenceWeightFromSet(weight.value, reps)
+  if (value == null) return null
+  return { value, from: `${weight.from ?? `${weight.value}kg`} for ${reps}` }
+}
+
+/**
+ * A SET THE SETUP COACH PASSES MUST BE THE ONE THEY SAID: its weight and its reps both appear, as numbers, in the
+ * person's own message. The lift numbers are the plan's most trusted load basis, so a set the model rounded, assumed
+ * the reps of, or converted for them is refused and the boxes are shown instead. "My max is 140" names its reps in
+ * words, so one rep is taken from "max", "1RM" or "single".
+ */
+export function liftSetInUserWords(raw: string, userText: string): boolean {
+  const m = /^(.+?)\s*(?:x|×|\*|for)\s*(\d{1,2})\s*(?:reps?)?$/.exec(raw.trim().toLowerCase())
+  const weight = m ? /\d+(?:\.\d+)?/.exec(m[1])?.[0] : undefined
+  if (!m || weight == null) return false
+  const said = (userText.match(/\d+(?:\.\d+)?/g) ?? []).map(Number)
+  const reps = Number(m[2])
+  const repsSaid = said.includes(reps) || (reps === 1 && /\b(?:max|1\s*rm|one[- ]rep|single)\b/i.test(userText))
+  // The weight and the reps are two different numbers in the message: "100" alone is not "100 for 100".
+  const weightSaid = said.filter(n => n === Number(weight)).length >= (Number(weight) === reps && said.includes(reps) ? 2 : 1)
+  return weightSaid && repsSaid
+}
+
 /** Which parser a slot needs, or none. Keyed on the slot itself so a caller cannot pair the wrong one. */
 export function measureParserFor(slotKey: string): ((raw: string) => ParsedMeasure | null) | null {
   if (slotKey === 'heightCm') return parseHeight
   if (slotKey === 'weightKg') return parseWeight
-  if (slotKey === 'knownSquatKg' || slotKey === 'knownBenchKg' || slotKey === 'knownDeadliftKg') return parseLiftWeight
+  if (slotKey === 'knownSquatKg' || slotKey === 'knownBenchKg' || slotKey === 'knownDeadliftKg') return parseLiftSet
   return null
 }
 

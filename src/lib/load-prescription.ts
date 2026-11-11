@@ -1,6 +1,7 @@
 import { equipmentTierFor, ownsKitItem, type KitItem } from './kit-list'
 import type { TrainingExperience, UserProfile } from './types'
 import { getExerciseEntry, type ExerciseEntry } from './exercise-db'
+import { KNOWN_WEIGHT_REFERENCE_REPS, KNOWN_WEIGHT_REFERENCE_RPE, percentOf1RM } from './working-weight'
 
 // ---------------------------------------------------------------------------
 // LOAD PRESCRIPTION
@@ -443,17 +444,12 @@ function parseRepsMidpoint(label: string | undefined): number | null {
  * a low-rep strength phase ended up prescribed the same load for the same
  * RPE label.
  */
-function percentOf1RM(reps: number, rpe: number): number {
-  const repsToFailure = Math.max(1, reps + (10 - rpe))
-  return 100 / (1 + (repsToFailure - 1) / 30)
-}
 
 // The reference point a self-reported "known working weight" is assumed to
 // represent — a working set the trainee can currently do for real, not a
 // tested 1RM. Used only to scale a known weight to whatever THIS week's
 // actual reps/RPE are, relative to that baseline.
-const KNOWN_WEIGHT_REFERENCE_REPS = 10
-const KNOWN_WEIGHT_REFERENCE_RPE = 8
+// The two numbers themselves live in working-weight.ts, with the words setup shows and the conversion from a set.
 
 /** Maps an exercise onto a standards category. */
 export function categorize(entry: ExerciseEntry): string | null {
