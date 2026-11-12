@@ -140,6 +140,7 @@ check('the heading is that day', (await ev(`document.querySelector('[data-testid
 const planned = await ev(`(() => { const c = document.querySelector('[data-planned-card]'); return c ? {
   rings: [...c.querySelectorAll('[data-ring]')].map(r => [r.dataset.ring, Number(r.dataset.share)]),
   verdict: c.querySelector('[data-testid="planned-verdict"]')?.textContent ?? null,
+  verdictColor: c.querySelector('[data-testid="planned-verdict"]') ? getComputedStyle(c.querySelector('[data-testid="planned-verdict"]')).color : null,
   kicker: c.querySelector('[data-testid="planned-kicker"]')?.textContent ?? null,
   rows: Object.fromEntries([...c.querySelectorAll('[data-planned-row]')].map(r => [r.dataset.plannedRow, r.querySelector('.tabular-mono')?.textContent ?? ''])),
   addInCard: !!c.querySelector('[data-testid="meal-day-add-grocery"], [data-testid="meal-day-grocery"]'),
@@ -200,6 +201,22 @@ await click('[data-testid="shop-whole-week"]')
 const after = await ev(`({ hash: location.hash, days: window.__nw.takeGroceryDays(), again: window.__nw.takeGroceryDays() })`)
 check('it opens the shopping list asking for 7 days, once', after.hash === '#/nutrition/grocery' && after.days === 7 && after.again === null, after)
 await click('[data-testid="nutrition-week-toggle"]').catch(() => {})
+
+console.log('\n[W1b] An OFF-target day says what is off (one on-target day cannot test the verdict)')
+// The everyday test week is on target every day, so "always on target" would pass above. ?refit=1 drifts the targets,
+// putting every day off: the card and the week must say the engine's words for it, in the warning colour.
+await open('/?tour=off&week=1&refit=1&n=2#/tab/nutrition', '[data-testid="meal-day-strip"]')
+const daysR = await ev(`[...document.querySelectorAll('[data-meal-day]')].map(b => b.dataset.mealDay)`)
+await click(`[data-meal-day="${daysR[3]}"]`)
+const offCard = await ev(`(() => { const v = document.querySelector('[data-planned-card] [data-testid="planned-verdict"]'); return v ? { text: v.textContent, color: getComputedStyle(v).color } : null })()`)
+const offWant = await ev(`window.__nw.verdict(window.__nw.week[3].totals, window.__nw.targets)`)
+check('the off-target day is off by the engine (the fixture binds)', typeof offWant === 'string' && offWant !== 'on target', offWant)
+check('...and the card says exactly that', offCard?.text === offWant, [offCard?.text, offWant])
+await click('[data-testid="nutrition-week-toggle"]')
+await click(`[data-week-day="${daysR[3]}"] > button`)
+const offWeek = await ev(`(() => { const v = document.querySelector('[data-week-day-open="yes"] [data-testid="week-day-verdict"]'); return v ? { text: v.textContent, color: getComputedStyle(v).color } : null })()`)
+check('...and so does the week view', offWeek?.text === offWant, [offWeek?.text, offWant])
+check('a miss is drawn in a different colour from "on target"', !!offCard && !!planned && offCard.color !== (await (async () => planned.verdictColor)()), [offCard?.color, planned?.verdictColor])
 
 console.log('\n[List] The shopping list takes the 7 days')
 const memo = () => ev(`(() => { const k = Object.keys(localStorage).find(k => k.startsWith('fitplan_grocery_built_v1:')); return k ? JSON.parse(localStorage.getItem(k)).days : null })()`)
