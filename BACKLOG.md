@@ -2,6 +2,7 @@
 
 Newest first. One line each.
 
+- [x] **RELEASED: EXERCISE WEEK ON MAIN** (12 Nov 2026, his "merge it to main", then "make it live in the app"). Pushed to `main` at `abc37d05` before the full sweep finished (his "make it live"); the sweep then ran 545: 540 passed, four the known ones (three need a database, `coach-exam-fresh` needs an exam run on his machine) and ONE REAL: `verify:program-titles` at 320px, the Full Program's exercise names squeezed to 36-90px by the new load on the right. FIXED: on a narrow row the load wraps under the name, which keeps 120px; 18 gates and drivers that draw the row re-run green. Needs the `chat-gemini` deploy for the coach's map of the tab.
 - [x] **EXERCISE WEEK: THE EXERCISE TAB IN THE NUTRITION STYLE — X1 TODAY, X1b LOGGING, XW3 THE WEEK** (12 Nov 2026,
   his handoff approved that day, `docs/design/design_handoff_exercise_week/`, `docs/plans/exercise-week.md`). HIS
   RULINGS, in his words: no rings on the Today card ("remove the ring and the three lines of text here and leave the

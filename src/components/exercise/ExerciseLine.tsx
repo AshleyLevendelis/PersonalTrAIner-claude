@@ -109,8 +109,10 @@ export function ExerciseLine({
       >
         {setsDone != null && <StatusCircle done={done} sets={ex.sets} />}
         <span className="min-w-0 flex-1">
-          <span className="flex items-start justify-between gap-3">
-            <span className="min-w-0">
+          {/* ON A NARROW ROW THE LOAD GOES UNDER THE NAME (verify:program-titles at 320px): the name keeps 120px to be
+              read, and the load wraps to the right of the next line rather than squeezing it. */}
+          <span className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">
+            <span className="min-w-[120px] flex-1">
               {eyebrow && (
                 <span className={`block text-[0.65625rem] font-semibold uppercase tracking-[.12em] ${mainLift ? 'text-primary-text' : 'text-muted-foreground'}`} data-testid="exercise-eyebrow">{eyebrow}</span>
               )}
@@ -125,7 +127,7 @@ export function ExerciseLine({
                 </span>
               </span>
             </span>
-            {badge && <LoadBadgeView badge={badge} progressing={progressing} />}
+            {badge && <span className="ml-auto"><LoadBadgeView badge={badge} progressing={progressing} /></span>}
           </span>
           <SetBar className="mt-2.5" rampTotal={rampTotal} rampDone={rampDone} workingTotal={ex.sets} workingDone={done} />
           {/* A FINISHED ROW KEEPS ITS LEGEND (the handoff's X1b): its bar is full and its circle ticked; what was lifted is
