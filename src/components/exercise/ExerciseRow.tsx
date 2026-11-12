@@ -7,7 +7,9 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { formatRampSets, prescribedDose, formatCompletedSummary, setProgress } from '@/lib/session-derive'
 import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChip'
-import { ExerciseLine, StatusCircle } from './ExerciseLine'
+import { ExerciseLine } from './ExerciseLine'
+import { LoadBadgeView, SetBar } from './ExerciseBar'
+import { exerciseLoadBadge } from '@/lib/exercise-week'
 import { isExternallyLoaded, isUnverifiedLoadSource, splitLoadDisplay, unloadedLoadLabel } from '@/lib/load-prescription'
 import { AssistanceChip } from './AssistanceChip'
 import { AddedLoadChip } from './AddedLoadChip'
@@ -186,6 +188,8 @@ export function ExerciseRow({
     : ex.suggested_assistance_kg != null ? `${ex.suggested_assistance_kg} kg assist`
     : ex.suggested_added_load_kg != null ? `+${ex.suggested_added_load_kg} kg` : null
 
+  const loadBadge = exerciseLoadBadge(ex, unloadedLabel)
+
   if (!expanded) {
     // Collapsed: the shared line (also the peek's), a status circle, and the
     // same ⋮ as the open card — every change to an exercise lives in it (her
@@ -204,6 +208,7 @@ export function ExerciseRow({
           // WORKING sets, the same count as the track: a ramp set logged is
           // not a set of the exercise done.
           setsDone={rampProgress.workingDone}
+          rampDone={rampProgress.rampDone}
           progressing={progressionNote?.didProgress}
           eyebrow={sectionLabel && sectionLabel !== 'Accessory' ? sectionLabel : undefined}
           trailing={menu}
@@ -228,14 +233,15 @@ export function ExerciseRow({
       // check that ticks "a working set" can find one without guessing.
       data-movement-prep={isMovementPrepRow(ex) ? '' : undefined}
       data-exercise-open
-      className="relative overflow-clip rounded-[20px] px-3 pb-2 pt-3.5"
-      style={{ background: 'var(--surface-raised)', border: '1px solid rgba(var(--glow-rgb), .22)' }}
+      className="relative overflow-clip rounded-[20px] px-3.5 pb-2 pt-3.5"
+      style={{ background: 'var(--surface-raised)', border: '1px solid rgba(var(--glow-rgb), .40)' }}
     >
+      {/* THE OPEN CARD'S HEAD (Exercise Week X1b, 12 Nov 2026): "Now" (or its tag), the name, sets × reps and rest,
+          the load on the right with its blue swatch and unit, the ⋮ — then the set bar. */}
       <div className="flex items-start gap-2.5">
-        <StatusCircle done={completedSets} sets={ex.sets} current={isCurrent} />
         <div className="min-w-0 flex-1">
           {(eyebrow || state) && (
-            <p className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-primary-text" data-testid="exercise-eyebrow">
+            <p className="text-[0.65625rem] font-semibold uppercase tracking-[.12em] text-primary-text" data-testid="exercise-eyebrow">
               {[eyebrow, state].filter(Boolean).join(' · ')}
             </p>
           )}
@@ -247,37 +253,24 @@ export function ExerciseRow({
             onToggleExpanded={onToggleExpanded}
             allSetsLogged={allSetsLogged}
           />
-          {/* WHAT IS PRESCRIBED, ONE MONO LINE: sets × reps · load · rest. Rest
-              as visible TEXT, not only a prop into the grid (one-day-one-look
-              §4b): it is what she reads before she has trained. */}
-          <p className="mt-0.5 font-mono text-[0.75rem] text-muted-foreground" data-testid="exercise-meta">
-            {prescribedDose(ex)}
-            {loadText && <> · <span data-testid="exercise-load">{loadText}</span></>}
-            {unloadedLabel && <> · <span data-testid="bodyweight-load">{unloadedLabel}</span></>}
+          {/* WHAT IS PRESCRIBED: sets × reps · rest. Rest as visible TEXT, not only a prop into the grid
+              (one-day-one-look §4b): it is what he reads before he has trained. The load is on the right. */}
+          <p className="mt-0.5 text-[0.8125rem] text-text-tertiary" data-testid="exercise-meta">
+            <span className="tabular-mono">{prescribedDose(ex)}</span>
             {ex.rest && <> · rest <span className="tabular-mono">{ex.rest === 'alternate' ? 'alternate — no rest between' : ex.rest}</span></>}
           </p>
         </div>
-        <div className="-mr-1 shrink-0">{menu}</div>
+        {loadBadge && <div className="pt-0.5"><LoadBadgeView badge={loadBadge} valueTestId={loadText ? 'exercise-load' : unloadedLabel ? 'bodyweight-load' : undefined} /></div>}
+        <div className="-mr-1.5 shrink-0">{menu}</div>
       </div>
 
-      {/* ONE CONTINUOUS TRACK, RAMP THEN WORKING. Violet is the build-up, mint
-          the work, the gap between them the only separator needed. The
-          counts are said for a screen reader; the segments say them to the eye. */}
+      {/* ONE CONTINUOUS SET BAR, WARM-UPS THEN WORKING. Violet is the build-up, mint the work, the space between them
+          the only separator needed. The counts are said for a screen reader; the segments say them to the eye. */}
       {(rampProgress.rampTotal > 0 || rampProgress.workingTotal > 0) && (
         <div className="mt-3" data-testid="set-progress-track">
-          <div className="flex items-center gap-[3px]" aria-hidden>
-            {Array.from({ length: rampProgress.rampTotal }, (_, i) => (
-              <span key={`r${i}`} className="h-1 flex-1 rounded-[2px]"
-                style={{ background: i < rampProgress.rampDone ? 'var(--ramp-track-done)' : 'var(--ramp-track-pending)' }} />
-            ))}
-            {rampProgress.rampTotal > 0 && rampProgress.workingTotal > 0 && <span className="w-[4px] shrink-0" />}
-            {Array.from({ length: rampProgress.workingTotal }, (_, i) => (
-              <span key={`w${i}`} className="h-1 flex-1 rounded-[2px]"
-                style={{ background: i < rampProgress.workingDone ? 'var(--working-track-done)' : 'var(--working-track-pending)' }} />
-            ))}
-          </div>
+          <SetBar rampTotal={rampProgress.rampTotal} rampDone={rampProgress.rampDone} workingTotal={rampProgress.workingTotal} workingDone={rampProgress.workingDone} />
           <span className="sr-only">
-            {rampProgress.rampTotal > 0 && <span data-testid="ramp-counter">Ramp {rampProgress.rampDone}/{rampProgress.rampTotal} </span>}
+            {rampProgress.rampTotal > 0 && <span data-testid="ramp-counter">Warm-up {rampProgress.rampDone}/{rampProgress.rampTotal} </span>}
             <span data-testid="working-counter">Working {rampProgress.workingDone}/{rampProgress.workingTotal}</span>
           </span>
         </div>

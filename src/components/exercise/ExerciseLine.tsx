@@ -1,9 +1,11 @@
-import { ArrowUp, Check } from 'lucide-react'
-import { isUnverifiedLoadSource } from '@/lib/load-prescription'
-import { describeExerciseTempo } from '@/lib/periodization'
+import { Check } from 'lucide-react'
+import { isUnverifiedLoadSource, unloadedLoadLabel } from '@/lib/load-prescription'
+import { getExerciseEntry } from '@/lib/exercise-db'
+import { exerciseLoadBadge, exerciseLegend } from '@/lib/exercise-week'
+import { LoadBadgeView, SetBar, SetLegend } from './ExerciseBar'
 import type { LoadSource } from './LoadChip'
 import type { Exercise } from '@/lib/types'
-import { prescribedDose, type ExerciseGroup } from '@/lib/session-derive'
+import { formatRampSets, type ExerciseGroup } from '@/lib/session-derive'
 
 // ---------------------------------------------------------------------------
 // The collapsed exercise line, shared by today's list and the upcoming-day
@@ -35,6 +37,7 @@ export function ExerciseLine({
   setsDone,
   progressing,
   eyebrow,
+  rampDone = 0,
 }: {
   ex: Exercise
   supersetLabel?: string
@@ -55,21 +58,22 @@ export function ExerciseLine({
   progressing?: boolean
   /** "Main lift", "Primer" — the small label over a collapsed row (2a), where it says something. */
   eyebrow?: string
+  /** Today only: warm-up rows logged, for the violet half of the set bar. */
+  rampDone?: number
 }) {
   const loadIsUnverified = loadSource != null && isUnverifiedLoadSource(loadSource)
 
-  // THE LOAD carries the plan's own string — ex.suggested_load, NOT a
-  // re-formatted suggested_load_kg. formatLoad wrote it with its unit: "~14kg
-  // per hand" for a dumbbell pair, "~42.5kg" for a barbell. Printing
-  // `${kg} kg` would put a per-hand number in the same format as a total.
-  const chip = ex.suggested_load_kg != null
-    ? (ex.suggested_load ?? `~${ex.suggested_load_kg}kg`)
-    : ex.suggested_assistance_kg != null
-      ? (ex.assistance_ready_to_graduate ? 'no assist' : `${ex.suggested_assistance_kg}kg assist`)
-      // Signed, always: "+15kg" beside a pull-up is weight to add.
-      : ex.suggested_added_load_kg != null ? `+${ex.suggested_added_load_kg}kg` : null
-  const tempo = describeExerciseTempo(ex)
   const done = Math.max(0, Math.min(setsDone ?? 0, ex.sets))
+  // THE ROW'S LOAD, SET BAR AND LEGEND (Exercise Week, 12 Nov 2026): the load on the right in its own unit with its
+  // qualifier, one segment per set under the name, and what the segments are. Read off the plan; a peeked day has
+  // nothing logged, so its bar is all to do.
+  const entry = getExerciseEntry(ex.name)
+  const hasLoadStatement = ex.suggested_load_kg != null || ex.suggested_assistance_kg != null || ex.suggested_added_load_kg != null
+  const badge = exerciseLoadBadge(ex, entry && !hasLoadStatement ? unloadedLoadLabel(entry) : null)
+  const ramp = formatRampSets(ex)
+  const rampTotal = ramp && ramp.kind !== 'stale' ? ramp.sets.length : 0
+  const legend = exerciseLegend(ex, rampTotal)
+  const mainLift = eyebrow === 'Main lift'
 
   if (expanded) {
     return (
@@ -81,15 +85,16 @@ export function ExerciseLine({
         className="hit-slop-44 mt-[3px] flex min-w-0 cursor-pointer items-center gap-2 text-left"
       >
         {supersetLabel && <span className="shrink-0 font-mono text-[0.625rem] font-semibold text-primary-text glow-mint">{supersetLabel}</span>}
-        <span className={`text-[1.1875rem] font-semibold tracking-[-.01em] ${allSetsLogged ? 'line-through text-muted-foreground' : ''}`}>{ex.name}</span>
+        <span className={`text-[1.0625rem] font-bold tracking-[-.01em] ${allSetsLogged ? 'line-through text-muted-foreground' : ''}`}>{ex.name}</span>
       </div>
     )
   }
 
-  // A HAIRLINE ROW (2a): status circle, the name, and one mono line of what is
-  // prescribed — or, once every set is in, what was done.
+  // A HAIRLINE ROW (Exercise Week X1, 12 Nov 2026): the status circle, the tag over the name, the load on the right,
+  // then the set bar and its legend. The ⋮ sits outside the tap target, as it always has (his 14 Sep "all of them
+  // behind the ⋮").
   return (
-    <div className="flex min-h-[60px] items-center gap-3">
+    <div className="flex items-start gap-1.5 py-3">
       {/* A plain div, not a <button> — a button may not legally contain the
           buttons a row can grow. role="button" + tabIndex + Enter/Space keeps
           this a real, keyboard-operable control. */}
@@ -98,42 +103,35 @@ export function ExerciseLine({
         tabIndex={0}
         onClick={onToggleExpanded}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleExpanded() } }}
-        className="hit-slop-44 flex min-w-0 flex-1 cursor-pointer items-center gap-3 py-2 text-left"
+        className="hit-slop-44 flex min-w-0 flex-1 cursor-pointer items-start gap-3 text-left"
       >
         {setsDone != null && <StatusCircle done={done} sets={ex.sets} />}
-        {/* NO 01 / 02 NUMBERS (30 Oct 2026, "less is more"): the list's order already says it. */}
         <span className="min-w-0 flex-1">
-          {eyebrow && <span className="block text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground" data-testid="exercise-eyebrow">{eyebrow}</span>}
-          <span className="flex items-center gap-2">
-            {supersetLabel && <span className="shrink-0 font-mono text-[0.625rem] font-semibold text-primary-text glow-mint">{supersetLabel}</span>}
-            {/* TWO LINES, NOT ONE HARD CUT — "you can't see the exercises until
-                you click into it" (Ashley, from a phone): a name is the row. */}
-            <span
-              className={`line-clamp-2 text-[0.9375rem] font-medium ${allSetsLogged ? 'text-muted-foreground' : ''} ${loadIsUnverified ? 'border-b border-dotted border-muted-foreground/50' : ''}`}
-            >
-              {ex.name}
+          <span className="flex items-start justify-between gap-3">
+            <span className="min-w-0">
+              {eyebrow && (
+                <span className={`block text-[0.65625rem] font-semibold uppercase tracking-[.12em] ${mainLift ? 'text-primary-text' : 'text-muted-foreground'}`} data-testid="exercise-eyebrow">{eyebrow}</span>
+              )}
+              <span className="flex items-center gap-2">
+                {supersetLabel && <span className="shrink-0 font-mono text-[0.625rem] font-semibold text-primary-text glow-mint">{supersetLabel}</span>}
+                {/* TWO LINES, NOT ONE HARD CUT — "you can't see the exercises until
+                    you click into it" (Ashley, from a phone): a name is the row. */}
+                <span
+                  className={`line-clamp-2 text-[0.96875rem] font-semibold leading-[1.3] ${allSetsLogged ? 'text-text-tertiary' : ''} ${loadIsUnverified ? 'border-b border-dotted border-muted-foreground/50' : ''}`}
+                >
+                  {ex.name}
+                </span>
+              </span>
             </span>
+            {badge && <LoadBadgeView badge={badge} progressing={progressing} />}
           </span>
-          <span className="mt-0.5 block font-mono text-[0.75rem] text-muted-foreground">
-            {allSetsLogged && loggedSummary ? (
-              <span className="text-primary-text glow-mint">✓ {loggedSummary}</span>
-            ) : (
-              <>
-                {prescribedDose(ex)}{tempo ? ` · ${tempo}` : ''}
-                {chip && (
-                  // Accent with an up-arrow only when the load progressed.
-                  <span className={progressing ? 'text-primary-text' : undefined} data-load-chip={progressing ? 'up' : 'hold'}>
-                    {' · '}
-                    {progressing && <ArrowUp className="inline size-3 align-[-2px]" aria-label="up from last session" />}
-                    {chip}
-                  </span>
-                )}
-              </>
-            )}
-          </span>
+          <SetBar className="mt-2.5" rampTotal={rampTotal} rampDone={rampDone} workingTotal={ex.sets} workingDone={done} />
+          {/* A FINISHED ROW KEEPS ITS LEGEND (the handoff's X1b): its bar is full and its circle ticked; what was lifted is
+              on the card and in the history. */}
+          <SetLegend className="mt-1.5" warmups={legend.warmups} dose={legend.dose} word={legend.word} />
         </span>
       </div>
-      {trailing && <div className="shrink-0 pr-2">{trailing}</div>}
+      {trailing && <div className="shrink-0 -mr-1">{trailing}</div>}
     </div>
   )
 }
@@ -194,7 +192,8 @@ export function SectionLabel({ text, expanded }: { text: string; expanded: boole
 export function sectionLabelFor(group: ExerciseGroup, isFirstMainLift: boolean, conditioningDay = false): string {
   if (group.kind === 'superset') return `Superset ${group.label}`
   if (isFirstMainLift) return 'Main lift'
-  if (group.ex.tier === 'tier_0_primer') return 'Primer'
+  // "WARM-UP MOVE" (his Exercise Week handoff, 12 Nov 2026): the movement prep before the work, in his words.
+  if (group.ex.tier === 'tier_0_primer') return 'Warm-up move'
   // On a day of conditioning the intervals ARE the session, not a finisher after it.
   if (group.ex.tier === 'tier_4_finisher') return conditioningDay ? 'Conditioning' : 'Finisher'
   return 'Accessory'

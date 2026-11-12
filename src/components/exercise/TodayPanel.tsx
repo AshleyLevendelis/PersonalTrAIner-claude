@@ -40,6 +40,9 @@ import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { ceilingToAskFor, saveStatedCeiling, declineStatedCeilings } from '@/lib/load-ceiling-prompt'
 import { LoadCeilingPrompt } from './LoadCeilingPrompt'
 import { WeekContextRow } from './WeekContextRow'
+import { ExerciseWeekView } from './ExerciseWeekView'
+import { weekPhaseLine } from '@/lib/exercise-week'
+import { weekRangeLabel } from '@/lib/nutrition-week'
 import { PRIMARY_CTA_CLASS, PRIMARY_CTA_STYLE } from '@/components/OnePage'
 import { PeekPanel, PeekWhatYouDid } from './PeekPanel'
 import { SectionLabel, sectionLabelFor } from './ExerciseLine'
@@ -215,6 +218,8 @@ export function TodayPanel({
   const currentMesoWeekObj = hasMesocycle ? mesocycle.find(w => w.week_number === liveWeek) : undefined
 
   const [peekDay, setPeekDay] = useState<string | null>(null)
+  // XW3 (his Exercise Week handoff, 12 Nov 2026): the week on one screen, only when "Week" is tapped.
+  const [weekOpen, setWeekOpen] = useState(false)
   // "What happened?" — the day on screen (a peeked day, else today).
   const [whatHappened, setWhatHappened] = useState<WhatHappenedTarget | null>(null)
   // Taking one exercise out — the drop-or-swap sheet (her ruling, 11 Sep 2026).
@@ -1177,11 +1182,6 @@ export function TodayPanel({
   // TODAY'S SESSION, IN THE GLOWING CARD (tab polish, Exercise 2a, 31 Oct 2026) — only on the day's own session;
   // a peek, a rest day, a moved day or recovery has its own card below, and the card then says the week.
   const showsTodaysSession = !peekDay && !(isMovedAway && movedAwayTo) && !isRestDay && !isActiveRecovery && !!workout
-  // "18 min in" while it runs, off the session's own start and the app's clock (a minute is plenty).
-  const minuteTick = useDeadlineTick(status === 'running', 30_000)
-  const minutesIn = status === 'running' && startedAtIso
-    ? (void minuteTick, Math.max(0, Math.floor((getAppNow(profileId).getTime() - new Date(startedAtIso).getTime()) / 60_000)))
-    : null
   // START LIVES IN THE CARD (2a) — and the bar above the tab bar comes back
   // the moment the card has scrolled away, so Start is never off screen (the
   // reason it was docked on 6 Sep). Watched, never guessed.
@@ -1193,7 +1193,7 @@ export function TodayPanel({
     const io = new IntersectionObserver(([e]) => setHeroStartInView(e.isIntersecting))
     io.observe(el)
     return () => io.disconnect()
-  }, [showsTodaysSession, status])
+  }, [showsTodaysSession, status, weekOpen])
   const focusWords = workout?.focus?.trim().split(/\s+/) ?? []
   const heroLeft = showsTodaysSession ? (
     <div>
@@ -1202,7 +1202,7 @@ export function TodayPanel({
           <span className="whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[.12em] text-primary-text">
             {/* TODAY IS TODAY'S NAME even when another day's session is borrowed onto it (user
                 test 8 Oct 2026, finding 16). */}
-            Today · {todayName}
+            {status === 'running' ? 'Today · in progress' : `Today · ${todayName}`}
           </span>
           {devOverrideDay && (
             <span className="text-[0.625rem] font-mono px-1.5 py-0.5 rounded border border-[color:var(--role-warn-border)] bg-[color:var(--role-warn-bg)] text-[color:var(--role-warn-text)]">
@@ -1213,20 +1213,25 @@ export function TodayPanel({
             <span className="text-[0.625rem] text-muted-foreground italic" data-testid="borrowed-from">{borrowedDayName}&apos;s session</span>
           )}
         </div>
-        {(minutesIn != null || status === 'finished') && (
-          <span className="shrink-0 whitespace-nowrap text-[0.6875rem] text-text-tertiary" data-testid="hero-status">
-            {status === 'finished' ? 'Done' : `${minutesIn} min in`}
+        {/* THE RIGHT OF THE KICKER (Exercise Week X1/X1b, his 12 Nov 2026 handoff): the day's length before it starts,
+            the sets done while it runs (the one capped count, his 1 Nov "Sets done"), "Done" once finished. */}
+        {status === 'running' && heroCount ? (
+          <span className="shrink-0 whitespace-nowrap text-[0.75rem] text-text-tertiary" data-testid="hero-sets">
+            <span className="tabular-mono">{heroCount.logged} of {heroCount.planned}</span> sets
           </span>
-        )}
+        ) : status === 'finished' ? (
+          <span className="shrink-0 whitespace-nowrap text-[0.6875rem] text-text-tertiary" data-testid="hero-status">Done</span>
+        ) : sessionEstimate.length ? (
+          <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[0.75rem] text-text-tertiary" data-testid="hero-length">
+            <Clock className="size-3.5" aria-hidden /> {sessionEstimate.length.replace(/ · .*$/, '')}
+          </span>
+        ) : null}
       </div>
-      {/* THE NAME, ITS LAST WORD LIT (2a). */}
-      <p className="mt-2 break-words text-[2rem] font-bold leading-[1.05] tracking-[-.03em]" data-testid="hero-focus">
+      {/* THE NAME, ITS LAST WORD LIT. NO META LINE UNDER IT: his 12 Nov 2026 ruling, "remove the ring and the three
+          lines of text here and leave the rest" (kicker, time, name, Start). */}
+      <p className="mt-2 break-words text-[1.75rem] font-bold leading-[1.1] tracking-[-.03em]" data-testid="hero-focus">
         {focusWords.slice(0, -1).join(' ')}{focusWords.length > 1 ? ' ' : ''}
         <span className="text-primary-text glow-text">{focusWords[focusWords.length - 1]}</span>
-      </p>
-      {/* THE META LINE: what is in it, how long, and the working sets — the SHARED capped count (her M39 "one count"). */}
-      <p className="mt-2 text-[0.78125rem] text-text-tertiary" data-testid="hero-meta">
-        {workout!.exercises.length} exercise{workout!.exercises.length === 1 ? '' : 's'}{sessionEstimate.length ? ` · ${sessionEstimate.length}` : ''}{heroCount ? ` · ${heroCount.planned} working sets` : ''}
       </p>
       {/* THE REASON BESIDE THE NUMBER (audit §6.5): "why is it shorter than I asked for", always visible,
           never behind an expander, under the length it explains. */}
@@ -1234,12 +1239,9 @@ export function TodayPanel({
         <p className="mt-1 text-xs leading-[1.5] text-muted-foreground" data-testid="session-length-note">{sessionEstimate.note}</p>
       )}
       {/* HOW FAR THROUGH, once it has begun — the same count as the strip, Home and the coach. */}
-      {heroCount && (status !== 'idle' || heroCount.logged > 0) && (
-        <div className="mt-4">
-          <div className="h-1 overflow-hidden rounded-full" style={{ background: 'var(--hairline)' }}>
-            <div className="h-1 rounded-full" style={{ width: `${heroCount.planned > 0 ? Math.min(100, (heroCount.logged / heroCount.planned) * 100) : 0}%`, background: 'var(--primary)', boxShadow: '0 0 8px rgba(var(--glow-rgb), .8)' }} />
-          </div>
-          <p className="mt-1.5 text-[0.6875rem] text-muted-foreground" data-testid="hero-sets">{heroCount.logged} of {heroCount.planned} working sets</p>
+      {heroCount && status === 'running' && (
+        <div className="mt-3.5 h-1 overflow-hidden rounded-full" style={{ background: 'var(--hairline)' }} data-testid="hero-progress" aria-hidden>
+          <div className="h-1 rounded-full" style={{ width: `${heroCount.planned > 0 ? Math.min(100, (heroCount.logged / heroCount.planned) * 100) : 0}%`, background: 'var(--primary)', boxShadow: '0 0 8px rgba(var(--glow-rgb), .8)' }} />
         </div>
       )}
       {status === 'idle' && (
@@ -1338,6 +1340,7 @@ export function TodayPanel({
   })()
   /** The line on screen is the week's note — so the week row must not print it again, and its chevron opens the rest. */
   const lineIsWeekNote = coachLine?.source === 'fallback' && todayNudge?.source === 'week-note'
+  const weekPhase = weekPhaseLine(currentMesoWeekObj?.block_number, currentMesoWeekObj?.phase_label, { isDeload: currentMesoWeekObj?.is_deload, isCalibrationWeek: currentMesoWeekObj?.isCalibrationWeek })
 
   return (
     <div className="space-y-3">
@@ -1362,6 +1365,20 @@ export function TodayPanel({
         expanded={weekNotesOpen}
         onToggleExpanded={setWeekNotesOpen}
         hero={heroLeft}
+        weekOpen={weekOpen}
+        onToggleWeek={() => { setWeekOpen(o => !o); setPeekDay(null) }}
+        weekSummary={{
+          range: weekRangeLabel(weekTrain.days.map(d => d.date)),
+          line: (
+            <>
+              <span className="text-muted-foreground">
+                <span className="tabular-mono font-bold text-foreground">{weekTrain.sessionsDone}</span> of{' '}
+                <span className="tabular-mono font-bold text-foreground">{weekTrain.sessionsPlanned}</span> sessions done
+              </span>
+              {weekPhase ? <span className="truncate text-right text-[0.75rem] text-muted-foreground" data-testid="week-view-phase">{weekPhase}</span> : null}
+            </>
+          ),
+        }}
       />
       <Suspense fallback={null}>
       <WhatHappenedSheet
@@ -1407,7 +1424,13 @@ export function TodayPanel({
       />
       </Suspense>
 
-      {peekDay ? (
+      {weekOpen ? (
+        <ExerciseWeekView
+          days={weekTrain.days}
+          todayName={todayName}
+          onOpenDay={d => { setWeekOpen(false); setPeekDay(d === todayName ? null : d) }}
+        />
+      ) : peekDay ? (
         peekMovedTo ? (
           /* The day's session has LEFT. Says where, and offers to go there —
              the answer she needed and could not get from any screen. */
@@ -1836,7 +1859,7 @@ export function TodayPanel({
       {/* THE PROGRAM ROW LEFT THIS PAGE on 30 Oct 2026 ("less is more"): "Program ›" and the week line at
           the top of this page open the whole programme, and Tools has "Your program". */}
       {/* Clears the fixed bar below, so the last row is never sitting underneath it. */}
-      {showsTodaysSession && (status === 'idle' || status === 'running') && <div aria-hidden className="h-[100px]" />}
+      {!weekOpen && showsTodaysSession && (status === 'idle' || status === 'running') && <div aria-hidden className="h-[100px]" />}
 
       {/* START, WHEN THE CARD HAS SCROLLED AWAY (2a). Start is in the glowing
           card; this compact bar above the tab bar exists only while that
@@ -1844,7 +1867,7 @@ export function TodayPanel({
           out of reach (why it was docked on 6 Sep). Rides above BottomDock
           using the height the dock publishes. ONLY BEFORE THE SESSION STARTS:
           status has three values, and a finished day gets no Start (7 Sep). */}
-      {!heroStartInView && !peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'idle' && (
+      {!weekOpen && !heroStartInView && !peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'idle' && (
         <div
           className="fixed inset-x-0 z-40 px-[22px] pb-3 pt-2.5"
           style={{
@@ -1868,7 +1891,7 @@ export function TodayPanel({
           "Log set 3 · Bench 80 kg × 6", read off the tick that would save it
           and pressing that tick — see next-set-label.ts. Gone when no open
           row has a set left to log, rather than guessing at one. */}
-      {!peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'running' && (
+      {!weekOpen && !peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'running' && (
         <NextSetButton
           root={listEl}
           bottom={`calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockHeightPx > 0 ? dockHeightPx + 12 : 0}px)`}

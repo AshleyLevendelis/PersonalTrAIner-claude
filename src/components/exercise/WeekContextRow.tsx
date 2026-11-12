@@ -1,11 +1,9 @@
 import type * as React from 'react'
-import { ChevronDown, ChevronRight, MoreHorizontal, History, CalendarDays } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, ChevronUp, MoreHorizontal, History, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 import { dayLabel, weekBoundaryIndex, weekBoundaryNote } from '@/lib/week-glyphs'
-import { tallyWeek } from '@/hooks/useTrainingWeek'
-import { weekSetCount } from '@/lib/one-page'
 
 // ---------------------------------------------------------------------------
 // Turn 5 — merges what were three separate rows (WeekStrip, ContextLine,
@@ -56,7 +54,9 @@ const DOT_STYLE: Record<StripDot, React.CSSProperties | null> = {
   done: { background: 'var(--primary)' },
   part: { background: 'color-mix(in srgb, var(--primary) 50%, transparent)' },
   missed: { background: 'var(--role-warn)' },
-  due: { background: 'var(--text-dim)' },
+  // A SESSION DAY'S DOT IS MINT (Exercise Week X1, 12 Nov 2026): a done day now carries a tick, so a dot only ever
+  // means a session still to come, and the two cannot be confused.
+  due: { background: 'color-mix(in srgb, var(--primary) 75%, transparent)' },
   away: { boxShadow: 'inset 0 0 0 1px var(--text-dim)' },
   none: null,
 }
@@ -85,6 +85,9 @@ export function WeekContextRow({
   expanded,
   onToggleExpanded,
   hero,
+  weekOpen = false,
+  onToggleWeek,
+  weekSummary,
 }: {
   days: TrainingWeekDay[]
   todayName: string
@@ -121,12 +124,16 @@ export function WeekContextRow({
    * says what the week has done, and the day's own card below says the rest.
    */
   hero?: React.ReactNode
+  /** XW3 (his 12 Nov 2026 handoff): the week view is open. The strip, the notes and the card step aside for it. */
+  weekOpen?: boolean
+  /** The "Week ▾" pill. Absent, no pill is drawn. */
+  onToggleWeek?: () => void
+  /** The week view's own header: its date range for the kicker, and the line under the title. */
+  weekSummary?: { range: string; line: React.ReactNode }
 }) {
   const phaseToken = isCalibrationWeek ? 'Calibration' : isDeload ? 'Deload week' : phaseLabel
   const boundary = weekBoundaryIndex(days)
   const boundaryNote = todayDate ? weekBoundaryNote(days, todayDate) : null
-  const tally = tallyWeek(days, todayDate ?? '')
-  const sets = weekSetCount(days)
 
   // Tab-restructure handoff — "Wk 3/16 · B1 Hypertrophy · ~52 min" as one
   // line, block number included (blockNumber was accepted as a prop before
@@ -142,25 +149,32 @@ export function WeekContextRow({
   if (blockNumber != null) eyebrowParts.push(`B${blockNumber}`)
   if (isCalibrationWeek || isDeload) eyebrowParts.push(phaseToken!)
 
+  const pill = 'hit-slop-44 flex h-[30px] items-center gap-1 whitespace-nowrap rounded-full px-[11px] text-[0.75rem] font-semibold text-primary-text'
+  const pillStyle = { background: 'rgba(var(--glow-rgb), .12)', border: '1px solid rgba(var(--glow-rgb), .3)' }
+
   return (
     <div data-tour="extoday">
-      {/* THE PAGE'S HEADER (2a): where she is in the plan over "Exercise", and
-          "Program ›" beside the day menu. The week line still opens the
-          programme too (30 Oct), and its chevron the week's notes. */}
-      <div className="flex items-end justify-between gap-3">
+      {/* THE PAGE'S HEADER (2a; Exercise Week X1, 12 Nov 2026): where he is in the plan over "Exercise", and two pills,
+          "Program ›" and "Week ▾", beside the day menu. In the week view the kicker is the week's dates and the pill
+          reads "Week ▴" and closes it. The week line still opens the programme too, and its chevron the week's notes. */}
+      <div className="flex items-end justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-1">
           <div className="flex min-w-0 items-center gap-1">
-            <button
-              type="button"
-              className="hit-slop-44 min-w-0 text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground"
-              onClick={onOpenProgram}
-              data-testid="week-context-header"
-              aria-label={`${headerParts.join(' · ')} — open the whole program`}
-            >
-              {/* The text clips in its own span: a clipped BUTTON would clip its 44px slop with it. */}
-              <span className="block truncate">{eyebrowParts.join(' · ')}</span>
-            </button>
-            {(phaseFocus || coachNote) && (
+            {weekOpen && weekSummary ? (
+              <span className="block truncate text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground" data-testid="week-view-range">{weekSummary.range}</span>
+            ) : (
+              <button
+                type="button"
+                className="hit-slop-44 min-w-0 text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground"
+                onClick={onOpenProgram}
+                data-testid="week-context-header"
+                aria-label={`${headerParts.join(' · ')} — open the whole program`}
+              >
+                {/* The text clips in its own span: a clipped BUTTON would clip its 44px slop with it. */}
+                <span className="block truncate">{eyebrowParts.join(' · ')}</span>
+              </button>
+            )}
+            {!weekOpen && (phaseFocus || coachNote) && (
               <button
                 type="button"
                 className="hit-slop-44 text-primary-text"
@@ -176,15 +190,23 @@ export function WeekContextRow({
         </div>
         <div className="mb-0.5 flex shrink-0 items-center gap-1.5">
           {onOpenProgram && (
-            <button
-              type="button"
-              onClick={onOpenProgram}
-              data-testid="program-pill"
-              className="hit-slop-44 flex h-[30px] items-center gap-1 whitespace-nowrap rounded-full px-[11px] text-[0.75rem] font-semibold text-primary-text"
-              style={{ background: 'rgba(var(--glow-rgb), .12)', border: '1px solid rgba(var(--glow-rgb), .3)' }}
-            >
+            <button type="button" onClick={onOpenProgram} data-testid="program-pill" className={pill} style={pillStyle}>
               Program
               <ChevronRight className="size-3" aria-hidden />
+            </button>
+          )}
+          {onToggleWeek && (
+            <button
+              type="button"
+              onClick={onToggleWeek}
+              data-testid="week-pill"
+              aria-expanded={weekOpen}
+              aria-label={weekOpen ? 'Close the week view' : 'Show the whole week'}
+              className={pill}
+              style={pillStyle}
+            >
+              Week
+              {weekOpen ? <ChevronUp className="size-3" aria-hidden /> : <ChevronDown className="size-3" aria-hidden />}
             </button>
           )}
           {/* "Add unplanned work" LEFT THIS MENU on 6 Sep 2026: it is the "I also
@@ -217,69 +239,22 @@ export function WeekContextRow({
         </div>
       </div>
 
-      {/* THE ONE GLOWING CARD (2a): today's session on top — from TodayPanel,
-          which knows the day — and the week under a hairline. On a rest day, a
-          peek or a moved day the top says "This week" and the day's own card
-          below says the rest. */}
-      <div
-        className="mt-5 rounded-[24px] p-5"
-        data-exercise-hero
-        style={{
-          background: 'radial-gradient(120% 90% at 100% 0%, rgba(var(--glow-rgb), .20), transparent 55%), var(--surface-deep)',
-          border: '1px solid rgba(var(--glow-rgb), .30)',
-          boxShadow: '0 10px 30px rgba(0, 0, 0, .35)',
-        }}
-      >
-        {hero}
-        {/* With no session today the card is the week alone, so "This week" heads it once. */}
-        <div className={hero ? 'mt-4 border-t border-[color:var(--hairline)] pt-3' : undefined}>
-          {/* THE WEEK IN ONE LINE (30 Oct 2026), the same counts the strip and
-              Home use (tallyWeek, weekSetCount), over the strip it describes. */}
-          <p
-            className={`flex items-baseline justify-between gap-3 text-[0.6875rem] text-muted-foreground ${hero ? '' : '[&>span:first-child]:font-semibold [&>span:first-child]:uppercase [&>span:first-child]:tracking-[.12em] [&>span:first-child]:text-primary-text'}`}
-            data-testid="week-meter"
-            aria-label={`${tally.sessionsDone} of ${tally.sessionsPlanned} sessions and ${sets.logged} of ${sets.planned} sets done this week`}
-          >
-            <span>This week</span>
-            <span className="tabular-mono" data-testid="week-key">
-              <span className="text-foreground" data-testid="week-meter-count">{tally.sessionsDone} of {tally.sessionsPlanned}</span> session{tally.sessionsPlanned === 1 ? '' : 's'} · {sets.logged}/{sets.planned} sets
-            </span>
-          </p>
-
-          {/* THE NOTES ARE ON SCREEN, NOT ONLY BEHIND THE CHEVRON (Ashley, 3 Sep
-              2026: "the notes section doesn't populate") — unless the coach
-              line under this card is already saying the note, when one screen
-              must not carry the sentence twice. */}
-          {!expanded && coachNote && !coachNoteShownBelow && (
-            <button
-              type="button"
-              onClick={() => onToggleExpanded(true)}
-              className="mt-2 w-full text-left text-xs leading-[1.5] line-clamp-1"
-              style={{ color: 'var(--role-ai-text)' }}
-              aria-label="Show the Personal TrAIner's notes on this week"
-            >
-              {coachNote}
-            </button>
-          )}
-          {/* Expanded, the note is STILL only in one place. */}
-          {expanded && (phaseFocus || (coachNote && !coachNoteShownBelow)) && (
-            <div className="mt-2.5 space-y-1.5">
-              {phaseFocus && <p className="text-xs leading-[1.5] text-text-tertiary">{phaseFocus}</p>}
-              {coachNote && !coachNoteShownBelow && <p className="text-xs leading-[1.5]" style={{ color: 'var(--role-ai-text)' }}>{coachNote}</p>}
-            </div>
-          )}
-
-          {/* THE DAY STRIP (2a): seven columns, a 26px cell over the day's
-              letter. The day on screen is boxed and its letter mint; training
-              days carry their dot, rest days a dash. Tapping another day keeps
-              the peek it always opened. A hairline before the first day of a
-              new training week says where the week changes. */}
-          <div className="mt-2 grid grid-cols-7 gap-1" data-exercise-strip>
+      {weekOpen ? (
+        weekSummary && <div className="mt-2.5 flex items-baseline justify-between gap-3 text-[0.8125rem]" data-testid="week-view-line">{weekSummary.line}</div>
+      ) : (
+        <>
+          {/* THE DAY STRIP (Exercise Week X1): Monday to Sunday (his 15 Oct ruling), each day's short name over its date
+              and its mark. Today is outlined mint; the day on screen (a peek) is boxed; a done day carries a tick, a
+              session still to come a dot, a missed day the warning dot, a rest day the dash (his 1 Nov "Dash on both").
+              Tapping another day keeps the peek it always opened. A hairline before the first day of a new training
+              week says where the week changes. */}
+          <div className="mt-4 grid grid-cols-7 gap-1" data-exercise-strip>
             {days.map((d, i) => {
               const isToday = d.dayName === todayName
               const isSelected = d.dayName === (selectedDay ?? todayName)
               const dot = stripDot(d.state)
               const rest = dot === 'none'
+              const dateNum = Number(d.date.slice(8, 10))
               return (
                 <button
                   key={d.date}
@@ -289,36 +264,36 @@ export function WeekContextRow({
                   data-dot={dot}
                   data-week-boundary={i === boundary ? 'start' : undefined}
                   aria-current={isSelected ? 'date' : undefined}
-                  className="relative flex min-h-11 flex-col items-center justify-start gap-1"
+                  className="relative flex min-h-[58px] flex-col items-center justify-start gap-0.5 rounded-[14px] py-1.5"
+                  style={isToday
+                    ? { background: 'color-mix(in srgb, var(--primary) 10%, var(--surface-raised))', boxShadow: 'inset 0 0 0 1px rgba(var(--glow-rgb), .55)' }
+                    : isSelected ? { background: 'var(--surface-raised)', boxShadow: 'inset 0 0 0 1px var(--hairline)' } : undefined}
                   // dayLabel is the vocabulary's own sentence, shared with Home's
                   // strip, and names what a swapped day was swapped for (M14).
                   aria-label={dayLabel(d)}
                 >
                   {i === boundary && <span aria-hidden className="absolute -left-[3px] top-1 bottom-1 w-px bg-border" data-testid="week-boundary-mark" />}
-                  <span
-                    aria-hidden
-                    className="flex h-[26px] w-full items-center justify-center rounded-lg text-[0.6875rem] leading-none text-muted-foreground"
-                    style={isSelected ? { background: 'var(--surface-raised)', boxShadow: 'inset 0 0 0 1px rgba(var(--glow-rgb), .45)' } : undefined}
-                  >
+                  {/* A REST DAY'S NAME READS LIKE ANY OTHER (2 Nov 2026): the dash under it already says rest. verify:strip-readable. */}
+                  <span aria-hidden className={`text-[0.5625rem] font-semibold uppercase tracking-[.08em] ${isToday ? 'text-primary-text' : 'text-muted-foreground'}`}>
+                    {isToday ? 'Today' : (DAY3[d.dayName] ?? d.dayName)}
+                  </span>
+                  <span aria-hidden className={`tabular-mono text-[1rem] font-semibold leading-none ${isSelected ? 'text-foreground' : 'text-text-tertiary'}`}>{dateNum}</span>
+                  <span aria-hidden className="flex h-3 items-center justify-center text-[0.6875rem] leading-none text-muted-foreground">
                     {isSelected && (rest || dot === 'away') ? (
                       // A SELECTED REST DAY IS STILL A REST DAY: the dash, as on Home. Her ruling 1 Nov 2026, "Dash
                       // on both", over a mint dot on whatever day is selected, so a dot only ever means a session.
-                      // A day whose session MOVED AWAY holds none either (whole-app QA walk, 7 Nov 2026): it took the
-                      // mint session dot when selected while Home drew the dash.
+                      // A day whose session MOVED AWAY holds none either (whole-app QA walk, 7 Nov 2026).
                       <span data-selected-dot={rest ? 'rest' : 'away'}>–</span>
+                    ) : dot === 'done' ? (
+                      <Check className="size-3 text-primary-text" strokeWidth={3} data-selected-dot={isSelected ? 'plain' : undefined} />
                     ) : isSelected ? (
                       // A SELECTED MISSED DAY STAYS MISSED (run 7, M52).
                       <span className="size-1.5 rounded-full" data-selected-dot={dot === 'missed' ? 'missed' : 'plain'} style={dot === 'missed' ? DOT_STYLE.missed! : { background: 'var(--primary)' }} />
                     ) : DOT_STYLE[dot] ? (
-                      <span className={`size-1.5 rounded-full ${dot === 'done' ? 'glow-mint-box' : ''}`} style={DOT_STYLE[dot]!} />
+                      <span className="size-1.5 rounded-full" style={DOT_STYLE[dot]!} />
                     ) : (
                       <span>–</span>
                     )}
-                  </span>
-                  {/* A REST DAY'S LETTER READS LIKE ANY OTHER (2 Nov 2026, the UX pass): it was drawn in the dim colour, 1.4-2.0:1 in
-                      every theme, too faint to read; the dash above already says it is a rest day. verify:strip-readable. */}
-                  <span className={`text-[0.625rem] ${isSelected ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
-                    {(DAY3[d.dayName] ?? d.dayName).slice(0, 1)}
                   </span>
                 </button>
               )
@@ -326,8 +301,48 @@ export function WeekContextRow({
           </div>
 
           {boundaryNote && <p className="mt-1.5 text-center text-[0.6875rem] text-muted-foreground" data-testid="week-boundary-note">{boundaryNote}</p>}
-        </div>
-      </div>
+
+          {/* THE NOTES ARE ON SCREEN, NOT ONLY BEHIND THE CHEVRON (Ashley, 3 Sep 2026: "the notes section doesn't
+              populate") — unless the coach line below is already saying the note, when one screen must not carry the
+              sentence twice. Out of the card since 12 Nov 2026: the card is the day's workout and nothing else. */}
+          {!expanded && coachNote && !coachNoteShownBelow && (
+            <button
+              type="button"
+              onClick={() => onToggleExpanded(true)}
+              className="mt-2.5 w-full text-left text-xs leading-[1.5] line-clamp-1"
+              style={{ color: 'var(--role-ai-text)' }}
+              aria-label="Show the Personal TrAIner's notes on this week"
+              data-testid="week-note-line"
+            >
+              {coachNote}
+            </button>
+          )}
+          {/* Expanded, the note is STILL only in one place. */}
+          {expanded && (phaseFocus || (coachNote && !coachNoteShownBelow)) && (
+            <div className="mt-2.5 space-y-1.5" data-testid="week-notes">
+              {phaseFocus && <p className="text-xs leading-[1.5] text-text-tertiary">{phaseFocus}</p>}
+              {coachNote && !coachNoteShownBelow && <p className="text-xs leading-[1.5]" style={{ color: 'var(--role-ai-text)' }}>{coachNote}</p>}
+            </div>
+          )}
+
+          {/* THE TODAY CARD (Exercise Week X1): today's session and nothing else, from TodayPanel, which knows the day.
+              No rings and no week counts in it (his 12 Nov 2026 ruling); on a rest day, a peek or a moved day there is
+              no card here, and the day's own card below says the rest. */}
+          {hero && (
+            <div
+              className="mt-4 rounded-[24px] p-5"
+              data-exercise-hero
+              style={{
+                background: 'radial-gradient(120% 90% at 100% 0%, rgba(var(--glow-rgb), .20), transparent 55%), var(--surface-deep)',
+                border: '1px solid rgba(var(--glow-rgb), .30)',
+                boxShadow: '0 10px 30px rgba(0, 0, 0, .35)',
+              }}
+            >
+              {hero}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

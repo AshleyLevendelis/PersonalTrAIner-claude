@@ -907,8 +907,13 @@ export function SetGrid({
   // seconds or metres rather than reps. A number never reaches a screen
   // without its unit.
   const unitQualifier = loadUnitLabel && loadUnitLabel !== 'kg' ? loadUnitLabel.replace(/^kg\s*/, '') : null
-  const showColumnLabels = !!unitQualifier || logColumnLabel !== 'Reps'
-  const GRID = 'grid grid-cols-[24px_minmax(80px,1fr)_28px_56px_auto] gap-1.5 items-center'
+  // TODAY'S CARD (Exercise Week X1b, 12 Nov 2026): set · weight · reps · a 44px tick, and the three column names always
+  // said. Off the card (Additional Work) the older grid, with the implement's mark and the bodyweight switch beside it.
+  const onCard = !!onToggleRamp
+  const showColumnLabels = onCard || !!unitQualifier || logColumnLabel !== 'Reps'
+  const GRID = onCard
+    ? 'grid grid-cols-[28px_minmax(0,1fr)_72px_44px] gap-2 items-center'
+    : 'grid grid-cols-[24px_minmax(80px,1fr)_28px_56px_auto] gap-1.5 items-center'
   const addWarmupButton = (
     <button
       type="button"
@@ -958,7 +963,8 @@ export function SetGrid({
           >
             <Check className="size-[11px]" strokeWidth={3} />
           </span>
-          <span className="whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[.12em] text-[color:var(--ramp-label)]">Ramp up</span>
+          {/* "WARM-UP 2 of 2 done · not counted" (Exercise Week X1b): the build-up, in his word for it. */}
+          <span className="whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[.12em] text-[color:var(--ramp-label)]">Warm-up</span>
           <span className="min-w-0 flex-1 truncate text-[0.71875rem] text-text-tertiary" data-testid="ramp-summary">{rampSummary}</span>
           <span className="whitespace-nowrap text-[0.625rem] text-muted-foreground">not counted</span>
           <ChevronDown aria-hidden className={`size-[13px] shrink-0 text-muted-foreground transition-transform duration-150 ${rampOpen ? 'rotate-180' : ''}`} />
@@ -966,13 +972,13 @@ export function SetGrid({
       )}
       {logAllWarmupsButton}
       {showColumnLabels && (
-        <div className={`${GRID} px-0.5 text-[0.625rem] text-muted-foreground`} data-testid="set-columns">
-          <span />
+        <div className={`${GRID} px-0.5 text-[0.625rem] ${onCard ? 'font-semibold uppercase tracking-[.12em]' : ''} text-muted-foreground`} data-testid="set-columns">
+          <span>{onCard ? 'Set' : ''}</span>
           <span>
             {loadIsEstimate ? 'Log weight' : 'Weight'}
             {unitQualifier && <span className="text-muted-foreground/70"> · {unitQualifier}</span>}
           </span>
-          <span />
+          {!onCard && <span />}
           <span>{logColumnLabel}</span>
           <span />
         </div>
@@ -1014,7 +1020,7 @@ export function SetGrid({
           ? !rowRefs.slice(0, rowIndex).some(r => r.kind === 'working')
           : rowIndex > 0 && rowRefs[rowIndex - 1].kind === 'warmup')
         const groupHead = rowIndex === 0 && warm && !hasFold
-          ? { left: 'Ramp up', right: 'not counted' }
+          ? { left: 'Warm-up', right: 'not counted' }
           : startsWorking
             ? (onToggleRamp
               // The card's own header already says "3 × 6 · 72.5 kg · rest 120s".
@@ -1113,9 +1119,24 @@ export function SetGrid({
                 value={isBW ? '' : input.weight}
                 onChange={e => updateInput(ref, 'weight', e.target.value)}
                 onFocus={scrollRowIntoView}
-                className={`h-11 rounded-[8px] border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${plateButton ? 'pr-10' : ''} ${isSaved ? 'text-foreground' : 'text-[color:var(--role-ai-text)]'} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[k] ? 'ring-1 ring-destructive' : rowWarnings[k] ? 'ring-1 ring-amber-500' : ''}`}
+                className={`h-11 rounded-[8px] border-0 bg-[color:var(--surface-raised)] shadow-none ${onCard ? `font-mono text-[1.0625rem] font-bold ${plateButton && isBodyweightCapable ? 'pr-[5.5rem]' : plateButton || isBodyweightCapable ? 'pr-[3.75rem]' : 'pr-8'}` : `text-sm ${plateButton ? 'pr-10' : ''}`} ${isSaved ? 'text-foreground' : 'text-[color:var(--role-ai-text)]'} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[k] ? 'ring-1 ring-destructive' : rowWarnings[k] ? 'ring-1 ring-amber-500' : ''}`}
                 disabled={isBW}
               />
+              {/* THE UNIT IN THE BOX (X1b): a number never reaches a screen without its unit. */}
+              {onCard && !isBW && (
+                <span aria-hidden className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-[0.6875rem] text-muted-foreground ${plateButton && isBodyweightCapable ? 'right-[4.75rem]' : plateButton || isBodyweightCapable ? 'right-[2.75rem]' : 'right-2.5'}`} data-unit="kg">kg</span>
+              )}
+              {onCard && isBodyweightCapable && (
+                <Button
+                  variant={isBW ? 'default' : 'outline'}
+                  size="sm"
+                  className={`absolute top-1.5 h-8 w-8 px-0 text-[0.625rem] font-bold ${plateButton ? 'right-10' : 'right-1'}`}
+                  onClick={() => toggleBodyweight(ref)}
+                  aria-label="Toggle bodyweight"
+                >
+                  BW
+                </Button>
+              )}
               {onOpenPlateCalc && plateButton && (
                 <Button
                   variant="ghost"
@@ -1133,7 +1154,7 @@ export function SetGrid({
             </div>
             {/* The implement's mark, or the bodyweight switch where the
                 movement can be done without load. */}
-            {isBodyweightCapable ? (
+            {onCard ? null : isBodyweightCapable ? (
               <Button
                 variant={isBW ? 'default' : 'outline'}
                 size="sm"
@@ -1146,6 +1167,7 @@ export function SetGrid({
             ) : (
               <span aria-hidden className="flex justify-center text-muted-foreground"><Dumbbell className="size-3.5" /></span>
             )}
+            <div className="relative min-w-0">
             <Input
               id={`setgrid-reps-${exerciseId}-${k}`}
               type="number"
@@ -1158,11 +1180,15 @@ export function SetGrid({
               value={input.reps}
               onChange={e => updateInput(ref, 'reps', e.target.value)}
               onFocus={scrollRowIntoView}
-              className={`h-11 rounded-[8px] border-0 bg-[color:var(--surface-raised)] text-sm shadow-none ${isSaved ? 'text-foreground' : 'text-[color:var(--role-ai-text)]'} ${rowErrors[k] ? 'ring-1 ring-destructive' : ''}`}
+              className={`h-11 rounded-[8px] border-0 bg-[color:var(--surface-raised)] shadow-none ${onCard ? `font-mono text-[1.0625rem] font-bold ${logColumnLabel === 'Reps' ? 'pr-9' : ''}` : 'text-sm'} ${isSaved ? 'text-foreground' : 'text-[color:var(--role-ai-text)]'} ${rowErrors[k] ? 'ring-1 ring-destructive' : ''}`}
             />
-            <div className="flex items-center justify-end gap-1">
+            {onCard && logColumnLabel === 'Reps' && (
+              <span aria-hidden className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-[0.6875rem] text-muted-foreground" data-unit="reps">reps</span>
+            )}
+            </div>
+            <div className={`flex items-center justify-end gap-1 ${onCard ? 'relative' : ''}`}>
               {isPRSet && prBadgeSet?.result && (
-                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[0.625rem] font-medium bg-primary/15 text-primary-text glow-mint whitespace-nowrap ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
+                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[0.625rem] font-medium bg-primary/15 text-primary-text glow-mint whitespace-nowrap ${onCard ? 'absolute -top-2.5 right-0 z-10' : ''} ${animatingPr ? 'animate-pulse scale-110' : ''} transition-transform`}>
                   <Trophy className="size-2.5" />
                   PR
                 </span>
@@ -1176,7 +1202,7 @@ export function SetGrid({
                 data-tour={isSaved || offersNoWeight(ref) ? undefined : 'setrow'}
                 variant="ghost"
                 size="icon"
-                className={`hit-slop-44 size-[30px] shrink-0 rounded-[10px] ${isActive ? 'glow-pulse' : ''}`}
+                className={`hit-slop-44 shrink-0 ${onCard ? 'size-11 rounded-[12px]' : 'size-[30px] rounded-[10px]'} ${isActive ? 'glow-pulse' : ''}`}
                 style={isSaved ? {
                   background: warm ? 'var(--ramp-button)' : 'linear-gradient(180deg, color-mix(in oklab, var(--primary) 84%, white), var(--primary-2))',
                   color: warm ? 'var(--ramp-on)' : 'var(--primary-foreground)',
