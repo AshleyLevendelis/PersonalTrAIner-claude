@@ -43,7 +43,7 @@ for (const flags of ['', 'legcurl=1', 'offstyle=1', 'mobility=1']) {
   const found = []
   for (const name of names) {
     await ensureOpen(name)
-    found.push({ name, sets: await ev(`${rowsExpr(name)}.length`), perHand: await ev(`/Log weight · per hand/.test(${cardExpr(name)}?.innerText ?? '')`), bodyweightOnly: await ev(`${rowsExpr(name)}[0]?.querySelectorAll('input')[0]?.disabled === true`), prep: await ev(`(window.__primerNames ?? []).includes(${JSON.stringify(name)})`) })
+    found.push({ name, sets: await ev(`${rowsExpr(name)}.length`), perHand: await ev(`/Log weight · per hand/i.test(${cardExpr(name)}?.innerText ?? '')`), bodyweightOnly: await ev(`${rowsExpr(name)}[0]?.querySelectorAll('input')[0]?.disabled === true`), prep: await ev(`(window.__primerNames ?? []).includes(${JSON.stringify(name)})`) })
   }
   const pair = found.find(p => p.perHand && p.sets >= 2) ?? null
   if (pair || plan.length === 0) { FLAGS = flags; plan = found; H = pair }

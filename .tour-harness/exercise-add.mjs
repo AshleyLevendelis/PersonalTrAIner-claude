@@ -59,7 +59,8 @@ const headerMinutes = async () => {
   // RE-ANCHORED 10 Oct 2026 (design handoff 2c): the length left the week row
   // for the hero's meta line ("7 exercises · ~48 min"). "The first button with
   // a ~N min" became the warm-up row and read its 7 minutes.
-  const header = await text('[data-testid="hero-meta"]')
+  // RE-ANCHORED 12 Nov 2026 (Exercise Week X1): the length is the Today card's time.
+  const header = await text('[data-testid="hero-length"]')
   const m = /~\s*(\d+)\s*min/.exec(header)
   return { note: await text('[data-testid="session-length-note"]'), header, mins: m ? Number(m[1]) : NaN }
 }

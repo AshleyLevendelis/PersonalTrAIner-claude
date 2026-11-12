@@ -133,7 +133,7 @@ export function ExerciseLine({
           <SetLegend className="mt-1.5" warmups={legend.warmups} dose={legend.dose} word={legend.word} tempo={tempo} />
         </span>
       </div>
-      {trailing && <div className="shrink-0 -mr-1">{trailing}</div>}
+      {trailing && <div className="shrink-0 pr-2">{trailing}</div>}
     </div>
   )
 }

@@ -83,7 +83,7 @@ const choose = async (machine, scopeText) => {
 const cardOf = async name => {
   if (!(await ev(`!!${row(name)}`))) return null
   if (!(await ev(`!!${row(name)}?.querySelector('[data-testid="exercise-load"]')`))) { await tap(`${row(name)}?.querySelector('[role="button"], .cursor-pointer')`); await wait(700) }
-  return ev(`(() => { const r = ${row(name)}; return r ? { load: [...r.querySelectorAll('[data-testid="exercise-load"]')].map(n => n.textContent.trim()).join(' | '), text: r.innerText.slice(0, 300) } : null })()`)
+  return ev(`(() => { const r = ${row(name)}; return r ? { load: [...r.querySelectorAll('[data-testid="exercise-load"]')].map(n => (n.closest('[data-load-badge]') ?? n).innerText.replace(/\\s+/g, ' ').trim()).join(' | ') /* 12 Nov 2026: the qualifier sits under the value */, text: r.innerText.slice(0, 300) } : null })()`)
 }
 
 console.log('\nA MACHINE AT HER GYM: FOUND IN THE SWAP SEARCH, SWAPPED IN, PRICED\n')

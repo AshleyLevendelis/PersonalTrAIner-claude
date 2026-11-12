@@ -11,7 +11,10 @@ const d = await startDriver({ port: 9535, page: 'app-boot.html', name: 'live-set
 const { ev, check, until, wait, go, clickAt, shoot, finish } = d
 const btn = re => `[...document.querySelectorAll('button')].find(b => ${re}.test((b.textContent || '').trim()))`
 const pill = () => ev(`(() => { const s = document.querySelector('[data-testid="chat-context-strip"]'); const m = s && s.innerText.match(/(\\d+) of (\\d+) sets/); return m ? { logged: +m[1], planned: +m[2] } : null })()`)
-const meter = () => ev(`(() => { const m = document.querySelector('[data-testid="week-key"]')?.textContent?.match(/(\\d+)\\/(\\d+) sets/); return m ? { logged: +m[1], planned: +m[2] } : null })()`)
+// RE-ANCHORED 12 Nov 2026 (his Exercise Week handoff): the week meter left the Exercise screen. The week reader the chat
+// shares now shows on Exercise as TODAY'S MARK on the strip, part-done once a set is in, and the planned total is the
+// Today card's ("2 of 18 sets").
+const meter = () => ev(`(() => { const c = [...document.querySelectorAll('[data-exercise-strip] [data-strip-day]')].find(b => /^Today/i.test(b.innerText.trim())); const m = document.querySelector('[data-testid="hero-sets"]')?.textContent?.match(/(\\d+) of (\\d+) sets/); return c && m ? { mark: c.getAttribute('data-dot'), logged: +m[1], planned: +m[2] } : null })()`)
 const saved = () => ev(`(() => { const m = document.querySelector('[data-testid="hero-sets"]')?.textContent?.match(/^(\\d+) of/); return m ? +m[1] : null })()`)
 
 await go('&session-day=1')
@@ -35,8 +38,8 @@ if (!(await ev(`!!${workTick}`))) { await clickAt(openWork); await wait(800) }
 for (let i = 0; i < 2; i++) { await clickAt(workTick); await wait(900) }
 const after = await saved()
 check('3. two working sets are ticked: the session card itself counts 2', before === 0 && after === 2, { before, after })
-const m = await until(meter, v => v && v.logged >= 2, 30)
-check('4. Exercise\'s "This week" counts them without finishing the session', m?.logged === 2, m)
+const m = await until(meter, v => v && v.mark === 'part', 30)
+check('4. Exercise\'s week (today\'s mark on the strip) counts them without finishing the session', m?.mark === 'part' && m?.logged === 2, m)
 
 await ev(`location.hash = '#/tab/chat'`); await wait(800)
 const p1 = await until(pill, v => v && v.logged >= 2, 30)

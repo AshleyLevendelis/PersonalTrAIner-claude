@@ -120,14 +120,20 @@ console.log('\n[3] A whole session with no signal: logged, counted, finished, an
 await go('&tour=off', '#/tab/exercise')
 await until(() => ev(`!!(${byText('/Start session/')})`), v => v === true, 80)
 await wait(1500)
-const planned = Number(await ev(`(document.body.innerText.match(/(\\d+) working sets/) || [])[1] ?? 0`))
-const weekBefore = await ev(`(document.body.innerText.match(/(\\d+) of (\\d+) sessions · (\\d+)\\/(\\d+) sets/) || []).slice(1).map(Number)`)
-check('the fixture is a session day with nothing logged', planned >= 6 && Array.isArray(weekBefore) && weekBefore[0] === 0 && weekBefore[2] === 0, { planned, weekBefore })
+// RE-ANCHORED 12 Nov 2026 (his Exercise Week handoff): the day's planned sets are counted by the Today card once it
+// runs ("0 of 18 sets"), and the week's running set total left the Exercise screen with the week meter. The week is
+// read where it is now drawn: TODAY'S MARK on the strip (the same week reader), and the Week view's session count.
+const todayMark = () => ev(`(() => { const c = [...document.querySelectorAll('[data-exercise-strip] [data-strip-day]')].find(b => /^Today/i.test(b.innerText.trim())); return c ? c.getAttribute('data-dot') : null })()`)
+const weekLine = async () => { await clickAt(`document.querySelector('[data-testid="week-pill"]')`); await wait(500); const t = await ev(`document.querySelector('[data-testid="week-view-line"] > span')?.textContent?.replace(/\\s+/g, ' ').trim() ?? ''`); await clickAt(`document.querySelector('[data-testid="week-pill"]')`); await wait(500); return Number((t.match(/^(\d+) of \d+ sessions done$/) || [])[1] ?? -1) }
+const weekBefore = { mark: await todayMark(), sessions: await weekLine() }
+check('the fixture is a session day with nothing logged', weekBefore.mark === 'due' && weekBefore.sessions === 0, { weekBefore })
 // What the server already holds for other days (the fixture's history): the sets below are counted over it.
 const serverBefore = await ev(`(window.__fakeDb ?? {}).exercise_set_logs?.filter(r => !r.is_warmup).length ?? -1`)
 await setOffline(true)
 await clickAt(byText('/Start session/'))
 await until(() => ev(`!!document.querySelector('[data-next-set-button]')`), v => v === true, 40)
+const planned = Number(await ev(`(document.querySelector('[data-testid="hero-sets"]')?.textContent?.match(/of (\\d+) sets/) || [])[1] ?? 0`))
+check('...a day with real work in it', planned >= 6, planned)
 let taps = 0
 for (let i = 0; i < 80; i++) {
   if (!(await ev(`!!document.querySelector('[data-next-set-button]')`))) break
@@ -149,9 +155,9 @@ check('every set of the session was logged with no signal', taps >= planned, { t
 check('...and none of it crashed', (await crashed()) === false)
 const waiting = Number((mid.match(/(\d+) sets? waiting to send/) || [])[1] ?? 0)
 check('the app says they are waiting to send', waiting >= planned, { waiting, planned })
-check('the card counts them', new RegExp(`${planned} of ${planned} working sets`).test(mid), (mid.match(/\d+ of \d+ working sets/) || [])[0])
-const weekMid = await until(() => ev(`(document.body.innerText.match(/(\\d+) of (\\d+) sessions · (\\d+)\\/(\\d+) sets/) || []).slice(1).map(Number)`), v => Array.isArray(v) && v[2] === planned, 30)
-check('...AND SO DOES THE WEEK, before a single one has been sent', Array.isArray(weekMid) && weekMid[2] === planned, weekMid)
+check('the card counts them', new RegExp(`${planned} of ${planned} sets`).test(mid), (mid.match(/\d+ of \d+ sets/) || [])[0])
+const weekMid = await until(() => todayMark(), v => v === 'part', 30)
+check('...AND SO DOES THE WEEK, before a single one has been sent: today is marked part-done on the strip', weekMid === 'part', weekMid)
 check('nothing has reached the server yet (the fixture really is offline)', serverBefore >= 0 && (await ev(`(window.__fakeDb ?? {}).exercise_set_logs?.filter(r => !r.is_warmup).length ?? -1`)) === serverBefore, serverBefore)
 
 await clickAt(byText('/^Finish session$/'))
@@ -161,8 +167,8 @@ const done = await until(() => text(), v => /✓ (Done|Session finished)/.test(v
 await shoot('gym-offline-finished')
 check('Finish works with no signal: the day reads as done', /✓ (Done|Session finished)/.test(done), (done.match(/✓ [^\n]*/) || [])[0])
 check('...never "Done · 0 of N sets" over a session fully logged', !/Done · 0 of \d+ sets/.test(done), (done.match(/✓ [^\n]*/) || [])[0])
-const weekDone = await until(() => ev(`(document.body.innerText.match(/(\\d+) of (\\d+) sessions · (\\d+)\\/(\\d+) sets/) || []).slice(1).map(Number)`), v => Array.isArray(v) && v[0] === 1, 30)
-check('...and the week counts the session, 1 done', Array.isArray(weekDone) && weekDone[0] === 1 && weekDone[2] === planned, weekDone)
+const weekDone = { mark: await until(() => todayMark(), v => v === 'done', 30), sessions: await weekLine() }
+check('...and the week counts the session, 1 done (today ticked, "1 of N sessions done")', weekDone.mark === 'done' && weekDone.sessions === 1, weekDone)
 
 // THE SIGNAL COMES BACK, and nobody touches the phone.
 await ev(`window.__sameLoad = 'still'`)
@@ -181,8 +187,9 @@ await wait(900)
 const summary = await ev(`document.querySelector('[role="dialog"]')?.innerText ?? ''`)
 await shoot('gym-offline-summary')
 check('the summary opens and no longer says the finish has not synced', summary.length > 20 && !/hasn't synced yet/.test(summary), summary.slice(0, 200))
-const weekAfter = await ev(`(document.body.innerText.match(/(\\d+) of (\\d+) sessions · (\\d+)\\/(\\d+) sets/) || []).slice(1).map(Number)`)
-check('the week still says 1 session and every set, now from the server', Array.isArray(weekAfter) && weekAfter[0] === 1 && weekAfter[2] === planned, weekAfter)
+await ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`); await wait(500)
+const weekAfter = { mark: await todayMark(), sessions: await weekLine() }
+check('the week still says 1 session done and today ticked, now from the server', weekAfter.mark === 'done' && weekAfter.sessions === 1, weekAfter)
 
 // ---------------------------------------------------------------------------------------------------------------
 console.log('\n[4] "The machine is taken": a swap with no signal is kept on the phone and sent later')

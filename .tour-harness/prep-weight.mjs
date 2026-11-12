@@ -84,7 +84,7 @@ check('1. the prep card is on screen with its set grid', card.found === true && 
 
 if (card.found) {
   check('2. it leads with a weight, not a blank where every other card has one',
-    card.big.some(v => /^[0-9]/.test(v)), card.big)
+    card.big.some(v => /^~?[0-9]/.test(v)), card.big) // 12 Nov 2026: an estimate keeps its "~"
   // THE OTHER HALF OF HER RULING, and the half that keeps it prep. A number
   // without this sentence would be the app quietly turning a warm-up into work.
   // THE OTHER HALF OF HER RULING, as the card actually carries it.
@@ -140,7 +140,7 @@ check('6. no row of per-set chips says the same number more than once',
 // primer call sites on 18 Sep). Reading BOTH off one real screen is the only
 // way to know the halving reached the whole card and not just the headline.
 if (card.found) {
-  const bigNum = (card.big.find(v => /^[0-9]/.test(v)) || '').replace(/[^0-9.]/g, '')
+  const bigNum = (card.big.find(v => /^~?[0-9]/.test(v)) || '').replace(/[^0-9.]/g, '')
   const ghost = (card.boxes.find(b => b.placeholder && /[0-9]/.test(b.placeholder)) || {}).placeholder
   check('8. the number on the card is the number the log box offers',
     bigNum !== '' && ghost !== undefined && Number(bigNum) === Number(ghost),

@@ -137,12 +137,13 @@ await shoot('one-page-nutrition')
 
 console.log('\nC. Exercise')
 await open('exercise')
-const meter = await text('[data-testid="week-meter-count"]')
-const key = await text('[data-testid="week-key"]')
-// RE-ANCHORED 30 Oct 2026 ("less is more"): the rings and key became one line, "0 of 4 sessions · 0/76 sets", and
-// the Program card left the page. The count is the strip's: one "done" dot per session done.
+// RE-ANCHORED 12 Nov 2026 (his Exercise Week handoff): the week meter left the day view; the count is said once, on the
+// Week view's line ("N of M sessions done"), and it is still the strip's: one "done" mark per session done.
 const done = await ev(`document.querySelectorAll('[data-exercise-strip] [data-dot="done"]').length`)
-check('17. the week line\'s session count is the strip\'s', !!meter && key.startsWith(`${meter} session`) && Number(meter.split(' of ')[0]) === done, { meter, key, done })
+await tap('[data-testid="week-pill"]'); await wait(500)
+const meter = await text('[data-testid="week-view-line"] > span')
+await tap('[data-testid="week-pill"]'); await wait(500)
+check('17. the Week view\'s session count is the strip\'s', /^\d+ of \d+ sessions done$/.test(meter.replace(/\s+/g, ' ').trim()) && Number(meter.trim().split(' ')[0]) === done && !(await ev(`!!document.querySelector('[data-testid="week-meter-count"]')`)), { meter, done })
 check('18. no week rings and no Program card on the page', await ev(`!document.querySelector('main [data-ring]') && !document.querySelector('[data-program-row]')`))
 const start = await ev(`(() => { const b = [...document.querySelectorAll('button')].find(n => n.innerText.trim() === 'Start session'); if (!b) return null; const r = b.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, h: innerHeight } })()`)
 // RE-ANCHORED 31 Oct 2026 (Exercise 2a): Start is in the glowing card at the top, on screen and clear of the tab bar;

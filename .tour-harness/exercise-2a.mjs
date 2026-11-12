@@ -39,14 +39,17 @@ check('A0. the fixture names a day with a ramped, loaded lift', !!target?.date &
 
 const head = await ev(`(() => ({ eyebrow: document.querySelector('[data-testid="week-context-header"]')?.textContent?.trim() ?? null, title: document.querySelector('h2')?.textContent?.trim() ?? null, pill: document.querySelector('[data-testid="program-pill"]')?.textContent?.trim() ?? null }))()`)
 check('A1. the header: "Week N of M · B1" over "Exercise", and a "Program ›" pill', /^Week \d+ of \d+ · B\d/.test(head.eyebrow ?? '') && head.title === 'Exercise' && head.pill === 'Program', head)
-const hero = await ev(`(() => { const h = document.querySelector('[data-exercise-hero]'); if (!h) return null; return { today: /^Today · \\w+day/i.test(h.innerText), focus: h.querySelector('[data-testid="hero-focus"]')?.textContent ?? '', meta: h.querySelector('[data-testid="hero-meta"]')?.textContent ?? '', start: !!h.querySelector('[data-testid="hero-start"]'), strip: !!h.querySelector('[data-exercise-strip]'), meter: !!h.querySelector('[data-testid="week-meter"]') } })()`)
-check('A2. ONE glowing card holds today, the name, the meta with its working sets, Start, and the week strip', !!hero && hero.today && hero.focus.length > 2 && /exercises? · .* · \d+ working sets$/.test(hero.meta) && hero.start && hero.strip && hero.meter, hero)
+// RE-ANCHORED 12 Nov 2026 (his Exercise Week handoff, X1): the card is the kicker, the time, the name and Start ("remove
+// the ring and the three lines of text"); the strip sits ABOVE it, under the header, and the week meter is gone.
+const hero = await ev(`(() => { const h = document.querySelector('[data-exercise-hero]'); if (!h) return null; return { today: /^Today · \\w+day/i.test(h.innerText.trim()), focus: h.querySelector('[data-testid="hero-focus"]')?.textContent ?? '', length: h.querySelector('[data-testid="hero-length"]')?.textContent ?? '', start: !!h.querySelector('[data-testid="hero-start"]'), stripInCard: !!h.querySelector('[data-exercise-strip]'), stripAbove: !!document.querySelector('[data-exercise-strip]') && (document.querySelector('[data-exercise-strip]').compareDocumentPosition(h) & Node.DOCUMENT_POSITION_FOLLOWING) > 0, meter: !!document.querySelector('[data-testid="week-meter"]') } })()`)
+check('A2. ONE glowing card holds today, the time, the name and Start; the week strip sits above it, and no meter', !!hero && hero.today && hero.focus.length > 2 && /~?\d+ min/.test(hero.length) && hero.start && !hero.stripInCard && hero.stripAbove && !hero.meter, hero)
 check('A3. while the card\'s Start is on screen, no second Start is docked', (await inView(q('[data-testid="hero-start"]'))) === true && !(await ev(`!!${q('[data-testid="start-bar"]')}`)))
 const note = await coachText()
 check('A4. the coach line is there, without "probe" outside a calibration week, and with no invented judgement', !!note && !/probe/i.test(note) && !/moved well/i.test(note), note)
 check('A5. the warm-up is one row with "Feeling tight?" on it', await ev(`(() => { const w = ${q('[data-testid="warmup-section"]')}; return !!w && /Warm-up/.test(w.innerText) && !!w.querySelector('[data-testid="tightness-open"]') })()`))
 const rows = await ev(`[...document.querySelectorAll('[data-exercise-name]')].map(c => ({ name: c.getAttribute('data-exercise-name'), open: c.hasAttribute('data-exercise-open'), menu: !!c.querySelector('[aria-label="Exercise options"]'), circle: !!c.querySelector('[data-set-dots]') }))`)
-check('A6. one open card, the rest closed rows — and every one has its own ⋮ and status circle', rows.filter(r => r.open).length === 1 && rows.length >= 3 && rows.every(r => r.menu && r.circle), rows)
+// RE-ANCHORED 12 Nov 2026 (Exercise Week X1b): the open card has no status circle (its set bar says it); closed rows keep theirs.
+check('A6. one open card, the rest closed rows — and every one has its own ⋮, every closed one its status circle', rows.filter(r => r.open).length === 1 && rows.length >= 3 && rows.every(r => r.menu) && rows.filter(r => !r.open).every(r => r.circle), rows)
 await shoot('exercise-2a-not-started')
 await ev('window.scrollTo(0, document.documentElement.scrollHeight)'); await wait(700)
 check('A7. scrolled past the card, Start is docked again above the tab bar', (await ev(`!!${q('[data-testid="start-bar"]')}`)) && (await inView(`${q('[data-testid="start-bar"]')}?.querySelector('button')`)) === true)
@@ -70,12 +73,14 @@ await load(`dock=1&today=${target.date}`)
 await ready()
 const X = target.exercise
 check('B0. today holds the ramped lift', !!(await ev(`!!${card(X)}`)), await b.exerciseNames())
-check('B1. Start (in the card) starts the session; the card now offers Finish and says how long it has run', (await tapExpr(q('[data-testid="hero-start"]'))) && !!(await until(`!!${byText('Finish session')} && /min in/.test(${q('[data-testid="hero-status"]')}?.textContent ?? '')`, 5000)))
+// RE-ANCHORED 12 Nov 2026 (Exercise Week X1b): the running card says "Today · in progress" and the sets done ("0 of 18
+// sets"); how long it has run is the dock's clock, as before.
+check('B1. Start (in the card) starts the session; the card now offers Finish, says it is in progress, and counts the sets', (await tapExpr(q('[data-testid="hero-start"]'))) && !!(await until(`!!${byText('Finish session')} && /in progress/i.test(document.querySelector('[data-exercise-hero]')?.innerText ?? '') && /^0 of \\d+ sets$/.test(${q('[data-testid="hero-sets"]')}?.textContent?.trim() ?? '')`, 5000)))
 // Open the ramped lift (collapsed rows open on a tap of the line).
 if (!(await ev(`${card(X)}?.hasAttribute('data-exercise-open')`))) { await tapExpr(`${card(X)}?.querySelector('[role="button"]')`); await wait(700) }
 const fold = () => ev(`(() => { const c = ${card(X)}; const t = c?.querySelector('[data-testid="warmup-caption"]'); if (!t) return null; return { open: t.getAttribute('aria-expanded') === 'true', text: t.innerText.replace(/\\s+/g, ' ').trim(), h: Math.round(t.getBoundingClientRect().height), rows: c.querySelectorAll('[data-testid="warmup-row"]').length, saved: c.querySelectorAll('[data-testid="warmup-row"][data-sync]').length, working: c.querySelector('[data-testid="working-counter"]')?.textContent ?? null } })()`)
 const f0 = await fold()
-check('B2. the ramp is ONE 44px row — "Ramp up", how far, "not counted" — open while it has rows to do', !!f0 && f0.h >= 44 && /RAMP UP/i.test(f0.text) && /0 of \d/.test(f0.text) && /not counted/i.test(f0.text) && f0.open && f0.rows >= 2, f0)
+check('B2. the ramp is ONE 44px row — "Warm-up" (his word on the card, 12 Nov 2026), how far, "not counted" — open while it has rows to do', !!f0 && f0.h >= 44 && /^WARM-UP/i.test(f0.text) && /0 of \d/.test(f0.text) && /not counted/i.test(f0.text) && f0.open && f0.rows >= 2, f0)
 await ev(`${card(X)}?.querySelector('[data-testid="warmup-caption"]')?.scrollIntoView({ block: 'start' })`); await wait(400)
 await shoot('exercise-2a-ramp-open')
 // Log every ramp row with its own tick (her 17 Sep ruling: a box for every set).
@@ -135,16 +140,17 @@ for (let i = 0; i < n; i++) { await b.tick(X, i); await wait(300) }
 check('B17. after the LAST working set, no rest row is drawn under it', !(await ev(`!!${card(X)}?.querySelector('[data-testid="inline-rest"]')`)), n)
 const coachDone = await coachText()
 check('B18. and the coach line names the lift done and what is next, from the plan', new RegExp(`^${X.replace(/[()]/g, '.')} done\\. (Next: .+, \\d+ × .+\\.|Every working set is logged\\.)$`).test(coachDone ?? ''), coachDone)
-check('B19. the card\'s count of working sets moved by the working sets alone', new RegExp(`^${n} of \\d+ working sets$`).test(await ev(`${q('[data-testid="hero-sets"]')}?.textContent ?? ''`)), await ev(`${q('[data-testid="hero-sets"]')}?.textContent ?? ''`))
+check('B19. the card\'s count of working sets moved by the working sets alone', new RegExp(`^${n} of \\d+ sets$`).test(await ev(`${q('[data-testid="hero-sets"]')}?.textContent ?? ''`)), await ev(`${q('[data-testid="hero-sets"]')}?.textContent ?? ''`))
 await ev('window.scrollTo(0, 0)'); await wait(400)
 await shoot('exercise-2a-mid-session-top')
 
 // ---- C. A rest day ------------------------------------------------------------
 console.log('\n  C. A REST DAY')
 await load('freetoday=1')
-await until(`!!document.querySelector('[data-exercise-hero]')`, 12000); await wait(1200)
-const restHero = await ev(`(() => { const h = document.querySelector('[data-exercise-hero]'); return h ? { thisWeek: /this week/i.test(h.innerText), strip: !!h.querySelector('[data-exercise-strip]'), start: !!h.querySelector('[data-testid="hero-start"]') } : null })()`)
-check('C1. a rest day keeps the glowing week — "This week", the strip — and offers no Start', !!restHero && restHero.thisWeek && restHero.strip && !restHero.start, restHero)
+await until(`!!document.querySelector('[data-exercise-strip]')`, 12000); await wait(1200)
+// RE-ANCHORED 12 Nov 2026 (Exercise Week X1): the week is the header and the strip, no card; a rest day has no Today card.
+const restHero = await ev(`(() => ({ strip: document.querySelectorAll('[data-exercise-strip] [data-strip-day]').length, weekPill: !!document.querySelector('[data-testid="week-pill"]'), card: !!document.querySelector('[data-exercise-hero]'), start: !!document.querySelector('[data-testid="hero-start"]') }))()`)
+check('C1. a rest day keeps the week — the strip and the Week pill — and offers no Start', restHero.strip === 7 && restHero.weekPill && !restHero.card && !restHero.start, restHero)
 check('C2. ...with its own day card under it (the week track, the quick log)', await ev(`!!document.querySelector('[data-testid="week-track"]') && !!document.querySelector('[data-testid="activity-quick-log"]')`))
 await shoot('exercise-2a-rest-day')
 

@@ -150,7 +150,8 @@ await go(`sam=1&today=${walkDay.date}`, '#/tab/exercise', 4200)
 const shown = await targets()
 const walkShown = (shown?.days ?? []).find(d => d.day === walkDay.day) ?? null
 const otherShown = (shown?.days ?? []).find(d => d.day === otherDay.day) ?? null
-const header = await text('[data-testid="hero-meta"]')
+// RE-ANCHORED 12 Nov 2026 (Exercise Week X1): today's length is the Today card's time; a peek keeps its meta line.
+const header = await text('[data-testid="hero-length"]')
 const headerLen = parseLength(header)
 check('2a. the header\'s two parts add up to the day on screen, and the walk is not in them',
   !!headerLen && !!walkShown && walkShown.cardio?.timing === 'independent_session' &&
@@ -251,7 +252,7 @@ await go(`mobility=1&today=${optDay?.date ?? ''}`, '#/tab/exercise', 4200)
 const mobShown = await targets()
 const optShown = (mobShown?.days ?? []).find(d => d.day === optDay?.day) ?? null
 if (optShown) { want.total = Math.round(optShown.totalSeconds / 60); want.optional = Math.round(optShown.optionalSeconds / 60) }
-const optHeader = parseLength(await text('[data-testid="hero-meta"]'))
+const optHeader = parseLength(await text('[data-testid="hero-length"]'))
 check('5b. the header says the work and the optional part apart, and they add up to the day',
   !!optHeader && optHeader.optional === want.optional && optHeader.work + optHeader.optional === want.total && / · \+ \d+ optional$/.test(optHeader.worded), { optHeader, want })
 const optRows = await ev(`[...document.querySelectorAll('[data-testid^="finisher-row"]')].map(r => (r.innerText ?? '').replace(/\\s+/g, ' ').trim().slice(0, 60))`)

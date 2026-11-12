@@ -196,8 +196,9 @@ check('...so no build-up row and working row share a spoken name',
 // a header naming the group but not its cost re-creates the ambiguity the
 // whole design is about, and one naming the cost but not the group leaves the
 // R labels unexplained.
+// RE-ANCHORED 12 Nov 2026 (Exercise Week X1b): the fold says "Warm-up", his word on the card.
 check('the group header names the build-up',
-  /ramp/i.test(loaded.warmCaption ?? ''), loaded.warmCaption)
+  /^warm-up/i.test(loaded.warmCaption ?? ''), loaded.warmCaption)
 check('...and says it does not count',
   /not counted/i.test(loaded.warmCaption ?? ''), loaded.warmCaption)
 // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the prescription is the card's own meta line ("3 × 9-11 · 47.5 kg · rest
