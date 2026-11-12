@@ -434,6 +434,7 @@
     "test:meal-variety": "tsx scripts/test-meal-variety.ts",
     "test:meal-days": "tsx scripts/test-meal-days.ts",
     "test:nutrition-week": "tsx scripts/test-nutrition-week.ts",
+    "test:exercise-week": "tsx scripts/test-exercise-week.ts",
     "test:meal-likes": "tsx scripts/test-meal-likes.ts",
     "measure:meal-fresh-fit": "tsx scripts/measure-meal-fresh-fit.ts",
     "test:meal-fresh-fit": "tsx scripts/test-meal-fresh-fit.ts",

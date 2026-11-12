@@ -121,7 +121,7 @@ export function weekMainLift(session: WorkoutDay): Exercise | null {
 export function weekDayRow(day: TrainingWeekDay, unloadedLabelFor: (ex: Exercise) => string | null): WeekDayRow {
   const session = day.session ?? null
   const status = day.state === 'missed' ? 'Missed'
-    : day.state === 'moved' ? (day.movedTo ? `Moved to ${day.movedTo}` : 'Moved')
+    : day.state === 'moved' ? (day.movedTo ? `Moved to ${day.movedTo.dayName}` : 'Moved')
     : day.state === 'swapped' ? (day.swappedLine ?? 'Swapped')
     : null
   if (!dayHasSession(session) || day.state === 'moved') {

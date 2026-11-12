@@ -1520,7 +1520,9 @@ menu" stays true when a copy is also left outside it.
 - **The week list appears only when he asks for it**: "this should be only when you select to view the week, otherwise
   show just the day's workout". X1 never shows the week list; the `Week` pill opens XW3 and `Week ▴` closes it.
 - **XW3 for the weeks ahead**, "I like this way of seeing the upcoming week's sessions"; XW1 (a separate tapped-day card)
-  was NOT chosen, so tapping a day in the strip keeps today's peek of that day, its rows restyled.
+  was NOT chosen, so tapping a day in the strip keeps today's peek of that day, its rows restyled. BUILT 12 Nov 2026;
+  a week-view day is drawn by the shared read-only day list (one way to draw a day), so its rows keep their ⋮.
+  `verify:exercise-week`, `test:exercise-week`
 
 ### His Nutrition Week handoff, approved 11 Nov 2026 (`docs/plans/nutrition-week.md`)
 - **Rings on Nutrition again: option 3d**, in his words "I want one circle with all the rings inside it like I used to

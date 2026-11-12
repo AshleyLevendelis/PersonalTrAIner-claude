@@ -2,6 +2,27 @@
 
 Newest first. One line each.
 
+- [x] **EXERCISE WEEK: THE EXERCISE TAB IN THE NUTRITION STYLE — X1 TODAY, X1b LOGGING, XW3 THE WEEK** (12 Nov 2026,
+  his handoff approved that day, `docs/design/design_handoff_exercise_week/`, `docs/plans/exercise-week.md`). HIS
+  RULINGS, in his words: no rings on the Today card ("remove the ring and the three lines of text here and leave the
+  rest"); the week list only when asked ("this should be only when you select to view the week, otherwise show just the
+  day's workout"); XW3 over XW1 ("I like this way of seeing the upcoming week's sessions"), so a tapped strip day keeps
+  the peek. BUILT, presentation only: header pills `Program ›` and `Week ▾/▴`; the strip (tick for done, mint dot for a
+  session to come, dash for rest); the Today card as kicker, time, name, Start ("Today · in progress", "4 of 18 sets"
+  and a bar once running); every row with its load on the right (blue swatch, value, unit, qualifier, from the plan's
+  own string), its set bar (violet warm-ups, mint working sets filled as logged) and legend (with the tempo); the open
+  card's warm-up fold, set grid with the plate button and units inside the boxes, 44px ticks, inline rest under the set;
+  the week view, one row per day off the strip's own week, one day open at a time, drawn by the shared read-only day
+  list. FOUND ON THE WAY: a moved day would have read "Moved to [object Object]" in the week view (a typed object in a
+  template string; no typecheck sees it), caught by the new gate before it shipped. CHANGED FROM THE DESIGN, each in the
+  plan with its reason: the ⋯ day menu and the week notes stay; the real phase name; "~" kept on estimated loads; R1/R2
+  warm-up labels; the open week day uses the shared list (section labels and ⋮ rather than eyebrows); "+ N optional"
+  kept in the time. VERIFIED: `test:exercise-week` (29 checks, 15 mutations, 14 caught, the 15th an equivalent change),
+  `verify:exercise-week` at 390x844 (DRIVER_RESULT), 12 gates re-anchored deliberately to the new places (load reader,
+  length on the card, strip under the header, the done-day tick, "Warm-up" fold word, the week count on the week view),
+  the tour's Exercise stop and the coach's map of the tab now name the Week view. NEEDS: the `chat-gemini` deploy for
+  the coach's map (the exam was already stale before this, needing his machine).
+
 - [x] **RELEASED TO MAIN AT c02382d9 (12 Nov 2026), his "All of it" and "ok go ahead"**: Nutrition Week (with his second
   handoff), eating out, meals cooked for him, his usual meals first, setup's lift weight and reps, the one-tap lift
   effort. Checks on the released version: 540 in the list; the first 334 ran on the version before the design change
