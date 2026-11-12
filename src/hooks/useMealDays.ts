@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { datesFrom, pinsFromPicks, serveMealWeek, ROTATION_DAYS, type MealShape, type Rotation, type ServedDay } from '@/lib/meal-rotation'
 import { computeSlotBudgets, type HeldAround } from '@/lib/meal-generation'
-import { getMealPicksForDates, setMealPick, swapPoolMeal, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
+import { getMealPicksForDates, setMealPick, clearMealPick, swapPoolMeal, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
+import { eatingOutName, eatingOutOption, EATING_OUT_REFUSALS, type EatingOutController, type EatingOutSize } from '@/lib/eating-out'
+import { removeEatingOutOptions } from '@/lib/eating-out-store'
+import { applyMealOptionToSlot } from '@/lib/pending-action-executor'
 import { addGroceryDays, removeGroceryDays, readGroceryCoverage, type AddGroceryDaysResult } from '@/lib/grocery-store'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
 import { weekdayLong } from '@/lib/day-labels'
@@ -422,6 +425,60 @@ export function useMealDays(input: MealDaysInput) {
     return (await readGroceryCoverage(profileId, today, readGroceryBuildMemo(profileId)?.startDate)).includes(date)
   }
 
+  /**
+   * EATING OUT (his 12 Nov 2026 ruling, "Ask: light/normal/big"): marks a meal on a day as out, at the size he chose,
+   * through the shared add-a-meal road (the pool row, then the pick, the row rolled back if the pick fails). The screen
+   * and the coach both call it. A pick needs the new option in the pool before it can serve, so the pool is re-read
+   * before the pick is shown.
+   */
+  const pickFor = async (date: string, slot: MealSlotName, name: string): Promise<boolean> => {
+    if (!profileId) return false
+    if (date === today) {
+      try { await setMealPick(profileId, date, slot, name) } catch { return false }
+      await reloadPools?.()
+      showTodaysPick?.(slot, name)
+      return true
+    }
+    await reloadPools?.()
+    return applyPick(date, slot, name)
+  }
+  const eatingOut: EatingOutController = {
+    dates,
+    mark: async (date: string, slot: MealSlotName, size: EatingOutSize) => {
+      if (!profileId || !targets) return { ok: false, reason: EATING_OUT_REFUSALS.noTargets }
+      if (!dates.includes(date)) return { ok: false, reason: EATING_OUT_REFUSALS.outsideWindow }
+      const budget = computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks)[slot]
+      if (!budget || !(budget.calories > 0)) return { ok: false, reason: EATING_OUT_REFUSALS.noSuchMeal(slot) }
+      if (date === today) {
+        const logged = await readLoggedToday()
+        if (logged?.includes(slot)) return { ok: false, reason: EATING_OUT_REFUSALS.eaten(slot) }
+      }
+      const shown = date === today ? week[0]?.day.chosen[slot] : week.find(w => w.date === date)?.day.chosen[slot]
+      const name = eatingOutName(slot, date)
+      // The dish it showed, for the Undo; a meal already out at another size goes back to that meal's own dish, so
+      // it is not "restored" to the old size.
+      const before = date === today ? todaysPins[slot]?.name ?? null : futurePicks[date]?.[slot] ?? null
+      const previous = before === name ? null : before
+      if (shown?.name === name || before === name) {
+        if (!(await removeEatingOutOptions(profileId, slot, name))) return { ok: false, reason: DAY_MOVE.undo.saveFailed }
+      }
+      const option = eatingOutOption(slot, date, budget, size)
+      const { receipt } = await applyMealOptionToSlot(profileId, { slot, date, option }, p => pickFor(p.date, p.slot, p.option.name))
+      if (receipt.failed.length > 0) return { ok: false, reason: DAY_MOVE.undo.saveFailed }
+      return { ok: true, option, previous }
+    },
+    clear: async (date: string, slot: MealSlotName, restore?: string | null) => {
+      if (!profileId || !dates.includes(date)) return false
+      if (!(await clearMealPick(profileId, date, slot))) return false
+      await removeEatingOutOptions(profileId, slot, eatingOutName(slot, date))
+      if (restore) return pickFor(date, slot, restore)
+      await reloadPools?.()
+      if (date === today) showTodaysPick?.(slot, null)
+      else setFuturePicks(prev => { const d = { ...(prev[date] ?? {}) }; delete d[slot]; return { ...prev, [date]: d } })
+      return true
+    },
+  }
+
   const openDay: OpenMealDay | null = openDate && openAssembled ? {
     date: openDate,
     dayName: weekdayLong(openDate),
@@ -461,6 +518,8 @@ export function useMealDays(input: MealDaysInput) {
     week: weekDays,
     /** Saves and shows a pick for an upcoming date — the coach's confirm path. */
     applyPick,
+    /** Mark a meal out, or put it back on the plan: the meal sheet and the coach's card both call it. */
+    eatingOut,
     /** Put a day on the shopping list, or take it back off — the coach's path too. */
     addToGrocery,
     removeFromGrocery,

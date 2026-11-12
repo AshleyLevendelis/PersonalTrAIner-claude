@@ -750,6 +750,29 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_eating_out",
+    description:
+      "PROPOSES marking one meal on one day as EATING OUT (a restaurant, a takeaway, dinner at a friend's). This does NOT apply anything, they tap Apply. The meal stays in that day's plan as an estimate, is left off the shopping list, and the day's other meals fit around it. Call this for 'I'm out for dinner Friday', 'we're going out for lunch tomorrow', 'eating out tonight'. Ashley's ruling, 12 Nov 2026: the APP ASKS how big a night it is (light, normal or a big night), not you: call this straight away with the day and the meal; when they have not said how big, the app replies with the question and three buttons, and when they answer, call it again with the same day and meal. Never state calories or sizes yourself. Today or the next six days only. NOT for a meal cooked for them at work (propose_custom_meal with cooked_for_me), and NOT for logging food they have already eaten (log_meal). When they tell you WHAT they will order, that is propose_custom_meal with cooked_for_me true for that day and meal: the estimate of the dish replaces this one.",
+    parameters: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "The day, as YYYY-MM-DD from UPCOMING MEALS, or 'today'. Omit for today.",
+        },
+        meal_slot: {
+          type: "string",
+          description: "breakfast, lunch, dinner or snack. Dinner when they said 'going out tonight' with no meal named.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["meal_slot", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_meal_rebalance",
     description:
       "PROPOSES moving SOME of one meal's calories to another meal on the same day — the same two dishes, one made smaller and the other bigger by that amount, so the day's total stays where it was. This does NOT apply anything, they tap Apply. Call this for 'move some of lunch's calories to dinner', 'make lunch smaller and dinner bigger', 'can I have less at breakfast and more at dinner', 'shift 200 calories from my snack to lunch'. Ashley's ruling, 20 Oct 2026: ASK HOW MUCH FIRST — and the APP asks, not you: call this straight away with from_slot and to_slot and NO kcal unless they gave a number; the app replies with the question and amount buttons. When they answer with an amount ('200 kcal to dinner'), call it again with the same two meals and that kcal; the card then shows both new sizes. Never state calories, protein or sizes yourself. NOT the whole-day resize (propose_meal_refit — that is for meals that no longer add up to the targets, with no meal named), NOT moving a WHOLE meal into another slot (propose_meal_move), NOT a different dish (propose_meal_swap), and NOT one food's amount (propose_meal_food_resize). A meal already logged as eaten today stays as eaten; the app says so.",
@@ -2363,7 +2386,7 @@ This is the complete, current list. Nothing outside it exists — not a variant,
 
 Five tabs, bottom of the screen: Home, Nutrition, Exercise, Tools, Chat (this conversation).
 - Home: the greeting, the streak ("12 in a row"), today so far as four rings (calories, protein, water, steps) with one percentage and a key under them, a rotating tip from you, then Up next as rows — today's session (the week as seven dots beside it; once finished it shows the time, the sets and any PR, and opens its summary), the next meal, and tomorrow — and Progress: the weight with its trend (tap it to weigh in), the latest PR and this week's volume. A Start button sits at the bottom until the session is done. Calories, protein and water there are read-outs that open Nutrition; step-count logging happens right here (tap Steps in the key). On shopping day a Shopping card appears here too, with how many things are left to buy and the first few of them.
-- Nutrition: a strip of today and the next six days (no earlier day can be opened there: what was eaten on a past day is not on any screen, only in what you are told below), and a "Week" button beside the title. For TODAY: one circle of rings (water, calories, protein, carbs and fat) with the calories left in the middle, and a row under it for each, eaten against target. Water logging happens here: tap "+ Water" on that card for the +250/+500 quick-adds. Tap an upcoming day on the strip and the card shows that day's PLANNED totals against target and whether the day is on target, with a button to add that day to the shopping list. "Week" shows all seven days on one screen, each with its planned calories and its meals, one day opened at a time, and a "Shop the whole week" button that builds the shopping list for 7 days. Then the day's meals, each with its calories and a bar of protein, carbs and fat, marked eaten or next, with per-meal logging (open a meal and tap Log; tap again to unlog); a round + that opens this chat to log something else; a "Grocery list" button that opens the shopping list; and a "Targets & plan settings" row that opens the BMR/TDEE derivation, the macro split, the water target and the Standard/Dynamic method picker.
+- Nutrition: a strip of today and the next six days (no earlier day can be opened there: what was eaten on a past day is not on any screen, only in what you are told below), and a "Week" button beside the title. For TODAY: one circle of rings (water, calories, protein, carbs and fat) with the calories left in the middle, and a row under it for each, eaten against target. Water logging happens here: tap "+ Water" on that card for the +250/+500 quick-adds. Tap an upcoming day on the strip and the card shows that day's PLANNED totals against target and whether the day is on target, with a button to add that day to the shopping list. "Week" shows all seven days on one screen, each with its planned calories and its meals, one day opened at a time, and a "Shop the whole week" button that builds the shopping list for 7 days. Then the day's meals, each with its calories and a bar of protein, carbs and fat, marked eaten or next, with per-meal logging (open a meal and tap Log; tap again to unlog), and "Eating out" on an upcoming meal, which asks Light, Normal or Big night and keeps the meal in the day as an estimate the rest of the day fits around; a round + that opens this chat to log something else; a "Grocery list" button that opens the shopping list; and a "Targets & plan settings" row that opens the BMR/TDEE derivation, the macro split, the water target and the Standard/Dynamic method picker.
 - Exercise: today's workout (sets/reps/load, warm-up, rest timer), swap/ban an exercise, the full training-week program view, and a per-exercise screen from the row's menu with three tabs — Summary (a body diagram of the muscles it works, and a strength trend), History (past sessions and PRs), How to (the app's own form cues).
 - Tools: a Timers card at the top with three tiles, each opening its timer directly — a round/interval timer (Tabata, EMOM, plain rounds, or your own numbers, with a Full screen option), a stopwatch, and a lap timer — plus a Start button for the last round run, once there is one. While a round is actually running, its card takes the Timers card's place. Under it a plate calculator card: a ± 2.5 kg stepper that starts on the next barbell lift in the plan and shows the plates for each side of a 20 kg bar; tapping it opens the full calculator. Then rows for the full training program, session history, and the grocery list. The rest timer is NOT set up anywhere — it starts on its own the moment a set is logged, in the session dock.
 Shopping list: its own full screen rather than part of a tab. Built from the week's meals; opened from the link on Nutrition, from the Shopping card on Home on shopping day, or from the Grocery list row on Tools. One list, three doors — not three lists.
@@ -2820,6 +2843,7 @@ FUNCTION CALL RULES (CRITICAL):
 - Exercise swaps default to scope: "today" (only applies to today's workout; the original exercise returns next time that day comes up). Only set scope: "permanent" when the user explicitly says they want a lasting change (e.g. "for the rest of the plan", "permanently", "I never want to do X", "always use Y instead").
 - Trigger propose_volume_change / propose_schedule_change / propose_style_change / propose_goal_change / propose_concurrent_activity per §3d/§3e/§3f/§3f2/§3g once the request is an actual imperative and you have the required fields, WITH an origin_verbatim_quote. None applies anything — all five show a confirm card. "Should I drop to three days?" is a question, not a command: answer it in text. The same test is strictest on the goal (§3f2): "should I be bulking?" is a question about their training, and answering it well means having an opinion, not producing a card.
 - Trigger propose_custom_meal when the user TELLS you what they eat or will eat ("I usually have eggs and greek yoghurt and fruit for breakfast"). The flow Ashley specified: if any stated food has no amount, ask how much of each — one question, not an interrogation — then call with their exact foods and amounts. Their portions are never adjusted; the app fits the rest of the day around the meal. "What should I have for breakfast?" is a question — ANSWER IT IN TEXT; this tool is for what they are actually having. (That clause used to read "answer it or use propose_meal_addition", which is how "What should I eat?" produced a card offering to replace a real user's lunch on 8 Sep 2026. A question is never a trigger for either tool.)
+- EATING OUT (Ashley, 12 Nov 2026). When they say they are eating out at a meal today or in the next six days ("I'm out for dinner Friday", "we're going out for lunch tomorrow"), call propose_eating_out with that day and meal straight away. The APP asks how big a night it is, with buttons: never ask it yourself and never guess a size. The meal then sits in their plan as an estimate, off the shopping list, and the rest of that day fits around it. If they then say what they will order, estimate that dish with propose_custom_meal (cooked_for_me true, that day and meal). Never call a meal out "on plan", "fine" or "free": a restaurant's food is unknown, and an allergy or restriction on their profile still stands; say the app cannot confirm what is in it.
 - A MEAL COOKED FOR THEM (Ashley, 11 Nov 2026). Their plan can already hold meals somebody else cooks: a day's list then shows "Breakfast cooked for you" or "Lunch cooked for you" at a normal size, marked as assumed, and those meals are never on the shopping list. When they tell you WHAT one of those meals is ("the canteen has chicken curry and rice today", "Thursday's work lunch is a jacket potato with tuna"), call propose_custom_meal with cooked_for_me true, that day's date and that meal: write the dish as its everyday foods at ordinary single portions (they cannot weigh a canteen plate, so here, and only here, you supply the amounts), and say in one short line that it is an estimate. ONE MEAL PER CALL: if they give you several days at once, do the nearest one, and say you will take the others one at a time when they are ready. NEVER say a meal cooked for them fits their diet or is free of anything: you do not know what is in a kitchen's food, and if it clashes with an allergy or restriction on their profile the app will say so itself. WHICH meals are cooked for them on WHICH days is a setting you cannot change: if they tell you that ("breakfast and lunch are cooked for me at work, Monday to Friday"), say plainly that you can't set it from here and that it is on Profile, under Meals & shopping, as "Meals cooked for me". Do not claim to have recorded it.
 - Trigger propose_rest_day the same way when they tell you they are resting a training day and name nothing in its place. "Rest day today" is a statement of fact about their day, not a question — call the tool. "Should I rest today?" is a question: answer it.
 - Trigger propose_missed_session when they tell you a session did NOT happen and they are not calling it a rest — "I missed Monday", "skipped yesterday", "mark it missed". Missed and rested are different facts and the week shows them differently; never record one as the other. If they name something they did instead, that is propose_session_activity_swap; if the session is happening later this week, propose_session_move.
@@ -3522,6 +3546,26 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_meal_refit",
               rawArgs: { origin_verbatim_quote: args.origin_verbatim_quote },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_eating_out") {
+        // Forwarded, not decided. The size comes from HIS words (the client reads them), and when he has not said one
+        // the APP asks with three buttons (his 12 Nov 2026 ruling); the estimate and the save are the client's, the
+        // same function the meal sheet on Nutrition calls.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_eating_out",
+              rawArgs: {
+                date: args.date,
+                meal_slot: args.meal_slot,
+                origin_verbatim_quote: args.origin_verbatim_quote,
+              },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

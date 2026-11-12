@@ -1355,6 +1355,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_plan_restart: { done: 'Plan started again', failed: "I couldn't start your plan again" },
   propose_meal_day_move: { done: 'Swapped over', failed: "I couldn't swap those meals" },
   propose_meal_rebalance: { done: 'Moved', failed: "I couldn't move those calories" },
+  propose_eating_out: { done: 'Marked as eating out', failed: "I couldn't mark that meal as out" },
   propose_circuit_log: { done: 'Logged', failed: "I couldn't log that workout" },
   propose_cardio_log: { done: 'Logged', failed: "I couldn't log that" },
 }

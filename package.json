@@ -188,6 +188,7 @@
     "test:lift-effort": "tsx scripts/test-lift-effort.ts",
     "test:usual-meals": "tsx scripts/test-usual-meals.ts",
     "test:meals-elsewhere": "tsx scripts/test-meals-elsewhere.ts",
+    "test:eating-out": "tsx scripts/test-eating-out.ts",
     "test:onboarding-corrections": "tsx scripts/test-onboarding-corrections.ts",
     "test:onboarding-chip-match": "tsx scripts/test-onboarding-chip-match.ts",
     "test:onboarding-receipts": "tsx scripts/test-onboarding-receipts.ts",

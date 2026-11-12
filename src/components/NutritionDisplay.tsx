@@ -20,6 +20,7 @@ import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
+import type { EatingOutController } from '@/lib/eating-out'
 import { calculateWeeklySchedule, getMacroDerivation, sportFuelNote } from '@/lib/macro-calculator'
 import { macroShortfallLine } from '@/lib/macro-shortfall'
 import { paceClock } from '@/lib/pace'
@@ -125,6 +126,8 @@ export interface NutritionDisplayProps {
    * Absent, the Move control offers only the meal slots, as it did.
    */
   dayMove?: MealDayMoveController
+  /** Marks a meal out, or puts it back (his 12 Nov 2026 "Ask: light/normal/big"); the coach's card calls the same. */
+  eatingOut?: EatingOutController
   /** What a swap did to today's other meals (runs 3-4, M34), and its Undo. */
   heldAround?: HeldAround
   onKeepHeldSizes?: (date: string, keep: boolean) => void
@@ -176,7 +179,7 @@ export function NutritionDisplay({
   onSwapMealSlot, onUndoMealSwap, onRegenerateMealSlot, onMakeOneNewMeal, onFindMoreOptions, onRegenerateAllMeals,
   mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
   mealTopUp = null, mealTopUpBusy = false, mealTopUpNote = null, onMealTopUp, onMealTopUpDecline, onDismissMealTopUpNote, mealTopUpStart = null,
-  mealStrip, mealWeek, upcomingDay = null, dayMove, heldAround, onKeepHeldSizes,
+  mealStrip, mealWeek, upcomingDay = null, dayMove, eatingOut, heldAround, onKeepHeldSizes,
 }: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
   // fitness_profiles columns (computed once at onboarding); they're now
@@ -658,6 +661,7 @@ export function NutritionDisplay({
           onRegenerateAll={onRegenerateAllMeals}
           upcoming={upcomingDay}
           dayMove={dayMove}
+          eatingOut={eatingOut}
           heldAround={upcomingDay.heldAround}
           onKeepHeldSizes={onKeepHeldSizes}
           regeneratingAll={mealsRegeneratingAll}
@@ -690,6 +694,7 @@ export function NutritionDisplay({
         onFindMoreOptions={onFindMoreOptions}
         onRegenerateAll={onRegenerateAllMeals}
         dayMove={dayMove}
+        eatingOut={eatingOut}
         heldAround={heldAround}
         onKeepHeldSizes={onKeepHeldSizes}
         regeneratingAll={mealsRegeneratingAll}

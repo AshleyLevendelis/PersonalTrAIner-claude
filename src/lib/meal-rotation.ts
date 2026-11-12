@@ -31,13 +31,15 @@
 // fixed on 15 Sep 2026 cannot come back through this door.
 // ---------------------------------------------------------------------------
 
-import { assembleDay, computeSlotBudgets, VARIETY_MEMORY_DAYS, type AssembledDay, type PoolOption } from './meal-generation'
+import { assembleDay, computeSlotBudgets, dayVerdict, VARIETY_MEMORY_DAYS, type AssembledDay, type PoolOption } from './meal-generation'
 import { newFromDate, isPinOnly, isAfterEaten } from './meal-new-from'
 import type { Macros100g } from './food-db'
 import { scaleToTarget, meetsProteinFloor } from './portion-scaler'
 import { costStoredMeal } from './meal-costing'
 import { USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
 import { holdAroundPins } from './hold-around-pins'
+import { resizeDish, AROUND_EATEN_MIN } from './day-as-shown'
+import { isEatingOut } from './eating-out'
 import { menuFor } from './meal-menu'
 import type { MacroTargets } from './types'
 import { sameDish, resizedCopyBase, editedFrom, RESIZED_COPY_SUFFIX } from './meal-dish-identity'
@@ -563,6 +565,7 @@ export function assembleRotationDay(
     const held = holdAroundPins({ planned: plannedDay, fixed, targets, keepSizes: opts.keepHeldSizes })
     if (held) day = held
   }
+  if (live.some(([, o]) => isEatingOut(o))) day = shrinkAroundEatingOut(day, Object.fromEntries(live), targets)
 
   // PROMISE TOMORROW'S LUNCH ONLY WHEN IT IS ACTUALLY PROMISED. The rotation
   // worked out tomorrow's leftover from the dinner IT chose; if the user has
@@ -603,6 +606,35 @@ function isHerOwnDish(option: PoolOption, pools: Partial<Record<MealSlotName, Po
   const baseName = option.name.slice(0, resized.index)
   const base = Object.values(pools).flatMap(o => o ?? []).find(o => o.name === baseName)
   return !base || isHerOwnDish(base, pools)
+}
+
+/**
+ * A MEAL OUT SHRINKS THE REST OF THE DAY (his 12 Nov 2026 ruling, "Ask: light/normal/big": the size "drives how much
+ * the rest of the day shrinks"). The day is re-planned around the meal out first (it is his own meal); when that still
+ * runs over on calories, the day's other free meals are made smaller together by one factor, never more than a quarter
+ * (the app's own "still the same dish" limit, AROUND_EATEN_MIN), and what is left over is said by the day's verdict.
+ * CSCS delegation, population nutrition: no meal is skipped or halved to "earn" a night out, and protein is mostly kept
+ * (measured 12 Nov 2026 over four targets and six days: a big night 447 kcal over with the rest re-planned only, 244
+ * with this, protein 98% of target on average). Never touches a pin, a leftover lunch or a meal cooked for him.
+ */
+function shrinkAroundEatingOut(day: AssembledDay, pins: Partial<Record<MealSlotName, PoolOption>>, targets: MacroTargets): AssembledDay {
+  const slots = Object.keys(day.chosen) as MealSlotName[]
+  const free = slots.filter(s => {
+    const o = day.chosen[s]
+    return o && !pins[s] && o.leftoverFrom !== 'dinner' && !isCookedElsewhere(o)
+  })
+  const kcal = (ss: MealSlotName[]) => ss.reduce((n, s) => n + (day.chosen[s]?.macros.calories ?? 0), 0)
+  const freeKcal = kcal(free)
+  const fixedKcal = kcal(slots.filter(s => !free.includes(s)))
+  if (free.length === 0 || freeKcal <= 0 || fixedKcal + freeKcal <= targets.calories * 1.05) return day
+  const factor = Math.max(AROUND_EATEN_MIN, (targets.calories - fixedKcal) / freeKcal)
+  if (!(factor < 1)) return day
+  const chosen = { ...day.chosen }
+  for (const s of free) chosen[s] = resizeDish(day.chosen[s]!, factor) ?? day.chosen[s]
+  const totals = (Object.values(chosen) as PoolOption[]).reduce((a, o) => ({
+    calories: a.calories + o.macros.calories, protein: a.protein + o.macros.protein, carbs: a.carbs + o.macros.carbs, fat: a.fat + o.macros.fat,
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
+  return { ...day, chosen, totals, withinTolerance: dayVerdict(totals, targets).onTarget }
 }
 
 /** One date's meals, and the pool and rotation that served them. */

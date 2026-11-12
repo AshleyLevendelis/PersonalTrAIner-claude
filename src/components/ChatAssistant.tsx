@@ -61,7 +61,8 @@ import type { MealRefit } from '@/lib/meal-refit'
 import type { TopUpOutcome, TopUpPlan } from '@/lib/meal-top-up'
 import type { MealDayMoveArgs, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
 import { rebalanceSaid, rebalanceAskText, mealsNamed, type MealRebalanceController, type MealRebalancePayload } from '@/lib/meal-rebalance'
-import { DEFAULT_POOL_SIZE } from '@/lib/meal-generation'
+import { DEFAULT_POOL_SIZE, computeSlotBudgets } from '@/lib/meal-generation'
+import { EATING_OUT_REFUSALS, EATING_OUT_SIZES, EATING_OUT_WORDS, eatingOutMacros, eatingOutSizeSaid, type EatingOutController, type EatingOutSize } from '@/lib/eating-out'
 import { executeMealMove, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { detectTodayClaim, todayClaimFloor, type TodayFacts } from '@/lib/today-claim'
@@ -403,6 +404,8 @@ interface ChatAssistantProps {
    * write and the Undo, so the coach cannot offer a move or an amount the sheet would not. Absent: no plan to work from.
    */
   onMealRebalance?: MealRebalanceController
+  /** Marks a meal out, or puts it back: the same controller the meal sheet on Nutrition calls (his 12 Nov 2026 ruling). */
+  onEatingOut?: EatingOutController
   /** Fired after a confirmed propose_meal_swap executes — mirrors App.tsx's handleSwapMealSlot's setManualMealPicks, the ONLY thing that makes a swapped-in pool option actually render as today's pick. Without this the receipt would claim a swap the Nutrition tab never shows — exactly the incident this framework exists to prevent. */
   /** Returns whether the pick actually persisted — a receipt must never say "Swapped" for a write that didn't land. */
   onMealSwapApplied: (slot: MealSlotName, chosenName: string) => Promise<boolean>
@@ -509,7 +512,7 @@ const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan — 
 /** The cards that would put a food on her plate: a named food her restrictions keep out never gets one (H41). */
 const FOOD_OFFER_KINDS = new Set(['propose_meal_swap', 'propose_meal_addition', 'propose_custom_meal', 'propose_meal_food_add', 'propose_meal_food_replace'])
 
-export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onMealKnockOn, onMealKnockOnMove, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onEatingOut, onMealKnockOn, onMealKnockOnMove, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -2688,6 +2691,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (pendingAction.kind === 'propose_session_activity_swap') return 'Want me to swap that day over?'
     if (pendingAction.kind === 'propose_circuit_log') return 'Want me to log this workout?'
     if (pendingAction.kind === 'propose_cardio_log') return 'Want me to log that?'
+    if (pendingAction.kind === 'propose_eating_out') return 'Want me to mark that meal as eating out?'
     if (pendingAction.kind === 'propose_session_move') return 'Want me to move that session?'
     const intentVerb = INTENT_PROPOSAL_VERB[pendingAction.kind]
     if (intentVerb) return `Want me to ${intentVerb} **${rows[0].after}**?`
@@ -4152,6 +4156,48 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         lead: ask(`mark ${dayName} as ${activityName} instead of your lift`),
         rows: [{ field: dayName, before: session.focus, after: activityName }],
         implications,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * EATING OUT (his 12 Nov 2026 request and ruling, "Ask: light/normal/big"). The coach names the day and the meal; the
+   * SIZE comes only from his own words in the message he sent (eatingOutSizeSaid), never from the coach's argument,
+   * and when he has not said one THE APP ASKS, with the three as buttons whose words carry the size, the meal and the
+   * day, so a tap answers it. The estimate on the card is the same one the meal sheet saves (eatingOutMacros).
+   */
+  const buildEatingOutProposal = (rawArgs: Record<string, unknown>, userSaid: string):
+    | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: { date: string; slot: MealSlotName; size: EatingOutSize }; diff: import('@/lib/pending-actions-store').ProposalDiff }
+    | { ok: false; refusal: string } => {
+    const today = activeSession.date
+    const date = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date) ? rawArgs.date : today
+    const slotArg = String(rawArgs.meal_slot ?? 'dinner').toLowerCase()
+    const slot = (['breakfast', 'lunch', 'dinner', 'snack'] as MealSlotName[]).find(s => s === slotArg) ?? 'dinner'
+    if (!onEatingOut) return { ok: false, refusal: EATING_OUT_WORDS.notSaved }
+    if (!onEatingOut.dates.includes(date)) return { ok: false, refusal: EATING_OUT_REFUSALS.outsideWindow }
+    const dayWord = date === today ? "today's" : `${dayNameOf(date)}'s`
+    const size = eatingOutSizeSaid(userSaid)
+    if (!size) {
+      const chipDay = date === today ? 'today' : `on ${dayNameOf(date)}`
+      return { ok: false, refusal: `${EATING_OUT_WORDS.chatAsk(slot, dayWord)}\n[QUICK_REPLIES: ${EATING_OUT_SIZES.map(sz => `"${EATING_OUT_WORDS.chatChip(sz, slot, chipDay)}"`).join(' | ')}]` }
+    }
+    if (!macros) return { ok: false, refusal: EATING_OUT_REFUSALS.noTargets }
+    const budget = computeSlotBudgets(macros, profile.meals_per_day, profile.include_snacks)[slot]
+    if (!budget || !(budget.calories > 0)) return { ok: false, refusal: EATING_OUT_REFUSALS.noSuchMeal(slot) }
+    const est = eatingOutMacros(budget, size)
+    const before = date === today
+      ? (mealPlan.find(d => d.meal.toLowerCase() === slot)?.items?.[0] as { name?: string } | undefined)?.name ?? ''
+      : upcomingMeals?.find(u => u.date === date)?.meals[slot] ?? ''
+    return {
+      ok: true,
+      scopeKey: `${profile.id}:propose_eating_out:${date}:${slot}`,
+      preconditions: { date, slot },
+      payload: { date, slot, size },
+      diff: {
+        lead: ask(`mark ${dayWord} ${slot} as eating out`),
+        rows: [{ field: `${dayWord.replace(/^\w/, c => c.toUpperCase())} ${slot}`, before, after: `${EATING_OUT_WORDS.label}, ${EATING_OUT_WORDS.sizeLabel[size].toLowerCase()} (about ${est.calories.toLocaleString('en-GB')} kcal, an estimate)` }],
+        implications: [{ severity: 'info', text: 'The rest of the day fits around it, and it stays off your shopping list. Tell me what you order and I can estimate the real thing.' }],
         reversible: true,
       },
     }
@@ -6225,6 +6271,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             // move above; two named without one ("lunch and dinner are over") get the sentence that offers it.
             : REBALANCE.refitFits(mealsNamed(userSaid).length >= 2)
         }
+      } else if (result.proposal.kind === 'propose_eating_out') {
+        const out = buildEatingOutProposal(result.proposal.rawArgs ?? {}, userSaid)
+        if (out.ok) built = { scopeKey: out.scopeKey, preconditions: out.preconditions, payload: out.payload as unknown as Record<string, unknown>, diff: out.diff }
+        else refusal = out.refusal
       } else if (result.proposal.kind === 'propose_cardio_log') {
         const cardio = buildCardioLogProposal(result.proposal.rawArgs ?? {})
         if (cardio.ok) built = { scopeKey: cardio.scopeKey, preconditions: cardio.preconditions, payload: cardio.payload as unknown as Record<string, unknown>, diff: cardio.diff }
@@ -7144,6 +7194,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // payload is three numbers precisely so the write reads live state.
       // Asking again after a target move re-offers, which is the way back.
       undoToken = undefined
+    } else if (row.kind === 'propose_eating_out') {
+      // ONE WRITE FOR BOTH SURFACES: the meal sheet's sizes call this same function.
+      const payload = row.payload as unknown as { date: string; slot: MealSlotName; size: EatingOutSize }
+      const today = getSessionDateContext(profile.id).date
+      const r = onEatingOut ? await onEatingOut.mark(payload.date, payload.slot, payload.size) : { ok: false as const, reason: EATING_OUT_WORDS.notSaved }
+      receipt = r.ok ? { landed: [`${payload.slot}: ${EATING_OUT_WORDS.label}`], failed: [], previousMeal: r.previous } : { landed: [], failed: [{ op: 'propose_eating_out', error: r.reason }] }
+      title = r.ok ? RECEIPTS['propose_eating_out'].done : RECEIPTS['propose_eating_out'].failed
+      rows = r.ok ? [{ label: DAY_MOVE.rowLabel(dayLabel(payload.date, today), payload.slot), detail: `${EATING_OUT_WORDS.sizeLabel[payload.size]}, about ${r.option.macros.calories.toLocaleString('en-GB')} kcal` }] : []
+      undoToken = r.ok ? row.id : undefined
     } else if (row.kind === 'propose_cardio_log') {
       const payload = row.payload as unknown as CardioLogPayload
       const result = await executeCardioLog(profile, payload, editedScope === 'instead')
@@ -7942,6 +8001,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const undone = await undoRestDay(profile.id, row.payload as unknown as RestDayPayload)
         onLogsUpdated?.()
         if (!undone) return { refused: RECEIPTS_UNDONE.failed, keep: true }
+      } else if (row.kind === 'propose_eating_out') {
+        // Puts back the meal it showed before (kept on the receipt), through the function the screen's Undo calls.
+        const payload = row.payload as unknown as { date: string; slot: MealSlotName }
+        const back = onEatingOut ? await onEatingOut.clear(payload.date, payload.slot, row.result?.previousMeal ?? null) : false
+        if (!back) return { refused: RECEIPTS_UNDONE.failed, keep: true }
       } else if (row.kind === 'propose_cardio_log') {
         // AN UNDO IS A WRITE (27 Oct 2026): one that did not save says so and keeps its button, never "undone".
         const undone = await undoCardioLog(profile.id, row.payload as unknown as CardioLogPayload)

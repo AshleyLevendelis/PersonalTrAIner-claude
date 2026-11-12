@@ -90,6 +90,8 @@ export interface PendingActionReceipt {
   scope?: string
   /** What every plan week read once the card landed (offer-still-holds.ts), so Undo can tell a later change. */
   planAfter?: Record<string, string>
+  /** A meal marked as eating out: the dish it showed before, so Undo puts THAT back (eating-out.ts). */
+  previousMeal?: string | null
 }
 
 const PENDING_WINDOW_MINUTES = 10

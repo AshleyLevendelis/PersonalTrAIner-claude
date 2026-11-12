@@ -45,6 +45,7 @@ import { cookedHint } from '@/lib/as-weighed'
 import { methodSteps } from '@/lib/method-steps'
 import { revealBelowTap } from '@/components/nutrition/reveal'
 import { MealMacros } from '@/components/nutrition/NutritionRings'
+import { EATING_OUT_SIZES, EATING_OUT_WORDS, eatingOutSizeOf, isEatingOut, type EatingOutController, type EatingOutSize } from '@/lib/eating-out'
 const MealMoveSheet = lazyWithReload(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
 const MealFoodAddSheet = lazyWithReload(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
 
@@ -160,6 +161,11 @@ interface MealPlanProps {
    */
   dayMove?: MealDayMoveController
   /**
+   * EATING OUT (his 12 Nov 2026 ruling, "Ask: light/normal/big"): mark this day's meal as out, at a size he chooses, or
+   * put it back. From App, the same controller the coach's card uses. Absent, no meal offers it.
+   */
+  eatingOut?: EatingOutController
+  /**
    * What a swap did to this day's other meals (runs 3-4, M34; her "Resize,
    * else leave"), and the Undo that keeps them at their planned sizes.
    */
@@ -191,7 +197,7 @@ export function MealPlan({
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, onOpenMyMeals, dietaryPreferences = [], avoidFoods = [],
   mealsPerDay, includeSnacks, onMealPickApplied,
   onSwapSlot, onUndoSwap, onRegenerateSlot, onMakeOneNew, onFindMoreOptions, onRegenerateAll, upcoming, dayMove, regeneratingAll = false,
-  heldAround, onKeepHeldSizes,
+  heldAround, onKeepHeldSizes, eatingOut,
 }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
   // A slot generation requested and asked for (present as a key in `pools`,
@@ -315,6 +321,22 @@ export function MealPlan({
   const shownOption = (slot: MealSlotName): PoolOption | null => shown.slots.find(r => r.slot === slot)?.option ?? chosen[slot] ?? null
   const aroundLine = aroundEatenLine(shown.aroundEaten)
   const heldLine = heldAround ? heldAroundLine(heldAround) : null
+  // EATING OUT's line and its Undo (his 8 Nov "Undo line" shape): what was marked, and the dish to put back.
+  const [outLine, setOutLine] = useState<{ slot: MealSlotName; text: string; undo: { previous: string | null } | null } | null>(null)
+  const [outBusy, setOutBusy] = useState(false)
+  const dayWord = upcoming ? `${upcoming.dayName}'s` : "Today's"
+  /** Marks a meal out; null when it landed, else the reason in his words. */
+  const markOut = eatingOut ? async (slot: MealSlotName, size: EatingOutSize): Promise<string | null> => {
+    const r = await eatingOut.mark(date, slot, size)
+    if (!r.ok) return r.reason
+    setOutLine({ slot, text: EATING_OUT_WORDS.marked(slot, dayWord, size), undo: { previous: r.previous } })
+    return null
+  } : undefined
+  const clearOut = eatingOut ? async (slot: MealSlotName, restore: string | null): Promise<boolean> => {
+    const ok = await eatingOut.clear(date, slot, restore)
+    setOutLine(ok ? { slot, text: EATING_OUT_WORDS.cleared(slot, dayWord), undo: null } : { slot, text: EATING_OUT_WORDS.notSaved, undo: null })
+    return ok
+  } : undefined
 
   // A MEAL ALREADY EATEN IS NOT A WARNING — roadmap item 9. The banner tells
   // you which of today's meals to swap or regenerate; a meal you have already
@@ -443,6 +465,11 @@ export function MealPlan({
       listOwnMeals={() => (pools[slot] ?? []).filter(o => !o.breaksRestriction && !isCookedElsewhere(o)
         && checkMealAgainstRestrictions(o.name, o.ingredients, dietaryPreferences, avoidFoods).ok).slice(0, 6)}
       onCookMyOwn={name => onSwapSlot(slot, name)}
+      eatingOut={markOut && clearOut && isEatingOut(shownOption(slot)) ? {
+        size: eatingOutSizeOf(shownOption(slot)),
+        resize: size => markOut(slot, size),
+        notOut: () => clearOut(slot, null),
+      } : undefined}
       onLog={async option => {
         if (!profileId) return
         logMealEaten(profileId, date, slot, option.name, {
@@ -516,6 +543,7 @@ export function MealPlan({
               : null}
             date={date}
             dayMove={dayMove}
+            onEatingOut={markOut ? size => markOut(slot, size) : undefined}
             onRegenerate={onRegenerateSlot}
             onMakeOneNew={upcoming ? undefined : onMakeOneNew}
             onFindMore={upcoming ? undefined : onFindMoreOptions}
@@ -607,6 +635,18 @@ export function MealPlan({
           )}
           {heldAround.kind === 'kept' && onKeepHeldSizes && (
             <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="held-around-refit" onClick={() => onKeepHeldSizes(date, false)}>Fit around my swap</button>
+          )}
+        </p>
+      )}
+
+      {outLine && (
+        <p className="flex items-start justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="eating-out-line">
+          <span>{outLine.text}</span>
+          {outLine.undo && clearOut && (
+            <button type="button" disabled={outBusy} className="hit-slop-44 shrink-0 font-semibold text-primary-text" data-testid="eating-out-undo"
+              onClick={async () => { setOutBusy(true); try { await clearOut(outLine.slot, outLine.undo!.previous) } finally { setOutBusy(false) } }}>
+              Undo
+            </button>
           )}
         </p>
       )}
@@ -892,8 +932,11 @@ function MealSlotRow({
   upcoming,
   date,
   dayMove,
+  onEatingOut,
   variant = 'later',
 }: {
+  /** Marks this meal out at a size (his "Ask: light/normal/big"); resolves to null when it landed, else the reason. */
+  onEatingOut?: (size: EatingOutSize) => Promise<string | null>
   /**
    * DESIGN HANDOFF 2b, 10 Oct 2026. 'upnext': the first meal of today not
    * yet logged, as a card with Log it / Swap / method. 'later': a plain row
@@ -966,6 +1009,9 @@ function MealSlotRow({
   // not move on a failed write; now a line under the row says why not.
   const [favouriteError, setFavouriteError] = useState<string | null>(null)
   const [moveOpen, setMoveOpen] = useState(false)
+  const [outOpen, setOutOpen] = useState(false)
+  const [outError, setOutError] = useState<string | null>(null)
+  const [outSaving, setOutSaving] = useState<EatingOutSize | null>(null)
   const [addOpen, setAddOpen] = useState(false)
   const [addNote, setAddNote] = useState<string | null>(null)
   const [moveNote, setMoveNote] = useState<string | null>(null)
@@ -1594,8 +1640,21 @@ function MealSlotRow({
                   {/* MOVE and REGENERATE, the two changes to the whole meal that are not a swap. Move is hidden
                       when the screen cannot finish the job (no profile, no targets, no pick path), on the same rule
                       the food edits follow: a control that cannot finish is worse than no control. */}
-                  {(((moveContext && onMealPickApplied) || dayMove) || !upcoming) && (
+                  {(((moveContext && onMealPickApplied) || dayMove) || !upcoming || (onEatingOut && !isLogged)) && (
                     <div className="flex flex-wrap items-center gap-2" data-meal-sheet-actions>
+                      {/* EATING OUT (12 Nov 2026): never on a meal already eaten, which is a record, not a plan. */}
+                      {onEatingOut && !isLogged && (
+                        <button
+                          type="button"
+                          onClick={() => { setOutOpen(o => !o); setOutError(null) }}
+                          aria-expanded={outOpen}
+                          className="flex min-h-[44px] items-center gap-1.5 rounded-xl px-3.5 text-[0.75rem] font-medium"
+                          style={{ background: 'var(--surface-raised)' }}
+                          data-testid="eating-out-open"
+                        >
+                          <UtensilsCrossed className="size-3.5" aria-hidden /> {EATING_OUT_WORDS.offer}
+                        </button>
+                      )}
                       {((moveContext && onMealPickApplied) || dayMove) && (
                         <button
                           type="button"
@@ -1623,6 +1682,35 @@ function MealSlotRow({
                           {busy ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />} Regenerate
                         </button>
                       )}
+                    </div>
+                  )}
+                  {outOpen && onEatingOut && !isLogged && (
+                    /* HIS RULING: THE APP ASKS how big a night it is. Three answers, each with what it means. */
+                    <div className="space-y-2" data-testid="eating-out-sizes">
+                      <p className="text-[0.8125rem] font-medium">{EATING_OUT_WORDS.question(slot)}</p>
+                      <div className="grid grid-cols-3 gap-2">
+                        {EATING_OUT_SIZES.map(size => (
+                          <button
+                            key={size}
+                            type="button"
+                            disabled={outSaving !== null}
+                            onClick={async () => {
+                              setOutSaving(size); setOutError(null)
+                              try {
+                                const err = await onEatingOut(size)
+                                if (err) setOutError(err)
+                                else { setOutOpen(false); onToggle() }
+                              } finally { setOutSaving(null) }
+                            }}
+                            className="flex min-h-[56px] flex-col items-center justify-center gap-0.5 rounded-xl border border-border px-2 text-center disabled:opacity-60"
+                            data-eating-out-size={size}
+                          >
+                            <span className="text-[0.8125rem] font-semibold">{outSaving === size ? 'Saving…' : EATING_OUT_WORDS.sizeLabel[size]}</span>
+                            <span className="text-[0.65625rem] leading-tight text-muted-foreground">{EATING_OUT_WORDS.sizeHint[size]}</span>
+                          </button>
+                        ))}
+                      </div>
+                      {outError && <p role="alert" className="text-[0.71875rem] text-[color:var(--role-warn-text)]" data-testid="eating-out-error">{outError}</p>}
                     </div>
                   )}
                   {moveOpen && ((moveContext && onMealPickApplied) || dayMove) && (
@@ -1850,7 +1938,7 @@ function MealSlotRow({
  * a badge saying where they come from (assumed, or an estimate of a menu he gave). It can be logged as eaten, and on
  * a day he is cooking for himself he picks one of his plan's meals instead, for that day only.
  */
-function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle, loggedEvents, hasOwnMeals, listOwnMeals, onCookMyOwn, onLog, onUnlog }: {
+function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle, loggedEvents, hasOwnMeals, listOwnMeals, onCookMyOwn, onLog, onUnlog, eatingOut }: {
   slot: MealSlotName
   variant: 'upnext' | 'later' | 'eaten'
   option: PoolOption
@@ -1865,6 +1953,11 @@ function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle,
   onCookMyOwn: (name: string) => Promise<boolean | void>
   onLog: (option: PoolOption) => Promise<void>
   onUnlog: (clientIds: string[]) => Promise<boolean>
+  /**
+   * A MEAL MARKED AS EATING OUT (12 Nov 2026): its size, and the two things he can do to it, a different size or put it
+   * back on the plan. Present only on a meal out.
+   */
+  eatingOut?: { size: EatingOutSize | null; resize: (size: EatingOutSize) => Promise<string | null>; notOut: () => Promise<boolean> }
 }) {
   const [busy, setBusy] = useState(false)
   const [ownMeals, setOwnMeals] = useState<PoolOption[] | null>(null)
@@ -1888,7 +1981,7 @@ function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle,
         <span className="flex items-start gap-2">
         <span className="min-w-0 flex-1">
           <span className={`block text-[0.65625rem] uppercase tracking-[.12em] ${variant === 'upnext' ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
-            {SLOT_LABEL[slot]}{variant === 'upnext' ? ' · next' : ''}{variant === 'eaten' && !upcoming ? ' · eaten' : ''} · <span data-testid="elsewhere-label">{ELSEWHERE_WORDS.label}</span>
+            {SLOT_LABEL[slot]}{variant === 'upnext' ? ' · next' : ''}{variant === 'eaten' && !upcoming ? ' · eaten' : ''} · <span data-testid="elsewhere-label">{eatingOut ? EATING_OUT_WORDS.label : ELSEWHERE_WORDS.label}</span>
           </span>
           <span data-meal-name={slot} className="mt-0.5 block line-clamp-2 text-[0.96875rem] font-semibold leading-[1.3]" style={{ color: soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
             {name}
@@ -1907,7 +2000,7 @@ function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle,
         <MealMacros protein={shown.protein} carbs={shown.carbs} fat={shown.fat} className="mt-2" />
         {!isLogged && (
           <span data-testid="elsewhere-badge" className="mt-1.5 inline-block rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[.08em] text-muted-foreground">
-            {state === 'assumed' ? ELSEWHERE_WORDS.assumedBadge : ELSEWHERE_WORDS.estimateBadge}
+            {eatingOut ? EATING_OUT_WORDS.badge : state === 'assumed' ? ELSEWHERE_WORDS.assumedBadge : ELSEWHERE_WORDS.estimateBadge}
           </span>
         )}
         </span>
@@ -1915,7 +2008,7 @@ function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle,
       {expanded && (
         <div className="space-y-2.5 pb-3 pl-[38px]" data-testid="elsewhere-panel">
           <p className="text-[0.75rem] leading-snug text-muted-foreground" data-testid="elsewhere-note">
-            {state === 'assumed' ? ELSEWHERE_WORDS.assumedNote(slot) : ELSEWHERE_WORDS.estimateNote}
+            {eatingOut ? EATING_OUT_WORDS.note(eatingOut.size ?? 'normal', Math.round(option.macros.calories)) : state === 'assumed' ? ELSEWHERE_WORDS.assumedNote(slot) : ELSEWHERE_WORDS.estimateNote}
           </p>
           {state === 'estimate' && option.ingredients.length > 0 && (
             <ul className="space-y-0.5 text-[0.75rem] text-muted-foreground" data-testid="elsewhere-foods">
@@ -1934,7 +2027,24 @@ function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle,
               </Button>
             )
           )}
-          {!isLogged && hasOwnMeals && (
+          {eatingOut && !isLogged && (
+            <div className="space-y-2" data-testid="eating-out-change">
+              <div className="grid grid-cols-3 gap-2" role="group" aria-label={EATING_OUT_WORDS.question(slot)}>
+                {EATING_OUT_SIZES.map(size => (
+                  <button key={size} type="button" disabled={busy} aria-pressed={eatingOut.size === size} data-eating-out-size={size}
+                    onClick={() => void run(async () => { if (eatingOut.size === size) return; const err = await eatingOut.resize(size); if (err) setNote(err) })}
+                    className={`min-h-[44px] rounded-xl border px-2 text-[0.8125rem] font-semibold ${eatingOut.size === size ? 'border-primary text-primary-text' : 'border-border text-muted-foreground'}`}>
+                    {EATING_OUT_WORDS.sizeLabel[size]}
+                  </button>
+                ))}
+              </div>
+              <Button variant="outline" disabled={busy} className="min-h-[44px] w-full" data-testid="eating-out-clear"
+                onClick={() => void run(async () => { const ok = await eatingOut.notOut(); if (!ok) setNote(EATING_OUT_WORDS.notSaved) })}>
+                {EATING_OUT_WORDS.notOut}
+              </Button>
+            </div>
+          )}
+          {!eatingOut && !isLogged && hasOwnMeals && (
             picking ? (
               <div className="space-y-1.5" data-testid="elsewhere-own-list">
                 <p className="text-[0.75rem] text-muted-foreground">{ELSEWHERE_WORDS.ownPrompt(upcoming)}</p>

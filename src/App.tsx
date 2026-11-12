@@ -3431,6 +3431,7 @@ function App() {
               upcomingDay={mealDays.openDay}
               mealWeek={mealDays.week}
               dayMove={mealDays.dayMove}
+              eatingOut={mealDays.eatingOut}
               heldAround={mealDays.today?.day.heldAround}
               onKeepHeldSizes={mealDays.keepHeldSizes}
             />
@@ -3513,6 +3514,7 @@ function App() {
               onMealDayMoveConfirm={mealDays.dayMove.confirm}
               onMealDayMoveUndo={mealDays.dayMove.undo}
               onMealRebalance={mealDays.dayMove.rebalance}
+              onEatingOut={mealDays.eatingOut}
               onMealKnockOn={mealDays.dayMove.knockOn}
               onMealKnockOnMove={mealDays.dayMove.knockOnMove}
               mealTopUp={mealTopUpPlan ? { ...mealTopUpPlan, building: initialMealBuild } : null}

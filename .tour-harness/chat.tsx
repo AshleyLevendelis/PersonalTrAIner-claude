@@ -881,6 +881,7 @@ function Harness() {
               onMealDayMoveConfirm={DAYMOVE ? mealDays.dayMove.confirm : undefined}
               onMealDayMoveUndo={DAYMOVE ? mealDays.dayMove.undo : undefined}
               onMealRebalance={DAYMOVE ? mealDays.dayMove.rebalance : undefined}
+              onEatingOut={DAYMOVE ? mealDays.eatingOut : undefined}
               onMealKnockOn={mealDays.dayMove.knockOn}
               onMealKnockOnMove={mealDays.dayMove.knockOnMove}
               mealTopUp={TOPUP && macros ? { ...topUpPlan(pools as never, topUpSlots as never, macros), building: false } : null}
