@@ -149,12 +149,16 @@ async function main() {
   const row = read('src/components/exercise/WeekContextRow.tsx')
   check('Exercise: the ⋯ menu keeps What happened? and Session history', /data-testid="what-happened-item"/.test(row) && /Session history/.test(row))
   check('Exercise: the week number still opens the programme', /onClick=\{onOpenProgram\}\s*data-testid="week-context-header"/.test(row))
-  check('Exercise: the meter counts the strip\'s days (tallyWeek, weekSetCount)', /tallyWeek\(days,/.test(row) && /weekSetCount\(days\)/.test(row))
+  // RE-ANCHORED 12 Nov 2026 (his Exercise Week handoff): the week meter left the day view ("remove the ring and the
+  // three lines of text"); the week's count is said once, on the week view's line, from the training week's own tally
+  // (useTrainingWeek -> tallyWeek over the strip's days), never counted again on the row.
+  check('Exercise: the week count is the strip\'s days\' own tally, said on the week view', /weekTrain\.sessionsDone\}<\/span> of\{' '\}[\s\S]{0,120}weekTrain\.sessionsPlanned\}<\/span> sessions done/.test(read('src/components/exercise/TodayPanel.tsx')) && !/tallyWeek\(/.test(row))
   check('Exercise: the old "See the whole program" link has not come back', !/See the whole program/.test(row))
   const panel = read('src/components/exercise/TodayPanel.tsx')
   check('Exercise: the programme is still one tap away (the week number), and Tools still opens it', /onClick=\{onOpenProgram\}\s*data-testid="week-context-header"/.test(row) && /label: 'Your program'[^\n]*programHash\(\)/.test(tools))
   // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the shared count moved into the glowing card, as "N of M working sets".
-  check('Exercise: today\'s lifts carry the shared set count', /data-testid="hero-sets">\{heroCount\.logged\} of \{heroCount\.planned\} working sets/.test(panel) && /const heroCount = [^\n]*sessionSetCount\(workout, logs\)/.test(panel))
+  // RE-ANCHORED 12 Nov 2026 (Exercise Week X1b): "4 of 18 sets", the design's words, same count.
+  check('Exercise: today\'s lifts carry the shared set count', /data-testid="hero-sets">\s*<span className="tabular-mono">\{heroCount\.logged\} of \{heroCount\.planned\}<\/span> sets/.test(panel) && /const heroCount = [^\n]*sessionSetCount\(workout, logs\)/.test(panel))
 
   console.log('\n6. Less is more (her "Move things", 30 Oct 2026): said once, the rest one tap away')
   const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/^\s*\/\/.*$/gm, '')
@@ -209,7 +213,8 @@ async function main() {
     check('Nutrition: the planned day is one line with the engine\'s verdict, macros behind a tap', /data-testid="day-kcal"/.test(hero) && /\{deltaLabel\}/.test(hero) && /\{open && \(/.test(hero) && hero.indexOf('{open && (') < hero.indexOf('{targets.protein} P'))
   }
   check('Nutrition: the allergy line is still under the list', /Ingredients are filtered, not verified\. Check labels if you have an allergy\./.test(mealPlan))
-  check('Exercise: no week rings on the page', !/<RingMeter/.test(strip(row)) && /data-testid="week-meter-count">\{tally\.sessionsDone\} of \{tally\.sessionsPlanned\}/.test(row))
+  // RE-ANCHORED 12 Nov 2026 (Exercise Week): no rings at all now, and no week meter on the day view.
+  check('Exercise: no week rings on the page', !/<RingMeter/.test(strip(row)) && !/week-meter/.test(strip(row)))
   check('Exercise: "Feeling tight?" is on the warm-up row', /trailing=\{[\s\S]{0,600}data-testid="tightness-open"/.test(panel))
   // RE-ANCHORED 31 Oct 2026 (Exercise 2a): "Add exercise" is the one button and "I also did…" the quiet line under it;
   // both ways to add are still there, once each, and nothing else at the foot.

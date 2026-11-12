@@ -108,7 +108,8 @@ console.log('\n3. The ramp folds; its rows are the same rows, never counted')
 {
   const grid = code('src/components/exercise/SetGrid.tsx')
   const row = code('src/components/exercise/ExerciseRow.tsx')
-  check('one row with "Ramp up", how far, and "not counted", and a toggle', /data-testid="warmup-caption"/.test(grid) && /aria-expanded=\{rampOpen\}/.test(grid) && />Ramp up</.test(grid) && />not counted</.test(grid))
+  // RE-ANCHORED 12 Nov 2026 (his Exercise Week handoff): the fold reads "Warm-up", his word for it on the card.
+  check('one row with "Warm-up", how far, and "not counted", and a toggle', /data-testid="warmup-caption"/.test(grid) && /aria-expanded=\{rampOpen\}/.test(grid) && />Warm-up</.test(grid) && />not counted</.test(grid))
   check('folded rows are left out only while the fold is shut', /if \(warm && !showWarm\) return null/.test(grid) && /const showWarm = !hasFold \|\| rampOpen/.test(grid))
   check('open, they are the same grid rows, saved as WARM-UPS through the one save', /data-testid=\{warm \? 'warmup-row'/.test(grid) && /isWarmup: warm,/.test(grid) && /onClick=\{\(\) => handleSaveSet\(ref\)\}/.test(grid))
   check('open while ANY of the grid\'s build-up rows is still to do (an added one too), folded once done, then her choice', /const rampOpen = rampChoice \?\? rampDone < warmupRowNumbers\.length/.test(grid) && /const rampDone = warmupRowNumbers\.filter\(n => warmupLogs\.some\(l => l\.set_number === n\)\)\.length/.test(grid))
@@ -138,7 +139,7 @@ console.log('\n4. The plate button sits in the box and opens at the row\'s weigh
 console.log('\n5. Every change in the ⋮, on every row; "Add exercise" and "I also did…"')
 {
   const row = code('src/components/exercise/ExerciseRow.tsx')
-  check('a closed row carries the same ⋮ as the open card', /trailing=\{menu\}/.test(row) && /<div className="-mr-1 shrink-0">\{menu\}<\/div>/.test(row))
+  check('a closed row carries the same ⋮ as the open card', /trailing=\{menu\}/.test(row) && /<div className="-mr-1(\.5)? shrink-0">\{menu\}<\/div>/.test(row))
   const menuAt = row.indexOf('function ExerciseMenu')
   const menu = row.slice(menuAt)
   check('the menu holds swap, move, take out and ban', ['swap-exercise', 'move-up', 'move-down', 'remove-exercise', 'ban-exercise'].every(id => menu.includes(`data-testid="${id}"`)))

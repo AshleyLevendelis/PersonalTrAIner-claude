@@ -110,8 +110,12 @@ console.log('\n3. The tick says what it would save, by the save path\'s own fall
 console.log('\n4. The collapsed row')
 {
   const line = code('src/components/exercise/ExerciseLine.tsx')
-  check('the chip is the plan\'s own load string, which carries "per hand"', /ex\.suggested_load \?\? `~\$\{ex\.suggested_load_kg\}kg`/.test(line))
-  check('it is accent with an up-arrow only when the load progressed', /progressing && <ArrowUp/.test(line) && /data-load-chip=\{progressing \? 'up' : 'hold'\}/.test(line))
+  // RE-ANCHORED 12 Nov 2026 (his Exercise Week handoff): the load sits on the right of the name, drawn by the shared
+  // LoadBadgeView from exerciseLoadBadge, which reads the plan's own string. Same two properties, asked where they live.
+  const bar = code('src/components/exercise/ExerciseBar.tsx')
+  const wk = code('src/lib/exercise-week.ts')
+  check('the chip is the plan\'s own load string, which carries "per hand"', /exerciseLoadBadge\(ex,/.test(line) && /<LoadBadgeView badge=\{badge\} progressing=\{progressing\}/.test(line) && /splitLoadDisplay\(ex\.suggested_load \?\? `\$\{ex\.suggested_load_kg\}kg`\)/.test(wk))
+  check('it is accent with an up-arrow only when the load progressed', /progressing && <ArrowUp/.test(bar) && /data-load-chip=\{progressing \? 'up' : 'hold'\}/.test(bar))
   // RE-ANCHORED 31 Oct 2026 (tab polish, Exercise 2a): the dots became ONE status circle that fills as working sets
   // land. The property is unchanged: today's count only, nothing on a peek, done-of-planned and nothing else.
   check('the status circle only when today passes a count — a peeked day draws none', /setsDone != null && <StatusCircle done=\{done\} sets=\{ex\.sets\} \/>/.test(line))

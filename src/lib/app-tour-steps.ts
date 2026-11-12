@@ -132,8 +132,9 @@ export const TOUR_STEPS: TourStep[] = [
     // Steps MOVED here from Nutrition, and this is the one place the tour can
     // say so. Anyone who used the old Nutrition logger will otherwise go
     // looking for it on the tab it left.
-    // ONE-PAGE EXERCISE (17 Oct 2026): the week is two rings and the strip; the phase is the Program row.
-    copy: 'Your program lives here — this week as two rings and a strip of days, and my notes on the week (tap to read the whole thing). Today’s session sits right below, and the Program row at the bottom shows the phase you’re in.',
+    // EXERCISE WEEK (his handoff, 12 Nov 2026): no rings; the strip of days, "Week" for every day on one screen, and
+    // "Program" for the whole plan and its phases.
+    copy: 'Your program lives here — a strip of this week’s days, my notes on the week (tap to read the whole thing), and today’s session right below. Tap Week to see every day’s session on one screen, and Program for the whole plan and the phase you’re in.',
   },
   {
     key: 'set', tab: 'exercise', target: 'setrow', gate: true,

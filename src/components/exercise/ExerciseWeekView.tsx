@@ -1,13 +1,13 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Check, ChevronDown, ChevronRight, ChevronUp, Dumbbell, Footprints, Moon } from 'lucide-react'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 import type { Exercise } from '@/lib/types'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { unloadedLoadLabel } from '@/lib/load-prescription'
-import { groupExercises, mainLiftGroupIndex } from '@/lib/session-derive'
 import { weekDayRow, weekMainLift, exerciseLoadBadge, loadPhrase, type WeekDayRow } from '@/lib/exercise-week'
-import { ExerciseLine, sectionLabelFor } from './ExerciseLine'
 import { Swatch } from './ExerciseBar'
+import { groupsUpTo } from './ReadOnlyDayList'
+import { groupExercises } from '@/lib/session-derive'
 
 // ---------------------------------------------------------------------------
 // XW3: THE WEEK ON ONE SCREEN (his Exercise Week handoff, 12 Nov 2026: "I like this way of seeing the upcoming week's
@@ -15,7 +15,8 @@ import { Swatch } from './ExerciseBar'
 // just the day's workout"). One row per day, Monday to Sunday, read off the training week the strip and Home read
 // (useTrainingWeek): a ring that is full with a tick when the day is done, the main lift and its weight, the minutes,
 // and "Done" or a chevron. A rest day is one quiet line. A tap opens a day in place, ONE at a time. Read-only, as browse
-// is: a day's whole list, with its ⋮, is "N more exercises ›", the peek the strip opens.
+// is: the opened day is drawn by the ONE read-only day list (each exercise with its ⋮, swap and ban, as on a peeked
+// day), its first few exercises only, and "N more exercises ›" is the peek the strip opens.
 // ---------------------------------------------------------------------------
 
 const DAY3: Record<string, string> = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun' }
@@ -25,21 +26,6 @@ const unloadedFor = (ex: Exercise): string | null => {
   const e = getExerciseEntry(ex.name)
   const stated = ex.suggested_load_kg != null || ex.suggested_assistance_kg != null || ex.suggested_added_load_kg != null
   return e && !stated ? unloadedLoadLabel(e) : null
-}
-
-/** The first few exercises of a day with the tag each wears (the same vocabulary as today's list). */
-function firstExercises(exercises: Exercise[]): { ex: Exercise; eyebrow?: string }[] {
-  const groups = groupExercises(exercises)
-  const main = mainLiftGroupIndex(groups, exercises)
-  const out: { ex: Exercise; eyebrow?: string }[] = []
-  groups.forEach((g, gi) => {
-    if (g.kind === 'superset') g.members.forEach((m, i) => out.push({ ex: m.ex, eyebrow: `Superset ${g.label}${i + 1}` }))
-    else {
-      const label = sectionLabelFor(g, gi === main)
-      out.push({ ex: g.ex, eyebrow: label === 'Accessory' ? undefined : label })
-    }
-  })
-  return out
 }
 
 function DayRing({ kind, done }: { kind: 'session' | 'recovery'; done: boolean }) {
@@ -58,9 +44,11 @@ function DayRing({ kind, done }: { kind: 'session' | 'recovery'; done: boolean }
   )
 }
 
-export function ExerciseWeekView({ days, todayName, onOpenDay }: {
+export function ExerciseWeekView({ days, todayName, onOpenDay, renderDay }: {
   days: TrainingWeekDay[]
   todayName: string
+  /** The opened day's first `limit` exercises, drawn by the shared read-only day list (TodayPanel wires its handlers). */
+  renderDay: (day: TrainingWeekDay, limit: number) => ReactNode
   /** Closes the week and shows that day: today's own view for today, the strip's peek for any other. */
   onOpenDay: (dayName: string) => void
 }) {
@@ -83,7 +71,11 @@ export function ExerciseWeekView({ days, todayName, onOpenDay }: {
         }
         const isOpen = open === day.date
         const session = day.session
-        const list = session && row.kind === 'session' ? firstExercises(session.exercises) : []
+        const total = session && row.kind === 'session' ? session.exercises.length : 0
+        // Whole groups, as the list draws them: a superset is never cut in half, so "N more" counts what is really left.
+        const shown = session && row.kind === 'session'
+          ? groupsUpTo(groupExercises(session.exercises), SHOWN).reduce((n, g) => n + (g.kind === 'single' ? 1 : g.members.length), 0)
+          : 0
         const main = session && row.kind === 'session' ? weekMainLift(session) : null
         const mainPhrase = main ? loadPhrase(exerciseLoadBadge(main, unloadedFor(main))) : null
         return (
@@ -132,18 +124,14 @@ export function ExerciseWeekView({ days, todayName, onOpenDay }: {
                     {session.plannedActivity.reason && <span className="mt-1 block text-[0.75rem] text-muted-foreground">{session.plannedActivity.reason}</span>}
                   </p>
                 )}
-                {list.slice(0, SHOWN).map(({ ex, eyebrow }, i) => (
-                  <div key={`${ex.name}-${i}`} className="border-t border-[color:var(--hairline)]" data-week-exercise={ex.name}>
-                    <ExerciseLine ex={ex} loadSource={ex.load_source as never} expanded={false} onToggleExpanded={() => onOpenDay(day.dayName)} eyebrow={eyebrow} />
-                  </div>
-                ))}
+                {row.kind === 'session' && <div className="border-t border-[color:var(--hairline)]" data-week-day-exercises data-week-day-total={total}>{renderDay(day, SHOWN)}</div>}
                 <button
                   type="button"
                   onClick={() => onOpenDay(day.dayName)}
                   className="flex min-h-11 w-full items-center justify-between border-t border-[color:var(--hairline)] text-[0.8125rem] font-semibold text-primary-text"
                   data-testid="week-day-more"
                 >
-                  {list.length > SHOWN ? `${list.length - SHOWN} more exercise${list.length - SHOWN === 1 ? '' : 's'}` : isToday ? "Open today's workout" : `Open ${day.dayName}`}
+                  {total > shown ? `${total - shown} more exercise${total - shown === 1 ? '' : 's'}` : isToday ? "Open today's workout" : `Open ${day.dayName}`}
                   <ChevronRight className="size-4" aria-hidden />
                 </button>
               </div>

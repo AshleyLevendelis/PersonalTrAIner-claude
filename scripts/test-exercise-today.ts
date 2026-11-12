@@ -92,7 +92,7 @@ check('Finish stays in the hero, one of it', (today.match(/Finish session/g) ?? 
 // never out of reach, which is why it was docked on 6 Sep.
 check('...and the card carries Start, the bar only while the card\'s button is out of view',
   /data-testid="hero-start"/.test(todayCode) && /new IntersectionObserver\(\(\[e\]\) => setHeroStartInView\(e\.isIntersecting\)\)/.test(todayCode)
-  && /\{!heroStartInView && !peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'idle' && \(/.test(todayCode))
+  && /\{!weekOpen && !heroStartInView && !peekWorkout && !isRestDay && !isActiveRecovery && workout && status === 'idle' && \(/.test(todayCode))
 
 // ---------------------------------------------------------------------------
 console.log('\n2. The coaching line: the most specific true thing, or nothing')
@@ -276,8 +276,15 @@ console.log('\n4. The week context is context — no card, tertiary, strip under
 // selected day of the strip — never as a panel around the row.
 // The row itself, up to the Program row (one-page Exercise, 17 Oct 2026), which is its own raised object.
 const rowOnly = contextRowCode.slice(0, contextRowCode.indexOf('export function ProgramRow') > 0 ? contextRowCode.indexOf('export function ProgramRow') : undefined)
-check('the --surface-raised box is gone — the fill is only the selected day\'s',
-  (rowOnly.match(/var\(--surface-raised\)/g) ?? []).length === 1 && /isSelected \? \{ background: 'var\(--surface-raised\)'/.test(rowOnly))
+// RE-ANCHORED 12 Nov 2026 (his Exercise Week handoff): today's cell is mint-tinted over the same raised fill, so the
+// fill appears twice — but still only on a day of the strip, never as a panel around the row.
+{
+  const stripAt = rowOnly.indexOf('data-exercise-strip')
+  const stripEnd = rowOnly.indexOf('data-testid="week-boundary-note"')
+  const fills = [...rowOnly.matchAll(/var\(--surface-raised\)/g)].map(m => m.index ?? -1)
+  check('the --surface-raised box is gone — the fill is only on a day of the strip (today\'s and the selected one)',
+    stripAt > 0 && stripEnd > stripAt && fills.length >= 1 && fills.every(i => i > stripAt && i < stripEnd) && /isSelected \? \{ background: 'var\(--surface-raised\)'/.test(rowOnly), { stripAt, stripEnd, fills })
+}
 check('...and so is the rounded panel it sat in', !/rounded-2xl/.test(contextRowCode))
 // One-page Exercise (5c·4, 17 Oct 2026): the page is titled "Exercise"; the plan position is the quiet line.
 // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the plan position is the small muted eyebrow over "Exercise".
@@ -285,9 +292,11 @@ check('the plan position is a quiet line, not foreground', /className="hit-slop-
 check('the tour anchor survived the restyle', /data-tour="extoday"/.test(contextRow))
 // RE-ANCHORED 30 Oct 2026: the week's rings and key became one line, and the strip sits under it.
 {
-  const line = contextRow.indexOf('data-testid="week-meter"')
-  const strip = contextRow.indexOf('className="mt-2 grid grid-cols-7 gap-1" data-exercise-strip')
-  check('the strip sits under the week line, seven equal columns', line !== -1 && strip !== -1 && line < strip, { line, strip })
+  // RE-ANCHORED 12 Nov 2026 (Exercise Week X1): the week line left with the rings ("remove the ring and the three
+  // lines of text"); the strip now sits under the header and its "Week" pill.
+  const line = contextRow.indexOf('data-testid="week-pill"')
+  const strip = contextRow.indexOf('className="mt-4 grid grid-cols-7 gap-1" data-exercise-strip')
+  check('the strip sits under the header, seven equal columns', line !== -1 && strip !== -1 && line < strip, { line, strip })
 }
 // The assistant has one name in UI text.
 check('nothing on this screen calls it "Coach"',

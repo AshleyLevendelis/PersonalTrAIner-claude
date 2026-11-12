@@ -25,6 +25,7 @@
 // ---------------------------------------------------------------------------
 
 import { readFileSync, readdirSync, statSync } from 'fs'
+import { exerciseLoadBadge } from '../src/lib/exercise-week'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { formatLoad, splitLoadDisplay, loadingMode, isPerSideLoad, takesPlateCalculator, unloadedLoadLabel, isExternallyLoaded } from '../src/lib/load-prescription'
@@ -112,7 +113,12 @@ console.log('\n2. No screen hand-rolls a weight string')
   // The two that were wrong, named — so a revert is caught by name as well as
   // by shape, and so this file records which they were.
   const line = readFileSync(join(ROOT, 'src/components/exercise/ExerciseLine.tsx'), 'utf8')
-  check('ExerciseLine renders the plan\'s own string', /ex\.suggested_load \?\?/.test(line))
+  // RE-ANCHORED 12 Nov 2026 (his Exercise Week handoff): the row's load moved to the right of the name, split into a
+  // value, unit and qualifier by exerciseLoadBadge, which reads the PLAN'S OWN STRING (formatLoad's "~14kg per hand").
+  // The property is unchanged: a per-hand number must never read as a total. Asked of the function, and the row
+  // must call it.
+  const perHand = exerciseLoadBadge({ suggested_load: '~14kg per hand', suggested_load_kg: 14 } as never, null)
+  check('ExerciseLine renders the plan\'s own string (per hand stays per hand)', /exerciseLoadBadge\(ex,/.test(line) && perHand?.value === '~14' && perHand?.unit === 'kg' && perHand?.qualifier === 'per hand', perHand)
   // The bare form may only appear as the fallback behind `suggested_load ??`.
   const bareInLine = [...line.matchAll(/\$\{ex\.suggested_load_kg\}kg/g)].length
   const guardedInLine = [...line.matchAll(/ex\.suggested_load \?\? `~\$\{ex\.suggested_load_kg\}kg`/g)].length

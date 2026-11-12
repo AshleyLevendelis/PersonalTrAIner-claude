@@ -41,6 +41,7 @@ import { ceilingToAskFor, saveStatedCeiling, declineStatedCeilings } from '@/lib
 import { LoadCeilingPrompt } from './LoadCeilingPrompt'
 import { WeekContextRow } from './WeekContextRow'
 import { ExerciseWeekView } from './ExerciseWeekView'
+import { ReadOnlyDayList } from './ReadOnlyDayList'
 import { weekPhaseLine } from '@/lib/exercise-week'
 import { weekRangeLabel } from '@/lib/nutrition-week'
 import { PRIMARY_CTA_CLASS, PRIMARY_CTA_STYLE } from '@/components/OnePage'
@@ -1223,7 +1224,7 @@ export function TodayPanel({
           <span className="shrink-0 whitespace-nowrap text-[0.6875rem] text-text-tertiary" data-testid="hero-status">Done</span>
         ) : sessionEstimate.length ? (
           <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[0.75rem] text-text-tertiary" data-testid="hero-length">
-            <Clock className="size-3.5" aria-hidden /> {sessionEstimate.length.replace(/ · .*$/, '')}
+            <Clock className="size-3.5" aria-hidden /> {sessionEstimate.length}
           </span>
         ) : null}
       </div>
@@ -1429,6 +1430,19 @@ export function TodayPanel({
           days={weekTrain.days}
           todayName={todayName}
           onOpenDay={d => { setWeekOpen(false); setPeekDay(d === todayName ? null : d) }}
+          renderDay={(cell, limit) => {
+            const ref = sessionRefFromCell(cell, liveWeek)
+            return cell.session ? (
+              <ReadOnlyDayList
+                workout={cell.session}
+                limit={limit}
+                onSwap={(exIndex, name) => ref && editTarget(ref).ok && onOpenSwap(ref.planDayName, exIndex, name, ref.sayDay)}
+                onBan={handleBan}
+                onOpenDetail={onOpenDetail}
+                banBusyName={banBusy}
+              />
+            ) : null
+          }}
         />
       ) : peekDay ? (
         peekMovedTo ? (

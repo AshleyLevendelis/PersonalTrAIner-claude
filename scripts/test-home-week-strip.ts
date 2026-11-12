@@ -104,10 +104,13 @@ console.log('\n[3] The two strips use the one rule for today')
   // HER RULING 1 NOV 2026, "Dash on both": a selected REST day draws the dash (as Home does) before the accent dot
   // branch is reached, so the accent dot is now "the day on screen, unless it was missed or is a rest".
   // 7 Nov 2026 (whole-app QA walk): a day whose session moved away holds no session either, so it takes the dash too.
-  check('src/components/exercise/WeekContextRow.tsx gives the accent dot only to the day on screen (unless it was missed, is a rest, or its session moved away), and a due day a plain one',
+  check('src/components/exercise/WeekContextRow.tsx gives a done day its tick, the day on screen its dot (unless it was missed, is a rest, or its session moved away), and a due day the mint dot',
     // RE-ANCHORED 31 Oct 2026 (Exercise 2a): the day on screen is a boxed cell with a FILLED accent dot (the design's).
-    /\{isSelected && \(rest \|\| dot === 'away'\) \? \(\s*<span data-selected-dot=\{rest \? 'rest' : 'away'\}>–<\/span>\s*\) : isSelected \? \(\s*<span className="size-1\.5 rounded-full"[^>]*style=\{dot === 'missed' \? DOT_STYLE\.missed! : \{ background: 'var\(--primary\)' \}\}/.test(ex)
-    && /due: \{ background: 'var\(--text-dim\)' \}/.test(ex))
+    // RE-ANCHORED 12 Nov 2026 (his Exercise Week handoff, X1): a DONE day carries a tick (before the selected branch, so
+    // the day on screen keeps its tick too), and a session still to come a mint dot, the design's; the day on screen
+    // is told apart by its box and today's outline, not by the dot. The rest-dash and missed-stays-missed rules hold.
+    /\{isSelected && \(rest \|\| dot === 'away'\) \? \(\s*<span data-selected-dot=\{rest \? 'rest' : 'away'\}>–<\/span>\s*\) : dot === 'done' \? \(\s*<Check [^>]*\/>\s*\) : isSelected \? \(\s*<span className="size-1\.5 rounded-full"[^>]*style=\{dot === 'missed' \? DOT_STYLE\.missed! : \{ background: 'var\(--primary\)' \}\}/.test(ex)
+    && /due: \{ background: 'color-mix\(in srgb, var\(--primary\) 75%, transparent\)' \}/.test(ex))
   check('...and never the bare today test the old Home strip had', !/\{isToday \? \(/.test(ex))
 }
 

@@ -61,7 +61,7 @@ export function SetBar({ rampTotal, rampDone, workingTotal, workingDone, classNa
 }
 
 /** THE LEGEND: "■ 2 warm-up  ■ 3 × 11-13 working", or "■ 2 × 8 easy" for a warm-up move. */
-export function SetLegend({ warmups, dose, word, className }: { warmups: number | null; dose: string; word: 'working' | 'easy'; className?: string }) {
+export function SetLegend({ warmups, dose, word, tempo, className }: { warmups: number | null; dose: string; word: 'working' | 'easy'; tempo?: string | null; className?: string }) {
   return (
     <span className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 ${className ?? ''}`} data-set-legend>
       {warmups != null && (
@@ -76,6 +76,8 @@ export function SetLegend({ warmups, dose, word, className }: { warmups: number 
         <span className="tabular-mono text-[0.875rem] font-bold text-foreground">{dose}</span>
         <span className="text-[0.8125rem] text-text-tertiary">{word}</span>
       </span>
+      {/* The tempo stays on the row (it is part of the prescription), quiet, after the counts. */}
+      {tempo && <span className="text-[0.75rem] text-text-tertiary" data-legend="tempo">{tempo}</span>}
     </span>
   )
 }

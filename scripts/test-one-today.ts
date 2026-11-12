@@ -49,7 +49,7 @@ console.log('\n1. A finished session is not offered a start button\n')
   // the card has scrolled away — so each block is located by its own testid, and BOTH must be idle-only.
   const barAt = panel.indexOf('data-testid="start-bar"')
   const heroAt = panel.indexOf('data-testid="hero-start"')
-  const cta = barAt < 0 || heroAt < 0 ? '' : panel.slice(panel.lastIndexOf('{!heroStartInView', barAt), barAt + 40) + '\n' + panel.slice(panel.lastIndexOf('{status === ', heroAt), heroAt + 40)
+  const cta = barAt < 0 || heroAt < 0 ? '' : panel.slice(panel.lastIndexOf('{!weekOpen && !heroStartInView', barAt), barAt + 40) + '\n' + panel.slice(panel.lastIndexOf('{status === ', heroAt), heroAt + 40)
   check('the Start-workout block was located (sanity check on this check)', cta.length > 80, cta.length)
   check('it is offered only from idle', (cta.match(/status === 'idle'/g) ?? []).length === 2, cta.slice(0, 200))
   check('...and never merely because a session is not running',

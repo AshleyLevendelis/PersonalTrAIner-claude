@@ -51,6 +51,24 @@ export interface ReadOnlyDayListProps {
   banBusyName: string | null
   /** Extra classes for the list wrapper — the two callers pad differently. */
   className?: string
+  /**
+   * The week view (Exercise Week XW3, 12 Nov 2026) shows the first few exercises of an opened day, then "N more". Whole
+   * groups only, so a superset is never cut in half; the rest of the day is the peek, one tap away.
+   */
+  limit?: number
+}
+
+/** The groups that hold the first `limit` exercises (whole groups; a superset is never split). */
+export function groupsUpTo(groups: ExerciseGroup[], limit: number | undefined): ExerciseGroup[] {
+  if (limit == null) return groups
+  const out: ExerciseGroup[] = []
+  let n = 0
+  for (const g of groups) {
+    if (n >= limit) break
+    out.push(g)
+    n += g.kind === 'single' ? 1 : g.members.length
+  }
+  return out
 }
 
 export function ReadOnlyDayList({
@@ -61,6 +79,7 @@ export function ReadOnlyDayList({
   onOpenHistory,
   banBusyName,
   className,
+  limit,
 }: ReadOnlyDayListProps) {
   const [explainedKey, setExplainedKey] = useState<string | null>(null)
   // WHY THIS EXERCISE, on the browse surface too. Separate from explainedKey
@@ -201,7 +220,7 @@ export function ReadOnlyDayList({
     // Same list chrome as today's ExerciseList: hairline-separated rows in one
     // column, not gap-separated cards and not a data table.
     <div className={`flex flex-col ${className ?? ''}`}>
-      {groups.map((g, i) => (
+      {groupsUpTo(groups, limit).map((g, i) => (
         <div
           key={i}
           className="flex flex-col gap-2.5 py-3"

@@ -154,11 +154,17 @@ console.log('\n4. The two rows say the same things about an exercise')
   }
   // A field read THROUGH a shared formatter is still shown: prescribedDose(ex) is the dose line ("3 × 8", "20 min"),
   // so it reads sets, reps and the prescription type (10 Nov 2026, when the shared line stopped reading ex.reps itself).
-  const VIA: Record<string, string[]> = { prescribedDose: ['sets', 'reps', 'prescription_type'] }
+  // Exercise Week (12 Nov 2026): the shared row reads its load through exerciseLoadBadge and its dose through
+  // exerciseLegend (which calls prescribedDose), so those count as shown too.
+  const VIA: Record<string, string[]> = {
+    prescribedDose: ['sets', 'reps', 'prescription_type'],
+    exerciseLegend: ['sets', 'reps', 'prescription_type'],
+    exerciseLoadBadge: ['suggested_load', 'suggested_load_kg', 'suggested_assistance_kg', 'suggested_added_load_kg', 'assistance_ready_to_graduate'],
+  }
   const fieldsIn = (...srcs: string[]) =>
     new Set(srcs.flatMap(s => [
       ...[...s.matchAll(/\bex\.([a-z_]+)\b/g)].map(m => m[1]),
-      ...Object.entries(VIA).flatMap(([fn, fields]) => new RegExp(`\\b${fn}\\(ex\\)`).test(s) ? fields : []),
+      ...Object.entries(VIA).flatMap(([fn, fields]) => new RegExp(`\\b${fn}\\(ex[,)]`).test(s) ? fields : []),
     ]))
   const session = fieldsIn(rowSession, line)
   const browse = fieldsIn(rowBrowse, line)

@@ -106,7 +106,8 @@ check("Exercise's strip IS interactive", /onClick/.test(exStrip) && /<button/.te
 // RE-ANCHORED 31 Oct 2026 (tab polish 2c + 2a): both strips now draw a 26px cell (Home inside the session card,
 // Exercise over the day's letter). The point is unchanged: Home's is a record, Exercise's day is a button of at least
 // 44px, so the navigator is still the bigger target.
-check('Home cells are 26px; Exercise\'s day is a 44px button', /(size|h)-\[26px\]/.test(homeStrip) && /className="relative flex min-h-11 flex-col/.test(exStrip) && !/min-h-11/.test(homeStrip))
+// RE-ANCHORED 12 Nov 2026 (Exercise Week X1): the day cell is 58px tall (name, date, mark), still at least 44.
+check('Home cells are 26px; Exercise\'s day is a 44px button', /(size|h)-\[26px\]/.test(homeStrip) && /className="relative flex min-h-(11|\[(4[4-9]|[5-9]\d)px\]) flex-col/.test(exStrip) && !/min-h-11/.test(homeStrip))
 // RE-ANCHORED 9 Oct 2026 (M14). This asserted that Exercise's strip contains
 // the text `STATE_LABEL[d.state]` — the mechanism. Both strips now take their
 // sentence from one function in the shared vocabulary (dayLabel), which is what

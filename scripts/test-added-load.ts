@@ -28,6 +28,7 @@
 
 import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { getExerciseEntry, EXERCISE_DATABASE } from '../src/lib/exercise-db'
+import { exerciseLoadBadge } from '../src/lib/exercise-week'
 import { prescribeAddedLoad } from '../src/lib/load-prescription'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { readFileSync } from 'fs'
@@ -275,7 +276,9 @@ console.log('\n5. It reaches the screen, and never as a bare weight')
   check('it says "added", not a bare number', /kg added/.test(chip))
   check('it names what to hang it from', /on top of bodyweight/.test(chip))
   check('the expanded row renders it', /<AddedLoadChip ex=\{ex\}/.test(row))
-  check('the collapsed line renders it signed', /\+\$\{ex\.suggested_added_load_kg\}kg/.test(line))
+  // RE-ANCHORED 12 Nov 2026 (Exercise Week): the row's load is drawn from exerciseLoadBadge. Still signed, always.
+  const added = exerciseLoadBadge({ suggested_added_load_kg: 15 } as never, null)
+  check('the collapsed line renders it signed', /exerciseLoadBadge\(ex,/.test(line) && added?.value === '+15' && added?.unit === 'kg', added)
 
   // And the engine must never smuggle it into the ordinary load field.
   const weeks = plan({ equipment_access: 'full_gym', training_experience: 'advanced' }, 'ag:full_gym:advanced:hypertrophy:upper_lower')

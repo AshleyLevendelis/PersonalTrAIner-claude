@@ -135,7 +135,9 @@ console.log('\n4. It changed what is said, and not one set')
   // DESIGN HANDOFF 2c (10 Oct 2026): the length moved from the week row to
   // the hero's meta line, so the reason moved with it. Same property: the
   // reason sits beside the number, never behind an expander.
-  const metaAt = panel.indexOf('data-testid="hero-meta"')
+  // Exercise Week (12 Nov 2026): the length is the Today card's top line now ("remove ... the three lines of text"),
+  // so the reason sits beside THAT, not beside the meta line that was removed.
+  const metaAt = panel.indexOf('data-testid="hero-length"')
   const noteAt = panel.indexOf('data-testid="session-length-note"')
   check('the reason is shown next to the number, not hidden behind the expander',
     metaAt > 0 && noteAt > metaAt && noteAt - metaAt < 1200 && !/expanded && sessionEstimate\.note/.test(panel), { metaAt, noteAt })
@@ -143,7 +145,7 @@ console.log('\n4. It changed what is said, and not one set')
   // "~52 min" chip its own header describes never rendered. (Since 9 Oct 2026
   // the prop is `sessionLength`, a worded length — see above.)
   check('the length it always described actually renders, on the hero\'s meta line',
-    /data-testid="hero-meta">[\s\S]{0,200}\$\{sessionEstimate\.length\}/.test(panel))
+    /data-testid="hero-length">[\s\S]{0,200}\{sessionEstimate\.length\}/.test(panel))
 }
 
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }

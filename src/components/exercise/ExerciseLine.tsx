@@ -1,6 +1,7 @@
 import { Check } from 'lucide-react'
 import { isUnverifiedLoadSource, unloadedLoadLabel } from '@/lib/load-prescription'
 import { getExerciseEntry } from '@/lib/exercise-db'
+import { describeExerciseTempo } from '@/lib/periodization'
 import { exerciseLoadBadge, exerciseLegend } from '@/lib/exercise-week'
 import { LoadBadgeView, SetBar, SetLegend } from './ExerciseBar'
 import type { LoadSource } from './LoadChip'
@@ -74,6 +75,7 @@ export function ExerciseLine({
   const rampTotal = ramp && ramp.kind !== 'stale' ? ramp.sets.length : 0
   const legend = exerciseLegend(ex, rampTotal)
   const mainLift = eyebrow === 'Main lift'
+  const tempo = describeExerciseTempo(ex)
 
   if (expanded) {
     return (
@@ -128,7 +130,7 @@ export function ExerciseLine({
           <SetBar className="mt-2.5" rampTotal={rampTotal} rampDone={rampDone} workingTotal={ex.sets} workingDone={done} />
           {/* A FINISHED ROW KEEPS ITS LEGEND (the handoff's X1b): its bar is full and its circle ticked; what was lifted is
               on the card and in the history. */}
-          <SetLegend className="mt-1.5" warmups={legend.warmups} dose={legend.dose} word={legend.word} />
+          <SetLegend className="mt-1.5" warmups={legend.warmups} dose={legend.dose} word={legend.word} tempo={tempo} />
         </span>
       </div>
       {trailing && <div className="shrink-0 -mr-1">{trailing}</div>}

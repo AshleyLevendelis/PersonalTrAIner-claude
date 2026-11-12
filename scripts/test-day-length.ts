@@ -133,7 +133,7 @@ function main() {
     /formatDayLength\(length\)/.test(browse) && /dayLengthParts\(workout\)/.test(browse) && /length\.workingSets/.test(browse))
   check('…and no longer costs a day itself', !/estimateDaySeconds\(/.test(browse))
   check('the Exercise tab\'s header is handed a worded length, for the day that is OPEN',
-    /data-testid="hero-meta">[\s\S]{0,200}\$\{sessionEstimate\.length\}/.test(panel) && /if \(peekDay\) \{[\s\S]{0,260}formatDayLength\(dayLengthParts\(shown\)\)/.test(panel) && /formatDayLength\(dayLengthParts\(workout\)\)/.test(panel))
+    /data-testid="hero-length">[\s\S]{0,200}\{sessionEstimate\.length\}/.test(panel) && /if \(peekDay\) \{[\s\S]{0,260}formatDayLength\(dayLengthParts\(shown\)\)/.test(panel) && /formatDayLength\(dayLengthParts\(workout\)\)/.test(panel))
   // 2c moved the length to the hero's meta line; the week row prints none.
   check('…and the week row words no length of its own', !/sessionLength/.test(rowSrc) && !/~\$\{/.test(rowSrc) && !/estimateDaySeconds\(/.test(rowSrc))
   check('Home takes its length from the same helper', /formatDayLength\(lengthParts\)/.test(home) && /dayLengthParts\(todayWorkoutDay\)/.test(home) && !/estimateDaySeconds\(/.test(home))
