@@ -1512,6 +1512,16 @@ menu" stays true when a copy is also left outside it.
   meal it changes on another day (a dinner out leaves no leftovers) is named, read off the swap's trial. Undo on both.
   `test:eating-out`, `verify:eating-out`. Needs the `chat-gemini` deploy for the coach's half
 
+### His Exercise Week handoff, approved 12 Nov 2026 (`docs/design/design_handoff_exercise_week/`, `docs/plans/exercise-week.md`)
+- **Exercise follows the new Nutrition style, screen for screen**: X1 today, X1b logging a set, XW3 the week view.
+  Presentation only: no new data, action or coach tool.
+- **No rings on the Today card**, in his words "remove the ring and the three lines of text here and leave the rest":
+  the card is the kicker, the time, the session name and Start session.
+- **The week list appears only when he asks for it**: "this should be only when you select to view the week, otherwise
+  show just the day's workout". X1 never shows the week list; the `Week` pill opens XW3 and `Week ▴` closes it.
+- **XW3 for the weeks ahead**, "I like this way of seeing the upcoming week's sessions"; XW1 (a separate tapped-day card)
+  was NOT chosen, so tapping a day in the strip keeps today's peek of that day, its rows restyled.
+
 ### His Nutrition Week handoff, approved 11 Nov 2026 (`docs/plans/nutrition-week.md`)
 - **Rings on Nutrition again: option 3d**, in his words "I want one circle with all the rings inside it like I used to
   have before, including water". It REVERSES his 17 Oct "rings live on Home only" for Nutrition; Home keeps its own.
