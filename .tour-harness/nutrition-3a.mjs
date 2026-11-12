@@ -14,15 +14,18 @@ import { boot } from './session-driver-lib.mjs'
 const d = await boot({ debugPort: 9873, passed: 'Nutrition 3a/3b: every check passed.' })
 const { ev, check, finish, load, until, wait, shoot, tapExpr, q, J } = d
 
-console.log('\nA. The top card (3a, rings left out)')
+console.log('\nA. The top card (3a; one circle of rings since 11 Nov 2026, his Nutrition Week 3d)')
 await load('', { tab: 'nutrition' })
 await until(`!!document.querySelector('[data-meal-row]')`, 30000)
 await wait(600)
-check('1. no rings on Nutrition (her 17 Oct ruling)', await ev(`!document.querySelector('main [data-ring], [data-nutrition-hero] svg circle')`))
+// TURNED ROUND 12 Nov 2026: his 3d ("one circle with all the rings inside it ... including water") reverses the 17 Oct
+// "rings on Home only" for Nutrition. One circle, five rings, outside in; each row says what is left.
+check('1. one circle of five rings on the card: water, calories, protein, carbs, fat', (await ev(`[...document.querySelectorAll('[data-nutrition-hero] [data-ring]')].map(c => c.dataset.ring).join()`)) === 'water,calories,protein,carbs,fat')
 const rows = await ev(`[...document.querySelectorAll('[data-ring-key] [data-ring-key-row]')].map(r => r.dataset.ringKeyRow)`)
-check('2. the legend is protein, carbs, fat, water, in that order', (rows ?? []).join(',') === 'protein,carbs,fat,water', rows)
-const bars = await ev(`[...document.querySelectorAll('[data-ring-key] [data-ring-key-row]')].map(r => { const b = r.querySelector('[data-share]'); return b ? { h: Math.round(b.getBoundingClientRect().height), share: b.dataset.share } : null })`)
-check('3. every row carries its own 3px bar', (bars ?? []).length === 4 && bars.every(b => b && b.h === 3), bars)
+check('2. a named row per ring under it: calories, protein, carbs, fat, water', (rows ?? []).join(',') === 'calories,protein,carbs,fat,water', rows)
+// RE-ANCHORED 12 Nov 2026: the bars became the rings; each row now says what is left (or over) of its target.
+const lefts = await ev(`[...document.querySelectorAll('[data-ring-key] [data-ring-key-row]')].map(r => r.querySelector('[data-ring-left]')?.textContent.trim() ?? '')`)
+check('3. every row says what is left (or over), with its unit', (lefts ?? []).length === 5 && lefts.every(t => /^[\d.,]+(g|L)? (left|over)$/.test(t)), lefts)
 const hero = await ev(`(() => { const h = ${q('[data-nutrition-hero]')}; if (!h) return null; return { text: h.innerText.replace(/\\s+/g, ' '), eaten: ${q('[data-testid="kcal-eaten"]')}?.innerText, left: ${q('[data-testid="kcal-left"]')}?.innerText, leftN: ${q('[data-testid="kcal-left-number"]')}?.innerText, target: ${q('[data-testid="kcal-target"]')}?.innerText } })()`)
 const n = s => Number(String(s ?? '').replace(/,/g, ''))
 check('4. the calories say what is eaten of the target, and what is left from the phrasebook (left/over)',
@@ -51,7 +54,8 @@ await until(`!!document.querySelector('[data-meal-row]')`, 30000)
 await wait(600)
 const meta = await ev(`[...document.querySelectorAll('[data-meal-row]')].map(r => { const s = r.querySelector('[data-meal-status]'); const b = r.querySelector('button'); const name = r.querySelector('[data-meal-name]'); return { slot: r.dataset.mealRow, variant: r.dataset.variant, status: s?.dataset.mealStatus, size: s ? Math.round(s.getBoundingClientRect().width) : 0, h: b ? Math.round(b.getBoundingClientRect().height) : 0, macros: (r.querySelector('[data-meal-macros]')?.innerText ?? '').replace(/\\s+/g, ' '), kcal: r.querySelector('[data-testid="meal-row-kcal"]')?.innerText, ink: name ? getComputedStyle(name).color : null, opacity: name ? getComputedStyle(name).opacity : null } })`)
 check('9. every row has a 26px status circle matching its state, and is at least 44px tall', (meta ?? []).length > 0 && meta.every(m => m.status === m.variant && m.size === 26 && m.h >= 44), meta)
-check('10. every row with a dish shows its P · C · F', meta.every(m => /P\s*\d+g\s*C\s*\d+g\s*F\s*\d+g/.test(m.macros)), meta.map(m => m.macros))
+// RE-ANCHORED 12 Nov 2026 (M2): the macros are a split bar with the grams named in words.
+check('10. every row with a dish shows its protein, carbs and fat in words', meta.every(m => /\d+g protein\s*\d+g carbs\s*\d+g fat/.test(m.macros)), meta.map(m => m.macros))
 const nextRow = meta.find(m => m.variant === 'upnext')
 check('11. exactly one row is next, labelled "· next"', meta.filter(m => m.variant === 'upnext').length === 1 && await ev(`/· next/i.test(${q('[data-meal-row][data-variant="upnext"]')}?.innerText ?? '')`), meta.map(m => m.variant))
 const later = meta.filter(m => m.variant === 'later')

@@ -29,8 +29,22 @@ Newest first. One line each.
   (its "no rings on Nutrition" would now have passed vacuously, so it was turned round), `test:one-page`,
   `test:day-as-shown`. `test:bundle` budgets moved with the measurement (clean branch head 2894 kB, with this 2906).
   The 93 logic checks that read the changed files, and the Nutrition, meal, shopping-list and Profile browser drivers
-  (see the sweep line below). Screenshots read at phone size in the dark theme only.
-  NOT PROVEN: the eight other themes on a real screen (tokens only, no fixed colours); a real phone.
+  (below).
+  FOUND BY THE SCREEN RUN (49 Nutrition, meal, shopping and Profile drivers on 41f5b7ce: 42 passed, 7 failed):
+  ONE MATTERED. The warning "N of today's meals no longer fit your restrictions" (and the one for a diet the app
+  cannot honour) sat at the top of the meal list, and the taller rings card pushed it below the first screen
+  (`verify:kept-meal`, "where she can see it"). Both warnings are now drawn at the TOP of the page, above the rings
+  card, on today and on a future day. Mine to decide (keeping an existing rule: a safety-adjacent notice is on screen
+  when he arrives); one deliberate break (drawing it back in the list) was caught. The other six were checks reading
+  the old card: "no rings", the 3px bars, the water "cell", the macro letters, a future day's verdict under the card,
+  and a meal's calories read as "1" from "1,346" (now printed with a comma, as drawn); each re-anchored with the
+  reason written beside it. `verify:day-verdict` held today's "Meals planned · verdict" line to the FIRST screen;
+  under the taller card it sits just below it, so it is now held to its place at the head of today's meals (a
+  break moving it under the meals was caught). Also: "+ Water" text deepened so it reads on the light themes.
+  MUTATIONS: 15 on the logic gate, 17 on the new driver (one MISSED until an off-target day was added: the everyday
+  test week is on target on all seven days, so "always on target" passed), 2 on the re-anchored placements; all caught.
+  Screenshots read in Nightshift (dark) and Daylight (light).
+  NOT PROVEN: the other seven themes on a real screen (tokens only, no fixed colours); a real phone.
   Needs: the frontend on merge; the `chat-gemini` deploy for the coach's map of the tab.
 
 - [x] **THE COMPLETE SWEEP ON THE 11 NOV WORK, AND ONE FAILURE IT FOUND** (11 Nov 2026). On a clean copy of the

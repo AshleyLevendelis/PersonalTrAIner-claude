@@ -98,11 +98,15 @@ const header = async () => {
     if (mm) macros[mm[3]] = { actual: Number(mm[1]), target: Number(mm[2]), lit: /text-primary-text/.test(span.className) }
   }
   const r = verdict.getBoundingClientRect()
+  // RE-ANCHORED 12 Nov 2026 (Nutrition Week): the rings card is taller than the old one, so this line now sits just
+  // under the first screen. It is held where it belongs instead: under "Today's meals", above the first meal.
+  const mh = document.querySelector('[data-meals-header]')?.getBoundingClientRect()
+  const first = document.querySelector('[data-meal-row]')?.getBoundingClientRect()
   return m && macros.P && macros.C && macros.F ? {
     text, label: m[2],
     totals: { calories: planned, protein: macros.P.actual, carbs: macros.C.actual, fat: macros.F.actual },
     targets: { calories: Number(m[1]), protein: macros.P.target, carbs: macros.C.target, fat: macros.F.target },
-    proteinLit: macros.P.lit, onScreen: r.top >= 0 && r.bottom <= innerHeight,
+    proteinLit: macros.P.lit, atHeadOfMeals: !!mh && !!first && r.top >= mh.bottom - 1 && r.bottom <= first.top + 1,
   } : null
 })()`)
 }
@@ -142,7 +146,7 @@ const engine = engineSays(seen.map(s => s.h ? { totals: s.h.totals, targets: s.h
 
 console.log('\n1. On each day, the header\'s words are the engine\'s\n')
 for (const [i, { name, h }] of seen.entries()) {
-  check(`1.${i + 1}a. ${name}: the header is on the Nutrition tab, on screen`, !!h && h.onScreen === true, h)
+  check(`1.${i + 1}a. ${name}: the header is on the Nutrition tab, at the head of today's meals`, !!h && h.atHeadOfMeals === true, h)
   check(`1.${i + 1}b. ...it says what the engine says about those numbers ("${engine[i].label}")`, !!h && h.label === engine[i].label, { screen: h?.label, engine: engine[i].label, totals: h?.totals, targets: h?.targets })
   check(`1.${i + 1}c. ...protein is lit exactly when the engine has protein on target`, !!h && h.proteinLit === engine[i].protein, { lit: h?.proteinLit, engine: engine[i].protein })
   check(`1.${i + 1}d. ...and neither old phrase is on the screen`, !!h && !/macros off|on the number/i.test(h.text), h?.text)

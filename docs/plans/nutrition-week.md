@@ -39,6 +39,14 @@ Nutrition tab only. Presentation only: nothing new is stored, no new action, so 
 - Today's row in the week shows the same meals and total as today's list.
 - The 44px rings are within 0.1px of the design (its two sizes are not one exact proportion).
 
+## Found by the screen run, fixed
+
+- The restriction warnings (a meal that breaks a food he avoids; a diet the app cannot honour) were pushed below the
+  first screen by the taller card. They are now drawn at the top of the page, above the rings card (the meal list
+  draws into a slot the screen gives it).
+- Today's "Meals planned · verdict" line now sits just under the first screen; it is held to the head of today's meals.
+- "+ Water" text deepened for the light themes.
+
 ## Checks
 
 `test:nutrition-week` (40 checks), `verify:nutrition-week` (64 checks at 390x844, including the shopping list's

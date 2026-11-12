@@ -223,6 +223,8 @@ export function NutritionDisplay({
   // quick-add Home used to carry. The store owns the number; its synchronous row is what moves the cell,
   // so a tap never waits on the network. Undo for six seconds, as before.
   const [waterOpen, setWaterOpen] = useState(false)
+  /** Where the meal list draws its restriction warnings: the top of the page, so the rings card cannot push them out of sight. */
+  const [noticeSlot, setNoticeSlot] = useState<HTMLElement | null>(null)
   /** W3: the week on one screen, opened and closed by the header's "Week" pill. */
   const [weekOpen, setWeekOpen] = useState(false)
   const [lastWaterLog, setLastWaterLog] = useState<WaterLogRow | null>(null)
@@ -407,6 +409,9 @@ export function NutritionDisplay({
       {mealStrip && (
         <MealDayStrip dates={mealStrip.dates} today={mealStrip.today} selected={mealStrip.selected} onSelect={mealStrip.onSelect} />
       )}
+      {/* THE DAY'S RESTRICTION WARNINGS (12 Nov 2026): a meal that breaks a food he avoids, or a diet the app cannot
+          honour, is said HERE, above the rings card, so it is on screen when he arrives. The meal list draws into it. */}
+      <div ref={setNoticeSlot} className="empty:hidden flex flex-col gap-2" data-testid="nutrition-top-notices" />
       {/* W1 (11 Nov 2026): A FUTURE DAY'S RINGS ARE ITS PLAN — planned over target, the engine's verdict, and the
           strip's add-to-list moved into the card. */}
       {upcomingDay && (
@@ -441,7 +446,7 @@ export function NutritionDisplay({
               aria-expanded={waterOpen}
               aria-label={`Log water. ${litres(todayWaterMl)} of ${litres(waterTarget)} litres so far.`}
               className="hit-slop-44 flex h-8 shrink-0 items-center rounded-full px-3 text-[0.75rem] font-semibold"
-              style={{ border: '1px solid color-mix(in srgb, var(--chart-3) 60%, transparent)', color: 'var(--chart-3)' }}
+              style={{ border: '1px solid color-mix(in srgb, var(--chart-3) 60%, transparent)', color: 'color-mix(in srgb, var(--chart-3) 60%, var(--foreground))' }}
               data-water-add
             >
               + Water
@@ -632,6 +637,7 @@ export function NutritionDisplay({
           key={upcomingDay.date}
           fitnessGoal={profile.fitness_goal}
           profileId={profileId}
+          noticeSlot={noticeSlot}
           date={upcomingDay.date}
           pools={pools}
           chosen={upcomingDay.chosen}
@@ -660,6 +666,7 @@ export function NutritionDisplay({
       <MealPlan
         fitnessGoal={profile.fitness_goal}
         profileId={profileId}
+        noticeSlot={noticeSlot}
         date={date}
         pools={pools}
         chosen={chosen}

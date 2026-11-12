@@ -1,5 +1,7 @@
 import { ELSEWHERE_WORDS, elsewhereState, isCookedElsewhere } from '@/lib/meals-elsewhere'
 import { useEffect, useRef, useState, Suspense, useMemo } from 'react'
+import { createPortal } from 'react-dom'
+import type { ReactNode } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import type { HeldAround } from '@/lib/meal-generation'
 import { Button } from '@/components/ui/button'
@@ -77,6 +79,12 @@ export interface UpcomingMealDay {
 
 interface MealPlanProps {
   profileId: string | undefined
+  /**
+   * WHERE THE DAY'S RESTRICTION WARNINGS GO (12 Nov 2026): the top of the page, above the rings card. The Nutrition Week
+   * card is tall enough to push them below the fold, and a meal that breaks a food he avoids (or a diet the app cannot
+   * honour) must be on screen when he arrives. Absent, they are drawn at the top of the list, as before.
+   */
+  noticeSlot?: HTMLElement | null
   /** Local-calendar YYYY-MM-DD, dev-clock-aware — same "today" set-log-store/getSessionDateContext use. */
   date: string
   /** Every generated option per slot — what the swap panel offers. */
@@ -179,7 +187,7 @@ interface MealPlanProps {
  */
 export function MealPlan({
   fitnessGoal,
-  profileId, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
+  profileId, noticeSlot, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, onOpenMyMeals, dietaryPreferences = [], avoidFoods = [],
   mealsPerDay, includeSnacks, onMealPickApplied,
   onSwapSlot, onUndoSwap, onRegenerateSlot, onMakeOneNew, onFindMoreOptions, onRegenerateAll, upcoming, dayMove, regeneratingAll = false,
@@ -347,6 +355,8 @@ export function MealPlan({
   // they don't overlap). No dismiss action: the cause doesn't go away until
   // Profile is actually fixed, so a dismiss button would just teach the user
   // to hide a problem that's still there next time they regenerate.
+  /** A restriction warning at the top of the page when there is a place for it there (noticeSlot). */
+  const atTop = (node: ReactNode) => (noticeSlot ? createPortal(node, noticeSlot) : node)
   const unrecognisedBanner = unrecognisedDietaryRestrictions && unrecognisedDietaryRestrictions.length > 0 && (
     <InsightBanner tone="warning" className="items-start justify-between">
       <span>
@@ -387,7 +397,7 @@ export function MealPlan({
   if (activeSlots.length === 0 && emptySlots.length === 0) {
     return (
       <div data-tour="meals" className="flex flex-col items-center justify-center gap-3 py-16">
-        {unrecognisedBanner || errorBanner}
+        {unrecognisedBanner ? atTop(unrecognisedBanner) : errorBanner}
         {isGenerating ? (
           <>
             <Loader2 className="size-8 animate-spin text-primary-text" />
@@ -548,7 +558,7 @@ export function MealPlan({
 
   return (
     <div data-tour="meals" className="space-y-4">
-      {unrecognisedBanner || errorBanner}
+      {unrecognisedBanner ? atTop(unrecognisedBanner) : errorBanner}
       {unlogError && (
         <InsightBanner tone="warning" className="items-start justify-between">
           <span>{unlogError}</span>
@@ -557,8 +567,8 @@ export function MealPlan({
           </button>
         </InsightBanner>
       )}
-      {blockedSlots.length > 0 && (
-        <InsightBanner tone="warning" className="items-start justify-between">
+      {blockedSlots.length > 0 && atTop(
+        <InsightBanner tone="warning" className="items-start justify-between" data-testid="meals-restriction-notice">
           <span>
             {blockedSlots.length === 1
               ? `Your ${SLOT_LABEL[blockedSlots[0]].toLowerCase()} no longer fits your restrictions.`

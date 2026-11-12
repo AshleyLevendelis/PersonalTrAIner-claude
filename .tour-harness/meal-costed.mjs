@@ -81,7 +81,7 @@ check('0. the Nutrition tab loads and the stored meals have been read', read)
 await wait(800)
 
 // The day list first, every card closed: each row's kcal and the day's planned total.
-const rows = await ev(`[...document.querySelectorAll('[data-testid="meal-row-kcal"]')].map(e => ({ slot: e.getAttribute('data-slot'), kcal: parseInt(e.textContent, 10) }))`)
+const rows = await ev(`[...document.querySelectorAll('[data-testid="meal-row-kcal"]')].map(e => ({ slot: e.getAttribute('data-slot'), kcal: parseInt(e.textContent.replace(/,/g, ''), 10) }))`)
 const day = await ev(`parseInt(document.querySelector('[data-testid="day-kcal"]')?.textContent ?? '', 10)`)
 await shoot('meal-costed-day')
 

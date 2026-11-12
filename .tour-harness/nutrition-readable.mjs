@@ -40,7 +40,8 @@ for (const t of THEMES) check(`3. ${t}: the allergy line reads at 4.5:1 or bette
 await shoot('nutrition-readable')
 // THE WATER BUTTONS (same test): "+250 ml" and "+500 ml" were 84x40, under the 44px floor.
 await ev(`(() => { const h = document.documentElement; h.setAttribute('data-theme', 'nightshift'); h.removeAttribute('data-canvas') })()`)
-await clickAt(`document.querySelector('[aria-label^="Water:"][aria-label$="Tap to log water."]')`); await wait(600)
+// RE-ANCHORED 12 Nov 2026 (Nutrition Week 3d): the water quick-add opens from the rings card's "+ Water".
+await clickAt(`document.querySelector('[data-water-add]')`); await wait(600)
 const water = await ev(`[...document.querySelectorAll('button')].filter(b => /^\\+\\s?(250|500)\\s?ml$/i.test(b.textContent.trim())).map(b => Math.round(b.getBoundingClientRect().height))`)
 check('4. the two water buttons are on the screen', Array.isArray(water) && water.length === 2, water)
 check('5. ...and each is at least 44px tall', Array.isArray(water) && water.length === 2 && water.every(h => h >= 44), water)

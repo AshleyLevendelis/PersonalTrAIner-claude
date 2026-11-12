@@ -5,7 +5,7 @@
 //   A. Home: the headline is the mean of the rings drawn; Steps in the key opens the steps entry, the other
 //      rows and the rings open Nutrition; the pill says "in a row"; the next meal is the dish (and the kcal)
 //      Nutrition's Up next card shows; the docked button names today's session and sits above the tab bar.
-//   B. Nutrition: the day strip is above the calories; no rings; the bar is eaten over target; the water
+//   B. Nutrition: the day strip is above the calories; one circle of rings (11 Nov 2026); the ring is eaten over target; the water
 //      cell opens the quick-add, +500 moves it by 0.5 L and Undo puts it back; Targets opens the sheet.
 //   C. Exercise: the week line's count is the strip's; no rings, no Program card, the week number opens the
 //      programme; the ⋯ menu still holds What happened?; "Start session" is docked. (Re-anchored 30 Oct 2026.)
@@ -105,19 +105,22 @@ console.log('\nB. Nutrition')
 await open('nutrition')
 const order = await ev(`(() => { const s = document.querySelector('[data-testid="meal-day-strip"], [data-meal-day-strip]') ?? [...document.querySelectorAll('button')].find(b => /^today/i.test(b.innerText.trim()))?.parentElement; const h = document.querySelector('[data-nutrition-hero]'); return s && h ? { strip: s.getBoundingClientRect().top, hero: h.getBoundingClientRect().top } : null })()`)
 check('9. "Keep it on top": the day strip is above the calories', !!order && order.strip < order.hero, order)
-check('10. no rings on Nutrition', await ev(`!document.querySelector('main [data-ring]')`))
-const bar = await ev(`(() => { const b = document.querySelector('[data-testid="kcal-bar"]'); return b ? { share: b.dataset.share, eaten: document.querySelector('[data-testid="kcal-eaten"]')?.innerText, of: b.closest('[data-nutrition-hero]')?.innerText } : null })()`)
+// TURNED ROUND 12 Nov 2026: his Nutrition Week 3d ("one circle with all the rings inside it ... including water")
+// reverses the 17 Oct "rings on Home only" for Nutrition. One circle, five rings, outside in.
+check('10. one circle of rings on Nutrition (11 Nov 2026, 3d): water, calories, protein, carbs, fat', (await ev(`[...document.querySelectorAll('[data-testid="today-rings"] [data-ring]')].map(c => c.dataset.ring).join()`)) === 'water,calories,protein,carbs,fat')
+// RE-ANCHORED 12 Nov 2026 (3d): the calories are the circle's calorie ring, its eaten and target on the Kcal row.
+const bar = await ev(`(() => { const b = document.querySelector('[data-testid="today-rings"] [data-ring="calories"]'); return b ? { share: b.dataset.share, eaten: document.querySelector('[data-testid="kcal-eaten"]')?.innerText, target: document.querySelector('[data-testid="kcal-target"]')?.innerText } : null })()`)
 const num = s => Number(String(s).replace(/,/g, ''))
-const kcalTarget = bar ? num((bar.of.match(/of\s+([\d,]+)/) ?? [])[1]) : NaN
-check('11. the calorie bar is eaten over target', !!bar && Math.abs(Number(bar.share) - Math.min(1, num(bar.eaten) / kcalTarget)) < 0.002, { bar, kcalTarget })
+const kcalTarget = bar ? num(bar.target) : NaN
+check('11. the calorie ring is eaten over target', !!bar && Math.abs(Number(bar.share) - Math.min(1, num(bar.eaten) / kcalTarget)) < 0.002, { bar, kcalTarget })
 // RE-ANCHORED 31 Oct 2026 (design 3a): one list, the next meal is the row marked next; its kcal is the row's own number.
 const nextRow = () => ev(`(() => { const r = document.querySelector('[data-meal-row][data-variant="upnext"]'); return r ? { slot: r.dataset.mealRow, kcal: r.querySelector('[data-testid="meal-row-kcal"]')?.textContent.trim() } : null })()`)
 const upnextKcal = await nextRow()
 const mealKcal = homeMeal ? (homeMeal.text.match(/(\d[\d,]*) kcal/) ?? [])[1] : null
-check('12. Home\'s next meal is the dish and the kcal on Nutrition\'s Up next card', !!upnextKcal && !!mealKcal && upnextKcal.kcal === mealKcal && upnextKcal.slot === homeMeal.slot, { upnextKcal, homeMeal })
+check('12. Home\'s next meal is the dish and the kcal on Nutrition\'s Up next card', !!upnextKcal && !!mealKcal && num(upnextKcal.kcal) === num(mealKcal) && upnextKcal.slot === homeMeal.slot, { upnextKcal, homeMeal })
 const waterBefore = await text('[data-ring-key-row="water"]')
-await tap('[data-ring-key-row="water"]')
-check('13. the water cell opens the quick-add', await ev(`!!document.querySelector('[data-water-quick-add]')`))
+await tap('[data-water-add]')
+check('13. "+ Water" opens the quick-add', await ev(`!!document.querySelector('[data-water-quick-add]')`))
 await shoot('one-page-nutrition-water')
 await ev(`[...document.querySelectorAll('[data-water-quick-add] button')].find(b => b.innerText.trim() === '+500 ml')?.click()`)
 await wait(600)
@@ -160,12 +163,11 @@ console.log('\nD. With breakfast logged over its plan (the rest of the day re-si
 await open('nutrition', 'refit=1&drift=1&ateover=200')
 const resized = await ev(`document.querySelector('[data-testid="around-eaten"]')?.dataset.kind ?? null`)
 const nUp = await nextRow()
-const bar2 = await ev(`Number(document.querySelector('[data-testid="kcal-bar"]')?.dataset.share ?? 'NaN')`)
-const hero2 = await text('[data-nutrition-hero]')
+const bar2 = await ev(`Number(document.querySelector('[data-testid="today-rings"] [data-ring="calories"]')?.dataset.share ?? 'NaN')`)
 const eaten2 = num(await text('[data-testid="kcal-eaten"]'))
-const target2 = num((hero2.match(/of\s+([\d,]+)/) ?? [])[1])
+const target2 = num(await text('[data-testid="kcal-target"]'))
 check('23. (the fixture binds: the day was re-sized around what was eaten, and the bar has moved)', resized === 'resized' && bar2 > 0, { resized, bar2 })
-check('23b. with food eaten, the calorie bar is eaten over target', eaten2 > 0 && Math.abs(bar2 - Math.min(1, eaten2 / target2)) < 0.002, { bar2, eaten2, target2 })
+check('23b. with food eaten, the calorie ring is eaten over target', eaten2 > 0 && Math.abs(bar2 - Math.min(1, eaten2 / target2)) < 0.002, { bar2, eaten2, target2 })
 const readHomeMeal = () => ev(`(() => { const r = document.querySelector('[data-home-next-meal]'); return r ? { slot: r.dataset.homeNextMeal, text: r.innerText.replace(/\\s+/g, ' ').trim() } : null })()`)
 const kcalOf = m => m ? (m.text.match(/(\d[\d,]*) kcal/) ?? [])[1] : null
 await open('dashboard', 'refit=1&drift=1')
@@ -173,7 +175,7 @@ const plain = await readHomeMeal()
 await open('dashboard', 'refit=1&drift=1&ateover=200')
 const hm2 = await readHomeMeal()
 const k2 = kcalOf(hm2)
-check('24. Home\'s next meal carries the re-sized kcal Nutrition shows', !!nUp && !!k2 && nUp.kcal === k2 && nUp.slot === hm2.slot, { nUp, hm2 })
+check('24. Home\'s next meal carries the re-sized kcal Nutrition shows', !!nUp && !!k2 && num(nUp.kcal) === num(k2) && nUp.slot === hm2.slot, { nUp, hm2 })
 check('25. ...which is not the stored dish\'s kcal (the same dish with nothing eaten)', !!plain && plain.slot === hm2?.slot && kcalOf(plain) !== k2, { plain, hm2 })
 
 const err = await ev('window.__err ?? null')
