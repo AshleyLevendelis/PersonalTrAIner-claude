@@ -219,8 +219,12 @@ console.log('\n1. The libraries are cached separately from the app')
   // The week builder, the day's list on Nutrition and today's fit-around all read it as the app draws its first
   // screen, and the row is part of that list, so this is first-paint code by nature (the Profile grid is in Profile's
   // own chunk). Her 15 Sep ruling, "raise it with room to grow": 8 kB gz and 25 kB raw over today's numbers.
-  headroom('a deploy re-downloads', appGzip, 406, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 406, appGzip)
+  // MOVED 12 Nov 2026: the Nutrition Week screens (his handoff of 11 Nov: the rings card, the meal rows' split bar, a
+  // future day's planned card and the week view). MEASURED through this gate on a clean worktree of 8809547a and on
+  // the change: deploy 398 -> 401 gz, first paint 554 -> 557 gz, app 1386 -> 1398 raw, total 2894 -> 2906 raw (total
+  // OVER by 4). His 15 Sep ruling, "raise it with room to grow": 8 kB gz and 25 kB raw over today's number.
+  headroom('a deploy re-downloads', appGzip, 409, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 409, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -307,9 +311,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 9 Nov 2026: 535 -> 544, the date-of-birth day — see the deploy figure above for both ends.
   // MOVED 10 Nov 2026: 544 -> 552, the long-flight batch — see the deploy figure above for both ends.
   // MOVED 11 Nov 2026: 552 -> 562, meals cooked for him elsewhere — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 562, 'kB gzipped')
+  // MOVED 12 Nov 2026: 562 -> 565, the Nutrition Week screens — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 565, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 562, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 565, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -431,7 +436,8 @@ console.log('\n3. Nothing has crept back up')
   // table, the third exercise batch and the cardio-day labels) and 1351 with the whole-block swap fix. 25 raw of room.
   // MOVED 11 Nov 2026: 1376 -> 1411, meals cooked for him elsewhere; measured 1375 before (1 left) and 1386 after
   // (see the deploy figure above for both ends). 25 raw of room.
-  const APP_CHUNK_BUDGET_KB = 1411
+  // MOVED 12 Nov 2026: 1411 -> 1423, the Nutrition Week screens; measured 1386 before and 1398 after.
+  const APP_CHUNK_BUDGET_KB = 1423
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -699,7 +705,11 @@ console.log('\n3. Nothing has crept back up')
   //     after    deploy 395 gz   paint 551 gz   app 1374 raw   total 2877 raw   (total OVER by 9)
   // 8 of the 9 kB are in the Profile chunk; the planner was first built in App and cost the start 2 kB gz more, so it
   // was moved to load with Profile. His 15 Sep ruling, "raise it with room to grow": 25 kB raw over today's number.
-  const TOTAL_BUDGET_KB = 2902
+  // MOVED 12 Nov 2026: the Nutrition Week screens (his handoff of 11 Nov: the rings card, the meal rows' split bar, a
+  // future day's planned card and the week view). MEASURED through this gate on a clean worktree of 8809547a and on
+  // the change: deploy 398 -> 401 gz, first paint 554 -> 557 gz, app 1386 -> 1398 raw, total 2894 -> 2906 raw (total
+  // OVER by 4). His 15 Sep ruling, "raise it with room to grow": 8 kB gz and 25 kB raw over today's number.
+  const TOTAL_BUDGET_KB = 2931
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

@@ -188,7 +188,7 @@ console.log('\n2. The shortfall line only speaks when there is something to say'
 }
 
 // ---------------------------------------------------------------------------
-console.log('\n3. The legend is four rows in two columns, beside the rings')
+console.log('\n3. The rings card: one circle, a named row per ring')
 // ---------------------------------------------------------------------------
 // RE-ANCHORED 10 Oct 2026 (design handoff 2b): the legend became the RING
 // KEY — four rows in a 2x2 grid, named in full, in the order the rings sit —
@@ -199,19 +199,24 @@ console.log('\n3. The legend is four rows in two columns, beside the rings')
 // RE-ANCHORED 30 Oct 2026 ("less is more", her "Move things"): the four sit in ONE row of four, no icons.
 // RE-ANCHORED 31 Oct 2026 (design 3a, her "build, keep my rulings"): the top card is the design's legend with the
 // rings left out — one row per macro and water, in a column, each with its own bar.
-check('a column of legend rows holds it, one per macro and water', /flex flex-col[^"]*" data-ring-key>/.test(nutrition) && (nutrition.match(/<LegendRow\b/g) ?? []).length === 4)
-for (const label of ['label="Protein"', 'label="Carbs"', 'label="Fat"', 'label="Water"']) {
-  check(`the grid carries ${label}`, nutrition.includes(label))
+// RE-ANCHORED 11 Nov 2026 (Nutrition Week handoff, option 3d, his "I want one circle with all the rings inside it
+// like I used to have before, including water"): it REVERSES his 17 Oct "rings live on Home only" for Nutrition. One
+// circle of five rings (water, calories, protein, carbs, fat), the calories left in the middle, and one named row per
+// ring under it, in that order. The property this section always held — every macro and water named in full with
+// its own number on the card, the left figure through the phrasebook — holds on the new card.
+check('a column of named rows holds it, one per ring: calories, protein, carbs, fat, water',
+  /flex flex-col" data-ring-key>/.test(nutrition) && (nutrition.match(/<RingRow k="(\w+)"/g) ?? []).join(',') === '<RingRow k="calories",<RingRow k="protein",<RingRow k="carbs",<RingRow k="fat",<RingRow k="water"')
+const ringLabels = readFileSync(join(ROOT, 'src/components/nutrition/NutritionRings.tsx'), 'utf8')
+for (const label of ["calories: 'Kcal'", "protein: 'Protein'", "carbs: 'Carbs'", "fat: 'Fat'", "water: 'Water'"]) {
+  check(`each row is named in full: ${label}`, ringLabels.includes(label))
 }
-check('the cells are those four, in that order (protein, carbs / fat, water)',
-  /k="protein"[\s\S]{0,400}k="carbs"[\s\S]{0,400}k="fat"[\s\S]{0,400}k="water"/.test(nutrition))
-check('the calories are a bar, not a ring', /testid="kcal-bar"/.test(nutrition) && !/<circle/.test(nutrition))
-// RE-ANCHORED 31 Oct 2026 (design 3a): the big number is what has been EATEN, "of N kcal" under it, and what is
-// LEFT moved to the card's header line — both still on the card, the left figure still through the phrasebook.
-check('the hero is what is EATEN of the target (3a), and what is left is on the card\'s header line',
-  /className="[^"]*text-\[2\.125rem\][^"]*" data-testid="kcal-eaten"/.test(nutrition) && /data-testid="kcal-target"/.test(nutrition)
-  && nutrition.indexOf('data-testid="kcal-left-number"') > -1 && nutrition.indexOf('data-testid="kcal-left-number"') < nutrition.indexOf('data-testid="kcal-eaten"'))
-check('the caption says left or over, from the phrasebook', /kcalLeftOrOver\(macros\.calories - eaten\.kcal\)/.test(nutrition) && /data-testid="kcal-left">kcal \{word\}/.test(nutrition))
+check('the circle is the five rings, water outermost, drawn from eaten over target',
+  /<NestedRings\s+size=\{TODAY_RING_SIZE\}\s+rings=\{TODAY_RINGS\}/.test(nutrition) && /ringShares\(\{ calories: eaten\.kcal/.test(nutrition))
+check('what is EATEN of the target is on the Kcal row, and what is LEFT is in the middle of the circle',
+  /k="calories" eaten=\{eaten\.kcal\} target=\{macros\?\.calories\}[^>]*testids=\{\{ eaten: 'kcal-eaten', target: 'kcal-target' \}\}/.test(nutrition)
+  && nutrition.indexOf('data-testid="kcal-left-number"') > -1 && nutrition.indexOf('data-testid="kcal-left-number"') < nutrition.indexOf('data-ring-key>'))
+check('the middle says left or over, from the phrasebook', /leftOrOverLabel\(macros\.calories, eaten\.kcal\)/.test(nutrition) && /data-testid="kcal-left">kcal \{kcalLeft!\.word\}/.test(nutrition)
+  && /kcalLeftOrOver\(target - value\)/.test(readFileSync(join(ROOT, 'src/lib/nutrition-week.ts'), 'utf8')))
 
 // ---------------------------------------------------------------------------
 console.log('\n4. The meal list points at the list it fills')

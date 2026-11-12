@@ -14,7 +14,8 @@
  *      edit that sinks it fails here), never by lowering opacity.
  *   4. The "Today's meals" row: the grocery list's Nutrition door and the + that is "Log something else" (her
  *      M51 rule: off-plan food goes through the coach), moved there and not left behind as a second copy.
- *   5. The top card keeps her 17 Oct ruling: no rings here, the legend's rows in order, water logged from its row.
+ *   5. The top card: since 11 Nov 2026 one circle of rings (his 3d, reversing 17 Oct's "rings on Home only"), the
+ *      rows in order, water still logged from Nutrition.
  *
  * What the screen DOES with all of this is verify:nutrition-3a (a real Chromium at 390px).
  */
@@ -155,11 +156,16 @@ console.log('\n4. "Today\'s meals": the grocery pill and the +')
 // ---------------------------------------------------------------------------
 console.log('\n5. The top card keeps her rulings')
 // ---------------------------------------------------------------------------
-check('no rings on Nutrition (17 Oct: rings live on Home only)', !/<RingMeter|<circle/.test(nut))
-check('the legend\'s rows are protein, carbs, fat, water, in that order',
-  /<LegendRow k="protein"[\s\S]{0,300}<LegendRow k="carbs"[\s\S]{0,300}<LegendRow k="fat"[\s\S]{0,300}<LegendRow\s+k="water"/.test(nut))
-check('the water row logs water: it opens the quick-add', /<LegendRow\s+k="water"[\s\S]{0,400}onClick=\{\(\) => setWaterOpen\(o => !o\)\}/.test(nut))
-check('the calories left (or over) come from the phrasebook', /kcalLeftOrOver\(macros\.calories - eaten\.kcal\)/.test(nut) && /data-testid="kcal-left">kcal \{word\}/.test(nut))
+// RE-ANCHORED 11 Nov 2026: his Nutrition Week ruling (option 3d, "one circle with all the rings inside it like I used
+// to have before, including water") REVERSES the 17 Oct "rings live on Home only" for Nutrition. The check that stood
+// here ("no rings") would now pass vacuously (the circle is drawn by a component in its own file), so it is turned
+// round: the rings ARE here, and the two rulings that stand — water logged from Nutrition, left or over through the
+// phrasebook — are held on the new card.
+check('the rings are on Nutrition now (11 Nov 2026, 3d): one circle, five rings', /<NestedRings\s+size=\{TODAY_RING_SIZE\}\s+rings=\{TODAY_RINGS\}/.test(nut))
+check('the rows are calories, protein, carbs, fat, water, in that order (the rings outside in, water last)',
+  /<RingRow k="calories"[\s\S]{0,300}<RingRow k="protein"[\s\S]{0,300}<RingRow k="carbs"[\s\S]{0,300}<RingRow k="fat"[\s\S]{0,300}<RingRow k="water"/.test(nut))
+check('water is still logged here (her 17 Oct ruling): "+ Water" opens the quick-add', /onClick=\{\(\) => setWaterOpen\(o => !o\)\}[\s\S]{0,800}\+ Water/.test(nut) && /data-water-quick-add/.test(nut))
+check('the calories left (or over) come from the phrasebook', /leftOrOverLabel\(macros\.calories, eaten\.kcal\)/.test(nut) && /data-testid="kcal-left">kcal \{kcalLeft!\.word\}/.test(nut))
 
 console.log(`\n${ran} checks ran`)
 if (failures > 0) { console.log(`${failures} FAILED`); process.exit(1) }

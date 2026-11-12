@@ -15,6 +15,7 @@
 // passing the flat disc — are held by test:grocery-screen, not driven here.
 // ---------------------------------------------------------------------------
 
+import { openGroceryForDays } from '@/lib/app-route'
 import { StrictMode, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { setSupabaseClient } from '@/lib/supabase'
@@ -37,10 +38,15 @@ const EMPTY = params.get('empty') === '1'
 // THE LIST WAS BUILT TODAY, over seven days — the note GroceryList keeps when
 // Rebuild runs. ?nomemo=1 leaves it out, as on a phone that never rebuilt.
 if (params.get('nomemo') !== '1') {
-  try { localStorage.setItem(`fitplan_grocery_built_v1:${PROFILE_ID}`, JSON.stringify({ startDate: ANCHOR_ISO.slice(0, 10), days: 7 })) } catch { /* the screen falls back to "Day 1" */ }
+  // ?built=3: the list was last built over 3 days (verify:nutrition-week), so a request for 7 is a different number.
+  const builtDays = Number(params.get('built') ?? 7) || 7
+  try { localStorage.setItem(`fitplan_grocery_built_v1:${PROFILE_ID}`, JSON.stringify({ startDate: ANCHOR_ISO.slice(0, 10), days: builtDays })) } catch { /* the screen falls back to "Day 1" */ }
 } else {
   try { localStorage.removeItem(`fitplan_grocery_built_v1:${PROFILE_ID}`) } catch { /* nothing to remove */ }
 }
+
+// ?asked=7: the list is opened the way the Nutrition week view's "Shop the whole week" opens it (verify:nutrition-week).
+if (params.get('asked')) openGroceryForDays(Number(params.get('asked')))
 
 const profile = {
   id: PROFILE_ID, age: 30, gender: 'female', height_cm: 168, weight_kg: 65, activity_level: 'moderate',

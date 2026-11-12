@@ -1503,6 +1503,17 @@ menu" stays true when a copy is also left outside it.
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
 
+### His Nutrition Week handoff, approved 11 Nov 2026 (`docs/plans/nutrition-week.md`)
+- **Rings on Nutrition again: option 3d**, in his words "I want one circle with all the rings inside it like I used to
+  have before, including water". It REVERSES his 17 Oct "rings live on Home only" for Nutrition; Home keeps its own.
+  One circle of five rings (water, calories, protein, carbs, fat), calories left in the middle, a named row for each;
+  "+ Water" opens the same quick-add (his 17 Oct "water from Nutrition" holds). **Meal rows: M2**, a split bar of each
+  macro's share of the meal's ENERGY with the grams in words (over boxed tiles and plain text). **W1 + W3** (over W2):
+  a future day tapped in the strip turns violet and its card shows PLANNED over target, the engine's own verdict and
+  the add-to-list (no water ring: water is never planned); "Week" shows the seven days on one screen, one open at a
+  time, and "Shop the whole week" opens the list on its 7-day choice. Presentation only, parity unchanged. BUILT.
+  `test:nutrition-week`, `verify:nutrition-week`. Needs the `chat-gemini` deploy for the coach's map of the tab
+
 ### His rulings of 11 Nov 2026 (each from options; build state is said on each line and corrected as it lands)
 - **Setup's lift numbers: "Weight and reps"** (over one number with an explanation). Setup had asked for "working
   weights" without saying what the number was or which lifts; the plan reads it as the weight for about 10 reps with 2
@@ -1660,7 +1671,8 @@ menu" stays true when a copy is also left outside it.
   blocked; never worded as "contains".
 
 ### His rulings of 17 Oct 2026, the one-page Home, Nutrition and Exercise (`docs/plans/one-page-tabs.md`)
-- **"Build this one"**: design 5c·5 / 5c·6 / 5c·4, layout only, nothing removed. Rings live on Home only.
+- **"Build this one"**: design 5c·5 / 5c·6 / 5c·4, layout only, nothing removed. Rings live on Home only (REVERSED for
+  Nutrition 11 Nov 2026, his Nutrition Week 3d: see "His Nutrition Week handoff" above).
 - **Nutrition's day strip: "Keep it on top."** **The streak pill: "12 in a row"** (never "days": it counts
   sessions). **Logging: "Tap the steps ring"** — steps from Home's key, water from Nutrition's water cell;
   Home logs no water any more. `test:one-page`, `verify:one-page`, `test:tab-ownership`, `test:app-tour`,

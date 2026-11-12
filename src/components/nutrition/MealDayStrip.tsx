@@ -43,14 +43,19 @@ export function MealDayStrip({
             data-meal-day={date}
             data-meal-day-selected={isSelected ? 'yes' : 'no'}
             className="flex min-h-[48px] flex-col items-center justify-center gap-0.5 rounded-[10px] transition-colors"
-            style={isSelected
+            // TODAY SELECTED IS MINT; A FUTURE DAY SELECTED IS VIOLET (W1, 11 Nov 2026), the colour of a planned day,
+            // so a day that has not happened never looks like today. Today keeps its mint text either way.
+            style={isSelected && isToday
               ? { background: 'rgba(var(--glow-rgb),.14)', border: '1px solid rgba(var(--glow-rgb),.45)' }
-              : { border: '1px solid transparent' }}
+              : isSelected
+                ? { background: 'color-mix(in srgb, var(--chart-2) 16%, transparent)', border: '1px solid color-mix(in srgb, var(--chart-2) 70%, var(--foreground))' }
+                : { border: '1px solid transparent' }}
+            data-meal-day-tone={isSelected ? (isToday ? 'today' : 'planned') : 'none'}
           >
-            <span className={`text-[0.5625rem] uppercase tracking-[.08em] ${isToday ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
+            <span className={`text-[0.5625rem] uppercase tracking-[.08em] ${isToday ? 'font-semibold text-primary-text' : isSelected ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
               {isToday ? 'Today' : weekdayShort(date)}
             </span>
-            <span className={`tabular-mono text-[0.9375rem] leading-none ${isSelected ? 'font-semibold text-primary-text glow-mint' : isToday ? 'text-primary-text' : 'text-foreground'}`}>
+            <span className={`tabular-mono text-[0.9375rem] leading-none ${isSelected && isToday ? 'font-semibold text-primary-text glow-mint' : isToday ? 'text-primary-text' : isSelected ? 'font-semibold text-foreground' : 'text-foreground'}`}>
               {dayOfMonth(date)}
             </span>
           </button>

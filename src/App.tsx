@@ -3429,6 +3429,7 @@ function App() {
               onDismissMealTopUpNote={() => setMealTopUpNote(null)}
               mealStrip={mealDays.strip}
               upcomingDay={mealDays.openDay}
+              mealWeek={mealDays.week}
               dayMove={mealDays.dayMove}
               heldAround={mealDays.today?.day.heldAround}
               onKeepHeldSizes={mealDays.keepHeldSizes}

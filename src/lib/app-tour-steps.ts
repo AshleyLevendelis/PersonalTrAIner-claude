@@ -111,9 +111,9 @@ export const TOUR_STEPS: TourStep[] = [
     // same way on 6 Sep (to Home, with the rest of the day's logging), so
     // this copy no longer promises a tap it cannot deliver on this tab; what
     // Nutrition owns is the read-out and the targets behind it.
-    // ONE-PAGE NUTRITION (17 Oct 2026): no rings here any more — calories left with a bar, then a grid of
-    // macros and water — and the water quick-add is back on this tab, behind the water cell.
-    copy: "Everything you eat and drink lives here: what's left today, your macros, and your water — tap the water cell to log a glass. The targets behind them are one tap down, in Targets & plan settings.",
+    // THE RINGS CARD (Nutrition Week, his 3d of 11 Nov 2026): one circle of rings with a row for each, and water logged
+    // from its "+ Water" pill. Before that (17 Oct) there were no rings here and water was behind a water cell.
+    copy: "Everything you eat and drink lives here: what's left today, your macros, and your water — tap + Water to log a glass. The targets behind them are one tap down, in Targets & plan settings.",
   },
   {
     key: 'meals', tab: 'nutrition', target: 'meals',

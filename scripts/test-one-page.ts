@@ -118,15 +118,19 @@ async function main() {
   check('the headline is today\'s four rings through todaySoFarPercent', /todaySoFarPercent\(\[calShare, proteinShare, waterShare, stepsShare\]\)/.test(home))
   check('Home\'s next meal is Nutrition\'s: the same sections and the same day-as-shown sizes', /dayAsShown\(\{/.test(home) && /mealSections\(\{/.test(home) && /eatenMacrosBySlot\(/.test(home))
   const nut = read('src/components/NutritionDisplay.tsx')
-  const waterAt = nut.indexOf('k="water"')
-  const waterCell = waterAt < 0 ? '' : nut.slice(waterAt, nut.indexOf('/>', waterAt))
-  check('Nutrition\'s water cell opens the quick-add', /onClick=\{\(\) => setWaterOpen\(/.test(waterCell), waterCell)
+  // RE-ANCHORED 11 Nov 2026 (Nutrition Week, 3d): the water is logged from the rings card's "+ Water" pill, which
+  // opens the same quick-add the water cell did. His 17 Oct "water from Nutrition" holds.
+  const waterAt = nut.indexOf('data-water-add')
+  const waterCell = waterAt < 0 ? '' : nut.slice(Math.max(0, nut.lastIndexOf('<button', waterAt)), waterAt + 200)
+  check('Nutrition\'s "+ Water" opens the quick-add', /onClick=\{\(\) => setWaterOpen\(/.test(waterCell) && /\+ Water/.test(waterCell), waterCell)
   check('...whose buttons log water through the store, with an Undo', /onClick=\{\(\) => handleAddWater\(ml\)\}/.test(nut) && /logWater\(\{ profileId, date, amountMl, source: 'manual' \}\)/.test(nut) && /undoLog\(lastWaterLog\)/.test(nut))
   check('"Keep it on top": the day strip is still on Nutrition, above the calories', (() => {
     const a = nut.indexOf('<MealDayStrip'); const b = nut.indexOf('data-nutrition-hero')
     return a >= 0 && b >= 0 && a < b
   })())
-  check('no rings on Nutrition: the calories are a bar', !/<RingMeter/.test(nut) && /testid="kcal-bar"/.test(nut))
+  // TURNED ROUND 11 Nov 2026: his 3d ruling ("one circle with all the rings inside it like I used to have before,
+  // including water") reverses the 17 Oct "rings live on Home only" for Nutrition. Home keeps its own rings.
+  check('rings on Nutrition (11 Nov 2026, 3d): one circle, its own component, not Home\'s', /<NestedRings\b/.test(nut) && !/<RingMeter/.test(nut))
   check('one coach voice: an offer showing takes the macro line\'s place', /\{macroNudge && !mealRefit && !\(mealTopUp && !mealTopUpNote\) && <TrainerNudge/.test(nut))
 
   console.log('\n5. Nothing the old screens carried is gone')
@@ -196,7 +200,8 @@ async function main() {
       && /label: 'What changed\?'/.test(home) && /label: 'Adjust today'/.test(home))
   }
   // RE-ANCHORED 31 Oct 2026 (design 3a): the legend of the top card, one row each, the rings still left out.
-  check('Nutrition: the macros and water are the legend\'s rows, one each, no rings', /flex flex-col[^"]*" data-ring-key>/.test(nut) && (nut.match(/<LegendRow\b/g) ?? []).length === 4 && !/<RingMeter/.test(nut))
+  // RE-ANCHORED 11 Nov 2026 (3d): one named row per ring under the circle, calories included.
+  check('Nutrition: the calories, macros and water are named rows, one each', /flex flex-col" data-ring-key>/.test(nut) && (nut.match(/<RingRow\b/g) ?? []).length === 5)
   const mealPlan = read('src/components/MealPlan.tsx')
   {
     const heroAt = mealPlan.indexOf('function TotalsHero')

@@ -41,6 +41,24 @@ export function groceryHash(): string {
   return '#/nutrition/grocery'
 }
 
+/**
+ * "SHOP THE WHOLE WEEK" (W3, 11 Nov 2026): opens the list asking for a number of days. The list takes the request
+ * once, as if that number had been picked from its own day choice, so it rebuilds at once when the number changes
+ * (his 8 Nov "Rebuild at once") and leaves the list alone when it is already that number. Held here, not in the
+ * address, so a reload or a back-tap never rebuilds the list a second time.
+ */
+let requestedGroceryDays: number | null = null
+export function openGroceryForDays(days: number): void {
+  requestedGroceryDays = days
+  window.location.hash = groceryHash()
+}
+/** The request, once: the second read is null. */
+export function takeRequestedGroceryDays(): number | null {
+  const d = requestedGroceryDays
+  requestedGroceryDays = null
+  return d
+}
+
 /** `#/exercise/program` (week list — no week number yet) or `#/exercise/program/{n}` (week detail). */
 export function programHash(week?: number): string {
   return week != null ? `#/exercise/program/${week}` : '#/exercise/program'

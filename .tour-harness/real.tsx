@@ -82,6 +82,8 @@ import '@/index.css'
 import { computeMealMacros } from '@/lib/food-db'
 import { buildRotation, assembleRotationDay, rotationIndexFor, pinsFromPicks } from '@/lib/meal-rotation'
 import { useMealDays } from '@/hooks/useMealDays'
+import { dayVerdictLabel as nwDayVerdictLabel } from '@/lib/meal-generation'
+import { takeRequestedGroceryDays } from '@/lib/app-route'
 import { useMealPlanActions } from '@/hooks/useMealPlanActions'
 import { SLOT_LABEL as MEAL_SLOT_LABEL } from '@/components/MealPlan'
 import { useServablePools } from '@/hooks/useServablePools'
@@ -1542,6 +1544,9 @@ function Harness() {
     dietaryPreferences: profile.dietary_preferences,
     dislikedFoods: () => [],
   })
+  // NUTRITION WEEK (11 Nov 2026): what the week view and the planned card are read against — the week the strip
+  // serves, the targets, the engine's own verdict, and the shopping list's day request. Observations, not output.
+  ;(window as unknown as { __nw: unknown }).__nw = { week: mealDays.week, targets: driftedMacros, verdict: nwDayVerdictLabel, takeGroceryDays: takeRequestedGroceryDays }
   // SWAP, REGENERATE ONE, REGENERATE ALL — THE APP'S OWN HOOK, handed what
   // this page's screen holds, exactly as App.tsx hands it what App's holds.
   const [regenBusy, setRegenBusy] = useState(false)
@@ -1863,7 +1868,7 @@ function Harness() {
             onDismissMealTopUpNote={() => setTopUpNote(null)}
             // What App passes: it opens Profile at "My meals". Here it only says it was asked to.
             onOpenMyMeals={() => { const w = window as unknown as { __openedMyMeals?: number }; w.__openedMyMeals = (w.__openedMyMeals ?? 0) + 1 }}
-            mealStrip={mealDays.strip} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove}
+            mealStrip={mealDays.strip} mealWeek={mealDays.week} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove}
             // The app's own held state and its Undo (runs 3-4, M34), as App passes them.
             heldAround={TOPUP || DAYMOVE ? mealDays.today?.day.heldAround : undefined} onKeepHeldSizes={mealDays.keepHeldSizes} />
         )}

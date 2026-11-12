@@ -82,6 +82,14 @@ export interface OpenMealDay {
   isOnGroceryList: () => Promise<boolean>
 }
 
+/** One day of the week view: its meals and what they add up to. */
+export interface MealWeekDay {
+  date: string
+  dayName: string
+  chosen: Partial<Record<MealSlotName, PoolOption>>
+  totals: MacroTargets
+}
+
 /** A day's planned totals: the sum of its chosen meals. */
 function sumChosenMacros(chosen: Partial<Record<MealSlotName, PoolOption>>): MacroTargets {
   return Object.values(chosen).reduce<MacroTargets>(
@@ -158,6 +166,11 @@ export function useMealDays(input: MealDaysInput) {
   )
 
   const openAssembled = openDate ? week.find(w => w.date === openDate)?.day ?? null : null
+
+  const weekDays: MealWeekDay[] = useMemo(
+    () => week.map(({ date, day }) => ({ date, dayName: weekdayLong(date), chosen: day.chosen, totals: sumChosenMacros(day.chosen) })),
+    [week],
+  )
 
   /**
    * A swap on an upcoming day: the pool's own swap, then the pick saved for
@@ -441,6 +454,11 @@ export function useMealDays(input: MealDaysInput) {
     futurePicks,
     /** The next six days' meals by name, for the coach. */
     upcoming,
+    /**
+     * ALL SEVEN DAYS, today first, as the strip serves them: Nutrition's week view (W3, 11 Nov 2026) reads its meals
+     * and planned totals off the same week the strip opens, so the two cannot disagree about a day.
+     */
+    week: weekDays,
     /** Saves and shows a pick for an upcoming date — the coach's confirm path. */
     applyPick,
     /** Put a day on the shopping list, or take it back off — the coach's path too. */

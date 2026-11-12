@@ -15,6 +15,7 @@
 
 import { ELSEWHERE_WORDS } from '@/lib/meals-elsewhere'
 import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { takeRequestedGroceryDays } from '@/lib/app-route'
 import { Input } from '@/components/ui/input'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -175,6 +176,18 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
       setGenerating(false)
     }
   }
+
+  // W3's "Shop the whole week" (11 Nov 2026): a number of days asked for on the way in is picked exactly as the day
+  // choice picks it — a different number rebuilds at once, the same number leaves the list as it is.
+  // Read in the effect, never in render: a render can be thrown away (React may call it twice), an effect cannot.
+  useEffect(() => {
+    const d = takeRequestedGroceryDays()
+    if (d == null || d === horizonDays) return
+    setHorizonDays(d)
+    void handleGenerate(d)
+  // Once, on the way in.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleQuickAdd = () => {
     if (!profileId || !quickAdd.trim()) return

@@ -178,7 +178,11 @@ console.log('\n6. The screen asks this calculation')
   check('the line and its Undo are drawn', /\{aroundLine\}/.test(mp) && /data-testid="around-eaten-undo" onClick=\{\(\) => setKept\(true\)\}/.test(mp))
   // RE-ANCHORED 10 Oct 2026 (2b): the phrase is split into the hero number
   // and its word, still read off the one phrasebook function.
-  check('the ring says "over" past the target', /= kcalLeftOrOver\(macros\.calories - eaten\.kcal\)\.split\(' '\)/.test(nd) && /kcal \{word\}/.test(nd) && !/Math\.max\(0, Math\.round\(macros\.calories - eaten\.kcal\)\)/.test(nd))
+  // RE-ANCHORED 11 Nov 2026 (Nutrition Week, 3d): the number sits in the middle of the rings, through
+  // leftOrOverLabel, which is the same phrasebook function with the number grouped. Still never clamped at 0.
+  const nwk = readFileSync(join(ROOT, 'src/lib/nutrition-week.ts'), 'utf8')
+  check('the ring says "over" past the target', /leftOrOverLabel\(macros\.calories, eaten\.kcal\)/.test(nd) && /kcal \{kcalLeft!\.word\}/.test(nd)
+    && /kcalLeftOrOver\(target - value\)\.split\(' '\)/.test(nwk) && !/Math\.max\(0, Math\.round\(macros\.calories - eaten\.kcal\)\)/.test(nd) && !/Math\.max\(0, [^)]*target - value/.test(nwk))
   check('no line promises a re-fit nothing checks', !/re-fitted around it/.test(mp))
 }
 

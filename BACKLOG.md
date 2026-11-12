@@ -2,6 +2,37 @@
 
 Newest first. One line each.
 
+- [x] **THE NUTRITION WEEK DESIGN: RINGS CARD, CLEARER MEAL ROWS, A FUTURE DAY, THE WEEK** (12 Nov 2026, his design
+  handoff approved 11 Nov: "N1, W1, W3", with M2 rows). Layout only: nothing new is stored and no action was added, so
+  coach/screen parity is unchanged.
+  HIS CHOICES (in the handoff, his words where given): the rings card is option 3d, "I want one circle with all the
+  rings inside it like I used to have before, including water". THIS REVERSES his 17 Oct "rings live on Home only"
+  for Nutrition (Home keeps its own rings); recorded in CLAUDE.md beside the old line. Meal rows M2 (over boxed tiles
+  and plain text). W1 + W3 (over W2, a long scroll of full day cards).
+  WHAT CHANGED ON THE PHONE: today's card is one circle of five rings (water, calories, protein, carbs, fat), calories
+  left in the middle, a row for each with what is left; "+ Water" opens the same +250/+500 quick-add. Each meal row has
+  a bar split by each macro's share of the meal's ENERGY (fat at 9 kcal a gram) and "47g protein · 116g carbs · 24g
+  fat" in words; "· eaten" once logged, "· leftovers" on last night's dinner. Tapping a future day turns it violet and
+  the card shows that day's PLANNED totals against target (four rings, no water: water is never planned), the
+  engine's own verdict, and "Add Friday to the shopping list" (moved into the card from under the list). "Week" shows
+  the seven days on one screen, one opened at a time with its meals, and "Shop the whole week" opens the shopping list
+  on its 7-day choice (a different number rebuilds at once, his 8 Nov ruling; already 7 leaves it alone).
+  DECIDED BY ME (named in `docs/plans/nutrition-week.md`): a meal in the week view opens that day on the strip rather
+  than a recipe inside the week; the week view hides the strip and the targets row while open, as drawn; the recipe
+  sheet's header keeps its compact P/C/F line; the small rings are within 0.1px of the design.
+  FOUND ON THE WAY: the coach's map of the Nutrition tab still described a calories bar and a water "cell" (wrong since
+  31 Oct as well as now) and the tour said "tap the water cell". Both now describe the new card. The new driver caught
+  a screen-reader label of my own reading "3,040 left kcal"; fixed to "3,040 kcal left". It also caught "47gprotein"
+  read as one word; a space was added.
+  VERIFIED: `test:nutrition-week` (40 checks) and `verify:nutrition-week` at 390x844 (64 checks, including the shopping
+  list's half on its own page). Re-anchored, each saying the reversal: `test:nutrition-layout`, `test:nutrition-3a`
+  (its "no rings on Nutrition" would now have passed vacuously, so it was turned round), `test:one-page`,
+  `test:day-as-shown`. `test:bundle` budgets moved with the measurement (clean branch head 2894 kB, with this 2906).
+  The 93 logic checks that read the changed files, and the Nutrition, meal, shopping-list and Profile browser drivers
+  (see the sweep line below). Screenshots read at phone size in the dark theme only.
+  NOT PROVEN: the eight other themes on a real screen (tokens only, no fixed colours); a real phone.
+  Needs: the frontend on merge; the `chat-gemini` deploy for the coach's map of the tab.
+
 - [x] **THE COMPLETE SWEEP ON THE 11 NOV WORK, AND ONE FAILURE IT FOUND** (11 Nov 2026). On a clean copy of the
   "meals cooked for him" commit: 178 browser tests (176 passed) and 361 logic checks (358 passed), 539 in all.
   THE FIVE THAT DID NOT PASS, each read for its own reason: `verify:app-boot` failed once while other jobs ran on the

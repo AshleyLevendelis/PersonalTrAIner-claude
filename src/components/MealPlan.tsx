@@ -12,7 +12,7 @@ import {
   ShieldAlert,
   Plus,
   Heart,
-  ChevronDown, X, ArrowLeftRight,
+  ChevronDown, X, ArrowLeftRight, ShoppingCart,
 } from 'lucide-react'
 import { InsightBanner } from '@/components/ui/insight-banner'
 import type { FitnessGoal, MacroTargets } from '@/lib/types'
@@ -42,6 +42,7 @@ import { menuForSlot, menuWeekOf } from '@/lib/meal-menu'
 import { cookedHint } from '@/lib/as-weighed'
 import { methodSteps } from '@/lib/method-steps'
 import { revealBelowTap } from '@/components/nutrition/reveal'
+import { MealMacros } from '@/components/nutrition/NutritionRings'
 const MealMoveSheet = lazyWithReload(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
 const MealFoodAddSheet = lazyWithReload(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
 
@@ -574,7 +575,8 @@ export function MealPlan({
           </button>
         </InsightBanner>
       )}
-      {targets && <TotalsHero totals={shown.totals} targets={targets} />}
+      {/* AN UPCOMING DAY'S PLANNED TOTALS AND VERDICT ARE ITS RINGS CARD NOW (W1, 11 Nov 2026), with its add-to-list. */}
+      {targets && !upcoming && <TotalsHero totals={shown.totals} targets={targets} />}
       {aroundLine && (
         <p className="flex items-start justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="around-eaten" data-kind={shown.aroundEaten.kind}>
           <span>{aroundLine}</span>
@@ -598,8 +600,6 @@ export function MealPlan({
           )}
         </p>
       )}
-
-      {upcoming && <AddDayToGrocery key={date} upcoming={upcoming} />}
 
       {/* THE WORKING STATE FOR "REGENERATE ALL" (test log M22). The same two
           sentences the first build shows, because it is the same job; and a
@@ -671,7 +671,7 @@ export function MealPlan({
  * did NOT do: a day already on the list is not added twice, and the button
  * says so before it is tapped rather than after.
  */
-function AddDayToGrocery({ upcoming }: { upcoming: UpcomingMealDay }) {
+export function AddDayToGrocery({ upcoming }: { upcoming: UpcomingMealDay }) {
   const [state, setState] = useState<'checking' | 'ready' | 'busy' | 'added' | 'already' | 'failed'>('checking')
   useEffect(() => {
     let live = true
@@ -716,7 +716,7 @@ function AddDayToGrocery({ upcoming }: { upcoming: UpcomingMealDay }) {
   }
   if (state === 'added' || state === 'already') {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-xl bg-[color:var(--surface-raised)] px-3.5 py-3" data-testid="meal-day-grocery" data-state={state}>
+      <div className="flex min-h-[44px] items-center justify-between gap-3 rounded-xl bg-[color:var(--surface-raised)] px-3.5 py-2" data-testid="meal-day-grocery" data-state={state}>
         <span className="flex items-center gap-1.5 text-xs">
           <Check className="size-3.5 shrink-0 text-primary-text" />
           {state === 'added' ? `${upcoming.dayName}'s meals are on your shopping list.` : `${upcoming.dayName} is already on your shopping list.`}
@@ -738,10 +738,18 @@ function AddDayToGrocery({ upcoming }: { upcoming: UpcomingMealDay }) {
   }
   return (
     <div className="flex flex-col gap-1.5" data-testid="meal-day-grocery" data-state={state}>
-      <Button onClick={() => void add()} disabled={state === 'busy' || state === 'checking'} className="min-h-[44px] w-full" data-testid="meal-day-add-grocery">
-        {state === 'busy' ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+      {/* W1 (11 Nov 2026): a full-width pill at the foot of the day's rings card. */}
+      <button
+        type="button"
+        onClick={() => void add()}
+        disabled={state === 'busy' || state === 'checking'}
+        className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full text-[0.8125rem] font-semibold disabled:opacity-60"
+        style={{ background: 'rgba(var(--glow-rgb), .12)', border: '1px solid rgba(var(--glow-rgb), .30)', color: 'var(--primary-text)' }}
+        data-testid="meal-day-add-grocery"
+      >
+        {state === 'busy' ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <ShoppingCart className="size-4" aria-hidden />}
         Add {upcoming.dayName} to the shopping list
-      </Button>
+      </button>
       {state === 'failed' && (
         <p className="text-[0.71875rem] text-[color:var(--role-warn-text)]">That didn't go onto the list. Try again in a moment.</p>
       )}
@@ -1209,17 +1217,24 @@ function MealSlotRow({
         disabled={!option}
         aria-haspopup="dialog"
         aria-expanded={sheetOpen}
-        className="flex min-h-[62px] w-full items-center gap-3 py-1.5 text-left disabled:cursor-default"
+        className="flex min-h-[62px] w-full items-center gap-3 py-2.5 text-left disabled:cursor-default"
       >
         <MealStatus variant={upcoming ? 'later' : variant} />
+        {/* M2 (11 Nov 2026): the name and the calories on the top line, the split bar and its legend the full width under
+            both, so the legend reads on one line. */}
         <span className="min-w-0 flex-1">
-          <span className={`block text-[0.625rem] uppercase tracking-[.12em] ${variant === 'upnext' ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
-            {SLOT_LABEL[slot]}{variant === 'upnext' ? ' · next' : ''}{expanded ? ' · open' : ''}
+        <span className="flex items-start gap-2">
+        <span className="min-w-0 flex-1">
+          {/* M2 (11 Nov 2026): "· eaten" once logged, "· leftovers" in amber when it is last night's dinner. */}
+          <span className={`block text-[0.65625rem] uppercase tracking-[.12em] ${variant === 'upnext' ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
+            {SLOT_LABEL[slot]}{variant === 'upnext' ? ' · next' : ''}{variant === 'eaten' && !upcoming ? ' · eaten' : ''}
+            {option?.leftoverFrom === 'dinner' && <span data-testid="meal-row-leftovers" style={{ color: 'var(--role-warn-text)' }}> · leftovers</span>}
+            {expanded ? ' · open' : ''}
           </span>
           {option ? (
             /* NOT a hard one-line cut: Ashley, 3 Sep 2026, could not read a
                long meal name. Two lines on the row, all of it in the sheet. */
-            <span data-meal-name={slot} className="mt-0.5 block line-clamp-2 text-[0.90625rem] font-medium leading-[1.3]" style={{ color: soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
+            <span data-meal-name={slot} className="mt-0.5 block line-clamp-2 text-[0.96875rem] font-semibold leading-[1.3]" style={{ color: soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
               {displayName}
             </span>
           ) : (
@@ -1227,19 +1242,21 @@ function MealSlotRow({
               {alternatives.length > 0 && alternatives.every(a => a.breaksRestriction) ? 'Nothing saved fits what you avoid' : 'No option generated'}
             </span>
           )}
-          {option && <MacroLine protein={rowMacros.protein} carbs={rowMacros.carbs} fat={rowMacros.fat} className="mt-[5px]" />}
         </span>
         {option && (
-          <span className="flex shrink-0 items-center gap-1.5">
+          <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
             <span className="flex min-w-[44px] flex-col items-end">
-              <span data-testid="meal-row-kcal" data-slot={slot} className="tabular-mono text-[1rem] font-bold leading-none tracking-[-.02em]" style={{ color: kcalColor }}>
-                {kcalShown}{duplicated ? ` ×${loggedEvents.length}` : ''}
+              <span data-testid="meal-row-kcal" data-slot={slot} className="tabular-mono text-[1.0625rem] font-bold leading-none tracking-[-.02em]" style={{ color: kcalColor }}>
+                {kcalShown.toLocaleString('en-GB')}{duplicated ? ` ×${loggedEvents.length}` : ''}
               </span>
-              <span className="mt-1 text-[0.5625rem] font-semibold uppercase leading-none tracking-[.12em] text-muted-foreground">kcal</span>
+              <span className="mt-1 text-[0.625rem] font-semibold uppercase leading-none tracking-[.12em] text-muted-foreground">kcal</span>
             </span>
             <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
           </span>
         )}
+        </span>
+        {option && <MealMacros protein={rowMacros.protein} carbs={rowMacros.carbs} fat={rowMacros.fat} className="mt-2" />}
+        </span>
       </button>
 
       {eatenNote && (
@@ -1855,32 +1872,34 @@ function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle,
   const run = async (work: () => Promise<void>) => { setBusy(true); setNote(null); try { await work() } finally { setBusy(false) } }
   return (
     <div data-meal-row={slot} data-variant={variant} data-elsewhere={state} style={{ borderBottom: '1px solid var(--hairline)' }}>
-      <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex min-h-[62px] w-full items-center gap-3 py-1.5 text-left">
+      <button type="button" onClick={onToggle} aria-expanded={expanded} className="flex min-h-[62px] w-full items-center gap-3 py-2.5 text-left">
         <MealStatus variant={upcoming ? 'later' : variant} />
         <span className="min-w-0 flex-1">
-          <span className={`block text-[0.625rem] uppercase tracking-[.12em] ${variant === 'upnext' ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
-            {SLOT_LABEL[slot]}{variant === 'upnext' ? ' · next' : ''} · <span data-testid="elsewhere-label">{ELSEWHERE_WORDS.label}</span>
+        <span className="flex items-start gap-2">
+        <span className="min-w-0 flex-1">
+          <span className={`block text-[0.65625rem] uppercase tracking-[.12em] ${variant === 'upnext' ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
+            {SLOT_LABEL[slot]}{variant === 'upnext' ? ' · next' : ''}{variant === 'eaten' && !upcoming ? ' · eaten' : ''} · <span data-testid="elsewhere-label">{ELSEWHERE_WORDS.label}</span>
           </span>
-          <span data-meal-name={slot} className="mt-0.5 block line-clamp-2 text-[0.90625rem] font-medium leading-[1.3]" style={{ color: soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
+          <span data-meal-name={slot} className="mt-0.5 block line-clamp-2 text-[0.96875rem] font-semibold leading-[1.3]" style={{ color: soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
             {name}
           </span>
-          <span className="mt-[5px] flex flex-wrap items-center gap-x-3 gap-y-1">
-            <MacroLine protein={shown.protein} carbs={shown.carbs} fat={shown.fat} />
-            {!isLogged && (
-              <span data-testid="elsewhere-badge" className="rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[.08em] text-muted-foreground">
-                {state === 'assumed' ? ELSEWHERE_WORDS.assumedBadge : ELSEWHERE_WORDS.estimateBadge}
-              </span>
-            )}
-          </span>
         </span>
-        <span className="flex shrink-0 items-center gap-1.5">
+        <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
           <span className="flex min-w-[44px] flex-col items-end">
-            <span data-testid="meal-row-kcal" data-slot={slot} className="tabular-mono text-[1rem] font-bold leading-none tracking-[-.02em]" style={{ color: variant === 'eaten' ? 'var(--primary-text)' : soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
-              {Math.round(shown.kcal)}
+            <span data-testid="meal-row-kcal" data-slot={slot} className="tabular-mono text-[1.0625rem] font-bold leading-none tracking-[-.02em]" style={{ color: variant === 'eaten' ? 'var(--primary-text)' : soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
+              {Math.round(shown.kcal).toLocaleString('en-GB')}
             </span>
-            <span className="mt-1 text-[0.5625rem] font-semibold uppercase leading-none tracking-[.12em] text-muted-foreground">kcal</span>
+            <span className="mt-1 text-[0.625rem] font-semibold uppercase leading-none tracking-[.12em] text-muted-foreground">kcal</span>
           </span>
           <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
+        </span>
+        </span>
+        <MealMacros protein={shown.protein} carbs={shown.carbs} fat={shown.fat} className="mt-2" />
+        {!isLogged && (
+          <span data-testid="elsewhere-badge" className="mt-1.5 inline-block rounded-full border border-border px-2 py-0.5 text-[0.625rem] font-semibold uppercase tracking-[.08em] text-muted-foreground">
+            {state === 'assumed' ? ELSEWHERE_WORDS.assumedBadge : ELSEWHERE_WORDS.estimateBadge}
+          </span>
+        )}
         </span>
       </button>
       {expanded && (
@@ -1947,8 +1966,9 @@ function MealStatus({ variant }: { variant: 'upnext' | 'later' | 'eaten' }) {
 }
 
 /**
- * "P 42g  C 72g  F 18g" (3a): each letter in its macro's colour, the numbers in one soft ink, tabular. Used by the
- * rows and by the sheet's header, so the two say a meal's macros one way.
+ * "P 42g  C 72g  F 18g" (3a): each letter in its macro's colour, the numbers in one soft ink, tabular. The recipe
+ * sheet's header only since 11 Nov 2026: the rows draw M2's split bar and legend (NutritionRings' MealMacros), which
+ * names each macro in words; the sheet's header keeps the compact form the 3b sheet was drawn with.
  */
 function MacroLine({ protein, carbs, fat, className }: { protein: number; carbs: number; fat: number; className?: string }) {
   const parts: [string, number, string][] = [
