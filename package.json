@@ -402,6 +402,7 @@
     "verify:lift-effort": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/lift-effort.mjs",
     "verify:usual-meals": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/usual-meals.mjs",
     "verify:meals-elsewhere": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meals-elsewhere.mjs",
+    "verify:eating-out": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/eating-out.mjs",
     "verify:day-as-shown": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/day-as-shown.mjs",
     "test:log-needs-your-words": "tsx scripts/test-log-needs-your-words.ts",
     "test:exercise-aliases": "tsx scripts/test-exercise-aliases.ts",

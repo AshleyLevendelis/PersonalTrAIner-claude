@@ -115,8 +115,11 @@ function main() {
   console.log('\n4. The day around it')
   {
     const pools = libraryPools()
+    // AS STORED: the shared add-a-meal write marks every added meal as his own request (so a regenerate keeps it).
+    // Tested in that form, because the unmarked option was measured holding the day while the stored one re-planned it.
+    const stored = (o: PoolOption): PoolOption => ({ ...o, tags: [...(o.tags ?? []), 'user-requested'] })
     const serve = (size: EatingOutSize | null) => {
-      const pin = size ? { [FRIDAY]: { dinner: eatingOutOption('dinner', FRIDAY, BUDGETS.dinner, size) } } : undefined
+      const pin = size ? { [FRIDAY]: { dinner: stored(eatingOutOption('dinner', FRIDAY, BUDGETS.dinner, size)) } } : undefined
       return serveDates({ dates: WEEK, pools, targets: TARGETS, shape: SHAPE, ...(pin ? { pinsByDate: pin } : {}) })
     }
     const plain = serve(null)
@@ -134,11 +137,15 @@ function main() {
     const shrunk = SLOTS.filter(s => s !== 'dinner').map(s => [s, friday(big).chosen[s]!, poolOf(s, friday(big).chosen[s]!.name)] as const)
     check('...each other meal is still its own dish, never less than three quarters of its size', shrunk.every(([, o, p]) => !!p && o.macros.calories >= p.macros.calories * 0.74), shrunk.map(([s, o, p]) => [s, o.macros.calories, p?.macros.calories]))
     check('...and at least one of them is smaller than its dish (the shrink happened)', shrunk.some(([, o, p]) => !!p && o.macros.calories < p.macros.calories * 0.95), shrunk.map(([s, o, p]) => [s, o.macros.calories, p?.macros.calories]))
-    check('the day is worked out again around it, never held at its old dishes (so no "fits around your change" note)', [big, light, serve('normal')].every(w => friday(w).heldAround === undefined), [big, light].map(w => friday(w).heldAround))
+    check('the rest of Friday KEEPS its dishes, at every size: nothing else on the plate changes, only how much', [big, light, serve('normal')].every(w => SLOTS.filter(s => s !== 'dinner').every(s => friday(w).chosen[s]?.name === friday(plain).chosen[s]?.name)), [big, light].map(w => SLOTS.map(s => friday(w).chosen[s]?.name)))
+    check('...with no second note beside the meal out\'s own line', [big, light, serve('normal')].every(w => friday(w).heldAround === undefined), [big, light].map(w => friday(w).heldAround))
+    const satPlain = plain.find(d => d.date === '2026-11-14')!.day, satBig = big.find(d => d.date === '2026-11-14')!.day
+    check('the fixture binds: Saturday\'s lunch was Friday\'s dinner, as leftovers', satPlain.chosen.lunch?.leftoverFrom === 'dinner' && satPlain.chosen.lunch?.name === friday(plain).chosen.dinner?.name, [satPlain.chosen.lunch?.name, friday(plain).chosen.dinner?.name])
+    check('...with Friday\'s dinner out there are no leftovers: Saturday\'s lunch is a fresh dish', satBig.chosen.lunch?.leftoverFrom !== 'dinner' && satBig.chosen.lunch?.name !== satPlain.chosen.lunch?.name, satBig.chosen.lunch?.name)
     {
       // Lunch AND dinner out, both big: only breakfast and the snack are left, so the quarter limit binds.
       const two = serveDates({ dates: WEEK, pools, targets: TARGETS, shape: SHAPE, pinsByDate: { [FRIDAY]: {
-        lunch: eatingOutOption('lunch', FRIDAY, BUDGETS.lunch, 'big'), dinner: eatingOutOption('dinner', FRIDAY, BUDGETS.dinner, 'big') } } })
+        lunch: stored(eatingOutOption('lunch', FRIDAY, BUDGETS.lunch, 'big')), dinner: stored(eatingOutOption('dinner', FRIDAY, BUDGETS.dinner, 'big')) } } })
       const day = two.find(d => d.date === FRIDAY)!.day
       const left = (['breakfast', 'snack'] as MealSlotName[]).map(s => [s, day.chosen[s]!, poolOf(s, day.chosen[s]!.name)] as const)
       const need = (TARGETS.calories - day.chosen.lunch!.macros.calories - day.chosen.dinner!.macros.calories) / left.reduce((n, [, , p]) => n + (p?.macros.calories ?? 0), 0)
@@ -152,8 +159,9 @@ function main() {
       const withMine = serveDates({ dates: WEEK, pools, targets: TARGETS, shape: SHAPE, pinsByDate: { [FRIDAY]: { lunch: mine, dinner: eatingOutOption('dinner', FRIDAY, BUDGETS.dinner, 'big') } } })
       const day = withMine.find(d => d.date === FRIDAY)!.day
       check('a lunch he picked keeps its own size beside a big night out', day.chosen.lunch?.name === mine.name && day.chosen.lunch!.macros.calories === mine.macros.calories, [day.chosen.lunch?.name, day.chosen.lunch?.macros.calories, mine.macros.calories])
-      check('...while the breakfast he did not pick is made smaller', !!day.chosen.breakfast && !!poolOf('breakfast', day.chosen.breakfast.name) && day.chosen.breakfast.macros.calories < poolOf('breakfast', day.chosen.breakfast.name)!.macros.calories, [day.chosen.breakfast?.macros.calories, poolOf('breakfast', day.chosen.breakfast?.name ?? '')?.macros.calories])
+      check('...while the breakfast he did not pick is made smaller (his own lunch re-plans the day, his 1 Sep rule)', !!day.chosen.breakfast && !!poolOf('breakfast', day.chosen.breakfast.name) && day.chosen.breakfast.macros.calories < poolOf('breakfast', day.chosen.breakfast.name)!.macros.calories, [day.chosen.breakfast?.macros.calories, poolOf('breakfast', day.chosen.breakfast?.name ?? '')?.macros.calories])
     }
+    check('the write\'s own mark is checked: the stored meal out carries it', stored(eatingOutOption('dinner', FRIDAY, dinner, 'big')).tags!.includes('user-requested') && /tags: \[\.\.\.\(option\.tags \?\? \[\]\), USER_REQUESTED_TAG\]/.test(read('src/lib/pending-action-executor.ts')))
     check('the meal out itself is never shrunk', friday(big).chosen.dinner!.macros.calories === est.big.calories && friday(serve('normal')).chosen.dinner!.macros.calories === est.normal.calories)
     check('no other day serves the meal out', big.filter(d => d.date !== FRIDAY).every(d => SLOTS.every(s => !isEatingOut(d.day.chosen[s]))))
     check('no other day\'s meals changed', big.filter(d => d.date !== FRIDAY && d.date < FRIDAY).every(d => SLOTS.every(s => d.day.chosen[s]?.name === plain.find(p => p.date === d.date)!.day.chosen[s]?.name)))
@@ -168,7 +176,7 @@ function main() {
     check('the controller refuses a day outside the strip', /if \(!dates\.includes\(date\)\) return \{ ok: false, reason: EATING_OUT_REFUSALS\.outsideWindow \}/.test(mark))
     check('...refuses a meal of today\'s already logged as eaten', /readLoggedToday\(\)/.test(mark) && /EATING_OUT_REFUSALS\.eaten\(slot\)/.test(mark))
     check('...writes through the shared add-a-meal road', /applyMealOptionToSlot\(/.test(mark) && /eatingOutOption\(/.test(mark))
-    check('...and hands back what the meal showed before', /return \{ ok: true, option, previous \}/.test(mark))
+    check('...and hands back what the meal showed before, and what it changes on other days', /return \{ ok: true, option, previous, elsewhere: trial\?\.elsewhere \?\? \[\] \}/.test(mark) && /const trial = await knockOn\(date, slot, option, true\)/.test(mark))
     check('the hook hands the controller out', /^\s*eatingOut,$/m.test(hook))
     const app = read('src/App.tsx')
     check('App gives the same controller to Nutrition and to the coach', /eatingOut=\{mealDays\.eatingOut\}/.test(app) && /onEatingOut=\{mealDays\.eatingOut\}/.test(app))
@@ -176,11 +184,13 @@ function main() {
     check('Nutrition hands it to the meal list', (nd.match(/eatingOut=\{eatingOut\}/g) ?? []).length >= 1)
     const mp = read('src/components/MealPlan.tsx')
     check('the meal sheet marks and clears through it', /eatingOut\.mark\(/.test(mp) && /eatingOut\.clear\(/.test(mp))
+    check('...and its line names what the meal out changed on other days', /text: \[EATING_OUT_WORDS\.marked\(slot, dayWord, size\), \.\.\.r\.elsewhere\]\.join\(' '\)/.test(mp))
     const chat = read('src/components/ChatAssistant.tsx')
     const build = chat.slice(chat.indexOf('const buildEatingOutProposal'), chat.indexOf('const buildCardioLogProposal'))
     check('the coach\'s card reads the size from his message, never from the coach', /eatingOutSizeSaid\(userSaid\)/.test(build) && !/rawArgs\.size/.test(build))
     check('...and with no size said the APP asks, with the three as buttons', /EATING_OUT_WORDS\.chatAsk\(/.test(build) && /QUICK_REPLIES/.test(build) && /EATING_OUT_SIZES\.map/.test(build))
     check('...its estimate is the same function the sheet saves', /eatingOutMacros\(budget, size\)/.test(build))
+    check('the coach\'s card lists the same trial\'s lines', /\.\.\.\(trial\?\.lines \?\? \[\]\)/.test(build) && /onMealKnockOn\(date, slot, eatingOutOption\(slot, date, budget, size\), true\)/.test(build))
     check('the coach\'s Apply calls the controller', /onEatingOut\.mark\(payload\.date, payload\.slot, payload\.size\)/.test(chat))
     check('...and its Undo puts back the meal it showed before', /onEatingOut\.clear\(payload\.date, payload\.slot, row\.result\?\.previousMeal \?\? null\)/.test(chat) && /previousMeal: r\.previous/.test(chat))
     const fn = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')

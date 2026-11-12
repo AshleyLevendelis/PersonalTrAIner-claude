@@ -1503,6 +1503,15 @@ menu" stays true when a copy is also left outside it.
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
 
+### His ruling of 12 Nov 2026, eating out (`docs/plans/eating-out.md`)
+- **A meal marked as out: "Ask: light/normal/big"** (from three options; his request "build it, start with out for
+  dinner"). The APP asks how big a night it is, on both surfaces (the coach's tool has no size; the size is read from
+  his own words, else the app asks with three buttons). The meal stays in the day as an estimate ("Eating out",
+  "Estimate"), never shopped for; the day's other meals keep their dishes and are made smaller together, never by more
+  than a quarter (mine, CSCS: no meal skipped to earn a night out; protein held); what is left over the day says. Any
+  meal it changes on another day (a dinner out leaves no leftovers) is named, read off the swap's trial. Undo on both.
+  `test:eating-out`, `verify:eating-out`. Needs the `chat-gemini` deploy for the coach's half
+
 ### His Nutrition Week handoff, approved 11 Nov 2026 (`docs/plans/nutrition-week.md`)
 - **Rings on Nutrition again: option 3d**, in his words "I want one circle with all the rings inside it like I used to
   have before, including water". It REVERSES his 17 Oct "rings live on Home only" for Nutrition; Home keeps its own.

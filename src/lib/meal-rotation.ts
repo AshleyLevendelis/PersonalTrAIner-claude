@@ -592,6 +592,10 @@ export function assembleRotationDay(
  */
 function isHerOwnDish(option: PoolOption, pools: Partial<Record<MealSlotName, PoolOption[]>>): boolean {
   if (!option.tags?.includes(USER_REQUESTED_TAG)) return false
+  // A MEAL OUT (12 Nov 2026) is stored with that mark, as every added meal is (so a regenerate keeps it), and is still
+  // not a dish of hers to plan the day around: the day keeps its dishes and shrinks (shrinkAroundEatingOut). Measured:
+  // re-planning changed that day's dinner and with it the next day's meals, which the card had not said.
+  if (isEatingOut(option)) return false
   // AN EDIT MADE AFTER EATING is judged by the meal it was made from (Ashley, 2 Nov 2026, "Same dishes"): a plan's own
   // dish corrected after logging holds the rest of the day, as the logged meal itself does. Edited from a dish that is
   // her own, or from one this day's pool no longer holds (an edit made before eating), it re-plans as before.
@@ -610,14 +614,16 @@ function isHerOwnDish(option: PoolOption, pools: Partial<Record<MealSlotName, Po
 
 /**
  * A MEAL OUT SHRINKS THE REST OF THE DAY (his 12 Nov 2026 ruling, "Ask: light/normal/big": the size "drives how much
- * the rest of the day shrinks"). The day is re-planned around the meal out first (it is his own meal); when that still
- * runs over on calories, the day's other free meals are made smaller together by one factor, never more than a quarter
- * (the app's own "still the same dish" limit, AROUND_EATEN_MIN), and what is left over is said by the day's verdict.
- * CSCS delegation, population nutrition: no meal is skipped or halved to "earn" a night out, and protein is mostly kept
- * (measured 12 Nov 2026 over four targets and six days: a big night 447 kcal over with the rest re-planned only, 244
- * with this, protein 98% of target on average). Never touches a pin, a leftover lunch or a meal cooked for him.
+ * the rest of the day shrinks"). The day's other meals keep their dishes (the hold above, his 10 Oct "Resize, else
+ * leave"), so no other meal and no other day changes dish; when the day still runs over on calories, they are made
+ * smaller together by one factor, never more than a quarter (the app's own "still the same dish" limit,
+ * AROUND_EATEN_MIN), and what is left over is said by the day's verdict. CSCS delegation, population nutrition: no meal
+ * is skipped or halved to "earn" a night out, and protein is mostly kept. The hold's own note is dropped: the meal
+ * out's line already says the day fits around it, and after this step the hold's "how far over" would be stale.
+ * Never touches a pin, a leftover lunch or a meal cooked for him.
  */
-function shrinkAroundEatingOut(day: AssembledDay, pins: Partial<Record<MealSlotName, PoolOption>>, targets: MacroTargets): AssembledDay {
+function shrinkAroundEatingOut(held: AssembledDay, pins: Partial<Record<MealSlotName, PoolOption>>, targets: MacroTargets): AssembledDay {
+  const { heldAround: _note, ...day } = held
   const slots = Object.keys(day.chosen) as MealSlotName[]
   const free = slots.filter(s => {
     const o = day.chosen[s]

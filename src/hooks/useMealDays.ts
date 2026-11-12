@@ -463,9 +463,11 @@ export function useMealDays(input: MealDaysInput) {
         if (!(await removeEatingOutOptions(profileId, slot, name))) return { ok: false, reason: DAY_MOVE.undo.saveFailed }
       }
       const option = eatingOutOption(slot, date, budget, size)
+      // READ OFF A TRIAL BEFORE THE WRITE: the meals it changes on other days, pinned as the write will pin it.
+      const trial = await knockOn(date, slot, option, true).catch(() => null)
       const { receipt } = await applyMealOptionToSlot(profileId, { slot, date, option }, p => pickFor(p.date, p.slot, p.option.name))
       if (receipt.failed.length > 0) return { ok: false, reason: DAY_MOVE.undo.saveFailed }
-      return { ok: true, option, previous }
+      return { ok: true, option, previous, elsewhere: trial?.elsewhere ?? [] }
     },
     clear: async (date: string, slot: MealSlotName, restore?: string | null) => {
       if (!profileId || !dates.includes(date)) return false

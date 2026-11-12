@@ -326,10 +326,12 @@ export function MealPlan({
   const [outBusy, setOutBusy] = useState(false)
   const dayWord = upcoming ? `${upcoming.dayName}'s` : "Today's"
   /** Marks a meal out; null when it landed, else the reason in his words. */
-  const markOut = eatingOut ? async (slot: MealSlotName, size: EatingOutSize): Promise<string | null> => {
+  // A SIZE CHANGED ON A MEAL ALREADY OUT gets no Undo: the old size is one tap away on the row, and an Undo there would
+  // take the meal off eating out altogether, which is more than he did.
+  const markOut = eatingOut ? async (slot: MealSlotName, size: EatingOutSize, resized = false): Promise<string | null> => {
     const r = await eatingOut.mark(date, slot, size)
     if (!r.ok) return r.reason
-    setOutLine({ slot, text: EATING_OUT_WORDS.marked(slot, dayWord, size), undo: { previous: r.previous } })
+    setOutLine({ slot, text: [EATING_OUT_WORDS.marked(slot, dayWord, size), ...r.elsewhere].join(' '), undo: resized ? null : { previous: r.previous } })
     return null
   } : undefined
   const clearOut = eatingOut ? async (slot: MealSlotName, restore: string | null): Promise<boolean> => {
@@ -467,7 +469,7 @@ export function MealPlan({
       onCookMyOwn={name => onSwapSlot(slot, name)}
       eatingOut={markOut && clearOut && isEatingOut(shownOption(slot)) ? {
         size: eatingOutSizeOf(shownOption(slot)),
-        resize: size => markOut(slot, size),
+        resize: size => markOut(slot, size, true),
         notOut: () => clearOut(slot, null),
       } : undefined}
       onLog={async option => {

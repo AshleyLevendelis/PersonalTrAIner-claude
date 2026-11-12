@@ -1,0 +1,16 @@
+{
+  "name": "eating-out-asks-size",
+  "why": "12 Nov 2026, his request 'build it, start with out for dinner' and his ruling 'Ask: light/normal/big': a meal out is marked with propose_eating_out, called straight away with the day and the meal and NEVER a size; the APP asks how big a night it is, with buttons. Turn one says it in words the prompt never uses (a table booked, no meal named but an evening), so a coach keying on 'eating out' or 'out for dinner' cannot pass by accident. Turn two is the size in his words: the same tool again, still no size of the coach's own. Turn three names the dish he will order: that is the coach's estimate of the real dish (propose_custom_meal with cooked_for_me), not another meal-out card. The nearest neighbours cost different things: log_meal records food already eaten; propose_meal_swap changes a plan dish.",
+  "messages": [
+    "we've got a table booked for friday evening",
+    "it'll be a proper blowout, three courses",
+    "I'm going to order the steak frites with a side salad"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      { "turn": 0, "oneOf": ["propose_eating_out"] },
+      { "turn": 1, "oneOf": ["propose_eating_out"] },
+      { "turn": 2, "oneOf": ["propose_custom_meal"] }
+    ]
+  }
+}

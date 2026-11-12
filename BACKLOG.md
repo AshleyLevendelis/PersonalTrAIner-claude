@@ -2,6 +2,44 @@
 
 Newest first. One line each.
 
+- [x] **EATING OUT: MARK A MEAL AS OUT, THE APP ASKS HOW BIG, THE DAY FITS AROUND IT** (12 Nov 2026, his "build it,
+  start with out for dinner" and his ruling the same day, from three options, **"Ask: light/normal/big"**). Both
+  surfaces: the meal's sheet on Nutrition ("Eating out") and the coach (`propose_eating_out`), one controller from
+  `useMealDays` handed to both. `docs/plans/eating-out.md`.
+  WHAT CHANGED ON THE PHONE: open a meal (today or the six strip days, never one logged as eaten), tap "Eating out",
+  pick Light / Normal / Big night. The meal stays in the day as "Dinner out (Friday)", labelled "Eating out", badged
+  "Estimate", counted, never on the shopping list; the size can be changed on the row, and "Not eating out" puts the
+  plan's dish back. A line under the meals says what happened and names any meal it changed on another day, with an
+  Undo. Told "I'm out for dinner Friday", the APP asks how big a night it is with three buttons (the coach never sets a
+  size: the tool has none, and the size is read from his own words only); the card names the meal before and after,
+  the estimate and every other change, before Apply; Undo on the receipt.
+  DECIDED BY ME, CSCS delegation (population nutrition), with the basis: the sizes are 1.0 / 1.35 / 1.7 times the
+  meal's share of his day. Full-service restaurant mains average about 1,000-1,200 kcal (UK studies about 1,030, US
+  about 1,200) against a planned dinner share of roughly 600-1,100, so "Normal" is a typical main, about a third over
+  the share, and "Big night" (starter, main, dessert or drinks) about seven tenths over. Protein is held at the share
+  (a restaurant main carries a normal serving of protein; the extra is sauces, sides, bread, puddings, drinks). The
+  rest of the day is made smaller by up to a quarter and no more, the app's own "still the same dish" limit: a coach
+  does not have someone skip or halve meals to "earn" a night out, and protein is the daily floor while calories can
+  run over for one day. Measured on the real library, four targets, six days: a big night lands about 250 kcal over
+  (447 with no shrink), protein 98% of target; Normal lands on calories, rest 11.5% smaller.
+  FOUND ON THE WAY, BY THE CHECKS: (1) my first build let the day be re-planned around the meal out, and the driver
+  showed Thursday's dinner, and with it Friday's meals, changing with nothing said. The cause was the shared
+  add-a-meal write marking every added meal as his own request, which re-plans a day. A meal out now never counts as
+  his own dish for re-planning (it keeps the mark, so a regenerate keeps it). The gate now tests the meal as STORED,
+  the shape that hid it. (2) A dinner out leaves no leftovers for tomorrow's lunch, so that lunch changes, and the
+  rotation can move a later meal or two. An ordinary dinner swap does exactly the same (measured: 20 of 20 weeks).
+  Both are now named, read off the swap's own trial, on the line and the coach's card. (3) "Nothing heavy" read as a
+  big night; a size word under a no now reads as light.
+  VERIFIED: `test:eating-out` (71 checks, 18 mutations, all caught) and `verify:eating-out` at 390x844 (59 checks, 10
+  mutations, all caught after one crash was made null-safe: the sheet, the row, the line,
+  Undo, a size change, "Not eating out", an eaten meal, an upcoming day, a leftover pair found by property, and the
+  chat's ask, buttons, card, Apply and Undo). `coach-parity` (the parity list names it
+  on both surfaces) and `coach-rules-sync` (the coach's map of Nutrition says it) green.
+  NOT PROVEN: whether the deployed coach calls the tool for "I'm out for dinner Friday" (model behaviour; the stub
+  answers in the function's own shape). An exam case was added (`eating-out-asks-size`); the exam needs a run on his
+  machine. Also found: `test:no-dead-code` was red at the first eating-out commit (an unused export); fixed. Needs the `chat-gemini` deploy for the coach's half; the screen works on merge.
+  NOT BUILT: a menu link or photo; spreading a big night over the week; drinks as their own line.
+
 - [x] **THE NUTRITION WEEK DESIGN: RINGS CARD, CLEARER MEAL ROWS, A FUTURE DAY, THE WEEK** (12 Nov 2026, his design
   handoff approved 11 Nov: "N1, W1, W3", with M2 rows). Layout only: nothing new is stored and no action was added, so
   coach/screen parity is unchanged.

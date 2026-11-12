@@ -62,7 +62,7 @@ import type { TopUpOutcome, TopUpPlan } from '@/lib/meal-top-up'
 import type { MealDayMoveArgs, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
 import { rebalanceSaid, rebalanceAskText, mealsNamed, type MealRebalanceController, type MealRebalancePayload } from '@/lib/meal-rebalance'
 import { DEFAULT_POOL_SIZE, computeSlotBudgets } from '@/lib/meal-generation'
-import { EATING_OUT_REFUSALS, EATING_OUT_SIZES, EATING_OUT_WORDS, eatingOutMacros, eatingOutSizeSaid, type EatingOutController, type EatingOutSize } from '@/lib/eating-out'
+import { EATING_OUT_REFUSALS, EATING_OUT_SIZES, EATING_OUT_WORDS, eatingOutMacros, eatingOutOption, eatingOutSizeSaid, type EatingOutController, type EatingOutSize } from '@/lib/eating-out'
 import { executeMealMove, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { detectTodayClaim, todayClaimFloor, type TodayFacts } from '@/lib/today-claim'
@@ -4167,9 +4167,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * and when he has not said one THE APP ASKS, with the three as buttons whose words carry the size, the meal and the
    * day, so a tap answers it. The estimate on the card is the same one the meal sheet saves (eatingOutMacros).
    */
-  const buildEatingOutProposal = (rawArgs: Record<string, unknown>, userSaid: string):
+  const buildEatingOutProposal = async (rawArgs: Record<string, unknown>, userSaid: string): Promise<
     | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: { date: string; slot: MealSlotName; size: EatingOutSize }; diff: import('@/lib/pending-actions-store').ProposalDiff }
-    | { ok: false; refusal: string } => {
+    | { ok: false; refusal: string }> => {
     const today = activeSession.date
     const date = typeof rawArgs.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.date) ? rawArgs.date : today
     const slotArg = String(rawArgs.meal_slot ?? 'dinner').toLowerCase()
@@ -4186,6 +4186,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const budget = computeSlotBudgets(macros, profile.meals_per_day, profile.include_snacks)[slot]
     if (!budget || !(budget.calories > 0)) return { ok: false, refusal: EATING_OUT_REFUSALS.noSuchMeal(slot) }
     const est = eatingOutMacros(budget, size)
+    // WHAT ELSE IT CHANGES, read off the trial the meal sheet's write runs (a dinner out leaves no leftovers for the
+    // next day's lunch), before the tap, as a swap's card does.
+    let trial: Awaited<ReturnType<MealKnockOnFn>> | null = null
+    if (onMealKnockOn) {
+      try { trial = await onMealKnockOn(date, slot, eatingOutOption(slot, date, budget, size), true) }
+      catch (err) { console.error('chat: the eating-out trial failed', err) }
+    }
     const before = date === today
       ? (mealPlan.find(d => d.meal.toLowerCase() === slot)?.items?.[0] as { name?: string } | undefined)?.name ?? ''
       : upcomingMeals?.find(u => u.date === date)?.meals[slot] ?? ''
@@ -4197,7 +4204,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       diff: {
         lead: ask(`mark ${dayWord} ${slot} as eating out`),
         rows: [{ field: `${dayWord.replace(/^\w/, c => c.toUpperCase())} ${slot}`, before, after: `${EATING_OUT_WORDS.label}, ${EATING_OUT_WORDS.sizeLabel[size].toLowerCase()} (about ${est.calories.toLocaleString('en-GB')} kcal, an estimate)` }],
-        implications: [{ severity: 'info', text: 'The rest of the day fits around it, and it stays off your shopping list. Tell me what you order and I can estimate the real thing.' }],
+        implications: [{ severity: 'info', text: 'The rest of the day fits around it, and it stays off your shopping list. Tell me what you order and I can estimate the real thing.' }, ...(trial?.lines ?? [])],
         reversible: true,
       },
     }
@@ -6272,7 +6279,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             : REBALANCE.refitFits(mealsNamed(userSaid).length >= 2)
         }
       } else if (result.proposal.kind === 'propose_eating_out') {
-        const out = buildEatingOutProposal(result.proposal.rawArgs ?? {}, userSaid)
+        const out = await buildEatingOutProposal(result.proposal.rawArgs ?? {}, userSaid)
         if (out.ok) built = { scopeKey: out.scopeKey, preconditions: out.preconditions, payload: out.payload as unknown as Record<string, unknown>, diff: out.diff }
         else refusal = out.refusal
       } else if (result.proposal.kind === 'propose_cardio_log') {

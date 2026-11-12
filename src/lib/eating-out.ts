@@ -12,12 +12,11 @@ import type { MacroTargets } from './types'
 import type { MealSlotName } from './meal-store'
 import type { PoolOption } from './meal-generation'
 import { ELSEWHERE_TAG } from './meals-elsewhere'
-import { USER_REQUESTED_TAG } from './meal-store'
 import { tagsPinOnly } from './meal-new-from'
 
 export type EatingOutSize = 'light' | 'normal' | 'big'
 export const EATING_OUT_SIZES: EatingOutSize[] = ['light', 'normal', 'big']
-export const EATING_OUT_TAG = 'eating-out'
+const EATING_OUT_TAG = 'eating-out'
 const SIZE_TAG_PREFIX = 'eating-out-size:'
 
 /**
@@ -73,11 +72,10 @@ export function eatingOutOption(slot: MealSlotName, date: string, budget: MacroT
     name: eatingOutName(slot, date),
     ingredients: [],
     macros: eatingOutMacros(budget, size),
-    // HIS OWN MEAL, not one of the plan's (USER_REQUESTED_TAG): the rest of the day is worked out again around it, as it
-    // is around the coach's estimate of a meal he names, never held at its old dishes. His ruling: the size "drives
-    // how much the rest of the day shrinks", and holding the day's dishes within a quarter cannot shrink it for a big
-    // night (measured 12 Nov 2026: 467 kcal over, the other meals untouched).
-    tags: tagsPinOnly([USER_REQUESTED_TAG, ELSEWHERE_TAG, EATING_OUT_TAG, `${SIZE_TAG_PREFIX}${size}`]),
+    // NOT tagged as his own request: the day's other meals KEEP THEIR DISHES and are made smaller together (meal-rotation's
+    // shrinkAroundEatingOut), as around a swap (his 10 Oct "Resize, else leave"). Re-planning them instead was measured
+    // on 12 Nov 2026 to change a dinner, and with it the next day's leftover lunch, which nobody asked for.
+    tags: tagsPinOnly([ELSEWHERE_TAG, EATING_OUT_TAG, `${SIZE_TAG_PREFIX}${size}`]),
   }
 }
 
@@ -129,9 +127,13 @@ export const EATING_OUT_WORDS = {
 const EATING_OUT_SIZES_WORDS: Record<EatingOutSize, string> = { light: 'light', normal: 'normal', big: 'big' }
 const EATING_OUT_SIZES_CHIP: Record<EatingOutSize, string> = { light: 'A light', normal: 'A normal', big: 'A big night,' }
 
-/** What marking a meal out did, or why it did not. `previous` is the dish the meal showed before, for the Undo. */
+/**
+ * What marking a meal out did, or why it did not. `previous` is the dish the meal showed before, for the Undo;
+ * `elsewhere` names any meal it changed on ANOTHER day, read off the same trial a swap's is (meal-knock-on.ts): a dinner
+ * out leaves no leftovers for the next day's lunch, and nothing changes silently (his UX rule 1).
+ */
 export type EatingOutResult =
-  | { ok: true; option: PoolOption; previous: string | null }
+  | { ok: true; option: PoolOption; previous: string | null; elsewhere: string[] }
   | { ok: false; reason: string }
 
 /**
