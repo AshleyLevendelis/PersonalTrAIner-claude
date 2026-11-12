@@ -141,11 +141,15 @@ const planned = await ev(`(() => { const c = document.querySelector('[data-plann
   rings: [...c.querySelectorAll('[data-ring]')].map(r => [r.dataset.ring, Number(r.dataset.share)]),
   verdict: c.querySelector('[data-testid="planned-verdict"]')?.textContent ?? null,
   verdictColor: c.querySelector('[data-testid="planned-verdict"]') ? getComputedStyle(c.querySelector('[data-testid="planned-verdict"]')).color : null,
+  verdictIcon: !!c.querySelector('[data-verdict-icon]'),
   kicker: c.querySelector('[data-testid="planned-kicker"]')?.textContent ?? null,
   rows: Object.fromEntries([...c.querySelectorAll('[data-planned-row]')].map(r => [r.dataset.plannedRow, r.querySelector('.tabular-mono')?.textContent ?? ''])),
   addInCard: !!c.querySelector('[data-testid="meal-day-add-grocery"], [data-testid="meal-day-grocery"]'),
 } : null })()`)
 const D = W.week[pick]
+// THE CALORIES SWATCH (his comment, 12 Nov 2026): every meal row's calories has the calories ring's colour beside it.
+const swatches = await ev(`(() => { const ring = document.querySelector('[data-ring="calories"]'); const ringCol = ring ? getComputedStyle(ring).stroke : null; return { ringCol, rows: [...document.querySelectorAll('[data-meal-row]')].map(r => { const k = r.querySelector('[data-testid="meal-row-kcal"]'); const sw = k?.parentElement?.querySelector('[data-kcal-swatch]'); const b = sw?.getBoundingClientRect(); return sw ? { col: getComputedStyle(sw).backgroundColor, w: Math.round(b.width), before: !!(sw.compareDocumentPosition(k) & Node.DOCUMENT_POSITION_FOLLOWING) } : null }) } })()`)
+check('every meal row has the calories swatch, 8px, in the calories ring colour, before the number', swatches.rows.length >= 3 && swatches.rows.every(r => r && r.w === 8 && r.col === swatches.ringCol && r.before), swatches)
 check('a planned card, four rings and NO water ring (water is logged, never planned)', !!planned && planned.rings.map(r => r[0]).join() === 'calories,protein,carbs,fat', planned?.rings)
 check('the kicker is the day and "planned"', planned?.kicker === `${D.dayName} ${Number(D.date.slice(8))} · planned`, planned?.kicker)
 check('the verdict is the engine\'s dayVerdictLabel for that day', planned?.verdict === (await ev(`window.__nw.verdict(window.__nw.week[${pick}].totals, window.__nw.targets)`)), planned?.verdict)
@@ -179,6 +183,8 @@ check('every other day is "Thu 17" style', wk.rows.slice(1).every(r => /^[A-Z][a
 check('each day\'s calories are its planned total, with "kcal" beside them', wk.rows.every((r, i) => num(r.kcal) === Math.round(W.week[i].totals.calories) && /kcal$/.test(r.kcalCtx ?? '')), wk.rows.map((r, i) => [r.kcal, W.week[i].totals.calories]))
 check('each day lists its meals', wk.rows.every((r, i) => W.week[i].names.every(n => (r.meals ?? '').includes(n))), wk.rows.map(r => r.meals))
 check('every row is a thumb-sized target', wk.rows.every(r => r.h >= 64), wk.rows.map(r => r.h))
+const weekSw = await ev(`(() => { const ring = document.querySelector('[data-week-day] [data-ring="calories"]'); const ringCol = ring ? getComputedStyle(ring).stroke : null; return [...document.querySelectorAll('[data-week-day]')].map(r => { const sw = r.querySelector('[data-kcal-swatch]'); return !!sw && getComputedStyle(sw).backgroundColor === ringCol && !!(sw.compareDocumentPosition(r.querySelector('[data-week-day-kcal]')) & Node.DOCUMENT_POSITION_FOLLOWING) }) })()`)
+check('each day row has the calories swatch before its calories, in the ring colour', weekSw.length === 7 && weekSw.every(Boolean), weekSw)
 check('the strip steps aside in the week view', wk.strip === false)
 const openRows = () => ev(`[...document.querySelectorAll('[data-week-day-open="yes"]')].map(r => r.dataset.weekDay)`)
 await click(`[data-week-day="${days[2]}"] > button`)
@@ -208,15 +214,22 @@ console.log('\n[W1b] An OFF-target day says what is off (one on-target day canno
 await open('/?tour=off&week=1&refit=1&n=2#/tab/nutrition', '[data-testid="meal-day-strip"]')
 const daysR = await ev(`[...document.querySelectorAll('[data-meal-day]')].map(b => b.dataset.mealDay)`)
 await click(`[data-meal-day="${daysR[3]}"]`)
-const offCard = await ev(`(() => { const v = document.querySelector('[data-planned-card] [data-testid="planned-verdict"]'); return v ? { text: v.textContent, color: getComputedStyle(v).color } : null })()`)
+const verdictProbe = sel => ev(`((sel) => { const v = document.querySelector(sel); if (!v) return null; const w = v.closest('[data-verdict-miss]'); const tmp = document.createElement('span'); document.body.appendChild(tmp); const col = c => { tmp.style.color = c; return getComputedStyle(tmp).color }; const out = { text: v.textContent, color: getComputedStyle(v).color, icon: !!w?.querySelector('[data-verdict-icon]'), fg: col('var(--foreground)'), mint: col('var(--primary-text)'), amber: col('var(--role-warn-text)'), carbs: col('var(--chart-4)') }; tmp.remove(); return out })(${JSON.stringify(sel)})`)
+const offCard = await verdictProbe('[data-planned-card] [data-testid="planned-verdict"]')
 const offWant = await ev(`window.__nw.verdict(window.__nw.week[3].totals, window.__nw.targets)`)
 check('the off-target day is off by the engine (the fixture binds)', typeof offWant === 'string' && offWant !== 'on target', offWant)
 check('...and the card says exactly that', offCard?.text === offWant, [offCard?.text, offWant])
 await click('[data-testid="nutrition-week-toggle"]')
 await click(`[data-week-day="${daysR[3]}"] > button`)
-const offWeek = await ev(`(() => { const v = document.querySelector('[data-week-day-open="yes"] [data-testid="week-day-verdict"]'); return v ? { text: v.textContent, color: getComputedStyle(v).color } : null })()`)
+const offWeek = await verdictProbe('[data-week-day-open="yes"] [data-testid="week-day-verdict"]')
+await shoot('nutrition-week-miss')
 check('...and so does the week view', offWeek?.text === offWant, [offWeek?.text, offWant])
 check('a miss is drawn in a different colour from "on target"', !!offCard && !!planned && offCard.color !== (await (async () => planned.verdictColor)()), [offCard?.color, planned?.verdictColor])
+// HIS RULING 12 NOV 2026, option 1: a miss is in the ordinary text colour with a warning triangle, NEVER amber (it read
+// as carbs). Read off both places a miss is said, against the theme's own colours.
+check('a miss is in the text colour, never the warning amber or the carbs colour, on the card and in the week', [offCard, offWeek].every(v => !!v && v.color === v.fg && v.color !== v.amber && v.color !== v.carbs), [offCard, offWeek])
+check('...with a warning triangle in front of it, in both places', [offCard, offWeek].every(v => v?.icon === true), [offCard?.icon, offWeek?.icon])
+check('...and "on target" is mint, with no triangle', !!planned && planned.verdict === 'on target' && planned.verdictColor === offCard?.mint && planned.verdictIcon === false, [planned?.verdict, planned?.verdictColor, offCard?.mint, planned?.verdictIcon])
 
 console.log('\n[List] The shopping list takes the 7 days')
 const memo = () => ev(`(() => { const k = Object.keys(localStorage).find(k => k.startsWith('fitplan_grocery_built_v1:')); return k ? JSON.parse(localStorage.getItem(k)).days : null })()`)

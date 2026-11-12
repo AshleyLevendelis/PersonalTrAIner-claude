@@ -6,7 +6,7 @@ import type { PoolOption } from '@/lib/meal-generation'
 import { dayVerdictLabel } from '@/lib/meal-generation'
 import { dayOfMonth, weekdayShort } from '@/lib/day-labels'
 import { plannedRings, ringShares } from '@/lib/nutrition-week'
-import { NestedRings, MealMacros, RING_COLOR, RING_LABEL } from '@/components/nutrition/NutritionRings'
+import { NestedRings, MealMacros, KcalSwatch, DayVerdict, RING_COLOR, RING_LABEL } from '@/components/nutrition/NutritionRings'
 import { AddDayToGrocery, SLOT_LABEL, SLOT_ORDER, type UpcomingMealDay } from '@/components/MealPlan'
 
 // ---------------------------------------------------------------------------
@@ -20,10 +20,6 @@ import { AddDayToGrocery, SLOT_LABEL, SLOT_ORDER, type UpcomingMealDay } from '@
 /** The violet of a planned day, the strip's selected future day and this card's border. */
 const PLANNED_INK = 'color-mix(in srgb, var(--chart-2) 55%, var(--foreground))'
 const PLANNED_BORDER = 'color-mix(in srgb, var(--chart-2) 45%, transparent)'
-
-function verdictColor(label: string): string {
-  return label === 'on target' ? 'var(--primary-text)' : 'var(--role-warn-text)'
-}
 
 const MACROS = ['calories', 'protein', 'carbs', 'fat'] as const
 
@@ -53,9 +49,7 @@ export function PlannedDayCard({ date, totals, targets, upcoming }: {
           {upcoming.dayName} {dayOfMonth(date)} · planned
         </span>
         {verdict && (
-          <span className="whitespace-nowrap text-[0.75rem] font-semibold" style={{ color: verdictColor(verdict) }} data-testid="planned-verdict">
-            {verdict}
-          </span>
+          <span className="text-[0.75rem]"><DayVerdict label={verdict} data-testid="planned-verdict" /></span>
         )}
       </div>
       <div className="mt-4 flex items-center gap-4">
@@ -143,7 +137,8 @@ export function NutritionWeekView({ days, today, targets, onOpenDay, onShopWeek 
                 <span className="flex items-baseline justify-between gap-2">
                   <span className={`text-[0.9375rem] font-semibold ${isToday ? 'text-primary-text' : ''}`} data-week-day-label>{label}</span>
                   {!isOpen && (
-                    <span className="shrink-0 text-[0.6875rem] text-muted-foreground">
+                    <span className="flex shrink-0 items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
+                      <KcalSwatch />
                       <span className="tabular-mono text-[0.875rem] font-bold text-foreground" data-week-day-kcal>{n(day.totals.calories)}</span> kcal
                     </span>
                   )}
@@ -151,7 +146,7 @@ export function NutritionWeekView({ days, today, targets, onOpenDay, onShopWeek 
                 {isOpen ? (
                   <span className="mt-0.5 block text-[0.75rem] text-muted-foreground" data-week-day-summary>
                     <span className="tabular-mono" data-week-day-kcal>{n(day.totals.calories)}</span> kcal
-                    {verdict && <> · <span className="font-semibold" style={{ color: verdictColor(verdict) }} data-testid="week-day-verdict">{verdict}</span></>}
+                    {verdict && <> · <DayVerdict label={verdict} data-testid="week-day-verdict" /></>}
                   </span>
                 ) : (
                   <span className="mt-0.5 block truncate text-[0.75rem] text-muted-foreground" data-week-day-meals>
@@ -185,7 +180,7 @@ export function NutritionWeekView({ days, today, targets, onOpenDay, onShopWeek 
                         <span className="mt-0.5 block line-clamp-2 text-[0.96875rem] font-semibold leading-[1.3]">{o.name}</span>
                         </span>
                         <span className="flex shrink-0 flex-col items-end pt-0.5">
-                          <span className="tabular-mono text-[1.0625rem] font-bold leading-none">{n(o.macros.calories)}</span>
+                          <span className="flex items-center gap-1.5"><KcalSwatch /><span className="tabular-mono text-[1.0625rem] font-bold leading-none">{n(o.macros.calories)}</span></span>
                           <span className="mt-1 text-[0.625rem] font-semibold uppercase leading-none tracking-[.12em] text-muted-foreground">kcal</span>
                         </span>
                         </span>

@@ -1,4 +1,5 @@
 import type * as React from 'react'
+import { AlertTriangle } from 'lucide-react'
 import { macroEnergySplit, type RingGeometry, type RingKey } from '@/lib/nutrition-week'
 
 // ---------------------------------------------------------------------------
@@ -14,6 +15,29 @@ export const RING_COLOR: Record<RingKey, string> = {
   protein: 'var(--chart-2)',
   carbs: 'var(--chart-4)',
   fat: 'var(--text-tertiary)',
+}
+
+/**
+ * THE CALORIES SWATCH (his comment, 12 Nov 2026): an 8px mint square before a meal's or a day's calories, so calories
+ * carry their ring colour as protein, carbs and fat already do.
+ */
+export function KcalSwatch() {
+  return <span aria-hidden className="block size-2 shrink-0 rounded-[3px]" style={{ background: RING_COLOR.calories }} data-kcal-swatch />
+}
+
+/**
+ * A DAY'S VERDICT, as the engine words it (dayVerdictLabel). "on target" in mint; a miss in the ordinary text colour
+ * with a warning triangle in front, NEVER amber: his ruling 12 Nov 2026, option 1, because the warning amber is almost
+ * the carbs colour and on this screen read as carbs.
+ */
+export function DayVerdict({ label, ...rest }: { label: string; 'data-testid'?: string }) {
+  const onTarget = label === 'on target'
+  return (
+    <span className="inline-flex items-center gap-1 whitespace-nowrap font-semibold" style={{ color: onTarget ? 'var(--primary-text)' : 'var(--foreground)' }} data-verdict-miss={onTarget ? 'no' : 'yes'}>
+      {!onTarget && <AlertTriangle aria-hidden className="size-[13px] shrink-0" strokeWidth={2.2} data-verdict-icon />}
+      <span data-testid={rest['data-testid']}>{label}</span>
+    </span>
+  )
 }
 
 /** The name of each ring as a row says it. */

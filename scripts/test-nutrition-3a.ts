@@ -82,7 +82,9 @@ const controls: [string, RegExp][] = [
   ['the method', /data-meal-method=\{option\.name\}/],
   ['the tags', /displayTags\(option\.tags\)\.map\(/],
   ['the "your plan now shows" line', /\{planMovedOn && \(/],
-  ['Move, its sheet and its Undo', /data-testid="meal-move-open"[\s\S]{0,2400}<MealMoveSheet[\s\S]{0,2400}data-testid="meal-move-undo"/],
+  // In this order inside the sheet; the reach was widened 12 Nov 2026 when the eating-out sizes came to sit between the
+  // Move button and its sheet (the order is the property, not the distance).
+  ['Move, its sheet and its Undo', /data-testid="meal-move-open"[\s\S]{0,6000}<MealMoveSheet[\s\S]{0,2400}data-testid="meal-move-undo"/],
   ['Regenerate this meal', /onClick=\{handleRegenerate\}/],
   ['the swap list (each dish a button)', /otherOptions\.map\(alt =>[\s\S]{0,1200}onClick=\{\(\) => handleChoose\(alt\.name\)\}/],
   ['the restriction check on every dish offered', /checkAlternative\(alt\)/],

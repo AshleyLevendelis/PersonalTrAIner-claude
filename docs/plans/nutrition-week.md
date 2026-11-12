@@ -52,3 +52,10 @@ Nutrition tab only. Presentation only: nothing new is stored, no new action, so 
 `test:nutrition-week` (40 checks), `verify:nutrition-week` (64 checks at 390x844, including the shopping list's
 half on grocery.html). Re-anchored to the new card, each with the reversal said: `test:nutrition-layout`,
 `test:nutrition-3a`, `test:one-page`, `test:day-as-shown`. Budgets moved in `test:bundle` with the measurement.
+
+## Revision, 12 Nov 2026 (his second handoff)
+
+- A miss is drawn in the ordinary text colour with a 13px warning triangle in front, never amber (his ruling, option 1:
+  the amber read as carbs). "On target" stays mint. Shared piece: `DayVerdict` in `NutritionRings.tsx`.
+- An 8px mint swatch sits before the calories on every meal row and each Week-view day row (his comment). Shared piece:
+  `KcalSwatch`.

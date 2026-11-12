@@ -115,6 +115,13 @@ async function main() {
   const weekView = planned.slice(planned.indexOf('export function NutritionWeekView'))
   check('W3: one day open at a time (one piece of state, a date or none)', /useState<string \| null>\(null\)/.test(weekView) && /setOpen\(o => \(o === day\.date \? null : day\.date\)\)/.test(weekView))
   check('W3: an open day\'s verdict is dayVerdictLabel too', /dayVerdictLabel\(day\.totals, targets\)/.test(weekView))
+  {
+    // HIS RULING 12 NOV 2026 (option 1): a miss is never amber on this screen, it read as carbs.
+    const rings = strip(readFileSync('src/components/nutrition/NutritionRings.tsx', 'utf8'))
+    const dv = rings.slice(rings.indexOf('export function DayVerdict'), rings.indexOf('/** The name of each ring'))
+    check('a day\'s verdict: a miss in the text colour with a warning triangle, "on target" in mint, never amber', /onTarget \? 'var\(--primary-text\)' : 'var\(--foreground\)'/.test(dv) && /<AlertTriangle/.test(dv) && !/role-warn/.test(dv))
+    check('...and both verdicts on the week screen are drawn by it, with no colour of their own', (planned.match(/<DayVerdict label=\{verdict\}/g) ?? []).length === 2 && !/verdictColor|role-warn-text\)' \}\} data-testid="(planned|week-day)-verdict/.test(planned))
+  }
   check('W3: small rings are planned over target, 44px, no water', /size=\{44\}\s+rings=\{plannedRings\(44\)\}/.test(weekView) && /ringShares\(day\.totals, targets\)/.test(weekView))
   check('W3: today\'s row is the day the today list shows (its chosen meals and their total)', /d\.date === mealStrip\.today \? \{ \.\.\.d, chosen, totals: mealTotals \} : d/.test(nutrition))
   const hook = read('src/hooks/useMealDays.ts')

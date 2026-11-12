@@ -44,7 +44,7 @@ import { menuForSlot, menuWeekOf } from '@/lib/meal-menu'
 import { cookedHint } from '@/lib/as-weighed'
 import { methodSteps } from '@/lib/method-steps'
 import { revealBelowTap } from '@/components/nutrition/reveal'
-import { MealMacros } from '@/components/nutrition/NutritionRings'
+import { MealMacros, KcalSwatch } from '@/components/nutrition/NutritionRings'
 import { EATING_OUT_SIZES, EATING_OUT_WORDS, eatingOutSizeOf, isEatingOut, type EatingOutController, type EatingOutSize } from '@/lib/eating-out'
 const MealMoveSheet = lazyWithReload(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
 const MealFoodAddSheet = lazyWithReload(() => import('./nutrition/MealFoodAddSheet').then(m => ({ default: m.MealFoodAddSheet })))
@@ -1304,8 +1304,11 @@ function MealSlotRow({
         {option && (
           <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
             <span className="flex min-w-[44px] flex-col items-end">
-              <span data-testid="meal-row-kcal" data-slot={slot} className="tabular-mono text-[1.0625rem] font-bold leading-none tracking-[-.02em]" style={{ color: kcalColor }}>
-                {kcalShown.toLocaleString('en-GB')}{duplicated ? ` ×${loggedEvents.length}` : ''}
+              <span className="flex items-center gap-1.5">
+                <KcalSwatch />
+                <span data-testid="meal-row-kcal" data-slot={slot} className="tabular-mono text-[1.0625rem] font-bold leading-none tracking-[-.02em]" style={{ color: kcalColor }}>
+                  {kcalShown.toLocaleString('en-GB')}{duplicated ? ` ×${loggedEvents.length}` : ''}
+                </span>
               </span>
               <span className="mt-1 text-[0.625rem] font-semibold uppercase leading-none tracking-[.12em] text-muted-foreground">kcal</span>
             </span>
@@ -1991,8 +1994,11 @@ function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle,
         </span>
         <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
           <span className="flex min-w-[44px] flex-col items-end">
-            <span data-testid="meal-row-kcal" data-slot={slot} className="tabular-mono text-[1.0625rem] font-bold leading-none tracking-[-.02em]" style={{ color: variant === 'eaten' ? 'var(--primary-text)' : soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
-              {Math.round(shown.kcal).toLocaleString('en-GB')}
+            <span className="flex items-center gap-1.5">
+              <KcalSwatch />
+              <span data-testid="meal-row-kcal" data-slot={slot} className="tabular-mono text-[1.0625rem] font-bold leading-none tracking-[-.02em]" style={{ color: variant === 'eaten' ? 'var(--primary-text)' : soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
+                {Math.round(shown.kcal).toLocaleString('en-GB')}
+              </span>
             </span>
             <span className="mt-1 text-[0.625rem] font-semibold uppercase leading-none tracking-[.12em] text-muted-foreground">kcal</span>
           </span>

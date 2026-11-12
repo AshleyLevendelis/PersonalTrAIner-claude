@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [x] **NUTRITION WEEK, HIS SECOND HANDOFF: A MISS IS WHITE WITH A WARNING TRIANGLE, CALORIES GET THEIR SWATCH** (12 Nov
+  2026, the revised handoff, "make this live in the app"). Two changes over yesterday's build, both his:
+  (1) **his ruling 12 Nov, option 1**: a day that misses its target says so in the ordinary text colour with a warning
+  triangle in front ("⚠ 330 kcal under"), never amber, because the warning amber is almost the carbs colour and on this
+  screen read as carbs. Applies to the upcoming day's card and an opened day in the Week view; "on target" stays mint;
+  the amber "· leftovers" label is unchanged (the handoff keeps it). Today's own planned line was already grey.
+  (2) **his comment 12 Nov**: an 8px mint swatch before the calories on every meal row (today, an upcoming day, the
+  Week view's meals, a meal cooked for him or eaten out) and on each day row of the Week view, so calories carry their
+  ring colour as protein, carbs and fat do. One shared piece each (`DayVerdict`, `KcalSwatch`), so no screen draws its
+  own. VERIFIED: `test:nutrition-week` 42 checks (2 new, 2 mutations caught), `verify:nutrition-week` 73 checks at
+  390x844 (verdict read against the theme's own text, amber and carbs colours on the card and in the week; the swatch's
+  size, colour and place on every row; 8 mutations caught). Also from the eating-out sweep: its coach receipt was four
+  words against the three-word rule ("Eating out added" now), and `test:nutrition-3a` pinned the Move button within a
+  fixed reach of its sheet, which the eating-out sizes now sit between (widened; the order is the property).
+
 - [x] **EATING OUT: MARK A MEAL AS OUT, THE APP ASKS HOW BIG, THE DAY FITS AROUND IT** (12 Nov 2026, his "build it,
   start with out for dinner" and his ruling the same day, from three options, **"Ask: light/normal/big"**). Both
   surfaces: the meal's sheet on Nutrition ("Eating out") and the coach (`propose_eating_out`), one controller from
