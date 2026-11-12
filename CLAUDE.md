@@ -1522,6 +1522,10 @@ menu" stays true when a copy is also left outside it.
   the add-to-list (no water ring: water is never planned); "Week" shows the seven days on one screen, one open at a
   time, and "Shop the whole week" opens the list on its 7-day choice. Presentation only, parity unchanged. BUILT.
   `test:nutrition-week`, `verify:nutrition-week`. Needs the `chat-gemini` deploy for the coach's map of the tab
+- **A day's miss is never amber on Nutrition: his ruling 12 Nov 2026, option 1** (the warning amber read as carbs): it is
+  the ordinary text colour with a warning triangle in front; "on target" stays mint. **And calories carry their mint
+  swatch** (his comment the same day) on every meal row and Week-view day row. `test:nutrition-week`,
+  `verify:nutrition-week`
 
 ### His rulings of 11 Nov 2026 (each from options; build state is said on each line and corrected as it lands)
 - **Setup's lift numbers: "Weight and reps"** (over one number with an explanation). Setup had asked for "working
