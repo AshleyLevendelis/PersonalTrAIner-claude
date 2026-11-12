@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **RELEASED TO MAIN AT c02382d9 (12 Nov 2026), his "All of it" and "ok go ahead"**: Nutrition Week (with his second
+  handoff), eating out, meals cooked for him, his usual meals first, setup's lift weight and reps, the one-tap lift
+  effort. Checks on the released version: 540 in the list; the first 334 ran on the version before the design change
+  and the 110 of those reading anything it touched were run again on c02382d9, all passing; the other 206 ran on
+  c02382d9, all passing. Not passing, as expected: `test:coach-exam-fresh` (the exam needs a run on his machine); not
+  run here, no database: `test:meal-quality`, `test:schema-parity`, `verify:rls`. The website deploys from main.
+  NEEDS HIS MACHINE: the meals-elsewhere database step, the `chat-gemini`, `generate-meals` and `onboarding-chat`
+  deploys, and an exam run (`docs/handover/release-2026-11-12.md`).
+
 - [x] **NUTRITION WEEK, HIS SECOND HANDOFF: A MISS IS WHITE WITH A WARNING TRIANGLE, CALORIES GET THEIR SWATCH** (12 Nov
   2026, the revised handoff, "make this live in the app"). Two changes over yesterday's build, both his:
   (1) **his ruling 12 Nov, option 1**: a day that misses its target says so in the ordinary text colour with a warning
