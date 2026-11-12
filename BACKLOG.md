@@ -18,9 +18,13 @@ Newest first. One line each.
   plan with its reason: the ⋯ day menu and the week notes stay; the real phase name; "~" kept on estimated loads; R1/R2
   warm-up labels; the open week day uses the shared list (section labels and ⋮ rather than eyebrows); "+ N optional"
   kept in the time. VERIFIED: `test:exercise-week` (29 checks, 15 mutations, 14 caught, the 15th an equivalent change),
-  `verify:exercise-week` at 390x844 (DRIVER_RESULT), 12 gates re-anchored deliberately to the new places (load reader,
+  `verify:exercise-week` at 390x844 (28 checks, 13 mutations, all caught; the first crashed the driver until its reads were made null-safe), 12 gates re-anchored deliberately to the new places (load reader,
   length on the card, strip under the header, the done-day tick, "Warm-up" fold word, the week count on the week view),
-  the tour's Exercise stop and the coach's map of the tab now name the Week view. NEEDS: the `chat-gemini` deploy for
+  the tour's Exercise stop and the coach's map of the tab now name the Week view. 64 logic checks pass; the 66 browser
+  drivers that open the Exercise screen pass after 11 were moved to the new places (the card's time, the Week view's
+  count, today's strip mark, "Warm-up"), and one of them found a REAL defect: each closed row's ⋮ tap area reached 12px
+  past its card (`verify:tap-targets`), now inset. The week's running set total ("· 3/76 sets") left the Exercise screen
+  with the week meter, by his ruling; the drivers that watched it now watch today's strip mark. NEEDS: the `chat-gemini` deploy for
   the coach's map (the exam was already stale before this, needing his machine).
 
 - [x] **RELEASED TO MAIN AT c02382d9 (12 Nov 2026), his "All of it" and "ok go ahead"**: Nutrition Week (with his second
