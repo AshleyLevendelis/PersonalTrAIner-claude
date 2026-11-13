@@ -22,7 +22,7 @@ Nothing has been merged, deployed or migrated. Do NOT merge to main unless Ashle
    Verify each deploy printed the production project and the function name; a deploy from an old checkout prints the
    same, so confirm step 1 first.
 4. Re-run the coach exam against the deployed coach (it needs the keys on this machine):
-   run the exam, grade it, then `npm run test:coach-exam-fresh` must pass. Five questions are new or unanswered:
+   `npm run coach-exam:run`, then `npm run coach-exam:grade`, then `npm run test:coach-exam-fresh` must pass. Five questions are new or unanswered:
    eating-out-asks-size, meal-cooked-for-me, out-no-compensation, out-suggested-orders, usual-meal-ask-then-card.
    Read back the hard-rule breaches and the voice / warm / teaches marks, and commit the scores to the branch.
 Done = schema parity green with the three migrations, three deploys named correctly, exam fresh and its scores pushed.
