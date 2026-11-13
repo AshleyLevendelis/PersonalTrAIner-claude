@@ -93,7 +93,14 @@ const db: Db = {
   ],
   daily_steps: [], water_logs: [], exercise_set_logs: [], workout_sessions: [], cardio_logs: [],
   meal_events: [], meal_plan_picks: [], favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
-  plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [], chat_messages: [],
+  plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],
+  // ?chat-yesterday: a RETURNING conversation (an INPUT), one exchange yesterday, as every account past its first day
+  // has. The coach's daily hello is for exactly this account (verify:coach-hello mounts the chat alone; this boots it
+  // through App.tsx's own start).
+  chat_messages: new URLSearchParams(location.search).has('chat-yesterday') ? [
+    { id: 'c1', profile_id: PROFILE_ID, role: 'user', content: 'How much protein should I eat?', status: 'complete', action_data: null, created_at: new Date(anchorNowMs() - 26 * 3600000).toISOString() },
+    { id: 'c2', profile_id: PROFILE_ID, role: 'assistant', content: 'About 160g a day for you.', status: 'complete', action_data: null, created_at: new Date(anchorNowMs() - 26 * 3600000 + 5000).toISOString() },
+  ] : [],
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
 }
 

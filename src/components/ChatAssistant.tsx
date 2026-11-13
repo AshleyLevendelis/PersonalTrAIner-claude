@@ -1464,8 +1464,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   })
   const [seenAttention, setSeenAttention] = useState<string | null>(() => (profile.id ? loadSeenAttention(profile.id) : null))
   useEffect(() => {
+    // NOT BEFORE THE HISTORY IS IN (13 Nov 2026, Ashley: "I'm not getting proactive messages"). On a phone with
+    // nothing stored, the seed ("what is on screen now has been read") ran on the EMPTY transcript before the history
+    // arrived, so yesterday's reply then read as unread and the coach kept quiet until the chat was opened: the hello
+    // never lit the button. Seeding on the loaded transcript is what the seed always meant.
+    if (!historyLoaded) return
     setSeenAttention(prev => nextSeenAttention(prev, activeAttention, chatVisible))
-  }, [activeAttention, chatVisible])
+  }, [activeAttention, chatVisible, historyLoaded])
   useEffect(() => {
     if (profile.id && seenAttention !== null) saveSeenAttention(profile.id, seenAttention)
   }, [profile.id, seenAttention])
