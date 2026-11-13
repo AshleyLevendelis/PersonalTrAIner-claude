@@ -1523,6 +1523,14 @@ menu" stays true when a copy is also left outside it.
   Weeks 1-2 stay walks only and nothing on the pathway ever carries a weight. `test:pathway`, `verify:pathway`,
   `measure:pathway-personas`, `docs/plans/pathway.md`. Needs the `enjoyed_activities` migration and the `onboarding-chat`
   deploy
+- **Flexible nutrition** (slice 4): **a freestyle day has its own line, his ruling 13 Nov 2026 "Its own label"**
+  ("Freestyle · protein hit · calories within range", never "on target"; protein at 95%, calories ±10%); its meals are
+  empty one-day choices he fills and logs, never shopped for, "Back to the plan" restores them. Profile's "Show numbers"
+  off is a starter tier with no calorie, gram or ring on Nutrition or Home (one switch, `useShowNumbers`; a coach line
+  holding a figure is not drawn). His own meal resized says so; the week view says the week's average over the days
+  logged; "Meal variety" changes only how much the day search remembers, never past the targets. Screen only for the
+  three switches (parity list). `test:flexible-nutrition`, `verify:flexible-nutrition`, `docs/plans/flexible-nutrition.md`.
+  Needs the flexible-nutrition migration and the `chat-gemini` deploy
 
 ### His ruling of 12 Nov 2026, eating out (`docs/plans/eating-out.md`)
 - **A meal marked as out: "Ask: light/normal/big"** (from three options; his request "build it, start with out for
