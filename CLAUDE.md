@@ -2981,6 +2981,11 @@ same six files. Sizes are why it matters: these are not files to read whole.
   it is written once and never read back.
 - `BACKLOG.md` — newest first, the record of what was found and decided.
   `VISION.md` — the product bar. `docs/plans/` — one file per non-trivial build.
+- **THE LIVE APP IS `personal-tr-a-iner-claude-yco8.vercel.app`, NOT `personal-tr-a-iner-claude.vercel.app`.** The
+  second is a Vercel project with no environment variables: every build of it says "I couldn't sign you in ·
+  supabaseUrl is required". The connected Vercel account sees only that empty project, so `list_project_domains`
+  names the wrong address. Given to Ashley wrongly twice (8 Oct and 13 Nov 2026). Never quote the app's address from
+  a lookup; quote this line.
 - The app's coach runs on **Gemini** (`_shared/gemini.ts` names the model), not
   on Claude. Do not confuse the model writing the code with the model in the app.
 
