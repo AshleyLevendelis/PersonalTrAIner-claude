@@ -44,6 +44,21 @@ const NO_CARDIO = new URLSearchParams(location.search).has('no-cardio')
 const WEIGH = Number(new URLSearchParams(location.search).get('weigh')) || 80
 
 setDevClockOverride(PROFILE_ID, ANCHOR_ISO)
+// ?chat-stale-offer: a LONGER conversation from yesterday (24 messages, more than the chat's first page of 20, so the
+// phone's own copy is what shows) in which an offer of the coach's was left untapped (an INPUT: he tapped neither
+// Apply nor Not now). The phone keeps that card as it last drew it, as every phone does.
+const STALE_OFFER = new URLSearchParams(location.search).has('chat-stale-offer')
+const staleChat = STALE_OFFER ? Array.from({ length: 24 }, (_, i) => {
+  const at = new Date(anchorNowMs() - 26 * 3600000 + i * 60000).toISOString()
+  const coach = i % 2 === 1
+  return { id: `s${i}`, profile_id: '00000000-0000-4000-8000-00000000b007', role: coach ? 'assistant' : 'user', content: coach ? `Coach reply ${i}.` : `Question ${i}?`, status: 'complete', action_data: null, created_at: at }
+}) : []
+if (STALE_OFFER) {
+  const yesterday = new Date(anchorNowMs() - 26 * 3600000 + 6 * 60000)
+  const cached = staleChat.map(r => ({ id: r.id, role: r.role, content: r.content, status: r.status, created_at: r.created_at,
+    ...(r.id === 's5' ? { pendingAction: { id: 'pa-stale', kind: 'swap_exercise', status: 'pending', diff: { rows: [], lead: 'Swap it for Leg Press?' }, expiresAt: new Date(yesterday.getTime() + 10 * 60000).toISOString() } } : {}) }))
+  try { localStorage.setItem('chat_history_cache_00000000-0000-4000-8000-00000000b007', JSON.stringify(cached)) } catch { /* none */ }
+}
 try {
   // Returning, not new: this phone already knows whose profile it holds, and has seen the tour.
   localStorage.setItem('fitplan_profile_id', PROFILE_ID)
@@ -97,7 +112,7 @@ const db: Db = {
   // ?chat-yesterday: a RETURNING conversation (an INPUT), one exchange yesterday, as every account past its first day
   // has. The coach's daily hello is for exactly this account (verify:coach-hello mounts the chat alone; this boots it
   // through App.tsx's own start).
-  chat_messages: new URLSearchParams(location.search).has('chat-yesterday') ? [
+  chat_messages: STALE_OFFER ? staleChat : new URLSearchParams(location.search).has('chat-yesterday') ? [
     { id: 'c1', profile_id: PROFILE_ID, role: 'user', content: 'How much protein should I eat?', status: 'complete', action_data: null, created_at: new Date(anchorNowMs() - 26 * 3600000).toISOString() },
     { id: 'c2', profile_id: PROFILE_ID, role: 'assistant', content: 'About 160g a day for you.', status: 'complete', action_data: null, created_at: new Date(anchorNowMs() - 26 * 3600000 + 5000).toISOString() },
   ] : [],

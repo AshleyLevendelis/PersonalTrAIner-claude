@@ -167,3 +167,24 @@ export function saveSeenAttention(profileId: string, seen: string): void {
     // ignore — the in-memory set still governs this session.
   }
 }
+
+/**
+ * IS A QUESTION OF THE COACH'S STILL WAITING ON HIM? (13 Nov 2026, Ashley: "there's no hey ashley message in the
+ * chat".) The coach never speaks over an offer still open for Apply / Not now, or over a choice it has just asked him
+ * to make. But this read `status === 'pending'` alone, and an offer left untapped keeps that status on this phone for
+ * good (the chat's cache carries the card; its window is drawn as passed, never written back), so one ignored offer in
+ * the last 50 messages silenced the daily hello for ever. An offer counts only while its window is open (unknown
+ * means open), and a choice only on the day it was asked (unknown means now).
+ */
+export function waitingOnAnswer(messages: ChatMessage[], today: string, nowMs: number, localDate: (d: Date) => string): boolean {
+  const open = messages.some(m => {
+    const p = m.pendingAction
+    if (!p || p.status !== 'pending') return false
+    const at = p.expiresAt ? Date.parse(p.expiresAt) : NaN
+    return !(Number.isFinite(at) && nowMs >= at)
+  })
+  if (open) return true
+  const last = messages[messages.length - 1]
+  if (!last?.clarification) return false
+  return !last.created_at || localDate(new Date(last.created_at)) === today
+}

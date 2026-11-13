@@ -43,6 +43,16 @@ check('the coach said its one message of the day without being opened', list.len
 check('...greeting him by name', /^Hey Sam\b/.test(list[0]?.c ?? ''), list[0])
 check('the chat button lights to call him in', await ev(`!!document.querySelector('[data-testid="chat-attention-dot"], [data-testid="chat-unread-ring"]')`) === true)
 
+console.log('\nA longer chat in which an offer was left untapped yesterday (the phone keeps the card as it was drawn)')
+await ev('localStorage.clear()')
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/.tour-harness/app-boot.html?slow=0&chat-stale-offer&n=2` })
+for (let i = 0; i < 150 && !(await ev(`${hellos}.length > 0`)); i++) await wait(100)
+await wait(600)
+const stale = JSON.parse((await ev(`JSON.stringify(${hellos}.map(m => ({ c: m.content })))`)) ?? '[]')
+const cachedCard = await ev(`(() => { try { return JSON.parse(localStorage.getItem('chat_history_cache_00000000-0000-4000-8000-00000000b007') || '[]').some(m => m.pendingAction && m.pendingAction.status === 'pending') } catch { return false } })()`)
+check('the phone still holds yesterday\'s untapped offer (the case is real, not already cleared)', cachedCard === true)
+check('...and the coach still says its hello: an offer whose time ran out is not a question still waiting', stale.length === 1 && /^Hey Sam\b/.test(stale[0]?.c ?? ''), stale)
+
 console.log(`\n${ran} checks ran.`)
 chrome.kill(); server.close()
 if (failures > 0) { console.error(`${failures} check(s) failed`); process.exit(1) }

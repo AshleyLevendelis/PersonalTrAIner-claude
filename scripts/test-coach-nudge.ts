@@ -297,10 +297,12 @@ console.log('\n8. The wiring — what makes it a nudge rather than a nag')
     /if \(!proactiveData \|\| !feelContext \|\| trainingWeek\.loading \|\| !planKnown\) return/.test(chat))
   check('never on top of the opener — one bubble with no id IS the opener',
     /if \(messages\.length === 1 && !messages\[0\]\.id\) return/.test(chat))
+  // Re-anchored 13 Nov 2026: both now go through waitingOnAnswer (section 11 runs it), which counts an offer only while
+  // its window is open and a choice only on the day it was asked.
   check('never over an open proposal she has been asked to confirm',
-    /if \(messages\.some\(m => m\.pendingAction\?\.status === 'pending'\)\) return/.test(chat))
+    /if \(waitingOnAnswer\(messages,.*\)\) return$/m.test(chat) && /p\.status !== 'pending'/.test(sourceOf('src/lib/chat-unread.ts')))
   check('never over a clarification waiting on a choice',
-    /if \(messages\[messages\.length - 1\]\?\.clarification\) return/.test(chat))
+    /if \(!last\?\.clarification\) return false/.test(sourceOf('src/lib/chat-unread.ts')))
   // Since 7 Nov 2026 the spacing lives in pickUnprompted (section 9 runs it); the chat hands it the store's time.
   check('the quiet period is enforced against the persisted store',
     /lastUnpromptedAt: Math\.max\(nudgeStore\(\)\.lastAt, lastRowAt\)/.test(chat))
@@ -455,6 +457,22 @@ console.log('\n10. Happy birthday (his request, 9 Nov 2026): the coach wishes hi
   check('as the day\'s first message it is the hello, greeted by name, and fits within Light\'s one a day',
     hello?.text === "Hey Ashley — happy birthday! Hope it's a good one." && hello?.moment === 'birthday' && hello.keys.includes(helloKey(all.today)), hello)
   check('the chat works it out from the date of birth he picked', /birthdayToday: isBirthday\(profile\.date_of_birth, activeSession\.date\)/.test(chat))
+}
+
+{
+  console.log('\n11. An offer left untapped is not a question still waiting (13 Nov 2026, "no hey ashley message")')
+  const { waitingOnAnswer } = await import('../src/lib/chat-unread')
+  const loc = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  const now = Date.parse('2026-09-16T10:00:00')
+  const card = (expiresAt?: string, status = 'pending') => ({ role: 'assistant', content: 'x', pendingAction: { id: 'p', kind: 'swap_exercise', status, diff: { rows: [] }, ...(expiresAt ? { expiresAt } : {}) } }) as never
+  check('an offer still inside its window keeps the coach quiet', waitingOnAnswer([card('2026-09-16T10:05:00')], '2026-09-16', now, loc) === true)
+  check('an offer whose window passed yesterday does not', waitingOnAnswer([card('2026-09-15T10:05:00')], '2026-09-16', now, loc) === false)
+  check('an offer with no known window is treated as open (never guess it closed)', waitingOnAnswer([card()], '2026-09-16', now, loc) === true)
+  check('an answered offer never holds it back', waitingOnAnswer([card('2026-09-16T10:05:00', 'confirmed')], '2026-09-16', now, loc) === false)
+  const clar = (created_at?: string) => ({ role: 'assistant', content: 'Which one?', clarification: { options: [] }, ...(created_at ? { created_at } : {}) }) as never
+  check('a choice asked today, still the last message, keeps it quiet', waitingOnAnswer([clar('2026-09-16T09:00:00')], '2026-09-16', now, loc) === true)
+  check('a choice left unanswered yesterday does not', waitingOnAnswer([clar('2026-09-15T20:00:00')], '2026-09-16', now, loc) === false)
+  check('the chat asks this one rule, not the bare status', /waitingOnAnswer\(messages,/.test(chat) && !/pendingAction\?\.status === 'pending'\)\) return/.test(chat))
 }
 
 console.log(failures === 0 ? '\nAll coach-nudge checks passed.\n' : `\n${failures} check(s) FAILED.\n`)

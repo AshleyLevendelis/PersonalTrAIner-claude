@@ -27,7 +27,7 @@ import { groupMessages, bubblePositions, bubbleRadius, groupTimestamp, timeLabel
 import { supabase } from '@/lib/supabase'
 import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
-import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
+import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, waitingOnAnswer, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { swapPoolMeal, setMealPick, recordMealEvent, getEatenByDate, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
 import { buildCoachEatenSummary, eatenWindow } from '@/lib/coach-eaten'
 import { buildCoachWeekReview, weekReviewDates } from '@/lib/coach-week-review'
@@ -1513,8 +1513,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // has — a proposal card open for confirmation, or a clarification waiting on a
     // choice. Speaking under either buries the thing that needs an answer and moves
     // the quick replies onto a different question.
-    if (messages.some(m => m.pendingAction?.status === 'pending')) return
-    if (messages[messages.length - 1]?.clarification) return
+    // Only while it is still open (waitingOnAnswer): an offer left untapped days ago is no longer a question.
+    if (waitingOnAnswer(messages, nudgeInputRef.current.today, Date.now(), getLocalDateString)) return
 
     // HELLO + MORE MOMENTS (her ruling 7 Nov 2026): one decision over the day's events, the daily hello and the
     // phone's time-of-day moments, capped by her Light / Normal / Lots setting. Every unprompted message is a chat
