@@ -209,7 +209,8 @@ function main() {
     check('the row says "Eating out" and "Estimate"', EATING_OUT_WORDS.label === 'Eating out' && EATING_OUT_WORDS.badge === 'Estimate')
     check('the sizes read Light, Normal, Big night', EATING_OUT_SIZES.map(s => EATING_OUT_WORDS.sizeLabel[s]).join() === 'Light,Normal,Big night')
     check('the line names the day, the meal and the size', EATING_OUT_WORDS.marked('dinner', "Friday's", 'big') === "Friday's dinner is out, a big night. The rest of the day fits around it.", EATING_OUT_WORDS.marked('dinner', "Friday's", 'big'))
-    check('the note says it is an estimate, with its calories', /estimate/i.test(EATING_OUT_WORDS.note('normal', 1231)) && EATING_OUT_WORDS.note('normal', 1231).includes('1,231 kcal'))
+    // RE-ANCHORED 13 Nov 2026, his ruling "A range" (strategy slice 5): the note gives the range, never one figure.
+    check('the note says it is an estimate, with its range of calories', /estimate/i.test(EATING_OUT_WORDS.note('normal', 1231)) && EATING_OUT_WORDS.note('normal', 1231).includes('about 1,050–1,400 kcal') && !EATING_OUT_WORDS.note('normal', 1231).includes('1,231'), EATING_OUT_WORDS.note('normal', 1231))
     check('the question asks how big', EATING_OUT_WORDS.chatAsk('dinner', "Friday's") === "How big a night out is Friday's dinner?")
     const all = [EATING_OUT_WORDS.note('big', 1500), EATING_OUT_WORDS.marked('lunch', 'Today\'s', 'light'), ...Object.values(EATING_OUT_REFUSALS).map(v => typeof v === 'function' ? v('dinner') : v)]
     check('nothing it says calls a meal out healthy, safe, on plan or free', all.every(t => !/\b(healthy|safe|on plan|free|guilt)/i.test(t)), all)

@@ -105,6 +105,23 @@ export function eatingOutSizeSaid(text: string): EatingOutSize | null {
   return null
 }
 
+/**
+ * A RANGE, NOT A NUMBER (his ruling 13 Nov 2026, collision (b), "A range"): a restaurant's recipe is unknown, so a meal
+ * out is said as the estimate ±15%, each end to the nearest 50 kcal ("about 650-850 kcal"), and the day counts the
+ * middle. The range covers the whole plate, so nothing is quietly left out; his 15 Oct rule (a food that cannot be
+ * counted is asked about) still holds for a food typed or told as a food.
+ */
+export const EATING_OUT_SPREAD = 0.15
+export function eatingOutRange(kcal: number): { low: number; high: number } {
+  const r50 = (v: number) => Math.round(v / 50) * 50
+  return { low: r50(kcal * (1 - EATING_OUT_SPREAD)), high: r50(kcal * (1 + EATING_OUT_SPREAD)) }
+}
+/** "about 650-850 kcal" (an en dash between the ends). */
+export function eatingOutRangeWords(kcal: number): string {
+  const { low, high } = eatingOutRange(kcal)
+  return `about ${low.toLocaleString('en-GB')}–${high.toLocaleString('en-GB')} kcal`
+}
+
 /** Every word the screen and the coach's card say about a meal out, in one place. */
 export const EATING_OUT_WORDS = {
   label: 'Eating out',
@@ -114,7 +131,7 @@ export const EATING_OUT_WORDS = {
   sizeHint: { light: 'about your usual size', normal: 'a typical main', big: 'starter, main, dessert or drinks' } as Record<EatingOutSize, string>,
   question: (slot: MealSlotName) => `How big a ${slot} out?`,
   note: (size: EatingOutSize, kcal: number) =>
-    `An estimate for a ${EATING_OUT_SIZES_WORDS[size]} night out, about ${kcal.toLocaleString('en-GB')} kcal. The rest of the day fits around it. Tell the coach what you'll order and it updates.`,
+    `An estimate for a ${EATING_OUT_SIZES_WORDS[size]} night out, ${eatingOutRangeWords(kcal)}; the day counts the middle. The rest of the day fits around it. Tell the coach what you'll order and it updates.`,
   notOut: 'Not eating out',
   marked: (slot: MealSlotName, dayWord: string, size: EatingOutSize) =>
     `${dayWord} ${slot} is out, a ${EATING_OUT_SIZES_WORDS[size]} night. The rest of the day fits around it.`,

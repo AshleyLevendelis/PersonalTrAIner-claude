@@ -1531,6 +1531,12 @@ menu" stays true when a copy is also left outside it.
   logged; "Meal variety" changes only how much the day search remembers, never past the targets. Screen only for the
   three switches (parity list). `test:flexible-nutrition`, `verify:flexible-nutrition`, `docs/plans/flexible-nutrition.md`.
   Needs the flexible-nutrition migration and the `chat-gemini` deploy
+- **Eating out, the strategy's half** (slice 5): **a meal out is a range, his ruling 13 Nov 2026 "A range"** ("about
+  900–1,200 kcal", the day counts the middle); **same day only, ruling 3**: the other meals shrink only to the day's
+  target, never by more than a quarter (after rounding), never below 95% of its protein, and the next day is untouched.
+  The coach suggests 2-3 orders with a reason each, never says a dish is free of an allergen, never says to make up for
+  it. `test:eating-out-budget`, `test:eating-out`, `verify:eating-out`, `docs/plans/eating-out-budget.md`. Needs the
+  `chat-gemini` deploy and an exam run
 
 ### His ruling of 12 Nov 2026, eating out (`docs/plans/eating-out.md`)
 - **A meal marked as out: "Ask: light/normal/big"** (from three options; his request "build it, start with out for

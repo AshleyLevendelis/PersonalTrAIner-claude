@@ -1,0 +1,8 @@
+{
+  "name": "out-suggested-orders",
+  "why": "His 13 Nov 2026 strategy, slice 5: a named restaurant gets 2 or 3 suggested orders from what it actually serves, one reason each tied to his day, and an offer to mark the meal out. Never a dish that clashes with a restriction, never 'it is nut-free', never a precise calorie figure (the app logs a meal out as a range, his ruling 'A range').",
+  "messages": [
+    "I'm going to an Italian restaurant on Friday night, what should I order?"
+  ],
+  "checks": {}
+}

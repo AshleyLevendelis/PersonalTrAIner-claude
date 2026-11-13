@@ -63,7 +63,7 @@ import type { TopUpOutcome, TopUpPlan } from '@/lib/meal-top-up'
 import type { MealDayMoveArgs, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
 import { rebalanceSaid, rebalanceAskText, mealsNamed, type MealRebalanceController, type MealRebalancePayload } from '@/lib/meal-rebalance'
 import { DEFAULT_POOL_SIZE, computeSlotBudgets } from '@/lib/meal-generation'
-import { EATING_OUT_REFUSALS, EATING_OUT_SIZES, EATING_OUT_WORDS, eatingOutMacros, eatingOutOption, eatingOutSizeSaid, type EatingOutController, type EatingOutSize } from '@/lib/eating-out'
+import { EATING_OUT_REFUSALS, EATING_OUT_SIZES, EATING_OUT_WORDS, eatingOutMacros, eatingOutOption, eatingOutSizeSaid, type EatingOutController, type EatingOutSize, eatingOutRangeWords } from '@/lib/eating-out'
 import { executeMealMove, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { detectTodayClaim, todayClaimFloor, type TodayFacts } from '@/lib/today-claim'
@@ -4263,7 +4263,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       payload: { date, slot, size },
       diff: {
         lead: ask(`mark ${dayWord} ${slot} as eating out`),
-        rows: [{ field: `${dayWord.replace(/^\w/, c => c.toUpperCase())} ${slot}`, before, after: `${EATING_OUT_WORDS.label}, ${EATING_OUT_WORDS.sizeLabel[size].toLowerCase()} (about ${est.calories.toLocaleString('en-GB')} kcal, an estimate)` }],
+        rows: [{ field: `${dayWord.replace(/^\w/, c => c.toUpperCase())} ${slot}`, before, after: `${EATING_OUT_WORDS.label}, ${EATING_OUT_WORDS.sizeLabel[size].toLowerCase()} (${eatingOutRangeWords(est.calories)}, an estimate)` }],
         implications: [{ severity: 'info', text: 'The rest of the day fits around it, and it stays off your shopping list. Tell me what you order and I can estimate the real thing.' }, ...(trial?.lines ?? [])],
         reversible: true,
       },
@@ -7268,7 +7268,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const r = onEatingOut ? await onEatingOut.mark(payload.date, payload.slot, payload.size) : { ok: false as const, reason: EATING_OUT_WORDS.notSaved }
       receipt = r.ok ? { landed: [`${payload.slot}: ${EATING_OUT_WORDS.label}`], failed: [], previousMeal: r.previous } : { landed: [], failed: [{ op: 'propose_eating_out', error: r.reason }] }
       title = r.ok ? RECEIPTS['propose_eating_out'].done : RECEIPTS['propose_eating_out'].failed
-      rows = r.ok ? [{ label: DAY_MOVE.rowLabel(dayLabel(payload.date, today), payload.slot), detail: `${EATING_OUT_WORDS.sizeLabel[payload.size]}, about ${r.option.macros.calories.toLocaleString('en-GB')} kcal` }] : []
+      rows = r.ok ? [{ label: DAY_MOVE.rowLabel(dayLabel(payload.date, today), payload.slot), detail: `${EATING_OUT_WORDS.sizeLabel[payload.size]}, ${eatingOutRangeWords(r.option.macros.calories)}` }] : []
       undoToken = r.ok ? row.id : undefined
     } else if (row.kind === 'propose_cardio_log') {
       const payload = row.payload as unknown as CardioLogPayload

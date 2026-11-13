@@ -578,8 +578,10 @@ export function assembleRotationDay(
   // rest of my meals". A pin set aside for a restriction is not a pin.
   const live = (Object.entries(pinned) as [MealSlotName, PoolOption | undefined][])
     .filter((e): e is [MealSlotName, PoolOption] => e[1] != null && !e[1].breaksRestriction)
+  let plannedForOut: AssembledDay | undefined
   if (live.length > 0 && !live.some(([, o]) => isHerOwnDish(o, pools))) {
     const plannedDay = dayFor({})
+    plannedForOut = plannedDay
     const fixed: Partial<Record<MealSlotName, PoolOption>> = Object.fromEntries(live)
     // A leftover lunch is last night's dinner, already portioned: it stays as
     // it is. Taken from the day WITH her pin, which already knows whether the
@@ -590,7 +592,7 @@ export function assembleRotationDay(
     const held = holdAroundPins({ planned: plannedDay, fixed, targets, keepSizes: opts.keepHeldSizes })
     if (held) day = held
   }
-  if (live.some(([, o]) => isEatingOut(o))) day = shrinkAroundEatingOut(day, Object.fromEntries(live), targets)
+  if (live.some(([, o]) => isEatingOut(o))) day = shrinkAroundEatingOut(day, Object.fromEntries(live), targets, plannedForOut)
 
   // PROMISE TOMORROW'S LUNCH ONLY WHEN IT IS ACTUALLY PROMISED. The rotation
   // worked out tomorrow's leftover from the dinner IT chose; if the user has
@@ -647,7 +649,47 @@ function isHerOwnDish(option: PoolOption, pools: Partial<Record<MealSlotName, Po
  * out's line already says the day fits around it, and after this step the hold's "how far over" would be stale.
  * Never touches a pin, a leftover lunch or a meal cooked for him.
  */
-function shrinkAroundEatingOut(held: AssembledDay, pins: Partial<Record<MealSlotName, PoolOption>>, targets: MacroTargets): AssembledDay {
+/** The share of the protein target a day with a meal out keeps (the plan's own protein floor, 0.95). */
+const EATING_OUT_PROTEIN_FLOOR = 0.95
+
+function shrinkAroundEatingOut(held: AssembledDay, pins: Partial<Record<MealSlotName, PoolOption>>, targets: MacroTargets, planned?: AssembledDay): AssembledDay {
+  const shrunk = shrinkAroundEatingOutCalories(held, pins, targets)
+  return planned ? keepProteinAroundEatingOut(shrunk, pins, targets, planned) : shrunk
+}
+
+/**
+ * PROTEIN KEPT, AFTER THE FIT (his 13 Nov 2026 strategy, slice 5; CSCS, mine). The fit around the meal out (the hold,
+ * then the shrink) trims the other dishes, and their protein goes with them: measured on real dishes, a night out's day
+ * fell to 87-92% of its protein target. So when the day is under 95% of protein, the other dishes grow back together
+ * toward their PLANNED size, only as far as the protein needs and never past the size they were planned at. Calories
+ * may then sit a little over target on that day, which the same-day budget allows. Never a pin, a leftover or a meal
+ * cooked for him.
+ */
+function keepProteinAroundEatingOut(day: AssembledDay, pins: Partial<Record<MealSlotName, PoolOption>>, targets: MacroTargets, planned: AssembledDay): AssembledDay {
+  const slots = Object.keys(day.chosen) as MealSlotName[]
+  const free = slots.filter(s => {
+    const o = day.chosen[s]
+    const p = planned.chosen[s]
+    return o && p && !pins[s] && o.leftoverFrom !== 'dinner' && !isCookedElsewhere(o) && p.name === o.name && p.macros.calories > o.macros.calories
+  })
+  if (free.length === 0) return day
+  const protein = (ss: MealSlotName[]) => ss.reduce((n, s) => n + (day.chosen[s]?.macros.protein ?? 0), 0)
+  const freeP = protein(free)
+  const fixedP = protein(slots.filter(s => !free.includes(s)))
+  const need = targets.protein * EATING_OUT_PROTEIN_FLOOR
+  if (fixedP + freeP >= need || freeP <= 0) return day
+  const room = Math.min(...free.map(s => planned.chosen[s]!.macros.calories / day.chosen[s]!.macros.calories))
+  const factor = Math.min(room, (need - fixedP) / freeP)
+  if (!(factor > 1)) return day
+  const chosen = { ...day.chosen }
+  for (const s of free) chosen[s] = resizeDish(day.chosen[s]!, factor) ?? day.chosen[s]
+  const totals = (Object.values(chosen) as PoolOption[]).reduce((a, o) => ({
+    calories: a.calories + o.macros.calories, protein: a.protein + o.macros.protein, carbs: a.carbs + o.macros.carbs, fat: a.fat + o.macros.fat,
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
+  return { ...day, chosen, totals, withinTolerance: dayVerdict(totals, targets).onTarget }
+}
+
+function shrinkAroundEatingOutCalories(held: AssembledDay, pins: Partial<Record<MealSlotName, PoolOption>>, targets: MacroTargets): AssembledDay {
   const { heldAround: _note, ...day } = held
   const slots = Object.keys(day.chosen) as MealSlotName[]
   const free = slots.filter(s => {
@@ -658,14 +700,33 @@ function shrinkAroundEatingOut(held: AssembledDay, pins: Partial<Record<MealSlot
   const freeKcal = kcal(free)
   const fixedKcal = kcal(slots.filter(s => !free.includes(s)))
   if (free.length === 0 || freeKcal <= 0 || fixedKcal + freeKcal <= targets.calories * 1.05) return day
-  const factor = Math.max(AROUND_EATEN_MIN, (targets.calories - fixedKcal) / freeKcal)
+  // PROTEIN KEPT (his 13 Nov 2026 strategy, slice 5; CSCS, mine): the other meals stop shrinking where the day would
+  // fall below 95% of its protein target (the plan's own protein floor). Shrinking a dish shrinks its protein with it,
+  // and measured on real dishes that took a night out's day to 87% of target. Calories may then sit a little over the
+  // target, which the same-day budget allows; protein is the macro that protects muscle on a lighter day.
+  const prot = (ss: MealSlotName[]) => ss.reduce((n, s) => n + (day.chosen[s]?.macros.protein ?? 0), 0)
+  const freeProtein = prot(free)
+  const proteinFloor = freeProtein > 0 ? (targets.protein * EATING_OUT_PROTEIN_FLOOR - prot(slots.filter(s => !free.includes(s)))) / freeProtein : 0
+  const factor = Math.max(AROUND_EATEN_MIN, (targets.calories - fixedKcal) / freeKcal, proteinFloor)
   if (!(factor < 1)) return day
   const chosen = { ...day.chosen }
-  for (const s of free) chosen[s] = resizeDish(day.chosen[s]!, factor) ?? day.chosen[s]
+  // WHOLE ITEMS ROUND (a wrap, an egg): measured 13 Nov 2026, a lunch asked for 75% came back at 72%. The cap is a
+  // promise about the plate, so a dish that rounds under it is asked again a step bigger until it holds.
+  for (const s of free) chosen[s] = resizeAtLeast(day.chosen[s]!, factor, AROUND_EATEN_MIN) ?? day.chosen[s]
   const totals = (Object.values(chosen) as PoolOption[]).reduce((a, o) => ({
     calories: a.calories + o.macros.calories, protein: a.protein + o.macros.protein, carbs: a.carbs + o.macros.carbs, fat: a.fat + o.macros.fat,
   }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
   return { ...day, chosen, totals, withinTolerance: dayVerdict(totals, targets).onTarget }
+}
+
+/** resizeDish at `factor`, stepped up (never past its own size) until the dish holds at least `floor` of its size. */
+function resizeAtLeast(dish: PoolOption, factor: number, floor: number): PoolOption | null {
+  const base = dish.macros.calories
+  for (let f = factor; f < 1; f += 0.01) {
+    const r = resizeDish(dish, f)
+    if (!r || base <= 0 || r.macros.calories >= base * floor - 1) return r
+  }
+  return dish
 }
 
 /** One date's meals, and the pool and rotation that served them. */
