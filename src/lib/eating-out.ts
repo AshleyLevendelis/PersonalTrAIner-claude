@@ -111,7 +111,7 @@ export function eatingOutSizeSaid(text: string): EatingOutSize | null {
  * middle. The range covers the whole plate, so nothing is quietly left out; his 15 Oct rule (a food that cannot be
  * counted is asked about) still holds for a food typed or told as a food.
  */
-export const EATING_OUT_SPREAD = 0.15
+const EATING_OUT_SPREAD = 0.15
 export function eatingOutRange(kcal: number): { low: number; high: number } {
   const r50 = (v: number) => Math.round(v / 50) * 50
   return { low: r50(kcal * (1 - EATING_OUT_SPREAD)), high: r50(kcal * (1 + EATING_OUT_SPREAD)) }
