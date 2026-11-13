@@ -1118,6 +1118,8 @@ function App() {
       // reads as "keep the plan they have". A default here would answer for
       // them (see the start_preference migration).
       start_preference: profileRow.start_preference ?? undefined,
+      // Absent before its migration (`select('*')` needs no column): read as none.
+      enjoyed_activities: Array.isArray(profileRow.enjoyed_activities) ? profileRow.enjoyed_activities : [],
       meals_per_day: profileRow.meals_per_day ?? 3,
       include_snacks: profileRow.include_snacks ?? true,
       batch_cooking: profileRow.batch_cooking ?? true,
@@ -1906,6 +1908,8 @@ function App() {
         recovery_capacity: enrichedProfile.recovery_capacity,
         conditioning_preference: enrichedProfile.conditioning_preference,
         start_preference: enrichedProfile.start_preference ?? null,
+        // What he enjoys besides walking (pathway.ts). Column pending its migration: dropped on retry below.
+        enjoyed_activities: enrichedProfile.enjoyed_activities ?? [],
         meals_per_day: enrichedProfile.meals_per_day ?? 3,
         include_snacks: enrichedProfile.include_snacks ?? true,
         // NAMED HERE OR WRITTEN ONCE AND NEVER READ BACK — this insert is
@@ -1959,9 +1963,19 @@ function App() {
         fat_g: enrichedProfile.fat_g,
     }
     let { data, error: insertError } = await supabase.from('fitness_profiles').insert(profileInsert).select('id').maybeSingle()
-    if (insertError && isMissingColumnError(insertError, 'date_of_birth')) {
-      const { date_of_birth: _notYet, ...withoutBirthday } = profileInsert
-      ;({ data, error: insertError } = await supabase.from('fitness_profiles').insert(withoutBirthday).select('id').maybeSingle())
+    // COLUMNS WHOSE MIGRATIONS MAY NOT HAVE RUN YET: each is dropped and the insert retried, so a pending
+    // migration costs that one answer and never the whole profile.
+    {
+      let pending: Record<string, unknown> = profileInsert
+      const PENDING_COLUMNS = ['date_of_birth', 'enjoyed_activities']
+      for (let tries = 0; tries < PENDING_COLUMNS.length; tries++) {
+        // Whichever one the database named, in either order.
+        const column = PENDING_COLUMNS.find(c => c in pending && insertError && isMissingColumnError(insertError, c))
+        if (!column) break
+        const { [column]: _notYet, ...without } = pending
+        pending = without
+        ;({ data, error: insertError } = await supabase.from('fitness_profiles').insert(pending).select('id').maybeSingle())
+      }
     }
 
     if (insertError) {

@@ -90,6 +90,9 @@ const REMINDERS_LIVE = new URLSearchParams(location.search).get('reminders') ===
 // see the screen show both kinds of like, take one of each away, add one of
 // its own, and be refused a like of the food she avoids.
 const LIKES = new URLSearchParams(location.search).get('likes') === '1'
+// ?walker=1 — ON THE PATHWAY (his 13 Nov 2026 strategy, slice 3): the answers starting-out.ts reads, so Profile shows
+// the "Also enjoy" row. verify:pathway taps it.
+const WALKER = new URLSearchParams(location.search).get('walker') === '1'
 // &keptclash=1 — a hearted dinner, kept in the pool the way a heart survives a
 // regenerate, with mushrooms in it: the food this seed already avoids. The
 // Profile list must keep it and mark it (Ashley's ruling, 27 Sep 2026).
@@ -146,6 +149,7 @@ const baseProfile: UserProfile = {
   // switching to 'move_more' is the interesting direction: it is the one that
   // means the plan on screen is the wrong KIND of plan.
   start_preference: 'train',
+  ...(WALKER ? { start_preference: 'move_more' as const, training_experience: 'beginner' as const, activity_level: 'sedentary' as const, fitness_goal: 'fat_loss' as const, enjoyed_activities: [] } : {}),
   // SKIPPED THE CALIBRATION WEEK, with the three lifts answered — the case
   // where correcting one genuinely changes the plan, and so the case worth
   // driving. Her ruling's other half (a calibrated plan is told the correction

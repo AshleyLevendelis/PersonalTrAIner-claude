@@ -10,6 +10,8 @@
 // not retire — see that file's original doc comment for why).
 // ---------------------------------------------------------------------------
 
+import { ENJOYED_ACTIVITY_OPTIONS } from '@/lib/pathway'
+import { isMissingColumnError } from '@/lib/missing-column'
 import { loadSwitches, remindersSummary } from '@/lib/coach-reach-out'
 import { splitFoodList } from '@/lib/food-list'
 import { containsPhrase } from '@/lib/meal-ingredients'
@@ -1072,6 +1074,12 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     }).catch(err => {
       console.error('Profile field save failed — reverting', err)
       onProfileChanged(revertPatch)
+      // A SETTING WHOSE DATABASE STEP HAS NOT RUN is not a connection problem, and saying so would send him to
+      // check his signal for nothing.
+      if ('enjoyed_activities' in patch && isMissingColumnError(err, 'enjoyed_activities')) {
+        setSaveError("That setting isn't switched on yet, so it couldn't be saved. Nothing else has changed.")
+        return
+      }
       setSaveError("Couldn't save that change — it's been reverted. Check your connection and try again.")
     })
   }
@@ -1251,6 +1259,34 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               options={START_PREFERENCE_OPTIONS}
               onSave={v => savePatch({ start_preference: v as StartPreference })}
             /></Row>
+            {/* WHAT HE ENJOYS BESIDES WALKING (his 13 Nov 2026 strategy, slice 3): only on the pathway, where one walk a
+                week becomes a swim or a ride. A tap saves and offers the rebuild (plan-invalidation.ts). */}
+            {isStartingOut(profile) && (
+              <Row label="Also enjoy">
+                <div className="flex flex-wrap justify-end gap-2" data-testid="profile-enjoyed">
+                  {ENJOYED_ACTIVITY_OPTIONS.map(o => {
+                    const on = (profile.enjoyed_activities ?? []).includes(o.value)
+                    return (
+                      <button
+                        key={o.value}
+                        type="button"
+                        aria-pressed={on}
+                        data-enjoyed={o.value}
+                        className="min-h-[44px] rounded-full px-4 text-[0.875rem]"
+                        style={{
+                          border: `1px solid ${on ? 'var(--primary)' : 'var(--hairline)'}`,
+                          color: on ? 'var(--primary)' : 'var(--foreground)',
+                        }}
+                        onClick={() => {
+                          const current = profile.enjoyed_activities ?? []
+                          savePatch({ enjoyed_activities: on ? current.filter(a => a !== o.value) : [...current, o.value] })
+                        }}
+                      >{o.label}</button>
+                    )
+                  })}
+                </div>
+              </Row>
+            )}
           </div>
         {loading && <p className="text-sm text-muted-foreground">Loading…</p>}
         {goals.length > 0 && (

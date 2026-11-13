@@ -90,7 +90,8 @@ console.log('\n2. Every question the app can ask is recognised as itself')
     // they want to start).
     const lifter = { ...initialSlotValues(), equipment: 'home_gym', trainingExperience: 'intermediate', activityLevel: 'moderate', knowsWorkingLifts: true } as OnboardingSlotValues
     const starter = { ...initialSlotValues(), equipment: 'bodyweight', trainingExperience: 'beginner', activityLevel: 'sedentary', fitnessGoal: 'fat_loss' } as OnboardingSlotValues
-    const values = s.key === 'startPreference' ? starter : lifter
+    // ...and, since 13 Nov 2026 (slice 3), someone who chose the walks: the only person asked what they enjoy.
+    const values = s.key === 'startPreference' ? starter : s.key === 'enjoyedActivities' ? { ...starter, startPreference: 'move_more' } as OnboardingSlotValues : lifter
     const got = chooseCard({ hostText: `Right, next thing I need — ${s.question}`, requested: [s.key], liveCards: [], values, confirmed: new Set(), corrected: new Set(), cardedThisTurn: [] })
     return !got || !numericGroupFor(s.key).includes(got)
   }).map(s => s.key)

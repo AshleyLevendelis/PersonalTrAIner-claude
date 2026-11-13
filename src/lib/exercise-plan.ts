@@ -9,7 +9,7 @@ import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
 } from './experience-config'
-import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields } from './warmup'
+import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields, withBalanceWork } from './warmup'
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
@@ -19,6 +19,7 @@ import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, REC
 import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays, effectiveRecoveryCapacity } from './concurrent-activity'
 import { dayAnchorExercise, anchorScore, canAnchor } from './session-derive'
 import { isStartingOut, applyStartingOut, startingOutActivity } from './starting-out'
+import { applyPathwayWeek, PATHWAY_STRENGTH_NOTE } from './pathway'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS, yieldFillerTo, optionalFillerSeconds } from './session-duration'
 import { implausibleLifts } from './lift-plausibility'
 import { kitOf, equipmentTierFor, kitAllowsEquipment, kitInWords, type ResolvedKit } from './kit-list'
@@ -7449,6 +7450,7 @@ export function generateMesocycle(
   sequence = dedupeAdjacentPhases(sequence, effectiveAllowedPhases)
   const weeks: MesocycleWeek[] = []
   let weekCounter = 0
+  let pathwayEligible: ((name: string) => boolean) | undefined
 
   // Onboarding "I know my numbers" path — present only when the trainee
   // opted out of calibration. Absent (undefined) rather than an
@@ -8962,7 +8964,7 @@ export function generateMesocycle(
       // actually ship with, and outside the !isDeload guard because a deload's
       // warm-up goes just as stale as a loading week's.
       for (let i = 0; i < days.length; i++) {
-        if (days[i].exercises.length > 0) days[i] = rebuildWarmup(days[i], profile)
+        if (days[i].exercises.length > 0) days[i] = rebuildWarmup(days[i], profile, { balance: false })
       }
 
       // Deload weeks are SUPPOSED to run short (half volume, by design) — a
@@ -9035,6 +9037,16 @@ export function generateMesocycle(
           if (!days[i].plannedActivity) continue
           days[i] = { ...days[i], plannedActivity: { ...activity } }
         }
+        // THE PATHWAY (his 13 Nov 2026 strategy, slice 3): home strength on two
+        // walk days from week 3, balance from 65, a swim or ride he enjoys in
+        // place of one walk. Eligibility is this plan's own pool (equipment,
+        // injuries, bans), style relaxed: a home circuit is a coaching choice.
+        pathwayEligible ??= (() => {
+          const names = new Set(getConstrainedPool(profile, exclusions, { skipStyle: true }).map(e => e.name))
+          return (name: string) => names.has(name)
+        })()
+        const pathwayDays = applyPathwayWeek(days, weekCounter, profile, pathwayEligible)
+        for (let i = 0; i < days.length; i++) days[i] = pathwayDays[i]
       }
 
       // FINALISATION POINT for this week. Deliberately the LAST thing before
@@ -9070,6 +9082,8 @@ export function generateMesocycle(
       }
 
       reconcilePerSetLoads(days)
+      // Balance from 65, stamped after every budget pass so it takes nothing away (warmup.ts withBalanceWork).
+      for (let i = 0; i < days.length; i++) days[i] = withBalanceWork(days[i], profile)
       weeks.push({
         week_number: weekCounter,
         block_number: blockIndex + 1,
@@ -9095,6 +9109,13 @@ export function generateMesocycle(
             && days.some(d => d.plannedActivity)
           if (activityOnly) {
             return days.find(d => d.plannedActivity)?.plannedActivity?.reason ?? ''
+          }
+          // THE PATHWAY'S STRENGTH WEEKS (slice 3): the walk's reason, then what the home sessions are. Never the
+          // phase's lifting copy: there is no load, no deload and no working set to talk about.
+          if (isStartingOut(profile)) {
+            const walkReason = days.find(d => d.plannedActivity)?.plannedActivity?.reason
+              ?? days.find(d => d.recommendedCardio)?.recommendedCardio?.reason ?? ''
+            return [walkReason, PATHWAY_STRENGTH_NOTE].filter(Boolean).join(' ')
           }
           // Decided once per week, from the week that was actually built —
           // see loadlessWeek above, shared with the tempo pass.

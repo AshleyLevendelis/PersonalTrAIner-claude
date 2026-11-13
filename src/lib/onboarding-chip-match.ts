@@ -113,6 +113,7 @@ const ASKS: Record<SlotKey, Asks> = {
   // never put anything under a question: "date of birth" brings the AGE card (above), which sets this beside the age.
   dateOfBirth: /date of birth|\bborn\b|birthday|\bdob\b/i,
   kitTicks: /which of these do you have|untick anything you don.t have|what (kit|equipment) do you (actually )?(have|own) at home/i,
+  enjoyedActivities: /(enjoy|like) (swimming|cycling)|swimming or cycling|besides walking/i,
 }
 
 /**

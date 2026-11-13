@@ -258,8 +258,9 @@ console.log('\n8. A plan with no lifting in it is never described as lifting')
   // on the main lifts — same rep target, more weight than last week" above
   // a week of Walk / Rest / Walk / Walk / Walk / Rest / Rest.
   const walking = planFor({ training_experience: 'beginner', activity_level: 'sedentary', equipment_access: 'bodyweight' }, 'wn:walk')
-  const exerciseCount = walking.reduce((s, w) => s + w.days.reduce((n, d) => n + d.exercises.length, 0), 0)
-  check(`the starting-out plan really does contain no exercises (${exerciseCount})`, exerciseCount === 0, exerciseCount)
+  // RE-ANCHORED 13 Nov 2026 (slice 3): home strength joins from week 3, unloaded; weeks 1-2 are walks only.
+  const exerciseCount = walking.filter(w => w.week_number <= 2).reduce((s, w) => s + w.days.reduce((n, d) => n + d.exercises.length, 0), 0)
+  check(`the starting-out plan's first two weeks contain no exercises (${exerciseCount})`, exerciseCount === 0, exerciseCount)
 
   // The vocabulary of work that is not in this plan. Each of these appeared
   // on her screen.

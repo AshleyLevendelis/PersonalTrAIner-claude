@@ -1,3 +1,4 @@
+import { ENJOYED_ACTIVITY_OPTIONS, type EnjoyedActivity } from './pathway'
 import { ALLERGEN_FOOD_PATTERNS } from './allergen-words'
 import { splitFoodList, splitUsualFoods } from './food-list'
 import { DIETARY_PREFERENCES, type DietaryPreference } from '@/lib/diet-rules'
@@ -82,7 +83,9 @@ export const GOAL_OPTIONS: { value: FitnessGoal; icon: string; label: string; de
 // onboarding never asked, or wording it differently enough that she cannot
 // tell it is the same question.
 export const START_PREFERENCE_OPTIONS: { value: StartPreference; icon: string; label: string; description: string }[] = [
-  { value: 'move_more', icon: '🚶', label: 'Get moving first', description: 'Walks and easy activity, building up week by week' },
+  // THE COACH PROPOSES THE PATHWAY (his 13 Nov 2026 strategy, slice 3): walks first, short home strength from week 3,
+  // and the gym is always the other answer.
+  { value: 'move_more', icon: '🚶', label: 'Walks, then home strength', description: 'Walks to start; two short home strength sessions join from week 3' },
   { value: 'train', icon: '🏋️', label: 'Straight into training', description: 'Proper sessions from week one' },
 ]
 
@@ -478,6 +481,11 @@ export interface OnboardingSlotValues {
    * they don't have. null until the card is answered; the card shows defaultKitTicks meanwhile.
    */
   kitTicks: string[] | null
+  /**
+   * WHAT HE ENJOYS BESIDES WALKING (his 13 Nov 2026 strategy, slice 3; collision (d) answered "Setup asks,
+   * optional"). Asked only on the pathway; one walk a week becomes one of them (pathway.ts). [] means neither.
+   */
+  enjoyedActivities: string[]
 }
 
 /**
@@ -524,6 +532,7 @@ export function initialSlotValues(): OnboardingSlotValues {
     dateOfBirth: '',
     otherSports: '',
     kitTicks: null,
+    enjoyedActivities: [],
   }
 }
 
@@ -688,6 +697,18 @@ export function isStartingFromNothing(values: OnboardingSlotValues): boolean {
  * question would stop being asked of someone the plan still routes to walks,
  * or vice versa.
  */
+/** He chose the pathway: the walks first (his 13 Nov 2026 strategy, slice 3). Only then is "what do you enjoy?" asked. */
+export function choseThePathway(values: OnboardingSlotValues): boolean {
+  return needsStartPreferenceAnswer(values) && values.startPreference === 'move_more'
+}
+
+const ENJOYED_OPTIONS: { value: EnjoyedActivity; icon: string; label: string; description: string }[] =
+  ENJOYED_ACTIVITY_OPTIONS.map(o => ({ value: o.value, icon: o.value === 'swimming' ? '🏊' : '🚴', label: o.label, description: `A ${o.label.toLowerCase()} session in place of one walk a week` }))
+
+function isEnjoyedActivity(v: string): v is EnjoyedActivity {
+  return ENJOYED_ACTIVITY_OPTIONS.some(o => o.value === v)
+}
+
 export function needsStartPreferenceAnswer(values: OnboardingSlotValues): boolean {
   return isStartingFromNothing(values)
     && values.fitnessGoal != null
@@ -932,6 +953,8 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
     // A draft saved before this that holds it is simply asked again.
     validate: isOneOf(OFFERED_STYLE_OPTIONS) },
   { key: 'conditioningPreference', question: 'How do you feel about cardio?', inputHint: 'Love it or loathe it?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
+  // BESIDE THE CARDIO QUESTION, and after injuries (which must stay in the opening block). OPTIONAL, AND ONLY ON THE PATHWAY (his 13 Nov 2026 strategy, slice 3; collision (d), "Setup asks, optional").
+  { key: 'enjoyedActivities', question: 'Besides walking, do you enjoy swimming or cycling?', inputHint: 'Swimming, cycling, or neither', shortLabel: 'Also enjoy', control: 'multi', required: false, requiredIf: choseThePathway, options: ENJOYED_OPTIONS, destination: 'column', validate: isSubsetOf(ENJOYED_OPTIONS) },
   // REQUIRED, and the comment that used to sit here argued the opposite.
   //
   // It read: "measured to have zero effect anywhere in the generated plan
@@ -1400,6 +1423,8 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     // so the FIRST plan is built around it (concurrent-activity.ts) and
     // Profile shows it. App's insert names the column.
     concurrent_activities: parseSportsSlot(data.otherSports) ?? [],
+    // What he enjoys besides walking, only on the pathway (pathway.ts reads it).
+    enjoyed_activities: choseThePathway(data) ? data.enjoyedActivities.filter(isEnjoyedActivity) : [],
     ...PROFILE_CONSTANTS,
   }
 }

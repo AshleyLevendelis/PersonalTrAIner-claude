@@ -763,6 +763,25 @@ const doneSeed = (() => {
 // an EMPTY row, which is a different card (ActiveRecoveryCard), and driving
 // the rest-day rebuild against it measured the wrong component for an hour.
 // This names the weekday the plan omits, or null when it omits none.
+;(window as unknown as { __pathwayTarget: unknown }).__pathwayTarget = (() => {
+  // THE PATHWAY'S FIRST HOME STRENGTH DAY (his 13 Nov 2026 strategy, slice 3), for verify:pathway. Week 3 of the
+  // walker's plan, found by what the plan holds and dated by walking the calendar from the plan's own start. Null for
+  // every profile but ?walker=1.
+  const week3 = mesocycle.find(w => w.week_number === 3)
+  const strength = week3?.days.find(d => d.exercises.length > 0 && d.recommendedCardio)
+  const walkOnly = week3?.days.find(d => d.plannedActivity && d.exercises.length === 0)
+  if (!strength || !walkOnly) return null
+  const start = new Date(profile.created_at as string); start.setHours(12, 0, 0, 0)
+  const dateFor = (dayName: string) => {
+    for (let i = 14; i < 21; i++) { const d = new Date(start); d.setDate(d.getDate() + i); if (DAYS[d.getDay()] === dayName) return isoOf(d) }
+    return null
+  }
+  return {
+    day: strength.day, date: dateFor(strength.day), names: strength.exercises.map(e => e.name),
+    walk: strength.recommendedCardio, walkDay: walkOnly.day, walkDate: dateFor(walkOnly.day),
+  }
+})()
+
 ;(window as unknown as { __noRowDay: unknown }).__noRowDay = (() => {
   const liveWeek = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
   const liveDays = mesocycle.find(w => w.week_number === liveWeek)?.days ?? exercisePlan

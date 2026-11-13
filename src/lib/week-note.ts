@@ -1,3 +1,4 @@
+import { isPathwayWeek } from './pathway'
 import type { MesocycleWeek } from './types'
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,10 @@ export function weekNoteText(week: Pick<MesocycleWeek, 'phase_focus' | 'coach_no
     if (activity?.reason?.trim()) return terminate(activity.reason.trim())
     return ''
   }
+  // THE PATHWAY'S STRENGTH WEEKS (strategy slice 3, 13 Nov 2026) are walks plus two short unloaded home sessions.
+  // The phase's heading ("Build muscle — moderate loads...") describes work that is not in them, so the week's own
+  // stored note (the walk's reason, then what the home sessions are) is the whole note.
+  if (isPathwayWeek({ days }) && week.coach_note?.trim()) return terminate(week.coach_note.trim())
   const kept: string[] = []
   const add = (sentence: string) => {
     const s = terminate(sentence)

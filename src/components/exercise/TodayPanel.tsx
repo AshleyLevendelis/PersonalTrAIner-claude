@@ -1,3 +1,4 @@
+import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { sessionSetCount, shortOfPlan } from '@/lib/session-count'
@@ -1138,6 +1139,7 @@ export function TodayPanel({
       lowRecovery: !!profile && effectiveRecoveryCapacity(profile) === 'low',
       shortenedToMinutes: shortened,
       lightened: workout.lightened_today === true,
+      pathway: !!profile && isStartingOut(profile),
     })
     const lightenedLine = workout.lightened_today === true && shortened == null
       ? 'Made lighter for today. Back to the full session next week.'

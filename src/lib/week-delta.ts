@@ -1,3 +1,4 @@
+import { isPathwayWeek } from './pathway'
 import type { MesocycleWeek, WorkoutDay } from './types'
 
 // ---------------------------------------------------------------------------
@@ -124,6 +125,9 @@ export function weekDelta(
   // lighter on purpose", a reduction that never happened. Caught by the gate
   // written for the note, on the same plan.
   if (sets === 0 && weekSetTotal(previous) === 0) return null
+  // NOR ON THE PATHWAY (slice 3): week 3 brings in the home sessions, so "+16 sets vs last week" would read as a jump
+  // in training load to someone who has just been walking, and its "deload" weeks do not change the circuit at all.
+  if (isPathwayWeek(week) || isPathwayWeek(previous)) return null
 
   // A deload is measured against the week it is stepping down FROM, which is
   // always the one immediately before it.

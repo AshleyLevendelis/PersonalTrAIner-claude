@@ -123,8 +123,14 @@ console.log('\n0c. The AUDIT still generates walking plans after the routing cha
 
 console.log('\n0b. The fixture really is a plan with no lifting in it')
 {
+  // RE-ANCHORED 13 Nov 2026 (strategy slice 3, his ruling "strength joins the walking pathway from week 3, as short
+  // home sessions"): the walking plan now has exercises from week 3, and the promise is that none of them is LOADED
+  // and the first two weeks are walks only.
+  const firstTwo = walking.filter(w => w.week_number <= 2).reduce((s, w) => s + w.days.reduce((n, d) => n + d.exercises.length, 0), 0)
+  check(`the walking plan's first two weeks have no exercises (${firstTwo})`, firstTwo === 0, firstTwo)
+  const loaded = walking.flatMap(w => w.days.flatMap(d => d.exercises)).filter(e => e.suggested_load_kg != null && e.suggested_load_kg > 0)
+  check(`...and nothing in it, ever, carries a weight (${loaded.length})`, loaded.length === 0, loaded.slice(0, 2).map(e => e.name))
   const exercises = walking.reduce((s, w) => s + w.days.reduce((n, d) => n + d.exercises.length, 0), 0)
-  check(`the walking plan has no exercises at all (${exercises})`, exercises === 0, exercises)
   const liftExercises = lifting.reduce((s, w) => s + w.days.reduce((n, d) => n + d.exercises.length, 0), 0)
   check(`the control plan does have them (${liftExercises}), so the checks below can tell the two apart`, liftExercises > 0)
 }
@@ -149,13 +155,15 @@ console.log('\n3. SURFACE: the first thing the app ever says — the welcome')
   // Exactly what ChatAssistant passes: the plan shape, and a brief built from
   // the first scheduled day.
   const shape = planShapeFromMesocycle(walking)
-  check('the plan shape knows this plan has no lifting in it', shape?.activityOnly === true, shape)
+  check('the plan shape knows this plan starts with no lifting in it', shape?.activityOnly === true, shape)
+  check('...and that short home strength joins it later (slice 3)', shape?.homeStrengthJoins === true, shape)
   const d1 = walking[0].days.find(d => d.plannedActivity)
   const brief = { focus: d1!.focus, movements: `${d1!.plannedActivity!.duration} minutes, easy pace`, when: 'today' as const }
   const messages = buildFirstRunIntro('Hi Ashley', brief, shape)
   const all = messages.map(m => m.content).join(' ')
   console.log(`     "${messages[1]?.content ?? ''}"`)
   check('the welcome does not promise working weights or climbing loads', !PROMISES_LOADING.test(all), all)
+  check('...and says the home strength joins from week 3', /from week 3 two short home strength sessions/.test(all), all)
   check('...and does not leave a dangling dash where the movements would be', !/—\s*\./.test(all), all)
   // A button offering something the plan has none of is the same untruth.
   const replies = messages.flatMap(m => m.quickReplies ?? [])

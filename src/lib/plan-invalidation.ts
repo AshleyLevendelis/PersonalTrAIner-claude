@@ -81,7 +81,7 @@ export const KNOWN_LIFT_FIELDS = ['known_squat_kg', 'known_bench_kg', 'known_dea
 // EXPERIENCE, RECOVERY AND CONDITIONING ADDED 8 Nov 2026, his ruling "Offer a rebuild" (QA round 2): all three are read
 // by the plan generator, and changing one on Profile saved it and left the plan as it was, with no word, the session-
 // length defect above again. They take the same road goal and style take: an offer, nothing changed until yes.
-export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', 'session_duration_preference', 'training_experience', 'recovery_capacity', 'conditioning_preference', ...KNOWN_LIFT_FIELDS] as const
+export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', 'enjoyed_activities', 'session_duration_preference', 'training_experience', 'recovery_capacity', 'conditioning_preference', ...KNOWN_LIFT_FIELDS] as const
 export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number] | 'concurrent_activities'
 
 /**
@@ -276,6 +276,19 @@ export function detectPlanInvalidation(
         : 'Your current plan is a training plan. I can rebuild it from this week onwards as the '
           + 'easing-in one — walks and easy movement, building a little at a time. Everything '
           + 'you have already logged stays exactly as it is.',
+    }
+  }
+
+  // WHAT HE ENJOYS BESIDES WALKING (his 13 Nov 2026 strategy, slice 3): one walk a week becomes a swim or a ride.
+  if ('enjoyed_activities' in patch
+      && [...(patch.enjoyed_activities ?? [])].sort().join(',') !== [...(before.enjoyed_activities ?? [])].sort().join(',')) {
+    const now = (patch.enjoyed_activities ?? []).map(a => (a === 'swimming' ? 'a swim' : a === 'cycling' ? 'a ride' : a))
+    return {
+      field: 'enjoyed_activities',
+      title: now.length > 0 ? `Swap a walk a week for ${now.join(' or ')}?` : 'Back to walks only?',
+      detail: now.length > 0
+        ? `I can rebuild your plan from this week so one walk a week is ${now.join(' or ')}, at the same easy effort and the same minutes. Everything you have already logged stays exactly as it is.`
+        : 'I can rebuild your plan from this week with every activity day as a walk. Everything you have already logged stays exactly as it is.',
     }
   }
 

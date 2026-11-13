@@ -86,7 +86,11 @@ async function main() {
   const insert = app.slice(app.indexOf('const profileInsert = {'), app.indexOf('const profileInsert = {') + 6000)
   check('the setup save names it', /date_of_birth: enrichedProfile\.date_of_birth \?\? null,/.test(insert))
   check('...and tries once more without it when the database has not got it',
-    /if \(insertError && isMissingColumnError\(insertError, 'date_of_birth'\)\) \{\s*const \{ date_of_birth: _notYet, \.\.\.withoutBirthday \} = profileInsert[\s\S]{0,200}insert\(withoutBirthday\)/.test(insert))
+    // RE-ANCHORED 13 Nov 2026 on the property: the column is on the pending list, and a missing-column error for it
+    // drops just that column from the payload and inserts again (one loop for every pending column since slice 3).
+    /PENDING_COLUMNS = \[[^\]]*'date_of_birth'/.test(insert)
+      && /isMissingColumnError\(insertError, c\)/.test(insert)
+      && /const \{ \[column\]: _notYet, \.\.\.without \} = pending[\s\S]{0,120}\.insert\(pending\)/.test(insert))
   const migration = readdirSync('supabase/migrations').filter(f => /date_of_birth/.test(f)).map(f => readFileSync(`supabase/migrations/${f}`, 'utf8')).join('\n')
   check('the database change adds the column, as a date, nullable', /ADD COLUMN IF NOT EXISTS date_of_birth date NULL/.test(migration), migration.slice(0, 200))
 

@@ -602,7 +602,10 @@
     "test:mince-asked": "tsx scripts/test-mince-asked.ts",
     "test:calamari-asked": "tsx scripts/test-calamari-asked.ts",
     "test:food-figures": "tsx scripts/test-food-figures.ts",
-    "verify:deep-pool": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/deep-pool.mjs"
+    "verify:deep-pool": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/deep-pool.mjs",
+    "test:pathway": "tsx scripts/test-pathway.ts",
+    "measure:pathway-personas": "tsx scripts/measure-pathway-personas.ts",
+    "verify:pathway": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/pathway.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

@@ -138,6 +138,8 @@ export interface UserProfile {
   injuries: string[]
   display_name?: string
   concurrent_activities?: ConcurrentActivity[]
+  /** What he enjoys besides walking ('swimming' | 'cycling'), asked in setup on the pathway (his 13 Nov 2026 strategy, slice 3). One walk a week becomes one of them. Column `enjoyed_activities` (migration 20261113130000, not run). */
+  enjoyed_activities?: string[] | null
   weekly_schedule?: Record<string, string | null>
   created_at?: string
   bmr?: number

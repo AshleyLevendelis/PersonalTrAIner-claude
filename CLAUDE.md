@@ -1516,6 +1516,13 @@ menu" stays true when a copy is also left outside it.
   switchable, inside his daily limit; a "Shortest version" of any session that counts; the same message ignored three
   times running turns the limit down a level and the coach says so. `test:coach-rhythm`, `verify:short-version`,
   `verify:coach-hello-boot`. Needs the moment-log migration and the `coach-reach-out` and `chat-gemini` deploys
+- **The pathway: his ruling 13 Nov 2026, "strength joins the walking pathway from week 3, as short home sessions"**
+  (slice 3). From week 3 two walk days, furthest apart, open with about 15 minutes of unloaded home strength (squat,
+  incline push-up, towel row, glute bridge; 2 x 8-12, easy effort); balance from 65, added after sizing so nothing is
+  cut; setup asks (optional, his "Setup asks") whether he enjoys swimming or cycling, and one walk a week becomes it.
+  Weeks 1-2 stay walks only and nothing on the pathway ever carries a weight. `test:pathway`, `verify:pathway`,
+  `measure:pathway-personas`, `docs/plans/pathway.md`. Needs the `enjoyed_activities` migration and the `onboarding-chat`
+  deploy
 
 ### His ruling of 12 Nov 2026, eating out (`docs/plans/eating-out.md`)
 - **A meal marked as out: "Ask: light/normal/big"** (from three options; his request "build it, start with out for

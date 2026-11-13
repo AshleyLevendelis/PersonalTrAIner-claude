@@ -308,7 +308,7 @@ await openSheet('Goal')
 const start = await until(startRow, v => v && v.hasControl)
 check('6a. the starting point is on the screen at all', !!start, start)
 check('6b. ...showing the answer already given, not an empty box',
-  !!start && /get moving first|straight into training/i.test(start.shown), start?.shown)
+  !!start && /walks, then home strength|straight into training/i.test(start.shown), start?.shown)
 check('6c. ...and a thumb reaches it', !!start && start.reachable, start)
 await shoot('setup-answers-4-starting-point')
 
@@ -323,7 +323,7 @@ await ev(`(() => {
 })()`)
 await wait(500)
 const picked = await ev(`(() => {
-  const o = [...document.querySelectorAll('[role="option"]')].find(x => /get moving first/i.test(x.textContent || ''))
+  const o = [...document.querySelectorAll('[role="option"]')].find(x => /walks, then home strength/i.test(x.textContent || ''))
   if (!o) return [...document.querySelectorAll('[role="option"]')].map(x => (x.textContent||'').trim())
   o.click(); return true
 })()`)

@@ -1,3 +1,4 @@
+import { needsBalanceWork, BALANCE_WARMUP_ITEM } from './pathway'
 import type { EquipmentAccess, TrainingExperience } from './types'
 import type { ExerciseEntry, MovementPattern } from './exercise-db'
 import {
@@ -614,6 +615,7 @@ export function buildWarmup(ctx: WarmupContext): WarmupBlock {
 
   let spent = general.reduce((n, g) => n + g.duration_seconds, 0) + rampSeconds
   const mobility: WarmupItem[] = []
+
   const coveredJoints = new Set<string>()
 
   // Mobility is not normally the discretionary part of a warm-up — two
@@ -691,7 +693,12 @@ export function getWarmupReserveSeconds(budgetSeconds: number): number {
 // ---------------------------------------------------------------------------
 
 /** The day's warm-up, re-derived from the exercises it now actually contains. */
-export function rebuildWarmup(day: WorkoutDay, profile: UserProfile): WorkoutDay {
+export function rebuildWarmup(day: WorkoutDay, profile: UserProfile, opts: { balance?: boolean } = {}): WorkoutDay {
+  const rebuilt = rebuildWarmupCore(day, profile)
+  return opts.balance === false ? rebuilt : withBalanceWork(rebuilt, profile)
+}
+
+function rebuildWarmupCore(day: WorkoutDay, profile: UserProfile): WorkoutDay {
   const entries = day.exercises
     .map(ex => ({ ex, entry: getExerciseEntry(ex.name) }))
     .filter((p): p is { ex: typeof day.exercises[number]; entry: NonNullable<ReturnType<typeof getExerciseEntry>> } => !!p.entry)
@@ -761,4 +768,28 @@ export function drillsPreparing(joints: string[], injuries: string[] = []): Warm
       b.prepares_joints.filter(j => want.has(j)).length -
       a.prepares_joints.filter(j => want.has(j)).length)
     .map(d => ({ name: d.name, prescription: d.prescription, purpose: d.purpose, duration_seconds: d.duration_seconds }))
+}
+
+// ---------------------------------------------------------------------------
+// BALANCE FROM 65 (his 13 Nov 2026 strategy, slice 3: "age only adds safeguards and never downgrades").
+//
+// ADDED AFTER THE DAY IS SIZED, never inside it. Measured 13 Nov 2026: built into the warm-up, its two minutes
+// went into the session's time budget and the plan paid for them in sets, in 31 places of a 68-year-old's
+// sixteen weeks. Added last, the day's work is exactly what it would be without it and the session simply runs
+// about two minutes longer, which is his 13 Sep 2026 ruling for additions ("add it and say the session is now
+// longer"). The generator builds every warm-up without it and stamps it at the end of each week; an edit's
+// rebuild (rebuildWarmup) stamps it straight away, since an edit trims nothing for time.
+// ---------------------------------------------------------------------------
+
+export function withBalanceWork(day: WorkoutDay, profile: Pick<UserProfile, 'age'>): WorkoutDay {
+  if (!day.warmup || day.exercises.length === 0 || !needsBalanceWork(profile)) return day
+  if (day.warmup.mobility.some(m => m.name === BALANCE_WARMUP_ITEM.name)) return day
+  return {
+    ...day,
+    warmup: {
+      ...day.warmup,
+      mobility: [...day.warmup.mobility, { ...BALANCE_WARMUP_ITEM }],
+      total_seconds: day.warmup.total_seconds + BALANCE_WARMUP_ITEM.duration_seconds,
+    },
+  }
 }

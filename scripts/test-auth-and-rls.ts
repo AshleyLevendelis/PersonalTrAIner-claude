@@ -226,10 +226,15 @@ console.log('\n6. The app signs in BEFORE it reads, and stamps what it writes')
   // again without the date of birth before that migration lands; every insert of the profile is that object.
   const insertAt = app.indexOf('const profileInsert = {')
   const insert = insertAt >= 0 ? app.slice(insertAt, insertAt + 400) : ''
-  const inserts = [...app.matchAll(/from\('fitness_profiles'\)\.insert\((\w+)\)/g)].map(m => m[1])
+  // EVERY insert's argument, whatever its shape: a literal or a spread is not a bare name and must fail, not vanish.
+  const inserts = [...app.matchAll(/from\('fitness_profiles'\)\.insert\(([^)]*)\)/g)].map(m => m[1].trim())
   check('a new profile is stamped with its owner', /owner_id: signIn\.userId/.test(insert)
-    && inserts.length >= 1 && inserts.every(v => v === 'profileInsert' || v === 'withoutBirthday')
-    && /const \{ date_of_birth: _notYet, \.\.\.withoutBirthday \} = profileInsert/.test(app), { insert: insert.slice(0, 200), inserts })
+    // RE-ANCHORED 13 Nov 2026 on the PROPERTY, not one retry's variable name: every insert is the stamped object or
+    // that object with pending columns TAKEN AWAY (never added to), and the owner is never one of the columns taken.
+    && inserts.length >= 1 && inserts.every(v => v === 'profileInsert' || v === 'pending')
+    && /let pending: Record<string, unknown> = profileInsert\b/.test(app)
+    && /const \{ \[column\]: _notYet, \.\.\.without \} = pending\s*\n\s*pending = without/.test(app)
+    && !/PENDING_COLUMNS = \[[^\]]*owner_id/.test(app), { insert: insert.slice(0, 200), inserts })
   check('...from a sign-in performed first', insertAt > 0 && app.lastIndexOf('ensureSignedIn(', insertAt) > 0)
 
   // RE-ANCHORED 15 Sep 2026. This pinned the pronoun: "We couldn't sign you

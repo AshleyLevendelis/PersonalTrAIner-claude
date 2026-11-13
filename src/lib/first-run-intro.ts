@@ -1,3 +1,4 @@
+import { PATHWAY_FOCUS } from './pathway'
 import { loadParkedQuestions } from './parked-questions'
 
 /**
@@ -122,6 +123,8 @@ export interface FirstRunPlanShape {
    * climb" above a sixteen-week plan containing no weights whatsoever.
    */
   activityOnly: boolean
+  /** The pathway: short home strength sessions join the walks later in the plan (slice 3). */
+  homeStrengthJoins?: boolean
   /**
    * Whole days since the plan's first day, when known. The intro is the FIRST CHAT, not the first day: someone who
    * trains for nine days before opening the coach was told "Day one is today" and "you'll start light" (1 Nov 2026,
@@ -204,7 +207,7 @@ export function planShapeFromMesocycle(
     week_number?: number
     block_number?: number
     isCalibrationWeek?: boolean
-    days?: { exercises?: unknown[]; plannedActivity?: unknown }[]
+    days?: { exercises?: unknown[]; plannedActivity?: unknown; focus?: string }[]
   }[],
 ): FirstRunPlanShape | null {
   if (mesocycle.length === 0) return null
@@ -219,16 +222,20 @@ export function planShapeFromMesocycle(
   // exercises anywhere is an activity plan, whoever it was built for. Read
   // from the plan rather than from the profile for the same reason
   // isLoadlessWeek is — the thing being described is what got generated.
-  const daysSeen = mesocycle.flatMap(w => w.days ?? [])
+  // THE PATHWAY (slice 3) STARTS AS AN ACTIVITY PLAN and gains short home strength sessions from week 3: the welcome
+  // describes how it starts (week one), and says the strength is coming. Neither half promises weights.
+  const daysSeen = (weekOne?.days ?? [])
   const activityOnly = daysSeen.length > 0
     && daysSeen.every(d => (d.exercises?.length ?? 0) === 0)
     && daysSeen.some(d => d.plannedActivity != null)
+  const homeStrengthJoins = activityOnly && mesocycle.some(w => (w.days ?? []).some(d => d.focus === PATHWAY_FOCUS))
 
   return {
     totalWeeks: mesocycle.length,
     blocks,
     startsLight: weekOne?.isCalibrationWeek === true,
     activityOnly,
+    homeStrengthJoins,
   }
 }
 
@@ -275,7 +282,9 @@ export function buildFirstRunIntro(
   if (shape?.activityOnly) {
     // No weights in this plan, so nothing about weights. What is actually
     // true of it: the dose steps up a block at a time, at the same effort.
-    structureParts.push("It starts where you are and builds a little at a time — the same easy effort throughout, just a bit longer as the blocks go on.")
+    structureParts.push(shape.homeStrengthJoins
+      ? "It starts with walks where you are, and from week 3 two short home strength sessions join them — about 15 minutes, no equipment, at an easy effort."
+      : "It starts where you are and builds a little at a time — the same easy effort throughout, just a bit longer as the blocks go on.")
   } else if (shape?.startsLight && (shape.daysSinceStart ?? 0) < 7) {
     structureParts.push("You'll start light on purpose while we find your working weights, then the loads climb, and every block ends with an easier week so the work actually sticks.")
   } else if (shape && shape.blocks >= 2) {
