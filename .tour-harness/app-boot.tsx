@@ -120,6 +120,12 @@ const db: Db = {
     { id: 'c2', profile_id: PROFILE_ID, role: 'assistant', content: 'About 160g a day for you.', status: 'complete', action_data: null, created_at: new Date(anchorNowMs() - 26 * 3600000 + 5000).toISOString() },
   ] : [],
   daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
+  // ?ignored3: the same evening message went unanswered three days running (an INPUT: the moment log as the app keeps it,
+  // his strategy slice 1), so the coach should turn itself down a level (slice 2).
+  coach_moment_log: new URLSearchParams(location.search).has('ignored3') ? [1, 2, 3].map(d => ({
+    id: `ml${d}`, user_id: '00000000-0000-4000-8000-00000000b007', moment: 'protein_short', surface: 'phone', chat_message_id: null,
+    sent_at: new Date(anchorNowMs() - d * 86400000 + 3600000).toISOString(), answered_at: null, answer: null,
+  })) : [],
 }
 
 // The plan goes in through the app's own writer (so the rows are the shape the app stores), with no delay: the

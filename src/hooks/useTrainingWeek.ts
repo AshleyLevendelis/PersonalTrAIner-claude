@@ -466,6 +466,34 @@ export async function readTrainingWeeks(
   return { thisWeek: build(monday), lastWeek: build(lastMonday) }
 }
 
+/**
+ * THE LAST N WEEKS, MONDAY TO SUNDAY, AS THE STRIP DRAWS EACH ONE — his strategy of 13 Nov 2026 (slice 2, "weekly
+ * consistency in place of the streak", docs/plans/coach-rhythm.md). The same builder as readTrainingWeeks, over a longer
+ * window in ONE read, newest first: [this week, last week, ...]. Every week is classified against its own plan week.
+ */
+export async function readTrainingWeeksBack(
+  profileId: string,
+  today: string,
+  plan: WorkoutDay[],
+  mesocycle: MesocycleWeek[] | undefined,
+  planCreatedAt: string | undefined,
+  count: number,
+  knownMoves: SessionMove[] = [],
+): Promise<TrainingWeekDay[][]> {
+  const monday = mondayOf(new Date(today + 'T12:00:00'))
+  const mondays = Array.from({ length: Math.max(1, count) }, (_, i) => { const m = new Date(monday); m.setDate(m.getDate() - 7 * i); return m })
+  const sunday = new Date(monday)
+  sunday.setDate(sunday.getDate() + 6)
+  const from = getLocalDateString(mondays[mondays.length - 1])
+  const to = getLocalDateString(sunday)
+  const [dashboard, readMoves] = await Promise.all([
+    getWeeklyDashboard(profileId, from, to).then(week => weekWithLocalWork(profileId, week, from, to, true)),
+    getSessionMovesInRange(profileId, from, to).catch(() => [] as SessionMove[]),
+  ])
+  const moves = [...readMoves, ...knownMoves.filter(m => !readMoves.some(r => r.fromDate === m.fromDate))]
+  return mondays.map(m => buildTrainingWeekDays({ monday: m, today, plan, mesocycle, planCreatedAt, dashboard, moves, loading: false }))
+}
+
 function classifyLoadingSafe(
   weekdayName: string,
   plan: WorkoutDay[],

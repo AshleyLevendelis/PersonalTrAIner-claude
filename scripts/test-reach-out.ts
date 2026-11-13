@@ -24,7 +24,7 @@ import * as app from '../src/lib/coach-moments'
 import { coachMessageShortcut as appShortcut } from '../src/lib/coach-voice'
 import { coachMessage } from '../src/lib/coach-voice'
 /** The phrasebook's words with no name: what a profile with no display name hears. */
-const appNotification = (k: string, streak = 0, meals = 0) => coachMessage(k, { streak, mealsLogged: meals })
+const appNotification = (k: string, week = 0, meals = 0) => coachMessage(k, { weekDone: week, weekPlanned: week + 1, mealsLogged: meals })
 
 let failures = 0
 let ran = 0
@@ -73,8 +73,9 @@ async function main() {
   check('yesterday planned and nothing logged is a miss', factsFor(tueRow, NONE, TODAY, 12).missedYesterday === true)
   check('...but not once she has said she missed it', factsFor(tueRow, { ...NONE, marks: { [MON]: {}, [addDays(TODAY, -1)]: { missed: true } } }, TODAY, 12).missedYesterday === false)
   check('...nor if she logged it', factsFor(tueRow, { ...NONE, activityDates: [addDays(TODAY, -1)] }, TODAY, 12).missedYesterday === false)
-  check('a streak Home counted yesterday is trusted', factsFor({ ...MWF, streak_days: 5, streak_as_of: '2026-09-22' }, NONE, TODAY, 19).streakDays === 5)
-  check('...one counted three days ago is not — it may already be broken', factsFor({ ...MWF, streak_days: 5, streak_as_of: '2026-09-20' }, NONE, TODAY, 19).streakDays === 0)
+  // RE-ANCHORED 13 Nov 2026: the streak went (his ruling); the week's sessions take its place, trusted the same way.
+  check('this week\'s count Home sent yesterday is trusted', factsFor({ ...MWF, week_sessions_done: 2, week_sessions_planned: 3, week_as_of: '2026-09-22' }, NONE, TODAY, 19).weekSessionsPlanned === 3)
+  check('...one counted three days ago is not — the week may have moved on', factsFor({ ...MWF, week_sessions_done: 2, week_sessions_planned: 3, week_as_of: '2026-09-20' }, NONE, TODAY, 19).weekSessionsPlanned === 0)
   check('a block that ended two days ago has just ended', factsFor({ ...MWF, block_ends_on: '2026-09-21' }, NONE, TODAY, 12).blockJustEnded === true)
   check('...one that ended a week ago has not', factsFor({ ...MWF, block_ends_on: '2026-09-16' }, NONE, TODAY, 12).blockJustEnded === false)
   check('...and one still to come has not', factsFor({ ...MWF, block_ends_on: '2026-09-25' }, NONE, TODAY, 12).blockJustEnded === false)
@@ -129,7 +130,7 @@ async function main() {
     due: { sub: [sub('s1', 'due')], row: MWF, live: NONE },
     asleep: { sub: [sub('s2', 'asleep', 'Pacific/Auckland')], row: MWF, live: NONE },
     goneDevice: { sub: [sub('s3', 'goneDevice'), sub('s3b', 'goneDevice')], row: MWF, live: NONE },
-    switchedOff: { sub: [sub('s4', 'switchedOff')], row: { ...MWF, streak_days: 4, streak_as_of: '2026-09-22' }, live: NONE, switches: { session_not_logged: false } },
+    switchedOff: { sub: [sub('s4', 'switchedOff')], row: MWF, live: { ...NONE, mealLoggedRecently: true, mealsAccountedToday: 0 }, switches: { session_not_logged: false } },
     movedAway: { sub: [sub('s5', 'movedAway')], row: MWF, live: { ...NONE, marks: { [TODAY]: { movedAway: true } } } },
     broken: { sub: [sub('s6', 'broken')], row: MWF, live: NONE, throws: true },
     allFail: { sub: [sub('s7', 'allFail')], row: MWF, live: NONE },
@@ -196,7 +197,7 @@ async function main() {
   check('a device that has gone is dropped, and the person\'s other device still gets it',
     dropped.includes('s3') && to('s3b').length === 1 && !dropped.includes('s3b'), { dropped, s3b: to('s3b') })
   check('a switched-off moment is not sent — and a different live one still can be',
-    to('s4').length === 1 && to('s4')[0].moment === 'streak_at_risk', to('s4'))
+    to('s4').length === 1 && to('s4')[0].moment === 'meal_not_logged', to('s4'))
   check('a session she moved away is not nagged about on the day it left', to('s5').length === 0, to('s5'))
   check('one person whose read fails does not stop the rest of the run', report.failed >= 1 && to('s1').length === 1, report)
   check('a send that failed everywhere is not recorded as said — next hour tries again', !recorded.allFail, recorded.allFail)
@@ -268,7 +269,7 @@ async function main() {
     // LOTS needs more to say: everything a busy day holds.
     const busy = me.live
     me.live = { ...NONE, mealLoggedRecently: true, mealsAccountedToday: 0, beatTargetOffered: true, unratedRecentSession: true }
-    me.row = { ...MWF, protein_target_g: 160, block_ends_on: TODAY, streak_days: 5, streak_as_of: '2026-09-22' }
+    me.row = { ...MWF, protein_target_g: 160, block_ends_on: TODAY }
     const lots = await runDay('lots')
     const normalBusy = await runDay(null)
     me.live = busy; me.row = { ...MWF, protein_target_g: 160 }
@@ -333,7 +334,7 @@ async function main() {
         const f: app.MomentFacts = {
           localHour,
           awaitingFeel: !!(bits & 1), plannedToday: !!(bits & 2), loggedToday: !!(bits & 4),
-          missedYesterday: !!(bits & 8), daysSinceAnyLog: days, streakDays: bits & 16 ? 5 : 1,
+          missedYesterday: !!(bits & 8), daysSinceAnyLog: days, weekday: bits & 16 ? 6 : 0, weekSessionsDone: 2, weekSessionsPlanned: bits & 128 ? 0 : 3,
           blockJustEnded: !!(bits & 32), beatTargetPending: !!(bits & 64),
         }
         for (const sw of switchSets) {
@@ -358,7 +359,7 @@ async function main() {
             for (const sw of [{}, { workout_today: false }, { meal_not_logged: false }, { protein_short: false }]) {
               const f: app.MomentFacts = {
                 localHour, awaitingFeel: !!(bits & 1), plannedToday: !!(bits & 2), loggedToday: !!(bits & 4),
-                missedYesterday: false, daysSinceAnyLog: 1, streakDays: 0, blockJustEnded: false, beatTargetPending: false,
+                missedYesterday: false, daysSinceAnyLog: 1, blockJustEnded: false, beatTargetPending: false,
                 mealsAccountedToday: meals, logsMeals, proteinTargetG: target, proteinEatenToday: eaten,
               }
               foodCompared++
@@ -377,7 +378,7 @@ async function main() {
     && app.PROTEIN_SHORT_SHARE === server.PROTEIN_SHORT_SHARE && app.PROTEIN_SHORT_MIN_G === server.PROTEIN_SHORT_MIN_G
     && app.MAX_NOTIFICATIONS_PER_DAY === server.MAX_NOTIFICATIONS_PER_DAY && app.MIN_HOURS_BETWEEN === server.MIN_HOURS_BETWEEN
     && JSON.stringify(app.MOMENT_KEYS) === JSON.stringify(server.MOMENT_KEYS))
-  const details = [{}, { name: 'Ashley' }, { name: 'Ashley', streak: 4, mealsLogged: 1 }, { name: ' ', finishedWhen: 'this morning' as const }, { finishedWhen: 'yesterday' as const, mealsLogged: 0 }]
+  const details = [{}, { name: 'Ashley' }, { name: 'Ashley', weekDone: 3, weekPlanned: 4, mealsLogged: 1 }, { name: ' ', finishedWhen: 'this morning' as const }, { finishedWhen: 'yesterday' as const, mealsLogged: 0 }]
   check('...and every sentence is the phrasebook\'s, with and without her name',
     app.MOMENT_KEYS.every(k => details.every(d => server.coachMessage(k, d) === coachMessage(k, d))))
   check('...and the same shortcut on each, and the same daily limits',
@@ -470,19 +471,20 @@ async function main() {
     // derivation exists to avoid.
     const meso = [1, 1, 1, 2, 2, 2, 2, 2].map((b, i) => ({ week_number: i + 1, block_number: b, days: [] }) as unknown as M)
     const created = '2026-09-02T09:00:00'
-    const f = momentFactsFrom({ exercisePlan: plan, mesocycle: meso, planCreatedAt: created, now: new Date('2026-09-10T12:00:00'), streakDays: 4, today: '2026-09-10' })
+    const f = momentFactsFrom({ exercisePlan: plan, mesocycle: meso, planCreatedAt: created, now: new Date('2026-09-10T12:00:00'), weekSessions: { done: 2, planned: 3 }, today: '2026-09-10' })
     check('the weekday pattern holds only days that train', JSON.stringify(f.trainingWeekdays) === '["Monday","Wednesday","Friday"]', f.trainingWeekdays)
     check('the plan ends the day after its last week', f.planEndsOn === '2026-10-28', f.planEndsOn)
     check('block 1 (three weeks) ends the day after ITS last week, not after a four-week guess', f.blockEndsOn === '2026-09-23', f.blockEndsOn)
-    const f2 = momentFactsFrom({ exercisePlan: plan, mesocycle: meso, planCreatedAt: created, now: new Date('2026-09-25T12:00:00'), streakDays: -2, today: '2026-09-25' })
+    const f2 = momentFactsFrom({ exercisePlan: plan, mesocycle: meso, planCreatedAt: created, now: new Date('2026-09-25T12:00:00'), weekSessions: null, today: '2026-09-25' })
     check('...and once block 2 has started, its end is block 2\'s', f2.blockEndsOn === '2026-10-28', f2.blockEndsOn)
-    check('the streak is sent as counted, with the day it was counted on, never below zero', f.streakDays === 4 && f.streakAsOf === '2026-09-10' && f2.streakDays === 0, { f, f2 })
-    const noBlocks = momentFactsFrom({ exercisePlan: plan, mesocycle: meso.map(w => ({ ...w, block_number: undefined })), planCreatedAt: created, now: new Date('2026-09-10T12:00:00'), streakDays: 0, today: '2026-09-10' })
+    check('this week\'s sessions are sent as counted, with the day they were counted on; an unread week sends none',
+      f.weekSessionsDone === 2 && f.weekSessionsPlanned === 3 && f.weekAsOf === '2026-09-10' && f2.weekSessionsPlanned === undefined, { f, f2 })
+    const noBlocks = momentFactsFrom({ exercisePlan: plan, mesocycle: meso.map(w => ({ ...w, block_number: undefined })), planCreatedAt: created, now: new Date('2026-09-10T12:00:00'), weekSessions: null, today: '2026-09-10' })
     check('a plan with no blocks sends no block end, rather than inventing one', noBlocks.blockEndsOn === null && noBlocks.planEndsOn === '2026-10-28', noBlocks)
-    const withTarget = momentFactsFrom({ exercisePlan: plan, mesocycle: meso, planCreatedAt: created, now: new Date('2026-09-10T12:00:00'), streakDays: 0, today: '2026-09-10', proteinTarget: 159.6 })
+    const withTarget = momentFactsFrom({ exercisePlan: plan, mesocycle: meso, planCreatedAt: created, now: new Date('2026-09-10T12:00:00'), weekSessions: null, today: '2026-09-10', proteinTarget: 159.6 })
     check('the protein target goes ahead, in whole grams; none known sends none (never a 0 that reads as a target)',
       withTarget.proteinTargetG === 160 && f.proteinTargetG === null
-      && momentFactsFrom({ exercisePlan: plan, mesocycle: meso, planCreatedAt: created, now: new Date('2026-09-10T12:00:00'), streakDays: 0, today: '2026-09-10', proteinTarget: 0 }).proteinTargetG === null,
+      && momentFactsFrom({ exercisePlan: plan, mesocycle: meso, planCreatedAt: created, now: new Date('2026-09-10T12:00:00'), weekSessions: null, today: '2026-09-10', proteinTarget: 0 }).proteinTargetG === null,
       { withTarget: withTarget.proteinTargetG, none: f.proteinTargetG })
 
     // A fake client that records upserts and can be told to fail.
@@ -505,26 +507,26 @@ async function main() {
     const r2 = await sendFactsAhead('p1', f)
     check('facts are sent once, and an identical repeat is not sent again', r1 === 'sent' && r2 === 'unchanged' && upserts.length === 1, { r1, r2, n: upserts.length })
     check('...as one row per person, keyed on the person', (upserts[0] as { opts?: { onConflict?: string } })?.opts?.onConflict === 'user_id', upserts[0])
-    const r3 = await sendFactsAhead('p1', { ...f, streakDays: 5 })
+    const r3 = await sendFactsAhead('p1', { ...f, weekSessionsDone: 5 })
     check('...and a changed fact IS sent', r3 === 'sent' && upserts.length === 2, { r3, n: upserts.length })
     nextError = { code: 'PGRST205', message: "Could not find the table 'public.coach_moment_facts' in the schema cache" }
-    const r4 = await sendFactsAhead('p1', { ...f, streakDays: 6 })
+    const r4 = await sendFactsAhead('p1', { ...f, weekSessionsDone: 6 })
     check('a missing table (migration not pushed) is "not live yet", not an error', r4 === 'not_live_yet', r4)
     nextError = { code: '42501', message: 'new row violates row-level security policy for table "coach_moment_facts"' }
-    const r5 = await sendFactsAhead('p1', { ...f, streakDays: 7 })
+    const r5 = await sendFactsAhead('p1', { ...f, weekSessionsDone: 7 })
     check('...but a refusal that merely NAMES the table is a real failure', r5 === 'failed', r5)
-    const r6 = await sendFactsAhead('p1', { ...f, streakDays: 7 })
+    const r6 = await sendFactsAhead('p1', { ...f, weekSessionsDone: 7 })
     check('...and a failed send is retried next time, not remembered as sent', r6 === 'sent', r6)
     // BEFORE THE 4 NOV MIGRATION: the protein column is missing. The rest of
     // the facts must still go, without it — a missing column costs the
-    // protein nudge, never the streak.
+    // protein nudge, never the week's count.
     nextError = { code: 'PGRST204', message: "Could not find the 'protein_target_g' column of 'coach_moment_facts' in the schema cache" }
     const n = upserts.length
-    const r7 = await sendFactsAhead('p1', { ...f, streakDays: 8, proteinTargetG: 150 })
+    const r7 = await sendFactsAhead('p1', { ...f, weekSessionsDone: 8, proteinTargetG: 150 })
     const retried = upserts[n] as { row?: Record<string, unknown> } | undefined
     check('a missing protein column: the facts still go, once, without it',
-      r7 === 'sent' && upserts.length === n + 1 && retried?.row?.streak_days === 8 && !('protein_target_g' in (retried?.row ?? {})), { r7, retried })
-    const r8 = await sendFactsAhead('p1', { ...f, streakDays: 9, proteinTargetG: 150 })
+      r7 === 'sent' && upserts.length === n + 1 && retried?.row?.week_sessions_done === 8 && !('protein_target_g' in (retried?.row ?? {})), { r7, retried })
+    const r8 = await sendFactsAhead('p1', { ...f, weekSessionsDone: 9, proteinTargetG: 150 })
     check('...and once it lands, the target is sent', r8 === 'sent' && (upserts[upserts.length - 1] as { row?: Record<string, unknown> }).row?.protein_target_g === 150, upserts[upserts.length - 1])
 
     profileRow = { id: 'p1' }

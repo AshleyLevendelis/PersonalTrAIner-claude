@@ -34,6 +34,7 @@ import { isExternallyLoaded } from '@/lib/load-prescription'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 import type { WorkoutDay } from '@/lib/types'
 import { estimateDaySeconds } from '@/lib/session-duration'
+import { SHORTEST_VERSION_MINUTES } from '@/lib/exercise-plan'
 import { dayVerbs, dayHasSession, type DayVerb } from '@/lib/day-verbs'
 import { buildSessionKindTodayProposal, type SessionKind, type SessionKindOption, type SessionKindOffer, type SessionKindPlan } from '@/lib/session-kind'
 
@@ -262,6 +263,7 @@ export function WhatHappenedSheet({
    * five-minute margin so "shorten my 32-minute session to 30" is not offered
    * as though it were worth a tap.
    */
+  const hasSessionToShorten = !!session && session.exercises.length > 0
   const shortenChoices = useMemo(() => {
     // The session RUN on this date, not the weekday's own row — on a day a
     // session moved onto, that row is empty and no times were offered (H19).
@@ -454,12 +456,17 @@ export function WhatHappenedSheet({
               full session next week.
             </p>
             <div className="flex flex-wrap gap-2">
+              {/* THE SHORT VERSION, "a floor that counts" (his strategy, 13 Nov 2026): the main lift and two more,
+                  as short as it goes. Finished, it is a session done like any other. */}
+              {hasSessionToShorten && (
+                <Button size="sm" variant="outline" disabled={busy} onClick={() => runShorten(SHORTEST_VERSION_MINUTES)} data-shorten-floor>Shortest version</Button>
+              )}
               {shortenChoices.map(m => (
                 <Button key={m} size="sm" variant="outline" disabled={busy} onClick={() => runShorten(m)} data-shorten-minutes={m}>{m} min</Button>
               ))}
             </div>
-            {shortenChoices.length === 0 && (
-              <p className="text-sm text-muted-foreground">This session is already about as short as it gets.</p>
+            {hasSessionToShorten && (
+              <p className="text-xs text-muted-foreground" data-testid="shorten-floor-note">The shortest version still counts as today&rsquo;s session once you finish it.</p>
             )}
             <Button variant="ghost" size="sm" disabled={busy} onClick={() => setPhase('menu')}>Back</Button>
           </div>

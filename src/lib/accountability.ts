@@ -18,7 +18,7 @@
 // positive (a genuinely strong week) sits high enough that a consistent user
 // isn't only ever met with shortfalls.
 //
-// Pure, sync, no I/O — same shape as streak.ts / coach-tips.ts.
+// Pure, sync, no I/O — same shape as consistency.ts / coach-tips.ts.
 // ---------------------------------------------------------------------------
 
 export interface AccountabilityInput {
@@ -30,8 +30,9 @@ export interface AccountabilityInput {
   caloriesTarget: number
   waterMl: number
   waterTargetMl: number
-  /** Consecutive-day training streak (streak.ts). */
-  streak: number
+  /** Of the last finished weeks (up to 12), how many were on plan (consistency.ts; his 13 Nov 2026 ruling, weekly
+   *  consistency in place of the streak). Null when unknown. */
+  weeksOnPlan: { onPlan: number; of: number } | null
   /** Days since the most recent weigh-in; null when they've never logged one. */
   daysSinceWeighIn: number | null
   /** True when today has a scheduled session and nothing has been logged for it yet. */
@@ -66,7 +67,7 @@ const EVENING_HOUR = 17
 export function pickAccountabilityCheckIn(input: AccountabilityInput): string | null {
   const {
     hour, proteinEaten, proteinTarget, caloriesEaten, caloriesTarget,
-    waterMl, waterTargetMl, streak, daysSinceWeighIn, sessionDueUnlogged,
+    waterMl, waterTargetMl, weeksOnPlan, daysSinceWeighIn, sessionDueUnlogged,
     setsLoggedToday, setsPlannedToday, onTrackForGoal, missedYesterday,
   } = input
 
@@ -95,12 +96,10 @@ export function pickAccountabilityCheckIn(input: AccountabilityInput): string | 
 
   // 4. A genuinely strong run, acknowledged plainly. Sits above the
   //    shortfalls deliberately — a consistent person shouldn't only ever
-  //    hear about what's missing. The streak IS the "strong week" signal;
-  //    there's no separate sessions-done-this-week source wired into chat,
-  //    and inventing a second one would just be a number that could disagree
-  //    with the dashboard's.
-  if (streak >= 5) {
-    return `They've done ${streak} planned sessions in a row.`
+  //    hear about what's missing. Weeks on plan IS the "strong run" signal,
+  //    read from the same count Home shows, so the two can never disagree.
+  if (weeksOnPlan && weeksOnPlan.onPlan >= 3) {
+    return `They've had ${weeksOnPlan.onPlan} of the last ${weeksOnPlan.of} weeks on plan.`
   }
 
   // 5. Protein — the macro that actually changes outcomes, so it outranks calories.

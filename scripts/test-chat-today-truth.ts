@@ -66,7 +66,8 @@ const nudge = pickNudge({
 check('the PR message names Thursday', nudge?.kind === 'personal_best' && /Bench Press at 80 ?kg on Thursday/.test(nudge.text), nudge)
 check('the opener\'s noticed best and the greeting\'s PR line carry the day',
   /\$\{whenSaid\(pr\.date, activeSession\.date\)\} is a best/.test(chat) && /nice PR on \$\{recentPR\.exerciseName\}[^`]*\$\{whenSaid\(recentPR\.date, activeSession\.date\)\}/.test(chat))
-check('no "days on the trot": the streak opener uses the sessions wording', !/days on the trot/.test(chat) && /\$\{streak\} \$\{streakLabel\(streak\)\} now/.test(chat))
+// RE-ANCHORED 13 Nov 2026: the streak line became weeks on plan (his ruling), a count, never a run.
+check('no "days on the trot": the noticed line counts weeks on plan', !/days on the trot/.test(chat) && /\$\{weeksOnPlanSentence\(onPlan\)\}\. How are you holding up\?/.test(chat))
 
 // ---------------------------------------------------------------------------
 console.log('\n3. "How did it feel?" only about a session with work in it (source-held)')

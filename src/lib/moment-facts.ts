@@ -28,8 +28,13 @@ export interface FactsAhead {
   trainingWeekdays?: string[]
   planEndsOn?: string | null
   blockEndsOn?: string | null
-  streakDays?: number
-  streakAsOf?: string
+  /**
+   * THIS WEEK'S SESSIONS, Monday to Sunday as the strip counts them, and the day they were counted (his strategy, 13 Nov
+   * 2026, slice 2): the Saturday review's one number. Replaces the streak, which his ruling of that day retired.
+   */
+  weekSessionsDone?: number
+  weekSessionsPlanned?: number
+  weekAsOf?: string
   /**
    * Today's protein target, as Home shows it (4 Nov 2026: the evening protein
    * nudge). Null when Home has no targets to show — the server then never says
@@ -39,6 +44,8 @@ export interface FactsAhead {
 }
 
 const SENT_KEY = 'fitplan_moment_facts_sent_v1'
+/** Columns added after the table, each dropped from a write the database does not know yet. */
+const LATER_COLUMNS = ['protein_target_g', 'week_sessions_done', 'week_sessions_planned', 'week_as_of'] as const
 
 /**
  * ONLY WHEN SOMETHING CHANGED. This runs from App and from Home as their data
@@ -54,8 +61,9 @@ export async function sendFactsAhead(profileId: string, facts: FactsAhead): Prom
   if (facts.trainingWeekdays) row.training_weekdays = facts.trainingWeekdays
   if (facts.planEndsOn !== undefined) row.plan_ends_on = facts.planEndsOn
   if (facts.blockEndsOn !== undefined) row.block_ends_on = facts.blockEndsOn
-  if (facts.streakDays !== undefined) row.streak_days = facts.streakDays
-  if (facts.streakAsOf !== undefined) row.streak_as_of = facts.streakAsOf
+  if (facts.weekSessionsDone !== undefined) row.week_sessions_done = facts.weekSessionsDone
+  if (facts.weekSessionsPlanned !== undefined) row.week_sessions_planned = facts.weekSessionsPlanned
+  if (facts.weekAsOf !== undefined) row.week_as_of = facts.weekAsOf
   if (facts.proteinTargetG !== undefined) row.protein_target_g = facts.proteinTargetG
 
   let remembered: Record<string, string> = {}
@@ -65,12 +73,14 @@ export async function sendFactsAhead(profileId: string, facts: FactsAhead): Prom
   if (remembered[memoKey] === fingerprint) return 'unchanged'
 
   let { error } = await supabase.from('coach_moment_facts').upsert({ ...row, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-  // THE PROTEIN COLUMN COMES IN A LATER MIGRATION than the table. Before it
-  // lands, the rest of the facts must still go: a missing column costs the
-  // protein nudge, never the streak or the training days.
-  if (error && 'protein_target_g' in row && isMissingColumnError(error, 'protein_target_g')) {
-    const { protein_target_g: _dropped, ...rest } = row
-    ;({ error } = await supabase.from('coach_moment_facts').upsert({ ...rest, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }))
+  // COLUMNS THAT CAME IN LATER MIGRATIONS than the table (protein, 4 Nov; the week's sessions, 13 Nov). Before one
+  // lands, the rest of the facts must still go: a missing column costs its own nudge, never the training days.
+  let sending = row
+  for (const late of LATER_COLUMNS) {
+    if (!error || !(late in sending) || !isMissingColumnError(error, late)) continue
+    const { [late]: _dropped, ...rest } = sending
+    sending = rest
+    ;({ error } = await supabase.from('coach_moment_facts').upsert({ ...sending, updated_at: new Date().toISOString() }, { onConflict: 'user_id' }))
   }
   if (error) {
     const code = String((error as { code?: string }).code ?? '')
@@ -90,7 +100,8 @@ export function momentFactsFrom(input: {
   mesocycle: MesocycleWeek[]
   planCreatedAt: string | undefined
   now: Date
-  streakDays: number
+  /** This week's sessions so far; null when Home could not read the week. */
+  weekSessions: { done: number; planned: number } | null
   today: string
   /** Today's protein target; null or absent when Home has none to show. */
   proteinTarget?: number | null
@@ -120,5 +131,8 @@ export function momentFactsFrom(input: {
     }
   }
   const proteinTargetG = input.proteinTarget && input.proteinTarget > 0 ? Math.round(input.proteinTarget) : null
-  return { trainingWeekdays, planEndsOn, blockEndsOn, streakDays: Math.max(0, input.streakDays), streakAsOf: input.today, proteinTargetG }
+  return {
+    trainingWeekdays, planEndsOn, blockEndsOn, proteinTargetG,
+    ...(input.weekSessions ? { weekSessionsDone: input.weekSessions.done, weekSessionsPlanned: input.weekSessions.planned, weekAsOf: input.today } : {}),
+  }
 }

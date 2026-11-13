@@ -30,7 +30,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, rememberNudge, rememberWithoutSpeaking,
-  STREAK_MILESTONES, NUDGE_MIN_GAP_MS, type NudgeInput, type NudgeStore,
+  CONSISTENCY_MILESTONES, NUDGE_MIN_GAP_MS, type NudgeInput, type NudgeStore,
   pickUnprompted, keysSaidByMarkers, helloKey, greeted, HELLO_MOMENT, MOMENT_MIN_GAP_MS, openerSkips, type UnpromptedInput, type CoachNudge,
 } from '../src/lib/coach-nudge'
 import { momentsToRaise, dailyCap, type MomentFacts } from '../src/lib/coach-moments'
@@ -63,7 +63,7 @@ const base: NudgeInput = {
   awaitingFeel: null,
   missedYesterday: null,
   recentPR: null,
-  streak: 3,
+  weeksOnPlan: 3,
   todaySession: { focus: 'Push & Press', movements: 'Barbell Bench Press, Overhead Press, Dips' },
   todayLogged: false,
 }
@@ -76,7 +76,7 @@ const PR = { exerciseName: 'Barbell Bench Press', metric: 'load' as const, value
 
 console.log('\n1. One thing, ranked by how actionable it is right now')
 {
-  const all: NudgeInput = { ...base, awaitingFeel: FEEL, missedYesterday: MISSED, recentPR: PR, streak: 30 }
+  const all: NudgeInput = { ...base, awaitingFeel: FEEL, missedYesterday: MISSED, recentPR: PR, weeksOnPlan: 12 }
   const first = pickNudge(all, [])
   check('an unreviewed session outranks everything', first?.kind === 'session_feel', first?.kind)
 
@@ -84,10 +84,10 @@ console.log('\n1. One thing, ranked by how actionable it is right now')
   check('a missed day outranks a PR', noFeel?.kind === 'missed_yesterday', noFeel?.kind)
 
   const noMissed = pickNudge({ ...all, awaitingFeel: null, missedYesterday: null }, [])
-  check('a PR outranks a streak milestone', noMissed?.kind === 'personal_best', noMissed?.kind)
+  check('a PR outranks a weeks-on-plan milestone', noMissed?.kind === 'personal_best', noMissed?.kind)
 
   const noPR = pickNudge({ ...all, awaitingFeel: null, missedYesterday: null, recentPR: null }, [])
-  check('a streak milestone outranks today\'s session', noPR?.kind === 'streak_milestone', noPR?.kind)
+  check('a weeks-on-plan milestone outranks today\'s session', noPR?.kind === 'consistency_milestone', noPR?.kind)
 
   const only = pickNudge(base, [])
   check('today\'s session is what is left', only?.kind === 'session_due', only?.kind)
@@ -118,10 +118,10 @@ console.log('\n2. Said once — and the key is the EVENT, not its kind')
   check('beating the same lift again is a new event too',
     beaten?.kind === 'personal_best' && beaten.text.includes('85'), beaten?.text)
 
-  const keys = nudgeKeys({ ...base, awaitingFeel: FEEL, missedYesterday: MISSED, recentPR: PR, streak: 30 })
+  const keys = nudgeKeys({ ...base, awaitingFeel: FEEL, missedYesterday: MISSED, recentPR: PR, weeksOnPlan: 12 })
   check('every key carries the identity of the thing, not just its kind',
     keys.feel === 'feel:2026-09-07' && keys.missed === 'missed:2026-09-06' &&
-    keys.pr === 'pr:Barbell Bench Press:2026-09-07:80' && keys.streak === 'streak:30' &&
+    keys.pr === 'pr:Barbell Bench Press:2026-09-07:80' && keys.consistency === 'weeks-on-plan:12' &&
     keys.due === 'due:2026-09-07', keys)
 
   // A key outranked today must NOT be burnt — otherwise the second thing
@@ -145,10 +145,10 @@ console.log('\n3. Ashley\'s rulings, 7 Sep 2026')
   const kinds = [...nudgeSrc.matchAll(/kind: '([a-z_]+)'/g)].map(m => m[1])
   const unique = [...new Set(kinds)].sort()
   // RE-ANCHORED 9 Nov 2026: his request "the chat should also be able to proactively wish you happy birthday" adds a
-  // sixth, and nothing else (no food, water or weigh-in still).
+  // sixth, and nothing else (no food, water or weigh-in still). 13 Nov 2026: the streak milestone became weeks on plan.
   check('exactly the events he chose: the five, and the birthday he asked for',
     JSON.stringify(unique) === JSON.stringify(
-      ['birthday', 'missed_yesterday', 'personal_best', 'session_due', 'session_feel', 'streak_milestone']),
+      ['birthday', 'consistency_milestone', 'missed_yesterday', 'personal_best', 'session_due', 'session_feel']),
     unique)
   // Checked two ways, because one alone is weak. `weightKg` legitimately
   // appears (a PR is a weight), so this cannot be a bare search for "weight".
@@ -158,10 +158,10 @@ console.log('\n3. Ashley\'s rulings, 7 Sep 2026')
   check('and it does not import the module that produces them',
     !/accountability/.test(nudgeSrc))
 
-  check('the milestones are stated, not scattered', STREAK_MILESTONES.length > 0)
-  check('a non-milestone streak says nothing',
-    pickNudge({ ...base, streak: 8, todaySession: null }, []) === null)
-  check('a milestone streak does', pickNudge({ ...base, streak: STREAK_MILESTONES[0] }, [])?.kind === 'streak_milestone')
+  check('the milestones are stated, not scattered', CONSISTENCY_MILESTONES.length > 0)
+  check('a count that is not a milestone says nothing',
+    pickNudge({ ...base, weeksOnPlan: 7, todaySession: null }, []) === null)
+  check('a milestone does', pickNudge({ ...base, weeksOnPlan: CONSISTENCY_MILESTONES[0] }, [])?.kind === 'consistency_milestone')
 }
 
 console.log('\n4. A PR folds into the question about that session')
@@ -210,7 +210,7 @@ console.log('\n6. Every chip is a sentence the coach can finish')
     { ...base, awaitingFeel: FEEL },
     { ...base, missedYesterday: MISSED },
     { ...base, recentPR: PR },
-    { ...base, streak: STREAK_MILESTONES[0] },
+    { ...base, weeksOnPlan: CONSISTENCY_MILESTONES[0] },
     base,
   ]
   const all = inputs.map(i => pickNudge(i, [])!).filter(Boolean)
@@ -368,7 +368,7 @@ console.log('\n9. Hello + more moments (her ruling 7 Nov 2026): one decision ove
   // An ordinary evening: she logs meals, nothing logged today (the phone's own test, run for real).
   const facts: MomentFacts = {
     localHour: 19, awaitingFeel: false, plannedToday: false, loggedToday: false, missedYesterday: false,
-    daysSinceAnyLog: null, streakDays: 0, blockJustEnded: false, beatTargetPending: false,
+    daysSinceAnyLog: null, blockJustEnded: false, beatTargetPending: false,
     mealsAccountedToday: 0, logsMeals: true, proteinEatenToday: 0, proteinTargetG: 130, name: 'Ashley',
   }
   const moments = momentsToRaise(facts, {})
@@ -445,7 +445,7 @@ console.log('\n10. Happy birthday (his request, 9 Nov 2026): the coach wishes hi
   check('born 29 February: wished on 1 March in a year without one, the day the age goes up', isBirthday('2000-02-29', '2027-03-01') && !isBirthday('2000-02-29', '2027-02-28'))
   check('...and on 29 February in a year with one', isBirthday('2000-02-29', '2028-02-29') && !isBirthday('2000-02-29', '2028-03-01'))
   check('no date of birth (an age typed instead): never', !isBirthday(null, '2026-06-15') && !isBirthday(undefined, '2026-06-15') && !isBirthday('', '2026-06-15'))
-  const all: NudgeInput = { ...base, birthdayToday: true, awaitingFeel: FEEL, missedYesterday: MISSED, recentPR: PR, streak: 30 }
+  const all: NudgeInput = { ...base, birthdayToday: true, awaitingFeel: FEEL, missedYesterday: MISSED, recentPR: PR, weeksOnPlan: 12 }
   const first = pickNudge(all, [])
   check('on the day it comes first, ahead of a session to ask about', first?.kind === 'birthday' && /happy birthday/i.test(first.text), first)
   check('...and it is a wish: no chips, no training in it', first?.chips.length === 0 && !/session|train|workout|lift/i.test(first?.text ?? ''), first?.text)

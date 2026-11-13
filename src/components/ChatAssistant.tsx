@@ -68,7 +68,7 @@ import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { detectTodayClaim, todayClaimFloor, type TodayFacts } from '@/lib/today-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal, swapDiffFromTrial } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, streakLabel, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine, logOnlyRefusal, coachShortcutLabel } from '@/lib/coach-voice'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, weeksOnPlanSentence, turnedDownLine, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine, logOnlyRefusal, coachShortcutLabel } from '@/lib/coach-voice'
 import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
 import { getLastWorkingSessionDate } from '@/lib/set-log-store'
@@ -112,7 +112,7 @@ import {
 import { reasonChipsFor, reasonQuestion, equipmentNothingToChange, type ReasonedEditKind } from '@/lib/edit-reason'
 import { assessMealEdit, mealAskKey, type MealEditKind, type MealEditContext } from '@/lib/meal-tradeoff'
 import { settleWeek } from '@/lib/settle-week'
-import { shortenDayTo } from '@/lib/exercise-plan'
+import { shortenOrFloor, SHORTEST_VERSION_MINUTES } from '@/lib/exercise-plan'
 import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
 import { estimateDaySeconds } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
@@ -153,14 +153,15 @@ import { lessonDue, lessonBrief, lessonTaughtIn, taughtFromRows, actionDataWithL
 import { pickOpener, movementList, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import { cleanReplyText, applyMessageBreaks, ACTION_TAG_RE, QUICK_REPLIES_RE } from '@/lib/reply-text'
 import { rowToMessage, addServerMessages } from '@/lib/chat-history-merge'
-import { recordMomentSent, markMomentAnswered } from '@/lib/moment-log'
+import { recordMomentSent, markMomentAnswered, type MomentLogRow } from '@/lib/moment-log'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
   rememberNudge, rememberWithoutSpeaking, pickUnprompted, keysSaidByMarkers, helloKey, openerSkips,
   type NudgeInput, type NudgeStore,
 } from '@/lib/coach-nudge'
 import { momentsToRaise, dailyCap, type NotificationSettings, type MomentFacts } from '@/lib/coach-moments'
-import { loadSwitches } from '@/lib/coach-reach-out'
+import { loadSwitches, saveSwitches, frequencyOf, frequencyLabel } from '@/lib/coach-reach-out'
+import { turnDownFor } from '@/lib/engagement'
 
 const TRAILING_BRACKET_RE = /\[(?:ACTION|QUICK_REPLIES|BREAK)[^\]]*$/i
 const PAGE_SIZE = 20
@@ -1338,10 +1339,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         chips: ['How am I doing so far?'],
       }
     }
-    const streak = proactiveData?.streak ?? 0
-    if (streak >= 3) {
+    // WEEKS ON PLAN, never a run (his 13 Nov 2026 ruling, weekly consistency in place of the streak).
+    const onPlan = proactiveData?.weeksOnPlan
+    if (onPlan && onPlan.onPlan >= 3) {
       return {
-        text: `${streak} ${streakLabel(streak)} now. How are you holding up?`,
+        text: `${weeksOnPlanSentence(onPlan)}. How are you holding up?`,
         chips: ['How am I doing so far?'],
       }
     }
@@ -1370,7 +1372,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       : null,
     missedYesterday: missedYesterday ? { date: yesterdayDate, ...missedYesterday } : null,
     recentPR: proactiveData?.recentPRs[0] ?? null,
-    streak: proactiveData?.streak ?? 0,
+    weeksOnPlan: proactiveData?.weeksOnPlan?.onPlan ?? 0,
     todaySession: todayPlan ? { focus: todayPlan.focus, movements: movementsOf(todayPlan) } : null,
     todayLogged: activeSession.logs.some(l => !l.is_warmup) || trainedTodayFacts(activeSession.date).trainedToday,
     // The birthday wish (his 9 Nov request), from the date of birth he picked; none for an age typed instead.
@@ -1400,6 +1402,38 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     loadSwitches(profile.id).then(r => { if (!cancelled) setReminderSettings(r.switches) }).catch(() => {})
     return () => { cancelled = true }
   }, [profile.id, clockTick])
+  // THE COACH TURNS ITSELF DOWN (his strategy, 13 Nov 2026, slice 2, docs/plans/coach-rhythm.md §2e): when the same
+  // message has gone unanswered three times running, the daily limit drops a level and the coach says so, once. Read
+  // from the moment log (slice 1), so before its migration there is nothing to read and nothing changes.
+  const turnDownCheckedRef = useRef(false)
+  useEffect(() => {
+    if (!profile.id || !historyLoaded || turnDownCheckedRef.current) return
+    turnDownCheckedRef.current = true
+    const profileId = profile.id
+    void (async () => {
+      try {
+        // On the app's clock (the phone's, outside a test page), so the harness's fixed day can drive it.
+        const nowMs = getAppNow(profileId).getTime()
+        const since = new Date(nowMs - 60 * 86400000).toISOString()
+        const [{ data, error }, settings] = await Promise.all([
+          supabase.from('coach_moment_log').select('*').eq('user_id', profileId).gte('sent_at', since),
+          loadSwitches(profileId).then(r => r.switches),
+        ])
+        if (error) return
+        const verdict = turnDownFor((data ?? []) as MomentLogRow[], frequencyOf(settings), settings.frequency_dropped_at, nowMs)
+        if (!verdict) return
+        const next: NotificationSettings = { ...settings, frequency: verdict.to, frequency_dropped_at: new Date(nowMs).toISOString() }
+        if (await saveSwitches(profileId, next) !== 'saved') return
+        setReminderSettings(next)
+        const text = turnedDownLine(frequencyLabel(verdict.to).name as 'Light' | 'Normal')
+        const { data: row } = await supabase.from('chat_messages')
+          .insert({ profile_id: profileId, role: 'assistant', content: text, status: 'complete', action_data: { source: 'reminder', moment: 'turned_down', shortcut: null } })
+          .select('id').maybeSingle()
+        if (!row?.id) return
+        setMessages(prev => [...prev, { id: row.id as string, role: 'assistant', content: text, status: 'complete', created_at: new Date(nowMs).toISOString(), reminder: { moment: 'turned_down', shortcut: null } }])
+      } catch { /* a check that could not run changes nothing */ }
+    })()
+  }, [profile.id, historyLoaded])
   // WHETHER SHE LOGS MEALS AT ALL (anything in the fortnight before today), the phone's own test: the evening
   // "nothing logged" line is never said to somebody who has never logged a meal.
   const [logsMeals, setLogsMeals] = useState(false)
@@ -1422,7 +1456,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     loggedToday: nudgeInput.todayLogged,
     missedYesterday: false,
     daysSinceAnyLog: null,
-    streakDays: proactiveData.streak ?? 0,
+    // The weekly rhythm (his strategy, 13 Nov 2026): the Saturday review and Sunday's plan-the-week, from the same
+    // week Home counts.
+    weekday: getAppNow(profile.id).getDay(),
+    weekSessionsDone: proactiveData.weekSessions?.done ?? 0,
+    weekSessionsPlanned: proactiveData.weekSessions?.planned ?? 0,
     blockJustEnded: false,
     beatTargetPending: false,
     mealsAccountedToday: proactiveData.mealsAccountedToday ?? 0,
@@ -2200,7 +2238,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // `proactiveData` effect above) — specific-or-silent by construction:
       // each field is only ever set when there's something real to report,
       // never a placeholder the model would have to paper over.
-      streak_days: proactiveData?.streak ?? null,
+      weeks_on_plan: weeksOnPlanSentence(proactiveData?.weeksOnPlan ?? null),
       weight_trend_summary: proactiveData?.weightTrend && proactiveData.weightTrend.ratePerWeekKg != null
         ? `rolling average ${proactiveData.weightTrend.rollingAvgKg.toFixed(1)}kg, trending ${proactiveData.weightTrend.ratePerWeekKg >= 0 ? '+' : ''}${proactiveData.weightTrend.ratePerWeekKg.toFixed(2)}kg/week (${proactiveData.weightTrend.sampleCount} weigh-ins)${proactiveData.weightTrend.onTrackForGoal === false ? ', off track for their stated goal' : ''}`
         : null,
@@ -2246,7 +2284,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       trainedToday,
       restDayToday: cell?.state === 'rest' || cell?.state === 'rest_chosen' || cell?.state === 'recovery',
       recentBest: (proactiveData?.recentPRs.length ?? 0) > 0,
-      streak: proactiveData?.streak ?? null,
+      weeksOnPlan: proactiveData?.weeksOnPlan?.onPlan ?? null,
       goal: profile.fitness_goal ?? null,
       weightFalling: (proactiveData?.weightTrend?.ratePerWeekKg ?? 0) < 0,
     }, taughtLessons, now)
@@ -2282,7 +2320,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       caloriesTarget: proactiveData.caloriesTarget,
       waterMl: proactiveData.waterMl,
       waterTargetMl: proactiveData.waterTargetMl,
-      streak: proactiveData.streak,
+      weeksOnPlan: proactiveData.weeksOnPlan,
       daysSinceWeighIn,
       sessionDueUnlogged: proactiveData.session.setsPlanned > 0 && proactiveData.session.setsLogged === 0,
       missedYesterday,
@@ -3783,8 +3821,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     diff: import('@/lib/pending-actions-store').ProposalDiff
   } | { refusal: string } | null => {
     const minutes = Number(rawArgs.minutes)
-    if (!Number.isFinite(minutes) || minutes <= 0) return null
+    // 0 is the shortest version (a floor that counts, his strategy of 13 Nov 2026); anything below is no request.
+    if (!Number.isFinite(minutes) || minutes < 0) return null
     if (mesocycle.length === 0) return null
+    const floor = minutes === SHORTEST_VERSION_MINUTES
     const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
     if (!week) return null
 
@@ -3794,7 +3834,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (!on.ok) return { refusal: on.reason }
     const day = on.day
 
-    const trial = shortenDayTo(week, day.day, profile, minutes)
+    const trial = shortenOrFloor(week, day.day, profile, minutes)
     if (!trial.changed) return { refusal: on.say(trial.refusal ?? "I couldn't shorten that one.") }
 
     const after = trial.week.days.find((d: WorkoutDay) => d.day === day.day)!
@@ -3806,7 +3846,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     ]
     // SAY IT WHEN IT COULD NOT GET THERE, rather than showing a card headed
     // "25 min" for a session that takes 32.
-    if (trial.achievedMinutes > minutes) {
+    if (!floor && trial.achievedMinutes > minutes) {
       implications.push({ severity: 'warn', text: `${minutes} minutes isn't reachable without cutting into your main lift — about ${trial.achievedMinutes} is the closest.` })
     }
     // SAY WHAT ACTUALLY COMES OFF when it is only the padding — otherwise the
@@ -3825,7 +3865,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       payload: { weekNumber: activeSession.liveWeek, dayName: day.day, sayDay: on.sayDay, minutes, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
       preImage: mesocycle,
       diff: {
-        lead: ask(`cut ${on.sayDay} down to about ${trial.achievedMinutes} minutes`),
+        lead: ask(floor ? `do the short version of ${on.sayDay}, about ${trial.achievedMinutes} minutes` : `cut ${on.sayDay} down to about ${trial.achievedMinutes} minutes`),
         rows: [
           { field: 'Time', before: `~${Math.round(estimateDaySeconds(day) / 60)} min`, after: `~${trial.achievedMinutes} min` },
           { field: 'Exercises', before: String(day.exercises.length), after: String(after.exercises.length) },

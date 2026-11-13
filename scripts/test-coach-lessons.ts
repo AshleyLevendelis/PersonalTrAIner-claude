@@ -33,7 +33,7 @@ const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s
 
 const QUIET: LessonFacts = {
   isDeload: false, isCalibrationWeek: false, planIsNew: false, sessionDueToday: false, trainedToday: false,
-  restDayToday: false, recentBest: false, streak: null, goal: null, weightFalling: false,
+  restDayToday: false, recentBest: false, weeksOnPlan: null, goal: null, weightFalling: false,
 }
 const NOW = new Date(2026, 10, 6, 18, 0) // 6 Nov 2026, 6pm local
 const YESTERDAY = new Date(2026, 10, 5, 9, 0).toISOString()
@@ -51,8 +51,8 @@ check('a lesson taught TODAY means no second lesson today, whatever else is due'
   lessonDue({ ...QUIET, isDeload: true, restDayToday: true }, [{ id: 'consistency', at: THIS_MORNING }], NOW) === null)
 check('everything due already taught, nothing offered',
   lessonDue({ ...QUIET, isDeload: true }, [{ id: 'deload', at: YESTERDAY }], NOW) === null)
-check('a streak of 3 offers consistency; 2 does not',
-  lessonDue({ ...QUIET, streak: 3 }, [], NOW)?.id === 'consistency' && lessonDue({ ...QUIET, streak: 2 }, [], NOW) === null)
+check('two weeks on plan offers the consistency lesson; one does not (weeks on plan, his 13 Nov ruling)',
+  lessonDue({ ...QUIET, weeksOnPlan: 2 }, [], NOW)?.id === 'consistency' && lessonDue({ ...QUIET, weeksOnPlan: 1 }, [], NOW) === null)
 check('keeping muscle while losing fat needs BOTH the fat-loss goal and a falling weight',
   lessonDue({ ...QUIET, goal: 'fat_loss', weightFalling: true }, [], NOW)?.id === 'protein-in-a-deficit'
     && lessonDue({ ...QUIET, goal: 'fat_loss' }, [], NOW) === null
@@ -66,7 +66,7 @@ check('there are at least ten lessons', LESSONS.length >= 10, LESSONS.length)
 const facts: LessonFacts[] = [
   { ...QUIET, isDeload: true }, { ...QUIET, isCalibrationWeek: true }, { ...QUIET, planIsNew: true },
   { ...QUIET, restDayToday: true }, { ...QUIET, sessionDueToday: true }, { ...QUIET, trainedToday: true },
-  { ...QUIET, recentBest: true }, { ...QUIET, streak: 5 }, { ...QUIET, goal: 'fat_loss', weightFalling: true },
+  { ...QUIET, recentBest: true }, { ...QUIET, weeksOnPlan: 5 }, { ...QUIET, goal: 'fat_loss', weightFalling: true },
   { ...QUIET, goal: 'fat_loss', restDayToday: true },
 ]
 const unreachable = LESSONS.filter(l => !facts.some(f => {

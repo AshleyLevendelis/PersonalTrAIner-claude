@@ -14,11 +14,13 @@
 
 export const MOMENT_KEYS = [
   'session_feel',
+  'comeback',
+  'door_open',
   'workout_today',
   'session_not_logged',
   'missed_yesterday',
-  'week_gone_quiet',
-  'streak_at_risk',
+  'week_review',
+  'plan_week',
   'meal_not_logged',
   'protein_short',
   'block_review',
@@ -33,7 +35,9 @@ export interface MomentFacts {
   loggedToday: boolean
   missedYesterday: boolean
   daysSinceAnyLog: number | null
-  streakDays: number
+  weekday?: number
+  weekSessionsDone?: number
+  weekSessionsPlanned?: number
   blockJustEnded: boolean
   beatTargetPending: boolean
   mealsAccountedToday?: number
@@ -58,6 +62,8 @@ export function dailyCap(frequency: unknown): number {
 export type NotificationSettings = MomentSwitches & {
   frequency?: ReminderFrequency
   coach_reply?: boolean
+  /** When the coach last turned itself down a level after going unanswered (his strategy, 13 Nov 2026). */
+  frequency_dropped_at?: string
 }
 
 export const QUIET_BEFORE_HOUR = 8
@@ -65,7 +71,11 @@ export const QUIET_BEFORE_HOUR = 8
  * allowed the whole 9pm hour until 7 Nov 2026 (the whole-app QA walk saw "Got twenty minutes?" at 9:30pm). */
 export const QUIET_AFTER_HOUR = 21
 export const NOT_LOGGED_AFTER_HOUR = 18
-export const QUIET_WEEK_DAYS = 7
+export const COMEBACK_AFTER_DAYS = 3
+export const DOOR_OPEN_AFTER_DAYS = 14
+export const WEEK_REVIEW_WEEKDAY = 6
+export const PLAN_WEEK_WEEKDAY = 0
+export const WEEKEND_FROM_HOUR = 12
 export const MIN_HOURS_BETWEEN = 3
 export const WORKOUT_REMINDER_BEFORE_HOUR = 12
 export const FOOD_NUDGE_AFTER_HOUR = 19
@@ -81,7 +91,8 @@ export interface CoachMoment {
 /** The phrasebook's coach messages — a copy of coach-voice.ts `coachMessage()`. */
 export interface CoachMessageDetail {
   name?: string | null
-  streak?: number
+  weekDone?: number
+  weekPlanned?: number
   mealsLogged?: number
   finishedWhen?: 'this morning' | 'this afternoon' | 'this evening' | 'yesterday' | null
 }
@@ -94,8 +105,16 @@ export function coachMessage(key: string, d: CoachMessageDetail = {}): string {
     case 'workout_today': return `${hey}are you ready for your session today?`
     case 'session_not_logged': return `${hey}today's session is still waiting. Even a short one keeps you moving forward. Got twenty minutes?`
     case 'missed_yesterday': return `${hey}yesterday's session got away from you, and that's fine. Want to move it or let it go?`
-    case 'week_gone_quiet': return `${hey}it's been a quiet week, and that happens. A small session is the quickest way back in. Shall we pick one?`
-    case 'streak_at_risk': return `${hey}that's ${Math.max(0, d.streak ?? 0)} in a row, brilliant. Today would keep it going.`
+    case 'comeback': return `${hey}how about a ten-minute walk today? Small still counts.`
+    case 'door_open': return `${hey}no pressure at all. Whenever you want to pick things back up, I'm here, and we'll start gently.`
+    case 'week_review': {
+      const done = Math.max(0, d.weekDone ?? 0)
+      const planned = Math.max(0, d.weekPlanned ?? 0)
+      if (planned > 0 && done >= planned) return `${hey}your week so far: all ${planned} sessions done. That's the part most people find hardest. Anything you'd change for next week?`
+      if (done > 0) return `${hey}your week so far: ${done} of ${planned} sessions done. Want a quick look at what worked, and what to change for next week?`
+      return `${hey}this week didn't go to plan, and that's fine. Want to make next week easier to fit in?`
+    }
+    case 'plan_week': return `${hey}shall we plan next week? Which days suit training, and any meals out I should know about?`
     case 'meal_not_logged': return (d.mealsLogged ?? 0) >= 1
       ? `${hey}just one meal logged today. Add the rest so your numbers add up?`
       : `${hey}nothing logged on Nutrition yet today. Got a minute to add what you've eaten?`
@@ -122,13 +141,20 @@ export function coachMessageShortcut(key: string): 'exercise' | 'nutrition' | nu
   return null
 }
 
+function inLapse(f: MomentFacts): boolean {
+  return f.daysSinceAnyLog !== null && f.daysSinceAnyLog >= COMEBACK_AFTER_DAYS
+}
+
 function isLive(key: MomentKey, f: MomentFacts): boolean {
+  if ((key === 'workout_today' || key === 'session_not_logged' || key === 'missed_yesterday') && inLapse(f)) return false
   switch (key) {
     case 'session_feel': return f.awaitingFeel
     case 'session_not_logged': return f.plannedToday && !f.loggedToday && f.localHour >= NOT_LOGGED_AFTER_HOUR
     case 'missed_yesterday': return f.missedYesterday
-    case 'week_gone_quiet': return f.daysSinceAnyLog !== null && f.daysSinceAnyLog >= QUIET_WEEK_DAYS
-    case 'streak_at_risk': return f.streakDays >= 3 && f.plannedToday && !f.loggedToday && f.localHour >= NOT_LOGGED_AFTER_HOUR
+    case 'comeback': return f.daysSinceAnyLog === COMEBACK_AFTER_DAYS
+    case 'door_open': return f.daysSinceAnyLog === DOOR_OPEN_AFTER_DAYS
+    case 'week_review': return f.weekday === WEEK_REVIEW_WEEKDAY && f.localHour >= WEEKEND_FROM_HOUR && (f.weekSessionsPlanned ?? 0) > 0
+    case 'plan_week': return f.weekday === PLAN_WEEK_WEEKDAY && f.localHour >= WEEKEND_FROM_HOUR
     case 'block_review': return f.blockJustEnded
     case 'beat_target': return f.beatTargetPending
     case 'workout_today': return f.plannedToday && !f.loggedToday && f.localHour < WORKOUT_REMINDER_BEFORE_HOUR
@@ -149,13 +175,15 @@ export function momentToRaise(facts: MomentFacts, switches: MomentSwitches = {})
 /** Every moment that may speak now, best first. The sender takes the first its own limits allow. */
 export function momentsToRaise(facts: MomentFacts, switches: MomentSwitches = {}): CoachMoment[] {
   if (facts.localHour < QUIET_BEFORE_HOUR || facts.localHour >= QUIET_AFTER_HOUR) return []
+  // THEN SILENCE (the comeback path): after the door-open day, nothing unprompted until he logs something again.
+  if (facts.daysSinceAnyLog !== null && facts.daysSinceAnyLog > DOOR_OPEN_AFTER_DAYS) return []
   const out: CoachMoment[] = []
   for (const key of MOMENT_KEYS) {
     if (switches[key] === false) continue
     if (isLive(key, facts)) {
       out.push({
         key,
-        text: coachMessage(key, { name: facts.name, streak: facts.streakDays, mealsLogged: facts.mealsAccountedToday ?? 0, finishedWhen: facts.finishedWhen }),
+        text: coachMessage(key, { name: facts.name, mealsLogged: facts.mealsAccountedToday ?? 0, finishedWhen: facts.finishedWhen, weekDone: facts.weekSessionsDone, weekPlanned: facts.weekSessionsPlanned }),
         shortcut: coachMessageShortcut(key),
       })
     }

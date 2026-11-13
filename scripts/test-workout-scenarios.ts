@@ -133,21 +133,22 @@ async function main() {
   }
 
   // ---------------------------------------------------------------------------------------------------------------
-  console.log('\n[1] A CHOSEN REST DAY IS NOT A MISS — on the streak as on the strip')
+  console.log('\n[1] A CHOSEN REST DAY IS NOT A MISS — in the week\'s count as on the strip')
   // The rest card says "It won't count as a missed session, and it won't count against your week." The strip agrees
-  // (rest_chosen is not tallied). The streak did not: a scheduled, unlogged day it was never told about is a miss.
+  // (rest_chosen is not tallied). RE-ANCHORED 13 Nov 2026: the streak went (his ruling); the week's count, which weeks on
+  // plan are read from, is where a chosen rest must not count against him.
   fresh()
   lastWeekAllTrained()
   trained(TUE)
   check('setup: Monday chosen as rest', await track.setDeliberateRest(PID, MON, true))
   let v = await look(WED)
   check('the strip calls Monday a chosen rest', v.states[MON] === 'rest_chosen', v.states)
-  const streakBefore = v.home.streak
+  const plannedBefore = v.tally.sessionsPlanned
   check('setup: Thursday chosen as rest too (second in the week)', await track.setDeliberateRest(PID, THU, true))
   v = await look(FRI)
   check('the strip calls Thursday a chosen rest', v.states[THU] === 'rest_chosen', v.states)
-  check('THE STREAK SURVIVES TWO CHOSEN RESTS IN ONE WEEK (it spent its make-up on one and broke on the other)',
-    v.home.streak >= streakBefore && v.home.streak >= 5, { before: streakBefore, after: v.home.streak })
+  check('TWO CHOSEN RESTS IN ONE WEEK ARE NEITHER COUNTED AGAINST HIM: each leaves the week\'s planned sessions',
+    v.tally.sessionsPlanned === plannedBefore - 1 && plannedBefore === 3, { before: plannedBefore, after: v.tally.sessionsPlanned })
   // And the contrast that proves the case binds: two days SAID missed in one week do break it.
   fresh()
   lastWeekAllTrained()
@@ -155,7 +156,7 @@ async function main() {
   await track.setMarkedMissed(PID, MON, true)
   await track.setMarkedMissed(PID, THU, true)
   v = await look(FRI)
-  check('...while two days marked MISSED in one week still break it (the fixture binds)', v.home.streak <= 1, v.home.streak)
+  check('...while two days marked MISSED in one week stay owed (the fixture binds)', v.tally.sessionsPlanned === 4 && v.tally.sessionsDone === 1, v.tally)
   // A chosen rest she then trained on counts as the session it became.
   fresh()
   lastWeekAllTrained()
@@ -163,12 +164,12 @@ async function main() {
   trained(MON)
   v = await look(TUE)
   check('a rest she trained on anyway is a session done', v.states[MON] === 'done', v.states)
-  const streakTrainedRest = v.home.streak
+  const doneTrainedRest = v.tally.sessionsDone
   fresh()
   lastWeekAllTrained()
   trained(MON)
   v = await look(TUE)
-  check('...and counts on the streak exactly as the same day trained without the note', streakTrainedRest === v.home.streak && v.home.streak >= 5, { withNote: streakTrainedRest, without: v.home.streak })
+  check('...and counts in the week exactly as the same day trained without the note', doneTrainedRest === v.tally.sessionsDone && doneTrainedRest === 1, { withNote: doneTrainedRest, without: v.tally.sessionsDone })
 
   // ---------------------------------------------------------------------------------------------------------------
   console.log('\n[2] SEQUENCES OF DAY CHANGES — each step read back by every reader')

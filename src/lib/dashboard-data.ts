@@ -24,7 +24,7 @@ import { breakDayKg, layoffStatus, NO_LAYOFF, type LayoffStatus } from './layoff
 import { getLastWorkingSessionDate } from './set-log-store'
 import { getDoubleProgressionRecommendation } from './progression-engine'
 import { getActiveGoals } from './memory-store'
-import { computeStreak, buildStreakDays, type StreakDayInput } from './streak'
+import { weeksOnPlan, WEEKS_LOOKED_BACK, type WeeksOnPlan } from './consistency'
 import { computeWeightTrend, type WeightTrendResult } from './weight-trend'
 import { selectCoachTipWithKey, eligibleCoachTips, type CoachTipContext, type SelectedCoachTip } from './coach-tips'
 import { weekVolume } from './week-volume'
@@ -40,7 +40,7 @@ import { dayLengthParts, formatDayLength } from './session-duration'
 import { readBorrowedDay } from './borrowed-day'
 import { honestSessionMinutes } from './session-derive'
 import { sessionForDate, addDays, dayNameOf, daysBetween, type SessionMove } from './session-move'
-import { readTrainingWeeks, dayCountsTowardWeek, dayCountsAsDone, type TrainingWeekDay } from '@/hooks/useTrainingWeek'
+import { readTrainingWeeksBack, tallyWeek, dayCountsTowardWeek, dayCountsAsDone, type TrainingWeekDay } from '@/hooks/useTrainingWeek'
 
 /**
  * 'unknown' IS NOT 'rest', and conflating them is the defect this value
@@ -299,7 +299,10 @@ export interface DashboardData {
   /** Where she started: the weight given at sign-up, or the first weigh-in ever when none was given. What "since you started" is measured from — never the first row of the 14 the chart happens to hold. */
   startingWeightKg: number | null
   recentPRs: RecentPR[]
-  streak: number
+  /** His 13 Nov 2026 ruling: weekly consistency in place of the streak. Null when the weeks could not be read. */
+  weeksOnPlan: WeeksOnPlan | null
+  /** This week's sessions, Monday to Sunday, as the strip counts them: the weekly review's one number. */
+  weekSessions: { done: number; planned: number } | null
   whatsLeftLine: string | null
   phase: PhaseContext | null
   /** Tab restructure — Home's calorie/water tiles are read-only nav tiles into Nutrition; the read itself still belongs here (the one aggregator), not in Dashboard.tsx, which no longer imports water-store at all. */
@@ -638,33 +641,6 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     ? []
     : notes.filter(r => !!r.moved_to_date).map(r => ({ fromDate: r.date, toDate: r.moved_to_date as string }))
   const windowMoves: SessionMove[] = [...readMoves, ...moves.filter(m => !readMoves.some(r => r.fromDate === m.fromDate))]
-  const planStartForStreak = planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : null
-  const streakDays: StreakDayInput[] = buildStreakDays({
-    todayStr,
-    plan: exercisePlan,
-    // Each date in its own plan week (week boundaries S2), as Home and the strip read it.
-    planFor: date => planDaysForDate(date, todayStr, activeWeekDays, mesocycle, planCreatedAt).days,
-    moves: windowMoves,
-    swappedDates: new Set(notes.filter(r => !!r.swapped_for_activity).map(r => r.date)),
-    restDates: new Set(notes.filter(r => !!r.deliberate_rest).map(r => r.date)),
-    setDates: new Set(workingLogs.map(l => l.date)),
-    cardioDates: new Set(cardioLogs.map(c => c.date)),
-    planStartStr: planStartForStreak,
-    // Noon, as every other date walk in this file: a fixed-millisecond step
-    // over five weeks crosses a clock change twice a year.
-    planWeekOf: date => getActiveMesocycleWeek(planCreatedAt, new Date(`${date}T12:00:00`), totalWeeks),
-  })
-  // What "the planned session was done" means for each day of the window: a
-  // lifting day needs working sets; an activity-shaped day (a walk) is done by
-  // the activity. An optional walk on a lifting day keeps the streak alive and
-  // does not stand in for the session (user test 8 Oct 2026, #20).
-  const workingDates = new Set(workingLogs.map(l => l.date))
-  const sessionDoneByDate = new Map<string, boolean>()
-  for (const d of streakDays) {
-    const held = sessionForDate({ date: d.date, plan: planDaysForDate(d.date, todayStr, activeWeekDays, mesocycle, planCreatedAt).days, moves: windowMoves }).day
-    sessionDoneByDate.set(d.date, held != null && held.exercises.length > 0 ? workingDates.has(d.date) : loggedDates.has(d.date))
-  }
-  const streakResult = computeStreak(streakDays)
 
   // The plan's first day, as a LOCAL date (planCreatedAt is a UTC timestamp; reading the UTC date off it made
   // the plan a day older or younger near midnight). Days before it are never part of a week's "usual".
@@ -677,8 +653,13 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
   // the strip counts finished sessions Monday to Sunday. Both now read the days the strip draws
   // (readTrainingWeeks): a session counts once it is 'done' there, and nothing else is a session. There is no
   // "usual" without a whole previous week inside the plan, and a failed read says nothing at all.
-  const weeks = await readTrainingWeeks(profileId, todayStr, activeWeekDays, mesocycle, planCreatedAt ?? undefined, windowMoves)
-    .catch(err => { console.error('Home could not read the training week; the pace note stays quiet:', err); return null })
+  // ONE READ, THIRTEEN WEEKS (his 13 Nov 2026 ruling, weekly consistency in place of the streak): this week, last week,
+  // and the eleven before it, each drawn as the strip draws it. The finished ones give "N of the last M weeks on plan".
+  const weeksBack = await readTrainingWeeksBack(profileId, todayStr, activeWeekDays, mesocycle, planCreatedAt ?? undefined, WEEKS_LOOKED_BACK + 1, windowMoves)
+    .catch(err => { console.error('Home could not read the training weeks; the pace note and the weeks on plan stay quiet:', err); return null })
+  const weeks = weeksBack ? { thisWeek: weeksBack[0], lastWeek: weeksBack[1] } : null
+  const onPlanWeeks: WeeksOnPlan | null = weeksBack ? weeksOnPlan(weeksBack.slice(1).map(w => tallyWeek(w, todayStr))) : null
+  const thisWeekTally = weeksBack ? tallyWeek(weeksBack[0], todayStr) : null
   // So far: the days before today, and today once its session is done (today is not missed yet).
   const thisWeekSoFar = weeks ? weeks.thisWeek.filter(d => d.date < todayStr || (d.date === todayStr && d.state === 'done')) : []
   // The same span of last week: Monday up to the same weekday as today, today included.
@@ -841,7 +822,8 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
     weightGoalKg: weightGoal?.target_value ?? null,
     startingWeightKg,
     recentPRs,
-    streak: streakResult.currentStreak,
+    weeksOnPlan: onPlanWeeks,
+    weekSessions: thisWeekTally ? { done: thisWeekTally.sessionsDone, planned: thisWeekTally.sessionsPlanned } : null,
     whatsLeftLine,
     phase,
     waterMl,

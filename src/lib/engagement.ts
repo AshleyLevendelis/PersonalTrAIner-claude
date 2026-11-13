@@ -74,3 +74,26 @@ export function ignoredRun(rows: Pick<MomentLogRow, 'moment' | 'sent_at' | 'answ
   }
   return run
 }
+
+/** Three unanswered in a row turns the coach down a level (his strategy, 13 Nov 2026, slice 2). */
+export const IGNORED_BEFORE_TURNING_DOWN = 3
+
+/**
+ * SHOULD THE COACH TURN ITSELF DOWN? When the same moment has gone unanswered three times running since the last time
+ * it turned down, his daily limit drops one level: Lots to Normal, Normal to Light. Light stays Light. Rows sent before
+ * the last drop are not counted again, so a drop needs three NEW ignores. Null when nothing should change.
+ */
+export function turnDownFor(
+  rows: Pick<MomentLogRow, 'moment' | 'sent_at' | 'answered_at'>[],
+  frequency: 'light' | 'normal' | 'lots',
+  droppedAt: string | null | undefined,
+  nowMs: number,
+): { to: 'light' | 'normal'; moment: string } | null {
+  if (frequency === 'light') return null
+  const since = droppedAt ? Date.parse(droppedAt) : Number.NEGATIVE_INFINITY
+  const fresh = rows.filter(r => Date.parse(r.sent_at) > since)
+  for (const moment of new Set(fresh.map(r => r.moment))) {
+    if (ignoredRun(fresh, moment, nowMs) >= IGNORED_BEFORE_TURNING_DOWN) return { to: frequency === 'lots' ? 'normal' : 'light', moment }
+  }
+  return null
+}

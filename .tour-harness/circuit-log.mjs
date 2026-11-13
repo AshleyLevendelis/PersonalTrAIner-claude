@@ -89,11 +89,11 @@ const fake = () => ev(`({
 const tapTestId = id => ev(`(() => { const b = document.querySelector('[data-testid="${id}"]'); if (!b) return false; b.scrollIntoView({ block: 'center' }); b.click(); return true })()`)
 
 console.log('\nA. Two blocks logged, the session still due')
-// HIS RULING, 8 Nov 2026, "Count it as a session": counting the blocks as the workout must not LOWER the streak or the
+// HIS RULING, 8 Nov 2026, "Count it as a session": counting the blocks as the workout must not LOWER the weeks on plan (the streak until 13 Nov) or the
 // week (QA round 2: the streak went 2 → 1 and the week "Session 2 of 4" → "0 of 3"). Read on Home before and after.
 const homeCounts = async () => {
   await ev(`location.hash = '#/tab/dashboard'`); await wait(2500)
-  const r = await ev(`(() => { const t = document.body.innerText; const w = t.match(/(\\d+) of (\\d+) sessions? done/); const o = t.match(/Session \\d+ of (\\d+)/i); const s = document.querySelector('[data-testid="home-streak"]')?.innerText.match(/(\\d+)/); return { done: w ? +w[1] : null, of: w ? +w[2] : o ? +o[1] : null, streak: s ? +s[1] : null } })()`)
+  const r = await ev(`(() => { const t = document.body.innerText; const w = t.match(/(\\d+) of (\\d+) sessions? done/); const o = t.match(/Session \\d+ of (\\d+)/i); const s = document.querySelector('[data-testid="home-consistency"]')?.innerText.trim() ?? null; return { done: w ? +w[1] : null, of: w ? +w[2] : o ? +o[1] : null, weeks: s } })()`)
   await ev(`location.hash = '#/tab/exercise'`); await wait(1500)
   return r
 }
@@ -115,7 +115,9 @@ check('7. ...and no extra cardio row was written for it', after.cardio === befor
 await shoot('circuit-counted-today')
 const homeAfter = await homeCounts()
 check('7b. counting it counts as a session done, of the same number owed (it read "0 of 3")', homeBefore.of != null && homeAfter.of === homeBefore.of && homeAfter.done >= 1, { homeBefore, homeAfter })
-check('7c. ...and the streak does not go down', homeBefore.streak != null && homeAfter.streak != null && homeAfter.streak >= homeBefore.streak, { homeBefore, homeAfter })
+// 7c RE-POINTED 13 Nov 2026: the streak went (his ruling); weeks on plan read finished weeks only, so today's swap
+// cannot move them, and the pill must say the same before and after.
+check('7c. ...and the weeks on plan do not go down', homeBefore.weeks != null && homeAfter.weeks === homeBefore.weeks, { homeBefore, homeAfter })
 
 console.log('\nB. "Not today"')
 await open('circuit=1')

@@ -101,7 +101,7 @@ const DEAD = () => ({ data: null, error: { message: 'TypeError: Failed to fetch'
 export const INTEGER_COLUMNS: Record<string, readonly string[]> = {
   ai_usage_daily: ['requests'],
   cardio_logs: ['avg_heart_rate', 'duration_minutes', 'intensity_rpe'],
-  coach_moment_facts: ['streak_days', 'protein_target_g'],
+  coach_moment_facts: ['streak_days', 'protein_target_g', 'week_sessions_done', 'week_sessions_planned'],
   daily_nutrition_targets: ['calculated_bmr', 'calculated_tdee', 'estimated_eee', 'target_calories', 'target_carbs_g', 'target_fats_g', 'target_protein_g'],
   daily_steps: ['steps'],
   exercise_plans: ['sets', 'week_number'],

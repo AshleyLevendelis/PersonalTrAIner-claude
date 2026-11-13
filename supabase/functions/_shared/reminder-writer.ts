@@ -45,8 +45,10 @@ function purpose(moment: CoachMoment, f: MomentFacts): string {
     case 'session_feel': return `They finished a session ${f.finishedWhen ?? 'earlier'}. Ask how it felt; their answer helps you adjust the next one.`
     case 'session_not_logged': return "Today's planned session is still waiting and the day is getting on. Encourage a session, even a shorter one, without guilt."
     case 'missed_yesterday': return "Yesterday's planned session did not happen. Be kind, no guilt, and ask whether to move it or let it go."
-    case 'week_gone_quiet': return 'Nothing has been logged for a week or more. Be warm, no guilt, and invite a small first step back.'
-    case 'streak_at_risk': return `They have ${f.streakDays} sessions in a row and today's is due. Be glad for the run and encourage keeping it going.`
+    case 'comeback': return 'Nothing has been logged for three days. Do NOT mention what was missed. Offer one small, easy next step for today, warmly, with no guilt.'
+    case 'door_open': return 'Nothing has been logged for two weeks. Say, warmly and with no pressure, that the door is open whenever they want to start again, and that it will start gently. Ask nothing of them.'
+    case 'week_review': return `It is Saturday. This week so far: ${f.weekSessionsDone ?? 0} of ${f.weekSessionsPlanned ?? 0} planned sessions done. Name one thing that went well, give that one number, and offer to adjust next week. No guilt.`
+    case 'plan_week': return 'It is Sunday. Offer to plan next week together: which days suit training, and any meals out. One short question.'
     case 'meal_not_logged': return (f.mealsAccountedToday ?? 0) >= 1
       ? 'Only one meal is logged on Nutrition today. Encourage adding the rest so the day adds up.'
       : 'Nothing is logged on Nutrition yet today. Encourage adding what they have eaten.'

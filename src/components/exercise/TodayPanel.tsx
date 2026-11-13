@@ -74,7 +74,7 @@ import type { ReasonAnswer } from './EditReasonStep'
 // the tap and the sheet's cost line. The 13 kB is recorded in test:bundle.
 import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor, type SessionEditResult } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
-import { shortenDayTo, mapTier } from '@/lib/exercise-plan'
+import { shortenOrFloor, mapTier } from '@/lib/exercise-plan'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
 // The builder is FETCHED WHEN USED: only the marker and its sentence are drawn on
 // every render, and they live in an import-free module (test:bundle, 20 Oct 2026).
@@ -534,7 +534,7 @@ export function TodayPanel({
     if (!week) return "I can't see this week on your plan just now."
     const target = editTarget(todayRef)
     if (!target.ok) return target.refusal
-    const result = shortenDayTo(week, target.planDayName, profile, minutes)
+    const result = shortenOrFloor(week, target.planDayName, profile, minutes)
     if (!result.changed) return say(result.refusal ?? "I couldn't shorten that one.")
     const settled = settleWeek(result.week, target.planDayName, profile)
     return applySessionEdit(

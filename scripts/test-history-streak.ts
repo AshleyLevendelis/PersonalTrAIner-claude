@@ -66,7 +66,6 @@ async function main() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setSupabaseClient(makeFakeSupabase(db) as any)
   const history = await import('../src/lib/exercise-history')
-  const streak = await import('../src/lib/streak')
 
   // -------------------------------------------------------------------------
   console.log('\n[1] SESSION HISTORY LISTS SESSIONS — the tester\'s five rows, and two more kinds')
@@ -125,78 +124,14 @@ async function main() {
   const tools = strip(read('src/components/ToolsTab.tsx'))
   check('Tools counts sessions with the same function', /countSessions\(rows\)/.test(tools))
 
-  // -------------------------------------------------------------------------
-  console.log('\n[3] THE STREAK — the tracer\'s replay, as fixtures')
-  const day = (name: string, training: boolean) => ({ day: name, focus: training ? 'Session' : 'Rest', exercises: training ? [{ name: 'Goblet Squats', sets: 3, reps: '10' }] : [] })
-  const plan = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-    .map(n => day(n, ['Monday', 'Tuesday', 'Thursday', 'Saturday'].includes(n))) as never
-  // Plan weeks run from the plan's own first day, as the app counts them — so
-  // two days in one calendar week of the fixture really do share a make-up token.
-  const weekFrom = (start: string) => (date: string) => Math.max(1, Math.floor((new Date(`${date}T12:00:00`).getTime() - new Date(`${start}T12:00:00`).getTime()) / (7 * 86400000)) + 1)
-  const count = (o: { today: string; sets?: string[]; cardio?: string[]; moves?: { fromDate: string; toDate: string }[]; swapped?: string[]; planStart?: string | null }) =>
-    streak.computeStreak(streak.buildStreakDays({
-      todayStr: o.today, plan, moves: o.moves ?? [], swappedDates: new Set(o.swapped ?? []),
-      setDates: new Set(o.sets ?? []), cardioDates: new Set(o.cardio ?? []),
-      planStartStr: o.planStart === undefined ? PLAN_START : o.planStart, planWeekOf: weekFrom(o.planStart ?? PLAN_START),
-    })).currentStreak
-
-  check('row 1 — the first workout only: 1', count({ today: THU8, sets: [THU8] }) === 1, count({ today: THU8, sets: [THU8] }))
-  check('row 2 — PLUS FOOTBALL BACK-DATED TO THE TUESDAY BEFORE THE PLAN EXISTED: still 1 (it said 2)',
-    count({ today: THU8, sets: [THU8], cardio: [TUE6], swapped: [TUE6] }) === 1, count({ today: THU8, sets: [THU8], cardio: [TUE6], swapped: [TUE6] }))
-  const moves = [{ fromDate: MON5, toDate: FRI9 }, { fromDate: SAT10, toDate: SUN11 }]
-  check('row 3 — PLUS FRIDAY\'S WORKOUT, Monday\'s session moved there: 2 (it stayed on the old number)',
-    count({ today: FRI9, sets: [THU8, FRI9], cardio: [TUE6], swapped: [TUE6], moves }) === 2, count({ today: FRI9, sets: [THU8, FRI9], cardio: [TUE6], swapped: [TUE6], moves }))
-  check('row 4 — Friday without the football entry: 2 (it said 1)', count({ today: FRI9, sets: [THU8, FRI9], moves }) === 2, count({ today: FRI9, sets: [THU8, FRI9], moves }))
-  check('...and the same two days WITHOUT the move score 1: Friday is not a planned session unless one was moved onto it',
-    count({ today: FRI9, sets: [THU8, FRI9] }) === 1, count({ today: FRI9, sets: [THU8, FRI9] }))
-
-  console.log('\n[4] the rule, case by case')
-  // Three full weeks in: Mon 19, Tue 20, Thu 22, Sat 24, Mon 26, Tue 27, Thu 29.
-  const done = ['2026-10-19', '2026-10-20', '2026-10-22', '2026-10-24', '2026-10-26', '2026-10-27']
-  const today = '2026-10-29'
-  check('six planned sessions done in a row is 6', count({ today, sets: done, planStart: '2026-10-19' }) === 6, count({ today, sets: done, planStart: '2026-10-19' }))
-  check('a rest day between them neither counts nor breaks', count({ today: '2026-10-28', sets: done, planStart: '2026-10-19' }) === 6)
-  check('today\'s session, not done yet, is not a miss', count({ today, sets: done, planStart: '2026-10-19' }) === 6)
-  check('...and counts once it is', count({ today, sets: [...done, today], planStart: '2026-10-19' }) === 7)
-  // WHERE "not done yet" BINDS: Monday 26th was missed, so this week's token
-  // is spent — were today a miss too, the streak would stop at Tuesday.
-  const missedMonday = ['2026-10-19', '2026-10-20', '2026-10-22', '2026-10-24', '2026-10-27']
-  check('...even in a week whose one make-up token is already spent', count({ today, sets: missedMonday, planStart: '2026-10-19' }) === 5, count({ today, sets: missedMonday, planStart: '2026-10-19' }))
-  check('a second real miss in one week does stop it', count({ today: '2026-10-30', sets: missedMonday, planStart: '2026-10-19' }) === 1, count({ today: '2026-10-30', sets: missedMonday, planStart: '2026-10-19' }))
-  // TWO MOVES IN ONE WEEK, BOTH DONE. Tue 20 → Wed 21, Sat 24 → Sun 25.
-  const twoMoves = [{ fromDate: '2026-10-20', toDate: '2026-10-21' }, { fromDate: '2026-10-24', toDate: '2026-10-25' }]
-  const movedDone = ['2026-10-19', '2026-10-21', '2026-10-22', '2026-10-25', '2026-10-26', '2026-10-27']
-  check('TWO SESSIONS MOVED IN ONE WEEK, BOTH DONE ON THEIR NEW DAYS, KEEP THE STREAK: 6 (it broke: two "misses", one token)',
-    count({ today, sets: movedDone, moves: twoMoves, planStart: '2026-10-19' }) === 6, count({ today, sets: movedDone, moves: twoMoves, planStart: '2026-10-19' }))
-  check('...the same week WITHOUT the moves recorded is two misses and the streak stops at them',
-    count({ today, sets: movedDone, planStart: '2026-10-19' }) < 6, count({ today, sets: movedDone, planStart: '2026-10-19' }))
-  check('a session moved and then NOT done on its new day is a miss there',
-    count({ today, sets: ['2026-10-19', '2026-10-22', '2026-10-24', '2026-10-26', '2026-10-27'], moves: [twoMoves[0]], planStart: '2026-10-19' }) === 5)
-  // A swapped day: football instead of Thursday 22nd's session.
-  const swappedWeek = ['2026-10-19', '2026-10-20', '2026-10-24', '2026-10-26', '2026-10-27']
-  // RE-ANCHORED 8 Nov 2026 on his ruling "Count it as a session" (QA round 2): a swap with the activity LOGGED counts
-  // as a session done; it REPLACES the 9 Oct CSCS rule that kept it transparent. A swap with nothing logged still is.
-  check('A DAY SWAPPED FOR FOOTBALL, WITH THE FOOTBALL LOGGED, COUNTS AS A SESSION: 6',
-    count({ today, sets: swappedWeek, cardio: ['2026-10-22'], swapped: ['2026-10-22'], planStart: '2026-10-19' }) === 6,
-    count({ today, sets: swappedWeek, cardio: ['2026-10-22'], swapped: ['2026-10-22'], planStart: '2026-10-19' }))
-  check('...while a swap with NOTHING logged keeps the streak without counting: 5',
-    count({ today, sets: swappedWeek, swapped: ['2026-10-22'], planStart: '2026-10-19' }) === 5,
-    count({ today, sets: swappedWeek, swapped: ['2026-10-22'], planStart: '2026-10-19' }))
-  check('...and without spending the week\'s make-up token: a real miss the same week is still forgiven once',
-    count({ today, sets: ['2026-10-19', '2026-10-24', '2026-10-26', '2026-10-27'], swapped: ['2026-10-22'], planStart: '2026-10-19' }) === 4)
-  check('a swapped day she trained on anyway counts like any other', count({ today, sets: done, swapped: ['2026-10-22'], planStart: '2026-10-19' }) === 6)
-  check('a planned WALK logged as cardio is that day\'s session, and counts', count({ today, sets: done.slice(1), cardio: ['2026-10-19'], planStart: '2026-10-19' }) === 6)
-  check('nothing before the plan started counts, however much was logged', count({ today: '2026-10-20', sets: ['2026-10-12', '2026-10-13', '2026-10-15', '2026-10-17', '2026-10-19', '2026-10-20'], planStart: '2026-10-19' }) === 2)
-  check('...and a plan with no known start date counts what it always did', count({ today: '2026-10-20', sets: ['2026-10-15', '2026-10-17', '2026-10-19', '2026-10-20'], planStart: null }) === 4)
-
-  console.log('\n[5] and it is called what it counts')
-  const { streakLabel } = await import('../src/lib/coach-voice')
-  check('"2 sessions in a row"', streakLabel(2) === 'sessions in a row', streakLabel(2))
-  check('"1 session in a row"', streakLabel(1) === 'session in a row', streakLabel(1))
-  const home = strip(read('src/components/Dashboard.tsx'))
-  check('Home prints the count with that label, and no longer says "days streak"', /streakLabel\(data\.streak\)/.test(home) && !/day\{data\.streak === 1 \? '' : 's'\} streak/.test(home))
-  const data = strip(read('src/lib/dashboard-data.ts'))
-  check('the streak is built from dated sessions, not from the weekday pattern', /buildStreakDays\(/.test(data) && !/scheduledWeekdays\.has\(weekdayName\)/.test(data))
+  // [3]-[5] RETIRED 13 Nov 2026 with the streak (his ruling: weekly consistency in place of it). What they held for
+  // the streak, the week's own count holds: a moved session counts where it ran and a logged swap counts as done
+  // (useTrainingWeek's dayCountsTowardWeek / dayCountsAsDone, test:workout-scenarios), and weeks on plan read those
+  // weeks (test:coach-rhythm).
+  console.log('\n[3] the streak is retired; history still lists only sessions')
+  const { dayCountsAsDone } = await import('../src/hooks/useTrainingWeek')
+  check('his 8 Nov "Count it as a session" survives in the week count: a logged swap is done, an empty one is not',
+    dayCountsAsDone({ state: 'swapped', swapLogged: true } as never) && !dayCountsAsDone({ state: 'swapped', swapLogged: false } as never))
 
   console.log(`\n${ran} checks ran. ${failures === 0 ? 'All passed.' : `${failures} FAILED.`}`)
   if (failures > 0) process.exit(1)

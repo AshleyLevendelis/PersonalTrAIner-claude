@@ -3,7 +3,7 @@
 //
 // Reads the numbers off the real screens and taps her three rulings of that day:
 //   A. Home: the headline is the mean of the rings drawn; Steps in the key opens the steps entry, the other
-//      rows and the rings open Nutrition; the pill says "in a row"; the next meal is the dish (and the kcal)
+//      rows and the rings open Nutrition; the pill says "N of M weeks" (weeks on plan, since 13 Nov 2026); the next meal is the dish (and the kcal)
 //      Nutrition's Up next card shows; the docked button names today's session and sits above the tab bar.
 //   B. Nutrition: the day strip is above the calories; one circle of rings (11 Nov 2026); the ring is eaten over target; the water
 //      cell opens the quick-add, +500 moves it by 0.5 L and Undo puts it back; Targets opens the sheet.
@@ -82,7 +82,8 @@ const shares = (rings ?? []).filter(r => r.s !== 'none').map(r => Number(r.s))
 const expected = shares.length ? `${Math.round(shares.reduce((a, b) => a + b, 0) / shares.length * 100)}%` : '—'
 const soFar = await text('[data-testid="home-so-far"]')
 check('2. the headline is the mean of the rings drawn (a ring with no target left out)', soFar === expected && shares.length > 0, { soFar, expected, rings })
-check('3. the pill reads "N in a row", never "days"', /^\d+ in a row$/.test(await text('[data-testid="home-streak"]')), await text('[data-testid="home-streak"]'))
+// RE-ANCHORED 13 Nov 2026: his ruling of that day put weeks on plan in place of the "12 in a row" streak.
+check('3. the pill reads "N of M weeks" (weeks on plan), never a run', /^\d+ of \d+ weeks?$/.test(await text('[data-testid="home-consistency"]')) && !/in a row|streak/i.test(await ev('document.body.innerText')), await text('[data-testid="home-consistency"]'))
 // RE-ANCHORED 30 Oct 2026 ("less is more"): not docked; directly under the session it starts, on the first screen.
 // RE-ANCHORED 31 Oct 2026 (tab polish 2c): inside the session card, under the session's name and above the week.
 const cta = await ev(`(() => { const n = document.querySelector('[data-home-cta] button'); const card = document.querySelector('[data-home-hero]'); const name = document.querySelector('[data-home-title]'); const week = document.querySelector('[data-home-hero] [data-home-week]'); if (!n || !card || !name || !week) return null; const b = n.getBoundingClientRect(); return { text: n.innerText.trim(), inCard: card.contains(n), top: b.top, bottom: b.bottom, nameBottom: name.getBoundingClientRect().bottom, weekTop: week.getBoundingClientRect().top, h: innerHeight } })()`)

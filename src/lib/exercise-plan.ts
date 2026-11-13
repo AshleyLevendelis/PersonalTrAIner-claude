@@ -7084,6 +7084,23 @@ export function shortenDayTo(
   }
 }
 
+/**
+ * THE SHORTEST VERSION OF A SESSION, "A FLOOR THAT COUNTS" — his strategy of 13 Nov 2026, slice 2
+ * (docs/plans/coach-rhythm.md §2d): a bad day becomes a smaller yes instead of a no. Asked for as 0 minutes, it is the
+ * shorten path taken as far as it goes: the main lift kept whole, at least three real exercises, sets down to each
+ * role's floor. CSCS basis (BACKLOG): the main lift's working sets plus two more exercises is a real stimulus, the
+ * minimum dose that keeps progression moving on a short day. Marked with the minutes it really takes, never the 0 asked.
+ * Today only, like any shortening, and a finished floor session is a session done like any other.
+ */
+export const SHORTEST_VERSION_MINUTES = 0
+
+export function shortenOrFloor(week: MesocycleWeek, dayName: string, profile: UserProfile, minutes: number): DayShortening {
+  if (minutes !== SHORTEST_VERSION_MINUTES) return shortenDayTo(week, dayName, profile, minutes)
+  const r = shortenDayTo(week, dayName, profile, 1)
+  if (!r.changed) return { ...r, refusal: r.refusal?.startsWith('There\'s no session') ? r.refusal : `${dayName}'s session is already as short as it goes while keeping your main lift.` }
+  return { ...r, week: { ...r.week, days: r.week.days.map(d => (d.day === dayName ? { ...d, shortened_to_minutes: r.achievedMinutes } : d)) } }
+}
+
 // Below this underrun, a day is "close enough" and gets no filler — matches
 // the quality scorer's tighter (10%/20%) overrun bands staying strict while
 // underrun gets real headroom before anything is appended.

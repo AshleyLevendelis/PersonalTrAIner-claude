@@ -158,9 +158,12 @@ console.log('\n4. The dashboard measures the streak and the plan start on local 
   // streak.ts's buildStreakDays (the streak is built per date now, M16/M31).
   // The property is unchanged — the window steps on LOCAL CALENDAR dates from
   // the local "today", never on fixed milliseconds and never through UTC.
-  const streakSrc = stripComments(readFileSync(join(ROOT, 'src/lib/streak.ts'), 'utf8'))
-  check('the 35-day streak window steps on local calendar dates',
-    /buildStreakDays\(\{\s*todayStr,/.test(dash) && /const date = addDays\(input\.todayStr, -i\)/.test(streakSrc) && !/toISOString|86400000|86_400_000/.test(streakSrc))
+  // RE-ANCHORED 13 Nov 2026: the streak and its 35-day window went (his ruling: weeks on plan). The weeks Home now
+  // counts step back from the local Monday by whole weeks, on local dates, through the strip's own week builder.
+  const weekSrc = stripComments(readFileSync(join(ROOT, 'src/hooks/useTrainingWeek.ts'), 'utf8'))
+  const back = weekSrc.slice(weekSrc.indexOf('export async function readTrainingWeeksBack'), weekSrc.indexOf('function classifyLoadingSafe'))
+  check('the weeks on plan step back by local calendar weeks from the local Monday',
+    back.length > 0 && /mondayOf\(new Date\(today \+ 'T12:00:00'\)\)/.test(back) && /m\.setDate\(m\.getDate\(\) - 7 \* i\)/.test(back) && !/toISOString|86400000|86_400_000/.test(back))
   check('the plan start date is converted to a local date before comparison',
     /planStartStr = planCreatedAt \? getLocalDateString\(new Date\(planCreatedAt\)\)/.test(dash))
 }

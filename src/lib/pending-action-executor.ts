@@ -23,7 +23,7 @@ import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession,
 import { settleWeek } from './settle-week'
 import { rebuildDayAroundMainLift } from './session-rebuild'
 import type { SessionKindOffer } from './session-kind'
-import { shortenDayTo } from './exercise-plan'
+import { shortenOrFloor } from './exercise-plan'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, weeksTouchedByScope, restoreMesocycle } from './mesocycle-persistence'
 import { getExerciseEntry } from './exercise-db'
 import { swapPoolMeal, clearMealPick, getMealPicksForDate, getMealPicksForDates, setMealPick, USER_REQUESTED_TAG, type MealSlotName } from './meal-store'
@@ -1318,7 +1318,7 @@ export async function executeSessionShorten(
     return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'shorten', error: "I can't see that week on your plan just now." }] } }
   }
 
-  const result = shortenDayTo(week, payload.dayName, profile, payload.minutes)
+  const result = shortenOrFloor(week, payload.dayName, profile, payload.minutes)
   if (!result.changed) {
     return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'shorten', error: result.refusal ?? "I couldn't shorten that one." }] } }
   }

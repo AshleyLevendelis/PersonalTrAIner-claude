@@ -21,11 +21,12 @@
 // ---------------------------------------------------------------------------
 import { boot } from './session-driver-lib.mjs'
 
-const b = await boot({ debugPort: 9605, passed: 'History lists the workouts, the streak counts planned sessions where they were done, and both say so.' })
+const b = await boot({ debugPort: 9605, passed: 'History lists the workouts, Home counts finished weeks on plan, and both say so.' })
 const { ev, check, finish, tapExpr, q, byText, until, wait, load, tick, exerciseNames, shoot, escape, beforeLoad, ensureOpen, rowsExpr } = b
 
 const goto = async tab => { await ev(`window.location.hash = '#/tab/${tab}'`); await wait(1500) }
-const streak = async () => { await goto('home'); await until(`!!${q('[data-testid="home-streak"]')}`, 8000); await wait(600); return ev(`${q('[data-testid="home-streak"]')}?.innerText.replace(/\\s+/g, ' ').trim() ?? null`) }
+// RE-ANCHORED 13 Nov 2026: the streak went (his ruling); the pill is weeks on plan, read by its own testid.
+const streak = async () => { await goto('home'); await until(`!!${q('[data-testid="home-consistency"]')}`, 8000); await wait(600); return ev(`${q('[data-testid="home-consistency"]')}?.innerText.replace(/\\s+/g, ' ').trim() ?? null`) }
 const openHistory = async () => {
   await goto('exercise')
   await until(`!!${q('button[aria-label="More options"]')}`, 8000)
@@ -63,21 +64,19 @@ await beforeLoad(`window.__seedDb = (db, ctx) => {
 
 console.log('\nHISTORY AND THE STREAK\n')
 await load('', { tab: 'home' })
-await until(`!!window.__days && !!${q('[data-testid="home-streak"]')}`, 12000)
+await until(`!!window.__days && !!${q('[data-testid="home-consistency"]')}`, 12000)
 const D = await ev('window.__days')
 const rowsStored = await ev(`(window.__fakeDb?.workout_sessions ?? []).length`)
 check('0. eight rows are in the sessions table: four workouts and four day notes', rowsStored === 8, rowsStored)
 
-console.log('\n  1. HOME — the streak')
+console.log('\n  1. HOME — weeks on plan (the streak until 13 Nov 2026)')
 const s1 = await streak()
-// RE-ANCHORED 8 Nov 2026 on his ruling "Count it as a session": Sunday's football, swapped in AND logged, now counts.
-check('1a. FIVE: Monday, the two sessions done on the days they were moved to, Sunday\'s logged football, the first Monday', /^5 /.test(s1 ?? ''), s1)
-// HER 17 OCT RULING, "12 in a row": the pill shows the number and "in a row" (never "days"), and says the
-// whole thing, "N sessions in a row", to a screen reader. The number itself is 1a's to check.
-const s1Label = await ev(`${q('[data-testid="home-streak"]')}?.getAttribute('aria-label') ?? null`)
-check('1b. ...called what it counts: "in a row" on the pill, "sessions in a row" spoken, never "days"',
-  /^\d+ in a row$/.test(s1 ?? '') && s1Label === `${(s1 ?? '').split(' ')[0]} ${(s1 ?? '').startsWith('1 ') ? 'session' : 'sessions'} in a row` && !/day/i.test(s1 ?? ''), { s1, s1Label })
-const pill = await ev(`(() => { const n = ${q('[data-testid="home-streak"]')}; const r = n.getBoundingClientRect(); return { right: Math.round(r.right), vw: innerWidth, h: Math.round(r.height), wraps: n.scrollWidth > n.clientWidth + 1 } })()`)
+// The count itself (moves, a logged swap counting as done) is test:coach-rhythm's and test:workout-scenarios'.
+check('1a. the pill counts finished weeks on plan: "N of M weeks"', /^\d+ of \d+ weeks?$/.test(s1 ?? ''), s1)
+const s1Label = await ev(`${q('[data-testid="home-consistency"]')}?.getAttribute('aria-label') ?? null`)
+check('1b. ...and says the whole thing to a screen reader, never a run',
+  !!s1Label && /on plan/.test(s1Label) && !/in a row|streak/i.test(`${s1} ${s1Label}`), { s1, s1Label })
+const pill = await ev(`(() => { const n = ${q('[data-testid="home-consistency"]')}; const r = n.getBoundingClientRect(); return { right: Math.round(r.right), vw: innerWidth, h: Math.round(r.height), wraps: n.scrollWidth > n.clientWidth + 1 } })()`)
 check('1c. the pill fits beside the greeting', !!pill && pill.right <= pill.vw && !pill.wraps && pill.h < 40, pill)
 await shoot('history-streak-home')
 
@@ -102,7 +101,7 @@ await goto('tools')
 const tools = await until(`(() => { const t = document.querySelector('[data-testid="history-row"]')?.innerText?.replace(/\\s+/g, ' ') ?? ''; const m = t.match(/(\\d+ sessions?) logged (\\d+ PRs?)/); return m ? m[1] + ' · ' + m[2] : null })()`, 6000)
 check('3a. "4 sessions" — workouts, not rows (eight) and not rows plus activity days (ten)', /^4 sessions · /.test(tools ?? ''), tools)
 
-console.log('\n  4. TODAY\'S SESSION IS DONE — the streak moves')
+console.log('\n  4. TODAY\'S SESSION — the finished weeks do not move')
 await goto('exercise')
 await until(`document.querySelectorAll('[data-exercise-name]').length > 0`, 12000)
 await wait(800)
@@ -111,8 +110,8 @@ let X = null
 for (const n of names) { await ensureOpen(n); if ((await ev(`${rowsExpr(n)}.length`)) >= 1) { X = n; break } }
 check('4a. a set of today\'s session is ticked', !!X && (await tick(X, 0)) === true, names)
 const s2 = await streak()
-// Re-anchored 20 Oct 2026 to her 17 Oct pill ('N in a row'); 1b holds the words, this holds the NUMBER.
-check('4b. SIX — it sat on the same number after a second day\'s training', s2 === '6 in a row', s2)
+// RE-ANCHORED 13 Nov 2026: weeks on plan count FINISHED weeks, so a set today cannot move the pill.
+check('4b. a set today leaves the finished weeks as they were', !!s2 && s2 === s1, { s1, s2 })
 const hist2 = (await openHistory()) ?? []
 const todays = hist2.find(h => h.title.includes(D.today))
 check('4c. today is in history, titled by its weekday, with "1 set"', todays?.kind === 'history-session' && /^Wednesday · /.test(todays.title) && /· 1 set( |$)/.test(todays.text), todays)

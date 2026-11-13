@@ -63,6 +63,7 @@ await wait(150)
 await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /send/i.test(x.getAttribute('aria-label') || '')); if (!b || b.disabled) return false; b.click(); return true })()`)
 for (let i = 0; i < 40 && !((await momentRows())[0]?.answered); i++) await wait(100)
 const after = await momentRows()
+const firstTurned = await ev(`(window.__fakeDb?.chat_messages ?? []).filter(m => m.action_data && m.action_data.moment === 'turned_down').length`)
 check('his reply marks it answered ("replied")', after.length === 1 && !!after[0].answered && after[0].answer === 'replied', after)
 
 console.log('\nA longer chat in which an offer was left untapped yesterday (the phone keeps the card as it was drawn)')
@@ -75,6 +76,19 @@ const stale = JSON.parse((await ev(`JSON.stringify(${hellos}.map(m => ({ c: m.co
 const cachedCard = await ev(`(() => { try { return JSON.parse(localStorage.getItem('chat_history_cache_00000000-0000-4000-8000-00000000b007') || '[]').some(m => m.pendingAction && m.pendingAction.status === 'pending') } catch { return false } })()`)
 check('the phone still holds yesterday\'s untapped offer (the case is real, not already cleared)', cachedCard === true)
 check('...and the coach still says its hello: an offer whose time ran out is not a question still waiting', stale.length === 1 && /^Hey Sam\b/.test(stale[0]?.c ?? ''), stale)
+
+console.log('\nThe same message ignored three days running: the coach turns itself down a level, and says so (slice 2)')
+await send('Page.navigate', { url: 'about:blank' })
+await wait(300)
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/.tour-harness/app-boot.html?slow=0&chat-yesterday&ignored3&clear-storage&n=3` })
+const turned = `(window.__fakeDb?.chat_messages ?? []).filter(m => m.action_data && m.action_data.moment === 'turned_down')`
+for (let i = 0; i < 150 && !(await ev(`${turned}.length > 0`)); i++) await wait(100)
+await wait(800)
+const td = JSON.parse((await ev(`JSON.stringify(${turned}.map(m => m.content))`)) ?? '[]')
+const sw = await ev(`JSON.stringify((window.__fakeDb?.fitness_profiles ?? [])[0]?.notification_switches ?? null)`).then(x => JSON.parse(x ?? 'null'))
+check('his limit is saved one level down, Normal to Light, with the time it happened', sw?.frequency === 'light' && typeof sw?.frequency_dropped_at === 'string', sw)
+check('...and the coach says so once, naming Light and where to change it', td.length === 1 && /down to Light/.test(td[0]) && /Profile, Reminders/.test(td[0]), td)
+check('...while a phone with nothing ignored is never turned down (the first visit above)', firstTurned === 0, firstTurned)
 
 console.log(`\n${ran} checks ran.`)
 chrome.kill(); server.close()

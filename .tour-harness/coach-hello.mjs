@@ -145,7 +145,7 @@ console.log('\nB. The evening: the hello was at 3pm, she logs meals, nothing log
 await open('seed=hello&said=hello&meals=1&clock=19:30')
 const b = await settle(1)
 const moment = b.added[0]
-const MOMENTS = ['session_not_logged', 'streak_at_risk', 'meal_not_logged', 'protein_short']
+const MOMENTS = ['session_not_logged', 'meal_not_logged', 'protein_short', 'week_review', 'plan_week']
 check('B1. one coach message arrives on its own', b.added.length === 1 && moment?.role === 'assistant', b.added)
 check('B2. it is one of the phone\'s evening moments, marked as such', MOMENTS.includes(moment?.marker?.moment), moment?.marker)
 check('B3. it does not greet again (the day\'s hello was at 3pm) beyond the phone\'s own words', !/^Hey\b[^,]* — /.test(moment?.text ?? ''), moment?.text)

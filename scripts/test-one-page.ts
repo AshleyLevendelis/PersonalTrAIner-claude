@@ -5,7 +5,7 @@
 //   1. ring shares and Home's "% of today's targets" (a ring with no target is left out, never "0%")
 //   2. the Exercise week meter counts the strip's own days with the shared capped set count
 //   3. the Program row is the plan's own blocks, named by their phases, with an honest deload line
-//   4. her rulings: steps from the Steps key row, water from Nutrition's water cell, "in a row" pill,
+//   4. her rulings: steps from the Steps key row, water from Nutrition's water cell, the weeks-on-plan pill (was "in a row" until 13 Nov 2026),
 //      the day strip still on Nutrition; the rest of the key and the rings open Nutrition
 //   5. nothing the old screens carried is gone: the weigh-in, the summary, the ⋯ menu, the resize offer
 // docs/plans/one-page-tabs.md.
@@ -113,8 +113,9 @@ async function main() {
   check('the steps entry still writes through the plausibility guard', /handleLogSteps/.test(home) && /isPlausibleStepCount\(rounded\)/.test(home))
   check('Home no longer logs water (it moved to Nutrition\'s water cell)', !/logWater\(/.test(home))
   const voice = readFileSync('src/lib/coach-voice.ts', 'utf8')
-  check('"12 in a row": the pill\'s words are "in a row"', /export const STREAK_PILL_WORDS = 'in a row'/.test(voice) && /data-testid="home-streak-label">\{STREAK_PILL_WORDS\}/.test(home))
-  check('...never "days", and the full sentence is what a screen reader hears', !/home-streak-label">[^<]*days/.test(home) && /aria-label=\{`\$\{data\.streak\} \$\{streakLabel\(data\.streak\)\}`\}/.test(home))
+  // RE-ANCHORED 13 Nov 2026: his ruling of that day replaced his 17 Oct "12 in a row" pill with weeks on plan.
+  check('"9 of 12 weeks": the pill counts weeks on plan, in the phrasebook\'s words', /export function weeksOnPlanPill/.test(voice) && /data-testid="home-consistency-label">\{weeksOnPlanPill\(data\.weeksOnPlan\)\}/.test(home))
+  check('...never a run, and the full sentence is what a screen reader hears', !/in a row/.test(home) && /aria-label=\{weeksOnPlanSentence\(data\.weeksOnPlan\) \?\? ''\}/.test(home))
   check('the headline is today\'s four rings through todaySoFarPercent', /todaySoFarPercent\(\[calShare, proteinShare, waterShare, stepsShare\]\)/.test(home))
   check('Home\'s next meal is Nutrition\'s: the same sections and the same day-as-shown sizes', /dayAsShown\(\{/.test(home) && /mealSections\(\{/.test(home) && /eatenMacrosBySlot\(/.test(home))
   const nut = read('src/components/NutritionDisplay.tsx')

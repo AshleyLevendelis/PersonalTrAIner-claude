@@ -1508,6 +1508,14 @@ menu" stays true when a copy is also left outside it.
   chat cannot take it; a reply within 12 hours answers the newest, a shortcut tap answers its own; one reader gives each
   week's sessions, days logged and moments answered, and retention at weeks 1, 4 and 12. `test:measurement`,
   `verify:coach-hello-boot`, `test:reach-out` §5. Needs the moment-log migration and the `coach-reach-out` deploy
+- **Weeks on plan in place of the streak: his ruling 13 Nov 2026, "Replace"** (from three options, told it REVERSES his
+  17 Oct "12 in a row" pill; his 8 Nov "count it as a session" kept). Home says "9 of 12 weeks"; a week is on plan at three
+  quarters of its sessions rounded up; a run, broken or not, is never shown and no message stakes one. `test:coach-rhythm`
+- **The coach's rhythm** (slice 2): a comeback at 3 quiet days with no word of what was missed and no session reminders
+  through the lapse, one "door is open" at 14, then silence; a review on Saturday and plan the week on Sunday, from noon,
+  switchable, inside his daily limit; a "Shortest version" of any session that counts; the same message ignored three
+  times running turns the limit down a level and the coach says so. `test:coach-rhythm`, `verify:short-version`,
+  `verify:coach-hello-boot`. Needs the moment-log migration and the `coach-reach-out` and `chat-gemini` deploys
 
 ### His ruling of 12 Nov 2026, eating out (`docs/plans/eating-out.md`)
 - **A meal marked as out: "Ask: light/normal/big"** (from three options; his request "build it, start with out for

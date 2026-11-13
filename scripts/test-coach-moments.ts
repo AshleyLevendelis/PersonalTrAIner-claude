@@ -17,12 +17,14 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
   momentToRaise, liveMoments, MOMENT_KEYS, DEFAULT_MOMENT_SWITCHES,
-  QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, NOT_LOGGED_AFTER_HOUR, QUIET_WEEK_DAYS,
+  QUIET_BEFORE_HOUR, QUIET_AFTER_HOUR, NOT_LOGGED_AFTER_HOUR, COMEBACK_AFTER_DAYS,
   WORKOUT_REMINDER_BEFORE_HOUR, FOOD_NUDGE_AFTER_HOUR, MIN_HOURS_BETWEEN, momentsToRaise, dailyCap, REMINDER_FREQUENCIES, DEFAULT_FREQUENCY,
   type MomentFacts, type MomentKey,
 } from '../src/lib/coach-moments'
 import { coachMessage, coachMessageShortcut, coachShortcutLabel } from '../src/lib/coach-voice'
-const notification = (k: string, streak = 0, meals = 0) => coachMessage(k, { name: 'Ashley', streak, mealsLogged: meals })
+// The second argument is this week's sessions done, out of one more planned (the weekly review's one number, his
+// 13 Nov 2026 ruling: weekly consistency in place of the streak).
+const notification = (k: string, week = 0, meals = 0) => coachMessage(k, { name: 'Ashley', weekDone: week, weekPlanned: week + 1, mealsLogged: meals })
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const read = (f: string) => readFileSync(join(ROOT, f), 'utf8')
@@ -38,7 +40,7 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
 /** A quiet afternoon with nothing live. Every case below moves ONE fact off this. */
 const QUIET: MomentFacts = {
   localHour: 12, awaitingFeel: false, plannedToday: false, loggedToday: false,
-  missedYesterday: false, daysSinceAnyLog: 0, streakDays: 0,
+  missedYesterday: false, daysSinceAnyLog: 0,
   blockJustEnded: false, beatTargetPending: false,
 }
 
@@ -75,14 +77,15 @@ console.log('\n2. At most ONE thing, ever')
   // and the two that mattered go with the one that did not.
   const everything: MomentFacts = {
     localHour: 19, awaitingFeel: true, plannedToday: true, loggedToday: false,
-    missedYesterday: true, daysSinceAnyLog: 30, streakDays: 9,
+    missedYesterday: true, daysSinceAnyLog: 0,
     blockJustEnded: true, beatTargetPending: true,
-    logsMeals: true, mealsAccountedToday: 0,
+    logsMeals: true, mealsAccountedToday: 0, weekday: 6, weekSessionsDone: 2, weekSessionsPlanned: 4,
   }
   // The morning reminder and the evening ones cannot share an hour, so "every
   // moment live at once" is every moment but the morning one, at 7pm — and
   // the morning one has its own case below.
-  const eveningKeys = MOMENT_KEYS.filter(k => k !== 'workout_today' && k !== 'protein_short')
+  // A lapse (comeback, door open) and Sunday's plan the week cannot share this Saturday evening either; each has its own case.
+  const eveningKeys = MOMENT_KEYS.filter(k => !['workout_today', 'protein_short', 'comeback', 'door_open', 'plan_week'].includes(k))
   check('every evening moment really is live on this day', eveningKeys.every(k => liveMoments(everything).includes(k)),
     liveMoments(everything))
   const got = momentToRaise(everything)
@@ -92,7 +95,7 @@ console.log('\n2. At most ONE thing, ever')
   // the signal that goes stale fastest.
   check('...the one that goes stale fastest', got?.key === 'session_feel', got)
   check('...and the order is a declared list, not an accident of the switch',
-    MOMENT_KEYS[0] === 'session_feel' && MOMENT_KEYS.indexOf('week_gone_quiet') > MOMENT_KEYS.indexOf('missed_yesterday'),
+    MOMENT_KEYS[0] === 'session_feel' && MOMENT_KEYS.indexOf('week_review') > MOMENT_KEYS.indexOf('missed_yesterday'),
     [...MOMENT_KEYS])
 }
 
@@ -102,8 +105,10 @@ console.log('\n3. Each moment fires on its own fact, and only on it')
     ['session_feel', { awaitingFeel: true }],
     ['session_not_logged', { plannedToday: true, localHour: 19 }],
     ['missed_yesterday', { missedYesterday: true }],
-    ['week_gone_quiet', { daysSinceAnyLog: QUIET_WEEK_DAYS }],
-    ['streak_at_risk', { streakDays: 5, plannedToday: true, localHour: 19 }],
+    ['comeback', { daysSinceAnyLog: COMEBACK_AFTER_DAYS }],
+    ['door_open', { daysSinceAnyLog: 14 }],
+    ['week_review', { weekday: 6, localHour: 13, weekSessionsDone: 2, weekSessionsPlanned: 3 }],
+    ['plan_week', { weekday: 0, localHour: 13 }],
     ['block_review', { blockJustEnded: true }],
     ['beat_target', { beatTargetPending: true }],
     ['workout_today', { plannedToday: true, localHour: 9 }],
@@ -122,7 +127,7 @@ console.log('\n3. Each moment fires on its own fact, and only on it')
 
 console.log('\n4. The two that wait for the evening, because a morning nag is about nothing')
 {
-  const trainingDay: MomentFacts = { ...QUIET, plannedToday: true, streakDays: 5 }
+  const trainingDay: MomentFacts = { ...QUIET, plannedToday: true }
   // At 9am the only thing live is the MORNING reminder — never the evening
   // nudge or the streak, which would be a nag about a session not yet due.
   check('a session unlogged at 9am gets the morning reminder and nothing else',
@@ -134,14 +139,9 @@ console.log('\n4. The two that wait for the evening, because a morning nag is ab
     liveMoments({ ...trainingDay, localHour: NOT_LOGGED_AFTER_HOUR }).includes('session_not_logged'))
   check('...and a logged session never does, however late',
     !liveMoments({ ...trainingDay, localHour: 22, loggedToday: true }).includes('session_not_logged'))
-  // A STREAK ONLY COUNTS ONCE THERE IS ONE. Telling somebody on day zero that
-  // their streak is at risk is the app inventing a stake they never had.
-  check('a streak of nothing is never "at risk"',
-    !liveMoments({ ...QUIET, localHour: 19, plannedToday: true, streakDays: 0 }).includes('streak_at_risk'))
-  check('...nor is a streak of two',
-    !liveMoments({ ...QUIET, localHour: 19, plannedToday: true, streakDays: 2 }).includes('streak_at_risk'))
-  check('...while a real one is',
-    liveMoments({ ...QUIET, localHour: 19, plannedToday: true, streakDays: 3 }).includes('streak_at_risk'))
+  // THE STREAK WENT (his ruling 13 Nov 2026, "Replace"): "don't break your streak" is the loss-framed nudge the
+  // strategy rules out, so no evening message stakes a run at all.
+  check('no moment puts a streak at stake', !(MOMENT_KEYS as readonly string[]).includes('streak_at_risk'), [...MOMENT_KEYS])
 }
 
 console.log('\n4b. The three of 4 Nov 2026: the morning reminder and the two food nudges')
@@ -203,17 +203,16 @@ console.log('\n4b. The three of 4 Nov 2026: the morning reminder and the two foo
     both[0] === momentToRaise({ ...eater, plannedToday: true })?.key && both.indexOf('session_not_logged') < both.indexOf('meal_not_logged'), both)
 }
 
-console.log('\n5. A quiet week is days, not a guess, and "never logged" is not a quiet week')
+console.log('\n5. Quiet is counted in days, not guessed, and "never logged" is not a lapse')
 {
-  check(`${QUIET_WEEK_DAYS - 1} days is not yet a quiet week`,
-    !liveMoments({ ...QUIET, daysSinceAnyLog: QUIET_WEEK_DAYS - 1 }).includes('week_gone_quiet'))
-  check(`${QUIET_WEEK_DAYS} days is`,
-    liveMoments({ ...QUIET, daysSinceAnyLog: QUIET_WEEK_DAYS }).includes('week_gone_quiet'))
+  check(`${COMEBACK_AFTER_DAYS - 1} quiet days is not yet a lapse`,
+    !liveMoments({ ...QUIET, daysSinceAnyLog: COMEBACK_AFTER_DAYS - 1 }).includes('comeback'))
+  check(`${COMEBACK_AFTER_DAYS} days is`,
+    liveMoments({ ...QUIET, daysSinceAnyLog: COMEBACK_AFTER_DAYS }).includes('comeback'))
   // NULL IS NOT A BIG NUMBER. Someone who has never logged anything has not
-  // "gone quiet" — they have not started, which is a different conversation
-  // and not one to open by telling them off.
-  check('somebody who has never logged is not told their week went quiet',
-    !liveMoments({ ...QUIET, daysSinceAnyLog: null }).includes('week_gone_quiet'))
+  // "gone quiet" — they have not started, which is a different conversation.
+  check('somebody who has never logged is not treated as lapsed',
+    !liveMoments({ ...QUIET, daysSinceAnyLog: null }).some(k => k === 'comeback' || k === 'door_open'))
 }
 
 console.log('\n6. The switches turn things OFF, and absent means on')
@@ -235,7 +234,7 @@ console.log('\n6. The switches turn things OFF, and absent means on')
   const allOff = Object.fromEntries(MOMENT_KEYS.map(k => [k, false]))
   check('turning everything off is silent on the loudest possible day', momentToRaise({
     localHour: 19, awaitingFeel: true, plannedToday: true, loggedToday: false,
-    missedYesterday: true, daysSinceAnyLog: 30, streakDays: 9,
+    missedYesterday: true, daysSinceAnyLog: 3, weekday: 6, weekSessionsPlanned: 4,
     blockJustEnded: true, beatTargetPending: true,
   }, allOff) === null)
 }
@@ -265,8 +264,8 @@ console.log('\n7. Every word comes from the phrasebook')
       && /earlier\?$/.test(coachMessage('session_feel', { name: 'Ashley' })), coachMessage('session_feel', { name: 'Ashley', finishedWhen: 'this morning' }))
   check('the morning reminder is her own example, "are you ready for your session today?"',
     notification('workout_today') === 'Hey Ashley, are you ready for your session today?', notification('workout_today'))
-  check('the streak counts sessions, "5 in a row", never days (her 17 Oct ruling)',
-    /\b5 in a row\b/.test(notification('streak_at_risk', 5)) && !/\bdays?\b/i.test(notification('streak_at_risk', 5)), notification('streak_at_risk', 5))
+  check('the weekly review counts sessions, "5 of 6 sessions done", never days',
+    /\b5 of 6 sessions done\b/.test(notification('week_review', 5)) && !/\bdays?\b/i.test(notification('week_review', 5)), notification('week_review', 5))
   check('the session and food messages carry their shortcut, the rest none',
     coachMessageShortcut('workout_today') === 'exercise' && coachMessageShortcut('session_not_logged') === 'exercise'
       && coachMessageShortcut('meal_not_logged') === 'nutrition' && coachMessageShortcut('protein_short') === 'nutrition'
@@ -276,9 +275,9 @@ console.log('\n7. Every word comes from the phrasebook')
   check('...and every moment raised carries its message and its shortcut',
     momentsToRaise({ ...QUIET, localHour: 9, plannedToday: true, name: 'Ashley' })[0]?.shortcut === 'exercise'
       && momentsToRaise({ ...QUIET, localHour: 9, plannedToday: true, name: 'Ashley' })[0]?.text === 'Hey Ashley, are you ready for your session today?')
-  check('the streak line is the only one carrying a number',
-    /\b9\b/.test(notification('streak_at_risk', 9))
-    && MOMENT_KEYS.filter(k => k !== 'streak_at_risk').every(k => !/\d/.test(notification(k, 9))),
+  check('the weekly review is the only one carrying a number',
+    /\b9\b/.test(notification('week_review', 9))
+    && MOMENT_KEYS.filter(k => k !== 'week_review').every(k => !/\d/.test(notification(k, 9))),
     MOMENT_KEYS.map(k => notification(k, 9)))
   // The house voice, applied to a surface that arrives uninvited.
   check('...and none of them shouts', MOMENT_KEYS.every(k => !notification(k).includes('!')))

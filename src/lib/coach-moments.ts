@@ -34,11 +34,13 @@ import { coachMessage, coachMessageShortcut } from './coach-voice'
  */
 export const MOMENT_KEYS = [
   'session_feel',
+  'comeback',
+  'door_open',
   'workout_today',
   'session_not_logged',
   'missed_yesterday',
-  'week_gone_quiet',
-  'streak_at_risk',
+  'week_review',
+  'plan_week',
   'meal_not_logged',
   'protein_short',
   'block_review',
@@ -63,8 +65,14 @@ export interface MomentFacts {
   missedYesterday: boolean
   /** Days since anything at all was logged. Null when they have never logged. */
   daysSinceAnyLog: number | null
-  /** Days in the current streak, and whether today would break it. */
-  streakDays: number
+  /**
+   * WEEKLY RHYTHM (his strategy, 13 Nov 2026, slice 2). The person's own weekday (0 Sunday to 6 Saturday), and this
+   * week's sessions so far, Monday to Sunday as the strip counts them. Optional: a caller without them raises neither
+   * the review nor the plan-the-week message.
+   */
+  weekday?: number
+  weekSessionsDone?: number
+  weekSessionsPlanned?: number
   /** A block ended and its review has not been shown. */
   blockJustEnded: boolean
   /** The accelerator offer is waiting and has not been answered. */
@@ -118,6 +126,8 @@ export type NotificationSettings = MomentSwitches & {
   frequency?: ReminderFrequency
   /** A reply to a message she sent. Never held back by the frequency: she asked, the coach answers. */
   coach_reply?: boolean
+  /** When the coach last turned itself down a level after going unanswered (his strategy, 13 Nov 2026). */
+  frequency_dropped_at?: string
 }
 
 /**
@@ -143,8 +153,18 @@ export const QUIET_AFTER_HOUR = 21
 /** The session-not-logged nudge waits until the day is genuinely getting on. */
 export const NOT_LOGGED_AFTER_HOUR = 18
 
-/** A week is "gone quiet" at this many days with nothing logged at all. */
-export const QUIET_WEEK_DAYS = 7
+/**
+ * THE COMEBACK PATH (his strategy, 13 Nov 2026, slice 2, docs/plans/coach-rhythm.md §2b). After three quiet days one
+ * message with one small step and no mention of what was missed; after two weeks one "the door is open", then SILENCE:
+ * nothing unprompted at all until he logs something again. Each is said on the day the gap reaches it, once a lapse.
+ */
+export const COMEBACK_AFTER_DAYS = 3
+export const DOOR_OPEN_AFTER_DAYS = 14
+
+/** The weekly review on Saturday from noon, plan the week on Sunday from noon: the strategy's weekend lunchtime. */
+export const WEEK_REVIEW_WEEKDAY = 6
+export const PLAN_WEEK_WEEKDAY = 0
+export const WEEKEND_FROM_HOUR = 12
 
 /**
  * HOW CLOSE TOGETHER — Ashley's ruling, 4 Nov 2026, "Up to 3, spaced": at
@@ -185,7 +205,17 @@ export interface CoachMoment {
 }
 
 /** Is this moment live, on the facts alone? Switches and quiet hours are applied above. */
+/**
+ * A LAPSE HAS BEGUN at three quiet days (the comeback path): from then the coach stops reminding him of sessions and of
+ * what was missed. The comeback (day 3) and the open door (day 14) are its only training messages, so each really is
+ * the one message, not one more nag beside the daily reminders.
+ */
+function inLapse(f: MomentFacts): boolean {
+  return f.daysSinceAnyLog !== null && f.daysSinceAnyLog >= COMEBACK_AFTER_DAYS
+}
+
 function isLive(key: MomentKey, f: MomentFacts): boolean {
+  if ((key === 'workout_today' || key === 'session_not_logged' || key === 'missed_yesterday') && inLapse(f)) return false
   switch (key) {
     case 'session_feel': return f.awaitingFeel
     // NOT "it is a training day" — "it is a training day, it is evening, and
@@ -193,10 +223,10 @@ function isLive(key: MomentKey, f: MomentFacts): boolean {
     // after work is a nag about nothing.
     case 'session_not_logged': return f.plannedToday && !f.loggedToday && f.localHour >= NOT_LOGGED_AFTER_HOUR
     case 'missed_yesterday': return f.missedYesterday
-    case 'week_gone_quiet': return f.daysSinceAnyLog !== null && f.daysSinceAnyLog >= QUIET_WEEK_DAYS
-    // A streak only counts as at risk once there IS one. Telling somebody on
-    // day zero that their streak is in danger is the app inventing a stake.
-    case 'streak_at_risk': return f.streakDays >= 3 && f.plannedToday && !f.loggedToday && f.localHour >= NOT_LOGGED_AFTER_HOUR
+    case 'comeback': return f.daysSinceAnyLog === COMEBACK_AFTER_DAYS
+    case 'door_open': return f.daysSinceAnyLog === DOOR_OPEN_AFTER_DAYS
+    case 'week_review': return f.weekday === WEEK_REVIEW_WEEKDAY && f.localHour >= WEEKEND_FROM_HOUR && (f.weekSessionsPlanned ?? 0) > 0
+    case 'plan_week': return f.weekday === PLAN_WEEK_WEEKDAY && f.localHour >= WEEKEND_FROM_HOUR
     case 'block_review': return f.blockJustEnded
     case 'beat_target': return f.beatTargetPending
     // NOT "today is a training day": a reminder after she has already logged
@@ -241,6 +271,8 @@ export function momentsToRaise(
   switches: MomentSwitches = {},
 ): CoachMoment[] {
   if (facts.localHour < QUIET_BEFORE_HOUR || facts.localHour >= QUIET_AFTER_HOUR) return []
+  // THEN SILENCE (the comeback path): after the door-open day, nothing unprompted until he logs something again.
+  if (facts.daysSinceAnyLog !== null && facts.daysSinceAnyLog > DOOR_OPEN_AFTER_DAYS) return []
   const out: CoachMoment[] = []
   for (const key of MOMENT_KEYS) {
     // ABSENT MEANS ON. A profile written before these columns existed has no
@@ -250,7 +282,7 @@ export function momentsToRaise(
     if (isLive(key, facts)) {
       out.push({
         key,
-        text: coachMessage(key, { name: facts.name, streak: facts.streakDays, mealsLogged: facts.mealsAccountedToday ?? 0, finishedWhen: facts.finishedWhen }),
+        text: coachMessage(key, { name: facts.name, mealsLogged: facts.mealsAccountedToday ?? 0, finishedWhen: facts.finishedWhen, weekDone: facts.weekSessionsDone, weekPlanned: facts.weekSessionsPlanned }),
         shortcut: coachMessageShortcut(key),
       })
     }

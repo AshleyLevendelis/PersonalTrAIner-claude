@@ -28,3 +28,12 @@ CREATE POLICY "owner_update_coach_moment_log" ON coach_moment_log FOR UPDATE
   TO anon, authenticated USING (owns_profile(user_id)) WITH CHECK (owns_profile(user_id));
 CREATE POLICY "owner_delete_coach_moment_log" ON coach_moment_log FOR DELETE
   TO anon, authenticated USING (owns_profile(user_id));
+
+-- ---------------------------------------------------------------------------
+-- THIS WEEK'S SESSIONS FOR THE PHONE'S SATURDAY REVIEW (his strategy, slice 2, docs/plans/coach-rhythm.md). The app
+-- counts the week as the strip does and sends it ahead, like the training days; the server trusts it only on the day it
+-- was counted for the week it belongs to. Replaces the streak the app no longer counts (his 13 Nov ruling).
+-- ---------------------------------------------------------------------------
+ALTER TABLE coach_moment_facts ADD COLUMN IF NOT EXISTS week_sessions_done integer;
+ALTER TABLE coach_moment_facts ADD COLUMN IF NOT EXISTS week_sessions_planned integer;
+ALTER TABLE coach_moment_facts ADD COLUMN IF NOT EXISTS week_as_of date;

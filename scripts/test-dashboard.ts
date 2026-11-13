@@ -2,7 +2,7 @@ import { readFileSync } from 'fs'
 /**
  * Dashboard regression suite (VISION-ARCHITECTURE.md §5 Part 5 verification).
  *
- *   1. streak.ts: rest days counted correctly (transparent — never count or break)
+ *   1. (retired 13 Nov 2026 with the streak: weeks on plan are test:coach-rhythm's)
  *   2. coach-tips.ts: never renders without supporting data
  *   3. water target: user-set, never auto-suggested/computed
  *   4. calories-in matches the ledger (direct passthrough, no recomputation)
@@ -139,67 +139,15 @@ async function main() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   setSupabaseClient(fakeClient as any)
 
-  const { computeStreak } = await import('../src/lib/streak')
   const { selectCoachTip } = await import('../src/lib/coach-tips')
   const { computeWeightTrend } = await import('../src/lib/weight-trend')
   const { setWaterTargetMl, logWater, getLogsForDate, getTotalForDate, flushPending } = await import('../src/lib/water-store')
   const { loadDashboardData } = await import('../src/lib/dashboard-data')
-
-  // ---- 1. Streak: rest days counted correctly -------------------------------
-  console.log('\n[1] streak.ts: rest days are transparent — never count, never break')
-
-  const allTrainedNoRest = [
-    { date: '2026-01-01', scheduled: true, logged: true, planWeek: 1 },
-    { date: '2026-01-02', scheduled: true, logged: true, planWeek: 1 },
-    { date: '2026-01-03', scheduled: true, logged: true, planWeek: 1 },
-  ]
-  check('3 scheduled+logged days in a row = streak of 3', computeStreak(allTrainedNoRest).currentStreak === 3, computeStreak(allTrainedNoRest))
-
-  const withRestDaysInterleaved = [
-    { date: '2026-01-01', scheduled: true, logged: true, planWeek: 1 },
-    { date: '2026-01-02', scheduled: false, logged: false, planWeek: 1 }, // rest day, not logged
-    { date: '2026-01-03', scheduled: true, logged: true, planWeek: 1 },
-    { date: '2026-01-04', scheduled: false, logged: false, planWeek: 1 }, // rest day
-    { date: '2026-01-05', scheduled: true, logged: true, planWeek: 1 },
-  ]
-  check('rest days interleaved with training days do not break or count toward the streak (still 3)',
-    computeStreak(withRestDaysInterleaved).currentStreak === 3, computeStreak(withRestDaysInterleaved))
-
-  const restDayAtEnd = [
-    { date: '2026-01-01', scheduled: true, logged: true, planWeek: 1 },
-    { date: '2026-01-02', scheduled: true, logged: true, planWeek: 1 },
-    { date: '2026-01-03', scheduled: false, logged: false, planWeek: 1 }, // most recent day is a rest day
-  ]
-  check('a rest day as the MOST RECENT day still shows the streak from before it (2, not 0)',
-    computeStreak(restDayAtEnd).currentStreak === 2, computeStreak(restDayAtEnd))
-
-  const missedTrainingDay = [
-    { date: '2026-01-01', scheduled: true, logged: true, planWeek: 1 },
-    { date: '2026-01-02', scheduled: true, logged: false, planWeek: 1 }, // missed, no make-up used yet this week
-    { date: '2026-01-03', scheduled: true, logged: true, planWeek: 1 },
-  ]
-  const missedResult = computeStreak(missedTrainingDay)
-  check('one missed scheduled day consumes the make-up token (forgiven) rather than breaking immediately',
-    missedResult.currentStreak === 2 && !missedResult.brokenByMissedDay, missedResult)
-
-  const twoMissedSameWeek = [
-    { date: '2026-01-01', scheduled: true, logged: true, planWeek: 1 },
-    { date: '2026-01-02', scheduled: true, logged: false, planWeek: 1 }, // the OLDER miss this week
-    { date: '2026-01-03', scheduled: true, logged: false, planWeek: 1 }, // the MORE RECENT miss this week — walking backward, this one is forgiven first
-    { date: '2026-01-04', scheduled: true, logged: true, planWeek: 1 },
-  ]
-  const twoMissResult = computeStreak(twoMissedSameWeek)
-  check('two missed scheduled days in the SAME plan week: the more recent miss is forgiven (streak keeps the day-4 count), the older one breaks the walk right after',
-    twoMissResult.brokenByMissedDay && twoMissResult.currentStreak === 1, twoMissResult)
-
-  const missedDifferentWeeks = [
-    { date: '2026-01-01', scheduled: true, logged: false, planWeek: 1 }, // miss, week 1 — forgiven
-    { date: '2026-01-02', scheduled: true, logged: true, planWeek: 1 },
-    { date: '2026-01-08', scheduled: true, logged: false, planWeek: 2 }, // miss, week 2 — separate token, forgiven
-    { date: '2026-01-09', scheduled: true, logged: true, planWeek: 2 },
-  ]
-  check('a make-up token is per PLAN WEEK, not shared globally — two misses in two different weeks are both forgiven',
-    !computeStreak(missedDifferentWeeks).brokenByMissedDay, computeStreak(missedDifferentWeeks))
+  // [1] RETIRED 13 Nov 2026: the streak (streak.ts) went by his ruling of that day, weekly consistency in place of it.
+  // Weeks on plan are held by test:coach-rhythm; the week's own count (moves, rests, a logged swap) by this gate's
+  // week checks and test:workout-scenarios.
+  console.log('\n[1] the streak is retired (his 13 Nov 2026 ruling): Home counts weeks on plan instead')
+  check('Home no longer counts a streak', !/computeStreak|buildStreakDays/.test(readFileSync('src/lib/dashboard-data.ts', 'utf8').replace(/\/\/.*$/gm, '')))
 
   // ---- 2. Coach tips never render without supporting data --------------------
   console.log('\n[2] coach-tips.ts: never renders a tip without real supporting data')
@@ -656,12 +604,11 @@ async function main() {
     check('a day whose session moved away is not a planned session on that date', sessions(a)?.outOf === 1, sessions(a))
     check('...so the week reads 1 of 1, never "2 for 2"', sessions(a)?.done === 1 && !/2 for 2/.test(a.coachTip ?? ''), { s: sessions(a), tip: a.coachTip })
 
-    // (b) No move: a walk on a LIFTING day keeps the streak but is not the session.
+    // (b) No move: a walk on a LIFTING day is not the session.
     const walked = fresh()
     done(walked, '2026-09-21'); walk(walked, '2026-09-23')
     const b = await load(walked, '2026-09-21', '2026-09-24')
     check('an optional walk on a lifting day does not count as that day\'s session', sessions(b)?.outOf === 2 && sessions(b)?.done === 1, sessions(b))
-    check('...and still counts toward the activity streak', b.streak >= 1, b.streak)
 
     // (c) #21: week 1 has no "usual".
     const week1 = fresh()

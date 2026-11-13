@@ -42,8 +42,8 @@ export interface LessonFacts {
   restDayToday: boolean
   /** A personal best in the last two weeks. */
   recentBest: boolean
-  /** Sessions in a row (the streak), or null when unknown. */
-  streak: number | null
+  /** Weeks on plan of the last finished weeks (consistency.ts), or null when unknown. */
+  weeksOnPlan: number | null
   /** Her goal, as the profile names it. */
   goal: string | null
   /** The weight trend is downward. */
@@ -113,8 +113,8 @@ export const LESSONS: readonly Lesson[] = [
   {
     id: 'consistency',
     title: 'consistency over single sessions',
-    point: 'Turning up week after week is what changes the body; no single session does. A steady run matters more than any one great day.',
-    when: f => f.streak != null && f.streak >= 3,
+    point: 'Turning up week after week is what changes the body; no single session does. Steady weeks matter more than any one great day.',
+    when: f => f.weeksOnPlan != null && f.weeksOnPlan >= 2,
   },
   {
     id: 'protein-in-a-deficit',

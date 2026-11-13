@@ -19,7 +19,7 @@ import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
 import { stepsTargetFor } from '@/lib/steps-target'
 import { getStepsForDate, logStepsManual, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, type DailyStepsRow } from '@/lib/steps-store'
 import { getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
-import { Trophy, UtensilsCrossed, Activity, ChevronDown, Flame, Drumstick, Droplet, Footprints, CalendarDays, Play } from 'lucide-react'
+import { Trophy, UtensilsCrossed, Activity, ChevronDown, Flame, Drumstick, Droplet, Footprints, CalendarDays, CalendarCheck, Play } from 'lucide-react'
 import { WeighInCard } from '@/components/WeighInCard'
 import type { UserProfile, MacroTargets, WorkoutDay, MesocycleWeek } from '@/lib/types'
 import { useTrainingWeek } from '@/hooks/useTrainingWeek'
@@ -40,7 +40,7 @@ const SessionSummaryDialog = lazyWithReload(() => import('@/components/exercise/
 // meals now, and is up one day a week; first paint does not wait for it.
 // AMBIENT: it appears on its own day, nobody taps to open it, so with its file missing Home draws nothing in its place.
 const ShopDayCard = lazyWithReload(() => import('@/components/ShopDayCard').then(m => ({ default: m.ShopDayCard })), { ambient: true })
-import { personalBest, bestReadingOf, streakLabel, STREAK_PILL_WORDS } from '@/lib/coach-voice'
+import { personalBest, bestReadingOf, weeksOnPlanPill, weeksOnPlanSentence } from '@/lib/coach-voice'
 import { useCardioLogsToday } from '@/components/exercise/CardioSetRow'
 import { cardioLine } from '@/lib/cardio-lines'
 
@@ -255,14 +255,14 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         // remembering; the re-run below replaces it within the same visit.
         if (fresh.session.status !== 'unknown') saveDashboardCache(profile.id, activeSession.date, fresh)
         // THE COACH, WHEN THE APP IS SHUT, needs the few facts only the plan
-        // engine knows — sent from here because Home is where the streak is
+        // engine knows — sent from here because Home is where the week is
         // counted and the default tab everyone opens. Same guard as the cache:
         // a day computed without a plan is not worth telling anyone about.
         // Deduped inside, so a re-render sends nothing new.
         if (fresh.session.status !== 'unknown' && exercisePlan?.length && profile.id) {
           void sendFactsAhead(profile.id, momentFactsFrom({
             exercisePlan, mesocycle: mesocycle ?? [], planCreatedAt,
-            now: getAppNow(profile.id), streakDays: fresh.streak, today: activeSession.date,
+            now: getAppNow(profile.id), weekSessions: fresh.weekSessions, today: activeSession.date,
             proteinTarget: fresh.hasNutritionTargets ? fresh.proteinTarget : null,
           }))
         }
@@ -520,20 +520,21 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           <p className="ds-label">{dateLabel}</p>
           <h2 className="mt-1 text-[1.75rem] font-bold leading-[1.1] tracking-[-.03em]">{greeting}</h2>
         </div>
-        <span
-          className="mb-0.5 inline-flex h-[30px] shrink-0 items-center gap-[5px] rounded-full border px-[11px]"
-          style={data.streak > 0
-            ? { background: 'rgba(var(--glow-rgb), .12)', borderColor: 'rgba(var(--glow-rgb), .3)', color: 'var(--primary-text)' }
-            : { background: 'var(--surface-raised)', borderColor: 'transparent', color: 'var(--muted-foreground)' }}
-          data-testid="home-streak"
-          role="img"
-          aria-label={`${data.streak} ${streakLabel(data.streak)}`}
-        >
-          <Flame aria-hidden className="size-[13px]" />
-          <span className="tabular-mono text-[0.75rem] font-semibold">{data.streak}</span>
-          {/* "in a row", her 17 Oct ruling over the handoff's "days": the streak counts sessions. */}
-          <span className="text-[0.75rem] font-semibold" data-testid="home-streak-label">{STREAK_PILL_WORDS}</span>
-        </span>
+        {/* WEEKS ON PLAN, his 13 Nov 2026 ruling, in place of the "12 in a row" streak: "9 of 12 weeks", never a run. */}
+        {weeksOnPlanPill(data.weeksOnPlan) && (
+          <span
+            className="mb-0.5 inline-flex h-[30px] shrink-0 items-center gap-[5px] rounded-full border px-[11px]"
+            style={data.weeksOnPlan && data.weeksOnPlan.onPlan > 0
+              ? { background: 'rgba(var(--glow-rgb), .12)', borderColor: 'rgba(var(--glow-rgb), .3)', color: 'var(--primary-text)' }
+              : { background: 'var(--surface-raised)', borderColor: 'transparent', color: 'var(--muted-foreground)' }}
+            data-testid="home-consistency"
+            role="img"
+            aria-label={weeksOnPlanSentence(data.weeksOnPlan) ?? ''}
+          >
+            <CalendarCheck aria-hidden className="size-[13px]" />
+            <span className="tabular-mono text-[0.75rem] font-semibold" data-testid="home-consistency-label">{weeksOnPlanPill(data.weeksOnPlan)}</span>
+          </span>
+        )}
       </div>
 
       {/* 2. TODAY'S SESSION — the one glowing card. */}

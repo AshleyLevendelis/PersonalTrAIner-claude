@@ -533,10 +533,11 @@ export const REBALANCE = {
  * knows it, a question where one is natural. Never an exclamation mark — a
  * coach checking in, not an app shouting.
  *
- * NO NUMBERS EXCEPT THE STREAK, deliberately. The message may be read hours
- * late; a figure quoted in it is one the app cannot promise is still true. The
- * streak is the exception because it IS the subject of its own line, and it
- * counts SESSIONS ("5 in a row", her 17 Oct ruling: never "days").
+ * NO NUMBERS EXCEPT THE WEEK'S SESSIONS, deliberately. The message may be read
+ * hours late; a figure quoted in it is one the app cannot promise is still true.
+ * The weekly review is the exception because the count IS its subject ("3 of 4
+ * sessions done"), and it is said on the Saturday it is read. The streak line
+ * went with the streak (his 13 Nov 2026 ruling, weekly consistency instead).
  *
  * No grams and no named food on the protein line: it cannot see her diet or
  * her allergies, and "a protein-rich snack" is true for every one of them.
@@ -544,8 +545,9 @@ export const REBALANCE = {
 export interface CoachMessageDetail {
   /** The name the coach uses for her (the profile's display name). Blank means no name: "Hey, …". */
   name?: string | null
-  /** Sessions in the current run, for the streak line. */
-  streak?: number
+  /** This week's sessions so far, Monday to Sunday, for the weekly review (his strategy, 13 Nov 2026). */
+  weekDone?: number
+  weekPlanned?: number
   /** Meals accounted for today, for the meal line's two wordings. */
   mealsLogged?: number
   /** When the session being asked about finished, in her words. Absent reads as "earlier". */
@@ -560,8 +562,16 @@ export function coachMessage(key: string, d: CoachMessageDetail = {}): string {
     case 'workout_today': return `${hey}are you ready for your session today?`
     case 'session_not_logged': return `${hey}today's session is still waiting. Even a short one keeps you moving forward. Got twenty minutes?`
     case 'missed_yesterday': return `${hey}yesterday's session got away from you, and that's fine. Want to move it or let it go?`
-    case 'week_gone_quiet': return `${hey}it's been a quiet week, and that happens. A small session is the quickest way back in. Shall we pick one?`
-    case 'streak_at_risk': return `${hey}that's ${Math.max(0, d.streak ?? 0)} in a row, brilliant. Today would keep it going.`
+    case 'comeback': return `${hey}how about a ten-minute walk today? Small still counts.`
+    case 'door_open': return `${hey}no pressure at all. Whenever you want to pick things back up, I'm here, and we'll start gently.`
+    case 'week_review': {
+      const done = Math.max(0, d.weekDone ?? 0)
+      const planned = Math.max(0, d.weekPlanned ?? 0)
+      if (planned > 0 && done >= planned) return `${hey}your week so far: all ${planned} sessions done. That's the part most people find hardest. Anything you'd change for next week?`
+      if (done > 0) return `${hey}your week so far: ${done} of ${planned} sessions done. Want a quick look at what worked, and what to change for next week?`
+      return `${hey}this week didn't go to plan, and that's fine. Want to make next week easier to fit in?`
+    }
+    case 'plan_week': return `${hey}shall we plan next week? Which days suit training, and any meals out I should know about?`
     case 'meal_not_logged': return (d.mealsLogged ?? 0) >= 1
       ? `${hey}just one meal logged today. Add the rest so your numbers add up?`
       : `${hey}nothing logged on Nutrition yet today. Got a minute to add what you've eaten?`
@@ -1106,23 +1116,27 @@ export const SET_WAITING_TO_SEND = 'on this phone, waiting to send'
  * quiet line. A first log is where a record STARTS; it is not one.
  */
 /**
- * What the streak is CALLED, after its number: "2 sessions in a row".
- *
- * It said "2 days streak" over a count of planned sessions done — two
- * sessions a week apart are a streak of 2 and are not two days. Decided
- * unprompted on 9 Oct 2026, reversible (the owner question's default): keep
- * the idea of a streak, name the unit it actually counts.
+ * WEEKS ON PLAN, IN PLACE OF THE STREAK — his ruling 13 Nov 2026 ("Replace", told it reverses his 17 Oct "12 in a row"
+ * pill). Home's pill says "9 of 12 weeks"; a screen reader and the coach hear the whole sentence. A run, and a broken
+ * run, is never said (docs/plans/coach-rhythm.md §2a). Null when there is no finished week to count yet.
  */
-export function streakLabel(count: number): string {
-  return `${count === 1 ? 'session' : 'sessions'} in a row`
+/**
+ * THE COACH TURNS ITSELF DOWN, AND SAYS SO (his strategy, 13 Nov 2026, slice 2): said once, in the chat, when the
+ * same message has gone unanswered three times running. Names the new level and where to change it back.
+ */
+export function turnedDownLine(level: 'Light' | 'Normal'): string {
+  return `I've turned my messages down to ${level}, because the last few went unanswered. You can change it any time in Profile, Reminders.`
 }
 
-/**
- * HOME'S PILL SAYS "12 in a row" — her ruling 17 Oct 2026, from options, over the one-page design's
- * "12 days": the streak counts sessions, so "days" would be untrue, and the pill has no room for
- * "sessions". The full sentence (streakLabel) is what a screen reader hears.
- */
-export const STREAK_PILL_WORDS = 'in a row'
+export function weeksOnPlanPill(w: { onPlan: number; of: number } | null): string | null {
+  return w && w.of > 0 ? `${w.onPlan} of ${w.of} ${w.of === 1 ? 'week' : 'weeks'}` : null
+}
+export function weeksOnPlanSentence(w: { onPlan: number; of: number } | null): string | null {
+  if (!w || w.of === 0) return null
+  return w.of === 1
+    ? (w.onPlan === 1 ? 'last week on plan' : 'last week not quite on plan')
+    : `${w.onPlan} of the last ${w.of} weeks on plan`
+}
 
 /**
  * THE QUESTION BEFORE FINISHING WITH SETS STILL TO DO (M12, 9 Oct 2026).

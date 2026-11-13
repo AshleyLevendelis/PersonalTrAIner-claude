@@ -40,23 +40,22 @@
 // caller's app clock, exactly as coach-opener.ts takes them.
 // ---------------------------------------------------------------------------
 
-import { recordPhrase, streakLabel, whenSaid, type RecordFact } from './coach-voice'
+import { recordPhrase, whenSaid, type RecordFact } from './coach-voice'
 
 export type NudgeKind =
   | 'birthday'
   | 'session_feel'
   | 'missed_yesterday'
   | 'personal_best'
-  | 'streak_milestone'
+  | 'consistency_milestone'
   | 'session_due'
 
 /**
- * Streak lengths worth a word. A judgement, not a measured threshold — written
- * here so it is one line to change. Spaced widely on purpose: the streak is a
- * day count with rest days transparent (streak.ts), so on four sessions a week
- * these land roughly fortnightly at the start and then rarely.
+ * WEEKS ON PLAN WORTH A WORD (his 13 Nov 2026 ruling: weekly consistency in place of the streak). Counted over the last
+ * 12 finished weeks (consistency.ts), so these land a month apart at the start. A count, never a run: a missed week does
+ * not take anything away that was said.
  */
-export const STREAK_MILESTONES = [7, 14, 30, 60, 100]
+export const CONSISTENCY_MILESTONES = [4, 8, 12]
 
 export interface NudgeSession {
   focus: string
@@ -83,8 +82,8 @@ export interface NudgeInput {
   missedYesterday: { date: string; dayName: string; focus: string } | null
   /** The most recent personal best inside the dashboard's own recent window, or null. */
   recentPR: (RecordFact & { date: string }) | null
-  /** Planned sessions done in a row (streak.ts) — sessions, not days. */
-  streak: number
+  /** Of the last 12 finished weeks, how many were on plan (consistency.ts). */
+  weeksOnPlan: number
   /** Today's session from the LIVE week. Null on a rest day OR when planKnown is false. */
   todaySession: NudgeSession | null
   /** Any set logged today. */
@@ -116,10 +115,10 @@ export function nudgeKeys(input: NudgeInput): {
   feel: string | null
   missed: string | null
   pr: string | null
-  streak: string | null
+  consistency: string | null
   due: string | null
 } {
-  const milestone = STREAK_MILESTONES.includes(input.streak) ? input.streak : null
+  const milestone = CONSISTENCY_MILESTONES.includes(input.weeksOnPlan) ? input.weeksOnPlan : null
   return {
     birthday: input.birthdayToday ? `birthday:${input.today}` : null,
     feel: input.awaitingFeel ? `feel:${input.awaitingFeel.date}` : null,
@@ -127,7 +126,7 @@ export function nudgeKeys(input: NudgeInput): {
     pr: input.recentPR
       ? `pr:${input.recentPR.exerciseName}:${input.recentPR.date}:${input.recentPR.value}`
       : null,
-    streak: milestone ? `streak:${milestone}` : null,
+    consistency: milestone ? `weeks-on-plan:${milestone}` : null,
     // ONLY BEFORE THE CUTOFF. Past the hour she usually trains, "today's Push
     // & Press, feeling good for it?" is a question about a session that has
     // either already happened (and will come back as a feel question the
@@ -237,14 +236,13 @@ export function pickNudge(input: NudgeInput, said: string[]): CoachNudge | null 
     }
   }
 
-  // 4. A streak milestone. Below the PR because a streak is a fact about
-  //    turning up and a PR is a fact about her, and only one of them is new
-  //    information.
-  if (unsaid(keys.streak)) {
+  // 4. Weeks on plan. Below the PR because turning up is a fact about the
+  //    weeks and a PR is a fact about her, and only one of them is new information.
+  if (unsaid(keys.consistency)) {
     return {
-      kind: 'streak_milestone',
-      keys: [keys.streak],
-      text: `${input.streak} ${streakLabel(input.streak)} now. That's the part most people don't manage.`,
+      kind: 'consistency_milestone',
+      keys: [keys.consistency],
+      text: `That's ${input.weeksOnPlan} weeks on plan now. Turning up is the part most people don't manage.`,
       chips: ['How am I doing so far?'],
     }
   }
@@ -368,7 +366,7 @@ const NUDGE_MOMENT: Record<NudgeKind, string> = {
   session_feel: 'session_feel',
   missed_yesterday: 'missed_yesterday',
   personal_best: 'personal_best',
-  streak_milestone: 'streak_milestone',
+  consistency_milestone: 'consistency_milestone',
   session_due: 'workout_today',
 }
 

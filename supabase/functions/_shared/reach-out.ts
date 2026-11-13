@@ -16,8 +16,8 @@
 // WHERE THE FACTS COME FROM — the design decision that kept this small. Which
 // days are training days is the whole plan engine, which lives only in src/.
 // So the APP, whenever it is open, sends ahead the few plan-shaped facts: the
-// weekday pattern it trains on (the same one the streak counts by), when the
-// plan and the current block end, and the streak Home just counted. Everything
+// weekday pattern it trains on, when the plan and the current block end, and
+// this week's sessions Home just counted (13 Nov 2026: the streak is retired). Everything
 // else is read live from the database: what was logged, her own marks and
 // moves, a finished session nobody has rated, and an unanswered offer.
 // ---------------------------------------------------------------------------
@@ -40,15 +40,20 @@ export interface PushSubscriptionRow {
 
 /** The row the app sends ahead. Every field optional: a stale or partial row must not crash a run. */
 export interface MomentFactsRow {
-  /** Weekday names the plan trains on — "Monday", … — the pattern the streak itself counts by. */
+  /** Weekday names the plan trains on — "Monday", … — the pattern the week itself counts by. */
   training_weekdays?: string[] | null
   /** The day after the plan's last week. Nothing is "planned" from here on. */
   plan_ends_on?: string | null
   /** The day after the current block's last week, as the app last saw it. */
   block_ends_on?: string | null
-  streak_days?: number | null
-  /** The local date the streak was counted on. A streak not counted since before yesterday is not trusted. */
-  streak_as_of?: string | null
+  /**
+   * THIS WEEK'S SESSIONS, Monday to Sunday as Home's strip counts them, and the local date they were counted on (his
+   * strategy, 13 Nov 2026: the Saturday review's one number). Trusted only when counted today or yesterday, in the
+   * same Monday-to-Sunday week.
+   */
+  week_sessions_done?: number | null
+  week_sessions_planned?: number | null
+  week_as_of?: string | null
   /** Today's protein target in grams, as Home last showed it. Absent or 0 means unknown: no protein nudge. */
   protein_target_g?: number | null
   updated_at?: string | null
@@ -221,7 +226,7 @@ export function isPlanned(date: string, row: MomentFactsRow | null, live: LiveFa
  * Each fact that could otherwise repeat for ever is bounded, because a
  * notification about a stale fact is a nag about nothing: an unrated session
  * counts for 36 hours (bounded by the read), a block's end for three days, and
- * a streak only if Home counted it yesterday or today.
+ * a week's sessions only if Home counted them yesterday or today, that week.
  */
 /**
  * WHEN THE SESSION BEING ASKED ABOUT FINISHED, in her words and on her clock:
@@ -236,11 +241,23 @@ export function finishedWhen(finishedAt: string | null | undefined, localToday: 
   return null
 }
 
+/** The weekday of a local date as a number, 0 Sunday to 6 Saturday, read at noon so no clock change can move it. */
+function weekdayNumberOf(localDate: string): number {
+  return WEEKDAYS.indexOf(weekdayOf(localDate))
+}
+
+/** The Monday of a local date's Monday-to-Sunday week. */
+function mondayOfLocal(localDate: string): string {
+  return addDays(localDate, -((weekdayNumberOf(localDate) + 6) % 7))
+}
+
 export function factsFor(row: MomentFactsRow | null, live: LiveFacts, localToday: string, localHour: number, words: { name?: string | null; timezone?: string } = {}): MomentFacts {
   const yesterday = addDays(localToday, -1)
   const logged = new Set(live.activityDates)
   const lastLog = live.activityDates[0] ?? null
-  const streakFresh = !!row?.streak_as_of && daysBetween(row.streak_as_of, localToday) <= 1
+  // The week's count is trusted only within its own Monday-to-Sunday week, counted today or yesterday.
+  const weekFresh = !!row?.week_as_of && daysBetween(row.week_as_of, localToday) <= 1 && daysBetween(row.week_as_of, localToday) >= 0
+    && mondayOfLocal(row.week_as_of) === mondayOfLocal(localToday)
   const blockEnd = row?.block_ends_on ?? null
   return {
     localHour,
@@ -251,7 +268,9 @@ export function factsFor(row: MomentFactsRow | null, live: LiveFacts, localToday
     // asking about a miss once it is declared, and the phone does the same.
     missedYesterday: isPlanned(yesterday, row, live) && !logged.has(yesterday) && !live.marks[yesterday]?.missed,
     daysSinceAnyLog: lastLog ? daysBetween(lastLog, localToday) : null,
-    streakDays: streakFresh ? Math.max(0, row?.streak_days ?? 0) : 0,
+    weekday: weekdayNumberOf(localToday),
+    weekSessionsDone: weekFresh ? Math.max(0, Number(row?.week_sessions_done ?? 0) || 0) : 0,
+    weekSessionsPlanned: weekFresh ? Math.max(0, Number(row?.week_sessions_planned ?? 0) || 0) : 0,
     blockJustEnded: !!blockEnd && daysBetween(blockEnd, localToday) >= 0 && daysBetween(blockEnd, localToday) <= 3,
     beatTargetPending: live.beatTargetOffered,
     mealsAccountedToday: live.mealsAccountedToday ?? 0,

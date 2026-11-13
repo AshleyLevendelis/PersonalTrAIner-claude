@@ -28,15 +28,16 @@ const check = (label: string, ok: boolean, extra?: unknown) => {
 
 const F: MomentFacts = {
   localHour: 19, awaitingFeel: false, plannedToday: true, loggedToday: false, missedYesterday: false,
-  daysSinceAnyLog: 1, streakDays: 5, blockJustEnded: false, beatTargetPending: false, name: 'Ashley',
+  daysSinceAnyLog: 1, weekday: 6, weekSessionsDone: 5, weekSessionsPlanned: 6, blockJustEnded: false, beatTargetPending: false, name: 'Ashley',
 }
 const moment = (key: string, f: MomentFacts = F): CoachMoment => ({
   key: key as CoachMoment['key'],
-  text: coachMessage(key, { name: f.name, streak: f.streakDays, mealsLogged: f.mealsAccountedToday ?? 0, finishedWhen: f.finishedWhen }),
+  text: coachMessage(key, { name: f.name, weekDone: f.weekSessionsDone, weekPlanned: f.weekSessionsPlanned, mealsLogged: f.mealsAccountedToday ?? 0, finishedWhen: f.finishedWhen }),
   shortcut: null,
 })
 const NOT_LOGGED = moment('session_not_logged')
-const STREAK = moment('streak_at_risk')
+// The weekly review carries the week's numbers (5 of 6), as the streak line carried its count until 13 Nov 2026.
+const REVIEW = moment('week_review')
 const PROTEIN = moment('protein_short')
 
 async function main() {
@@ -55,10 +56,10 @@ async function main() {
   check('a message not opening "Hey" is refused (her WhatsApp shape)', refused('Ashley, your session is waiting.') === 'does not open "Hey"')
   check('a number the fixed sentence does not carry is refused (the coach never invents one)',
     /a number it was not given \(40\)/.test(refused("Hey Ashley, you're 40g short today.", PROTEIN) ?? ''), refused("Hey Ashley, you're 40g short today.", PROTEIN))
-  // A CASE WHERE THE ALLOWANCE BINDS: the streak sentence carries 5, so 5 is allowed and 6 is not.
+  // A CASE WHERE THE ALLOWANCE BINDS: the review carries 5 and 6, so those are allowed and 7 is not.
   check('...while the number it WAS given passes, and a different one does not',
-    checkReminder("Hey Ashley, 5 in a row, brilliant! Today's keeps it going.", STREAK, F).ok
-      && refused("Hey Ashley, 6 in a row, brilliant! Today's keeps it going.", STREAK) === 'a number it was not given (6)')
+    checkReminder("Hey Ashley, 5 of 6 sessions this week, lovely work. Anything you'd change for next week?", REVIEW, F).ok
+      && refused("Hey Ashley, 7 of 6 sessions this week, lovely work. Anything you'd change for next week?", REVIEW) === 'a number it was not given (7)')
   check('a food named is refused: it never knows her allergies',
     refused('Hey Ashley, a handful of almonds would close the protein gap tonight.', PROTEIN) === 'names a food (almonds)'
       && refused('Hey Ashley, a Greek yoghurt before bed would close the gap.', PROTEIN) === 'names a food (yoghurt)'
@@ -126,7 +127,7 @@ async function main() {
   check('the coach was asked, once, for this moment', a.prompts.length === 1 && /still waiting/.test(a.prompts[0]), a.prompts)
   check('its words went into the chat AND to the phone, the same words', a.chat[0] === coachWords && a.pushed[0] === coachWords && a.report.sent === 1, a)
   const b = await run(async () => 'Hey Ashley, smash it today, a banana first!')
-  const fixed = coachMessage('session_not_logged', { name: 'Ashley', streak: 0, mealsLogged: 0 })
+  const fixed = coachMessage('session_not_logged', { name: 'Ashley', mealsLogged: 0 })
   check('a refused message sends the fixed sentence to both, never the refused words', b.chat[0] === fixed && b.pushed[0] === fixed && !b.pushed.some(x => /banana/.test(x)), b)
   const c = await run(undefined)
   check('with no writer wired, the fixed sentence goes, as before', c.chat[0] === fixed && c.pushed[0] === fixed, c)

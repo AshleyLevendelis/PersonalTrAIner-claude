@@ -236,7 +236,8 @@ console.log('\n[4] "today" means one week, and next week is the full session')
   check('...and writes ONE week, not the whole plan', body.includes('saveMesocycleWeek(') && !body.includes('saveMesocycle('),
     { one: body.includes('saveMesocycleWeek('), all: /saveMesocycle\(/.test(body) })
   check('...through the shared settling tail', body.includes('settleWeek('))
-  check('...and through shortenDayTo rather than its own trimming', body.includes('shortenDayTo('))
+  // RE-ANCHORED 13 Nov 2026: reached through shortenOrFloor, which is shortenDayTo for any number and its floor for 0.
+  check('...and through shortenDayTo rather than its own trimming', body.includes('shortenOrFloor(') && /return shortenDayTo\(week, dayName, profile, minutes\)/.test(readFileSync(join(ROOT, 'src/lib/exercise-plan.ts'), 'utf8')))
 }
 
 // ---------------------------------------------------------------------------

@@ -13,8 +13,8 @@
 //      the server; a no-longer leaves nothing behind;
 //   4. a refused permission and an iPhone outside the home screen each say
 //      what is true and offer no dead switch;
-//   5. Home sends the server the facts it cannot work out, and the streak it
-//      sends is the streak Home SHOWS.
+//   5. Home sends the server the facts it cannot work out, and the week it
+//      sends is the week Home SHOWS (the streak until 13 Nov 2026).
 //
 // WHAT IS STUBBED, so the result is not overread: the browser's push machinery
 // (permission prompt, subscription) and the function's key endpoint. A
@@ -137,8 +137,10 @@ const moments = (sw1 ?? []).filter(s => s.id.startsWith('reminder-') && s.id !==
 // 6 NOV 2026: a coach REPLY has its own switch, on to begin with, beside the ten messages.
 const replySwitch = (sw1 ?? []).find(s => s.id === 'reminder-coach_reply')
 check('2b2. a switch for the coach\'s replies, in her words, on to begin with', replySwitch?.label === 'Message me when the coach replies' && replySwitch?.on === true, replySwitch)
-check('2b. ten message switches, each named for what arrives', moments.length === 10 && moments.every(s => s.label && s.label.length > 10), moments.map(s => s.label))
-check('2c. ...all on to begin with (her ruling)', moments.length === 10 && moments.every(s => s.on), moments)
+// 13 NOV 2026 (his strategy, slice 2): twelve. The streak and the quiet-week check went; the comeback, the open door,
+// the Saturday review and Sunday's plan the week came in, each switchable.
+check('2b. twelve message switches, each named for what arrives', moments.length === 12 && moments.every(s => s.label && s.label.length > 10), moments.map(s => s.label))
+check('2c. ...all on to begin with (her ruling)', moments.length === 12 && moments.every(s => s.on), moments)
 const pushAsked0 = await ev('window.__push?.asked')
 check('2d. loading the screen never raised the permission prompt', pushAsked0 === 0, { asked: pushAsked0, stubError: await ev('window.__pushStubError ?? null') })
 const rows = await ev(`[...document.querySelectorAll('${SECTION} [role="switch"]')].map(s => Math.round(s.closest('div').getBoundingClientRect().height))`)
@@ -162,7 +164,7 @@ await until(() => ev(`!!document.querySelector('[data-slot="dialog-content"]')`)
 await ev(`(() => { document.querySelector('[data-profile-sheet]') && document.querySelector('[data-profile-back]')?.click(); setTimeout(() => document.querySelector('[data-profile-row="Reminders"]')?.click(), 200) })()`)
   await wait(300)
 const reread = await until(switches, v => Array.isArray(v) && v.length >= 8)
-check('2i. closing and reopening Profile reads it back off', reread?.find(s => s.id === 'reminder-missed_yesterday')?.on === false && reread.filter(s => s.id.startsWith('reminder-')).length === 11, reread)
+check('2i. closing and reopening Profile reads it back off', reread?.find(s => s.id === 'reminder-missed_yesterday')?.on === false && reread.filter(s => s.id.startsWith('reminder-')).length === 13, reread)
 
 // --- 2j. HOW OFTEN: her ruling of 6 Nov 2026, "Three levels" ----------------------------------------------
 const freq = () => ev(`[...document.querySelectorAll('${SECTION} [data-testid="reminders-frequency"] [role="radio"]')].map(b => { const r = b.getBoundingClientRect(); return { f: b.dataset.frequency, on: b.getAttribute('aria-checked') === 'true', text: b.textContent.replace(/\\s+/g, ' ').trim(), h: Math.round(r.height), inView: r.top >= 0 && r.bottom <= innerHeight } })`)
@@ -252,15 +254,15 @@ check('4n3. ...nor does the Profile row: it states no level it did not read', /^
 console.log('  5. Home tells the server what only the plan knows')
 if (stubId) { await send('Page.removeScriptToEvaluateOnNewDocument', { identifier: stubId }); stubId = null }
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/.tour-harness/real.html` })
-// Read off the pill's own testid (9 Oct 2026): its words changed from "N days
-// streak" to "N sessions in a row" (M-lane), and the number is the claim.
-const shown = await until(() => ev(`(() => { const m = (document.querySelector('[data-testid="home-streak"]')?.textContent || '').match(/^\\s*(\\d+)/); return m ? Number(m[1]) : null })()`), v => v !== null)
+// RE-ANCHORED 13 Nov 2026: the streak went (his ruling); Home now sends this week's sessions for the Saturday review,
+// and what it sends must be the count Home SHOWS ("N of M sessions done" / "Session N of M").
+const shown = await until(() => ev(`(() => { const t = document.querySelector('[data-home-week]')?.getAttribute('aria-label') ?? ''; const w = t.match(/(\\d+) of (\\d+) sessions? done/); return w ? { done: +w[1], of: +w[2] } : null })()`), v => v !== null)
 const facts = await until(() => ev(`(window.__fakeDb?.coach_moment_facts ?? [])[0] ?? null`), v => v !== null)
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 check('5a. Home sent the facts once it had a plan', !!facts, facts)
 check('5b. ...the weekday pattern, as real weekday names', Array.isArray(facts?.training_weekdays) && facts.training_weekdays.length >= 2 && facts.training_weekdays.every(d => WEEKDAYS.includes(d)), facts?.training_weekdays)
-check('5c. ...the streak it SHOWS, not some other count', typeof shown === 'number' && facts?.streak_days === shown, { shown, sent: facts?.streak_days })
-check('5d. ...counted as of the day on screen', facts?.streak_as_of === ANCHOR_ISO, facts?.streak_as_of)
+check('5c. ...this week\'s sessions as Home SHOWS them, not some other count', !!shown && facts?.week_sessions_planned === shown.of && (shown.done == null || facts?.week_sessions_done === shown.done), { shown, sent: [facts?.week_sessions_done, facts?.week_sessions_planned] })
+check('5d. ...counted as of the day on screen', facts?.week_as_of === ANCHOR_ISO, facts?.week_as_of)
 check('5e. ...and a block end after today, no later than the plan end',
   typeof facts?.block_ends_on === 'string' && typeof facts?.plan_ends_on === 'string' && facts.block_ends_on > ANCHOR_ISO && facts.block_ends_on <= facts.plan_ends_on, facts)
 // One row per person and no repeat sends are test:reach-out §8's: this page
