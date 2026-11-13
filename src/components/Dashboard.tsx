@@ -5,6 +5,7 @@
 // no new visual language invented here.
 // ---------------------------------------------------------------------------
 
+import { useShowNumbers } from '@/lib/show-numbers'
 import type * as React from 'react'
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
@@ -155,6 +156,7 @@ function withMealSnapshot(d: DashboardData | null, profileId: string | undefined
 }
 
 export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreatedAt, onWeightLogged, logsVersion, trainerNudge, stepsVersion, onStepsLogged, todaysMeals, mealPools }: DashboardProps) {
+  const showNumbers = useShowNumbers()
   const stepsTarget = stepsTargetFor(profile)
   const activeSession = useActiveSession()
   // LAST KNOWN HOME, PAINTED IMMEDIATELY. Every tab but chat unmounts when you
@@ -587,15 +589,16 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
       <section className="px-1" data-tour="tiles">
         <div className="flex items-baseline justify-between">
           <span className="ds-label">Today</span>
-          <span className="text-[0.6875rem] text-muted-foreground">
+          {showNumbers && <span className="text-[0.6875rem] text-muted-foreground">
             <span className="tabular-mono font-semibold text-foreground" data-testid="home-so-far">{soFar == null ? '—' : `${soFar}%`}</span> of targets
-          </span>
+          </span>}
         </div>
-        <div className="mt-3 grid grid-cols-4 gap-1" data-home-today data-home-rings>
-          <RingCell k="calories" share={calShare} color="var(--primary)" glow icon={<Flame />} value={Math.round(data.caloriesEaten).toLocaleString()} label="kcal"
+        {/* THE STARTER TIER (slice 4b): water and steps only, no calories or protein. */}
+        <div className={`mt-3 grid ${showNumbers ? 'grid-cols-4' : 'grid-cols-2'} gap-1`} data-home-today data-home-rings>
+          {showNumbers && <><RingCell k="calories" share={calShare} color="var(--primary)" glow icon={<Flame />} value={Math.round(data.caloriesEaten).toLocaleString()} label="kcal"
             onClick={toNutrition} ariaLabel={`Calories: ${Math.round(data.caloriesEaten).toLocaleString()}${data.hasNutritionTargets ? ` of ${Math.round(data.caloriesTarget).toLocaleString()}` : ''}. Open Nutrition`} />
           <RingCell k="protein" share={proteinShare} color="var(--chart-2)" icon={<Drumstick />} value={`${Math.round(data.proteinEaten)}g`} label="protein"
-            onClick={toNutrition} ariaLabel={`Protein: ${Math.round(data.proteinEaten)}${data.hasNutritionTargets ? ` of ${Math.round(data.proteinTarget)}` : ''} grams. Open Nutrition`} />
+            onClick={toNutrition} ariaLabel={`Protein: ${Math.round(data.proteinEaten)}${data.hasNutritionTargets ? ` of ${Math.round(data.proteinTarget)}` : ''} grams. Open Nutrition`} /></>}
           <RingCell k="water" share={waterShare} color="var(--chart-3)" icon={<Droplet />} value={`${(data.waterMl / 1000).toFixed(1)} L`} label="water"
             onClick={toNutrition} ariaLabel={`Water: ${(data.waterMl / 1000).toFixed(1)} of ${(data.waterTargetMl / 1000).toFixed(1)} litres. Open Nutrition to log it`} />
           <RingCell k="steps" share={stepsShare} color="var(--chart-4)" icon={<Footprints />} value={compactCount(stepsToday)} label="steps"
@@ -751,7 +754,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           className="border-t-0"
           icon={<UtensilsCrossed className="size-4" />}
           title={<>{SLOT_LABEL[nextMealSlot]} · {nextMeal.name}</>}
-          sub={`${Math.round(nextMeal.macros.calories)} kcal · ${Math.round(nextMeal.macros.protein)}g P`}
+          sub={showNumbers ? `${Math.round(nextMeal.macros.calories)} kcal · ${Math.round(nextMeal.macros.protein)}g P` : undefined}
           onClick={toNutrition}
           data-home-next-meal={nextMealSlot}
         />

@@ -1,9 +1,10 @@
+import { useShowNumbers } from '@/lib/show-numbers'
 import { useState } from 'react'
 import { ChevronDown, ShoppingCart } from 'lucide-react'
 import type { MacroTargets } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
-import { dayVerdictLabel } from '@/lib/meal-generation'
+import { dayLineFor } from '@/lib/freestyle'
 import { dayOfMonth, weekdayShort } from '@/lib/day-labels'
 import { plannedRings, ringShares } from '@/lib/nutrition-week'
 import { NestedRings, MealMacros, KcalSwatch, DayVerdict, RING_COLOR, RING_LABEL } from '@/components/nutrition/NutritionRings'
@@ -30,13 +31,16 @@ const n = (v: number) => Math.round(v).toLocaleString('en-GB')
  * W1: AN UPCOMING DAY'S RINGS CARD, "planned". Four rings (no water: water is logged, never planned), each filled by
  * planned over target; four rows beside it; the day's verdict top right; "Add Friday to the shopping list" at the foot.
  */
-export function PlannedDayCard({ date, totals, targets, upcoming }: {
+export function PlannedDayCard({ date, totals, targets, upcoming, chosen = {} }: {
   date: string
+  /** The day's meals, so a freestyle day reads its own line (slice 4a). */
+  chosen?: Partial<Record<MealSlotName, PoolOption>>
   totals: MacroTargets
   targets: MacroTargets | null
   upcoming: UpcomingMealDay
 }) {
-  const verdict = targets ? dayVerdictLabel(totals, targets) : null
+  const showNumbers = useShowNumbers()
+  const verdict = targets && showNumbers ? dayLineFor(chosen, totals, targets) : null
   const shares = ringShares(totals, targets)
   return (
     <div
@@ -52,7 +56,7 @@ export function PlannedDayCard({ date, totals, targets, upcoming }: {
           <span className="text-[0.75rem]"><DayVerdict label={verdict} data-testid="planned-verdict" /></span>
         )}
       </div>
-      <div className="mt-4 flex items-center gap-4">
+      {showNumbers ? (<div className="mt-4 flex items-center gap-4">
         <NestedRings
           size={150}
           rings={plannedRings(150)}
@@ -72,7 +76,12 @@ export function PlannedDayCard({ date, totals, targets, upcoming }: {
             </div>
           ))}
         </div>
-      </div>
+      </div>) : (
+        // THE STARTER TIER (slice 4b): the day's meals by name, never numbers.
+        <p className="mt-3 text-[0.875rem]" data-testid="planned-starter">
+          {SLOT_ORDER.filter(s => chosen[s]).map(s => chosen[s]!.name).join(' · ') || 'No meals planned'}
+        </p>
+      )}
       <div className="mt-4">
         <AddDayToGrocery key={date} upcoming={upcoming} />
       </div>
@@ -93,8 +102,10 @@ export interface WeekViewDay {
  * and its meals; a meal opens that day on the strip, where everything it can do lives. "Shop the whole week" opens
  * the shopping list on its 7-day choice.
  */
-export function NutritionWeekView({ days, today, targets, onOpenDay, onShopWeek }: {
+export function NutritionWeekView({ days, today, targets, onOpenDay, onShopWeek, weekLine = null }: {
   days: WeekViewDay[]
+  /** The week so far, Monday to yesterday, as eaten (slice 4d), or null when nothing finished is logged yet. */
+  weekLine?: string | null
   today: string
   targets: MacroTargets | null
   /** Closes the week and opens that day on the strip. */
@@ -102,13 +113,17 @@ export function NutritionWeekView({ days, today, targets, onOpenDay, onShopWeek 
   onShopWeek: () => void
 }) {
   const [open, setOpen] = useState<string | null>(null)
+  const showNumbers = useShowNumbers()
   return (
     <div className="flex flex-col gap-2" data-testid="nutrition-week">
+      {weekLine && (
+        <p className="px-1 pb-1 text-[0.8125rem] text-muted-foreground" data-testid="week-average">{weekLine}</p>
+      )}
       {days.map(day => {
         const isToday = day.date === today
         const isOpen = open === day.date
         const slots = SLOT_ORDER.filter(s => day.chosen[s])
-        const verdict = targets ? dayVerdictLabel(day.totals, targets) : null
+        const verdict = targets && showNumbers ? dayLineFor(day.chosen, day.totals, targets) : null
         const label = isToday ? 'Today' : `${weekdayShort(day.date)} ${dayOfMonth(day.date)}`
         return (
           <div
@@ -127,16 +142,16 @@ export function NutritionWeekView({ days, today, targets, onOpenDay, onShopWeek 
               aria-expanded={isOpen}
               className="flex min-h-[64px] w-full items-center gap-3 px-3.5 py-2.5 text-left"
             >
-              <NestedRings
+              {showNumbers && <NestedRings
                 size={44}
                 rings={plannedRings(44)}
                 shares={ringShares(day.totals, targets)}
                 label={`${day.dayName}: ${n(day.totals.calories)}${targets ? ` of ${n(targets.calories)}` : ''} kcal planned`}
-              />
+              />}
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-2">
                   <span className={`text-[0.9375rem] font-semibold ${isToday ? 'text-primary-text' : ''}`} data-week-day-label>{label}</span>
-                  {!isOpen && (
+                  {!isOpen && showNumbers && (
                     <span className="flex shrink-0 items-center gap-1.5 text-[0.6875rem] text-muted-foreground">
                       <KcalSwatch />
                       <span className="tabular-mono text-[0.875rem] font-bold text-foreground" data-week-day-kcal>{n(day.totals.calories)}</span> kcal
@@ -144,10 +159,10 @@ export function NutritionWeekView({ days, today, targets, onOpenDay, onShopWeek 
                   )}
                 </span>
                 {isOpen ? (
-                  <span className="mt-0.5 block text-[0.75rem] text-muted-foreground" data-week-day-summary>
+                  showNumbers ? <span className="mt-0.5 block text-[0.75rem] text-muted-foreground" data-week-day-summary>
                     <span className="tabular-mono" data-week-day-kcal>{n(day.totals.calories)}</span> kcal
                     {verdict && <> · <DayVerdict label={verdict} data-testid="week-day-verdict" /></>}
-                  </span>
+                  </span> : null
                 ) : (
                   <span className="mt-0.5 block truncate text-[0.75rem] text-muted-foreground" data-week-day-meals>
                     {slots.length > 0 ? slots.map(s => day.chosen[s]!.name).join(' · ') : 'No meals planned'}
@@ -179,10 +194,10 @@ export function NutritionWeekView({ days, today, targets, onOpenDay, onShopWeek 
                         </span>
                         <span className="mt-0.5 block line-clamp-2 text-[0.96875rem] font-semibold leading-[1.3]">{o.name}</span>
                         </span>
-                        <span className="flex shrink-0 flex-col items-end pt-0.5">
+                        {showNumbers && <span className="flex shrink-0 flex-col items-end pt-0.5">
                           <span className="flex items-center gap-1.5"><KcalSwatch /><span className="tabular-mono text-[1.0625rem] font-bold leading-none">{n(o.macros.calories)}</span></span>
                           <span className="mt-1 text-[0.625rem] font-semibold uppercase leading-none tracking-[.12em] text-muted-foreground">kcal</span>
-                        </span>
+                        </span>}
                         </span>
                         <MealMacros protein={o.macros.protein} carbs={o.macros.carbs} fat={o.macros.fat} className="mt-2" />
                       </span>

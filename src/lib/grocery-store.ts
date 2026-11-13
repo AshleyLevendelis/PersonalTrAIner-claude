@@ -25,6 +25,7 @@ import { supabase } from './supabase'
 import { lookupIngredient, unitToGrams, type FoodCategory } from './food-db'
 import type { PoolOption } from './meal-generation'
 import { isCookedElsewhere } from './meals-elsewhere'
+import { isFreestyle } from './freestyle'
 import { serveDates, datesFrom, epochDay, addDays, type MealShape } from './meal-rotation'
 import type { MealSlotName } from './meal-store'
 import type { MacroTargets } from './types'
@@ -943,6 +944,8 @@ async function reconcileGenerated(
       // A MEAL COOKED FOR HIM ELSEWHERE IS NEVER SHOPPED FOR (Ashley, 11 Nov 2026), assumed or estimated: somebody
       // else buys it. Counted, so the list can say once why it is shorter than the week.
       if (isCookedElsewhere(option)) { cookedElsewhere++; continue }
+      // A FREESTYLE MEAL (slice 4a) is never shopped for, even once foods are added to it: he eats what he likes.
+      if (isFreestyle(option)) continue
       // A LEFTOVER IS BOUGHT WITH THE DINNER IT IS COOKED FROM (runs 7-10, H37, 20 Oct 2026): one batch, cooked once
       // (cook-once.ts). Counted on the lunch, the list bought today's lunch again (its dinner was cooked yesterday,
       // before the list began) and missed the last day's batch (its lunch falls after the list ends).

@@ -2985,7 +2985,9 @@ ${context.meal_summary}
 ${context.upcoming_meal_summary ? `
 UPCOMING MEALS — the next six days, exactly as the Nutrition tab's day strip shows them (tap a day, see its meals). NAMES ONLY: each is one of their saved options, and the ingredient rule above holds — a dish name is not a list of what it contains, so for "is there X in Monday's dinner?" answer from the ingredients above if that dish is on today's plate, and otherwise say you can see its name but not its ingredients from here, and offer to swap it anyway. To change one of these meals, call propose_meal_swap with that day's date. To shop for a whole day, add_day_to_grocery_list with its date. To swap a meal with the same meal on another day, propose_meal_day_move with both dates.
 ${context.upcoming_meal_summary}` : ''}
-${context.eaten_by_day_read === true && typeof context.eaten_by_day === 'string' ? `
+${context.show_numbers === false ? `
+NUMBERS OFF (his Profile setting, the starter tier): he chose not to see calories or macros. Never quote a calorie, kcal, gram or macro figure to him, even when the data below has one; talk about meals, portions (a palm of protein, a fist of carbs) and how the day went. Weights on the bar and minutes are fine.
+` : ''}${context.eaten_by_day_read === true && typeof context.eaten_by_day === 'string' ? `
 WHAT THEY LOGGED AS EATEN — totals from their meal log, today first. Logged, not eaten-in-fact: "nothing logged" means nothing was logged. This is the only record of a past day anywhere in the app; no screen shows it.
 ${context.eaten_by_day}` : context.eaten_by_day_read === false ? `
 WHAT THEY LOGGED AS EATEN — could not be read this turn. Say you can't see their log right now; never guess a figure.` : ''}

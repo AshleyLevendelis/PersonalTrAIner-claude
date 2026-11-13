@@ -1,3 +1,4 @@
+import { freestyleOption, freestyleName, isFreestyle, FREESTYLE_WORDS, type FreestyleController } from '@/lib/freestyle'
 import { useEffect, useMemo, useState } from 'react'
 import { datesFrom, pinsFromPicks, serveMealWeek, ROTATION_DAYS, type MealShape, type Rotation, type ServedDay } from '@/lib/meal-rotation'
 import { computeSlotBudgets, type HeldAround } from '@/lib/meal-generation'
@@ -481,6 +482,47 @@ export function useMealDays(input: MealDaysInput) {
     },
   }
 
+  /**
+   * FREESTYLE, A DAY AT A TIME (slice 4a): every meal of the date not already eaten becomes an empty one-day "Your
+   * choice" meal, down the same add-a-meal road as eating out; "Back to the plan" removes them and the plan's dishes
+   * return. All or nothing: a meal that fails to save puts back the ones already written.
+   */
+  const freestyle: FreestyleController = {
+    dates,
+    mark: async (date: string) => {
+      if (!profileId || !targets) return { ok: false, reason: EATING_OUT_REFUSALS.noTargets }
+      if (!dates.includes(date)) return { ok: false, reason: FREESTYLE_WORDS.outsideWindow }
+      const slots = Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks)) as MealSlotName[]
+      const eaten = date === today ? new Set(await readLoggedToday() ?? []) : new Set<MealSlotName>()
+      const done: MealSlotName[] = []
+      for (const slot of slots.filter(s => !eaten.has(s))) {
+        const { receipt } = await applyMealOptionToSlot(profileId, { slot, date, option: freestyleOption(slot, date) }, p => pickFor(p.date, p.slot, p.option.name))
+        if (receipt.failed.length > 0) {
+          for (const back of done) { await clearMealPick(profileId, date, back); await removeEatingOutOptions(profileId, back, freestyleName(back, date)) }
+          await reloadPools?.()
+          return { ok: false, reason: FREESTYLE_WORDS.notSaved }
+        }
+        done.push(slot)
+      }
+      return done.length > 0 ? { ok: true } : { ok: false, reason: FREESTYLE_WORDS.notSaved }
+    },
+    clear: async (date: string) => {
+      if (!profileId || !dates.includes(date) || !targets) return false
+      const slots = Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks)) as MealSlotName[]
+      const shown = date === today ? week[0]?.day.chosen : week.find(w => w.date === date)?.day.chosen
+      let ok = true
+      for (const slot of slots) {
+        if (!isFreestyle(shown?.[slot])) continue
+        if (!(await clearMealPick(profileId, date, slot))) { ok = false; continue }
+        await removeEatingOutOptions(profileId, slot, freestyleName(slot, date))
+        if (date === today) showTodaysPick?.(slot, null)
+        else setFuturePicks(prev => { const d = { ...(prev[date] ?? {}) }; delete d[slot]; return { ...prev, [date]: d } })
+      }
+      await reloadPools?.()
+      return ok
+    },
+  }
+
   const openDay: OpenMealDay | null = openDate && openAssembled ? {
     date: openDate,
     dayName: weekdayLong(openDate),
@@ -522,6 +564,8 @@ export function useMealDays(input: MealDaysInput) {
     applyPick,
     /** Mark a meal out, or put it back on the plan: the meal sheet and the coach's card both call it. */
     eatingOut,
+    /** Make a day freestyle, or put it back on the plan (slice 4a). */
+    freestyle,
     /** Put a day on the shopping list, or take it back off — the coach's path too. */
     addToGrocery,
     removeFromGrocery,

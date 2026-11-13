@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { ENJOYED_ACTIVITY_OPTIONS } from '@/lib/pathway'
+import { MEAL_VARIETY_OPTIONS } from '@/lib/freestyle'
 import { isMissingColumnError } from '@/lib/missing-column'
 import { loadSwitches, remindersSummary } from '@/lib/coach-reach-out'
 import { splitFoodList } from '@/lib/food-list'
@@ -1076,7 +1077,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       onProfileChanged(revertPatch)
       // A SETTING WHOSE DATABASE STEP HAS NOT RUN is not a connection problem, and saying so would send him to
       // check his signal for nothing.
-      if ('enjoyed_activities' in patch && isMissingColumnError(err, 'enjoyed_activities')) {
+      if ((['enjoyed_activities', 'meal_variety', 'show_numbers'] as const).some(c => c in patch && isMissingColumnError(err, c))) {
         setSaveError("That setting isn't switched on yet, so it couldn't be saved. Nothing else has changed.")
         return
       }
@@ -1806,6 +1807,16 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <Row label="Batch cook lunches">
               <Button size="sm" variant={(profile.batch_cooking ?? true) ? 'default' : 'outline'} className="h-11 text-xs" onClick={() => savePatch({ batch_cooking: !(profile.batch_cooking ?? true) })}>
                 {(profile.batch_cooking ?? true) ? 'Yes' : 'No'}
+              </Button>
+            </Row>
+            {/* HOW MUCH HE IS HAPPY TO REPEAT (his 13 Nov 2026 strategy, slice 4e). Read by the day search's variety
+                keys only, never past the day's targets. */}
+            <Row label="Meal variety"><EditableSelectField value={profile.meal_variety ?? 'variety'} options={MEAL_VARIETY_OPTIONS} onSave={v => savePatch({ meal_variety: v as 'variety' | 'some' | 'same' })} /></Row>
+            {/* THE STARTER TIER (slice 4b): off hides calories and macros on Nutrition and Home. */}
+            <Row label="Show numbers">
+              <Button size="sm" variant={profile.show_numbers !== false ? 'default' : 'outline'} className="h-11 text-xs" data-testid="profile-show-numbers"
+                onClick={() => savePatch({ show_numbers: profile.show_numbers === false })}>
+                {profile.show_numbers !== false ? 'Yes' : 'No'}
               </Button>
             </Row>
             {/* MEALS COOKED FOR HIM ELSEWHERE (Ashley, 11 Nov 2026). Saved before it is believed, on its own road:

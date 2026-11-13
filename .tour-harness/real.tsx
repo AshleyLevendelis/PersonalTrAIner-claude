@@ -52,6 +52,7 @@ import type { UserProfile, MacroTargets } from '@/lib/types'
 
 import { Dashboard } from '@/components/Dashboard'
 import { NutritionDisplay } from '@/components/NutritionDisplay'
+import { ShowNumbersContext } from '@/lib/show-numbers'
 import { ExerciseTab } from '@/components/exercise/ExerciseTab'
 import { getActiveAdaptations, endAdaptationEarly, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { loadPlanEditContext } from '@/lib/plan-edit-context'
@@ -280,6 +281,9 @@ const MUAY = new URLSearchParams(location.search).get('muay') === '1'
 // The six fields below are exactly what isStartingOut reads (starting-out.ts)
 // — a real profile the app would route this way, not a hand-seeded day.
 const WALKER = new URLSearchParams(location.search).get('walker') === '1'
+// Strategy slice 4: ?numbers=off is the starter tier (his Profile switch, as App provides it); ?pastate=1 seeds the week.
+const NUMBERS_OFF = new URLSearchParams(location.search).get('numbers') === 'off'
+const PAST_ATE = new URLSearchParams(location.search).get('pastate') === '1'
 
 // ?planDelay=N — App.tsx holds exercisePlan/mesocycle at [] until its read
 // resolves (App.tsx:111,138). Every other run of this harness hands them over
@@ -1101,6 +1105,17 @@ const db: Db = {
           meal_name: 'Leftover chilli and rice', macros: { kcal: 610, protein: 40, carbs: 70, fat: 15 },
           source: 'manual', client_id: 'seed-lunch', created_at: anchorDate().toISOString() },
       ]
+    // ?pastate=1 (strategy slice 4d): two meals logged on MONDAY of the anchor's week (the anchor is a Wednesday) and
+    // nothing on Tuesday, so the week's average has one logged day of two finished ones. INPUT only.
+    : PAST_ATE
+    ? [
+        { id: 'me-p1', profile_id: PROFILE_ID, date: '2026-09-14', slot: 'breakfast', event_type: 'confirmed',
+          meal_name: 'Porridge', macros: { kcal: 900, protein: 60, carbs: 100, fat: 25 },
+          source: 'manual', client_id: 'seed-past-1', created_at: anchorDate().toISOString() },
+        { id: 'me-p2', profile_id: PROFILE_ID, date: '2026-09-14', slot: 'dinner', event_type: 'confirmed',
+          meal_name: 'Chicken and rice', macros: { kcal: 1500, protein: 110, carbs: 160, fat: 40 },
+          source: 'manual', client_id: 'seed-past-2', created_at: anchorDate().toISOString() },
+      ]
     : [],
   meal_plan_picks: [], meal_plan_slots: [],
   favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
@@ -1853,6 +1868,7 @@ function Harness() {
 
       <main className="mx-auto max-w-md px-4 pb-40 pt-14">
         {activeTab === 'dashboard' && (
+          <ShowNumbersContext.Provider value={!NUMBERS_OFF}>
           <Dashboard profile={profile} macros={REFIT ? driftedMacros : homeMacros} exercisePlan={livePlan}
             mesocycle={liveMeso} planCreatedAt={profile.created_at}
             onWeightLogged={handleWeightLogged}
@@ -1860,8 +1876,10 @@ function Harness() {
             todaysMeals={(TOPUP || DAYMOVE ? mealDays.today?.day.chosen ?? {} : liveChosen) as never}
             mealPools={servablePools as never}
 />
+          </ShowNumbersContext.Provider>
         )}
         {activeTab === 'nutrition' && (
+          <ShowNumbersContext.Provider value={!NUMBERS_OFF}>
           <NutritionDisplay profile={profile} macros={driftedMacros} exercisePlan={exercisePlan}
             latestWeightKg={WEIGHIN != null ? Number(WEIGHIN) : 80} targetWeightKg={profile.weight_kg} profileId={PROFILE_ID} date={today} planCreatedAt={profile.created_at}
             pools={servablePools as never} chosen={(TOPUP || DAYMOVE ? mealDays.today?.day.chosen ?? {} : liveChosen) as never} mealTotals={liveTotals}
@@ -1889,7 +1907,9 @@ function Harness() {
             onOpenMyMeals={() => { const w = window as unknown as { __openedMyMeals?: number }; w.__openedMyMeals = (w.__openedMyMeals ?? 0) + 1 }}
             mealStrip={mealDays.strip} mealWeek={mealDays.week} upcomingDay={mealDays.openDay} dayMove={mealDays.dayMove} eatingOut={mealDays.eatingOut}
             // The app's own held state and its Undo (runs 3-4, M34), as App passes them.
-            heldAround={TOPUP || DAYMOVE ? mealDays.today?.day.heldAround : undefined} onKeepHeldSizes={mealDays.keepHeldSizes} />
+            heldAround={TOPUP || DAYMOVE ? mealDays.today?.day.heldAround : undefined} onKeepHeldSizes={mealDays.keepHeldSizes}
+            freestyle={mealDays.freestyle} />
+          </ShowNumbersContext.Provider>
         )}
         {activeTab === 'exercise' && (
           <ExerciseTab plan={planBornAt === profile.created_at ? exercisePlan : editedMeso[0]?.days ?? exercisePlan} mesocycle={editedMeso} exclusions={[]}

@@ -104,6 +104,12 @@ been wrong twice — "None" while tightness shipped, then "One" while three more
 sat listed underneath it. Both times somebody edited a bullet and left the
 header alone. Count what is below before trusting what is here.
 
+- **Freestyle a day, and the starter tier's "Show numbers" and "Meal variety" switches.** `screen only`, added
+  13 Nov 2026 with the strategy's slice 4 (`docs/plans/flexible-nutrition.md`): Nutrition's "Freestyle this day",
+  and two rows on Profile → Meals & shopping. The coach logs what he ate on a freestyle day with its existing food
+  logging, is told when numbers are off, and sees the week's average. NOT BUILT rather than decided against: a coach
+  card for each.
+
 - **Which meals are cooked for him, on which days.** `screen only`, added
   11 Nov 2026 with the feature (his ruling, "Set days + optional menu"):
   Profile → Meals & shopping → "Meals cooked for me", a button a weekday. The

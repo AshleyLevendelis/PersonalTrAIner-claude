@@ -28,6 +28,7 @@ import { supabase } from '@/lib/supabase'
 import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, waitingOnAnswer, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
+import { weeklyAverage, weeklyAverageLine, finishedDaysThisWeek } from '@/lib/weekly-average'
 import { swapPoolMeal, setMealPick, recordMealEvent, getEatenByDate, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
 import { buildCoachEatenSummary, eatenWindow } from '@/lib/coach-eaten'
 import { buildCoachWeekReview, weekReviewDates } from '@/lib/coach-week-review'
@@ -2230,6 +2231,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       eaten_by_day: eatenByDay,
       eaten_by_day_read: eatenByDay != null,
       week_review: weekReview,
+      // THE STARTER TIER (slice 4b): false means he chose not to see calories or macros, so the coach quotes none.
+      show_numbers: profile.show_numbers !== false,
       week_review_read: weekReview != null,
       favorites_summary: favoritesSummary,
       workout_log_history: workoutLogHistory,
@@ -2564,9 +2567,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // THIS TURN'S EATEN LOG, read now rather than from a copy loaded earlier, so
     // a meal logged on Nutrition a moment ago is in it (H26).
     const eatenToday = getLocalDateString(getAppNow(profile.id))
-    const eatenByDay = profile.id
+    const eatenSummary = profile.id
       ? buildCoachEatenSummary(await getEatenByDate(profile.id, eatenWindow(eatenToday)).catch(() => null), eatenToday)
       : null
+    // THE WEEK'S AVERAGE (slice 4d), the same line Nutrition's Week view shows, on the end of the eaten summary so the
+    // coach reads it without a new field: a day over is not a failure if the week lands, and nothing is cut to make up.
+    const weekEaten = profile.id && macros && eatenSummary != null
+      ? await getEatenByDate(profile.id, finishedDaysThisWeek(eatenToday)).catch(() => null)
+      : null
+    const weekAvg = weekEaten && macros ? weeklyAverage(weekEaten, eatenToday, macros) : null
+    const eatenByDay = eatenSummary != null && weekAvg ? `${eatenSummary}\n${weeklyAverageLine(weekAvg)}` : eatenSummary
     // THE WEEK AS THE SCREENS COUNT IT (run 7, M50): this week and last, Monday to Sunday, each day in the
     // strip's own words, with that day's logged meals, read now for this turn.
     const reviewWeeks = profile.id

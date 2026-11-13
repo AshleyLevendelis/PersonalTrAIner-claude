@@ -1,3 +1,4 @@
+import type { FreestyleController } from '@/lib/freestyle'
 import { useEffect, useRef, useState } from 'react'
 import type { HeldAround } from '@/lib/meal-generation'
 import { Badge } from '@/components/ui/badge'
@@ -11,7 +12,9 @@ import { MacroSplitCard } from '@/components/MacroSplitCard'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { mealsDrifted, MORE_MEALS } from '@/lib/coach-voice'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot } from '@/lib/meal-store'
+import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot, getEatenByDate } from '@/lib/meal-store'
+import { weeklyAverage, finishedDaysThisWeek, weeklyAverageLine, weeklyLoggedLine, type WeeklyAverage } from '@/lib/weekly-average'
+import { useShowNumbers, starterDayLine, holdsNutritionFigure, MEALS_DRIFTED_PLAIN } from '@/lib/show-numbers'
 import { getLogsForDate as getWaterLogsForDate, setWaterTargetMl, logWater, undoLog, type WaterLogRow } from '@/lib/water-store'
 import { TODAY_RINGS, TODAY_RING_SIZE, ringShares, leftOrOverLabel, litres, weekRangeLabel, type RingKey } from '@/lib/nutrition-week'
 import { NestedRings, RING_COLOR, RING_LABEL } from '@/components/nutrition/NutritionRings'
@@ -128,6 +131,7 @@ export interface NutritionDisplayProps {
   dayMove?: MealDayMoveController
   /** Marks a meal out, or puts it back (his 12 Nov 2026 "Ask: light/normal/big"); the coach's card calls the same. */
   eatingOut?: EatingOutController
+  freestyle?: FreestyleController
   /** What a swap did to today's other meals (runs 3-4, M34), and its Undo. */
   heldAround?: HeldAround
   onKeepHeldSizes?: (date: string, keep: boolean) => void
@@ -179,7 +183,7 @@ export function NutritionDisplay({
   onSwapMealSlot, onUndoMealSwap, onRegenerateMealSlot, onMakeOneNewMeal, onFindMoreOptions, onRegenerateAllMeals,
   mealRefit = null, mealRefitBusy = false, mealRefitError = null, onMealRefitConfirm, onMealRefitDecline,
   mealTopUp = null, mealTopUpBusy = false, mealTopUpNote = null, onMealTopUp, onMealTopUpDecline, onDismissMealTopUpNote, mealTopUpStart = null,
-  mealStrip, mealWeek, upcomingDay = null, dayMove, eatingOut, heldAround, onKeepHeldSizes,
+  mealStrip, mealWeek, upcomingDay = null, dayMove, eatingOut, freestyle, heldAround, onKeepHeldSizes,
 }: NutritionDisplayProps) {
   // Living targets (M0): BMR/TDEE were previously read from the frozen
   // fitness_profiles columns (computed once at onboarding); they're now
@@ -230,6 +234,17 @@ export function NutritionDisplay({
   const [noticeSlot, setNoticeSlot] = useState<HTMLElement | null>(null)
   /** W3: the week on one screen, opened and closed by the header's "Week" pill. */
   const [weekOpen, setWeekOpen] = useState(false)
+  const showNumbers = useShowNumbers()
+  // THE WEEK'S AVERAGE (slice 4d): read when the Week view opens, from the same eaten-by-day reader the coach uses.
+  const [weekAverage, setWeekAverage] = useState<WeeklyAverage | null>(null)
+  useEffect(() => {
+    if (!weekOpen || !profileId || !date || !macros) return
+    let live = true
+    void getEatenByDate(profileId, finishedDaysThisWeek(date)).then(eaten => {
+      if (live) setWeekAverage(eaten ? weeklyAverage(eaten, date, macros) : null)
+    })
+    return () => { live = false }
+  }, [weekOpen, profileId, date, macros])
   const [lastWaterLog, setLastWaterLog] = useState<WaterLogRow | null>(null)
   const handleAddWater = (amountMl: number) => {
     if (!profileId || !date) return
@@ -406,6 +421,7 @@ export function NutritionDisplay({
           targets={macros}
           onOpenDay={d => { setWeekOpen(false); mealStrip.onSelect(d) }}
           onShopWeek={() => { setWeekOpen(false); openGroceryForDays(7) }}
+          weekLine={weekAverage ? (showNumbers ? weeklyAverageLine(weekAverage) : weeklyLoggedLine(weekAverage)) : null}
         />
       ) : (<>
       {/* THE DAY STRIP STAYS ON TOP — her 17 Oct ruling, over the one-page design, which had none. */}
@@ -418,7 +434,7 @@ export function NutritionDisplay({
       {/* W1 (11 Nov 2026): A FUTURE DAY'S RINGS ARE ITS PLAN — planned over target, the engine's verdict, and the
           strip's add-to-list moved into the card. */}
       {upcomingDay && (
-        <PlannedDayCard date={upcomingDay.date} totals={upcomingDay.totals} targets={macros} upcoming={upcomingDay} />
+        <PlannedDayCard date={upcomingDay.date} totals={upcomingDay.totals} targets={macros} upcoming={upcomingDay} chosen={upcomingDay.chosen} />
       )}
       {/* TODAY'S PARTS ARE TODAY'S. The calories, the trainer's line and the
           resize offer are about what has been eaten today and today's meals,
@@ -475,7 +491,7 @@ export function NutritionDisplay({
               )}
             </div>
           )}
-          <div className="mt-4 flex justify-center">
+          {showNumbers ? (<div className="mt-4 flex justify-center">
             <NestedRings
               size={TODAY_RING_SIZE}
               rings={TODAY_RINGS}
@@ -499,14 +515,19 @@ export function NutritionDisplay({
                 </>
               )}
             </NestedRings>
-          </div>
+          </div>) : (
+            // THE STARTER TIER (slice 4b): meals, never numbers.
+            <p className="mt-4 text-[1rem] font-semibold" data-testid="starter-day-line">{starterDayLine(mealsLogged, mealsPlanned)}</p>
+          )}
 
           {/* ONE NAMED ROW PER RING, under the circle: swatch, name, eaten / target, and what is left (or over). */}
           <div className="mt-4 flex flex-col" data-ring-key>
+            {showNumbers && (<>
             <RingRow k="calories" eaten={eaten.kcal} target={macros?.calories} unit="" testids={{ eaten: 'kcal-eaten', target: 'kcal-target' }} />
             <RingRow k="protein" eaten={eaten.protein} target={macros?.protein} unit="g" />
             <RingRow k="carbs" eaten={eaten.carbs} target={macros?.carbs} unit="g" />
             <RingRow k="fat" eaten={eaten.fat} target={macros?.fat} unit="g" />
+            </>)}
             <RingRow k="water" eaten={todayWaterMl} target={waterTarget > 0 ? waterTarget : null} unit="L" litresOf celebrate={waterJustCompleted} />
           </div>
           {!macros && <p className="mt-2 text-[0.71875rem] text-text-tertiary">Add your weight on Profile for your targets.</p>}
@@ -529,7 +550,7 @@ export function NutritionDisplay({
       {/* THE TRAINER'S LINE. One sentence about the macro furthest behind,
           and only when something is. Derived here from the same eaten/target
           pairs the rings are drawn from — no second source, no new call. */}
-      {macroNudge && !mealRefit && !(mealTopUp && !mealTopUpNote) && <TrainerNudge slim text={macroNudge} tag="Nutrition" openChat askPrefill={`Tell me more about this: "${macroNudge}"`} />}
+      {macroNudge && (showNumbers || !holdsNutritionFigure(macroNudge)) && !mealRefit && !(mealTopUp && !mealTopUpNote) && <TrainerNudge slim text={macroNudge} tag="Nutrition" openChat askPrefill={`Tell me more about this: "${macroNudge}"`} />}
 
       {/* THE DRIFT OFFER. Ashley's ruling, 17 Sep 2026: tell her, and offer to
           refit. It sits ABOVE the meal list because it is about that list, and
@@ -539,7 +560,7 @@ export function NutritionDisplay({
       {mealRefit && (
         <div data-testid="meal-refit-offer">
           <TrainerNudge
-            text={mealsDrifted(mealRefit.before.totals.calories, macros?.calories ?? 0)}
+            text={showNumbers ? mealsDrifted(mealRefit.before.totals.calories, macros?.calories ?? 0) : MEALS_DRIFTED_PLAIN}
             actions={[
               { label: mealRefitBusy ? 'Resizing…' : 'Resize them', onClick: () => onMealRefitConfirm?.(), disabled: mealRefitBusy },
               { label: 'Leave them', onClick: () => onMealRefitDecline?.(), disabled: mealRefitBusy, secondary: true },
@@ -549,7 +570,7 @@ export function NutritionDisplay({
             {mealRefit.resized.map(r => (
               <li key={r.slot} className="flex items-baseline justify-between gap-3 text-[0.6875rem] text-muted-foreground">
                 <span className="truncate">{SLOT_LABEL[r.slot]} · {r.name}</span>
-                <span className="shrink-0 tabular-nums">{Math.round(r.before.calories)} → {Math.round(r.after.calories)} kcal</span>
+                {showNumbers && <span className="shrink-0 tabular-nums">{Math.round(r.before.calories)} → {Math.round(r.after.calories)} kcal</span>}
               </li>
             ))}
           </ul>
@@ -662,6 +683,7 @@ export function NutritionDisplay({
           upcoming={upcomingDay}
           dayMove={dayMove}
           eatingOut={eatingOut}
+          freestyle={freestyle}
           heldAround={upcomingDay.heldAround}
           onKeepHeldSizes={onKeepHeldSizes}
           regeneratingAll={mealsRegeneratingAll}
@@ -695,6 +717,7 @@ export function NutritionDisplay({
         onRegenerateAll={onRegenerateAllMeals}
         dayMove={dayMove}
         eatingOut={eatingOut}
+        freestyle={freestyle}
         heldAround={heldAround}
         onKeepHeldSizes={onKeepHeldSizes}
         regeneratingAll={mealsRegeneratingAll}
@@ -721,7 +744,7 @@ export function NutritionDisplay({
         >
           <SlidersHorizontal aria-hidden className="size-4 shrink-0 text-text-tertiary" />
           <span className="min-w-0 flex-1 truncate text-[0.875rem]">Targets &amp; plan settings</span>
-          <span className="tabular-mono shrink-0 text-[0.75rem] text-muted-foreground" data-testid="target-kcal">{macros?.calories ?? derivation.target.calories} kcal</span>
+          {showNumbers && <span className="tabular-mono shrink-0 text-[0.75rem] text-muted-foreground" data-testid="target-kcal">{macros?.calories ?? derivation.target.calories} kcal</span>}
           <ChevronRight aria-hidden className="size-4 shrink-0" style={{ color: 'var(--text-dim)' }} />
         </button>
       ) : (

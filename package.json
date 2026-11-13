@@ -502,6 +502,8 @@
     "test:offer-text": "tsx scripts/test-offer-text.ts",
     "verify:one-page": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/one-page.mjs",
     "verify:nutrition-3a": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/nutrition-3a.mjs",
+    "verify:flexible-nutrition": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/flexible-nutrition.mjs",
+    "test:flexible-nutrition": "tsx scripts/test-flexible-nutrition.ts",
     "verify:nutrition-week": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/nutrition-week.mjs",
     "test:boot-cache": "tsx scripts/test-boot-cache.ts",
     "verify:weigh-in-unread": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/weigh-in-unread.mjs",

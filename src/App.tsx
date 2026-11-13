@@ -1,3 +1,4 @@
+import { ShowNumbersContext } from '@/lib/show-numbers'
 import { couldNot, targetsMoved, mealsDrifted, type TargetMoveCause } from '@/lib/coach-voice'
 import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react'
 import { lazyWithReload, isChunkLoadError, reloadOnce } from '@/lib/chunk-reload'
@@ -491,9 +492,10 @@ function App() {
     mealsPerDay: profile?.meals_per_day,
     includeSnacks: profile?.include_snacks,
     batchCooking: profile?.batch_cooking,
+    variety: profile?.meal_variety ?? undefined,
     // Meals cooked for him elsewhere ride on the shape, so every surface that builds a week is handed them.
     elsewhere: profile?.meals_elsewhere,
-  }), [profile?.meals_per_day, profile?.include_snacks, profile?.batch_cooking, profile?.meals_elsewhere])
+  }), [profile?.meals_per_day, profile?.include_snacks, profile?.batch_cooking, profile?.meals_elsewhere, profile?.meal_variety])
   const mealRotation = useMemo(
     // Built from THIS WEEK'S MENU (9 Nov 2026, meal-menu.ts): a deep pool is never searched whole. The same object
     // serveDates draws for today, so the strip finds this rotation again rather than building its own.
@@ -1120,6 +1122,9 @@ function App() {
       start_preference: profileRow.start_preference ?? undefined,
       // Absent before its migration (`select('*')` needs no column): read as none.
       enjoyed_activities: Array.isArray(profileRow.enjoyed_activities) ? profileRow.enjoyed_activities : [],
+      // Slice 4's two settings, absent before their migration: read as the defaults.
+      meal_variety: profileRow.meal_variety === 'some' || profileRow.meal_variety === 'same' ? profileRow.meal_variety : 'variety',
+      show_numbers: profileRow.show_numbers !== false,
       meals_per_day: profileRow.meals_per_day ?? 3,
       include_snacks: profileRow.include_snacks ?? true,
       batch_cooking: profileRow.batch_cooking ?? true,
@@ -3365,6 +3370,8 @@ function App() {
           </InsightBanner>
           </div>
         )}
+        {/* THE STARTER TIER (his 13 Nov 2026 strategy, slice 4b): one switch every nutrition number reads. */}
+        <ShowNumbersContext.Provider value={profile?.show_numbers !== false}>
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
           <TabsContent value="dashboard">
             <Dashboard
@@ -3446,6 +3453,7 @@ function App() {
               mealWeek={mealDays.week}
               dayMove={mealDays.dayMove}
               eatingOut={mealDays.eatingOut}
+              freestyle={mealDays.freestyle}
               heldAround={mealDays.today?.day.heldAround}
               onKeepHeldSizes={mealDays.keepHeldSizes}
             />
@@ -3568,6 +3576,7 @@ function App() {
             </Suspense>
           </TabsContent>
         </Tabs>
+        </ShowNumbersContext.Provider>
       </main>
       <BottomDock />
       <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} chatAttention={chatAttention && activeTab !== 'chat'} flatChatDisc={groceryFullScreen || activeTab === 'chat'} />

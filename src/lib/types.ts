@@ -140,6 +140,10 @@ export interface UserProfile {
   concurrent_activities?: ConcurrentActivity[]
   /** What he enjoys besides walking ('swimming' | 'cycling'), asked in setup on the pathway (his 13 Nov 2026 strategy, slice 3). One walk a week becomes one of them. Column `enjoyed_activities` (migration 20261113130000, not run). */
   enjoyed_activities?: string[] | null
+  /** How much he is happy to repeat meals (slice 4e): 'variety' (default) | 'some' | 'same'. Column `meal_variety`, migration 20261113140000, not run. */
+  meal_variety?: 'variety' | 'some' | 'same' | null
+  /** The starter tier (slice 4b): false hides calories and macros on Nutrition and Home. Column `show_numbers`, same migration. Absent reads as true. */
+  show_numbers?: boolean | null
   weekly_schedule?: Record<string, string | null>
   created_at?: string
   bmr?: number

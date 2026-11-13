@@ -1,3 +1,4 @@
+import { useShowNumbers } from '@/lib/show-numbers'
 import type * as React from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { macroEnergySplit, type RingGeometry, type RingKey } from '@/lib/nutrition-week'
@@ -96,6 +97,8 @@ export function NestedRings({ size, rings, shares, label, children, ...rest }: {
  * energy (protein and carbs x4, fat x9). Under it the grams with their words: "■ 42g protein ■ 92g carbs ■ 18g fat".
  */
 export function MealMacros({ protein, carbs, fat, className }: { protein: number; carbs: number; fat: number; className?: string }) {
+  // THE STARTER TIER (slice 4b): no macros.
+  if (!useShowNumbers()) return null
   const split = macroEnergySplit(protein, carbs, fat)
   const parts = [
     { key: 'protein' as const, grams: protein, word: 'protein' },

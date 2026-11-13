@@ -272,6 +272,31 @@ export interface MealShape {
    * construction. Undefined or empty: nothing is cooked for him.
    */
   elsewhere?: MealsElsewhere
+  /**
+   * HOW MUCH HE IS HAPPY TO REPEAT (his 13 Nov 2026 strategy, slice 4e). Undefined reads as 'variety', today's rules.
+   * It sets how many days back the day's search remembers, and nothing else: the day's targets still decide first.
+   */
+  variety?: MealVariety
+}
+
+export type MealVariety = 'variety' | 'some' | 'same'
+
+/**
+ * THE HISTORY THE DAY'S SEARCH SEES, for his variety setting. 'variety' keeps today's memory (six days, a dish rests
+ * three); 'some' remembers only yesterday, so a dish can come back after one day off; 'same' remembers nothing, so the
+ * best-fitting dishes can come back every day and a week can be built from a few staples. Variety is a sort key inside
+ * the day's tolerance bands, so no setting can buy a day off target.
+ */
+export function historyForVariety(
+  history: Partial<Record<MealSlotName, string[]>>,
+  shape: MealShape | undefined,
+): Partial<Record<MealSlotName, string[]>> {
+  const v = shape?.variety ?? 'variety'
+  if (v === 'variety') return history
+  if (v === 'same') return {}
+  const out: Partial<Record<MealSlotName, string[]>> = {}
+  for (const [slot, names] of Object.entries(history) as [MealSlotName, string[]][]) out[slot] = names.slice(-1)
+  return out
 }
 
 /** Is batch cooking on for this shape? Undefined means yes. */
@@ -406,7 +431,7 @@ export function buildRotation(
     if (leftover) pinned.lunch = leftover
     leftovers.push(leftover ? { lunch: leftover } : {})
 
-    let day = assembleDay(pools, targets, dayHistory, softLikedFoods, pinned)
+    let day = assembleDay(pools, targets, historyForVariety(dayHistory, shape), softLikedFoods, pinned)
 
     // COOK ONCE, EAT TWICE — NOT TWICE TODAY.
     //
@@ -434,7 +459,7 @@ export function buildRotation(
     if (leftover && day.chosen.dinner && sameDish(pools.dinner, day.chosen.dinner.name, leftover.name)) {
       delete pinned.lunch
       leftovers[leftovers.length - 1] = {}
-      day = assembleDay(pools, targets, dayHistory, softLikedFoods, pinned)
+      day = assembleDay(pools, targets, historyForVariety(dayHistory, shape), softLikedFoods, pinned)
     }
     days.push(day)
     history = extendHistory(history, day.chosen)
@@ -531,14 +556,14 @@ export function assembleRotationDay(
     const sameInputs = !replanned && Object.keys(pinned).length === 0 && b.pools === pools && b.targets === targets && b.softLikedFoods === softLikedFoods
     let day = sameInputs && rotation.days[index]
       ? rotation.days[index]
-      : assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, withLeftover)
+      : assembleDay(pools, targets, historyForVariety(rotation.historyFor(index), rotation.builtFrom.shape), softLikedFoods, withLeftover)
     // COOK ONCE, EAT TWICE — NOT TWICE TODAY, the rule buildRotation keeps for
     // its own leftovers, now kept for every day: the leftover yields rather than
     // sit beside the same dish at dinner. Reached by a re-made leftover, and by
     // a dinner she swapped to the very dish her lunch is — which served it
     // twice in one day before 28 Sep 2026.
     if (leftover.lunch && !pinned.lunch && day.chosen.dinner && sameDish(pools.dinner, day.chosen.dinner.name, leftover.lunch.name)) {
-      day = assembleDay(pools, targets, rotation.historyFor(index), softLikedFoods, { ...away, ...pinned })
+      day = assembleDay(pools, targets, historyForVariety(rotation.historyFor(index), rotation.builtFrom.shape), softLikedFoods, { ...away, ...pinned })
     }
     return day
   }

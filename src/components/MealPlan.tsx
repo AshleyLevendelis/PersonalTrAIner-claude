@@ -1,3 +1,5 @@
+import { useShowNumbers } from '@/lib/show-numbers'
+import { dayLineFor, isFreestyle, isFreestyleDay, FREESTYLE_WORDS, type FreestyleController } from '@/lib/freestyle'
 import { ELSEWHERE_WORDS, elsewhereState, isCookedElsewhere } from '@/lib/meals-elsewhere'
 import { useEffect, useRef, useState, Suspense, useMemo } from 'react'
 import { createPortal } from 'react-dom'
@@ -22,7 +24,7 @@ import { undoMealEdit, type MealEditUndo } from '@/lib/pending-action-executor'
 import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { mealSections } from '@/lib/meal-sections'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
-import { methodToShow, dayVerdictLabel, macroOnTarget, type PoolOption } from '@/lib/meal-generation'
+import { methodToShow, macroOnTarget, isFamiliarOption, type PoolOption } from '@/lib/meal-generation'
 import type { MethodRules } from '@/lib/meal-method-check'
 import { formatKitchenQuantity, kitchenLine } from '@/lib/portion-scaler'
 import { groceryHash } from '@/lib/app-route'
@@ -165,6 +167,8 @@ interface MealPlanProps {
    * put it back. From App, the same controller the coach's card uses. Absent, no meal offers it.
    */
   eatingOut?: EatingOutController
+  /** Freestyle a day, or put it back on the plan (slice 4a). */
+  freestyle?: FreestyleController
   /**
    * What a swap did to this day's other meals (runs 3-4, M34; her "Resize,
    * else leave"), and the Undo that keeps them at their planned sizes.
@@ -197,7 +201,7 @@ export function MealPlan({
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, onOpenMyMeals, dietaryPreferences = [], avoidFoods = [],
   mealsPerDay, includeSnacks, onMealPickApplied,
   onSwapSlot, onUndoSwap, onRegenerateSlot, onMakeOneNew, onFindMoreOptions, onRegenerateAll, upcoming, dayMove, regeneratingAll = false,
-  heldAround, onKeepHeldSizes, eatingOut,
+  heldAround, onKeepHeldSizes, eatingOut, freestyle,
 }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
   // A slot generation requested and asked for (present as a key in `pools`,
@@ -322,6 +326,8 @@ export function MealPlan({
   const aroundLine = aroundEatenLine(shown.aroundEaten)
   const heldLine = heldAround ? heldAroundLine(heldAround) : null
   // EATING OUT's line and its Undo (his 8 Nov "Undo line" shape): what was marked, and the dish to put back.
+  const [freeBusy, setFreeBusy] = useState(false)
+  const [freeLine, setFreeLine] = useState<string | null>(null)
   const [outLine, setOutLine] = useState<{ slot: MealSlotName; text: string; undo: { previous: string | null } | null } | null>(null)
   const [outBusy, setOutBusy] = useState(false)
   const dayWord = upcoming ? `${upcoming.dayName}'s` : "Today's"
@@ -496,6 +502,7 @@ export function MealPlan({
             slot={slot}
             isFirst={false}
             option={shownOption(slot)}
+            sizedUsual={sizedUsualLine(shownOption(slot), pools[slot] ?? [])}
             methodRules={methodRules}
             alternatives={pools[slot] ?? []}
             expanded={expandedSlot === slot}
@@ -616,7 +623,7 @@ export function MealPlan({
         </InsightBanner>
       )}
       {/* AN UPCOMING DAY'S PLANNED TOTALS AND VERDICT ARE ITS RINGS CARD NOW (W1, 11 Nov 2026), with its add-to-list. */}
-      {targets && !upcoming && <TotalsHero totals={shown.totals} targets={targets} />}
+      {targets && !upcoming && <TotalsHero totals={shown.totals} targets={targets} chosen={chosen} eaten={new Set((Object.keys(loggedBySlot) as MealSlotName[]).filter(sl => (loggedBySlot[sl] ?? []).length > 0))} />}
       {aroundLine && (
         <p className="flex items-start justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="around-eaten" data-kind={shown.aroundEaten.kind}>
           <span>{aroundLine}</span>
@@ -640,6 +647,30 @@ export function MealPlan({
           )}
         </p>
       )}
+
+      {/* FREESTYLE, A DAY AT A TIME (his 13 Nov 2026 strategy, slice 4a): one control for the day, and its line. */}
+      {freestyle && targets && (() => {
+        const eatenNow = new Set((Object.keys(loggedBySlot) as MealSlotName[]).filter(sl => (loggedBySlot[sl] ?? []).length > 0))
+        const on = isFreestyleDay(chosen, eatenNow)
+        const dayDate = date
+        const dayName = upcoming ? upcoming.dayName : 'Today'
+        return (
+          <div className="flex flex-col gap-1">
+            <button type="button" disabled={freeBusy} data-testid={on ? 'freestyle-back' : 'freestyle-on'}
+              className="flex min-h-[44px] items-center self-start text-[0.8125rem] font-semibold text-primary-text"
+              onClick={async () => {
+                setFreeBusy(true)
+                try {
+                  if (on) setFreeLine((await freestyle.clear(dayDate)) ? FREESTYLE_WORDS.cleared(dayName) : FREESTYLE_WORDS.notSaved)
+                  else { const r = await freestyle.mark(dayDate); setFreeLine(r.ok ? FREESTYLE_WORDS.marked(dayName) : r.reason ?? FREESTYLE_WORDS.notSaved) }
+                } finally { setFreeBusy(false) }
+              }}>
+              {on ? FREESTYLE_WORDS.back : FREESTYLE_WORDS.offer}
+            </button>
+            {freeLine && <p className="text-[0.71875rem] text-muted-foreground" data-testid="freestyle-line">{freeLine}</p>}
+          </div>
+        )
+      })()}
 
       {outLine && (
         <p className="flex items-start justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="eating-out-line">
@@ -835,7 +866,8 @@ function EmptySlotRow({ slot, isGenerating, onRegenerate }: { slot: MealSlotName
 }
 
 /** One hero number (today's planned calories) + a 2px progress line + a quiet tabular-mono macro row — replaces the old dual progress-bar TotalsBar. */
-function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroTargets }) {
+function TotalsHero({ totals, targets, chosen, eaten }: { totals: MacroTargets; targets: MacroTargets; chosen: Partial<Record<MealSlotName, PoolOption>>; eaten: ReadonlySet<MealSlotName> }) {
+  const useShowNumbersFlag = useShowNumbers()
   // THE ENGINE'S VERDICT, NOT A SECOND OPINION. This component had its own
   // rule for "on the number" (calories within 30 kcal, protein and carbs
   // within 10%, fat not looked at) beside the meal engine's bands for a
@@ -844,7 +876,8 @@ function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroT
   // protein apart in the 9 Oct 2026 test log (179 g "on the number", 181 g
   // "macros off") were both, by the engine, fine. The words now come from the
   // engine (dayVerdictLabel), and an off day says WHICH number is off.
-  const deltaLabel = dayVerdictLabel(totals, targets)
+  // A FREESTYLE DAY READS ITS OWN LINE (slice 4a, his ruling "Its own label"), never "on target".
+  const deltaLabel = dayLineFor(chosen, totals, targets, eaten)
   // Lit when protein is where a correct day has it — the same band, not a
   // third rule ("at or above target" lit it at 30% over too).
   const proteinAchieved = targets.protein > 0 && macroOnTarget('protein', totals.protein, targets.protein)
@@ -855,6 +888,8 @@ function TotalsHero({ totals, targets }: { totals: MacroTargets; targets: MacroT
   // ONE LINE SINCE 30 OCT 2026 ("less is more"): the planned total and the verdict, no panel and no second
   // copy of the target (the hero above says it). Tapping it shows the planned protein, carbs and fat.
   const [open, setOpen] = useState(false)
+  // THE STARTER TIER (slice 4b): no day total and no verdict (both are numbers); the rings card says the meals.
+  if (!useShowNumbersFlag) return null
   return (
     <div data-planned-day>
       <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left">
@@ -906,6 +941,7 @@ function CookedHint({ ing }: { ing: { name: string; quantity: number; unit: stri
 }
 
 function MealSlotRow({
+  sizedUsual = null,
   profileId,
   isFavourite,
   onToggleFavourite,
@@ -957,6 +993,8 @@ function MealSlotRow({
   slot: MealSlotName
   isFirst: boolean
   option: PoolOption | null
+  /** "Your usual, sized to today's targets." when a meal of his is served at a different size (slice 4c), else null. */
+  sizedUsual?: string | null
   /**
    * Her restrictions TODAY, for the cooking steps (11 Oct 2026): a method
    * naming a food she must not eat, or one the dish does not have, is not
@@ -1003,6 +1041,7 @@ function MealSlotRow({
   /** Swapping this meal with another day's. Absent: no day to swap with. */
   dayMove?: MealDayMoveController
 }) {
+  const useShowNumbersFlag = useShowNumbers()
   const [busy, setBusy] = useState(false)
   const [favouriteBusy, setFavouriteBusy] = useState(false)
   // THE HEART'S FAILURE IS SAID. Until 9 Oct 2026 a heart that did not save
@@ -1159,6 +1198,9 @@ function MealSlotRow({
   }
 
   const blocked = restriction != null && !restriction.ok
+  // A FREESTYLE MEAL WITH NOTHING IN IT YET (slice 4a) has nothing to log: logging it would record an empty meal as
+  // eaten. It says what to do instead.
+  const emptyFreestyle = !!option && isFreestyle(option) && option.ingredients.length === 0
 
   const isLogged = loggedEvents.length > 0
   // WHAT YOU ATE, NOT WHAT THE PLAN NOW SAYS — roadmap item 9. `option` is
@@ -1206,7 +1248,7 @@ function MealSlotRow({
     // the flag mean something: a warning you can tap straight past teaches
     // the user the warning is decorative. Unlogging is always allowed —
     // whatever is already recorded stays correctable.
-    if (blocked && !isLogged) return
+    if ((blocked || emptyFreestyle) && !isLogged) return
     setBusy(true)
     try {
       // ALL of them. Undo here means "this meal is not logged", and leaving
@@ -1303,7 +1345,7 @@ function MealSlotRow({
         </span>
         {option && (
           <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
-            <span className="flex min-w-[44px] flex-col items-end">
+            {useShowNumbersFlag && (<span className="flex min-w-[44px] flex-col items-end">
               <span className="flex items-center gap-1.5">
                 <KcalSwatch />
                 <span data-testid="meal-row-kcal" data-slot={slot} className="tabular-mono text-[1.0625rem] font-bold leading-none tracking-[-.02em]" style={{ color: kcalColor }}>
@@ -1311,7 +1353,7 @@ function MealSlotRow({
                 </span>
               </span>
               <span className="mt-1 text-[0.625rem] font-semibold uppercase leading-none tracking-[.12em] text-muted-foreground">kcal</span>
-            </span>
+            </span>)}
             <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
           </span>
         )}
@@ -1878,6 +1920,14 @@ function MealSlotRow({
                 </p>
               )}
 
+              {sizedUsual && !isLogged && (
+                <p className="text-[0.75rem] text-muted-foreground" data-testid="sized-usual">{sizedUsual}</p>
+              )}
+
+              {emptyFreestyle && !isLogged && (
+                <p className="text-[0.75rem] text-muted-foreground" data-testid="freestyle-row-note">{FREESTYLE_WORDS.rowNote}</p>
+              )}
+
               {duplicated && (
                 /* SAID OUT LOUD, in the number that is wrong. The totals at
                    the top of this screen have been counting this meal more than
@@ -1904,7 +1954,7 @@ function MealSlotRow({
                 <button
                   type="button"
                   onClick={handleLogToggle}
-                  disabled={busy || (blocked && !isLogged)}
+                  disabled={busy || ((blocked || emptyFreestyle) && !isLogged)}
                   className={`flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-[0.9375rem] font-bold disabled:opacity-60 ${!isLogged && !blocked ? 'glow-mint-box' : ''}`}
                   style={isLogged
                     ? { background: 'rgba(var(--glow-rgb), .15)', color: 'var(--primary-text)' }
@@ -1964,6 +2014,7 @@ function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle,
    */
   eatingOut?: { size: EatingOutSize | null; resize: (size: EatingOutSize) => Promise<string | null>; notOut: () => Promise<boolean> }
 }) {
+  const useShowNumbersFlag = useShowNumbers()
   const [busy, setBusy] = useState(false)
   const [ownMeals, setOwnMeals] = useState<PoolOption[] | null>(null)
   const picking = ownMeals !== null
@@ -1993,7 +2044,7 @@ function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle,
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-1.5 pt-0.5">
-          <span className="flex min-w-[44px] flex-col items-end">
+          {useShowNumbersFlag && (<span className="flex min-w-[44px] flex-col items-end">
             <span className="flex items-center gap-1.5">
               <KcalSwatch />
               <span data-testid="meal-row-kcal" data-slot={slot} className="tabular-mono text-[1.0625rem] font-bold leading-none tracking-[-.02em]" style={{ color: variant === 'eaten' ? 'var(--primary-text)' : soft ? 'var(--text-tertiary)' : 'var(--foreground)' }}>
@@ -2001,7 +2052,7 @@ function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle,
               </span>
             </span>
             <span className="mt-1 text-[0.625rem] font-semibold uppercase leading-none tracking-[.12em] text-muted-foreground">kcal</span>
-          </span>
+          </span>)}
           <ChevronRight className="size-3.5 text-muted-foreground" aria-hidden />
         </span>
         </span>
@@ -2116,4 +2167,17 @@ function MacroLine({ protein, carbs, fat, className }: { protein: number; carbs:
       ))}
     </span>
   )
+}
+
+/**
+ * STAPLES, SAID WHERE IT HAPPENS (his 13 Nov 2026 strategy, slice 4c). The day's search resizes a dish before it picks
+ * a different one; when the dish is one of his own and today's size is not the one he wrote (more than 3% either way),
+ * the meal says so once. Read off the pool's own copy by name, so nothing new is stored.
+ */
+export function sizedUsualLine(shown: PoolOption | null | undefined, pool: PoolOption[]): string | null {
+  if (!shown) return null
+  const base = pool.find(o => o.name === shown.name)
+  if (!base || !isFamiliarOption(base) || !(base.macros.calories > 0)) return null
+  const ratio = shown.macros.calories / base.macros.calories
+  return Math.abs(ratio - 1) > 0.03 ? "Your usual, sized to today's targets." : null
 }
