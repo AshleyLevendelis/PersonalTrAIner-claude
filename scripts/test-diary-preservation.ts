@@ -102,7 +102,8 @@ check('the note is only claimed when the eaten meal IS still this slot\'s option
   /const eatenNote = isLogged && !planMovedOn && restriction && !restriction\.ok/.test(meal))
 // Logging a flagged meal is still refused, and unlogging is still always
 // allowed — item 9 must not have quietly reopened the thing the flag exists for.
-check('a flagged meal still cannot be logged', /if \(blocked && !isLogged\) return/.test(meal))
+// Since strategy slice 4 an empty freestyle meal shares the same guard: (blocked || emptyFreestyle).
+check('a flagged meal still cannot be logged', /if \(blocked && !isLogged\) return/.test(meal) || /if \(\(blocked \|\| emptyFreestyle\) && !isLogged\) return/.test(meal))
 
 // ---------------------------------------------------------------------------
 console.log('\n[4] The record itself is append-only and self-contained')

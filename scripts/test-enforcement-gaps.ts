@@ -169,7 +169,8 @@ console.log('\n4. One matcher, and the screens actually use it')
   // from one logged event per slot to all of them (`loggedEvent` ->
   // `isLogged`); the behaviour is identical and this was re-pinned, not
   // loosened.
-  check('a flagged meal cannot be logged as eaten', /disabled=\{busy \|\| \(blocked && !isLogged\)\}/.test(plan))
+  // Since strategy slice 4 an empty freestyle meal shares the same guard: ((blocked || emptyFreestyle) && !isLogged).
+  check('a flagged meal cannot be logged as eaten', /disabled=\{busy \|\| \(blocked && !isLogged\)\}/.test(plan) || /disabled=\{busy \|\| \(\(blocked \|\| emptyFreestyle\) && !isLogged\)\}/.test(plan))
   check('...and the reason is rendered', /restriction\.message/.test(plan))
   check('the offer to redo is an offer, not an automatic rebuild',
     /blockedSlots\.length > 0 &&/.test(plan) && !/useEffect[\s\S]{0,200}onRegenerateAll\(\)/.test(plan))

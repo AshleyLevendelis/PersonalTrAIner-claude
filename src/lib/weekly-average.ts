@@ -1,5 +1,6 @@
 import type { MacroTargets } from '@/lib/types'
 import type { EatenDay } from '@/lib/meal-store'
+import { addDays } from '@/lib/session-move'
 
 // ---------------------------------------------------------------------------
 // THE WEEK'S AVERAGE (his 13 Nov 2026 strategy, slice 4d; docs/plans/flexible-nutrition.md). Monday to Sunday, the
@@ -22,26 +23,17 @@ export interface WeeklyAverage {
   targetProtein: number
 }
 
-/** "2026-11-09" for any date in that Monday-to-Sunday week (dates are YYYY-MM-DD, read as calendar dates). */
+/** "2026-11-09" for any date in that Monday-to-Sunday week. Walked as a calendar date (session-move's addDays), never a timestamp. */
 export function mondayOfDate(date: string): string {
   const [y, m, d] = date.split('-').map(Number)
-  const t = new Date(Date.UTC(y, m - 1, d))
-  const back = (t.getUTCDay() + 6) % 7
-  t.setUTCDate(t.getUTCDate() - back)
-  return t.toISOString().slice(0, 10)
+  const back = (new Date(y, m - 1, d).getDay() + 6) % 7
+  return addDays(date, -back)
 }
 
 /** The finished days of this week before today, Monday first. Empty on a Monday. */
 export function finishedDaysThisWeek(today: string): string[] {
-  const monday = mondayOfDate(today)
   const out: string[] = []
-  const [y, m, d] = monday.split('-').map(Number)
-  for (let i = 0; i < 7; i++) {
-    const t = new Date(Date.UTC(y, m - 1, d + i))
-    const iso = t.toISOString().slice(0, 10)
-    if (iso >= today) break
-    out.push(iso)
-  }
+  for (let i = 0, day = mondayOfDate(today); i < 7 && day < today; i++, day = addDays(day, 1)) out.push(day)
   return out
 }
 

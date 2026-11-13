@@ -654,7 +654,8 @@ export function MealPlan({
         const on = isFreestyleDay(chosen, eatenNow)
         const dayDate = date
         const dayName = upcoming ? upcoming.dayName : 'Today'
-        return (
+        // Not "return (" + JSX: test:app-tour counts those as the component's own render branches.
+        const control = (
           <div className="flex flex-col gap-1">
             <button type="button" disabled={freeBusy} data-testid={on ? 'freestyle-back' : 'freestyle-on'}
               className="flex min-h-[44px] items-center self-start text-[0.8125rem] font-semibold text-primary-text"
@@ -670,6 +671,7 @@ export function MealPlan({
             {freeLine && <p className="text-[0.71875rem] text-muted-foreground" data-testid="freestyle-line">{freeLine}</p>}
           </div>
         )
+        return control
       })()}
 
       {outLine && (

@@ -132,7 +132,7 @@ async function main() {
   // TURNED ROUND 11 Nov 2026: his 3d ruling ("one circle with all the rings inside it like I used to have before,
   // including water") reverses the 17 Oct "rings live on Home only" for Nutrition. Home keeps its own rings.
   check('rings on Nutrition (11 Nov 2026, 3d): one circle, its own component, not Home\'s', /<NestedRings\b/.test(nut) && !/<RingMeter/.test(nut))
-  check('one coach voice: an offer showing takes the macro line\'s place', /\{macroNudge && !mealRefit && !\(mealTopUp && !mealTopUpNote\) && <TrainerNudge/.test(nut))
+  check('one coach voice: an offer showing takes the macro line\'s place', /\{macroNudge && (\(showNumbers \|\| !holdsNutritionFigure\(macroNudge\)\) && )?!mealRefit && !\(mealTopUp && !mealTopUpNote\) && <TrainerNudge/.test(nut))
 
   console.log('\n5. Nothing the old screens carried is gone')
   check('Home: the weigh-in still opens from the weight', /onClick=\{\(\) => setWeighInOpen\(o => !o\)\}/.test(home) && /<WeighInCard /.test(home))
@@ -188,7 +188,7 @@ async function main() {
     check('Home: the latest PR is on the card\'s face; the weight, recent PRs and volume sit behind its Progress row', cardAt !== -1 && prAt > cardAt && toggleAt > prAt && openAt > toggleAt && weightAt > openAt && recentAt > openAt && volAt > openAt, { cardAt, prAt, toggleAt, openAt, weightAt, recentAt, volAt })
     check('...which says the weight and the PR state while closed', /lastWeighIn \? `\$\{lastWeighIn\.kg\.toFixed\(1\)\} kg`/.test(homeCode.slice(toggleAt, openAt)))
     const rings = [...homeCode.matchAll(/<RingCell k="(\w+)"/g)].map(m => m[1])
-    check('Home: the rings are one row of four (calories, protein, water, steps), and no sleep ring: the app records none', /grid grid-cols-4[^"]*" data-home-today data-home-rings/.test(homeCode) && rings.join(',') === 'calories,protein,water,steps' && !/sleep/i.test(homeCode), rings)
+    check('Home: the rings are one row of four (calories, protein, water, steps), and no sleep ring: the app records none', (/grid grid-cols-4[^"]*" data-home-today data-home-rings/.test(homeCode) || /grid \$\{showNumbers \? 'grid-cols-4' : 'grid-cols-2'\}[^`]*`\} data-home-today data-home-rings/.test(homeCode)) && rings.join(',') === 'calories,protein,water,steps' && !/sleep/i.test(homeCode), rings)
   }
   const nudge = read('src/components/TrainerNudge.tsx')
   {

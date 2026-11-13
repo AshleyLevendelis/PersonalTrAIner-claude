@@ -149,7 +149,9 @@ async function main() {
     const ui = strip(readFileSync(join(ROOT, 'src/components/MealPlan.tsx'), 'utf8'))
     const hero = ui.slice(ui.indexOf('function TotalsHero('), ui.indexOf('function formatIngredient('))
     check('the header component was found (sanity check on this check)', hero.length > 400, hero.length)
-    check('it prints the engine\'s label', /dayVerdictLabel\(totals, targets\)/.test(hero))
+    // Since strategy slice 4 through dayLineFor, which is the engine's label on any day that is not freestyle
+    // (test:flexible-nutrition holds that it returns dayVerdictLabel there).
+    check('it prints the engine\'s label', /dayVerdictLabel\(totals, targets\)/.test(hero) || /dayLineFor\(chosen, totals, targets, eaten\)/.test(hero))
     check('...and lights protein by the engine\'s verdict for protein', /macroOnTarget\('protein', totals\.protein, targets\.protein\)/.test(hero))
     check('no percentage, no 30 kcal, no "macros off" of its own', !/0\.1\b|< 30\b|macros off|on the number|withinTolerance/.test(hero), hero.match(/0\.1\b|< 30\b|macros off|on the number|withinTolerance/)?.[0])
     const engine = strip(readFileSync(join(ROOT, 'src/lib/meal-generation.ts'), 'utf8'))

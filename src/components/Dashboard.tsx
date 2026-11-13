@@ -595,10 +595,12 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         </div>
         {/* THE STARTER TIER (slice 4b): water and steps only, no calories or protein. */}
         <div className={`mt-3 grid ${showNumbers ? 'grid-cols-4' : 'grid-cols-2'} gap-1`} data-home-today data-home-rings>
-          {showNumbers && <><RingCell k="calories" share={calShare} color="var(--primary)" glow icon={<Flame />} value={Math.round(data.caloriesEaten).toLocaleString()} label="kcal"
+          {showNumbers && (<>
+          <RingCell k="calories" share={calShare} color="var(--primary)" glow icon={<Flame />} value={Math.round(data.caloriesEaten).toLocaleString()} label="kcal"
             onClick={toNutrition} ariaLabel={`Calories: ${Math.round(data.caloriesEaten).toLocaleString()}${data.hasNutritionTargets ? ` of ${Math.round(data.caloriesTarget).toLocaleString()}` : ''}. Open Nutrition`} />
           <RingCell k="protein" share={proteinShare} color="var(--chart-2)" icon={<Drumstick />} value={`${Math.round(data.proteinEaten)}g`} label="protein"
-            onClick={toNutrition} ariaLabel={`Protein: ${Math.round(data.proteinEaten)}${data.hasNutritionTargets ? ` of ${Math.round(data.proteinTarget)}` : ''} grams. Open Nutrition`} /></>}
+            onClick={toNutrition} ariaLabel={`Protein: ${Math.round(data.proteinEaten)}${data.hasNutritionTargets ? ` of ${Math.round(data.proteinTarget)}` : ''} grams. Open Nutrition`} />
+          </>)}
           <RingCell k="water" share={waterShare} color="var(--chart-3)" icon={<Droplet />} value={`${(data.waterMl / 1000).toFixed(1)} L`} label="water"
             onClick={toNutrition} ariaLabel={`Water: ${(data.waterMl / 1000).toFixed(1)} of ${(data.waterTargetMl / 1000).toFixed(1)} litres. Open Nutrition to log it`} />
           <RingCell k="steps" share={stepsShare} color="var(--chart-4)" icon={<Footprints />} value={compactCount(stepsToday)} label="steps"

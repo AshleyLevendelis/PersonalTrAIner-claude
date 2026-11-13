@@ -107,14 +107,14 @@ async function main() {
   const planned = read('src/components/nutrition/NutritionWeek.tsx')
   const plannedCard = planned.slice(planned.indexOf('export function PlannedDayCard'), planned.indexOf('export interface WeekViewDay'))
   check('W1: the planned card\'s rings are planned over target, with no water', /rings=\{plannedRings\(150\)\}/.test(plannedCard) && /ringShares\(totals, targets\)/.test(plannedCard) && !/water/i.test(plannedCard.replace(/water is logged, never planned/gi, '')))
-  check('W1: the verdict is the engine\'s dayVerdictLabel, never a second opinion', /dayVerdictLabel\(totals, targets\)/.test(plannedCard) && /\{verdict\}/.test(plannedCard))
+  check('W1: the verdict is the engine\'s dayVerdictLabel, never a second opinion', (/dayVerdictLabel\(totals, targets\)/.test(plannedCard) || /dayLineFor\(chosen, totals, targets\)/.test(plannedCard)) && /\{verdict\}/.test(plannedCard))
   check('W1: the add-to-list is in the card', /<AddDayToGrocery\b/.test(plannedCard))
   const meals = read('src/components/MealPlan.tsx')
   check('...and no longer in the meal list (one door, not two)', !/<AddDayToGrocery\b/.test(meals))
   check('...and an upcoming day\'s planned total and verdict are the card\'s, not a second line under it', /\{targets && !upcoming && <TotalsHero/.test(meals))
   const weekView = planned.slice(planned.indexOf('export function NutritionWeekView'))
   check('W3: one day open at a time (one piece of state, a date or none)', /useState<string \| null>\(null\)/.test(weekView) && /setOpen\(o => \(o === day\.date \? null : day\.date\)\)/.test(weekView))
-  check('W3: an open day\'s verdict is dayVerdictLabel too', /dayVerdictLabel\(day\.totals, targets\)/.test(weekView))
+  check('W3: an open day\'s verdict is dayVerdictLabel too', (/dayVerdictLabel\(day\.totals, targets\)/.test(weekView) || /dayLineFor\(day\.chosen, day\.totals, targets\)/.test(weekView)))
   {
     // HIS RULING 12 NOV 2026 (option 1): a miss is never amber on this screen, it read as carbs.
     const rings = strip(readFileSync('src/components/nutrition/NutritionRings.tsx', 'utf8'))

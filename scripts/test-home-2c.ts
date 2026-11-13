@@ -123,7 +123,9 @@ async function main() {
   check('...a ring with no target is an empty track, marked so', /data-share="none"/.test(ring(null)) && /opacity="0"/.test(ring(null)))
   check('...and the ring, its value and its label are one button (44px tall at least)', /^<button type="button"[^>]*min-h-\[44px\][^>]*data-key-row="water"/.test(quarter) && /0\.8 L[\s\S]*water<\/span><\/span><\/button>$/.test(quarter))
   const cells = [...home.matchAll(/<RingCell k="(\w+)"[\s\S]*?\/>\n/g)].map(m => ({ k: m[1], src: m[0] }))
-  check('four rings in one row: calories, protein, water, steps (no sleep: the app records none)', cells.map(c => c.k).join(',') === 'calories,protein,water,steps' && !/sleep/i.test(home) && /grid grid-cols-4[^"]*" data-home-today data-home-rings/.test(home), cells.map(c => c.k))
+  check('four rings in one row: calories, protein, water, steps (no sleep: the app records none)', cells.map(c => c.k).join(',') === 'calories,protein,water,steps' && !/sleep/i.test(home) && (/grid grid-cols-4[^"]*" data-home-today data-home-rings/.test(home)
+      // The starter tier (strategy slice 4, "Show numbers" off) draws only water and steps, in two columns.
+      || /grid \$\{showNumbers \? 'grid-cols-4' : 'grid-cols-2'\}[^`]*`\} data-home-today data-home-rings/.test(home)), cells.map(c => c.k))
   check('steps opens the steps entry here; the other three open Nutrition (where water is logged)', /onClick=\{\(\) => setStepsOpen\(o => !o\)\}/.test(cells.find(c => c.k === 'steps')?.src ?? '') && cells.filter(c => c.k !== 'steps').every(c => /onClick=\{toNutrition\}/.test(c.src)))
   check('"N% of targets" is the mean of the four rings', /todaySoFarPercent\(\[calShare, proteinShare, waterShare, stepsShare\]\)/.test(home) && /data-testid="home-so-far">\{soFar == null \? '—' : `\$\{soFar\}%`\}/.test(home))
 

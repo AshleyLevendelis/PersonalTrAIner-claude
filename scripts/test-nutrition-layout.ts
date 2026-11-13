@@ -184,7 +184,7 @@ console.log('\n2. The shortfall line only speaks when there is something to say'
     /macroShortfallLine\(/.test(nutrition) && !/const gaps = \[/.test(nutrition))
   // ...one coach voice (17 Oct 2026): a resize or top-up offer showing takes the line's place.
   check('...and renders the result through the shared nudge',
-    /\{macroNudge && !mealRefit && !\(mealTopUp && !mealTopUpNote\) && <TrainerNudge/.test(nutrition))
+    /\{macroNudge && (\(showNumbers \|\| !holdsNutritionFigure\(macroNudge\)\) && )?!mealRefit && !\(mealTopUp && !mealTopUpNote\) && <TrainerNudge/.test(nutrition))
 }
 
 // ---------------------------------------------------------------------------
