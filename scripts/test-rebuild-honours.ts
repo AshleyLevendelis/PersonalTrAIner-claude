@@ -190,7 +190,8 @@ async function main() {
     check('...and the seed and start reach the payload confirm reads', /payload: \{ \.\.\.p, fromWeek: start\.fromWeek, fromDate: start\.fromDate, seedKey \}/.test(chat))
     const exec = code('src/lib/pending-action-executor.ts')
     const runs = (exec.match(/rebuildFromCurrentWeek\(updated, exclusions, mesocycle, payload\.fromWeek, context, \{ fromDate: payload\.fromDate, seedKey: payload\.seedKey \}\)/g) ?? []).length
-    check('every rebuild executor passes the start and the seed (6)', runs === 6, runs)
+    // 7 since 13 Nov 2026: the running goal (strategy slice 6) is a seventh rebuild executor.
+    check('every rebuild executor passes the start and the seed (7)', runs === 7, runs)
     const adapt = code('src/lib/plan-adaptations.ts')
     // Read inside the rebuild only: a TRAVEL substitution replaces the running travel kit on purpose, and the
     // kit list's own substitution sits beside it in the same file (11 Oct 2026, the kit-list merge).

@@ -227,8 +227,11 @@ console.log('\n1. The libraries are cached separately from the app')
   // worktree of 9dc7e877 (slices 1-2): deploy 407 gz, paint 563 gz, app 1419 raw, total 2935 raw (2, 2, 4, 21 left);
   // with slice 3: deploy 410, paint 566, app 1425 (OVER by 1, 1, 2). The pathway's week builder runs in plan
   // generation, which is first-paint code. His 15 Sep ruling, "raise it with room to grow": 8 gz and 25 raw over today.
-  headroom('a deploy re-downloads', appGzip, 418, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 418, appGzip)
+  // MOVED 13 Nov 2026, again: strategy slice 6, running (the ladder runs in plan generation, first-paint code). MEASURED
+  // through this gate on a clean worktree of 6ce27839 and on the change: deploy 413 -> 418 gz, paint 569 -> 574 gz, app
+  // 1434 -> 1448 raw, total 2952 -> 2970 raw. His 15 Sep ruling, "raise it with room to grow": 8 gz and 25 raw over today.
+  headroom('a deploy re-downloads', appGzip, 426, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 426, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -317,9 +320,10 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 11 Nov 2026: 552 -> 562, meals cooked for him elsewhere — see the deploy figure above for both ends.
   // MOVED 12 Nov 2026: 562 -> 565, the Nutrition Week screens — see the deploy figure above for both ends.
   // MOVED 13 Nov 2026: 565 -> 574, strategy slices 1-3 — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 574, 'kB gzipped')
+  // MOVED 13 Nov 2026: 574 -> 582, strategy slice 6 (running) — see the deploy figure above for both ends.
+  headroom('first paint fetches', firstLoadGzip, 582, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 574, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 582, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -443,7 +447,8 @@ console.log('\n3. Nothing has crept back up')
   // (see the deploy figure above for both ends). 25 raw of room.
   // MOVED 12 Nov 2026: 1411 -> 1423, the Nutrition Week screens; measured 1386 before and 1398 after.
   // MOVED 13 Nov 2026: 1423 -> 1450, strategy slices 1-3; measured 1419 before slice 3 and 1425 after.
-  const APP_CHUNK_BUDGET_KB = 1450
+  // MOVED 13 Nov 2026: 1450 -> 1473, strategy slice 6 (running); measured 1434 before and 1448 after.
+  const APP_CHUNK_BUDGET_KB = 1473
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -719,7 +724,8 @@ console.log('\n3. Nothing has crept back up')
   // MEASURED through this gate on a clean worktree of ed4784c8 (the Exercise Week work had worn the room to 1 kB) and on
   // the change: total 2930 -> 2931 raw (OVER by a fraction). His 15 Sep ruling, "raise it with room to grow": 25 kB raw
   // over today's number.
-  const TOTAL_BUDGET_KB = 2956
+  // MOVED 13 Nov 2026: 2956 -> 2995, strategy slice 6 (running); measured 2952 before and 2970 after.
+  const TOTAL_BUDGET_KB = 2995
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

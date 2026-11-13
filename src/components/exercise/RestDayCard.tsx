@@ -6,6 +6,7 @@ import { Heart, ChevronRight, ArrowRight, Footprints, Bike, Waves, Dumbbell, Cal
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getRecentActivityDurations, DEFAULT_ACTIVITY_MINUTES, readCardioLogs } from '@/lib/cardio-log-store'
 import { runForToday, RUN_ACTIVITY, type RunToday } from '@/lib/running'
+import { addDays } from '@/lib/session-move'
 import type { PlannedActivity } from '@/lib/types'
 import { PlannedCardioRow, UnplannedCardioEntry, CardioReceipts, useCardioReceiptsToday, type CardioPick } from './CardioSetRow'
 // Its own chunk — see the file for the measurement that put it there.
@@ -548,7 +549,7 @@ function useRunHeldToLog(planned: PlannedActivity | undefined, raceDate: string 
   useEffect(() => {
     if (!isRun || !profileId || !planned) { setHeld(null); return }
     let live = true
-    const from = new Date(Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10) - 30)).toISOString().slice(0, 10)
+    const from = addDays(date, -30)
     void readCardioLogs(profileId, { from, to: date }).then(read => {
       if (!live) return
       setHeld(runForToday(planned, date, read.rows.map(r => ({ date: r.date, minutes: r.duration_minutes, activity: r.activity_name })), raceDate))

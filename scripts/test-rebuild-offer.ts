@@ -150,7 +150,8 @@ console.log('\n2. And nothing else does')
     // + experience, recovery and conditioning, his ruling 8 Nov 2026 "Offer a rebuild".
     // + enjoyed_activities, his 13 Nov strategy (slice 3): on the walking pathway a sport he enjoys replaces a walk a
     // week, so changing it changes what the plan contains.
-    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'conditioning_preference,enjoyed_activities,equipment_access,fitness_goal,injuries,known_bench_kg,known_deadlift_kg,known_squat_kg,recovery_capacity,session_duration_preference,start_preference,training_days,training_experience,training_style',
+    // + running_goal and running_base_minutes, slice 6 (13 Nov): runs join the week and replace lifting days.
+    [...PLAN_INVALIDATING_FIELDS].sort().join(',') === 'conditioning_preference,enjoyed_activities,equipment_access,fitness_goal,injuries,known_bench_kg,known_deadlift_kg,known_squat_kg,recovery_capacity,running_base_minutes,running_goal,session_duration_preference,start_preference,training_days,training_experience,training_style',
     PLAN_INVALIDATING_FIELDS)
   // HIS RULING, 8 Nov 2026, "Offer a rebuild": each of the three offers one, in words about what it shapes, and only
   // when it actually changed.

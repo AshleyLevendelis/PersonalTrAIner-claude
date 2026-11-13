@@ -107,7 +107,7 @@ export const INTEGER_COLUMNS: Record<string, readonly string[]> = {
   exercise_plans: ['sets', 'week_number'],
   exercise_set_logs: ['drop_index', 'reps_completed', 'set_number', 'week_number'],
   favorite_meals: ['calories', 'carbs', 'fat', 'protein', 'times_used'],
-  fitness_profiles: ['age', 'daily_step_target', 'meals_per_day', 'water_target_ml'],
+  fitness_profiles: ['age', 'daily_step_target', 'meals_per_day', 'running_base_minutes', 'water_target_ml'],
   load_suggestions: ['block_number', 'exercise_index'],
   meal_plan_slots: ['pool_index'],
   meal_plans: ['calories', 'carbs', 'fat', 'protein', 'sub_calories', 'sub_carbs', 'sub_fat', 'sub_protein'],

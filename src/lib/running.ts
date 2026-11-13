@@ -1,5 +1,6 @@
 import type { UserProfile, WorkoutDay, PlannedActivity } from '@/lib/types'
 import { PATHWAY_RUN_FOCUS } from '@/lib/pathway'
+import { addDays } from '@/lib/session-move'
 
 // ---------------------------------------------------------------------------
 // RUNNING (his 13 Nov 2026 strategy, slice 6, ruling 4 "the first sport is running"; built on his "Build it").
@@ -90,9 +91,9 @@ const TARGET: Record<RunningGoal, { easy: number; long: number }> = {
 }
 
 /** The first continuous runs, after walk-run: 20 minutes, the number "with nothing logged" falls back to. */
-export const FIRST_CONTINUOUS_MINUTES = 20
+const FIRST_CONTINUOUS_MINUTES = 20
 /** The 10% rule, for the long run off the log and for the week's total off the week before. */
-export const LONG_RUN_GROWTH = 1.1
+const LONG_RUN_GROWTH = 1.1
 const LIGHTER_FACTOR = 0.7
 
 function secs(s: number): string {
@@ -287,7 +288,7 @@ export function weeksToGoal(goal: RunningGoal, opts: LadderOptions = {}): number
 }
 
 /** The two weeks before a race are a taper: the plan must reach the goal this many weeks before the race. */
-export const TAPER_WEEKS = 2
+const TAPER_WEEKS = 2
 
 /**
  * A RACE DATE COUNTS BACK (told to the coach only, his ruling of 13 Nov 2026). The goal it can safely reach by then,
@@ -366,7 +367,7 @@ export function chooseRunningDays(available: string[], goal: RunningGoal): Runni
 }
 
 /** A runner's week holds at most six sessions: one day is always a full rest. */
-export const MAX_RUNNING_WEEK_DAYS = 6
+const MAX_RUNNING_WEEK_DAYS = 6
 
 function bitCount(m: number): number {
   let c = 0
@@ -431,7 +432,7 @@ export function liftingDaysFor(profile: Pick<UserProfile, 'running_goal' | 'trai
 
 /** The plan marks a run day by this activity name; the logs read it back by the same word. */
 export const RUN_ACTIVITY = 'Run'
-export const WALK_RUN_ACTIVITY = 'Walk-run'
+const WALK_RUN_ACTIVITY = 'Walk-run'
 
 export function isRunDay(day: Pick<WorkoutDay, 'plannedActivity'> | null | undefined): boolean {
   const a = day?.plannedActivity?.activity
@@ -448,7 +449,7 @@ function asActivity(s: RunSession): PlannedActivity {
 }
 
 /** A week's sessions fitted to the days it has: two days keep an easy run and the long run, one keeps an easy run. */
-export function fitSessions(week: RunWeek, roles: RunningSplit['runDays']): RunSession[] {
+function fitSessions(week: RunWeek, roles: RunningSplit['runDays']): RunSession[] {
   const [easy, middle, long] = week.sessions
   if (roles.length >= 3) {
     return roles.map(r => (r.role === 'long' ? long : r.role === 'quality' ? middle : easy))
@@ -485,7 +486,7 @@ export function withRunDays(
 }
 
 /** The pathway's ladder starts in week 3 (weeks 1-2 stay walks): his walk days become the runs, up to three. */
-export const PATHWAY_RUNNING_FROM_WEEK = 3
+const PATHWAY_RUNNING_FROM_WEEK = 3
 
 /**
  * ON THE PATHWAY (starting out), the walks become the ladder's sessions from week 3: every day with a walk, up to
@@ -603,9 +604,7 @@ function cappedToLog(planned: PlannedActivity, today: string, logs: LoggedRun[])
 }
 
 function shiftDate(date: string, days: number): string {
-  const d = new Date(Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10)))
-  d.setUTCDate(d.getUTCDate() + days)
-  return d.toISOString().slice(0, 10)
+  return addDays(date, days)
 }
 
 /** "Sunday 11 April 2027": a race date in words, read as a date (never an instant). */

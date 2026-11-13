@@ -211,12 +211,17 @@ async function rebuiltFromWeek9(): Promise<MesocycleWeek[]> {
 
 console.log('\n7. Setup, Profile, the rebuild offer and the coach')
 const slot = ONBOARDING_SLOTS.find(s => s.key === 'runningGoal')
-check('setup asks it, optional, with "Not for now" and the four goals', !!slot && slot.required === false
-  && JSON.stringify((slot.options ?? []).map(o => o.value)) === JSON.stringify(['none', ...RUNNING_GOAL_OPTIONS.map(o => o.value)]))
+check('setup asks it, optional (its Skip is "not for now"), with the four goals', !!slot && slot.required === false
+  && JSON.stringify((slot.options ?? []).map(o => o.value)) === JSON.stringify(RUNNING_GOAL_OPTIONS.map(o => o.value)))
+check('...only of someone who loves cardio (his ruling "Only if they like cardio")', !!slot?.requiredIf
+  && slot.requiredIf({ ...initialSlotValues(), conditioningPreference: 'love' } as never) === true
+  && slot.requiredIf({ ...initialSlotValues(), conditioningPreference: 'tolerate' } as never) === false
+  && slot.requiredIf({ ...initialSlotValues(), conditioningPreference: 'avoid' } as never) === false)
 check('...and never asks a race date (his ruling: the coach only)', !ONBOARDING_SLOTS.some(s => /race/i.test(s.question)))
 const v = { ...initialSlotValues() }
-check('"Not for now" saves no goal; "5 km" saves 5k', assembleProfile({ ...v, runningGoal: 'none' } as never).running_goal === null
-  && assembleProfile({ ...v, runningGoal: '5k' } as never).running_goal === '5k')
+check('a skipped question saves no goal; "5 km" from someone who loves cardio saves 5k', assembleProfile({ ...v, conditioningPreference: 'love', runningGoal: null } as never).running_goal === null
+  && assembleProfile({ ...v, conditioningPreference: 'love', runningGoal: '5k' } as never).running_goal === '5k')
+check('...and an answer left over after the cardio answer changed is not kept', assembleProfile({ ...v, conditioningPreference: 'avoid', runningGoal: '5k' } as never).running_goal === null)
 const offer = detectPlanInvalidation({ running_goal: null } as UserProfile, { running_goal: '10k' })
 check('choosing a goal on Profile offers the rebuild, naming it', offer?.field === 'running_goal' && /10 km/i.test(offer?.title ?? ''), offer)
 check('...and taking it away offers one too', detectPlanInvalidation({ running_goal: '10k' } as UserProfile, { running_goal: null })?.field === 'running_goal')

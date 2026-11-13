@@ -1541,7 +1541,8 @@ menu" stays true when a copy is also left outside it.
   pace"** (minutes and effort only). Mine (CSCS): runs replace lifting days down to two (one for a half), never lifting
   the day before the long or hard run, one full rest day a week. A ladder from walk-run to a half (`running.ts`), the
   long run by the 10% rule, every fourth week lighter; today's run is held to 10% over the longest run logged in 30 days
-  and says so; a goal added mid-plan starts at the bottom. Setup (optional), Profile and `propose_running_goal`.
+  and says so; a goal added mid-plan starts at the bottom. Setup asks it (optional) only of someone who loves cardio, his
+  ruling "Only if they like cardio"; Profile and `propose_running_goal` for everyone.
   `test:running-ladder`, `verify:running-day`, `measure:running-personas`, `docs/plans/running.md`. Needs the
   `running_goal` migration, the `chat-gemini` deploy and an exam run
 
