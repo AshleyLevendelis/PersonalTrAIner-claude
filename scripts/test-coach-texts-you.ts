@@ -212,7 +212,7 @@ async function main() {
     check('the chat re-reads on return: visible again, focus, arriving at the chat, and the service worker\'s word',
       /visibilitychange/.test(chat) && /addEventListener\('focus'/.test(chat) && /'hashchange'/.test(chat) && /serviceWorker\?\.addEventListener\?\.\('message'/.test(chat) && /'coach-message'/.test(chat))
     check('a reminder\'s shortcut opens the tab through the chat\'s own link, worded by the phrasebook',
-      /onClick=\{\(\) => openStripLink\(msg\.reminder!\.shortcut!\)\}/.test(chat) && /coachShortcutLabel\(msg\.reminder\.shortcut\)/.test(chat))
+      /onClick=\{\(\) => \{?[^}]*openStripLink\(msg\.reminder!\.shortcut!\)/.test(chat) && /coachShortcutLabel\(msg\.reminder\.shortcut\)/.test(chat))
     const fn = strip(readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8'))
     const serve = fn.slice(fn.indexOf('Deno.serve('), fn.indexOf('function replyPushDeps'))
     check('chat-gemini sends the reply AFTER building the response, never instead of it',

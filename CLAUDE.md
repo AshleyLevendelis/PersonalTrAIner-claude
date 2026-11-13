@@ -1503,6 +1503,12 @@ menu" stays true when a copy is also left outside it.
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
   `installable`, `a11y`, `verify:walk`
 
+### His strategy of 13 Nov 2026 (`docs/plans/measurement.md` and the slice plans after it)
+- **Measurement first: every unprompted coach message is kept with whether he answered** (slice 1). Its own table, so Clear
+  chat cannot take it; a reply within 12 hours answers the newest, a shortcut tap answers its own; one reader gives each
+  week's sessions, days logged and moments answered, and retention at weeks 1, 4 and 12. `test:measurement`,
+  `verify:coach-hello-boot`, `test:reach-out` §5. Needs the moment-log migration and the `coach-reach-out` deploy
+
 ### His ruling of 12 Nov 2026, eating out (`docs/plans/eating-out.md`)
 - **A meal marked as out: "Ask: light/normal/big"** (from three options; his request "build it, start with out for
   dinner"). The APP asks how big a night it is, on both surfaces (the coach's tool has no size; the size is read from

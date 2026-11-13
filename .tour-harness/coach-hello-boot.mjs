@@ -25,6 +25,13 @@ ws.addEventListener('message', e => { const m = JSON.parse(e.data); if (m.id && 
 const send = (m, p = {}) => new Promise(r => { const i = ++id; pend.set(i, r); ws.send(JSON.stringify({ id: i, method: m, params: p })) })
 const ev = async x => (await send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true })).result?.result?.value
 await send('Page.enable'); await send('Runtime.enable')
+await send('Page.addScriptToEvaluateOnNewDocument', { source: `
+  const realFetch = window.fetch
+  window.fetch = async (url, init) => {
+    if (String(url).includes('chat-gemini')) return new Response(JSON.stringify({ reply: 'Nice one.' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+    return realFetch(url, init)
+  }
+` })
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true })
 
 let failures = 0, ran = 0
@@ -43,9 +50,25 @@ check('the coach said its one message of the day without being opened', list.len
 check('...greeting him by name', /^Hey Sam\b/.test(list[0]?.c ?? ''), list[0])
 check('the chat button lights to call him in', await ev(`!!document.querySelector('[data-testid="chat-attention-dot"], [data-testid="chat-unread-ring"]')`) === true)
 
+console.log('\nMeasurement (his strategy, 13 Nov 2026, slice 1): the hello is kept apart from the chat, and his reply answers it')
+const momentRows = () => ev(`JSON.stringify((window.__fakeDb?.coach_moment_log ?? []).map(r => ({ moment: r.moment, surface: r.surface, chat: r.chat_message_id, answered: r.answered_at, answer: r.answer })))`).then(x => JSON.parse(x ?? '[]'))
+const helloId = await ev(`(${hellos}[0] || {}).id ?? null`)
+const before = await momentRows()
+check('the hello is recorded once in the moment log, as a chat moment, with its message', before.length === 1 && before[0].surface === 'chat' && before[0].chat === helloId && !!helloId && before[0].answered == null, { before, helloId })
+await ev(`location.hash = '#/tab/chat'`)
+for (let i = 0; i < 60 && !(await ev(`!!document.querySelector('[data-testid="chat-composer"] textarea')`)); i++) await wait(100)
+await wait(600)
+await ev(`(() => { const t = document.querySelector('[data-testid="chat-composer"] textarea'); if (!t) return false; const s = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; s.call(t, 'Thanks, will do'); t.dispatchEvent(new Event('input', { bubbles: true })); return true })()`)
+await wait(150)
+await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /send/i.test(x.getAttribute('aria-label') || '')); if (!b || b.disabled) return false; b.click(); return true })()`)
+for (let i = 0; i < 40 && !((await momentRows())[0]?.answered); i++) await wait(100)
+const after = await momentRows()
+check('his reply marks it answered ("replied")', after.length === 1 && !!after[0].answered && after[0].answer === 'replied', after)
+
 console.log('\nA longer chat in which an offer was left untapped yesterday (the phone keeps the card as it was drawn)')
-await ev('localStorage.clear()')
-await send('Page.navigate', { url: `http://127.0.0.1:${port}/.tour-harness/app-boot.html?slow=0&chat-stale-offer&n=2` })
+await send('Page.navigate', { url: 'about:blank' })
+await wait(300)
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/.tour-harness/app-boot.html?slow=0&chat-stale-offer&clear-storage&n=2` })
 for (let i = 0; i < 150 && !(await ev(`${hellos}.length > 0`)); i++) await wait(100)
 await wait(600)
 const stale = JSON.parse((await ev(`JSON.stringify(${hellos}.map(m => ({ c: m.content })))`)) ?? '[]')

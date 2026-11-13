@@ -144,6 +144,8 @@ async function main() {
   const sentSeq: Record<string, number> = {}
   const recorded: Record<string, SentRecord[]> = {}
   const dropped: string[] = []
+  // MEASUREMENT (13 Nov 2026, slice 1): one row per reminder a phone took. 'named' has no table yet: its write throws.
+  const momentLog: { user: string; moment: string; chatMessageId: string }[] = []
   const deps = (at: Date): ReachOutDeps => ({
     now: at,
     listSubscriptions: async () => Object.values(people).flatMap(p => p.sub),
@@ -174,6 +176,7 @@ async function main() {
       if (recorded[u].length === 0) delete recorded[u]
     },
     dropSubscription: async id => { dropped.push(id) },
+    recordMoment: async (u, moment, chatMessageId) => { if (u === 'named') throw new Error('relation "coach_moment_log" does not exist'); momentLog.push({ user: u, moment, chatMessageId }) },
   })
   // A RUN THAT THROWS IS A FAILED CHECK, NOT A CRASHED GATE: the whole point of
   // one of these checks is that it must not throw, and a gate that dies there
@@ -210,6 +213,10 @@ async function main() {
     chat.filter(r => r.user === 'allFail').length >= 1 && chat.filter(r => r.user === 'allFail').every(r => r.deleted) && !recorded.allFail, chat.filter(r => r.user === 'allFail'))
   check('a chat that cannot be written to means no notification this hour, and nothing counted',
     to('s10').length === 0 && !recorded.noChat, { s10: to('s10'), rec: recorded.noChat })
+  check('each reminder a phone took is kept in the moment log, with its chat message (Clear chat cannot take it)',
+    momentLog.some(r => r.user === 'due' && r.moment === 'session_not_logged' && r.chatMessageId === dueRow?.id), momentLog)
+  check('...never one no phone took', !momentLog.some(r => r.user === 'allFail') && !momentLog.some(r => r.user === 'raced'), momentLog)
+  check('...and a log that cannot be written (no table yet) still sends', to('s9').length === 1 && !momentLog.some(r => r.user === 'named'), { s9: to('s9') })
 
   const again = await safeRun(deps(new Date('2026-09-23T19:30:00Z')))
   check('the next hour, nobody who heard an hour ago hears again (three hours apart)',

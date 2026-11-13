@@ -190,6 +190,8 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
       return rows[0].id;
     },
     deleteChatMessage: (userId, id) => restWrite("DELETE", `chat_messages?id=eq.${id}&profile_id=eq.${userId}`),
+    recordMoment: (userId, moment, chatMessageId) =>
+      restWrite("POST", "coach_moment_log", { user_id: userId, moment, surface: "phone", chat_message_id: chatMessageId }),
 
     // TODAY'S UNPROMPTED CHAT MESSAGES, the app's and this function's alike (the reminder marker), on her own
     // calendar. A day and a half back is enough to cover any timezone's today.

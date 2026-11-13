@@ -153,6 +153,7 @@ import { lessonDue, lessonBrief, lessonTaughtIn, taughtFromRows, actionDataWithL
 import { pickOpener, movementList, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import { cleanReplyText, applyMessageBreaks, ACTION_TAG_RE, QUICK_REPLIES_RE } from '@/lib/reply-text'
 import { rowToMessage, addServerMessages } from '@/lib/chat-history-merge'
+import { recordMomentSent, markMomentAnswered } from '@/lib/moment-log'
 import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
   rememberNudge, rememberWithoutSpeaking, pickUnprompted, keysSaidByMarkers, helloKey, openerSkips,
@@ -1572,6 +1573,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           writeNudgeStore({ ...nudgeStore(), lastAt: now })
           return
         }
+        // MEASUREMENT (his strategy, 13 Nov 2026, slice 1): every unprompted message is kept apart from the chat.
+        void recordMomentSent(profileId, { moment: pick.moment, surface: 'chat', chatMessageId: data.id as string, sentAt: new Date().toISOString() })
         let store = rememberNudge(nudgeStore(), pick.keys, now)
         if (pick.fromOpener && pick.openerKind) {
           // The hello IS the opener: advance its rotation and burn what it spoke for, as the first bubble does.
@@ -2602,6 +2605,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // of silent, same convention as onMealSwapApplied's pool re-read.
   const persistUserMessage = (text: string) => {
     if (!profile.id) return
+    // Whatever he sends answers the coach's newest unprompted message of the last 12 hours (measurement, slice 1).
+    void markMomentAnswered(profile.id, 'replied')
     supabase.from('chat_messages').insert({
       profile_id: profile.id,
       role: 'user',
@@ -8522,7 +8527,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                 <button
                                   type="button"
                                   data-testid="chat-reminder-shortcut"
-                                  onClick={() => openStripLink(msg.reminder!.shortcut!)}
+                                  onClick={() => { if (profile.id) void markMomentAnswered(profile.id, 'tapped', msg.id ?? null); openStripLink(msg.reminder!.shortcut!) }}
                                   className="mt-1 inline-flex min-h-11 items-center rounded-full px-4 text-sm font-medium"
                                   style={{ border: '1px solid var(--primary)', color: 'var(--primary)', background: 'transparent' }}
                                 >

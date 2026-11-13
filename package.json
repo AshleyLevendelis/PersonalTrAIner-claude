@@ -143,6 +143,7 @@
     "test:beat-target": "tsx scripts/test-beat-target-offer.ts",
     "test:session-feel": "tsx scripts/test-session-feel.ts",
     "test:coach-opener": "tsx scripts/test-coach-opener.ts",
+    "test:measurement": "tsx scripts/test-measurement.ts",
     "test:coach-nudge": "tsx scripts/test-coach-nudge.ts",
     "test:style-starve": "tsx scripts/test-style-does-not-starve.ts",
     "test:onboarding-handover": "tsx scripts/test-onboarding-handover.ts",

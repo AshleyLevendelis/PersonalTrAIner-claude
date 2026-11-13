@@ -43,6 +43,9 @@ const TRAIN_TODAY = new URLSearchParams(location.search).has('session-day')
 const NO_CARDIO = new URLSearchParams(location.search).has('no-cardio')
 const WEIGH = Number(new URLSearchParams(location.search).get('weigh')) || 80
 
+// ?clear-storage: a phone with nothing kept from an earlier visit, wiped HERE, before anything of the app's runs, so a
+// page the driver just left cannot write into it afterwards.
+if (new URLSearchParams(location.search).has('clear-storage')) { try { localStorage.clear() } catch { /* none */ } }
 setDevClockOverride(PROFILE_ID, ANCHOR_ISO)
 // ?chat-stale-offer: a LONGER conversation from yesterday (24 messages, more than the chat's first page of 20, so the
 // phone's own copy is what shows) in which an offer of the coach's was left untapped (an INPUT: he tapped neither

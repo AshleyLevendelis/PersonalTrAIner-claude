@@ -709,7 +709,11 @@ console.log('\n3. Nothing has crept back up')
   // future day's planned card and the week view). MEASURED through this gate on a clean worktree of 8809547a and on
   // the change: deploy 398 -> 401 gz, first paint 554 -> 557 gz, app 1386 -> 1398 raw, total 2894 -> 2906 raw (total
   // OVER by 4). His 15 Sep ruling, "raise it with room to grow": 8 kB gz and 25 kB raw over today's number.
-  const TOTAL_BUDGET_KB = 2931
+  // MOVED 13 Nov 2026: the measurement slice of his 13 Nov strategy (the moment log the chat writes, read with the coach).
+  // MEASURED through this gate on a clean worktree of ed4784c8 (the Exercise Week work had worn the room to 1 kB) and on
+  // the change: total 2930 -> 2931 raw (OVER by a fraction). His 15 Sep ruling, "raise it with room to grow": 25 kB raw
+  // over today's number.
+  const TOTAL_BUDGET_KB = 2956
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

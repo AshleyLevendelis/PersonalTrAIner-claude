@@ -131,6 +131,11 @@ export interface ReachOutDeps {
   /** Takes the message back when no phone took the push: the chat never holds a message nobody was sent. */
   deleteChatMessage(userId: string, id: string): Promise<void>
   /**
+   * MEASUREMENT (his strategy, 13 Nov 2026, slice 1): one row per reminder a phone took, kept apart from the chat
+   * so Clear chat cannot take it; the app marks it answered. Optional and best-effort: a failure never stops a send.
+   */
+  recordMoment?(userId: string, moment: MomentKey, chatMessageId: string): Promise<void>
+  /**
    * RESERVES the notification BEFORE it is sent, and says whether the
    * reservation landed. False means the database refused it (two runs racing,
    * or the one-a-day rule still in place before its migration): send nothing.
@@ -374,7 +379,12 @@ export async function runReachOut(deps: ReachOutDeps): Promise<ReachOutReport> {
       }
       // COUNTED ONLY WHEN SOMETHING ARRIVED. A send that failed everywhere
       // gives its reservation back, and the next hour tries again.
-      if (delivered) report.sent++
+      if (delivered) {
+        report.sent++
+        if (deps.recordMoment) {
+          try { await deps.recordMoment(userId, moment.key, messageId) } catch (err) { console.warn('[reach-out] moment log not written (the table may not exist yet):', err) }
+        }
+      }
       else {
         await deps.deleteChatMessage(userId, messageId)
         await deps.unrecordSent(userId, today, moment.key)
