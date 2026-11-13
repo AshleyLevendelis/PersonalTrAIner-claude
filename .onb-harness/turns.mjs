@@ -878,10 +878,13 @@ await section(27, 'Up to 3, then back: a tangent gets three follow-ups before th
   await say('straight after, about 7 hours')
   check('after the THIRD follow-up the app still has not cut in (her "up to 3")', !(await forced()), (await ev('document.body.innerText')).slice(-400))
   await shot('follow-ups-three')
-  // A fourth follow-up is past her ruling: the app puts the next setup question under it.
-  await queue(followUp('And what do you eat on a night shift, usually?', ''))
+  // A fourth follow-up is past his ruling: the app asks the next setup question. Since 13 Nov 2026 (his setup: "it
+  // started asking multiple questions at once which broke the process") it asks it INSTEAD of the coach's off-setup
+  // question, not under it: one question a turn.
+  await queue(followUp('Makes sense. And what do you eat on a night shift, usually?', ''))
   await say('never before, I am wrecked')
-  check('a FOURTH follow-up gets the next setup question put under it', await forced(), (await ev('document.body.innerText')).slice(-400))
+  check('a FOURTH follow-up gets the next setup question', await forced(), (await ev('document.body.innerText')).slice(-400))
+  check('...in place of the coach\'s off-setup question, never under it', !/what do you eat on a night shift/.test(await ev('document.body.innerText')), (await ev('document.body.innerText')).slice(-400))
   const kept = (await evj(`__draft()`))?.pendingContextFacts?.map(f => f.displayText) ?? []
   check('each follow-up was noted as it went', ['Works night shifts', 'Two night shifts a week', 'Sleeps straight after a shift'].every(n => kept.includes(n)), kept)
 

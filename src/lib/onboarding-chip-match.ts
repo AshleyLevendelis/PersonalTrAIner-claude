@@ -1,4 +1,5 @@
 import {
+  NEVER_BLOCKING_SLOTS,
   ONBOARDING_SLOTS,
   getSlotDef,
   isSlotApplicable,
@@ -64,7 +65,7 @@ type Asks = RegExp | readonly [RegExp, RegExp]
 const ASKS: Record<SlotKey, Asks> = {
   displayName: /call you|your name/i,
   fitnessGoal: /\bgoals?\b|aiming (at|for)|what are you (actually |really |mainly )?after|what do you want (to get )?(out of|from)|what brings you|hoping to (get|achieve)/i,
-  trainingExperience: /how (much|long) (training|lifting)|how long have you (been|trained|lifted)|\bexperience\b|new to (this|it|training|lifting|the gym)|(trained|lifted) before|where are you at with/i,
+  trainingExperience: /how (much|long) (training|lifting)|background (with|in) (lifting|training|the gym|weights)|(lifting|training) background|describe your .{0,30}(lifting|training)|how long have you (been|trained|lifted)|\bexperience\b|new to (this|it|training|lifting|the gym)|(trained|lifted) before|where are you at with/i,
   activityLevel: /how active|day[- ]to[- ]day|on your feet|\bdesk\b|outside (of )?(training|the gym|your sessions)/i,
   equipment: /equipment|\bkit\b|where (do|will|would) you (train|be training|work ?out)|access to|gym or (at )?home|home or (the |a )?gym|what (have|do) you (got|have) to (train|work) with/i,
   startPreference: /where (do|would) you (want|like) to start|ease in|straight in/i,
@@ -245,7 +246,10 @@ export function chooseCard(input: CardChoiceInput): SlotKey | undefined {
   if (!question.includes('?')) return undefined
   const choices = new Set<SlotKey>()
   for (const s of ONBOARDING_SLOTS) {
-    const mustAsk = s.requiredIf ? s.requiredIf(values) : s.required
+    // ...and the optional ones setup still asks (13 Nov 2026, his setup: "Which should I use for your calorie and
+    // starting-weight maths?" came with no Male / Female, and a vague question with nothing to tap is what he found
+    // confusing). Only the bonus questions setup never asks stay out.
+    const mustAsk = s.requiredIf ? s.requiredIf(values) : (s.required || !NEVER_BLOCKING_SLOTS.includes(s.key))
     if ((s.control === 'single' || s.control === 'multi') && mustAsk && open(s.key) && asksOne(s.key, question)) choices.add(cardKeyFor(s.key))
   }
   return choices.size === 1 ? [...choices][0] : undefined

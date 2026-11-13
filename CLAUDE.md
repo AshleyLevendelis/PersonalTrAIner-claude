@@ -1144,7 +1144,12 @@ menu" stays true when a copy is also left outside it.
   limit): what he volunteers gets up to three follow-ups, noted as it goes, before the coach steers back; the app steps
   in on the fourth reply with nothing recorded, asks itself when a reply asks nothing, and the setup summary lists
   "What I'll remember" with Forget. `test:setup-follow-ups`, `verify:onboarding-turns` §27. Needs the `onboarding-chat`
-  deploy; whether the model follows up is unproven until a real setup
+  deploy; whether the model follows up is unproven until a real setup.
+  **And ONE question a turn (his setup, 13 Nov 2026, "it started asking multiple questions at once")**: the app never
+  adds its question under a coach question about setup; past the third follow-up its question REPLACES the coach's,
+  not under it; a weight typed on the lifts ("110kg") is asked about by the app (which lift, how many reps, with the
+  boxes); every question setup asks brings its options when asked in words. `verify:onboarding-one-question`,
+  `test:onboarding-one-question`, `test:onboarding-chip-match` §9
 - **It reads like texting a coach — Ashley's three rulings of 24 Sep 2026**,
   after seeing four-paragraph answers and a question tacked onto every reply:
   (1) **"short steps"**, from three options (over speech-only and over a

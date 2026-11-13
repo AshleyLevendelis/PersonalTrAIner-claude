@@ -41,12 +41,13 @@ import {
 import { measureParserFor, liftSetInUserWords, ageOn, todayLocal } from '@/lib/body-units'
 import { detectFoodExclusions, mergeFoodsToAvoid, isFoodToAvoid } from '@/lib/food-exclusions'
 import { splitFoodList, isPlainNone } from '@/lib/food-list'
-import { allergenFilterReceipt, liftSetsAsk, liftNeedsASet } from '@/lib/coach-voice'
+import { allergenFilterReceipt, liftSetsAsk, liftNeedsASet, liftWhichOne } from '@/lib/coach-voice'
+import { bareLiftWeight, coachAskedSetupQuestion, dropCoachQuestions, withoutQuestions } from '@/lib/onboarding-one-question'
 import { implausibleLifts } from '@/lib/lift-plausibility'
 import { ceilingIsInUserWords, isCeilingSlot } from '@/lib/onboarding-ceiling-capture'
 import { parseKitSlot, kitStatementInUserWords } from '@/lib/kit-list'
 import { closeOutOpenQuestions, closeOutTrailingQuestions, COMPLETE_MESSAGE } from '@/lib/onboarding-completion'
-import { chooseCard, questionPartOf } from '@/lib/onboarding-chip-match'
+import { chooseCard, questionAsksSlot, questionPartOf } from '@/lib/onboarding-chip-match'
 import { mealCountIn, mergePendingGoal, sessionLengthNote, snackAnswerIn, trainingDaysIn } from '@/lib/onboarding-capture'
 import { sportsIn, mergeSports, parseSportsSlot, formatSportsSlot } from '@/lib/setup-sports'
 import { contextNoteText } from '@/lib/save-reply'
@@ -1163,7 +1164,16 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       for (const m of messages) {
         if (isLiveCard(m) && sameQuestion.includes(m.slotCard!)) ws.supersedeCards.add(m.slotCard!)
       }
-      if (host) host.slotCard = cardKey
+      if (host) {
+        host.slotCard = cardKey
+        // A YES/NO CARD UNDER A QUESTION ASKING FOR NUMBERS (his setup, 13 Nov 2026): "could you tell me your current
+        // working weights for the squat, bench press, and deadlift?" sat over "Not sure / I know my numbers", so he
+        // typed a number, and a bare number is no answer to either. Where the words ask for the numbers rather than
+        // whether he knows them, the question sentence is the card's own.
+        if (cardKey === 'knowsWorkingLifts' && !/\bknow\b/i.test(questionPartOf(host.content))) {
+          host.content = [withoutQuestions(host.content), getSlotDef('knowsWorkingLifts')!.question].filter(Boolean).join(' ')
+        }
+      }
       // No words at all this turn: render the slot's own question with it.
       else ws.newMessages.push({ role: 'assistant', content: cardQuestion(cardKey as SlotKey, ws.values, ws.confirmed), slotCard: cardKey })
     } else if (host && presentRequests.length > 0) {
@@ -1447,6 +1457,27 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       // them itself, see handleResolveSingle). One card on screen: a card the
       // coach put under another question this turn is taken off, and that
       // question comes round again once the boxes are answered.
+      // A WEIGHT WITH NO SET, GIVEN ON THE LIFTS (his setup, 13 Nov 2026): he typed "110kg", the coach said "Got
+      // it." over a number nothing kept and asked for all three lifts, and his "which exercise did I mean?" was then
+      // talked over. A number typed there means he knows at least one lift: the app records that, takes the coach's
+      // words for the turn (they claimed a record), and asks which lift and how many reps, with the boxes.
+      const liftsOnScreen = (msgs: readonly ChatMsg[]) => msgs.some(m => m.role === 'assistant' && !m.isReceipt && (
+        m.slotCard === 'knowsWorkingLifts' || isKnownLiftSlot(m.slotCard as SlotKey)
+        || questionAsksSlot('knowsWorkingLifts', questionPartOf(m.content)) || questionAsksSlot('knownSquatKg', questionPartOf(m.content))))
+      const lastCoach = [...priorMessages].reverse().find(m => m.role === 'assistant' && !m.isReceipt && m.content !== RESUME_BANNER)
+      const knowsDef = getSlotDef('knowsWorkingLifts')!
+      const liftsOpen = isSlotApplicable(knowsDef, responseWs.values) && !numericGroupFor('knownSquatKg').some(k => responseWs.confirmed.has(k))
+        && (!responseWs.confirmed.has('knowsWorkingLifts') || responseWs.values.knowsWorkingLifts === true)
+      const bare = liftsOpen ? bareLiftWeight(trimmed) : undefined
+      // A lift he names ("I squat 110") is on the lifts whatever was asked; a number alone only where the lifts are.
+      if (bare && (bare.lift || liftsOnScreen(lastCoach ? [lastCoach] : []) || liftsOnScreen(responseWs.newMessages))) {
+        if (!responseWs.confirmed.has('knowsWorkingLifts')) applySlot(responseWs, 'knowsWorkingLifts', true, responseWs.values)
+        for (const m of responseWs.newMessages) if (m.slotCard) for (const k of numericGroupFor(m.slotCard as SlotKey)) responseWs.supersedeCards.delete(k)
+        responseWs.newMessages = responseWs.newMessages.filter(m => m.isReceipt)
+        for (const m of priorMessages) if (isLiveCard(m) && isKnownLiftSlot(m.slotCard as SlotKey)) responseWs.supersedeCards.add(m.slotCard!)
+        responseWs.newMessages.push({ role: 'assistant', content: liftWhichOne(bare.weight, bare.lift), slotCard: 'knownSquatKg' })
+        responseWs.openReview = false
+      }
       if (liftBoxesDue(responseWs.values, responseWs.confirmed, cardedSlots([...priorMessages, ...responseWs.newMessages]))) {
         for (const m of responseWs.newMessages) {
           if (m.slotCard) {
@@ -1454,6 +1485,8 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
             m.slotCard = undefined
           }
         }
+        // ...and the coach's own question goes with its card: the boxes are this turn's one question.
+        responseWs.newMessages = dropCoachQuestions(responseWs.newMessages)
         responseWs.newMessages.push({ role: 'assistant', content: LIFT_BOXES_ASK, slotCard: 'knownSquatKg' })
         responseWs.openReview = false
       }
@@ -1542,7 +1575,9 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         // has a path (decline_slot, and the "Prefer not to say" button), and
         // a numeric card carries nothing to choose from anyway. Same pair the
         // server's own present_slot guard used.
-        if (def && target && !alreadyHasCard && (def.control === 'single' || def.control === 'multi')) {
+        // ...and never a second card: a coach card this turn is already the options on screen (13 Nov 2026).
+        const turnHasCard = responseWs.newMessages.some(m => !!m.slotCard)
+        if (def && target && !alreadyHasCard && !turnHasCard && (def.control === 'single' || def.control === 'multi')) {
           responseWs.newMessages.push({
             role: 'assistant',
             content: `No problem — here are the options. ${def.question}`,
@@ -1583,7 +1618,12 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
           // never cuts across one (her "Up to 3, then back").
           const coachAsked = responseWs.newMessages.some(m => m.role === 'assistant' && !m.isReceipt && (!!m.slotCard || m.content.includes('?')))
           const stuck = priorAsks >= 3 || stalledTurns >= STALL_TURN_LIMIT
-          if ((stuck || !coachAsked) && !askedThisTurn) {
+          // ONE QUESTION AT A TIME (his setup, 13 Nov 2026: "it started asking multiple questions at once which broke
+          // the process"). A coach reply that already asks a setup question (a card, or words asking something setup
+          // still needs) is never given a second one: that is what put male/female under recovery and cardio under
+          // training style, every turn, once the counter had tripped.
+          const coachAskedSetup = coachAskedSetupQuestion(responseWs.newMessages, responseWs.confirmed)
+          if ((stuck || !coachAsked) && !askedThisTurn && !coachAskedSetup) {
             // Which question to force is a choice, not just "the first one
             // still missing". Hammering one slot the user plainly can't or
             // won't answer produced the same question three times over with
@@ -1598,6 +1638,9 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
             const target = pickSlotToForce(openSlots, responseWs.values, askCount, hasLiveCard)
             const def = target ? getSlotDef(target) : undefined
             if (def && target) {
+              // The coach asked something off setup (the fourth follow-up, his "Up to 3, then back"): the app's
+              // question REPLACES that question rather than sitting under it. The coach's reaction stays.
+              if (coachAsked) responseWs.newMessages = dropCoachQuestions(responseWs.newMessages)
               const timesSteppedIn = allMsgs.filter(m => FORCED_ASK_MARKERS.some(marker => m.content.startsWith(marker))).length
               // A dead end gets the question alone; only a stuck conversation gets a lead.
               const lead = stuck ? forcedAskLead(timesSteppedIn, target !== canonicalNext, def.control === 'text') : ''

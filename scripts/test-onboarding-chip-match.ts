@@ -242,9 +242,24 @@ console.log('\n8. Numbers asked in words get their labelled boxes, asked for or 
   check('...never when the sentence asks two such questions at once', fresh("What's your main goal, and how many days a week can you train?", []) === undefined,
     fresh("What's your main goal, and how many days a week can you train?", []))
   check('...never from a remark that asks nothing', fresh('Three days a week works well for most people.', []) === undefined, fresh('Three days a week works well for most people.', []))
-  check('...and an OPTIONAL question still gets no chips unasked', pick('Which should I use for your calorie maths — male or female?', []) === undefined)
+  // REVERSED 13 Nov 2026 (his setup: "Which should I use for your calorie and starting-weight maths?" with no Male /
+  // Female under it, "no multiple choice is confusing"). An optional question setup still asks gets its options too;
+  // only a bonus question setup never asks stays bare.
+  check('...and an OPTIONAL question setup asks gets its chips unasked too (13 Nov 2026)', pick('Which should I use for your calorie and starting-weight maths?', []) === 'gender', pick('Which should I use for your calorie and starting-weight maths?', []))
+  check('...but a BONUS question setup never asks still gets none', pick('Snacks too, or meals only?', []) === undefined, pick('Snacks too, or meals only?', []))
   check('...and a question asking two numbered cards at once picks neither',
     fresh('How old are you, and what do you squat?', []) === undefined, fresh('How old are you, and what do you squat?', []))
+}
+
+console.log('\n9. His setup, 13 Nov 2026: the lifting-background question comes with its options')
+{
+  // His words: "Asking me questions about my background in lifting which is vague and no multiple choice is confusing."
+  const his = 'Fair enough! To help me tailor the workouts properly, how would you describe your overall background with lifting?'
+  check('his exact question is the experience question', questionAsksSlot('trainingExperience', questionPartOf(his)))
+  check('...and brings the experience options with nothing requested', fresh(his, []) === 'trainingExperience', fresh(his, []))
+  check('...the other ways it is put', ['What\'s your training background like?', 'How would you describe your lifting background?', 'Tell me about your background in the gym?'].every(q => fresh(q, []) === 'trainingExperience'),
+    ['What\'s your training background like?', 'How would you describe your lifting background?', 'Tell me about your background in the gym?'].map(q => fresh(q, [])))
+  check('...and "background" alone is not the experience question (a work background is something else)', fresh('What\'s your work background?', []) === undefined, fresh('What\'s your work background?', []))
 }
 
 console.log(`\n${ran} checks ran.`)

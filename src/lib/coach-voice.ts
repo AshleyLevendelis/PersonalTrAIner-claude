@@ -1573,6 +1573,16 @@ export function workingWeightProfileNote(): string {
 export function liftNeedsASet(): string {
   return 'For a lift I need a set: the weight, and the reps you got. Fill in the ones you know:'
 }
+/**
+ * A weight typed with no set behind it, while setup is on the lifts (his setup, 13 Nov 2026: "110kg", then "Which
+ * exercise did I mean?"). The app asks which lift and how many reps itself, with the boxes, instead of letting the
+ * coach say "Got it" over a number nothing kept.
+ */
+export function liftWhichOne(weight: string, lift?: string): string {
+  return lift
+    ? `How many reps did you get with ${weight} on the ${lift}? Put the set in its boxes:`
+    : `Which lift was ${weight} on, and how many reps did you get? Put it in that lift's boxes:`
+}
 /** Why a lift's two boxes cannot be saved yet, in the place it happened. */
 export function liftSetProblem(kind: 'weight' | 'reps' | 'too_many' | 'unread'): string {
   if (kind === 'weight') return 'What weight was that set?'

@@ -268,6 +268,60 @@ if (state === 'review-lifter') {
   ))
 }
 
+// HIS SETUP, 13 NOV 2026 (five screenshots: "Asking me questions about my background in lifting which is vague and no
+// multiple choice ... it asked me working weights and I gave a number but it didn't clarify which exercise ... then it
+// started asking multiple questions at once"). INPUT only: which answers are in and which question is on screen.
+//   his-experience  name and goal answered; the coach has just asked whether he lifts, in words, no card.
+//   his-lifts       a barbell lifter up to the working-lifts question; the coach asked what he lifts, in words, no card.
+//   his-stalled     the working-lifts card has been put up three times and never answered (his session after "110kg"),
+//                   then a later answer landed (a tick), so the conversation is moving but the counter is tripped.
+const HIS_SO_FAR = {
+  displayName: 'Ashley', fitnessGoal: 'hypertrophy', trainingExperience: 'intermediate',
+  activityLevel: 'moderate', equipment: 'full_gym', injuries: [],
+}
+if (state === 'his-experience') {
+  const answered = { displayName: 'Ashley', fitnessGoal: 'hypertrophy' }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Ashley' },
+      { role: 'assistant', content: 'Building muscle, good. Have you done any lifting before?' },
+    ],
+    answered,
+    Object.keys(answered),
+  ))
+}
+if (state === 'his-lifts') {
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Ashley' },
+      { role: 'assistant', content: 'Nothing to work around, good. What sort of weights are you moving on the big lifts at the moment?' },
+    ],
+    HIS_SO_FAR,
+    Object.keys(HIS_SO_FAR),
+  ))
+}
+if (state === 'his-stalled') {
+  const answered = { ...HIS_SO_FAR, trainingDays: ['Mon', 'Wed', 'Fri'] }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Ashley' },
+      { role: 'assistant', content: 'Do you know your working weights for squat, bench and deadlift?', slotCard: 'knowsWorkingLifts', slotCardSuperseded: true },
+      { role: 'user', content: '110kg' },
+      { role: 'assistant', content: 'Got it. Could you tell me your current working weights for the squat, bench press, and deadlift?', slotCard: 'knowsWorkingLifts', slotCardSuperseded: true },
+      { role: 'user', content: 'Which exercise did I mean?' },
+      { role: 'assistant', content: 'Was that 110kg for your back squat, bench press, or deadlift?', slotCard: 'knowsWorkingLifts' },
+      { role: 'user', content: 'Mon, Wed, Fri' },
+      { role: 'assistant', content: '✓ Training days — Mon, Wed, Fri', isReceipt: true },
+      { role: 'assistant', content: 'Three days works. How long have you got for each session?' },
+    ],
+    answered,
+    Object.keys(answered),
+  ))
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ConversationalOnboarding onComplete={p => { w.__onbCompleted = p }} />
