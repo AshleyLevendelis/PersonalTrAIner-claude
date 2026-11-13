@@ -1537,6 +1537,13 @@ menu" stays true when a copy is also left outside it.
   The coach suggests 2-3 orders with a reason each, never says a dish is free of an allergen, never says to make up for
   it. `test:eating-out-budget`, `test:eating-out`, `verify:eating-out`, `docs/plans/eating-out-budget.md`. Needs the
   `chat-gemini` deploy and an exam run
+- **Running (slice 6): his rulings 13 Nov 2026, "Coach only" (a race date is asked by the coach, never setup) and "No
+  pace"** (minutes and effort only). Mine (CSCS): runs replace lifting days down to two (one for a half), never lifting
+  the day before the long or hard run, one full rest day a week. A ladder from walk-run to a half (`running.ts`), the
+  long run by the 10% rule, every fourth week lighter; today's run is held to 10% over the longest run logged in 30 days
+  and says so; a goal added mid-plan starts at the bottom. Setup (optional), Profile and `propose_running_goal`.
+  `test:running-ladder`, `verify:running-day`, `measure:running-personas`, `docs/plans/running.md`. Needs the
+  `running_goal` migration, the `chat-gemini` deploy and an exam run
 
 ### His ruling of 12 Nov 2026, eating out (`docs/plans/eating-out.md`)
 - **A meal marked as out: "Ask: light/normal/big"** (from three options; his request "build it, start with out for

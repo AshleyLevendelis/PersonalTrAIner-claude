@@ -1,4 +1,5 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
+import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays } from '@/lib/running'
 import { blockShape } from '@/lib/timer-engine'
 import { circuitName } from '@/lib/circuit'
 import { textBesideSave, contextNoteText } from '@/lib/save-reply'
@@ -42,7 +43,7 @@ import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { undoEatenCorrection } from '@/lib/eaten-correction'
 import { isBirthday } from '@/lib/body-units'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
-  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioLog, undoCardioLog, type CardioLogPayload, executeCardioSession, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload, planAsSaved } from '@/lib/pending-action-executor'
+  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeRunningGoal, type RunningGoalPayload, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioLog, undoCardioLog, type CardioLogPayload, executeCardioSession, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload, planAsSaved } from '@/lib/pending-action-executor'
 import { planSessionKindToday, sessionKindFrom, buildSessionKindTodayProposal, SESSION_KINDS } from '@/lib/session-kind'
 import { STYLE_OPTIONS, OFFERED_STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from '@/lib/onboarding-slots'
 import { getDurationBudgetSeconds } from '@/lib/session-duration'
@@ -503,7 +504,7 @@ function sessionCutoffHour(preferredTime: string | undefined): number {
 }
 
 /** The coach tools that rebuild the rest of the plan; each card is finished by finishRebuildCard. */
-const REBUILD_CARD_KINDS = new Set(['propose_schedule_change', 'propose_session_length', 'propose_style_change', 'propose_goal_change', 'propose_concurrent_activity'])
+const REBUILD_CARD_KINDS = new Set(['propose_schedule_change', 'propose_session_length', 'propose_running_goal', 'propose_style_change', 'propose_goal_change', 'propose_concurrent_activity'])
 
 /**
  * ONLY for a proposal this client does not know at all. Every tool it knows says what it could not do in its own
@@ -2186,6 +2187,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       macros,
       dietary_preferences: profile.dietary_preferences || [],
       concurrent_activities: profile.concurrent_activities || [],
+      // THE RUNNING GOAL (running.ts), in the app's own words: the coach quotes this, never a pace (his 13 Nov ruling).
+      running_goal: isRunningGoal(profile.running_goal)
+        ? `${runningGoalLabel(profile.running_goal)}${profile.running_race_date ? `, race day ${raceDateWords(profile.running_race_date)}` : ''}${profile.running_base_minutes ? `; they said they run ${profile.running_base_minutes} minutes non-stop now` : ''}`
+        : '',
       // weekly_schedule intentionally no longer sent (trace-report fix): the
       // edge function stopped reading it from context — it only ever fed a
       // field the update_workout_schedule tool wrote and nothing else read,
@@ -2741,6 +2746,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (pendingAction.kind === 'propose_session_kind_today') return "Here's today as a different kind of session:"
     if (pendingAction.kind === 'propose_schedule_change') return "Here's the new week:"
     if (pendingAction.kind === 'propose_session_length') return "Here's your plan at the new session length:"
+    if (pendingAction.kind === 'propose_running_goal') return "Here's your week with running in it:"
     if (pendingAction.kind === 'propose_style_change') return "Here's your plan in the new style:"
     if (pendingAction.kind === 'propose_goal_change') return "Here's your plan and your food for the new goal:"
     if (pendingAction.kind === 'propose_concurrent_activity') return "Here's the week built around it:"
@@ -3293,6 +3299,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const after: UserProfile | null =
       kind === 'propose_schedule_change' ? { ...profile, training_days: (profile.training_days ?? []).map(d => ({ ...d, available: (p.trainingDays as string[]).some(w => w.toLowerCase() === d.day.toLowerCase()) })) }
       : kind === 'propose_session_length' ? { ...profile, session_duration_preference: p.sessionDuration as UserProfile['session_duration_preference'] }
+      : kind === 'propose_running_goal' ? { ...profile, running_goal: (p.runningGoal as string | null) ?? null, running_race_date: (p.raceDate as string | null) ?? null, running_base_minutes: (p.baseMinutes as number | null) ?? null }
       : kind === 'propose_style_change' ? { ...profile, training_style: p.trainingStyle as UserProfile['training_style'] }
       : kind === 'propose_goal_change' ? { ...profile, fitness_goal: p.fitnessGoal as UserProfile['fitness_goal'] }
       : kind === 'propose_concurrent_activity' ? profileAfterConcurrentActivity(profile, p as unknown as Parameters<typeof profileAfterConcurrentActivity>[1])
@@ -4715,6 +4722,67 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             ? 'Your sessions get rebuilt to fit — fewer exercises and sets, not the same ones with the end cut off.'
             : 'Your sessions get rebuilt to use the extra time properly, rather than leaving it over.' },
         ],
+        rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
+        reversible: true,
+      },
+    }
+  }
+
+  /**
+   * A RUNNING GOAL TOLD TO THE COACH (his 13 Nov 2026 strategy, slice 6). Every value is checked against the app's own
+   * list, never the model's spelling. A race date is the coach's to ask (his ruling of 13 Nov 2026) and COUNTS BACK:
+   * when the goal cannot be reached safely by then, the card sets the biggest one that can and says so; when not even
+   * 20 minutes non-stop can, there is no card and the refusal says why.
+   */
+  const buildRunningGoalProposal = (rawArgs: Record<string, unknown>): {
+    scopeKey: string
+    preconditions: Record<string, unknown>
+    payload: RunningGoalPayload
+    preImage: MesocycleWeek[]
+    diff: import('@/lib/pending-actions-store').ProposalDiff
+  } | { refusal: string } | null => {
+    const raw = String(rawArgs.goal ?? '').trim()
+    const asked = raw === 'none' ? null : isRunningGoal(raw) ? raw : undefined
+    if (asked === undefined || mesocycle.length === 0) return null
+    const dateRaw = typeof rawArgs.race_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawArgs.race_date) ? rawArgs.race_date : null
+    if (dateRaw && dateRaw <= activeSession.date) return { refusal: `That date has already gone by, so I've not set it. Tell me the race date as it is on the entry, and I'll count back from it.` }
+    const base = typeof rawArgs.base_minutes === 'number' && Number.isFinite(rawArgs.base_minutes) && rawArgs.base_minutes > 0 && rawArgs.base_minutes <= 300
+      ? Math.round(rawArgs.base_minutes) : (profile.running_base_minutes ?? null)
+    let goal = asked
+    const notes: { severity: 'info' | 'warn'; text: string }[] = []
+    if (goal && dateRaw) {
+      const weeks = weeksBetween(activeSession.date, dateRaw)
+      const reach = reachableByRace(goal, weeks, { baseMinutes: base, age: profile.age })
+      if (!reach) return { refusal: `${raceDateWords(dateRaw)} is ${weeks} week${weeks === 1 ? '' : 's'} away, and building safely to even 20 minutes non-stop takes longer than that from where you are. I can set a running goal without the date, and you can run that day as a walk-run.` }
+      if (reach !== goal) {
+        notes.push({ severity: 'warn', text: `${runningGoalLabel(goal)} by ${raceDateWords(dateRaw)} would mean building up faster than is safe from where you are, so this sets ${runningGoalLabel(reach).toLowerCase()} for that day instead.` })
+        goal = reach
+      }
+      notes.push({ severity: 'info', text: `The last two weeks before ${raceDateWords(dateRaw)} are lighter, so you arrive fresh.` })
+    }
+    const before = isRunningGoal(profile.running_goal) ? profile.running_goal : null
+    if (goal === before && (dateRaw ?? null) === (profile.running_race_date ?? null) && base === (profile.running_base_minutes ?? null)) return null
+    const startWeek = activeSession.liveWeek
+    const weeksAhead = mesocycle.filter(w => w.week_number >= startWeek).length
+    if (weeksAhead === 0) return null
+    if (goal) {
+      const available = (profile.training_days ?? []).filter(d => d.available).map(d => d.day)
+      const split = chooseRunningDays(available, goal)
+      if (split.runDays.length === 0) return { refusal: "With one training day a week there's no room for runs beside your lifting. Add a day and I can build running in." }
+      notes.unshift({ severity: 'info', text: `Runs on ${split.runDays.map(r => r.day).join(', ')}; lifting on ${split.liftDays.join(', ') || 'none of your days'}. Minutes and effort only, building up week by week.` })
+    }
+    return {
+      scopeKey: `${profile.id}:propose_running_goal:${goal ?? 'none'}:${dateRaw ?? ''}:${base ?? ''}:${startWeek}`,
+      preconditions: { before, beforeRaceDate: profile.running_race_date ?? null, beforeBase: profile.running_base_minutes ?? null, startWeek },
+      payload: { runningGoal: goal, raceDate: goal ? dateRaw : null, baseMinutes: base, fromWeek: startWeek, reason: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined },
+      preImage: mesocycle,
+      diff: {
+        lead: ask(goal ? `build running into your plan: ${runningGoalLabel(goal).toLowerCase()}` : 'take running out of your plan'),
+        rows: [
+          { field: 'Running goal', before: before ? runningGoalLabel(before) : 'None', after: goal ? runningGoalLabel(goal) : 'None' },
+          ...(goal && dateRaw ? [{ field: 'Race day', before: profile.running_race_date ? raceDateWords(profile.running_race_date) : 'None', after: raceDateWords(dateRaw) }] : []),
+        ],
+        implications: notes,
         rationale: typeof rawArgs.reason === 'string' ? rawArgs.reason : undefined,
         reversible: true,
       },
@@ -6270,6 +6338,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           const current = DURATION_OPTIONS.find(o => o.value === profile.session_duration_preference)?.label ?? 'that length'
           refusal = `Your sessions are already set to ${current}. If you just mean today, tell me how long you have and I'll cut this one down instead.`
         }
+      } else if (result.proposal.kind === 'propose_running_goal' && result.proposal.rawArgs) {
+        const run = buildRunningGoalProposal(result.proposal.rawArgs)
+        if (run && 'refusal' in run) refusal = run.refusal
+        else if (run) built = { scopeKey: run.scopeKey, preconditions: run.preconditions, payload: run.payload as unknown as Record<string, unknown>, preImage: run.preImage, diff: run.diff }
+        else {
+          const current = isRunningGoal(profile.running_goal) ? runningGoalLabel(profile.running_goal).toLowerCase() : 'no running goal'
+          refusal = `You're already set to ${current}, so there's nothing to change. Tell me a distance (20 minutes non-stop, 5 km, 10 km or a half marathon) or a race date and I'll build it in.`
+        }
       } else if (result.proposal.kind === 'propose_style_change' && result.proposal.rawArgs) {
         const style = buildStyleChangeProposal(result.proposal.rawArgs)
         if (style) built = { scopeKey: style.scopeKey, preconditions: style.preconditions, payload: style.payload as unknown as Record<string, unknown>, preImage: style.preImage, diff: style.diff }
@@ -7551,6 +7627,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       title = ok ? RECEIPTS['propose_session_length'].done : RECEIPTS['propose_session_length'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       undoToken = ok ? row.id : undefined
+    } else if (row.kind === 'propose_running_goal') {
+      const payload = row.payload as unknown as RunningGoalPayload
+      const result = await executeRunningGoal(profile, mesocycle, exerciseExclusions, payload, await loadEditContext())
+      onMesocycleUpdated(await planAsSaved(profile.id, result, mesocycle))
+      if (result.receipt.failed.length === 0) onProfileChanged({ running_goal: payload.runningGoal, running_race_date: payload.raceDate, running_base_minutes: payload.baseMinutes })
+      receipt = result.receipt
+      const ok = receipt.failed.length === 0
+      title = ok ? RECEIPTS['propose_running_goal'].done : RECEIPTS['propose_running_goal'].failed
+      rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_style_change') {
       const payload = row.payload as unknown as StyleChangePayload
       const result = await executeStyleChange(profile, mesocycle, exerciseExclusions, payload, await loadEditContext())
@@ -8003,7 +8089,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         if (!preImage || !planCreatedAt) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
-      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change' || row.kind === 'propose_goal_change' || row.kind === 'propose_concurrent_activity') {
+      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change' || row.kind === 'propose_goal_change' || row.kind === 'propose_concurrent_activity' || row.kind === 'propose_running_goal') {
         // Both wrote a RUN of weeks, so undo restores the same run rather
         // than the swap's single week. The starting week comes off the
         // payload, not off today's live week — undoing tomorrow must put
@@ -8018,7 +8104,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
               ? (row.payload as unknown as GoalChangePayload).fromWeek
               : row.kind === 'propose_concurrent_activity'
                 ? (row.payload as unknown as ConcurrentActivityPayload).fromWeek
-                : (row.payload as unknown as ScheduleChangePayload).fromWeek
+                : row.kind === 'propose_running_goal'
+                  ? (row.payload as unknown as RunningGoalPayload).fromWeek
+                  : (row.payload as unknown as ScheduleChangePayload).fromWeek
         await undoWeekRangeChange(profile.id, preImage, fromWeek)
         onMesocycleUpdated(preImage)
         if (row.kind === 'propose_schedule_change') {
@@ -8052,6 +8140,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           const patch: Partial<UserProfile> = { concurrent_activities: pre?.beforeActivities ?? [] }
           if (pre?.wantedDays && pre.beforeDays) patch.training_days = (profile.training_days ?? []).map(d => ({ ...d, available: pre.beforeDays!.some(b => b.toLowerCase() === d.day.toLowerCase()) }))
           if (pre?.wantedTime && pre.beforeTime) patch.preferred_time = pre.beforeTime
+          await updateProfileField(profile.id, patch)
+          onProfileChanged(patch)
+        }
+        if (row.kind === 'propose_running_goal') {
+          // The plan goes back, so the goal, its race date and his base go back with it.
+          const pre = row.preconditions as { before?: string | null; beforeRaceDate?: string | null; beforeBase?: number | null } | null
+          const patch: Partial<UserProfile> = { running_goal: pre?.before ?? null, running_race_date: pre?.beforeRaceDate ?? null, running_base_minutes: pre?.beforeBase ?? null }
           await updateProfileField(profile.id, patch)
           onProfileChanged(patch)
         }

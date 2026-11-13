@@ -72,6 +72,7 @@ export function weeksUndoWrites(kind: string, payload: Record<string, unknown>, 
     case 'propose_schedule_change':
     case 'propose_style_change':
     case 'propose_goal_change':
+    case 'propose_running_goal':
     case 'propose_concurrent_activity': {
       const from = Number(payload.fromWeek)
       return all.filter(n => n >= from)

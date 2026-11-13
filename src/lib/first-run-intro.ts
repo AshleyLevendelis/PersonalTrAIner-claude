@@ -1,4 +1,4 @@
-import { PATHWAY_FOCUS } from './pathway'
+import { PATHWAY_FOCUS, PATHWAY_RUN_FOCUS } from './pathway'
 import { loadParkedQuestions } from './parked-questions'
 
 /**
@@ -228,7 +228,7 @@ export function planShapeFromMesocycle(
   const activityOnly = daysSeen.length > 0
     && daysSeen.every(d => (d.exercises?.length ?? 0) === 0)
     && daysSeen.some(d => d.plannedActivity != null)
-  const homeStrengthJoins = activityOnly && mesocycle.some(w => (w.days ?? []).some(d => d.focus === PATHWAY_FOCUS))
+  const homeStrengthJoins = activityOnly && mesocycle.some(w => (w.days ?? []).some(d => d.focus === PATHWAY_FOCUS || d.focus === PATHWAY_RUN_FOCUS))
 
   return {
     totalWeeks: mesocycle.length,

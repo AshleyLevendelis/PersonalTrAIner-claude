@@ -4,7 +4,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Heart, ChevronRight, ArrowRight, Footprints, Bike, Waves, Dumbbell, CalendarDays } from 'lucide-react'
 import { useActiveSession } from '@/hooks/useActiveSession'
-import { getRecentActivityDurations, DEFAULT_ACTIVITY_MINUTES } from '@/lib/cardio-log-store'
+import { getRecentActivityDurations, DEFAULT_ACTIVITY_MINUTES, readCardioLogs } from '@/lib/cardio-log-store'
+import { runForToday, RUN_ACTIVITY, type RunToday } from '@/lib/running'
+import type { PlannedActivity } from '@/lib/types'
 import { PlannedCardioRow, UnplannedCardioEntry, CardioReceipts, useCardioReceiptsToday, type CardioPick } from './CardioSetRow'
 // Its own chunk — see the file for the measurement that put it there.
 const AddCardioSession = lazyWithReload(() => import('./AddCardioSessionSheet').then(m => ({ default: m.AddCardioSession })))
@@ -454,12 +456,15 @@ export function ActiveRecoveryCard({
   tomorrow,
   onPeek,
   onAddCardio,
+  raceDate,
 }: {
   workout: WorkoutDay
   weekTally: { done: number; planned: number; left?: number }
   tomorrow?: { dayName: string; focus: string; detail: string }
   onPeek?: (dayName: string) => void
   onAddCardio?: (activity: string, minutes: number, targetRpe: number) => Promise<string | null>
+  /** His race date (running.ts): the two weeks before it are lighter. */
+  raceDate?: string | null
 }) {
   const cardio = workout.recommendedCardio
   // A DAY WHOSE WHOLE PLAN IS AN ACTIVITY SHOWS THE ACTIVITY. The beginner's
@@ -469,7 +474,7 @@ export function ActiveRecoveryCard({
   // "log a walk" form. The plan said walk 20 minutes; the screen asked what you
   // did. This is not an add-on like recommendedCardio: it IS the session, which
   // is why it leads the card and why the card stops calling itself recovery.
-  const planned = workout.plannedActivity
+  const planned = useRunHeldToLog(workout.plannedActivity, raceDate ?? null)
   return (
     // THE RECOVERY COLOUR, as the rest day (Ashley's handoff, 4 Nov 2026, Exercise Screen option 4b): amber is for
     // warnings such as "That didn't save", and this card had kept it from before the 20 Sep rest-day rebuild.
@@ -500,6 +505,9 @@ export function ActiveRecoveryCard({
         {planned && (
           <div className="space-y-1.5" data-testid="planned-activity">
             <PlannedCardioRow prescription={planned} />
+            {planned.heldBack && (
+              <p className="text-xs leading-[1.5] text-foreground px-0.5" data-testid="run-held-back">{planned.heldBack}</p>
+            )}
             {planned.reason && (
               <p className="text-xs leading-[1.5] text-muted-foreground px-0.5">{planned.reason}</p>
             )}
@@ -526,4 +534,33 @@ export function ActiveRecoveryCard({
       </CardContent>
     </Card>
   )
+}
+
+/**
+ * TODAY'S RUN, HELD TO WHAT HE HAS RUN (his 13 Nov 2026 strategy, slice 6; running.ts `runForToday`): a continuous run
+ * is never more than 10% longer than the longest run he logged in the last 30 days. The plan's number comes back
+ * unchanged for anything that is not a run, and while the logs are still being read.
+ */
+function useRunHeldToLog(planned: PlannedActivity | undefined, raceDate: string | null): (PlannedActivity & { heldBack?: string | null }) | undefined {
+  const { profileId, date } = useActiveSession()
+  const [held, setHeld] = useState<RunToday | null>(null)
+  const isRun = planned?.activity === RUN_ACTIVITY
+  useEffect(() => {
+    if (!isRun || !profileId || !planned) { setHeld(null); return }
+    let live = true
+    const from = new Date(Date.UTC(+date.slice(0, 4), +date.slice(5, 7) - 1, +date.slice(8, 10) - 30)).toISOString().slice(0, 10)
+    void readCardioLogs(profileId, { from, to: date }).then(read => {
+      if (!live) return
+      setHeld(runForToday(planned, date, read.rows.map(r => ({ date: r.date, minutes: r.duration_minutes, activity: r.activity_name })), raceDate))
+    })
+    return () => { live = false }
+  }, [isRun, profileId, date, planned, raceDate])
+  if (!planned) return undefined
+  if (!held || !isRun) return planned
+  // HELD BACK, THE PLAN'S OWN WORDS STEP ASIDE: they name the planned minutes (and any Steady part), and a run kept short
+  // to what he has run is run Easy throughout. Found on the screen: "Kept to 25 minutes" above "then 30 minutes Easy".
+  if (held.heldBack && held.minutes < planned.duration) {
+    return { ...planned, duration: held.minutes, heldBack: held.heldBack, reason: 'Easy throughout: you can talk in full sentences.', targetRpe: Math.min(planned.targetRpe ?? 4, 4) }
+  }
+  return { ...planned, duration: held.minutes, heldBack: held.heldBack }
 }

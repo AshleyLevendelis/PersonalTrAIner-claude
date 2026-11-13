@@ -24,6 +24,7 @@
 import type { UserProfile, MesocycleWeek, SessionDuration } from './types'
 import { rebuildAgainstProfile, type PlanEditContext } from './plan-adaptations'
 import { getDurationBudgetSeconds } from './session-duration'
+import { isRunningGoal, runningGoalLabel } from './running'
 import { getFlaggedJoints } from './exercise-plan'
 
 /**
@@ -81,7 +82,7 @@ export const KNOWN_LIFT_FIELDS = ['known_squat_kg', 'known_bench_kg', 'known_dea
 // EXPERIENCE, RECOVERY AND CONDITIONING ADDED 8 Nov 2026, his ruling "Offer a rebuild" (QA round 2): all three are read
 // by the plan generator, and changing one on Profile saved it and left the plan as it was, with no word, the session-
 // length defect above again. They take the same road goal and style take: an offer, nothing changed until yes.
-export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', 'enjoyed_activities', 'session_duration_preference', 'training_experience', 'recovery_capacity', 'conditioning_preference', ...KNOWN_LIFT_FIELDS] as const
+export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', 'enjoyed_activities', 'running_goal', 'running_base_minutes', 'session_duration_preference', 'training_experience', 'recovery_capacity', 'conditioning_preference', ...KNOWN_LIFT_FIELDS] as const
 export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number] | 'concurrent_activities'
 
 /**
@@ -289,6 +290,19 @@ export function detectPlanInvalidation(
       detail: now.length > 0
         ? `I can rebuild your plan from this week so one walk a week is ${now.join(' or ')}, at the same easy effort and the same minutes. Everything you have already logged stays exactly as it is.`
         : 'I can rebuild your plan from this week with every activity day as a walk. Everything you have already logged stays exactly as it is.',
+    }
+  }
+
+  // A RUNNING GOAL (his 13 Nov 2026 strategy, slice 6; running.ts): runs join the week and replace lifting days down to
+  // two (one for a half), or leave it again. Offered like every other rebuild: nothing changes until yes.
+  if ('running_goal' in patch && (patch.running_goal ?? null) !== (before.running_goal ?? null)) {
+    const goal = isRunningGoal(patch.running_goal) ? patch.running_goal : null
+    return {
+      field: 'running_goal',
+      title: goal ? `Build running into your plan: ${runningGoalLabel(goal).toLowerCase()}?` : 'Take running out of your plan?',
+      detail: goal
+        ? 'I can rebuild your plan from this week with runs on some of your training days, building up week by week in minutes and effort, and lifting on the rest (at least two days, one for a half marathon). Everything you have already logged stays exactly as it is.'
+        : 'I can rebuild your plan from this week with every training day back to lifting. Everything you have already logged stays exactly as it is.',
     }
   }
 

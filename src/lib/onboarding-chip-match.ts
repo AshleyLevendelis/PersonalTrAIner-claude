@@ -114,6 +114,7 @@ const ASKS: Record<SlotKey, Asks> = {
   dateOfBirth: /date of birth|\bborn\b|birthday|\bdob\b/i,
   kitTicks: /which of these do you have|untick anything you don.t have|what (kit|equipment) do you (actually )?(have|own) at home/i,
   enjoyedActivities: /(enjoy|like) (swimming|cycling)|swimming or cycling|besides walking/i,
+  runningGoal: /running goal|work towards a run|run (a )?(5|10) ?k|half marathon|20 minutes non-stop/i,
 }
 
 /**

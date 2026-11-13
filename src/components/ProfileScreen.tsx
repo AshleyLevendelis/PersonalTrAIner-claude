@@ -11,6 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { ENJOYED_ACTIVITY_OPTIONS } from '@/lib/pathway'
+import { RUNNING_GOAL_OPTIONS, isRunningGoal, raceDateWords } from '@/lib/running'
 import { MEAL_VARIETY_OPTIONS } from '@/lib/freestyle'
 import { isMissingColumnError } from '@/lib/missing-column'
 import { loadSwitches, remindersSummary } from '@/lib/coach-reach-out'
@@ -1077,7 +1078,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       onProfileChanged(revertPatch)
       // A SETTING WHOSE DATABASE STEP HAS NOT RUN is not a connection problem, and saying so would send him to
       // check his signal for nothing.
-      if ((['enjoyed_activities', 'meal_variety', 'show_numbers'] as const).some(c => c in patch && isMissingColumnError(err, c))) {
+      if ((['enjoyed_activities', 'meal_variety', 'show_numbers', 'running_goal'] as const).some(c => c in patch && isMissingColumnError(err, c))) {
         setSaveError("That setting isn't switched on yet, so it couldn't be saved. Nothing else has changed.")
         return
       }
@@ -1260,6 +1261,17 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               options={START_PREFERENCE_OPTIONS}
               onSave={v => savePatch({ start_preference: v as StartPreference })}
             /></Row>
+            {/* A RUNNING GOAL (his 13 Nov 2026 strategy, slice 6): runs join the week, built up in minutes and effort,
+                never pace (his ruling of 13 Nov 2026). A change saves and offers the rebuild (plan-invalidation.ts).
+                A race date is the coach's to ask, so it is shown here only when one is set. */}
+            <Row label="Running goal"><div data-testid="profile-running-goal"><EditableSelectField
+              value={isRunningGoal(profile.running_goal) ? profile.running_goal : 'none'}
+              options={[{ value: 'none', label: 'Not for now' }, ...RUNNING_GOAL_OPTIONS.map(o => ({ value: o.value, label: o.label }))]}
+              onSave={v => savePatch({ running_goal: v === 'none' ? null : v })}
+            /></div></Row>
+            {isRunningGoal(profile.running_goal) && profile.running_race_date && (
+              <Row label="Race day"><span className="text-[0.875rem]" data-testid="profile-race-date">{raceDateWords(profile.running_race_date)}</span></Row>
+            )}
             {/* WHAT HE ENJOYS BESIDES WALKING (his 13 Nov 2026 strategy, slice 3): only on the pathway, where one walk a
                 week becomes a swim or a ride. A tap saves and offers the rebuild (plan-invalidation.ts). */}
             {isStartingOut(profile) && (

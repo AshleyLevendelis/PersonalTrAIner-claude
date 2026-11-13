@@ -1,7 +1,33 @@
-# Running: walk-run to a half marathon (strategy slice 6, PLAN ONLY, 13 Nov 2026)
+# Running: walk-run to a half marathon (strategy slice 6, BUILT 13 Nov 2026 on his "Build it")
 
-His strategy of 13 Nov 2026, slice 6, and ruling 4 ("the first sport is running"). REPORT ONLY: nothing here is built
-until he says "build it". Ruling 5 (watch / Strava import) is later and not in this plan.
+His strategy of 13 Nov 2026, slice 6, and ruling 4 ("the first sport is running"). Ruling 5 (watch / Strava import) is
+later and not in this plan.
+
+## As built (13 Nov 2026), and his answers of the day
+
+- **Race date: "Coach only"** (over setup asking, and both). Setup asks only the distance, optional ("Not for now" first).
+- **Pace: "No pace"** (over pace in history, and everywhere). Every run is minutes and effort (Easy / Steady / Hard).
+- **Mine (CSCS): runs replace lifting days down to two (one for a half)**, never below one; three runs a week where the
+  days allow; at most six days a week hold a session (one full rest day); no lifting the day before the long run or the
+  hard session (0 of 254 day sets break it); the long run on the weekend where one is a run day.
+- The ladder as built: walk-run in six steps (25 to 29 minutes a session, the running inside growing from 8 to 21
+  minutes), then continuous running, the long run growing by the 10% rule to 25 minutes (20 non-stop), 40 (5 km), 70
+  (10 km) or 135 (half), easy runs by two minutes a week; strides from a 26-minute long run (5 km and up); one Steady
+  or interval session for 10 km and the half once the long run reaches 40. Every fourth week is lighter (about 70%, no
+  hard session), and lines up with the lifting deload. Weeks to the goal from nothing: 13, 21, 29, 38.
+- **In walk-run the load is time on feet** (mine, CSCS): a session's minutes rise by at most 10% while the running inside
+  grows; the 10% rule on running minutes alone is impossible from a base of 8.
+- What he ran holds today's run back: a continuous run is never more than 10% longer than his longest run logged in the
+  last 30 days, and with nothing logged 20 minutes of running stands; when held back, the card says so in one line and
+  the run is Easy throughout. A race date tapers the last two weeks (70%, then half) and race day says so.
+- A goal added mid-plan starts its ladder at the week it joined (a rebuild reads where runs first appear in the plan it
+  replaces), never mid-ladder. On the walking pathway the walks become the ladder from week 3, after the home strength
+  on two of the days.
+- NOT BUILT, named: moving up the ladder from the log (the plan is laid out by calendar and held back by the 10% rule,
+  not moved forward); "a missed week repeats" (only the long run's cap reacts); a knee or ankle ease-off turning runs
+  into walk-run (the existing "asked once" about a run during an ease-off stands); a marathon; a running goal beside a
+  running "other sport" counts the running twice (the coach's card does not yet say so); the welcome screen does not
+  mention runs; the coach's existing move, swap and shorten tools on a run day are unverified.
 
 ## What exists today (measured 13 Nov 2026)
 

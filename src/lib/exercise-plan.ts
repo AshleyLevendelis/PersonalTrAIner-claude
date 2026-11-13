@@ -19,7 +19,8 @@ import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, REC
 import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays, effectiveRecoveryCapacity } from './concurrent-activity'
 import { dayAnchorExercise, anchorScore, canAnchor } from './session-derive'
 import { isStartingOut, applyStartingOut, startingOutActivity } from './starting-out'
-import { applyPathwayWeek, PATHWAY_STRENGTH_NOTE } from './pathway'
+import { applyPathwayWeek, PATHWAY_STRENGTH_NOTE, PATHWAY_STRENGTH_RUN_NOTE } from './pathway'
+import { liftingDaysFor, withRunDays, pathwayWithRuns, runningWeekNote, runningGoalOf, runOnDay, ladderWeekOf } from './running'
 import { getDurationBudgetSeconds, getSessionMinimumSeconds, getSessionMaximumSeconds, getSteadyStateSeconds, DEFAULT_CARRY_DISTANCE_M, estimateDaySeconds, estimateSlotsSeconds, parseRestSeconds, SESSION_OVERHEAD_SECONDS, yieldFillerTo, optionalFillerSeconds } from './session-duration'
 import { implausibleLifts } from './lift-plausibility'
 import { kitOf, equipmentTierFor, kitAllowsEquipment, kitInWords, type ResolvedKit } from './kit-list'
@@ -5757,6 +5758,12 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // here used to throw outright rather than degrade — an unhelpful failure
   // mode for a field a malformed stored row could plausibly be missing.
   let availableDays = (profile.training_days || []).filter(d => d.available)
+  // A RUNNING GOAL (his 13 Nov 2026 strategy, slice 6; running.ts): the run days are taken out before anything is
+  // split, so lifting is planned for the days left to it. generateMesocycle adds the runs back, week by week.
+  {
+    const lifting = liftingDaysFor(profile, isStartingOut(profile))
+    if (lifting) availableDays = availableDays.filter(d => lifting.has(d.day))
+  }
   if (effectiveRecoveryCapacity(profile) === 'low' && availableDays.length >= 5) {
     // Low recovery capacity (poor sleep, high stress, a physically demanding
     // job) can't safely absorb 5+ weekly sessions on top of everything else
@@ -9045,7 +9052,7 @@ export function generateMesocycle(
           const names = new Set(getConstrainedPool(profile, exclusions, { skipStyle: true }).map(e => e.name))
           return (name: string) => names.has(name)
         })()
-        const pathwayDays = applyPathwayWeek(days, weekCounter, profile, pathwayEligible)
+        const pathwayDays = pathwayWithRuns(applyPathwayWeek(days, weekCounter, profile, pathwayEligible), weekCounter, profile)
         for (let i = 0; i < days.length; i++) days[i] = pathwayDays[i]
       }
 
@@ -9084,6 +9091,12 @@ export function generateMesocycle(
       reconcilePerSetLoads(days)
       // Balance from 65, stamped after every budget pass so it takes nothing away (warmup.ts withBalanceWork).
       for (let i = 0; i < days.length; i++) days[i] = withBalanceWork(days[i], profile)
+      // THE RUNS, last of all, so no lifting pass sizes, trims or balances them (running.ts owns their minutes).
+      if (runningGoalOf(profile) && !isStartingOut(profile)) {
+        const withRuns = withRunDays(days, ladderWeekOf(weekCounter, profile.running_start_week), profile)
+        days.splice(0, days.length, ...withRuns)
+      }
+      const runNote = runningWeekNote(days)
       weeks.push({
         week_number: weekCounter,
         block_number: blockIndex + 1,
@@ -9092,7 +9105,7 @@ export function generateMesocycle(
         phase_focus: phaseConfig.focus,
         is_deload: isDeload,
         isCalibrationWeek,
-        coach_note: (() => {
+        coach_note: [(() => {
           // A WEEK OF ACTIVITIES HAS NO PHASE COACHING TO GIVE. Making the
           // week loadless swapped "load goes up on the main lifts" for the
           // weightless copy — an improvement, and still untrue: that copy
@@ -9113,9 +9126,12 @@ export function generateMesocycle(
           // THE PATHWAY'S STRENGTH WEEKS (slice 3): the walk's reason, then what the home sessions are. Never the
           // phase's lifting copy: there is no load, no deload and no working set to talk about.
           if (isStartingOut(profile)) {
-            const walkReason = days.find(d => d.plannedActivity)?.plannedActivity?.reason
-              ?? days.find(d => d.recommendedCardio)?.recommendedCardio?.reason ?? ''
-            return [walkReason, PATHWAY_STRENGTH_NOTE].filter(Boolean).join(' ')
+            // The WALK's reason only: once the walks are runs (a running goal), the running line below says the week.
+            const withRuns = days.some(d => runOnDay(d))
+            const walkReason = days.find(d => d.plannedActivity && !runOnDay(d))?.plannedActivity?.reason
+              ?? days.find(d => d.recommendedCardio && !runOnDay(d))?.recommendedCardio?.reason ?? ''
+            const strengthWeek = days.some(d => d.exercises.length > 0)
+            return [withRuns ? '' : walkReason, strengthWeek ? (withRuns ? PATHWAY_STRENGTH_RUN_NOTE : PATHWAY_STRENGTH_NOTE) : ''].filter(Boolean).join(' ')
           }
           // Decided once per week, from the week that was actually built —
           // see loadlessWeek above, shared with the tempo pass.
@@ -9143,7 +9159,7 @@ export function generateMesocycle(
                 : phaseNote,
             buildProgressionNote(w, isDeload, isCalibrationWeek, policy, loadless),
           ].filter(Boolean).join(' ')
-        })(),
+        })(), runNote].filter(Boolean).join(' '),
         label: isDeload
           ? `Week ${weekCounter} — ${phaseConfig.label}: Deload`
           : `Week ${weekCounter} — ${phaseConfig.label} (wk ${w} of block ${blockIndex + 1})`,

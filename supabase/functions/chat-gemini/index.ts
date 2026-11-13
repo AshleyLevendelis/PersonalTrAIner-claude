@@ -1155,6 +1155,39 @@ const toolDeclarations = [
   },
 
   {
+    name: "propose_running_goal",
+    description:
+      "PROPOSES setting, changing or removing their RUNNING GOAL, then rebuilding the plan from the live week — this does NOT apply anything, the app shows a card and the user taps Apply. Use it when they want to work towards a run ('I want to run a 5k', 'get me to a half marathon', 'I'd like to run 20 minutes without stopping'), tell you a race date for one ('my 10k is on 12 April'), or want running out of the plan. WHAT IT DOES, so you can say it plainly: runs join their week (three where the days allow) and replace lifting days down to two (one for a half marathon), building up week by week in MINUTES AND EFFORT, never pace; a beginner starts with walk-run. A race date counts back: if the goal cannot be reached safely by then, the card says so and sets the biggest one that can. ASK FOR A RACE DATE YOURSELF when they name a race and no date: setup never asks it. If they say how long they can run non-stop now, pass it as base_minutes.",
+    parameters: {
+      type: "object",
+      properties: {
+        goal: {
+          type: "string",
+          enum: ["run_20", "5k", "10k", "half", "none"],
+          description: "run_20 = run 20 minutes non-stop; 5k; 10k; half = half marathon; none = take running out of the plan. Map what they said to one of these; a marathon or anything longer is not offered yet, so ask whether a half marathon would do.",
+        },
+        race_date: {
+          type: "string",
+          description: "The race date YYYY-MM-DD, only when they gave one. Never invent one.",
+        },
+        base_minutes: {
+          type: "number",
+          description: "How many minutes they can run without stopping now, only when they said it.",
+        },
+        reason: {
+          type: "string",
+          description: "One short sentence on what they described — shown on the card.",
+        },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["goal", "origin_verbatim_quote"],
+    },
+  },
+
+  {
     name: "propose_session_length",
     description:
       "PROPOSES changing how long their sessions are FROM NOW ON, then rebuilding the plan from the live week forward — this does NOT apply anything, the app shows a before/after card and the user taps Confirm. Use it when the time they have has CHANGED for good: 'my sessions need to be 45 minutes from now on', 'I can only do half an hour these days', 'I've got more time now, make them longer'. WHAT IT DOES, so you can say it plainly: the remaining weeks are rebuilt to FIT the new length — fewer or more exercises, sets and rest to match — rather than the same sessions with the end cut off. Days already trained, and a session in progress, are never rewritten, and it starts on the date they ask for (see `starts`). THE DIFFERENCE FROM propose_session_shorten IS THE TIME SCOPE, NEVER THE NUMBER: both carry a figure in minutes. 'I only have 45 minutes today' is one day and is propose_session_shorten; 'my sessions need to be 45 minutes' is every session from here and is this one. If you cannot tell which they mean, ASK — do not guess, because one of them rebuilds the rest of their block.",
@@ -2525,6 +2558,7 @@ When the user says they're away or at a different gym for a period ("hotel gym f
 - "I've only got 25 minutes", "I can do half an hour before work", "I need to be out by 7" — call propose_session_shorten with the number of minutes they said. If they say they are short of time but no number, ASK how long they have; do not guess one.
 - A BAD DAY IS A SMALLER YES, NOT A NO (his strategy, 13 Nov 2026). When they cannot face the full session, or ask for the least they can do, offer THE SHORTEST VERSION: their main lift and two more, and it still counts as today's session once finished. On their yes, call propose_session_shorten with minutes 0. Never call it "the minimum" as a judgement; it is the short version.
 - "My sessions need to be 45 minutes from now on", "I can only do half an hour these days", "make them shorter permanently", "I've got more time now" — call propose_session_length. THE TIME SCOPE IS THE WHOLE DISTINCTION, NEVER THE NUMBER: both tools take a figure in minutes, and the same "45 minutes" means one day in the first list and every session from here in this one. Words that decide it: "today", "this morning", "before work" mean ONE day; "from now on", "these days", "permanently", "always", "in future" mean LASTING. If NEITHER kind of word is there — a bare "my sessions should be 45 minutes" — ASK which they mean. Do not guess: one of them rebuilds the rest of their block and the other does not touch tomorrow.
+- "I want to run a 5k", "get me to a half marathon", "I'd like to be able to run 20 minutes", "my 10k is on 12 April", "take the running out" — call propose_running_goal. If they name a race and give no date, ASK for the date before the card (setup never asks it), unless they say there is no date. Running is MINUTES AND EFFORT (Easy / Steady / Hard): NEVER give a pace, a time per km or mile, or a finish time. A marathon or longer is not offered yet: ask whether a half marathon would do.
 - COMING BACK AFTER A BREAK. When the plan section says COMING BACK AFTER A BREAK, today's card already shows eased weights (or holds last time's weight with no increase) for the first session back — quote the card, never the plan's printed weights, and never call the break a failure. If they say WHY they were away: illness → ease back and listen; injury or pain → the same triage as any pain report (a niggle, something that has been there a while, or sharp/one-sided/worsening, which names a professional and changes nothing); busy → no lecture. After twelve weeks or more, and only when they say they want to start over, call propose_plan_restart; the app refuses it after a shorter break, so never promise it.
 - Say what it will do, in their terms: the main lift stays exactly as it is, the accessory work at the end comes out until it fits, and the day is back to the full session next week. Never name a specific exercise as the one that will go — the app decides that against the floors and you cannot see the result until the card renders.
 - This is TODAY. "Tuesdays are always too long" is not this tool: session length is a lasting setting they change on the Profile screen, and saying so is the honest answer.
@@ -2908,6 +2942,7 @@ USER PROFILE:
 - Training Style: ${context.profile.training_style || 'not recorded (activity-only profile, or not asked)'}
 - Training Days: Originally ${context.training_days_count} days/week (user can add or remove days at any time via chat — this is NOT a ceiling)
 - Session Duration: ${context.session_duration_preference || '45-60'} minutes
+- Running goal: ${context.running_goal || 'none'}. Their runs are on the plan below as days named Walk-run, Easy run, Steady run, Intervals or Long run, in minutes and effort (Easy / Steady / Hard). NEVER give a pace or a time per km or mile: the app gives minutes and effort only.
 - Workout Split: ${context.workout_split_preference || 'ai_recommendation'}
 ${context.dietary_preferences && context.dietary_preferences.length > 0 ? `- Dietary Restrictions: ${context.dietary_preferences.join(", ")}` : ""}
 - Injuries: ${context.injuries_summary || 'No injuries or sore areas currently on file.'}
@@ -4666,6 +4701,21 @@ Keep this context in mind to ensure your greetings and questions naturally align
               // rest of the plan, and an arg dropped here reads there as
               // "ongoing" — silently the more far-reaching of the two.
               rawArgs: { day: args.day, direction: args.direction, scope: args.scope, reason: args.reason },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_running_goal") {
+        // Courier, like propose_session_length: no server write, raw args forwarded, the client builds the card
+        // (running.ts counts back from a race date and picks the days) and the rebuild.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_running_goal",
+              rawArgs: { goal: args.goal, race_date: args.race_date, base_minutes: args.base_minutes, reason: args.reason },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

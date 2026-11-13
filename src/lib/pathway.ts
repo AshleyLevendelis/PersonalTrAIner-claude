@@ -178,13 +178,17 @@ function walkAsCardio(activity: PlannedActivity, minutes: number, cut: boolean):
  */
 /** The day's name on a strength + walk day, and the mark a week is a pathway week by. */
 export const PATHWAY_FOCUS = 'Home strength + walk'
+/** The same day once its walk is a run (a running goal on the pathway, running.ts). */
+export const PATHWAY_RUN_FOCUS = 'Home strength + run'
 
 /** A week of the pathway: a home strength day in it, or nothing but activities. Read from the week itself. */
 export function isPathwayWeek(week: { days: WorkoutDay[] }): boolean {
-  return week.days.some(d => d.focus === PATHWAY_FOCUS)
+  return week.days.some(d => d.focus === PATHWAY_FOCUS || d.focus === PATHWAY_RUN_FOCUS)
     || (week.days.length > 0 && week.days.every(d => d.exercises.length === 0) && week.days.some(d => !!d.plannedActivity))
 }
 
+/** The same note when the walks have become runs (a running goal on the pathway, running.ts). */
+export const PATHWAY_STRENGTH_RUN_NOTE = 'Two short home strength sessions this week, about 15 minutes each, then your run. Easy effort: stop each move with a few more in the tank.'
 export const PATHWAY_STRENGTH_NOTE = 'Two short home strength sessions this week, about 15 minutes each, then your walk. Easy effort: stop each move with a few more in the tank.'
 
 // ---------------------------------------------------------------------------

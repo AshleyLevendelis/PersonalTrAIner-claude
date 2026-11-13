@@ -1571,6 +1571,7 @@ export function TodayPanel({
           tomorrow={tomorrowPreview}
           onPeek={d => setPeekDay(d)}
           onAddCardio={handleAddCardio}
+          raceDate={profile?.running_goal ? profile?.running_race_date ?? null : null}
         />
       ) : (
         <div className="space-y-3">

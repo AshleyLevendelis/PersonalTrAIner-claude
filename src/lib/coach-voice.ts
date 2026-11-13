@@ -1338,6 +1338,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_volume_change: { done: 'Adjusted', failed: "I couldn't adjust it" },
   propose_schedule_change: { done: 'Rescheduled', failed: "I couldn't change the schedule" },
   propose_session_length: { done: 'Sessions resized', failed: "I couldn't change your session length" },
+  propose_running_goal: { done: 'Running goal set', failed: "I couldn't change your running goal" },
   propose_style_change: { done: 'Restyled', failed: "I couldn't change the style" },
   // CAUGHT BY THIS FILE'S OWN GATE, 17 Sep 2026: my first title was "Rebuilt
   // for your new goal", a sentence where every sibling is a word or two, and

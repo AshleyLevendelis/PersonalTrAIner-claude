@@ -1,0 +1,14 @@
+{
+  "name": "running-asks-race-date",
+  "why": "His 13 Nov 2026 strategy, slice 6, and his ruling that day: a race date is asked for by the COACH only (setup asks only the distance). Named race, no date: turn one asks for the date with no card; turn two, given the date, carries the running-goal card. And no pace anywhere (his ruling 'No pace'): the reply is minutes and effort.",
+  "messages": [
+    "I've signed up for a 10k and I want to train for it",
+    "It's on the 11th of April next year"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      { "turn": 0, "oneOf": [] },
+      { "turn": 1, "oneOf": ["propose_running_goal"] }
+    ]
+  }
+}

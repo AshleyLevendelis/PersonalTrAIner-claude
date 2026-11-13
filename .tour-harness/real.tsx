@@ -281,6 +281,10 @@ const MUAY = new URLSearchParams(location.search).get('muay') === '1'
 // The six fields below are exactly what isStartingOut reads (starting-out.ts)
 // — a real profile the app would route this way, not a hand-seeded day.
 const WALKER = new URLSearchParams(location.search).get('walker') === '1'
+// Strategy slice 6: ?runner=1 is a 5 km running goal with "I run 30 minutes now" (his Profile row or the coach's card, as
+// App provides it); &ranlong=1 adds a 30-minute run logged three days before the run day verify:running-day opens.
+const RUNNER = new URLSearchParams(location.search).get('runner') === '1'
+const RAN_LONG = new URLSearchParams(location.search).get('ranlong') === '1'
 // Strategy slice 4: ?numbers=off is the starter tier (his Profile switch, as App provides it); ?pastate=1 seeds the week.
 const NUMBERS_OFF = new URLSearchParams(location.search).get('numbers') === 'off'
 const PAST_ATE = new URLSearchParams(location.search).get('pastate') === '1'
@@ -326,6 +330,7 @@ const profile: UserProfile = {
   // harness could never see it render.
   created_at: EFFORT_PLAN_AGE > 0 ? (() => { const d = daysAgo(EFFORT_PLAN_AGE); d.setHours(8, 0, 0, 0); return d.toISOString() })() : AWAY > 0 ? (() => { const d = daysAgo(AWAY + 9); d.setHours(8, 0, 0, 0); return d.toISOString() })() : THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - (JOINED_TODAY ? 0 : 9) * 86400000).toISOString(),
   ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
+  ...(RUNNER ? { running_goal: '5k', running_base_minutes: 30 } : {}),
 } as UserProfile
 
 // ALWAYS FROM THE MESOCYCLE, never generateExercisePlan directly —
@@ -767,6 +772,24 @@ const doneSeed = (() => {
 // an EMPTY row, which is a different card (ActiveRecoveryCard), and driving
 // the rest-day rebuild against it measured the wrong component for an hour.
 // This names the weekday the plan omits, or null when it omits none.
+// THE FIRST EASY RUN OF WEEK 1 (strategy slice 6), for verify:running-day: found by what the plan holds, dated by walking
+// the calendar from the plan's own start. Null for every profile but ?runner=1.
+const RUN_TARGET = (() => {
+  const week1 = mesocycle.find(w => w.week_number === 1)
+  const run = week1?.days.find(d => d.plannedActivity?.activity === 'Run' && d.focus === 'Easy run')
+  if (!run) return null
+  const start = new Date(profile.created_at as string); start.setHours(12, 0, 0, 0)
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start); d.setDate(d.getDate() + i)
+    if (DAYS[d.getDay()] !== run.day) continue
+    const before = new Date(d); before.setDate(before.getDate() - 3)
+    return { day: run.day, date: isoOf(d), planned: run.plannedActivity!.duration, focus: run.focus, loggedRunDate: isoOf(before) }
+  }
+  return null
+})()
+
+;(window as unknown as { __runTarget: unknown }).__runTarget = RUN_TARGET
+
 ;(window as unknown as { __pathwayTarget: unknown }).__pathwayTarget = (() => {
   // THE PATHWAY'S FIRST HOME STRENGTH DAY (his 13 Nov 2026 strategy, slice 3), for verify:pathway. Week 3 of the
   // walker's plan, found by what the plan holds and dated by walking the calendar from the plan's own start. Null for
@@ -1066,6 +1089,9 @@ const db: Db = {
     ? [{ id: 'ws-swap-past', profile_id: PROFILE_ID, date: swappedPastDate, is_completed: false, split_type: 'swapped', duration_minutes: 0, swapped_for_activity: 'Football' }]
     : [],
   cardio_logs: [
+    ...(RAN_LONG && RUN_TARGET
+      ? [{ id: 'c-ran', user_id: PROFILE_ID, date: RUN_TARGET.loggedRunDate, activity_name: 'Run', duration_minutes: 30, intensity_rpe: 4, notes: null, completed_at: `${RUN_TARGET.loggedRunDate}T08:00:00.000Z` }]
+      : []),
     ...(SWAPPED_PAST
       ? [{
           id: 'c-football', user_id: PROFILE_ID, date: swappedPastDate, activity_name: 'Football',

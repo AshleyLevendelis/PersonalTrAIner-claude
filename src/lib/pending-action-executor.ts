@@ -16,6 +16,8 @@ import { didNotSave, DAY_MOVE, logOnlyRefusal } from './coach-voice'
 import { adjustDayVolume, describeVolumeChange, isVolumeAdjustable, type VolumeDirection } from './volume-adjust'
 import { rebuildFromCurrentWeek, rebuiltLine } from './plan-invalidation'
 import { updateProfileField } from './profile-store'
+import { isMissingColumnError } from './missing-column'
+import { isRunningGoal, runningGoalLabel, raceDateWords } from './running'
 import type { MesocycleWeek, UserProfile, EquipmentAccess, TrainingStyle, FitnessGoal, ConcurrentActivity, SessionDuration } from './types'
 import { describeActivity, activityCountsAsLoad } from './concurrent-activity'
 import { swapExerciseInMesocycle, type SwapScope } from './mesocycle-edit'
@@ -1796,6 +1798,68 @@ export async function executeGoalChange(
 }
 
 // ---------------------------------------------------------------------------
+
+export interface RunningGoalPayload {
+  /** The running goal from now on, or null to take running out of the plan. */
+  runningGoal: string | null
+  /** A race date he told the coach (his ruling of 13 Nov 2026: the coach only asks it), or null. */
+  raceDate: string | null
+  /** The longest he says he runs non-stop now, in minutes, or null. */
+  baseMinutes: number | null
+  fromWeek: number
+  fromDate?: string
+  seedKey?: string
+  reason?: string
+}
+
+/**
+ * A RUNNING GOAL SET OR CHANGED BY THE COACH (his 13 Nov 2026 strategy, slice 6): the same road as the session length.
+ * Rebuild first, write second, so a failed rebuild never leaves a profile saying "5 km" over a plan with no runs.
+ */
+export async function executeRunningGoal(
+  profile: UserProfile,
+  mesocycle: MesocycleWeek[],
+  exclusions: string[],
+  payload: RunningGoalPayload,
+  context: PlanEditContext,
+): Promise<AdaptationResult> {
+  const preImage = mesocycle
+  const fields = { running_goal: payload.runningGoal, running_race_date: payload.raceDate, running_base_minutes: payload.baseMinutes }
+  const updated: UserProfile = { ...profile, ...fields }
+  const rebuild = await rebuildFromCurrentWeek(updated, exclusions, mesocycle, payload.fromWeek, context, { fromDate: payload.fromDate, seedKey: payload.seedKey })
+  if (!rebuild.ok || !rebuild.mesocycle) {
+    return { mesocycle, preImage, receipt: { landed: [], failed: [{ op: 'rebuild', error: rebuild.error ?? 'The plan could not be rebuilt.' }] } }
+  }
+  const failed: { op: string; error: string }[] = []
+  if (profile.id) {
+    try { await updateProfileField(profile.id, fields) }
+    catch (e) {
+      failed.push({ op: 'save', error: isMissingColumnError(e as { code?: string; message?: string }, 'running_goal') || isMissingColumnError(e as { code?: string; message?: string }, 'running_race_date') || isMissingColumnError(e as { code?: string; message?: string }, 'running_base_minutes')
+        ? "Running goals aren't switched on yet, so nothing was changed"
+        : "The running goal didn't save" })
+    }
+    if (failed.length === 0) {
+      for (const week of rebuild.mesocycle) {
+        if (week.week_number < payload.fromWeek) continue
+        try { await saveMesocycleWeek(profile.id, week) }
+        catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
+      }
+    }
+  }
+  const goal = isRunningGoal(payload.runningGoal) ? payload.runningGoal : null
+  return {
+    mesocycle: failed.length === 0 ? rebuild.mesocycle : mesocycle,
+    preImage,
+    receipt: {
+      landed: failed.length === 0
+        ? [`Running goal: ${goal ? runningGoalLabel(goal) : 'none'}`,
+           ...(goal && payload.raceDate ? [`Race day: ${raceDateWords(payload.raceDate)}`] : []),
+           rebuiltLine(rebuild, payload.fromWeek)]
+        : [],
+      failed,
+    },
+  }
+}
 
 export interface SessionLengthPayload {
   /** The band their sessions run to from now on, replacing whatever was set. */

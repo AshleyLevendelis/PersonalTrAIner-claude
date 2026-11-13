@@ -9,6 +9,7 @@
 // 14-day change rewrote four days already trained and missed its last three.
 // ---------------------------------------------------------------------------
 
+import { runningStartWeek } from './running'
 import type { MesocycleWeek, Exercise, UserProfile, EquipmentAccess, WorkoutDay } from './types'
 import { getExerciseEntry, isContraindicatedFor } from './exercise-db'
 import { getFlaggedJoints, isEquipmentAllowed, isLegPattern, isLegDay } from './exercise-plan'
@@ -602,7 +603,11 @@ export async function rebuildAgainstProfile(
   const { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } = await import('./exercise-plan')
   const { seededRngFromKey } = await import('./seeded-random')
 
-  const generate = (against: UserProfile): MesocycleWeek[] => {
+  // A RUNNING GOAL STARTS ITS LADDER WHERE IT JOINED THE PLAN (running.ts), never mid-ladder.
+  const fromWeek = weekNumbers && weekNumbers.length > 0 ? Math.min(...weekNumbers) : 1
+  const runningStart = runningStartWeek(mesocycle, fromWeek)
+  const generate = (againstProfile: UserProfile): MesocycleWeek[] => {
+    const against: UserProfile = { ...againstProfile, running_start_week: runningStart }
     // Both generate* calls are synchronous, so the seeded window never spans an
     // await and cannot leak into unrelated generation happening elsewhere.
     if (seedKey) setRandomSource(seededRngFromKey(seedKey))

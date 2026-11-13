@@ -192,6 +192,8 @@
     "test:meals-elsewhere": "tsx scripts/test-meals-elsewhere.ts",
     "test:eating-out": "tsx scripts/test-eating-out.ts",
     "test:eating-out-budget": "tsx scripts/test-eating-out-budget.ts",
+    "test:running-ladder": "tsx scripts/test-running-ladder.ts",
+    "measure:running-personas": "tsx scripts/measure-running-personas.ts",
     "test:onboarding-corrections": "tsx scripts/test-onboarding-corrections.ts",
     "test:onboarding-chip-match": "tsx scripts/test-onboarding-chip-match.ts",
     "test:onboarding-receipts": "tsx scripts/test-onboarding-receipts.ts",
@@ -608,7 +610,8 @@
     "verify:deep-pool": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/deep-pool.mjs",
     "test:pathway": "tsx scripts/test-pathway.ts",
     "measure:pathway-personas": "tsx scripts/measure-pathway-personas.ts",
-    "verify:pathway": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/pathway.mjs"
+    "verify:pathway": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/pathway.mjs",
+    "verify:running-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/running-day.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

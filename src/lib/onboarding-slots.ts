@@ -1,4 +1,5 @@
 import { ENJOYED_ACTIVITY_OPTIONS, type EnjoyedActivity } from './pathway'
+import { RUNNING_GOAL_OPTIONS, isRunningGoal } from './running'
 import { ALLERGEN_FOOD_PATTERNS } from './allergen-words'
 import { splitFoodList, splitUsualFoods } from './food-list'
 import { DIETARY_PREFERENCES, type DietaryPreference } from '@/lib/diet-rules'
@@ -486,6 +487,8 @@ export interface OnboardingSlotValues {
    * optional"). Asked only on the pathway; one walk a week becomes one of them (pathway.ts). [] means neither.
    */
   enjoyedActivities: string[]
+  /** A running goal (his 13 Nov 2026 strategy, slice 6): 'none' or a RunningGoal. Optional, asked of everyone. */
+  runningGoal: string | null
 }
 
 /**
@@ -533,6 +536,7 @@ export function initialSlotValues(): OnboardingSlotValues {
     otherSports: '',
     kitTicks: null,
     enjoyedActivities: [],
+    runningGoal: null,
   }
 }
 
@@ -701,6 +705,12 @@ export function isStartingFromNothing(values: OnboardingSlotValues): boolean {
 export function choseThePathway(values: OnboardingSlotValues): boolean {
   return needsStartPreferenceAnswer(values) && values.startPreference === 'move_more'
 }
+
+/** The running goal's choices (running.ts), and "Not for now". A race date is never asked here: the coach asks (his ruling of 13 Nov 2026). */
+const RUNNING_GOAL_SLOT_OPTIONS: { value: string; icon: string; label: string; description: string }[] = [
+  { value: 'none', icon: '🚫', label: 'Not for now', description: 'No running in your plan. You can add a goal later on Profile or by telling me' },
+  ...RUNNING_GOAL_OPTIONS.map(o => ({ value: o.value, icon: '🏃', label: o.label, description: o.value === 'run_20' ? 'Walk-run sessions that build to 20 minutes without stopping' : `Runs join your week and build up to ${o.short}, minutes and effort only` })),
+]
 
 const ENJOYED_OPTIONS: { value: EnjoyedActivity; icon: string; label: string; description: string }[] =
   ENJOYED_ACTIVITY_OPTIONS.map(o => ({ value: o.value, icon: o.value === 'swimming' ? '🏊' : '🚴', label: o.label, description: `A ${o.label.toLowerCase()} session in place of one walk a week` }))
@@ -954,6 +964,9 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
     validate: isOneOf(OFFERED_STYLE_OPTIONS) },
   { key: 'conditioningPreference', question: 'How do you feel about cardio?', inputHint: 'Love it or loathe it?', shortLabel: 'Cardio', control: 'single', required: true, options: CONDITIONING_PREF_OPTIONS, destination: 'column', validate: isOneOf(CONDITIONING_PREF_OPTIONS) },
   // BESIDE THE CARDIO QUESTION, and after injuries (which must stay in the opening block). OPTIONAL, AND ONLY ON THE PATHWAY (his 13 Nov 2026 strategy, slice 3; collision (d), "Setup asks, optional").
+  // A RUNNING GOAL, OPTIONAL AND ASKED OF EVERYONE (his 13 Nov 2026 strategy, slice 6, ruling 4; "Build it"). Only the
+  // distance: a race date is the coach's to ask (his ruling of 13 Nov 2026).
+  { key: 'runningGoal', question: 'Would you like to work towards a running goal?', inputHint: 'A distance, or not for now', shortLabel: 'Running goal', control: 'single', required: false, options: RUNNING_GOAL_SLOT_OPTIONS, destination: 'column', validate: isOneOf(RUNNING_GOAL_SLOT_OPTIONS) },
   { key: 'enjoyedActivities', question: 'Besides walking, do you enjoy swimming or cycling?', inputHint: 'Swimming, cycling, or neither', shortLabel: 'Also enjoy', control: 'multi', required: false, requiredIf: choseThePathway, options: ENJOYED_OPTIONS, destination: 'column', validate: isSubsetOf(ENJOYED_OPTIONS) },
   // REQUIRED, and the comment that used to sit here argued the opposite.
   //
@@ -1425,6 +1438,8 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     concurrent_activities: parseSportsSlot(data.otherSports) ?? [],
     // What he enjoys besides walking, only on the pathway (pathway.ts reads it).
     enjoyed_activities: choseThePathway(data) ? data.enjoyedActivities.filter(isEnjoyedActivity) : [],
+    // A running goal when he chose one (running.ts); "Not for now" and no answer are both none.
+    running_goal: isRunningGoal(data.runningGoal) ? data.runningGoal : null,
     ...PROFILE_CONSTANTS,
   }
 }
