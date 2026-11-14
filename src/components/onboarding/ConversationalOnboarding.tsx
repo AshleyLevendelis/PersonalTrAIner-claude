@@ -24,6 +24,7 @@ import {
   toggleValue,
   multiSelection,
   numericGroupFor,
+  setupScreenCount,
   liftBoxesDue,
   isKnownLiftSlot,
   initialSlotValues,
@@ -760,18 +761,17 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   // an end and then carrying on. A required slot is never in
   // NEVER_BLOCKING_SLOTS, so "applicable and not never-blocking" is exactly
   // required + ask-anyway: the same set readyToGenerate gates on.
-  const trackedSlots = useMemo(
-    () => ONBOARDING_SLOTS.filter(s => isSlotApplicable(s, values) && !NEVER_BLOCKING_SLOTS.includes(s.key)),
-    [values],
-  )
-  const requiredCount = trackedSlots.length
+  // (setupScreenCount reads the same set: applicable and not never-blocking, a numeric card counted once.)
+  // THE SCREENS, not the slots (his 14 Nov 2026 "Light trim"): age, height and weight are one card and count once.
+  const screens = useMemo(() => setupScreenCount(values, confirmed), [values, confirmed])
+  const requiredCount = screens.total
   // CONFIRMED, not values. `confirmed` is only ever set by applySlot (which
   // validates first) or declineSlots, so it means "we asked and got an
   // answer" — whereas values is written the instant a multi chip is tapped,
   // before Done (handleToggleMulti), which made merely touching one
   // training-day chip nudge the bar and drop the slot out of the missing
   // list. Counting confirmations fixes the honesty and that leak together.
-  const answeredCount = trackedSlots.filter(s => confirmed.has(s.key)).length
+  const answeredCount = screens.answered
   // What both the manual escape hatch and Generate gate on. Required-missing
   // alone was the wrong bar: it let "Review and build my plan" appear (and
   // Generate succeed) before injuries or dietary restrictions had ever been

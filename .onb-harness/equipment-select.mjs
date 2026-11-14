@@ -82,7 +82,7 @@ for (const l of list) console.log(`      ${l}`)
 check('the open list offers all four tiers', list.length === 4, list.length)
 check('Minimalist shows what it really includes', /Minimalist \| Dumbbells, kettlebells, bands, pull-up bar, weighted bag/.test(list.join('\n')), list)
 check('Home gym shows the rack and bench', /Home gym \| Barbell, rack, bench/.test(list.join('\n')), list)
-check('Bodyweight admits the pull-up bar', /Bodyweight only \| Bodyweight, a pull-up bar/.test(list.join('\n')), list)
+check('Bodyweight says it assumes no pull-up bar (his 14 Nov 2026 "Nothing ticked")', /Bodyweight only \| Just your bodyweight — no pull-up bar/.test(list.join('\n')), list)
 check('no option is still label-only', list.every(l => l.includes(' | ')), list)
 
 const overflow = await ev(`(()=>{const es=[...document.querySelectorAll('[data-slot="select-item"]')];

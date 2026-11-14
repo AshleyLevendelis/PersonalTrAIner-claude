@@ -958,7 +958,7 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // AFTER injuries, which must stay in the opening block (her ruling: the only question whose absence can hurt),
   // and still right behind equipment: the ticks start from that answer (picksHomeKit, defaultKitTicks).
   { key: 'kitTicks', question: 'Which of these do you have?', inputHint: 'Tick everything you have', shortLabel: 'Your kit', control: 'multi', required: false, requiredIf: picksHomeKit, options: KIT_TICK_OPTIONS, destination: 'user_facts', validate: isSubsetOf(KIT_TICK_OPTIONS) },
-  { key: 'knowsWorkingLifts', question: 'Do you know what you lift on the barbell back squat, bench press and deadlift?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', required: true, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
+  { key: 'knowsWorkingLifts', question: 'Do you know what you lift on the barbell back squat, bench press and deadlift?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', required: false, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Only meaningful once someone has said they DO know their numbers.
   { key: 'knownSquatKg', question: liftSetQuestion('back squat'),
     inputHint: 'Your squat, in kg…', shortLabel: 'Squat', control: 'numeric', required: false, requiredIf: knowsTheirLifts, min: 1, max: 500, unit: 'kg', destination: 'column', validate: isNumberIn(1, 500) },
@@ -1260,7 +1260,33 @@ export const NEVER_BLOCKING_SLOTS: SlotKey[] = [
   'otherSports',
   // The date of birth: set by the age card, never asked on its own (his 9 Nov option 1).
   'dateOfBirth',
+  // SHORTER SETUP, his "Light trim" (14 Nov 2026). The lift numbers moved to the FIRST SESSION ("Ask at the first
+  // session": a card there asks a recent hard set of each, "I don't know" beside it; unanswered, the calibration week
+  // finds them). Still recorded when volunteered here, and the boxes still follow "I know my numbers" said unasked.
+  'knowsWorkingLifts', 'knownSquatKg', 'knownBenchKg', 'knownDeadliftKg',
+  // The running goal moved to the coach and Profile ("Move it to the coach", 14 Nov 2026; it reverses his 13 Nov "Only
+  // if they like cardio" for setup). Still recorded when volunteered.
+  'runningGoal',
 ]
+
+/**
+ * THE SCREENS SETUP SHOWS, which is what its "N of M" counts (his 14 Nov 2026 "Light trim": setup should get SHORTER,
+ * and the bar should say so honestly). Slots asked on one screen count once: age, height and weight have always been
+ * one card (NUMERIC_GROUPS), and a group is answered when every member that applies is.
+ */
+export function setupScreenCount(values: OnboardingSlotValues, confirmed: ReadonlySet<string>): { total: number; answered: number } {
+  const tracked = ONBOARDING_SLOTS.filter(s => isSlotApplicable(s, values) && !NEVER_BLOCKING_SLOTS.includes(s.key)).map(s => s.key)
+  const seen = new Set<SlotKey>()
+  let total = 0, answered = 0
+  for (const key of tracked) {
+    if (seen.has(key)) continue
+    const screen = screenGroupFor(key).filter(k => tracked.includes(k))
+    for (const k of screen) seen.add(k)
+    total++
+    if (screen.every(k => confirmed.has(k))) answered++
+  }
+  return { total, answered }
+}
 
 /** Required slots whose VALUE must validate before completion, per the current answers (requiredIf-aware). */
 export function missingRequiredSlots(values: OnboardingSlotValues): SlotKey[] {
@@ -1514,6 +1540,11 @@ const NUMERIC_GROUPS: SlotKey[][] = [
 
 export function numericGroupFor(key: SlotKey): SlotKey[] {
   return NUMERIC_GROUPS.find(g => g.includes(key)) ?? [key]
+}
+
+/** The slots asked on the same SCREEN as this one (a numeric card's boxes), for the setup counter. */
+function screenGroupFor(key: SlotKey): SlotKey[] {
+  return numericGroupFor(key)
 }
 
 const KNOWN_LIFT_SLOTS: SlotKey[] = NUMERIC_GROUPS[1]

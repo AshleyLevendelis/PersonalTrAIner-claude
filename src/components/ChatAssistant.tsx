@@ -2188,6 +2188,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       macros,
       dietary_preferences: profile.dietary_preferences || [],
       concurrent_activities: profile.concurrent_activities || [],
+      // A RUNNING GOAL TO OFFER (his 14 Nov 2026 "Move it to the coach"): setup no longer asks it of someone who loves
+      // cardio, so the coach offers it, once, on their yes a card.
+      offer_running_goal: profile.conditioning_preference === 'love' && !isRunningGoal(profile.running_goal),
       // WHAT A DOCTOR HAS SAID TO WATCH (health-conditions.ts, his 14 Nov 2026 ruling), in the app's own words.
       health_conditions: healthConditionsInWords(healthConditionsOf(profile)),
       // THE RUNNING GOAL (running.ts), in the app's own words: the coach quotes this, never a pace (his 13 Nov ruling).

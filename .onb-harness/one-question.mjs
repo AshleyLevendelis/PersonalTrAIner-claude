@@ -260,7 +260,9 @@ const worst = perTurn.reduce((a, p) => Math.max(a, p.asking), 0)
 check('5a. setup reached the summary', reachedReview, perTurn.slice(-4))
 check('5b. EVERY turn on the way put one question in front of him, never two', perTurn.length >= 12 && worst === 1, perTurn.filter(p => p.asking !== 1))
 check('5c. the lifting-background question came with its options', perTurn.some(p => /background with lifting/.test(p.text) && p.cards[0] === 'trainingExperience'), perTurn.filter(p => /lifting/.test(p.text)))
-check('5d. his "110kg" was asked about (which lift, how many reps) and the lifts were then kept from the sets he gave', perTurn.some(p => /Which lift was 110 kg on/.test(p.text)) && !!t.values.knownSquatKg && !!t.values.knownBenchKg, { squat: t.values.knownSquatKg, bench: t.values.knownBenchKg })
+// RE-ANCHORED 14 Nov 2026 (his "Light trim" + "Ask at the first session"): setup no longer asks the lift numbers, so
+// the walk never meets them. A "110kg" he volunteers is still asked about (section 2 above).
+check('5d. the walk never asked the lift numbers (the first session asks them now)', !perTurn.some(p => p.cards[0] === 'knowsWorkingLifts' || p.cards[0] === 'knownSquatKg' || /what you lift on the barbell/i.test(p.text)), perTurn.filter(p => /lift/i.test(p.text)))
 check('5g. every choice question on the way came with its options (only typed questions had none)', perTurn.filter(p => p.cards.length === 0).every(p => /left out|usually eat|call you/i.test(p.text)), perTurn.filter(p => p.cards.length === 0))
 check('5e. no turn on the way had the app stepping in over a question', !perTurn.some(p => STEP_IN.test(p.text)), perTurn.filter(p => STEP_IN.test(p.text)))
 await shot('summary')
@@ -269,7 +271,7 @@ if (reachedReview) {
   await wait(800)
 }
 const profile = await page.evaluate(() => window.__onbCompleted ?? null)
-check('5f. the plan can be made from it, with his squat and bench from the sets he typed', !!profile && Number(profile.known_squat_kg) > 0 && Number(profile.known_bench_kg) > 0, profile ? { squat: profile.known_squat_kg, bench: profile.known_bench_kg } : null)
+check('5f. the plan can be made from it, with no lift numbers (the first week or the first session finds them)', !!profile && profile.known_squat_kg == null && profile.known_bench_kg == null && profile.skip_calibration_week !== true, profile ? { squat: profile.known_squat_kg, bench: profile.known_bench_kg, skip: profile.skip_calibration_week } : null)
 check('harness: no page errors', pageErrors.length === 0, pageErrors)
 console.log(`      (${perTurn.length} turns walked)`)
 if (process.env.SHOW_TURNS) for (const p of perTurn) console.log("       ", p.asking, JSON.stringify(p.cards), p.text)

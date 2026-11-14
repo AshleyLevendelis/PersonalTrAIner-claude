@@ -191,12 +191,13 @@ check('dietaryPreferences must be explicitly asked', unasked.includes('dietaryPr
     !LIFT_KEYS.some(k => unconfirmedOptionalSlots(before, lifter(false)).includes(k) || openSlotsInOrder(before, lifter(false)).includes(k)))
   check('...or before she has answered at all',
     !LIFT_KEYS.some(k => openSlotsInOrder(new Set(['equipment', 'trainingExperience', 'activityLevel']), lifter(null)).includes(k)))
+  // RE-ANCHORED 14 Nov 2026 (his "Light trim" + "Ask at the first session"): setup no longer asks the lifts, so even
+  // after "I know my numbers" they never hold the review up and the coach is told they are BONUS. The boxes still
+  // come up ONCE, put there by the app (liftBoxesDue, below), so a number he volunteers is kept.
   const open = openSlotsInOrder(before, lifter(true))
-  check('the three lift boxes ARE asked once she says she knows them', LIFT_KEYS.every(k => open.includes(k)), open.join(', '))
-  check('...together, in the app\'s own order, before the training days',
-    open.indexOf('knownBenchKg') === open.indexOf('knownSquatKg') + 1 && open.indexOf('knownDeadliftKg') === open.indexOf('knownSquatKg') + 2
-    && open.indexOf('knownSquatKg') < open.indexOf('trainingDays'), open.join(', '))
-  check('...and the coach is no longer told they are BONUS', LIFT_KEYS.every(k => buildSlotCatalog(lifter(true)).find(c => c.key === k)?.neverBlocks === false))
+  check('the three lift boxes never hold setup up, even once she says she knows them', !LIFT_KEYS.some(k => open.includes(k)), open.join(', '))
+  check('...nor does the yes-or-no question itself', !openSlotsInOrder(new Set(['equipment', 'trainingExperience', 'activityLevel']), lifter(null)).includes('knowsWorkingLifts'))
+  check('...and the coach is told they are BONUS', LIFT_KEYS.every(k => buildSlotCatalog(lifter(true)).find(c => c.key === k)?.neverBlocks === true))
   check('...and a skip (answered with no value) clears them',
     !LIFT_KEYS.some(k => openSlotsInOrder(new Set([...before, ...LIFT_KEYS]), lifter(true)).includes(k)))
 

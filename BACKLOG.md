@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [ ] **SHORTER SETUP, his "Light trim" (14 Nov 2026) — STEP 1 OF 3 BUILT.** Measured with setup's own functions
+  first: a gym lifter was asked 22 questions plus the name, and the bar said "of 22" while age, height and weight sat
+  on one card. Step 1: the lift numbers (his "Ask at the first session") and the running goal (his "Move it to the
+  coach", which REVERSES his 13 Nov "Only if they like cardio" for setup; asked as a collision) leave setup's asks; a
+  number volunteered is still kept and the boxes still follow "I know my numbers" said unasked; the bar counts
+  SCREENS (age/height/weight once). Now 16 screens plus the name for a gym lifter (17 home, 17 beginner). The setup
+  coach is told not to raise the lifts and that both are BONUS; the chat coach offers a running goal once to someone
+  who loves cardio and has none (a prompt line: whether it does is model behaviour, the exam's). Steps 2 and 3 to
+  come: the first-session lifts card, then days-with-length and diet-with-leave-outs on one screen each (target 15).
+  Checks: `test:onboarding-slots` re-anchored (3 checks; restoring the lifts to setup fails all 3),
+  `verify:onboarding-one-question` 5d/5f re-anchored (the walk never meets the lifts; 1/1 mutation caught), 45 setup
+  gates and 11 setup drivers green. ALSO: `verify:equipment-labels` was RED from the bodyweight commit (a driver that
+  names the picker's words; the file-grep derivation cannot find it, the CLAUDE.md "drivers name the screen" rule
+  again); re-anchored here. Deploys: `onboarding-chat`, `chat-gemini`.
 - [x] **HEALTH CONDITIONS ON THE INJURIES CARD (his "Fold into injuries" + "Yes, build it", 14 Nov 2026)** — BUILT,
   needs the migration (his machine) and the `chat-gemini` deploy. Five taps under "What a doctor has said to watch"
   on setup's injuries card and Profile's injuries sheet (high blood pressure, a heart condition, diabetes or
