@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [ ] **HIS FOLLOW-UP RULINGS, 14 Nov 2026** (each asked as one question with options; asked on his "Push. And ask me
+  follow ups"). (1) Health taps: **"Yes, build it"**, migration included (his machine). (2) Shorter setup: **"Light
+  trim"**. I first described it wrongly to him (as merging style with the starting point, and "about 18 today") from
+  memory instead of the proposal file; corrected in the next message from the file (about 22 today). (3) The light trim
+  moved usual meals out of setup, against his 11 Nov ruling; put to him as a collision: **"Keep it in setup"**. (4)
+  Lift numbers out of setup: **"Ask at the first session"** (over calibration week only, and over keeping them). (5)
+  Name: **"Keep it first"** (over last-and-skippable and over the coach asking). (6) "Bodyweight only" kit screen:
+  **"Nothing ticked"** (over bar-only and over keeping bar + bag). (7) Going live: **"After the new builds"**, one merge.
 - [ ] **SAL AND MARGARET: EIGHT OF NINE BUILT (his "build it", 14 Nov 2026); HEALTH CONDITIONS PLANNED, NEEDS A MIGRATION**
   BUILT, local commits 0ebe1c81..0f662722 (not pushed: his "commit, never push, unless I say so"):
   (Group A) Start a new plan clears every piece of the last person's state; with no weight there are no targets,

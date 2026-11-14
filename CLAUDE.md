@@ -1552,8 +1552,16 @@ menu" stays true when a copy is also left outside it.
   `running_goal` migration, the `chat-gemini` deploy and an exam run
 
 ### His rulings of 14 Nov 2026, Sal and Margaret's setups (`docs/audits/onboarding-live-test-2026-11-14.md`)
-- **Setup should get SHORTER, not longer** (his words). Proposal, not built: `docs/plans/shorter-setup.md`.
-- **Health conditions: "Fold into injuries"** (no new question). NOT BUILT: needs a migration, `docs/plans/health-conditions.md`.
+- **Setup should get SHORTER, not longer** (his words). **His pick, 14 Nov: "Light trim"** (`docs/plans/shorter-setup.md`
+  option 1), with three of his own: **usual meals STAY in setup** (his 11 Nov ruling won over the trim), **the name
+  stays FIRST**, and **the lift numbers move to the first session** (a card asks a recent hard set of each, "I don't
+  know" beside it; unanswered, the calibration week finds them). Being built.
+- **Health conditions: "Fold into injuries"** (no new question); **"Yes, build it"** (14 Nov), with the migration
+  (his machine). `docs/plans/health-conditions.md`. Being built.
+- **"Bodyweight only" starts with NOTHING ticked** (his ruling 14 Nov, over "bar ticked, bag not" and over keeping
+  both): no pull-up bar and no weighted bag until he ticks one. Being built.
+- **Going live: "After the new builds"** — today's fixes merge together with the three builds above, after one full
+  sweep, with one handover prompt (database step + deploys).
 - **A safety question about a condition, medication or pregnancy is never parked: "A"**: the GP line now, noted, back to
   setup. `test:sal-margaret` §4, `verify:onboarding-turns` §30. Needs the `onboarding-chat` deploy
 - **Rest-day activity: "B"**, only as optional ("Rest day · optional cardio", "Optional" on every screen), none for a
