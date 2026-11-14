@@ -2,6 +2,35 @@
 
 Newest first. One line each.
 
+- [x] **A SETUP WEIGHT CORRECTED THE SAME DAY, OR ON PROFILE, REPLACES IT (his ruling 14 Nov 2026, "Correct it now",
+  from three options: over "keep holding it" and over "also ask at setup")**. His live report, with screenshots: setup
+  kept 187 kg, Nutrition said 4,336 kcal / 374 g protein (2.0 x 187), he told the coach "I meant 87kg", confirmed
+  "is 87 kg right?", and the receipt said the target was unchanged until another day agrees; he regenerated the meals
+  and nothing moved. TRACED (read-only): every step did what it was written to do. A confirmed weigh-in 100 kg off the
+  sign-up figure is held by the 9 Oct "Ask, and hold the target" rule; the target follows the weigh-in anchor, and
+  Profile's "Onboarding weight" row saved the profile and moved nothing (a silent no-op); regenerating meals never
+  recomputes targets (meals follow targets). Whether he typed 187 or the setup coach wrote it is NOT known: nothing in
+  the setup parser can turn 87 into 187, but the coach's set_slot for the weight has no "in his own words" check.
+  BUILT: `correctStartingWeight` (nutrition-targets.ts) rewrites what took the wrong figure as the start (each target
+  row's weight, so the change is announced FROM the old numbers; the sign-up day's weigh-in; never a weigh-in typed on
+  another day) and works the targets out again. A confirmed weigh-in on the SIGN-UP DAY that disagrees with setup is a
+  correction (`startingWeightCorrection`, weigh-in-check.ts), inside `retargetAfterWeighIn`, so the weigh-in box and the
+  coach's card both get it; the card says "That replaces the 187 kg from setup, and your calorie target is worked out
+  again from 87 kg" instead of the wait line, and the receipt says "Calorie target: worked out again from 87 kg". Any
+  saved weight change from Profile, Exercise or the coach goes through one App handler to the same function. From the
+  next day a surprising weigh-in is held exactly as before. REVERSES the 9 Oct hold for the sign-up day only.
+  CHECKS: `test:weigh-in-targets` section 13 (18 checks; 15 mutations: 13 caught, 2 were conditions that could never
+  change a result and were removed, the two-mechanisms rule), and its old same-day typo cases moved to a sign-up two
+  weeks earlier so they still hold the 9 Oct rule. `verify:setup-weight-correction` (new, whole app, 10 checks, 3 of 3
+  mutations): signed up at 187, Profile asks "100 kg lighter than the 187 kg you gave before", Yes, and Nutrition goes
+  4,699 -> 3,151 kcal, every target record and the sign-up weigh-in reading 87. The driver found the first build's
+  Profile wiring on the Exercise tab's copy of the handler (three identical lines in App); the unit gate could not.
+  NOT DRIVEN: the coach's card and receipt wording on a real screen (no chat harness plays a weigh-in card; held by
+  source checks C1-C3 and C17). NOT FIXED, named: the coach answered "I meant 87kg" with "Got it, 187 kg to start. What
+  number are you aiming for?" — the app's goal question, so the model called record_goal on a correction (model
+  behaviour; an exam case is the right place). Frontend only: no deploy, no migration. FOR HIS ACCOUNT: once this is
+  live, Profile -> Height & weight -> Onboarding weight -> 87 -> Yes moves his targets.
+
 - [x] **PRE-MERGE SWEEP OF THE THREE 14 NOV BUILDS: THREE GATES MOVED BY "BODYWEIGHT ONLY STARTS WITH NOTHING TICKED"**
   (sweep on cbcdec27, 564 checks). All three were grid fixtures that leaned on the pull-up bar or the weighted bag.
   (1) `test:push-pull-score` [2] and [5]: their pull-heavy plan was bodyweight, pull-heavy only because of pull-ups and

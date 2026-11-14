@@ -1580,6 +1580,11 @@ menu" stays true when a copy is also left outside it.
 - **"2 meals": "A"**, breakfast + dinner unless breakfast is skipped, then lunch + dinner; a day serves only the meals the
   profile says. `test:sal-margaret` §7
 - **Start a new plan carries nothing of the last person** (no weight: no targets, Nutrition says why). `verify:new-plan-carryover`
+- **A setup weight corrected the same day, or on Profile, replaces it: "Correct it now"** (his live report: setup kept
+  187 kg, "I meant 87" was held "until another day agrees", Profile moved nothing). A confirmed weigh-in on the SIGN-UP
+  day that disagrees with setup corrects it, and any saved Profile weight change does; the targets follow at once and
+  say so. From the next day a surprising weigh-in is held as before. `test:weigh-in-targets` §13,
+  `verify:setup-weight-correction`
 
 ### His ruling of 12 Nov 2026, eating out (`docs/plans/eating-out.md`)
 - **A meal marked as out: "Ask: light/normal/big"** (from three options; his request "build it, start with out for
@@ -1828,7 +1833,8 @@ menu" stays true when a copy is also left outside it.
   `verify:kit-ticks`, `docs/plans/kit-list.md`. Needs the `chat-gemini` and `onboarding-chat` deploys
 - **A surprising weigh-in: "Ask, and hold the target."** More than about 3% from the last one is
   asked about ("That's 19 kg lighter than this morning — is 62 right?") and saved only on yes; even
-  then the calorie target waits for a second day that agrees. BUILT on the branch (N1), unverified
+  then the calorie target waits for a second day that agrees. ON THE SIGN-UP DAY a confirmed figure instead CORRECTS
+  the setup weight (his "Correct it now", 14 Nov 2026). BUILT on the branch (N1), unverified
   on a phone
 - **The allergy and diet path: "Build all four."** (1) "I don't eat pork" said in passing goes into
   Foods to avoid with a visible tick; (2) setup stops promising "entirely nut-free" and uses the
