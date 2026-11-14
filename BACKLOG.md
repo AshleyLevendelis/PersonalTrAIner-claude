@@ -10,7 +10,7 @@ Newest first. One line each.
   plan with its pulling tripled). 2 of 2 mutations caught (exemption widened to every pull-heavy week; pull-heavy no
   longer counted). (2) `test:frozen-weeks`: the carry floor "> 20" was a measurement of the old grid; backpack carries
   left the bodyweight plans and frozen carries fell 52 -> 5. Re-anchored on what the floor held: some carries freeze,
-  and every one that does is at the distance cap. Mutation run below. (3) `test:day-purpose` P4: five bodyweight
+  and every one that does is at the distance cap. 2 of 2 mutations caught (cap raised to 30; cap flag off by one). (3) `test:day-purpose` P4: five bodyweight
   Chest & Triceps days at 9 working sets with 10+ minutes of optional mobility "could still take Push-Ups". A
   read-only trace: the week's push:pull pass now REMOVES the push-ups on purpose, because the only pulls left without
   a bar are two rows of one family, so no pull can be added to match (before, it added an inverted row or a pull-up).
@@ -20,6 +20,7 @@ Newest first. One line each.
   would not press more than they can row. So P4 takes P3's existing rule: a press is not "work to give" in a week that
   already presses as much as it pulls. Named cost: a bodyweight lifter with no bar gets a lighter chest day with more
   optional mobility; ticking a pull-up bar on Profile gives the pass a pull to add and the second press comes back.
+  P4 binds: without the new rule the same five days fail (the sweep's own result); with it, 69 of 69 pass.
 
 - [x] **SHORTER SETUP STEP 2: THE LIFT NUMBERS AT THE FIRST SESSION (his "Ask at the first session", 14 Nov 2026)** —
   BUILT; with steps 1 and 3 the light trim is done. Just under today's session card on a lifter's first session, one
