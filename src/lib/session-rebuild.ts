@@ -1,3 +1,5 @@
+import { isExternallyLoaded } from './load-prescription'
+import { getExerciseEntry } from './exercise-db'
 import type { MesocycleWeek, Exercise, UserProfile } from './types'
 import { getReplacementCandidates, buildReplacementSlot, calibrates, isMainLiftSlot } from './mesocycle-edit'
 import { settleWeek, clearOrphanedSupersetLabels } from './settle-week'
@@ -118,9 +120,17 @@ export async function rebuildDayAroundMainLift(params: RebuildSessionParams): Pr
     if (isMainLiftSlot(slot)) { next.push(slot); continue }
 
     const candidates = getReplacementCandidates(slot.name, profile, exclusions)
-    const pick = candidates.find(c => !taken.has(c.exercise.name))
+    // A LOADED LIFT IS NOT REBUILT INTO AN UNLOADED ONE (his 10 Sep ruling; QA, 14 Nov 2026: Leg Extensions became a band
+    // knee drill on a full-gym plan, because the one loaded option was already in the week and the list fell through).
+    // The swap sheet only OFFERS the unloaded ones; a rebuild picks, so it keeps the lift instead (mine, CSCS: the same
+    // lift again beats a rehab drill in a strength slot).
+    const outgoing = getExerciseEntry(slot.name)
+    const mustBeLoaded = !!outgoing && isExternallyLoaded(outgoing)
+    const pick = candidates.find(c => !taken.has(c.exercise.name) && (!mustBeLoaded || isExternallyLoaded(c.exercise)))
     if (!pick) {
-      kept.push({ name: slot.name, reason: 'nothing else fits that slot with your equipment and injuries' })
+      kept.push({ name: slot.name, reason: mustBeLoaded && candidates.some(c => !taken.has(c.exercise.name))
+        ? 'the only other options carry no weight, and this one does'
+        : 'nothing else fits that slot with your equipment and injuries' })
       next.push(slot)
       continue
     }

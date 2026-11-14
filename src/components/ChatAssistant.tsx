@@ -4570,7 +4570,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       fromDayName: trueFromDayName,
       toDayName: target.dayName,
       sessionFocus: session.focus,
-      ...(target.asWanted ? {} : { requestedDayName: target.requestedDayName }),
+      ...(target.asWanted ? {} : { requestedDayName: target.requestedDayName, ...(target.requestedWhyNot ? { requestedWhyNot: target.requestedWhyNot } : {}) }),
       reason,
       ...(alsoDoing ? { alsoDoing } : {}),
     }

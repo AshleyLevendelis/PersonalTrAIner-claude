@@ -300,8 +300,12 @@ export function resolveMoveTarget(input: MoveTargetInput, depth = 0): MoveTarget
   // that edge is what stopped it, "every day left already has a session" is not the reason.
   let consideredAny = false
   let nextWeekStarts: string | null = null
-  for (let d = start; daysBetween(start, d) <= 7; d = addDays(d, 1)) {
-    if (weekOf(d) !== originWeek) { nextWeekStarts = d; break }
+  // FROM THE DAY THEY NAMED, THEN FROM THE EARLIEST LEGAL DAY (QA, 14 Nov 2026): "move Thursday to Monday" refused with
+  // "no free day left" while Saturday and Sunday sat free, because the scan began at Monday, already past the week's
+  // end. A day before the one they named is as good a next-free day as one after it.
+  const scanStarts = start === earliest ? [start] : [start, earliest]
+  for (const from of scanStarts) for (let d = from; daysBetween(from, d) <= 7; d = addDays(d, 1)) {
+    if (weekOf(d) !== originWeek) { nextWeekStarts = nextWeekStarts ?? d; break }
     consideredAny = true
     if (!isFree(d)) continue
     const asWanted = !!requestedDate && d === requestedDate

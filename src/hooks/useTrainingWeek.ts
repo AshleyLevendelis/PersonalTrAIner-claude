@@ -8,6 +8,7 @@
 // instead (see WeekStrip).
 // ---------------------------------------------------------------------------
 
+import { isMovementPrepRow } from '@/lib/session-duration'
 import { useCallback, useEffect, useState } from 'react'
 import { getWeeklyDashboard, getSessionMovesInRange, type WeeklyDashboardDay } from '@/lib/daily-tracking'
 import { subscribeSetLogView } from '@/lib/set-log-store'
@@ -168,9 +169,12 @@ export function classifyDay(
   // session onto a rest day and lifting stayed "rest day" on the strip and "0 of 4 done" on Home.
   // The rule below already says logged work outranks every date judgement; it now holds on a rest
   // day too. LIFTING only: an activity logged on a rest day is the rest-day card doing its job.
+  // BEFORE THE PLAN BEGAN, a rest or recovery day is not one (QA, 14 Nov 2026: Tuesday read "active recovery" between
+  // two days that read "before your plan started"). Logged work still outranks it, as it does below.
+  const beforePlan = !!planStartStr && dateStr < planStartStr
   if (!workout) {
     if (dashboardDay && dashboardDay.workingLogs.length > 0) return dashboardDay.session?.is_completed ? 'done' : 'partial'
-    return 'rest'
+    return beforePlan ? 'before_plan' : 'rest'
   }
   // A PRESCRIBED ACTIVITY IS A SESSION, not recovery (user test 8 Oct 2026, finding 19): the
   // starting-out plan's walk read "~" on the strip, done or not, so a skipped walk never showed as
@@ -181,7 +185,7 @@ export function classifyDay(
     // same rule as a day with no row at all, two lines up. It returned
     // 'recovery' before the logged work below was ever asked.
     if (!workout.plannedActivity && dashboardDay && dashboardDay.workingLogs.length > 0) return dashboardDay.session?.is_completed ? 'done' : 'partial'
-    if (!workout.plannedActivity) return 'recovery'
+    if (!workout.plannedActivity) return beforePlan ? 'before_plan' : 'recovery'
     if ((dashboardDay?.cardioLogs?.length ?? 0) > 0) return 'done'
   }
 
@@ -198,9 +202,13 @@ export function classifyDay(
   // WORKING sets, not any row. This is the guard written FOR Ashley's Thursday
   // — a session marked complete with nothing in it — and a build-up row would
   // have satisfied it just as an empty completed session used to.
-  const loggedWork = !!dashboardDay && (dashboardDay.workingLogs.length > 0 || (dashboardDay.cardioLogs?.length ?? 0) > 0)
+  // AND NOT THE MOVEMENT PREP (QA, 14 Nov 2026): two Clamshell sets and Finish read "Done ✓ · 0/17 sets" and counted
+  // in the week. The prep row is a warm-up, as the set count already says (sessionSetCount); it is not the session.
+  const prep = new Set(workout.exercises.filter(isMovementPrepRow).flatMap(e => [e.name, e.id].filter((x): x is string => !!x)))
+  const sessionLogs = (dashboardDay?.workingLogs ?? []).filter(l => !prep.has(l.exercise_name) && !(l.exercise_id && prep.has(l.exercise_id)))
+  const loggedWork = sessionLogs.length > 0 || (dashboardDay?.cardioLogs?.length ?? 0) > 0
   if (dashboardDay?.session?.is_completed && loggedWork) return 'done'
-  if (dashboardDay && dashboardDay.workingLogs.length > 0) return 'partial'
+  if (sessionLogs.length > 0) return 'partial'
 
   // SAID missed, not merely looking missed. Ranked directly under logged work
   // — someone who marked Tuesday missed and then trained has earned the done

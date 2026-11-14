@@ -1356,7 +1356,7 @@ export function TodayPanel({
         todayName={todayName}
         todayDate={today}
         selectedDay={peekDay ?? todayName}
-        onSelectDay={d => setPeekDay(d)}
+        onSelectDay={d => setPeekDay(d === todayName ? null : d)}
         weekNumber={liveWeek}
         totalWeeks={totalWeeks}
         blockNumber={currentMesoWeekObj?.block_number}
@@ -1458,7 +1458,7 @@ export function TodayPanel({
             <p className="text-muted-foreground">{peekDay}'s session is on {peekMovedTo.dayName} now.</p>
             {/* Real buttons, not 16px text links (whole-app QA walk, 7 Nov 2026): a gym-floor tap needs 44px. */}
             <div className="mt-3 flex flex-wrap justify-center gap-2">
-              <Button size="sm" variant="outline" className="min-h-11" data-testid="peek-see-moved" onClick={() => setPeekDay(peekMovedTo.dayName)}>
+              <Button size="sm" variant="outline" className="min-h-11" data-testid="peek-see-moved" onClick={() => setPeekDay(peekMovedTo.dayName === todayName ? null : peekMovedTo.dayName)}>
                 See {peekMovedTo.dayName} →
               </Button>
               <PeekBackToToday onClick={() => setPeekDay(null)} />

@@ -2231,6 +2231,8 @@ export interface SessionMovePayload {
    * discover later.
    */
   requestedDayName?: string
+  /** Why that day could not be used, so the receipt says the same as the card (QA, 14 Nov 2026). */
+  requestedWhyNot?: 'busy' | 'gone' | 'other_week'
   reason?: string
   /**
    * What they did INSTEAD on the day the session left, when the same message
@@ -2254,7 +2256,11 @@ export async function executeSessionMove(
   }
   const landed = [
     `${payload.fromDayName}${payload.sessionFocus ? `'s ${payload.sessionFocus}` : ''} moved to ${payload.toDayName}`
-    + (payload.requestedDayName ? ` (${payload.requestedDayName} already had a session on it)` : ''),
+    + (payload.requestedDayName
+      ? (payload.requestedWhyNot === 'gone' ? ` (${payload.requestedDayName} had already gone)`
+        : payload.requestedWhyNot === 'other_week' ? ` (${payload.requestedDayName} is in a different training week)`
+        : ` (${payload.requestedDayName} already had a session on it)`)
+      : ''),
   ]
   const failed: { op: string; error: string }[] = []
   // THE PASSENGER, through the client's own cardio path — clientId dedupe,

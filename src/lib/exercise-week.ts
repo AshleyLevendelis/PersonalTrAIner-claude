@@ -126,8 +126,14 @@ export function weekDayRow(day: TrainingWeekDay, unloadedLabelFor: (ex: Exercise
     : null
   // A day before the plan began is not a rest day either: nothing was planned (his live test, 14 Nov 2026).
   if (day.state === 'before_plan') return { kind: 'rest', date: day.date, dayName: day.dayName, note: null, beforePlan: true }
-  if (!dayHasSession(session) || day.state === 'moved') {
-    return { kind: 'rest', date: day.date, dayName: day.dayName, note: day.state === 'moved' ? status : day.state === 'rest_chosen' ? 'chosen rest' : null }
+  // A CHOSEN REST AND A MISSED DAY SAY SO (QA, 14 Nov 2026): a rest chosen on a session day was drawn as the session,
+  // and a missed day whose session was then moved on read "Rest day".
+  if (!dayHasSession(session) || day.state === 'moved' || day.state === 'rest_chosen') {
+    const note = day.state === 'moved' ? status
+      : day.state === 'rest_chosen' ? 'chosen rest'
+      : day.state === 'missed' ? (day.movedTo ? `Missed · moved to ${day.movedTo.dayName}` : 'Missed')
+      : null
+    return { kind: 'rest', date: day.date, dayName: day.dayName, note }
   }
   const done = day.state === 'done' || (day.state === 'swapped' && !!day.swapLogged)
   if ((session.exercises?.length ?? 0) === 0 && session.plannedActivity) {

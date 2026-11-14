@@ -259,7 +259,7 @@ export function WeekContextRow({
                 <button
                   key={d.date}
                   type="button"
-                  onClick={() => { if (!isToday) onSelectDay(d.dayName) }}
+                  onClick={() => onSelectDay(d.dayName)}
                   data-strip-day={d.dayName}
                   data-dot={dot}
                   data-week-boundary={i === boundary ? 'start' : undefined}
