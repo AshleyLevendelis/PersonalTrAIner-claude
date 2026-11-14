@@ -104,6 +104,9 @@ console.log('\n7. "2 meals" with breakfast skipped is lunch and dinner, and a da
   check('Margaret (2 meals, skips breakfast, no snacks): every day is lunch and dinner', margaret.every(d => d === 'dinner,lunch'), margaret)
   const twoMeals = served({ mealsPerDay: 2, includeSnacks: true, skipBreakfast: false })
   check('2 meals + snacks: never a fourth meal from a lunch pool left over', twoMeals.every(d => d === 'breakfast,dinner,snack'), twoMeals)
+  check('a shape that never said how many meals drops nothing (older profiles)', poolsForShape(pools, T, { skipBreakfast: undefined }) === pools)
+  check('...and one that never said whether snacks are on keeps the snack', 'snack' in poolsForShape(pools, T, { mealsPerDay: 3, skipBreakfast: undefined }))
+  check('...while "no snacks" said plainly drops it', !('snack' in poolsForShape(pools, T, { mealsPerDay: 3, includeSnacks: false, skipBreakfast: undefined })))
   check('a pool set that needs nothing dropped is handed back as the same object', poolsForShape(pools, T, { mealsPerDay: 4, includeSnacks: true, skipBreakfast: false }) === pools)
 }
 

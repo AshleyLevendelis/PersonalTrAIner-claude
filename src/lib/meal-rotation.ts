@@ -256,7 +256,11 @@ export function poolsForShape(
   targets: MacroTargets,
   shape: MealShape,
 ): Partial<Record<MealSlotName, PoolOption[]>> {
+  // Only what the profile SAYS: a shape that never said whether snacks are on keeps the snack (older profiles and saved
+  // shapes leave it unset, and a snack pool was always served). An unset meal count reads as three, which drops nothing
+  // a three-meal pool holds (a separate guard for it measured as doing nothing: a MISSED mutation, deleted).
   const active = new Set(Object.keys(computeSlotBudgets(targets, shape.mealsPerDay, shape.includeSnacks, shape.skipBreakfast)))
+  if (shape.includeSnacks == null) active.add('snack')
   const keys = Object.keys(pools) as MealSlotName[]
   if (keys.every(k => active.has(k))) return pools
   return Object.fromEntries(keys.filter(k => active.has(k)).map(k => [k, pools[k]])) as Partial<Record<MealSlotName, PoolOption[]>>
