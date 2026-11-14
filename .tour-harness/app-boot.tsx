@@ -119,7 +119,12 @@ const db: Db = {
     { id: 'c1', profile_id: PROFILE_ID, role: 'user', content: 'How much protein should I eat?', status: 'complete', action_data: null, created_at: new Date(anchorNowMs() - 26 * 3600000).toISOString() },
     { id: 'c2', profile_id: PROFILE_ID, role: 'assistant', content: 'About 160g a day for you.', status: 'complete', action_data: null, created_at: new Date(anchorNowMs() - 26 * 3600000 + 5000).toISOString() },
   ] : [],
-  daily_nutrition_targets: [], workout_exercises: [], weight_basis_offers: [],
+  // ?targets-moved: an earlier target snapshot with other numbers (an INPUT: a row as the app writes it), so the start
+  // says his targets moved (verify:new-plan-carryover needs a person with that line, to show the next person never gets it).
+  daily_nutrition_targets: new URLSearchParams(location.search).has('targets-moved') ? [
+    { id: 't0', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 3 * 86400000)), workout_split: 'REST', target_calories: 1900, target_protein_g: 150, target_carbs_g: 180, target_fats_g: 60, calculated_bmr: 1700, calculated_tdee: 2400, calculated_weight_kg: 84 },
+  ] : [],
+  workout_exercises: [], weight_basis_offers: [],
   // ?ignored3: the same evening message went unanswered three days running (an INPUT: the moment log as the app keeps it,
   // his strategy slice 1), so the coach should turn itself down a level (slice 2).
   coach_moment_log: new URLSearchParams(location.search).has('ignored3') ? [1, 2, 3].map(d => ({

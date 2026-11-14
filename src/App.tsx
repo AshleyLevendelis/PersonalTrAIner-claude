@@ -907,8 +907,16 @@ function App() {
     ? MACRO_INPUT_KEYS.map(k => String(profile[k] ?? '')).join('|')
     : null
   const lastMacroInputsRef = useRef<string | null>(null)
+  // Whose inputs those were. A different profile is a FIRST pass, never a change: comparing a new person's answers
+  // with the last person's is how a sign-up came to "move" targets on day one (14 Nov 2026).
+  const lastMacroProfileIdRef = useRef<string | null>(null)
   useEffect(() => {
     if (isRestoring || !profile || macroInputs == null) return
+    if (lastMacroProfileIdRef.current !== (profile.id ?? null)) {
+      lastMacroProfileIdRef.current = profile.id ?? null
+      lastMacroInputsRef.current = macroInputs
+      return
+    }
     // Skip the first pass — restoreSession has already computed these, and
     // recomputing immediately would just be the same numbers again.
     if (lastMacroInputsRef.current === null) { lastMacroInputsRef.current = macroInputs; return }
@@ -2041,7 +2049,11 @@ function App() {
       // itself failing quietly: a missed anchor is the old behaviour, never a
       // blocked sign-up.
       anchorTargetsAtSignUp(data.id, enrichedProfile, calculatedMacros)
-        .then(anchorKg => { if (anchorKg != null && activeProfileIdRef.current === data.id) setTargetWeightAnchorKg(anchorKg) })
+        .then(anchorKg => {
+          // The new profile, or setup still finishing it (the ref is set when the plan is committed, and the write can
+          // land first: dropping it then left the anchor empty and the targets were later worked out at another weight).
+          if (anchorKg != null && (activeProfileIdRef.current === data.id || activeProfileIdRef.current == null)) setTargetWeightAnchorKg(anchorKg)
+        })
         .catch(err => console.error('Anchoring the first targets failed:', err))
       // Conversational-onboarding draft: context facts / goals volunteered
       // mid-conversation queue in the draft (user_context_facts/user_goals
@@ -2988,6 +3000,30 @@ function App() {
       // handed to every tab is derived from them (the kit list), so a new
       // profile must not start life wearing the old one's kit.
       setMemoryFacts([])
+      // NOTHING OF THE LAST PERSON SURVIVES A NEW PLAN (his Sal and Margaret test, 14 Nov 2026). The app is not
+      // reloaded, so every piece of per-profile state is cleared here by name. The weight anchor was the serious one:
+      // left set, the next profile's targets were worked out at the LAST person's weight (Margaret, who gave none,
+      // got 1,596 kcal and 160 g from Sal-era 80 kg) and saved under the new id; the notice list carried Sal's
+      // "targets moved" line onto Margaret's Home.
+      setTargetWeightAnchorKg(null)
+      anchorUnknownRef.current = false
+      lastMacroInputsRef.current = null
+      lastMacroProfileIdRef.current = null
+      setAdaptationMessages([])
+      setMealRegenerateError(null)
+      setMealTopUpNote(null)
+      setActiveAdaptationsForReset([])
+      setPlanInvalidation(null)
+      setGroceryItems([])
+      setMemoryGoals([])
+      setMemoryContextFacts([])
+      setUnrecognisedDietaryRestrictions(null)
+      setWriteError(null)
+      setInitialMealBuild(false)
+      activeProfileIdRef.current = null
+      // Two device keys that are not filed under a profile: the shopping day (and its snooze) and a chat draft.
+      localStorage.removeItem('fitplan_shop_day_v1')
+      try { sessionStorage.removeItem('fitplan_chat_prefill_v1') } catch { /* private mode */ }
       setLogsVersion(0)
       setNewPlanResetting(false)
       setNewPlanConfirmOpen(false)

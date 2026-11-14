@@ -438,12 +438,17 @@ export function MealPlan({
           <>
             <UtensilsCrossed className="size-8 text-muted-foreground/50" />
             <p className="text-sm text-muted-foreground">No meal plan generated yet.</p>
-            {unrecognisedBanner ? (
+            {/* NO TARGETS, NO MEALS, AND IT SAYS WHY (his Margaret test, 14 Nov 2026): she declined her weight, setup
+                rightly built no meals, and this read "Complete onboarding" to someone who just had. Meals are sized to
+                the targets, so with none there is nothing to generate: the note above names what to add. */}
+            {targets === null && !unrecognisedBanner ? (
+              <p className="text-xs text-muted-foreground/70" data-testid="meals-need-targets">Your meals are sized to your food targets, so they're built once those are in. The note above says what to add.</p>
+            ) : unrecognisedBanner ? (
               <p className="text-xs text-muted-foreground/70">Fix the restriction above, then generate.</p>
             ) : (
               <p className="text-xs text-muted-foreground/70">Complete onboarding to generate your meal pools, or regenerate below.</p>
             )}
-            {!unrecognisedBanner && (
+            {!unrecognisedBanner && targets !== null && (
               <Button size="sm" onClick={onRegenerateAll} disabled={isGenerating} className="mt-2">
                 {isGenerating ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <RefreshCw className="size-3.5 mr-1.5" />}
                 Generate meals
