@@ -247,6 +247,9 @@ for (let i = 0; i < 60; i++) {
     if (want && await want.count()) await want.first().click({ timeout: 3000 }).catch(() => {})
     else if (await opts.count()) await opts.first().click({ timeout: 3000 }).catch(() => {})
     await wait(300)
+    // A card carrying a second question (his "Light trim", 14 Nov 2026: the length under the days) answers it too.
+    const companion = c.locator('[data-companion] [role="radio"]')
+    if (await companion.count()) { await companion.first().click({ timeout: 3000 }).catch(() => {}); await wait(200) }
     const next = c.locator('[data-slot-next]')
     if (await next.count() && await next.isEnabled().catch(() => false)) await next.click({ timeout: 3000 }).catch(() => {})
     await wait(1300); continue

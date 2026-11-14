@@ -310,6 +310,7 @@
     "verify:setup-hiccup": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/setup-hiccup.mjs",
     "verify:setup-kit": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/setup-kit.mjs",
     "verify:health-taps": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/health-taps.mjs",
+    "verify:two-question-screens": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/two-question-screens.mjs",
     "verify:onboarding-walk": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/walk-questions.mjs",
     "verify:chat-shell": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-shell.mjs",
     "verify:tap-targets": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tap-targets.mjs",

@@ -1,7 +1,8 @@
+import { useState } from 'react'
 import { OptionRow, OptionPill, OptionCell } from './OptionRow'
 import { isHealthCondition, healthConditionLine } from '@/lib/health-conditions'
 import { Button } from '@/components/ui/button'
-import { getSlotDef, offeredOptionsFor, multiSelection, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
+import { getSlotDef, offeredOptionsFor, multiSelection, companionSlotFor, isSlotApplicable, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
 import { dietTargetCaveat } from '@/lib/coach-voice'
 
 // ---------------------------------------------------------------------------
@@ -54,12 +55,22 @@ export function SlotChipsCard({
   busy: boolean
   onToggleMulti: (key: SlotKey, value: string) => void
   onResolveSingle: (key: SlotKey, value: string) => void
-  onResolveMulti: (key: SlotKey) => void
+  /** The card's own answer, plus its companion's when the screen carries one (companionSlotFor). */
+  onResolveMulti: (key: SlotKey, companion?: { key: SlotKey; value: string }) => void
 }) {
   const def = getSlotDef(slotKey)
   // Via offeredOptionsFor so any future "hidden until the engine can honour
   // it" filtering applies here automatically.
   const options = def ? offeredOptionsFor(def) : undefined
+  // THE SECOND QUESTION ON THIS SCREEN (his "Light trim", 14 Nov 2026): session length under the days, "anything else
+  // to leave out" under the diet. Held here until Next, which answers both. (Before any early return: a hook.)
+  const companionKey = def ? companionSlotFor(def.key) : null
+  const companionDef = companionKey ? getSlotDef(companionKey) : undefined
+  const companionOn = !!companionDef && isSlotApplicable(companionDef, values)
+  const [companionValue, setCompanionValue] = useState<string>(() => {
+    const v = companionKey ? values[companionKey] : null
+    return v === null || v === undefined ? '' : String(v)
+  })
   if (!def || !options || (def.control !== 'single' && def.control !== 'multi')) return null
 
   const current = values[def.key]
@@ -224,6 +235,35 @@ export function SlotChipsCard({
           (canDeclineSlot) — moved, not copied. */}
       {/* NEXT, FULL WIDTH, for a question that takes more than one tap. A
           single-choice question is still answered by its one tap. */}
+      {companionOn && companionDef && companionDef.control === 'single' && (
+        <div data-companion={companionDef.key} className="space-y-2 pt-2">
+          <p className="text-[0.8125rem] font-medium">{companionDef.question}</p>
+          <div role="radiogroup" aria-label={companionDef.question} className="flex flex-wrap gap-2">
+            {(offeredOptionsFor(companionDef) ?? []).map(opt => (
+              <OptionPill
+                key={String(opt.value)}
+                label={opt.label}
+                selected={companionValue === String(opt.value)}
+                selectionRole="radio"
+                onClick={() => setCompanionValue(String(opt.value))}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+      {companionOn && companionDef && companionDef.control === 'text' && (
+        <div data-companion={companionDef.key} className="space-y-1.5 pt-2">
+          <label htmlFor={`companion-${companionDef.key}`} className="block text-[0.8125rem] font-medium">{companionDef.question}</label>
+          <input
+            id={`companion-${companionDef.key}`}
+            type="text"
+            value={companionValue}
+            onChange={e => setCompanionValue(e.target.value)}
+            placeholder={companionDef.inputHint ?? 'Optional'}
+            className="h-11 w-full rounded-xl border border-[color:var(--hairline)] bg-card px-3 text-[0.9375rem]"
+          />
+        </div>
+      )}
       {/* THE PICKS, READ BACK IN WORDS, under pills or a day strip, where a
           filled chip is the only other sign of what was chosen. */}
       {def.control === 'multi' && shape !== 'rows' && selectedMulti.length > 0 && (
@@ -234,8 +274,8 @@ export function SlotChipsCard({
       {def.control === 'multi' && (
         <Button
           className="h-[54px] w-full text-[0.9375rem] font-semibold glow-mint-box"
-          disabled={busy || (def.required && selectedMulti.length === 0)}
-          onClick={() => onResolveMulti(def.key)}
+          disabled={busy || (def.required && selectedMulti.length === 0) || (companionOn && companionDef?.control === 'single' && companionValue === '')}
+          onClick={() => onResolveMulti(def.key, companionOn && companionKey ? { key: companionKey, value: companionValue } : undefined)}
           data-slot-next
         >
           {selectedMulti.length === 0 ? (def.required ? 'Pick at least one' : 'None — next →') : 'Next →'}

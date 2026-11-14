@@ -1798,21 +1798,34 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     void sendMessage(label, ws)
   }
 
-  const handleResolveMulti = (key: SlotKey) => {
+  const handleResolveMulti = (key: SlotKey, companion?: { key: SlotKey; value: string }) => {
     const def = getSlotDef(key)
     if (!def) return
     if (!isSlotApplicable(def, values)) return
     const selected = multiSelection(key, values)
     const ws = makeWorkingState()
+    // THE SECOND QUESTION ON THE SAME SCREEN (his "Light trim", 14 Nov 2026): answered by this Next, said back with it.
+    let companionSaid = ''
+    const companionDef = companion ? getSlotDef(companion.key) : undefined
+    if (companion && companionDef) {
+      if (companionDef.control === 'text') {
+        // Foods to leave out: the typed words as a list, or an empty answer (asked, nothing to add).
+        const foods = splitFoodList(companion.value)
+        if (applySlot(ws, companion.key, foods.join(', '), values, false) && foods.length > 0) companionSaid = `leave out ${foods.join(', ')}`
+      } else if (companion.value !== '' && applySlot(ws, companion.key, coerceSlotValue(companionDef, companion.value), values, false)) {
+        companionSaid = companionDef.options?.find(o => String(o.value) === companion.value)?.label ?? companion.value
+      }
+    }
     if (!applySlot(ws, key, selected, values, false)) {
       // Belt-and-braces: SlotChipsCard disables Done for a required-empty
       // multi, but a validation miss must still be LOUD, never a no-op.
       setMessages(prev => [...prev, { role: 'assistant', content: 'I need at least one there — tap the ones that work for you.' }])
       return
     }
-    const labels = selected.length > 0
+    const picked = selected.length > 0
       ? selected.map(v => def.options?.find(o => String(o.value) === v)?.label ?? v).join(', ')
       : 'none'
+    const labels = companionSaid ? `${picked} · ${companionSaid}` : picked
     if (settleEdit(ws, labels)) return
     void sendMessage(labels, ws)
   }

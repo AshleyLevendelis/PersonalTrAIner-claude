@@ -1542,9 +1542,25 @@ export function numericGroupFor(key: SlotKey): SlotKey[] {
   return NUMERIC_GROUPS.find(g => g.includes(key)) ?? [key]
 }
 
-/** The slots asked on the same SCREEN as this one (a numeric card's boxes), for the setup counter. */
+/**
+ * TWO QUESTIONS ON ONE SCREEN (his "Light trim", 14 Nov 2026): session length rides on the training-days card and
+ * "anything else to leave out" on the diet card. The companion is answered by the same Next as its card; asked on its
+ * own (the coach can still present it), it is its own card as before.
+ */
+const SCREEN_COMPANIONS: Partial<Record<SlotKey, SlotKey>> = {
+  trainingDays: 'sessionDuration',
+  dietaryPreferences: 'dislikedFoods',
+}
+
+/** The question answered on the same screen as this card, if any. */
+export function companionSlotFor(key: SlotKey): SlotKey | null {
+  return SCREEN_COMPANIONS[key] ?? null
+}
+
+/** The slots asked on the same SCREEN as this one (a numeric card's boxes, a card and its companion), for the counter. */
 function screenGroupFor(key: SlotKey): SlotKey[] {
-  return numericGroupFor(key)
+  const owner = (Object.keys(SCREEN_COMPANIONS) as SlotKey[]).find(k => k === key || SCREEN_COMPANIONS[k] === key)
+  return owner ? [owner, SCREEN_COMPANIONS[owner]!] : numericGroupFor(key)
 }
 
 const KNOWN_LIFT_SLOTS: SlotKey[] = NUMERIC_GROUPS[1]

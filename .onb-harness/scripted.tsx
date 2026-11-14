@@ -118,6 +118,26 @@ if (state === 'days') {
   ))
 }
 
+if (state === 'days-card' || state === 'diet-card') {
+  // THE TWO-QUESTION SCREENS (his "Light trim", 14 Nov 2026): the days card carries session length, the diet card
+  // carries "anything else to leave out". Everything before each is answered; the card is the app's next question.
+  const days = state === 'days-card'
+  const { trainingDays: _a, sessionDuration: _b, trainingStyle: _c, conditioningPreference: _d, kitTicks: _e, ...before } = SAM_SO_FAR
+  void _a; void _b; void _c; void _d; void _e
+  const b = days ? before : { ...SAM_SO_FAR, recoveryCapacity: 'moderate', age: '31', heightCm: '178', weightKg: '82', gender: 'male', mealsPerDay: 3 }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Sam' },
+      days
+        ? { role: 'assistant', content: 'Which days can you actually train?', slotCard: 'trainingDays' }
+        : { role: 'assistant', content: 'Any dietary preferences or restrictions?', slotCard: 'dietaryPreferences' },
+    ],
+    b,
+    Object.keys(b),
+  ))
+}
+
 if (state === 'injuries') {
   // THE INJURIES CARD WITH THE HEALTH TAPS (his ruling 14 Nov 2026, "Fold into injuries"): goal, experience and
   // equipment answered; the injuries card is the app's next question.

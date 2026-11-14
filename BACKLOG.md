@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [ ] **SHORTER SETUP STEP 3 OF 3 BUILT (14 Nov 2026): two questions on one screen.** The days card carries "How
+  long can your sessions usually run?" (Next waits for a day and a length) and the diet card carries "Anything else
+  you'd rather I left out?" (typed foods, kept as a list); one Next answers both and his reply says both. Asked on
+  their own by the coach, each is still its own card. The bar counts each pair as one screen: a home trainer now
+  sees "of 15" (was 19), a gym lifter 14 + name (was 22 + name). `verify:two-question-screens` (14 checks, 5/5
+  mutations); `verify:onboarding-one-question`'s walk answers the second question too (14 turns). Named: on the diet
+  screen the leave-out box sits under 22 diet chips, so it needs a scroll on a phone. Step 2 (the first-session lifts
+  card) still to build.
 - [ ] **SHORTER SETUP, his "Light trim" (14 Nov 2026) — STEP 1 OF 3 BUILT.** Measured with setup's own functions
   first: a gym lifter was asked 22 questions plus the name, and the bar said "of 22" while age, height and weight sat
   on one card. Step 1: the lift numbers (his "Ask at the first session") and the running goal (his "Move it to the
