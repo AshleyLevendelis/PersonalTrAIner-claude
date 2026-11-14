@@ -44,7 +44,8 @@ console.log('  A. A PART-TRAINED DAY')
 await beforeLoad(`window.__seedDb = undefined`)
 await load('')
 await ready()
-const names = (await until(`(() => { const n = [...document.querySelectorAll('[data-exercise-name]')].map(c => c.getAttribute('data-exercise-name')); return n.length ? n : null })()`, 12000)) ?? []
+// THE SESSION'S OWN WORK, never the movement prep: two prep sets and Finish are not a session started (QA, 14 Nov 2026).
+const names = (await until(`(() => { const n = [...new Set([...document.querySelectorAll('[data-exercise-name]:not([data-movement-prep])')].map(c => c.getAttribute('data-exercise-name')))]; return n.length ? n : null })()`, 12000)) ?? []
 check(`A0. today (${TODAY_NAME}) has a session to part-train`, names.length >= 2 && /: due$/.test(await cell(TODAY_NAME) || ''), { names, cell: await cell(TODAY_NAME) })
 // The control first: before anything is logged, the same menu DOES offer move, rest and missed.
 const opened0 = (await openSheet()) === 'open'
