@@ -1586,6 +1586,31 @@ menu" stays true when a copy is also left outside it.
   say so. From the next day a surprising weigh-in is held as before. `test:weigh-in-targets` §13,
   `verify:setup-weight-correction`
 
+### His rulings of 14 Nov 2026, live-test batches 2-3 (Priya and his own phone)
+- **"Leave it as it is" on a goal change undoes the goal: "Undo the goal change"** (over keeping the goal and saying
+  so, and over always rebuilding): the goal is saved before the question and moves calories at once, so Leave puts the
+  old goal back and the targets follow. `test:qa-batch3` §1, `test:rebuild-offer`
+- **Pregnancy: "Exercise rules only"** (over "talk to your midwife" copy only and over the full version with calories
+  and food): a due date or trimester the plan reads; no jumping or impact moves; no moves lying flat on the back after
+  about 16 weeks; balance-risky moves flagged; the RPE cap kept; the coach names the midwife. Calories and food are
+  untouched (clinical nutrition). Plan first: `docs/plans/pregnancy-exercise-rules.md`
+- **A moved session survives a change of days: "Keep it, still owed"**: it stays on the day it was moved to as a
+  one-off that week, and the change-days card says so.
+- **Plan pause: "Add a pause"**: Profile and the coach; while paused no session is due, nothing is missed, no workout
+  reminder or cheerful nudge; meals carry on; resume is eased by the return-after-a-break rules.
+- **After a coach red flag: "Park it, go quiet"**: the open workout ends where it stands (sets kept), the rest banner
+  goes, no unprompted cheerful message or workout reminder for 48 hours, the pause is offered, and the next chat open
+  asks how she is, once.
+- **An impossible set: "Ask once, then save"**: above 3x the prescribed reps, or over 100 on a loaded lift, the tick
+  asks; a confirmed outlier is saved and never raises next week's weights.
+- **Weigh-ins: "Need a week of readings"**: targets move only with weigh-ins on at least 3 days in the last 7 and the
+  average moved 1 kg or more; the sign-up-day correction stands; a pregnant user's targets never move on weight gain.
+  This CHANGES WHAT THE TARGET MOVE MEASURES: target moves before 14 Nov are not comparable.
+- **"I don't like X": "Ask, and hold Tuesday"**: one question, "just this meal, or never?" (allergies and "I don't eat
+  X" still saved at once), and a swap holds the next day's other meals as a same-day swap does.
+- **Packaged food: "Add standard UK packs"**: crisps, cans, meal-deal sandwiches and bars at their usual size; the card
+  says which sizes it assumed.
+
 ### His ruling of 12 Nov 2026, eating out (`docs/plans/eating-out.md`)
 - **A meal marked as out: "Ask: light/normal/big"** (from three options; his request "build it, start with out for
   dinner"). The APP asks how big a night it is, on both surfaces (the coach's tool has no size; the size is read from

@@ -129,7 +129,9 @@ console.log('\n6. The chat harness still reproduces the container App.tsx actual
   // A copy that drifts is worse than no copy, so the two are pinned together.
   const app = readFileSync(join(ROOT, 'src/App.tsx'), 'utf8')
   const harness = readFileSync(join(ROOT, '.tour-harness/chat.tsx'), 'utf8')
-  const mainClass = app.match(/<main className="([^"]+)"/)?.[1]
+  // RE-ANCHORED 14 Nov 2026: the page is <DockPaddedMain> (bottom padding 7rem plus the dock's height, 7rem with no
+  // dock, as in the harness), which renders the <main> with that class.
+  const mainClass = app.match(/<DockPaddedMain className="([^"]+)"/)?.[1]
   check('App.tsx has a <main> wrapper to copy (sanity check on this gate)', !!mainClass, mainClass)
   check('the harness reproduces it verbatim',
     !!mainClass && harness.includes(`<main className="${mainClass}"`),

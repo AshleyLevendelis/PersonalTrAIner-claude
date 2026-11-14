@@ -381,7 +381,10 @@ console.log('\n4. Nothing rebuilds without somebody saying yes')
     /const handleConfirmRebuild = async/.test(app) && /onClick=\{handleConfirmRebuild\}/.test(app))
   check('there is a way to decline', /Leave it as it is/.test(app))
   check('...which clears the offer without rebuilding',
-    /Leave it as it is/.test(app) && /onClick=\{\(\) => setPlanInvalidation\(null\)\}/.test(app))
+    // RE-ANCHORED 14 Nov 2026 (his "Undo the goal change"): Leave closes the offer and, for a goal, puts the old goal
+    // back. It never rebuilds: leaveAsItIs has no call to the confirm path.
+    /Leave it as it is/.test(app) && /onClick=\{\(\) => void leaveAsItIs\(\)\}/.test(app) && /const leaveAsItIs = async \(\) => \{\s*const inv = planInvalidation\s*setPlanInvalidation\(null\)/.test(app)
+      && !/handleConfirmRebuild|rebuildAgainstProfile/.test(app.slice(app.indexOf('const leaveAsItIs = async'), app.indexOf('const leaveAsItIs = async') + 900)))
   check('a failed save is reported rather than swallowed',
     /couldn't be rebuilt right now/.test(app))
   // The rebuild must start from the live week, or it would rewrite history.

@@ -133,7 +133,7 @@ function main() {
     // His diet and allergies: the app knows nothing about a plate it has not been told, and must never say it does.
     check('no sentence claims the meal suits his diet or is free of anything', !/\b(safe|suits?|fits? your diet|free of|-free|allergen|allerg)/i.test(every), every)
     check('the assumed note says the app does not know what is on the plate', SLOTS.every(s => /doesn't know what's on the plate/.test(ELSEWHERE_WORDS.assumedNote(s)) && ELSEWHERE_WORDS.assumedNote(s).includes(s)))
-    check('the list line counts one meal and several in plain words', ELSEWHERE_WORDS.listLine(1) === '1 meal is cooked for you, so it is not on this list.' && ELSEWHERE_WORDS.listLine(10) === '10 meals are cooked for you, so they are not on this list.')
+    check('the list line counts one meal and several in plain words', ELSEWHERE_WORDS.listLine(1) === '1 meal is eaten out or cooked for you, so it is not on this list.' && ELSEWHERE_WORDS.listLine(10) === '10 meals are eaten out or cooked for you, so they are not on this list.')  // re-anchored 14 Nov 2026: a meal out counts here too
     check('no dash or semicolon in a sentence he reads', !/[—–;]/.test(every))
   }
 

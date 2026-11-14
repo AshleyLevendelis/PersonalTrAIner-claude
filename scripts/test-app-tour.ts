@@ -250,7 +250,8 @@ console.log('\n5. The behaviour the copy depends on is still wired')
   // Mounted as a SIBLING of <main> — inside a tab's subtree it could not
   // overlay the tab bar, which is what three of its stops spotlight.
   check('...outside <main>, so it can overlay the tab bar',
-    app.indexOf('<AppTour') > app.indexOf('</main>'))
+    // RE-ANCHORED 14 Nov 2026: the page is <DockPaddedMain> (it pads for the floating bars), which renders the <main>.
+    app.indexOf('</DockPaddedMain>') > 0 && app.indexOf('<AppTour') > app.indexOf('</DockPaddedMain>'))
   check('...and only after onboarding actually succeeded',
     /armed=\{tourArmed\}/.test(app) && /setTourArmed\(true\)/.test(app))
   // Arming must not sit in the finally block, which also runs on failure.
