@@ -25,6 +25,13 @@ Newest first. One line each.
   `docs/plans/health-conditions.md` (no place to store them without a migration; his word needed); the bodyweight
   tier's assumed backpack ("Bodyweight only lists a weighted bag") and the dumbbell-alternative primers (inferred,
   unverified). The shorter-setup proposal: `docs/plans/shorter-setup.md`. Deploys: `onboarding-chat`.
+  FULL SWEEP on 0f662722: 548 of 559. The 11: three need a live database (meal-quality, schema-parity, rls), one was
+  red before today (coach-exam-fresh: the exam needs re-running on his machine), and seven were knock-ons of today's
+  work, each fixed and re-run with every gate that reads the file: an old Band check (re-anchored), the shorten
+  receipt losing "then" on a sets-only trim (fixed in the app), the reset dropping the shopping day (kept, his earlier
+  rule), the mobility driver reading the wrong plan week (harness), a day swap saying "no snack planned" for a meal the
+  plan does not have (back to the Profile line), a widened source window, and verify:deep-pool counting a leaked
+  fourth meal (now three, mutation-tested).
   HIS RULINGS, each
   from options I gave: (1) **health conditions: "Fold into injuries"** — his words "A is good but we keep adding
   questions and the onboarding keeps getting longer ... I want to make it shorter", so NO new question: the existing
