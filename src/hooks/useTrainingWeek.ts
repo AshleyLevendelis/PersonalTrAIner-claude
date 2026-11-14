@@ -315,7 +315,10 @@ function buildTrainingWeekDays(input: BuildTrainingWeekInput): TrainingWeekDay[]
       deliberateRest: !!dashboardDay?.session?.deliberate_rest,
       movedTo: resolved.movedTo,
       movedFrom: resolved.movedFrom,
-      session: resolved.day,
+      // NOTHING WAS PRESCRIBED BEFORE THE PLAN BEGAN (his live test, 14 Nov 2026: set up on a Saturday, the week
+      // view drew Mon 9, Wed 11 and Fri 13 as sessions, borrowed from week 1 by the date lookup's clamp). The tally
+      // already left them out; now no screen is handed a session to draw for them.
+      session: state === 'before_plan' ? undefined : resolved.day,
       workingLogs: dashboardDay?.workingLogs ?? [],
       ...(planWeek !== undefined ? { planWeek } : {}),
     }

@@ -61,10 +61,10 @@ export function ExerciseWeekView({ days, todayName, onOpenDay, renderDay }: {
         const label = `${isToday ? 'Today' : `${DAY3[day.dayName] ?? day.dayName} ${Number(day.date.slice(8, 10))}`}`
         if (row.kind === 'rest') {
           return (
-            <div key={day.date} className="flex min-h-12 items-center gap-3 px-3.5 text-[0.875rem] text-text-tertiary" data-week-day={day.date} data-week-day-kind="rest">
+            <div key={day.date} className="flex min-h-12 items-center gap-3 px-3.5 text-[0.875rem] text-text-tertiary" data-week-day={day.date} data-week-day-kind={row.beforePlan ? 'before-plan' : 'rest'}>
               <Moon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
               <span>
-                <span className={`font-semibold ${isToday ? 'text-primary-text' : 'text-foreground'}`}>{label}</span> · Rest day{row.note ? ` · ${row.note}` : ''}
+                <span className={`font-semibold ${isToday ? 'text-primary-text' : 'text-foreground'}`}>{label}</span> · {row.beforePlan ? 'Before your plan began' : 'Rest day'}{row.note ? ` · ${row.note}` : ''}
               </span>
             </div>
           )

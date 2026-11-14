@@ -35,7 +35,10 @@ import type { UserProfile } from '@/lib/types'
 const PROFILE_ID = '00000000-0000-4000-8000-00000000b007'
 const USER_ID = '00000000-0000-4000-8000-0000000000a1'
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const created = new Date(anchorNowMs() - 9 * 86400000).toISOString()
+// ?plan-today: the plan began TODAY (an INPUT: when he finished setup), his live test of 14 Nov 2026, so the days of this
+// Monday-to-Sunday week before it are before the plan. verify:live-test-nov14.
+const PLAN_TODAY = new URLSearchParams(location.search).has('plan-today')
+const created = new Date(anchorNowMs() - (PLAN_TODAY ? 0 : 9) * 86400000).toISOString()
 const TRAIN_TODAY = new URLSearchParams(location.search).has('session-day')
 // The anchor's Wednesday is "Rest day · optional cardio" on this profile, a planned day with no lifting. ?no-cardio:
 // she would rather avoid cardio (an INPUT), and the generator then leaves Wednesday a plain rest day with no plan
@@ -118,7 +121,13 @@ const db: Db = {
     { id: 'm2', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 5 * 86400000)), weight_kg: 80.4 },
   ],
   daily_steps: [], water_logs: [], exercise_set_logs: [], workout_sessions: [], cardio_logs: [],
-  meal_events: [], meal_plan_picks: [], favorite_meals: [], grocery_items: [], load_suggestions: [], pending_actions: [],
+  meal_events: [], meal_plan_picks: [], favorite_meals: [],
+  // ?list-stale: tomorrow is on the shopping list, built from a dinner the day no longer serves (an INPUT: a row as the
+  // list writes it, his live test of 14 Nov 2026, a dinner since marked as eating out). verify:live-test-nov14.
+  grocery_items: new URLSearchParams(location.search).has('list-stale') ? [
+    { id: 'g1', profile_id: PROFILE_ID, canonical_key: 'chicken thigh', display_name: 'Chicken thigh', quantity: 200, unit: 'g', category: 'meat_fish', source: 'generated', meal_refs: [{ day: 1, slot: 'dinner', mealName: "Hunter's chicken with potato wedges", date: isoOf(new Date(anchorNowMs() + 86400000)) }], checked: false, needs_review: false, client_id: null, created_at: new Date(anchorNowMs() - 3600000).toISOString(), dismissed: false, user_edited: false },
+  ] : [],
+  load_suggestions: [], pending_actions: [],
   plan_adaptations: [], user_facts: [], user_context_facts: [], user_goals: [],
   // ?chat-yesterday: a RETURNING conversation (an INPUT), one exchange yesterday, as every account past its first day
   // has. The coach's daily hello is for exactly this account (verify:coach-hello mounts the chat alone; this boots it

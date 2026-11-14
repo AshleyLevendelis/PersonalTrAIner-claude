@@ -2,6 +2,29 @@
 
 Newest first. One line each.
 
+- [x] **HIS LIVE TEST, 14 NOV 2026 EVENING: EIGHT FINDINGS, ALL FIXED ON THE BRANCH** (screenshots in the chat).
+  (1) "What option should I use to calibrate target" meant male or female and said neither: the question now says "male
+  or female formula", and a rephrased question about calibrating calorie targets still brings the buttons.
+  (2) Told setup he was pregnant, then asked his sex: pregnancy (the health tap or said in words, never "not pregnant")
+  now answers it as Female and the coach is told never to ask. (3) "Started the plan from Monday 9th": MEASURED, the
+  plan did start on the sign-up day (Sat 14); the week view borrowed week 1's sessions for the days before it, so Mon,
+  Wed and Fri of that week were drawn as sessions. They now read "Before your plan began". (4) "Tomorrow already has a
+  session" for a rest day: a move could only go LATER than the session's own day, and every refusal was worded as
+  "already has a session". A session can now move to an earlier free day still ahead in the same training week (CSCS:
+  the plan week's dose is unchanged, and the week's spacing rules still apply), and a day it cannot use says why (gone,
+  another training week, or a session). (5) The eating-out card's change row was a few letters wide: the new half now
+  keeps at least 9rem. (6) "Nothing changed in tomorrow's meal plan": MEASURED, the dinner did change (his screenshot
+  shows it); what did not was the shopping list, which went on calling the day "on your list". A day whose meals
+  changed since the list was built now says so with "Update list". (7) No video for a how-to, and (8) a video link
+  that did not open: a link is now the APP's, a "Watch a video" button to a YouTube search built from the catalogue's
+  own name, on a how-to or a video request; a bare address the coach types becomes a link; the coach is told never to
+  type one. AND FROM HIS EXAM RUN THE SAME DAY (45 cases, 2.33 of 3, 2 breaches): a race named with no date is now
+  ASKED about by the app ("When is it?"), never carded, the half of his "Coach only" ruling code can hold; and the
+  coach is told never to say "100% safe" even as a comparison ("a meal you know is 100% safe" was the breach).
+  `test:live-test-nov14` (52 checks; mutations caught, see the commit), `verify:live-test-nov14` (20 checks, 6
+  mutations). Needs the frontend, `chat-gemini` (video, "100% safe") and `onboarding-chat` (male or female, pregnancy)
+  deploys. NOT proven: whether the deployed coaches obey their new lines (the exam).
+
 - [x] **THE COACH'S SHARED COPIES ARE NOW CHECKED IN THE SWEEP** (14 Nov 2026). The "Correct it now" change edited the
   app's weigh-in rules and not the coach's generated copy, so every server deploy refused to run on his machine; his
   local session re-synced it and pushed to main. The drift check existed only as the deploy's own precheck, so no

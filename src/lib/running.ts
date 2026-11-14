@@ -629,3 +629,18 @@ export function runningStartWeek(mesocycle: { week_number: number; days: Workout
 export function ladderWeekOf(planWeek: number, startWeek: number | null | undefined): number {
   return planWeek - Math.max(1, startWeek ?? 1) + 1
 }
+
+/**
+ * HIS 13 NOV RULING, "Coach only": a race date is asked by the coach, never by setup. The coach exam of 14 Nov 2026 found
+ * the coach carding "I've signed up for a 10k" before asking when it is, so the app enforces the half that costs
+ * something: a message naming an entered RACE, with no date given and no "there's no date", gets the question and no card.
+ * "I want to run a 5k" names a distance, not a race, and goes through.
+ */
+const ENTERED_RACE = /\b(signed up|sign(?:ed)? me up|entered|registered|booked|doing|running) (?:for |in |into )?(?:a |an |the |my )?[^.?!]{0,30}\b(5 ?k|10 ?k|half|marathon|race|parkrun|event)\b|\b(my|the|a) (5 ?k|10 ?k|half marathon|half|race)\b[^.?!]{0,20}\b(is|on|in)\b|\brace\b/i
+const NO_DATE = /\bno (?:race )?date\b|\bnot a race\b|\bno race\b|\bisn'?t a race\b|\bno particular date\b|\bjust for me\b|\bdon'?t have a date\b|\bwhenever\b/i
+export function raceDateMissing(userSaid: string | null | undefined, goal: unknown, raceDate: unknown): boolean {
+  if (!userSaid || goal === 'none' || goal === 'run_20') return false
+  if (typeof raceDate === 'string' && raceDate.trim()) return false
+  return ENTERED_RACE.test(userSaid) && !NO_DATE.test(userSaid)
+}
+export const RACE_DATE_QUESTION = "When is it? Tell me the date and I'll count the plan back from it. If there isn't one, say so and I'll build towards it anyway."

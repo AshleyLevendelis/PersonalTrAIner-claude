@@ -725,7 +725,10 @@ console.log('\n3. Nothing has crept back up')
   // the change: total 2930 -> 2931 raw (OVER by a fraction). His 15 Sep ruling, "raise it with room to grow": 25 kB raw
   // over today's number.
   // MOVED 13 Nov 2026: 2956 -> 2995, strategy slice 6 (running); measured 2952 before and 2970 after.
-  const TOTAL_BUDGET_KB = 2995
+  // MOVED 14 Nov 2026: 2995 -> 3022, his evening live test (the app's video button, the list-out-of-date line, the
+  // pregnancy and sex-question fixes). MEASURED on a clean worktree of c7fe77c3: 2992 before, 2997 after. His 15 Sep
+  // ruling, "raise it with room to grow": 25 kB raw over today's number.
+  const TOTAL_BUDGET_KB = 3022
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

@@ -396,8 +396,11 @@ for (const lead of leads) {
 // now on the shape — the lead ends in a call to ask(), after the clause.
 check('...and every lead ends as a question, after any passenger clause',
   /lead: `\$\{leadBase\}\$\{alsoDoing \? alsoDoingLeadClause\(alsoDoing\) : ''\} \$\{ask\(/.test(moveBuilder), null)
+// RE-ANCHORED 14 Nov 2026 (his live test: "Sunday already has a session" when Sunday was a rest day): the reason is now
+// the real one (gone, another training week, or a session), worded once and named from the day he asked for.
 check('the re-routed lead says why the day changed',
-  leads.some(l => /\$\{target\.requestedDayName\} already has a session/.test(l)), leads)
+  leads.some(l => /^\$\{whyNot\}, so/.test(l))
+    && /whyNot = [^\n]*requestedDayName/.test(moveBuilder) && /already has a session/.test(moveBuilder) && /different training week/.test(moveBuilder), leads)
 // Same re-anchoring, same reason. The clause this used to require in the lead
 // ("so it won't show as missed") now sits in the card's implications, where
 // the rest-day card already said it verbatim — so the fact a person reads is

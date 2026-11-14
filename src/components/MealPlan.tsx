@@ -78,6 +78,10 @@ export interface UpcomingMealDay {
   onRemoveFromGrocery?: () => Promise<AddGroceryDaysResult | null>
   /** Whether the list already covers this day — read when the day opens, so the button tells the truth before it is tapped. */
   isOnGroceryList: () => Promise<boolean>
+  /** On the list, and whether it still matches the day (his live test, 14 Nov 2026). Absent: read as on or off only. */
+  listState?: () => Promise<'off' | 'on' | 'stale'>
+  /** Re-works the list's days from the meals as they are now. */
+  onRefreshGrocery?: () => Promise<boolean>
 }
 
 interface MealPlanProps {
@@ -764,11 +768,11 @@ export function MealPlan({
  * says so before it is tapped rather than after.
  */
 export function AddDayToGrocery({ upcoming }: { upcoming: UpcomingMealDay }) {
-  const [state, setState] = useState<'checking' | 'ready' | 'busy' | 'added' | 'already' | 'failed'>('checking')
+  const [state, setState] = useState<'checking' | 'ready' | 'busy' | 'added' | 'already' | 'stale' | 'failed'>('checking')
   useEffect(() => {
     let live = true
-    upcoming.isOnGroceryList()
-      .then(on => { if (live) setState(on ? 'already' : 'ready') })
+    ;(upcoming.listState ? upcoming.listState() : upcoming.isOnGroceryList().then(on => (on ? 'on' as const : 'off' as const)))
+      .then(s => { if (live) setState(s === 'stale' ? 'stale' : s === 'on' ? 'already' : 'ready') })
       .catch(() => { if (live) setState('ready') })
     return () => { live = false }
   // The day is the component's key, so this runs once per day opened.
@@ -805,6 +809,24 @@ export function AddDayToGrocery({ upcoming }: { upcoming: UpcomingMealDay }) {
       console.error('Taking a day off the shopping list failed', err)
       setState('added')
     }
+  }
+  // THE LIST NO LONGER MATCHES THE DAY (his live test, 14 Nov 2026): a meal changed after the list was made, here a
+  // dinner marked as eating out. Said, with the one tap that puts it right, never "already on your list".
+  if (state === 'stale' && upcoming.onRefreshGrocery) {
+    const refresh = upcoming.onRefreshGrocery
+    return (
+      <div className="flex min-h-[44px] items-center justify-between gap-3 rounded-xl bg-[color:var(--surface-raised)] px-3.5 py-2" data-testid="meal-day-grocery" data-state="stale">
+        <span className="text-xs">{`${upcoming.dayName}'s meals changed since your shopping list was made.`}</span>
+        <button
+          type="button"
+          className="min-h-11 shrink-0 text-[0.8125rem] font-semibold text-primary-text"
+          data-testid="meal-day-grocery-refresh"
+          onClick={async () => { setState('busy'); setState((await refresh()) ? 'already' : 'failed') }}
+        >
+          Update list
+        </button>
+      </div>
+    )
   }
   if (state === 'added' || state === 'already') {
     return (

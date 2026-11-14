@@ -35,6 +35,8 @@ import {
   displaySlotValue,
   editPromptFor,
   cardQuestion,
+  saysPregnant,
+  pregnancyAnswered,
   type OnboardingSlotValues,
   type SlotKey,
   type SlotDef,
@@ -615,7 +617,20 @@ function applySlot(
       isReceipt: true,
     })
   }
+  fillSexFromPregnancy(ws)
   return true
+}
+
+/**
+ * PREGNANCY ANSWERS THE SEX QUESTION (his live test, 14 Nov 2026). Tapped on the injuries card or said in her own words,
+ * it records Female so the question is never asked; anything already answered is left alone.
+ */
+function fillSexFromPregnancy(ws: WorkingState, userText?: string): void {
+  if (ws.values.gender != null) return
+  if (!pregnancyAnswered(ws.values) && !(userText && saysPregnant(userText))) return
+  ws.values = { ...ws.values, gender: 'female' } as OnboardingSlotValues
+  ws.confirmed = new Set(ws.confirmed).add('gender')
+  ws.resolveCards.add('gender')
 }
 
 /**
@@ -970,6 +985,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     userText: string,
   ) => {
     const presentRequests: string[] = []
+    fillSexFromPregnancy(ws, userText)
     for (const action of actions) {
       if (action.name === 'set_slot') {
         const key = normalizeSlotKey(String(action.args.slot_key ?? '')) as SlotKey

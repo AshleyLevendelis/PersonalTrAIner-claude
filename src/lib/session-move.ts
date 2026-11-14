@@ -62,6 +62,12 @@ export type MoveTarget =
       /** Set when asWanted is false — the day they asked for, so the coach can say why it moved on. */
       requestedDayName?: string
       /**
+       * WHY the day they named was not used (his live test, 14 Nov 2026: "Sunday already has a session" was said of an
+       * empty Sunday that lay before the session's own day). 'busy': it holds a session. 'gone': it has already passed.
+       * 'other_week': it is in a different training week.
+       */
+      requestedWhyNot?: 'busy' | 'gone' | 'other_week'
+      /**
        * Set only when the session being moved ARRIVED here by an earlier move.
        * The write must update THAT record — origin → the new day — rather than
        * chain a second move off the day it happens to be sitting on, or the
@@ -276,6 +282,19 @@ export function resolveMoveTarget(input: MoveTargetInput, depth = 0): MoveTarget
   }
 
   const requestedDayName = requestedDate ? dayNameOf(requestedDate) : undefined
+  // EARLIER, WHEN ASKED (his live test, 14 Nov 2026): "move it to tomorrow" on the day before a plan's first session
+  // was refused as "Sunday already has a session" because a move only ever looked LATER than the session's own day.
+  // A free day from today on, inside the same training week, is as good a day to bring a session forward to as to
+  // push it back to (the same rule as a later move; mine, CSCS: a session pulled one or two days forward still has
+  // its own recovery either side, and nothing about the week's count changes).
+  if (requestedDate && daysBetween(requestedDate, fromDate) > 0 && daysBetween(todayDate, requestedDate) >= 0
+    && weekOf(requestedDate) === originWeek && isFree(requestedDate)) {
+    return { ok: true, date: requestedDate, dayName: dayNameOf(requestedDate), asWanted: true }
+  }
+  const requestedWhyNot: 'busy' | 'gone' | 'other_week' | undefined = !requestedDate ? undefined
+    : daysBetween(todayDate, requestedDate) < 0 ? 'gone'
+    : weekOf(requestedDate) !== originWeek ? 'other_week'
+    : 'busy'
   // WHERE THE TRAINING WEEK ENDS, so a refusal can say so. The loop stops at the edge of the session's own
   // plan week (the plan repeats weekly, so a day past it already holds its own copy of every session); when
   // that edge is what stopped it, "every day left already has a session" is not the reason.
@@ -291,7 +310,7 @@ export function resolveMoveTarget(input: MoveTargetInput, depth = 0): MoveTarget
       date: d,
       dayName: dayNameOf(d),
       asWanted,
-      ...(asWanted ? {} : { requestedDayName }),
+      ...(asWanted ? {} : { requestedDayName, ...(requestedWhyNot ? { requestedWhyNot } : {}) }),
       ...(resolved.movedFrom ? { remapFrom: resolved.movedFrom.date } : {}),
     }
   }

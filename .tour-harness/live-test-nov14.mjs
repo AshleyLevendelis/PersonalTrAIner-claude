@@ -1,0 +1,151 @@
+// ---------------------------------------------------------------------------
+// verify:live-test-nov14 — HIS EVENING LIVE TEST, 14 NOV 2026, ON THE REAL SCREENS AT 390px.
+//   A. the chat: "how do I do box jumps?" gets the app's "Watch a video" button (https, YouTube, new tab, 44px);
+//      "show me a video" gets it again and a bare address the coach typed becomes a link; a long change row on an
+//      offer keeps the new half wide enough to read (his screenshot: one or two letters a line);
+//   B. Nutrition (the whole app): a day on the shopping list whose dinner changed since says so, with "Update list",
+//      and after the tap it is on the list again;
+//   C. Exercise (the whole app): with the plan begun today, the days of this week before it read "Before your plan
+//      began", never as sessions.
+// The coach is stubbed at the fetch boundary; every other answer is the app's own. Every check runs every time.
+// ---------------------------------------------------------------------------
+import { createServer } from 'http'
+import { readFileSync, existsSync, writeFileSync } from 'fs'
+import { join, extname } from 'path'
+import { createRequire } from 'module'
+const require = createRequire(new URL('../package.json', import.meta.url).pathname)
+const { chromium } = require('playwright')
+const DIST = new URL('./dist/', import.meta.url).pathname
+const T = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.json': 'application/json', '.woff2': 'font/woff2' }
+const server = createServer((q, r) => { const p = decodeURIComponent(q.url.split('?')[0]); const f = join(DIST, p); if (!existsSync(f)) { r.writeHead(404); r.end('nf'); return } r.writeHead(200, { 'Content-Type': T[extname(f)] ?? 'application/octet-stream' }); r.end(readFileSync(f)) })
+await new Promise(r => server.listen(0, '127.0.0.1', r))
+const origin = `http://127.0.0.1:${server.address().port}`
+const browser = await chromium.launch()
+const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true })
+const page = await ctx.newPage()
+const errors = []
+page.on('pageerror', e => errors.push(String(e.message)))
+const wait = ms => new Promise(r => setTimeout(r, ms))
+let failures = 0, ran = 0
+const check = (name, ok, detail) => { ran++; if (ok) console.log(`    ✓ ${name}`); else { failures++; console.error(`    ✗ ${name}${detail !== undefined ? ` — ${JSON.stringify(detail).slice(0, 400)}` : ''}`) } }
+const shot = async name => { try { writeFileSync(new URL(`./live-nov14-${name}.png`, import.meta.url).pathname, await page.screenshot()) } catch { /* not a check */ } }
+const dismissEmail = async () => { const b = page.getByRole('button', { name: /Not now/ }); if (await b.count()) { await b.first().click({ timeout: 3000 }).catch(() => {}); await wait(500) } }
+const body = () => page.evaluate(() => document.body.innerText)
+const until = async (fn, ok, tries = 40) => { let v; for (let i = 0; i < tries; i++) { v = await fn().catch(() => null); if (ok(v)) return v; await wait(250) } return v }
+
+// The coach, stubbed: a how-to, a video request answered with a bare address, and a swap offer.
+await page.addInitScript(() => {
+  const realFetch = window.fetch
+  window.fetch = async (url, init) => {
+    if (String(url).includes('chat-gemini')) {
+      const said = String(JSON.parse((init && init.body) || '{}').message || '')
+      const reply = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      if (/box jumps/i.test(said)) return reply({ reply: '1. Stand a foot from the box.\n2. Swing your arms and jump.\n3. Land softly, then step down.' })
+      if (/video/i.test(said)) return reply({ reply: 'Here is a great tutorial for box jumps: www.youtube.com/results?search_query=Box+Jumps+tutorial+form' })
+      if (/swap/i.test(said)) return reply({ reply: '', proposal: { kind: 'propose_exercise_swap', rawArgs: { day: '', old_item: window.__swapOld, new_item: 'leg press', scope: 'today', reason: 'Rack is busy.' } } })
+      return reply({ reply: 'Good question.' })
+    }
+    return realFetch(url, init)
+  }
+})
+const say = async text => {
+  await page.evaluate(t => { const a = document.querySelector('textarea'); const s = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; s.call(a, t); a.dispatchEvent(new Event('input', { bubbles: true })) }, text)
+  await wait(300)
+  const sent = await page.evaluate(() => { const b = [...document.querySelectorAll('button')].find(x => /send/i.test(x.getAttribute('aria-label') || '')); if (!b || b.disabled) return false; b.click(); return true })
+  await wait(2500)
+  return sent
+}
+const videoButtons = () => page.evaluate(() => [...document.querySelectorAll('[data-testid="form-video"]')].map(a => {
+  const r = a.getBoundingClientRect()
+  return { text: a.textContent.trim(), href: a.getAttribute('href'), target: a.getAttribute('target'), rel: a.getAttribute('rel'), h: Math.round(r.height), inView: r.top >= 0 && r.bottom <= innerHeight }
+}))
+
+console.log('\nA. The chat')
+await page.goto(`${origin}/.tour-harness/chat.html?day=mid`)
+await until(() => page.evaluate(() => !!document.querySelector('textarea')), v => v === true, 120)
+check('A0. the chat is up', await page.evaluate(() => !!document.querySelector('textarea')))
+check('A1. "how do I do box jumps?" is sent', await say('how do I do box jumps?'))
+const v1 = await until(videoButtons, v => Array.isArray(v) && v.length >= 1)
+check('A2. the reply carries a "Watch a video" button for Box Jumps', v1?.length === 1 && /Watch a video: Box Jumps/.test(v1[0].text), v1)
+check('A3. ...to a YouTube search the app built: https, the exercise\'s name', v1?.[0]?.href === 'https://www.youtube.com/results?search_query=Box%20Jumps%20exercise%20form%20tutorial', v1?.[0]?.href)
+check('A4. ...opening in a new tab, safely', v1?.[0]?.target === '_blank' && /noopener/.test(v1?.[0]?.rel ?? ''), v1?.[0])
+check('A5. ...a thumb\'s height (44px)', (v1?.[0]?.h ?? 0) >= 44, v1?.[0]?.h)
+await shot('video')
+check('A6. "show me a video" is sent', await say('show me a video'))
+const v2 = await until(videoButtons, v => Array.isArray(v) && v.length >= 2)
+check('A7. its reply carries the button again, named from what he asked before', v2?.length === 2 && /Box Jumps/.test(v2[1].text), v2)
+const typed = await page.evaluate(() => [...document.querySelectorAll('a')].filter(a => /youtube\.com\/results\?search_query=Box\+Jumps/.test(a.getAttribute('href') || '')).map(a => ({ href: a.getAttribute('href'), target: a.getAttribute('target') })))
+check('A8. the address the coach typed is now a link the chat opens in a new tab', typed.length === 1 && typed[0].target === '_blank', typed)
+check('A9. a plain question gets no video button', await say('did I train well this week?') && (await videoButtons()).length === 2)
+await shot('video-2')
+
+// A long change row: the offer's own row, with the two halves given his screenshot's lengths.
+await page.goto(`${origin}/.tour-harness/chat.html?day=mid&n=2`)
+await until(() => page.evaluate(() => !!document.querySelector('textarea')), v => v === true, 120)
+const target = await until(() => page.evaluate(() => window.__swapTarget ?? null), v => !!v)
+await page.evaluate(t => { window.__swapOld = t }, target?.loose ?? '')
+await say('swap it please')
+const row = await until(() => page.evaluate(() => {
+  const p = document.querySelector('[data-testid="offer-preview"]')
+  const to = p?.querySelector('[data-offer-to]')
+  const from = p?.querySelector('.line-through')
+  if (!p || !to || !from) return null
+  from.textContent = "Hunter's chicken with potato wedges"
+  to.textContent = 'Eating out, normal (about 600-800 kcal, an estimate)'
+  return true
+}), v => v === true)
+await wait(200)
+const geo = await page.evaluate(() => {
+  const to = document.querySelector('[data-testid="offer-preview"] [data-offer-to]')
+  const r = to?.getBoundingClientRect()
+  const lineH = to ? parseFloat(getComputedStyle(to).lineHeight) || 20 : 20
+  return r ? { w: Math.round(r.width), lines: Math.round(r.height / lineH) } : null
+})
+check('A10. a swap offer with its change row is drawn', row === true, row)
+check('A11. with his screenshot\'s two halves the new half is at least 140px wide and two lines at most (it was a few letters a line)', !!geo && geo.w >= 140 && geo.lines <= 2, geo)
+await shot('offer-row')
+
+console.log('\nB. Nutrition: a list day that changed')
+await page.goto(`${origin}/.tour-harness/app-boot.html?clear-storage&list-stale`)
+await page.waitForFunction(() => /Today|Home/.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {})
+await wait(2500)
+await dismissEmail()
+await page.evaluate(() => { location.hash = '#/tab/nutrition' })
+await wait(2500)
+await dismissEmail()
+const days = await page.evaluate(() => [...document.querySelectorAll('[data-meal-day]')].map(b => b.getAttribute('data-meal-day')))
+const tomorrow = days[1]
+await page.locator(`[data-meal-day="${tomorrow}"]`).first().click({ timeout: 6000 }).catch(() => {})
+const state = await until(() => page.evaluate(() => document.querySelector('[data-testid="meal-day-grocery"]')?.getAttribute('data-state') ?? null), v => v === 'stale')
+check('B1. tomorrow, on the list from a dinner it no longer serves: "out of date", never "already on your list"', state === 'stale', state)
+const line = await page.evaluate(() => document.querySelector('[data-testid="meal-day-grocery"]')?.textContent ?? '')
+check('B2. ...in words: its meals changed since the list was made, with "Update list"', /changed since your shopping list was made/.test(line) && /Update list/.test(line), line)
+await shot('list-stale')
+await page.locator('[data-testid="meal-day-grocery-refresh"]').click({ timeout: 4000 }).catch(() => {})
+const after = await until(() => page.evaluate(() => document.querySelector('[data-testid="meal-day-grocery"]')?.getAttribute('data-state') ?? null), v => v === 'already')
+check('B3. "Update list" puts it right: on the list', after === 'already', after)
+const rows = await page.evaluate(() => (window.__fakeDb?.grocery_items ?? []).filter(r => !r.dismissed).flatMap(r => r.meal_refs ?? []).map(m => m.mealName))
+check('B4. ...and the list no longer shops for the dinner it does not serve', !rows.includes("Hunter's chicken with potato wedges") && rows.length > 0, rows.slice(0, 6))
+
+console.log('\nC. Exercise: the plan began today')
+await page.goto(`${origin}/.tour-harness/app-boot.html?clear-storage&plan-today&n=3`)
+await page.waitForFunction(() => /Today|Home/.test(document.body.innerText), null, { timeout: 30000 }).catch(() => {})
+await wait(2500)
+await dismissEmail()
+await page.evaluate(() => { location.hash = '#/tab/exercise' })
+await wait(2500)
+await dismissEmail()
+await page.locator('[data-testid="week-pill"]').click({ timeout: 6000 }).catch(() => {})
+await wait(800)
+const week = await page.evaluate(() => [...document.querySelectorAll('[data-week-day]')].map(n => ({ date: n.getAttribute('data-week-day'), kind: n.getAttribute('data-week-day-kind'), text: n.textContent.replace(/\s+/g, ' ').trim() })))
+const before = week.filter(d => d.kind === 'before-plan')
+check('C1. the week view is open with seven days', week.length === 7, week.map(d => d.kind))
+check('C2. the days before the plan began read "Before your plan began"', before.length >= 1 && before.every(d => /Before your plan began/.test(d.text)), before)
+check('C3. ...and none of them is drawn as a session', week.filter(d => d.kind === 'session').every(d => !before.some(b => b.date === d.date)) && before.every(d => !/min/.test(d.text)), week)
+await shot('before-plan')
+check('harness: no page errors', errors.length === 0, errors.slice(0, 3))
+
+console.log(`\n${ran} checks ran.${failures ? ` ${failures} FAILED.` : ' His 14 Nov findings hold on screen.'}`)
+await browser.close()
+server.close()
+process.exit(failures > 0 ? 1 : 0)

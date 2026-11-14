@@ -6,7 +6,7 @@ import { getMealPicksForDates, setMealPick, clearMealPick, swapPoolMeal, getToda
 import { eatingOutName, eatingOutOption, EATING_OUT_REFUSALS, type EatingOutController, type EatingOutSize } from '@/lib/eating-out'
 import { removeEatingOutOptions } from '@/lib/eating-out-store'
 import { applyMealOptionToSlot } from '@/lib/pending-action-executor'
-import { addGroceryDays, removeGroceryDays, readGroceryCoverage, type AddGroceryDaysResult } from '@/lib/grocery-store'
+import { addGroceryDays, removeGroceryDays, readGroceryCoverage, readGroceryDayState, refreshGroceryDays, type AddGroceryDaysResult } from '@/lib/grocery-store'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
 import { weekdayLong } from '@/lib/day-labels'
 import type { PoolOption } from '@/lib/meal-generation'
@@ -84,6 +84,10 @@ export interface OpenMealDay {
   onAddToGrocery: () => Promise<AddGroceryDaysResult | null>
   onRemoveFromGrocery: () => Promise<AddGroceryDaysResult | null>
   isOnGroceryList: () => Promise<boolean>
+  /** On the list, and whether the list still matches the day's meals (14 Nov 2026). */
+  listState: () => Promise<'off' | 'on' | 'stale'>
+  /** Re-works the list's days from the meals as they are now; false when it could not. */
+  onRefreshGrocery: () => Promise<boolean>
 }
 
 /** One day of the week view: its meals and what they add up to. */
@@ -421,6 +425,20 @@ export function useMealDays(input: MealDaysInput) {
     }).catch(() => null)
   }
 
+  const listState = async (date: string, chosen: Partial<Record<MealSlotName, PoolOption>>): Promise<'off' | 'on' | 'stale'> => {
+    if (!profileId) return 'off'
+    const served = Object.fromEntries(Object.entries(chosen).map(([slot, o]) => [slot, o?.name]))
+    return readGroceryDayState(profileId, date, served, today, readGroceryBuildMemo(profileId)?.startDate)
+  }
+  const refreshGrocery = async (): Promise<boolean> => {
+    if (!profileId || !targets) return false
+    return refreshGroceryDays({
+      profileId, mealPools: pools, targets, softLikedFoods,
+      todaysPicks: todaysChosen, pinsByDate, mealShape, today,
+      legacyStartDate: readGroceryBuildMemo(profileId)?.startDate,
+    }).then(() => true, () => false)
+  }
+
   const isOnGroceryList = async (date: string): Promise<boolean> => {
     if (!profileId) return false
     return (await readGroceryCoverage(profileId, today, readGroceryBuildMemo(profileId)?.startDate)).includes(date)
@@ -533,6 +551,8 @@ export function useMealDays(input: MealDaysInput) {
     onAddToGrocery: () => addToGrocery(openDate),
     onRemoveFromGrocery: () => removeFromGrocery(openDate),
     isOnGroceryList: () => isOnGroceryList(openDate),
+    listState: () => listState(openDate, openAssembled.chosen),
+    onRefreshGrocery: refreshGrocery,
   } : null
 
   return {

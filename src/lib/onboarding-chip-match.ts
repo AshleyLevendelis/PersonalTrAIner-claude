@@ -93,7 +93,9 @@ const ASKS: Record<SlotKey, Asks> = {
     // A TARGET weight is a different question from what they weigh today.
     /goal|target|\baim|toward|get (down |up )?to|starting[- ]weight|working weight/i,
   ],
-  gender: /\bsex\b|\bgender\b|male or female|female or male|which should i use for/i,
+  // 14 Nov 2026, his live test: "Which option should I use to calibrate your baseline calorie and nutrition targets?"
+  // came with no buttons. A question about which FORMULA the calorie maths uses is this one.
+  gender: /\bsex\b|\bgender\b|male or female|female or male|which should i use for|which (option|one|formula|figures?) should i use|calibrat\w*\b.{0,40}\b(calorie|nutrition|target)/i,
   mealsPerDay: /how many meals|meals (a|per|each) day|times a day|how often (do|would) you (like to |want to )?eat|\b(two|three|four|2|3|4) meals/i,
   dietaryPreferences: /dietar|\bdiet\b|allerg|intoleran|vegetarian|vegan|restriction/i,
   dislikedFoods: /won'?t eat|rather i left out|leave (out|off)|foods? (you|to)\b.{0,20}(hate|dislike|avoid|can'?t stand)/i,
