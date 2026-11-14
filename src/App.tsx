@@ -25,7 +25,7 @@ import { useAppRoute, tabHash, groceryHash, isTab, isKnownTabHash, type Tab } fr
 
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, staticTDEEFor, resolveBodyMetrics } from '@/lib/macro-calculator'
-import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged, anchorTargetsAtSignUp, retargetAfterWeighIn } from '@/lib/nutrition-targets'
+import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged, anchorTargetsAtSignUp, retargetAfterWeighIn, correctStartingWeight } from '@/lib/nutrition-targets'
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
 import { currentAge } from '@/lib/body-units'
@@ -3129,13 +3129,23 @@ function App() {
   }
 
   /** Re-derives targets after a new weigh-in lands (Part 5's capture calls this). */
-  const handleWeightLogged = async () => {
+  const handleWeightLogged = async (profileCorrection?: { kg: number; previousKg: number | null }): Promise<{ correctedStartKg?: number } | undefined> => {
     if (!profile?.id) return
     // One function for the whole chain (nutrition-targets.ts), so the 7-day /
     // 1 kg ruling it carries is run by a gate rather than read off this file.
-    const retarget = await retargetAfterWeighIn(profile.id, profile, exercisePlan)
+    // PROFILE'S "Onboarding weight" corrects the setup figure (his "Correct it now", 14 Nov 2026): the same chain,
+    // after the wrong figure is rewritten. It had moved nothing: the target followed the anchor, not this field.
+    const retarget = profileCorrection
+      ? await correctStartingWeight(profile.id, { ...profile, weight_kg: profileCorrection.kg }, profileCorrection.previousKg, exercisePlan)
+      : await retargetAfterWeighIn(profile.id, profile, exercisePlan)
     // Unread (8 Nov 2026): the weigh-in is saved; the targets stay as they are until a read can see it.
     if (retarget.unread) return
+    // A weigh-in that corrected the setup figure the same day: the profile takes the right weight too.
+    const correctedStartKg = retarget.correctedStartKg
+    if (correctedStartKg != null) {
+      setProfile(prev => (prev ? { ...prev, weight_kg: correctedStartKg } : prev))
+      await updateProfileField(profile.id, { weight_kg: correctedStartKg }).catch(err => console.error('The corrected setup weight did not save on the profile', err))
+    }
     anchorUnknownRef.current = false
     const targets = retarget.targets
     setLatestWeightKg(retarget.latestWeightKg)
@@ -3187,6 +3197,18 @@ function App() {
         setAdaptationMessages(prev => prev.some(m => m.goalId === info.goalId) ? prev : [...prev, { text: info.message, goalId: info.goalId }])
       }
     }
+    return correctedStartKg != null ? { correctedStartKg } : {}
+  }
+
+  /**
+   * A profile field saved by a screen (Profile, Exercise, the coach). A changed WEIGHT is the setup figure corrected (his
+   * ruling 14 Nov 2026, "Correct it now"): the targets follow it at once. They had not: they follow the weigh-in anchor,
+   * which the field never touched, so a correction on Profile was a silent no-op.
+   */
+  const handleProfilePatched = (patch: Partial<UserProfile>) => {
+    const previousKg = profile?.weight_kg ?? null
+    setProfile(prev => prev ? { ...prev, ...patch } : prev)
+    if (patch.weight_kg != null && patch.weight_kg !== previousKg) void handleWeightLogged({ kg: patch.weight_kg, previousKg })
   }
 
   if (isRestoring) {
@@ -3456,7 +3478,7 @@ function App() {
               exercisePlan={exercisePlan}
               mesocycle={mesocycle}
               planCreatedAt={mesocycleCreatedAt ?? profile.created_at}
-              onWeightLogged={handleWeightLogged}
+              onWeightLogged={() => handleWeightLogged().then(() => undefined)}
               logsVersion={logsVersion}
               todaysMeals={chosenMeals}
               mealPools={mealPools}
@@ -3553,7 +3575,7 @@ function App() {
               onSwapExercise={handleSwapExercise}
               onBanExercise={handleBanExercise}
               onMesocycleUpdated={setMesocycle}
-              onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
+              onProfileChanged={handleProfilePatched}
               onDevOverrideWeekChange={setDevOverrideWeek}
               onDevOverrideDayChange={setDevOverrideDay}
               onDevBypassLocksChange={setDevBypassLocks}
@@ -3596,7 +3618,7 @@ function App() {
               onLogsUpdated={() => { setLogsVersion(v => v + 1); bumpCoachData() }}
               onWeightLogged={handleWeightLogged}
               onMesocycleUpdated={setMesocycle}
-              onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
+              onProfileChanged={handleProfilePatched}
               onGoalMealsNeedRebuild={handleRegenerateAllMeals}
               mealRefit={mealRefitOffer}
               onMealRefitConfirm={handleMealRefitConfirm}
@@ -3679,7 +3701,7 @@ function App() {
         onOpenChange={setProfileInfoOpen}
         profile={profile}
         latestWeightKg={latestWeightKg}
-        onProfileChanged={patch => setProfile(prev => prev ? { ...prev, ...patch } : prev)}
+        onProfileChanged={handleProfilePatched}
         onPlanInvalidated={setPlanInvalidation}
         activeAdaptations={activeAdaptations}
         endingAdaptationId={endingAdaptationId}

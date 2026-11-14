@@ -517,6 +517,7 @@
     "test:flexible-nutrition": "tsx scripts/test-flexible-nutrition.ts",
     "verify:nutrition-week": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/nutrition-week.mjs",
     "test:boot-cache": "tsx scripts/test-boot-cache.ts",
+    "verify:setup-weight-correction": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/setup-weight-correction.mjs",
     "verify:weigh-in-unread": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/weigh-in-unread.mjs",
     "verify:coach-hello-boot": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-hello-boot.mjs",
     "verify:app-boot": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/app-boot.mjs",

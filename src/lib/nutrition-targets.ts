@@ -22,11 +22,11 @@
 
 import type { UserProfile, MacroTargets, WorkoutDay } from './types'
 import { calculateDailyMacros, getStaticDailyMacros, computeBMR, staticTDEEFor, resolveBodyMetrics } from './macro-calculator'
-import { getDailyMetrics, upsertNutritionTarget, getNutritionTargets } from './daily-tracking'
+import { getDailyMetrics, upsertNutritionTarget, getNutritionTargets, upsertDailyMetric } from './daily-tracking'
 import { computeWeightTrend } from './weight-trend'
 import { supabase } from './supabase'
 import { getAppNow, getLocalDateString } from './dev-clock'
-import { weighInStanding, heldWeighInOn, type WeighInStanding, type WeighInReading, type HeldWeighIn } from './weigh-in-check'
+import { weighInStanding, heldWeighInOn, startingWeightCorrection, type WeighInStanding, type WeighInReading, type HeldWeighIn } from './weigh-in-check'
 
 export interface ComputeTargetsOptions {
   /** Latest daily_metrics weigh-in, if any — overrides profile.weight_kg. */
@@ -406,6 +406,8 @@ export interface WeighInRetarget {
    * caller keeps the targets it has: the weigh-in itself is saved, and the next start that can read it moves them.
    */
   unread?: true
+  /** The setup weight this weigh-in corrected (a same-day correction of a typo, his "Correct it now"): the caller saves it on the profile. */
+  correctedStartKg?: number
 }
 
 /**
@@ -430,9 +432,63 @@ export async function retargetAfterWeighIn(
   // A fresh weigh-in is exactly the case the anchor threshold exists for —
   // recompute it (it may or may not actually move) rather than assuming this
   // new reading itself is the new anchor.
+  // A confirmed weigh-in on the sign-up day that disagrees with the setup figure CORRECTS it (his "Correct it now").
+  let picture: WeighInPicture | null = null
+  try { picture = await getWeighInPicture(profileId, { strict: true }) } catch { return unread() }
+  const correction = startingWeightCorrection(picture)
+  if (correction) {
+    const corrected = await correctStartingWeight(profileId, { ...profile, weight_kg: correction.toKg }, correction.fromKg, exercisePlan)
+    return corrected.unread ? corrected : { ...corrected, latestWeightKg, correctedStartKg: correction.toKg }
+  }
   const effective = await getEffectiveTargetWeightKg(profileId, latestWeightKg ?? profile.weight_kg)
   if (effective.unread) return unread()
   const anchorKg = effective.weightKg ?? null
+  const targets = computeTargets(profile, { latestWeightKg: anchorKg, exercisePlan })
+  return { latestWeightKg, anchorKg, targets, recorded: snapshotTargetsIfChanged(profileId, profile, targets, anchorKg) }
+}
+
+/**
+ * THE SETUP WEIGHT, CORRECTED (his ruling 14 Nov 2026, "Correct it now"). `profile` carries the RIGHT weight; `wrongKg`
+ * is the figure setup kept. Every record that took the wrong figure as the starting point is rewritten to the right
+ * one — the weight each target row was worked out from (its numbers stay as history, so the change is announced as a
+ * move FROM them), and the sign-up day's weigh-in — and the targets are then worked out exactly as after any weigh-in.
+ * A weigh-in typed on another day is never touched: that is a reading, not the setup figure.
+ *
+ * Called by a confirmed same-day weigh-in that disagrees with setup (retargetAfterWeighIn) and by Profile's
+ * "Onboarding weight" (App). The caller saves `profile.weight_kg`.
+ */
+export async function correctStartingWeight(
+  profileId: string,
+  profile: UserProfile,
+  wrongKg: number | null | undefined,
+  exercisePlan?: WorkoutDay[],
+): Promise<WeighInRetarget> {
+  const kg = profile.weight_kg
+  const unread = (): WeighInRetarget => ({
+    latestWeightKg: null, anchorKg: null, targets: null, unread: true,
+    recorded: Promise.resolve({ snapshotted: false, changedFromPrior: false, previous: null }),
+  })
+  if (kg == null || !(kg > 0)) return unread()
+  const isWrong = (v: unknown) => wrongKg != null && Number.isFinite(Number(v)) && Math.abs(Number(v) - wrongKg) < 0.05
+  try {
+    const today = targetsToday(profileId)
+    const rows = await getNutritionTargets(profileId, '1970-01-01', today)
+    const signUpDate = rows[0]?.date ?? today
+    for (const r of rows) {
+      if (!isWrong(r.calculated_weight_kg)) continue
+      const { id: _id, created_at: _c, updated_at: _u, ...rest } = r
+      await upsertNutritionTarget({ ...rest, calculated_weight_kg: kg })
+    }
+    const seed = (await getRecentWeighIns(profileId, 14, true)).find(w => w.date === signUpDate)
+    if (seed && isWrong(seed.weight_kg)) await upsertDailyMetric({ profile_id: profileId, date: signUpDate, weight_kg: kg })
+  } catch {
+    return unread()
+  }
+  let latestWeightKg: number | null
+  try { latestWeightKg = await getLatestWeightKg(profileId, true) } catch { return unread() }
+  const effective = await getEffectiveTargetWeightKg(profileId, latestWeightKg ?? kg)
+  if (effective.unread) return unread()
+  const anchorKg = effective.weightKg ?? kg
   const targets = computeTargets(profile, { latestWeightKg: anchorKg, exercisePlan })
   return { latestWeightKg, anchorKg, targets, recorded: snapshotTargetsIfChanged(profileId, profile, targets, anchorKg) }
 }

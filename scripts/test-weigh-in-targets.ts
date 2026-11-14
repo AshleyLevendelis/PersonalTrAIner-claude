@@ -368,7 +368,8 @@ async function main() {
     check('the onboarding path was found (sanity check on this check)', onboarding.length > 2000, onboarding.length)
     check('signing up writes the first anchor', /anchorTargetsAtSignUp\(data\.id, enrichedProfile, calculatedMacros\)/.test(onboarding))
     check('...and puts it in the session\'s state, so the first weigh-in reads it without a reload', /anchorTargetsAtSignUp\([\s\S]{0,300}setTargetWeightAnchorKg\(anchorKg\)/.test(onboarding))
-    const handler = app.slice(app.indexOf('const handleWeightLogged = async () =>'), app.indexOf('const handleWeightLogged = async () =>') + 1400)
+    // RE-ANCHORED 14 Nov 2026: the handler gained an optional Profile correction (his "Correct it now"); found by its name.
+    const handler = app.slice(app.indexOf('const handleWeightLogged = async ('), app.indexOf('const handleWeightLogged = async (') + 2400)
     check('a saved weigh-in goes through the one retarget function', /retargetAfterWeighIn\(profile\.id, profile, exercisePlan\)/.test(handler))
     check('...and its three results reach the screen', /setLatestWeightKg\(retarget\.latestWeightKg\)/.test(handler) && /setTargetWeightAnchorKg\(retarget\.anchorKg\)/.test(handler) && /setMacros\(targets\)/.test(handler))
     check('...and its notice is the phrasebook\'s, only when something moved', /retarget\.recorded\.then\([\s\S]{0,300}targetsMoved\([\s\S]{0,200}result\.changedFromPrior && moved/.test(handler))
@@ -434,15 +435,17 @@ async function main() {
 
   console.log('\n11. Saved on her yes — and the calorie target HOLDS until another day agrees\n')
   {
-    // The test log, to the letter: sign up at 82, weigh in at 81.2, then type 62 the same day.
+    // The test log: weigh in at 81.2, then type 62 the same day. RE-ANCHORED 14 Nov 2026: signed up two weeks before (outside the 7-day average, so its sums are the old ones).
+    // On the sign-up day itself a confirmed figure now corrects the setup weight (his "Correct it now", section 13);
+    // from the next day on it is a weigh-in, and these sections hold that, unchanged.
     const h = sam('hold-1')
-    const s0 = await signUp(h, '2026-03-02')
+    const s0 = await signUp(h, '2026-02-16')
     await typeWeighIn(h, '2026-03-02', 81.2)
     const no = await typeWeighIn(h, '2026-03-02', 62, 'no')
     check('62 after 81.2 is asked about', !!no.asked && no.asked.differenceKg === -19.2, no.asked)
-    check('"No, change it": nothing is saved — today\'s weigh-in is still 81.2', no.saved === false && (db.daily_metrics ?? []).find(r => r.profile_id === h.id)?.weight_kg === 81.2, (db.daily_metrics ?? []).filter(r => r.profile_id === h.id))
+    check('"No, change it": nothing is saved — today\'s weigh-in is still 81.2', no.saved === false && (db.daily_metrics ?? []).find(r => r.profile_id === h.id && r.date === '2026-03-02')?.weight_kg === 81.2, (db.daily_metrics ?? []).filter(r => r.profile_id === h.id))
     const yes = await typeWeighIn(h, '2026-03-02', 62, 'yes')
-    check('"Yes": it is saved', yes.saved === true && (db.daily_metrics ?? []).find(r => r.profile_id === h.id)?.weight_kg === 62)
+    check('"Yes": it is saved', yes.saved === true && (db.daily_metrics ?? []).find(r => r.profile_id === h.id && r.date === '2026-03-02')?.weight_kg === 62)
     check('...and the calorie target is exactly what it was', yes.result?.targets.calories === s0.targets.calories && yes.result?.targets.protein === s0.targets.protein, { before: s0.targets.calories, after: yes.result?.targets.calories })
     check('...the anchor is still the 82 kg', yes.result?.anchorKg === 82, yes.result?.anchorKg)
     check('...nothing is announced, and no new target is recorded', yes.result?.notice === null && (db.daily_nutrition_targets ?? []).filter(r => r.profile_id === h.id).length === 1, yes.result?.notice)
@@ -474,7 +477,7 @@ async function main() {
   {
     // IT WAS A TYPO, and she says yes by mistake. The next day she weighs in properly.
     const t = sam('hold-2')
-    const s0 = await signUp(t, '2026-03-02')
+    const s0 = await signUp(t, '2026-02-16')
     await typeWeighIn(t, '2026-03-02', 62, 'yes')
     const back = await typeWeighIn(t, '2026-03-03', 81.6)
     check('a typo confirmed by mistake, then 81.6 kg the next day: asked (it is 19.6 kg from yesterday\'s)', !!back.asked && back.asked.differenceKg === 19.6 && back.asked.daysSince === 1, back.asked)
@@ -486,7 +489,7 @@ async function main() {
   {
     // Corrected the same day.
     const c = sam('hold-3')
-    const s0 = await signUp(c, '2026-03-02')
+    const s0 = await signUp(c, '2026-02-16')
     await typeWeighIn(c, '2026-03-02', 62, 'yes')
     const fixed = await typeWeighIn(c, '2026-03-02', 81.5)
     check('a typo corrected the same day: asked (heavier than earlier today), saved, not waiting, target unmoved',
@@ -518,7 +521,9 @@ async function main() {
   {
     // The Profile weight field edits the STARTING weight. The target is worked out from the weigh-in anchor, so it cannot move it.
     const p0 = sam('profile-field')
-    check('the Profile field cannot move the target: with an anchor, the target does not read the profile\'s weight', kcalAt({ ...p0, weight_kg: 28 } as UserProfile, 82) === kcalAt(p0, 82) && nt.computeTargets({ ...p0, weight_kg: 28 } as UserProfile)!.calories !== kcalAt(p0, 82))
+    // RE-ANCHORED 14 Nov 2026: the field now DOES move the target, by rewriting the anchor (section 13). What stays
+    // true, and is why it has to: the target reads the anchor over the profile's weight.
+    check('the target reads the weigh-in anchor over the profile\'s weight (so Profile has to rewrite the anchor)', kcalAt({ ...p0, weight_kg: 28 } as UserProfile, 82) === kcalAt(p0, 82) && nt.computeTargets({ ...p0, weight_kg: 28 } as UserProfile)!.calories !== kcalAt(p0, 82))
     const app = strip(raw('src/App.tsx'))
     check('...and App recomputes on a profile edit from the anchor first', /computeTargets\(profile, \{\s*latestWeightKg: targetWeightAnchorKg \?\? profile\.weight_kg/.test(app))
     const words = (wicApp as unknown as { profileWeightQuestionText?: (d: number, prev: number, kg: number) => string } | null)?.profileWeightQuestionText
@@ -530,7 +535,7 @@ async function main() {
     const wp = await import('../src/lib/weigh-in-proposal').catch(() => null)
     check('the card builder and its confirm exist', typeof wp?.buildWeighInProposal === 'function' && typeof wp?.executeWeighIn === 'function')
     const k = sam('coach-1')
-    const s0 = await signUp(k, '2026-03-02')
+    const s0 = await signUp(k, '2026-02-16')
     await typeWeighIn(k, '2026-03-02', 81.2)
     setDevClockOverride(k.id!, '2026-03-02')
     const pic = picture ? await picture(k.id!) : null
@@ -541,7 +546,7 @@ async function main() {
     check('...and saying the target will wait', built?.diff.implications?.some(i => /calorie target stays where it is until another day's weigh-in agrees/.test(i.text)) === true, built?.diff.implications)
     // A beat first: a write started and not awaited would land after this line.
     await new Promise(r => setTimeout(r, 5))
-    check('building the card wrote nothing', (db.daily_metrics ?? []).find(r => r.profile_id === k.id)?.weight_kg === 81.2)
+    check('building the card wrote nothing', (db.daily_metrics ?? []).find(r => r.profile_id === k.id && r.date === '2026-03-02')?.weight_kg === 81.2)
     check('a weight outside 25-350 kg builds no card', wp && pic ? wp.buildWeighInProposal(k.id!, { weight_kg: 18, date: '2026-03-02' }, pic as never) === null : false)
     if (wp && built) {
       const done = await wp.executeWeighIn(k.id!, built.payload)
@@ -628,6 +633,86 @@ async function main() {
     check('U10. ...the sign-up weight is not written as a weigh-in when the read failed', /if \(!weighInsUnread && restoredWeight == null && restoredProfile\.weight_kg\)/.test(app))
     check('U11. ...and nothing is recorded at start while unread', /if \(!targetsUnread\) snapshotTargetsIfChanged\(restoredProfile\.id!/.test(app))
     check('U12. the weigh-in handler leaves the targets alone when unread', /retargetAfterWeighIn\([^)]*\)\s*if \(retarget\.unread\) return/.test(app))
+  }
+
+
+  // 13. THE SETUP WEIGHT, CORRECTED (his ruling 14 Nov 2026, "Correct it now"). Found live: setup kept 187 kg, he
+  // told the coach "I meant 87kg" the same afternoon, confirmed it, and the target stayed on 187 "until another
+  // day's weigh-in agrees"; changing it on Profile moved nothing either. A typo at setup is not a weigh-in.
+  console.log('\n13. A setup weight corrected the same day, or on Profile, replaces it and the targets follow\n')
+  {
+    const big = (id: string): UserProfile => ({ ...sam(id), weight_kg: 187 })
+    const wp = await import('../src/lib/weigh-in-proposal')
+    const at87 = kcalAt({ ...sam('x'), weight_kg: 87 }, 87)
+    check('C0. the fixture binds: 187 kg and 87 kg give very different calorie targets', kcalAt(big('x'), 187) - at87 > 800, [kcalAt(big('x'), 187), at87])
+
+    // The coach's card, before the yes: it says the setup figure is replaced, never that the target waits.
+    const c = big('fix-card')
+    await signUp(c, '2026-05-04')
+    const card = wp.buildWeighInProposal(c.id!, { weight_kg: 87 }, await nt.getWeighInPicture(c.id!))
+    const cardText = JSON.stringify(card?.diff ?? null)
+    check('C1. the card asks first (100 kg lighter than earlier today)', /100 kg lighter/.test(card?.diff.lead ?? ''), card?.diff.lead)
+    check('C2. ...and says the 187 from setup is replaced and the target worked out again from 87', /replaces the 187 kg from setup/.test(cardText) && /worked out again from 87 kg/.test(cardText), card?.diff.implications)
+    check('C3. ...never that the target waits for another day', !cardText.includes(wp.WEIGH_IN_CARD_HOLD_LINE), card?.diff.implications)
+
+    // His yes, the same day: the weigh-in is saved, and the chain corrects the setup figure.
+    const a = big('fix-same-day')
+    const startA = await signUp(a, '2026-05-04')
+    setDevClockOverride(a.id!, '2026-05-04')
+    await upsertDailyMetric({ profile_id: a.id!, date: '2026-05-04', weight_kg: 87 } as never)
+    const r = await nt.retargetAfterWeighIn(a.id!, a)
+    const rec = await r.recorded
+    check('C4. same day: the targets are worked out from 87 kg at once', r.targets?.calories === at87 && r.anchorKg === 87, { calories: r.targets?.calories, at87, anchor: r.anchorKg })
+    check('C5. ...the caller is told the setup weight was corrected, so the profile takes 87 too', r.correctedStartKg === 87, r.correctedStartKg)
+    check('C6. ...no record still says the targets were set from 187', (db.daily_nutrition_targets ?? []).filter(x => x.profile_id === a.id).every(x => x.calculated_weight_kg === 87), (db.daily_nutrition_targets ?? []).filter(x => x.profile_id === a.id))
+    const moved = rec.previous && r.targets ? targetsMoved(rec.previous, r.targets, 'weigh_in') : null
+    check('C7. ...and the change is announced, from the old calories to the new', rec.changedFromPrior && !!moved && moved.includes(startA.targets.calories.toLocaleString('en-GB')) , moved)
+    check('C8. ...nothing is held any more', (await nt.getWeighInPicture(a.id!)).heldLatest === null)
+
+    // The next day it is a real weigh-in: the hold stands, as he ruled on 9 Oct.
+    const b = big('fix-next-day')
+    const startB = await signUp(b, '2026-05-04')
+    setDevClockOverride(b.id!, '2026-05-05')
+    await upsertDailyMetric({ profile_id: b.id!, date: '2026-05-05', weight_kg: 87 } as never)
+    const rb = await nt.retargetAfterWeighIn(b.id!, b)
+    check('C9. a day later: held, the target unchanged, nothing corrected', rb.targets?.calories === startB.targets.calories && rb.correctedStartKg === undefined, { calories: rb.targets?.calories, start: startB.targets.calories, corrected: rb.correctedStartKg })
+    // ...even with no seed weigh-in on the sign-up day (the start writes none when its read failed): the sign-up date
+    // decides it, not the absence of other days.
+    const b2 = big('fix-next-day-noseed')
+    const startB2 = await signUp(b2, '2026-05-04')
+    db.daily_metrics = (db.daily_metrics ?? []).filter(x => x.profile_id !== b2.id)
+    setDevClockOverride(b2.id!, '2026-05-05')
+    await upsertDailyMetric({ profile_id: b2.id!, date: '2026-05-05', weight_kg: 87 } as never)
+    const rb2 = await nt.retargetAfterWeighIn(b2.id!, b2)
+    check('C9b. a day later with no sign-up weigh-in: still held, nothing corrected', rb2.targets?.calories === startB2.targets.calories && rb2.correctedStartKg === undefined, { calories: rb2.targets?.calories, corrected: rb2.correctedStartKg })
+    const cardB = wp.buildWeighInProposal(b.id!, { weight_kg: 86.5, date: '2026-05-05' }, await nt.getWeighInPicture(b.id!))
+    check('C10. ...and a card that day still says the target waits', JSON.stringify(cardB?.diff ?? null).includes(wp.WEIGH_IN_CARD_HOLD_LINE), cardB?.diff.implications)
+
+    // Profile's "Onboarding weight", any day: the same function, and the targets follow.
+    const d = big('fix-profile')
+    await signUp(d, '2026-05-04')
+    setDevClockOverride(d.id!, '2026-05-07')
+    const rd = await nt.correctStartingWeight(d.id!, { ...d, weight_kg: 87 }, 187)
+    check('C11. Profile, three days on: the targets are worked out from 87 kg', rd.targets?.calories === at87 && rd.anchorKg === 87, { calories: rd.targets?.calories, anchor: rd.anchorKg })
+    check('C12. ...the sign-up weigh-in now reads 87 (it was the setup figure)', (db.daily_metrics ?? []).find(x => x.profile_id === d.id && x.date === '2026-05-04')?.weight_kg === 87)
+
+    // Profile, after real weigh-ins: a weigh-in on another day is never rewritten.
+    const e = big('fix-profile-later')
+    await signUp(e, '2026-05-04')
+    // The same figure as the setup typo, typed on a later day: a real reading, so it must survive.
+    await weighIn(e, '2026-05-06', 187)
+    setDevClockOverride(e.id!, '2026-05-07')
+    await nt.correctStartingWeight(e.id!, { ...e, weight_kg: 87 }, 187)
+    check('C13. a weigh-in typed on another day is left as typed, even at the setup figure', (db.daily_metrics ?? []).find(x => x.profile_id === e.id && x.date === '2026-05-06')?.weight_kg === 187)
+
+    const app = strip(raw('src/App.tsx'))
+    const patched = app.slice(app.indexOf('const handleProfilePatched'), app.indexOf('const handleProfilePatched') + 500)
+    check('C14. App: a saved weight change runs the correction', /patch\.weight_kg != null && patch\.weight_kg !== previousKg\) void handleWeightLogged\(\{ kg: patch\.weight_kg, previousKg \}\)/.test(patched))
+    check('C14b. ...and Profile hands its saves to it (the first build put it on the Exercise tab\'s copy, found by verify:setup-weight-correction)', /<ProfileScreen[\s\S]{0,1200}onProfileChanged=\{handleProfilePatched\}/.test(app))
+    check('C15. ...which is correctStartingWeight', /profileCorrection\s*\?\s*await correctStartingWeight\(/.test(app))
+    check('C16. ...and a corrected weigh-in saves the weight on the profile', /if \(correctedStartKg != null\) \{[\s\S]{0,200}updateProfileField\(profile\.id, \{ weight_kg: correctedStartKg \}\)/.test(app))
+    const chat = strip(raw('src/components/ChatAssistant.tsx'))
+    check('C17. the coach\'s receipt says the target was worked out again, never "unchanged"', /if \(correctedStartKg != null\) rows\.push\(\{ label: 'Calorie target', detail: weighInCorrectionReceiptDetail\(correctedStartKg\) \}\)/.test(chat))
   }
 
   console.log(`\n${ran} checks ran.`)

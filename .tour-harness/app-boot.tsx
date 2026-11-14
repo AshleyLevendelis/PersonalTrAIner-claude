@@ -28,6 +28,7 @@ import { setDevClockOverride } from '@/lib/dev-clock'
 import { generateMesocycle, setRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeMealMacros } from '@/lib/food-db'
+import { computeTargets } from '@/lib/nutrition-targets'
 import { ANCHOR_ISO, anchorNowMs, iso as isoOf } from './anchor.mjs'
 import type { UserProfile } from '@/lib/types'
 
@@ -42,6 +43,10 @@ const TRAIN_TODAY = new URLSearchParams(location.search).has('session-day')
 // reaches Home and Profile. Without them the page is unchanged.
 const NO_CARDIO = new URLSearchParams(location.search).has('no-cardio')
 const WEIGH = Number(new URLSearchParams(location.search).get('weigh')) || 80
+// ?setup-typo: he signed up TODAY and setup kept 187 kg (his live report, 14 Nov 2026). INPUTS only: the weight on the
+// profile, the sign-up weigh-in, and the sign-up target row as the app writes it at sign-up (anchorTargetsAtSignUp:
+// the targets computeTargets gives for the profile, anchored at its weight). verify:setup-weight-correction.
+const SETUP_TYPO = new URLSearchParams(location.search).has('setup-typo')
 
 // ?clear-storage: a phone with nothing kept from an earlier visit, wiped HERE, before anything of the app's runs, so a
 // page the driver just left cannot write into it afterwards.
@@ -82,6 +87,7 @@ const profileRow = {
   macro_calculation_mode: 'STANDARD_STATIC', coaching_persona: 'supportive', recovery_capacity: 'moderate',
   conditioning_preference: NO_CARDIO ? 'avoid' : 'tolerate', created_at: created,
   bmr: 1800, tdee: 2500, calorie_target: 2700, protein_g: 160, carbs_g: 320, fat_g: 80,
+  ...(SETUP_TYPO ? { weight_kg: 187 } : {}),
 }
 
 // The plan the app's own generator makes for this profile, seeded so a re-run is comparable.
@@ -105,7 +111,9 @@ const db: Db = {
     meal('dinner', 0, 'Salmon and potatoes', [{ name: 'salmon', quantity: 170, unit: 'g' }, { name: 'raw potato', quantity: 350, unit: 'g' }]),
     meal('snack', 0, 'Yoghurt and banana', [{ name: 'greek yoghurt 0%', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
   ],
-  daily_metrics: [
+  daily_metrics: SETUP_TYPO ? [
+    { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs())), weight_kg: 187 },
+  ] : [
     { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 86400000)), weight_kg: WEIGH },
     { id: 'm2', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 5 * 86400000)), weight_kg: 80.4 },
   ],
@@ -121,7 +129,10 @@ const db: Db = {
   ] : [],
   // ?targets-moved: an earlier target snapshot with other numbers (an INPUT: a row as the app writes it), so the start
   // says his targets moved (verify:new-plan-carryover needs a person with that line, to show the next person never gets it).
-  daily_nutrition_targets: new URLSearchParams(location.search).has('targets-moved') ? [
+  daily_nutrition_targets: SETUP_TYPO ? (() => {
+    const t = computeTargets(profileRow as unknown as UserProfile)!
+    return [{ id: 't0', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs())), workout_split: 'REST', target_calories: t.calories, target_protein_g: t.protein, target_carbs_g: t.carbs, target_fats_g: t.fat, calculated_bmr: 2400, calculated_tdee: 4000, calculated_weight_kg: 187 }]
+  })() : new URLSearchParams(location.search).has('targets-moved') ? [
     { id: 't0', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 3 * 86400000)), workout_split: 'REST', target_calories: 1900, target_protein_g: 150, target_carbs_g: 180, target_fats_g: 60, calculated_bmr: 1700, calculated_tdee: 2400, calculated_weight_kg: 84 },
   ] : [],
   workout_exercises: [], weight_basis_offers: [],

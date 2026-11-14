@@ -18,7 +18,7 @@
 import { upsertDailyMetric } from './daily-tracking'
 import type { WeighInPicture } from './nutrition-targets'
 import type { ProposalDiff, PendingActionReceipt } from './pending-actions-store'
-import { weighInQuestion, weighInQuestionText, weighInStanding, heldWeighInOn, type WeighInQuestion } from './weigh-in-check'
+import { weighInQuestion, weighInQuestionText, weighInStanding, heldWeighInOn, startingWeightCorrection, type WeighInQuestion } from './weigh-in-check'
 
 export interface WeighInPayload {
   /** YYYY-MM-DD — the day the weigh-in is for. */
@@ -28,6 +28,16 @@ export interface WeighInPayload {
 
 /** On the card, under the question, when saving it will not move the calorie target yet. */
 export const WEIGH_IN_CARD_HOLD_LINE = "Your calorie target stays where it is until another day's weigh-in agrees."
+
+/** On the card when saving it CORRECTS the setup weight (his "Correct it now", 14 Nov 2026): the target moves at once. */
+export function weighInCorrectionLine(fromKg: number, toKg: number): string {
+  return `That replaces the ${fromKg} kg from setup, and your calorie target is worked out again from ${toKg} kg.`
+}
+
+/** On the receipt, beside "Calorie target", once a correction is saved. */
+export function weighInCorrectionReceiptDetail(toKg: number): string {
+  return `worked out again from ${toKg} kg`
+}
 
 /** On the receipt, beside "Calorie target", once a held weigh-in is saved. */
 export const WEIGH_IN_RECEIPT_HOLD_DETAIL = "unchanged until another day's weigh-in agrees"
@@ -52,7 +62,16 @@ export function buildWeighInProposal(profileId: string, rawArgs: Record<string, 
       : null
   const question = weighInQuestion(weightKg, date, readings, picture.anchors) ?? fromServer
   const after = weighInStanding([...readings.filter(r => r.date !== date), { date, kg: weightKg }], picture.anchors)
+  // A same-day correction of the setup figure is not held: it replaces it (his "Correct it now", 14 Nov 2026).
+  const correction = startingWeightCorrection({
+    today: picture.today,
+    anchors: picture.anchors,
+    heldLatest: heldWeighInOn(after, date),
+  })
   const willHold = heldWeighInOn(after, date) != null
+  const implications: ProposalDiff['implications'] = correction
+    ? [{ severity: 'info', text: weighInCorrectionLine(correction.fromKg, correction.toKg) }]
+    : willHold ? [{ severity: 'info', text: WEIGH_IN_CARD_HOLD_LINE }] : []
   // THE COACH COULD NOT CHECK IT (its read failed, or it had no date): never saved unasked. Asked against this read
   // when that finds something to ask about, else one plain question. Only on a failed check, so it is rare.
   if (!question && rawArgs.unchecked === true) {
@@ -63,7 +82,7 @@ export function buildWeighInProposal(profileId: string, rawArgs: Record<string, 
       diff: {
         lead: `Want me to save ${weightKg} kg as your weigh-in for ${date === picture.today ? 'today' : date}?`,
         rows: [{ field: 'Weigh-in', before: '—', after: `${weightKg} kg` }],
-        implications: willHold ? [{ severity: 'info', text: WEIGH_IN_CARD_HOLD_LINE }] : [],
+        implications,
         reversible: false,
       },
     }
@@ -77,7 +96,7 @@ export function buildWeighInProposal(profileId: string, rawArgs: Record<string, 
     diff: {
       lead: weighInQuestionText(question, weightKg),
       rows: [{ field: 'Weigh-in', before: `${question.againstKg} kg`, after: `${weightKg} kg` }],
-      implications: willHold ? [{ severity: 'info', text: WEIGH_IN_CARD_HOLD_LINE }] : [],
+      implications,
       reversible: false,
     },
   }

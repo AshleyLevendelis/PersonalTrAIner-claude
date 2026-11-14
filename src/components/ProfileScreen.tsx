@@ -1174,10 +1174,12 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             {/* The same "is this believable?" check the weigh-in card asks
                 (weigh-in-check.ts), against the figure being replaced.
                 ASHLEY'S RULING, 9 Oct 2026 — "Ask, and hold the target": a
-                surprising figure is asked about and saved only on yes. The
-                HOLD needs nothing here: this is the starting weight, and the
-                calorie target is worked out from the weigh-in average
-                (App's targetWeightAnchorKg), which this field does not move. */}
+                surprising figure is asked about and saved only on yes. And a
+                saved change CORRECTS the setup figure (his ruling 14 Nov 2026,
+                "Correct it now"): App's handleProfilePatched rewrites what the
+                targets were worked out from, so they follow at once. Until
+                then this field moved nothing: the targets follow the weigh-in
+                anchor (verify:setup-weight-correction). */}
             <Row label="Onboarding weight">
               <span ref={weightFieldRef} data-testid="profile-weight-field" data-weigh-in-check={weightCheck?.verdict}>
                 <EditableTextField key={weightFieldKey} value={profile.weight_kg} unit="kg" min={25} max={350} onSave={n => {

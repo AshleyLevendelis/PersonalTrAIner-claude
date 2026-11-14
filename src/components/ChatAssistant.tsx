@@ -38,7 +38,7 @@ import { changeSinceStart } from '@/lib/weight-trend'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, undoWindowEndsAt, pendingWindowPassed, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
-import { buildWeighInProposal, executeWeighIn, WEIGH_IN_RECEIPT_HOLD_DETAIL, type WeighInPayload } from '@/lib/weigh-in-proposal'
+import { buildWeighInProposal, executeWeighIn, WEIGH_IN_RECEIPT_HOLD_DETAIL, weighInCorrectionReceiptDetail, type WeighInPayload } from '@/lib/weigh-in-proposal'
 import { getWeighInPicture } from '@/lib/nutrition-targets'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { undoEatenCorrection } from '@/lib/eaten-correction'
@@ -345,7 +345,8 @@ interface ChatAssistantProps {
   /** The same trial for a meal moved to another slot: both legs pinned at once, the day's total said (2 Nov 2026). */
   onMealKnockOnMove?: (date: string, legs: { slot: MealSlotName; option: PoolOption }[]) => Promise<MealKnockOn>
   /** Fired when a chat log_weight action lands so the app recomputes living targets. */
-  onWeightLogged?: () => void | Promise<void>
+  /** Resolves with the setup weight the weigh-in corrected, when it was a same-day correction (his "Correct it now"). */
+  onWeightLogged?: () => void | Promise<void | { correctedStartKg?: number } | undefined>
   /** Fired after a confirmed propose_exercise_swap executes — App.tsx's setMesocycle, since the executor is pure and returns the new array rather than mutating App.tsx's state directly. */
   onMesocycleUpdated: (mesocycle: MesocycleWeek[]) => void
   /** Fired after a confirmed propose_injury_as_lasting/propose_injury_recovered writes fitness_profiles.injuries directly (executeLastingInjury/executeInjuryRecovered) — mirrors ProfileScreen's own onProfileChanged so App.tsx's profile state stays in sync with a write chat made outside its own setProfile calls. */
@@ -7728,9 +7729,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       title = ok ? RECEIPTS['propose_weigh_in'].done : RECEIPTS['propose_weigh_in'].failed
       rows = ok ? receipt.landed.map(line => { const [label, detail] = line.split(': '); return { label, detail } }) : []
       if (ok) {
-        await onWeightLogged?.()
-        const held = (await getWeighInPicture(profile.id)).heldLatest
-        if (held && held.date === payload.date) rows.push({ label: 'Calorie target', detail: WEIGH_IN_RECEIPT_HOLD_DETAIL })
+        const logged = await onWeightLogged?.()
+        const correctedStartKg = logged ? logged.correctedStartKg : undefined
+        if (correctedStartKg != null) rows.push({ label: 'Calorie target', detail: weighInCorrectionReceiptDetail(correctedStartKg) })
+        else {
+          const held = (await getWeighInPicture(profile.id)).heldLatest
+          if (held && held.date === payload.date) rows.push({ label: 'Calorie target', detail: WEIGH_IN_RECEIPT_HOLD_DETAIL })
+        }
       }
     } else if (row.kind === 'propose_session_activity_swap') {
       const payload = row.payload as unknown as SwapForActivityPayload
