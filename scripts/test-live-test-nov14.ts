@@ -122,6 +122,12 @@ async function main() {
     check('"show me a video" after it: named from what he said before', then?.exercise === 'Box Jumps', then)
     check('"how do I do a barbell back squat" and "lunges" find the catalogue\'s own lift', !!exerciseNamedIn('how do I do a barbell back squat') && /lunge/i.test(exerciseNamedIn('show me lunges') ?? ''))
     for (const t of ['how do I brace my core', 'what should I eat for dinner', 'how do I stay motivated']) check(`"${t}": no video button`, formVideoFor(t, 'Some advice.') === null)
+    check('"show me a video" with a reply holding only a web address: named from before, never from the address', formVideoFor('show me a video', 'Here is a great tutorial: www.youtube.com/watch?v=abc123', 'how do I do box jumps?')?.exercise === 'Box Jumps')
+    // Each guard on a case where it alone decides (measured: a word search finds "Rear Delt Flyes" in "pressing on").
+    const prose = "Keep pressing on, you're doing well"
+    check('...the coach\'s prose is not searched word by word: a reply of encouragement names nothing', exerciseNamedIn(prose) !== null && exerciseNamedIn(prose, { wholeNameOnly: true }) === null
+      && formVideoFor('show me a video', prose, 'how do I do box jumps?')?.exercise === 'Box Jumps')
+    check('...and a web address is not words ("com" is not a Compound Chest Press)', exerciseNamedIn('see www.example.com') === null)
     check('a plain question is not a how-to', !asksHowOrVideo('did I train well this week?'))
     check('naming an exercise without asking how or for a video gets no button', formVideoFor('I did deadlifts today and felt strong', 'Nice work.') === null)
     const linked = linkifyBareUrls('Here: www.youtube.com/results?search_query=Box+Jumps and [ok](https://x.com).')

@@ -1,0 +1,75 @@
+// ---------------------------------------------------------------------------
+// "SHOW ME A VIDEO" (his live test, 14 Nov 2026). Asked how to do box jumps, the coach gave steps and no video; asked
+// for a video, it wrote "www.youtube.com/results?search_query=Box+Jumps+tutorial+form" as plain text the chat could not
+// open. A link is now the APP's, never the model's: on a how-to or a video request naming an exercise the app knows,
+// the chat draws a "Watch a video" button to a YouTube search the app builds from the catalogue's own name.
+// ---------------------------------------------------------------------------
+import { EXERCISE_DATABASE, searchExerciseCatalogByWords } from './exercise-db'
+
+const ASKS_HOW_OR_VIDEO = /\bvideos?\b|\btutorials?\b|\bdemo\b|\bshow me\b|\bhow (do|should|to|would|can) (i|you|we)\b|\bhow is\b|\bform\b|\btechnique\b|\bteach me\b/i
+
+/** He asked how to do something, or asked for a video. */
+export function asksHowOrVideo(text: string): boolean {
+  return ASKS_HOW_OR_VIDEO.test(text)
+}
+
+const norm = (s: string) => ` ${s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `
+/** Each word with a trailing plural "s" dropped, so "box jumps" finds "Box Jump" and "lunges" finds "Lunge". */
+const singular = (s: string) => s.replace(/(\w{3,})s\b/g, '$1')
+
+let names: { name: string; key: string }[] | null = null
+function catalogue(): { name: string; key: string }[] {
+  if (!names) names = EXERCISE_DATABASE.map(e => ({ name: e.name, key: singular(norm(e.name)) })).sort((a, b) => b.key.length - a.key.length)
+  return names
+}
+
+/** The catalogue exercise this text names, the longest match winning ("Barbell Back Squat" over "Squat"); null when none. */
+export function exerciseNamedIn(text: string | null | undefined, opts: { wholeNameOnly?: boolean } = {}): string | null {
+  if (!text) return null
+  // A web address is not words ("com" found a Compound Chest Press by its prefix, in his live test's video reply).
+  const t = singular(norm(text.replace(/(?:https?:\/\/|www\.)\S+/gi, ' ')))
+  const whole = catalogue().find(n => t.includes(n.key))?.name
+  if (whole || opts.wholeNameOnly) return whole ?? null
+  // A shorter or reordered name ("lunges", "a barbell back squat"): the app's own exercise search over his words, the
+  // longest run of words that finds something winning, so "back squat" is tried before "squat".
+  const words = t.trim().split(' ').filter(w => w && !STOP.has(w))
+  for (let n = Math.min(3, words.length); n >= 1; n--) {
+    for (let i = 0; i + n <= words.length; i++) {
+      const hit = searchExerciseCatalogByWords(words.slice(i, i + n).join(' '), 1)[0]
+      if (hit) return hit.name
+    }
+  }
+  return null
+}
+
+const STOP = new Set(['how', 'do', 'does', 'did', 'i', 'you', 'we', 'to', 'a', 'an', 'the', 'me', 'my', 'show', 'video', 'videos',
+  'tutorial', 'demo', 'form', 'technique', 'teach', 'for', 'of', 'on', 'with', 'should', 'can', 'could', 'would', 'is', 'it',
+  'this', 'that', 'please', 'properly', 'correctly', 'right', 'good', 'what', 'whats', 'way', 'best', 'and', 'or', 'in', 'at',
+  'be', 'am', 'are', 'so', 'just', 'one', 'some', 'here', 'there', 'get', 'go', 'like', 'look', 'see', 'watch', 'done',
+  'perform', 'exercise', 'exercises', 'workout', 'session', 'today', 'tomorrow', 'more', 'hi', 'hey', 'ok',
+  // A body part or a habit is not an exercise ("eat" would find a Seated row by its prefix): "how do I brace my core" must not find a core machine.
+  'core', 'back', 'chest', 'leg', 'legs', 'arm', 'arms', 'shoulder', 'shoulders', 'glute', 'glutes', 'abs', 'stomach',
+  'knee', 'knees', 'hip', 'hips', 'posture', 'brace', 'breathe', 'breathing', 'stay', 'motivated', 'eat', 'cook', 'meal',
+  'meals', 'sleep', 'lose', 'gain', 'weight', 'fat', 'muscle', 'build', 'grip'])
+
+function formVideoUrl(exercise: string): string {
+  return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${exercise} exercise form tutorial`)}`
+}
+
+/**
+ * The video button for a coach reply, or null. Asked of HIS message (did he ask how, or for a video?) and named from his
+ * message, else the reply (a whole catalogue name only: the coach's prose is not a search), else what he said just before ("show me a video" after "how do I do box jumps").
+ */
+export function formVideoFor(userText: string | null | undefined, replyText: string | null | undefined, earlierUserText?: string | null): { exercise: string; url: string } | null {
+  if (!userText || !asksHowOrVideo(userText)) return null
+  const exercise = exerciseNamedIn(userText) ?? exerciseNamedIn(replyText, { wholeNameOnly: true }) ?? exerciseNamedIn(earlierUserText)
+  return exercise ? { exercise, url: formVideoUrl(exercise) } : null
+}
+
+/**
+ * A web address the coach typed as bare text becomes a markdown link, so the chat's link renderer (which adds https and
+ * opens a new tab) can open it. An address already inside a markdown link is left alone.
+ */
+export function linkifyBareUrls(text: string): string {
+  return text.replace(/(^|\s)((?:https?:\/\/|www\.)[^\s<>()\]]+[^\s<>()\].,!?;:'"])/g, (_m, pre: string, url: string) => `${pre}[${url}](${url})`)
+}

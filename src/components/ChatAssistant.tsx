@@ -1,6 +1,6 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
 import { healthConditionsOf, healthConditionsInWords } from '@/lib/health-conditions'
-import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays } from '@/lib/running'
+import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays, raceDateMissing, RACE_DATE_QUESTION } from '@/lib/running'
 import { blockShape } from '@/lib/timer-engine'
 import { circuitName } from '@/lib/circuit'
 import { textBesideSave, contextNoteText } from '@/lib/save-reply'
@@ -14,7 +14,8 @@ import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { weekdayLong, dayLabel } from '@/lib/day-labels'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, Activity, ChevronRight, Check } from 'lucide-react'
+import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, Activity, ChevronRight, Check, PlayCircle } from 'lucide-react'
+import { formVideoFor, linkifyBareUrls } from '@/lib/exercise-video'
 import { chatContextPills } from '@/lib/chat-context-strip'
 import { sessionSetCount } from '@/lib/session-count'
 import { readSessionSummary } from '@/lib/session-summary-store'
@@ -4586,9 +4587,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // sentence is an explanation leaves a person reading prose when they are
     // looking for the thing to answer; the question belongs against the
     // buttons.
-    const leadBase = target.asWanted || !target.requestedDayName
+    // THE TRUE REASON the day they named was not used (his live test, 14 Nov 2026): it was never "already has a
+    // session" for a day that had gone or sat in another training week.
+    const whyNot = target.asWanted || !target.requestedDayName ? null
+      : target.requestedWhyNot === 'gone' ? `${target.requestedDayName} has already gone`
+      : target.requestedWhyNot === 'other_week' ? `${target.requestedDayName} is in a different training week`
+      : `${target.requestedDayName} already has a session`
+    const leadBase = !whyNot
       ? `${target.dayName}'s free, so ${trueFromDayName} won't count as missed.`
-      : `${target.requestedDayName} already has a session, so ${target.dayName} is the next one free — and ${trueFromDayName} won't count as missed.`
+      : `${whyNot}, so ${target.dayName} is the next day free — and ${trueFromDayName} won't count as missed.`
     return {
       ok: true,
       scopeKey: `${profile.id}:propose_session_move:${trueFromDate}:${target.date}`,
@@ -4612,9 +4619,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           ...(alsoDoing ? [alsoDoingRow(alsoDoing)] : []),
         ],
         implications: [
-          ...(target.asWanted || !target.requestedDayName
+          ...(!whyNot
             ? []
-            : [{ severity: 'info' as const, text: `${target.requestedDayName} already has a session on it, so this goes to ${target.dayName} — the next day that's free.` }]),
+            : [{ severity: 'info' as const, text: `${whyNot}, so this goes to ${target.dayName} — the next day that's free.` }]),
           { severity: 'info' as const, text: `${trueFromDayName} won't count as a missed session, and your week still owes the same number of sessions.` },
           ...(alsoDoing ? [{ severity: 'info' as const, text: alsoDoingImplication(alsoDoing) }] : []),
           { severity: 'info' as const, text: 'The plan itself is unchanged — this moves one session, this week only.' },
@@ -6351,7 +6358,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           refusal = `Your sessions are already set to ${current}. If you just mean today, tell me how long you have and I'll cut this one down instead.`
         }
       } else if (result.proposal.kind === 'propose_running_goal' && result.proposal.rawArgs) {
-        const run = buildRunningGoalProposal(result.proposal.rawArgs)
+        const run = raceDateMissing(userSaid, result.proposal.rawArgs.goal, result.proposal.rawArgs.race_date)
+          ? { refusal: RACE_DATE_QUESTION } : buildRunningGoalProposal(result.proposal.rawArgs)
         if (run && 'refusal' in run) refusal = run.refusal
         else if (run) built = { scopeKey: run.scopeKey, preconditions: run.preconditions, payload: run.payload as unknown as Record<string, unknown>, preImage: run.preImage, diff: run.diff }
         else {
@@ -8304,6 +8312,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const isInterrupted = (msg: ChatMessage) =>
     msg.role === 'assistant' && (msg.status === 'pending' || msg.status === 'streaming' || msg.status === 'failed')
 
+  /** The video button for the coach reply at `index`: read off what he said just before it (and the message before that). */
+  const videoForReply = (index: number, reply: string) => {
+    const said: string[] = []
+    for (let j = index - 1; j >= 0 && said.length < 2; j--) if (messages[j].role === 'user') said.push(messages[j].content)
+    return formVideoFor(said[0], reply, said[1])
+  }
+
   const markdownComponents = {
     p: ({ children }: { children?: React.ReactNode }) => <p className="mb-2 last:mb-0">{children}</p>,
     strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-semibold">{children}</strong>,
@@ -8592,7 +8607,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                           /* Interrupted/failed with content — show content + retry */
                           <div>
                             <ReactMarkdown components={markdownComponents}>
-                              {stripStreamingTags(msg.content)}
+                              {linkifyBareUrls(stripStreamingTags(msg.content))}
                             </ReactMarkdown>
                             <button
                               className="hit-slop-44 mt-2 flex items-center gap-1.5 text-xs text-primary-text font-medium hover:underline"
@@ -8604,13 +8619,32 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                             </button>
                           </div>
                         ) : (
-                          <TypewriterMarkdown
-                            text={stripStreamingTags(msg.content)}
-                            active={msg.id != null && msg.id === animatingMessageId}
-                            speed={revealSpeed}
-                            components={markdownComponents}
-                            onDone={() => setAnimatingMessageId(prev => (prev === msg.id ? null : prev))}
-                          />
+                          <>
+                            <TypewriterMarkdown
+                              text={linkifyBareUrls(stripStreamingTags(msg.content))}
+                              active={msg.id != null && msg.id === animatingMessageId}
+                              speed={revealSpeed}
+                              components={markdownComponents}
+                              onDone={() => setAnimatingMessageId(prev => (prev === msg.id ? null : prev))}
+                            />
+                            {(() => {
+                              // "SHOW ME A VIDEO" (his live test, 14 Nov 2026): the link is the app's, built from the
+                              // exercise he named, never a URL the coach typed.
+                              const v = videoForReply(i, msg.content)
+                              return v && (
+                                <a
+                                  data-testid="form-video"
+                                  href={v.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-primary/60 px-3.5 text-[0.8125rem] font-medium text-primary-text"
+                                >
+                                  <PlayCircle className="size-4" aria-hidden />
+                                  Watch a video: {v.exercise}
+                                </a>
+                              )
+                            })()}
+                          </>
                         )
                         const position = positions[k]
                         // Design 2b: the coach's bubbles get 88% of the chat

@@ -86,7 +86,7 @@ export function weekPhaseLine(blockNumber: number | null | undefined, phaseLabel
 
 /** A day of the week view (XW3). */
 export type WeekDayRow =
-  | { kind: 'rest'; date: string; dayName: string; note: string | null }
+  | { kind: 'rest'; date: string; dayName: string; note: string | null; beforePlan?: boolean }
   | {
       kind: 'session' | 'recovery'
       date: string
@@ -124,6 +124,8 @@ export function weekDayRow(day: TrainingWeekDay, unloadedLabelFor: (ex: Exercise
     : day.state === 'moved' ? (day.movedTo ? `Moved to ${day.movedTo.dayName}` : 'Moved')
     : day.state === 'swapped' ? (day.swappedLine ?? 'Swapped')
     : null
+  // A day before the plan began is not a rest day either: nothing was planned (his live test, 14 Nov 2026).
+  if (day.state === 'before_plan') return { kind: 'rest', date: day.date, dayName: day.dayName, note: null, beforePlan: true }
   if (!dayHasSession(session) || day.state === 'moved') {
     return { kind: 'rest', date: day.date, dayName: day.dayName, note: day.state === 'moved' ? status : day.state === 'rest_chosen' ? 'chosen rest' : null }
   }

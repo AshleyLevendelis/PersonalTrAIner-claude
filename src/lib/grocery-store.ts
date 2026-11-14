@@ -1101,6 +1101,34 @@ export async function readGroceryCoverage(
   return coveredDates(current, today, legacyStartDate).filter(d => d >= today)
 }
 
+/**
+ * IS THIS DAY ON THE LIST, AND DOES THE LIST STILL MATCH IT? (his live test, 14 Nov 2026: after Sunday's dinner was
+ * marked as eating out, Nutrition went on saying "Sunday is already on your shopping list" while the list still held
+ * the old dinner's food.) A day is 'stale' when a meal it serves now is not the dish its rows were built from, for a
+ * meal the list was built for: the same test Home's shopping card makes (shop-card.ts).
+ */
+export function dayListState(items: GroceryItemRow[], date: string, served: Partial<Record<string, string>>, today: string, legacyStartDate?: string): 'off' | 'on' | 'stale' {
+  if (!coveredDates(items, today, legacyStartDate).includes(date)) return 'off'
+  const built = new Map<string, Set<string>>()
+  for (const row of items) {
+    if (row.source !== 'generated') continue
+    for (const ref of row.meal_refs ?? []) {
+      if ((ref.date ?? addDays(legacyStartDate ?? today, ref.day)) !== date) continue
+      if (!built.has(ref.slot)) built.set(ref.slot, new Set())
+      built.get(ref.slot)!.add(ref.mealName)
+    }
+  }
+  for (const [slot, name] of Object.entries(served)) {
+    const names = built.get(slot)
+    if (name && names && !names.has(name)) return 'stale'
+  }
+  return 'on'
+}
+
+export async function readGroceryDayState(profileId: string, date: string, served: Partial<Record<string, string>>, today: string, legacyStartDate?: string): Promise<'off' | 'on' | 'stale'> {
+  return dayListState(await getAllItemsIncludingDismissed(profileId), date, served, today, legacyStartDate)
+}
+
 export interface AddGroceryDaysInput extends Omit<GenerateGroceryListInput, 'days' | 'startDate'> {
   /** The dates to add, `YYYY-MM-DD`. */
   dates: string[]

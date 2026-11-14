@@ -200,7 +200,10 @@ export function ProposalCard({
           {preview.label && <span className="sr-only">{preview.label}: </span>}
           <span className="min-w-0 break-words text-[0.8125rem] text-muted-foreground line-through">{preview.from}</span>
           <span className="shrink-0 text-primary-text">{' → '}</span>
-          <span className="min-w-0 flex-1 break-words font-semibold text-foreground">{preview.to}</span>
+          {/* A REAL BASIS (his live test, 14 Nov 2026): `flex-1` is a zero basis, so the new half never wrapped to its own line
+              and got whatever width the old half left: "Eating out, normal (about 600-800 kcal…)" one or two letters a
+              line down the screen. With a 9rem basis it sits beside a short old half and drops below a long one. */}
+          <span data-offer-to className="min-w-0 flex-[1_1_9rem] break-words font-semibold text-foreground">{preview.to}</span>
           {preview.note && <span className="shrink-0 font-mono text-[0.71875rem] text-[color:var(--text-tertiary)]">{' ('}{preview.note}{')'}</span>}
         </p>
       )}
