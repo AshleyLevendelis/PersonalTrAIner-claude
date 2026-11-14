@@ -244,6 +244,12 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
 
   const optA = dayA.day.chosen[slotA]
   const optB = dayB.day.chosen[slotB]
+  // A MEAL WITH DISHES THE PLAN DOES NOT HAVE (snacks off, breakfast skipped) says so and where to change it, rather than
+  // "nothing planned that day": since 14 Nov 2026 such a meal is never served, so it reaches here unserved.
+  const shapeBudgets = computeSlotBudgets(targets, serving.shape.mealsPerDay, serving.shape.includeSnacks, serving.shape.skipBreakfast)
+  const offPlan = (slot: MealSlotName) => !shapeBudgets[slot] && (pools[slot]?.length ?? 0) > 0
+  if (!optA && offPlan(slotA)) return refuse(DAY_MOVE.refusals.noSuchMeal(slotA))
+  if (!optB && offPlan(slotB)) return refuse(DAY_MOVE.refusals.noSuchMeal(slotB))
   if (!optA) return refuse(DAY_MOVE.refusals.nothingThere(slotA, labelA))
   if (!optB) return refuse(DAY_MOVE.refusals.nothingThere(slotB, labelB))
 
@@ -264,9 +270,8 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
   let landsInA: PoolOption
   let landsInB: PoolOption
   if (across) {
-    const budgets = computeSlotBudgets(targets, serving.shape.mealsPerDay, serving.shape.includeSnacks, serving.shape.skipBreakfast)
-    const budgetA = budgets[slotA]
-    const budgetB = budgets[slotB]
+    const budgetA = shapeBudgets[slotA]
+    const budgetB = shapeBudgets[slotB]
     if (!budgetA) return refuse(DAY_MOVE.refusals.noSuchMeal(slotA))
     if (!budgetB) return refuse(DAY_MOVE.refusals.noSuchMeal(slotB))
     const rules = { dietaryPreferences: input.dietaryPreferences ?? [], dislikedFoods: input.dislikedFoods ?? [] }

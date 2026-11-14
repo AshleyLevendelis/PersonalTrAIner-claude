@@ -713,6 +713,9 @@ async function main() {
       const stray = { ...pools, snack: [dish('snack', 'Rice cake', 30, 40, 3), dish('snack', 'Yoghurt pot', 25, 30, 2)] } as unknown as typeof pools
       const r = build(servingFor(shapeOff, { pools: stray }), { meal_slot: 'dinner', from_date: dates[1], to_date: dates[2], to_slot: 'snack' })
       check('a meal that has dishes but no budget in this plan\'s shape is named, not resized against nothing', !r.ok && r.reason === DAY_MOVE.refusals.noSuchMeal('snack'), r)
+      // And the other way round: the meal the swap starts from is the one the plan does not have (14 Nov 2026).
+      const r2 = build(servingFor(shapeOff, { pools: stray }), { meal_slot: 'snack', from_date: dates[1], to_date: dates[2], to_slot: 'dinner' })
+      check('...either way round', !r2.ok && r2.reason === DAY_MOVE.refusals.noSuchMeal('snack'), r2)
     }
     check('today\'s meal already eaten cannot move, whichever of the two it is',
       reason(build(serving, { meal_slot: 'dinner', from_date: today, to_date: dates[2], to_slot: 'lunch' }, { logged: ['dinner'] })) === DAY_MOVE.refusals.eaten('dinner')
@@ -895,7 +898,7 @@ async function main() {
     check('...its undo reads the ledger again and passes the SAME show and re-read as the swap',
       /undoMealDayMove\(profileId, payload, \{ show: showPicks, reloadPools, today, loggedTodaySlots: await readLoggedToday\(\) \}\)/.test(hook))
     check('...and the controller lists the meals this profile has, for the sheet to choose from',
-      /slots: targets \? \(Object\.keys\(computeSlotBudgets\(targets, mealShape\.mealsPerDay, mealShape\.includeSnacks\)\) as MealSlotName\[\]\) : \[\]/.test(hook))
+      /slots: targets \? \(Object\.keys\(computeSlotBudgets\(targets, mealShape\.mealsPerDay, mealShape\.includeSnacks(, mealShape\.skipBreakfast)?\)\) as MealSlotName\[\]\) : \[\]/.test(hook))
 
     const app = read('src/App.tsx')
     check('App gives the hook the way to re-read the options, and what a resized meal is verified against',
