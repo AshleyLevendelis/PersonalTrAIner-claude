@@ -216,9 +216,13 @@ await page.evaluate(() => {
 await say('Hi')
 const perTurn = []
 let typedLifts = false
+let sameInARow = 0
 for (let i = 0; i < 60; i++) {
   if (await page.locator('[data-review-row]').count()) break
   t = await lastTurn()
+  // A setup stuck on one turn is a FAILED walk (5a), never a hang: the same turn three times running ends it.
+  sameInARow = perTurn.length && perTurn[perTurn.length - 1].text === t.text.slice(0, 140) ? sameInARow + 1 : 0
+  if (sameInARow >= 2) break
   perTurn.push({ asking: t.asking, cards: t.cards, text: t.text.slice(0, 140) })
   const card = t.cards[0]
   // A box or button that is not there is a FAILED check below, never a crash (a crash is not a catch).

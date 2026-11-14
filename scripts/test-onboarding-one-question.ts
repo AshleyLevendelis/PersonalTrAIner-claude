@@ -38,7 +38,7 @@ console.log('\n1. A weight with no set behind it')
   // Two numbers are the coach's to sort out ("which is which?"), never the app's guess.
   check('two numbers are not one bare weight: "100, 150"', bare('100, 150') === undefined, bare('100, 150'))
   // Not a lift weight at all.
-  for (const not of ['3', '12', 'yes', 'Which exercise did I mean?', 'I weigh 82kg', 'I train 3 days', 'about 45 minutes', '600kg']) {
+  for (const not of ['3', '12', 'yes', 'Which exercise did I mean?', 'was it 110kg?', 'about 110 kg, maybe 115 on a good day', 'I weigh 82kg', 'I train 3 days', 'about 45 minutes', '600kg']) {
     check(`not a lift weight: "${not}"`, bare(not) === undefined, bare(not))
   }
 }
@@ -46,8 +46,8 @@ console.log('\n1. A weight with no set behind it')
 console.log('\n2. Does the coach\'s turn already ask a setup question?')
 {
   const none = new Set<string>(['displayName'])
-  check('a card is a setup question', coachAskedSetupQuestion([{ role: 'assistant', content: 'Sleep and stress ok?', slotCard: 'recoveryCapacity' }], none))
-  check('a named typed question is one', coachAskedSetupQuestion([{ role: 'assistant', content: 'What do you usually eat?', asksSlot: 'usualFoods' }], none))
+  check('a card is a setup question', coachAskedSetupQuestion([{ role: 'assistant', content: 'Pick one:', slotCard: 'trainingStyle' }], none))
+  check('a named typed question is one', coachAskedSetupQuestion([{ role: 'assistant', content: 'Go on then.', asksSlot: 'usualFoods' }], none))
   check('his screenshot 3: "was that 110kg for your back squat, bench press, or deadlift?" is about the lifts',
     coachAskedSetupQuestion([{ role: 'assistant', content: "I don't want to guess! Was that 110kg for your back squat, bench press, or deadlift?" }], none))
   const all = new Set(['displayName', 'fitnessGoal', 'trainingExperience', 'activityLevel', 'equipment', 'injuries', 'recoveryCapacity'])
@@ -62,7 +62,7 @@ console.log('\n3. Taking the coach\'s question out, keeping what it said')
   check('the reaction stays and the question goes', withoutQuestions('Makes sense. And what do you eat on a night shift, usually?') === 'Makes sense.')
   check('a message that was only a question leaves nothing', withoutQuestions('Which days can you train?') === '')
   const turn = [
-    { role: 'assistant' as const, content: '✓ Days — Mon', isReceipt: true },
+    { role: 'assistant' as const, content: '✓ Days — Mon? Wed', isReceipt: true },
     { role: 'assistant' as const, content: 'Nice. Do you spar?' },
     { role: 'assistant' as const, content: 'How long?' },
     { role: 'assistant' as const, content: 'Pick one.', slotCard: 'trainingStyle' },

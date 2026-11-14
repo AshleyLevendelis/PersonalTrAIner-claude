@@ -25,7 +25,7 @@ export interface TurnMessage {
 }
 
 /** Does this message ask a question at all (a card counts: the card IS a question)? */
-export function asksSomething(m: TurnMessage): boolean {
+function asksSomething(m: TurnMessage): boolean {
   return m.role === 'assistant' && !m.isReceipt && (!!m.slotCard || !!m.asksSlot || m.content.includes('?'))
 }
 
@@ -94,11 +94,12 @@ const LIFT_NAMES: Array<[RegExp, string]> = [
  */
 export function bareLiftWeight(text: string): { weight: string; lift?: string } | undefined {
   const t = text.trim()
-  if (!t || t.length > 60 || t.includes('?')) return undefined
+  // A question ("was it 110kg?") is never an answer: its question mark is left over below and turns it away.
+  if (!t) return undefined
   // A set ("110 x 5", "100 for 5", "5 reps at 100") always has a second number or a word that is not filler, so the
   // two checks below turn it away. A separate set test measured as doing nothing (a MISSED mutation) and was deleted.
-  const numbers = t.match(/\d+(?:[.,]\d+)?/g) ?? []
-  if (numbers.length !== 1) return undefined
+  // Two numbers ("100, 150") are never bare: the second is left over below and turns it away (a separate count of the
+  // numbers measured as doing nothing, a MISSED mutation, and was deleted).
   const m = t.match(/(\d+(?:[.,]\d+)?)\s*(kg|kgs|kilos?|lbs?|pounds?)?\b/i)
   if (!m) return undefined
   const value = Number(m[1].replace(',', '.'))

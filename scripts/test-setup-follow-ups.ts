@@ -72,7 +72,9 @@ check('...a typed answer and a tap count the same: follow-ups 1-3 under the limi
   [1, 2, 3, 4].map(k => count(before(tangent(typed, k)))).join() === '1,2,3,4' && [1, 2, 3, 4].map(k => count(before(tangent(tapped, k)))).join() === '1,2,3,4',
   [[1, 2, 3, 4].map(k => count(before(tangent(typed, k)))), [1, 2, 3, 4].map(k => count(before(tangent(tapped, k))))])
 check('a reply that asks nothing, with something still needed, gets the next question from the app',
-  /const coachAsked = responseWs\.newMessages\.some\(m => m\.role === 'assistant' && !m\.isReceipt && \(!!m\.slotCard \|\| m\.content\.includes\('\?'\)\)\)/.test(co) && /if \(\(stuck \|\| !coachAsked\) && !askedThisTurn\) \{/.test(co))
+  /const coachAsked = responseWs\.newMessages\.some\(m => m\.role === 'assistant' && !m\.isReceipt && \(!!m\.slotCard \|\| m\.content\.includes\('\?'\)\)\)/.test(co) && /if \(\(stuck \|\| !coachAsked\) && !askedThisTurn(?: && !coachAskedSetup)?\) \{/.test(co))
+// RE-ANCHORED 13 Nov 2026 (his setup: two questions at once): the step-in also stands aside when the coach's turn
+// already asks a setup question (verify:onboarding-one-question). A reply that asks NOTHING still gets the question.
 check('...plainly, with no "let\'s lock this in" lead (that is for a stuck conversation)', /const lead = stuck \? forcedAskLead\(timesSteppedIn, target !== canonicalNext[^)]*\) : ''/.test(co))
 // RE-ANCHORED 8 Nov 2026 (QA round 3): the lead also takes whether the question is typed (no "tap one" over nothing to
 // tap). The property held here is the same: only a STUCK conversation gets a lead.
