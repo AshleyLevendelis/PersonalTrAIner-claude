@@ -693,9 +693,13 @@ const doneSeed = (() => {
 // verify:mobility-filler. Same rules as __finisherTarget: training days only,
 // from the live week, asked of the plan rather than named.
 ;(window as unknown as { __mobilityTarget: unknown }).__mobilityTarget = (() => {
-  const liveWeek = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
-  const liveDays = mesocycle.find(w => w.week_number === liveWeek)?.days ?? exercisePlan
-  const hit = liveDays.find(d => d.exercises.length > 0 && !!d.recommendedCardio && !!d.mobilityFiller)
+  // Each candidate is read in the plan week OF THE DATE the driver opens (nearestAnchorDate can fall in the week
+  // before or after the anchor's, where its minutes differ: found 14 Nov 2026 when the day moved to a Sunday).
+  const weekOf = (date: string) => mesocycle.find(w => w.week_number === getActiveMesocycleWeek(profile.created_at as string, new Date(`${date}T12:00:00`), mesocycle.length))?.days ?? exercisePlan
+  const hit = DAYS.map(name => ({ name, date: nearestAnchorDate(name) }))
+    .map(({ name, date }) => ({ date, d: weekOf(date).find(x => x.day === name) }))
+    .find(({ d }) => !!d && d.exercises.length > 0 && !!d.recommendedCardio && !!d.mobilityFiller)
+    ?.d
   if (!hit) return null
   return {
     day: hit.day, date: nearestAnchorDate(hit.day),
