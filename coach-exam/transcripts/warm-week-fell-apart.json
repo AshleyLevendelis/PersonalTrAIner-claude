@@ -2,10 +2,10 @@
   "case": "warm-week-fell-apart",
   "why": "Ashley, 6 Nov 2026, 'Warm coach': a rough week is met with kindness before any fix, and never with guilt. 'A why on every answer': it should leave them knowing why one bad week costs little next to the weeks around it, in a line, not a lecture.",
   "checks": {},
-  "fingerprint": "c234cd0c1a76fd15",
-  "caseStamp": "b989e29f061d075a",
+  "fingerprint": "51500855009935f3",
+  "caseStamp": "13f74bb2872e8672",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-07T07:38:34.115Z",
+  "ranAt": "2026-11-14T19:35:28.906Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -23,7 +23,8 @@
       "bmr": 1420,
       "tdee": 1960,
       "training_experience": "intermediate",
-      "equipment_access": "home_gym"
+      "equipment_access": "home_gym",
+      "exercises_that_fit": "chest press: Barbell Bench Press, Dumbbell Bench Press, Barbell Floor Press, Dumbbell Floor Press, Neutral-Grip Dumbbell Press, Incline Dumbbell Press; overhead press: Landmine Press, Overhead Press, Dumbbell Shoulder Press, Arnold Press, Band Shoulder Press, Pike Push-Ups; row: Chest-Supported Row, Barbell Rows, Dumbbell Rows, Bent-Over Dumbbell Row, T-Bar Rows, Landmine Row; pull-down / pull-up: Kneeling Band Lat Pulldown, Pull-Ups, Chin-Ups, Dumbbell Pullover, Band Lat Pulldown, Single-Arm Band Pulldown; shoulder raise: Lateral Raises, Front Raises, Band Lateral Raise, Backpack Lateral Raise, Backpack Front Raise; traps: Shrugs, Dumbbell Shrugs, Band Shrug, Backpack Shrug; hinge: Deadlifts, Trap Bar Deadlift, Romanian Deadlifts, Good Mornings, Kettlebell Swing (Heavy), Glute Bridge; hamstrings: Sliding Leg Curl, Single-Leg Sliding Leg Curl, Seated Band Leg Curl, Dumbbell Leg Curl; squat: Barbell Squats, Goblet Squats, Wall Sit, Spanish Squat, Air Squat, Box Squat (Bodyweight); quads: Banded Terminal Knee Extension, Chair Leg Extension, Seated Short-Arc Quad Set; single-leg: Walking Lunges, Dumbbell Reverse Lunge, Bulgarian Split Squats, Split Squat (Bodyweight), Step-Ups (Bodyweight), Low Box Step-Up; carry: Farmer's Walk, Suitcase Carry, Overhead Carry, Trap Bar Carry, Loaded Backpack Walk, Farmer Squat Hold (Isometric Carry); calves: Single-Leg Dumbbell Calf Raise, Calf Raises (Bodyweight), Single-Leg Calf Raise (Bodyweight), Single-Leg Calf Raise Hold, Bent-Knee Calf Raise (Bodyweight); biceps: Barbell Curls, Dumbbell Curls, Hammer Curls, Band Curl, Incline Dumbbell Curls; triceps: Tricep Dips, Band Tricep Pushdown, Band Tricep Kickback, Dumbbell Tricep Kickback, Lying Dumbbell Tricep Extension, Overhead Tricep Extension; cardio: Jump Rope, Burpees, Mountain Climbers, High Knees, Jumping Jacks, Shadow Boxing; core: Plank, Dead Bug, Pallof Press, Hanging Leg Raises, Ab Wheel Rollout, Russian Twist"
     },
     "session_duration_preference": "45-60",
     "workout_split_preference": "upper_lower",
@@ -40,7 +41,7 @@
     "exercise_exclusions": [],
     "concurrent_activities": [],
     "streak_days": 4,
-    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunges 3x12, Standing Calf Raise 3x15.\n\nSWAP OPTIONS FOR TODAY — what the Exercise tab's swap list shows first for each of today's exercises, on their kit and injuries, best first.\nWhen they ask to swap one of these and do not name what to do instead, put the FIRST option in propose_exercise_swap's new_item, exactly as written. Offer the next one only when they say why the first will not do. A replacement THEY name is theirs to choose.\n- Walking Lunges: Dumbbell Reverse Lunge, Bulgarian Split Squats, Barbell Reverse Lunge",
     "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
     "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
     "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
@@ -57,8 +58,8 @@
   "turns": [
     {
       "user": "honestly this week has been a write off. only trained once and I've been eating rubbish",
-      "reply": "That happens, Ashley, but one off week doesn't erase your progress. [BREAK]\nI'd suggest shortening today's Lower body session just to get a quick win, though we can do the full one if you prefer. [BREAK]\nAre you up for the shorter session today to get your momentum moving forward again? 😅",
-      "raw": "That happens, Ashley, but one off week doesn't erase your progress. [BREAK]\nI'd suggest shortening today's Lower body session just to get a quick win, though we can do the full one if you prefer. [BREAK]\nAre you up for the shorter session today to get your momentum moving forward again? 😅",
+      "reply": "It happens, Ashley — one off week doesn't undo all your hard work, so there's no need to stress or try to \"make up\" for anything.\n\nThe best move right now is just picking back up with your next planned meal and getting today's session done.\n\nHow are you feeling about getting today's lower body session done?",
+      "raw": "It happens, Ashley — one off week doesn't undo all your hard work, so there's no need to stress or try to \"make up\" for anything.\n[BREAK]\nThe best move right now is just picking back up with your next planned meal and getting today's session done.\n[BREAK]\nHow are you feeling about getting today's lower body session done?\n[QUICK_REPLIES: \"Let me at it\" | \"Short on time today\" | \"Need a rest day\"]",
       "error": null,
       "action": null,
       "proposal": null,

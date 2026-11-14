@@ -4,10 +4,10 @@
   "checks": {
     "asksBeforePrescribing": true
   },
-  "fingerprint": "c234cd0c1a76fd15",
-  "caseStamp": "cfd5fb958aaa1825",
+  "fingerprint": "51500855009935f3",
+  "caseStamp": "84528db4ca2754b7",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-07T07:38:34.115Z",
+  "ranAt": "2026-11-14T19:35:28.906Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -25,7 +25,8 @@
       "bmr": 1420,
       "tdee": 1960,
       "training_experience": "intermediate",
-      "equipment_access": "home_gym"
+      "equipment_access": "home_gym",
+      "exercises_that_fit": "chest press: Barbell Bench Press, Dumbbell Bench Press, Barbell Floor Press, Dumbbell Floor Press, Neutral-Grip Dumbbell Press, Incline Dumbbell Press; overhead press: Landmine Press, Overhead Press, Dumbbell Shoulder Press, Arnold Press, Band Shoulder Press, Pike Push-Ups; row: Chest-Supported Row, Barbell Rows, Dumbbell Rows, Bent-Over Dumbbell Row, T-Bar Rows, Landmine Row; pull-down / pull-up: Kneeling Band Lat Pulldown, Pull-Ups, Chin-Ups, Dumbbell Pullover, Band Lat Pulldown, Single-Arm Band Pulldown; shoulder raise: Lateral Raises, Front Raises, Band Lateral Raise, Backpack Lateral Raise, Backpack Front Raise; traps: Shrugs, Dumbbell Shrugs, Band Shrug, Backpack Shrug; hinge: Deadlifts, Trap Bar Deadlift, Romanian Deadlifts, Good Mornings, Kettlebell Swing (Heavy), Glute Bridge; hamstrings: Sliding Leg Curl, Single-Leg Sliding Leg Curl, Seated Band Leg Curl, Dumbbell Leg Curl; squat: Barbell Squats, Goblet Squats, Wall Sit, Spanish Squat, Air Squat, Box Squat (Bodyweight); quads: Banded Terminal Knee Extension, Chair Leg Extension, Seated Short-Arc Quad Set; single-leg: Walking Lunges, Dumbbell Reverse Lunge, Bulgarian Split Squats, Split Squat (Bodyweight), Step-Ups (Bodyweight), Low Box Step-Up; carry: Farmer's Walk, Suitcase Carry, Overhead Carry, Trap Bar Carry, Loaded Backpack Walk, Farmer Squat Hold (Isometric Carry); calves: Single-Leg Dumbbell Calf Raise, Calf Raises (Bodyweight), Single-Leg Calf Raise (Bodyweight), Single-Leg Calf Raise Hold, Bent-Knee Calf Raise (Bodyweight); biceps: Barbell Curls, Dumbbell Curls, Hammer Curls, Band Curl, Incline Dumbbell Curls; triceps: Tricep Dips, Band Tricep Pushdown, Band Tricep Kickback, Dumbbell Tricep Kickback, Lying Dumbbell Tricep Extension, Overhead Tricep Extension; cardio: Jump Rope, Burpees, Mountain Climbers, High Knees, Jumping Jacks, Shadow Boxing; core: Plank, Dead Bug, Pallof Press, Hanging Leg Raises, Ab Wheel Rollout, Russian Twist"
     },
     "session_duration_preference": "45-60",
     "workout_split_preference": "upper_lower",
@@ -42,7 +43,7 @@
     "exercise_exclusions": [],
     "concurrent_activities": [],
     "streak_days": 4,
-    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunges 3x12, Standing Calf Raise 3x15.\n\nSWAP OPTIONS FOR TODAY — what the Exercise tab's swap list shows first for each of today's exercises, on their kit and injuries, best first.\nWhen they ask to swap one of these and do not name what to do instead, put the FIRST option in propose_exercise_swap's new_item, exactly as written. Offer the next one only when they say why the first will not do. A replacement THEY name is theirs to choose.\n- Walking Lunges: Dumbbell Reverse Lunge, Bulgarian Split Squats, Barbell Reverse Lunge",
     "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
     "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
     "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
@@ -59,8 +60,8 @@
   "turns": [
     {
       "user": "I can't face training today",
-      "reply": "That's completely fine, Ashley — listen to your body and take a total rest day to recharge. Forcing a session when you're completely drained usually backfires anyway. \n\nI can mark today as rest so it doesn't show as a missed workout, but let me know if you'd rather try one of our lighter options instead! 🤗",
-      "raw": "That's completely fine, Ashley — listen to your body and take a total rest day to recharge. Forcing a session when you're completely drained usually backfires anyway. \n[BREAK]\nI can mark today as rest so it doesn't show as a missed workout, but let me know if you'd rather try one of our lighter options instead! 🤗\n\n[QUICK_REPLIES: \"Take a rest day\" | \"Shorten workout\" | \"Light cardio\"]",
+      "reply": "I hear you. Some days the motivation just isn't there, and that's completely normal. \n\nHow are you feeling — are you just drained and short on energy, or is something feeling sore or tweaked?",
+      "raw": "I hear you. Some days the motivation just isn't there, and that's completely normal. \n\nHow are you feeling — are you just drained and short on energy, or is something feeling sore or tweaked?\n\n[QUICK_REPLIES: \"Just drained\" | \"Something is sore\" | \"Want a short session\"]",
       "error": null,
       "action": null,
       "proposal": null,
@@ -68,16 +69,16 @@
     },
     {
       "user": "honestly it's been a rough few weeks, not just today",
-      "reply": "I hear you, Ashley. When life is heavy like that, forcing yourself through a hard block of lifting is only going to drain your battery even further.\n\nTraining is meant to support your life, not beat you down when you're already struggling. Let's take the pressure off for a bit and just focus on getting you through the week. \n\nDo you want to ease off the plan for a short while, or just take things day by day right now?",
-      "raw": "I hear you, Ashley. When life is heavy like that, forcing yourself through a hard block of lifting is only going to drain your battery even further.\n\nTraining is meant to support your life, not beat you down when you're already struggling. Let's take the pressure off for a bit and just focus on getting you through the week. \n\nDo you want to ease off the plan for a short while, or just take things day by day right now?\n\n[QUICK_REPLIES: \"Ease off for a bit\" | \"Day by day\" | \"Just rest today\"]",
+      "reply": "I'm really sorry to hear that. When life gets heavy for weeks at a time, trying to push through a full training session usually just adds to the burn-out instead of helping.\n\nWe can take today completely off to give you space, or we can trim it down to just a quick 15-minute session if moving a little bit would feel good. \n\nWhat sounds best to you right now?",
+      "raw": "I'm really sorry to hear that. When life gets heavy for weeks at a time, trying to push through a full training session usually just adds to the burn-out instead of helping.\n\nWe can take today completely off to give you space, or we can trim it down to just a quick 15-minute session if moving a little bit would feel good. \n\nWhat sounds best to you right now?\n\n[QUICK_REPLIES: \"Take today off\" | \"Short 15-min session\" | \"Just want to talk\"]",
       "error": null,
       "action": null,
       "proposal": null,
       "saved": {
         "kind": "record_context_fact",
         "args": {
-          "origin_verbatim_quote": "honestly it's been a rough few weeks, not just today",
-          "display_text": "Going through a rough few weeks — needs understanding and support"
+          "display_text": "Having a rough few weeks — needs a gentler approach",
+          "origin_verbatim_quote": "it's been a rough few weeks"
         }
       }
     }

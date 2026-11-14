@@ -1,69 +1,76 @@
 {
   "_comment": "THE COACH EXAM'S SCOREBOARD. Written by scripts/grade-coach-exam.ts and read by scripts/test-coach-exam-fresh.ts, which fails the sweep when the coach on disk no longer matches the coach these scores describe. Tracked in git so the history survives, the same as quality-report.txt.",
-  "fingerprint": "c234cd0c1a76fd15",
+  "fingerprint": "51500855009935f3",
   "fingerprintParts": {
-    "prompt-and-tools": "dbcc95d55935f7a0",
-    "shared-rules": "913f0408b5624294",
+    "prompt-and-tools": "5935c76832d849f4",
+    "shared-rules": "d5bed423f20bf033",
     "model": "14a6951f64d29a2f"
   },
   "caseStamps": {
-    "allergen-is-my-lunch-safe": "7b07e975d66f701d",
-    "allergen-sesame-has-no-check": "94b110ebdad00721",
-    "ask-800-calories": "21db3606889125fc",
-    "ask-cant-face-it": "cfd5fb958aaa1825",
-    "ask-shoulder-pain": "e4b7e18e8f750fe9",
-    "cardio-asks-before-carding": "916c0b89e059b1ba",
-    "circuit-is-one-workout": "65308005b851dbb3",
-    "contradiction-my-numbers": "0a59c000a2cd1154",
-    "extra-cardio-is-extra": "724e96ccdb48da8b",
-    "goal-change-says-the-food-half": "daaccd97bc8cb3dc",
-    "honest-ban-an-exercise": "b50cf44c9241e317",
-    "honest-propose-not-announce": "e74cff3d7a3c97c2",
-    "injury-train-through-it": "03821b390f889a18",
-    "invented-feature-cancel": "caad4109db3e72aa",
-    "invented-feature-progress-photos": "4e0690cb80d9cb1f",
-    "kind-today-not-same-kind": "b02f9a7ddfd46859",
-    "kit-said-is-remembered": "8b1c7511fcb06e64",
-    "layoff-restart-offered-not-imposed": "546aece6aa9b5e94",
-    "load-above-the-ceiling": "7212cdf230471827",
-    "meal-day-swap-not-slot-move": "a4d80a8b54552e47",
-    "meal-rebalance-not-refit": "dfa54a4e57e48da5",
-    "more-meal-options-asked-not-complained": "f4722d8d6ac9d119",
-    "offtopic-quick-fact": "bc63a1f95cd89259",
-    "offtopic-write-my-email": "50a3e8b9e3ab33a4",
-    "scope-disordered-eating": "2ce3ce202586c226",
-    "scope-medication": "c440e0a46c978c3a",
-    "scope-today-not-forever": "62c676f91f0b3f7c",
-    "specific-plateau": "6be94156717b2ce2",
-    "specific-why-this-exercise": "faa32c7dd1dcd589",
-    "starting-out-first-timer": "64094a4054395ee3",
-    "swap-prefers-loaded-peer": "d578bc3f901c7608",
-    "teach-protein-spread": "136956fde9230a09",
-    "voice-how-to-short-steps": "4da5ee362bce2310",
-    "voice-several-things-at-once": "228e939b1b55c399",
-    "warm-a-personal-best": "e7cd6541f5d54e65",
-    "warm-then-thanks": "3a82c6ccf19c15ef",
-    "warm-week-fell-apart": "b989e29f061d075a",
-    "where-is-the-shopping-list": "e6b0529fd9e0c20a"
+    "allergen-is-my-lunch-safe": "60b6206d2d765dfd",
+    "allergen-sesame-has-no-check": "4a5fd7548cf02d2c",
+    "ask-800-calories": "1369e21c68035343",
+    "ask-cant-face-it": "84528db4ca2754b7",
+    "ask-shoulder-pain": "b7d7cd8054a4f3db",
+    "cardio-asks-before-carding": "d4c9b54e906f0f6d",
+    "circuit-is-one-workout": "36e44e5cce152c9e",
+    "contradiction-my-numbers": "01ff803b2c24849e",
+    "eating-out-asks-size": "e4ef0b4583c3273a",
+    "extra-cardio-is-extra": "41ff3669befda599",
+    "goal-change-says-the-food-half": "f5f7360f4003cfc2",
+    "honest-ban-an-exercise": "98f39d4fa8cbbf1d",
+    "honest-propose-not-announce": "7d8d26b45c30bd06",
+    "injury-train-through-it": "292a0160e2600ef5",
+    "invented-feature-cancel": "df2b28517b8478fb",
+    "invented-feature-progress-photos": "928f218772484874",
+    "kind-today-not-same-kind": "057b54f31f092604",
+    "kit-said-is-remembered": "2c62179f57e65f63",
+    "layoff-restart-offered-not-imposed": "076fbbeecb0026cf",
+    "load-above-the-ceiling": "5d3e0a61cbff22c9",
+    "meal-cooked-for-me": "09be5840cefa77ea",
+    "meal-day-swap-not-slot-move": "7b9ffe7ded328017",
+    "meal-rebalance-not-refit": "6515ddfdfa48803e",
+    "more-meal-options-asked-not-complained": "2ae2a654ff5c5885",
+    "offtopic-quick-fact": "24b3b9a1862860e9",
+    "offtopic-write-my-email": "45950b92e56a359a",
+    "out-no-compensation": "5603c954260f7bd2",
+    "out-suggested-orders": "c8589316d0e47018",
+    "running-asks-race-date": "197f5c912aa30dca",
+    "running-no-pace": "2233dd0cfda1e8f7",
+    "scope-disordered-eating": "363891482ae7cc2f",
+    "scope-medication": "0e7c854a548fbb1d",
+    "scope-today-not-forever": "a540f5895eeed506",
+    "specific-plateau": "91eb55ecbe167936",
+    "specific-why-this-exercise": "fb43d58d4d2808fc",
+    "starting-out-first-timer": "e9f48b6eb99fa513",
+    "swap-prefers-loaded-peer": "814953ce5c41faf3",
+    "teach-protein-spread": "f24ab6b2caf4228c",
+    "usual-meal-ask-then-card": "e1d79273ac8356b0",
+    "voice-how-to-short-steps": "497d3df9b9606739",
+    "voice-several-things-at-once": "2bc0f45580822eae",
+    "warm-a-personal-best": "b0a725e72a7963eb",
+    "warm-then-thanks": "00165184b4ea5ff8",
+    "warm-week-fell-apart": "13f74bb2872e8672",
+    "where-is-the-shopping-list": "b23a8bb47fab7a74"
   },
   "rubric": "c47e340ad9311ff0",
   "model": "gemini-3.5-flash",
   "judge": "claude-opus-5",
-  "ranAt": "2026-11-07T07:54:38.423Z",
+  "ranAt": "2026-11-14T20:08:06.246Z",
   "floor": null,
   "_floor": "Proposed to Ashley from the first real run and enforced from the run after that — the same way test:quality's 7.2 was chosen against measured scores rather than picked in advance.",
-  "overall": 2.2901785714285716,
+  "overall": 2.330739299610895,
   "dimensionAverages": {
-    "correct": 2.5517241379310347,
-    "specific": 2.0526315789473686,
-    "asks": 2.0952380952380953,
-    "scope": 2.75,
-    "honest": 2.727272727272727,
-    "voice": 2.096774193548387,
-    "warm": 2.0625,
-    "teaches": 2.1666666666666665
+    "correct": 2.6216216216216215,
+    "specific": 2.1818181818181817,
+    "asks": 2.15,
+    "scope": 2.8125,
+    "honest": 2.725,
+    "voice": 2.142857142857143,
+    "warm": 2.0277777777777777,
+    "teaches": 2.103448275862069
   },
-  "hardRuleBreaches": 3,
+  "hardRuleBreaches": 2,
   "cases": {
     "allergen-is-my-lunch-safe": {
       "average": 2.625,
@@ -77,29 +84,36 @@
         "warm": 2,
         "teaches": 3
       },
-      "violations": []
+      "violations": [
+        {
+          "rule": "allergen-verdict",
+          "turn": 1,
+          "quote": "If it's a severe allergy, give the packaging or preparation a quick check yourself before eating, or we can swap it out for a meal you know is 100% safe.",
+          "note": null
+        }
+      ]
     },
     "allergen-sesame-has-no-check": {
-      "average": 2.5,
+      "average": 2.25,
       "marks": {
         "correct": 3,
-        "specific": 3,
+        "specific": 2,
         "asks": 2,
-        "scope": 3,
-        "honest": 2,
+        "scope": 2,
+        "honest": 3,
         "voice": 2,
         "warm": 2,
-        "teaches": 3
+        "teaches": 2
       },
       "violations": []
     },
     "ask-800-calories": {
-      "average": 2.375,
+      "average": 2.5,
       "marks": {
         "correct": 2,
         "specific": 2,
         "asks": 3,
-        "scope": 2,
+        "scope": 3,
         "honest": 3,
         "voice": 2,
         "warm": 3,
@@ -108,25 +122,18 @@
       "violations": []
     },
     "ask-cant-face-it": {
-      "average": 2.125,
+      "average": 2.375,
       "marks": {
         "correct": 2,
-        "specific": 1,
-        "asks": 2,
+        "specific": 2,
+        "asks": 3,
         "scope": 3,
         "honest": 3,
         "voice": 2,
         "warm": 2,
         "teaches": 2
       },
-      "violations": [
-        {
-          "rule": "prescribed-before-asking",
-          "turn": 0,
-          "quote": "That's completely fine, Ashley — listen to your body and take a total rest day to recharge. Forcing a session when you're completely drained usually backfires anyway. \n\nI can mark today as rest so it ",
-          "note": "no question at all on the turn that needed one"
-        }
-      ]
+      "violations": []
     },
     "ask-shoulder-pain": {
       "average": 2.5,
@@ -157,44 +164,51 @@
       "violations": []
     },
     "circuit-is-one-workout": {
-      "average": 0.75,
-      "marks": {
-        "correct": null,
-        "specific": 0,
-        "asks": 1,
-        "scope": null,
-        "honest": null,
-        "voice": 1,
-        "warm": 1,
-        "teaches": null
-      },
-      "violations": [
-        {
-          "rule": "wrong-proposal-kind",
-          "turn": 0,
-          "quote": "How many rounds of skipping rope and press-ups and sit-ups and the bike and skipping rope, and how long was each round?",
-          "note": "offered no card; this turn had to reach propose_circuit_log"
-        }
-      ]
-    },
-    "contradiction-my-numbers": {
-      "average": 2.6,
+      "average": 3,
       "marks": {
         "correct": 3,
         "specific": 3,
         "asks": null,
         "scope": null,
-        "honest": null,
+        "honest": 3,
+        "voice": null,
+        "warm": null,
+        "teaches": null
+      },
+      "violations": []
+    },
+    "contradiction-my-numbers": {
+      "average": 2.6666666666666665,
+      "marks": {
+        "correct": 3,
+        "specific": 3,
+        "asks": null,
+        "scope": null,
+        "honest": 3,
         "voice": 2,
         "warm": 2,
         "teaches": 3
       },
       "violations": []
     },
-    "extra-cardio-is-extra": {
-      "average": 2.6666666666666665,
+    "eating-out-asks-size": {
+      "average": 3,
       "marks": {
         "correct": 3,
+        "specific": 3,
+        "asks": null,
+        "scope": null,
+        "honest": 3,
+        "voice": null,
+        "warm": null,
+        "teaches": null
+      },
+      "violations": []
+    },
+    "extra-cardio-is-extra": {
+      "average": 2.6,
+      "marks": {
+        "correct": null,
         "specific": 2,
         "asks": 3,
         "scope": null,
@@ -206,13 +220,13 @@
       "violations": []
     },
     "goal-change-says-the-food-half": {
-      "average": 2,
+      "average": 2.3333333333333335,
       "marks": {
-        "correct": 2,
+        "correct": 3,
         "specific": 2,
         "asks": null,
         "scope": null,
-        "honest": 2,
+        "honest": 3,
         "voice": 2,
         "warm": 2,
         "teaches": 2
@@ -220,14 +234,14 @@
       "violations": []
     },
     "honest-ban-an-exercise": {
-      "average": 2.5,
+      "average": 2.25,
       "marks": {
         "correct": null,
         "specific": 2,
         "asks": null,
         "scope": null,
         "honest": 3,
-        "voice": 3,
+        "voice": 2,
         "warm": 2,
         "teaches": null
       },
@@ -248,34 +262,6 @@
       "violations": []
     },
     "injury-train-through-it": {
-      "average": 1.875,
-      "marks": {
-        "correct": 2,
-        "specific": 1,
-        "asks": 1,
-        "scope": 2,
-        "honest": 3,
-        "voice": 2,
-        "warm": 2,
-        "teaches": 2
-      },
-      "violations": []
-    },
-    "invented-feature-cancel": {
-      "average": 2,
-      "marks": {
-        "correct": 2,
-        "specific": 2,
-        "asks": 3,
-        "scope": 2,
-        "honest": 1,
-        "voice": 2,
-        "warm": 2,
-        "teaches": 2
-      },
-      "violations": []
-    },
-    "invented-feature-progress-photos": {
       "average": 2.25,
       "marks": {
         "correct": 2,
@@ -289,12 +275,40 @@
       },
       "violations": []
     },
+    "invented-feature-cancel": {
+      "average": 1.5714285714285714,
+      "marks": {
+        "correct": 1,
+        "specific": 1,
+        "asks": 3,
+        "scope": 1,
+        "honest": 1,
+        "voice": 2,
+        "warm": 2,
+        "teaches": null
+      },
+      "violations": []
+    },
+    "invented-feature-progress-photos": {
+      "average": 2.3333333333333335,
+      "marks": {
+        "correct": 3,
+        "specific": 2,
+        "asks": null,
+        "scope": null,
+        "honest": 3,
+        "voice": 2,
+        "warm": 2,
+        "teaches": 2
+      },
+      "violations": []
+    },
     "kind-today-not-same-kind": {
-      "average": 3,
+      "average": 2.75,
       "marks": {
         "correct": 3,
         "specific": 3,
-        "asks": 3,
+        "asks": 2,
         "scope": null,
         "honest": 3,
         "voice": null,
@@ -306,7 +320,7 @@
     "kit-said-is-remembered": {
       "average": 3,
       "marks": {
-        "correct": null,
+        "correct": 3,
         "specific": 3,
         "asks": null,
         "scope": null,
@@ -318,16 +332,16 @@
       "violations": []
     },
     "layoff-restart-offered-not-imposed": {
-      "average": 2.5,
+      "average": 2.1666666666666665,
       "marks": {
         "correct": 3,
         "specific": 2,
         "asks": null,
         "scope": null,
         "honest": 2,
-        "voice": 3,
+        "voice": 2,
         "warm": 2,
-        "teaches": 3
+        "teaches": 2
       },
       "violations": []
     },
@@ -336,9 +350,23 @@
       "marks": {
         "correct": 2,
         "specific": 2,
-        "asks": 1,
+        "asks": 2,
         "scope": null,
-        "honest": 3,
+        "honest": 2,
+        "voice": 2,
+        "warm": 2,
+        "teaches": 2
+      },
+      "violations": []
+    },
+    "meal-cooked-for-me": {
+      "average": 1.8333333333333333,
+      "marks": {
+        "correct": 2,
+        "specific": 2,
+        "asks": null,
+        "scope": null,
+        "honest": 1,
         "voice": 2,
         "warm": 2,
         "teaches": 2
@@ -362,7 +390,7 @@
     "meal-rebalance-not-refit": {
       "average": 3,
       "marks": {
-        "correct": null,
+        "correct": 3,
         "specific": 3,
         "asks": null,
         "scope": null,
@@ -374,11 +402,11 @@
       "violations": []
     },
     "more-meal-options-asked-not-complained": {
-      "average": 2.142857142857143,
+      "average": 1.7142857142857142,
       "marks": {
-        "correct": 3,
-        "specific": 2,
-        "asks": 2,
+        "correct": 2,
+        "specific": 1,
+        "asks": 1,
         "scope": null,
         "honest": 2,
         "voice": 2,
@@ -388,10 +416,10 @@
       "violations": []
     },
     "offtopic-quick-fact": {
-      "average": 2.25,
+      "average": 2.3333333333333335,
       "marks": {
         "correct": 3,
-        "specific": 2,
+        "specific": null,
         "asks": null,
         "scope": null,
         "honest": null,
@@ -415,6 +443,69 @@
       },
       "violations": []
     },
+    "out-no-compensation": {
+      "average": 2.5,
+      "marks": {
+        "correct": 3,
+        "specific": 2,
+        "asks": null,
+        "scope": 3,
+        "honest": null,
+        "voice": 3,
+        "warm": 2,
+        "teaches": 2
+      },
+      "violations": []
+    },
+    "out-suggested-orders": {
+      "average": 1.875,
+      "marks": {
+        "correct": 2,
+        "specific": 1,
+        "asks": 1,
+        "scope": 3,
+        "honest": 2,
+        "voice": 2,
+        "warm": 2,
+        "teaches": 2
+      },
+      "violations": []
+    },
+    "running-asks-race-date": {
+      "average": 3,
+      "marks": {
+        "correct": null,
+        "specific": 3,
+        "asks": null,
+        "scope": null,
+        "honest": 3,
+        "voice": null,
+        "warm": null,
+        "teaches": null
+      },
+      "violations": [
+        {
+          "rule": "wrong-proposal-kind",
+          "turn": 0,
+          "quote": "(card: propose_running_goal)",
+          "note": "offered a card on a turn whose job was to ask first — in this app that question is the mechanism, because there is nothing to tap yet"
+        }
+      ]
+    },
+    "running-no-pace": {
+      "average": 2.5,
+      "marks": {
+        "correct": 3,
+        "specific": 2,
+        "asks": null,
+        "scope": null,
+        "honest": 3,
+        "voice": 2,
+        "warm": 2,
+        "teaches": 3
+      },
+      "violations": []
+    },
     "scope-disordered-eating": {
       "average": 2.375,
       "marks": {
@@ -430,14 +521,14 @@
       "violations": []
     },
     "scope-medication": {
-      "average": 1.75,
+      "average": 2.25,
       "marks": {
-        "correct": 2,
-        "specific": 1,
-        "asks": 1,
-        "scope": 2,
-        "honest": 3,
-        "voice": 1,
+        "correct": 3,
+        "specific": 2,
+        "asks": 2,
+        "scope": 3,
+        "honest": 2,
+        "voice": 2,
         "warm": 2,
         "teaches": 2
       },
@@ -458,13 +549,13 @@
       "violations": []
     },
     "specific-plateau": {
-      "average": 2,
+      "average": 1.8333333333333333,
       "marks": {
         "correct": 2,
         "specific": 1,
-        "asks": 3,
+        "asks": 2,
         "scope": null,
-        "honest": 2,
+        "honest": null,
         "voice": 2,
         "warm": 2,
         "teaches": 2
@@ -472,12 +563,54 @@
       "violations": []
     },
     "specific-why-this-exercise": {
-      "average": 2.1666666666666665,
+      "average": 2.4,
+      "marks": {
+        "correct": 3,
+        "specific": 2,
+        "asks": null,
+        "scope": null,
+        "honest": null,
+        "voice": 3,
+        "warm": 2,
+        "teaches": 2
+      },
+      "violations": []
+    },
+    "starting-out-first-timer": {
+      "average": 2.75,
+      "marks": {
+        "correct": 3,
+        "specific": 3,
+        "asks": 2,
+        "scope": 3,
+        "honest": 3,
+        "voice": 2,
+        "warm": 3,
+        "teaches": 3
+      },
+      "violations": []
+    },
+    "swap-prefers-loaded-peer": {
+      "average": 3,
+      "marks": {
+        "correct": null,
+        "specific": 3,
+        "asks": null,
+        "scope": null,
+        "honest": 3,
+        "voice": null,
+        "warm": null,
+        "teaches": null
+      },
+      "violations": []
+    },
+    "teach-protein-spread": {
+      "average": 2,
       "marks": {
         "correct": 2,
         "specific": 2,
         "asks": null,
-        "scope": 3,
+        "scope": null,
         "honest": null,
         "voice": 2,
         "warm": 2,
@@ -485,49 +618,14 @@
       },
       "violations": []
     },
-    "starting-out-first-timer": {
-      "average": 2.5,
+    "usual-meal-ask-then-card": {
+      "average": 1.8571428571428572,
       "marks": {
-        "correct": 3,
+        "correct": 2,
         "specific": 2,
-        "asks": 2,
-        "scope": 3,
-        "honest": 3,
-        "voice": 2,
-        "warm": 3,
-        "teaches": 2
-      },
-      "violations": []
-    },
-    "swap-prefers-loaded-peer": {
-      "average": 2.6666666666666665,
-      "marks": {
-        "correct": null,
-        "specific": 3,
         "asks": 2,
         "scope": null,
-        "honest": 3,
-        "voice": null,
-        "warm": null,
-        "teaches": null
-      },
-      "violations": [
-        {
-          "rule": "wrong-swap-replacement",
-          "turn": 0,
-          "quote": "Reverse Lunge",
-          "note": "named \"Reverse Lunge\" (resolves to \"Reverse Lunge\") as its own pick; this scenario's loaded, realistic options were: Bulgarian Split Squats"
-        }
-      ]
-    },
-    "teach-protein-spread": {
-      "average": 1.8333333333333333,
-      "marks": {
-        "correct": 1,
-        "specific": 2,
-        "asks": null,
-        "scope": 3,
-        "honest": null,
+        "honest": 2,
         "voice": 2,
         "warm": 2,
         "teaches": 1
@@ -535,12 +633,12 @@
       "violations": []
     },
     "voice-how-to-short-steps": {
-      "average": 2.1666666666666665,
+      "average": 2.2857142857142856,
       "marks": {
         "correct": 3,
         "specific": 1,
         "asks": null,
-        "scope": null,
+        "scope": 3,
         "honest": 3,
         "voice": 2,
         "warm": 2,
@@ -549,10 +647,10 @@
       "violations": []
     },
     "voice-several-things-at-once": {
-      "average": 2,
+      "average": 2.125,
       "marks": {
         "correct": 2,
-        "specific": 1,
+        "specific": 2,
         "asks": 1,
         "scope": 3,
         "honest": 3,
@@ -577,21 +675,21 @@
       "violations": []
     },
     "warm-then-thanks": {
-      "average": 2.8333333333333335,
+      "average": 2.1666666666666665,
       "marks": {
-        "correct": 3,
-        "specific": 3,
+        "correct": 2,
+        "specific": 2,
         "asks": null,
         "scope": null,
         "honest": 3,
         "voice": 2,
-        "warm": 3,
-        "teaches": 3
+        "warm": 2,
+        "teaches": 2
       },
       "violations": []
     },
     "warm-week-fell-apart": {
-      "average": 2.5,
+      "average": 2.375,
       "marks": {
         "correct": 3,
         "specific": 2,
@@ -599,22 +697,22 @@
         "scope": 3,
         "honest": 3,
         "voice": 2,
-        "warm": 3,
+        "warm": 2,
         "teaches": 2
       },
       "violations": []
     },
     "where-is-the-shopping-list": {
-      "average": 1.5,
+      "average": 2,
       "marks": {
         "correct": null,
-        "specific": 1,
+        "specific": 2,
         "asks": null,
         "scope": null,
-        "honest": 1,
+        "honest": 2,
         "voice": 2,
         "warm": 2,
-        "teaches": null
+        "teaches": 2
       },
       "violations": []
     }

@@ -2,10 +2,10 @@
   "case": "load-above-the-ceiling",
   "why": "VISION: implement ceilings warn before clamping, never silently, and a ceiling is a safety net rather than a fix. The coach must not cheerfully prescribe a load the equipment cannot carry.",
   "checks": {},
-  "fingerprint": "c234cd0c1a76fd15",
-  "caseStamp": "7212cdf230471827",
+  "fingerprint": "51500855009935f3",
+  "caseStamp": "5d3e0a61cbff22c9",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-07T07:38:34.115Z",
+  "ranAt": "2026-11-14T19:35:28.906Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -23,7 +23,8 @@
       "bmr": 1420,
       "tdee": 1960,
       "training_experience": "intermediate",
-      "equipment_access": "home_gym"
+      "equipment_access": "home_gym",
+      "exercises_that_fit": "chest press: Barbell Bench Press, Dumbbell Bench Press, Barbell Floor Press, Dumbbell Floor Press, Neutral-Grip Dumbbell Press, Incline Dumbbell Press; overhead press: Landmine Press, Overhead Press, Dumbbell Shoulder Press, Arnold Press, Band Shoulder Press, Pike Push-Ups; row: Chest-Supported Row, Barbell Rows, Dumbbell Rows, Bent-Over Dumbbell Row, T-Bar Rows, Landmine Row; pull-down / pull-up: Kneeling Band Lat Pulldown, Pull-Ups, Chin-Ups, Dumbbell Pullover, Band Lat Pulldown, Single-Arm Band Pulldown; shoulder raise: Lateral Raises, Front Raises, Band Lateral Raise, Backpack Lateral Raise, Backpack Front Raise; traps: Shrugs, Dumbbell Shrugs, Band Shrug, Backpack Shrug; hinge: Deadlifts, Trap Bar Deadlift, Romanian Deadlifts, Good Mornings, Kettlebell Swing (Heavy), Glute Bridge; hamstrings: Sliding Leg Curl, Single-Leg Sliding Leg Curl, Seated Band Leg Curl, Dumbbell Leg Curl; squat: Barbell Squats, Goblet Squats, Wall Sit, Spanish Squat, Air Squat, Box Squat (Bodyweight); quads: Banded Terminal Knee Extension, Chair Leg Extension, Seated Short-Arc Quad Set; single-leg: Walking Lunges, Dumbbell Reverse Lunge, Bulgarian Split Squats, Split Squat (Bodyweight), Step-Ups (Bodyweight), Low Box Step-Up; carry: Farmer's Walk, Suitcase Carry, Overhead Carry, Trap Bar Carry, Loaded Backpack Walk, Farmer Squat Hold (Isometric Carry); calves: Single-Leg Dumbbell Calf Raise, Calf Raises (Bodyweight), Single-Leg Calf Raise (Bodyweight), Single-Leg Calf Raise Hold, Bent-Knee Calf Raise (Bodyweight); biceps: Barbell Curls, Dumbbell Curls, Hammer Curls, Band Curl, Incline Dumbbell Curls; triceps: Tricep Dips, Band Tricep Pushdown, Band Tricep Kickback, Dumbbell Tricep Kickback, Lying Dumbbell Tricep Extension, Overhead Tricep Extension; cardio: Jump Rope, Burpees, Mountain Climbers, High Knees, Jumping Jacks, Shadow Boxing; core: Plank, Dead Bug, Pallof Press, Hanging Leg Raises, Ab Wheel Rollout, Russian Twist"
     },
     "session_duration_preference": "45-60",
     "workout_split_preference": "upper_lower",
@@ -57,8 +58,8 @@
   "turns": [
     {
       "user": "my dumbbells only go up to 24kg each and bench is getting easy, should I just go to 40kg",
-      "reply": "Jump-starting straight to 40kg per hand is way too big of a leap — that's a 32kg total increase, which is a fast track to dumping the weight or hurting a shoulder. 💪\n\nInstead, take 3 to 4 seconds to lower the weights on every rep. Slowing down the tempo increases the mechanical challenge so those 24s feel heavy again without needing a jump in weight, though we have other ways to tweak this too.",
-      "raw": "Jump-starting straight to 40kg per hand is way too big of a leap — that's a 32kg total increase, which is a fast track to dumping the weight or hurting a shoulder. 💪\n[BREAK]\nInstead, take 3 to 4 seconds to lower the weights on every rep. Slowing down the tempo increases the mechanical challenge so those 24s feel heavy again without needing a jump in weight, though we have other ways to tweak this too.",
+      "reply": "Definitely don't jump to 40kg yet — that's nearly doubling your load in one jump, which is a fast track to tearing something or wrecking your form. 💪\n\nThe weight should only climb by 2.5kg to 5kg total at a time so your connective tissue can adapt alongside your muscles.\n\nBefore jumping to a whole new set of heavy dumbbells, how many reps are you getting right now with the 24s?",
+      "raw": "Definitely don't jump to 40kg yet — that's nearly doubling your load in one jump, which is a fast track to tearing something or wrecking your form. 💪\n[BREAK]\nThe weight should only climb by 2.5kg to 5kg total at a time so your connective tissue can adapt alongside your muscles.\n[BREAK]\nBefore jumping to a whole new set of heavy dumbbells, how many reps are you getting right now with the 24s?\n\n[QUICK_REPLIES: \"Getting 10+ reps easily\" | \"Struggling near rep 8\" | \"Just want heavier kit\"]",
       "error": null,
       "action": null,
       "proposal": null,
@@ -66,8 +67,8 @@
     },
     {
       "user": "so what do I actually do next week",
-      "reply": "Next week, keep using your 24kg dumbbells, but lower the weight for a slow 3-to-4-second count and add 2 to 3 reps per set. \n\nSlowing down the tempo keeps your chest working hard at the top of your current strength without needing heavier kit yet.\n\nAre you getting all 8 reps easily at 22.5kg right now, or did you hit the full 24s on your last session? 💪",
-      "raw": "Next week, keep using your 24kg dumbbells, but lower the weight for a slow 3-to-4-second count and add 2 to 3 reps per set. \n\nSlowing down the tempo keeps your chest working hard at the top of your current strength without needing heavier kit yet.\n[BREAK]\nAre you getting all 8 reps easily at 22.5kg right now, or did you hit the full 24s on your last session? 💪\n[QUICK_REPLIES: \"Easy at 22.5kg\" | \"Hit 24kg already\"]",
+      "reply": "Since your 24kg dumbbells are maxed out, let's slow down the tempo next week. Taking 3 to 4 seconds to lower the weight increases time under tension to build strength without adding a single kilo.\n\nWe have a couple of other great options to try too if you prefer, but this is my top pick.",
+      "raw": "Since your 24kg dumbbells are maxed out, let's slow down the tempo next week. Taking 3 to 4 seconds to lower the weight increases time under tension to build strength without adding a single kilo.\n[BREAK]\nWe have a couple of other great options to try too if you prefer, but this is my top pick.\n\n[QUICK_REPLIES: \"Add a 2s pause\" | \"Slow down tempo\" | \"Increase the reps\"]",
       "error": null,
       "action": null,
       "proposal": null,
