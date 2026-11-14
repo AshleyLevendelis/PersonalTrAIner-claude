@@ -143,7 +143,10 @@ const WEIGH_IN_ANCHOR = new URLSearchParams(location.search).get('anchor') === '
 const WEIGH_IN_HELD = new URLSearchParams(location.search).get('held') === '1'
 setDevClockOverride(PROFILE_ID, TODAY_ISO, CLOCK)
 // ?joined=today — the account was made today (no pace line is said that day).
-const JOINED_TODAY = new URLSearchParams(location.search).get('joined') === 'today'
+// ?firstlifts=1 — THE FIRST-SESSION LIFTS CARD (his "Ask at the first session", 14 Nov 2026): a plan made today and
+// nothing ever logged, the only state the card is for. Chosen as INPUT (when the plan began, what the log holds).
+const FIRST_LIFTS = new URLSearchParams(location.search).get('firstlifts') === '1'
+const JOINED_TODAY = new URLSearchParams(location.search).get('joined') === 'today' || FIRST_LIFTS
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
 // TODAY MUST BE A TRAINING DAY or the tour legitimately drops its set stop
@@ -973,7 +976,7 @@ const db: Db = {
   // CURRENT plan week, and it falls on one of the four available weekdays.
   // (1 and 3 days back are neither, which is why the first fixture read 0/1.)
   exercise_set_logs: [
-    ...(AWAY > 0 ? [] : [1]).map((back, i) => ({
+    ...(AWAY > 0 || FIRST_LIFTS ? [] : [1]).map((back, i) => ({
       id: `l${i}`, user_id: PROFILE_ID, exercise_name: 'Barbell Squats', set_number: 1,
       weight_kg: 60, reps_completed: 8, is_bodyweight: false, is_warmup: false,
       completed_at: new Date(anchorNowMs() - (back + 1) * 86400000).toISOString(),
@@ -1946,6 +1949,9 @@ function Harness() {
             profile={kitProfile} profileId={PROFILE_ID} planCreatedAt={planBornAt}
             storedProfile={KIT ? kitProfile : undefined} kitController={kitController}
             onRestartPlan={restartPlan}
+            // What App passes saves the numbers and rebuilds the plan (test:first-session-lifts holds that half). Here
+            // it records what the card asked to save, so the driver reads the patch the app would write.
+            onFirstSessionLifts={async patch => { (window as unknown as { __firstLifts?: unknown[] }).__firstLifts = [...((window as unknown as { __firstLifts?: unknown[] }).__firstLifts ?? []), patch]; return null }}
             activeAdaptations={activeAdaptations}
             endingAdaptationId={endingAdaptationId}
             onAdaptationsChanged={refreshAdaptations}

@@ -106,6 +106,7 @@ import { missedDayView, runItLabel } from '@/lib/missed-day'
 import { readSessionSummary, saveSessionSummary } from '@/lib/session-summary-store'
 import { SessionSummaryDialog, type SessionSummaryData } from './SessionSummaryDialog'
 import { InsightBanner } from '@/components/ui/insight-banner'
+import { FirstSessionLiftsCard } from './FirstSessionLiftsCard'
 import { CircuitOffer } from './CircuitOffer'
 import { describeDayGap, dayGapCanAddPress } from '@/lib/day-gap-note'
 import type { Exercise, WorkoutDay, MesocycleWeek, UserProfile } from '@/lib/types'
@@ -145,6 +146,7 @@ export function TodayPanel({
   onOpenSessionHistory,
   onCalibrationSessionFinished,
   onRestartPlan,
+  onFirstSessionLifts,
   kit,
 }: {
   plan: WorkoutDay[]
@@ -190,6 +192,8 @@ export function TodayPanel({
   onCalibrationSessionFinished?: (args: { date: string; dayName: string }) => void
   /** Start the plan again from week 1 after a very long break (layoff.ts). Resolves to a sentence on failure, null on success. */
   onRestartPlan?: () => Promise<string | null>
+  /** The first-session lifts card's save and rebuild (App, first-session-lifts.ts); the failure sentence, or null. */
+  onFirstSessionLifts?: (patch: Partial<UserProfile>) => Promise<string | null>
   /** The kit, for good, from the remove sheet's "I haven't got the kit" (H34). */
   kit?: import('./EditReasonStep').EditReasonKit
 }) {
@@ -1592,6 +1596,15 @@ export function TodayPanel({
               </span>
             </InsightBanner>
           )}
+          {/* THE LIFT NUMBERS, ASKED AT THE FIRST SESSION (his ruling 14 Nov 2026, "Ask at the first session"). */}
+          <FirstSessionLiftsCard
+            profile={storedProfile ?? profile}
+            profileId={profileId}
+            today={today}
+            week={currentMesoWeekObj}
+            workingSetsToday={logs.filter(l => !l.is_warmup && (l.drop_index ?? 0) === 0).length}
+            onSave={onFirstSessionLifts}
+          />
           {/* THE BLOCKS SHE LOGGED OFF THE TIMER, COUNTED AS TODAY'S WORKOUT in one tap (her ruling A,
               8 Oct 2026). Gone once it is counted: the swapped line below says so instead. */}
           <CircuitOffer

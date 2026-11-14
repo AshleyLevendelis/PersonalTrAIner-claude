@@ -198,7 +198,7 @@ async function main() {
     const rebuildBody = /export (?:async )?function rebuildAgainstProfile[\s\S]*?\n}\n/.exec(adapt)?.[0] ?? ''
     check('a temporary KIT change is carried through a rebuild, not dropped', rebuildBody.length > 0 && /constraintProfile\(clone, context\.constraints\)/.test(rebuildBody) && !/temporaryEquipment: null/.test(rebuildBody), rebuildBody.length)
     check('...for as long as any temporary change runs', /const injuryEnds = live\.map\(/.test(code('src/lib/plan-edit-context.ts')))
-    check('the Profile rebuild offer lists the changes too, from the same seeded trial', /describeRebuild\(mesocycle, trial\.mesocycle/.test(code('src/App.tsx')) && /seedKey: rebuildPreview\?\.seedKey/.test(code('src/App.tsx')))
+    check('the Profile rebuild offer lists the changes too, from the same seeded trial', /describeRebuild\(mesocycle, trial\.mesocycle/.test(code('src/App.tsx')) && /rebuildPlanFrom\(profile, rebuildPreview\?\.seedKey\)/.test(code('src/App.tsx')) && /rebuildFromCurrentWeek\(p, effectiveExclusions, mesocycle, currentWeek, context, \{ seedKey \}\)/.test(code('src/App.tsx')))
     const fn = code('supabase/functions/chat-gemini/index.ts')
     const withStarts = ['propose_schedule_change', 'propose_session_length', 'propose_style_change', 'propose_goal_change', 'propose_concurrent_activity']
       .filter(t => { const i = fn.indexOf(`name: "${t}"`); return i >= 0 && /starts: \{/.test(fn.slice(i, i + 4000)) })

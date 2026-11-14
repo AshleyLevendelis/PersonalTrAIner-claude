@@ -1557,7 +1557,10 @@ menu" stays true when a copy is also left outside it.
   stays FIRST**, and **the lift numbers move to the first session** (a card asks a recent hard set of each, "I don't
   know" beside it; unanswered, the calibration week finds them), and **the running goal moves to the coach** ("Move it
   to the coach", reversing his 13 Nov "Only if they like cardio" for setup). Step 1 built (lifts and running out, the
-  bar counts screens: 16 plus name for a gym lifter, was 22); the first-session card and the two merged screens to come.
+  bar counts screens). ALL BUILT 14 Nov 2026: days carry session length and the diet carries "anything else to leave
+  out" on one screen each (a gym lifter 14 screens + name, was 22 + name; home 15, was 19); the first-session card asks a
+  recent hard set only where answering skips the testing week (never a beginner, no body weight, no barbell).
+  `test:first-session-lifts`, `verify:first-session-lifts`, `verify:two-question-screens`, `test:onboarding-slots`
 - **Health conditions: "Fold into injuries"** (no new question); **"Yes, build it"** (14 Nov). BUILT: five taps
   under "What a doctor has said to watch" on setup's injuries card and Profile, the GP line, sets at RPE 8 at most,
   cardio at 7 by effort words (no heart rate, no all-out), the coach told and told to send the condition to the GP;

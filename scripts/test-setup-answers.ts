@@ -387,7 +387,8 @@ check('...and telling her what moved', /describeReprice\(changes\)/.test(app))
 // code, reading the two props next to each other as the handler asking for a
 // dialog.
 const ceilingHandlerAt = app.indexOf('const handleCeilingsCorrected = async')
-const nextHandlerAt = app.indexOf('  const handleConfirmRebuild', ceilingHandlerAt + 1)
+// The NEXT top-level declaration bounds it (14 Nov 2026: a shared rebuild helper now sits between it and the confirm).
+const nextHandlerAt = app.indexOf('\n  const ', ceilingHandlerAt + 1)
 const ceilingBody = ceilingHandlerAt === -1 ? '' : app.slice(ceilingHandlerAt, nextHandlerAt)
 check('the handler was found and bounded', ceilingBody.length > 200 && nextHandlerAt > ceilingHandlerAt,
   { len: ceilingBody.length })

@@ -63,6 +63,7 @@ import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed
 import { readBootSnapshot, saveBootSnapshot, clearBootSnapshot, type BootSnapshot } from '@/lib/boot-cache'
 import { ensureSignedIn, claimProfile, hasClaimedOnThisPhone, markClaimedOnThisPhone, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
 import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
+import { updateProfileField } from '@/lib/profile-store'
 import { SignInScreen } from '@/components/SignInScreen'
 
 // ---------------------------------------------------------------------------
@@ -2807,39 +2808,68 @@ function App() {
     }
   }
 
+  /**
+   * The rebuild from this week, for a given profile: shared by the rebuild offer below and the first-session lifts
+   * card (which rebuilds from a profile it has just saved, so it cannot wait for the state to catch up). Returns the
+   * sentence to show when it fails, or null when the plan was rebuilt and saved.
+   */
+  const rebuildPlanFrom = async (p: UserProfile, seedKey?: string): Promise<string | null> => {
+    if (!p.id) return `${couldNot('rebuild your plan just now')} Nothing has changed.`
+    const currentWeek = getActiveMesocycleWeek(
+      mesocycleCreatedAt ?? p.created_at, undefined, mesocycle.length || 4,
+    )
+    // Which days are already trained, read at the moment of the tap: the
+    // rebuild leaves every one of them exactly as it is.
+    const context = await loadPlanEditContext(p, mesocycle, mesocycleCreatedAt ?? p.created_at)
+    const result = await rebuildFromCurrentWeek(p, effectiveExclusions, mesocycle, currentWeek, context, { seedKey })
+    if (!result.ok || !result.mesocycle) return result.error ?? `${couldNot('rebuild your plan just now')} Nothing has changed.`
+    const previous = mesocycle
+    setMesocycle(result.mesocycle)
+    try {
+      // Same reasoning as the ban path: this is an EDIT of the live plan,
+      // so the original creation time has to survive or live-week
+      // detection rewinds to week 1.
+      await saveMesocycle(p.id, result.mesocycle, mesocycleCreatedAt ?? p.created_at)
+    } catch (err) {
+      // The profile change itself already landed and is real. Only the plan
+      // rewrite failed, so say exactly that rather than implying the injury
+      // was not saved.
+      console.error('Persisting rebuild failed:', err)
+      setMesocycle(previous)
+      return "That change is saved, but your plan couldn't be rebuilt right now — reopen the app to try again."
+    }
+    setLogsVersion(v => v + 1)
+    return null
+  }
+
+  /**
+   * THE FIRST-SESSION LIFTS CARD (his "Ask at the first session", 14 Nov 2026; first-session-lifts.ts): his numbers are
+   * saved and the plan rebuilt from this week around them, the first week's testing skipped. His tap on "Start from
+   * these" is the yes. Returns the sentence to show when it fails; nothing is half-done silently.
+   */
+  const handleFirstSessionLifts = async (patch: Partial<UserProfile>): Promise<string | null> => {
+    if (!profile?.id) return `${couldNot('save those numbers just now')} Nothing has changed.`
+    try {
+      await updateProfileField(profile.id, patch)
+    } catch (err) {
+      console.error('First-session lifts save failed:', err)
+      return `${couldNot('save those numbers just now')} Nothing has changed.`
+    }
+    const next = { ...profile, ...patch }
+    setProfile(prev => (prev ? { ...prev, ...patch } : prev))
+    return rebuildPlanFrom(next)
+  }
+
   const handleConfirmRebuild = async () => {
     if (!profile?.id || rebuilding) return
     let rebuiltOk = false
     setRebuilding(true)
     try {
-      const currentWeek = getActiveMesocycleWeek(
-        mesocycleCreatedAt ?? profile.created_at, undefined, mesocycle.length || 4,
-      )
-      // Which days are already trained, read at the moment of the tap: the
-      // rebuild leaves every one of them exactly as it is.
-      const context = await loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at)
-      const result = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek, context, { seedKey: rebuildPreview?.seedKey })
-      if (!result.ok || !result.mesocycle) {
-        setWriteError(result.error ?? `${couldNot('rebuild your plan just now')} Nothing has changed.`)
+      const failed = await rebuildPlanFrom(profile, rebuildPreview?.seedKey)
+      if (failed) {
+        setWriteError(failed)
         return
       }
-      const previous = mesocycle
-      setMesocycle(result.mesocycle)
-      try {
-        // Same reasoning as the ban path: this is an EDIT of the live plan,
-        // so the original creation time has to survive or live-week
-        // detection rewinds to week 1.
-        await saveMesocycle(profile.id, result.mesocycle, mesocycleCreatedAt ?? profile.created_at)
-      } catch (err) {
-        // The profile change itself already landed and is real. Only the plan
-        // rewrite failed, so say exactly that rather than implying the injury
-        // was not saved.
-        console.error('Persisting rebuild failed:', err)
-        setMesocycle(previous)
-        setWriteError("That change is saved, but your plan couldn't be rebuilt right now — reopen the app to try again.")
-        return
-      }
-      setLogsVersion(v => v + 1)
       // THE FOOD HALF OF A GOAL CHANGE — Ashley's ruling, 17 Sep 2026, from
       // three options: training AND food, from this week. She rejected asking
       // about food as a second question, because somebody training for muscle
@@ -3532,6 +3562,7 @@ function App() {
               onLogsUpdated={() => { setLogsVersion(v => v + 1); bumpCoachData() }}
               onCalibrationSessionFinished={handleCalibrationSessionFinished}
               onRestartPlan={handleRestartPlan}
+              onFirstSessionLifts={handleFirstSessionLifts}
               kitController={kitController}
             />
           </TabsContent>

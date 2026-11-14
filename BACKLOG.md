@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **SHORTER SETUP STEP 2: THE LIFT NUMBERS AT THE FIRST SESSION (his "Ask at the first session", 14 Nov 2026)** —
+  BUILT; with steps 1 and 3 the light trim is done. Just under today's session card on a lifter's first session, one
+  card: "Know a recent hard set?", a weight and reps box for the barbell back squat, bench press and deadlift, "Start
+  from these" and "I don't know". A set becomes the plan's number exactly as setup read it (the same function), a
+  half-filled lift or an implausible one is said back and nothing saved; "Start from these" saves the numbers with the
+  first week's testing skipped and rebuilds the plan from this week (the rebuild offer's own road, now one shared
+  helper fed the SAVED profile, because the screen's copy is a tick behind); either answer is kept on the phone and a
+  logged set also ends it. SHOWN ONLY WHERE IT TAKES EFFECT (a read-only trace found the plan skips the testing week
+  only for a non-beginner whose body weight is known): never for a beginner, the walking pathway, no body weight, no
+  barbell, a plan already skipping it, a lift already known, or a log that cannot be read. CSCS review: (1) a lifter who
+  knows a recent hard set starts at his real weights instead of an easy finding week; (2) taken away: that week, only
+  on his tap; (3) fundamentals unchanged, the same progression from the same reading; (4) no floor moved: the reading,
+  the plausibility rule and the beginner-always-tests rule are the existing ones; (5) in scope. Checks:
+  `test:first-session-lifts` (28 checks, 10 mutations, 9 caught at first; the miss was a loose sentence check,
+  tightened and caught), `verify:first-session-lifts` (17 checks on the real Exercise tab, 4/4 mutations; the harness
+  page gains `?firstlifts=1`, a plan made today with nothing logged). Re-anchored on the shared rebuild helper, each
+  mutation-tested: `test:rebuild-offer`, `test:rebuild-honours`, `test:setup-answers`. 109 gates reading the changed
+  files green. Named: the card sits under the session card rather than above it; what App's save does is held by
+  source checks (no harness page boots App), and the harness page records the patch instead of saving.
 - [ ] **SHORTER SETUP STEP 3 OF 3 BUILT (14 Nov 2026): two questions on one screen.** The days card carries "How
   long can your sessions usually run?" (Next waits for a day and a length) and the diet card carries "Anything else
   you'd rather I left out?" (typed foods, kept as a list); one Next answers both and his reply says both. Asked on
