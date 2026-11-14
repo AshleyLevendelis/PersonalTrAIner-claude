@@ -164,3 +164,21 @@ export function checkLoggedSetWeight(input: {
 function trimKg(kg: number): string {
   return String(Math.round(kg * 100) / 100)
 }
+
+/**
+ * A REP COUNT NOBODY DID (his ruling 14 Nov 2026, "Ask once, then save"; Priya saved 212 then 312 reps on a set of 12).
+ * More than three times the prescription's top, or over MAX_PLAUSIBLE_LOADED_REPS on a loaded lift. The tick asks once;
+ * a confirmed one is saved and never counts as reaching the top of the range or as a personal best.
+ */
+export const MAX_PLAUSIBLE_LOADED_REPS = 100
+export function repsLookImpossible(reps: number, prescribedHigh?: number | null, loaded = true): boolean {
+  if (!(reps > 0)) return false
+  if (prescribedHigh != null && prescribedHigh > 0 && reps > 3 * prescribedHigh) return true
+  return loaded && reps > MAX_PLAUSIBLE_LOADED_REPS
+}
+/** The top of a prescription like "8-12" or "10", or null when it is not a rep count. */
+export function prescribedRepsHigh(prescribed: string | null | undefined): number | null {
+  const nums = (prescribed ?? '').match(/\d+/g)
+  if (!nums || !/^\s*\d+\s*(-\s*\d+)?\s*$/.test(prescribed ?? '')) return null
+  return Math.max(...nums.map(Number))
+}

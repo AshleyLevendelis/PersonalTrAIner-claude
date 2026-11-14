@@ -35,6 +35,7 @@
     "test:qa-training-nov14": "tsx scripts/test-qa-training-nov14.ts",
     "test:qa-meals-nov14": "tsx scripts/test-qa-meals-nov14.ts",
     "test:qa-batch3": "tsx scripts/test-qa-batch3.ts",
+    "test:odd-reps": "tsx scripts/test-odd-reps.ts",
     "verify:live-test-nov14": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/live-test-nov14.mjs",
     "test:meal-amounts": "tsx scripts/test-meal-amounts.ts",
     "verify:meal-log-card": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-log-card.mjs",

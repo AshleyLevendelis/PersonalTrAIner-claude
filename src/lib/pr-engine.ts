@@ -1,3 +1,4 @@
+import { repsLookImpossible } from './set-plausibility'
 import type { BestReading } from './coach-voice'
 import { supabase } from './supabase'
 import { getLocalDateString } from './dev-clock'
@@ -118,7 +119,7 @@ export function toSessionSets(logs: ExerciseSetLog[]): SessionSet[] {
     // candidate maximum, and on a high-rep build-up it can win the bodyweight
     // "most reps in one set" record outright.
     .filter(l => !l.is_warmup)
-    .filter(l => l.reps_completed > 0)
+    .filter(l => l.reps_completed > 0 && !repsLookImpossible(l.reps_completed, null, Number(l.weight_kg) > 0))
     .map(l => ({
       setNumber: l.set_number,
       weight: l.weight_kg,
@@ -334,6 +335,8 @@ export async function refreshPRCacheFromDB(userId: string): Promise<void> {
     // MOVEMENT PREP HOLDS NO RECORD — see canHoldRecord. Here, where the
     // records are built, so no reader downstream has to remember it.
     if (!canHoldRecord(row.exercise_name)) continue
+    // AN IMPOSSIBLE COUNT IS NO RECORD (his "Ask once, then save", 14 Nov 2026): saved, never a best.
+    if (repsLookImpossible(row.reps_completed, null, Number(row.weight_kg) > 0 || row.added_load_kg != null)) continue
     const shape: SetShape = {
       weightKg: Number(row.weight_kg),
       reps: row.reps_completed,

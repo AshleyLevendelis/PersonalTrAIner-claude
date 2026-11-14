@@ -26,7 +26,7 @@ import { lastTime, sameAsSet, setReading, loggedSetReading, loggedCountLabel, SE
 import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, plateBarKg, nextSetRungsKg } from '@/lib/load-prescription'
-import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG } from '@/lib/set-plausibility'
+import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG, repsLookImpossible, prescribedRepsHigh } from '@/lib/set-plausibility'
 import { blankWeightFor, carriedWeightFor, type BlankWeight } from '@/lib/set-row'
 import type { UserProfile } from '@/lib/types'
 import { EFFORT_RPE, effortFromRpe, type LiftEffort } from '@/lib/lift-effort'
@@ -416,6 +416,7 @@ export function SetGrid({
    * Disarmed by editing the weight instead: a new number is a new decision.
    */
   const [confirmWeightSet, setConfirmWeightSet] = useState<string | null>(null)
+  const [confirmRepsSet, setConfirmRepsSet] = useState<string | null>(null)
   const [prBadgeSet, setPrBadgeSet] = useState<{ rowKey: string; result: PRResult } | null>(null)
   const [animatingPr, setAnimatingPr] = useState(false)
   /** Armed-then-confirm delete, tap-tap within 3s — no window.confirm (themed-app clash, PWA-suppressible per the UX sweep's Clear-chat finding), but a saved set is still a real row to lose, so a bare single tap doesn't do it. */
@@ -459,6 +460,8 @@ export function SetGrid({
     if (field === 'weight') {
       if (rowWarnings[k]) setRowWarnings(prev => { const n = { ...prev }; delete n[k]; return n })
       if (confirmWeightSet === k) setConfirmWeightSet(null)
+    if (confirmRepsSet === k) setConfirmRepsSet(null)
+      if (confirmRepsSet === k) setConfirmRepsSet(null)
     }
   }
 
@@ -655,6 +658,14 @@ export function SetGrid({
       return
     }
 
+    // A REP COUNT NOBODY DID IS ASKED ABOUT, ONCE (his ruling 14 Nov 2026, "Ask once, then save"): 312 reps on a set of
+    // 12. A second tap saves it; it never reaches the top of the range or a personal best (repsLookImpossible).
+    if (maxCountFor(prescriptionType) === MAX_REPS && repsLookImpossible(reps, prescribedRepsHigh(prescribedReps), !isBodyweightCapable || !!input.weight) && confirmRepsSet !== k) {
+      setRowWarnings(prev => ({ ...prev, [k]: `${reps} reps — is that right? Tap ✓ again to log it, or fix the number.` }))
+      setConfirmRepsSet(k)
+      return
+    }
+
     // CALIBRATION, SETS 2+: AN EMPTY BOX IS REFUSED, NOT FILLED. Placed
     // before the bodyweight resolution below, because on a bodyweight-capable
     // lift an empty weight would otherwise resolve to "bodyweight" and be
@@ -717,6 +728,7 @@ export function SetGrid({
       }
     }
     setConfirmWeightSet(null)
+    setConfirmRepsSet(null)
     if (rowWarnings[k]) {
       setRowWarnings(prev => { const next = { ...prev }; delete next[k]; return next })
     }

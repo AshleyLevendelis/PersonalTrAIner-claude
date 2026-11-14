@@ -1,3 +1,4 @@
+import { repsLookImpossible } from './set-plausibility'
 import { supabase } from './supabase'
 import { sessionDeclaresWarmups } from './session-derive'
 import { getExerciseEntry, getExerciseId } from './exercise-db'
@@ -208,7 +209,7 @@ export async function checkDoubleProgression(
 
   const relevantSets = workingToday.slice(0, prescribedSets)
 
-  const allAtTop = relevantSets.every(s => s.reps_completed >= topReps)
+  const allAtTop = relevantSets.every(s => s.reps_completed >= topReps && !repsLookImpossible(s.reps_completed, topReps))
   const avgRpe = relevantSets.reduce((sum, s) => sum + (s.rpe ?? 7), 0) / relevantSets.length
   const rpeQualifies = avgRpe <= 8
 
@@ -465,7 +466,7 @@ export async function getDoubleProgressionRecommendation(
       note: `Too easy last time, so today starts at ${weightKg}kg. Go up again if it's still easy: your heaviest good set becomes your weight.` }
   }
 
-  const hitTopOnAllSets = working.every(s => s.reps_completed >= prescribedRepRangeHigh)
+  const hitTopOnAllSets = working.every(s => s.reps_completed >= prescribedRepRangeHigh && !repsLookImpossible(s.reps_completed, prescribedRepRangeHigh))
   if (hitTopOnAllSets) {
     const weightKg = lastWeight + increment
     return { ...said, weightKg, lastWeightKg: lastWeight, didProgress: true,
@@ -607,7 +608,7 @@ export async function getAddedLoadProgression(
 
   const lastAdded = withAdded.reduce((max, s) => Math.max(max, s.added_load_kg ?? 0), 0)
   const topAdded = withAdded.filter(s => (s.added_load_kg ?? 0) >= lastAdded)
-  const hitTopOnAllSets = topAdded.every(s => s.reps_completed >= prescribedRepRangeHigh)
+  const hitTopOnAllSets = topAdded.every(s => s.reps_completed >= prescribedRepRangeHigh && !repsLookImpossible(s.reps_completed, prescribedRepRangeHigh))
 
   if (!hitTopOnAllSets) {
     return {
