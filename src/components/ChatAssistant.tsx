@@ -3323,7 +3323,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const context = await loadEditContext()
     const trial = await rebuildFromCurrentWeek(after, exerciseExclusions, mesocycle, start.fromWeek, context, { fromDate: start.fromDate, seedKey })
     if (!trial.ok || !trial.mesocycle) return { refusal: `I couldn't work that out on your plan just now (${trial.error ?? 'the rebuild failed'}), so nothing has changed. Try again in a moment.` }
-    const lines = describeRebuild(mesocycle, trial.mesocycle, { start, planCreatedAt: planCreatedAt ?? profile.created_at })
+    const lines = describeRebuild(mesocycle, trial.mesocycle, { start, planCreatedAt: planCreatedAt ?? profile.created_at, moves: context.calendar.moves, today: context.calendar.today })
     if (lines.length === 0) return { refusal: `That wouldn't change anything in your plan ${start.said} — the days it would touch are already trained or already like that.` }
     // The old "Rebuilds N weeks from week X on" line goes; anything else it said (a second sport's reason) stays.
     const kept = (built.diff.implications ?? [])

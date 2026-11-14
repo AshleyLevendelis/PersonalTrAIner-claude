@@ -164,8 +164,12 @@ export function buildDayGuard(mesocycle: MesocycleWeek[], input: DayGuardInput):
   const first = input.planCreatedAt ? localDateOf(input.planCreatedAt) : input.today
   const from = first < input.today ? first : input.today
   const last = addDays(from, mesocycle.length * 7 + 8)
+  // A SESSION STILL OWED ON THE DAY IT WAS MOVED TO (his ruling 14 Nov 2026, "Keep it, still owed"): a change of days
+  // rewrote the row the move serves, so Saturday's session vanished and Sunday showed a ghost of it. The row a pending
+  // move brings in (moved to today or later) is protected like a trained one: the rebuild leaves it, and the move with it.
+  const owed = new Set((input.moves ?? []).filter(m => m.toDate).map(m => m.toDate))
   for (let date = from; date <= last; date = addDays(date, 1)) {
-    const trained = date < input.today || logged.has(date) || closed.has(date)
+    const trained = date < input.today || logged.has(date) || closed.has(date) || owed.has(date)
     for (const row of planRowsOnDate(mesocycle, input, date)) {
       served.add(key(row.weekNumber, row.dayName))
       if (trained) protectedRows.add(key(row.weekNumber, row.dayName))

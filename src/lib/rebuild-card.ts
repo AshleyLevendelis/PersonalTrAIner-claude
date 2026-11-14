@@ -83,7 +83,7 @@ const listOf = (names: string[], cap = 5): string => {
 export function describeRebuild(
   before: MesocycleWeek[],
   after: MesocycleWeek[],
-  at: { start: RebuildStart; planCreatedAt: string | undefined },
+  at: { start: RebuildStart; planCreatedAt: string | undefined; moves?: readonly { fromDate: string; toDate?: string | null }[]; today?: string },
 ): string[] {
   const changed = after.filter((w, i) => w !== before[i] && JSON.stringify(w.days) !== JSON.stringify(before[i]?.days))
   if (changed.length === 0) return []
@@ -110,6 +110,11 @@ export function describeRebuild(
     dayLines.push(`${when}: ${a ?? 'rest'}${b !== a ? ` (was ${b ?? 'rest'})` : ', new exercises'}`)
   }
   if (dayLines.length > 0) lines.push(`Week ${first.week_number}: ${dayLines.join('; ')}.`)
+  // A MOVED SESSION STAYS WHERE IT WAS MOVED (his ruling 14 Nov 2026, "Keep it, still owed"), said before the tap.
+  for (const m of at.moves ?? []) {
+    if (!m.toDate || !at.today || m.toDate < at.today) continue
+    lines.push(`Your session moved to ${shortDate(m.toDate)} stays there: it is still owed, as you agreed.`)
+  }
 
   // WHAT COMES IN AND WHAT LEAVES, across every week it changes.
   const namesIn = (weeks: MesocycleWeek[]) => new Set(weeks.flatMap(w => w.days.flatMap(d => d.exercises.map(e => e.name))))

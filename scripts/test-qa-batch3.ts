@@ -22,6 +22,7 @@ import { ELSEWHERE_WORDS } from '../src/lib/meals-elsewhere'
 import { resolveMoveTarget } from '../src/lib/session-move'
 import { describeRebuild } from '../src/lib/rebuild-card'
 import { computeMealMacros, lookupIngredient } from '../src/lib/food-db'
+import { buildDayGuard } from '../src/lib/plan-guard'
 import type { UserProfile, WorkoutDay, MesocycleWeek } from '../src/lib/types'
 
 let failures = 0
@@ -130,6 +131,25 @@ console.log('\n10. Standard UK packs (his ruling "Add standard UK packs")')
   const crisps = lookupIngredient('crisps')
   check('"crisps" with no flavour carries the flavours\' allergens (dairy, gluten, shellfish); ready salted does not', !!crisps && (crisps.tags as Record<string, boolean>).contains_dairy === true && (crisps.tags as Record<string, boolean>).contains_shellfish === true && !(lookupIngredient('ready salted crisps')?.tags as Record<string, boolean> | undefined)?.contains_dairy)
   check('a diet cola is near nothing; a regular can about 140 kcal', (lookupIngredient('diet coke')?.per100g.kcal ?? 99) < 1 && Math.abs((lookupIngredient('coke')?.per100g.kcal ?? 0) * 3.3 - 139) < 5)
+}
+
+console.log('\n11. A moved session survives a change of days (his "Keep it, still owed")')
+{
+  const day = (d: string) => ({ day: d, focus: d, exercises: [{ name: 'Goblet Squat', sets: 3, reps: '8', rest: '90s' }] })
+  const meso = [1, 2].map(n => ({ week_number: n, days: [day('Tuesday'), day('Thursday'), day('Saturday')] })) as unknown as MesocycleWeek[]
+  const cal = { planCreatedAt: '2026-11-14T08:00:00', today: '2026-11-14', loggedDates: [], closedDates: [] }
+  const withMove = buildDayGuard(meso, { ...cal, moves: [{ fromDate: '2026-11-14', toDate: '2026-11-15' }] })
+  const noMove = buildDayGuard(meso, { ...cal, moves: [] })
+  check('Saturday\'s session, moved to Sunday and not yet done, is kept by a rebuild', withMove(1, 'Saturday') === true)
+  check('...with no move the same row is open to the rebuild (the fixture binds)', noMove(1, 'Saturday') === false)
+  const before = [{ week_number: 1, days: [day('Tuesday'), day('Thursday'), day('Saturday')] }] as unknown as MesocycleWeek[]
+  const after = [{ week_number: 1, days: [day('Monday'), day('Friday'), day('Saturday')] }] as unknown as MesocycleWeek[]
+  const lines = describeRebuild(before, after, { start: { fromWeek: 1, fromDate: '2026-11-14', said: 'today' }, planCreatedAt: '2026-11-14T08:00:00', moves: [{ fromDate: '2026-11-14', toDate: '2026-11-15' }], today: '2026-11-14' } as never)
+  check('the change-days card says the moved session stays, before the tap', lines.some(l => /moved to Sun 15 Nov stays there/.test(l)), lines)
+  const past = describeRebuild(before, after, { start: { fromWeek: 1, fromDate: '2026-11-16', said: 'today' }, planCreatedAt: '2026-11-14T08:00:00', moves: [{ fromDate: '2026-11-14', toDate: '2026-11-15' }], today: '2026-11-16' } as never)
+  check('...and a move to a day already gone is not announced', !past.some(l => /stays there/.test(l)), past)
+  const app = read('src/App.tsx'); const chat = read('src/components/ChatAssistant.tsx')
+  check('...on both surfaces (the moves are handed to the card)', /moves: context\.calendar\.moves, today \}\) \}\)/.test(app) && /moves: context\.calendar\.moves, today: context\.calendar\.today \}\)/.test(chat))
 }
 
 console.log(`\n${ran} checks ran, ${failures} failed.`)

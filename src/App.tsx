@@ -2928,7 +2928,7 @@ function App() {
       const trial = await rebuildFromCurrentWeek(profile, effectiveExclusions, mesocycle, currentWeek, context, { seedKey })
       if (cancelled || !trial.ok || !trial.mesocycle) return
       const today = context.calendar.today
-      setRebuildPreview({ seedKey, lines: describeRebuild(mesocycle, trial.mesocycle, { start: { fromWeek: currentWeek, fromDate: today, said: 'from today' }, planCreatedAt: createdAt }) })
+      setRebuildPreview({ seedKey, lines: describeRebuild(mesocycle, trial.mesocycle, { start: { fromWeek: currentWeek, fromDate: today, said: 'from today' }, planCreatedAt: createdAt, moves: context.calendar.moves, today }) })
     })().catch(console.error)
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
