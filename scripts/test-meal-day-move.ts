@@ -123,7 +123,7 @@ async function main() {
   const { datesFrom, buildRotation, serveMealWeek, pinsFromPicks } = await import('../src/lib/meal-rotation')
   const { dayLabel } = await import('../src/lib/day-labels')
   const { computeMealMacros } = await import('../src/lib/food-db')
-  const { buildMealDayMoveProposal, sameMealDayMove, isNoticeableResize } = await import('../src/lib/meal-day-move')
+  const { buildMealDayMoveProposal, sameMealDayMove, isNoticeableResize, describeOtherChanges } = await import('../src/lib/meal-day-move')
   const { executeMealDayMove } = await import('../src/lib/pending-action-executor')
   const { setDevClockOverride } = await import('../src/lib/dev-clock')
   const { DAY_MOVE } = await import('../src/lib/coach-voice')
@@ -341,23 +341,19 @@ async function main() {
     check('a swap that needs the day re-fitted keeps every other dish: no meal becomes a different dish to fit',
       !!refit && refitTruth.every(t => t.resized || t.nowLeftover || t.wasLeftover) && !refitSaid.some(x => /becomes .*, so the day still fits\./.test(x)), { refitTruth, refitSaid })
 
-    // MORE THAN FOUR CHANGES: the first four are listed and the rest folded
-    // into one counted line, so a card never becomes a wall of text and never
-    // hides that there is more.
-    const [m1, m2] = pairWhere(t => t.length > 4)
-    const many = okOf(build(on, { meal_slot: 'dinner', from_date: dates[m1], to_date: dates[m2] }))
-    const manyTruth = diffOf(many?.after, [dates[m1], dates[m2]], 'dinner')
-    const lines = (many?.diff.implications ?? []).map(i => i.text)
-    check('the fixture is under pressure: more than four other meals change', manyTruth.length > 4, manyTruth.length)
+    // MORE THAN FOUR CHANGES: the first four are listed and the rest folded into one counted line, so a card never
+    // becomes a wall of text and never hides that there is more. RE-ANCHORED 14 Nov 2026 (his "Ask, and hold Tuesday"):
+    // a swap now holds the next day's other meals too, so no swap in this week changes more than four meals or resizes
+    // one past the line; the card's own lines are built by describeOtherChanges, asked here of constructed changes.
+    const opt = (name: string, kcal: number, leftover = false) => ({ name, macros: { calories: kcal, protein: 30, carbs: 50, fat: 10 }, ingredients: [], tags: [], ...(leftover ? { leftoverFrom: 'dinner' } : {}) }) as never
+    const six = [1, 2, 3, 4, 5, 6].map(i => ({ date: dates[i], slot: 'breakfast' as Slot, was: opt(`Old ${i}`, 400), to: opt(`New ${i}`, 400), resized: false }))
+    const lines = describeOtherChanges(six, weekOn, today)
+    check('the card is built from the one function the tests ask', /for \(const text of describeOtherChanges\(changes, after, today\)\) implications\.push/.test(readFileSync(join(ROOT, 'src/lib/meal-day-move.ts'), 'utf8')))
     check('the first four are listed', lines.filter(t => /becomes|goes from/.test(t)).length === 4, lines)
-    check('...and the rest are counted in one line, not dropped', lines.includes(DAY_MOVE.andMore(manyTruth.length - 4)), { n: manyTruth.length, lines })
-    // A pair with a size-only change among few enough changes that every one is listed (found, not written down: see above).
-    const [z1, z2] = pairWhere(t => t.length <= 4 && t.some(x => x.resized))
-    const sized = okOf(build(on, { meal_slot: 'dinner', from_date: dates[z1], to_date: dates[z2] }))
-    const sizedTruth = diffOf(sized?.after, [dates[z1], dates[z2]], 'dinner')
-    const sizedSaid = (sized?.diff.implications ?? []).map(i => i.text)
-    check('a meal that changes only in SIZE is reported with both sizes',
-      sizedTruth.some(t => t.resized) && sizedSaid.some(x => /goes from [\d,]+ to [\d,]+ kcal/.test(x)), { sizedTruth, sizedSaid })
+    check('...and the rest are counted in one line, not dropped', lines.includes(DAY_MOVE.andMore(2)), lines)
+    const sizedSaid = describeOtherChanges([{ date: dates[2], slot: 'breakfast', was: opt('Oats bowl', 400), to: opt('Oats bowl', 520), resized: true }, { date: dates[3], slot: 'lunch', was: opt('A', 500), to: opt('B', 500), resized: false }], weekOn, today)
+    check('a meal that changes only in SIZE is reported with both sizes, after the new dishes',
+      sizedSaid.length === 2 && /goes from 400 to 520 kcal/.test(sizedSaid[1]) && /becomes/.test(sizedSaid[0]), sizedSaid)
 
     // WHEN A SIZE CHANGE IS WORTH A LINE, with literals, so the thresholds
     // bind: at least 50 kcal AND a tenth of the meal.

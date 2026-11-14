@@ -120,8 +120,8 @@ console.log('\n6. The coach (main chat) and Profile')
     send.length > 1000 && /if \(!failed && !coachSavedAFoodDislike\)[\s\S]{0,120}saveFoodsSaidInPassing\(userText\)/.test(send)
     && /coachSavedAFoodDislike = result\.memoryIntent\?\.tool === 'record_fact'/.test(send))
   const saver = chat.slice(chat.indexOf('const saveFoodsSaidInPassing'), chat.indexOf('const resolveAndSaveMemory'))
-  check('...through the same write as Profile\'s Foods to avoid (a hard food dislike), each with an Undo',
-    saver.length > 200 && /detectFoodExclusions\(userText\)/.test(saver) && /kind: 'food_preference'/.test(saver) && /polarity: 'dislike', hardness: 'hard'/.test(saver) && /undoToken: row\.id/.test(saver))
+  check('...through the same write as Profile\'s Foods to avoid (a hard food dislike), each with an Undo; only what was said firmly (his "Ask, and hold Tuesday")',
+    saver.length > 200 && /firmFoodExclusions\(userText\)/.test(saver) && /kind: 'food_preference'/.test(saver) && /polarity: 'dislike', hardness: 'hard'/.test(saver) && /undoToken: row\.id/.test(saver))
   const prof = code('src/components/ProfileScreen.tsx')
   check('Profile\'s Foods to avoid box splits what is typed into foods', /<EditableTagList values=\{hardFoodDislikeValues\}[^>]*split=\{splitFoodList\}/.test(prof))
 }

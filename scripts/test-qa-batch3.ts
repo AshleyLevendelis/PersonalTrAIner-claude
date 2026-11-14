@@ -23,6 +23,9 @@ import { resolveMoveTarget } from '../src/lib/session-move'
 import { describeRebuild } from '../src/lib/rebuild-card'
 import { computeMealMacros, lookupIngredient } from '../src/lib/food-db'
 import { buildDayGuard, buildOwedGuard } from '../src/lib/plan-guard'
+import { firmFoodExclusions, foodDislikesToAsk, DISLIKE_ASK } from '../src/lib/food-exclusions'
+import { computeMealMacros } from '../src/lib/food-db'
+import { datesFrom, buildRotation, serveMealWeek } from '../src/lib/meal-rotation'
 import type { UserProfile, WorkoutDay, MesocycleWeek } from '../src/lib/types'
 
 let failures = 0
@@ -155,6 +158,65 @@ console.log('\n11. A moved session survives a change of days (his "Keep it, stil
   check('...and a move to a day already gone is not announced', !past.some(l => /stays there/.test(l)), past)
   const app = read('src/App.tsx'); const chat = read('src/components/ChatAssistant.tsx')
   check('...on both surfaces (the moves are handed to the card)', /moves: context\.calendar\.moves, today \}\) \}\)/.test(app) && /moves: context\.calendar\.moves, today: context\.calendar\.today \}\)/.test(chat))
+}
+
+console.log('\n12. "I don\'t like X" is asked about; a swap holds the next day (his "Ask, and hold Tuesday")')
+{
+  check('"I don\'t like salmon", "I hate mushrooms", "not a fan of tuna": asked, never saved at once',
+    ["I don't like salmon", 'I hate mushrooms', 'not a fan of tuna'].every(t => foodDislikesToAsk(t).length === 1 && firmFoodExclusions(t).length === 0))
+  check('an allergy, "I don\'t eat pork", "no pork for me" and "Never give me salmon": saved at once, never asked',
+    ["I'm allergic to peanuts", "I don't eat pork", 'no pork for me', 'Never give me salmon'].every(t => firmFoodExclusions(t).length === 1 && foodDislikesToAsk(t).length === 0))
+  check('...and in one message each is read on its own', JSON.stringify(foodDislikesToAsk("I'm allergic to peanuts and I don't like salmon")) === '["salmon"]' && JSON.stringify(firmFoodExclusions("I'm allergic to peanuts and I don't like salmon")) === '["peanuts"]')
+  const turn = DISLIKE_ASK.turn(['salmon'])
+  check('the app asks "just this meal, or never?" with two buttons, and the "never" button is itself a firm statement',
+    /just this meal, or should I keep salmon off your meals for good\?/.test(turn) && /\[QUICK_REPLIES: "Just this meal" \| "Never give me salmon"\]/.test(turn) && firmFoodExclusions(DISLIKE_ASK.never(['salmon'])).length === 1)
+  const chat = read('src/components/ChatAssistant.tsx')
+  check('the coach\'s save of a food dislike waits for the answer, and the backstop saves only what was said firmly',
+    /args\?\.polarity !== 'like' && toAsk\.length > 0\) \{\s*return \{ text: DISLIKE_ASK\.turn\(toAsk\) \}/.test(chat) && /mergeFoodsToAvoid\(already, firmFoodExclusions\(userText\)\)/.test(chat))
+  check('...and when the coach recorded nothing, the app asks under its reply', /const toAsk = foodDislikesToAsk\(userText\)\s*if \(toAsk\.length > 0\) \{\s*const turn = DISLIKE_ASK\.turn\(toAsk\)/.test(chat))
+  const coach = fs.readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
+  check('the coach is told the app asks, and not to record or ask it itself', (coach.match(/just this meal, or never\?/g) ?? []).length >= 2)
+
+  // HOLD TUESDAY: swap a day's dinner for another of the plan's dinners; the next day's lunch is re-made from it, and
+  // the next day's breakfast and dinner keep the dishes the plan served.
+  type Opt = { slot: string; name: string; ingredients: { name: string; quantity: number; unit: string }[]; tags: string[]; macros: { calories: number; protein: number; carbs: number; fat: number } }
+  const dish = (slot: string, name: string, chicken: number, rice: number, oil: number): Opt => {
+    const ingredients = [{ name: 'chicken breast', quantity: chicken, unit: 'g' }, { name: 'white rice', quantity: rice, unit: 'g' }, { name: 'olive oil', quantity: oil, unit: 'g' }]
+    const c = computeMealMacros(ingredients)
+    return { slot, name, ingredients, tags: [], macros: { calories: Math.round(c.kcal), protein: Math.round(c.protein), carbs: Math.round(c.carbs), fat: Math.round(c.fat) } }
+  }
+  const pools = {
+    breakfast: [dish('breakfast', 'Oats bowl', 60, 150, 8), dish('breakfast', 'Rice porridge', 55, 160, 7), dish('breakfast', 'Egg rice', 65, 140, 9), dish('breakfast', 'Small bowl', 55, 110, 6)],
+    lunch: [dish('lunch', 'Chicken salad', 150, 200, 12), dish('lunch', 'Rice and greens', 140, 220, 11), dish('lunch', 'Grain bowl', 160, 190, 13)],
+    dinner: [dish('dinner', 'Tray bake', 170, 220, 14), dish('dinner', 'Rice pot', 160, 240, 12), dish('dinner', 'Baked chicken', 180, 210, 15), dish('dinner', 'Light supper', 165, 150, 9), dish('dinner', 'Chicken broth bowl', 170, 130, 8)],
+  }
+  const t = [pools.breakfast[0], pools.lunch[0], pools.dinner[0]].reduce((a, o) => ({ calories: a.calories + o.macros.calories, protein: a.protein + o.macros.protein, carbs: a.carbs + o.macros.carbs, fat: a.fat + o.macros.fat }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
+  const today = '2026-09-27'
+  const dates = datesFrom(today, 7)
+  const shape = { mealsPerDay: 3, includeSnacks: false, batchCooking: true }
+  const serving = (pinsByDate: Record<string, Record<string, unknown>>) => serveMealWeek({ today, dates, todaysPins: {}, pinsByDate, pools, targets: t, softLikedFoods: [], shape, rotation: buildRotation(pools as never, t, [], shape as never) } as never)
+  const base = serving({})
+  let cases = 0, lunchMoved = 0, held = 0, collisions = 0, ghost = 0; const broke: string[] = []
+  for (let i = 1; i < dates.length - 1; i++) {
+    const was = base[i].day.chosen.dinner?.name
+    for (const other of pools.dinner.filter(d => d.name !== was)) {
+      const after = serving({ [dates[i]]: { dinner: other } })
+      const next = after[i + 1].day.chosen, before = base[i + 1].day.chosen
+      cases++
+      if (next.lunch?.name !== before.lunch?.name) lunchMoved++
+      // A lunch served as last night's leftovers is of the dinner actually cooked, never of the one swapped out.
+      if (next.lunch?.leftoverFrom === 'dinner' && was && next.lunch.name.startsWith(was) && !next.lunch.name.startsWith(other.name)) ghost++
+      // A dinner that would be the lunch's own dish again changes (never the same dish twice a day); nothing else does.
+      const dinnerOk = before.dinner?.name === other.name ? (!!next.dinner && !!next.lunch && !next.lunch.name.startsWith(next.dinner.name) && !next.dinner.name.startsWith(next.lunch.name)) : next.dinner?.name === before.dinner?.name
+      if (before.dinner?.name === other.name) collisions++
+      if (next.breakfast?.name === before.breakfast?.name && dinnerOk) held++
+      else broke.push(`${dates[i]} -> ${other.name}: ${before.breakfast?.name}/${before.dinner?.name} became ${next.breakfast?.name}/${next.dinner?.name}`)
+    }
+  }
+  check('the fixture binds: a swapped dinner re-makes the next day\'s lunch in most cases', cases >= 10 && lunchMoved >= cases / 2, { cases, lunchMoved })
+  check('...and the next day\'s breakfast and dinner keep the dishes the plan served, every time (where the lunch would repeat the dinner\'s dish, one of the two changes)', held === cases, broke.slice(0, 4))
+  check('...and the next day\'s lunch is never the leftovers of the dinner swapped out', ghost === 0, { ghost })
+  check('...the repeat case is in the fixture, so that exception is tested too', collisions >= 1, { collisions })
 }
 
 console.log(`\n${ran} checks ran, ${failures} failed.`)

@@ -86,7 +86,7 @@ import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options
 import { compileFoodDislikes, compileSoftExercisePreferences } from '@/lib/fact-compiler'
 import { coachSwapPick, swapOptionsBlock } from '@/lib/coach-swap-pick'
 import { namedFoodClash, namedFoodKindAsk, clashSentence, allergyRefusal } from '@/lib/named-food-clash'
-import { detectFoodExclusions, mergeFoodsToAvoid } from '@/lib/food-exclusions'
+import { firmFoodExclusions, foodDislikesToAsk, DISLIKE_ASK, mergeFoodsToAvoid } from '@/lib/food-exclusions'
 import { exercisesThatFit } from '@/lib/exercise-shortlist'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { swapNameFallback } from '@/lib/swap-name-fallback'
@@ -5218,7 +5218,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const profileId = profile.id
     if (!profileId) return []
     const already = memoryFacts.filter(f => f.kind === 'food_preference' && f.polarity === 'dislike').map(f => f.resolved_refs?.[0] ?? f.display_text)
-    const { added } = mergeFoodsToAvoid(already, detectFoodExclusions(userText))
+    const { added } = mergeFoodsToAvoid(already, firmFoodExclusions(userText))
     const receipts: ChatReceiptView[] = []
     for (const food of added) {
       const displayText = `won't eat/do ${food}`
@@ -6673,6 +6673,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       return resolveAndMaybeLog(entries, result.logWorkout.corrects_previous === true, userSaid)
     }
     if (result.memoryIntent) {
+      // "I DON'T LIKE X" IS ASKED ABOUT FIRST (his "Ask, and hold Tuesday", 14 Nov 2026): a food dislike said only with a
+      // like-verb is not saved; the app asks "just this meal, or never?", and "Never give me X" saves it.
+      const toAsk = foodDislikesToAsk(userSaid ?? '')
+      const args = result.memoryIntent.rawArgs
+      if (result.memoryIntent.tool === 'record_fact' && args?.kind === 'food_preference' && args?.polarity !== 'like' && toAsk.length > 0) {
+        return { text: DISLIKE_ASK.turn(toAsk) }
+      }
       return textBesideSave(await resolveAndSaveMemory(result.memoryIntent), result.reply)
     }
     if (result.groceryIntent) {
@@ -7022,6 +7029,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const ticks = await saveFoodsSaidInPassing(userText)
       if (ticks.length > 0) {
         setMessages(prev => [...prev, ...ticks.map(r => ({ role: 'assistant' as const, content: r.title, status: 'complete' as const, receipt: r }))])
+      }
+      // The coach recorded nothing and he said "I don't like X": the app asks, once, under the coach's reply.
+      const toAsk = foodDislikesToAsk(userText)
+      if (toAsk.length > 0) {
+        const turn = DISLIKE_ASK.turn(toAsk)
+        setMessages(prev => [...prev, { role: 'assistant' as const, content: stripTags(turn), quickReplies: extractQuickReplies(turn), status: 'complete' as const }])
       }
     }
   }

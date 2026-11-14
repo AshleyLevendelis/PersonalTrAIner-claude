@@ -603,17 +603,27 @@ export function assembleRotationDay(
   const live = (Object.entries(pinned) as [MealSlotName, PoolOption | undefined][])
     .filter((e): e is [MealSlotName, PoolOption] => e[1] != null && !e[1].breaksRestriction)
   let plannedForOut: AssembledDay | undefined
-  if (live.length > 0 && !live.some(([, o]) => isHerOwnDish(o, pools))) {
-    const plannedDay = dayFor({})
+  // AND A LUNCH RE-MADE FROM A SWAPPED DINNER HOLDS THE REST OF ITS DAY (his ruling 14 Nov 2026, "Ask, and hold
+  // Tuesday"): Monday's dinner swapped, Tuesday's lunch is the new dinner's leftovers (or cooked fresh), and Tuesday's
+  // other meals keep the dishes the plan served, re-sized together as a same-day swap does. Priya's whole Tuesday changed.
+  if ((live.length > 0 || replanned) && !live.some(([, o]) => isHerOwnDish(o, pools))) {
+    const plannedDay = replanned
+      ? assembleDay(pools, targets, historyForVariety(rotation.historyFor(index), rotation.builtFrom.shape), softLikedFoods, { ...planned, ...away })
+      : dayFor({})
     plannedForOut = plannedDay
     const fixed: Partial<Record<MealSlotName, PoolOption>> = Object.fromEntries(live)
     // A leftover lunch is last night's dinner, already portioned: it stays as
     // it is. Taken from the day WITH her pin, which already knows whether the
     // leftover yields to a dinner of the same dish (cook once, not twice today).
-    if (!fixed.lunch && day.chosen.lunch?.leftoverFrom === 'dinner') fixed.lunch = day.chosen.lunch
+    if (!fixed.lunch && (day.chosen.lunch?.leftoverFrom === 'dinner' || replanned) && day.chosen.lunch) fixed.lunch = day.chosen.lunch
     // A meal cooked for him is the kitchen's portion, not his: it is never one of the meals re-sized around a swap.
     for (const [s, o] of Object.entries(away) as [MealSlotName, PoolOption][]) if (!fixed[s]) fixed[s] = o
-    const held = holdAroundPins({ planned: plannedDay, fixed, targets, keepSizes: opts.keepHeldSizes })
+    let held = holdAroundPins({ planned: plannedDay, fixed, targets, keepSizes: opts.keepHeldSizes })
+    // The re-made lunch is the very dish the plan served for dinner that day: only the dinner changes (to the one the
+    // day picked without it), and breakfast and snacks still hold. Never the same dish twice in a day.
+    if (!held && replanned && day.chosen.dinner && !fixed.dinner) {
+      held = holdAroundPins({ planned: plannedDay, fixed: { ...fixed, dinner: day.chosen.dinner }, targets, keepSizes: opts.keepHeldSizes })
+    }
     if (held) day = held
   }
   if (live.some(([, o]) => isEatingOut(o))) day = shrinkAroundEatingOut(day, Object.fromEntries(live), targets, plannedForOut)

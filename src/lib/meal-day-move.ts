@@ -177,6 +177,29 @@ const kcalNote = (from: PoolOption, to: PoolOption) => {
 /** The most other-meal changes the card lists before folding the rest into one line. */
 const MAX_LISTED_CHANGES = 4
 
+/** Another meal a swap changes: a different dish, or the same dish at a size worth saying. */
+export type OtherMealChange = { date: string; slot: MealSlotName; was: PoolOption | undefined; to: PoolOption; resized: boolean }
+
+/**
+ * The card's lines for the other meals a swap changes: a different dish first, then a resize, the first four listed and
+ * the rest counted in one line, so a card never becomes a wall of text and never hides that there is more.
+ */
+export function describeOtherChanges(changes: readonly OtherMealChange[], after: readonly { date: string; day: { withinTolerance: boolean } }[], today: string): string[] {
+  const sorted = [...changes].sort((x, y) => Number(x.resized) - Number(y.resized))
+  const lines: string[] = []
+  for (const c of sorted.slice(0, MAX_LISTED_CHANGES)) {
+    const day = dayLabel(c.date, today)
+    const fits = after.find(a => a.date === c.date)?.day.withinTolerance === true
+    lines.push(c.resized
+      ? DAY_MOVE.alsoResized(day, c.slot, Math.round(c.was!.macros.calories), Math.round(c.to.macros.calories), fits)
+      : c.to.leftoverFrom === 'dinner' ? DAY_MOVE.alsoLeftover(day, c.slot, c.to.name)
+      : c.was?.leftoverFrom === 'dinner' ? DAY_MOVE.alsoFresh(day, c.slot, c.to.name)
+      : DAY_MOVE.alsoRefit(day, c.slot, c.to.name, fits))
+  }
+  if (sorted.length > MAX_LISTED_CHANGES) lines.push(DAY_MOVE.andMore(sorted.length - MAX_LISTED_CHANGES))
+  return lines
+}
+
 /**
  * A meal that keeps its name but changes size is worth a line only when the
  * change is one she would notice on the plate: at least this many calories AND
@@ -361,8 +384,7 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
   // EVERY OTHER MEAL THE SWAP CHANGES, on any day of the week: a different
   // dish first, then the same dish at a different size (a pinned meal leaves
   // the free ones to re-fit, and a free meal can be resized a long way).
-  type Change = { date: string; slot: MealSlotName; was: PoolOption | undefined; to: PoolOption; resized: boolean }
-  const changes: Change[] = []
+  const changes: OtherMealChange[] = []
   for (const served of after) {
     const wasDay = before.find(b => b.date === served.date)!
     for (const s of SLOTS) {
@@ -376,20 +398,7 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
       }
     }
   }
-  changes.sort((x, y) => Number(x.resized) - Number(y.resized))
-  for (const c of changes.slice(0, MAX_LISTED_CHANGES)) {
-    const day = dayLabel(c.date, today)
-    const fits = after.find(a => a.date === c.date)?.day.withinTolerance === true
-    const text = c.resized
-      ? DAY_MOVE.alsoResized(day, c.slot, Math.round(c.was!.macros.calories), Math.round(c.to.macros.calories), fits)
-      : c.to.leftoverFrom === 'dinner' ? DAY_MOVE.alsoLeftover(day, c.slot, c.to.name)
-      : c.was?.leftoverFrom === 'dinner' ? DAY_MOVE.alsoFresh(day, c.slot, c.to.name)
-      : DAY_MOVE.alsoRefit(day, c.slot, c.to.name, fits)
-    implications.push({ severity: 'info', text })
-  }
-  if (changes.length > MAX_LISTED_CHANGES) {
-    implications.push({ severity: 'info', text: DAY_MOVE.andMore(changes.length - MAX_LISTED_CHANGES) })
-  }
+  for (const text of describeOtherChanges(changes, after, today)) implications.push({ severity: 'info', text })
 
   // THE SHOPPING LIST IS NOT REBUILT BEHIND HER BACK (her refit and top-up
   // rulings: tell her). Every day whose meals changed counts, not only the two

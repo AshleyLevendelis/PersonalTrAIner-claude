@@ -235,7 +235,7 @@ export async function getWeighInPicture(profileId: string, opts: { strict?: bool
  * as this, rather than before it, and the fallback is only awaited on the one branch that uses it.
  */
 /** Weigh-ins on this many different days in the last seven before a target can move (his "Need a week of readings"). */
-export const WEIGH_IN_DAYS_TO_MOVE = 3
+const WEIGH_IN_DAYS_TO_MOVE = 3
 
 /** How many different days in the seven ending today hold a reading. */
 export function daysWeighedInLastWeek(dates: readonly string[], today: string): number {
