@@ -1,3 +1,4 @@
+import { plainTyped } from '@/lib/typed-text'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -626,6 +627,12 @@ function applySlot(
  * it records Female so the question is never asked; anything already answered is left alone.
  */
 function fillSexFromPregnancy(ws: WorkingState, userText?: string): void {
+  // SAID IN WORDS, IT IS NOTED AS THE TAP WOULD (QA, 14 Nov 2026): "I'm 20 weeks pregnant" filled in the sex and left
+  // "Pregnant" unticked, so the plan never knew. It is ticked on the injuries card (still asked, for the joints), and
+  // a skipped card keeps it (declineSlots).
+  if (userText && saysPregnant(userText) && !pregnancyAnswered(ws.values) && !ws.confirmed.has('injuries')) {
+    ws.values = { ...ws.values, injuries: [...((ws.values.injuries as string[] | null) ?? []), 'pregnancy'] } as OnboardingSlotValues
+  }
   if (ws.values.gender != null) return
   if (!pregnancyAnswered(ws.values) && !(userText && saysPregnant(userText))) return
   ws.values = { ...ws.values, gender: 'female' } as OnboardingSlotValues
@@ -659,7 +666,9 @@ function declineSlots(ws: WorkingState, keys: SlotKey[]): SlotKey[] {
     // plain blanks. null is the fact, not an inference, and it lands in the
     // same absence handling ('' and null both become undefined in
     // assembleProfile's numericOrUndefined).
-    ws.values = { ...ws.values, [key]: null } as OnboardingSlotValues
+    // Pregnancy she told us about is never lost to a skipped injuries card (fillSexFromPregnancy).
+    const kept = key === 'injuries' && pregnancyAnswered(ws.values) ? ['pregnancy'] : null
+    ws.values = { ...ws.values, [key]: kept } as OnboardingSlotValues
     ws.confirmed = new Set(ws.confirmed).add(key)
     ws.resolveCards.add(key)
     declined.push(key)
@@ -1220,7 +1229,8 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
    * sees an already-answered slot as remaining.
    */
   const sendMessage = async (text: string, preRecorded?: WorkingState) => {
-    const trimmed = text.trim()
+    // A phone's curly apostrophe is made plain before any of the app's readers see it (plainTyped).
+    const trimmed = plainTyped(text.trim())
     if (!trimmed || busy) return
     // CHANGING "FOODS TO AVOID" FROM THE SUMMARY IS SETTLED HERE, NOT BY THE
     // MODEL (test log H12, 11 Oct 2026). A typed answer to a text slot's edit

@@ -954,7 +954,7 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // HEALTH CONDITIONS RIDE ON THIS CARD (his ruling 14 Nov 2026, "Fold into injuries": no new question). The card offers
   // the joints and then five taps for what a doctor has said to watch; the answer holds both and assembleProfile
   // splits them, joints to `injuries` (the injury filter) and conditions to `health_conditions` (health-conditions.ts).
-  { key: 'injuries', question: 'Anything that bothers you when you train, or anything a doctor has said to watch?', inputHint: 'Anything that bothers you?', shortLabel: 'Niggles', control: 'multi', required: false, options: INJURY_CARD_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_CARD_OPTIONS) },
+  { key: 'injuries', question: 'Anything that bothers you when you train, or anything a doctor has said to watch?', inputHint: 'Anything that bothers you?', shortLabel: 'Injuries and health', control: 'multi', required: false, options: INJURY_CARD_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_CARD_OPTIONS) },
   // AFTER injuries, which must stay in the opening block (her ruling: the only question whose absence can hurt),
   // and still right behind equipment: the ticks start from that answer (picksHomeKit, defaultKitTicks).
   { key: 'kitTicks', question: 'Which of these do you have?', inputHint: 'Tick everything you have', shortLabel: 'Your kit', control: 'multi', required: false, requiredIf: picksHomeKit, options: KIT_TICK_OPTIONS, destination: 'user_facts', validate: isSubsetOf(KIT_TICK_OPTIONS) },
@@ -1635,8 +1635,12 @@ export function cardQuestion(key: SlotKey, values: OnboardingSlotValues, confirm
  * about pregnancy in general.
  */
 export function saysPregnant(text: string): boolean {
-  if (/\bnot\b[^.?!]{0,12}\bpregnan/i.test(text)) return false
-  return /\b(i'?m|i am|am|currently|now|we'?re)\b[^.?!]{0,24}\bpregnan/i.test(text)
+  const t = text.replace(/[\u2018\u2019\u02BC]/g, "'")
+  if (/\b(not|no longer|was|were|been|after|before)\b[^.?!]{0,12}\bpregnan/i.test(t)) return false
+  // Her own present pregnancy, never someone else's ("we're pregnant" can be said by a partner, so it is not read).
+  return /\b(i'?m|i am|am|currently)\b[^.?!]{0,24}\bpregnan/i.test(t)
+    || /^\s*pregnant\b/i.test(t)
+    || /\b\d{1,2} ?(weeks?|months?) (pregnant|into my pregnancy)\b/i.test(t)
 }
 export function pregnancyAnswered(values: { injuries?: unknown }): boolean {
   return Array.isArray(values.injuries) && values.injuries.includes('pregnancy')

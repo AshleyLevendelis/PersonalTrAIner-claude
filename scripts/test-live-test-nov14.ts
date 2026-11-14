@@ -18,6 +18,8 @@ import { weekDayRow } from '../src/lib/exercise-week'
 import { resolveMoveTarget } from '../src/lib/session-move'
 import { dayListState, type GroceryItemRow } from '../src/lib/grocery-store'
 import { formVideoFor, exerciseNamedIn, linkifyBareUrls, asksHowOrVideo } from '../src/lib/exercise-video'
+import { plainTyped } from '../src/lib/typed-text'
+import { detectFoodExclusions } from '../src/lib/food-exclusions'
 import { raceDateMissing, RACE_DATE_QUESTION } from '../src/lib/running'
 import type { WorkoutDay } from '../src/lib/types'
 
@@ -152,6 +154,24 @@ async function main() {
     check('the chat asks it before building the running card', /raceDateMissing\(userSaid, result\.proposal\.rawArgs\.goal, result\.proposal\.rawArgs\.race_date\)\s*\?\s*\{ refusal: RACE_DATE_QUESTION \}\s*:\s*buildRunningGoalProposal/.test(chat))
     const coach = fs.readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
     check('the coach is told never to say "100% safe", even as a comparison', /NOT EVEN AS A COMPARISON/.test(coach) && /Never write "100% safe"/.test(coach))
+  }
+
+  console.log('\n9. Setup QA, 14 Nov: a phone\'s curly apostrophe, pregnancy said in words, the meals note')
+  {
+    check('a curly apostrophe is made plain', plainTyped('I can\u2019t do Monday') === "I can't do Monday" && plainTyped('\u201Cok\u201D') === '"ok"')
+    check('"I\u2019m 20 weeks pregnant" (phone apostrophe) is read as pregnant', saysPregnant('I\u2019m 20 weeks pregnant and want to stay fit'))
+    check('"Pregnant, 20 weeks" and "12 weeks into my pregnancy" are read', saysPregnant('Pregnant, 20 weeks') && saysPregnant("I'm 12 weeks into my pregnancy") && saysPregnant('about 20 weeks pregnant now'))
+    check('"my wife is pregnant", "we\'re pregnant", "I was pregnant last year", "after my pregnancy" are not', !saysPregnant('my wife is pregnant') && !saysPregnant("we're pregnant!") && !saysPregnant('I was pregnant last year') && !saysPregnant("I'm 6 months after my pregnancy"))
+    const ex = detectFoodExclusions(plainTyped('I don\u2019t eat pork'))
+    check('"I don\u2019t eat pork" (phone apostrophe) reaches Foods to avoid once made plain', JSON.stringify(ex).includes('pork'), ex)
+    const onb = strip(fs.readFileSync('src/components/onboarding/ConversationalOnboarding.tsx', 'utf8'))
+    check('setup makes what he types plain before any reader', /const trimmed = plainTyped\(text\.trim\(\)\)/.test(onb))
+    check('pregnancy said in words is ticked on the injuries card, unless that card was answered', /saysPregnant\(userText\) && !pregnancyAnswered\(ws\.values\) && !ws\.confirmed\.has\('injuries'\)/.test(onb) && /injuries: \[\.\.\.\(\(ws\.values\.injuries as string\[\] \| null\) \?\? \[\]\), 'pregnancy'\]/.test(onb))
+    check('...and a skipped injuries card keeps it', /const kept = key === 'injuries' && pregnancyAnswered\(ws\.values\) \? \['pregnancy'\] : null/.test(onb) && /\[key\]: kept \}/.test(onb))
+    const chatSrc = strip(fs.readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
+    check('the chat makes what he types plain too', /const userText = plainTyped\(input\.trim\(\)\)/.test(chatSrc))
+    const meal = strip(fs.readFileSync('src/components/MealPlan.tsx', 'utf8'))
+    check('Nutrition never tells someone who just set up to "Complete onboarding"', !/Complete onboarding/.test(meal))
   }
 
   console.log(`\n${ran} checks ran, ${failures} failed.`)

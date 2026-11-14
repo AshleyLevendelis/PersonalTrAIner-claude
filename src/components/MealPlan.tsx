@@ -452,7 +452,7 @@ export function MealPlan({
             ) : unrecognisedBanner ? (
               <p className="text-xs text-muted-foreground/70">Fix the restriction above, then generate.</p>
             ) : (
-              <p className="text-xs text-muted-foreground/70">Complete onboarding to generate your meal pools, or regenerate below.</p>
+              <p className="text-xs text-muted-foreground/70">Tap below to make your meals.</p>
             )}
             {!unrecognisedBanner && targets !== null && (
               <Button size="sm" onClick={onRegenerateAll} disabled={isGenerating} className="mt-2">

@@ -1,5 +1,6 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
 import { healthConditionsOf, healthConditionsInWords } from '@/lib/health-conditions'
+import { plainTyped } from '@/lib/typed-text'
 import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays, raceDateMissing, RACE_DATE_QUESTION } from '@/lib/running'
 import { blockShape } from '@/lib/timer-engine'
 import { circuitName } from '@/lib/circuit'
@@ -6825,7 +6826,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (!input.trim() || isLoading) return
     if (navigator.vibrate) navigator.vibrate(10)
 
-    const userText = input.trim()
+    // A phone's curly apostrophe is made plain before the app's readers see it (plainTyped, QA 14 Nov 2026).
+    const userText = plainTyped(input.trim())
     const now = new Date().toISOString()
     const userMessage: ChatMessage = { role: 'user', content: userText, status: 'complete', created_at: now }
     setMessages(prev => [...prev, userMessage])
