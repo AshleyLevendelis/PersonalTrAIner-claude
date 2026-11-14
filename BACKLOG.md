@@ -2,6 +2,11 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH'S SHARED COPIES ARE NOW CHECKED IN THE SWEEP** (14 Nov 2026). The "Correct it now" change edited the
+  app's weigh-in rules and not the coach's generated copy, so every server deploy refused to run on his machine; his
+  local session re-synced it and pushed to main. The drift check existed only as the deploy's own precheck, so no
+  sweep could see it. `test:shared-code-sync` runs it (1 mutation: a line added to the app's copy, caught).
+
 - [x] **A SETUP WEIGHT CORRECTED THE SAME DAY, OR ON PROFILE, REPLACES IT (his ruling 14 Nov 2026, "Correct it now",
   from three options: over "keep holding it" and over "also ask at setup")**. His live report, with screenshots: setup
   kept 187 kg, Nutrition said 4,336 kcal / 374 g protein (2.0 x 187), he told the coach "I meant 87kg", confirmed

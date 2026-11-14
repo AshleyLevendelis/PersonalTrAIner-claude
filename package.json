@@ -30,6 +30,7 @@
     "test:chat-app-reality": "tsx scripts/test-chat-app-reality.ts",
     "test:grocery": "tsx scripts/test-grocery.ts",
     "sync:shared": "node scripts/sync-shared-code.mjs",
+    "test:shared-code-sync": "node scripts/sync-shared-code.mjs --check",
     "test:meal-amounts": "tsx scripts/test-meal-amounts.ts",
     "verify:meal-log-card": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-log-card.mjs",
     "test:weigh-in-targets": "tsx scripts/test-weigh-in-targets.ts",
