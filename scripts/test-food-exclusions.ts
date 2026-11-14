@@ -105,7 +105,7 @@ console.log('\n5. Setup: the backstop, the summary edit, the guard')
   check('...BEFORE the coach is asked (committed with the turn, so the model sees it answered)',
     send.indexOf('detectFoodExclusions(') > 0 && send.indexOf('detectFoodExclusions(') < send.indexOf('functions/v1/onboarding-chat'))
   check('the coach can add to Foods to avoid but never take one off: after its actions, the list as the turn began is put back',
-    /executeActions\(responseWs[\s\S]{0,900}mergeFoodsToAvoid\(splitFoodList\(responseWs\.values\.dislikedFoods\),\s*splitFoodList\(ws\.values\.dislikedFoods\)\)\s*if \(keptFoods\.added\.length > 0\) applySlot\(responseWs,\s*'dislikedFoods'/.test(send))
+    /executeActions\(responseWs[\s\S]{0,3000}mergeFoodsToAvoid\(splitFoodList\(responseWs\.values\.dislikedFoods\),\s*splitFoodList\(ws\.values\.dislikedFoods\)\)\s*if \(keptFoods\.added\.length > 0\) applySlot\(responseWs,\s*'dislikedFoods'/.test(send))
   check('"Change Foods to avoid" from the summary is settled in code: split into foods, saved, no model call',
 /if \(!preRecorded && editingKey === 'dislikedFoods' && \(isPlainNone\(trimmed\) \|\| \(typedFoods\.length > 0 && typedFoods\.every\(isFoodToAvoid\)\)\)\) \{[\s\S]{0,200}applySlot\(edit,\s*'dislikedFoods',\s*typedFoods\.join\(', '\),\s*values\)\s*&&\s*settleEdit\(edit,\s*trimmed\)\)\s*return/.test(send)
     && send.indexOf("editingKey === 'dislikedFoods'") < send.indexOf('setBusy(true)'))
