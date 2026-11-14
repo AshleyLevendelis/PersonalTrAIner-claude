@@ -75,6 +75,7 @@ const noteOn = (day: WorkoutDay, profile: UserProfile): string | null =>
 // this gate agree with it. ----
 const LEG_COMPOUND = new Set(['knee_dominant', 'hip_hinge', 'single_leg'])
 const LEG_FOCUS = new Set(['Legs & Calves', 'Squat & Carry', 'Pull & Hinge', 'Full Body Power'])
+const PRESS = new Set(['horizontal_push', 'vertical_push'])
 const isDeltWork = (e: ExerciseEntry) =>
   e.movement_pattern === 'vertical_push' || e.movement_pattern === 'isolation_shoulder' || e.substitution_group === 'rear_delt'
 const DEFINING: Record<string, (e: ExerciseEntry) => boolean> = {
@@ -346,6 +347,10 @@ function main() {
           if (!own && !borrowed) return false
           if (borrowed && !own && e.mechanics_tier === 'tier1_compound') return false
           if (onTheDay.includes(getMovementFamily(e))) return false
+          // A press is not "work to give" in a week that already presses as much as it pulls: the week's push:pull pass
+          // takes it away on purpose, the same deliberate rule P3 accepts. Found 14 Nov 2026, when "Bodyweight only"
+          // lost the pull-up bar: with two rows left and no pull to add, the pass removes the chest day's push-ups.
+          if (PRESS.has(e.movement_pattern) && pressSets >= pullSets) return false
           return (weekCount.get(e.name) ?? 0) < 2
         }) : []
         if (reachable.length > 0) offenders.thin.push(`${key} ${d.day} ${d.focus} sets=${workingSets(d)} could still take ${reachable.slice(0, 3).map(e => e.name).join(', ')}`)

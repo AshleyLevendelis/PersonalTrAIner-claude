@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **PRE-MERGE SWEEP OF THE THREE 14 NOV BUILDS: THREE GATES MOVED BY "BODYWEIGHT ONLY STARTS WITH NOTHING TICKED"**
+  (sweep on cbcdec27, 564 checks). All three were grid fixtures that leaned on the pull-up bar or the weighted bag.
+  (1) `test:push-pull-score` [2] and [5]: their pull-heavy plan was bodyweight, pull-heavy only because of pull-ups and
+  inverted rows; with no bar it reads 8:8. A search of a third of the hybrid and bodybuilding grid found no plan
+  pull-heavy with two presses to hand, so the case is now CONSTRUCTED the way [3] and [4] already were (a full-gym grid
+  plan with its pulling tripled). 2 of 2 mutations caught (exemption widened to every pull-heavy week; pull-heavy no
+  longer counted). (2) `test:frozen-weeks`: the carry floor "> 20" was a measurement of the old grid; backpack carries
+  left the bodyweight plans and frozen carries fell 52 -> 5. Re-anchored on what the floor held: some carries freeze,
+  and every one that does is at the distance cap. Mutation run below. (3) `test:day-purpose` P4: five bodyweight
+  Chest & Triceps days at 9 working sets with 10+ minutes of optional mobility "could still take Push-Ups". A
+  read-only trace: the week's push:pull pass now REMOVES the push-ups on purpose, because the only pulls left without
+  a bar are two rows of one family, so no pull can be added to match (before, it added an inverted row or a pull-up).
+  CSCS review (mine): the effect is one press family on that day and a week that pulls at least as much as it presses,
+  which is the shoulder-health fundamental the pass exists for; it takes away a second chest movement, not a pattern;
+  coverage, overload and recovery are untouched; no floor is redefined; in scope. A coach with only a towel and a table
+  would not press more than they can row. So P4 takes P3's existing rule: a press is not "work to give" in a week that
+  already presses as much as it pulls. Named cost: a bodyweight lifter with no bar gets a lighter chest day with more
+  optional mobility; ticking a pull-up bar on Profile gives the pass a pull to add and the second press comes back.
+
 - [x] **SHORTER SETUP STEP 2: THE LIFT NUMBERS AT THE FIRST SESSION (his "Ask at the first session", 14 Nov 2026)** —
   BUILT; with steps 1 and 3 the light trim is done. Just under today's session card on a lifter's first session, one
   card: "Know a recent hard set?", a weight and reps box for the barbell back squat, bench press and deadlift, "Start

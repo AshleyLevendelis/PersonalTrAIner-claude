@@ -481,7 +481,7 @@ console.log('\n5. The measured improvement holds')
   // when the weight cannot" — docs/plans/consolidation-and-the-capped-bar.md).
   // Loaded non-carry 95 → 80 → 72; carries 38 throughout. Bar left at 4.0%:
   // the two named mutations already fail well inside it.
-  let total = 0, frozen = 0, loadedFrozen = 0, carryFrozen = 0
+  let total = 0, frozen = 0, loadedFrozen = 0, carryFrozen = 0, carryFrozenCapped = 0
   for (const { profile, seed } of everyCombo()) {
     for (const { exA, exB } of transitions(meso(profile, seed))) {
       const pt = (exA as { prescription_type?: string }).prescription_type
@@ -492,8 +492,10 @@ console.log('\n5. The measured improvement holds')
         : exA.suggested_load_kg === exB.suggested_load_kg
       if (!(loadFrozen && exA.reps === exB.reps)) continue
       frozen++
-      if (getExerciseEntry(exA.name)?.movement_pattern === 'carry') carryFrozen++
-      else if (exA.suggested_load_kg != null) loadedFrozen++
+      if (getExerciseEntry(exA.name)?.movement_pattern === 'carry') {
+        carryFrozen++
+        if ((exB as { distance_bump?: string }).distance_bump === 'capped') carryFrozenCapped++
+      } else if (exA.suggested_load_kg != null) loadedFrozen++
     }
   }
   const rate = frozen / total * 100
@@ -507,8 +509,12 @@ console.log('\n5. The measured improvement holds')
   // residual sit at exactly the 55m cap, which is a ceiling reached rather
   // than a lever missing. Asserted as a real reduction with a floor under it,
   // so neither a regression NOR a silent walk past the cap passes.
-  check(`carries roughly halved and stopped at the cap (${carryFrozen}, was 100)`,
-    carryFrozen < 70 && carryFrozen > 20, String(carryFrozen))
+  // RE-ANCHORED 14 Nov 2026: the floor was "> 20", a measurement of the old grid. "Bodyweight only" now starts with no
+  // pull-up bar and no weighted bag (his ruling that day), so the backpack carries left the bodyweight plans and the
+  // count fell to 5. The property the floor held is that carries DO stop at the cap (a cap removed reads 0), so it is
+  // asserted as that: some carries freeze, and every one that does is a carry whose distance ramp has run out.
+  check(`carries stay well under the 100 frozen before distance progressed, and do stop at the cap (${carryFrozen}, ${carryFrozenCapped} at the cap)`,
+    carryFrozen < 70 && carryFrozen > 0 && carryFrozenCapped === carryFrozen, `${carryFrozen} frozen, ${carryFrozenCapped} at the cap`)
 }
 
 // ---------------------------------------------------------------------------
