@@ -919,6 +919,23 @@ await section(29, 'A change to Beginner drops the lift numbers and says so; none
     built && { exp: built.training_experience, squat: built.known_squat_kg, skip: built.skip_calibration_week })
 })
 
+await section(30, 'A question about training safely with a condition is never parked: GP line now, noted, back to setup (Sal/Margaret, 14 Nov 2026)', async () => {
+  await open('days')
+  await queue({
+    reply: "Great question, and I'll answer it properly once you're set up. So, how long have you got each time?",
+    actions: [{ name: 'park_question', args: { question: 'is it safe to exercise with high blood pressure?' } }],
+  })
+  await say('is it safe to exercise with high blood pressure?')
+  const text = await ev('document.body.innerText')
+  check('the app says to check with the GP, now', /check with your GP before you start a new exercise plan/.test(text), text.slice(-500))
+  check('...never "I\'ll answer it once you\'re set up"', !/once you.re set up/.test(text), text.match(/[^\n]{0,120}once you.re set up[^\n]{0,60}/)?.[0])
+  check('...and goes back to the question it was on', /how long have you got each time\?/.test(text), text.slice(-300))
+  const d = await evj(`__draft()`)
+  check('nothing is parked for later', (d?.parkedQuestions ?? []).length === 0, d?.parkedQuestions)
+  check('...and his own words are noted', (d?.pendingContextFacts ?? []).some(f => /blood pressure/.test(f.displayText)), d?.pendingContextFacts)
+  await shot('health-question-not-parked')
+})
+
 if (!isGone()) {
   try { check('harness: every request in this run was scripted', (await ev(`window.__onbUnscripted`)) === 0) } catch {}
 }

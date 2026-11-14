@@ -1561,6 +1561,15 @@ export function liftSetsAsk(): string {
   return "For each lift, a recent hard set: the weight, and how many reps you got. A one-rep max counts, put 1 rep. I'll work out your starting weights from them. Leave a lift empty if you're not sure of it."
 }
 /**
+ * The app's answer when the setup coach would have parked a question about training safely with a health condition,
+ * medication or pregnancy (his ruling 14 Nov 2026, "A"): never "later", always the GP now. No advice of its own: a CSCS
+ * does not assess a condition, and the app's one rule for this is to send it to someone who can.
+ */
+export function setupHealthQuestionLine(about: string): string {
+  return `Good to ask now rather than later. With ${about}, check with your GP before you start a new exercise plan: they know your health and anything you take. I've noted it.`
+}
+
+/**
  * Said by the app when a change to Beginner sets aside lift numbers already given (Sal/Margaret, 14 Nov 2026; his
  * ruling "a beginner won't know their numbers"): they are dropped, never saved, and he is told so in one line.
  */

@@ -41,7 +41,7 @@ import {
 import { measureParserFor, liftSetInUserWords, ageOn, todayLocal } from '@/lib/body-units'
 import { detectFoodExclusions, mergeFoodsToAvoid, isFoodToAvoid } from '@/lib/food-exclusions'
 import { splitFoodList, isPlainNone } from '@/lib/food-list'
-import { allergenFilterReceipt, beginnerLiftsSetAside, liftSetsAsk, liftNeedsASet, liftWhichOne } from '@/lib/coach-voice'
+import { allergenFilterReceipt, beginnerLiftsSetAside, setupHealthQuestionLine, liftSetsAsk, liftNeedsASet, liftWhichOne } from '@/lib/coach-voice'
 import { bareLiftWeight, coachAskedSetupQuestion, dropCoachQuestions, namedLiftSets, withoutQuestions } from '@/lib/onboarding-one-question'
 import { implausibleLifts } from '@/lib/lift-plausibility'
 import { ceilingIsInUserWords, isCeilingSlot } from '@/lib/onboarding-ceiling-capture'
@@ -51,6 +51,7 @@ import { chooseCard, questionAsksSlot, questionPartOf } from '@/lib/onboarding-c
 import { mealCountIn, mergePendingGoal, sessionLengthNote, snackAnswerIn, trainingDaysIn } from '@/lib/onboarding-capture'
 import { sportsIn, mergeSports, parseSportsSlot, formatSportsSlot } from '@/lib/setup-sports'
 import { contextNoteText } from '@/lib/save-reply'
+import { healthSafetyQuestion } from '@/lib/setup-health-question'
 import type { SessionDuration } from '@/lib/types'
 import { addParkedQuestion, saveParkedQuestions } from '@/lib/parked-questions'
 import {
@@ -1449,6 +1450,20 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       // words is decided in there, and a re-asked question brings its card
       // along whether or not the model asked for one.
       executeActions(responseWs, Array.isArray(result.actions) ? result.actions : [], trimmed)
+      // A SAFETY QUESTION ABOUT A CONDITION IS NEVER PARKED (his ruling 14 Nov 2026, "A"; setup-health-question.ts).
+      // When the coach parked one anyway, the app takes the park back, says the GP line instead of "later", notes it
+      // in his own words, and keeps whatever question the coach went back to.
+      const healthAbout = healthSafetyQuestion(trimmed)
+      if (healthAbout && responseWs.parkedQuestions.length > ws.parkedQuestions.length) {
+        responseWs.parkedQuestions = ws.parkedQuestions
+        const idx = responseWs.newMessages.findIndex(m => m.role === 'assistant' && !m.isReceipt && m.content.trim() !== '')
+        const backTo = idx >= 0 ? (responseWs.newMessages[idx].content.match(/[^.!?]+\?/g) ?? []).map(q => q.trim()).slice(-1).join(' ') : ''
+        const line = [setupHealthQuestionLine(healthAbout), backTo].filter(Boolean).join(' ')
+        if (idx >= 0) responseWs.newMessages[idx] = { ...responseWs.newMessages[idx], content: line }
+        else responseWs.newMessages.unshift({ role: 'assistant', content: line })
+        const note = trimmed.slice(0, 120)
+        if (!responseWs.pendingContextFacts.some(f => f.displayText === note)) responseWs.pendingContextFacts = [...responseWs.pendingContextFacts, { rawPhrase: trimmed, displayText: note }]
+      }
       // THE ANSWER TO "WHAT DO YOU USUALLY EAT?" IS WHAT HE TYPED (11 Nov 2026, his "My usual meals first"). The
       // question has no chips, so the only route for the answer was the coach's own set_slot; when it replies warmly
       // and records nothing, the question stays open and is asked again. So where the question on screen was this

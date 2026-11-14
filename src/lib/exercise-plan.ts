@@ -5564,7 +5564,12 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
     remaining--
   }
 
-  for (const day of heavyDays) {
+  // Not stacked on a heavy day in a SHORT session for a beginner or low recovery (Sal/Margaret, 14 Nov 2026). Their
+  // rest-day share is gone (above), and moving it onto the heaviest day ran a 30-45 minute "Full Body Power" day over
+  // its time (the constraint audit, 111 plans). With 45 minutes or more the brief post-lift block stays: without it a
+  // three-day beginner on fat loss had no conditioning at all, which is the goal lost (CSCS: specificity), and a brief
+  // easy block after lifting is standard practice when the time is there.
+  for (const day of noRestDayActivity && isTimeLimited ? [] : heavyDays) {
     if (remaining <= 0) break
     day.conditioning_note = `${cardioForGoal.heavyDayBrief.activity} (${cardioForGoal.heavyDayBrief.duration} min)`
     day.recommendedCardio = {

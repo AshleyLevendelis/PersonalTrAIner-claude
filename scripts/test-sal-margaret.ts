@@ -8,9 +8,11 @@ process.env.VITE_SUPABASE_ANON_KEY ??= 'anon'
 import { assembleProfile, initialSlotValues, type OnboardingSlotValues } from '../src/lib/onboarding-slots'
 import { computeSlotBudgets, skipsBreakfast, verifyProposal, generateMealPools, isHisUsualMeal, type PoolOption } from '../src/lib/meal-generation'
 import { setSupabaseClient } from '../src/lib/supabase'
+import { HEAVY_TRACKS } from '../src/lib/concurrent-activity'
 import { generateExercisePlan, OPTIONAL_CARDIO_FOCUS, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { MY_MEAL_TAG } from '../src/lib/meal-store'
 import { unloadedLoadLabel } from '../src/lib/load-prescription'
+import { healthSafetyQuestion } from '../src/lib/setup-health-question'
 import { EXERCISE_DATABASE } from '../src/lib/exercise-db'
 import { fitDishToBudget } from '../src/lib/meal-library'
 import { MEAL_LIBRARY } from '../src/lib/meal-library-data'
@@ -48,6 +50,17 @@ console.log('\n6. Lift numbers are saved only where the lift questions apply (hi
   check('...and keeps the calibration week', beginner.skip_calibration_week !== true, beginner.skip_calibration_week)
   const home = assembleProfile(answers({ ...lifts, equipment: 'minimalist' }))
   check('equipment changed away from a barbell saves none either', home.known_squat_kg == null && home.skip_calibration_week !== true, { squat: home.known_squat_kg, skip: home.skip_calibration_week })
+}
+
+console.log('\n4. A safety question about a condition is recognised, so setup never parks it (his ruling "A")')
+{
+  const q = (t: string) => healthSafetyQuestion(t)
+  check('Margaret\'s "is it safe to exercise with high blood pressure?"', q('is it safe to exercise with high blood pressure?') === 'blood pressure', q('is it safe to exercise with high blood pressure?'))
+  check('"can I lift weights while pregnant"', q('can I lift weights while pregnant') === 'pregnancy')
+  check('"should I eat before training, I\'m diabetic?"', q("should I eat before training, I'm diabetic?") === 'diabetes')
+  check('"I\'m on warfarin, is that ok?"', q("I'm on warfarin, is that ok?") === 'blood thinners')
+  check('a statement is not a question: "I have high blood pressure"', q('I have high blood pressure') === undefined)
+  check('an ordinary question is not one: "what does creatine do?"', q('what does creatine do?') === undefined)
 }
 
 console.log('\n5. "Band" only when a band is the only way to do it')
@@ -164,6 +177,9 @@ console.log('\n9. No days nobody chose for a beginner or low recovery; elsewhere
   check('a beginner gets no extra days', extras(margaret).length === 0, extras(margaret))
   check('...and keeps the goal\'s conditioning inside her chosen sessions', margaret.days.some(d => d.recommendedCardio && d.recommendedCardio.timing !== 'rest_day'), margaret.days.map(d => [d.day, d.recommendedCardio?.timing]))
   check('...on the days she chose only', margaret.days.every(d => ['Monday', 'Wednesday', 'Friday'].includes(d.day)), margaret.days.map(d => d.day))
+  const short = plan({ trainingExperience: 'beginner', recoveryCapacity: 'high', sessionDuration: '30-45' })
+  const heavy = short.days.filter(d => HEAVY_TRACKS.has(d.focus) && d.recommendedCardio)
+  check('...and a short session for a beginner never has cardio stacked on its heaviest day', heavy.length === 0 && short.days.some(d => HEAVY_TRACKS.has(d.focus)), heavy.map(d => d.focus))
   const tired = plan({ trainingExperience: 'intermediate', recoveryCapacity: 'low' })
   check('low recovery gets no extra days either', extras(tired).length === 0, extras(tired))
   resetRandomSource()
