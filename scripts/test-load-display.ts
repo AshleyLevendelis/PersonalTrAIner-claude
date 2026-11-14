@@ -283,7 +283,10 @@ console.log('\nO. WHAT STANDS WHERE THE WEIGHT WOULD GO, WHEN THERE IS NONE')
   // A band ALONE. Eccentric Wrist Extension pairs one with a dumbbell, is
   // externally loaded, and correctly says nothing here — found by this check
   // being written too broadly the first time.
-  const bands = EXERCISE_DATABASE.filter(e => (e.equipment ?? []).includes('resistance band') && !isExternallyLoaded(e))
+  // AND A BAND THAT IS THE ONLY WAY (Sal, 14 Nov 2026): a movement listing the band as one alternative beside
+  // bodyweight (Clamshell) is done without one and reads "Bodyweight" (test:sal-margaret §5 holds that half).
+  const bands = EXERCISE_DATABASE.filter(e => (e.equipment ?? []).includes('resistance band') && !isExternallyLoaded(e)
+    && !(e.equipment_alternatives && e.equipment.includes('bodyweight')))
   check('every band-only movement says "Band", never "Bodyweight"',
     bands.length >= 10 && bands.every(e => unloadedLoadLabel(e) === 'Band'), bands.filter(e => unloadedLoadLabel(e) !== 'Band').map(e => e.name))
   check('a push-up says "Bodyweight"', unloadedLoadLabel(getExerciseEntry('Push-Ups')!) === 'Bodyweight')
