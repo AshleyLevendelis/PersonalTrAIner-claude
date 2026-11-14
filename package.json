@@ -33,6 +33,7 @@
     "test:shared-code-sync": "node scripts/sync-shared-code.mjs --check",
     "test:live-test-nov14": "tsx scripts/test-live-test-nov14.ts",
     "test:qa-training-nov14": "tsx scripts/test-qa-training-nov14.ts",
+    "test:qa-meals-nov14": "tsx scripts/test-qa-meals-nov14.ts",
     "verify:live-test-nov14": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/live-test-nov14.mjs",
     "test:meal-amounts": "tsx scripts/test-meal-amounts.ts",
     "verify:meal-log-card": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/meal-log-card.mjs",

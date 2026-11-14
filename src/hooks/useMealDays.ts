@@ -207,6 +207,8 @@ export function useMealDays(input: MealDaysInput) {
       console.error('useMealDays: the pick did not save — not applying the swap on screen', err)
       return false
     }
+    // A coach edit or custom meal names a dish just added to the pool: re-read it, or the pick points at nothing.
+    try { await reloadPools?.() } catch { /* the pick saved; the screen catches up on the next read */ }
     setFuturePicks(prev => ({ ...prev, [date]: { ...(prev[date] ?? {}), [slot]: name } }))
     return true
   }

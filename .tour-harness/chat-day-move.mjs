@@ -160,7 +160,7 @@ check('...it names both dinners, before and after',
   r.text.includes(dinnerA) && r.text.includes(dinnerB) && r.text.includes(`${long(dA)}'s dinner`) && r.text.includes(`${long(dB)}'s dinner`), r.text.slice(-900))
 check('...says they swap places, so both days keep a dinner', /swap places, so both days keep a dinner/.test(r.text), r.text.slice(-900))
 check('...saying before the tap what stays, as one clean line',
-  /Unchanged: The meals themselves, their foods and their amounts — only which day each one is on/.test(r.text) && !/\.,/.test(r.text), r.text.slice(-900))
+  /Unchanged: The two swapped meals themselves, their foods and their amounts — only which day each one is on/.test(r.text) && !/\.,/.test(r.text), r.text.slice(-900))
 check('...with no Undo promised', !/Undo/.test(r.text) && r.hasUndo === false)
 await shoot('chat-day-move-card')
 

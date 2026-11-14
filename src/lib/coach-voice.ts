@@ -177,8 +177,8 @@ export function mealsDrifted(mealCalories: number, targetCalories: number): stri
 export function moreMealOptionsOffer(counts: number[], target: number): string {
   const fewest = Math.min(...counts)
   const have = counts.every(c => c === counts[0])
-    ? `Your meals have ${fewest} options each.`
-    : `Some of your meals have only ${fewest} options.`
+    ? `Your meals have ${fewest} ${fewest === 1 ? 'option' : 'options'} each.`
+    : `Some of your meals have only ${fewest} ${fewest === 1 ? 'option' : 'options'}.`
   return `${have} I can top each one up to ${target}, so your week repeats less. Today, and any day on your shopping list, stay exactly as they are.`
 }
 
@@ -190,8 +190,8 @@ export function moreMealOptionsOffer(counts: number[], target: number): string {
 export function moreMealLibraryOffer(counts: number[]): string {
   const fewest = Math.min(...counts)
   const have = counts.every(c => c === counts[0])
-    ? `Your meals have ${fewest} options each.`
-    : `Some of your meals have only ${fewest} options.`
+    ? `Your meals have ${fewest} ${fewest === 1 ? 'option' : 'options'} each.`
+    : `Some of your meals have only ${fewest} ${fewest === 1 ? 'option' : 'options'}.`
   return `${have} I can add every dish from our own meal library that suits you, so each week brings different meals. Today, and any day on your shopping list, stay exactly as they are.`
 }
 
@@ -355,7 +355,7 @@ export const DAY_MOVE = {
     `${cap(poss(day))} ${slot} and ${poss(otherDay)} ${otherSlot} swap places, and each is resized to fit the meal it lands in.`,
   unchangedAcross: 'The foods in each meal — only how much of each changes, to fit the meal it lands in',
   /** One item: the card prints these after "Unchanged:". */
-  unchanged: 'The meals themselves, their foods and their amounts — only which day each one is on',
+  unchanged: 'The two swapped meals themselves, their foods and their amounts — only which day each one is on',
   /** A card row's label: "Today's dinner", "Wednesday's dinner". */
   rowLabel: (day: string, slot: string) => `${cap(poss(day))} ${slot}`,
   stillOnTarget: 'Both days are re-fitted around the swap and still land on your target.',

@@ -18,6 +18,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, Activity, ChevronRight, Check, PlayCircle } from 'lucide-react'
 import { formVideoFor, linkifyBareUrls } from '@/lib/exercise-video'
 import { chatContextPills } from '@/lib/chat-context-strip'
+import { useShowNumbers } from '@/lib/show-numbers'
 import { sessionSetCount } from '@/lib/session-count'
 import { readSessionSummary } from '@/lib/session-summary-store'
 import { getLedgerSnapshot } from '@/lib/meal-store'
@@ -521,6 +522,8 @@ const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan — 
 const FOOD_OFFER_KINDS = new Set(['propose_meal_swap', 'propose_meal_addition', 'propose_custom_meal', 'propose_meal_food_add', 'propose_meal_food_replace'])
 
 export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onEatingOut, onMealKnockOn, onMealKnockOnMove, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+  // "Show numbers" off (slice 4b): no calorie figure in the chat's own pills or cards (QA, 14 Nov 2026).
+  const showNumbers = useShowNumbers()
   // NL logging (§3) writes through the SAME frozen session identity +
   // logSet facade SetGrid.tsx uses — never saveSet directly (see
   // nl-logging-executor.ts's own doc comment).
@@ -4252,6 +4255,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const slot = (['breakfast', 'lunch', 'dinner', 'snack'] as MealSlotName[]).find(s => s === slotArg) ?? 'dinner'
     if (!onEatingOut) return { ok: false, refusal: EATING_OUT_WORDS.notSaved }
     if (!onEatingOut.dates.includes(date)) return { ok: false, refusal: EATING_OUT_REFUSALS.outsideWindow }
+    // A MEAL ALREADY EATEN IS NOT OFFERED (QA, 14 Nov 2026): the card asked, and Apply then refused. Said up front,
+    // in the words the sheet uses, as a coach swap of an eaten meal already is.
+    if (date === today && (await slotsEatenToday())?.includes(slot)) return { ok: false, refusal: EATING_OUT_REFUSALS.eaten(slot) }
     const dayWord = date === today ? "today's" : `${dayNameOf(date)}'s`
     const size = eatingOutSizeSaid(userSaid)
     if (!size) {
@@ -4279,7 +4285,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       payload: { date, slot, size },
       diff: {
         lead: ask(`mark ${dayWord} ${slot} as eating out`),
-        rows: [{ field: `${dayWord.replace(/^\w/, c => c.toUpperCase())} ${slot}`, before, after: `${EATING_OUT_WORDS.label}, ${EATING_OUT_WORDS.sizeLabel[size].toLowerCase()} (${eatingOutRangeWords(est.calories)}, an estimate)` }],
+        rows: [{ field: `${dayWord.replace(/^\w/, c => c.toUpperCase())} ${slot}`, before, after: showNumbers ? `${EATING_OUT_WORDS.label}, ${EATING_OUT_WORDS.sizeLabel[size].toLowerCase()} (${eatingOutRangeWords(est.calories)}, an estimate)` : `${EATING_OUT_WORDS.label}, ${EATING_OUT_WORDS.sizeLabel[size].toLowerCase()} (an estimate)` }],
         implications: [{ severity: 'info', text: 'The rest of the day fits around it, and it stays off your shopping list. Tell me what you order and I can estimate the real thing.' }, ...(trial?.lines ?? [])],
         reversible: true,
       },
@@ -7299,6 +7305,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const editProfileId = profile.id
       const result = await applyMealOptionToSlot(editProfileId, payload, async p => {
         if (p.date === getSessionDateContext(editProfileId).date) return await onMealSwapApplied(p.slot, p.option.name)
+        // AN UPCOMING DAY HAS A SCREEN TOO since the day strip (QA, 14 Nov 2026: avocado added to tomorrow's lunch was
+        // saved and Nutrition went on showing the old lunch). The strip's own pick path saves, shows and re-reads the pool.
+        if (onUpcomingMealPickApplied) return await onUpcomingMealPickApplied(p.date, p.slot, p.option.name)
         try { await setMealPick(editProfileId, p.date, p.slot, p.option.name); return true } catch { return false }
       })
       receipt = result.receipt
@@ -7320,6 +7329,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const moveProfileId = profile.id
       receipt = await executeMealMove(moveProfileId, payload, async p => {
         if (p.date === getSessionDateContext(moveProfileId).date) return await onMealSwapApplied(p.slot, p.option.name)
+        if (onUpcomingMealPickApplied) return await onUpcomingMealPickApplied(p.date, p.slot, p.option.name)
         try { await setMealPick(moveProfileId, p.date, p.slot, p.option.name); return true } catch { return false }
       })
       const ok = receipt.failed.length === 0
@@ -8368,7 +8378,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     running: activeSession.status === 'running',
     count: sessionSetCount(stripCell?.session, stripCell?.workingLogs),
     minutes: readSessionSummary(profile.id, activeSession.date)?.summary.durationMinutes ?? proactiveData?.sessionMinutes ?? null,
-    kcal: macros && stripEaten != null ? { target: macros.calories, eaten: stripEaten } : null,
+    kcal: showNumbers && macros && stripEaten != null ? { target: macros.calories, eaten: stripEaten } : null,
   })
   const openStripLink = (to: 'exercise' | 'nutrition') => {
     if (to === 'exercise') { if (onOpenExercise) onOpenExercise(); else window.location.hash = tabHash('exercise') }

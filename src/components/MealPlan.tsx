@@ -1438,13 +1438,13 @@ function MealSlotRow({
                     {SLOT_LABEL[slot]} · {isLogged ? 'eaten' : 'planned'}
                   </p>
                   <h3 className="mt-1 text-[1.375rem] font-bold leading-[1.15] tracking-[-.02em]">{displayName}</h3>
-                  <div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  {useShowNumbersFlag && (<div className="mt-1.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                     <span className="flex items-baseline gap-1" data-testid="meal-sheet-kcal">
                       <span className="tabular-mono text-[0.9375rem] font-bold">{Math.round(headerMacros?.calories ?? option.macros.calories)}</span>
                       <span className="text-[0.6875rem] text-muted-foreground">kcal</span>
                     </span>
                     <MacroLine protein={headerMacros?.protein ?? option.macros.protein} carbs={headerMacros?.carbs ?? option.macros.carbs} fat={headerMacros?.fat ?? option.macros.fat} />
-                  </div>
+                  </div>)}
                 </div>
                 <div className="flex shrink-0 items-center">
                   {/* THE HEART — Ashley, 19 Sep 2026, from four options. The app never
@@ -2098,7 +2098,7 @@ function ElsewhereMealRow({ slot, variant, option, upcoming, expanded, onToggle,
       {expanded && (
         <div className="space-y-2.5 pb-3 pl-[38px]" data-testid="elsewhere-panel">
           <p className="text-[0.75rem] leading-snug text-muted-foreground" data-testid="elsewhere-note">
-            {eatingOut ? EATING_OUT_WORDS.note(eatingOut.size ?? 'normal', Math.round(option.macros.calories)) : state === 'assumed' ? ELSEWHERE_WORDS.assumedNote(slot) : ELSEWHERE_WORDS.estimateNote}
+            {eatingOut ? EATING_OUT_WORDS.note(eatingOut.size ?? 'normal', Math.round(option.macros.calories), slot) : state === 'assumed' ? ELSEWHERE_WORDS.assumedNote(slot) : ELSEWHERE_WORDS.estimateNote}
           </p>
           {state === 'estimate' && option.ingredients.length > 0 && (
             <ul className="space-y-0.5 text-[0.75rem] text-muted-foreground" data-testid="elsewhere-foods">

@@ -62,7 +62,10 @@ function formVideoUrl(exercise: string): string {
  */
 export function formVideoFor(userText: string | null | undefined, replyText: string | null | undefined, earlierUserText?: string | null): { exercise: string; url: string } | null {
   if (!userText || !asksHowOrVideo(userText)) return null
-  const exercise = exerciseNamedIn(userText) ?? exerciseNamedIn(replyText, { wholeNameOnly: true }) ?? exerciseNamedIn(earlierUserText)
+  // WHAT HE SAID BEFORE ONLY ANSWERS A BARE REQUEST FOR A VIDEO ("show me a video"), never another how-to (QA, 14 Nov
+  // 2026: "how do I brace my core?" after an RDL question got "Watch a video: Romanian Deadlifts").
+  const asksForVideo = /\b(videos?|tutorials?|demo|show me)\b/i.test(userText)
+  const exercise = exerciseNamedIn(userText) ?? exerciseNamedIn(replyText, { wholeNameOnly: true }) ?? (asksForVideo ? exerciseNamedIn(earlierUserText) : null)
   return exercise ? { exercise, url: formVideoUrl(exercise) } : null
 }
 

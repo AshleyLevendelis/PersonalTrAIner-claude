@@ -677,7 +677,7 @@ function isHerOwnDish(option: PoolOption, pools: Partial<Record<MealSlotName, Po
 const EATING_OUT_PROTEIN_FLOOR = 0.95
 
 function shrinkAroundEatingOut(held: AssembledDay, pins: Partial<Record<MealSlotName, PoolOption>>, targets: MacroTargets, planned?: AssembledDay): AssembledDay {
-  const shrunk = shrinkAroundEatingOutCalories(held, pins, targets)
+  const shrunk = shrinkAroundEatingOutCalories(planned ? neverBiggerThanPlanned(held, pins, planned, targets) : held, pins, targets)
   return planned ? keepProteinAroundEatingOut(shrunk, pins, targets, planned) : shrunk
 }
 
@@ -711,6 +711,27 @@ function keepProteinAroundEatingOut(day: AssembledDay, pins: Partial<Record<Meal
     calories: a.calories + o.macros.calories, protein: a.protein + o.macros.protein, carbs: a.carbs + o.macros.carbs, fat: a.fat + o.macros.fat,
   }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
   return { ...day, chosen, totals, withinTolerance: dayVerdict(totals, targets).onTarget }
+}
+
+/**
+ * NEVER BIGGER (QA, 14 Nov 2026; his 12 Nov ruling: the other meals "are made smaller together"). The hold re-sizes the
+ * day's other dishes toward the target both ways, so a day already under target GREW them around a big night out
+ * (breakfast 581 to 708 kcal). Around a meal out each other dish is held at most at the size it was planned at.
+ */
+function neverBiggerThanPlanned(held: AssembledDay, pins: Partial<Record<MealSlotName, PoolOption>>, planned: AssembledDay, targets: MacroTargets): AssembledDay {
+  const chosen = { ...held.chosen }
+  let changed = false
+  for (const s of Object.keys(chosen) as MealSlotName[]) {
+    const o = chosen[s]
+    const p = planned.chosen[s]
+    if (!o || !p || pins[s] || o.leftoverFrom === 'dinner' || isCookedElsewhere(o) || p.name !== o.name) continue
+    if (o.macros.calories > p.macros.calories) { chosen[s] = p; changed = true }
+  }
+  if (!changed) return held
+  const totals = (Object.values(chosen) as PoolOption[]).reduce((a, o) => ({
+    calories: a.calories + o.macros.calories, protein: a.protein + o.macros.protein, carbs: a.carbs + o.macros.carbs, fat: a.fat + o.macros.fat,
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
+  return { ...held, chosen, totals, withinTolerance: dayVerdict(totals, targets).onTarget }
 }
 
 function shrinkAroundEatingOutCalories(held: AssembledDay, pins: Partial<Record<MealSlotName, PoolOption>>, targets: MacroTargets): AssembledDay {
