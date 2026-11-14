@@ -3020,7 +3020,6 @@ function App() {
       setInitialMealBuild(false)
       activeProfileIdRef.current = null
       // Two device keys that are not filed under a profile: the shopping day (and its snooze) and a chat draft.
-      localStorage.removeItem('fitplan_shop_day_v1')
       try { sessionStorage.removeItem('fitplan_chat_prefill_v1') } catch { /* private mode */ }
       setLogsVersion(0)
       setNewPlanResetting(false)
