@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [x] **"BODYWEIGHT ONLY" MEANS NO KIT (his ruling 14 Nov 2026, "Nothing ticked")** — BUILT. The bodyweight tier
+  assumed a pull-up bar and a weighted bag (his 9 Sep "fix the words" kept them so no plan changed; this partly
+  reverses it): setup's kit screen came up with both ticked and plans held Backpack Row and pull-ups for Margaret, who
+  owns neither. Now the tier is bodyweight alone; the screen starts empty ("None — next"), a ticked bar or bag is kept
+  as "has" and brings its exercises back. Picker reads "Just your bodyweight — no pull-up bar or weighted bag"; the
+  coach's travel tool says the same (needs `chat-gemini`). The kit hint now says "Tick everything you have" (the old
+  "untick" was wrong on an empty screen; a longer version was caught by `test:onboarding-chips` as too long for the box).
+  CSCS review, measured on 768 bodyweight profiles (a third of the grid), same seeds, before and after:
+  (1) effect: 0 below the 7.2 floor either way, mean 11.61 -> 11.84 (frozen_week 3131 -> 0, the bag's held weights);
+  (2) taken away: every bag and bar exercise (37,456 and 29,200 slots), vertical pulling entirely (22,306 sets -> 0 on
+  384 profiles), and pressing sets fall about a third (the backpack presses); (3) fundamentals: no week without a pull
+  (0 of 6,144 both ways), pull:push about 1.4:1 (table and towel rows), progression by reps; (4) no floor redefined;
+  (5) in scope. NAMED COSTS: sore wrists at bodyweight now have no overhead press (the backpack press was its only
+  wrist-safe entry; `test:injury-coverage` EXPECTED_WIPES updated and says why); no vertical pull without a bar is the
+  honest plan for no kit, and the tick is on the same screen. Travel to a bodyweight week does not add a bag owned at
+  home. Re-anchored, each mutation-tested by putting the old bar + bag back (all fail): `test:equipment-labels` (3),
+  `test:kit-list` (3), `test:loadless-notes` (2, now sweeps a bag-ticked trainee and holds the bare tier at zero load),
+  `test:rehab-order` (its fixture ticks bar + bag, so its reported plan is unchanged), `test:injury-coverage`.
+  `verify:setup-kit` §4-5 (14 checks; 4 fail with the old guess). 29 bodyweight-reading gates + 32 setup-reading
+  gates + 3 drivers green; `test:bundle` 22 kB left. Deploys: `chat-gemini` (wording only).
 - [ ] **HIS FOLLOW-UP RULINGS, 14 Nov 2026** (each asked as one question with options; asked on his "Push. And ask me
   follow ups"). (1) Health taps: **"Yes, build it"**, migration included (his machine). (2) Shorter setup: **"Light
   trim"**. I first described it wrongly to him (as merging style with the starting point, and "about 18 today") from

@@ -4477,7 +4477,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   },
   // The next four are equipment: ['bodyweight'] ONLY — verified against
   // EQUIPMENT_SETS.bodyweight (exercise-plan.ts), which allows exactly
-  // ['bodyweight', 'pull-up bar', 'weighted backpack']. Added because the
+  // ['bodyweight'] since 14 Nov 2026 (a bar and a bag when this was written). Added because the
   // bodyweight equipment tier was the single largest driver of primer-pool
   // exhaustion (1616 of 3408 affected combos, measured against 3c2b191) —
   // every other existing primer needs a kettlebell, medicine ball,
@@ -4685,7 +4685,7 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
   // 45. Every entry below closes a hole that measurement named.
   //
   // EQUIPMENT IS THE WHOLE CONSTRAINT HERE. EQUIPMENT_SETS (exercise-plan.ts)
-  // gives bodyweight only 'bodyweight', 'pull-up bar' and 'weighted backpack';
+  // gives bodyweight only 'bodyweight' (a bar and a bag until 14 Nov 2026: now ticked, never assumed);
   // minimalist adds bands, kettlebells, dumbbells. An entry that closes a
   // bodyweight gap with a dumbbell closes nothing at all, so each group below
   // states which tier it is for and uses only what that tier owns.

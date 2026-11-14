@@ -61,6 +61,9 @@ function profileFor(injuries: string[]): UserProfile {
     age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
     fitness_goal: 'fat_loss', preferred_time: 'morning', bmr: 1800, tdee: 2500,
     equipment_access: 'bodyweight', injuries,
+    // The report's plan was made when the bodyweight tier assumed a bar and a bag (until 14 Nov 2026, his "Nothing
+    // ticked"); ticking both reproduces it, so the subject is unchanged.
+    kit_statements: [{ mode: 'has', items: ['pull_up_bar', 'weighted_bag'] }],
     training_style: 'hybrid', training_experience: 'intermediate',
     session_duration_preference: '90+', workout_split_preference: 'ai_recommendation',
     training_days: [

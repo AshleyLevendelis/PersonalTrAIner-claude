@@ -145,7 +145,7 @@ check('Minimalist is no longer just "Bands & kettlebells"', byTier.minimalist !=
 check('Home gym is no longer just "Barbell, dumbbells, bench"', byTier.home_gym !== 'Barbell, dumbbells, bench', byTier.home_gym)
 check('Bodyweight no longer claims "No equipment needed"', !/no equipment/i.test(byTier.bodyweight), byTier.bodyweight)
 check('Minimalist discloses dumbbells specifically — the one that bit', /dumbbell/i.test(byTier.minimalist), byTier.minimalist)
-check('Bodyweight discloses the pull-up bar specifically', /pull-up bar/i.test(byTier.bodyweight), byTier.bodyweight)
+check('Bodyweight says it assumes no pull-up bar (an exclusion, his 14 Nov ruling)', /no pull-up bar/i.test(byTier.bodyweight), byTier.bodyweight)
 
 console.log('\n6. Sanity — the parse actually read the sets')
 check('four tiers parsed', Object.keys(SETS).length === 4, Object.keys(SETS))
@@ -153,7 +153,8 @@ check('full_gym is the unfiltered one', SETS.full_gym === null)
 check('home_gym parsed a real set', (SETS.home_gym?.size ?? 0) > 10, SETS.home_gym?.size)
 check('minimalist parsed a real set', (SETS.minimalist?.size ?? 0) > 5, SETS.minimalist?.size)
 check('minimalist really does permit dumbbells (the premise of §5)', SETS.minimalist?.has('dumbbells') === true)
-check('bodyweight really does permit a pull-up bar', SETS.bodyweight?.has('pull-up bar') === true)
+// REVERSED 14 Nov 2026 (his "Nothing ticked"): bodyweight only assumes no bar and no bag; they are ticked, never assumed.
+check('bodyweight assumes no pull-up bar and no weighted bag', SETS.bodyweight?.has('pull-up bar') === false && SETS.bodyweight?.has('weighted backpack') === false && SETS.bodyweight?.has('bodyweight') === true, [...(SETS.bodyweight ?? [])])
 
 console.log('\n7. Where the description is SHOWN — both screens, not just setup')
 const profileSrc = fs.readFileSync('src/components/ProfileScreen.tsx', 'utf8')
@@ -183,8 +184,8 @@ check('setup prompt never maps "just some dumbbells" to home_gym, no longer call
   && !/just some dumbbells at home"?\s*→\s*equipment=minimalist/i.test(onbSrc)
   && /"just some dumbbells at home" is NOT a certain mapping/i.test(onbSrc)
   && /set_slot\(kitList=/.test(onbSrc), null)
-check('coach tool description admits bodyweight assumes a pull-up bar',
-  /bodyweight[^"]{0,80}pull-up bar/i.test(chatSrc), null)
+check('coach tool description says bodyweight assumes NO pull-up bar and no weighted bag',
+  /bodyweight \(no kit at all: no pull-up bar, no weighted bag\)/i.test(chatSrc) && !/bodyweight \(which still assumes a pull-up bar/i.test(chatSrc), null)
 check('coach §3b names what minimalist actually assumes',
   /minimalist assumes dumbbells, kettlebells, bands, a pull-up bar and a weighted bag/i.test(chatSrc), null)
 check('the "closest fit, not exact" honesty caveat survived',

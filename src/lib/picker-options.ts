@@ -21,7 +21,7 @@ export const EQUIPMENT_OPTIONS: { value: EquipmentAccess; icon: string; label: s
   { value: 'full_gym', icon: '🏢', label: 'Full gym', description: 'Everything a commercial gym has' },
   { value: 'home_gym', icon: '🏠', label: 'Home gym', description: 'Barbell, rack, bench, dumbbells, kettlebells, bands, pull-up bar, weighted bag' },
   { value: 'minimalist', icon: '🎒', label: 'Minimalist', description: 'Dumbbells, kettlebells, bands, pull-up bar, weighted bag — no barbell or bench' },
-  { value: 'bodyweight', icon: '🤸', label: 'Bodyweight only', description: 'Bodyweight, a pull-up bar and a weighted bag' },
+  { value: 'bodyweight', icon: '🤸', label: 'Bodyweight only', description: 'Just your bodyweight — no pull-up bar or weighted bag' },
 ]
 
 /**

@@ -1559,7 +1559,9 @@ menu" stays true when a copy is also left outside it.
 - **Health conditions: "Fold into injuries"** (no new question); **"Yes, build it"** (14 Nov), with the migration
   (his machine). `docs/plans/health-conditions.md`. Being built.
 - **"Bodyweight only" starts with NOTHING ticked** (his ruling 14 Nov, over "bar ticked, bag not" and over keeping
-  both): no pull-up bar and no weighted bag until he ticks one. Being built.
+  both): no pull-up bar and no weighted bag until he ticks one. It partly reverses his 9 Sep "fix the words". Costs, named:
+  no vertical pull without a bar, no overhead press for sore wrists. `verify:setup-kit` §4-5, `test:equipment-labels`,
+  `test:loadless-notes`
 - **Going live: "After the new builds"** — today's fixes merge together with the three builds above, after one full
   sweep, with one handover prompt (database step + deploys).
 - **A safety question about a condition, medication or pregnancy is never parked: "A"**: the GP line now, noted, back to

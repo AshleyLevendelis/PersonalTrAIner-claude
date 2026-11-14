@@ -173,7 +173,7 @@ const EQUIPMENT_SETS: Record<EquipmentAccess, Set<string> | null> = {
     'pull-up bar', 'jump rope', 'medicine ball', 'plyo box', 'ab wheel',
     'weighted backpack',
   ]),
-  bodyweight: new Set(['bodyweight', 'pull-up bar', 'weighted backpack']),
+  bodyweight: new Set(['bodyweight']),
 }
 
 // Style-required patterns

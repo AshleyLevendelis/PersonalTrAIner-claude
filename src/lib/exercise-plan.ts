@@ -550,11 +550,12 @@ const EQUIPMENT_SETS: Record<EquipmentAccess, Set<string> | null> = {
     'pull-up bar', 'jump rope', 'medicine ball', 'plyo box', 'ab wheel',
     'weighted backpack',
   ]),
-  // Anyone can put weight in a backpack regardless of tier — it's the one
-  // genuinely progressive external load available to a bodyweight-only
-  // client, which is exactly why it's included at every tier, not gated
-  // like real gym equipment.
-  bodyweight: new Set(['bodyweight', 'pull-up bar', 'weighted backpack']),
+  // BODYWEIGHT ONLY MEANS NO KIT (his ruling 14 Nov 2026, "Nothing ticked", from Margaret's setup): no pull-up bar
+  // and no weighted bag are assumed. Someone who has either ticks it on the kit screen (setup or Profile), and the
+  // kit list adds it. It partly reverses his 9 Sep "fix the words", which kept a bar and a bag on this tier so no
+  // plan changed. Measured on 768 bodyweight profiles: 0 below the 7.2 floor either way, mean 11.61 -> 11.84;
+  // every week still pulls (table and towel rows), pull:push about 1.4:1; vertical pulling goes, with the bar.
+  bodyweight: new Set(['bodyweight']),
 }
 
 // ---------------------------------------------------------------------------
@@ -6062,9 +6063,9 @@ function buildProgressionNote(
  * this trainee does not have.
  *
  * Asked of the WEEK'S OWN EXERCISES rather than of equipment_access, and that
- * is the point. EQUIPMENT_SETS.bodyweight includes 'weighted backpack' —
- * genuinely the one progressive load available with no gym — so a
- * bodyweight-tier plan does contain a couple of real numbers (Backpack Row,
+ * is the point. A bodyweight trainee who ticks a weighted bag (assumed by the
+ * tier until 14 Nov 2026) gets the one progressive load available with no
+ * gym — so a bodyweight-tier plan can contain a couple of real numbers (Backpack Row,
  * Loaded Backpack Walk). Keying on the equipment answer would have declared
  * those weightless; keying on the plan gets both right. MEASURED share of
  * working sets carrying a load, across four goals x three experience levels

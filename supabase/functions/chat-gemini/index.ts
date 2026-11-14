@@ -1046,7 +1046,7 @@ const toolDeclarations = [
         equipment_tier: {
           type: "string",
           enum: ["full_gym", "home_gym", "minimalist", "bodyweight"],
-          description: "The nearest fit to what's actually available. Hotel gym -> minimalist. Bodyweight only -> bodyweight (which still assumes a pull-up bar and a weighted bag). Dumbbells only -> minimalist (closest fit; minimalist also assumes kettlebells, bands and a pull-up bar, so say so honestly on the card rather than calling it exact). Full commercial gym -> full_gym.",
+          description: "The nearest fit to what's actually available. Hotel gym -> minimalist. Bodyweight only -> bodyweight (no kit at all: no pull-up bar, no weighted bag). Dumbbells only -> minimalist (closest fit; minimalist also assumes kettlebells, bands and a pull-up bar, so say so honestly on the card rather than calling it exact). Full commercial gym -> full_gym.",
         },
         duration_days: {
           type: "number",

@@ -95,7 +95,7 @@ export const TIER_KIT_ITEMS: Record<EquipmentAccess, readonly KitItem[]> = {
   full_gym: KIT_ITEMS,
   home_gym: KIT_ITEMS,
   minimalist: ['dumbbells', 'kettlebell', 'bands', 'pull_up_bar', 'weighted_bag'],
-  bodyweight: ['pull_up_bar', 'weighted_bag'],
+  bodyweight: [],
 }
 
 /**
@@ -309,6 +309,8 @@ const PERSONAL_ITEMS: readonly KitItem[] = ['bands', 'weighted_bag']
  * not things a place has. If they have said they do not have them, a week away
  * does not conjure them (the tester's travel card put a Backpack Row on a man
  * with no backpack). With no kit list this is exactly the tier, as before.
+ * Nor does a trip ADD one: "bodyweight only while I'm away" is no kit at all (his 14 Nov 2026 ruling), so a bag
+ * owned at home is not assumed in the hotel room.
  */
 export function travelProfile<P extends KitReader>(profile: P, tier: EquipmentAccess): P {
   const kit = kitOf(profile)

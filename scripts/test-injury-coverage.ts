@@ -147,19 +147,21 @@ console.log('\n4. The plan does not collapse — wiped patterns are named, not d
     'shoulders|full_gym': ['vertical_pull', 'isolation_shoulder'],
     'shoulders|home_gym': ['vertical_pull', 'isolation_shoulder'],
     'shoulders|minimalist': ['vertical_push', 'vertical_pull', 'isolation_shoulder'],
-    'shoulders|bodyweight': ['horizontal_push', 'vertical_push', 'vertical_pull', 'isolation_shoulder', 'isolation_trap', 'isolation_tricep'],
+    // 14 Nov 2026 (his "Nothing ticked"): bodyweight only has no bar and no bag, so vertical_pull, isolation_shoulder,
+    // isolation_trap and isolation_bicep are EMPTY at that tier (skipped, not wiped), and sore wrists now lose
+    // vertical_push: the backpack press was its only wrist-safe entry. A named content gap, the CSCS cost of no kit.
+    'shoulders|bodyweight': ['horizontal_push', 'vertical_push', 'isolation_tricep'],
     'neck|full_gym': ['isolation_trap'],
     'neck|home_gym': ['isolation_trap'],
     'neck|minimalist': ['isolation_trap'],
-    'neck|bodyweight': ['isolation_trap'],
-    'wrists|bodyweight': ['horizontal_push'],
+    'wrists|bodyweight': ['horizontal_push', 'vertical_push'],
     // ankle + calves is CORRECT and always was: every calf exercise loads the
     // ankle, so you do not train calves on a bad one.
     'ankles|full_gym': ['isolation_calf'],
     'ankles|home_gym': ['isolation_calf'],
     'ankles|minimalist': ['isolation_calf'],
     'ankles|bodyweight': ['isolation_calf'],
-    'elbows|bodyweight': ['vertical_push', 'isolation_bicep', 'isolation_tricep'],
+    'elbows|bodyweight': ['vertical_push', 'isolation_tricep'],
   }
 
   const patterns = [...new Set(EXERCISE_DATABASE.map(e => e.movement_pattern))]

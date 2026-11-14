@@ -81,4 +81,31 @@ await section(3, 'Next without touching keeps the guess, never "nothing"', async
   check('3a. untouched, the answer kept is the guess as shown (five things), not nothing', JSON.stringify(draft?.values?.kitTicks) === '["dumbbells","kettlebell","bands","pull_up_bar","weighted_bag"]', draft?.values?.kitTicks)
 })
 
+await section(4, 'Bodyweight only starts with nothing ticked (his ruling 14 Nov 2026)', async () => {
+  await send('Page.navigate', { url: `${origin}/?state=kit-bodyweight&load=3` })
+  await wait(1800)
+  check('4a. the kit card is on screen for Bodyweight only', (await evj(`document.querySelectorAll('[data-slot-card="kitTicks"]').length`)) === 1)
+  const t = await ticked()
+  check('4b. ...with nothing ticked: no pull-up bar, no bag', Array.isArray(t) && t.length === 0, t)
+  await shot('bodyweight')
+  check('4b2. ...and the button says so: None — next', (await evj(`[...document.querySelectorAll('[data-slot-card="kitTicks"] button')].some(b => (b.textContent || '').trim().startsWith('None — next'))`)) === true)
+  await ev(`window.__onbQueue.push(${JSON.stringify({ reply: 'Good. Which days can you train?', actions: [{ name: 'present_slot', args: { slot_key: 'trainingDays' } }] })})`)
+  await tapEl(`[...document.querySelectorAll('[data-slot-card="kitTicks"] button')].find(b => /next/i.test(b.textContent || ''))`, 'Next')
+  await wait(1200)
+  const draft = await evj(`JSON.parse(localStorage.getItem('fitplan_onboarding_draft') || 'null')`)
+  check('4c. untouched, the answer kept is no kit at all', JSON.stringify(draft?.values?.kitTicks) === '[]', draft?.values?.kitTicks)
+})
+
+await section(5, 'Bodyweight only, he ticks a pull-up bar: that is kept', async () => {
+  await send('Page.navigate', { url: `${origin}/?state=kit-bodyweight&load=4` })
+  await wait(1800)
+  const exact = await evj(`(() => { const b = [...document.querySelectorAll('[data-slot-card="kitTicks"] button[aria-pressed]')].find(b => (b.getAttribute('aria-label') || b.textContent || '').includes('Pull-up bar')); return b ? (b.getAttribute('aria-label') || b.textContent || '').trim() : null })()`)
+  await tapEl(button(exact), 'Pull-up bar')
+  await ev(`window.__onbQueue.push(${JSON.stringify({ reply: 'Good. Which days can you train?', actions: [{ name: 'present_slot', args: { slot_key: 'trainingDays' } }] })})`)
+  await tapEl(`[...document.querySelectorAll('[data-slot-card="kitTicks"] button')].find(b => /next/i.test(b.textContent || ''))`, 'Next')
+  await wait(1200)
+  const draft = await evj(`JSON.parse(localStorage.getItem('fitplan_onboarding_draft') || 'null')`)
+  check('5a. the bar he ticked is kept', JSON.stringify(draft?.values?.kitTicks) === '["pull_up_bar"]', draft?.values?.kitTicks)
+})
+
 finish('Setup shows the kit once, and keeps what he ticks.')

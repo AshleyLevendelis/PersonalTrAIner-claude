@@ -950,7 +950,7 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'injuries', question: 'Anything that bothers you when you train — something you avoid or work around?', inputHint: 'Anything that bothers you?', shortLabel: 'Niggles', control: 'multi', required: false, options: INJURY_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_OPTIONS) },
   // AFTER injuries, which must stay in the opening block (her ruling: the only question whose absence can hurt),
   // and still right behind equipment: the ticks start from that answer (picksHomeKit, defaultKitTicks).
-  { key: 'kitTicks', question: 'Which of these do you have?', inputHint: "Untick anything you don't have", shortLabel: 'Your kit', control: 'multi', required: false, requiredIf: picksHomeKit, options: KIT_TICK_OPTIONS, destination: 'user_facts', validate: isSubsetOf(KIT_TICK_OPTIONS) },
+  { key: 'kitTicks', question: 'Which of these do you have?', inputHint: 'Tick everything you have', shortLabel: 'Your kit', control: 'multi', required: false, requiredIf: picksHomeKit, options: KIT_TICK_OPTIONS, destination: 'user_facts', validate: isSubsetOf(KIT_TICK_OPTIONS) },
   { key: 'knowsWorkingLifts', question: 'Do you know what you lift on the barbell back squat, bench press and deadlift?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', required: true, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Only meaningful once someone has said they DO know their numbers.
   { key: 'knownSquatKg', question: liftSetQuestion('back squat'),

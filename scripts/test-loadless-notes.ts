@@ -87,10 +87,10 @@ const GOALS: FitnessGoal[] = ['hypertrophy', 'fat_loss', 'conditioning', 'functi
 const EXP: TrainingExperience[] = ['beginner', 'intermediate', 'advanced']
 const SPLITS = ['upper_lower', 'full_body', 'push_pull_legs'] as const
 
-function sweep(equipment_access: EquipmentAccess): { weeks: MesocycleWeek[]; loadedShare: number }[] {
+function sweep(equipment_access: EquipmentAccess, kit_statements?: unknown): { weeks: MesocycleWeek[]; loadedShare: number }[] {
   const out: { weeks: MesocycleWeek[]; loadedShare: number }[] = []
   for (const fitness_goal of GOALS) for (const training_experience of EXP) for (const workout_split_preference of SPLITS) {
-    const profile = buildProfile({ equipment_access, fitness_goal, training_experience, workout_split_preference } as Partial<UserProfile>)
+    const profile = buildProfile({ equipment_access, fitness_goal, training_experience, workout_split_preference, ...(kit_statements ? { kit_statements } : {}) } as Partial<UserProfile>)
     setRandomSource(seededRngFromKey(`ln:${equipment_access}:${fitness_goal}:${training_experience}:${workout_split_preference}`))
     const d = console.debug, w = console.warn
     console.debug = () => {}; console.warn = () => {}
@@ -108,7 +108,12 @@ function sweep(equipment_access: EquipmentAccess): { weeks: MesocycleWeek[]; loa
   return out
 }
 
-const bodyweight = sweep('bodyweight')
+// RE-ANCHORED 14 Nov 2026 (his "Nothing ticked"): the bodyweight tier no longer assumes a pull-up bar or a weighted
+// bag, so a bare bodyweight plan carries no load at all. The case this gate exists for is the one where the PLAN has
+// a few real numbers while the trainee is still weightless, which is now a bodyweight trainee who TICKED a bar and a
+// bag. So that is the sweep; the bare tier is kept beside it and must be exactly zero.
+const bodyweight = sweep('bodyweight', [{ mode: 'has', items: ['pull_up_bar', 'weighted_bag'] }])
+const bareBodyweight = sweep('bodyweight')
 const fullGym = sweep('full_gym')
 const minimalist = sweep('minimalist')
 
@@ -145,9 +150,9 @@ console.log('\n2. Everyone else still gets the load coaching')
 console.log('\n3. The predicate keys on the plan, not on the equipment answer')
 // ---------------------------------------------------------------------------
 {
-  // A bodyweight-tier plan is NOT entirely weightless — EQUIPMENT_SETS
-  // includes 'weighted backpack' at every tier on purpose, since it is the
-  // one progressive load available with no gym. So the threshold has to sit
+  // A bodyweight-tier plan with a ticked bag is NOT entirely weightless — the
+  // bag is the one progressive load available with no gym (assumed by the tier
+  // until 14 Nov 2026, ticked since). So the threshold has to sit
   // between "a couple of backpack lifts" and "half the session is loaded",
   // and this asserts both sides of it are where they were measured.
   const share = (rows: { loadedShare: number }[]) => rows.reduce((a, r) => a + r.loadedShare, 0) / rows.length
@@ -155,7 +160,8 @@ console.log('\n3. The predicate keys on the plan, not on the equipment answer')
   console.log(`     loaded share of working sets — bodyweight ${(bw * 100).toFixed(1)}%, minimalist ${(mini * 100).toFixed(1)}%, full_gym ${(gym * 100).toFixed(1)}%`)
   check('bodyweight sits below the 25% threshold', bw < 0.25, bw.toFixed(3))
   check('minimalist sits above it, so it keeps the load coaching', mini > 0.25, mini.toFixed(3))
-  check('bodyweight is not zero — the backpack lifts are real', bw > 0, bw.toFixed(3))
+  check('bodyweight with a ticked bag is not zero — the backpack lifts are real', bw > 0, bw.toFixed(3))
+  check('bare bodyweight (nothing ticked) carries no load at all', share(bareBodyweight) === 0, share(bareBodyweight).toFixed(3))
 }
 
 // ---------------------------------------------------------------------------

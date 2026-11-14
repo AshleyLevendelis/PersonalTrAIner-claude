@@ -118,6 +118,22 @@ if (state === 'days') {
   ))
 }
 
+if (state === 'kit-bodyweight') {
+  // MARGARET'S CASE (his ruling 14 Nov 2026, "Nothing ticked"): "Bodyweight only" just answered; the ticks start empty.
+  const { trainingDays: _a, sessionDuration: _b, trainingStyle: _c, conditioningPreference: _d, kitTicks: _e, ...before } = SAM_SO_FAR
+  void _a; void _b; void _c; void _d; void _e
+  const bw = { ...before, equipment: 'bodyweight' }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Sam' },
+      { role: 'assistant', content: 'Which of these do you have?', slotCard: 'kitTicks' },
+    ],
+    bw,
+    Object.keys(bw),
+  ))
+}
+
 if (state === 'kit') {
   // THE KIT TICKS (runs 7-10, H34, 18 Oct 2026): Sam has just picked "no barbell or bench" and said nothing more
   // about his kit; the app's own next question is the ticks. Equipment answered, the ticks not yet.

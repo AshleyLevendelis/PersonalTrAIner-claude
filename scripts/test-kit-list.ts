@@ -531,7 +531,8 @@ async function main() {
   check('...but a bag or bands he has said he does not have do not appear there either',
     !isEquipmentAllowed(getExerciseEntry('Backpack Row')!, away) && !isEquipmentAllowed(getExerciseEntry('Band Tricep Kickback')!, away))
   check('with no kit list a travel tier is exactly the tier (unchanged)',
-    isEquipmentAllowed(getExerciseEntry('Backpack Row')!, constraintProfile(samProfile(), { temporaryInjuries: [], temporaryEquipment: 'bodyweight' }))
+    isEquipmentAllowed(getExerciseEntry('Push-Ups')!, constraintProfile(samProfile(), { temporaryInjuries: [], temporaryEquipment: 'bodyweight' }))
+    && !isEquipmentAllowed(getExerciseEntry('Backpack Row')!, constraintProfile(samProfile(), { temporaryInjuries: [], temporaryEquipment: 'bodyweight' }))
     && constraintProfile(samProfile(), { temporaryInjuries: [], temporaryEquipment: 'bodyweight' }).kit_statements === undefined
     && constraintProfile(samProfile(), { temporaryInjuries: [], temporaryEquipment: 'bodyweight' }).equipment_access === 'bodyweight')
   check('no temporary change: the profile comes back as it was, kit and all', constraintProfile(samKitted, { temporaryInjuries: [], temporaryEquipment: null }) === samKitted)
