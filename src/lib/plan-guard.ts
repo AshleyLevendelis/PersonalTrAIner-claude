@@ -164,12 +164,8 @@ export function buildDayGuard(mesocycle: MesocycleWeek[], input: DayGuardInput):
   const first = input.planCreatedAt ? localDateOf(input.planCreatedAt) : input.today
   const from = first < input.today ? first : input.today
   const last = addDays(from, mesocycle.length * 7 + 8)
-  // A SESSION STILL OWED ON THE DAY IT WAS MOVED TO (his ruling 14 Nov 2026, "Keep it, still owed"): a change of days
-  // rewrote the row the move serves, so Saturday's session vanished and Sunday showed a ghost of it. The row a pending
-  // move brings in (moved to today or later) is protected like a trained one: the rebuild leaves it, and the move with it.
-  const owed = new Set((input.moves ?? []).filter(m => m.toDate).map(m => m.toDate))
   for (let date = from; date <= last; date = addDays(date, 1)) {
-    const trained = date < input.today || logged.has(date) || closed.has(date) || owed.has(date)
+    const trained = date < input.today || logged.has(date) || closed.has(date)
     for (const row of planRowsOnDate(mesocycle, input, date)) {
       served.add(key(row.weekNumber, row.dayName))
       if (trained) protectedRows.add(key(row.weekNumber, row.dayName))
@@ -230,4 +226,19 @@ export function shortDate(date: string): string {
 export function describeDateSpan(from: string, days: number): string {
   const to = addDays(from, Math.max(1, days) - 1)
   return to === from ? shortDate(from) : `${shortDate(from)} – ${shortDate(to)}`
+}
+
+/**
+ * A SESSION STILL OWED ON THE DAY IT WAS MOVED TO (his ruling 14 Nov 2026, "Keep it, still owed"). A change of days
+ * rewrote the row a pending move serves, so the moved session vanished and its new day showed a ghost of it. A REBUILD
+ * leaves that row (and so the move) as it is. Only a rebuild: an injury ease-off still reaches a moved session, which is
+ * judged on the day it is run (buildDayGuard).
+ */
+export function buildOwedGuard(mesocycle: MesocycleWeek[], input: PlanCalendar): DayGuard {
+  const owed = new Set<string>()
+  for (const m of input.moves ?? []) {
+    if (!m.toDate || m.toDate < input.today) continue
+    for (const row of planRowsOnDate(mesocycle, input, m.toDate)) owed.add(`${row.weekNumber}|${row.dayName}`)
+  }
+  return (weekNumber, dayName) => owed.has(`${weekNumber}|${dayName}`)
 }

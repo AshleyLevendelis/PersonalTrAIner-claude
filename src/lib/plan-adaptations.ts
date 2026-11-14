@@ -26,6 +26,7 @@ import { settleWeek } from './settle-week'
 import {
   comparePlanDays, planWeeksOnDate, weekdayIndex, NOTHING_TRAINED, planDayDate,
   type DayGuard, type PlanCalendar, type PlanDayOnDate, type PlanDayRef,
+  buildOwedGuard,
 } from './plan-guard'
 import { addDays } from './session-move'
 import { constraintProfile, NO_ACTIVE_ADAPTATIONS, type EffectiveConstraints } from './effective-constraints'
@@ -648,12 +649,13 @@ export async function rebuildAgainstProfile(
     const date = planDayDate(context.calendar.planCreatedAt, weekNumber, dayName)
     return date != null && date < context.fromDate
   }
+  const owed = buildOwedGuard(mesocycle, context.calendar)
   return Promise.all(mesocycle.map(async (original, i) => {
     if (!wanted(original.week_number)) return original
     const cautiousWeek = cautiousWeeks.has(original.week_number)
     const week = (cautiousWeek ? cautious : plain)?.[i]
     if (!week) return original
-    const mayChange = (dayName: string) => !context.isProtected(original.week_number, dayName) && !beforeStart(original.week_number, dayName)
+    const mayChange = (dayName: string) => !context.isProtected(original.week_number, dayName) && !owed(original.week_number, dayName) && !beforeStart(original.week_number, dayName)
     const dayNames = [...new Set([...original.days.map(d => d.day), ...week.days.map(d => d.day)])]
     if (!dayNames.some(mayChange)) return original
     const identity = {

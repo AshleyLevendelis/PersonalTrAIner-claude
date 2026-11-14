@@ -22,7 +22,7 @@ import { ELSEWHERE_WORDS } from '../src/lib/meals-elsewhere'
 import { resolveMoveTarget } from '../src/lib/session-move'
 import { describeRebuild } from '../src/lib/rebuild-card'
 import { computeMealMacros, lookupIngredient } from '../src/lib/food-db'
-import { buildDayGuard } from '../src/lib/plan-guard'
+import { buildDayGuard, buildOwedGuard } from '../src/lib/plan-guard'
 import type { UserProfile, WorkoutDay, MesocycleWeek } from '../src/lib/types'
 
 let failures = 0
@@ -138,10 +138,15 @@ console.log('\n11. A moved session survives a change of days (his "Keep it, stil
   const day = (d: string) => ({ day: d, focus: d, exercises: [{ name: 'Goblet Squat', sets: 3, reps: '8', rest: '90s' }] })
   const meso = [1, 2].map(n => ({ week_number: n, days: [day('Tuesday'), day('Thursday'), day('Saturday')] })) as unknown as MesocycleWeek[]
   const cal = { planCreatedAt: '2026-11-14T08:00:00', today: '2026-11-14', loggedDates: [], closedDates: [] }
-  const withMove = buildDayGuard(meso, { ...cal, moves: [{ fromDate: '2026-11-14', toDate: '2026-11-15' }] })
-  const noMove = buildDayGuard(meso, { ...cal, moves: [] })
+  const cal0 = { planCreatedAt: cal.planCreatedAt, today: cal.today }
+  const withMove = buildOwedGuard(meso, { ...cal0, moves: [{ fromDate: '2026-11-14', toDate: '2026-11-15' }] })
+  const noMove = buildOwedGuard(meso, { ...cal0, moves: [] })
   check('Saturday\'s session, moved to Sunday and not yet done, is kept by a rebuild', withMove(1, 'Saturday') === true)
   check('...with no move the same row is open to the rebuild (the fixture binds)', noMove(1, 'Saturday') === false)
+  check('...a move to a day already gone keeps nothing', buildOwedGuard(meso, { ...cal0, today: '2026-11-16', moves: [{ fromDate: '2026-11-14', toDate: '2026-11-15' }] })(1, 'Saturday') === false)
+  check('...and an injury ease-off still reaches a moved session (the trained-day guard leaves it open)', buildDayGuard(meso, { ...cal, moves: [{ fromDate: '2026-11-14', toDate: '2026-11-15' }] })(1, 'Saturday') === false)
+  const adapt = read('src/lib/plan-adaptations.ts')
+  check('the rebuild asks the owed guard before changing a day', /const owed = buildOwedGuard\(mesocycle, context\.calendar\)/.test(adapt) && /!context\.isProtected\(original\.week_number, dayName\) && !owed\(original\.week_number, dayName\)/.test(adapt))
   const before = [{ week_number: 1, days: [day('Tuesday'), day('Thursday'), day('Saturday')] }] as unknown as MesocycleWeek[]
   const after = [{ week_number: 1, days: [day('Monday'), day('Friday'), day('Saturday')] }] as unknown as MesocycleWeek[]
   const lines = describeRebuild(before, after, { start: { fromWeek: 1, fromDate: '2026-11-14', said: 'today' }, planCreatedAt: '2026-11-14T08:00:00', moves: [{ fromDate: '2026-11-14', toDate: '2026-11-15' }], today: '2026-11-14' } as never)
