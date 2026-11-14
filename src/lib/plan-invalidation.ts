@@ -107,6 +107,11 @@ export interface PlanInvalidation {
   /** What to tell the user, in their terms — never a field name. */
   title: string
   detail: string
+  /**
+   * The goal as it was, set only on a goal change: "Leave it as it is" puts it back (his ruling 14 Nov 2026, "Undo the
+   * goal change"), because the goal is saved before the question and moves calories at once.
+   */
+  previousGoal?: UserProfile['fitness_goal']
 }
 
 /**
@@ -358,6 +363,7 @@ export function detectPlanInvalidation(
   if ('fitness_goal' in patch && patch.fitness_goal !== before.fitness_goal) {
     return {
       field: 'fitness_goal',
+      previousGoal: before.fitness_goal,
       title: 'Rebuild your plan for this goal?',
       // BOTH HALVES, BEFORE THE TAP — Ashley's ruling, 17 Sep 2026, from three
       // options: training and food, from this week. The goal is the only

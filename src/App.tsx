@@ -17,7 +17,7 @@ import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
-import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
+import { BottomDockHeightProvider, useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { AppTour, replayAppTour } from '@/components/AppTour'
 import { isDevAccount, getSessionDateContext, getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { useKeptPlanSender } from '@/hooks/useKeptPlanSender'
@@ -2899,6 +2899,17 @@ function App() {
     }
   }
   const closeRebuildDialog = () => setPlanInvalidation(null)
+  // "LEAVE IT AS IT IS" LEAVES IT (his ruling 14 Nov 2026, "Undo the goal change"): a goal is saved before this question
+  // and moves the calorie targets at once (1,810 to 1,448 kcal measured), so declining puts the old goal back and the
+  // targets follow it through the same effect. Every other field's "leave it" keeps the saved answer, as before.
+  const leaveAsItIs = async () => {
+    const inv = planInvalidation
+    setPlanInvalidation(null)
+    if (inv?.field !== 'fitness_goal' || inv.previousGoal === undefined || !profile?.id) return
+    const patch = { fitness_goal: inv.previousGoal } as Partial<UserProfile>
+    handleProfilePatched(patch)
+    try { await updateProfileField(profile.id, patch) } catch (err) { console.error('Putting the goal back did not save', err) }
+  }
 
   // THE OFFER SAYS WHAT THE REBUILD WILL DO, read off a trial of it (run 5, H28, 11 Oct 2026): the same rebuild,
   // seeded, so the plan the tap applies is the plan the dialog described.
@@ -3436,7 +3447,7 @@ function App() {
         <OfflineStatusIndicator />
       </div>
 
-      <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
+      <DockPaddedMain className="max-w-6xl mx-auto px-4 pt-12 space-y-6">
         {/* M29, 9 Oct 2026. This sat in the page's flow ABOVE the tabs, so a
             failed swap mid-session printed its sentence a screen and a half
             above the tap and the person saw nothing happen; it then followed
@@ -3673,7 +3684,7 @@ function App() {
           </TabsContent>
         </Tabs>
         </ShowNumbersContext.Provider>
-      </main>
+      </DockPaddedMain>
       <BottomDock />
       <BottomTabBar activeTab={activeTab} onTabChange={handleTabChange} chatAttention={chatAttention && activeTab !== 'chat'} flatChatDisc={groceryFullScreen || activeTab === 'chat'} />
       {/* Sibling of <main>, like BottomDock, so it overlays every tab AND the
@@ -3753,7 +3764,7 @@ function App() {
             </ul>
           )}
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setPlanInvalidation(null)} disabled={rebuilding}>
+            <Button variant="outline" onClick={() => void leaveAsItIs()} disabled={rebuilding} data-testid="rebuild-leave">
               Leave it as it is
             </Button>
             <Button onClick={handleConfirmRebuild} disabled={rebuilding}>
@@ -3802,3 +3813,13 @@ function App() {
 }
 
 export default App
+
+/**
+ * THE PAGE LEAVES ROOM FOR THE FLOATING BARS (QA, 14 Nov 2026: at 375px the "Rest complete" bar covered Home's last row).
+ * The dock measures itself (useBottomDockHeight); the page's bottom padding grows by that height, so nothing a floating
+ * bar sits over is out of reach. Inside the provider, which App renders, so it reads the height App itself cannot.
+ */
+function DockPaddedMain({ className, children }: { className: string; children: React.ReactNode }) {
+  const { dockHeightPx } = useBottomDockHeight()
+  return <main className={className} style={{ paddingBottom: `calc(7rem + ${dockHeightPx}px)` }} data-dock-pad={dockHeightPx}>{children}</main>
+}

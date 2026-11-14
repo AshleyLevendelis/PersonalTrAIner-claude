@@ -228,7 +228,8 @@ export const ELSEWHERE_WORDS = {
   ownNone: 'None of your saved meals for this one fit what you avoid.',
   /** On the shopping list, once, when it left meals out. */
   listLine: (count: number) =>
-    `${count} ${count === 1 ? 'meal is' : 'meals are'} cooked for you, so ${count === 1 ? 'it is' : 'they are'} not on this list.`,
+    // A meal out is counted here too (it carries the same never-shopped tag), so the line names both (QA, 14 Nov 2026).
+    `${count} ${count === 1 ? 'meal is' : 'meals are'} eaten out or cooked for you, so ${count === 1 ? 'it is' : 'they are'} not on this list.`,
   profileHeading: 'Meals cooked for me',
   profileHelp: 'Meals somebody else cooks for you, at work for example. They stay in your day and count towards it, and are never on your shopping list.',
   profileNone: 'None',

@@ -94,7 +94,11 @@ export function describeRebuild(
   // THE FIRST WEEK IT TOUCHES, day by day — where a finished session or today's would show if it were touched.
   const first = changed[0]
   const was = before.find(w => w.week_number === first.week_number)
-  const names = [...new Set([...(was?.days ?? []).map(d => d.day), ...first.days.map(d => d.day)])].sort((a, b) => weekdayIndex(a) - weekdayIndex(b))
+  // IN DATE ORDER (QA, 14 Nov 2026: a week begun on a Saturday read "…Fri 20 Nov… Sat 14 Nov"). A plan week can start on
+  // any weekday, so the days sort by their date in that week, Monday first only when there is no date to read.
+  const dateOf = (day: string) => planDayDate(at.planCreatedAt, first.week_number, day) ?? ''
+  const names = [...new Set([...(was?.days ?? []).map(d => d.day), ...first.days.map(d => d.day)])]
+    .sort((a, b) => (dateOf(a) && dateOf(b) ? dateOf(a).localeCompare(dateOf(b)) : weekdayIndex(a) - weekdayIndex(b)))
   const dayLines: string[] = []
   for (const day of names) {
     const b = focusOf(was, day)

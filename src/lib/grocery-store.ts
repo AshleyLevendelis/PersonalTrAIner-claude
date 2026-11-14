@@ -1002,8 +1002,10 @@ async function reconcileGenerated(
   for (const agg of aggregate.values()) {
     const existing = existingGenerated.get(agg.canonicalKey)
     // Nothing weighable at all: show the count she would buy, not "0g".
+    // A LIQUID IS BOUGHT BY VOLUME (QA, 14 Nov 2026: "milk 30g", "olive oil 40g"). Read at water density, as the food
+    // table reads a ml (1 g = 1 ml; oil is about 0.92, close enough for a shopping line).
     const amount = agg.grams > 0 || !agg.uncounted
-      ? { quantity: Math.round(agg.grams), unit: 'g' }
+      ? { quantity: Math.round(agg.grams), unit: boughtByVolume(agg.canonicalKey) ? 'ml' : 'g' }
       : { quantity: agg.uncounted.quantity, unit: agg.uncounted.unit }
     if (existing?.dismissed) {
       // Deliberately removed by the user — leave it dismissed, don't resurrect it.
@@ -1202,4 +1204,12 @@ export async function removeGroceryDays(input: AddGroceryDaysInput): Promise<Add
   const planned = assembleDates(input.mealPools, input.targets, covered, input.softLikedFoods ?? [], pinsByDate, input.mealShape, input.today, readKeptHeldSizes(input.profileId))
   const result = await reconcileGenerated(input.profileId, planned, input.today)
   return { ...result, alreadyCovered: false, covered }
+}
+
+/** A food bought by volume: milk (dairy or plant), oil, juice, stock, kefir, single or double cream. Never a cheese, a
+ * spread, ice cream, a powder or chocolate. */
+export function boughtByVolume(key: string): boolean {
+  const k = key.toLowerCase()
+  if (/\b(cheese|ice cream|powder|chocolate|spray|butter\b(?!milk)|yoghurt|yogurt|condensed)\b/.test(k)) return false
+  return /\b(milk|buttermilk|oil|juice|stock|broth|kefir|single cream|double cream|cream\b$)/.test(k)
 }

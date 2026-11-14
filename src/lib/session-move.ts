@@ -66,7 +66,7 @@ export type MoveTarget =
        * empty Sunday that lay before the session's own day). 'busy': it holds a session. 'gone': it has already passed.
        * 'other_week': it is in a different training week.
        */
-      requestedWhyNot?: 'busy' | 'gone' | 'other_week'
+      requestedWhyNot?: 'busy' | 'gone' | 'other_week' | 'moved_in'
       /**
        * Set only when the session being moved ARRIVED here by an earlier move.
        * The write must update THAT record — origin → the new day — rather than
@@ -291,9 +291,12 @@ export function resolveMoveTarget(input: MoveTargetInput, depth = 0): MoveTarget
     && weekOf(requestedDate) === originWeek && isFree(requestedDate)) {
     return { ok: true, date: requestedDate, dayName: dayNameOf(requestedDate), asWanted: true }
   }
-  const requestedWhyNot: 'busy' | 'gone' | 'other_week' | undefined = !requestedDate ? undefined
+  const requestedWhyNot: 'busy' | 'gone' | 'other_week' | 'moved_in' | undefined = !requestedDate ? undefined
     : daysBetween(todayDate, requestedDate) < 0 ? 'gone'
     : weekOf(requestedDate) !== originWeek ? 'other_week'
+    // A DAY THAT ONLY HOLDS ANOTHER DAY'S MOVED SESSION is said so, never "already has a session" (QA, 14 Nov 2026:
+    // Sunday read rest everywhere else).
+    : existing.some(m => m.toDate === requestedDate) ? 'moved_in'
     : 'busy'
   // WHERE THE TRAINING WEEK ENDS, so a refusal can say so. The loop stops at the edge of the session's own
   // plan week (the plan repeats weekly, so a day past it already holds its own copy of every session); when

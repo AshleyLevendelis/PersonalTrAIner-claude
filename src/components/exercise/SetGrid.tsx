@@ -912,7 +912,7 @@ export function SetGrid({
   const onCard = !!onToggleRamp
   const showColumnLabels = onCard || !!unitQualifier || logColumnLabel !== 'Reps'
   const GRID = onCard
-    ? 'grid grid-cols-[28px_minmax(0,1fr)_72px_44px] gap-2 items-center'
+    ? 'grid grid-cols-[28px_minmax(0,1fr)_88px_44px] gap-2 items-center'
     : 'grid grid-cols-[24px_minmax(80px,1fr)_28px_56px_auto] gap-1.5 items-center'
   const addWarmupButton = (
     <button
@@ -1118,7 +1118,7 @@ export function SetGrid({
                 placeholder={isBW ? 'BW' : weightPlaceholderFor(ref)}
                 value={isBW ? '' : input.weight}
                 onChange={e => updateInput(ref, 'weight', e.target.value)}
-                onFocus={scrollRowIntoView}
+                onFocus={e => { e.currentTarget.select(); scrollRowIntoView(e) }}
                 className={`h-11 rounded-[8px] border-0 bg-[color:var(--surface-raised)] shadow-none ${onCard ? `font-mono text-[1.0625rem] font-bold ${plateButton && isBodyweightCapable ? 'pr-[5.5rem]' : plateButton || isBodyweightCapable ? 'pr-[3.75rem]' : 'pr-8'}` : `text-sm ${plateButton ? 'pr-10' : ''}`} ${isSaved ? 'text-foreground' : 'text-[color:var(--role-ai-text)]'} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[k] ? 'ring-1 ring-destructive' : rowWarnings[k] ? 'ring-1 ring-amber-500' : ''}`}
                 disabled={isBW}
               />
@@ -1179,7 +1179,7 @@ export function SetGrid({
               placeholder={ghost ? String(ghost.reps_completed) : defaultRepsFor(ref)}
               value={input.reps}
               onChange={e => updateInput(ref, 'reps', e.target.value)}
-              onFocus={scrollRowIntoView}
+              onFocus={e => { e.currentTarget.select(); scrollRowIntoView(e) }}
               className={`h-11 rounded-[8px] border-0 bg-[color:var(--surface-raised)] shadow-none ${onCard ? `font-mono text-[1.0625rem] font-bold ${logColumnLabel === 'Reps' ? 'pr-9' : ''}` : 'text-sm'} ${isSaved ? 'text-foreground' : 'text-[color:var(--role-ai-text)]'} ${rowErrors[k] ? 'ring-1 ring-destructive' : ''}`}
             />
             {onCard && logColumnLabel === 'Reps' && (

@@ -528,8 +528,10 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
           status: done ? 'done' as const : 'in_progress' as const,
           focus: borrowedDay?.focus ?? loggedSessionFocus(names),
           exerciseNames: borrowedDay ? borrowedDay.exercises.map(e => e.name) : names,
-          setsLogged: nonWarmupToday.length,
-          setsPlanned: planned,
+          // ONE COUNT (QA, 14 Nov 2026: Home "1 of 22 sets" while Exercise said "0 of 20"): the borrowed day is counted as
+          // every other day is, movement prep out and each lift capped (sessionSetCount).
+          setsLogged: counted?.logged ?? nonWarmupToday.length,
+          setsPlanned: counted?.planned ?? planned,
           exerciseCount: borrowedDay ? borrowedDay.exercises.length : names.length,
           estimatedMinutes: null, sessionLength: null, minutesLeft: null, leadLift: null,
         }

@@ -1207,7 +1207,10 @@ async function appendPools(
  */
 export function survivesRegeneration(tags: string[] | null | undefined): boolean {
   const list = tags ?? []
-  return list.includes(USER_REQUESTED_TAG) || list.includes(FAVOURITE_TAG)
+  // A ONE-DAY MEAL SURVIVES TOO (QA, 14 Nov 2026): a meal out, a freestyle meal, a meal cooked for him and a moved
+  // meal are pin-only, served on their own date only; a regenerate deleted them and left that date's pick naming
+  // nothing, so a night out he had marked quietly turned back into a planned dinner.
+  return list.includes(USER_REQUESTED_TAG) || list.includes(FAVOURITE_TAG) || list.includes('pin-only')
 }
 
 async function persistPools(profileId: string, accepted: Partial<Record<MealSlotName, PoolOption[]>>): Promise<void> {

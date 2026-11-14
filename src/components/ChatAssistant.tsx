@@ -4599,6 +4599,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const whyNot = target.asWanted || !target.requestedDayName ? null
       : target.requestedWhyNot === 'gone' ? `${target.requestedDayName} has already gone`
       : target.requestedWhyNot === 'other_week' ? `${target.requestedDayName} is in a different training week`
+      : target.requestedWhyNot === 'moved_in' ? `${target.requestedDayName} already has another day's session moved onto it`
       : `${target.requestedDayName} already has a session`
     const leadBase = !whyNot
       ? `${target.dayName}'s free, so ${trueFromDayName} won't count as missed.`
@@ -4622,7 +4623,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // implication below moved with it.
         rows: [
           { field: trueFromDayName, before: session.focus, after: `Moved to ${target.dayName}` },
-          { field: target.dayName, before: 'Nothing scheduled', after: session.focus },
+          // WHAT THE DAY HOLDS NOW, read off it (QA, 14 Nov 2026: Active Recovery read "Nothing scheduled").
+          { field: target.dayName, before: (() => {
+            const there = sessionForDate({ date: target.date, plan: planForDate(target.date), moves: trainingWeek.moves }).day
+            return there?.plannedActivity ? (there.focus || 'Active recovery') : there && there.exercises.length > 0 ? there.focus : 'Rest day'
+          })(), after: session.focus },
           ...(alsoDoing ? [alsoDoingRow(alsoDoing)] : []),
         ],
         implications: [
@@ -4633,7 +4638,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           ...(alsoDoing ? [{ severity: 'info' as const, text: alsoDoingImplication(alsoDoing) }] : []),
           { severity: 'info' as const, text: 'The plan itself is unchanged — this moves one session, this week only.' },
         ],
-        rationale: reason,
+        // THE COACH'S OWN NOTE IS NOT PRINTED on a move card (QA, 14 Nov 2026: "wants to train on Sunday instead" read
+        // as the app talking about him); the lead already says what is moving and why.
         reversible: true,
       },
     }

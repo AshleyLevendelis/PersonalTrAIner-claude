@@ -2232,7 +2232,7 @@ export interface SessionMovePayload {
    */
   requestedDayName?: string
   /** Why that day could not be used, so the receipt says the same as the card (QA, 14 Nov 2026). */
-  requestedWhyNot?: 'busy' | 'gone' | 'other_week'
+  requestedWhyNot?: 'busy' | 'gone' | 'other_week' | 'moved_in'
   reason?: string
   /**
    * What they did INSTEAD on the day the session left, when the same message
@@ -2259,6 +2259,7 @@ export async function executeSessionMove(
     + (payload.requestedDayName
       ? (payload.requestedWhyNot === 'gone' ? ` (${payload.requestedDayName} had already gone)`
         : payload.requestedWhyNot === 'other_week' ? ` (${payload.requestedDayName} is in a different training week)`
+        : payload.requestedWhyNot === 'moved_in' ? ` (${payload.requestedDayName} already had another day's session moved onto it)`
         : ` (${payload.requestedDayName} already had a session on it)`)
       : ''),
   ]
