@@ -1,4 +1,5 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
+import { healthConditionsOf, healthConditionsInWords } from '@/lib/health-conditions'
 import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays } from '@/lib/running'
 import { blockShape } from '@/lib/timer-engine'
 import { circuitName } from '@/lib/circuit'
@@ -2187,6 +2188,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       macros,
       dietary_preferences: profile.dietary_preferences || [],
       concurrent_activities: profile.concurrent_activities || [],
+      // WHAT A DOCTOR HAS SAID TO WATCH (health-conditions.ts, his 14 Nov 2026 ruling), in the app's own words.
+      health_conditions: healthConditionsInWords(healthConditionsOf(profile)),
       // THE RUNNING GOAL (running.ts), in the app's own words: the coach quotes this, never a pace (his 13 Nov ruling).
       running_goal: isRunningGoal(profile.running_goal)
         ? `${runningGoalLabel(profile.running_goal)}${profile.running_race_date ? `, race day ${raceDateWords(profile.running_race_date)}` : ''}${profile.running_base_minutes ? `; they said they run ${profile.running_base_minutes} minutes non-stop now` : ''}`

@@ -2,6 +2,28 @@
 
 Newest first. One line each.
 
+- [x] **HEALTH CONDITIONS ON THE INJURIES CARD (his "Fold into injuries" + "Yes, build it", 14 Nov 2026)** — BUILT,
+  needs the migration (his machine) and the `chat-gemini` deploy. Five taps under "What a doctor has said to watch"
+  on setup's injuries card and Profile's injuries sheet (high blood pressure, a heart condition, diabetes or
+  pre-diabetes, on blood thinners, pregnant); a tap shows the GP line ("…check with your GP before you start a new
+  exercise plan. I'll keep your sets short of all-out and your cardio by effort, not heart rate."), is kept apart from
+  the joints (new column `health_conditions`, the insert retries without it before the migration, Profile says "not
+  switched on yet"), offers the rebuild on Profile, and tells the coach with its rule. Food never changes.
+  CSCS review (mine under the 18 Sep delegation; basis: ACSM moderate intensity and no maximal efforts for
+  hypertension and heart disease, RPE over heart rate where beta blockers blunt it, ACOG talk-test intensity in
+  pregnancy): (1) effect: sets stop at RPE 8 (two reps in reserve), cardio at RPE 7, by feel; (2) taken away: the top
+  RPE point of an intermediate or advanced block's peak weeks (168 sets over 8 -> 0 on 34 seeded profiles) and the
+  all-out circuit (64 -> 0, now "hard but controlled"); (3) fundamentals: every phase, pattern and progression still
+  runs; (4) no existing floor or ceiling moved for anyone without a condition (the profile ceiling is optional and
+  the lowest wins); (5) inside scope: nothing about the condition, its medication or pregnancy is prescribed, all
+  of that is the GP line. Checks: `test:health-conditions` (43 checks, 14 mutations, 13 caught; the 14th exposed a
+  redundant filter, deleted), `verify:health-taps` (9 checks, 5/5 mutations; the driver no longer throws on a missing
+  tap, so every check runs), `verify:profile-fixes` §10 (7 checks, 3/3). Frozen lists extended on purpose:
+  `test:option-icons` (13 injury-card values), `test:rebuild-offer` (+ health_conditions). 204 gates reading the
+  changed files green; the setup, Profile, app-start and rebuild drivers green. NOT run yet: `test:quality` and
+  `test:audit` (the change is inert for every grid profile, none has a condition; the full sweep will run them).
+  NOTICED, NOT CHANGED (a lead for a CSCS look): fat-loss BEGINNERS can be given the "30s max effort" HIIT circuit at
+  RPE 8 (e.g. home_gym|wrists|30-45|combat|beginner|fat_loss|high|avoid), above the beginner set ceiling of 7.
 - [x] **"BODYWEIGHT ONLY" MEANS NO KIT (his ruling 14 Nov 2026, "Nothing ticked")** — BUILT. The bodyweight tier
   assumed a pull-up bar and a weighted bag (his 9 Sep "fix the words" kept them so no plan changed; this partly
   reverses it): setup's kit screen came up with both ticked and plans held Backpack Row and pull-ups for Margaret, who

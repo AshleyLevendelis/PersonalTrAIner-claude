@@ -2942,6 +2942,7 @@ USER PROFILE:
 - Training Style: ${context.profile.training_style || 'not recorded (activity-only profile, or not asked)'}
 - Training Days: Originally ${context.training_days_count} days/week (user can add or remove days at any time via chat — this is NOT a ceiling)
 - Session Duration: ${context.session_duration_preference || '45-60'} minutes
+- What a doctor has said to watch: ${context.health_conditions || 'none'}.${context.health_conditions ? ' The app already keeps every set short of all-out (RPE 8 at most) and their cardio by effort. NEVER advise on the condition itself, its medication, or what is safe with it: say that is one for their GP and carry on with the training. Use effort words (Easy / Steady / Hard), never a heart rate or a heart-rate zone.' : ''}
 - Running goal: ${context.running_goal || 'none'}. Their runs are on the plan below as days named Walk-run, Easy run, Steady run, Intervals or Long run, in minutes and effort (Easy / Steady / Hard). NEVER give a pace or a time per km or mile: the app gives minutes and effort only.
 - Workout Split: ${context.workout_split_preference || 'ai_recommendation'}
 ${context.dietary_preferences && context.dietary_preferences.length > 0 ? `- Dietary Restrictions: ${context.dietary_preferences.join(", ")}` : ""}

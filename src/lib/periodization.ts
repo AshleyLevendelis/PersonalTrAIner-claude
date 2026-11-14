@@ -369,10 +369,12 @@ export function resolveTargetRpe(
   experience: TrainingExperience,
   weekInBlock: number,
   isDeload: boolean,
+  /** A lower ceiling from the profile (a health condition: HEALTH_SET_RPE_CEILING). The lowest of the three wins. */
+  profileCeiling?: number,
 ): string {
   if (isDeload) return 'RPE 5-6 — deload, move well and recover'
 
-  const ceiling = EXPERIENCE_RPE_CEILING[experience]
+  const ceiling = Math.min(EXPERIENCE_RPE_CEILING[experience], profileCeiling ?? Infinity)
   // Ramp within the block: week 1 easier, building to the phase target.
   const ramp = [-1, -0.5, 0][Math.min(weekInBlock - 1, 2)]
   const target = Math.min(PHASE_CONFIGS[phase].target_rpe + ramp, ceiling)

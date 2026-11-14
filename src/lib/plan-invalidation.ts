@@ -82,7 +82,7 @@ export const KNOWN_LIFT_FIELDS = ['known_squat_kg', 'known_bench_kg', 'known_dea
 // EXPERIENCE, RECOVERY AND CONDITIONING ADDED 8 Nov 2026, his ruling "Offer a rebuild" (QA round 2): all three are read
 // by the plan generator, and changing one on Profile saved it and left the plan as it was, with no word, the session-
 // length defect above again. They take the same road goal and style take: an offer, nothing changed until yes.
-export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', 'enjoyed_activities', 'running_goal', 'running_base_minutes', 'session_duration_preference', 'training_experience', 'recovery_capacity', 'conditioning_preference', ...KNOWN_LIFT_FIELDS] as const
+export const PLAN_INVALIDATING_FIELDS = ['injuries', 'equipment_access', 'training_days', 'training_style', 'fitness_goal', 'start_preference', 'enjoyed_activities', 'health_conditions', 'running_goal', 'running_base_minutes', 'session_duration_preference', 'training_experience', 'recovery_capacity', 'conditioning_preference', ...KNOWN_LIFT_FIELDS] as const
 export type PlanInvalidatingField = typeof PLAN_INVALIDATING_FIELDS[number] | 'concurrent_activities'
 
 /**
@@ -277,6 +277,20 @@ export function detectPlanInvalidation(
         : 'Your current plan is a training plan. I can rebuild it from this week onwards as the '
           + 'easing-in one — walks and easy movement, building a little at a time. Everything '
           + 'you have already logged stays exactly as it is.',
+    }
+  }
+
+  // WHAT A DOCTOR HAS SAID TO WATCH (his ruling 14 Nov 2026; health-conditions.ts): sets short of all-out and cardio by
+  // effort. Offered like every other rebuild: nothing changes until yes.
+  if ('health_conditions' in patch
+      && [...(patch.health_conditions ?? [])].sort().join(',') !== [...(before.health_conditions ?? [])].sort().join(',')) {
+    const now = (patch.health_conditions ?? []).length > 0
+    return {
+      field: 'health_conditions',
+      title: now ? 'Rebuild your plan around this?' : 'Rebuild your plan without the limits?',
+      detail: now
+        ? 'I can rebuild your plan from this week so every set stops short of all-out and your cardio is set by effort, not heart rate. Everything you have already logged stays exactly as it is.'
+        : 'I can rebuild your plan from this week without those limits on effort. Everything you have already logged stays exactly as it is.',
     }
   }
 

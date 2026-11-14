@@ -130,8 +130,10 @@ console.log('\n4. Icons are presentation — the values they sit beside are unto
   check('...and every enforced preference is offered',
     (DIETARY_PREFERENCES as string[]).every(p => dietValues.includes(p)),
     (DIETARY_PREFERENCES as string[]).filter(p => !dietValues.includes(p)))
+  // + the five health conditions on the same card (his ruling 14 Nov 2026, "Fold into injuries"): frozen too, because
+  // assembleProfile splits on exactly these codes (health-conditions.ts).
   check(`injury values unchanged (${injValues.length})`,
-    injValues.join(',') === ['ankles', 'elbows', 'hips', 'knees', 'lower_back', 'neck', 'shoulders', 'wrists'].join(','),
+    injValues.join(',') === ['ankles', 'blood_thinners', 'diabetes', 'elbows', 'heart_condition', 'high_blood_pressure', 'hips', 'knees', 'lower_back', 'neck', 'pregnancy', 'shoulders', 'wrists'].join(','),
     injValues.join(','))
 }
 

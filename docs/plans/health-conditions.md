@@ -1,4 +1,4 @@
-# Health conditions folded into the injuries question (plan, NOT BUILT)
+# Health conditions folded into the injuries question (BUILT 14 Nov 2026; migration on his machine)
 
 His ruling, 14 Nov 2026 (Sal and Margaret, decision 1): **"Fold into injuries"**. In his words: "we keep adding
 questions and the onboarding keeps getting longer. When really I want to make it shorter." So no new question: the
@@ -37,3 +37,16 @@ A question about training safely with a condition, medication or pregnancy is ne
 GP line now, notes his own words, and goes back to the question it was on (`setup-health-question.ts`,
 `test:sal-margaret` §4, `verify:onboarding-turns` §30). The coach's prompt says the same; needs the `onboarding-chat`
 deploy.
+
+## As built (14 Nov 2026, his "Yes, build it")
+- Codes and every rule in `src/lib/health-conditions.ts`; migration `20261114150000_health_conditions.sql`.
+- Setup: the injuries card ("Anything that bothers you when you train, or anything a doctor has said to watch?")
+  shows the eight joints, then the five under "What a doctor has said to watch"; ticking one shows the GP line
+  under them. One answer holds both; `assembleProfile` splits joints to `injuries`, conditions to `health_conditions`.
+- Profile: the same five in the injuries sheet, the GP line, the row lists them, and a change offers the rebuild.
+- Plan: no working set above RPE 8 (`resolveTargetRpe`'s profile ceiling), conditioning capped at RPE 7, "max effort"
+  becomes "hard but controlled", every heart-rate figure removed (`effortWordsOnly`). Calibration already asks RPE 6.
+- Coach: told the conditions in words, with the rule (never advise on the condition, its medication or what is safe
+  with it; that is the GP's; effort words, never a heart rate). Needs the `chat-gemini` deploy.
+- Not built: anything pregnancy-specific (left to the GP line, by design); the setup coach recognising a condition
+  typed in words is its own model behaviour (the never-park rule already notes the words).

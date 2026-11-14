@@ -1125,6 +1125,8 @@ function App() {
       start_preference: profileRow.start_preference ?? undefined,
       // Absent before its migration (`select('*')` needs no column): read as none.
       enjoyed_activities: Array.isArray(profileRow.enjoyed_activities) ? profileRow.enjoyed_activities : [],
+      // What a doctor has said to watch (health-conditions.ts), absent before its migration: read as none.
+      health_conditions: Array.isArray(profileRow.health_conditions) ? profileRow.health_conditions : [],
       // The running goal (running.ts), absent before its migration: read as none.
       running_goal: typeof profileRow.running_goal === 'string' ? profileRow.running_goal : null,
       running_race_date: typeof profileRow.running_race_date === 'string' ? profileRow.running_race_date : null,
@@ -1925,6 +1927,8 @@ function App() {
         start_preference: enrichedProfile.start_preference ?? null,
         // What he enjoys besides walking (pathway.ts). Column pending its migration: dropped on retry below.
         enjoyed_activities: enrichedProfile.enjoyed_activities ?? [],
+        // What a doctor has said to watch (health-conditions.ts). Column pending its migration: dropped on retry below.
+        health_conditions: enrichedProfile.health_conditions ?? [],
         // The running goal (running.ts). Column pending its migration: dropped on retry below.
         running_goal: enrichedProfile.running_goal ?? null,
         meals_per_day: enrichedProfile.meals_per_day ?? 3,
@@ -1984,7 +1988,7 @@ function App() {
     // migration costs that one answer and never the whole profile.
     {
       let pending: Record<string, unknown> = profileInsert
-      const PENDING_COLUMNS = ['date_of_birth', 'enjoyed_activities', 'running_goal']
+      const PENDING_COLUMNS = ['date_of_birth', 'enjoyed_activities', 'running_goal', 'health_conditions']
       for (let tries = 0; tries < PENDING_COLUMNS.length; tries++) {
         // Whichever one the database named, in either order.
         const column = PENDING_COLUMNS.find(c => c in pending && insertError && isMissingColumnError(insertError, c))

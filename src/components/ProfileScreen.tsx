@@ -10,6 +10,7 @@
 // not retire — see that file's original doc comment for why).
 // ---------------------------------------------------------------------------
 
+import { HEALTH_CONDITION_OPTIONS, healthConditionsOf, hasHealthCondition, healthConditionLine } from '@/lib/health-conditions'
 import { ENJOYED_ACTIVITY_OPTIONS } from '@/lib/pathway'
 import { RUNNING_GOAL_OPTIONS, isRunningGoal, raceDateWords } from '@/lib/running'
 import { MEAL_VARIETY_OPTIONS } from '@/lib/freestyle'
@@ -1079,7 +1080,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       onProfileChanged(revertPatch)
       // A SETTING WHOSE DATABASE STEP HAS NOT RUN is not a connection problem, and saying so would send him to
       // check his signal for nothing.
-      if ((['enjoyed_activities', 'meal_variety', 'show_numbers', 'running_goal'] as const).some(c => c in patch && isMissingColumnError(err, c))) {
+      if ((['enjoyed_activities', 'meal_variety', 'show_numbers', 'running_goal', 'health_conditions'] as const).some(c => c in patch && isMissingColumnError(err, c))) {
         setSaveError("That setting isn't switched on yet, so it couldn't be saved. Nothing else has changed.")
         return
       }
@@ -1450,6 +1451,35 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               </div>
             )}
           </div>
+        </div>
+        {/* WHAT A DOCTOR HAS SAID TO WATCH (his ruling 14 Nov 2026, "Fold into injuries"; health-conditions.ts): the same
+            five taps as setup's injuries card, kept apart from the joints above. A change offers the rebuild. */}
+        <div className="space-y-2 pt-3" data-testid="profile-health-conditions">
+          <h3 className="ds-label">What a doctor has said to watch</h3>
+          <div className="flex flex-wrap gap-1.5">
+            {HEALTH_CONDITION_OPTIONS.map(o => {
+              const on = healthConditionsOf(profile).includes(o.value)
+              return (
+                <button
+                  key={o.value}
+                  type="button"
+                  aria-pressed={on}
+                  data-health={o.value}
+                  className="h-11 rounded-full border px-3 text-[0.6875rem]"
+                  style={{ borderColor: on ? 'var(--primary)' : 'var(--hairline)', color: on ? 'var(--primary)' : 'var(--foreground)' }}
+                  onClick={() => {
+                    const current = healthConditionsOf(profile)
+                    savePatch({ health_conditions: on ? current.filter(c => c !== o.value) : [...current, o.value] })
+                  }}
+                >{o.icon} {o.label}</button>
+              )
+            })}
+          </div>
+          {hasHealthCondition(profile) && (
+            <p className="text-[0.6875rem] leading-snug text-muted-foreground" data-testid="profile-health-line">
+              {healthConditionLine(healthConditionsOf(profile))}
+            </p>
+          )}
         </div>
         </>
       )
@@ -2072,7 +2102,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <ProfileGroup label="Body & goals">
               <SheetRow label="Height & weight" value={[profile.height_cm ? `${profile.height_cm} cm` : null, nowKg != null ? `${nowKg} kg` : null].filter(Boolean).join(' · ') || 'Not set'} onOpen={() => setSheet('body')} />
               <SheetRow label="Goal" value={[GOAL_OPTIONS.find(o => o.value === profile.fitness_goal)?.label, goalKg != null ? `${goalKg} kg` : null].filter(Boolean).join(' → ') || 'Not set'} onOpen={() => setSheet('goal')} />
-              <SheetRow label="Injuries" value={listOrNone([...activeChangeLines(activeAdaptations ?? [], 'injury', getAppNow(profileId)), ...injuryCodes.map(code => INJURY_OPTIONS.find(o => o.value === code)?.label ?? code), ...unrecognisedInjuries], 'None')} onOpen={() => setSheet('injuries')} />
+              <SheetRow label="Injuries" value={listOrNone([...activeChangeLines(activeAdaptations ?? [], 'injury', getAppNow(profileId)), ...injuryCodes.map(code => INJURY_OPTIONS.find(o => o.value === code)?.label ?? code), ...unrecognisedInjuries, ...HEALTH_CONDITION_OPTIONS.filter(o => healthConditionsOf(profile).includes(o.value)).map(o => o.label)], 'None')} onOpen={() => setSheet('injuries')} />
             </ProfileGroup>
 
             <ProfileGroup label="Training">

@@ -229,6 +229,27 @@ await wait(400)
 const lifts = await text('[data-profile-row="Known lifts"]')
 check('7a. the row names the squat, bench and deadlift the fixture knows', /Squat 100/.test(lifts) && /Bench 60/.test(lifts) && /Deadlift 120/.test(lifts), lifts)
 
+// --- 10. Health conditions ---------------------------------------------------------------------
+// His ruling 14 Nov 2026, "Fold into injuries": the injuries sheet carries the five taps; a tap saves, shows the GP line,
+// and offers the rebuild.
+console.log('\n  10. What a doctor has said to watch')
+await openRow('Injuries')
+const hTaps = await ev(`[...document.querySelectorAll('[data-testid="profile-health-conditions"] button[data-health]')].map(b => b.textContent.trim())`)
+check('10a. the injuries sheet offers the five conditions', Array.isArray(hTaps) && hTaps.length === 5 && hTaps.some(t => /High blood pressure/.test(t)) && hTaps.some(t => /Pregnant/.test(t)), hTaps)
+const hBtn = `document.querySelector('[data-testid="profile-health-conditions"] button[data-health="diabetes"]')`
+const hSize = await ev(`(() => { const b = ${hBtn}; if (!b) return 0; const r = b.getBoundingClientRect(); return r.height })()`)
+check('10b. ...each 44px tall', hSize >= 44, hSize)
+check('10c. no GP line before one is ticked', (await ev(`!!document.querySelector('[data-testid="profile-health-line"]')`)) === false)
+await pointAt(hBtn)
+const hRow = await until(async () => { const r = await profileRow(); return (r?.health_conditions ?? []).includes('diabetes') ? r : null })
+check('10d. a tap saves it to the profile', !!hRow, (await profileRow())?.health_conditions)
+const hLine = await until(() => text('[data-testid="profile-health-line"]'))
+check('10e. the GP line appears, naming it', /diabetes or pre-diabetes, check with your GP/.test(hLine ?? ''), hLine)
+const hOffer = await until(() => text('[data-testid="plan-invalidation-detail"]'))
+check('10f. ...and the rebuild is offered, nothing changed until yes', /stops short of all-out/.test(hOffer ?? ''), hOffer)
+check('10g. the joints are untouched by it', !((hRow?.injuries ?? []).includes('diabetes')), hRow?.injuries)
+await shoot('profile-fixes-10-health')
+
 console.log(`\n${ran} checks ran`)
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASSED')
 chrome.kill(); server.close(); ws.close()

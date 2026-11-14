@@ -118,6 +118,23 @@ if (state === 'days') {
   ))
 }
 
+if (state === 'injuries') {
+  // THE INJURIES CARD WITH THE HEALTH TAPS (his ruling 14 Nov 2026, "Fold into injuries"): goal, experience and
+  // equipment answered; the injuries card is the app's next question.
+  const { injuries: _i, trainingDays: _a, sessionDuration: _b, trainingStyle: _c, conditioningPreference: _d, kitTicks: _e, ...before } = SAM_SO_FAR
+  void _i; void _a; void _b; void _c; void _d; void _e
+  const b = { ...before, equipment: 'full_gym' }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Sam' },
+      { role: 'assistant', content: 'Anything that bothers you when you train, or anything a doctor has said to watch?', slotCard: 'injuries' },
+    ],
+    b,
+    Object.keys(b),
+  ))
+}
+
 if (state === 'kit-bodyweight') {
   // MARGARET'S CASE (his ruling 14 Nov 2026, "Nothing ticked"): "Bodyweight only" just answered; the ticks start empty.
   const { trainingDays: _a, sessionDuration: _b, trainingStyle: _c, conditioningPreference: _d, kitTicks: _e, ...before } = SAM_SO_FAR

@@ -135,11 +135,15 @@ export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: st
  * claim, and must name things the tier genuinely lacks.
  */
 import { EQUIPMENT_OPTIONS, INJURY_OPTIONS } from './picker-options'
+import { HEALTH_CONDITION_OPTIONS, isHealthCondition } from './health-conditions'
 import { parseSportsSlot } from './setup-sports'
 import { describeActivity } from './concurrent-activity'
 import { ageOn, todayLocal } from './body-units'
 import { parseKitSlot, describeKitStatement, KIT_ITEMS, KIT_ITEM_LABELS, kitItemsFor, statementsForTicks, isKitItem, type KitItem, type KitStatement } from './kit-list'
 export { EQUIPMENT_OPTIONS, INJURY_OPTIONS }
+
+/** The injuries card's options: the joints, then the health conditions (his 14 Nov 2026 "Fold into injuries"). */
+const INJURY_CARD_OPTIONS: { value: string; icon: string; label: string }[] = [...INJURY_OPTIONS, ...HEALTH_CONDITION_OPTIONS]
 
 export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string; description: string }[] = [
   { value: 'functional', icon: '🏃', label: 'Functional / athletic', description: 'Explosive & dynamic' },
@@ -947,7 +951,10 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   // Above the barbell chain deliberately, not incidentally: asking a trainee
   // to type a deadlift number BEFORE they have had a chance to mention their
   // back is the wrong order to ask those two questions in.
-  { key: 'injuries', question: 'Anything that bothers you when you train — something you avoid or work around?', inputHint: 'Anything that bothers you?', shortLabel: 'Niggles', control: 'multi', required: false, options: INJURY_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_OPTIONS) },
+  // HEALTH CONDITIONS RIDE ON THIS CARD (his ruling 14 Nov 2026, "Fold into injuries": no new question). The card offers
+  // the joints and then five taps for what a doctor has said to watch; the answer holds both and assembleProfile
+  // splits them, joints to `injuries` (the injury filter) and conditions to `health_conditions` (health-conditions.ts).
+  { key: 'injuries', question: 'Anything that bothers you when you train, or anything a doctor has said to watch?', inputHint: 'Anything that bothers you?', shortLabel: 'Niggles', control: 'multi', required: false, options: INJURY_CARD_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_CARD_OPTIONS) },
   // AFTER injuries, which must stay in the opening block (her ruling: the only question whose absence can hurt),
   // and still right behind equipment: the ticks start from that answer (picksHomeKit, defaultKitTicks).
   { key: 'kitTicks', question: 'Which of these do you have?', inputHint: 'Tick everything you have', shortLabel: 'Your kit', control: 'multi', required: false, requiredIf: picksHomeKit, options: KIT_TICK_OPTIONS, destination: 'user_facts', validate: isSubsetOf(KIT_TICK_OPTIONS) },
@@ -1435,7 +1442,9 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     max_single_implement_kg: ceilingFor('maxSingleImplementKg', data),
     max_improvised_kg: ceilingFor('maxImprovisedKg', data),
     recovery_capacity: data.recoveryCapacity!,
-    injuries: data.injuries,
+    // Joints only: a health condition is not a joint, and the injury filter would read it as an unknown injury.
+    injuries: data.injuries.filter(c => !isHealthCondition(c)),
+    health_conditions: data.injuries.filter(isHealthCondition),
     display_name: data.displayName.trim(),
     // WHAT THEY SAID ABOUT THEIR KIT, if they volunteered it (the kitList
     // slot). Attached the one way a kit reaches a profile, so the FIRST plan

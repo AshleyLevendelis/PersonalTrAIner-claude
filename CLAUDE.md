@@ -1556,8 +1556,11 @@ menu" stays true when a copy is also left outside it.
   option 1), with three of his own: **usual meals STAY in setup** (his 11 Nov ruling won over the trim), **the name
   stays FIRST**, and **the lift numbers move to the first session** (a card asks a recent hard set of each, "I don't
   know" beside it; unanswered, the calibration week finds them). Being built.
-- **Health conditions: "Fold into injuries"** (no new question); **"Yes, build it"** (14 Nov), with the migration
-  (his machine). `docs/plans/health-conditions.md`. Being built.
+- **Health conditions: "Fold into injuries"** (no new question); **"Yes, build it"** (14 Nov). BUILT: five taps
+  under "What a doctor has said to watch" on setup's injuries card and Profile, the GP line, sets at RPE 8 at most,
+  cardio at 7 by effort words (no heart rate, no all-out), the coach told and told to send the condition to the GP;
+  food never changes. Needs the `health_conditions` migration and the `chat-gemini` deploy. `test:health-conditions`,
+  `verify:health-taps`, `verify:profile-fixes` §10, `docs/plans/health-conditions.md`
 - **"Bodyweight only" starts with NOTHING ticked** (his ruling 14 Nov, over "bar ticked, bag not" and over keeping
   both): no pull-up bar and no weighted bag until he ticks one. It partly reverses his 9 Sep "fix the words". Costs, named:
   no vertical pull without a bar, no overhead press for sore wrists. `verify:setup-kit` §4-5, `test:equipment-labels`,

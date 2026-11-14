@@ -1,4 +1,5 @@
 import { OptionRow, OptionPill, OptionCell } from './OptionRow'
+import { isHealthCondition, healthConditionLine } from '@/lib/health-conditions'
 import { Button } from '@/components/ui/button'
 import { getSlotDef, offeredOptionsFor, multiSelection, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
 import { dietTargetCaveat } from '@/lib/coach-voice'
@@ -151,7 +152,7 @@ export function SlotChipsCard({
 
       {shape === 'pills' && (
         <div {...groupRole} className="flex flex-wrap gap-2">
-          {options.map(opt => (
+          {(def.key === 'injuries' ? options.filter(o => !isHealthCondition(o.value)) : options).map(opt => (
             <OptionPill
               key={String(opt.value)}
               label={opt.label}
@@ -163,6 +164,29 @@ export function SlotChipsCard({
         </div>
       )}
 
+      {/* HEALTH CONDITIONS ON THE INJURIES CARD (his ruling 14 Nov 2026, "Fold into injuries"): under their own small
+          heading, and the GP line the moment one is ticked. */}
+      {def.key === 'injuries' && shape === 'pills' && options.some(o => isHealthCondition(o.value)) && (
+        <div data-health-taps className="space-y-2 pt-1">
+          <p className="text-[0.71875rem] font-medium text-muted-foreground">What a doctor has said to watch</p>
+          <div className="flex flex-wrap gap-2">
+            {options.filter(o => isHealthCondition(o.value)).map(opt => (
+              <OptionPill
+                key={String(opt.value)}
+                label={opt.label}
+                selected={isSelected(opt.value)}
+                selectionRole={selectionRole}
+                onClick={() => choose(opt.value)}
+              />
+            ))}
+          </div>
+          {selectedMulti.some(isHealthCondition) && (
+            <p data-testid="health-condition-line" className="text-[0.6875rem] leading-snug text-muted-foreground">
+              {healthConditionLine(selectedMulti.filter(isHealthCondition))}
+            </p>
+          )}
+        </div>
+      )}
       {def.key === 'dietaryPreferences' && (
         <p className="text-[0.6875rem] leading-snug text-muted-foreground/70">
           These filters check ingredients we recognise. We can't check brands,

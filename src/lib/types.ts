@@ -140,6 +140,8 @@ export interface UserProfile {
   concurrent_activities?: ConcurrentActivity[]
   /** What he enjoys besides walking ('swimming' | 'cycling'), asked in setup on the pathway (his 13 Nov 2026 strategy, slice 3). One walk a week becomes one of them. Column `enjoyed_activities` (migration 20261113130000, not run). */
   enjoyed_activities?: string[] | null
+  /** What a doctor has said to watch (health-conditions.ts), ticked in setup's injuries card or on Profile (his ruling 14 Nov 2026, "Fold into injuries"). Not joints, so never in `injuries`. Column `health_conditions` (migration 20261114150000); missing before it runs. */
+  health_conditions?: string[] | null
   /** A running goal ('run_20' | '5k' | '10k' | 'half'), his 13 Nov 2026 strategy slice 6 (src/lib/running.ts). Asked in setup (optional) or told to the coach. Column `running_goal` (migration 20261114120000, not run). */
   running_goal?: string | null
   /** A race date (YYYY-MM-DD), told to the COACH only (his ruling of 13 Nov 2026). Column `running_race_date`. */

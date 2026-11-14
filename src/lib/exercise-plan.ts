@@ -15,6 +15,7 @@ import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, stepHoldSeconds, getPhaseTempo, formatTempo, PHASE_CONFIGS, type PhaseConfig, type TrainingPhase,
 } from './periodization'
+import { hasHealthCondition, effortWordsOnly, HEALTH_SET_RPE_CEILING, HEALTH_CONDITIONING_RPE_CEILING } from './health-conditions'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
 import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays, effectiveRecoveryCapacity } from './concurrent-activity'
 import { dayAnchorExercise, anchorScore, canAnchor } from './session-derive'
@@ -5398,7 +5399,23 @@ interface ConditioningProfile {
 // no HR target, no frequency minimum... that's not a prescription, that's a
 // suggestion." assignConditioningNotes always appends duration on top of
 // these strings; the strings themselves carry everything else.
-function getConditioningProfile(goal: FitnessGoal): ConditioningProfile {
+function getConditioningProfile(goal: FitnessGoal, healthCondition = false): ConditioningProfile {
+  const base = conditioningForGoal(goal)
+  if (!healthCondition) return base
+  // A HEALTH CONDITION (health-conditions.ts, his 14 Nov 2026 ruling): effort words, never a heart rate, never
+  // all-out. The same session, by feel and capped at HEALTH_CONDITIONING_RPE_CEILING.
+  const ease = (c: Omit<RecommendedCardio, 'timing' | 'reason'>) => ({
+    ...c,
+    activity: effortWordsOnly(c.activity),
+    targetRpe: Math.min(c.targetRpe ?? HEALTH_CONDITIONING_RPE_CEILING, HEALTH_CONDITIONING_RPE_CEILING),
+  })
+  return {
+    dedicatedDay: ease(base.dedicatedDay), postSession: ease(base.postSession), heavyDayBrief: ease(base.heavyDayBrief),
+    independentBlock: ease(base.independentBlock), restDay: ease(base.restDay),
+  }
+}
+
+function conditioningForGoal(goal: FitnessGoal): ConditioningProfile {
   if (goal === 'fat_loss') {
     return {
       dedicatedDay: { activity: 'HIIT Metabolic Circuit — 8 rounds of 30s max effort / 30s rest', duration: 25, targetRpe: 8 },
@@ -5462,7 +5479,7 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
   const classDays = activityDays(profile.concurrent_activities)
   const restDayNames = allDayNames.filter(d => !trainingDayNames.has(d) && !classDays.has(d))
 
-  const cardioForGoal = getConditioningProfile(goal)
+  const cardioForGoal = getConditioningProfile(goal, hasHealthCondition(profile))
   let remaining = Math.max(0, Math.round(resolveConditioningFrequency(policy, profile.conditioning_preference)))
 
   for (const day of days) {
@@ -7239,7 +7256,7 @@ function applyDurationFiller(
       continue
     }
 
-    const cardioForGoal = getConditioningProfile(profile.fitness_goal)
+    const cardioForGoal = getConditioningProfile(profile.fitness_goal, hasHealthCondition(profile))
     day.conditioning_note = `Optional finisher: ${cardioForGoal.heavyDayBrief.activity} (~${fillerMinutes} min) — today's session ran under your time budget.`
     day.recommendedCardio = {
       ...cardioForGoal.heavyDayBrief,
@@ -8278,7 +8295,7 @@ export function generateMesocycle(
           // Primers stay submaximal and un-scaled for the same reason as the
           // base plan — a warm-up movement should never carry a working-set
           // RPE or a load that scales with the block.
-          const intensity = isPrimer ? ex.intensity : resolveTargetRpe(phase, experience, w, isDeload)
+          const intensity = isPrimer ? ex.intensity : resolveTargetRpe(phase, experience, w, isDeload, hasHealthCondition(profile) ? HEALTH_SET_RPE_CEILING : undefined)
 
           let load = null as ReturnType<typeof prescribeLoad> | null
           // Independent of the load branch below — an assistance exercise
