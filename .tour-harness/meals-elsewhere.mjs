@@ -272,7 +272,7 @@ check('C2. NO line is bought for a breakfast or lunch on a working day', !refs.s
 check('C3. ...the weekend\'s breakfasts and lunches ARE bought', refs.some(r => /^(breakfast|lunch)@/.test(r) && !isWorkingDay(r)), refs.slice(0, 8))
 check('C4. ...and every day\'s dinner', new Set(refs.filter(r => /^dinner@/.test(r))).size === 7, [...new Set(refs.filter(r => /^dinner@/.test(r)))])
 const line = await until(() => text('[data-testid="grocery-elsewhere"]'), v => v.length > 0)
-check('C5. the list says, once, that ten meals are cooked for him and not on it', line === '10 meals are cooked for you, so they are not on this list.' && (await ev(`document.querySelectorAll('[data-testid="grocery-elsewhere"]').length`)) === 1, line)
+check('C5. the list says, once, that ten meals are eaten out or cooked for him and not on it', line === '10 meals are eaten out or cooked for you, so they are not on this list.' && (await ev(`document.querySelectorAll('[data-testid="grocery-elsewhere"]').length`)) === 1, line)
 await ev(`document.querySelector('[data-testid="grocery-elsewhere"]').scrollIntoView({ block: 'center' })`)
 await wait(200)
 await shoot('meals-elsewhere-list')

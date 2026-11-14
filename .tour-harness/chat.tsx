@@ -852,7 +852,7 @@ function Harness() {
     <BottomDockHeightProvider>
       {/* VERBATIM from App.tsx: the outer shell and <main>. */}
       <div className="min-h-screen bg-background">
-        <main className="max-w-6xl mx-auto px-4 pt-12 pb-28 space-y-6">
+        <main className="max-w-6xl mx-auto px-4 pt-12 space-y-6" style={{ paddingBottom: 'calc(7rem + 0px)' }}>
           <div className="space-y-6">
             <Suspense fallback={<div>Loading the coach…</div>}>
             <ChatAssistant
