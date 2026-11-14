@@ -192,6 +192,26 @@ export function weighInStanding(readings: readonly WeighInReading[], anchors?: r
   return { trusted, held }
 }
 
+/**
+ * A SETUP WEIGHT CORRECTED THE SAME DAY (his ruling 14 Nov 2026, "Correct it now"). Found live: setup kept 187 kg, he
+ * said "I meant 87kg" the same afternoon, confirmed it, and the target stayed on 187 "until another day agrees" — the
+ * surprising-weigh-in hold, doing its job against a figure that was never a weigh-in. A typo at setup is not a weigh-in.
+ *
+ * So a confirmed weigh-in is a CORRECTION of the setup figure, not a reading to hold, exactly when: it is waiting
+ * (surprising, confirmed), it is today's, and the target's first anchor (the sign-up) is also today's. Anything later
+ * is a real weigh-in and is held as before. ("No weigh-in on another day" was a second test of the same thing: a new
+ * profile has nothing before its sign-up day, and a mutation removing it changed nothing, so it went.)
+ */
+export function startingWeightCorrection(
+  picture: { today: string; anchors: readonly WeighInReading[]; heldLatest: HeldWeighIn | null },
+): { fromKg: number; toKg: number } | null {
+  const held = picture.heldLatest
+  if (!held || held.date !== picture.today) return null
+  const signUp = picture.anchors.reduce<WeighInReading | null>((first, a) => (first == null || a.date < first.date ? a : first), null)
+  if (!signUp || signUp.date !== picture.today) return null
+  return { fromKg: held.against.kg, toKg: held.kg }
+}
+
 /** The weigh-in that is waiting on `date`, if that day's is one. */
 export function heldWeighInOn(standing: WeighInStanding, date: string): HeldWeighIn | null {
   return standing.held.find(h => h.date === date) ?? null
