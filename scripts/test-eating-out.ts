@@ -137,6 +137,18 @@ function main() {
     const shrunk = SLOTS.filter(s => s !== 'dinner').map(s => [s, friday(big).chosen[s]!, poolOf(s, friday(big).chosen[s]!.name)] as const)
     check('...each other meal is still its own dish, never less than three quarters of its size', shrunk.every(([, o, p]) => !!p && o.macros.calories >= p.macros.calories * 0.74), shrunk.map(([s, o, p]) => [s, o.macros.calories, p?.macros.calories]))
     check('...and at least one of them is smaller than its dish (the shrink happened)', shrunk.some(([, o, p]) => !!p && o.macros.calories < p.macros.calories * 0.95), shrunk.map(([s, o, p]) => [s, o.macros.calories, p?.macros.calories]))
+    {
+      // QA, 14 Nov 2026: on a day already UNDER target the fit-around step grew the other meals around a night out
+      // (breakfast 581 to 708 kcal). His ruling says they are made smaller, never bigger.
+      const HIGH: MacroTargets = { calories: 3000, protein: 160, carbs: 338, fat: 93 }  // measured: a size where the hold grows
+      const serveHigh = (size: EatingOutSize | null) => serveDates({ dates: WEEK, pools, targets: HIGH, shape: SHAPE,
+        ...(size ? { pinsByDate: { [FRIDAY]: { dinner: eatingOutOption('dinner', FRIDAY, BUDGETS.dinner, size) } } } : {}) })
+      const planHigh = friday(serveHigh(null))
+      const outHigh = friday(serveHigh('normal'))
+      const grew = SLOTS.filter(s => s !== 'dinner').filter(s => (outHigh.chosen[s]?.macros.calories ?? 0) > (planHigh.chosen[s]?.macros.calories ?? 0) + 1)
+      check('the fixture binds: Friday is under its target before the meal out', planHigh.totals.calories < HIGH.calories * 0.95, planHigh.totals.calories)
+      check('on a day under target, no other meal grows around a night out', grew.length === 0, grew.map(s => [s, planHigh.chosen[s]?.macros.calories, outHigh.chosen[s]?.macros.calories]))
+    }
     check('the rest of Friday KEEPS its dishes, at every size: nothing else on the plate changes, only how much', [big, light, serve('normal')].every(w => SLOTS.filter(s => s !== 'dinner').every(s => friday(w).chosen[s]?.name === friday(plain).chosen[s]?.name)), [big, light].map(w => SLOTS.map(s => friday(w).chosen[s]?.name)))
     check('...with no second note beside the meal out\'s own line', [big, light, serve('normal')].every(w => friday(w).heldAround === undefined), [big, light].map(w => friday(w).heldAround))
     const satPlain = plain.find(d => d.date === '2026-11-14')!.day, satBig = big.find(d => d.date === '2026-11-14')!.day

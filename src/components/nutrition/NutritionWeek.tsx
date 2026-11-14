@@ -1,3 +1,4 @@
+import { isFreestyleDay } from '@/lib/freestyle'
 import { useShowNumbers } from '@/lib/show-numbers'
 import { useState } from 'react'
 import { ChevronDown, ShoppingCart } from 'lucide-react'
@@ -83,7 +84,11 @@ export function PlannedDayCard({ date, totals, targets, upcoming, chosen = {} }:
         </p>
       )}
       <div className="mt-4">
-        <AddDayToGrocery key={date} upcoming={upcoming} />
+        {/* A FREESTYLE DAY HAS NOTHING TO SHOP FOR (QA, 14 Nov 2026: "Thursday's meals are on your shopping list" while
+            nothing was added). Said instead of offered. */}
+        {isFreestyleDay(chosen)
+          ? <p className="text-xs text-muted-foreground" data-testid="meal-day-grocery-freestyle">{upcoming.dayName} is freestyle, so there's nothing to add to the shopping list.</p>
+          : <AddDayToGrocery key={date} upcoming={upcoming} />}
       </div>
     </div>
   )

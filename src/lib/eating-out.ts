@@ -99,7 +99,7 @@ export function eatingOutSizeSaid(text: string): EatingOutSize | null {
   const t = ` ${text.toLowerCase()} `
   // "Nothing heavy", "not a big night": a size word under a no is the light end, never the big one.
   if (/\b(nothing|not)( a| too| that)? (big|heavy|massive)\b/.test(t)) return 'light'
-  if (/\b(big night|big one|big meal|big (?:dinner|lunch|breakfast)|blow ?out|feast|three courses|3 courses|massive|heavy)\b/.test(t)) return 'big'
+  if (/\b(big night|big one|big meal|big (?:dinner|lunch|breakfast|snack)|blow ?out|feast|three courses|3 courses|massive|heavy)\b/.test(t)) return 'big'
   if (/\b(light|small|just a salad|something light|not much)\b/.test(t)) return 'light'
   if (/\b(normal|regular|usual|average|typical)\b/.test(t)) return 'normal'
   return null
@@ -130,18 +130,22 @@ export const EATING_OUT_WORDS = {
   sizeLabel: { light: 'Light', normal: 'Normal', big: 'Big night' } as Record<EatingOutSize, string>,
   sizeHint: { light: 'about your usual size', normal: 'a typical main', big: 'starter, main, dessert or drinks' } as Record<EatingOutSize, string>,
   question: (slot: MealSlotName) => `How big a ${slot} out?`,
-  note: (size: EatingOutSize, kcal: number) =>
-    `An estimate for a ${EATING_OUT_SIZES_WORDS[size]} night out, ${eatingOutRangeWords(kcal)}; the day counts the middle. The rest of the day fits around it. Tell the coach what you'll order and it updates.`,
+  // A NIGHT IS A DINNER (QA, 14 Nov 2026: "Today's breakfast is out, a light night."). Lunch and breakfast are a meal out.
+  note: (size: EatingOutSize, kcal: number, slot: MealSlotName = 'dinner') =>
+    `An estimate for a ${EATING_OUT_SIZES_WORDS[size]} ${outWord(slot)}, ${eatingOutRangeWords(kcal)}; the day counts the middle. The rest of the day fits around it. Tell the coach what you'll order and it updates.`,
   notOut: 'Not eating out',
   marked: (slot: MealSlotName, dayWord: string, size: EatingOutSize) =>
-    `${dayWord} ${slot} is out, a ${EATING_OUT_SIZES_WORDS[size]} night. The rest of the day fits around it.`,
+    `${dayWord} ${slot} is out, a ${EATING_OUT_SIZES_WORDS[size]} ${slot === 'dinner' ? 'night' : 'one'}. The rest of the day fits around it.`,
   cleared: (slot: MealSlotName, dayWord: string) => `${dayWord} ${slot} is back on the plan.`,
   notSaved: "That didn't save. Check your connection and try again.",
   /** The app's question in the chat when he has not said how big: his ruling, the app asks. */
-  chatAsk: (slot: MealSlotName, dayWord: string) => `How big a night out is ${dayWord} ${slot}?`,
-  chatChip: (size: EatingOutSize, slot: MealSlotName, dayWord: string) => `${EATING_OUT_SIZES_CHIP[size]} ${slot} out ${dayWord}`,
+  chatAsk: (slot: MealSlotName, dayWord: string) => slot === 'dinner' ? `How big a night out is ${dayWord} ${slot}?` : `How big a ${slot} out is ${dayWord} ${slot}?`,
+  chatChip: (size: EatingOutSize, slot: MealSlotName, dayWord: string) => slot === 'dinner' || size !== 'big'
+    ? `${EATING_OUT_SIZES_CHIP[size]} ${slot} out ${dayWord}`
+    : `A big ${slot} out ${dayWord}`,
 }
 const EATING_OUT_SIZES_WORDS: Record<EatingOutSize, string> = { light: 'light', normal: 'normal', big: 'big' }
+const outWord = (slot: MealSlotName) => (slot === 'dinner' ? 'night out' : `${slot} out`)
 const EATING_OUT_SIZES_CHIP: Record<EatingOutSize, string> = { light: 'A light', normal: 'A normal', big: 'A big night,' }
 
 /**
