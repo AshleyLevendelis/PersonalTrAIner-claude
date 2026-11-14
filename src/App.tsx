@@ -17,6 +17,7 @@ import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
+import { isPregnant } from '@/lib/health-conditions'
 import { BottomDockHeightProvider, useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { AppTour, replayAppTour } from '@/components/AppTour'
 import { isDevAccount, getSessionDateContext, getAppNow, getLocalDateString } from '@/lib/dev-clock'
@@ -1065,6 +1066,7 @@ function App() {
       ownedId,
       // quiet(): a failed weigh-in read rejects this, and it is awaited only on the branch that uses it.
       quiet(Promise.all([latestWeightP, profileP]).then(([w, { data: row }]) => w ?? (row?.weight_kg == null ? undefined : Number(row.weight_kg)))),
+      { frozen: quiet(profileP.then(({ data: row }) => isPregnant(row as UserProfile | null))) },
     ))
     const { data: profileRow, error: profileError } = await profileP
 

@@ -213,21 +213,38 @@ async function main() {
       rows.length === 2 && rows[0].date === '2026-03-02' && rows[0].target_calories === start.targets.calories && rows[1].date === '2026-03-04' && rows[1].target_calories === d2.targets.calories, rows.map(r => [r.date, r.target_calories, r.calculated_weight_kg]))
   }
 
-  console.log('\n3. A drop of a whole kilo on the day DOES move it (the rule is 1 kg, not "never on day one")\n')
+  // RE-ANCHORED 14 Nov 2026, his ruling "Need a week of readings": this section held the OLD rule ("a drop of a whole
+  // kilo on the day DOES move it"). One reading is not a trend: the target waits for weigh-ins on 3 days in a week.
+  console.log('\n3. One reading on day one never moves it; three days that agree do (his "Need a week of readings")\n')
   {
     const q = sam('sam-2')
     const s0 = await signUp(q, '2026-03-02')
     const same = await weighIn(q, '2026-03-02', 80.9)
-    check('82 kg -> 80.9 kg the same day moves the target', same.targets.calories !== s0.targets.calories && same.anchorKg === 80.9, same)
-    check('...with a notice, because there was a target to move from', typeof same.notice === 'string' && same.notice.length > 0, same.notice)
-    const r = sam('sam-3')
-    const r0 = await signUp(r, '2026-03-02')
-    const edge = await weighIn(r, '2026-03-02', 81.01)
-    check('...and 0.99 kg does not', edge.targets.calories === r0.targets.calories && edge.notice === null, edge)
+    check('82 kg -> 80.9 kg the same day (a 1.1 kg drop, not surprising): the target holds', same.targets.calories === s0.targets.calories && same.anchorKg === 82 && same.notice === null, same)
+    const d2 = await weighIn(q, '2026-03-03', 80.8)
+    check('...a second day agreeing still holds (two days, not three)', d2.targets.calories === s0.targets.calories && d2.notice === null, d2)
+    const d3 = await weighIn(q, '2026-03-04', 80.7)
+    check('...the third day moves it, with a notice', d3.targets.calories !== s0.targets.calories && typeof d3.notice === 'string' && d3.notice.length > 0, d3)
     const x = sam('sam-3b')
-    const x0 = await signUp(x, '2026-03-02')
-    const exact = await weighIn(x, '2026-03-02', 81)
-    check('...and exactly 1 kg does: the rule is "shifted 1 kg or more"', exact.anchorKg === 81 && exact.targets.calories !== x0.targets.calories, exact)
+    await signUp(x, '2026-03-02')
+    for (const [d, kg] of [['2026-03-02', 81.02], ['2026-03-03', 81.01], ['2026-03-04', 81.0]] as const) await weighIn(x, d, kg)
+    const xr = await weighIn(x, '2026-03-04', 81.0)
+    check('...and a three-day average 0.99 kg off does not', xr.anchorKg === 82, xr)
+  }
+
+  console.log('\n3b. Pregnancy holds the target (his ruling 14 Nov 2026)\n')
+  {
+    const preg = { ...sam('preg-1'), gender: 'female', weight_kg: 78, health_conditions: ['pregnancy'] } as unknown as UserProfile
+    const s0 = await signUp(preg, '2026-03-02')
+    for (const [d, kg] of [['2026-03-03', 80], ['2026-03-04', 80.2]] as const) await weighIn(preg, d, kg)
+    const third = await weighIn(preg, '2026-03-05', 80.4)
+    check('three days 2 kg heavier: a pregnant user\'s target holds', third.targets.calories === s0.targets.calories && third.anchorKg === 78 && third.notice === null, third)
+    const ctl = { ...sam('preg-ctl'), gender: 'female', weight_kg: 78 } as unknown as UserProfile
+    const c0 = await signUp(ctl, '2026-03-02')
+    for (const [d, kg] of [['2026-03-03', 80], ['2026-03-04', 80.2]] as const) await weighIn(ctl, d, kg)
+    const c3 = await weighIn(ctl, '2026-03-05', 80.4)
+    check('...the same readings without pregnancy move it (the fixture binds)', c3.targets.calories !== c0.targets.calories, c3)
+    check('three different days counted in the week, a same-day second reading not', nt.daysWeighedInLastWeek(['2026-03-03', '2026-03-03', '2026-03-05', '2026-02-20'], '2026-03-05') === 2 && nt.daysWeighedInLastWeek(['2026-02-27', '2026-03-01', '2026-03-05'], '2026-03-05') === 3)
   }
 
   console.log('\n4. "Today" is the app\'s date, in one place\n')
@@ -237,10 +254,11 @@ async function main() {
     // finds no weigh-in in "the last 7 days" at all.
     const t = sam('sam-4')
     await signUp(t, '2026-03-02')
-    await weighIn(t, '2026-03-09', 84)   // a week on: the sign-up row is 7 days old, outside the window
-    setDevClockOverride(t.id!, '2026-03-09')
+    // Three days in the week ending on the 11th (his "Need a week of readings"): the window is the app's date.
+    await weighIn(t, '2026-03-09', 84); await weighIn(t, '2026-03-10', 84); await weighIn(t, '2026-03-11', 84)
+    setDevClockOverride(t.id!, '2026-03-11')
     const eff = await nt.getEffectiveTargetWeightKg(t.id!, 82)
-    check('the 7-day window sits on the app\'s date: on the 9th it holds the 9th and not the 2nd', eff.weightKg === 84, eff)
+    check('the 7-day window sits on the app\'s date: on the 11th it holds the 9th-11th and not the 2nd', eff.weightKg === 84, eff)
     setDevClockOverride(t.id!, '2026-03-20')
     const later = await nt.getEffectiveTargetWeightKg(t.id!, 82)
     check('...and eleven days after the last weigh-in there is no average to follow, so the standing figure is used', later.weightKg === 82, later)
@@ -464,15 +482,16 @@ async function main() {
     check('a second figure the same day is not "another day": still held', again.result?.targets.calories === s0.targets.calories && (await linesUnderBox(h)).held?.kg === 62.2, again.result)
 
     // THE SECOND DAY AGREES.
+    // RE-ANCHORED 14 Nov 2026 ("Need a week of readings"): two days that agree release the held reading, and the target
+    // moves on the THIRD day with readings in the week.
     const day2 = await typeWeighIn(h, '2026-03-03', 62.5)
     check('next day, 62.5 kg: not asked — it agrees with the one waiting', day2.asked === null, day2.asked)
-    check('...and now the target moves', day2.result!.targets.calories !== s0.targets.calories, day2.result?.targets)
-    check('...to the target for the average of the two days (62.35 kg)', day2.result!.targets.calories === kcalAt(h, (62.2 + 62.5) / 2) && Math.abs((day2.result!.anchorKg ?? 0) - 62.35) < 0.001, { anchor: day2.result?.anchorKg, kcal: day2.result?.targets.calories })
-    const fmt = (n: number) => n.toLocaleString('en-GB')
-    check('...with the usual notice, naming from and to', typeof day2.result!.notice === 'string' && day2.result!.notice!.includes(fmt(s0.targets.calories)) && day2.result!.notice!.includes(fmt(day2.result!.targets.calories)), day2.result?.notice)
-    check('...and nothing is waiting any more', (await linesUnderBox(h)).held === null)
+    check('...nothing is waiting any more', (await linesUnderBox(h)).held === null)
+    check('...but two days are not a week of readings: the target holds', day2.result!.targets.calories === s0.targets.calories && day2.result!.notice === null, day2.result)
     const day3 = await typeWeighIn(h, '2026-03-04', 62.4)
-    check('the day after that it holds again and says nothing', day3.asked === null && day3.result!.targets.calories === day2.result!.targets.calories && day3.result!.notice === null, day3)
+    check('the third day moves it, to the average of the three (62.37 kg)', day3.asked === null && day3.result!.targets.calories === kcalAt(h, (62.2 + 62.5 + 62.4) / 3) && Math.abs((day3.result!.anchorKg ?? 0) - 62.3667) < 0.001, { anchor: day3.result?.anchorKg, kcal: day3.result?.targets.calories })
+    const fmt = (n: number) => n.toLocaleString('en-GB')
+    check('...with the usual notice, naming from and to', typeof day3.result!.notice === 'string' && day3.result!.notice!.includes(fmt(s0.targets.calories)) && day3.result!.notice!.includes(fmt(day3.result!.targets.calories)), day3.result?.notice)
   }
   {
     // IT WAS A TYPO, and she says yes by mistake. The next day she weighs in properly.
@@ -503,11 +522,12 @@ async function main() {
     check('back after 15 weeks, 22 kg lighter: asked once', !!back.asked && back.asked.differenceKg === -22 && back.asked.daysSince === 105, back.asked)
     check('...saved on yes, target held that day', back.saved && back.result!.targets.calories === s0.targets.calories && back.result!.anchorKg === 82, back.result)
     const next = await typeWeighIn(r, '2026-04-21', 60.3)
-    check('...and the next day\'s weigh-in is not asked about and moves the target to the new average', next.asked === null && Math.abs((next.result!.anchorKg ?? 0) - 60.15) < 0.001 && typeof next.result!.notice === 'string', next)
+    const third = await typeWeighIn(r, '2026-04-22', 60.0)
+    check('...the next days are not asked about, and the third day moves the target to the new average', next.asked === null && third.asked === null && Math.abs((third.result!.anchorKg ?? 0) - 60.1) < 0.001 && typeof third.result!.notice === 'string', third)
     const g = sam('hold-5')
     await signUp(g, '2026-01-05')
     const gentle = await typeWeighIn(g, '2026-04-20', 71)   // 11 kg in 15 weeks: believable
-    check('back after 15 weeks, 11 kg lighter: not asked, and the target moves the same day as it always did', gentle.asked === null && gentle.result!.anchorKg === 71 && typeof gentle.result!.notice === 'string', gentle)
+    check('back after 15 weeks, 11 kg lighter: not asked, and (one reading) the target waits for a week of them', gentle.asked === null && gentle.result!.anchorKg === 82, gentle)
   }
   {
     // A surprise among ordinary days: the average is taken over the others.

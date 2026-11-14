@@ -20,6 +20,7 @@
 // that history is what the M3 weight-trend loop reads.
 // ---------------------------------------------------------------------------
 
+import { isPregnant } from './health-conditions'
 import type { UserProfile, MacroTargets, WorkoutDay } from './types'
 import { calculateDailyMacros, getStaticDailyMacros, computeBMR, staticTDEEFor, resolveBodyMetrics } from './macro-calculator'
 import { getDailyMetrics, upsertNutritionTarget, getNutritionTargets, upsertDailyMetric } from './daily-tracking'
@@ -233,9 +234,25 @@ export async function getWeighInPicture(profileId: string, opts: { strict?: bool
  * It may also be a PROMISE of that figure (31 Oct 2026, app start): the start reads the latest weigh-in at the same time
  * as this, rather than before it, and the fallback is only awaited on the one branch that uses it.
  */
+/** Weigh-ins on this many different days in the last seven before a target can move (his "Need a week of readings"). */
+export const WEIGH_IN_DAYS_TO_MOVE = 3
+
+/** How many different days in the seven ending today hold a reading. */
+export function daysWeighedInLastWeek(dates: readonly string[], today: string): number {
+  const from = new Date(`${today}T12:00:00`)
+  from.setDate(from.getDate() - 6)
+  const start = `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, '0')}-${String(from.getDate()).padStart(2, '0')}`
+  return new Set(dates.filter(d => d >= start && d <= today)).size
+}
+
 export async function getEffectiveTargetWeightKg(
   profileId: string,
   fallbackWeightKg?: number | Promise<number | undefined>,
+  /**
+   * PREGNANCY HOLDS THE TARGET (his ruling 14 Nov 2026): weight gained in pregnancy is never a reason to move the
+   * calorie target, so with a target already set it stays where it is.
+   */
+  opts: { frozen?: boolean | Promise<boolean> } = {},
 ): Promise<EffectiveTargetWeight> {
   const todayStr = targetsToday(profileId)
   let picture: WeighInPicture
@@ -274,6 +291,14 @@ export async function getEffectiveTargetWeightKg(
   }
 
   if (lastAnchorKg == null) return { weightKg: trend.rollingAvgKg }
+  let frozen = false
+  try { frozen = !!(await opts.frozen) } catch { frozen = false }
+  if (frozen) return { weightKg: lastAnchorKg }
+  // A WEEK OF READINGS (his ruling 14 Nov 2026, "Need a week of readings"): the target moves only once there are
+  // trusted weigh-ins on at least WEIGH_IN_DAYS_TO_MOVE different days in the last seven, and their average has moved
+  // the threshold. One reading on a first day (78 to 79.4 kg moved 1,794 to 1,810 kcal) is not a trend. The sign-up-day
+  // correction of the setup weight is a different road (startingWeightCorrection) and is untouched.
+  if (daysWeighedInLastWeek(picture.standing.trusted.map(w => w.date), todayStr) < WEIGH_IN_DAYS_TO_MOVE) return { weightKg: lastAnchorKg }
   if (Math.abs(trend.rollingAvgKg - lastAnchorKg) >= TARGET_WEIGHT_ANCHOR_THRESHOLD_KG) {
     return { weightKg: trend.rollingAvgKg }
   }
@@ -440,7 +465,7 @@ export async function retargetAfterWeighIn(
     const corrected = await correctStartingWeight(profileId, { ...profile, weight_kg: correction.toKg }, correction.fromKg, exercisePlan)
     return corrected.unread ? corrected : { ...corrected, latestWeightKg, correctedStartKg: correction.toKg }
   }
-  const effective = await getEffectiveTargetWeightKg(profileId, latestWeightKg ?? profile.weight_kg)
+  const effective = await getEffectiveTargetWeightKg(profileId, latestWeightKg ?? profile.weight_kg, { frozen: isPregnant(profile) })
   if (effective.unread) return unread()
   const anchorKg = effective.weightKg ?? null
   const targets = computeTargets(profile, { latestWeightKg: anchorKg, exercisePlan })

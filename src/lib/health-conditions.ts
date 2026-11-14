@@ -44,6 +44,11 @@ export function hasHealthCondition(profile: { health_conditions?: readonly strin
   return healthConditionsOf(profile).length > 0
 }
 
+/** Pregnant (the "Pregnant" tap, or said in setup): the plan's pregnancy rules and the held calorie target read this. */
+export function isPregnant(profile: { health_conditions?: readonly string[] | null } | null | undefined): boolean {
+  return healthConditionsOf(profile).includes('pregnancy')
+}
+
 /** No working set above this with a condition ticked: two or more reps left in the tank. */
 export const HEALTH_SET_RPE_CEILING = 8
 /** No conditioning above this with a condition ticked: hard, never all-out. */
