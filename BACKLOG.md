@@ -2,6 +2,37 @@
 
 Newest first. One line each.
 
+- [x] **SCENARIO QA AFTER HIS 14 NOV LIVE TEST: THREE TESTERS, 26 FINDINGS, 19 FIXED** (14 Nov 2026). Three read-only
+  testers drove the real screens at 390px: setup (15 personas), training days (12+ scenarios, screen and coach), meals,
+  the shopping list and the coach chat.
+  SETUP: a phone's curly apostrophe was invisible to every reader the app has ("I can’t do Monday" made Monday the only
+  day; "I’m pregnant" and "I don’t eat pork" were missed): typed text is now made plain first, in setup and the chat.
+  Pregnancy said in words now ticks "Pregnant" on the injuries card (kept if that card is skipped); "we're pregnant" no
+  longer answers the sex question (a partner can say it). Nutrition no longer says "Complete onboarding" after setup.
+  The summary row reads "Injuries and health", not "Niggles".
+  TRAINING: "See Wednesday" and the strip's TODAY cell go back to today's live card; the week view draws a chosen rest
+  as a rest and a missed day as missed (with where it went); two warm-up-move sets and Finish are not a session done; a
+  rebuild never turns a loaded lift into an unloaded drill (mine, CSCS: the same lift again beats a band rehab drill in
+  a strength slot; his 10 Sep "weight always wins"); a move asked for a taken or next-week day falls back to the free
+  days before it, never "no free day left"; the receipt gives the card's reason; a rest or recovery day before the plan
+  began is before the plan. Two gates re-anchored (they held the old behaviour).
+  MEALS AND CHAT: a coach edit or custom meal for an UPCOMING day now reaches the screen (it saved and Nutrition went on
+  showing the old dish); "how do I brace my core?" after an RDL question no longer gets an RDL video; no eating-out offer
+  for a meal already eaten; the other meals never grow around a meal out on a day under target (breakfast 657 to 774
+  kcal measured; his 12 Nov ruling says smaller); only dinner is "a night out"; no calorie figure on the meal sheet, the
+  chat pill or the eating-out card with Show numbers off; a freestyle day is not "added" to the shopping list; "1
+  option"; the day swap's "Unchanged" names the two swapped meals.
+  NOT FIXED, NAMED: (a) an allergy mentioned early marks the whole diet question answered, so vegan/halal is never
+  offered (allergen path: plan first, CLAUDE.md); (b) "2 meals" never asks which two (his 14 Nov "A" stands); (c) the
+  body card's heading says "date of birth" while asking height and weight; (d) a custom meal for one day joins the
+  whole pool, so its card previews other days changing (a design question: should a meal asked for one day be that
+  day's only?); (e) milk shopped by weight; (f) "Just today · Tomorrow goes back to the plan" offered on a future day's
+  card; (g) the superset pairing lost on a rebuild; (h) shorten/rebuild have no screen Undo; (i) the knock-on lines'
+  kcal figures on meal cards with Show numbers off.
+  `test:live-test-nov14` §9, `test:qa-training-nov14` (19 checks, 9 mutations), `test:qa-meals-nov14` (17 checks, 8
+  mutations), `test:eating-out` §4 (1 mutation). Screens not yet re-driven after the fixes (the testers' scripts ran
+  before them).
+
 - [x] **HIS LIVE TEST, 14 NOV 2026 EVENING: EIGHT FINDINGS, ALL FIXED ON THE BRANCH** (screenshots in the chat).
   (1) "What option should I use to calibrate target" meant male or female and said neither: the question now says "male
   or female formula", and a rephrased question about calibrating calorie targets still brings the buttons.
