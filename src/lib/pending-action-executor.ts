@@ -1335,7 +1335,7 @@ export async function executeSessionShorten(
   landed.push(
     `${payload.dayName}: about ${result.achievedMinutes} min` + fillerPart +
     (result.droppedExercises.length > 0 ? `${fillerPart ? ', then' : ' —'} out came ${result.droppedExercises.join(', ')}` : '') +
-    (result.setsRemoved > 0 ? `${result.droppedExercises.length > 0 ? ', and' : ' —'} ${result.setsRemoved} set${result.setsRemoved === 1 ? '' : 's'} off what stayed` : ''),
+    (result.setsRemoved > 0 ? `${result.droppedExercises.length > 0 ? ', and' : fillerPart ? ', then' : ' —'} ${result.setsRemoved} set${result.setsRemoved === 1 ? '' : 's'} off what stayed` : ''),
   )
 
   try { if (profile.id) await saveMesocycleWeek(profile.id, settled.week) }
