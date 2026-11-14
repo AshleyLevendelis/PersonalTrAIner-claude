@@ -103,7 +103,10 @@ console.log('\n4. Days at or after the plan start behave normally')
 check('the plan-start day itself is not before_plan', classifyDay('Friday', PLAN_START, TODAY, PLAN, undefined, PLAN_START) !== 'before_plan')
 check('a future training day is due', classifyDay('Friday', '2026-08-28', TODAY, PLAN, undefined, PLAN_START) === 'due')
 check('a rest day is unaffected', classifyDay('Sunday', '2026-08-23', TODAY, PLAN, undefined, PLAN_START) === 'recovery')
-check('an unplanned weekday is rest', classifyDay('Tuesday', '2026-08-18', TODAY, PLAN, undefined, PLAN_START) === 'rest')
+// RE-ANCHORED 14 Nov 2026: 18 Aug was BEFORE the plan start (20 Aug) in a section about days after it; a day before the
+// plan is now before the plan whatever its kind (QA). The Tuesday after the start is the one this section means.
+check('an unplanned weekday is rest', classifyDay('Tuesday', '2026-08-25', TODAY, PLAN, undefined, PLAN_START) === 'rest')
+check('...and the same weekday before the plan began is before the plan', classifyDay('Tuesday', '2026-08-18', TODAY, PLAN, undefined, PLAN_START) === 'before_plan')
 
 console.log('\n5. Without a plan start date, behaviour is exactly as before')
 check('past unlogged training day is missed', classifyDay('Monday', MON, TODAY, PLAN, undefined, undefined) === 'missed')

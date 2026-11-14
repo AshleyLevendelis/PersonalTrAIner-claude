@@ -114,8 +114,10 @@ check('...and says why, in words a person can act on',
 // every session. A move that crossed the boundary would put Push & Press on
 // the calendar twice at two different prescribed loads.
 const nextWeek = resolveMoveTarget({ fromDate: SAT, requestedDate: addDays(SAT, 2), todayDate: SAT, plan, weekOf })
+// RE-ANCHORED 14 Nov 2026 (QA: "no free day left" while a day sat free): asked for next week's Monday, it lands on the
+// free Sunday of its OWN week and says why. The property is unchanged: it never crosses into the next plan week.
 check('a move never crosses into the next plan week',
-  !nextWeek.ok && nextWeek.reason === 'no_free_day', nextWeek)
+  nextWeek.ok && nextWeek.date === SUN && weekOf(nextWeek.date) === weekOf(SAT) && nextWeek.requestedWhyNot === 'other_week', nextWeek)
 // Sunday is free and in the same week, so Saturday CAN move — one day, not two.
 const sunday = resolveMoveTarget({ fromDate: SAT, requestedDate: SUN, todayDate: SAT, plan, weekOf })
 check('...but a free day inside the same week is still reachable',
