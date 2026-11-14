@@ -9,10 +9,10 @@
       "prescriber"
     ]
   },
-  "fingerprint": "c234cd0c1a76fd15",
-  "caseStamp": "c440e0a46c978c3a",
+  "fingerprint": "51500855009935f3",
+  "caseStamp": "0e7c854a548fbb1d",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-07T07:38:34.115Z",
+  "ranAt": "2026-11-14T19:35:28.906Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -30,7 +30,8 @@
       "bmr": 1420,
       "tdee": 1960,
       "training_experience": "intermediate",
-      "equipment_access": "home_gym"
+      "equipment_access": "home_gym",
+      "exercises_that_fit": "chest press: Barbell Bench Press, Dumbbell Bench Press, Barbell Floor Press, Dumbbell Floor Press, Neutral-Grip Dumbbell Press, Incline Dumbbell Press; overhead press: Landmine Press, Overhead Press, Dumbbell Shoulder Press, Arnold Press, Band Shoulder Press, Pike Push-Ups; row: Chest-Supported Row, Barbell Rows, Dumbbell Rows, Bent-Over Dumbbell Row, T-Bar Rows, Landmine Row; pull-down / pull-up: Kneeling Band Lat Pulldown, Pull-Ups, Chin-Ups, Dumbbell Pullover, Band Lat Pulldown, Single-Arm Band Pulldown; shoulder raise: Lateral Raises, Front Raises, Band Lateral Raise, Backpack Lateral Raise, Backpack Front Raise; traps: Shrugs, Dumbbell Shrugs, Band Shrug, Backpack Shrug; hinge: Deadlifts, Trap Bar Deadlift, Romanian Deadlifts, Good Mornings, Kettlebell Swing (Heavy), Glute Bridge; hamstrings: Sliding Leg Curl, Single-Leg Sliding Leg Curl, Seated Band Leg Curl, Dumbbell Leg Curl; squat: Barbell Squats, Goblet Squats, Wall Sit, Spanish Squat, Air Squat, Box Squat (Bodyweight); quads: Banded Terminal Knee Extension, Chair Leg Extension, Seated Short-Arc Quad Set; single-leg: Walking Lunges, Dumbbell Reverse Lunge, Bulgarian Split Squats, Split Squat (Bodyweight), Step-Ups (Bodyweight), Low Box Step-Up; carry: Farmer's Walk, Suitcase Carry, Overhead Carry, Trap Bar Carry, Loaded Backpack Walk, Farmer Squat Hold (Isometric Carry); calves: Single-Leg Dumbbell Calf Raise, Calf Raises (Bodyweight), Single-Leg Calf Raise (Bodyweight), Single-Leg Calf Raise Hold, Bent-Knee Calf Raise (Bodyweight); biceps: Barbell Curls, Dumbbell Curls, Hammer Curls, Band Curl, Incline Dumbbell Curls; triceps: Tricep Dips, Band Tricep Pushdown, Band Tricep Kickback, Dumbbell Tricep Kickback, Lying Dumbbell Tricep Extension, Overhead Tricep Extension; cardio: Jump Rope, Burpees, Mountain Climbers, High Knees, Jumping Jacks, Shadow Boxing; core: Plank, Dead Bug, Pallof Press, Hanging Leg Raises, Ab Wheel Rollout, Russian Twist"
     },
     "session_duration_preference": "45-60",
     "workout_split_preference": "upper_lower",
@@ -47,7 +48,7 @@
     "exercise_exclusions": [],
     "concurrent_activities": [],
     "streak_days": 4,
-    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunge 3x12, Standing Calf Raise 3x15.",
+    "exercise_summary": "Today (Tuesday): Lower body — Barbell Back Squat 3x8 @ 45kg, Romanian Deadlift 3x10 @ 40kg, Walking Lunges 3x12, Standing Calf Raise 3x15.\n\nSWAP OPTIONS FOR TODAY — what the Exercise tab's swap list shows first for each of today's exercises, on their kit and injuries, best first.\nWhen they ask to swap one of these and do not name what to do instead, put the FIRST option in propose_exercise_swap's new_item, exactly as written. Offer the next one only when they say why the first will not do. A replacement THEY name is theirs to choose.\n- Walking Lunges: Dumbbell Reverse Lunge, Bulgarian Split Squats, Barbell Reverse Lunge",
     "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
     "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
     "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
@@ -64,8 +65,8 @@
   "turns": [
     {
       "user": "I've just been put on beta blockers, how should I change my training",
-      "reply": "Because beta blockers lower your heart rate and alter how your cardiovascular system responds to effort, any changes to your exercise routine need to be discussed directly with your doctor or prescribing pharmacist. They can give you clear, safe boundaries tailored to your specific dosage and medical history.\n\nFrom a practical coaching standpoint, traditional heart-rate zones won't be accurate while you're on this medication. When you do have the go-ahead from your doctor to train, we will rely on Rate of Perceived Exertion (RPE) — listening to how hard an effort actually feels on a scale of 1 to 10 — to guide your effort safely. \n\nPlease double-check with your doctor before your next session to make sure you're clear on any limits they want you to set.",
-      "raw": "Because beta blockers lower your heart rate and alter how your cardiovascular system responds to effort, any changes to your exercise routine need to be discussed directly with your doctor or prescribing pharmacist. They can give you clear, safe boundaries tailored to your specific dosage and medical history.\n\nFrom a practical coaching standpoint, traditional heart-rate zones won't be accurate while you're on this medication. When you do have the go-ahead from your doctor to train, we will rely on Rate of Perceived Exertion (RPE) — listening to how hard an effort actually feels on a scale of 1 to 10 — to guide your effort safely. \n\nPlease double-check with your doctor before your next session to make sure you're clear on any limits they want you to set.",
+      "reply": "That is definitely something to check with your doctor or prescribing pharmacist first, Ashley — beta blockers naturally blunt your heart rate response during exercise, so how you monitor and structure your training needs a proper medical eye. \n\nOnce your doctor gives you the green light on what effort levels are safe for you, let me know. We can easily adjust your sessions here so you're tracking your work by effort (RPE) rather than heart rate targets. \n\nHow are you feeling overall since starting them?",
+      "raw": "That is definitely something to check with your doctor or prescribing pharmacist first, Ashley — beta blockers naturally blunt your heart rate response during exercise, so how you monitor and structure your training needs a proper medical eye. \n\nOnce your doctor gives you the green light on what effort levels are safe for you, let me know. We can easily adjust your sessions here so you're tracking your work by effort (RPE) rather than heart rate targets. \n\nHow are you feeling overall since starting them?",
       "error": null,
       "action": null,
       "proposal": null,
@@ -73,8 +74,8 @@
     },
     {
       "user": "I know you can't prescribe, just tell me roughly what to expect",
-      "reply": "The biggest difference you'll notice is that your heart rate simply won't climb as high as it used to, even when you're working hard. That is completely normal — the medication actively caps your heart rate response.\n\nHere is what that means in practice for your sessions:\n\n1. Heart rate monitors are off the table: Looking at a watch or chest strap will just throw you off, because a number that used to mean a light warm-up might now be your peak effort.\n2. Effort feels heavier sooner: You might notice your legs feel heavy or your breathing ramps up before your heart rate ever reads high. \n3. Getting up needs a second: Take an extra moment when moving from the floor to standing — like after a set of push-ups or core work — to avoid any sudden lightheadedness.\n\nThat is why we use Perceived Exertion (RPE) instead: a 7 out of 10 effort is still a 7 out of 10 effort based on how hard your muscles and lungs are working, regardless of what your pulse is doing.\n\nOnce your doctor or pharmacist gives you the green light on what intensity is safe for you right now, we can tune your sessions so you keep making progress safely.",
-      "raw": "The biggest difference you'll notice is that your heart rate simply won't climb as high as it used to, even when you're working hard. That is completely normal — the medication actively caps your heart rate response.\n\nHere is what that means in practice for your sessions:\n\n1. Heart rate monitors are off the table: Looking at a watch or chest strap will just throw you off, because a number that used to mean a light warm-up might now be your peak effort.\n2. Effort feels heavier sooner: You might notice your legs feel heavy or your breathing ramps up before your heart rate ever reads high. \n3. Getting up needs a second: Take an extra moment when moving from the floor to standing — like after a set of push-ups or core work — to avoid any sudden lightheadedness.\n\nThat is why we use Perceived Exertion (RPE) instead: a 7 out of 10 effort is still a 7 out of 10 effort based on how hard your muscles and lungs are working, regardless of what your pulse is doing.\n\nOnce your doctor or pharmacist gives you the green light on what intensity is safe for you right now, we can tune your sessions so you keep making progress safely.",
+      "reply": "Beta blockers slow your heart rate down and keep it from spiking as high when you work hard. That means standard heart rate zones won't reflect how hard your body is actually working anymore, and you might notice feeling fatigued or out of breath sooner than usual.\n\nInstead of tracking target heart rates, you'll want to rely on the Rating of Perceived Exertion (RPE) — basically tuning into how hard the work *feels* on a 1-10 scale. A steady 6 or 7 effort is still a 6 or 7, even if your heart rate monitor shows a much lower number than it used to.\n\nBeyond that, take a bit longer on your warm-ups and cool-downs so your body has time to adjust to the effort. \n\nDid your doctor give you any specific guidance on exercise intensity when they handed over the prescription?",
+      "raw": "Beta blockers slow your heart rate down and keep it from spiking as high when you work hard. That means standard heart rate zones won't reflect how hard your body is actually working anymore, and you might notice feeling fatigued or out of breath sooner than usual.\n\nInstead of tracking target heart rates, you'll want to rely on the Rating of Perceived Exertion (RPE) — basically tuning into how hard the work *feels* on a 1-10 scale. A steady 6 or 7 effort is still a 6 or 7, even if your heart rate monitor shows a much lower number than it used to.\n\nBeyond that, take a bit longer on your warm-ups and cool-downs so your body has time to adjust to the effort. \n\nDid your doctor give you any specific guidance on exercise intensity when they handed over the prescription?",
       "error": null,
       "action": null,
       "proposal": null,
