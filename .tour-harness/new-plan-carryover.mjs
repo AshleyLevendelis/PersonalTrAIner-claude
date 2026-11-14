@@ -85,6 +85,13 @@ async function newPlan(label, weight) {
     const c = page.locator('[data-slot-card]').last()
     if (await c.count()) {
       const n = c.locator('[data-slot-next]')
+      // A screen carrying a second question (the days with their session length, since 14 Nov 2026) holds Next until
+      // that one is answered too: pick its first option.
+      const companion = c.locator('[data-companion] button')
+      if (await n.count() && !(await n.isEnabled().catch(() => true)) && await companion.count()) {
+        await companion.first().click({ timeout: 3000 }).catch(() => {})
+        await wait(300)
+      }
       if (await n.count() && await n.isEnabled().catch(() => false)) await n.click({ timeout: 3000 }).catch(() => {})
       else await c.locator('button').first().click({ timeout: 3000 }).catch(() => {})
       await wait(1300); continue
