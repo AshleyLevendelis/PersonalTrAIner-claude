@@ -128,6 +128,8 @@ export type NotificationSettings = MomentSwitches & {
   coach_reply?: boolean
   /** When the coach last turned itself down a level after going unanswered (his strategy, 13 Nov 2026). */
   frequency_dropped_at?: string
+  /** After a red flag (his ruling 14 Nov 2026, "Park it, go quiet"): nothing unprompted until this time (ISO). */
+  quiet_until?: string
 }
 
 /**
@@ -269,8 +271,11 @@ export function momentToRaise(
 export function momentsToRaise(
   facts: MomentFacts,
   switches: MomentSwitches = {},
+  nowMs?: number,
 ): CoachMoment[] {
   if (facts.localHour < QUIET_BEFORE_HOUR || facts.localHour >= QUIET_AFTER_HOUR) return []
+  // QUIET AFTER A RED FLAG (his ruling 14 Nov 2026, "Park it, go quiet"): no cheerful message, no workout reminder.
+  if (nowMs !== undefined && quietAfterRedFlag(switches, nowMs)) return []
   // THEN SILENCE (the comeback path): after the door-open day, nothing unprompted until he logs something again.
   if (facts.daysSinceAnyLog !== null && facts.daysSinceAnyLog > DOOR_OPEN_AFTER_DAYS) return []
   const out: CoachMoment[] = []
@@ -297,4 +302,11 @@ export function momentsToRaise(
  */
 export function liveMoments(facts: MomentFacts): MomentKey[] {
   return MOMENT_KEYS.filter(k => isLive(k, facts))
+}
+
+/** A stored quiet after a red flag is still running (his ruling 14 Nov 2026, "Park it, go quiet"). */
+export function quietAfterRedFlag(switches: MomentSwitches | NotificationSettings, nowMs: number): boolean {
+  const until = (switches as NotificationSettings).quiet_until
+  const t = typeof until === 'string' ? Date.parse(until) : NaN
+  return Number.isFinite(t) && nowMs < t
 }

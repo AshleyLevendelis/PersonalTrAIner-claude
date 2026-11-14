@@ -362,7 +362,7 @@ export async function runReachOut(deps: ReachOutDeps): Promise<ReachOutReport> {
       // THE FIRST LIVE MOMENT ITS OWN LIMITS ALLOW, not merely the first live
       // one: a nudge already said today must not stand in front of the next.
       const facts = factsFor(row, live, today, hour, { name: profile.name, timezone: devices[0].timezone })
-      const moment = momentsToRaise(facts, profile.settings)
+      const moment = momentsToRaise(facts, profile.settings, deps.now.getTime())
         .find(m => mayNotify(recent, today, m.key) === 'ok')
       if (!moment) { report.quiet++; continue }
 

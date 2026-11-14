@@ -379,6 +379,9 @@ const EVENT_MOMENTS = new Set(Object.values(NUDGE_MOMENT))
 /** A time-of-day moment waits this long after the last unprompted message (the phone's own spacing). */
 export const MOMENT_MIN_GAP_MS = 3 * 60 * 60 * 1000
 
+/** The marker on the one check-in after a red flag. */
+export const RED_FLAG_CHECKIN_MOMENT = 'red_flag_checkin'
+
 export function helloKey(today: string): string { return `hello:${today}` }
 
 /** "Hey Ashley — yesterday's Legs didn't happen…": the event, greeted, as the day's first message. */
@@ -420,11 +423,20 @@ export interface UnpromptedInput {
   /** The opener's pick for today, built only when it is needed. */
   hello: () => { text: string; chips: string[]; kind?: string } | null
   /** Time-of-day moments live now, best first, switches and waking hours applied (momentsToRaise). */
-  moments: { key: string; text: string; shortcut: 'exercise' | 'nutrition' | null }[]
+  moments: { key: string; text: string; shortcut: 'exercise' | 'nutrition' | null }[]  /**
+   * AFTER A RED FLAG (his ruling 14 Nov 2026, "Park it, go quiet"): 'quiet' says nothing unprompted; 'checkin' says the
+   * one "how are you?" (on a later open, once), whatever the day's limits, because it is not a cheerful message.
+   */
+  redFlag?: { mode: 'checkin' | 'quiet' | 'normal'; checkIn: { text: string; chips: string[]; key: string } }
 }
 
 /** The one unprompted message to say now, or null. Pure: the caller writes the row and burns the keys. */
 export function pickUnprompted(input: UnpromptedInput): Unprompted | null {
+  if (input.redFlag?.mode === 'checkin' && !input.said.includes(input.redFlag.checkIn.key)) {
+    const c = input.redFlag.checkIn
+    return { text: c.text, chips: c.chips, keys: [c.key], moment: RED_FLAG_CHECKIN_MOMENT, shortcut: null, fromOpener: false }
+  }
+  if (input.redFlag && input.redFlag.mode !== 'normal') return null
   if (input.unpromptedToday >= input.cap) return null
   const since = input.now - input.lastUnpromptedAt
   if (since < NUDGE_MIN_GAP_MS) return null

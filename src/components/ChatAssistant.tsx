@@ -87,6 +87,7 @@ import { compileFoodDislikes, compileSoftExercisePreferences } from '@/lib/fact-
 import { coachSwapPick, swapOptionsBlock } from '@/lib/coach-swap-pick'
 import { namedFoodClash, namedFoodKindAsk, clashSentence, allergyRefusal } from '@/lib/named-food-clash'
 import { firmFoodExclusions, foodDislikesToAsk, DISLIKE_ASK, mergeFoodsToAvoid } from '@/lib/food-exclusions'
+import { isRedFlagTurn, readRedFlag, writeRedFlag, redFlagStateAt, unpromptedAfterRedFlag, RED_FLAG_WORDS } from '@/lib/red-flag'
 import { exercisesThatFit } from '@/lib/exercise-shortlist'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { swapNameFallback } from '@/lib/swap-name-fallback'
@@ -164,6 +165,7 @@ import {
   pickNudge, nudgeKeys, keysCoveredByOpener, loadNudgeStore, saveNudgeStore,
   rememberNudge, rememberWithoutSpeaking, pickUnprompted, keysSaidByMarkers, helloKey, openerSkips,
   type NudgeInput, type NudgeStore,
+  RED_FLAG_CHECKIN_MOMENT,
 } from '@/lib/coach-nudge'
 import { momentsToRaise, dailyCap, type NotificationSettings, type MomentFacts } from '@/lib/coach-moments'
 import { loadSwitches, saveSwitches, frequencyOf, frequencyLabel } from '@/lib/coach-reach-out'
@@ -1576,6 +1578,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const keys = nudgeKeys(nudgeInputRef.current)
     const said = [...nudgeStore().said, ...keysSaidByMarkers(keys, momentsSaidToday)]
     const facts = momentFactsInputRef.current
+    const redFlag = readRedFlag(profile.id)
     const pick = pickUnprompted({
       now, today,
       cap: dailyCap(reminderSettings.frequency),
@@ -1589,7 +1592,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const opener = composeOpener(openerSkips(keys, said))
         return { text: `${greetName()} — ${opener.text}`, chips: opener.chips, kind: opener.kind }
       },
-      moments: facts ? momentsToRaise(facts, reminderSettings) : [],
+      moments: facts ? momentsToRaise(facts, reminderSettings, now) : [],
+      redFlag: redFlag ? { mode: unpromptedAfterRedFlag(redFlag, now), checkIn: { text: RED_FLAG_WORDS.checkin(greetName()), chips: RED_FLAG_WORDS.checkinChips, key: `red-flag-checkin:${redFlag.at}` } } : undefined,
     })
     if (!pick) return
 
@@ -1629,6 +1633,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           store = rememberWithoutSpeaking(store, keysCoveredByOpener(pick.openerKind, keys, pick.openerKind === 'noticed'))
         }
         writeNudgeStore(store)
+        if (pick.moment === RED_FLAG_CHECKIN_MOMENT && redFlag) writeRedFlag(profileId, { ...redFlag, checkedIn: true })
         setMessages(prev => [...prev, {
           id: data.id as string,
           role: 'assistant',
@@ -7022,6 +7027,23 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     finalizePlaceholder(placeholderId, cleanedText, finalStatus, action, finalStatus === 'complete' ? lessonTaught : null)
     if (finalStatus === 'complete') noteLessonTaught(lessonTaught)
+
+    // A RED FLAG PARKS THE SESSION AND THE COACH GOES QUIET (his ruling 14 Nov 2026, "Park it, go quiet"): a symptom in
+    // his words, answered by a referral. The open workout ends where it stands (every set kept, the rest banner with
+    // it), nothing unprompted for 48 hours on this phone or from the server, the pause is offered, and a later open
+    // asks how he is, once.
+    if (!failed && finalStatus === 'complete' && isRedFlagTurn(userText, cleanedText) && profile.id) {
+      const state = redFlagStateAt(getAppNow(profile.id).getTime())
+      writeRedFlag(profile.id, state)
+      const next = { ...reminderSettings, quiet_until: new Date(state.until).toISOString() }
+      setReminderSettings(next)
+      void saveSwitches(profile.id, next).catch(() => {})
+      const wasRunning = activeSession.status === 'running'
+      if (wasRunning) await activeSession.finishSession().catch(() => null)
+      else if (activeSession.restEndsAt) activeSession.dismissRest()
+      const turn = RED_FLAG_WORDS.turn(wasRunning)
+      setMessages(prev => [...prev, { role: 'assistant' as const, content: stripTags(turn), quickReplies: extractQuickReplies(turn), status: 'complete' as const }])
+    }
 
     // The food backstop, after the coach's own turn has landed: its tick sits
     // under the reply, one per food, each with Undo like any saved fact.

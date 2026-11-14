@@ -26,6 +26,10 @@ import { buildDayGuard, buildOwedGuard } from '../src/lib/plan-guard'
 import { firmFoodExclusions, foodDislikesToAsk, DISLIKE_ASK } from '../src/lib/food-exclusions'
 import { computeMealMacros } from '../src/lib/food-db'
 import { datesFrom, buildRotation, serveMealWeek } from '../src/lib/meal-rotation'
+import { isRedFlagTurn, unpromptedAfterRedFlag, redFlagStateAt, RED_FLAG_WORDS } from '../src/lib/red-flag'
+import * as appMoments from '../src/lib/coach-moments'
+import * as serverMoments from '../supabase/functions/_shared/coach-moments'
+import { pickUnprompted, RED_FLAG_CHECKIN_MOMENT } from '../src/lib/coach-nudge'
 import type { UserProfile, WorkoutDay, MesocycleWeek } from '../src/lib/types'
 
 let failures = 0
@@ -217,6 +221,42 @@ console.log('\n12. "I don\'t like X" is asked about; a swap holds the next day (
   check('...and the next day\'s breakfast and dinner keep the dishes the plan served, every time (where the lunch would repeat the dinner\'s dish, one of the two changes)', held === cases, broke.slice(0, 4))
   check('...and the next day\'s lunch is never the leftovers of the dinner swapped out', ghost === 0, { ghost })
   check('...the repeat case is in the fixture, so that exception is tested too', collisions >= 1, { collisions })
+}
+
+console.log('\n13. After a red flag the app parks the session and goes quiet (his "Park it, go quiet")')
+{
+  const ref = 'That needs a GP to look at it, so please stop for today and get it checked.'
+  check('a symptom in his words answered by a referral is a red flag: chest pain, sharp pain, dizziness, pelvic pain',
+    isRedFlagTurn('I had chest pain on the bike', ref) && isRedFlagTurn('sharp pain in my knee when I squat', 'See a physio before you load it again.')
+    && isRedFlagTurn('felt really dizzy after the second set', 'Please speak to your doctor.') && isRedFlagTurn("I've got pelvic pain today", 'Talk to your midwife today.'))
+  check('...ordinary soreness answered with advice is not, nor a referral about something else, nor a symptom answered without one',
+    !isRedFlagTurn('my legs are sore from yesterday', 'Totally normal, ease in with a warm-up.')
+    && !isRedFlagTurn('should I take creatine?', 'Check with your doctor if you take any medication.')
+    && !isRedFlagTurn('I had chest pain on the bike', 'Let us do lighter work today.'))
+  const t0 = Date.parse('2026-11-14T10:00:00Z'), h = 3600_000
+  const st = redFlagStateAt(t0)
+  check('quiet straight away; the one check-in on a later open; quiet again once asked; normal after 48 hours',
+    unpromptedAfterRedFlag(st, t0 + h) === 'quiet' && unpromptedAfterRedFlag(st, t0 + 5 * h) === 'checkin'
+    && unpromptedAfterRedFlag({ ...st, checkedIn: true }, t0 + 30 * h) === 'quiet' && unpromptedAfterRedFlag({ ...st, checkedIn: true }, t0 + 49 * h) === 'normal'
+    && unpromptedAfterRedFlag(null, t0) === 'normal')
+  const F = { localHour: 9, awaitingFeel: false, plannedToday: true, loggedToday: false, missedYesterday: false, daysSinceAnyLog: 0, blockJustEnded: false, beatTargetPending: false }
+  const quiet = { quiet_until: new Date(t0 + 48 * h).toISOString() }
+  check('no reminder while the quiet holds, on the phone\'s server and in the app alike; one again after it',
+    [appMoments, serverMoments].every(m => m.momentsToRaise(F as never, quiet as never, t0 + h).length === 0 && m.momentsToRaise(F as never, quiet as never, t0 + 49 * h).length > 0))
+  check('...and the server and the chat both hand it the time', /momentsToRaise\(facts, profile\.settings, deps\.now\.getTime\(\)\)/.test(read('supabase/functions/_shared/reach-out.ts'))
+    && /momentsToRaise\(facts, reminderSettings, now\)/.test(read('src/components/ChatAssistant.tsx')))
+  const base = { now: t0 + h, today: '2026-11-14', cap: 3, unpromptedToday: 0, lastUnpromptedAt: 0, momentsSaidToday: [], said: [], greeting: 'Hey Priya',
+    event: { kind: 'due', text: 'Ready for your session?', chips: [], keys: ['due:x'] } as never, hello: () => ({ text: 'Hey Priya — morning!', chips: [] }), moments: [] }
+  const checkIn = { text: RED_FLAG_WORDS.checkin('Hey Priya'), chips: RED_FLAG_WORDS.checkinChips, key: 'red-flag-checkin:1' }
+  check('the chat says nothing unprompted while quiet, not even a due session or the hello', pickUnprompted({ ...base, redFlag: { mode: 'quiet', checkIn } }) === null)
+  const ci = pickUnprompted({ ...base, cap: 0, unpromptedToday: 3, redFlag: { mode: 'checkin', checkIn } })
+  check('...the check-in is said once, whatever the day\'s limit, and asks how he is', ci?.moment === RED_FLAG_CHECKIN_MOMENT && /how are you feeling today\?/.test(ci.text)
+    && pickUnprompted({ ...base, said: ['red-flag-checkin:1'], redFlag: { mode: 'checkin', checkIn } }) === null)
+  const chat = read('src/components/ChatAssistant.tsx')
+  const park = chat.slice(chat.indexOf('if (!failed && finalStatus === \'complete\' && isRedFlagTurn(userText, cleanedText)'), chat.indexOf('// The food backstop, after the coach'))
+  check('a red flag ends an open workout where it stands (sets kept) and clears the rest banner', park.length > 0 && /if \(wasRunning\) await activeSession\.finishSession\(\)/.test(park) && /else if \(activeSession\.restEndsAt\) activeSession\.dismissRest\(\)/.test(park))
+  check('...and stores the quiet for the phone\'s reminders as well as this phone', /quiet_until: new Date\(state\.until\)\.toISOString\(\)/.test(park) && /saveSwitches\(profile\.id, next\)/.test(park) && /writeRedFlag\(profile\.id, state\)/.test(park))
+  check('...and the check-in, once said, is remembered', /if \(pick\.moment === RED_FLAG_CHECKIN_MOMENT && redFlag\) writeRedFlag\(profileId, \{ \.\.\.redFlag, checkedIn: true \}\)/.test(chat))
 }
 
 console.log(`\n${ran} checks ran, ${failures} failed.`)
