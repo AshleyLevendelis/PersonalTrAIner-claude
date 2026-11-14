@@ -153,7 +153,7 @@ export function buildMealRebalanceProposal(input: BuildMealRebalanceInput): Meal
   const to = normaliseSlot(input.rawArgs.to_slot)
   if (!from || !to) return refuse(REBALANCE.refusals.whichSlots)
   if (from === to) return refuse(REBALANCE.refusals.sameSlot)
-  const budgets = computeSlotBudgets(targets, serving.shape.mealsPerDay, serving.shape.includeSnacks)
+  const budgets = computeSlotBudgets(targets, serving.shape.mealsPerDay, serving.shape.includeSnacks, serving.shape.skipBreakfast)
   if (!budgets[from]) return refuse(REBALANCE.refusals.noSuchMeal(from))
   if (!budgets[to]) return refuse(REBALANCE.refusals.noSuchMeal(to))
 

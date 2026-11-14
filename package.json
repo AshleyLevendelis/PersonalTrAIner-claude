@@ -203,6 +203,7 @@
     "test:onboarding-detours": "tsx scripts/test-onboarding-detours.ts",
     "verify:parked-question": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/parked-question.mjs",
     "verify:setup-qa3": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/setup-qa3.mjs",
+    "test:sal-margaret": "tsx scripts/test-sal-margaret.ts",
     "verify:onboarding-turns": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/turns.mjs",
     "verify:setup-fixes": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/setup-fixes.mjs",
     "verify:onboarding-one-question": "vite build --config .onb-harness/vite.config.ts && node .onb-harness/one-question.mjs",

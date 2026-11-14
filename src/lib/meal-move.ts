@@ -69,6 +69,8 @@ export interface BuildMealMoveInput {
   todayDate: string
   targets: MacroTargets
   mealsPerDay?: number
+  /** Breakfast skipped (skipsBreakfast): on two meals a day the day is lunch and dinner. Required so no surface forgets it. */
+  skipBreakfast: boolean | undefined
   includeSnacks?: boolean
   dietaryPreferences: string[]
   dislikedFoods?: string[]
@@ -213,7 +215,7 @@ export function buildMealMoveProposal(input: BuildMealMoveInput): MealMoveResult
   if (!toSlot) return { ok: false, reason: `Where should ${slotWords(fromSlot)} go — breakfast, lunch, dinner or a snack?` }
   if (fromSlot === toSlot) return { ok: false, reason: `That's already where ${slotWords(fromSlot)} is.` }
 
-  const budgets = computeSlotBudgets(input.targets, input.mealsPerDay, input.includeSnacks)
+  const budgets = computeSlotBudgets(input.targets, input.mealsPerDay, input.includeSnacks, input.skipBreakfast)
   const fromBudget = budgets[fromSlot]
   const toBudget = budgets[toSlot]
   // A SLOT THE PROFILE DOES NOT HAVE. Offering a move into it would be a

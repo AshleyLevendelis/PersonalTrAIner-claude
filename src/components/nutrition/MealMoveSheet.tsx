@@ -49,6 +49,8 @@ export interface MealMoveContext {
   fromSlot: MealSlotName
   targets: MacroTargets
   mealsPerDay?: number
+  /** Breakfast skipped: a two-meal day is lunch and dinner (skipsBreakfast). */
+  skipBreakfast: boolean | undefined
   includeSnacks?: boolean
   dietaryPreferences: string[]
   dislikedFoods: string[]
@@ -116,6 +118,7 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel, onSwapIn
       todayDate: ctx.date,
       targets: ctx.targets,
       mealsPerDay: ctx.mealsPerDay,
+      skipBreakfast: ctx.skipBreakfast,
       includeSnacks: ctx.includeSnacks,
       dietaryPreferences: ctx.dietaryPreferences,
       dislikedFoods: ctx.dislikedFoods,

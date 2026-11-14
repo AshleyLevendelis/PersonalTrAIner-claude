@@ -1473,9 +1473,9 @@ export function TodayPanel({
               {peekWorkout?.plannedActivity
                 ? `${peekDay}: ${peekWorkout.plannedActivity.activity}, ${peekWorkout.plannedActivity.duration} minutes.`
                 : peekWorkout?.recommendedCardio
-                ? `${peekDay} is a recovery day: ${prescriptionLine(peekWorkout.recommendedCardio)}.`
+                ? `${peekDay} is a rest day. Optional: ${prescriptionLine(peekWorkout.recommendedCardio)}.`
                 : peekWorkout?.conditioning_note
-                ? `${peekDay} is a recovery day. ${peekWorkout.conditioning_note}`
+                ? `${peekDay} is a rest day. Optional: ${peekWorkout.conditioning_note}`
                 : `${peekDay} is a rest or recovery day.`}
               <div className="mt-3 flex justify-center"><PeekBackToToday onClick={() => setPeekDay(null)} /></div>
             </div>

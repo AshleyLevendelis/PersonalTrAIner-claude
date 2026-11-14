@@ -1377,7 +1377,10 @@ const CARDIO_EQUIPMENT = new Set(['treadmill', 'stationary bike', 'rowing machin
 export function unloadedLoadLabel(entry: ExerciseEntry): string | null {
   if (isExternallyLoaded(entry)) return null
   if (entry.equipment.some(e => CARDIO_EQUIPMENT.has(e))) return null
-  if (entry.equipment.includes('resistance band')) return 'Band'
+  // "BAND" ONLY WHEN A BAND IS THE ONLY WAY TO DO IT (Sal, 14 Nov 2026: "Clamshell — Band" on a plan for somebody with
+  // no band). An entry that lists the band as one alternative beside bodyweight is done without one, so the word is
+  // the one that is true for everybody it is prescribed to.
+  if (entry.equipment.includes('resistance band') && !(entry.equipment_alternatives && entry.equipment.includes('bodyweight'))) return 'Band'
   return 'Bodyweight'
 }
 

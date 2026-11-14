@@ -520,7 +520,7 @@ export function ActiveRecoveryCard({
             or Light Swim" and left the person to guess which was the session —
             the same unanswerable question the type comment warns about, on
             screen instead of in the data. Found by the driver, on a real card. */}
-        {!planned && cardio && <PlannedCardioRow prescription={cardio} label="Suggested" />}
+        {!planned && cardio && <PlannedCardioRow prescription={cardio} label="Optional" />}
         {tomorrow && <TomorrowPreview tomorrow={tomorrow} onPeek={onPeek} />}
         <ActivityLogEntry alsoLabel={!!planned} claimed={planned ? [planned.activity] : cardio ? [cardio.activity] : []} />
         {/* AN EMPTY DAY IS THE ONE YOU WANT TO FILL, and this is the card an

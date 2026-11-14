@@ -268,6 +268,27 @@ if (state === 'review-lifter') {
   ))
 }
 
+// REVIEW-KNOWN-LIFTS (Sal/Margaret, 14 Nov 2026): everything answered, an intermediate lifter who gave his three sets,
+// so the summary is open with them in it. INPUT only. The driver changes his experience to Beginner from the summary.
+if (state === 'review-known-lifts') {
+  const all = {
+    ...JO_SO_FAR, knowsWorkingLifts: true, knownSquatKg: '100 kg x 5', knownBenchKg: '80 kg x 5', knownDeadliftKg: '120 kg x 5',
+    trainingDays: ['Mon', 'Wed', 'Fri'], sessionDuration: '45-60',
+    trainingStyle: 'functional', conditioningPreference: 'tolerate', recoveryCapacity: 'moderate',
+    age: '34', heightCm: '170', weightKg: '70', gender: 'female', mealsPerDay: 3,
+    dietaryPreferences: [], dislikedFoods: 'none', usualFoods: '',
+  }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Jo' },
+      { role: 'assistant', content: COMPLETE_MESSAGE },
+    ],
+    all,
+    Object.keys(all),
+  ))
+}
+
 // HIS SETUP, 13 NOV 2026 (five screenshots: "Asking me questions about my background in lifting which is vague and no
 // multiple choice ... it asked me working weights and I gave a number but it didn't clarify which exercise ... then it
 // started asking multiple questions at once"). INPUT only: which answers are in and which question is on screen.

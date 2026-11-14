@@ -516,7 +516,8 @@ export function ProgramBrowse({
               ? (workout?.plannedActivity
                   ? prescriptionLine(workout.plannedActivity)
                   : workout?.recommendedCardio
-                  ? prescriptionLine(workout.recommendedCardio)
+                  // OPTIONAL, SAID AS SUCH (Sal/Margaret, 14 Nov 2026): a rest day's cardio is a suggestion.
+                  ? `Optional: ${prescriptionLine(workout.recommendedCardio)}`
                   : 'Light movement and mobility.')
               : null
 

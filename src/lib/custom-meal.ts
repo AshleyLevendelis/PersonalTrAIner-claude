@@ -44,6 +44,8 @@ export interface BuildCustomMealInput {
   todayDate: string
   targets: MacroTargets
   mealsPerDay?: number
+  /** Breakfast skipped (skipsBreakfast): on two meals a day the day is lunch and dinner. Required so no surface forgets it. */
+  skipBreakfast: boolean | undefined
   includeSnacks?: boolean
   dietaryPreferences: string[]
   dislikedFoods?: string[]
@@ -81,7 +83,7 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
     ? rawArgs.name.trim()
     : cookedForMe ? assumedMealName(slot) : `My ${slot}`
 
-  const budgets = computeSlotBudgets(input.targets, input.mealsPerDay, input.includeSnacks)
+  const budgets = computeSlotBudgets(input.targets, input.mealsPerDay, input.includeSnacks, input.skipBreakfast)
   const budget = budgets[slot]
   if (!budget) {
     return { ok: false, reason: `Your plan doesn't have a ${slot} slot at the moment. You can change how many meals a day you eat in Profile, and then I can add it.` }

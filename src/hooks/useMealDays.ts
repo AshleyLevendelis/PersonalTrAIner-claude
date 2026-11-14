@@ -448,7 +448,7 @@ export function useMealDays(input: MealDaysInput) {
     mark: async (date: string, slot: MealSlotName, size: EatingOutSize) => {
       if (!profileId || !targets) return { ok: false, reason: EATING_OUT_REFUSALS.noTargets }
       if (!dates.includes(date)) return { ok: false, reason: EATING_OUT_REFUSALS.outsideWindow }
-      const budget = computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks)[slot]
+      const budget = computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks, mealShape.skipBreakfast)[slot]
       if (!budget || !(budget.calories > 0)) return { ok: false, reason: EATING_OUT_REFUSALS.noSuchMeal(slot) }
       if (date === today) {
         const logged = await readLoggedToday()
@@ -492,7 +492,7 @@ export function useMealDays(input: MealDaysInput) {
     mark: async (date: string) => {
       if (!profileId || !targets) return { ok: false, reason: EATING_OUT_REFUSALS.noTargets }
       if (!dates.includes(date)) return { ok: false, reason: FREESTYLE_WORDS.outsideWindow }
-      const slots = Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks)) as MealSlotName[]
+      const slots = Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks, mealShape.skipBreakfast)) as MealSlotName[]
       const eaten = date === today ? new Set(await readLoggedToday() ?? []) : new Set<MealSlotName>()
       const done: MealSlotName[] = []
       for (const slot of slots.filter(s => !eaten.has(s))) {
@@ -508,7 +508,7 @@ export function useMealDays(input: MealDaysInput) {
     },
     clear: async (date: string) => {
       if (!profileId || !dates.includes(date) || !targets) return false
-      const slots = Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks)) as MealSlotName[]
+      const slots = Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks, mealShape.skipBreakfast)) as MealSlotName[]
       const shown = date === today ? week[0]?.day.chosen : week.find(w => w.date === date)?.day.chosen
       let ok = true
       for (const slot of slots) {
@@ -575,7 +575,7 @@ export function useMealDays(input: MealDaysInput) {
      */
     dayMove: {
       dates, today,
-      slots: targets ? (Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks)) as MealSlotName[]) : [],
+      slots: targets ? (Object.keys(computeSlotBudgets(targets, mealShape.mealsPerDay, mealShape.includeSnacks, mealShape.skipBreakfast)) as MealSlotName[]) : [],
       plan: planDayMove, confirm: confirmDayMove, undo: undoDayMove, knockOn, knockOnMove,
       rebalance: { plan: planRebalance, confirm: confirmRebalance, undo: undoRebalance } satisfies MealRebalanceController,
     } satisfies MealDayMoveController,

@@ -32,7 +32,7 @@ import { currentAge } from '@/lib/body-units'
 import { isMissingColumnError } from '@/lib/missing-column'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, type MealSlotName } from '@/lib/meal-store'
-import { generateMealPools, chosenToMealPlanDays, persistResizedPools, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
+import { generateMealPools, chosenToMealPlanDays, persistResizedPools, computeSlotBudgets, skipsBreakfast, type PoolOption } from '@/lib/meal-generation'
 import { topUpPlan, topUpOffer, topUpMealPlan, previewTopUpStart, isTopUpDismissed, dismissTopUp, type TopUpOutcome } from '@/lib/meal-top-up'
 import { readGroceryBuildMemo } from '@/lib/grocery-display'
 import { buildRotation, firstDayAfter, rotationIndexFor, pinsFromPicks, poolsServedOn, type MealShape } from '@/lib/meal-rotation'
@@ -490,12 +490,13 @@ function App() {
   // separate arguments is how the two would quietly start disagreeing again.
   const mealShape: MealShape = useMemo(() => ({
     mealsPerDay: profile?.meals_per_day,
+    skipBreakfast: skipsBreakfast(profile),
     includeSnacks: profile?.include_snacks,
     batchCooking: profile?.batch_cooking,
     variety: profile?.meal_variety ?? undefined,
     // Meals cooked for him elsewhere ride on the shape, so every surface that builds a week is handed them.
     elsewhere: profile?.meals_elsewhere,
-  }), [profile?.meals_per_day, profile?.include_snacks, profile?.batch_cooking, profile?.meals_elsewhere, profile?.meal_variety])
+  }), [profile?.meals_per_day, profile?.include_snacks, profile?.breakfast_style, profile?.batch_cooking, profile?.meals_elsewhere, profile?.meal_variety])
   const mealRotation = useMemo(
     // Built from THIS WEEK'S MENU (9 Nov 2026, meal-menu.ts): a deep pool is never searched whole. The same object
     // serveDates draws for today, so the strip finds this rotation again rather than building its own.
@@ -572,6 +573,7 @@ function App() {
     macros && assembledMeals && !assembledMeals.withinTolerance
       ? checkMealRefit(mealDays.today?.pools ?? mealPools, macros, {
         mealsPerDay: profile?.meals_per_day,
+        skipBreakfast: skipsBreakfast(profile),
         includeSnacks: profile?.include_snacks,
         // A LEFTOVER LUNCH IS PART OF TODAY, and a fact like her own picks:
         // its size comes from last night's pan. Left out, the trial worked
@@ -611,8 +613,8 @@ function App() {
   // the asking. Only the meals she can be SERVED count (topUpNeeds), and the
   // offer waits while the first plan is still being built.
   const activeMealSlots = useMemo(
-    () => (macros ? Object.keys(computeSlotBudgets(macros, profile?.meals_per_day, profile?.include_snacks)) as MealSlotName[] : []),
-    [macros, profile?.meals_per_day, profile?.include_snacks],
+    () => (macros ? Object.keys(computeSlotBudgets(macros, profile?.meals_per_day, profile?.include_snacks, skipsBreakfast(profile))) as MealSlotName[] : []),
+    [macros, profile?.meals_per_day, profile?.include_snacks, profile?.breakfast_style],
   )
   // What is short AND what is stuck repeating (30 Sep 2026: seven dishes of
   // which two fit is not seven options). Worked out ONCE and handed to the
@@ -798,6 +800,7 @@ function App() {
     context: {
       profileId: profile.id, targets: macros,
       mealsPerDay: profile.meals_per_day, includeSnacks: profile.include_snacks,
+      skipBreakfast: skipsBreakfast(profile),
       dietaryPreferences: profile.dietary_preferences ?? [], dislikedFoods: effectiveDislikedFoods,
       todayDate: getSessionDateContext(profile.id).date, pools: mealPools,
     },
@@ -907,16 +910,8 @@ function App() {
     ? MACRO_INPUT_KEYS.map(k => String(profile[k] ?? '')).join('|')
     : null
   const lastMacroInputsRef = useRef<string | null>(null)
-  // Whose inputs those were. A different profile is a FIRST pass, never a change: comparing a new person's answers
-  // with the last person's is how a sign-up came to "move" targets on day one (14 Nov 2026).
-  const lastMacroProfileIdRef = useRef<string | null>(null)
   useEffect(() => {
     if (isRestoring || !profile || macroInputs == null) return
-    if (lastMacroProfileIdRef.current !== (profile.id ?? null)) {
-      lastMacroProfileIdRef.current = profile.id ?? null
-      lastMacroInputsRef.current = macroInputs
-      return
-    }
     // Skip the first pass — restoreSession has already computed these, and
     // recomputing immediately would just be the same numbers again.
     if (lastMacroInputsRef.current === null) { lastMacroInputsRef.current = macroInputs; return }
@@ -1632,6 +1627,7 @@ function App() {
         targets: macros,
         dietaryPreferences: profile.dietary_preferences,
         mealsPerDay: profile.meals_per_day,
+        skipBreakfast: skipsBreakfast(profile),
         includeSnacks: profile.include_snacks,
         cookingTimePreference: profile.cooking_time_preference,
         favoriteCuisines: profile.favorite_cuisines,
@@ -1712,6 +1708,7 @@ function App() {
                     targets: macros,
                     dietaryPreferences: profile.dietary_preferences,
                     mealsPerDay: profile.meals_per_day,
+                    skipBreakfast: skipsBreakfast(profile),
                     includeSnacks: profile.include_snacks,
                     cookingTimePreference: profile.cooking_time_preference,
                     favoriteCuisines: profile.favorite_cuisines,
@@ -1776,6 +1773,7 @@ function App() {
       targets,
       dietaryPreferences: forProfile.dietary_preferences,
       mealsPerDay: forProfile.meals_per_day,
+      skipBreakfast: skipsBreakfast(forProfile),
       includeSnacks: forProfile.include_snacks,
       cookingTimePreference: forProfile.cooking_time_preference,
       favoriteCuisines: forProfile.favorite_cuisines,
@@ -2423,6 +2421,7 @@ function App() {
       targets: macros,
       dietaryPreferences: profile.dietary_preferences,
       mealsPerDay: profile.meals_per_day,
+      skipBreakfast: skipsBreakfast(profile),
       includeSnacks: profile.include_snacks,
       cookingTimePreference: profile.cooking_time_preference,
       favoriteCuisines: profile.favorite_cuisines,
@@ -3008,7 +3007,6 @@ function App() {
       setTargetWeightAnchorKg(null)
       anchorUnknownRef.current = false
       lastMacroInputsRef.current = null
-      lastMacroProfileIdRef.current = null
       setAdaptationMessages([])
       setMealRegenerateError(null)
       setMealTopUpNote(null)

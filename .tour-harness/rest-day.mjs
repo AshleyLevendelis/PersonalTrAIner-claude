@@ -382,7 +382,7 @@ const rowsOnCard = () => ev(`(() => {
   }
 })()`)
 const atRest = await rowsOnCard()
-check('8b. the card holds the Suggested row and the chips', atRest.found && /suggested/i.test(atRest.label), atRest)
+check('8b. the card holds the Optional row and the chips', atRest.found && /optional/i.test(atRest.label), atRest)
 check('8c. THE DEFECT: one Minutes box, one "How hard" and one ✓ on the card, not two',
   atRest.minutes === 1 && atRest.headers === 1 && atRest.saves === 1, atRest)
 check('8d. ...the one being the suggestion\'s: "did you move today?" draws no row until something is chosen', atRest.unplannedRows === 0, atRest)

@@ -264,7 +264,7 @@ export function buildMealDayMoveProposal(input: BuildMealDayMoveInput): MealDayM
   let landsInA: PoolOption
   let landsInB: PoolOption
   if (across) {
-    const budgets = computeSlotBudgets(targets, serving.shape.mealsPerDay, serving.shape.includeSnacks)
+    const budgets = computeSlotBudgets(targets, serving.shape.mealsPerDay, serving.shape.includeSnacks, serving.shape.skipBreakfast)
     const budgetA = budgets[slotA]
     const budgetB = budgets[slotB]
     if (!budgetA) return refuse(DAY_MOVE.refusals.noSuchMeal(slotA))

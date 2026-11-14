@@ -900,6 +900,25 @@ await section(27, 'Up to 3, then back: a tangent gets three follow-ups before th
   check('Forget removes that note, and only that one, from what is kept', JSON.stringify(after) === JSON.stringify(['Three years of Muay Thai, spars most weeks']), after)
 })
 
+await section(29, 'A change to Beginner drops the lift numbers and says so; none are saved (Sal/Margaret, 14 Nov 2026)', async () => {
+  await open('review-known-lifts')
+  const start = await review()
+  check('harness: the summary is open with his squat in it', start.open && /100 kg|squat/i.test(JSON.stringify(start.rows.knownSquatKg ?? '')), start.rows)
+  await tapRow('trainingExperience')
+  await tapOption('trainingExperience', 'Beginner')
+  await wait(500)
+  const text = await ev('document.body.innerText')
+  check('the app says the lift numbers are left out, in one line', (text.match(/left out the lift numbers you gave/g) ?? []).length === 1, text.slice(-500))
+  const after = await review()
+  check('...the summary shows no lift rows', after.open && !['knowsWorkingLifts', 'knownSquatKg', 'knownBenchKg', 'knownDeadliftKg'].some(k => k in after.rows), after.rows)
+  await shot('beginner-lifts-dropped')
+  await tapButton('Generate My Plan')
+  const built = await evj(`window.__onbCompleted`)
+  check('...and the saved profile holds no lift numbers and no skipped calibration week',
+    !!built && built.training_experience === 'beginner' && built.known_squat_kg == null && built.known_bench_kg == null && built.known_deadlift_kg == null && !built.skip_calibration_week,
+    built && { exp: built.training_experience, squat: built.known_squat_kg, skip: built.skip_calibration_week })
+})
+
 if (!isGone()) {
   try { check('harness: every request in this run was scripted', (await ev(`window.__onbUnscripted`)) === 0) } catch {}
 }

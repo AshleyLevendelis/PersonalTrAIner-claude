@@ -36,7 +36,7 @@ const USER_ID = '00000000-0000-4000-8000-0000000000a1'
 const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 const created = new Date(anchorNowMs() - 9 * 86400000).toISOString()
 const TRAIN_TODAY = new URLSearchParams(location.search).has('session-day')
-// The anchor's Wednesday is "Active Recovery + Cardio" on this profile, a planned day with no lifting. ?no-cardio:
+// The anchor's Wednesday is "Rest day · optional cardio" on this profile, a planned day with no lifting. ?no-cardio:
 // she would rather avoid cardio (an INPUT), and the generator then leaves Wednesday a plain rest day with no plan
 // entry (verify:home-day-named). ?weigh=79.55: yesterday's weigh-in (an INPUT), so a reading with two decimals
 // reaches Home and Profile. Without them the page is unchanged.

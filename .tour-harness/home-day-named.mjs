@@ -3,7 +3,7 @@
 // The test found Home calling a day the plan names "Active Recovery + Cardio" a plain "Rest day", offering
 // "Adjust today" on a day with no session to adjust, a weight change printed as a bare "-0.4", and Profile showing
 // 79.55 kg where Home showed 79.5. The whole app (app-boot.html), each case set up by an INPUT only:
-//   1. the default page: today (Wednesday) is the plan's "Active Recovery + Cardio".
+//   1. the default page: today (Wednesday) is the plan's "Rest day · optional cardio" (named "Active Recovery + Cardio" until 14 Nov 2026).
 //   2. ?no-cardio: she avoids cardio, so today is a plain rest day with no plan entry.
 //   3. ?weigh=79.55: yesterday's weigh-in has two decimals.
 // PORT 9563.
@@ -30,7 +30,7 @@ const up = async query => {
 check('1a. the app is up, today active recovery', await up(''))
 const ar = await hero()
 check('1b. today is a rest status on Home (no lifting; the case binds)', ar?.status === 'rest', ar)
-check('1c. ...and is named as the plan names it, never "Rest day"', ar?.title === 'Active Recovery + Cardio', ar)
+check('1c. ...and is named as the plan names it, saying it is optional', ar?.title === 'Rest day · optional cardio', ar)
 check('1d. ...with its cardio in the plan\'s words underneath', /Active Recovery Walk or Light Swim/.test(ar?.sub ?? '') && /\d+ min/.test(ar?.sub ?? ''), ar?.sub)
 const arChips = await chips()
 check('1e. the coach note offers "What changed?" (a note is on screen, so the next check binds)', arChips.includes('What changed?'), arChips)

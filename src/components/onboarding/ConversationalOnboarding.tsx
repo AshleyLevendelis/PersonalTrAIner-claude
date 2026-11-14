@@ -41,7 +41,7 @@ import {
 import { measureParserFor, liftSetInUserWords, ageOn, todayLocal } from '@/lib/body-units'
 import { detectFoodExclusions, mergeFoodsToAvoid, isFoodToAvoid } from '@/lib/food-exclusions'
 import { splitFoodList, isPlainNone } from '@/lib/food-list'
-import { allergenFilterReceipt, liftSetsAsk, liftNeedsASet, liftWhichOne } from '@/lib/coach-voice'
+import { allergenFilterReceipt, beginnerLiftsSetAside, liftSetsAsk, liftNeedsASet, liftWhichOne } from '@/lib/coach-voice'
 import { bareLiftWeight, coachAskedSetupQuestion, dropCoachQuestions, namedLiftSets, withoutQuestions } from '@/lib/onboarding-one-question'
 import { implausibleLifts } from '@/lib/lift-plausibility'
 import { ceilingIsInUserWords, isCeilingSlot } from '@/lib/onboarding-ceiling-capture'
@@ -558,6 +558,8 @@ function textQuestionOnScreen(messages: ChatMsg[], confirmed: Set<string>): stri
   return askedIdx >= 0 && coachQuestionIdx <= askedIdx ? messages[askedIdx].asksSlot : undefined
 }
 
+const LIFT_ANSWER_KEYS: SlotKey[] = ['knowsWorkingLifts', 'knownSquatKg', 'knownBenchKg', 'knownDeadliftKg']
+
 function applySlot(
   ws: WorkingState,
   key: SlotKey,
@@ -587,6 +589,17 @@ function applySlot(
   if ((key === 'equipment' || key === 'kitList') && valueChanged && ws.values.kitTicks !== null) {
     ws.values = { ...ws.values, kitTicks: null }
     const c = new Set(ws.confirmed); c.delete('kitTicks'); ws.confirmed = c
+  }
+  // A CHANGE TO BEGINNER DROPS THE LIFT NUMBERS, AND SAYS SO (Sal/Margaret, 14 Nov 2026; his ruling "a beginner won't
+  // know their numbers"). They were hidden and kept, then saved: the summary she approved was not what was stored.
+  if (key === 'trainingExperience' && coerced === 'beginner' && valueChanged) {
+    const hadNumbers = LIFT_ANSWER_KEYS.some(k => k !== 'knowsWorkingLifts' && String(ws.values[k] ?? '').trim() !== '')
+    if (hadNumbers || ws.values.knowsWorkingLifts != null) {
+      ws.values = { ...ws.values, knowsWorkingLifts: null, knownSquatKg: '', knownBenchKg: '', knownDeadliftKg: '' } as OnboardingSlotValues
+      const c = new Set(ws.confirmed); for (const k of LIFT_ANSWER_KEYS) c.delete(k); ws.confirmed = c
+      for (const k of LIFT_ANSWER_KEYS) ws.resolveCards.add(k)
+      if (hadNumbers) ws.newMessages.push({ role: 'assistant', content: beginnerLiftsSetAside() })
+    }
   }
   ws.resolveCards.add(key)
   if (showReceipt && !alreadySame) {

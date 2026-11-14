@@ -133,6 +133,8 @@ interface MealPlanProps {
   dietaryPreferences?: string[]
   avoidFoods?: string[]
   mealsPerDay?: number
+  /** Breakfast skipped: a two-meal day is lunch and dinner (skipsBreakfast). */
+  skipBreakfast: boolean | undefined
   includeSnacks?: boolean
   /**
    * Makes a verified option the slot's meal and says whether it landed. The
@@ -199,7 +201,7 @@ export function MealPlan({
   fitnessGoal,
   profileId, noticeSlot, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
   unrecognisedDietaryRestrictions, onFixDietaryRestrictions, onOpenMyMeals, dietaryPreferences = [], avoidFoods = [],
-  mealsPerDay, includeSnacks, onMealPickApplied,
+  mealsPerDay, includeSnacks, skipBreakfast, onMealPickApplied,
   onSwapSlot, onUndoSwap, onRegenerateSlot, onMakeOneNew, onFindMoreOptions, onRegenerateAll, upcoming, dayMove, regeneratingAll = false,
   heldAround, onKeepHeldSizes, eatingOut, freestyle,
 }: MealPlanProps) {
@@ -519,7 +521,7 @@ export function MealPlan({
             editContextFor={o => (profileId && targets && onMealPickApplied && !upcoming)
               ? {
                   profileId, date, slot, targets, fitnessGoal,
-                  mealsPerDay, includeSnacks,
+                  mealsPerDay, includeSnacks, skipBreakfast,
                   dietaryPreferences: dietaryPreferences ?? [],
                   dislikedFoods: avoidFoods ?? [],
                   meal: { name: o.name, ingredients: o.ingredients.map(formatIngredient), macros: o.macros },
@@ -539,7 +541,7 @@ export function MealPlan({
             moveContext={(profileId && targets && onMealPickApplied && !upcoming)
               ? {
                   profileId, date, fromSlot: slot, targets,
-                  mealsPerDay, includeSnacks,
+                  mealsPerDay, includeSnacks, skipBreakfast,
                   dietaryPreferences: dietaryPreferences ?? [],
                   dislikedFoods: avoidFoods ?? [],
                   // EVERY SLOT'S MEAL, because the destination's is what comes
@@ -1582,7 +1584,7 @@ function MealSlotRow({
                       <Suspense fallback={null}><MealFoodAddSheet
                         ctx={{
                           profileId: ctx.profileId, date: ctx.date, slot: ctx.slot, targets: ctx.targets,
-                          mealsPerDay: ctx.mealsPerDay, includeSnacks: ctx.includeSnacks,
+                          mealsPerDay: ctx.mealsPerDay, includeSnacks: ctx.includeSnacks, skipBreakfast: ctx.skipBreakfast,
                           dietaryPreferences: ctx.dietaryPreferences, dislikedFoods: ctx.dislikedFoods,
                           meal: ctx.meal, afterEating: ctx.afterEating,
                         }}

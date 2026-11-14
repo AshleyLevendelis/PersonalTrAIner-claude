@@ -59,6 +59,8 @@ export interface BuildMealFoodEditInput {
   todayDate: string
   targets: MacroTargets
   mealsPerDay?: number
+  /** Breakfast skipped (skipsBreakfast): on two meals a day the day is lunch and dinner. Required so no surface forgets it. */
+  skipBreakfast: boolean | undefined
   includeSnacks?: boolean
   dietaryPreferences: string[]
   dislikedFoods?: string[]
@@ -134,7 +136,7 @@ function common(input: BuildMealFoodEditInput): Common {
   if (!input.currentMeal) {
     return { err: `There's no ${slot} on your plan today to change. Tell me what you're having and I'll set it up as the meal instead.` } as const
   }
-  const budgets = computeSlotBudgets(input.targets, input.mealsPerDay, input.includeSnacks)
+  const budgets = computeSlotBudgets(input.targets, input.mealsPerDay, input.includeSnacks, input.skipBreakfast)
   const budget = budgets[slot as MealSlotName]
   if (!budget) {
     return { err: `Your plan doesn't have a ${slot} slot at the moment. You can change how many meals a day you eat in Profile.` } as const

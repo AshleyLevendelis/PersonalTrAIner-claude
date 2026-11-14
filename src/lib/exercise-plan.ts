@@ -5436,6 +5436,13 @@ function getConditioningProfile(goal: FitnessGoal): ConditioningProfile {
  * finisher/week" and functional's "moderate" targets need an actual budget,
  * not an all-or-nothing switch.
  */
+/**
+ * The name of a rest day that carries a suggested cardio session (Sal/Margaret, 14 Nov 2026): "Active Recovery +
+ * Cardio" read as a session she had to do. Every surface that names the day names it this way, so it says it is
+ * optional wherever it appears.
+ */
+export const OPTIONAL_CARDIO_FOCUS = 'Rest day · optional cardio'
+
 function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, policy: GoalPolicy): void {
   const duration = profile.session_duration_preference || '45-60'
   const isTimeLimited = duration === '30-45'
@@ -5497,7 +5504,16 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
   // euphemism" on a client flagged moderate recovery. High recovery can
   // genuinely absorb cardio on every rest day; moderate/low cannot.
   const recovery = effectiveRecoveryCapacity(profile)
-  const maxCardioRestDays = recovery === 'high'
+  // NONE AT ALL FOR A BEGINNER OR LOW RECOVERY (Sal/Margaret, 14 Nov 2026; his ruling "B": extra activity only as clearly
+  // optional suggestions, and none for a beginner, low recovery or someone starting from nothing). CSCS basis: a
+  // beginner's first adaptations come from the sessions they chose, and recovery between them is what lets them
+  // repeat; activity added on the days they did not choose read to Margaret as days she had to do. The goal's
+  // conditioning is still prescribed, inside the chosen sessions below (lighter days first). Starting from nothing is
+  // a beginner too.
+  const noRestDayActivity = profile.training_experience === 'beginner' || recovery === 'low'
+  const maxCardioRestDays = noRestDayActivity
+    ? 0
+    : recovery === 'high'
     ? restDayNames.length
     : Math.max(0, restDayNames.length - 1)
 
@@ -5505,7 +5521,7 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
     if (remaining <= 0) return
     days.push({
       day: restDay,
-      focus: 'Active Recovery + Cardio',
+      focus: OPTIONAL_CARDIO_FOCUS,
       exercises: [],
       conditioning_note: `${cardioForGoal.restDay.activity} (~${cardioForGoal.restDay.duration} min)`,
       recommendedCardio: {
@@ -5523,7 +5539,7 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
   // is left alone: that day IS conditioning by design and the reorder above
   // will already have tried to keep it off a class day.
   const remainingTrainingDays = days.filter(
-    d => d.focus !== 'Conditioning & Core' && d.focus !== 'Active Recovery + Cardio' && !classDays.has(d.day)
+    d => d.focus !== 'Conditioning & Core' && d.focus !== OPTIONAL_CARDIO_FOCUS && !classDays.has(d.day)
   )
   const lightDays = remainingTrainingDays.filter(d => !heavyTrackDays.has(d.focus))
   const heavyDays = remainingTrainingDays.filter(d => heavyTrackDays.has(d.focus))

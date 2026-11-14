@@ -22,6 +22,7 @@ import { NutritionWeekView, PlannedDayCard, type WeekViewDay } from '@/component
 import type { MacroTargets, UserProfile, WorkoutDay, MacroCalculationMode } from '@/lib/types'
 import type { MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
+import { skipsBreakfast } from '@/lib/meal-generation'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
 import type { EatingOutController } from '@/lib/eating-out'
 import { calculateWeeklySchedule, getMacroDerivation, sportFuelNote } from '@/lib/macro-calculator'
@@ -676,6 +677,7 @@ export function NutritionDisplay({
           dietaryPreferences={profile.dietary_preferences}
           avoidFoods={avoidFoods}
           mealsPerDay={profile.meals_per_day}
+          skipBreakfast={skipsBreakfast(profile)}
           includeSnacks={profile.include_snacks}
           onSwapSlot={upcomingDay.onSwap}
           onRegenerateSlot={onRegenerateMealSlot}
@@ -707,6 +709,7 @@ export function NutritionDisplay({
         dietaryPreferences={profile.dietary_preferences}
         avoidFoods={avoidFoods}
         mealsPerDay={profile.meals_per_day}
+        skipBreakfast={skipsBreakfast(profile)}
         includeSnacks={profile.include_snacks}
         onMealPickApplied={onMealPickApplied}
         onSwapSlot={onSwapMealSlot}

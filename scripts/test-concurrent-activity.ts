@@ -18,7 +18,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
+import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSource, OPTIONAL_CARDIO_FOCUS } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { reorderTracksForClassDays, activityDays, HEAVY_TRACKS, describeActivity, MOVEMENT_DEMANDS, TIMES_OF_DAY, activityCountsAsLoad, countsAsTrainingLoad, effectiveRecoveryCapacity, volumeNotice, countWorkingSets, HARD_ACTIVITY_INTENSITY } from '../src/lib/concurrent-activity'
 import type { UserProfile, ConcurrentActivity, MesocycleWeek } from '../src/lib/types'
@@ -104,7 +104,7 @@ console.log("\n2. The generator honours it — Ashley's sentence, end to end\n")
     !withMuay.some(d => ['Tuesday', 'Thursday'].includes(d.day) && d.recommendedCardio && !(d.recommendedCardio as { is_filler?: boolean }).is_filler),
     withMuay.filter(d => ['Tuesday', 'Thursday'].includes(d.day)).map(d => [d.day, d.recommendedCardio?.activity]))
   check('...and no rest-day cardio was invented on a class day either',
-    !withMuay.some(d => ['Tuesday', 'Thursday'].includes(d.day) && d.focus === 'Active Recovery + Cardio'))
+    !withMuay.some(d => ['Tuesday', 'Thursday'].includes(d.day) && d.focus === OPTIONAL_CARDIO_FOCUS))
   // The lever is a reordering: same multiset of focuses as without the class.
   const without = quiet('cat', () => generateExercisePlan(profileFor()).plan)
   check('the same sessions exist, on different days',

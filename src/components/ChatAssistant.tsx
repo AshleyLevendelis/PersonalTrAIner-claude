@@ -63,7 +63,7 @@ import type { MealRefit } from '@/lib/meal-refit'
 import type { TopUpOutcome, TopUpPlan } from '@/lib/meal-top-up'
 import type { MealDayMoveArgs, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
 import { rebalanceSaid, rebalanceAskText, mealsNamed, type MealRebalanceController, type MealRebalancePayload } from '@/lib/meal-rebalance'
-import { DEFAULT_POOL_SIZE, computeSlotBudgets } from '@/lib/meal-generation'
+import { DEFAULT_POOL_SIZE, computeSlotBudgets, skipsBreakfast } from '@/lib/meal-generation'
 import { EATING_OUT_REFUSALS, EATING_OUT_SIZES, EATING_OUT_WORDS, eatingOutMacros, eatingOutOption, eatingOutSizeSaid, type EatingOutController, type EatingOutSize, eatingOutRangeWords } from '@/lib/eating-out'
 import { executeMealMove, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
@@ -4250,7 +4250,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       return { ok: false, refusal: `${EATING_OUT_WORDS.chatAsk(slot, dayWord)}\n[QUICK_REPLIES: ${EATING_OUT_SIZES.map(sz => `"${EATING_OUT_WORDS.chatChip(sz, slot, chipDay)}"`).join(' | ')}]` }
     }
     if (!macros) return { ok: false, refusal: EATING_OUT_REFUSALS.noTargets }
-    const budget = computeSlotBudgets(macros, profile.meals_per_day, profile.include_snacks)[slot]
+    const budget = computeSlotBudgets(macros, profile.meals_per_day, profile.include_snacks, skipsBreakfast(profile))[slot]
     if (!budget || !(budget.calories > 0)) return { ok: false, refusal: EATING_OUT_REFUSALS.noSuchMeal(slot) }
     const est = eatingOutMacros(budget, size)
     // WHAT ELSE IT CHANGES, read off the trial the meal sheet's write runs (a dinner out leaves no leftovers for the
@@ -6067,6 +6067,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             profileId: profile.id,
             targets: macros,
             mealsPerDay: profile.meals_per_day,
+            skipBreakfast: skipsBreakfast(profile),
             includeSnacks: profile.include_snacks,
             dietaryPreferences: profile.dietary_preferences ?? [],
             dislikedFoods: profile.disliked_foods ?? [],
@@ -6118,6 +6119,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             profileId: profile.id,
             targets: macros,
             mealsPerDay: profile.meals_per_day,
+            skipBreakfast: skipsBreakfast(profile),
             includeSnacks: profile.include_snacks,
             dietaryPreferences: profile.dietary_preferences ?? [],
             dislikedFoods: profile.disliked_foods ?? [],
@@ -6157,6 +6159,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             profileId: profile.id,
             targets: macros,
             mealsPerDay: profile.meals_per_day,
+            skipBreakfast: skipsBreakfast(profile),
             includeSnacks: profile.include_snacks,
             dietaryPreferences: profile.dietary_preferences ?? [],
             dislikedFoods: profile.disliked_foods ?? [],
@@ -6203,6 +6206,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             profileId: profile.id,
             targets: macros,
             mealsPerDay: profile.meals_per_day,
+            skipBreakfast: skipsBreakfast(profile),
             includeSnacks: profile.include_snacks,
             dietaryPreferences: profile.dietary_preferences ?? [],
             dislikedFoods: profile.disliked_foods ?? [],
@@ -6232,6 +6236,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             profileId: profile.id,
             targets: macros,
             mealsPerDay: profile.meals_per_day,
+            skipBreakfast: skipsBreakfast(profile),
             includeSnacks: profile.include_snacks,
             dietaryPreferences: profile.dietary_preferences ?? [],
             dislikedFoods: profile.disliked_foods ?? [],

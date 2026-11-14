@@ -215,7 +215,10 @@ export function moreMealFitOffer(items: { slot: string; fitting: number; have: n
     // EVERY ONE FITS, THERE ARE JUST FEW (run 7, L47): "Only 2 of your 2 lunches fit" read as a complaint about
     // dishes that are fine. Her wording: "You only have 2 lunches, so they keep repeating."
     if (fitting >= have && have > 0) return `You only have ${have} ${have === 1 ? slot : plural}, so ${have === 1 ? 'it keeps' : 'they keep'} repeating. I can add more. ${promise}`
-    const lead = fitting === 0
+    // ONE MEAL IS NOT "NONE OF YOUR 1 BREAKFASTS" (Margaret, 14 Nov 2026).
+    const lead = fitting === 0 && have === 1
+      ? `Your one ${slot} doesn't fit your targets right now, so it keeps repeating.`
+      : fitting === 0
       ? `None of your ${have} ${plural} fit your targets right now, so your ${plural} keep repeating.`
       : `Only ${fitting} of your ${have} ${plural} ${fitting === 1 ? 'fits' : 'fit'} your targets right now, so your ${plural} keep repeating.`
     return `${lead} I can add some that do. ${promise}`
@@ -1556,6 +1559,13 @@ export const WORKING_WEIGHT_LIFTS = {
 /** The line over the three lifts in setup. */
 export function liftSetsAsk(): string {
   return "For each lift, a recent hard set: the weight, and how many reps you got. A one-rep max counts, put 1 rep. I'll work out your starting weights from them. Leave a lift empty if you're not sure of it."
+}
+/**
+ * Said by the app when a change to Beginner sets aside lift numbers already given (Sal/Margaret, 14 Nov 2026; his
+ * ruling "a beginner won't know their numbers"): they are dropped, never saved, and he is told so in one line.
+ */
+export function beginnerLiftsSetAside(): string {
+  return "As a beginner, your first week finds your starting weights, so I've left out the lift numbers you gave."
 }
 /** One lift's own question, for a change from the summary and for the setup coach. */
 export function liftSetQuestion(lift: string): string {

@@ -54,6 +54,8 @@ export interface BuildMealAdditionInput {
   /** The day's macro targets the slot budget is carved out of. */
   targets: MacroTargets
   mealsPerDay?: number
+  /** Breakfast skipped (skipsBreakfast): on two meals a day the day is lunch and dinner. Required so no surface forgets it. */
+  skipBreakfast: boolean | undefined
   includeSnacks?: boolean
   dietaryPreferences: string[]
   dislikedFoods?: string[]
@@ -193,7 +195,7 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
     return { ok: false, reason: `I need to know roughly what goes into ${dishName} before I can put it in your plan — otherwise the macros would be a guess.` }
   }
 
-  const budgets = computeSlotBudgets(input.targets, input.mealsPerDay, input.includeSnacks)
+  const budgets = computeSlotBudgets(input.targets, input.mealsPerDay, input.includeSnacks, input.skipBreakfast)
   const budget = budgets[slot]
   if (!budget) {
     return { ok: false, reason: `Your plan doesn't have a ${slot} slot at the moment. You can change how many meals a day you eat in Profile, and then I can add it.` }

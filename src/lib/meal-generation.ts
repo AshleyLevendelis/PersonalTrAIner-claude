@@ -71,9 +71,23 @@ const ALL_SLOTS: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
 /** Ratios of the daily target each active slot gets, by meals-per-day (snack-less base case). Mirrors the interim placeholder plan's SLOT_RATIOS but keyed to this module's slot set. */
 const BASE_RATIOS: Record<2 | 3 | 4, Partial<Record<MealSlotName, number>>> = {
+  // Two meals are breakfast and dinner (his ruling 14 Nov 2026, "A"), unless breakfast is skipped: see TWO_MEALS_NO_BREAKFAST.
   2: { breakfast: 0.45, dinner: 0.55 },
   3: { breakfast: 0.30, lunch: 0.40, dinner: 0.30 },
   4: { breakfast: 0.25, lunch: 0.30, dinner: 0.30, snack: 0.15 },
+}
+
+/**
+ * TWO MEALS WITH BREAKFAST SKIPPED ARE LUNCH AND DINNER (Sal/Margaret, 14 Nov 2026). "Usually skip" breakfast only ever
+ * told the meal writer to make breakfast "extremely light" while the day still gave it 45% of the calories, so a light
+ * breakfast could never land the day. With three or four meals a day the answer keeps its old meaning (a light
+ * breakfast): he asked for that many meals.
+ */
+const TWO_MEALS_NO_BREAKFAST: Partial<Record<MealSlotName, number>> = { lunch: 0.45, dinner: 0.55 }
+
+/** Does this profile skip breakfast? The one reading of the answer every surface that sizes a day passes on. */
+export function skipsBreakfast(profile: { breakfast_style?: string | null } | null | undefined): boolean {
+  return profile?.breakfast_style === 'skip'
 }
 
 function scaleTargets(targets: MacroTargets, ratio: number): MacroTargets {
@@ -98,9 +112,11 @@ export function computeSlotBudgets(
   targets: MacroTargets,
   mealsPerDay: number | undefined,
   includeSnacks: boolean | undefined,
+  /** Required on purpose (undefined allowed): every caller must say, or two surfaces size two different days. */
+  skipBreakfast: boolean | undefined,
 ): Partial<Record<MealSlotName, MacroTargets>> {
   const mpd: 2 | 3 | 4 = mealsPerDay === 2 ? 2 : mealsPerDay === 4 ? 4 : 3
-  let ratios: Partial<Record<MealSlotName, number>> = { ...BASE_RATIOS[mpd] }
+  let ratios: Partial<Record<MealSlotName, number>> = { ...(mpd === 2 && skipBreakfast ? TWO_MEALS_NO_BREAKFAST : BASE_RATIOS[mpd]) }
 
   if (includeSnacks && ratios.snack == null) {
     const snackShare = 0.10
@@ -709,6 +725,8 @@ export async function generateMealPools(params: {
   targets: MacroTargets
   dietaryPreferences: string[]
   mealsPerDay?: number
+  /** Breakfast skipped (skipsBreakfast): a two-meal plan is lunch and dinner. Required so no caller forgets it. */
+  skipBreakfast: boolean | undefined
   includeSnacks?: boolean
   cookingTimePreference?: CookingTimePreference
   poolSize?: number
@@ -775,7 +793,7 @@ export async function generateMealPools(params: {
   deepLibrary?: boolean
 }): Promise<GenerateMealPoolsResult> {
   const poolSize = params.poolSize ?? DEFAULT_POOL_SIZE
-  const budgets = computeSlotBudgets(params.targets, params.mealsPerDay, params.includeSnacks)
+  const budgets = computeSlotBudgets(params.targets, params.mealsPerDay, params.includeSnacks, params.skipBreakfast)
   const activeSlots = (Object.keys(budgets) as MealSlotName[]).filter(
     s => !params.onlySlots || params.onlySlots.includes(s)
   )
@@ -899,6 +917,12 @@ export async function generateMealPools(params: {
       return
     }
     if (option) {
+      // A MEAL HE SAID HE USUALLY EATS COUNTS AS HIS OWN (Sal/Margaret, 14 Nov 2026). Setup keeps his usual meals as
+      // likes and the writer makes one option that IS each meal; until now nothing marked it as his, so "My usual meals
+      // first" never reached what he typed in setup. Marked as his own meal, it takes its share of the week.
+      if (isHisUsualMeal(option.name, params.likedFoods ?? []) && !(option.tags ?? []).includes(MY_MEAL_TAG)) {
+        option.tags = [...(option.tags ?? []), MY_MEAL_TAG]
+      }
       accepted[slot]!.push(params.appendToExisting && params.madeForOneDay
         ? { ...option, tags: tagsPinOnly(option.tags) }
         : params.appendToExisting && params.servedFrom
@@ -1624,6 +1648,20 @@ export function likedParts(like: string): string[] {
  * familiar dishes come first on a week's menu and the day's pick works towards about half its meals being familiar
  * (familiarShortfall). A dish that breaks a current restriction is never familiar, for the reason it is never liked.
  */
+const mealWords = (t: string) => t.toLowerCase().replace(/&/g, ' and ').replace(/[^a-z\s]/g, ' ').split(/\s+/)
+  .filter(w => w && !['and', 'with', 'a', 'the', 'of', 'on', 'in'].includes(w)).map(w => w.replace(/(es|s)$/, ''))
+/**
+ * Is this dish one of the meals he said he usually eats? Only a like that names a whole MEAL counts (two or more foods,
+ * "chicken and rice"), never one food ("salmon"): every food in it must be in the dish's name.
+ */
+export function isHisUsualMeal(dishName: string, likes: readonly string[]): boolean {
+  const dish = new Set(mealWords(dishName))
+  return likes.some(like => {
+    const words = mealWords(like)
+    return words.length >= 2 && words.every(w => dish.has(w))
+  })
+}
+
 export function isFamiliarOption(option: PoolOption): boolean {
   if (option.breaksRestriction) return false
   const tags = option.tags ?? []
@@ -1868,7 +1906,9 @@ export const MEAL_SHARE_BAND: Readonly<Record<'main' | 'snack', readonly [number
 
 /** The day's slot budgets, from the slots it holds: no lunch is a two-meal day, a snack slot means snacks. */
 function shareBudgets(chosen: Partial<Record<MealSlotName, PoolOption>>, targets: MacroTargets): Partial<Record<MealSlotName, MacroTargets>> {
-  return computeSlotBudgets(targets, chosen.lunch ? 3 : 2, chosen.snack != null)
+  // A day with lunch and no breakfast is a two-meal day with breakfast skipped (lunch 45%, dinner 55%), never a
+  // three-meal day missing its breakfast.
+  return computeSlotBudgets(targets, chosen.lunch && chosen.breakfast ? 3 : 2, chosen.snack != null, !!chosen.lunch && !chosen.breakfast)
 }
 
 /** Is `kcal` inside the share band for `slot` on a day with these budgets? A slot with no budget is not judged. */

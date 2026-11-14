@@ -40,6 +40,7 @@ import { resolveFoodTarget, compileFoodDislikes } from '@/lib/fact-compiler'
 import { markRestrictionBreakers, favouritesStillAllowed } from '@/lib/meal-restriction-check'
 import { getPools, type MealSlotName } from '@/lib/meal-store'
 import type { PoolOption } from '@/lib/meal-generation'
+import { skipsBreakfast } from '@/lib/meal-generation'
 import { checkFactConflict } from '@/lib/memory-reconcile'
 import { supabase } from '@/lib/supabase'
 import { computeGoalProgress } from '@/lib/goal-progress'
@@ -1837,6 +1838,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               answer={profile.meals_elsewhere}
               mealsPerDay={profile.meals_per_day}
               includeSnacks={profile.include_snacks}
+              skipBreakfast={skipsBreakfast(profile)}
               onSave={async next => {
                 if (!profileId) throw new Error('no profile')
                 const result = await saveMealsElsewhere(profileId, next)

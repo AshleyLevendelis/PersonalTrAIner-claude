@@ -63,10 +63,17 @@ async function newPlan(label, weight) {
   await page.evaluate(AUTO)
   await sendText('Hi')
   let body3 = false
+  let ageGiven = false
   for (let i = 0; i < 40 && !page.isClosed() && !(await page.locator('[data-review-row]').count().catch(() => 1)); i++) {
     if (await page.locator('[data-slot-card="age"], [data-slot-card="heightCm"], [data-slot-card="weightKg"]').count()) {
       body3 = true
-      if (weight == null) { await page.locator('[data-onboarding-skip]').first().click({ timeout: 4000 }).catch(() => {}) }
+      // As Margaret did: her age and height, but not her weight. Whatever is left (the weight) is then skipped.
+      if (weight == null && !ageGiven && await page.locator('#slot-age').count()) {
+        ageGiven = true
+        await page.fill('#slot-age', '1966-05-17', { timeout: 3000 }).catch(() => {})
+        await page.fill('#slot-heightCm', '160', { timeout: 3000 }).catch(() => {})
+        await page.locator('[data-slot-card]').last().getByRole('button', { name: 'Save' }).click({ timeout: 3000 }).catch(() => {})
+      } else if (weight == null) { await page.locator('[data-onboarding-skip]').first().click({ timeout: 4000 }).catch(() => {}) }
       else {
         await page.fill('#slot-age', '1990-05-17', { timeout: 3000 }).catch(() => {})
         await page.fill('#slot-heightCm', '170', { timeout: 3000 }).catch(() => {})
@@ -103,7 +110,7 @@ console.log('\n"START A NEW PLAN" CARRIES NOTHING OF THE LAST PERSON')
 {
   const { newProfile, savedTargets, home } = await newPlan('1. Margaret gives no weight', null)
   await shot('home')
-  check('...her profile has no weight', newProfile?.weight_kg == null, newProfile?.weight_kg)
+  check('...her profile has her age and height and no weight', newProfile?.weight_kg == null && Number(newProfile?.height_cm) === 160 && Number(newProfile?.age) > 50, { kg: newProfile?.weight_kg, cm: newProfile?.height_cm, age: newProfile?.age })
   check('no food targets were SAVED for her (nothing to work them out from)', savedTargets.length === 0, savedTargets.map(r => ({ kcal: r.target_calories, kg: r.calculated_weight_kg })))
   check('...and Home shows no calorie figure from the last person\'s weight', !/1,5\d\d|1,6\d\d|1,9\d\d|2,[0-9]\d\d kcal/.test(home), home.match(/[0-9,]+ ?kcal/g))
   await go('open Nutrition', () => page.evaluate(() => { location.hash = '#/tab/nutrition' }))

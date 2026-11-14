@@ -39,7 +39,7 @@
 // ---------------------------------------------------------------------------
 
 import {
-  assembleDay, computeSlotBudgets,
+  assembleDay, computeSlotBudgets, skipsBreakfast,
   type PoolOption, type AssembledDay,
 } from './meal-generation'
 import { scaleToTarget } from './portion-scaler'
@@ -92,6 +92,8 @@ export interface MealRefit {
 
 export interface RefitOptions {
   mealsPerDay?: number
+  /** Breakfast skipped (skipsBreakfast). */
+  skipBreakfast: boolean | undefined
   includeSnacks?: boolean
   /** Slots the user pinned. Their portions are facts and are never resized. */
   pinned?: Partial<Record<MealSlotName, PoolOption>>
@@ -117,9 +119,9 @@ export interface RefitOptions {
 export function checkMealRefit(
   pools: MealPools,
   targets: MacroTargets,
-  opts: RefitOptions = {},
+  opts: RefitOptions = { skipBreakfast: undefined },
 ): MealRefit {
-  const { mealsPerDay, includeSnacks, pinned = {}, softLikedFoods = [], recentNames = {} } = opts
+  const { mealsPerDay, includeSnacks, skipBreakfast, pinned = {}, softLikedFoods = [], recentNames = {} } = opts
 
   const before = assembleDay(pools, targets, recentNames, softLikedFoods, pinned)
   const emptyResult = (reason: string | null): MealRefit => ({
@@ -142,7 +144,7 @@ export function checkMealRefit(
     return emptyResult('There are no meals to resize yet.')
   }
 
-  const budgets = computeSlotBudgets(targets, mealsPerDay, includeSnacks)
+  const budgets = computeSlotBudgets(targets, mealsPerDay, includeSnacks, skipBreakfast)
   const rejected: string[] = []
   /** Slots the profile's own meal split gives no share of the day to. */
   const unbudgeted: MealSlotName[] = []
@@ -271,12 +273,13 @@ function describeResidue(
 export function refitNeeded(
   pools: MealPools,
   targets: MacroTargets | null,
-  profile: Pick<UserProfile, 'meals_per_day' | 'include_snacks'>,
+  profile: Pick<UserProfile, 'meals_per_day' | 'include_snacks' | 'breakfast_style'>,
   pinned?: Partial<Record<MealSlotName, PoolOption>>,
 ): boolean {
   if (!targets) return false
   return checkMealRefit(pools, targets, {
     mealsPerDay: profile.meals_per_day,
+    skipBreakfast: skipsBreakfast(profile),
     includeSnacks: profile.include_snacks,
     pinned,
   }).needed

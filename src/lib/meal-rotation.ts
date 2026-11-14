@@ -219,7 +219,7 @@ export function firstDayAfter(
   targets: MacroTargets,
   softLikedFoods: string[] = [],
   /** The shape the rotation is built with: a first day holding a meal cooked elsewhere is assembled around it. */
-  shape: MealShape = {},
+  shape: MealShape = { skipBreakfast: undefined },
 ): Partial<Record<MealSlotName, PoolOption>> | undefined {
   const next = addDays(date, ROTATION_DAYS - rotationIndexFor(date))
   // THE POOL AS IT STOOD ON `date`, not as it will stand next week. A meal added later carries a first day, and every
@@ -241,11 +241,26 @@ function elsewhereByIndex(
   shape: MealShape,
 ): (index: number) => Partial<Record<MealSlotName, PoolOption>> {
   if (!hasMealsElsewhere(shape.elsewhere)) return () => NO_PINS
-  const budgets = computeSlotBudgets(targets, shape.mealsPerDay, shape.includeSnacks)
+  const budgets = computeSlotBudgets(targets, shape.mealsPerDay, shape.includeSnacks, shape.skipBreakfast)
   const planSlots = (Object.keys(pools) as MealSlotName[]).filter(s => (pools[s]?.length ?? 0) > 0)
   return index => assumedMealsOn(shape.elsewhere, weekdayOfRotationIndex(index), budgets, planSlots)
 }
 const NO_PINS: Partial<Record<MealSlotName, PoolOption>> = Object.freeze({})
+
+/**
+ * Only the pools of the meals this shape's day holds. The same object when nothing is dropped, because the week's
+ * serving keys its cached rotations on the pool object.
+ */
+export function poolsForShape(
+  pools: Partial<Record<MealSlotName, PoolOption[]>>,
+  targets: MacroTargets,
+  shape: MealShape,
+): Partial<Record<MealSlotName, PoolOption[]>> {
+  const active = new Set(Object.keys(computeSlotBudgets(targets, shape.mealsPerDay, shape.includeSnacks, shape.skipBreakfast)))
+  const keys = Object.keys(pools) as MealSlotName[]
+  if (keys.every(k => active.has(k))) return pools
+  return Object.fromEntries(keys.filter(k => active.has(k)).map(k => [k, pools[k]])) as Partial<Record<MealSlotName, PoolOption[]>>
+}
 
 const asMacros100g = (t: MacroTargets): Macros100g => ({
   kcal: t.calories, protein: t.protein, carbs: t.carbs, fat: t.fat,
@@ -260,6 +275,11 @@ const asMacros100g = (t: MacroTargets): Macros100g => ({
 export interface MealShape {
   mealsPerDay?: number
   includeSnacks?: boolean
+  /**
+   * Breakfast skipped (Sal/Margaret, 14 Nov 2026): on two meals a day the day is lunch and dinner. Required (undefined
+   * allowed) so every surface that builds a shape says, and the tab and the list cannot build two different days.
+   */
+  skipBreakfast: boolean | undefined
   /**
    * Cook once, eat twice. UNDEFINED READS AS ON: Ashley's ruling of 19 Sep
    * 2026 was "a setting, on by default", and every profile that predates the
@@ -371,7 +391,7 @@ export function buildRotation(
   pools: Partial<Record<MealSlotName, PoolOption[]>>,
   targets: MacroTargets,
   softLikedFoods: string[] = [],
-  shape: MealShape = {},
+  shape: MealShape = { skipBreakfast: undefined },
   /**
    * What is served the day AFTER this cycle's last day, when that is not this cycle's own first day: a deep pool
    * serves each week from a different menu, so the day after a Wednesday is the NEXT menu's first day (firstDayAfter).
@@ -390,7 +410,7 @@ export function buildRotation(
   // actually has a lunch — a two-meal day is breakfast and dinner, with
   // nowhere for last night's dinner to go.
   const lunchBudget = batchCookingOn(shape)
-    ? computeSlotBudgets(targets, shape.mealsPerDay, shape.includeSnacks).lunch
+    ? computeSlotBudgets(targets, shape.mealsPerDay, shape.includeSnacks, shape.skipBreakfast).lunch
     : undefined
   let previousDinner: PoolOption | null = null
 
@@ -535,7 +555,7 @@ export function assembleRotationDay(
     && planned.lunch.name !== (opts.previousDinner ? resizedCopyBase(opts.previousDinner) : undefined)
   if (replanned) {
     const shape = rotation.builtFrom.shape
-    const lunchBudget = batchCookingOn(shape) ? computeSlotBudgets(targets, shape.mealsPerDay, shape.includeSnacks).lunch : undefined
+    const lunchBudget = batchCookingOn(shape) ? computeSlotBudgets(targets, shape.mealsPerDay, shape.includeSnacks, shape.skipBreakfast).lunch : undefined
     const fromActual = leftoverLunchFrom(opts.previousDinner, lunchBudget)
     leftover = fromActual ? { lunch: fromActual } : {}
   }
@@ -763,7 +783,10 @@ export function serveDates(input: {
   /** Dates where Undo kept the planned sizes around a swap (held-sizes-kept.ts). */
   keepHeldSizes?: string[]
 }): ServedDay[] {
-  const { dates, pools, targets, softLikedFoods = [], shape = {}, pinsByDate = {} } = input
+  const { dates, targets, softLikedFoods = [], shape = { skipBreakfast: undefined }, pinsByDate = {} } = input
+  // THE DAY SERVES THE MEALS HIS PROFILE ASKS FOR, NEVER WHATEVER POOLS EXIST (Sal/Margaret, 14 Nov 2026). A pool left
+  // from an earlier answer (three meals then two, or breakfast now skipped) used to be served as a fourth meal.
+  const pools = poolsForShape(input.pools, targets, shape)
   const kept = new Set(input.keepHeldSizes ?? [])
   const rotations = new Map<Partial<Record<MealSlotName, PoolOption[]>>, Rotation>()
   // Reused only when it was built from these very inputs; anything else and

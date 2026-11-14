@@ -1,4 +1,4 @@
-import { generateExercisePlan, generateMesocycle, getConstrainedPool, getFlaggedJoints, setRandomSource, resetRandomSource } from './exercise-plan'
+import { generateExercisePlan, generateMesocycle, getConstrainedPool, getFlaggedJoints, setRandomSource, resetRandomSource, OPTIONAL_CARDIO_FOCUS } from './exercise-plan'
 import { seededRngFromKey } from './seeded-random'
 import { EXERCISE_DATABASE, meetsCapabilityRequirement, isContraindicatedFor, contraindicatedJoints } from './exercise-db'
 import type {
@@ -487,7 +487,7 @@ function runSingleAudit(
   // fat_loss/conditioning — that's a real, intentional zero-exercise day,
   // not a broken one.
   for (const day of plan) {
-    if (day.focus === 'Active Recovery + Cardio') continue
+    if (day.focus === OPTIONAL_CARDIO_FOCUS) continue
     // A day carrying a plannedActivity IS prescribed work — a starting-out
     // walk with its minutes and target effort. Checked on the field rather
     // than on the focus text, so this cannot be satisfied by a day that

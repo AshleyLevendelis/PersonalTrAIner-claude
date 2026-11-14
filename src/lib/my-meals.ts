@@ -64,6 +64,8 @@ export interface MyMealContext {
   profileId: string
   targets: MacroTargets
   mealsPerDay?: number
+  /** Breakfast skipped (skipsBreakfast). */
+  skipBreakfast: boolean | undefined
   includeSnacks?: boolean
   dietaryPreferences: string[]
   dislikedFoods: string[]
@@ -94,12 +96,12 @@ export function planMyMeal(ctx: MyMealContext, draft: MyMealDraft): MyMealPlan {
   if (already) return { ok: false, reason: `${name} is already one of your ${draft.slot} options.` }
 
   const shared = {
-    profileId: ctx.profileId, targets: ctx.targets, mealsPerDay: ctx.mealsPerDay, includeSnacks: ctx.includeSnacks,
+    profileId: ctx.profileId, targets: ctx.targets, mealsPerDay: ctx.mealsPerDay, includeSnacks: ctx.includeSnacks, skipBreakfast: ctx.skipBreakfast,
     dietaryPreferences: ctx.dietaryPreferences, dislikedFoods: ctx.dislikedFoods, todayDate: ctx.todayDate,
   }
   const foodLines = draft.lines.split('\n').map(l => l.trim()).filter(Boolean)
-  const active = Object.keys(computeSlotBudgets(ctx.targets, ctx.mealsPerDay, ctx.includeSnacks)) as MealSlotName[]
-  const budget = computeSlotBudgets(ctx.targets, ctx.mealsPerDay, ctx.includeSnacks)[draft.slot]
+  const active = Object.keys(computeSlotBudgets(ctx.targets, ctx.mealsPerDay, ctx.includeSnacks, ctx.skipBreakfast)) as MealSlotName[]
+  const budget = computeSlotBudgets(ctx.targets, ctx.mealsPerDay, ctx.includeSnacks, ctx.skipBreakfast)[draft.slot]
   const sizedFrom = (lines: string[]) => buildMealAdditionProposal({ rawArgs: { meal_name: name, meal_slot: draft.slot, ingredients: lines }, ...shared })
   const lands = (o: PoolOption) => dishLandsADay(ctx.pools, active, ctx.targets, draft.slot, o, ctx.todayDate)
 

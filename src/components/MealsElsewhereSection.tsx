@@ -20,11 +20,13 @@ import {
 const SLOT_LABEL: Record<MealSlotName, string> = { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' }
 const ORDER: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
-export function MealsElsewhereSection({ answer, mealsPerDay, includeSnacks, onSave }: {
+export function MealsElsewhereSection({ answer, mealsPerDay, includeSnacks, skipBreakfast, onSave }: {
   /** The saved answer, as the profile holds it. */
   answer: MealsElsewhere | undefined
   mealsPerDay: number | undefined
   includeSnacks: boolean | undefined
+  /** Breakfast skipped: a two-meal day is lunch and dinner. */
+  skipBreakfast: boolean | undefined
   /** Saves the whole answer. 'not-yet': the database has no place for it yet. Throws when it did not save. */
   onSave: (next: MealsElsewhere) => Promise<'saved' | 'not-yet'>
 }) {
@@ -36,7 +38,7 @@ export function MealsElsewhereSection({ answer, mealsPerDay, includeSnacks, onSa
 
   // Only the meals his day has: a two-meal day has no lunch to be cooked for him.
   // (Asked of the app's own split with a round day: the shares are rounded, so a day of 1 would give every meal none.)
-  const budgets = computeSlotBudgets({ calories: 1000, protein: 100, carbs: 100, fat: 100 }, mealsPerDay, includeSnacks)
+  const budgets = computeSlotBudgets({ calories: 1000, protein: 100, carbs: 100, fat: 100 }, mealsPerDay, includeSnacks, skipBreakfast)
   const slots = ORDER.filter(s => (budgets[s]?.calories ?? 0) > 0)
 
   const save = async (next: MealsElsewhere) => {

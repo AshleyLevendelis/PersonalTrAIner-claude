@@ -1412,10 +1412,14 @@ export function assembleProfile(data: OnboardingSlotValues): UserProfile {
     // and then no number used to store true, while the plan generator
     // (canSkipCalibration, which needs a known lift) built the calibration
     // week anyway: the stored flag said one thing and the plan did another.
-    skip_calibration_week: data.knowsWorkingLifts === true && hasAnyKnownLift(data),
-    known_squat_kg: data.knowsWorkingLifts === true && data.knownSquatKg ? Number(data.knownSquatKg) : undefined,
-    known_bench_kg: data.knowsWorkingLifts === true && data.knownBenchKg ? Number(data.knownBenchKg) : undefined,
-    known_deadlift_kg: data.knowsWorkingLifts === true && data.knownDeadliftKg ? Number(data.knownDeadliftKg) : undefined,
+    // AND ONLY WHERE THE LIFT QUESTIONS STILL APPLY (Sal/Margaret, 14 Nov 2026). An answer given and then made moot
+    // (experience changed to Beginner, or equipment away from a barbell) was hidden from the summary and still saved,
+    // so a beginner's plan was anchored to numbers the summary she approved did not show. His ruling: "a beginner
+    // won't know their numbers", so they are dropped.
+    skip_calibration_week: knowsTheirLifts(data) && hasAnyKnownLift(data),
+    known_squat_kg: knowsTheirLifts(data) && data.knownSquatKg ? Number(data.knownSquatKg) : undefined,
+    known_bench_kg: knowsTheirLifts(data) && data.knownBenchKg ? Number(data.knownBenchKg) : undefined,
+    known_deadlift_kg: knowsTheirLifts(data) && data.knownDeadliftKg ? Number(data.knownDeadliftKg) : undefined,
     // Volunteered during setup, never asked for. Absent stays absent: an
     // unstated ceiling must read as "we do not know", not as a limit of zero,
     // because statedCeilingKg treats any number it finds as a hard clamp.
