@@ -42,7 +42,7 @@ import { measureParserFor, liftSetInUserWords, ageOn, todayLocal } from '@/lib/b
 import { detectFoodExclusions, mergeFoodsToAvoid, isFoodToAvoid } from '@/lib/food-exclusions'
 import { splitFoodList, isPlainNone } from '@/lib/food-list'
 import { allergenFilterReceipt, liftSetsAsk, liftNeedsASet, liftWhichOne } from '@/lib/coach-voice'
-import { bareLiftWeight, coachAskedSetupQuestion, dropCoachQuestions, withoutQuestions } from '@/lib/onboarding-one-question'
+import { bareLiftWeight, coachAskedSetupQuestion, dropCoachQuestions, namedLiftSets, withoutQuestions } from '@/lib/onboarding-one-question'
 import { implausibleLifts } from '@/lib/lift-plausibility'
 import { ceilingIsInUserWords, isCeilingSlot } from '@/lib/onboarding-ceiling-capture'
 import { parseKitSlot, kitStatementInUserWords } from '@/lib/kit-list'
@@ -1461,6 +1461,24 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       // it." over a number nothing kept and asked for all three lifts, and his "which exercise did I mean?" was then
       // talked over. A number typed there means he knows at least one lift: the app records that, takes the coach's
       // words for the turn (they claimed a record), and asks which lift and how many reps, with the boxes.
+      // LIFTS TYPED AS NAMED SETS ARE READ BY THE APP (the setup walk, 14 Nov 2026): "squat 110 for 5, bench 80 for 8"
+      // typed at the boxes saved nothing when the coach did not record it, and the boxes came back every turn. Only
+      // while the boxes apply and none is answered, only sets naming their lift, and never over what the coach
+      // recorded this turn. The coach's own question about the lifts goes with it: they are answered.
+      const liftGroup = numericGroupFor('knownSquatKg')
+      if (liftGroup.every(k => isSlotApplicable(getSlotDef(k)!, responseWs.values) && !responseWs.confirmed.has(k))) {
+        const typedSets = namedLiftSets(trimmed)
+        let took = false
+        for (const [key, set] of Object.entries(typedSets) as Array<[SlotKey, string]>) {
+          const def = getSlotDef(key)!
+          if (applySlot(responseWs, key, coerceSlotValue(def, set), responseWs.values, true, conversionNoteFor(def, set))) took = true
+        }
+        if (took) {
+          // A lift he did not name is left empty, as a blank box is: his first week finds it.
+          declineSlots(responseWs, liftGroup.filter(k => !responseWs.confirmed.has(k)) as SlotKey[])
+          responseWs.newMessages = responseWs.newMessages.filter(m => !(m.role === 'assistant' && !m.isReceipt && (isKnownLiftSlot(m.slotCard as SlotKey) || questionAsksSlot('knownSquatKg', questionPartOf(m.content)))))
+        }
+      }
       const liftsOnScreen = (msgs: readonly ChatMsg[]) => msgs.some(m => m.role === 'assistant' && !m.isReceipt && (
         m.slotCard === 'knowsWorkingLifts' || isKnownLiftSlot(m.slotCard as SlotKey)
         || questionAsksSlot('knowsWorkingLifts', questionPartOf(m.content)) || questionAsksSlot('knownSquatKg', questionPartOf(m.content))))

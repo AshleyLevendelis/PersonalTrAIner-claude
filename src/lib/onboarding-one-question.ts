@@ -114,3 +114,30 @@ export function bareLiftWeight(text: string): { weight: string; lift?: string } 
   if (restWithoutLifts.replace(/[\s,.!-]+/g, '').replace(/s\b/g, '').length > 0) return undefined
   return { weight: `${m[1].replace(',', '.')} ${unit}`, lift: named.length === 1 ? named[0][1] : undefined }
 }
+
+// ---------------------------------------------------------------------------
+// LIFTS TYPED AS SETS, EACH NAMED (the setup walk, 14 Nov 2026): "squat 110 for 5, bench 80 for 8, deadlift 140 for
+// 5" typed under the lift boxes saved nothing unless the coach recorded it, and a coach that did not left the boxes
+// asked again and again. The app reads typed days and usual meals itself; it reads named sets the same way. Only a
+// part of the message naming exactly ONE lift with a weight AND reps counts ("Weight and reps", his 11 Nov ruling):
+// a bare number, or a number between two lift names, is never assigned.
+// ---------------------------------------------------------------------------
+const LIFT_KEYS: Array<[RegExp, 'knownSquatKg' | 'knownBenchKg' | 'knownDeadliftKg']> = [
+  [/\bsquat/i, 'knownSquatKg'],
+  [/\bbench/i, 'knownBenchKg'],
+  [/\bdead\s?lift|\bdeads?\b/i, 'knownDeadliftKg'],
+]
+
+/** The sets he typed, by lift, as "110 kg x 5" / "225 lb x 3". Empty when nothing is plainly a named set. */
+export function namedLiftSets(text: string): Partial<Record<'knownSquatKg' | 'knownBenchKg' | 'knownDeadliftKg', string>> {
+  const out: Partial<Record<'knownSquatKg' | 'knownBenchKg' | 'knownDeadliftKg', string>> = {}
+  for (const part of text.split(/[,;\n]|\band\b/i)) {
+    const lifts = LIFT_KEYS.filter(([re]) => re.test(part))
+    if (lifts.length !== 1) continue
+    const m = part.match(/(\d+(?:\.\d+)?)\s*(kg|kgs|kilos?|lbs?|pounds?)?\s*(?:x|×|\*|for)\s*(\d{1,2})\b/i)
+    if (!m) continue
+    const unit = m[2] && /^(lb|lbs|pound|pounds)$/i.test(m[2]) ? 'lb' : 'kg'
+    out[lifts[0][1]] = `${m[1]} ${unit} x ${m[3]}`
+  }
+  return out
+}

@@ -10,6 +10,7 @@ import {
   bareLiftWeight,
   coachAskedSetupQuestion,
   dropCoachQuestions,
+  namedLiftSets,
   questionsInTurn,
   withoutQuestions,
 } from '../src/lib/onboarding-one-question'
@@ -70,6 +71,19 @@ console.log('\n3. Taking the coach\'s question out, keeping what it said')
   const out = dropCoachQuestions(turn)
   check('ticks and cards are left alone; a question-only message is dropped', out.length === 3 && out[0].isReceipt === true && out[1].content === 'Nice.' && out[2].slotCard === 'trainingStyle', out)
   check('questionsInTurn counts a card and a question mark, never a tick', questionsInTurn(turn) === 3 && questionsInTurn(out) === 1, [questionsInTurn(turn), questionsInTurn(out)])
+}
+
+console.log('\n4. Lifts typed as named sets are read by the app (the setup walk, 14 Nov 2026)')
+{
+  const all = namedLiftSets('squat 110 for 5, bench 80 for 8, deadlift 140 for 5')
+  check('three named sets, each kept on its own lift, weight and reps', JSON.stringify(all) === JSON.stringify({ knownSquatKg: '110 kg x 5', knownBenchKg: '80 kg x 8', knownDeadliftKg: '140 kg x 5' }), all)
+  check('"x", pounds and "and" between them', JSON.stringify(namedLiftSets('squat 225lb x 3 and bench 185 lbs x 5')) === JSON.stringify({ knownSquatKg: '225 lb x 3', knownBenchKg: '185 lb x 5' }), namedLiftSets('squat 225lb x 3 and bench 185 lbs x 5'))
+  check('a weight with no reps is not a set (his "Weight and reps")', JSON.stringify(namedLiftSets('squat 110, bench 80')) === '{}', namedLiftSets('squat 110, bench 80'))
+  check('bare sets with no lift named are never assigned', JSON.stringify(namedLiftSets('110 x 5, 80 x 8')) === '{}', namedLiftSets('110 x 5, 80 x 8'))
+  // "squat and bench 100 x 5": the set is said of the bench, so the bench takes it; the squat, with no set of its own,
+  // takes nothing (it is asked about through its empty box, never given the bench's number).
+  check('a lift with no set of its own takes nothing from its neighbour', JSON.stringify(namedLiftSets('squat and bench 100 x 5')) === JSON.stringify({ knownBenchKg: '100 kg x 5' }), namedLiftSets('squat and bench 100 x 5'))
+  check('...and "squat bench 100 x 5" names two lifts at once, so nothing', JSON.stringify(namedLiftSets('squat bench 100 x 5')) === '{}', namedLiftSets('squat bench 100 x 5'))
 }
 
 console.log(`\n${ran} checks ran.`)
