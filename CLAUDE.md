@@ -1551,6 +1551,18 @@ menu" stays true when a copy is also left outside it.
   `test:running-ladder`, `verify:running-day`, `measure:running-personas`, `docs/plans/running.md`. Needs the
   `running_goal` migration, the `chat-gemini` deploy and an exam run
 
+### His rulings of 14 Nov 2026, Sal and Margaret's setups (`docs/audits/onboarding-live-test-2026-11-14.md`)
+- **Setup should get SHORTER, not longer** (his words). Proposal, not built: `docs/plans/shorter-setup.md`.
+- **Health conditions: "Fold into injuries"** (no new question). NOT BUILT: needs a migration, `docs/plans/health-conditions.md`.
+- **A safety question about a condition, medication or pregnancy is never parked: "A"**: the GP line now, noted, back to
+  setup. `test:sal-margaret` §4, `verify:onboarding-turns` §30. Needs the `onboarding-chat` deploy
+- **Rest-day activity: "B"**, only as optional ("Rest day · optional cardio", "Optional" on every screen), none for a
+  beginner or low recovery. `test:sal-margaret` §9
+- **A beginner won't know their numbers**: Beginner drops lift numbers given, one line says so. `verify:onboarding-turns` §29
+- **"2 meals": "A"**, breakfast + dinner unless breakfast is skipped, then lunch + dinner; a day serves only the meals the
+  profile says. `test:sal-margaret` §7
+- **Start a new plan carries nothing of the last person** (no weight: no targets, Nutrition says why). `verify:new-plan-carryover`
+
 ### His ruling of 12 Nov 2026, eating out (`docs/plans/eating-out.md`)
 - **A meal marked as out: "Ask: light/normal/big"** (from three options; his request "build it, start with out for
   dinner"). The APP asks how big a night it is, on both surfaces (the coach's tool has no size; the size is read from

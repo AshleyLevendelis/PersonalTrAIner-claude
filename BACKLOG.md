@@ -2,8 +2,30 @@
 
 Newest first. One line each.
 
-- [ ] **SAL AND MARGARET: NINE DEFECTS TRACED, HIS FIVE RULINGS, NOT BUILT YET** (14 Nov 2026, his two live
-  onboardings; trace in `docs/audits/onboarding-live-test-2026-11-14.md`). Waiting on his "build it". HIS RULINGS, each
+- [ ] **SAL AND MARGARET: EIGHT OF NINE BUILT (his "build it", 14 Nov 2026); HEALTH CONDITIONS PLANNED, NEEDS A MIGRATION**
+  BUILT, local commits 0ebe1c81..0f662722 (not pushed: his "commit, never push, unless I say so"):
+  (Group A) Start a new plan clears every piece of the last person's state; with no weight there are no targets,
+  Nutrition says why, never "Complete onboarding" (`verify:new-plan-carryover` boots the whole app: Margaret with age
+  and height and no weight, Sal with 70 kg; mutations: anchor caught, notices caught, the empty state caught; a
+  per-profile macro guard MISSED, so it was deleted: the reset already does its job). (6) Beginner drops lift numbers,
+  one line says so, and a profile only saves lifts where the lift questions apply. (7) Two meals + skip breakfast is
+  lunch + dinner on every surface (the answer is a REQUIRED argument, so the typechecker named all 25 places that size
+  a day); a day serves only the meals the profile says (an unset snacks answer keeps the snack, caught by the sweep's
+  `test:grocery`); a usual meal from setup comes back marked as his own; "None of your 1 breakfasts" fixed. (5) "Band"
+  only when a band is the only way (Clamshell reads Bodyweight). (9) No rest-day cardio for a beginner or low
+  recovery, and the day is named "Rest day · optional cardio" with "Optional" on every screen; the constraint audit then
+  found 111 short (30-45 min) heavy days running over when that cardio moved onto them, so in a SHORT session it is left
+  out for them (45 min+ keeps the brief block: without it a 3-day beginner on fat loss had no conditioning at all).
+  (4) A health safety question is never parked: the coach is told, and the app takes back a park, says the GP line,
+  notes his words, keeps the question it was on. CSCS review, (9): effect, beginners recover between the sessions they
+  chose; taken away, rest-day cardio and, in 30-45 min sessions, heavy-day cardio; fundamentals, the goal's
+  conditioning stays on lighter days (and heavy days with 45 min+); no floor redefined; in scope. Checks:
+  `test:sal-margaret` (42 checks, 16 mutations, 15 caught, the 16th was the deleted guard), `verify:onboarding-turns`
+  §29-30 (5/5), `verify:new-plan-carryover` (19 checks). NOT BUILT: (3) health-condition taps, plan in
+  `docs/plans/health-conditions.md` (no place to store them without a migration; his word needed); the bodyweight
+  tier's assumed backpack ("Bodyweight only lists a weighted bag") and the dumbbell-alternative primers (inferred,
+  unverified). The shorter-setup proposal: `docs/plans/shorter-setup.md`. Deploys: `onboarding-chat`.
+  HIS RULINGS, each
   from options I gave: (1) **health conditions: "Fold into injuries"** — his words "A is good but we keep adding
   questions and the onboarding keeps getting longer ... I want to make it shorter", so NO new question: the existing
   "anything that bothers you" question also offers a few taps for what a doctor has said to watch (high blood
