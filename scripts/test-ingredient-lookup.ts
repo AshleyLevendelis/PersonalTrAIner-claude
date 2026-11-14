@@ -41,12 +41,17 @@ const both = (phrase: string) => {
 
 console.log('\n1. A dish is not one of its ingredients (plan, table A)')
 {
-  const DISHES = ['chicken caesar wrap', 'tuna mayo sandwich', 'cheese and ham toastie', 'egg fried rice', 'peanut butter cookie',
+  // 'tuna mayo sandwich' LEFT this list 14 Nov 2026: it is now a standard UK pack of its own (his "Add standard UK
+  // packs"), costed as the sandwich, never as its mayonnaise. Held in 1b.
+  const DISHES = ['chicken caesar wrap', 'cheese and ham toastie', 'egg fried rice', 'peanut butter cookie',
     'almond croissant', 'salmon sushi roll', 'oat milk latte', 'egg mayonnaise', 'avocado toast', 'almond-crusted cod',
     'honey mustard chicken', 'prawn cocktail', 'sausage roll', 'beef lasagne', 'chicken with rice', 'rice cakes with dark chocolate',
     'salt and pepper to taste', 'sweet potato fries', 'almond milk yoghurt', 'peanut sauce']
   const resolved = DISHES.map(d => [d, both(d)] as const).filter(([, r]) => r !== null)
   check(`all ${DISHES.length} dishes are a miss in both copies (they used to be a tortilla, mayonnaise, ham, cod...)`, resolved.length === 0, resolved)
+  // 1b. A pack is its own entry, never one of its ingredients.
+  const packs = (['tuna mayo sandwich', 'chicken and bacon sandwich', 'crisps', 'coke'] as const).map(d => [d, both(d)] as const)
+  check('a standard pack resolves to itself, never to an ingredient (mayonnaise, bacon, potato)', packs.every(([d, r]) => typeof r === 'string' && !['mayonnaise', 'bacon', 'potato', 'tuna', 'white bread'].includes(r)), packs)
 }
 
 console.log('\n2. A state word is kept (plan, table B; M20)')

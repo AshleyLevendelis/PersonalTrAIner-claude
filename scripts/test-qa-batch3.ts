@@ -21,6 +21,7 @@ import { boughtByVolume } from '../src/lib/grocery-store'
 import { ELSEWHERE_WORDS } from '../src/lib/meals-elsewhere'
 import { resolveMoveTarget } from '../src/lib/session-move'
 import { describeRebuild } from '../src/lib/rebuild-card'
+import { computeMealMacros, lookupIngredient } from '../src/lib/food-db'
 import type { UserProfile, WorkoutDay, MesocycleWeek } from '../src/lib/types'
 
 let failures = 0
@@ -114,6 +115,21 @@ console.log('\n9. The coach')
   const coach = fs.readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
   check('never a blanket safety assurance about the plan', /NEVER A BLANKET SAFETY ASSURANCE about their plan/.test(coach))
   check('one meal per log_meal call', /ONE MEAL PER CALL/.test(coach))
+}
+
+console.log('\n10. Standard UK packs (his ruling "Add standard UK packs")')
+{
+  const deal = computeMealMacros([
+    { name: 'chicken and bacon sandwich', quantity: 1, unit: 'whole' },
+    { name: 'ready salted potato crisps', quantity: 1, unit: 'bag' },
+    { name: 'coca cola original', quantity: 1, unit: 'can' },
+  ] as never)
+  check('"a meal deal, one of each, normal sizes" is counted whole (sandwich 200 g, crisps 25 g, can 330 ml)', deal.coverage === 1 && deal.unmatched.length === 0 && deal.kcal > 650 && deal.kcal < 850, { kcal: deal.kcal, coverage: deal.coverage, unmatched: deal.unmatched })
+  const sandwich = lookupIngredient('chicken and bacon sandwich')
+  check('a sandwich carries every allergen it may hold (gluten, egg, dairy, mustard, soy, sesame) and its pork', !!sandwich && ['contains_gluten', 'contains_egg', 'contains_dairy', 'contains_mustard', 'contains_soy', 'contains_sesame', 'contains_pork'].every(t => (sandwich.tags as Record<string, boolean>)[t] === true), sandwich?.tags)
+  const crisps = lookupIngredient('crisps')
+  check('"crisps" with no flavour carries the flavours\' allergens (dairy, gluten, shellfish); ready salted does not', !!crisps && (crisps.tags as Record<string, boolean>).contains_dairy === true && (crisps.tags as Record<string, boolean>).contains_shellfish === true && !(lookupIngredient('ready salted crisps')?.tags as Record<string, boolean> | undefined)?.contains_dairy)
+  check('a diet cola is near nothing; a regular can about 140 kcal', (lookupIngredient('diet coke')?.per100g.kcal ?? 99) < 1 && Math.abs((lookupIngredient('coke')?.per100g.kcal ?? 0) * 3.3 - 139) < 5)
 }
 
 console.log(`\n${ran} checks ran, ${failures} failed.`)
