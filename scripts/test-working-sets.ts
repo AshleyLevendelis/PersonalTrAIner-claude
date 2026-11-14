@@ -165,7 +165,7 @@ console.log('\n[5] The engine asks its questions of the working sets only')
   // A FUNCTION, NOT A BARE NAME — an import is not a use.
   check('the double-progression rule filters first', /const working = workingSetsOf\(sessionSets, ctx\)/.test(src))
   check('...and asks BOTH its questions of the filtered list',
-    /maxWorkingWeight\(working\)/.test(src) && /working\.every\(s => s\.reps_completed >= prescribedRepRangeHigh\)/.test(src))
+    /maxWorkingWeight\(working\)/.test(src) && /working\.every\(s => s\.reps_completed >= prescribedRepRangeHigh(\)| && !repsLookImpossible)/.test(src))  // re-anchored 14 Nov 2026: an impossible count never reaches the top
 
   // ORDER IS THE PROPERTY, not the line. checkDoubleProgression takes the
   // first `prescribedSets` rows BY ORDER; Ashley's first three rows were her
@@ -195,7 +195,7 @@ console.log('\n[5] The engine asks its questions of the working sets only')
     && guard.indexOf("!== 'easy') return null") < guard.indexOf('const found ='), guard.slice(0, 200))
   check('...and the screen tells it how many were prescribed', /prescribedSets: ex\.sets/.test(readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8')))
   check('the added-load rule judges only the sets that carried the belt',
-    /const topAdded = withAdded\.filter\(/.test(src) && /topAdded\.every\(s => s\.reps_completed >= prescribedRepRangeHigh\)/.test(src))
+    /const topAdded = withAdded\.filter\(/.test(src) && /topAdded\.every\(s => s\.reps_completed >= prescribedRepRangeHigh(\)| && !repsLookImpossible)/.test(src))
 
   const panel = readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8')
   // EVERY call site, not "somewhere in the file". MEASURED: a mutation that
