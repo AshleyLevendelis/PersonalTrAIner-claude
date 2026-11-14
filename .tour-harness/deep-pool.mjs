@@ -22,7 +22,10 @@ const rowUp = await until(`!!document.querySelector('[data-meal-row][data-varian
 const openMs = Date.now() - t0
 check('1. the Nutrition tab draws today\'s meals from a pool of dozens a meal', !!rowUp, openMs)
 const rows = await ev(`document.querySelectorAll('[data-meal-row] [data-meal-name]').length`)
-check('2. every meal of the day is on screen (four)', rows === 4, rows)
+// The page's day is three meals with no snack (its meal shape says so): since 14 Nov 2026 a day serves only the meals
+// the shape says, so the deep pool's snack dishes are not served. Four here was the leak Margaret hit.
+const names = await ev(`[...document.querySelectorAll('[data-meal-row] [data-meal-name]')].map(n => n.getAttribute('data-meal-name')).sort().join(',')`)
+check('2. every meal of the day is on screen, and only those (breakfast, lunch, dinner)', rows === 3 && names === 'breakfast,dinner,lunch', names)
 await shoot('deep-pool-day')
 
 console.log('\nB. The swap list: short, searchable, everything reachable')
