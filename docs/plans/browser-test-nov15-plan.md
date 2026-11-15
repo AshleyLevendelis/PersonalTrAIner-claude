@@ -255,3 +255,57 @@ Three read-only traces found the causes below (code reading, not runs). Allergy 
   first day; E3 "Snacks too" asked or left out, 45 max recorded as 45, the tour's overlay no longer hides what it
   describes; E4 grocery aisles (chilled, bakery, tins, spices), "gravy granules made", near-duplicates merged; E4b the
   "more options" card and "Freestyle this day" said in plain words.
+
+## Wave N: the coeliac night-shift nurse (beginner, vegan, gluten-free, dumbbells, sore left shoulder), added 15 Nov 2026
+
+Two read-only traces (code reading; her saved data was not visible). Causes, then who decides.
+
+### N-A. Missing lunch and dinner (worst first)
+- A new plan asks only the meal writer; a meal it fills with nothing gets no library fallback. Each dish must carry the
+  meal's full protein (no leeway) within 7% of its calories: about 7.6 g protein per 100 kcal for her, which tempeh
+  meets and lentil or chickpea dishes do not. Our library has single-digit vegan, gluten-free lunches and dinners
+  without tofu, avocado or oats. The build says nothing when some meals fill and others don't; the screen draws no row
+  for a meal with no saved dishes; the coach is told nothing about empty meals and invented an explanation.
+- FIX (mechanical): a meal left empty falls back to the library on a new plan too; a dish may sit a little under its
+  meal's protein when the day still lands (the day's own 0.95 band); an empty meal is drawn ("No lunch yet: we couldn't
+  find a lunch that fits vegan, gluten-free and your avoids", with Try again and what to relax, never the medical one);
+  the build says which meals failed; the coach is told which meals are empty; "Lunch don't fit" grammar; the "Meals
+  planned" line waits for the build; Regenerate all asks first. MORE DISHES (mine): vegan gluten-free lunches and
+  dinners from beans, lentils, tempeh, quinoa, edamame and pea protein, written and checked like the library's others.
+- PROTEIN (mine, CSCS, basis in BACKLOG when built): 2.0 g/kg is the trained-lifter figure; for a BEGINNER in a
+  deficit 1.6 g/kg (ISSN's lower bound for resistance-trained people in a deficit is above what a sedentary beginner
+  needs; 1.6 keeps the muscle-sparing effect with a target a vegan can reach). Measured before and after.
+
+### N-B. Coeliac and diet
+- Coeliac has no setting (note only); oats are not gluten in the table; her avoid list kept them out. The allergy card
+  (`docs/plans/allergy-card.md`) is the fix: gluten with coeliac yes, oats avoid / certified OK.
+- The "strictly avoids cross-contamination" promise was the model's own; no prompt line allows it. The allergy card's
+  code check on replies covers it.
+- Soy-sauce swap answered with only a refusal: part of "allergy questions answered as questions" (tamari, coconut
+  aminos named).
+- Shopping hints "certified gluten-free" on risky aisles: in the allergy card.
+- Soy milk under "Dairy & eggs": the table files it as dairy; plant milks and yoghurts get their own aisle line.
+  Olive oil 10 ml: pantry items show as "a bottle (you'll use about 10 ml)".
+
+### N-C. Targets and setup
+- "Very active" from "nurse, 3 night shifts" was the setup coach's own guess (no code infers it). It also kept her OFF
+  the beginner pathway, which needs "Sedentary". FIX (mechanical): daily activity is always asked with its four chips,
+  never set from a job description.
+- 20 minutes: the shortest option is 30-45 (budget 37). MINE (CSCS): add "20-30 min" (budget 25): three or four
+  exercises, a short warm-up, main lift kept; recorded and measured on the quality grid.
+- Flexible days: no support, and the coach promised it. FIX now: the coach never promises it. Building it: HIS.
+- Quiet hours: HIS ANSWER 15 Nov, "Set your own quiet hours": Profile, Reminders, "Don't message me between X and Y"
+  (default 9pm-8am); setup doesn't ask; the coach can set it.
+- Style "Explosive & dynamic" offered to a beginner with a sore shoulder; no "get started / feel better" goal. Style
+  filtering is mine (CSCS: not offered to a beginner); a new goal is HIS.
+- Equipment asked twice and "Your kit" twice; near-duplicate notes; "Snacks too" assumed: mechanical.
+- Plate calculator for a dumbbell-only user: hidden without a barbell (mechanical).
+
+### N-D. Shoulder
+- The swap card's "I'll also add 2 sets of floor press on Wednesday" comes from the week-balance pass, which tops up
+  pressing on other days and does not read injuries or what the swap removed. FIX (mine, CSCS): the balance pass never
+  adds sets to the exercise being swapped out, nor to a move the person's injury filter would remove; if pressing can't
+  be balanced safely, the card says the week is lighter on pressing instead.
+- Side and trigger ("left, overhead, weight on hands"): the "Other (describe)" built today keeps the words for the
+  coach; an overhead / weight-on-hands filter is a later build (mine, CSCS), listed.
+- "Are the floor press and dead bug ok?" was half answered: part of "answer every part".
