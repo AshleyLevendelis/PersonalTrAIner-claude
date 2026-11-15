@@ -85,7 +85,7 @@ import { prescriptionLine } from '@/lib/activity-day'
 import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options'
 import { compileFoodDislikes, compileSoftExercisePreferences } from '@/lib/fact-compiler'
 import { coachSwapPick, swapOptionsBlock } from '@/lib/coach-swap-pick'
-import { namedFoodClash, namedFoodKindAsk, clashSentence, allergyRefusal } from '@/lib/named-food-clash'
+import { namedFoodClash, namedFoodKindAsk, clashSentence, allergyRefusal, likeClash, likeRefusal } from '@/lib/named-food-clash'
 import { firmFoodExclusions, foodDislikesToAsk, DISLIKE_ASK, mergeFoodsToAvoid } from '@/lib/food-exclusions'
 import { isRedFlagTurn, readRedFlag, writeRedFlag, redFlagStateAt, unpromptedAfterRedFlag, RED_FLAG_WORDS } from '@/lib/red-flag'
 import { PAUSE_WORDS } from '@/lib/plan-pause'
@@ -5389,6 +5389,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           return { text: `I don't recognize "${targetPhrase}" as an exercise — could you name it the way it appears on your plan?` }
         }
 
+        // A FOOD HE CAN'T HAVE IS NEVER SAVED AS A LIKE (Marcus test, 15 Nov 2026): the same matcher as the refusal.
+        if (kind === 'food_preference' && polarity === 'like') {
+          const c = likeClash(targetPhrase, mealRestrictionsOf(profile), [...compileFoodDislikes(memoryFacts), ...(profile.disliked_foods ?? [])])
+          if (c) return { text: likeRefusal(c) }
+        }
         const conflict = checkFactConflict({ kind, polarity, resolvedRefs: resolution.resolvedRefs }, memoryFacts)
         if (conflict.needsConfirmation) return { text: conflict.message }
 

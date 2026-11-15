@@ -12,6 +12,7 @@
 
 import { PAUSE_WORDS } from '@/lib/plan-pause'
 import { otherInjuryOutcome, PELVIC_PREGNANCY_LINE } from '@/lib/other-injury'
+import { likeClash, likeRefusal as likeRefusalWords } from '@/lib/named-food-clash'
 import { HURT_KINDS, type HurtKind } from '@/lib/edit-reason'
 import { HEALTH_CONDITION_OPTIONS, healthConditionsOf, hasHealthCondition, healthConditionLine, mealRestrictionsOf, isPregnant, pregnancyWeeksOn } from '@/lib/health-conditions'
 import { ENJOYED_ACTIVITY_OPTIONS } from '@/lib/pathway'
@@ -893,6 +894,14 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       if (by) {
         setLikeRefusal(`${v} is caught by "${by}" on your foods to avoid, so it can't be in your meals. Take "${by}" off that list first if you've changed your mind.`)
         throw new Error('like caught by a food to avoid')
+      }
+    }
+    // AND HIS DIET AND ALLERGIES (Marcus test, 15 Nov 2026): a like the meals could never serve is not saved.
+    for (const v of added) {
+      const c = likeClash(v, mealRestrictionsOf(profile))
+      if (c) {
+        setLikeRefusal(likeRefusalWords(c))
+        throw new Error('like clashes with a diet or allergy')
       }
     }
     setLikeRefusal(null)

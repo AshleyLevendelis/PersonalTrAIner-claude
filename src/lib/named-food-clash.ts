@@ -167,3 +167,29 @@ export function clashSentence(c: FoodClash): string {
   const are = plural ? 'are' : 'is'
   return `${food} ${are} on your avoid list, so I won't suggest ${it} or add ${it} to your meals.`
 }
+
+// ---------------------------------------------------------------------------
+// A FOOD HE CAN'T HAVE IS NEVER SAVED AS ONE HE LIKES (Marcus test, 15 Nov 2026, A1; docs/plans/browser-test-nov15-plan.md
+// Wave M). The coach refused almond butter for a nut-free profile and, in the same turn, saved "always wants almond
+// butter", whose receipt promised new meals made with it in mind: the refusal only ever blocked food CARDS. Every writer
+// of a liked food asks this first (the chat's memory save, Profile's likes box, setup's usual meals). Same matcher as
+// the refusal, so the two can never disagree about what clashes.
+// ---------------------------------------------------------------------------
+
+/** The clash a liked food would have with his restrictions or avoid list, or null when it is fine to keep. */
+export function likeClash(phrase: string, restrictions: readonly string[], avoided: readonly string[] = []): FoodClash | null {
+  if (!phrase.trim()) return null
+  return namedFoodClash(phrase, [...restrictions], [...avoided])
+}
+
+/** "Almond butter has tree nuts in it, and your profile says nut-free, so I haven't saved it as a food you like." */
+export function likeRefusal(c: FoodClash): string {
+  const food = capitalise(c.food)
+  const plural = isPlural(c.food)
+  const it = plural ? 'them' : 'it'
+  if (c.restriction) {
+    const what = c.restriction === 'nut-free' && /peanut/i.test(c.food) ? 'peanuts' : CONTAINS_WORDS[c.restriction] ?? 'something'
+    return `${food} ${plural ? 'have' : 'has'} ${what} in ${it}, and your profile says ${c.restriction}, so I haven't saved ${it} as a food you like.`
+  }
+  return `${food} ${plural ? 'are' : 'is'} on your avoid list, so I haven't saved ${it} as a food you like.`
+}

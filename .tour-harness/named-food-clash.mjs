@@ -78,6 +78,11 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
         return json({ reply: 'Here is a swap for you.', proposal: { kind: 'propose_meal_swap', rawArgs: { meal_slot: 'lunch', origin_verbatim_quote: said } } })
       }
       if (/why not/i.test(said)) return json({ reply: 'I can add it as a custom dish if you like.' })
+      // Marcus, 15 Nov 2026: the coach saved the refused food as a like in the same turn.
+      if (/^remember i love (.+)$/i.test(said)) {
+        const food = said.replace(/^remember i love /i, '')
+        return json({ reply: '', memoryIntent: { tool: 'record_fact', rawArgs: { kind: 'food_preference', polarity: 'like', hardness: 'hard', target_phrase: food, origin_verbatim_quote: said } } })
+      }
       return json({ reply: 'Chicken and rice is a solid choice before training.' })
     }
     return realFetch(url, init)
@@ -166,6 +171,16 @@ check('6a. the chat is up, no restriction', await open('daymove=1'))
 check('6b. said it', await say("can you swap today's lunch for almond butter on toast?"))
 b = await last()
 check('6c. a card is drawn (so 1e is not passing on a harness that cannot draw one)', b.cards > 0, b)
+
+console.log('\n6b. A refused food is never saved as a like (Marcus, 15 Nov 2026)\n')
+const likes = food => ev(`(window.__fakeDb.user_facts ?? []).filter(f => f.kind === 'food_preference' && f.polarity === 'like' && JSON.stringify(f).toLowerCase().includes(${JSON.stringify(food)})).length`)
+check('6b-1. the chat is up, nut-free', await open('diet=nut-free&daymove=1'))
+check('6b-2. said it', await say('remember i love almond butter'))
+b = await last()
+check('6b-3. no like row was written for it', (await likes('almond butter')) === 0, await likes('almond butter'))
+check('6b-4. ...and the reply says why, the refusal', typeof b.text === 'string' && /tree nuts in it, and your profile says nut-free/.test(b.text) && !/always wants|made with it in mind/i.test(b.text), b)
+check('6b-5. a food the profile allows IS saved (so 6b-3 is not a harness that cannot save)', await say('remember i love salmon') && (await likes('salmon')) === 1, await likes('salmon'))
+check('6b-6. no restriction: the same almond butter IS saved (the restriction is what binds)', await open('daymove=1') && await say('remember i love almond butter') && (await likes('almond butter')) === 1, await likes('almond butter'))
 
 // ---------------------------------------------------------------------------
 // BARE "CALAMARI" FOR SOMEONE GLUTEN-FREE IS ASKED ABOUT, NEVER CARDED FROM A GUESS (his ruling 10 Nov 2026, "Ask

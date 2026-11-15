@@ -1,3 +1,4 @@
+import { likeClash } from '@/lib/named-food-clash'
 import { ShowNumbersContext } from '@/lib/show-numbers'
 import { couldNot, targetsMoved, mealsDrifted, type TargetMoveCause } from '@/lib/coach-voice'
 import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react'
@@ -2214,7 +2215,9 @@ function App() {
       // or food, the SAME row Profile's "Foods and meals I like" writes (soft like), so it shows there and can be
       // taken off there. One he also said to leave out is not written: an avoid always wins, and a like of an
       // avoided food is the contradiction Profile refuses.
-      const usualFoods = (enrichedProfile.usual_foods ?? []).filter(meal => !(enrichedProfile.disliked_foods ?? []).some(avoid => avoid.trim() && containsPhrase('', [meal], avoid)))
+      // Nor one his diet or allergies keep out (Marcus test, 15 Nov 2026): the meals could never serve it.
+      const usualFoods = (enrichedProfile.usual_foods ?? []).filter(meal => !(enrichedProfile.disliked_foods ?? []).some(avoid => avoid.trim() && containsPhrase('', [meal], avoid))
+        && !likeClash(meal, mealRestrictionsOf(enrichedProfile)))
       if (usualFoods.length > 0) {
         try {
           await Promise.all(usualFoods.map(meal => createFact({

@@ -99,6 +99,29 @@ async function main() {
   check('the add tool no longer tells it the app will refuse a clash for it', !/will refuse it if it clashes, so never promise/.test(prompt))
   check('plain words: never "pool", "verified", "pre-verified" or "custom dish" to her (L59)', /PLAIN WORDS, NEVER THE APP'S INSIDE WORDS/.test(prompt))
 
+  // A REFUSED FOOD IS NEVER SAVED AS A LIKE (Marcus test, 15 Nov 2026). The rule, then each writer asks it before writing.
+  console.log('\nA food he cannot have is never saved as one he likes')
+  const nm = await import('../src/lib/named-food-clash')
+  check('almond butter, nut-free: a clash', nm.likeClash('almond butter', ['nut-free'])?.restriction === 'nut-free')
+  check('salmon, nut-free: none', nm.likeClash('salmon', ['nut-free']) === null)
+  check('chicken, vegetarian: a clash (a diet binds too)', nm.likeClash('chicken curry', ['vegetarian'])?.restriction === 'vegetarian')
+  check('mushroom risotto, avoid list: a clash', !!nm.likeClash('mushroom risotto', [], ['mushrooms'])?.avoided)
+  const ab = nm.likeClash('almond butter', ['nut-free'])
+  const likeSaid = ab ? nm.likeRefusal(ab) : 'NO CLASH'
+  check("the words: what's in it, the setting, nothing saved", likeSaid === "Almond butter has tree nuts in it, and your profile says nut-free, so I haven't saved it as a food you like.", likeSaid)
+  const pb = nm.likeClash('peanut butter', ['nut-free'])
+  check('peanuts named as peanuts', !!pb && /has peanuts in it/.test(nm.likeRefusal(pb)))
+  const memFn = chat.slice(chat.indexOf('const resolveAndSaveMemory'), chat.indexOf('const resolveAndSaveMemory') + 12000)
+  const guardAt = memFn.indexOf('likeClash('), writeAt = memFn.indexOf('createFact(')
+  check('chat memory: the like is checked before any fact is written', guardAt > 0 && writeAt > 0 && guardAt < writeAt, { guardAt, writeAt })
+  const prof = strip(ui)
+  const saveFn = prof.slice(prof.indexOf('const saveLikedFoods'), prof.indexOf('const saveLikedFoods') + 4000)
+  const pg = saveFn.indexOf('likeClash('), pw = saveFn.indexOf('createFact(')
+  check("Profile's likes box: checked before it writes", pg > 0 && pw > 0 && pg < pw, { pg, pw })
+  const app = strip(readFileSync('src/App.tsx', 'utf8'))
+  const usual = app.slice(app.indexOf('const usualFoods'), app.indexOf('const usualFoods') + 400)
+  check("setup's usual meals: one his diet keeps out is not written", /!likeClash\(meal, mealRestrictionsOf\(enrichedProfile\)\)/.test(usual), usual.slice(0, 200))
+
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.log(`${failures} FAILED`); process.exit(1) }
   console.log('A food she names that her restrictions keep out is said first, and never put on her plate.')
