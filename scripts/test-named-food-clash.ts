@@ -52,8 +52,10 @@ async function main() {
   check('the avoid list says it is on the list', said('bacon sandwich?') === "Bacon is on your avoid list, so I won't suggest it or add it to your meals.", said('bacon sandwich?'))
   // Her second ruling: refuse, and say where to change it if there is no allergy.
   const refuse = (m: string, prefs = SAM, avoid = AVOID) => { const c = namedFoodClash(m, prefs, avoid); return c ? allergyRefusal(c) : 'no clash' }
-  check('an allergen: her sentence, then where to change it, exactly', refuse('almond butter on toast') === "Almond butter has tree nuts in it, and your profile says nut-free, so I won't suggest it or add it to your meals. If you don't have a nut allergy, change it on Profile, under Food, Diet.", refuse('almond butter on toast'))
-  check('...naming the allergy each filter is ("an egg allergy")', /If you don't have an egg allergy, change it on Profile, under Food, Diet\.$/.test(refuse('two eggs on toast', ['egg-free']) ?? ''), refuse('two eggs on toast', ['egg-free']))
+  // His 15 Nov 2026 ruling, "Say where it's set": where the setting lives, never an invitation to remove it.
+  check('an allergen: his sentence, then where it is set, exactly', refuse('almond butter on toast') === "Almond butter has tree nuts in it, and your profile says nut-free, so I won't suggest it or add it to your meals. Your nut-free setting is on Profile, under Food, Diet.", refuse('almond butter on toast'))
+  check('...naming each filter ("Your egg-free setting")', /Your egg-free setting is on Profile, under Food, Diet\.$/.test(refuse('two eggs on toast', ['egg-free']) ?? ''), refuse('two eggs on toast', ['egg-free']))
+  check('...and never invites removing it', !/don't have|change it|remove/i.test(refuse('almond butter on toast') ?? 'change it'), refuse('almond butter on toast'))
   check('a diet is not an allergy: no refusal line for a vegetarian naming chicken', refuse('can I have chicken tonight', ['vegetarian']) === null)
   check('...nor for the avoid list', refuse('bacon sandwich?') === null)
   const ui = readFileSync('src/components/ProfileScreen.tsx', 'utf8')
@@ -93,7 +95,7 @@ async function main() {
   console.log('\n6. The coach is told the same (model behaviour: graded by the exam, not here)')
   const prompt = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
   check('the dietary block: say it first, in her words, never offer to build it', /WHEN THEY NAME A FOOD THESE RESTRICTIONS KEEP OUT/.test(prompt) && /your FIRST words say so/.test(prompt) && /never "you're allergic"/.test(prompt) && /Never offer to add it, build it/.test(prompt))
-  check("...and an allergen is refused with where to change it, the same place the app names", /if they don't have that allergy they can change it on Profile, under Food, Diet/.test(prompt))
+  check("...and an allergen is refused with where it is set, never a nudge to remove it", /say where the setting is: Profile, under Food, Diet/.test(prompt) && /NEVER suggest removing or changing an allergy/.test(prompt) && !/they can change it on Profile/.test(prompt))
   check('the add tool no longer tells it the app will refuse a clash for it', !/will refuse it if it clashes, so never promise/.test(prompt))
   check('plain words: never "pool", "verified", "pre-verified" or "custom dish" to her (L59)', /PLAIN WORDS, NEVER THE APP'S INSIDE WORDS/.test(prompt))
 

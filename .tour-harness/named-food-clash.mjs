@@ -124,7 +124,7 @@ const last = () => ev(`(() => {
   return { text: b ? b.innerText.trim() : null, inView: !!r && r.top >= 0 && r.bottom <= 844, cards }
 })()`)
 
-const SENTENCE = "Almond butter has tree nuts in it, and your profile says nut-free, so I won't suggest it or add it to your meals. If you don't have a nut allergy, change it on Profile, under Food, Diet."
+const SENTENCE = "Almond butter has tree nuts in it, and your profile says nut-free, so I won't suggest it or add it to your meals. Your nut-free setting is on Profile, under Food, Diet."
 
 console.log('\n1. Nut-free: a swap card for almond butter is not built; the refusal is the reply\n')
 check('1a. the chat is up, nut-free', await open('diet=nut-free&daymove=1'))

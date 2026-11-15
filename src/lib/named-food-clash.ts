@@ -130,24 +130,15 @@ export function namedFoodClash(message: string, dietaryPreferences: string[], di
   return null
 }
 
-/** What the allergy is called, for the line that says where to change it ("a nut allergy"). */
-const ALLERGY_WORDS: Partial<Record<DietaryPreference, string>> = {
-  'nut-free': 'nut', 'dairy-free': 'dairy', 'gluten-free': 'gluten', 'egg-free': 'egg', 'soy-free': 'soy',
-  'shellfish-free': 'shellfish', 'fish-free': 'fish', 'celery-free': 'celery', 'sesame-free': 'sesame',
-  'mustard-free': 'mustard', 'lupin-free': 'lupin', 'sulphite-free': 'sulphite',
-}
-
 /**
- * HER SECOND RULING, 18 Oct 2026, on what follows the sentence: "If the user has specified an allergy dont offer to
- * add it to a meal. Refuse and say if they dont have an allergy they should go to the settings and update the
- * allergy." So an allergen clash is answered with the sentence and where to change it — Profile, Food, Diet, the one
- * screen that edits the restriction — and nothing else. Null for a diet or the avoid list.
+ * WHAT FOLLOWS THE SENTENCE. His 18 Oct 2026 ruling said where to change it ("If you don't have a nut allergy, change
+ * it on Profile, under Food, Diet"). REPLACED 15 Nov 2026, his "Say where it's set", after a tester with a tree-nut
+ * allergy and an adrenaline pen read it as a nudge to remove the allergy: it now says WHERE the setting lives and
+ * never invites changing it. Nothing else follows. Null for a diet or the avoid list.
  */
 export function allergyRefusal(c: FoodClash): string | null {
   if (!c.allergen || !c.restriction) return null
-  const word = ALLERGY_WORDS[c.restriction] ?? 'food'
-  const a = /^[aeiou]/i.test(word) ? 'an' : 'a'
-  return `${clashSentence(c)} If you don't have ${a} ${word} allergy, change it on Profile, under Food, Diet.`
+  return `${clashSentence(c)} Your ${c.restriction} setting is on Profile, under Food, Diet.`
 }
 
 function capitalise(s: string): string {
