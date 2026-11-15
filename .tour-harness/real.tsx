@@ -313,8 +313,7 @@ const profile: UserProfile = {
   // the day — and the refit card listed three meals while the fourth kept its
   // old size. The app now SAYS so (meal-refit's residue line), and the harness
   // stops describing a profile that eats a snack it does not budget for.
-  // NO SNACKS: the page's meals have none and its meal shape says none (15 Nov 2026, a plausible whole).
-  meals_per_day: 3, include_snacks: false,
+  meals_per_day: 3, include_snacks: true, // set from the starting meals below (a plausible whole)
   fitness_goal: FINISHER || WALKER || MOBILITY || SAM ? 'fat_loss' : 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
   ...(WALKER ? { start_preference: 'move_more' as const } : {}),
   // ?legcurl=1 — THE ONE-DUMBBELL LIFT, ON A REAL GENERATED PLAN.
@@ -1474,6 +1473,10 @@ const topUpPools = (() => {
   // ?deep=1 with daymove=1&regen=1: the deep pool, where a swap is saved for real (week=1 swaps nothing).
   return DEEP_POOL ?? out
 })()
+// A PLAUSIBLE WHOLE (15 Nov 2026): the profile says snacks exactly when the meals this page starts from have one, so
+// Nutrition's "a meal he chose has no dishes" row is never a fixture's contradiction (the resize mode has a snack; the
+// plain page does not).
+profile.include_snacks = (((EMPTY_MEALS ? pools : TOPUP || DAYMOVE ? topUpPools : LEFTOVERS || WEEK ? leftoverPools : pools) as Record<string, unknown[] | undefined>).snack?.length ?? 0) > 0
 if (TOPUP || DAYMOVE) {
   for (const [slot, options] of Object.entries(topUpPools)) {
     (options as { name: string; ingredients: unknown; macros: { calories: number; protein: number; carbs: number; fat: number } }[]).forEach((o, i) => db.meal_plan_slots.push({
