@@ -200,7 +200,10 @@ console.log('\n[7] Knee-rehab movements survive a knee injury')
 console.log('\n[8] Genuinely contraindicated knee work is STILL excluded (no safety relaxation)')
 {
   const knee = getFlaggedJoints(['knees'])
-  const MUST_EXCLUDE = ['Barbell Squats', 'Leg Press', 'Goblet Squats', 'Hack Squat', 'Air Squat',
+  // LEG PRESS AND HACK SQUAT LEFT THIS LIST ON 15 NOV 2026, by his ruling "Allow it, lighter" (after Marcus's knee
+  // surgery): supported machine leg work stays for a knee, one step lighter (test:knee-machine-work holds both halves).
+  // Everything else here, free-weight squats, lunges, steps, jumps and leg extensions, is still excluded.
+  const MUST_EXCLUDE = ['Barbell Squats', 'Goblet Squats', 'Air Squat',
     'Walking Lunges', 'Bulgarian Split Squats', 'Step-Ups', 'Split Squat (Bodyweight)',
     'Step-Ups (Bodyweight)', 'Pistol Squat Progression', 'Leg Extensions', 'Nordic Hamstring Curl',
     'Jump Rope', 'Burpees', 'Box Jumps', 'Broad Jumps', 'Deadlifts', 'Trap Bar Deadlift',
@@ -209,6 +212,10 @@ console.log('\n[8] Genuinely contraindicated knee work is STILL excluded (no saf
     const e = EXERCISE_DATABASE.find(x => x.name === name)
     if (!e) { check(`${name} exists`, false); continue }
     check(`${name}: still excluded`, isContraindicatedFor(e, knee))
+  }
+  for (const name of ['Leg Press', 'Hack Squat']) {
+    const e = EXERCISE_DATABASE.find(x => x.name === name)
+    check(`${name}: kept for a knee by his 15 Nov ruling, and still recorded as loading it`, !!e && !isContraindicatedFor(e, knee) && e.loads_joints.includes('knee'))
   }
 }
 
