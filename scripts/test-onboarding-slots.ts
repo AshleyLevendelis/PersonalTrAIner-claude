@@ -252,7 +252,8 @@ check('chip set is exactly the 8 known codes', INJURY_OPTIONS.length === 8)
 check('unknown injury string flags nothing (documented inert path)', getFlaggedJoints(['it_band']).size === 0)
 
 console.log('\n7. Dietary options stay derived from diet-rules')
-check('dietary option count matches DIETARY_PREFERENCES', DIETARY_OPTIONS.length === DIETARY_PREFERENCES.length)
+// 15 Nov 2026: every rule but 'pregnancy', which only the Pregnant tick switches on (never offered).
+check('dietary option count matches DIETARY_PREFERENCES, less the pregnancy rule', DIETARY_OPTIONS.length === DIETARY_PREFERENCES.length - 1 && !DIETARY_OPTIONS.some(o => (o.value as string) === 'pregnancy'))
 
 console.log('\n8. Helpers')
 check('toggleValue adds', JSON.stringify(toggleValue(['a'], 'b')) === JSON.stringify(['a', 'b']))

@@ -1,4 +1,6 @@
 import type { FreestyleController } from '@/lib/freestyle'
+import { mealRestrictionsOf, isPregnant, PREGNANCY_CALORIE_LINE } from '@/lib/health-conditions'
+import { pregnancyFishLines } from '@/lib/pregnancy-food'
 import { useEffect, useRef, useState } from 'react'
 import type { HeldAround } from '@/lib/meal-generation'
 import { Badge } from '@/components/ui/badge'
@@ -415,6 +417,16 @@ export function NutritionDisplay({
           </button>
         )}
       </div>
+      {/* PREGNANCY AS ONE SWITCH (his rulings 15 Nov 2026): the target is maintenance and says who to check it with, and
+          the week's tuna and oily fish are counted against the NHS limits (a limit, never a ban). */}
+      {isPregnant(profile) && (
+        <div className="mt-2 space-y-1" data-testid="pregnancy-nutrition">
+          <p className="text-[0.75rem] text-muted-foreground" data-testid="pregnancy-calorie-line">{PREGNANCY_CALORIE_LINE}</p>
+          {mealStrip && mealWeek && pregnancyFishLines(mealWeek.map(d => d.date === mealStrip.today ? { ...d, chosen } : d)).map(line => (
+            <p key={line} className="text-[0.75rem] text-foreground" data-testid="pregnancy-fish-line">{line}</p>
+          ))}
+        </div>
+      )}
       {weekOpen && mealStrip && mealWeek ? (
         <NutritionWeekView
           days={mealWeek.map(d => d.date === mealStrip.today ? { ...d, chosen, totals: mealTotals } : d)}
@@ -674,7 +686,7 @@ export function NutritionDisplay({
           unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}
           onFixDietaryRestrictions={onFixDietaryRestrictions}
           onOpenMyMeals={onOpenMyMeals}
-          dietaryPreferences={profile.dietary_preferences}
+          dietaryPreferences={mealRestrictionsOf(profile)}
           avoidFoods={avoidFoods}
           mealsPerDay={profile.meals_per_day}
           skipBreakfast={skipsBreakfast(profile)}
@@ -706,7 +718,7 @@ export function NutritionDisplay({
         unrecognisedDietaryRestrictions={unrecognisedDietaryRestrictions}
         onFixDietaryRestrictions={onFixDietaryRestrictions}
         onOpenMyMeals={onOpenMyMeals}
-        dietaryPreferences={profile.dietary_preferences}
+        dietaryPreferences={mealRestrictionsOf(profile)}
         avoidFoods={avoidFoods}
         mealsPerDay={profile.meals_per_day}
         skipBreakfast={skipsBreakfast(profile)}

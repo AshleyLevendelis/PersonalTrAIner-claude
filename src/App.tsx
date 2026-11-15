@@ -17,7 +17,7 @@ import { OfflineStatusIndicator } from '@/components/OfflineStatusIndicator'
 import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
-import { isPregnant } from '@/lib/health-conditions'
+import { isPregnant, mealRestrictionsOf } from '@/lib/health-conditions'
 import { BottomDockHeightProvider, useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { AppTour, replayAppTour } from '@/components/AppTour'
 import { isDevAccount, getSessionDateContext, getAppNow, getLocalDateString } from '@/lib/dev-clock'
@@ -419,7 +419,7 @@ function App() {
   // ruling, 27 Sep 2026: "stop serving it"). ONE derivation, and every
   // assembly below (today, the strip, the shopping list, the refit) reads it,
   // so they cannot disagree about what a day holds.
-  const mealPools = useServablePools(storedMealPools, profile?.dietary_preferences, memoryFacts)
+  const mealPools = useServablePools(storedMealPools, profile ? mealRestrictionsOf(profile) : undefined, memoryFacts)
   // And the generator is not asked for a hearted dish she can no longer eat.
   const steerableFavouriteMeals = useMemo(
     () => favouritesStillAllowed(mealPools, favouriteMealNames),
@@ -530,7 +530,7 @@ function App() {
     // A swap of two DIFFERENT meals adds a resized copy of each to the options,
     // and a pick can only be shown once the screen knows the option it names.
     reloadPools: async () => { if (profile?.id) setMealPools(await getPools(profile.id)) },
-    dietaryPreferences: profile?.dietary_preferences,
+    dietaryPreferences: profile ? mealRestrictionsOf(profile) : undefined,
     // A getter: the dislikes are worked out further down this component, and are only read when a swap is planned.
     dislikedFoods: () => effectiveDislikedFoods,
   })
@@ -804,7 +804,7 @@ function App() {
       profileId: profile.id, targets: macros,
       mealsPerDay: profile.meals_per_day, includeSnacks: profile.include_snacks,
       skipBreakfast: skipsBreakfast(profile),
-      dietaryPreferences: profile.dietary_preferences ?? [], dislikedFoods: effectiveDislikedFoods,
+      dietaryPreferences: mealRestrictionsOf(profile), dislikedFoods: effectiveDislikedFoods,
       todayDate: getSessionDateContext(profile.id).date, pools: mealPools,
     },
     reload: async () => { if (profile?.id) setMealPools(await getPools(profile.id)) },
@@ -1131,6 +1131,8 @@ function App() {
       enjoyed_activities: Array.isArray(profileRow.enjoyed_activities) ? profileRow.enjoyed_activities : [],
       // What a doctor has said to watch (health-conditions.ts), absent before its migration: read as none.
       health_conditions: Array.isArray(profileRow.health_conditions) ? profileRow.health_conditions : [],
+      // The due date (pregnancy, 15 Nov 2026), absent before its migration: read as none.
+      due_date: typeof profileRow.due_date === 'string' ? profileRow.due_date : null,
       // The running goal (running.ts), absent before its migration: read as none.
       running_goal: typeof profileRow.running_goal === 'string' ? profileRow.running_goal : null,
       running_race_date: typeof profileRow.running_race_date === 'string' ? profileRow.running_race_date : null,
@@ -1633,7 +1635,7 @@ function App() {
       }),
       generation: {
         targets: macros,
-        dietaryPreferences: profile.dietary_preferences,
+        dietaryPreferences: mealRestrictionsOf(profile),
         mealsPerDay: profile.meals_per_day,
         skipBreakfast: skipsBreakfast(profile),
         includeSnacks: profile.include_snacks,
@@ -1714,7 +1716,7 @@ function App() {
                   const result = await generateMealPools({
                     profileId: profile.id,
                     targets: macros,
-                    dietaryPreferences: profile.dietary_preferences,
+                    dietaryPreferences: mealRestrictionsOf(profile),
                     mealsPerDay: profile.meals_per_day,
                     skipBreakfast: skipsBreakfast(profile),
                     includeSnacks: profile.include_snacks,
@@ -1779,7 +1781,7 @@ function App() {
     generateMealPools({
       profileId,
       targets,
-      dietaryPreferences: forProfile.dietary_preferences,
+      dietaryPreferences: mealRestrictionsOf(forProfile),
       mealsPerDay: forProfile.meals_per_day,
       skipBreakfast: skipsBreakfast(forProfile),
       includeSnacks: forProfile.include_snacks,
@@ -2429,7 +2431,7 @@ function App() {
     generation: profile?.id && macros ? {
       profileId: profile.id,
       targets: macros,
-      dietaryPreferences: profile.dietary_preferences,
+      dietaryPreferences: mealRestrictionsOf(profile),
       mealsPerDay: profile.meals_per_day,
       skipBreakfast: skipsBreakfast(profile),
       includeSnacks: profile.include_snacks,

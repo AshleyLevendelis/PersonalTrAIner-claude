@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [x] **PREGNANCY AS ONE SWITCH (his three rulings 15 Nov 2026, from the third browser report; wave 1 of
+  `docs/plans/browser-test-nov15-plan.md`)**. The test profile (20 weeks pregnant) sat on a 1,448 kcal fat-loss target
+  while the coach's own notes said weight loss wasn't appropriate. Asked one at a time, he chose (each the recommended
+  option): "Maintenance + midwife" (over keeping the deficit and saying so, and over leaving it), "NHS list, auto-on"
+  (over bans only and no rule), "Ask due date" (over weeks and not asking). BUILT: `nutritionGoalOf` (Priya 1,448 ->
+  1,810 kcal, labelled "Maintenance while pregnant"); a `pregnancy` food rule (tag `pregnancy_avoid` on chorizo,
+  salami, pepperoni, smoked salmon, chicken liver, oysters, both food tables) read through `mealRestrictionsOf` by every
+  meal reader (pools, generation, swaps, the coach), never offered in the pickers; the week's tuna and oily fish counted
+  and said on Nutrition; the due date on Profile (migration `20261115120000_add_due_date`), RPE 7 and held weights from
+  28 weeks (CSCS basis in the plan doc); the week note drops deficit talk; the health line no longer claims "I'll keep
+  your sets..." when the rebuild was declined; the chat offers the tick ("I'm 20 weeks pregnant") and the pause ("pause
+  my plan for a week") when the coach's turn carried no card. Where I differed from the tester, and why: ham,
+  mozzarella, cheddar, sardines and tinned tuna are fine by NHS guidance, so they are not banned. NOT BUILT: the due
+  date in setup (Profile only, so setup stays short), the extra pregnancy calories (the midwife's number). Proven by
+  `test:pregnancy-one-switch` (47 checks; 8 mutations caught, one after a binding case was added) and 18 existing
+  gates; 4 re-anchored (`test:health-conditions` §6 asserted the old "food never touched" ruling). Not driven on a
+  screen yet.
 - [x] **HIS BROWSER TEST OF 15 NOV 2026 (Claude in Chrome on the live app, on the "Priya" test profile, desktop width)**:
   5 passed, 3 failed, 1 not run, 7 more bugs. FIXED, each with a check that was seen to fail on the old code:
   (1) a paused plan on a REST day said nothing (rest returned before the pause was asked): rest and recovery days

@@ -1,4 +1,5 @@
 import { PAUSE_WORDS, isPausedOn, planPausedSince } from '@/lib/plan-pause'
+import { noteForProfile, lateInPregnancy, PREGNANCY_HOLD_NOTE } from '@/lib/health-conditions'
 import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
@@ -928,6 +929,26 @@ export function TodayPanel({
         nextLoads[name] = card.weightKg
         nextNotes[name] = { note: card.note, didProgress: card.didProgress, findWeight: card.findWeight }
       }
+      // FROM 28 WEEKS PREGNANT, NO NEW HEAVIER WEIGHTS (his ruling 15 Nov 2026, "Ask due date"): a weight that would
+      // go up stays at last time's, and the note says why. Lower or the same is untouched.
+      if (lateInPregnancy(profile, today)) {
+        for (const [name, rec, kind] of results) {
+          if (!rec || kind === 'added') continue
+          const last = (rec as { lastWeightKg?: number }).lastWeightKg
+          if (last != null && nextLoads[name] != null && nextLoads[name] > last) {
+            nextLoads[name] = last
+            nextNotes[name] = { note: PREGNANCY_HOLD_NOTE, didProgress: false }
+          }
+        }
+        for (const [name, rec, kind] of results) {
+          if (!rec || kind !== 'added') continue
+          const last = (rec as { lastAddedKg?: number }).lastAddedKg
+          if (last != null && nextAdded[name] != null && nextAdded[name] > last) {
+            nextAdded[name] = last
+            nextNotes[name] = { note: PREGNANCY_HOLD_NOTE, didProgress: false }
+          }
+        }
+      }
       setProgressedAddedLoads(nextAdded)
       setProgressedLoads(nextLoads)
       setProgressionNotes(nextNotes)
@@ -1192,7 +1213,7 @@ export function TodayPanel({
       calibrationCue: cueIsOnMainLift
         ? calibrationCueText(mainLift!.suggested_load_kg != null, mainLift!.load_hold === 'stated_limit')
         : null,
-      coachNote: currentMesoWeekObj?.coach_note ?? null,
+      coachNote: noteForProfile(currentMesoWeekObj?.coach_note, profile),
     })
   })()
 
@@ -1374,7 +1395,7 @@ export function TodayPanel({
         isDeload={currentMesoWeekObj?.is_deload}
         isCalibrationWeek={currentMesoWeekObj?.isCalibrationWeek}
         phaseFocus={currentMesoWeekObj?.phase_focus}
-        coachNote={currentMesoWeekObj?.coach_note}
+        coachNote={noteForProfile(currentMesoWeekObj?.coach_note, profile) ?? undefined}
         onOpenProgram={onOpenProgram}
         onOpenSessionHistory={onOpenSessionHistory}
         onOpenWhatHappened={profileId ? openWhatHappened : undefined}

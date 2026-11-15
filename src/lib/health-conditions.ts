@@ -49,6 +49,72 @@ export function isPregnant(profile: { health_conditions?: readonly string[] | nu
   return healthConditionsOf(profile).includes('pregnancy')
 }
 
+// ---------------------------------------------------------------------------
+// PREGNANCY AS ONE SWITCH (his rulings 15 Nov 2026; docs/plans/pregnancy-one-switch.md). The tick drives the exercise
+// rules (stagePregnancyFilter), the calorie rule (nutritionGoalOf), the food rule (mealRestrictionsOf) and the late
+// pregnancy effort rule (pregnancyWeeksOn), so the three can never disagree again (the browser test of 15 Nov found a
+// 363 kcal deficit beside the coach's own "weight loss is not appropriate").
+// ---------------------------------------------------------------------------
+
+/**
+ * THE GOAL CALORIES AND MACROS ARE WORKED OUT FROM. "Maintenance + midwife": while pregnant, fat loss and muscle gain
+ * count as maintenance (no deficit, no surplus); the stored goal is kept and comes back when the tick goes. The app
+ * never adds pregnancy extra calories: that is the midwife's number.
+ */
+export function nutritionGoalOf<G extends string>(profile: { fitness_goal: G; health_conditions?: readonly string[] | null }): G | 'functional' {
+  if (isPregnant(profile) && (profile.fitness_goal === 'fat_loss' || profile.fitness_goal === 'hypertrophy')) return 'functional'
+  return profile.fitness_goal
+}
+
+/** Said wherever the calorie target is shown while pregnant. */
+export const PREGNANCY_CALORIE_LINE = 'While you\'re pregnant your target is maintenance, with no deficit. Check your calories with your midwife or GP.'
+
+/**
+ * EVERY FOOD RULE THE MEALS OBEY: the diets he picked, plus the pregnancy rule while the tick is on ("NHS list,
+ * auto-on"). Never saved: the picker edits `dietary_preferences`, this reads it.
+ */
+export function mealRestrictionsOf(profile: { dietary_preferences?: readonly string[] | null; health_conditions?: readonly string[] | null } | null | undefined): string[] {
+  const picked = [...(profile?.dietary_preferences ?? [])].filter(p => p !== 'pregnancy')
+  return isPregnant(profile) ? [...picked, 'pregnancy'] : picked
+}
+
+/**
+ * HOW FAR ALONG, from the due date ("Ask due date"): whole weeks, 40 at the due date. Null with no date, and the app
+ * then treats the pregnancy as past 16 weeks, as before.
+ */
+export function pregnancyWeeksOn(dueDate: string | null | undefined, today: string): number | null {
+  if (!dueDate || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return null
+  const days = Math.round((Date.parse(`${dueDate}T12:00:00Z`) - Date.parse(`${today}T12:00:00Z`)) / 86_400_000)
+  if (!Number.isFinite(days)) return null
+  return Math.max(0, 40 - Math.ceil(days / 7))
+}
+
+/**
+ * A WEEK NOTE WITHOUT DIETING TALK WHILE PREGNANT (the browser test: "…while you're in a deficit" on a pregnant plan).
+ * Drops every sentence about a deficit or fat loss; the rest of the note stands. Unchanged when not pregnant.
+ */
+export function noteForProfile(note: string | null | undefined, profile: { health_conditions?: readonly string[] | null } | null | undefined): string | null {
+  if (!note) return note ?? null
+  if (!isPregnant(profile)) return note
+  const kept = note.split(/(?<=[.!?])\s+/).filter(s => !/\bdeficit\b|\bfat[- ]loss\b|\blose (?:fat|weight)\b/i.test(s))
+  return kept.join(' ').trim() || null
+}
+
+/** From this many weeks the effort is capped one notch lower and no load is added (CSCS; the plan doc). */
+const LATE_PREGNANCY_WEEKS = 28
+/** The working-set ceiling from 28 weeks: one notch below the health ceiling. */
+export const LATE_PREGNANCY_SET_RPE_CEILING = 7
+
+/** Said on a lift held at last time's weight from 28 weeks. */
+export const PREGNANCY_HOLD_NOTE = 'Same weight as last time: from 28 weeks the weights hold, and the effort stays comfortable.'
+
+/** Pregnant and 28 weeks or more by the due date. False with no date. */
+export function lateInPregnancy(profile: { health_conditions?: readonly string[] | null; due_date?: string | null } | null | undefined, today: string): boolean {
+  if (!isPregnant(profile)) return false
+  const weeks = pregnancyWeeksOn(profile?.due_date ?? null, today)
+  return weeks != null && weeks >= LATE_PREGNANCY_WEEKS
+}
+
 /** No working set above this with a condition ticked: two or more reps left in the tank. */
 export const HEALTH_SET_RPE_CEILING = 8
 /** No conditioning above this with a condition ticked: hard, never all-out. */
@@ -67,7 +133,10 @@ export function healthConditionsInWords(codes: readonly string[]): string {
  */
 export function healthConditionLine(codes: readonly string[]): string {
   if (codes.length === 0) return ''
-  return `With ${healthConditionsInWords(codes)}, check with your GP before you start a new exercise plan. I'll keep your sets short of all-out and your cardio by effort, not heart rate.`
+  // TRUE WHETHER OR NOT THE REBUILD WAS TAKEN (15 Nov 2026, browser test: after "Leave it as it is" the line still said
+  // "I'll keep your sets short of all-out", which only a rebuilt plan does). What applies at once is said as fact.
+  const pregnant = codes.includes('pregnancy')
+  return `With ${healthConditionsInWords(codes)}, check with your ${pregnant ? 'midwife or GP' : 'GP'} before you start a new exercise plan. A plan built with this ticked keeps your sets short of all-out and your cardio by effort, not heart rate.${pregnant ? ' Your calories are maintenance and your meals leave out the NHS foods to avoid in pregnancy, from now.' : ''}`
 }
 
 /**
@@ -85,4 +154,30 @@ export function effortWordsOnly(activity: string): string {
     .replace(/\bmax effort\b/gi, 'hard but controlled')
     .replace(/\s{2,}/g, ' ')
     .trim()
+}
+
+/** The chat's offer to tick Pregnant, and what it says after (15 Nov 2026). */
+export const PREGNANCY_TICK_WORDS = {
+  offer: 'Shall I tick Pregnant on your profile? Your calories become maintenance, your meals leave out the NHS foods to avoid in pregnancy, and I\'ll offer to rebuild your training without jumping or lying-flat moves. Check any of it with your midwife or GP.',
+  unchanged: 'Your history and your other settings stay as they are.',
+  done: 'Ticked. You can add your due date on Profile.',
+  failed: "I couldn't save that to your profile. Nothing has changed.",
+}
+
+/** "I'm pregnant", "I'm 20 weeks pregnant", "we're expecting": said about themselves, not denied. */
+export function saidPregnant(text: string): boolean {
+  const t = text.toLowerCase()
+  if (/\b(not|no longer|isn'?t|wasn'?t|aren'?t)\s+(\w+\s+)?pregnant\b/.test(t)) return false
+  return /\b(i'?m|i am|we'?re|we are)\s+(about\s+|around\s+)?(\d+\s+weeks?\s+|\d+\s+months?\s+)?pregnant\b/.test(t)
+    || /\b\d+\s*(weeks?|wks?|months?)\s+pregnant\b/.test(t)
+    || /\b(i'?m|we'?re)\s+expecting\s+(a\s+)?(baby|twins)\b/.test(t)
+}
+
+/** "Pause my plan", "can you pause my training for a week", "I need a break from the plan". */
+export function askedToPause(text: string): boolean {
+  const t = text.toLowerCase()
+  if (/\b(don'?t|do not|never)\s+pause\b/.test(t)) return false
+  return /\bpause\s+(my|the)\s+(plan|training|program(me)?|workouts?|sessions?)\b/.test(t)
+    || /\b(put|have)\s+(my|the)\s+(plan|training)\s+on\s+(hold|pause)\b/.test(t)
+    || /\b(take|need)\s+a\s+break\s+from\s+(my|the)\s+(plan|training)\b/.test(t)
 }

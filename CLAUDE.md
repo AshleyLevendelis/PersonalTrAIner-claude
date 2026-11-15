@@ -1594,6 +1594,15 @@ menu" stays true when a copy is also left outside it.
   front while "Pregnant" is ticked, each replaced by one of the same group (never a wider swap: it brought kettlebell swings);
   the coach is told; calories and food untouched. No due date is stored, so every pregnancy is treated as past week 16
   (mine, CSCS, the safe side). `test:pregnancy-rules`, `docs/plans/pregnancy-exercise-rules.md`
+- **Pregnancy is ONE SWITCH: his rulings 15 Nov 2026 (browser test), "Maintenance + midwife", "NHS list, auto-on", "Ask
+  due date"** — they REPLACE the "calories and food untouched" half above. While Pregnant is ticked: calories and
+  macros are maintenance (fat loss and muscle gain count as maintenance; the goal is kept), Nutrition says "check with
+  your midwife or GP", the app never adds pregnancy calories itself; meals keep out the NHS foods to avoid (cold cured
+  meats, liver, cold-smoked fish, raw shellfish; a `pregnancy` rule the tick switches on, never in the diet pickers),
+  and tuna (4 tins) and oily fish (2 portions) are counted over the week and said, never banned; an optional due date
+  on Profile, and from 28 weeks the sets cap one notch lower (RPE 7) and weights hold. The chat OFFERS the tick when
+  someone says they're pregnant. `test:pregnancy-one-switch` (47 checks, 8 mutations), `docs/plans/pregnancy-one-switch.md`.
+  Needs the `due_date` migration and the `chat-gemini` and `generate-meals` deploys
 - **A moved session survives a change of days: "Keep it, still owed"**: it stays on the day it was moved to as a
   one-off that week, and the change-days card says so; an injury ease-off still reaches it. `test:qa-batch3` §11
 - **Plan pause: "Add a pause"**: Profile and the coach; while paused no session is due, nothing is missed, no workout

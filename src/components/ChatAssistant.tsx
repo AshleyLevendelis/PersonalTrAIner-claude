@@ -1,5 +1,5 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
-import { healthConditionsOf, healthConditionsInWords } from '@/lib/health-conditions'
+import { healthConditionsOf, healthConditionsInWords, mealRestrictionsOf, noteForProfile, isPregnant, saidPregnant, askedToPause, PREGNANCY_TICK_WORDS } from '@/lib/health-conditions'
 import { plainTyped } from '@/lib/typed-text'
 import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays, raceDateMissing, RACE_DATE_QUESTION } from '@/lib/running'
 import { blockShape } from '@/lib/timer-engine'
@@ -2016,7 +2016,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // read is still in flight: `moves` is empty until it resolves, and a week
       // that claims no moves is the exact wrong answer this is here to stop.
       week: trainingWeek.loading ? null : trainingWeek.days,
-      coachNote: activeMesoWeek?.coach_note,
+      coachNote: noteForProfile(activeMesoWeek?.coach_note, profile) ?? undefined,
       breakLine: layoffCardLine(breakStatus),
       pendingLoadSuggestions,
       today: {
@@ -2201,7 +2201,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       workout_split_preference: profile.workout_split_preference,
       display_name: profile.display_name || '',
       macros,
-      dietary_preferences: profile.dietary_preferences || [],
+      dietary_preferences: mealRestrictionsOf(profile),
       concurrent_activities: profile.concurrent_activities || [],
       // A RUNNING GOAL TO OFFER (his 14 Nov 2026 "Move it to the coach"): setup no longer asks it of someone who loves
       // cardio, so the coach offers it, once, on their yes a card.
@@ -6014,12 +6014,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * refuses a card and leaves prose alone. docs/plans/runs-7-10-batch-1-safety.md.
    */
   const processResponse = async (result: ChatApiResponse, userSaid = ''): ReturnType<typeof processResponseInner> => {
-    const clash = namedFoodClash(userSaid, profile.dietary_preferences ?? [], [...compileFoodDislikes(memoryFacts), ...(profile.disliked_foods ?? [])])
+    const clash = namedFoodClash(userSaid, mealRestrictionsOf(profile), [...compileFoodDislikes(memoryFacts), ...(profile.disliked_foods ?? [])])
     if (!clash) {
       // A FOOD WHOSE KIND DECIDES IT (his ruling 10 Nov 2026, "Ask which": a gluten-free person's bare "calamari").
       // The app asks; no card that would put it on his plate is built from the coach's guess at the answer, and on a
       // turn that is only talk the app's question is the reply. A log of something eaten is a record and is left alone.
-      const kindAsk = namedFoodKindAsk(userSaid, profile.dietary_preferences ?? [])
+      const kindAsk = namedFoodKindAsk(userSaid, mealRestrictionsOf(profile))
       if (kindAsk && result.proposal && FOOD_OFFER_KINDS.has(result.proposal.kind)) return { text: kindAsk }
       const plain = await processResponseInner(result, userSaid)
       return kindAsk && !result.proposal && !plain.pendingAction && !plain.receipt && !plain.action && !plain.clarification ? { ...plain, text: kindAsk } : plain
@@ -6075,7 +6075,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           // with the same compiler App uses, rather than passed down as a
           // prop, so the two can't drift.
           dislikedFoods: compileFoodDislikes(memoryFacts),
-          dietaryPreferences: profile.dietary_preferences ?? [],
+          dietaryPreferences: mealRestrictionsOf(profile),
           today: getSessionDateContext(profile.id).date,
           upcomingDays: (upcomingMeals ?? []).map(d => ({ date: d.date, dayName: d.dayName })),
           eatenSlotsToday: await slotsEatenToday(),
@@ -6135,7 +6135,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             mealsPerDay: profile.meals_per_day,
             skipBreakfast: skipsBreakfast(profile),
             includeSnacks: profile.include_snacks,
-            dietaryPreferences: profile.dietary_preferences ?? [],
+            dietaryPreferences: mealRestrictionsOf(profile),
             dislikedFoods: profile.disliked_foods ?? [],
             todayDate: getSessionDateContext(profile.id).date,
           })
@@ -6187,7 +6187,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             mealsPerDay: profile.meals_per_day,
             skipBreakfast: skipsBreakfast(profile),
             includeSnacks: profile.include_snacks,
-            dietaryPreferences: profile.dietary_preferences ?? [],
+            dietaryPreferences: mealRestrictionsOf(profile),
             dislikedFoods: profile.disliked_foods ?? [],
             todayDate: getSessionDateContext(profile.id).date,
             afterEating: await slotEatenToday(slotName),
@@ -6227,7 +6227,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             mealsPerDay: profile.meals_per_day,
             skipBreakfast: skipsBreakfast(profile),
             includeSnacks: profile.include_snacks,
-            dietaryPreferences: profile.dietary_preferences ?? [],
+            dietaryPreferences: mealRestrictionsOf(profile),
             dislikedFoods: profile.disliked_foods ?? [],
             todayDate: getSessionDateContext(profile.id).date,
           })
@@ -6274,7 +6274,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             mealsPerDay: profile.meals_per_day,
             skipBreakfast: skipsBreakfast(profile),
             includeSnacks: profile.include_snacks,
-            dietaryPreferences: profile.dietary_preferences ?? [],
+            dietaryPreferences: mealRestrictionsOf(profile),
             dislikedFoods: profile.disliked_foods ?? [],
             // WHAT SHE IS ALREADY BEING SERVED, so the swaps offered when a
             // food comes out lead with foods from her own plan rather than
@@ -6304,7 +6304,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             mealsPerDay: profile.meals_per_day,
             skipBreakfast: skipsBreakfast(profile),
             includeSnacks: profile.include_snacks,
-            dietaryPreferences: profile.dietary_preferences ?? [],
+            dietaryPreferences: mealRestrictionsOf(profile),
             dislikedFoods: profile.disliked_foods ?? [],
             todayDate: getSessionDateContext(profile.id).date,
           })
@@ -7106,7 +7106,43 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         setMessages(prev => [...prev, { role: 'assistant' as const, content: stripTags(turn), quickReplies: extractQuickReplies(turn), status: 'complete' as const }])
       }
     }
+
+    // THE APP OFFERS WHAT THE COACH ONLY TALKED ABOUT (browser test, 15 Nov 2026). "I'm 20 weeks pregnant" became three
+    // memory notes while the Pregnant tick, the calories and the food rule stayed off; "pause my plan for a week, I'm on
+    // holiday" got "have a fantastic holiday" and nothing paused. When the turn carried no card, the app raises the one
+    // the words asked for. Nothing changes until it is tapped.
+    if (!failed && !pendingAction) {
+      if (saidPregnant(userText) && !isPregnant(profile)) await offerFromApp('propose_pregnancy_tick', buildPregnancyTickProposal(userText))
+      else if (askedToPause(userText) && !profile.plan_paused_since) {
+        const pp = buildPlanPauseProposal({ action: 'pause', origin_verbatim_quote: userText })
+        if (pp.ok) await offerFromApp('propose_plan_pause', pp)
+      }
+    }
   }
+
+  /** A card the APP raises (never the coach): stored like any offer, so Apply runs the same confirm. */
+  const offerFromApp = async (kind: string, built: { scopeKey: string; preconditions: Record<string, unknown>; payload: Record<string, unknown>; diff: import('@/lib/pending-actions-store').ProposalDiff }) => {
+    if (!profile.id) return
+    try {
+      const row = await createPendingAction({ profileId: profile.id, actionClass: 'plan_mutation', kind, scopeKey: built.scopeKey, preconditions: built.preconditions, payload: built.payload, diff: built.diff })
+      const pa: ChatPendingActionView = { id: row.id, kind: row.kind, status: row.status, diff: row.diff, expiresAt: row.expires_at }
+      setMessages(prev => [...prev, { role: 'assistant' as const, content: describeProposalClientSide(pa), status: 'complete' as const, pendingAction: pa }])
+    } catch { /* an offer that could not be stored is simply not shown */ }
+  }
+
+  /** "Tick Pregnant?": the one switch for exercise, calories and food (his rulings 15 Nov 2026). */
+  const buildPregnancyTickProposal = (said: string) => ({
+    scopeKey: `${profile.id}:propose_pregnancy_tick`,
+    preconditions: { pregnant: false },
+    payload: { code: 'pregnancy' } as Record<string, unknown>,
+    diff: {
+      lead: ask(PREGNANCY_TICK_WORDS.offer),
+      rows: [{ field: 'What a doctor has said to watch', before: healthConditionsInWords(healthConditionsOf(profile)) || 'Nothing', after: 'Pregnant' }],
+      unchanged: [PREGNANCY_TICK_WORDS.unchanged],
+      rationale: said,
+      reversible: false,
+    },
+  })
 
   // Resets to a single fresh greeting: clears the in-memory list, the
   // localStorage mirror, and the server rows (so a reload doesn't resurrect
@@ -7488,6 +7524,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
       undoToken = ok ? row.id : undefined
       onLogsUpdated?.()
+    } else if (row.kind === 'propose_pregnancy_tick') {
+      // The same column and the same rebuild offer as Profile's tick (one switch, two roads).
+      const next = [...new Set([...healthConditionsOf(profile), 'pregnancy'])]
+      const { error } = await supabase.from('fitness_profiles').update({ health_conditions: next }).eq('id', profile.id)
+      const ok = !error
+      receipt = ok ? { landed: ['Pregnant ticked'], failed: [] } : { landed: [], failed: [{ op: 'propose_pregnancy_tick', error: PREGNANCY_TICK_WORDS.failed }] }
+      title = ok ? RECEIPTS['propose_pregnancy_tick'].done : RECEIPTS['propose_pregnancy_tick'].failed
+      rows = ok ? [{ label: 'Pregnant', detail: PREGNANCY_TICK_WORDS.done }] : []
+      undoToken = undefined
+      if (ok) {
+        onProfileChanged({ health_conditions: next })
+        const offer = detectPlanInvalidation(profile, { health_conditions: next })
+        if (offer) onPlanInvalidated?.(offer)
+      }
     } else if (row.kind === 'propose_plan_pause') {
       // ONE FUNCTION FOR BOTH SURFACES: App's handlePlanPause, which Profile's switch also calls.
       const pause = (row.payload as { pause?: boolean }).pause !== false

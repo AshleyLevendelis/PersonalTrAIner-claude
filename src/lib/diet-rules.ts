@@ -43,6 +43,9 @@ export type DietaryPreference =
   | 'mustard-free'
   | 'lupin-free'
   | 'sulphite-free'
+  // NEVER CHOSEN OR SAVED: switched on by the "Pregnant" tick (his ruling 15 Nov 2026, "NHS list, auto-on") through
+  // mealRestrictionsOf; the diet pickers leave it out (SELECTABLE_DIETARY_PREFERENCES).
+  | 'pregnancy'
 
 type TagKey = keyof FoodTags
 
@@ -123,6 +126,9 @@ export const FORBIDDEN_TAGS: Record<DietaryPreference, TagKey[]> = {
   'lupin-free': ['contains_lupin'],
   'sulphite-free': ['contains_sulphites'],
   'low-fodmap': ['is_high_fodmap'],
+  // The NHS "foods to avoid in pregnancy" the table holds (docs/plans/pregnancy-one-switch.md): cold cured meats,
+  // liver, cold-smoked fish, raw shellfish. Tuna and oily fish are LIMITS, watched over the week, never banned here.
+  pregnancy: ['pregnancy_avoid'],
 }
 
 /**
@@ -139,6 +145,9 @@ export const FORBIDDEN_TAGS: Record<DietaryPreference, TagKey[]> = {
  * export.
  */
 export const DIETARY_PREFERENCES: DietaryPreference[] = Object.keys(FORBIDDEN_TAGS) as DietaryPreference[]
+
+/** The ones a person picks: every rule except 'pregnancy', which only the Pregnant tick switches on. */
+export const SELECTABLE_DIETARY_PREFERENCES: DietaryPreference[] = DIETARY_PREFERENCES.filter(p => p !== 'pregnancy')
 
 export interface DietViolation {
   ingredient: string

@@ -4,6 +4,7 @@ import type {
   FatigueCost, MesocycleMovementPattern, EquipmentAccess, TrainingStyle,
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
+import { getAppNow, getLocalDateString } from './dev-clock'
 import { EXERCISE_DATABASE, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup, getExerciseEntry } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
@@ -15,7 +16,7 @@ import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, stepHoldSeconds, getPhaseTempo, formatTempo, PHASE_CONFIGS, type PhaseConfig, type TrainingPhase,
 } from './periodization'
-import { hasHealthCondition, isPregnant, effortWordsOnly, HEALTH_SET_RPE_CEILING, HEALTH_CONDITIONING_RPE_CEILING } from './health-conditions'
+import { hasHealthCondition, isPregnant, noteForProfile, lateInPregnancy, LATE_PREGNANCY_SET_RPE_CEILING, effortWordsOnly, HEALTH_SET_RPE_CEILING, HEALTH_CONDITIONING_RPE_CEILING } from './health-conditions'
 import { pregnancyExclusion, pregnancyWarning } from './pregnancy-rules'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
 import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays, effectiveRecoveryCapacity } from './concurrent-activity'
@@ -8337,7 +8338,10 @@ export function generateMesocycle(
           // Primers stay submaximal and un-scaled for the same reason as the
           // base plan — a warm-up movement should never carry a working-set
           // RPE or a load that scales with the block.
-          const intensity = isPrimer ? ex.intensity : resolveTargetRpe(phase, experience, w, isDeload, hasHealthCondition(profile) ? HEALTH_SET_RPE_CEILING : undefined)
+          // FROM 28 WEEKS PREGNANT, ONE NOTCH LOWER (his ruling 15 Nov 2026, "Ask due date"; CSCS basis in
+          // docs/plans/pregnancy-one-switch.md): the week's own date, read against the due date. No due date: as before.
+          const lateWeek = lateInPregnancy(profile, getLocalDateString(new Date(getAppNow(profile.id).getTime() + (w - 1) * 7 * 86_400_000)))
+          const intensity = isPrimer ? ex.intensity : resolveTargetRpe(phase, experience, w, isDeload, lateWeek ? LATE_PREGNANCY_SET_RPE_CEILING : hasHealthCondition(profile) ? HEALTH_SET_RPE_CEILING : undefined)
 
           let load = null as ReturnType<typeof prescribeLoad> | null
           // Independent of the load branch below — an assistance exercise
@@ -9218,7 +9222,8 @@ export function generateMesocycle(
           // see loadlessWeek above, shared with the tempo pass.
           const loadless = loadlessWeek
           const phaseNote = loadless ? phaseConfig.coach_note_loadless : phaseConfig.coach_note
-          const goalNote = loadless ? policy.coachNoteLoadless : policy.coachNote
+          // No dieting talk on a pregnant plan (15 Nov 2026): her calories are maintenance.
+          const goalNote = noteForProfile(loadless ? policy.coachNoteLoadless : policy.coachNote, profile) ?? ''
           return [
             // A DELOAD SAYS IT ONCE. This used to open with its own "Deload
             // week — volume is deliberately cut so you arrive at the next

@@ -119,6 +119,7 @@ function buildDietarySafetyBlock(preferences: string[]): string {
   if (has("mustard-free")) rules.push("MUSTARD-FREE: no mustard of any kind, including dijon, wholegrain, mustard powder, and dressings built on it.");
   if (has("lupin-free")) rules.push("LUPIN-FREE: no lupin flour or lupin-containing bread and baked goods.");
   if (has("sulphite-free")) rules.push("SULPHITE-FREE: no sulphite-preserved dried fruit, wine or wine vinegars, or products declaring sulphur dioxide.");
+  if (has("pregnancy")) rules.push("PREGNANCY (NHS foods to avoid): no cold cured meats (salami, chorizo, pepperoni, prosciutto), no liver or pâté, no cold-smoked fish (smoked salmon, gravlax), no raw shellfish (oysters), no mould-ripened or soft blue cheese. Cooked ham, pasteurised and hard cheeses and cooked shellfish are fine. Keep tuna and oily fish to one meal each in the week.");
   if (has("low-fodmap")) rules.push("LOW-FODMAP: avoid garlic, onion, wheat, and high-fructose fruit where possible.");
   // Mediterranean is a STYLE, not a restriction — diet-rules.ts gives it no
   // hard exclusions on purpose. But it was also absent from this block, so

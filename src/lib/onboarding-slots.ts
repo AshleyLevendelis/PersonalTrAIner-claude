@@ -2,7 +2,7 @@ import { ENJOYED_ACTIVITY_OPTIONS, type EnjoyedActivity } from './pathway'
 import { RUNNING_GOAL_OPTIONS, isRunningGoal } from './running'
 import { ALLERGEN_FOOD_PATTERNS } from './allergen-words'
 import { splitFoodList, splitUsualFoods } from './food-list'
-import { DIETARY_PREFERENCES, type DietaryPreference } from '@/lib/diet-rules'
+import { SELECTABLE_DIETARY_PREFERENCES, type DietaryPreference } from '@/lib/diet-rules'
 import { GOALS_THAT_MEAN_TRAIN } from '@/lib/starting-out'
 import { liftSetQuestion, liftAsStored } from './coach-voice'
 import type {
@@ -298,10 +298,12 @@ const DIETARY_META: Record<DietaryPreference, { icon: string; label: string }> =
   'shellfish-free': { icon: '🦐', label: 'Shellfish-free' },
   'fish-free': { icon: '🐟', label: 'Fish-free' },
   'low-fodmap': { icon: '🧬', label: 'Low-FODMAP' },
+  // Never offered (SELECTABLE_DIETARY_PREFERENCES leaves it out); the label is what a violation names.
+  pregnancy: { icon: '🤰', label: 'Pregnancy-safe' },
 }
 
 export const DIETARY_OPTIONS: { value: DietaryPreference; icon: string; label: string }[] =
-  DIETARY_PREFERENCES.map(value => ({ value, ...DIETARY_META[value] }))
+  SELECTABLE_DIETARY_PREFERENCES.map(value => ({ value, ...DIETARY_META[value] }))
 
 // Only these seven "-free" tags are structurally enforced — FORBIDDEN_TAGS
 // in diet-rules.ts is what generate-meals actually filters against. A

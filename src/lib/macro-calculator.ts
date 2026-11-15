@@ -1,4 +1,5 @@
 import { sportKcalOn, sportKcalPerWeek, sportSessionKcal, SPORT_SESSION_MINUTES } from './setup-sports'
+import { nutritionGoalOf } from './health-conditions'
 import { activityDays } from './concurrent-activity'
 import type {
   UserProfile,
@@ -325,7 +326,7 @@ export function computeMacroSplitTargets(weightKg: number, calorieTarget: number
 
 function computeStaticMacros(profile: UserProfile, m: BodyMetrics): MacroTargets {
   const tdee = staticTDEEFor(profile, m)
-  const calorieTarget = applyGoalAdjustment(tdee, profile.fitness_goal, m.gender)
+  const calorieTarget = applyGoalAdjustment(tdee, nutritionGoalOf(profile), m.gender)
 
   // The calories field is always recomputed from the FINAL macros (M0),
   // matching what dynamic mode already did — the old code returned the
@@ -337,7 +338,7 @@ function computeStaticMacros(profile: UserProfile, m: BodyMetrics): MacroTargets
   // (an endurance-oriented ratio, not bodyweight-anchored) — the macro-split
   // control below doesn't apply to it; the UI disables the control and says
   // why rather than silently having no effect.
-  if (profile.fitness_goal === 'conditioning') {
+  if (nutritionGoalOf(profile) === 'conditioning') {
     const protein = Math.round((calorieTarget * 0.20) / 4)
     const fat = Math.round((calorieTarget * 0.25) / 9)
     const carbs = Math.round((calorieTarget * 0.55) / 4)
@@ -389,10 +390,10 @@ function computeDynamicDay(
   }
 
   const dailyTDEE = Math.round(neatTDEE + eee)
-  const calories = applyGoalAdjustment(dailyTDEE, profile.fitness_goal, m.gender)
+  const calories = applyGoalAdjustment(dailyTDEE, nutritionGoalOf(profile), m.gender)
 
   const protein = Math.round(2.2 * weight)
-  const carbsPerKg = getCarbsPerKg(intensity, profile.fitness_goal)
+  const carbsPerKg = getCarbsPerKg(intensity, nutritionGoalOf(profile))
   let carbs = Math.round(carbsPerKg * weight)
 
   let fat = Math.round((calories - protein * 4 - carbs * 4) / 9)
@@ -508,12 +509,15 @@ export function getMacroDerivation(profile: UserProfile): MacroDerivation | null
   const tdee = staticTDEEFor(profile, m)
   const target = computeStaticMacros(profile, m)
   const surplusKcal = target.calories - tdee
+  // The goal the numbers were worked out from (pregnancy counts fat loss and muscle gain as maintenance, 15 Nov 2026).
+  const goal = nutritionGoalOf(profile)
   const surplusLabel =
-    profile.fitness_goal === 'fat_loss' ? 'Fat-loss deficit'
-    : profile.fitness_goal === 'hypertrophy' ? 'Hypertrophy surplus'
-    : profile.fitness_goal === 'conditioning' ? 'Conditioning adjustment'
+    goal !== profile.fitness_goal ? 'Maintenance while pregnant'
+    : goal === 'fat_loss' ? 'Fat-loss deficit'
+    : goal === 'hypertrophy' ? 'Hypertrophy surplus'
+    : goal === 'conditioning' ? 'Conditioning adjustment'
     : 'Maintenance adjustment'
-  const splitApplies = profile.fitness_goal !== 'conditioning'
+  const splitApplies = goal !== 'conditioning'
   const split = splitApplies ? getProfileMacroSplit(profile) : DEFAULT_MACRO_SPLIT
   return { bmr, tdee, surplusKcal, surplusLabel, target, split, splitApplies }
 }

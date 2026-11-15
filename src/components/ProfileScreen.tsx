@@ -11,7 +11,7 @@
 // ---------------------------------------------------------------------------
 
 import { PAUSE_WORDS } from '@/lib/plan-pause'
-import { HEALTH_CONDITION_OPTIONS, healthConditionsOf, hasHealthCondition, healthConditionLine } from '@/lib/health-conditions'
+import { HEALTH_CONDITION_OPTIONS, healthConditionsOf, hasHealthCondition, healthConditionLine, mealRestrictionsOf, isPregnant, pregnancyWeeksOn } from '@/lib/health-conditions'
 import { ENJOYED_ACTIVITY_OPTIONS } from '@/lib/pathway'
 import { RUNNING_GOAL_OPTIONS, isRunningGoal, raceDateWords } from '@/lib/running'
 import { MEAL_VARIETY_OPTIONS } from '@/lib/freestyle'
@@ -64,7 +64,7 @@ import { detectPlanInvalidation, type PlanInvalidation } from '@/lib/plan-invali
 import type { PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { ActiveAdaptationLines } from '@/components/exercise/ActiveAdaptationLines'
 import { activeChangeLines } from '@/lib/effective-constraints'
-import { getAppNow } from '@/lib/dev-clock'
+import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { getShopDay, setShopDay, defaultShopDay, DAY_NAMES, type DayName } from '@/lib/shop-day-store'
 import type { BanOutcome } from '@/lib/screen-ban'
 import type { DayGuard } from '@/lib/plan-guard'
@@ -948,10 +948,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
     return () => { live = false }
   }, [profileId, open])
   const clashingHearts = useMemo(() => {
-    const marked = markRestrictionBreakers(storedPools, profile.dietary_preferences ?? [], compileFoodDislikes(facts))
+    const marked = markRestrictionBreakers(storedPools, mealRestrictionsOf(profile), compileFoodDislikes(facts))
     const allowed = new Set(favouritesStillAllowed(marked, heartedMeals).map(n => n.toLowerCase()))
     return new Set(heartedMeals.filter(n => !allowed.has(n.toLowerCase())))
-  }, [storedPools, profile.dietary_preferences, facts, heartedMeals])
+  }, [storedPools, profile.dietary_preferences, profile.health_conditions, facts, heartedMeals])
   const unheart = async (name: string) => {
     if (!profileId) return
     const ok = await unmarkFavourite(profileId, name)
@@ -1085,7 +1085,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       onProfileChanged(revertPatch)
       // A SETTING WHOSE DATABASE STEP HAS NOT RUN is not a connection problem, and saying so would send him to
       // check his signal for nothing.
-      if ((['enjoyed_activities', 'meal_variety', 'show_numbers', 'running_goal', 'health_conditions'] as const).some(c => c in patch && isMissingColumnError(err, c))) {
+      if ((['enjoyed_activities', 'meal_variety', 'show_numbers', 'running_goal', 'health_conditions', 'due_date'] as const).some(c => c in patch && isMissingColumnError(err, c))) {
         setSaveError("That setting isn't switched on yet, so it couldn't be saved. Nothing else has changed.")
         return
       }
@@ -1482,6 +1482,20 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               )
             })}
           </div>
+          {/* THE DUE DATE (his ruling 15 Nov 2026, "Ask due date"): optional; the app works out the weeks from it. */}
+          {isPregnant(profile) && (
+            <label className="flex flex-col gap-1 pt-1 text-[0.6875rem] text-muted-foreground" data-testid="profile-due-date">
+              <span>Due date (optional): from 28 weeks the effort stays one notch lower and the weights hold.</span>
+              <input
+                type="date"
+                className="h-11 rounded-xl bg-[color:var(--surface-raised)] px-3 text-sm text-foreground"
+                value={profile.due_date ?? ''}
+                onChange={e => savePatch({ due_date: e.target.value || null })}
+                aria-label="Due date"
+              />
+              {(() => { const w = pregnancyWeeksOn(profile.due_date ?? null, getLocalDateString(getAppNow(profileId))); return w != null ? <span data-testid="profile-pregnancy-weeks">About {w} weeks</span> : null })()}
+            </label>
+          )}
           {hasHealthCondition(profile) && (
             <p className="text-[0.6875rem] leading-snug text-muted-foreground" data-testid="profile-health-line">
               {healthConditionLine(healthConditionsOf(profile))}

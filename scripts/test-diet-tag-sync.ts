@@ -80,7 +80,8 @@ async function main() {
   // count is a deliberate tripwire: adding a preference without updating both
   // prompt blocks and both food-db copies is the failure this file exists to
   // catch, and this line is what makes someone come and look.
-  check('exactly 22 preferences', DIETARY_PREFERENCES.length === 22, DIETARY_PREFERENCES)
+  // 22 -> 23 on 15 Nov 2026: 'pregnancy', switched on by the Pregnant tick (his "NHS list, auto-on"), never offered.
+  check('exactly 23 preferences', DIETARY_PREFERENCES.length === 23, DIETARY_PREFERENCES)
   check('no duplicate tags', new Set(DIETARY_PREFERENCES).size === DIETARY_PREFERENCES.length, DIETARY_PREFERENCES)
   check('fish-free is present (round 2 — contains_fish had no standalone lane)', DIETARY_PREFERENCES.includes('fish-free'))
 

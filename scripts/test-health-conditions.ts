@@ -133,7 +133,7 @@ console.log('\n5. The wiring: insert, restore, Profile, the rebuild offer, the c
   check('the restore reads it, as none when absent', /health_conditions: Array\.isArray\(profileRow\.health_conditions\) \? profileRow\.health_conditions : \[\]/.test(app))
   const prof = strip(fs.readFileSync('src/components/ProfileScreen.tsx', 'utf8'))
   check('Profile saves a tap to health_conditions', /savePatch\(\{ health_conditions:/.test(prof))
-  check('...says a missing column is "not switched on yet", not a connection problem', /'running_goal', 'health_conditions'\] as const\)\.some\(/.test(prof))
+  check('...says a missing column is "not switched on yet", not a connection problem', /'running_goal', 'health_conditions'(?:, '[a-z_]+')*\] as const\)\.some\(/.test(prof))
   check('...and shows the GP line', /healthConditionLine\(healthConditionsOf\(profile\)\)/.test(prof))
   const before = { health_conditions: [] } as unknown as UserProfile
   const offer = detectPlanInvalidation(before, { health_conditions: ['pregnancy'] })
@@ -149,11 +149,14 @@ console.log('\n5. The wiring: insert, restore, Profile, the rebuild offer, the c
   check('the migration adds the column, empty by default', !!mig && /ADD COLUMN IF NOT EXISTS health_conditions text\[\] NOT NULL DEFAULT '\{\}'/.test(fs.readFileSync(`supabase/migrations/${mig}`, 'utf8')), mig)
 }
 
-console.log('\n6. Food is never touched (clinical nutrition is out of scope)')
+console.log('\n6. Food reads the conditions only through the pregnancy switch (his rulings 15 Nov 2026 REPLACED "food never touched")')
 {
+  // RE-ANCHORED 15 Nov 2026: "Maintenance + midwife" and "NHS list, auto-on" made pregnancy change calories and food,
+  // through two functions and nothing else (test:pregnancy-one-switch). Every other condition still changes no food.
   const foodFiles = ['src/lib/macro-calculator.ts', 'src/lib/meal-generation.ts', 'src/lib/meal-rotation.ts', 'supabase/functions/generate-meals/index.ts']
   const readers = foodFiles.filter(f => fs.existsSync(f) && /health_conditions|health-conditions/.test(fs.readFileSync(f, 'utf8')))
-  check('no food file reads the conditions', readers.length === 0, readers)
+  const calc = fs.readFileSync('src/lib/macro-calculator.ts', 'utf8')
+  check('the one food file that reads them is the calculator, through nutritionGoalOf only', JSON.stringify(readers) === '["src/lib/macro-calculator.ts"]' && /import \{ nutritionGoalOf \} from '\.\/health-conditions'/.test(calc) && !/health_conditions/.test(calc), readers)
 }
 
 console.log(`\n${ran} checks ran, ${failures} failed.`)

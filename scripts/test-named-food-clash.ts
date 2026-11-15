@@ -81,7 +81,7 @@ async function main() {
   console.log('\n5. The chat reads her message before any card')
   const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
   const wrap = chat.slice(chat.indexOf('const processResponse = async'), chat.indexOf('const processResponseInner = async'))
-  check('every reply is read against her restrictions and her avoid list (both stores)', /namedFoodClash\(userSaid, profile\.dietary_preferences \?\? \[\], \[\.\.\.compileFoodDislikes\(memoryFacts\), \.\.\.\(profile\.disliked_foods \?\? \[\]\)\]\)/.test(wrap), wrap.slice(0, 300))
+  check('every reply is read against her restrictions and her avoid list (both stores)', /namedFoodClash\(userSaid, mealRestrictionsOf\(profile\), \[\.\.\.compileFoodDislikes\(memoryFacts\), \.\.\.\(profile\.disliked_foods \?\? \[\]\)\]\)/.test(wrap), wrap.slice(0, 300))
   check('the refusal is her allergy line on an allergen, her sentence otherwise', /const refusal = allergyRefusal\(clash\) \?\? clashSentence\(clash\)/.test(wrap))
   check('a card that would put the food on her plate is not built: the refusal is the reply', /if \(result\.proposal && FOOD_OFFER_KINDS\.has\(result\.proposal\.kind\)\) \{\s*return \{ text: refusal, outcome: 'refused' \}/.test(wrap))
   const kinds = chat.match(/const FOOD_OFFER_KINDS = new Set\(\[([^\]]*)\]\)/)?.[1] ?? ''

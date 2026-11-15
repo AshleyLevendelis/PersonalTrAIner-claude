@@ -65,6 +65,8 @@ export interface FoodTags {
   is_refined_sugar?: boolean
   is_high_carb?: boolean
   is_high_fodmap?: boolean
+  /** NHS 'foods to avoid in pregnancy' (his ruling 15 Nov 2026, "NHS list, auto-on"): cold cured meats, liver, cold-smoked fish, raw shellfish. Read only through the derived 'pregnancy' rule. */
+  pregnancy_avoid?: boolean
   // Populated on 8 entries (bacon, ham, chorizo, pepperoni, salami, gammon...)
   // but intentionally referenced by NO dietary preference in diet-rules.ts's
   // FORBIDDEN_TAGS — the mirror image of the is_grain bug (data with no
@@ -156,12 +158,12 @@ export const FOOD_DB: FoodEntry[] = [
   f('bacon medallions', ['bacon medallion'], { kcal: 150, protein: 28, carbs: 0.5, fat: 4 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
   f('gammon', ['gammon steak', 'ham steak'], { kcal: 145, protein: 24, carbs: 0.5, fat: 5 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
   f('ham', ['sliced ham', 'deli ham'], { kcal: 107, protein: 18, carbs: 1.5, fat: 3 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
-  f('chorizo', ['chorizo sausage'], { kcal: 455, protein: 24, carbs: 1.9, fat: 38 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
+  f('chorizo', ['chorizo sausage'], { kcal: 455, protein: 24, carbs: 1.9, fat: 38 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true, pregnancy_avoid: true }),
   f('pork sausage', ['pork sausages', 'breakfast sausage'], { kcal: 296, protein: 13, carbs: 8, fat: 24 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true, contains_gluten: true }),
 
   // ===== PROTEIN: fish & seafood ======================================
   f('salmon', ['salmon fillet', 'baked salmon', 'grilled salmon'], { kcal: 208, protein: 20, carbs: 0, fat: 13 }, 'protein', { contains_fish: true }),
-  f('smoked salmon', [], { kcal: 142, protein: 18, carbs: 0, fat: 4.5 }, 'protein', { contains_fish: true, is_processed_meat: false }),
+  f('smoked salmon', [], { kcal: 142, protein: 18, carbs: 0, fat: 4.5 }, 'protein', { contains_fish: true, is_processed_meat: false, pregnancy_avoid: true }),
   f('tuna canned in water', ['canned tuna', 'tuna in water', 'tinned tuna', 'tuna in spring water'], { kcal: 116, protein: 26, carbs: 0, fat: 0.8 }, 'protein', { contains_fish: true }),
   f('tuna steak fresh', ['fresh tuna', 'tuna steak', 'seared tuna'], { kcal: 109, protein: 24.4, carbs: 0, fat: 0.5 }, 'protein', { contains_fish: true }), // USDA yellowfin, raw (9 Nov 2026: was bluefin, which shops rarely sell)
   f('cod', ['cod fillet', 'baked cod'], { kcal: 105, protein: 23, carbs: 0, fat: 0.9 }, 'protein', { contains_fish: true }),
@@ -456,15 +458,15 @@ export const FOOD_DB: FoodEntry[] = [
   f('venison', ['venison steak'], { kcal: 158, protein: 30, carbs: 0, fat: 3.2 }, 'protein', { contains_meat: true }),
   f('beef brisket', [], { kcal: 221, protein: 25, carbs: 0, fat: 13 }, 'protein', { contains_meat: true }),
   f('pork belly', [], { kcal: 398, protein: 14, carbs: 0, fat: 37 }, 'protein', { contains_meat: true, contains_pork: true }),
-  f('chicken liver', [], { kcal: 119, protein: 17.9, carbs: 0.9, fat: 4.8 }, 'protein', { contains_meat: true }),
-  f('pepperoni', [], { kcal: 494, protein: 23, carbs: 2, fat: 44 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
-  f('salami', [], { kcal: 407, protein: 22, carbs: 1.5, fat: 34 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
+  f('chicken liver', [], { kcal: 119, protein: 17.9, carbs: 0.9, fat: 4.8 }, 'protein', { contains_meat: true, pregnancy_avoid: true }),
+  f('pepperoni', [], { kcal: 494, protein: 23, carbs: 2, fat: 44 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true, pregnancy_avoid: true }),
+  f('salami', [], { kcal: 407, protein: 22, carbs: 1.5, fat: 34 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true, pregnancy_avoid: true }),
 
   // ===== PROTEIN: more fish & plant-based ===============================
   f('anchovies', ['anchovy'], { kcal: 210, protein: 29, carbs: 0, fat: 10 }, 'protein', { contains_fish: true }),
   f('trout', ['trout fillet'], { kcal: 141, protein: 20, carbs: 0, fat: 6.6 }, 'protein', { contains_fish: true }),
   f('scallops', [], { kcal: 88, protein: 16.8, carbs: 2.4, fat: 0.8 }, 'protein', { contains_shellfish: true }),
-  f('oysters', [], { kcal: 68, protein: 7.1, carbs: 3.9, fat: 2.5 }, 'protein', { contains_shellfish: true }),
+  f('oysters', [], { kcal: 68, protein: 7.1, carbs: 3.9, fat: 2.5 }, 'protein', { contains_shellfish: true, pregnancy_avoid: true }),
   f('lobster', [], { kcal: 89, protein: 19, carbs: 0.5, fat: 0.9 }, 'protein', { contains_shellfish: true }),
   f('haricot beans', ['navy beans'], { kcal: 155, protein: 8.7, carbs: 27, fat: 0.6 }, 'protein', { is_legume: true, is_high_carb: true }),
   f('split peas', ['yellow split peas', 'cooked split peas'], { kcal: 118, protein: 8.3, carbs: 21, fat: 0.4 }, 'protein', { is_legume: true, is_high_carb: true }),
