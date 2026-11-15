@@ -29,7 +29,11 @@ console.log('\n2. Where it binds')
   const grid = read('src/components/exercise/SetGrid.tsx')
   check('the tick asks once before saving, and a second tap saves', /repsLookImpossible\(reps, prescribedRepsHigh\(prescribedReps\)/.test(grid) && /confirmRepsSet !== k\) \{/.test(grid) && /setConfirmRepsSet\(k\)/.test(grid))
   check('...asked BEFORE the save, never after', grid.indexOf('setConfirmRepsSet(k)') > 0 && grid.indexOf('setConfirmRepsSet(k)') < grid.indexOf('const addedLoadKg = takesAddedLoad'))
-  check('...and a changed number asks again (the confirm is reset on edit)', (grid.match(/if \(confirmRepsSet === k\) setConfirmRepsSet\(null\)/g) ?? []).length === 2)
+  // RE-ANCHORED 15 Nov 2026 (Marcus): this counted the reset line twice, which pinned a duplicate inside the weight-only
+  // branch; changing the REPS never cleared the question. Now: the edit handler clears the warning and resets the
+  // confirm whichever number changed (verify:absurd-weight 5c-5f drives it).
+  const upd = grid.slice(grid.indexOf('const updateInput = '), grid.indexOf('const toggleBodyweight = '))
+  check('...and a changed number, either one, clears the question and asks again', /\n    if \(rowWarnings\[k\]\) setRowWarnings\(/.test(upd) && /\n    if \(confirmRepsSet === k\) setConfirmRepsSet\(null\)/.test(upd) && !/if \(field === 'weight'\) \{[\s\S]*rowWarnings/.test(upd), upd.slice(0, 600))
   const prog = read('src/lib/progression-engine.ts')
   check('an impossible count never reaches the top of the range, at all three places progression asks', (prog.match(/&& !repsLookImpossible\(s\.reps_completed, (topReps|prescribedRepRangeHigh)\)/g) ?? []).length === 3)
   const pr = read('src/lib/pr-engine.ts')

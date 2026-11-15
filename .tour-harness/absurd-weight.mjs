@@ -157,6 +157,35 @@ two = await read(2)
 check('3f. ...still not logged', two.saved === false, two)
 await scrollToSection(); await wait(300); await shoot('absurd-weight-refused')
 
+// --- A REP COUNT ASKED ABOUT, THEN CORRECTED (Marcus, 15 Nov 2026) -----------------------------------------------------
+// "120 reps — is that right?" stayed after he typed 12. Set 3: a believable weight, 120 reps, tap; then 12.
+const typeReps = (setNumber, value) => ev(`(() => {
+  const sec = ${SECTION}
+  const el = sec.querySelector('input[id$="-s${setNumber}"][id^="setgrid-reps-"]')
+  if (!el) return false
+  ;(${setValue})(el, '${value}')
+  return true
+})()`)
+const repsWarning = setNumber => ev(`(() => { const sec = ${SECTION}; const w = sec && sec.querySelector('[data-testid="weight-warning"]'); return w && /reps/.test(w.textContent) ? w.textContent.trim() : null })()`)
+check('5a. a believable weight and 120 reps on set 3', (await type(3, '10')) && (await typeReps(3, '120')))
+check('5b. tapping the tick', await tapSave(3))
+await wait(400)
+check('5c. 120 reps is asked about', /120 reps/.test((await repsWarning(3)) ?? ''), await repsWarning(3))
+check('5d. typing 12 instead clears the question at once', (await typeReps(3, '12')) && (await wait(300), (await repsWarning(3)) === null), await repsWarning(3))
+check('5e. ...and one tap then logs 12, with no second question', await tapSave(3))
+await wait(400)
+const three = await read(3)
+check('5f. ...logged', three.saved === true && /12 reps|× ?12|x ?12/i.test(three.receipt ?? ''), three)
+// THREE DIGITS FIT IN THE REPS BOX (his "the reps box fits three digits"): typed into a box, the number is not cut off.
+await ev(`(() => { const sec = ${SECTION}; const el = sec.querySelector('input[id^="setgrid-reps-"]'); if (el) (${setValue})(el, '100'); return !!el })()`)
+await wait(200)
+const fit = await ev(`(() => { const sec = ${SECTION}; const el = sec.querySelector('input[id^="setgrid-reps-"]'); if (!el) return null; const cs = getComputedStyle(el); const c = document.createElement('canvas').getContext('2d'); c.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; const text = c.measureText(el.value).width; const room = el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight); return { text: Math.round(text), room: Math.round(room) } })()`)
+check('5g. three digits fit in the reps box', !!fit && fit.text <= fit.room, fit)
+// ...and on today's card, the big boxes (any reps box outside the Additional Work section).
+const cardFit = await ev(`(() => { const sec = ${SECTION}; const el = [...document.querySelectorAll('input[id^="setgrid-reps-"]')].find(i => !sec || !sec.contains(i)); if (!el) return null; el.scrollIntoView({ block: 'center' }); (${setValue})(el, '100'); const cs = getComputedStyle(el); const c = document.createElement('canvas').getContext('2d'); c.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; return { text: Math.round(c.measureText(el.value).width), room: Math.round(el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)), font: cs.fontSize } })()`)
+check('5h. ...and on today\'s card', !!cardFit && cardFit.text <= cardFit.room, cardFit)
+await scrollToSection(); await wait(300); await shoot('absurd-weight-reps')
+
 const err = await ev('window.__err ?? null')
 check('4. no uncaught error on the page', err === null, err)
 

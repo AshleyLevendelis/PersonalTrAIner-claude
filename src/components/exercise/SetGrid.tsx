@@ -459,12 +459,11 @@ export function SetGrid({
     setInputs(prev => ({ ...prev, [k]: next }))
     saveSetDraft(draftIdFor(ref), setNumber, next)
     if (rowErrors[k]) setRowErrors(prev => { const n = { ...prev }; delete n[k]; return n })
-    if (field === 'weight') {
-      if (rowWarnings[k]) setRowWarnings(prev => { const n = { ...prev }; delete n[k]; return n })
-      if (confirmWeightSet === k) setConfirmWeightSet(null)
+    // A WARNING IS ABOUT THE NUMBER IT NAMES, SO CHANGING EITHER NUMBER CLEARS IT (Marcus, 15 Nov 2026: "120 reps — is
+    // that right?" stayed on screen after he typed 12). The next tap asks again if the new number is odd too.
+    if (rowWarnings[k]) setRowWarnings(prev => { const n = { ...prev }; delete n[k]; return n })
     if (confirmRepsSet === k) setConfirmRepsSet(null)
-      if (confirmRepsSet === k) setConfirmRepsSet(null)
-    }
+    if (field === 'weight' && confirmWeightSet === k) setConfirmWeightSet(null)
   }
 
   const toggleBodyweight = (ref: SetRef) => {

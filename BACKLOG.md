@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **"120 REPS — IS THAT RIGHT?" CLEARS WHEN HE FIXES THE NUMBER (Marcus, 15 Nov 2026; Wave M-D2, mechanical)**.
+  The question about an impossible rep count only cleared when the WEIGHT changed: typing 12 left it on screen. A line
+  resetting it was also written twice inside the weight-only branch, and `test:odd-reps` counted exactly two copies, so
+  the gate pinned the slip. Now changing either number clears the question and the next tap asks again only if the
+  new number is odd too. THE REPS BOX WAS MEASURED, NOT CHANGED: at 390px three digits take 31 of 40 pixels on today's
+  card and 23 of 32 in the extra-work rows, so "100" fits; the check stays as a guard. `verify:absurd-weight` 21 -> 29
+  checks (asked, corrected, cleared, one tap logs 12, three digits fit in both layouts), `test:odd-reps` re-anchored on
+  the property; the old behaviour put back as a mutation is caught by both. 26 set-grid checks and four logging drivers
+  pass.
 - [x] **A MEAL LOGGED AS SOMETHING ELSE SHOWS WHAT HE ATE (Marcus, 15 Nov 2026; Wave M-B2, mechanical)**. He logged
   a different lunch, and the sheet kept the planned dish's ingredients, method, tags and "leftovers" line under what he
   ate, with the explanation at the very bottom. Now the logged meal is the heading (as before) and the planned dish is
