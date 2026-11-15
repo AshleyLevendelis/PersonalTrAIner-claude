@@ -301,6 +301,12 @@ export interface MealShape {
    * It sets how many days back the day's search remembers, and nothing else: the day's targets still decide first.
    */
   variety?: MealVariety
+  /**
+   * THE FIRST DAY OF HIS MEALS, a local date (15 Nov 2026, Marcus: the plan's first day served a lunch labelled as last
+   * night's dinner, and there was no last night on the plan). On the shape so the tab and the shopping list read the
+   * same day. On and before it, the night before is not one of his plan's dinners: lunch is cooked fresh.
+   */
+  firstDay?: string
 }
 
 export type MealVariety = 'variety' | 'some' | 'same'
@@ -849,6 +855,8 @@ export function serveDates(input: {
   dates.forEach((date, i) => {
     // Only a CONSECUTIVE run chains; after a gap, last night is unknown.
     if (i > 0 && addDays(dates[i - 1], 1) !== date) previousDinner = undefined
+    // The plan's first day has no night before on the plan: no dinner was served for its lunch to be the leftovers of.
+    if (shape.firstDay && date <= shape.firstDay) previousDinner = null
     // The pool as it stood that day, then that week's menu out of it (the same object when the pool is not deep).
     const dayPools = canonical(menuFor(poolsServedOn(pools, date), date, softLikedFoods))
     let rotation = rotations.get(dayPools)

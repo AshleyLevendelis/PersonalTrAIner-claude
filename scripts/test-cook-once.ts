@@ -168,6 +168,25 @@ console.log('\n§4 The card and the list read the same function')
   check('...only on a dinner that promises tomorrow\'s lunch', /option\.reusedTomorrow === true && option\.keepForTomorrow && \(\(\) => \{/.test(card))
 }
 
+console.log('\n§5 The plan\'s first day has no last night (15 Nov 2026, Marcus: "leftovers" on day one)')
+{
+  // The same week, told its first day is the run's first date: nothing was served the night before.
+  const first = serveDates({ dates, pools, targets, shape: { ...shape, firstDay: dates[0] }, previousDinner: yesterday })
+  check('without the first day the fixture is the case: day one\'s lunch is "last night\'s dinner"', week[0].day.chosen.lunch?.leftoverFrom === 'dinner')
+  check('with it, day one\'s lunch is cooked fresh, not a leftover', !!first[0].day.chosen.lunch && first[0].day.chosen.lunch.leftoverFrom !== 'dinner', first[0].day.chosen.lunch)
+  const later = first.findIndex((d, i) => i >= 1 && d.day.chosen.lunch?.leftoverFrom === 'dinner')
+  check('...and from the next day on, leftovers work as before', later >= 1, first.map(d => d.day.chosen.lunch?.leftoverFrom ?? '-'))
+  // The list buys day one's lunch: it is a dish of its own now, with nothing kept aside for it the night before.
+  const lines = (Object.values(first[0].day.chosen) as PoolOption[]).flatMap(o => shoppingLinesOf(o, true))
+  check('the shopping list buys day one\'s lunch like any other meal', lines.length > 0 && (first[0].day.chosen.lunch?.ingredients ?? []).every(i => lines.some(l => l.name === i.name)), lines.map(l => l.name))
+  // A first day later than the run changes nothing before it is reached.
+  const notYet = serveDates({ dates, pools, targets, shape: { ...shape, firstDay: addDays(dates[0], -30) }, previousDinner: yesterday })
+  check('a plan that began a month ago is untouched: day one\'s lunch is still last night\'s dinner', notYet[0].day.chosen.lunch?.leftoverFrom === 'dinner')
+  const app = readFileSync('src/App.tsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+  const shapeBlock = app.slice(app.indexOf('const mealShape: MealShape = useMemo('), app.indexOf('const mealRotation = useMemo('))
+  check('the app puts his first day on the one shape the tab and the list share', /firstDay: profile\?\.created_at \? todayLocal\(new Date\(profile\.created_at\)\) : undefined/.test(shapeBlock) && /profile\?\.created_at\]\)/.test(shapeBlock))
+}
+
 console.log(`\n${ran} checks ran`)
 if (failures > 0) { console.error(`${failures} check(s) failed`); process.exit(1) }
 console.log('cook once: all checks passed')

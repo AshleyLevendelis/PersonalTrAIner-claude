@@ -31,7 +31,7 @@ import { computeBMR, staticTDEEFor, resolveBodyMetrics } from '@/lib/macro-calcu
 import { computeTargets, getLatestWeightKg, getEffectiveTargetWeightKg, snapshotTargetsIfChanged, anchorTargetsAtSignUp, retargetAfterWeighIn, correctStartingWeight } from '@/lib/nutrition-targets'
 import { describeGoalProximity, isGoalProximityDismissed, dismissGoalProximity } from '@/lib/goal-proximity'
 import { upsertDailyMetric } from '@/lib/daily-tracking'
-import { currentAge } from '@/lib/body-units'
+import { currentAge, todayLocal } from '@/lib/body-units'
 import { isMissingColumnError } from '@/lib/missing-column'
 import { generateExercisePlan, generateMesocycle, MESOCYCLE_WEEK_LABELS } from '@/lib/exercise-plan'
 import { getPools, readPools, swapPoolMeal, getMealPicksForDate, setMealPick, type MealSlotName } from '@/lib/meal-store'
@@ -501,7 +501,9 @@ function App() {
     variety: profile?.meal_variety ?? undefined,
     // Meals cooked for him elsewhere ride on the shape, so every surface that builds a week is handed them.
     elsewhere: profile?.meals_elsewhere,
-  }), [profile?.meals_per_day, profile?.include_snacks, profile?.breakfast_style, profile?.batch_cooking, profile?.meals_elsewhere, profile?.meal_variety])
+    // The plan's first day, his own local date: its lunch is never "last night's dinner" (meal-rotation.ts MealShape).
+    firstDay: profile?.created_at ? todayLocal(new Date(profile.created_at)) : undefined,
+  }), [profile?.meals_per_day, profile?.include_snacks, profile?.breakfast_style, profile?.batch_cooking, profile?.meals_elsewhere, profile?.meal_variety, profile?.created_at])
   const mealRotation = useMemo(
     // Built from THIS WEEK'S MENU (9 Nov 2026, meal-menu.ts): a deep pool is never searched whole. The same object
     // serveDates draws for today, so the strip finds this rotation again rather than building its own.

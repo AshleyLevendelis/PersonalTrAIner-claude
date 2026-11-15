@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **NO "LEFTOVERS" ON THE PLAN'S FIRST DAY (Marcus, 15 Nov 2026; Wave M-E2, mechanical)**. Day one's lunch was
+  "last night's dinner" when there was no last night on the plan: the week is a repeating cycle, the first day served
+  could be any day of it, and nothing said when the plan began. His first meal day (his profile's start, his own local
+  date) now rides on the one meal shape the tab and the shopping list share; on that day the lunch is cooked fresh, so
+  the screen and the list agree (the list buys it as a meal of its own). From the next day leftovers work as before; a
+  plan that began earlier is untouched. `test:cook-once` 33 -> 39 checks (4 mutations of the rule and 1 of the app's
+  wiring, all caught); `test:meals-elsewhere` re-anchored (a fixed 500-character window stopped short of the shape's
+  dependency list once it gained a line; 1 mutation caught); 23 checks reading the week pass. NOT driven in a browser:
+  the test pages build their own shape without a start day, so they show today's behaviour unchanged.
 - [x] **"AVOCADO" NOW KEEPS OUT GUACAMOLE, AND 16 VEGAN GLUTEN-FREE DISHES WITHOUT TOFU (the coeliac nurse, 15 Nov 2026;
   Wave N-A)**. FOUND ON THE WAY, the real defect: Foods to avoid matched WORDS, so her "avocado" let through a taco
   salad with guacamole, and "oats" would let through granola, muesli and porridge. A short list of foods always made

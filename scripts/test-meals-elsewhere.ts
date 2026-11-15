@@ -297,7 +297,8 @@ function main() {
     const profile = strip(readFileSync('src/components/ProfileScreen.tsx', 'utf8'))
     const migration = readFileSync('supabase/migrations/20261111120000_add_meals_elsewhere.sql', 'utf8')
     check('the app reads the saved answer through its reader when it restores a profile', /meals_elsewhere: readMealsElsewhere\(profileRow\.meals_elsewhere\)/.test(app))
-    const shape = app.slice(app.indexOf('const mealShape: MealShape = useMemo('), app.indexOf('const mealShape: MealShape = useMemo(') + 500)
+    // The whole memo, from its start to the next one (a fixed 500 characters stopped short once the shape gained a line).
+    const shape = app.slice(app.indexOf('const mealShape: MealShape = useMemo('), app.indexOf('const mealRotation = useMemo('))
     check('...puts it on the meal shape, the one object every surface is handed', /elsewhere: profile\?\.meals_elsewhere,/.test(shape))
     check('...and rebuilds the shape when it changes', /\[[^\]]*profile\?\.meals_elsewhere[^\]]*\]\)/.test(shape), shape.slice(-160))
     check('the profile is restored with select(\'*\'), which needs no column to exist', /from\('fitness_profiles'\)\.select\('\*'\)/.test(app))
