@@ -3,7 +3,16 @@
 Newest first. One line each.
 
 - [x] **HIS LIVE-TEST BATCHES 2 AND 3 (Priya and his own phone), BUILT ON "BUILD IT", WITH HIS NINE RULINGS** (14-15 Nov
-  2026). Committed locally on his "commit, never push"; nothing on `main`, nothing deployed.
+  2026). Pushed on his "Push it", merged to `main` on his "Merge" (15 Nov 2026); nothing deployed.
+  PRE-MERGE SWEEP, 576 checks on 91d9da0e: 569 passed. Three need a live database (meal-quality, schema-parity, rls);
+  `test:coach-exam-fresh` says the coach changed since the 14 Nov exam (re-run on his machine). Three were REAL and are
+  fixed: (1) the UK pack "crisps" made every "cook until crisp" in a method an unlisted food, hiding 60 library methods
+  (`test:meal-method-check` caught it): a lone "crisp" is now read as cooking, as "toast" is, in both food tables, and
+  the one method saying "the skin crisps" says "is crisp"; (2) the nine pack foods were in no swap group
+  (`test:food-swaps`): crisps, soft drinks and meal-deal sandwiches are groups, the bars join chocolate and snack bars;
+  (3) `verify:weigh-in` §5 held the old "second day agrees" rule: the fixture gains an ordinary 80 kg two days back, so
+  today's makes three days in seven and the target moves to their average (68.1 kg); a mutation to four days is caught.
+  The deploy budget was raised 426 -> 434 kB gz (measured 426). 55 derived gates, 6 drivers and the typecheck green.
   BATCH 2-3 FIXES (no ruling needed): a regenerate keeps one-day meals (a meal out, freestyle, cooked for him, a moved
   meal); the reps box selects what is in it and fits three digits; Home counts a borrowed day's sets as Exercise does;
   the page leaves room for the floating bars at 375px; liquids are shopped in ml; the list's line names a meal out; a

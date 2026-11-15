@@ -957,8 +957,10 @@ const db: Db = {
   // A weigh-in so the Dashboard's trend has something real to draw rather
   // than rendering its empty state, which is not what the tour spotlights.
   // ?held=1 (verify:weigh-in §5): yesterday's weigh-in was a surprising 62 kg
-  // that she confirmed, so it is saved and WAITING, and there is none today.
+  // that she confirmed, so it is saved and WAITING, and there is none today. And an ordinary 80 kg the day before (15 Nov
+  // 2026, his "Need a week of readings": a target moves only on weigh-ins on 3 days in the last 7, so today's makes three).
   daily_metrics: WEIGH_IN_HELD ? [
+    { id: 'm0', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 2 * 86400000)), weight_kg: 80 },
     { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 86400000)), weight_kg: 62 },
     { id: 'm2', profile_id: PROFILE_ID, date: '2026-08-21', weight_kg: 80.6 },
   ] : [

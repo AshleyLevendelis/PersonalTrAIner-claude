@@ -230,8 +230,11 @@ console.log('\n1. The libraries are cached separately from the app')
   // MOVED 13 Nov 2026, again: strategy slice 6, running (the ladder runs in plan generation, first-paint code). MEASURED
   // through this gate on a clean worktree of 6ce27839 and on the change: deploy 413 -> 418 gz, paint 569 -> 574 gz, app
   // 1434 -> 1448 raw, total 2952 -> 2970 raw. His 15 Sep ruling, "raise it with room to grow": 8 gz and 25 raw over today.
-  headroom('a deploy re-downloads', appGzip, 426, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, not 444`, appGzip < 426, appGzip)
+  // MOVED 15 Nov 2026: his 14 Nov rulings (pause, red-flag quiet, pregnancy rules, dislike ask, UK packs) took it to
+  // 425, and the pre-merge sweep's fixes (UK packs in swap groups, "crisp" read as cooking) to 426: MEASURED 426 through
+  // this gate on the change. The other three were raised the same day and have room. "Raise it with room to grow": 8 gz.
+  headroom('a deploy re-downloads', appGzip, 434, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, under 434`, appGzip < 434, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')

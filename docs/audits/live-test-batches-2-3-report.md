@@ -1,6 +1,6 @@
 # Live test 14 Nov 2026, batches 2 and 3: what was wrong, what changed, how it was checked
 
-Built on his "build it", 14-15 Nov 2026. Committed on the session branch, NOT pushed (his "commit, never push").
+Built on his "build it", 14-15 Nov 2026. Pushed on his "Push it" and merged to `main` on his "Merge", 15 Nov 2026. Not deployed.
 "Checked at 375/390px" means a real phone-sized browser drove the screen; "by test" means a logic check.
 
 ## Batch 2

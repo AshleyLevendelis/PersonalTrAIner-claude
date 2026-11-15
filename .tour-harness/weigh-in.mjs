@@ -18,8 +18,10 @@
 //      NOT move, and the card says the target will follow once another day's
 //      weigh-in agrees;
 //   4. the Profile weight field asks the same way, and saves only on yes;
-//   5. the second day: with yesterday's surprising weigh-in waiting, a
-//      weigh-in today that agrees is not asked about, and the target moves.
+//   5. the third day: with yesterday's surprising weigh-in waiting, a
+//      weigh-in today that agrees is not asked about, and the target moves:
+//      that makes weigh-ins on 3 days in the last 7 (his 14 Nov ruling "Need a
+//      week of readings"), and the average is of the three.
 //
 // RE-ANCHORED on that ruling: sections 3d-3i and 4e-4g used to pin "saved
 // exactly as before, nothing new on screen" and were written to go red when
@@ -252,25 +254,25 @@ console.log('\n4. The Profile weight field asks the same check\n')
   await shoot('weigh-in-profile')
 }
 
-console.log('\n5. The second day agrees: the target follows\n')
+console.log('\n5. The third day agrees: the target follows\n')
 {
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/.tour-harness/real.html?run=3&held=1` })
   await until(() => ev(`(() => { const t = document.querySelector('[data-home-progress-toggle]'); if (t && t.getAttribute('aria-expanded') !== 'true') t.click(); return /Weight/.test(document.body.innerText) && !!document.querySelector('[data-home-weight] button[aria-expanded]') })()`), v => v === true)
   await ev(`(() => { const b = [...document.querySelectorAll('button, a')].find(x => (x.textContent || '').trim() === 'Skip'); if (b) b.click(); return !!b })()`)
   await wait(500)
   const rows = await metrics()
-  check('5a. the fixture: 80.6 kg in August, a surprising 62 kg yesterday, nothing today', rows.length === 2 && rows.some(m => m.endsWith(':62')) && rows.some(m => m.endsWith(':80.6')), rows)
+  check('5a. the fixture: 80.6 kg in August, 80 kg two days ago, a surprising 62 kg yesterday, nothing today', rows.length === 3 && rows.some(m => m.endsWith(':62')) && rows.some(m => m.endsWith(':80')) && rows.some(m => m.endsWith(':80.6')), rows)
   const before = await homeTarget()
   await ev(`(() => { const b = document.querySelector('[data-home-weight] > button[aria-expanded]'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); return !!b })()`)
   const c0 = await until(card, v => !!v && !!v.held)
   check('5b. a day later the card still says yesterday\'s 62 kg is waiting (worked out from the weigh-ins, not remembered)', /^62 kg is saved\./.test(c0?.held ?? ''), c0?.held)
   check('5c. typing 62.4 today and saving', await typeWeight(62.4))
-  const c1 = await until(card, v => !!v && /62\.2/.test(v.line))
+  const c1 = await until(card, v => !!v && /68\.1/.test(v.line))
   check('5d. it is NOT asked about — it agrees with yesterday\'s — and is saved', c1?.question === null && c1?.check === 'ok' && (await metrics()).some(m => m.endsWith(':62.4')), { c1, m: await metrics() })
   const moved = await until(() => ev(`window.__weighInRetarget ?? null`), v => !!v && v.notice != null)
-  check('5e. now the calorie target moves, to the average of the two days (62.2 kg)', !!moved && Math.abs(moved.anchorKg - 62.2) < 0.001 && moved.calories < before && (await until(homeTarget, v => v === moved.calories)) === moved.calories, { before, moved, home: await homeTarget() })
+  check('5e. now, with three days weighed, the calorie target moves, to their average (68.1 kg)', !!moved && Math.abs(moved.anchorKg - 68.1) < 0.05 && moved.calories < before && (await until(homeTarget, v => v === moved.calories)) === moved.calories, { before, moved, home: await homeTarget() })
   check('5f. ...with the usual notice, naming what it moved from and to', typeof moved?.notice === 'string' && moved.notice.includes(before.toLocaleString('en-GB')) && moved.notice.includes(moved.calories.toLocaleString('en-GB')), moved?.notice)
-  check('5g. ...nothing is waiting any more, and the average is of the two', c1?.held === null && c1?.line === 'Targets follow your 7-day average · avg of 2 weigh-ins 62.2 kg', c1)
+  check('5g. ...nothing is waiting any more, and the average is of the three', c1?.held === null && c1?.line === 'Targets follow your 7-day average · 7-day avg 68.1 kg', c1)
   await ev(`document.querySelector('[data-testid="weigh-in-card"]')?.scrollIntoView({ block: 'center' })`)
   await wait(300)
   await shoot('weigh-in-second-day')

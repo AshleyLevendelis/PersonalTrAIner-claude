@@ -82,8 +82,12 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   'tomato base': ['tomato passata', 'chopped tomatoes canned', 'marinara sauce'],
   'broth': ['beef broth', 'chicken broth', 'vegetable broth'],
   'dips': ['hummus', 'tzatziki', 'salsa'],
-  'chocolate': ['dark chocolate', 'dark chocolate 70%', 'milk chocolate'],
-  'snack bars': ['protein bar generic', 'greek yoghurt bar'],
+  'chocolate': ['dark chocolate', 'dark chocolate 70%', 'milk chocolate', 'chocolate bar'],
+  'snack bars': ['protein bar generic', 'greek yoghurt bar', 'cereal bar'],
+  // 15 Nov 2026, the standard UK packs: a pack swaps for another of its kind, the macro match orders them.
+  'crisps': ['crisps', 'ready salted crisps'],
+  'soft drinks': ['cola', 'diet cola'],
+  'meal-deal sandwiches': ['chicken and bacon sandwich', 'chicken sandwich', 'egg mayo sandwich', 'tuna mayo sandwich'],
 }
 
 /**
