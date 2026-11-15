@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **NO UP/DOWN ARROWS INSIDE A NUMBER BOX (Marcus, 15 Nov 2026: "30(" for 300; Wave M-D2)**. The reps box fits
+  three digits on a phone (measured, entry below), but his test ran in desktop Chrome, which draws spin arrows inside a
+  number box, and they took the room the third digit needed. Hidden app-wide (the base styles); typing and the phone's
+  number keyboard are unchanged. `verify:absurd-weight` +1 check (the box's appearance), caught when the style is
+  removed; `test:bundle` (8 kB left of the whole-app budget), `verify:tap-targets`, `verify:profile-fixes`,
+  `verify:setup-weight-correction` pass.
 - [x] **"120 REPS — IS THAT RIGHT?" CLEARS WHEN HE FIXES THE NUMBER (Marcus, 15 Nov 2026; Wave M-D2, mechanical)**.
   The question about an impossible rep count only cleared when the WEIGHT changed: typing 12 left it on screen. A line
   resetting it was also written twice inside the weight-only branch, and `test:odd-reps` counted exactly two copies, so

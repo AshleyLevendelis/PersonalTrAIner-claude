@@ -700,6 +700,18 @@
   * {
     @apply border-border;
   }
+  /* NO UP/DOWN ARROWS IN A NUMBER BOX (Marcus, 15 Nov 2026: "30(" for 300). A phone never draws them; a desktop browser
+     draws them inside the box and they took the room the third digit needed. Typing and the number keyboard are
+     unchanged. */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;

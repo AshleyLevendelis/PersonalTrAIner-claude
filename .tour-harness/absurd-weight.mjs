@@ -184,6 +184,10 @@ check('5g. three digits fit in the reps box', !!fit && fit.text <= fit.room, fit
 // ...and on today's card, the big boxes (any reps box outside the Additional Work section).
 const cardFit = await ev(`(() => { const sec = ${SECTION}; const el = [...document.querySelectorAll('input[id^="setgrid-reps-"]')].find(i => !sec || !sec.contains(i)); if (!el) return null; el.scrollIntoView({ block: 'center' }); (${setValue})(el, '100'); const cs = getComputedStyle(el); const c = document.createElement('canvas').getContext('2d'); c.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; return { text: Math.round(c.measureText(el.value).width), room: Math.round(el.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight)), font: cs.fontSize } })()`)
 check('5h. ...and on today\'s card', !!cardFit && cardFit.text <= cardFit.room, cardFit)
+// ...WITH NO UP/DOWN ARROWS EATING THE ROOM: a desktop browser draws them inside a number box (Marcus's "30(" for 300).
+// (Chrome draws no arrows for a number box whose appearance is "textfield"; its default is "auto", which draws them.)
+const arrows = await ev(`(() => { const el = document.querySelector('input[id^="setgrid-reps-"]'); return el ? getComputedStyle(el).appearance : null })()`)
+check('5i. ...and no up/down arrows are drawn inside the box', arrows === 'textfield', arrows)
 await scrollToSection(); await wait(300); await shoot('absurd-weight-reps')
 
 const err = await ev('window.__err ?? null')
