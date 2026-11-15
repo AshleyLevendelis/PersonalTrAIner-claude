@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **A REHAB DRILL IS NEVER THE DAY'S MAIN LIFT (15 Nov 2026, CSCS, mine; Marcus after knee surgery had "Step-Down
+  (Eccentric)" labelled MAIN LIFT)**. His knee flag removed the loaded leg work, and the step-down (a physio-style
+  control drill, tagged as indicated for the knee) was the highest-ranked thing left, so it got the label and the main
+  lift's rest floor. The one shared "can this be a main lift" rule now refuses any movement tagged as rehab for a joint
+  (12 in the catalogue; only Low Box Step-Up and the step-down could ever have ranked). Beside a glute bridge the bridge
+  leads; a day of drills alone has no main lift, the house rule that no main lift beats a wrong one. BASIS: rehab work
+  is done for control and is not progressed by load; the main lift is the movement the session is built to progress.
+  REVIEW: the drill stays in the session at its own dose; nothing removed; no floor redefined (the main-lift rest
+  floor now attaches to a real lift or none); in scope. VERIFIED: `test:main-lift-label` (4 new checks, re-anchored one
+  that had pinned "every reps movement can", mutation caught 3 of 4 new), and 20 gates reading the rule pass
+  (`test:main-lift-rest`, `test:day-purpose`, `test:rehab-prescribed`, `test:injury-adaptation-safety` among them).
+  The 9,216-plan quality grid is in the full run. NOT DONE, needs a written plan first (injury filtering): a knee flag
+  keeping knee-friendly loaded work (leg press, leg curl, a lighter leg extension), a "& Calves" day keeping one calf
+  exercise, and step patterns not offered as each other's replacement when the knee is flagged.
 - [x] **PANTRY ITEMS ON THE SHOPPING LIST READ AS A BOTTLE, JAR OR PACK (15 Nov 2026, the coeliac nurse: "Olive oil
   10 ml")**. A small amount (up to 250 g or ml) of an oil or a condiment reads "1 bottle (uses 10ml)": oils, vinegars
   and sauces are bottles, honey, pastes, nut-free spreads like tahini and coconut oil are jars, spices and stock are

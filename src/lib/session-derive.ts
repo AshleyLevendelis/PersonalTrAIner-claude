@@ -458,8 +458,14 @@ export function anchorScore(mechanicsTier: string | undefined, name: string): nu
  * Cardio and finishers are excluded because they are not the session's work,
  * and primers because a warm-up movement is never the point of the day.
  */
-/** Whether a catalogue movement can be a day's main lift: counted in reps, never timed or carried. */
-export function canAnchor(entry: { prescription_type?: string }): boolean {
+/**
+ * Whether a catalogue movement can be a day's main lift: counted in reps, never timed or carried, and NEVER A REHAB
+ * DRILL (15 Nov 2026, CSCS; Marcus, after knee surgery, had "Step-Down (Eccentric)" labelled MAIN LIFT once his knee
+ * flag had removed the loaded leg work). A movement tagged as indicated for a joint is the physio-style work for that
+ * joint: done for control, not progressed by load, and not the point of the day. No main lift beats a wrong one.
+ */
+export function canAnchor(entry: { prescription_type?: string; indicated_joints?: readonly string[] }): boolean {
+  if ((entry.indicated_joints?.length ?? 0) > 0) return false
   return (entry.prescription_type ?? 'reps') === 'reps'
 }
 

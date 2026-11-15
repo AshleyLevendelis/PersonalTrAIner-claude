@@ -34,7 +34,19 @@ const anchor = dayAnchorExercise([row(hold.name), row(weaker.name)])
 check('the reps movement is the main lift, not the hold', anchor?.name === weaker.name, anchor?.name)
 check('a day of holds alone has no main lift', dayAnchorExercise(holds.slice(0, 3).map(e => row(e.name))) === undefined)
 check('carries and intervals cannot anchor either', EXERCISE_DATABASE.filter(e => e.prescription_type === 'distance_load' || e.prescription_type === 'intervals').every(e => !canAnchor(e)))
-check('a reps movement can', reps.every(e => canAnchor(e)))
+check('a reps movement that is not a rehab drill can', reps.filter(e => (e.indicated_joints?.length ?? 0) === 0).every(e => canAnchor(e)))
+
+// A REHAB DRILL IS NEVER THE MAIN LIFT (15 Nov 2026, Marcus after knee surgery: "Step-Down (Eccentric)" was).
+{
+  const stepDown = EXERCISE_DATABASE.find(e => e.name === 'Step-Down (Eccentric)')
+  const bridge = EXERCISE_DATABASE.find(e => e.name === 'Glute Bridge')
+  check('the fixture: the step-down is rehab-tagged and outranks the bridge', !!stepDown && !!bridge && (stepDown!.indicated_joints?.length ?? 0) > 0
+    && anchorScore(stepDown!.mechanics_tier, stepDown!.name) >= anchorScore(bridge!.mechanics_tier, bridge!.name), [stepDown?.mechanics_tier, bridge?.mechanics_tier])
+  const a = dayAnchorExercise([row('Step-Down (Eccentric)'), row('Glute Bridge')])
+  check('beside a bridge, the bridge is the main lift, not the step-down', a?.name === 'Glute Bridge', a?.name)
+  check('a day of rehab drills alone has no main lift', dayAnchorExercise([row('Step-Down (Eccentric)'), row('Low Box Step-Up')]) === undefined)
+  check('no rehab-tagged movement can anchor', EXERCISE_DATABASE.filter(e => (e.indicated_joints?.length ?? 0) > 0).every(e => !canAnchor(e)))
+}
 
 const strip = (src: string) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 const engine = strip(readFileSync(join(ROOT, 'src/lib/exercise-plan.ts'), 'utf8'))
