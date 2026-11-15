@@ -2,6 +2,32 @@
 
 Newest first. One line each.
 
+- [x] **A "20-30 MIN" SESSION SETTING (15 Nov 2026, CSCS, decided by me under his delegation; the coeliac nurse had 20
+  minutes and the shortest choice was 30-45)**. Offered first on setup and Profile, and the coach's session-length card
+  can choose it. The plan aims at 23 minutes inside 20-30: the main lift and two accessories (no isolation slot); an
+  upper-body push and pull PAIRED as a superset (only second-tier lifts, never the main lift, never lower body; at other
+  lengths compounds stay unpaired as before); the goal's conditioning as its own short session instead of 10 minutes on
+  top of lifting; and a day still over 30 minutes with every rest at its floor gives up a set, accessories from the
+  bottom up and the main lift last, never below two (his 18 Sep "protect the rest, do less" and 13 Sep "protect the main
+  lift"). BASIS: antagonist paired sets hold their reps in about half the time because a press and a pull load
+  different muscles (Robbins et al. 2010; Weakley et al. 2017); novices progress on two working sets (ACSM 2009, Rhea et
+  al. 2003); a missing movement pattern is the bigger loss, so patterns stay. MEASURED (`measure:short-sessions`, 144
+  profiles, 5,184 loading sessions): over 30 minutes 336 (6.5%) on the first cut, 12 (0.2%) after, each a minute or two
+  over with every set at two (30-45 on the same grid: 2); median 25.9 minutes; every plan above the 7.2 quality floor
+  (lowest 9.2). REVIEW: (1) training effect: the four patterns each session already had, less accessory volume;
+  (2) takes away isolation work and, on the tightest days, a set; (3) patterns, overload and recovery kept;
+  (4) no floor redefined: the rest floors and his 30-second report are checked on every 20-30 plan; (5) in scope.
+  FOUND ON THE WAY, two real defects: (a) the week-balance pass could cut a day to TWO exercises (a four-day bodyweight
+  push day lost a push-up variation to even push and pull); it now never takes a day below three, at every length;
+  (b) A SUPERSET PARTNER'S "ALTERNATE" REST IS OVERWRITTEN WITH A FULL REST IN EVERY WEEK AFTER THE BASE PLAN, at every
+  length, so supersets have never saved time past week 1. Fixed at 20-30 only: at 45-60 the honest timing put 4 more
+  of 576 sessions under 45 minutes (`test:session-length` 32 -> 36, ceiling 6%), because the overcounted rest had been
+  padding them, so the general fix needs the top-up step looked at with it. OPEN, mine, next engine pass.
+  VERIFIED: `test:short-session` (37 checks, 17 mutations, all caught; one redundant main-lift clause found by a missed
+  mutation and deleted), `test:session-length`, `test:rest-floors`, `test:pattern-floor`, `test:option-icons`,
+  `test:onboarding-slots`, `test:no-dead-code`, `test:coach-promises`, `test:chat-app-reality` pass. NEEDS the
+  `chat-gemini` deploy (the coach's tool and scaling line) and `onboarding-chat` (the band wording). No migration: the
+  column is free text.
 - [x] **SETUP NEVER GUESSES HOW ACTIVE SOMEONE IS FROM THEIR JOB (15 Nov 2026, the coeliac nurse: "I'm a nurse" was
   recorded as "Very active" without a question, which sets her calorie target)**. The app now keeps an activity level
   only when the reply names one in words ("pretty sedentary", "lightly active") or taps a chip; a job or a description

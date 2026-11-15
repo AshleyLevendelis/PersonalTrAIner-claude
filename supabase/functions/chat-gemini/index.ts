@@ -1217,7 +1217,7 @@ const toolDeclarations = [
         },
         minutes: {
           type: "string",
-          enum: ["30-45", "45-60", "60-90", "90+"],
+          enum: ["20-30", "30-45", "45-60", "60-90", "90+"],
           description: "The band their sessions should be from now on. Map what they said to the band that CONTAINS it — 45 minutes is '30-45', an hour is '45-60'. If what they said sits on a boundary or between bands, ask rather than choosing for them.",
         },
         reason: {
@@ -2984,6 +2984,7 @@ ${context.dietary_preferences && context.dietary_preferences.length > 0 ? `- Die
 
 SESSION DURATION SCALING (MANDATORY):
 The user has ${context.session_duration_preference || '45-60'} minutes per session. Scale your exercise recommendations accordingly:
+- 20-30 min: 3 exercises: the main lift and two accessories, supersetted. No isolation work.
 - 30-45 min: 4-5 exercises max per session. Use supersets to compress time. Skip isolation work.
 - 45-60 min: 5-6 exercises. Standard compound + accessory structure.
 - 60-90 min: 6-7 exercises. Full compound, accessory, and isolation.

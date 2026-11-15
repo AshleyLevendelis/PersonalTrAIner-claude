@@ -25,6 +25,7 @@ import { parseTempo, tempoSecondsPerRep } from './periodization'
 // same flat `avg_duration_seconds`.
 
 export const DURATION_BUDGET_SECONDS: Record<SessionDuration, number> = {
+  '20-30': 23 * 60,
   '30-45': 37 * 60,
   '45-60': 52 * 60,
   '60-90': 75 * 60,
@@ -48,6 +49,7 @@ export function getDurationBudgetSeconds(duration: SessionDuration): number {
 // session up. MEASURED across loading weeks: 1% of "60-90" sessions fell below
 // their stated minimum against 13% of "45-60" ones, purely from that.
 export const SESSION_MINIMUM_SECONDS: Record<SessionDuration, number> = {
+  '20-30': 20 * 60,
   '30-45': 30 * 60,
   '45-60': 45 * 60,
   '60-90': 60 * 60,
@@ -69,7 +71,7 @@ export function getSessionMinimumSeconds(duration: SessionDuration): number {
  * safety trim in generateMesocycle.
  */
 export const SESSION_MAXIMUM_SECONDS: Record<SessionDuration, number> = {
-  '30-45': 45 * 60, '45-60': 60 * 60, '60-90': 90 * 60, '90+': 120 * 60,
+  '20-30': 30 * 60, '30-45': 45 * 60, '45-60': 60 * 60, '60-90': 90 * 60, '90+': 120 * 60,
 }
 
 export function getSessionMaximumSeconds(duration: SessionDuration): number {
@@ -84,6 +86,7 @@ export function getSessionMaximumSeconds(duration: SessionDuration): number {
 // registers in a long one; scaling it the same way DURATION_BUDGET_SECONDS
 // already scales everything else keeps it proportionate at every tier.
 export const STEADY_STATE_SECONDS: Record<SessionDuration, number> = {
+  '20-30': 10 * 60,
   '30-45': 15 * 60,
   '45-60': 20 * 60,
   '60-90': 30 * 60,

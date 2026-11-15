@@ -1514,7 +1514,7 @@ export function buildSupersetPairs(
   style: TrainingStyle,
   trace: ConstraintTrace,
 ): Exercise[] {
-  const isShort = duration === '30-45' || duration === '45-60'
+  const isShort = duration === '20-30' || duration === '30-45' || duration === '45-60'
   if (!isShort && style !== 'combat') return exercises
 
   const result = [...exercises]
@@ -1541,6 +1541,38 @@ export function buildSupersetPairs(
       if (!entryB || !isSupersetEligible(entryB)) continue
 
       if (entryB.movement_pattern === opposing) {
+        const letter = String.fromCharCode(65 + labelCounter)
+        result[i] = { ...result[i], superset_label: `${letter}1` }
+        result[j] = { ...result[j], superset_label: `${letter}2`, rest: 'alternate' }
+        paired.add(i)
+        paired.add(j)
+        labelCounter++
+        break
+      }
+    }
+  }
+
+  // A 20-30 MINUTE SESSION PAIRS AN UPPER PUSH WITH AN UPPER PULL (15 Nov 2026, CSCS). Above, compounds stay out of
+  // supersets because each needs its full rest. An antagonist pair is the exception the evidence supports: a press
+  // and a pull load different muscles, so each still rests for the other's set plus the shared rest, and paired
+  // sets hold their reps in about half the time (Robbins et al. 2010; Weakley et al. 2017). Only second-tier
+  // compounds, never the main lift, never lower body (a squat paired with a hinge is the defect noted above), and
+  // only at 20-30, where a full-body day's four patterns cannot otherwise fit.
+  if (duration === '20-30') {
+    const isPush = (e: ExerciseEntry) => e.movement_pattern === 'horizontal_push' || e.movement_pattern === 'vertical_push'
+    const isPull = (e: ExerciseEntry) => e.movement_pattern === 'horizontal_pull' || e.movement_pattern === 'vertical_pull'
+    const shortPairable = (idx: number) => {
+      if (paired.has(idx)) return null
+      const e = pool.find(x => x.name === result[idx].name)
+      return e && e.mechanics_tier === 'tier2_compound' && (isPush(e) || isPull(e)) ? e : null
+    }
+    for (let i = 0; i < result.length; i++) {
+      const a = shortPairable(i)
+      if (!a) continue
+      for (let j = i + 1; j < result.length; j++) {
+        const b = shortPairable(j)
+        if (!b || pairCrossesMainLift(mainIdx, i, j)) continue
+        if (!((isPush(a) && isPull(b)) || (isPull(a) && isPush(b)))) continue
         const letter = String.fromCharCode(65 + labelCounter)
         result[i] = { ...result[i], superset_label: `${letter}1` }
         result[j] = { ...result[j], superset_label: `${letter}2`, rest: 'alternate' }
@@ -1996,6 +2028,9 @@ export function getSplitForDays(dayCount: number, goal: FitnessGoal, splitPref: 
 // stopped being allowed to run unbounded.
 function getExerciseCountForDuration(duration: SessionDuration): { tier1: number; tier2: number; tier3: number } {
   switch (duration) {
+    // 20-30 (15 Nov 2026, CSCS): the main lift and two accessories, no isolation slot. Three exercises is the floor
+    // every cut already keeps, so the short session is that floor by design rather than by trimming.
+    case '20-30': return { tier1: 1, tier2: 2, tier3: 0 }
     case '30-45': return { tier1: 1, tier2: 2, tier3: 1 }
     case '45-60': return { tier1: 1, tier2: 2, tier3: 2 }
     case '60-90': return { tier1: 1, tier2: 4, tier3: 3 }
@@ -2015,6 +2050,10 @@ function adjustCountsForExperience(
 ): { tier1: number; tier2: number; tier3: number } {
   const adjust = experience.exercise_count_adjust
   if (adjust === 0) return counts
+
+  // A session with no isolation slot (20-30) is already the three-exercise floor: a beginner keeps all three rather
+  // than the trim below conjuring an isolation slot (its Math.max(1, ...) would ADD one) or cutting to two.
+  if (adjust < 0 && counts.tier3 === 0) return counts
 
   if (adjust < 0) {
     // Trim accessories first, then secondary compounds. Never below one each.
@@ -4479,6 +4518,10 @@ function balanceWeeklyStructure(
     for (let dayIdx = days.length - 1; dayIdx >= 0; dayIdx--) {
       const exercises = days[dayIdx].exercises
       if (exercises.length <= 1) continue
+      // NEVER BELOW THREE TRAINING EXERCISES (15 Nov 2026): the floor every cut keeps. Measured on the new 20-30
+      // setting, where a day has no isolation slot to spare: this removal took bodyweight push days to two push-up
+      // variations and nothing else. Another day carrying the pattern is tried instead.
+      if (trainingSlotCount(exercises.map(ex => findEntry(ex.name))) <= 3) continue
       for (let exIdx = exercises.length - 1; exIdx >= 0; exIdx--) {
         const entry = findEntry(exercises[exIdx].name)
         if (!entry || entry.mechanics_tier === 'tier1_compound' || entry.mechanics_tier === 'primer') continue
@@ -5498,7 +5541,7 @@ export const OPTIONAL_CARDIO_FOCUS = 'Rest day · optional cardio'
 
 function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, policy: GoalPolicy): void {
   const duration = profile.session_duration_preference || '45-60'
-  const isTimeLimited = duration === '30-45'
+  const isTimeLimited = duration === '20-30' || duration === '30-45'
   const goal = profile.fitness_goal
 
   // Hoisted to concurrent-activity.ts on 6 Sep 2026 — the same "which days
@@ -5624,6 +5667,18 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
   // easy block after lifting is standard practice when the time is there.
   for (const day of noRestDayActivity && isTimeLimited ? [] : heavyDays) {
     if (remaining <= 0) break
+    // 20-30 MINUTES HAS NO ROOM FOR A BLOCK AFTER LIFTING (15 Nov 2026, CSCS): ten minutes on top of a 25-minute
+    // session is a 35-minute session. The goal's conditioning stays, as its own short session, as on a light day.
+    if (duration === '20-30') {
+      day.recommendedCardio = {
+        ...cardioForGoal.independentBlock,
+        timing: 'independent_session',
+        reason: 'Scheduled as a separate session to preserve your strict lifting window.',
+      }
+      day.conditioning_note = `Independent session: ${cardioForGoal.independentBlock.activity} (${cardioForGoal.independentBlock.duration} min)`
+      remaining--
+      continue
+    }
     day.conditioning_note = `${cardioForGoal.heavyDayBrief.activity} (${cardioForGoal.heavyDayBrief.duration} min)`
     day.recommendedCardio = {
       ...cardioForGoal.heavyDayBrief,
@@ -6884,6 +6939,39 @@ function trimWeekRestForBudget(
       }
       if (!trimmed) break
     }
+  }
+}
+
+/**
+ * A 20-30 MINUTE DAY STILL OVER 30 ONCE REST IS AT ITS FLOOR GIVES UP A SET (15 Nov 2026, CSCS). His 18 Sep ruling:
+ * protect the rest, do less. On a full-body day holding all four patterns the rep ramp grows the day past 30 with
+ * every rest already at its floor, and the trim above may only touch rest. So: one set at a time off the accessories,
+ * from the bottom up, and the main lift last (his 13 Sep shorten ruling), never below two (a beginner's floor, and one set is not a stimulus), never
+ * an exercise removed, never a primer touched. Novices progress well on two working sets (ACSM 2009; Rhea et al.
+ * 2003); a pattern missing from the day is the worse loss (the pattern floor). Only at 20-30, where the margin is
+ * five minutes rather than eight or more.
+ */
+export function trimShortSessionSets(days: WorkoutDay[], maxSeconds: number, trimLog?: ConstraintTraceEntry[]): void {
+  for (let d = 0; d < days.length; d++) {
+    let day = days[d]
+    for (let guard = 0; guard < 100 && day.exercises.length > 0 && estimateDaySeconds(day) > maxSeconds; guard++) {
+      // Accessories first, from the bottom of the session up, and the main lift last: his 13 Sep ruling for a shortened
+      // day (protect the main lift, drop accessory work from the bottom up), applied to sets.
+      const order = day.exercises
+        .map((ex, i) => ({ ex, i }))
+        .filter(({ ex }) => ex.tier !== 'tier_0_primer' && typeof ex.sets === 'number' && ex.sets > 2)
+        .sort((a, b) => ((a.ex.tier === 'tier_1_primary' ? 1 : 0) - (b.ex.tier === 'tier_1_primary' ? 1 : 0)) || b.i - a.i)
+      if (order.length === 0) break
+      const { ex, i } = order[0]
+      const exercises = day.exercises.slice()
+      exercises[i] = { ...ex, sets: ex.sets - 1 }
+      day = { ...day, exercises }
+      trimLog?.push({
+        exercise: ex.name, stage: 'time_cap',
+        reason: `one set taken off (${ex.sets} -> ${ex.sets - 1}) so ${day.day} fits the 30 minutes, rest kept`,
+      })
+    }
+    days[d] = day
   }
 }
 
@@ -8324,9 +8412,16 @@ export function generateMesocycle(
           // Cardio, intervals and steady-state are excluded by
           // unbudgetedRestSeconds returning null: their rest is the bout, not
           // the tier.
+          // A SUPERSET PARTNER KEEPS ALTERNATING, at 20-30 (15 Nov 2026). Its rest is the literal 'alternate': it rests
+          // while its partner works, then shares the partner's rest. This floor reads 'alternate' as 20 seconds and
+          // raises it to the tier's full rest, so every A2 after the base plan carries a full rest of its own and a
+          // superset saves no time. TRUE AT EVERY LENGTH, fixed here only at 20-30: at 45-60 the honest timing put 4
+          // more of 576 sessions under 45 minutes (test:session-length, 32 -> 36), because the overcounted rest had been
+          // padding them. That needs the top-up step looked at too; it is its own fix (BACKLOG, 15 Nov 2026).
           {
             const unbudgeted = unbudgetedRestSeconds(dbEntry, profile.training_style || 'hybrid', restShift)
-            if (unbudgeted != null && dbEntry && dbEntry.mechanics_tier !== 'tier1_compound' && ex !== promotedAnchor) {
+            const keepsAlternating = restForWeek === 'alternate' && profile.session_duration_preference === '20-30'
+            if (!keepsAlternating && unbudgeted != null && dbEntry && dbEntry.mechanics_tier !== 'tier1_compound' && ex !== promotedAnchor) {
               const floor = restFloorFor(mapTier(dbEntry.mechanics_tier), unbudgeted)
               const current = parseRestSeconds(restForWeek)
               if (floor > 0 && current > 0 && current < floor) {
@@ -9112,6 +9207,9 @@ export function generateMesocycle(
           policy.minLoadedMainLiftRestSeconds,
           profile.training_style || 'hybrid',
         )
+        if (profile.session_duration_preference === '20-30') {
+          trimShortSessionSets(days, getSessionMaximumSeconds('20-30'), trimLog)
+        }
       }
 
       // Starting-out weeks progress on DURATION, not load. Everything above

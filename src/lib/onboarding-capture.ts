@@ -150,6 +150,7 @@ export function mealCountIn(text: string): 2 | 3 | 4 | undefined {
  * gate compares the two tables, so a drift is a red check, not a wrong claim.
  */
 export const SESSION_BAND_MINUTES: Record<SessionDuration, readonly [number, number]> = {
+  '20-30': [20, 30],
   '30-45': [30, 45],
   '45-60': [45, 60],
   '60-90': [60, 90],

@@ -287,6 +287,8 @@
     "test:pattern-tags": "tsx scripts/test-movement-pattern-tags.ts",
     "test:rehab-prescribed": "tsx scripts/test-rehab-prescribed.ts",
     "test:frozen-weeks": "tsx scripts/test-frozen-weeks.ts",
+    "test:short-session": "tsx scripts/test-short-session.ts",
+    "measure:short-sessions": "tsx scripts/measure-short-sessions.ts",
     "test:session-length": "tsx scripts/test-session-length.ts",
     "test:load-ceilings": "tsx scripts/test-load-ceilings.ts",
     "test:ceiling-units": "tsx scripts/test-load-ceiling-units.ts",

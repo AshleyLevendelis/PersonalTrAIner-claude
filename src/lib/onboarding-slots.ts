@@ -106,6 +106,7 @@ export const CONDITIONING_PREF_OPTIONS: { value: ConditioningPreference; icon: s
 ]
 
 export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: string; description: string }[] = [
+  { value: '20-30', icon: '⏲️', label: '20-30 min', description: 'Short & focused' },
   { value: '30-45', icon: '⚡', label: '30-45 min', description: 'Quick & efficient' },
   { value: '45-60', icon: '⏱️', label: '45-60 min', description: 'Standard session' },
   { value: '60-90', icon: '🏋️', label: '60-90 min', description: 'Extended volume' },

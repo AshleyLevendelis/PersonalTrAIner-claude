@@ -127,6 +127,7 @@ export function sportFuelNote(profile: Pick<UserProfile, 'concurrent_activities'
 
 function getSessionDurationMinutes(profile: UserProfile): number {
   switch (profile.session_duration_preference) {
+    case '20-30': return 25
     case '30-45': return 37
     case '45-60': return 52
     case '60-90': return 75
