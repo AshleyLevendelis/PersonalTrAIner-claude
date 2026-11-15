@@ -202,6 +202,9 @@ interface MealPlanProps {
  * one meal the user has open — everything else is a single collapsed line,
  * mirroring ExerciseRow's collapsed/expanded contract.
  */
+/** What "Regenerate all" replaces and keeps, said before it runs (meal-generation.ts survivesRegeneration). */
+export const REGENERATE_ALL_QUESTION = "Make new meals for every day? The app's own meals are replaced. Meals you hearted or asked for stay, and so do your meals out and what you've logged. Your shopping list stays as it is until you rebuild it."
+
 export function MealPlan({
   fitnessGoal,
   profileId, noticeSlot, date, pools, chosen, totals, targets, isGenerating, regenerateError, onDismissRegenerateError,
@@ -211,6 +214,9 @@ export function MealPlan({
   heldAround, onKeepHeldSizes, eatingOut, freestyle,
 }: MealPlanProps) {
   const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
+  // "REGENERATE ALL" ASKS FIRST (15 Nov 2026, the coeliac nurse's test): one tap replaced every meal the app had made,
+  // for every day, with no word. It now says what goes and what stays, and only "Make new meals" runs it.
+  const [confirmRegenerateAll, setConfirmRegenerateAll] = useState(false)
   // A slot generation requested and asked for (present as a key in `pools`,
   // per generateMealPools always seeding every active slot to []) but came
   // back with zero options must render honestly, never disappear — silently
@@ -750,11 +756,12 @@ export function MealPlan({
         <p className="text-xs text-text-tertiary" data-testid="allergen-limit">
           Ingredients are filtered, not verified. Check labels if you have an allergy.
         </p>
-        {!upcoming && (
+        {!upcoming && !confirmRegenerateAll && (
           <button
             type="button"
-            onClick={onRegenerateAll}
+            onClick={() => setConfirmRegenerateAll(true)}
             disabled={isGenerating}
+            data-testid="regenerate-all"
             className="hit-slop-44 flex shrink-0 items-center gap-1.5 text-[0.6875rem] font-semibold text-muted-foreground disabled:opacity-50"
           >
             {isGenerating ? <Loader2 className="size-3 animate-spin" /> : <RefreshCw className="size-3" />}
@@ -762,6 +769,24 @@ export function MealPlan({
           </button>
         )}
       </div>
+      {!upcoming && confirmRegenerateAll && (
+        <div role="group" aria-label="Make all new meals?" data-testid="regenerate-all-confirm" ref={n => n?.scrollIntoView({ block: 'center', behavior: 'smooth' })} className="rounded-xl border border-border bg-card p-3 text-sm">
+          <p className="text-foreground">{REGENERATE_ALL_QUESTION}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              data-testid="regenerate-all-yes"
+              disabled={isGenerating}
+              onClick={() => { setConfirmRegenerateAll(false); void onRegenerateAll() }}
+            >
+              Make new meals
+            </Button>
+            <Button size="sm" variant="outline" data-testid="regenerate-all-no" onClick={() => setConfirmRegenerateAll(false)}>
+              Keep these
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

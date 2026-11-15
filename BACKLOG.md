@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **"REGENERATE ALL" ASKS FIRST (the coeliac nurse's test, 15 Nov 2026; Wave N, mechanical in the plan)**. One tap
+  replaced the app's meals for every day with no word. The tap now opens a question in place: "Make new meals for every
+  day? The app's own meals are replaced. Meals you hearted or asked for stay, and so do your meals out and what you've
+  logged. Your shopping list stays as it is until you rebuild it." with "Make new meals" and "Keep these", scrolled into
+  view above the tab bar. Every sentence is what the code does (survivesRegeneration keeps hearted, asked-for and
+  one-day meals; a regenerate never touches the log or the list). The "Generate meals" button on an empty plan and the
+  "Redo them" offer under a restriction notice do not ask: the first replaces nothing, the second is already the answer
+  to a question on screen. `verify:meal-regenerate` 22 -> 23 checks (asks, nothing ran, Keep closes and changes nothing,
+  Make runs it, on screen), 4 mutations, 4 caught; screenshot read. 45 checks reading the meal screen pass, plus
+  `verify:empty-meals`, `verify:nutrition-week`, `verify:one-page`, `verify:meal-regenerate-one`.
 - [x] **A KNEE KEEPS MACHINE LEG WORK, LIGHTER (his answer 1 of 15 Nov 2026, "Allow it, lighter"; Marcus's leg day of
   rehab drills)**. Leg Press, Hack Squat and Seated Leg Curl are no longer removed for a knee on the injuries list
   (the catalogue says so per lift); free-weight squats, lunges and jumps still are. A lift that loads a flagged knee and

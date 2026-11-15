@@ -88,7 +88,21 @@ check('1d. before the tap there is no working state and the meals can be tapped'
 
 console.log('\n2. While it runs\n')
 await ev(`window.scrollTo(0, 0)`)
+// IT ASKS FIRST (15 Nov 2026, the coeliac nurse): the tap opens a question and nothing runs until "Make new meals".
 check('2a. tapping Regenerate all', await clickAt(`[...document.querySelectorAll('button')].find(b => /^\\s*Regenerate all\\s*$/.test(b.textContent || ''))`))
+const asked = await until(() => ev(`document.querySelector('[data-testid="regenerate-all-confirm"]')?.innerText ?? null`), v => !!v, 20)
+check('2a-i. ...asks first, saying what is replaced and what stays', /Make new meals for every day\?/.test(asked ?? '') && /hearted or asked for stay/.test(asked ?? '') && /shopping list stays as it is/.test(asked ?? ''), asked)
+await wait(600)
+const askBox = await ev(`(() => { const b = document.querySelector('[data-testid="regenerate-all-yes"]')?.getBoundingClientRect(); const bar = document.querySelector('nav')?.getBoundingClientRect(); return b ? { bottom: b.bottom, top: b.top, bar: bar?.top ?? innerHeight } : null })()`)
+check('2a-v. ...with its buttons on screen, above the tab bar', !!askBox && askBox.top >= 0 && askBox.bottom <= askBox.bar, askBox)
+await shoot('meal-regenerate-ask')
+check('2a-ii. ...and nothing has run yet', (await ev(`window.__generatorCalls`)) === callsBefore && (await working())?.panel === null, await ev(`window.__generatorCalls`))
+await ev(`document.querySelector('[data-testid="regenerate-all-no"]')?.click()`)
+await wait(300)
+check('2a-iii. "Keep these" closes it, changes nothing, and the button is back', (await ev(`!document.querySelector('[data-testid="regenerate-all-confirm"]') && !!document.querySelector('[data-testid="regenerate-all"]')`)) === true && (await ev(`window.__generatorCalls`)) === callsBefore && JSON.stringify(await options()) === JSON.stringify(optionsBefore))
+await clickAt(`document.querySelector('[data-testid="regenerate-all"]')`)
+await until(() => ev(`!!document.querySelector('[data-testid="regenerate-all-yes"]')`), v => v === true, 20)
+check('2a-iv. "Make new meals" runs it', await clickAt(`document.querySelector('[data-testid="regenerate-all-yes"]')`))
 const during = await until(working, v => !!v && v.panel !== null, 20)
 check('2b. it says what is happening, in words: building the meals, about how long, and what the meals underneath are',
   /Building your meals…/.test(during?.panel ?? '') && /up to a minute/.test(during?.panel ?? '') && /The meals below are the ones you had, until the new ones are ready\./.test(during?.panel ?? ''), during?.panel)
