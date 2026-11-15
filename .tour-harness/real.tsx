@@ -28,6 +28,7 @@
 // holds the real one; if these two ever disagree, believe that gate.
 // ---------------------------------------------------------------------------
 
+import { setPlanPausedSince } from '../src/lib/plan-pause'
 import { swapOnScreen } from '@/lib/screen-swap'
 import { useKeptPlanSender } from '@/hooks/useKeptPlanSender'
 import { banOnScreen } from '@/lib/screen-ban'
@@ -262,6 +263,9 @@ const SAM = new URLSearchParams(location.search).get('sam') === '1'
 // the remembered facts with the app's own functions — App's two lines, reproduced, nothing else. With ?sam=1 it is
 // Sam's own setup: the minimalist guess, nothing said about the kit.
 const KIT = new URLSearchParams(location.search).get('kit') === '1'
+// A PLAN PAUSE (his "Add a pause"): ?paused=YYYY-MM-DD is the INPUT, the date the pause began; the page mirrors it
+// into the app's one store exactly as App.tsx does, and nothing else.
+const PAUSED_FROM = new URLSearchParams(location.search).get('paused')
 // ?weighin=81.7 — THE LATEST WEIGH-IN ISN'T THE WEIGHT THE TARGETS USE (runs 7-10, M58). App works targets out from an
 // anchored 7-day weight that moves only when the average does; the raw reading is a display fact. INPUT only: the
 // anchor stays the profile's 80 kg, as App's would after one heavier morning.
@@ -1810,6 +1814,9 @@ function Harness() {
   // App's handler moves it. The plan itself comes from buildRestartedPlan, the function App
   // calls; only the saving is App's own (this page has no plan table to write to).
   const [planBornAt, setPlanBornAt] = useState(profile.created_at as string)
+  const [pausedSince, setPausedSince] = useState<string | null>(PAUSED_FROM)
+  setPlanPausedSince(PROFILE_ID, pausedSince)
+  const planPause = async (pause: boolean): Promise<string | null> => { setPausedSince(pause ? TODAY_ISO : null); return null }
   const restartPlan = async (): Promise<string | null> => {
     const weeks = buildRestartedPlan(profile, [])
     if (weeks.length === 0) return "I couldn't start your plan again."
@@ -1948,7 +1955,7 @@ function Harness() {
           <ExerciseTab plan={planBornAt === profile.created_at ? exercisePlan : editedMeso[0]?.days ?? exercisePlan} mesocycle={editedMeso} exclusions={[]}
             profile={kitProfile} profileId={PROFILE_ID} planCreatedAt={planBornAt}
             storedProfile={KIT ? kitProfile : undefined} kitController={kitController}
-            onRestartPlan={restartPlan}
+            onRestartPlan={restartPlan} onPlanPause={planPause}
             // What App passes saves the numbers and rebuilds the plan (test:first-session-lifts holds that half). Here
             // it records what the card asked to save, so the driver reads the patch the app would write.
             onFirstSessionLifts={async patch => { (window as unknown as { __firstLifts?: unknown[] }).__firstLifts = [...((window as unknown as { __firstLifts?: unknown[] }).__firstLifts ?? []), patch]; return null }}

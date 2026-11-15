@@ -4,12 +4,14 @@
 // followed. Now, when what HE said names a symptom and the coach's reply sends him to a professional:
 //   - the open workout ends where it stands (every set kept) and the rest banner goes;
 //   - no unprompted cheerful message or workout reminder for 48 hours, in the chat or on the phone;
-//   - the pause is offered;
+//   - the pause is offered (a "Pause my plan" button, which the coach answers with its pause card);
 //   - the next time the chat opens it asks how he is, once.
 // The detection reads HIS words and the coach's referral together, so neither a symptom answered with advice nor a
 // referral about something else parks anything. What the coach SAYS about the symptom stays the coach's rule (§1c):
 // sharp, one-sided or worsening names a professional and changes nothing else in the plan.
 // ---------------------------------------------------------------------------
+
+import { PAUSE_WORDS } from './plan-pause'
 
 /** How long the coach stays quiet after a red flag. */
 const RED_FLAG_QUIET_HOURS = 48
@@ -75,7 +77,10 @@ export const RED_FLAG_WORDS = {
   checkin: (greeting: string) => `${greeting} — how are you feeling today? Did you manage to get it looked at?`,
   checkinChips: ['Feeling better', 'Still not right', 'Seeing someone about it'],
   /** The app's turn under the coach's referral. */
-  turn(parked: boolean): string { return parked ? this.parked : this.quiet },
+  /** The app's turn under the coach's referral, offering the pause (his ruling) unless the plan is already paused. */
+  turn(parked: boolean, paused = false): string {
+    return `${parked ? this.parked : this.quiet}${paused ? '' : `\n[QUICK_REPLIES: "${PAUSE_WORDS.pause}"]`}`
+  },
 }
 
 const storeKey = (profileId: string) => `red_flag_${profileId}`

@@ -46,6 +46,7 @@ function stateWords(d: TrainingWeekDay, today: string): string {
     case 'rest': return 'rest day (none planned)'
     case 'recovery': return 'recovery day'
     case 'before_plan': return 'before the plan began'
+    case 'paused': return `${focus}plan paused (nothing owed)`
   }
 }
 

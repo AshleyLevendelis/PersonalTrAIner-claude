@@ -32,3 +32,14 @@ export async function saveMealsElsewhere(profileId: string, answer: NonNullable<
   if (isMissingColumnError(error, 'meals_elsewhere')) return 'not-yet'
   throw error
 }
+
+/**
+ * A PLAN PAUSE (his ruling 14 Nov 2026, "Add a pause"): the date it began, or null to resume. Saved on its own so a
+ * failure is said; 'not-yet' is the database without the column (its migration is run by hand): nothing was written.
+ */
+export async function savePlanPause(profileId: string, since: string | null): Promise<'saved' | 'not-yet'> {
+  const { error } = await supabase.from('fitness_profiles').update({ plan_paused_since: since }).eq('id', profileId)
+  if (!error) return 'saved'
+  if (isMissingColumnError(error, 'plan_paused_since')) return 'not-yet'
+  throw error
+}

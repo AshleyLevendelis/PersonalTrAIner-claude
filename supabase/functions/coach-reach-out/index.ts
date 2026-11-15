@@ -112,7 +112,8 @@ function realDeps(now: Date, appServer: webpush.ApplicationServer): ReachOutDeps
       const sw = rows[0]?.notification_switches;
       const name = rows[0]?.display_name;
       return {
-        settings: (sw && typeof sw === "object" ? sw : {}) as NotificationSettings,
+        // A PLAN PAUSE (his "Add a pause") rides with the settings, so the one check that decides every message sees it.
+        settings: { ...(sw && typeof sw === "object" ? sw : {}), plan_paused_since: typeof rows[0]?.plan_paused_since === "string" ? rows[0].plan_paused_since : null } as NotificationSettings,
         name: typeof name === "string" && name.trim() ? name.trim() : null,
       };
     },

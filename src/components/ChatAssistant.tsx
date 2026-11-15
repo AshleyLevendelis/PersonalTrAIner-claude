@@ -88,6 +88,7 @@ import { coachSwapPick, swapOptionsBlock } from '@/lib/coach-swap-pick'
 import { namedFoodClash, namedFoodKindAsk, clashSentence, allergyRefusal } from '@/lib/named-food-clash'
 import { firmFoodExclusions, foodDislikesToAsk, DISLIKE_ASK, mergeFoodsToAvoid } from '@/lib/food-exclusions'
 import { isRedFlagTurn, readRedFlag, writeRedFlag, redFlagStateAt, unpromptedAfterRedFlag, RED_FLAG_WORDS } from '@/lib/red-flag'
+import { PAUSE_WORDS } from '@/lib/plan-pause'
 import { exercisesThatFit } from '@/lib/exercise-shortlist'
 import { swapExerciseInMesocycle, type SwapScope } from '@/lib/mesocycle-edit'
 import { swapNameFallback } from '@/lib/swap-name-fallback'
@@ -398,6 +399,8 @@ interface ChatAssistantProps {
    * function, the same one the Exercise tab's offer calls. A sentence on failure, null on success.
    */
   onRestartPlan?: () => Promise<string | null>
+  /** Pause or resume the plan (his "Add a pause"): App's one function, the same Profile's switch calls. Null when done. */
+  onPlanPause?: (pause: boolean) => Promise<string | null>
   /**
    * SWAPPING A MEAL WITH ANOTHER DAY'S (Ashley, 29 Sep 2026: they swap
    * places). Both from App's week hook, the very functions the Move sheet on
@@ -523,7 +526,7 @@ const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan — 
 /** The cards that would put a food on her plate: a named food her restrictions keep out never gets one (H41). */
 const FOOD_OFFER_KINDS = new Set(['propose_meal_swap', 'propose_meal_addition', 'propose_custom_meal', 'propose_meal_food_add', 'propose_meal_food_replace'])
 
-export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onEatingOut, onMealKnockOn, onMealKnockOnMove, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onPlanPause, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onEatingOut, onMealKnockOn, onMealKnockOnMove, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // "Show numbers" off (slice 4b): no calorie figure in the chat's own pills or cards (QA, 14 Nov 2026).
   const showNumbers = useShowNumbers()
   // NL logging (§3) writes through the SAME frozen session identity +
@@ -1592,7 +1595,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const opener = composeOpener(openerSkips(keys, said))
         return { text: `${greetName()} — ${opener.text}`, chips: opener.chips, kind: opener.kind }
       },
-      moments: facts ? momentsToRaise(facts, reminderSettings, now) : [],
+      moments: facts ? momentsToRaise(facts, { ...reminderSettings, plan_paused_since: profile.plan_paused_since ?? null }, now) : [],
+      paused: !!profile.plan_paused_since,
       redFlag: redFlag ? { mode: unpromptedAfterRedFlag(redFlag, now), checkIn: { text: RED_FLAG_WORDS.checkin(greetName()), chips: RED_FLAG_WORDS.checkinChips, key: `red-flag-checkin:${redFlag.at}` } } : undefined,
     })
     if (!pick) return
@@ -2204,6 +2208,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       offer_running_goal: profile.conditioning_preference === 'love' && !isRunningGoal(profile.running_goal),
       // WHAT A DOCTOR HAS SAID TO WATCH (health-conditions.ts, his 14 Nov 2026 ruling), in the app's own words.
       health_conditions: healthConditionsInWords(healthConditionsOf(profile)),
+      // A plan pause (his "Add a pause"): the coach never asks about a session while it holds.
+      plan_paused_since: profile.plan_paused_since ?? null,
       // THE RUNNING GOAL (running.ts), in the app's own words: the coach quotes this, never a pace (his 13 Nov ruling).
       running_goal: isRunningGoal(profile.running_goal)
         ? `${runningGoalLabel(profile.running_goal)}${profile.running_race_date ? `, race day ${raceDateWords(profile.running_race_date)}` : ''}${profile.running_base_minutes ? `; they said they run ${profile.running_base_minutes} minutes non-stop now` : ''}`
@@ -5026,6 +5032,33 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     }
   }
 
+  /**
+   * PAUSE OR RESUME THE PLAN (his ruling 14 Nov 2026, "Add a pause"). Refused when it would change nothing; confirmed
+   * through App's handlePlanPause, the same function Profile's switch calls.
+   */
+  const buildPlanPauseProposal = (rawArgs: Record<string, unknown>):
+    | { ok: true; scopeKey: string; preconditions: Record<string, unknown>; payload: Record<string, unknown>; diff: import('@/lib/pending-actions-store').ProposalDiff }
+    | { ok: false; refusal: string } => {
+    const pause = rawArgs.action !== 'resume'
+    const pausedNow = !!profile.plan_paused_since
+    if (!onPlanPause) return { ok: false, refusal: PAUSE_WORDS.notLive }
+    if (pause && pausedNow) return { ok: false, refusal: PAUSE_WORDS.alreadyPaused(profile.plan_paused_since as string) }
+    if (!pause && !pausedNow) return { ok: false, refusal: PAUSE_WORDS.notPaused }
+    return {
+      ok: true,
+      scopeKey: `${profile.id}:propose_plan_pause:${pause ? 'pause' : 'resume'}:${activeSession.date}`,
+      preconditions: { paused: pausedNow },
+      payload: { pause },
+      diff: {
+        lead: pause ? PAUSE_WORDS.offerPause : PAUSE_WORDS.offerResume,
+        rows: [{ field: 'Plan', before: pause ? 'Running' : 'Paused', after: pause ? 'Paused from today' : 'Running from today' }],
+        unchanged: [PAUSE_WORDS.unchanged],
+        rationale: typeof rawArgs.origin_verbatim_quote === 'string' ? rawArgs.origin_verbatim_quote : undefined,
+        reversible: false,
+      },
+    }
+  }
+
   const buildGoalChangeProposal = (rawArgs: Record<string, unknown>): {
     scopeKey: string
     preconditions: Record<string, unknown>
@@ -6464,6 +6497,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const circuit = buildCircuitLogProposal(result.proposal.rawArgs ?? {})
         if (circuit.ok) built = { scopeKey: circuit.scopeKey, preconditions: circuit.preconditions, payload: circuit.payload as unknown as Record<string, unknown>, diff: circuit.diff }
         else refusal = circuit.refusal
+      } else if (result.proposal.kind === 'propose_plan_pause') {
+        const pp = buildPlanPauseProposal(result.proposal.rawArgs ?? {})
+        if (pp.ok) built = { scopeKey: pp.scopeKey, preconditions: pp.preconditions, payload: pp.payload, diff: pp.diff }
+        else refusal = pp.refusal
       } else if (result.proposal.kind === 'propose_plan_restart') {
         const restart = buildPlanRestartProposal(result.proposal.rawArgs ?? {})
         if (restart.ok) built = { scopeKey: restart.scopeKey, preconditions: restart.preconditions, payload: restart.payload, diff: restart.diff }
@@ -7041,7 +7078,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const wasRunning = activeSession.status === 'running'
       if (wasRunning) await activeSession.finishSession().catch(() => null)
       else if (activeSession.restEndsAt) activeSession.dismissRest()
-      const turn = RED_FLAG_WORDS.turn(wasRunning)
+      const turn = RED_FLAG_WORDS.turn(wasRunning, !!profile.plan_paused_since)
       setMessages(prev => [...prev, { role: 'assistant' as const, content: stripTags(turn), quickReplies: extractQuickReplies(turn), status: 'complete' as const }])
     }
 
@@ -7441,6 +7478,17 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
       undoToken = ok ? row.id : undefined
       onLogsUpdated?.()
+    } else if (row.kind === 'propose_plan_pause') {
+      // ONE FUNCTION FOR BOTH SURFACES: App's handlePlanPause, which Profile's switch also calls.
+      const pause = (row.payload as { pause?: boolean }).pause !== false
+      const failed = onPlanPause ? await onPlanPause(pause) : PAUSE_WORDS.notLive
+      const ok = failed === null
+      receipt = ok
+        ? { landed: [pause ? 'Plan paused' : 'Plan running again'], failed: [] }
+        : { landed: [], failed: [{ op: 'propose_plan_pause', error: failed ?? PAUSE_WORDS.notLive }] }
+      title = ok ? RECEIPTS['propose_plan_pause'].done : RECEIPTS['propose_plan_pause'].failed
+      rows = ok ? [{ label: 'Plan', detail: pause ? PAUSE_WORDS.card : 'Running' }] : []
+      undoToken = undefined
     } else if (row.kind === 'propose_plan_restart') {
       // ONE FUNCTION FOR BOTH SURFACES: App's handleRestartPlan, which the Exercise tab's
       // "Start again from week 1" also calls. No Undo: the old plan is replaced, and the

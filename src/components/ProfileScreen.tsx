@@ -10,6 +10,7 @@
 // not retire — see that file's original doc comment for why).
 // ---------------------------------------------------------------------------
 
+import { PAUSE_WORDS } from '@/lib/plan-pause'
 import { HEALTH_CONDITION_OPTIONS, healthConditionsOf, hasHealthCondition, healthConditionLine } from '@/lib/health-conditions'
 import { ENJOYED_ACTIVITY_OPTIONS } from '@/lib/pathway'
 import { RUNNING_GOAL_OPTIONS, isRunningGoal, raceDateWords } from '@/lib/running'
@@ -171,6 +172,8 @@ interface ProfileScreenProps {
   onRevealSpeedChange: (speed: RevealSpeed) => void
   /** Opens App.tsx's existing New Plan confirm dialog — the footer's only job. */
   onNewPlan: () => void
+  /** Pause or resume the plan (his ruling 14 Nov 2026, "Add a pause"); null when done, else the sentence to show. */
+  onPlanPause?: (pause: boolean) => Promise<string | null>
   /**
    * The kit list's one controller (kit-change.ts) — the same object the
    * coach's card is handed. Absent before there is a profile to save to.
@@ -555,7 +558,9 @@ function factEffect(fact: UserFactRow): string {
   return 'recorded — not yet applied (takes effect on your next plan regeneration)'
 }
 
-export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, activeAdaptations, endingAdaptationId, onEndAdaptation, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, exercisePlan, planBan, backLabel = 'Back', calorieTarget, kit, myMeals, onEquipmentChoiceChanged }: ProfileScreenProps) {
+export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, activeAdaptations, endingAdaptationId, onEndAdaptation, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, onPlanPause, exercisePlan, planBan, backLabel = 'Back', calorieTarget, kit, myMeals, onEquipmentChoiceChanged }: ProfileScreenProps) {
+  const [pauseBusy, setPauseBusy] = useState(false)
+  const [pauseNote, setPauseNote] = useState<string | null>(null)
   // Read once on mount: the store is the owner, this is the control's echo of
   // it. `null` means she has not chosen, which the picker shows as automatic.
   const [shopDayChoice, setShopDayChoice] = useState<string>(() => readShopDayChoice())
@@ -2209,7 +2214,25 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             action. Moved, not copied: the menu no longer offers it. The
             confirm dialog it opens is unchanged, and still names what is
             lost. */}
-        <div className="pt-1" style={{ borderTop: '1px solid var(--hairline)' }}>
+        <div className="pt-1 space-y-2" style={{ borderTop: '1px solid var(--hairline)' }}>
+          {/* A PLAN PAUSE (his ruling 14 Nov 2026, "Add a pause"): nothing due, nothing missed, no workout reminders;
+              meals carry on. One function with today's card and the coach (App's handlePlanPause). */}
+          {onPlanPause && (
+            <div className="space-y-1" data-testid="plan-pause-row">
+              <Button
+                variant="outline"
+                className="hit-slop-44 h-11 w-full"
+                disabled={pauseBusy}
+                data-testid={profile.plan_paused_since ? 'plan-resume-profile' : 'plan-pause-profile'}
+                onClick={async () => { setPauseBusy(true); setPauseNote(await onPlanPause(!profile.plan_paused_since)); setPauseBusy(false) }}
+              >
+                {pauseBusy ? 'Saving…' : profile.plan_paused_since ? PAUSE_WORDS.resume : PAUSE_WORDS.pause}
+              </Button>
+              <p className="text-xs text-muted-foreground" data-testid="plan-pause-note">
+                {pauseNote ?? (profile.plan_paused_since ? PAUSE_WORDS.paused(profile.plan_paused_since) : 'Nothing is due or counted as missed while paused, and meals carry on.')}
+              </p>
+            </div>
+          )}
           <Button
             variant="outline"
             className="hit-slop-44 h-11 w-full border-destructive/40 text-destructive"

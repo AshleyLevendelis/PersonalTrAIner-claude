@@ -64,7 +64,8 @@ import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed
 import { readBootSnapshot, saveBootSnapshot, clearBootSnapshot, type BootSnapshot } from '@/lib/boot-cache'
 import { ensureSignedIn, claimProfile, hasClaimedOnThisPhone, markClaimedOnThisPhone, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
 import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
-import { updateProfileField } from '@/lib/profile-store'
+import { updateProfileField, savePlanPause } from '@/lib/profile-store'
+import { setPlanPausedSince, PAUSE_WORDS } from '@/lib/plan-pause'
 import { SignInScreen } from '@/components/SignInScreen'
 
 // ---------------------------------------------------------------------------
@@ -1142,6 +1143,8 @@ function App() {
       batch_cooking: profileRow.batch_cooking ?? true,
       // Read through its own reader: a json column, absent before its migration (`select('*')` needs no column).
       meals_elsewhere: readMealsElsewhere(profileRow.meals_elsewhere),
+      // A plan pause (his "Add a pause"), absent before its migration: read as running.
+      plan_paused_since: typeof profileRow.plan_paused_since === 'string' ? profileRow.plan_paused_since : null,
       cooking_time_preference: profileRow.cooking_time_preference || 'moderate',
       // Meal-realism round, part 3: onboarding's optional food-preference
       // answers — see the field docs on UserProfile in types.ts.
@@ -3218,6 +3221,27 @@ function App() {
    * ruling 14 Nov 2026, "Correct it now"): the targets follow it at once. They had not: they follow the weigh-in anchor,
    * which the field never touched, so a correction on Profile was a silent no-op.
    */
+  // THE PAUSE, MIRRORED WHERE EVERY READER ASKS (plan-pause.ts), during render so the first strip drawn already knows.
+  if (profile?.id) setPlanPausedSince(profile.id, profile.plan_paused_since ?? null)
+
+  /**
+   * PAUSE OR RESUME THE PLAN (his ruling 14 Nov 2026, "Add a pause"). Null when done, else the sentence to show. One
+   * function for Profile, today's card and the coach, so every route pauses the same way.
+   */
+  const handlePlanPause = async (pause: boolean): Promise<string | null> => {
+    if (!profile?.id) return "That can't be changed until your profile has loaded."
+    const since = pause ? getLocalDateString(getAppNow(profile.id)) : null
+    try {
+      const outcome = await savePlanPause(profile.id, since)
+      if (outcome === 'not-yet') return PAUSE_WORDS.notLive
+    } catch (err) {
+      console.error('Saving the plan pause failed:', err)
+      return pause ? "Your plan didn't pause just now. Try again in a moment." : "Your plan didn't resume just now. Try again in a moment."
+    }
+    handleProfilePatched({ plan_paused_since: since })
+    return null
+  }
+
   const handleProfilePatched = (patch: Partial<UserProfile>) => {
     const previousKg = profile?.weight_kg ?? null
     setProfile(prev => prev ? { ...prev, ...patch } : prev)
@@ -3597,6 +3621,7 @@ function App() {
               onLogsUpdated={() => { setLogsVersion(v => v + 1); bumpCoachData() }}
               onCalibrationSessionFinished={handleCalibrationSessionFinished}
               onRestartPlan={handleRestartPlan}
+              onPlanPause={handlePlanPause}
               onFirstSessionLifts={handleFirstSessionLifts}
               kitController={kitController}
             />
@@ -3652,6 +3677,7 @@ function App() {
               onMealTopUpStart={previewMealTopUpStart}
               onMealTopUpConfirm={handleMealTopUpFromChat}
               onRestartPlan={handleRestartPlan}
+              onPlanPause={handlePlanPause}
               memoryFacts={memoryFacts}
               memoryGoals={memoryGoals}
               memoryContextFacts={memoryContextFacts}
@@ -3730,6 +3756,7 @@ function App() {
         // The tab's NAME, as the tab bar says it: 'dashboard' is Home there (1 Nov 2026, whole-app test: "‹ Dashboard").
         backLabel={activeTab === 'chat' ? 'Chat' : activeTab === 'dashboard' ? 'Home' : activeTab[0].toUpperCase() + activeTab.slice(1)}
         calorieTarget={macros?.calories ?? null}
+        onPlanPause={handlePlanPause}
         onNewPlan={() => {
           setActiveAdaptationsForReset([])
           if (profile?.id) getActiveAdaptations(profile.id).then(setActiveAdaptationsForReset).catch(console.error)

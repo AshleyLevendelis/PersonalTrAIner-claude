@@ -82,6 +82,8 @@ interface ExerciseTabProps {
   onCalibrationSessionFinished?: (args: { date: string; dayName: string }) => void
   /** Start the plan again from week 1 after a very long break (layoff.ts). Resolves to a sentence on failure, null on success. */
   onRestartPlan?: () => Promise<string | null>
+  /** Pause or resume the plan (his "Add a pause"); null when done. */
+  onPlanPause?: (pause: boolean) => Promise<string | null>
   onFirstSessionLifts?: (patch: Partial<UserProfile>) => Promise<string | null>
   /** The one kit controller (kit-change.ts), so "I haven't got the kit" can change the kit for good (H34). */
   kitController?: import('@/lib/kit-change').KitController | null
@@ -115,6 +117,7 @@ export function ExerciseTab({
   onLogsUpdated,
   onCalibrationSessionFinished,
   onRestartPlan,
+  onPlanPause,
   onFirstSessionLifts,
   kitController = null,
 }: ExerciseTabProps) {
@@ -366,6 +369,7 @@ export function ExerciseTab({
         onOpenSessionHistory={() => setSessionHistoryOpen(true)}
         onCalibrationSessionFinished={onCalibrationSessionFinished}
         onRestartPlan={onRestartPlan}
+        onPlanPause={onPlanPause}
         onFirstSessionLifts={onFirstSessionLifts}
         kit={kit}
       />

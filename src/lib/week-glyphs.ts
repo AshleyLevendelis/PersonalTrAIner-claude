@@ -37,6 +37,8 @@ export const GLYPH: Record<TrainingWeekDay['state'], string> = {
   // FORWARD rather than both ways: the swap says the work was traded for
   // something else, this says the same work is still coming, later.
   moved: '→',
+  // The plan is paused (his "Add a pause", 14 Nov 2026): nothing owed, nothing missed. The pause sign says exactly that.
+  paused: '‖',
 }
 
 /**
@@ -55,6 +57,7 @@ export const STATE_LABEL: Record<TrainingWeekDay['state'], string> = {
   swapped: 'swapped for another activity',
   rest_chosen: 'rest day you chose',
   moved: 'moved to another day',
+  paused: 'plan paused',
 }
 
 /**

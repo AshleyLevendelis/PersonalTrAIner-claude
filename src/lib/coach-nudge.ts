@@ -428,6 +428,8 @@ export interface UnpromptedInput {
    * one "how are you?" (on a later open, once), whatever the day's limits, because it is not a cheerful message.
    */
   redFlag?: { mode: 'checkin' | 'quiet' | 'normal'; checkIn: { text: string; chips: string[]; key: string } }
+  /** The plan is paused (his "Add a pause"): nothing unprompted but a red flag's check-in. */
+  paused?: boolean
 }
 
 /** The one unprompted message to say now, or null. Pure: the caller writes the row and burns the keys. */
@@ -437,6 +439,7 @@ export function pickUnprompted(input: UnpromptedInput): Unprompted | null {
     return { text: c.text, chips: c.chips, keys: [c.key], moment: RED_FLAG_CHECKIN_MOMENT, shortcut: null, fromOpener: false }
   }
   if (input.redFlag && input.redFlag.mode !== 'normal') return null
+  if (input.paused) return null
   if (input.unpromptedToday >= input.cap) return null
   const since = input.now - input.lastUnpromptedAt
   if (since < NUDGE_MIN_GAP_MS) return null

@@ -1,3 +1,4 @@
+import { PAUSE_WORDS } from '@/lib/plan-pause'
 import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
@@ -146,6 +147,7 @@ export function TodayPanel({
   onOpenSessionHistory,
   onCalibrationSessionFinished,
   onRestartPlan,
+  onPlanPause,
   onFirstSessionLifts,
   kit,
 }: {
@@ -192,6 +194,8 @@ export function TodayPanel({
   onCalibrationSessionFinished?: (args: { date: string; dayName: string }) => void
   /** Start the plan again from week 1 after a very long break (layoff.ts). Resolves to a sentence on failure, null on success. */
   onRestartPlan?: () => Promise<string | null>
+  /** Pause or resume the plan (his "Add a pause"); null when done. */
+  onPlanPause?: (pause: boolean) => Promise<string | null>
   /** The first-session lifts card's save and rebuild (App, first-session-lifts.ts); the failure sentence, or null. */
   onFirstSessionLifts?: (patch: Partial<UserProfile>) => Promise<string | null>
   /** The kit, for good, from the remove sheet's "I haven't got the kit" (H34). */
@@ -433,7 +437,11 @@ export function TodayPanel({
   const swappedToday = weekTrain.days.find(d => d.date === today)?.state === 'swapped'
     ? (weekTrain.days.find(d => d.date === today)?.swappedForActivity || 'something else')
     : null
-  const notThisSession = !!swappedToday || !!setAsideToday
+  // THE PLAN IS PAUSED (his ruling 14 Nov 2026, "Add a pause"): nothing is due, so the card stops offering the session.
+  const pausedToday = todayCell?.state === 'paused'
+  const [resumeBusy, setResumeBusy] = useState(false)
+  const [resumeError, setResumeError] = useState<string | null>(null)
+  const notThisSession = !!swappedToday || !!setAsideToday || pausedToday
 
   // MOVED, the third thing that can have happened to today. Same source as the
   // glyph and the swap above — never a second read of the same row.
@@ -1615,6 +1623,21 @@ export function TodayPanel({
             workingSetsToday={logs.filter(l => !l.is_warmup && (l.drop_index ?? 0) === 0).length}
             onChanged={() => { weekTrain.refresh(); onLogsUpdated?.() }}
           />
+          {pausedToday && (
+            <InsightBanner tone="ai" className="flex-col" data-testid="plan-paused-card">
+              <span className="text-sm font-semibold">{PAUSE_WORDS.card}</span>
+              <span className="text-sm">{PAUSE_WORDS.cardLine}</span>
+              {resumeError && <span className="mt-1 text-xs text-destructive" data-testid="plan-resume-error">{resumeError}</span>}
+              {onPlanPause && (
+                <div className="mt-2">
+                  <Button size="sm" disabled={resumeBusy} data-testid="plan-resume" className="min-h-11"
+                    onClick={async () => { setResumeBusy(true); setResumeError(await onPlanPause(false)); setResumeBusy(false) }}>
+                    {resumeBusy ? 'Resuming…' : PAUSE_WORDS.resume}
+                  </Button>
+                </div>
+              )}
+            </InsightBanner>
+          )}
           {setAsideToday && (
             <InsightBanner tone="ai" data-testid="set-aside-today">
               <span className="text-sm">

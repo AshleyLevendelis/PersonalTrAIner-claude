@@ -819,6 +819,22 @@ const toolDeclarations = [
     },
   },
   {
+    name: "propose_plan_pause",
+    description:
+      "PROPOSES pausing the user's training plan, or resuming a paused one (his ruling 14 Nov 2026, \"Add a pause\") — this does NOT apply anything, the app shows small Apply / Not now buttons. While paused nothing is due and nothing counts as missed, no workout reminders are sent, and meals carry on; on resume the first session back is eased in by the app's own break rules. Call it for 'pause my plan', 'I need a break from training', 'stop my workouts for a bit', 'I'm ill for a week, pause everything', and 'resume my plan', 'I'm back, start my plan again' (a SHORT break: never propose_plan_restart for that). The app refuses a pause when the plan is already paused and a resume when it is not, so never promise either. Food and meals are not paused.",
+    parameters: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["pause", "resume"], description: "pause, or resume a paused plan." },
+        origin_verbatim_quote: {
+          type: "string",
+          description: "The exact substring of the user's CURRENT message asking for this. Must be copied verbatim, not paraphrased.",
+        },
+      },
+      required: ["action", "origin_verbatim_quote"],
+    },
+  },
+  {
     name: "propose_plan_restart",
     description:
       "PROPOSES starting the user's training plan again from WEEK 1, with a calibration week to find their working weights again — this does NOT apply anything, the app shows a card and the user taps Confirm. It is for somebody COMING BACK AFTER A LONG BREAK (twelve weeks or more since they last trained) who says they want to start over: 'can I start my plan again', 'I want to start from the beginning', 'reset me back to week one'. Their history, meals and settings are untouched; only the plan is rebuilt from their current answers, beginning today. THE APP DECIDES whether it applies: after a shorter break it refuses and the card never appears, because today's weights are already eased for the break and climb back from the next session — so never promise a restart, offer it and let the card answer. NOT for changing their goal, days, equipment or session length (those have their own tools), and NOT a reason to rebuild after an ordinary missed week.",
@@ -2943,7 +2959,7 @@ USER PROFILE:
 - Training Style: ${context.profile.training_style || 'not recorded (activity-only profile, or not asked)'}
 - Training Days: Originally ${context.training_days_count} days/week (user can add or remove days at any time via chat — this is NOT a ceiling)
 - Session Duration: ${context.session_duration_preference || '45-60'} minutes
-- What a doctor has said to watch: ${context.health_conditions || 'none'}.${context.health_conditions ? ' The app already keeps every set short of all-out (RPE 8 at most) and their cardio by effort. NEVER advise on the condition itself, its medication, or what is safe with it: say that is one for their GP and carry on with the training. Use effort words (Easy / Steady / Hard), never a heart rate or a heart-rate zone.' : ''}
+${context.plan_paused_since ? `- THEIR PLAN IS PAUSED since ${context.plan_paused_since} (they chose to). No session is due and none is missed: never ask about a session, a missed day or the week's count while it holds, and never nudge them to train. Meals carry on. If they want to train again, offer propose_plan_pause with action resume.\n` : ''}- What a doctor has said to watch: ${context.health_conditions || 'none'}.${context.health_conditions ? ' The app already keeps every set short of all-out (RPE 8 at most) and their cardio by effort. NEVER advise on the condition itself, its medication, or what is safe with it: say that is one for their GP and carry on with the training. Use effort words (Easy / Steady / Hard), never a heart rate or a heart-rate zone.' : ''}
 - Running goal: ${context.running_goal || 'none'}.${context.offer_running_goal ? " They told setup they love cardio and setup no longer asks about running (his 14 Nov 2026 ruling): when the conversation allows, offer ONCE, in one line, to work towards a running goal (a 5k, a 10k or a half), and call propose_running_goal only on their yes. If they decline, never offer it again." : ''} Their runs are on the plan below as days named Walk-run, Easy run, Steady run, Intervals or Long run, in minutes and effort (Easy / Steady / Hard). NEVER give a pace or a time per km or mile: the app gives minutes and effort only.
 - Workout Split: ${context.workout_split_preference || 'ai_recommendation'}
 ${context.dietary_preferences && context.dietary_preferences.length > 0 ? `- Dietary Restrictions: ${context.dietary_preferences.join(", ")}` : ""}
@@ -3652,6 +3668,21 @@ Keep this context in mind to ensure your greetings and questions naturally align
             proposal: {
               kind: "propose_meal_top_up",
               rawArgs: { origin_verbatim_quote: args.origin_verbatim_quote },
+            },
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (name === "propose_plan_pause") {
+        // A courier like the restart: whether the plan is paused is the client's to know, and the card confirms through
+        // App's one function, the same one Profile's switch calls.
+        return new Response(
+          JSON.stringify({
+            reply: "",
+            proposal: {
+              kind: "propose_plan_pause",
+              rawArgs: { action: args.action === "resume" ? "resume" : "pause", origin_verbatim_quote: args.origin_verbatim_quote },
             },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

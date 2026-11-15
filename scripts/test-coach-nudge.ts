@@ -430,7 +430,7 @@ console.log('\n9. Hello + more moments (her ruling 7 Nov 2026): one decision ove
   check('the chat decides through pickUnprompted', /const pick = pickUnprompted\(\{/.test(chat))
   check('...capped by her own frequency', /cap: dailyCap\(reminderSettings\.frequency\)/.test(chat))
   check('...counting every unprompted row of today in the chat', /const unprompted = messages\.filter\(m => m\.role === 'assistant' && m\.reminder && m\.created_at[\s\S]{0,80}=== today\)/.test(chat))
-  check('...with the phone\'s moments, her switches applied', /moments: facts \? momentsToRaise\(facts, reminderSettings, now\) : \[\]/.test(chat))
+  check('...with the phone\'s moments, her switches applied', /moments: facts \? momentsToRaise\(facts, \{ \.\.\.reminderSettings, plan_paused_since: profile\.plan_paused_since \?\? null \}, now\) : \[\]/.test(chat))
   check('...and the phone\'s markers counted as said', /const said = \[\.\.\.nudgeStore\(\)\.said, \.\.\.keysSaidByMarkers\(keys, momentsSaidToday\)\]/.test(chat))
   check('every unprompted row carries the reminder marker', /const marker = \{ source: 'reminder', moment: pick\.moment, shortcut: pick\.shortcut \}/.test(chat))
   check('the empty-chat opener counts as today\'s hello', /rememberWithoutSpeaking\([\s\S]{0,200}helloKey\(nudgeInputRef\.current\.today\)/.test(chat))

@@ -5,6 +5,7 @@
 // no new visual language invented here.
 // ---------------------------------------------------------------------------
 
+import { PAUSE_WORDS } from '@/lib/plan-pause'
 import { useShowNumbers } from '@/lib/show-numbers'
 import type * as React from 'react'
 import { Suspense, useEffect, useRef, useState } from 'react'
@@ -506,7 +507,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const swappedFor = todayCell?.state === 'swapped' ? (todayCell.swappedLine || todayCell.swappedForActivity || 'something else') : null
   // ...AND A DAY SHE SAID SHE MISSED, OR MADE A REST DAY (QA walk, 10 Nov 2026): Exercise said so with "Train it
   // anyway" while Home still showed the full session and its Start button. Said here too, and Start is not offered.
-  const declaredToday = todayCell?.state === 'missed' || todayCell?.state === 'rest_chosen' ? todayCell.state : null
+  const declaredToday = todayCell?.state === 'missed' || todayCell?.state === 'rest_chosen' || todayCell?.state === 'paused' ? todayCell.state : null
   const showCta = homeOffersStart(status, swappedFor) && !declaredToday
 
   const recentCount = data.recentPRs.length
@@ -855,7 +856,7 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
   /** What she swapped today's session for, when she did. */
   swappedFor?: string | null
   /** Today said missed, or made a rest day, on the day menu: Home says so, as Exercise does. */
-  declaredToday?: 'missed' | 'rest_chosen' | null
+  declaredToday?: 'missed' | 'rest_chosen' | 'paused' | null
 }) {
   const weekCount = `${week.sessionsDone} of ${week.sessionsPlanned} session${week.sessionsPlanned === 1 ? '' : 's'} done`
   const ordinal = sessionOrdinal(week.days, data.today)
@@ -875,6 +876,11 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
     // calls "Active Recovery + Cardio"). A day with no plan entry is the plain rest day.
     title = data.session.recoveryLine && data.session.focus ? data.session.focus : 'Rest day'
     sub = data.session.recoveryLine ?? 'Recovery is part of the program'
+    right = weekCount
+  } else if (declaredToday === 'paused' && !done) {
+    // THE PLAN IS PAUSED (his ruling 14 Nov 2026, "Add a pause"): nothing is due, so Home offers nothing to start.
+    title = PAUSE_WORDS.card
+    sub = 'Nothing is due while it is paused. Resume from Profile or by asking the coach.'
     right = weekCount
   } else if (declaredToday && !done) {
     title = declaredToday === 'missed' ? 'Marked missed' : 'Rest day, your choice'

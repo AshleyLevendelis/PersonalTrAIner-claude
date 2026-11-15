@@ -8,6 +8,7 @@
 // instead (see WeekStrip).
 // ---------------------------------------------------------------------------
 
+import { isPausedOn, planPausedSince } from '@/lib/plan-pause'
 import { isMovementPrepRow } from '@/lib/session-duration'
 import { useCallback, useEffect, useState } from 'react'
 import { getWeeklyDashboard, getSessionMovesInRange, type WeeklyDashboardDay } from '@/lib/daily-tracking'
@@ -19,7 +20,7 @@ import { planDaysForDate } from '@/lib/plan-week'
 import { swappedActivityLine } from '@/lib/cardio-lines'
 import type { ExerciseSetLog, MesocycleWeek, WorkoutDay } from '@/lib/types'
 
-export type DayGlyphState = 'done' | 'partial' | 'due' | 'missed' | 'rest' | 'recovery' | 'before_plan' | 'swapped' | 'rest_chosen' | 'moved'
+export type DayGlyphState = 'done' | 'partial' | 'due' | 'missed' | 'rest' | 'recovery' | 'before_plan' | 'swapped' | 'rest_chosen' | 'moved' | 'paused'
 
 export interface TrainingWeekDay {
   date: string
@@ -123,7 +124,7 @@ function mondayOf(date: Date): Date {
  * owes two sessions where the plan asked for one.
  */
 export function countsTowardWeekTally(state: DayGlyphState): boolean {
-  return state !== 'rest' && state !== 'recovery' && state !== 'before_plan' && state !== 'swapped' && state !== 'rest_chosen' && state !== 'moved'
+  return state !== 'rest' && state !== 'recovery' && state !== 'before_plan' && state !== 'swapped' && state !== 'rest_chosen' && state !== 'moved' && state !== 'paused'
 }
 
 /**
@@ -156,6 +157,8 @@ export function classifyDay(
    * classifies exactly as it did before.
    */
   moves: SessionMove[] = [],
+  /** The day a plan pause began (his "Add a pause"), or null: from then on a planned day is 'paused', never due or missed. */
+  pausedSince: string | null = null,
 ): DayGlyphState {
   // WHAT IS ACTUALLY RUN HERE, which is the plan's own row only for a day
   // nothing has happened to. On the RECEIVING end of a move this is the
@@ -257,6 +260,9 @@ export function classifyDay(
   // days are not part of the plan and are not counted (see the tally above).
   if (planStartStr && dateStr < planStartStr) return 'before_plan'
 
+  // PAUSED (his ruling 14 Nov 2026, "Add a pause"): nothing is due and nothing is missed. Logged work above still wins.
+  if (isPausedOn(dateStr, pausedSince)) return 'paused'
+
   return dateStr < todayStr ? 'missed' : 'due'
 }
 
@@ -272,6 +278,8 @@ interface BuildTrainingWeekInput {
   dashboard: WeeklyDashboardDay[]
   moves: SessionMove[]
   loading: boolean
+  /** The day a plan pause began, or null (planPausedSince). */
+  pausedSince?: string | null
 }
 
 /**
@@ -288,7 +296,7 @@ interface BuildTrainingWeekInput {
  * longer come from two counts.
  */
 function buildTrainingWeekDays(input: BuildTrainingWeekInput): TrainingWeekDay[] {
-  const { monday, today, plan, mesocycle, planCreatedAt, dashboard, moves, loading } = input
+  const { monday, today, plan, mesocycle, planCreatedAt, dashboard, moves, loading, pausedSince = null } = input
   const planStartStr = planCreatedAt ? getLocalDateString(new Date(planCreatedAt)) : undefined
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(monday)
@@ -306,7 +314,7 @@ function buildTrainingWeekDays(input: BuildTrainingWeekInput): TrainingWeekDay[]
     // before data arrives, so gate explicitly on `loading`.
     const state = loading
       ? classifyLoadingSafe(dayName, dayPlan, dateStr, planStartStr)
-      : classifyDay(dayName, dateStr, today, dayPlan, dashboardDay, planStartStr, moves)
+      : classifyDay(dayName, dateStr, today, dayPlan, dashboardDay, planStartStr, moves, pausedSince)
     // Both ends of a move, resolved ONCE here rather than by each of the three
     // screens that need them. TodayPanel already reads the swap fact from this
     // hook rather than re-reading the row, with a comment recording why; this
@@ -426,7 +434,7 @@ export function useTrainingWeek(
   }, [profileId, refresh])
 
   const monday = sessionDate ? mondayOf(new Date(sessionDate + 'T12:00:00')) : new Date(getAppNow(profileId))
-  const days = buildTrainingWeekDays({ monday, today: sessionDate, plan, mesocycle, planCreatedAt, dashboard, moves, loading })
+  const days = buildTrainingWeekDays({ monday, today: sessionDate, plan, mesocycle, planCreatedAt, dashboard, moves, loading, pausedSince: planPausedSince(profileId) })
 
   const { sessionsDone, sessionsPlanned, sessionsLeft } = tallyWeek(days, sessionDate)
   return { days, sessionsDone, sessionsPlanned, sessionsLeft, loading, refresh, moves }
@@ -473,7 +481,7 @@ export async function readTrainingWeeks(
     getSessionMovesInRange(profileId, from, to).catch(() => [] as SessionMove[]),
   ])
   const moves = [...readMoves, ...knownMoves.filter(m => !readMoves.some(r => r.fromDate === m.fromDate))]
-  const build = (m: Date) => buildTrainingWeekDays({ monday: m, today, plan, mesocycle, planCreatedAt, dashboard, moves, loading: false })
+  const build = (m: Date) => buildTrainingWeekDays({ monday: m, today, plan, mesocycle, planCreatedAt, dashboard, moves, loading: false, pausedSince: planPausedSince(profileId) })
   return { thisWeek: build(monday), lastWeek: build(lastMonday) }
 }
 
@@ -502,7 +510,7 @@ export async function readTrainingWeeksBack(
     getSessionMovesInRange(profileId, from, to).catch(() => [] as SessionMove[]),
   ])
   const moves = [...readMoves, ...knownMoves.filter(m => !readMoves.some(r => r.fromDate === m.fromDate))]
-  return mondays.map(m => buildTrainingWeekDays({ monday: m, today, plan, mesocycle, planCreatedAt, dashboard, moves, loading: false }))
+  return mondays.map(m => buildTrainingWeekDays({ monday: m, today, plan, mesocycle, planCreatedAt, dashboard, moves, loading: false, pausedSince: planPausedSince(profileId) }))
 }
 
 function classifyLoadingSafe(

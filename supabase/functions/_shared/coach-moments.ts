@@ -66,6 +66,8 @@ export type NotificationSettings = MomentSwitches & {
   frequency_dropped_at?: string
   /** After a red flag (his ruling 14 Nov 2026, "Park it, go quiet"): nothing unprompted until this time (ISO). */
   quiet_until?: string
+  /** A plan pause (his ruling 14 Nov 2026, "Add a pause"): the date it began; while set, nothing unprompted is sent. Not a stored switch: read from the profile. */
+  plan_paused_since?: string | null
 }
 
 export const QUIET_BEFORE_HOUR = 8
@@ -175,9 +177,11 @@ export function momentToRaise(facts: MomentFacts, switches: MomentSwitches = {})
 }
 
 /** Every moment that may speak now, best first. The sender takes the first its own limits allow. */
-export function momentsToRaise(facts: MomentFacts, switches: MomentSwitches = {}, nowMs?: number): CoachMoment[] {
+export function momentsToRaise(facts: MomentFacts, switches: NotificationSettings = {}, nowMs?: number): CoachMoment[] {
   if (facts.localHour < QUIET_BEFORE_HOUR || facts.localHour >= QUIET_AFTER_HOUR) return []
   if (nowMs !== undefined && quietAfterRedFlag(switches, nowMs)) return []
+  // PAUSED (his ruling 14 Nov 2026, "Add a pause"): no workout reminder, no cheerful nudge, no comeback message.
+  if ((switches as NotificationSettings).plan_paused_since) return []
   // THEN SILENCE (the comeback path): after the door-open day, nothing unprompted until he logs something again.
   if (facts.daysSinceAnyLog !== null && facts.daysSinceAnyLog > DOOR_OPEN_AFTER_DAYS) return []
   const out: CoachMoment[] = []
