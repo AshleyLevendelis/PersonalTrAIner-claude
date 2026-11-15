@@ -54,7 +54,8 @@ export interface CoachLineInput {
 
 export type CoachLineSource = 'probe' | 'between-sets' | 'last-set' | 'next-exercise' | 'all-done' | 'fallback'
 
-export const PROBE_LINE = 'Set 1 is a probe. Stop with 3-4 reps in reserve.'
+// Plain words, 15 Nov 2026 (his "why aren't we giving the user clear instructions"): no "probe", no "reps in reserve".
+export const PROBE_LINE = 'Testing week: start set 1 at the weight shown, and stop with 3 or 4 reps still in you.'
 
 /** "72.5 kg", "24 kg per hand" — the number never without its unit. */
 const kgText = (kg: number, unit: string) => `${Number(kg.toFixed(2))} ${unit || 'kg'}`
@@ -119,7 +120,7 @@ export function exerciseCoachLine(input: CoachLineInput): { text: string; source
     : planKg != null ? { text: kgText(planKg, ex.unit), same: false } : null
 
   if (left <= 1) {
-    if (probe) return { text: 'One set left. Stop with 3-4 reps in reserve.', source: 'last-set' }
+    if (probe) return { text: 'One set left. Stop with 3 or 4 reps still in you.', source: 'last-set' }
     if (!weight) return { text: 'One set left.', source: 'last-set' }
     return { text: weight.same ? 'One set left. Same weight.' : `One set left: ${weight.text}.`, source: 'last-set' }
   }

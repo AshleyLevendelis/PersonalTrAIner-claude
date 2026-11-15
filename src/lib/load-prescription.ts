@@ -1102,6 +1102,34 @@ export function nextSetRungsKg(
 }
 
 /**
+ * THE TESTING WEEK'S NEXT SET, FROM HOW THE LAST ONE FELT — his ruling 15 Nov 2026, "Ask, then fill"
+ * (docs/plans/test-week-ask-then-fill.md). The week aims each set at 3-4 reps in reserve, from a start that is
+ * deliberately light, so: easy (5+ left) goes up about 10%, at least one plate step; about right keeps the weight (that set is the
+ * answer); hard (2 or fewer left) comes down about 5%, at least one plate step and never below one step. Every
+ * figure is a real step of the implement, and a climb never passes a stated kit limit.
+ */
+export function probeNextKg(
+  baseKg: number,
+  feel: 'easy' | 'right' | 'hard',
+  entry: ExerciseEntry | undefined,
+  profile: UserProfile | null | undefined,
+): number {
+  if (!(baseKg > 0)) return baseKg
+  if (feel === 'right') return baseKg
+  const mode = entry ? loadingMode(entry) : 'stack'
+  const step = plateStepKg(mode)
+  if (feel === 'easy') {
+    // About 10%, at least one step. NOT the ladder's top rung: that is forced a step above the 5% rung, so on a light
+    // bar it is two steps (25 -> 30 kg, +20%). A stated kit limit still caps it, at the same weight if it is reached.
+    const up = Math.max(roundToPlate(baseKg * 1.10, mode), baseKg + step)
+    const stated = entry && profile ? statedCeilingKg(entry, profile) : null
+    return Number((stated != null && up > stated ? Math.max(baseKg, Math.min(stated, up)) : up).toFixed(2))
+  }
+  const down = Math.min(roundToPlate(baseKg * 0.95, mode), baseKg - step)
+  return Number(Math.max(step, down).toFixed(2))
+}
+
+/**
  * IS THERE ANYTHING FOR A PLATE CALCULATOR TO WORK OUT?
  *
  * On a cable machine the number IS the weight: you move a pin to the plate

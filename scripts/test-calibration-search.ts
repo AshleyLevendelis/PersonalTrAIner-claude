@@ -33,7 +33,7 @@ import { seededRngFromKey } from '../src/lib/seeded-random'
 import { calibrationAnchorsFor, planCalibrationAnchors, calibrationAnchorMessage } from '../src/lib/calibration-anchor'
 import { patchBlockFromLiftedKg } from '../src/lib/beat-target-offer'
 import { getExerciseEntry, getExerciseId } from '../src/lib/exercise-db'
-import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, DELOAD_LOAD_FRACTION, nextSetRungsKg } from '../src/lib/load-prescription'
+import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, DELOAD_LOAD_FRACTION, nextSetRungsKg, probeNextKg } from '../src/lib/load-prescription'
 import type { UserProfile, ExerciseSetLog } from '../src/lib/types'
 import { blankWeightFor } from '../src/lib/set-row'
 import { perSetChipsWorthShowing } from '../src/components/exercise/LoadChip'
@@ -192,22 +192,22 @@ check('the confirm path refuses an empty box in a calibration week instead of wr
 check('...and a build-up row is exempt: its weight was never the guess being replaced', /!isWarm\(ref\)/.test(pred))
 check('...and so is a drop, whose weight comes from a set that really happened', /!isDrop\(ref\)/.test(pred))
 check('...before the weight is derived, so the fallback never runs', save.length > 0 && /probeNeedsWeight\(ref\)/.test(save))
-check('...and the refusal names the probe, so it reads as the design', /set 1 was the probe/.test(save))
-check('the empty box asks to be typed into', /const d = defaultWeightFor\(\w+\)\s*\n\s*return d === '' \? 'type it' : d/.test(grid))
+check('...and the refusal says what to do: tap how the set above felt, or enter the weight', /Tap how set \$\{setNumber - 1\} felt, or enter the weight you lifted/.test(save))
+check('the empty box says which set it waits on, never "type it" (his report, 15 Nov 2026)', /return `after set \$\{ref\.setNumber - 1\}`/.test(grid) && !/'type it'/.test(grid))
 
 // ANCHORED ON THE BLOCK'S OWN TESTID, not on the condition that renders it.
 // The old anchor was the full condition text and broke the moment that
 // condition gained `!drop` — and because indexOf returns -1 rather than
 // failing, the slice below would have silently become the whole component.
-const cascadeMarker = grid.indexOf('data-testid="calibration-cascade"')
+const cascadeMarker = grid.indexOf('data-testid="probe-feel"')
 const cascadeStart = cascadeMarker < 0 ? -1 : grid.lastIndexOf('{calibrationProbe', cascadeMarker)
-const cascadeEnd = grid.indexOf('{rowErrors[k] && (')
+const cascadeEnd = cascadeStart < 0 ? -1 : grid.indexOf("data-testid={warm ? 'warmup-row'", cascadeStart)
 // A SLICE THAT MISSED ITS END STILL SLICES. indexOf returning -1 quietly cuts
 // one character off the file instead of failing, so the checks below would have
 // read the whole component and passed on text from anywhere in it.
-check('the chip block was found where it is expected to be', cascadeStart > 0 && cascadeEnd > cascadeStart)
+check('the question block was found where it is expected to be', cascadeStart > 0 && cascadeEnd > cascadeStart)
 const cascade = grid.slice(cascadeStart, cascadeEnd)
-check('the next-weight chips exist, in a calibration week, on an unlogged set', cascade.includes('data-testid="calibration-cascade"'))
+check('the "how was set N" question exists, in a calibration week, on an unlogged set (his "Ask, then fill", 15 Nov 2026)', cascade.includes('data-testid="probe-feel"') && /How was set \{setNumber - 1\} at \{base\} kg\?/.test(cascade))
 check('...computed off the previous LOGGED set', /existingLogs\.find\(l => l\.set_number === setNumber - 1\)/.test(cascade))
 check('...never off the prescription', !/suggestedLoadKg|perSetLoadKg|defaultWeightFor/.test(cascade))
 // RE-ANCHORED 9 Oct 2026. The ladder's arithmetic moved out of the component
@@ -215,11 +215,11 @@ check('...never off the prescription', !/suggestedLoadKg|perSetLoadKg|defaultWei
 // dumbbell limit, and three checks that pinned its exact lines in SetGrid went
 // red on a correct change. They now hold the same properties by RUNNING the
 // ladder, plus one source check that the grid really uses it.
-check('...built by the shared ladder, from that logged weight and nothing else', /nextSetRungsKg\(base, catalogEntry, profile\)/.test(cascade) && /const base = Number\(prev\.weight_kg\)/.test(cascade))
+check('...each answer\'s weight from probeNextKg, off that logged weight and nothing else', /probeNextKg\(base, a\.feel, catalogEntry, profile\)/.test(cascade) && /const base = Number\(prev\.weight_kg\)/.test(cascade))
 const barbellLift = getExerciseEntry('Barbell Bench Press')!
 const pairLift = getExerciseEntry('Romanian Deadlifts')!
 check('...snapped to the implement\'s real plate step', nextSetRungsKg(40, barbellLift, null).every(kg => (kg * 2) % 5 === 0) && nextSetRungsKg(20, pairLift, null).every(kg => kg % 2 === 0), { bar: nextSetRungsKg(40, barbellLift, null), pair: nextSetRungsKg(20, pairLift, null) })
-check('...and a tap FILLS the box; it does not log the set', /updateInput\(\w+, 'weight', String\(o\.kg\)\)/.test(cascade) && !/handleSaveSet/.test(cascade))
+check('...and a tap FILLS the box; it does not log the set', /updateInput\(\w+, 'weight', String\(kg\)\)/.test(cascade) && !/handleSaveSet/.test(cascade))
 // The same re-anchoring as the refusal above, and it wants both exclusions:
 // a build-up's number comes from the prescription, and a DROP's comes from the
 // set above it, so on neither row is there a guess for a ladder to climb off.
@@ -250,11 +250,16 @@ check('...so each rung is floored one real step above the one before it',
   check('well under the limit the ladder is untouched', JSON.stringify(nextSetRungsKg(16, pairLift, owns(24))) === '[18,20]', nextSetRungsKg(16, pairLift, owns(24)))
   check('a stated limit on a DIFFERENT implement changes nothing here', JSON.stringify(nextSetRungsKg(30, pairLift, { ...profile, max_single_implement_kg: 12, max_improvised_kg: 10 } as unknown as UserProfile)) === '[32,34]')
   check('...and a barbell lift is never cut short by a dumbbell limit', JSON.stringify(nextSetRungsKg(27.5, barbellLift, owns(24))) === '[30,32.5]', nextSetRungsKg(27.5, barbellLift, owns(24)))
-  check('the "same" chip is still there — the grid always lists the logged weight first', /const opts = \[base, \.\.\.rungs\]/.test(cascade))
+  // HIS "ASK, THEN FILL" (15 Nov 2026): the three answers' weights, run, not read. Each case is one where the rule binds.
+  check('"About right" keeps the weight: that set is the answer', probeNextKg(25, 'right', barbellLift, profile) === 25 && probeNextKg(30, 'right', pairLift, profile) === 30)
+  check('"Easy" goes up about 10%, one plate step on a light bar (25 -> 27.5, not the old ladder\'s 30)', probeNextKg(25, 'easy', barbellLift, profile) === 27.5, probeNextKg(25, 'easy', barbellLift, profile))
+  check('...and about 10% on a heavy one (100 -> 110)', probeNextKg(100, 'easy', barbellLift, profile) === 110, probeNextKg(100, 'easy', barbellLift, profile))
+  check('...never past a stated limit: one step under, it offers the limit; at it, the same weight', probeNextKg(22, 'easy', pairLift, owns(24)) === 24 && probeNextKg(24, 'easy', pairLift, owns(24)) === 24, [probeNextKg(22, 'easy', pairLift, owns(24)), probeNextKg(24, 'easy', pairLift, owns(24))])
+  check('"Hard" comes down about 5%, at least one step (25 -> 22.5; 100 -> 95)', probeNextKg(25, 'hard', barbellLift, profile) === 22.5 && probeNextKg(100, 'hard', barbellLift, profile) === 95, [probeNextKg(25, 'hard', barbellLift, profile), probeNextKg(100, 'hard', barbellLift, profile)])
+  check('...and never below one step', probeNextKg(2.5, 'hard', barbellLift, profile) === plateStepKg(loadingMode(barbellLift)), probeNextKg(2.5, 'hard', barbellLift, profile))
 }
-check('...and the chip says the kilos it adds, which is true at every weight',
-  /label: kg === base \? 'same' : `\+\$\{Number\(\(kg - base\)\.toFixed\(2\)\)\}`/.test(cascade)
-  && !/\+5%|\+10%/.test(cascade))
+check('...and the three answers are words he would use, never percentages',
+  /label: 'Easy'/.test(cascade) && /label: 'About right'/.test(cascade) && /label: 'Hard'/.test(cascade) && !/\+5%|\+10%|%/.test(cascade))
 check('the plate step is a real one for every implement',
   (['barbell', 'ez_bar', 'stack', 'dumbbell', 'single_implement'] as const).every(m => {
     const step = plateStepKg(m)
@@ -299,7 +304,7 @@ check('no ladder at all shows nothing, rather than throwing',
 check('the JSX asks the predicate rather than re-deriving the rule beside it',
   /perSetChipsWorthShowing\(ex\.per_set_load, calibration\)/.test(read('src/components/exercise/LoadChip.tsx'))
   && !/new Set\(ex\.per_set_load/.test(strip(read('src/components/exercise/LoadChip.tsx'))))
-check('...and one probe line takes their place', /Set 1 · probe at \$\{ex\.suggested_load\}/.test(chip))
+check('...and one start line takes their place ("start at", not "probe at": plain words, 15 Nov 2026)', /Set 1 · start at \$\{ex\.suggested_load\}/.test(chip))
 check('...under a label that names the action', /source === 'estimate' && calibration\) return 'start here'/.test(chip))
 const row = strip(read('src/components/exercise/ExerciseRow.tsx'))
 // REPLACED 17 Sep 2026, not re-anchored: this asked whether the tickable ramp
@@ -351,8 +356,8 @@ check('the grid\'s calibration behaviour is off unless the week turns it on', /c
 // replace — the same test the plan re-anchor uses for evidence.
 check('the search is gated on there being a weight to search for',
   /const calibrationProbe = calibration && suggestedLoadKg != null && !!catalogEntry && isExternallyLoaded\(catalogEntry\)/.test(grid))
-check('...and all three rules read that same flag, not the week alone',
-  (grid.match(/calibrationProbe && [^\n]*setNumber > 1/g) || []).length === 3
+check('...and all four rules (blank box, refusal, its words, the question) read that same flag, not the week alone',
+  (grid.match(/calibrationProbe && [^\n]*setNumber > 1/g) || []).length === 4
   && !/[^a-zA-Z]calibration && [^\n]*setNumber > 1/.test(grid), (grid.match(/calibration(Probe)? && [^\n]*setNumber > 1/g) || []))
 
 // ---------------------------------------------------------------------------

@@ -25,7 +25,7 @@ import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropS
 import { lastTime, sameAsSet, setReading, loggedSetReading, loggedCountLabel, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE, EFFORT_ASK, effortLabel, effortLine } from '@/lib/coach-voice'
 import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, plateBarKg, nextSetRungsKg } from '@/lib/load-prescription'
+import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, plateBarKg, probeNextKg } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG, repsLookImpossible, prescribedRepsHigh } from '@/lib/set-plausibility'
 import { blankWeightFor, carriedWeightFor, type BlankWeight } from '@/lib/set-row'
 import type { UserProfile } from '@/lib/types'
@@ -394,6 +394,8 @@ export function SetGrid({
     return () => clearInterval(id)
   }, [holdTimer?.startedAt])
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
+  /** The testing week's answer for each row: how the set above it felt (his "Ask, then fill", 15 Nov 2026). */
+  const [probeFeel, setProbeFeel] = useState<Record<string, 'easy' | 'right' | 'hard'>>({})
   /**
    * A weight past what the app believes this trainee can load, said out loud
    * on the row. Separate state from rowErrors because it is a different
@@ -557,9 +559,13 @@ export function SetGrid({
   }
   const offersNoWeight = (ref: SetRef): boolean => defaultWeightFor(ref) === ''
 
+  // NEVER "type it" (his report, 15 Nov 2026). A testing week's set 2 onwards says which set it waits on; any other
+  // box with no weight to offer says "enter".
   const weightPlaceholderFor = (ref: SetRef): string => {
     const d = defaultWeightFor(ref)
-    return d === '' ? 'type it' : d
+    if (d !== '') return d
+    if (calibrationProbe && !isWarm(ref) && !isDrop(ref) && ref.setNumber > 1) return `after set ${ref.setNumber - 1}`
+    return 'enter'
   }
 
   /**
@@ -672,7 +678,7 @@ export function SetGrid({
     // logged as a set she never did. The message names the probe so the
     // refusal reads as the design, not a fault.
     if (probeNeedsWeight(ref)) {
-      setRowErrors(prev => ({ ...prev, [k]: 'Type the weight you lifted — set 1 was the probe' }))
+      setRowErrors(prev => ({ ...prev, [k]: `Tap how set ${setNumber - 1} felt, or enter the weight you lifted` }))
       return
     }
 
@@ -1084,6 +1090,58 @@ export function SetGrid({
               <span className="text-[0.625rem] text-muted-foreground whitespace-nowrap" data-testid={onToggleRamp && !warm ? 'logged-count' : undefined}>{groupHead.right}</span>
             </div>
           )}
+          {/* THE TESTING WEEK ASKS, THEN FILLS — his ruling 15 Nov 2026, "Ask, then fill", over clearer words only and
+              over copying set 1 down (docs/plans/test-week-ask-then-fill.md). Only in a testing week, only on an
+              unlogged working set whose set above is logged: "How was set 1 at 25 kg?" Easy / About right / Hard,
+              and the tap puts the next weight in this box (still editable, still one tick to log). Drawn ABOVE the row it
+              fills, so it reads in order: set 1, how was it, set 2. The weight comes
+              from the set above as LOGGED, never the prescription, which is the guess being replaced; probeNextKg
+              snaps it to the implement and holds it at a stated kit limit. It replaced "same · +2.5 · +5" buttons
+              that left the maths to him. NOT ON A BUILD-UP ROW: those have their number from the prescription. */}
+          {calibrationProbe && !warm && !drop && setNumber > 1 && !isSaved && (() => {
+            const prev = existingLogs.find(l => l.set_number === setNumber - 1)
+            if (!prev || prev.is_bodyweight || !(Number(prev.weight_kg) > 0)) return null
+            const base = Number(prev.weight_kg)
+            const chosen = probeFeel[k]
+            const answers: { feel: 'easy' | 'right' | 'hard'; label: string; hint: string }[] = [
+              { feel: 'easy', label: 'Easy', hint: '5 or more reps left' },
+              { feel: 'right', label: 'About right', hint: '3 or 4 reps left' },
+              { feel: 'hard', label: 'Hard', hint: '2 or fewer left' },
+            ]
+            return (
+              <div className="flex flex-col gap-1 px-1 pt-1" data-testid="probe-feel">
+                <span className="text-xs text-foreground">How was set {setNumber - 1} at {base} kg?</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {answers.map(a => {
+                    const kg = probeNextKg(base, a.feel, catalogEntry, profile)
+                    return (
+                      <button
+                        key={a.feel}
+                        type="button"
+                        data-feel={a.feel}
+                        data-next-kg={kg}
+                        aria-pressed={chosen === a.feel}
+                        className={`min-h-[44px] rounded-full border px-3 text-xs ${chosen === a.feel ? 'border-primary bg-primary/20 text-primary-text' : 'border-primary/50 text-foreground'}`}
+                        onClick={() => { setProbeFeel(prev => ({ ...prev, [k]: a.feel })); updateInput(ref, 'weight', String(kg)) }}
+                        aria-label={`${a.label}, ${a.hint}: set ${setNumber} at ${kg} kg`}
+                      >
+                        {a.label}
+                      </button>
+                    )
+                  })}
+                </div>
+                {chosen && (
+                  <span className="text-[0.6875rem] text-muted-foreground" data-testid="probe-feel-result">
+                    {chosen === 'easy' && probeNextKg(base, 'easy', catalogEntry, profile) === base
+                      ? `That's the heaviest you have: set ${setNumber} at ${base} kg, add a couple of reps.`
+                      : chosen === 'easy' ? `Set ${setNumber}: go up to ${probeNextKg(base, 'easy', catalogEntry, profile)} kg.`
+                      : chosen === 'right' ? `Set ${setNumber}: stay at ${base} kg. That's your weight.`
+                      : `Set ${setNumber}: come down to ${probeNextKg(base, 'hard', catalogEntry, profile)} kg.`}
+                  </span>
+                )}
+              </div>
+            )
+          })()}
           <div
             data-testid={warm ? 'warmup-row' : drop ? 'drop-row' : 'working-row'}
             data-sync={isSaved ? (sync ?? 'saved') : undefined}
@@ -1128,10 +1186,12 @@ export function SetGrid({
                 max={MAX_LOGGABLE_SET_KG}
                 step="0.5"
                 placeholder={isBW ? 'BW' : weightPlaceholderFor(ref)}
+                // A WORDED PROMPT ("after set 1", "enter") in the small plain face: in the big number face it was cut
+                // off ("after s") at 390px (15 Nov 2026).
                 value={isBW ? '' : input.weight}
                 onChange={e => updateInput(ref, 'weight', e.target.value)}
                 onFocus={e => { e.currentTarget.select(); scrollRowIntoView(e) }}
-                className={`h-11 rounded-[8px] border-0 bg-[color:var(--surface-raised)] shadow-none ${onCard ? `font-mono text-[1.0625rem] font-bold ${plateButton && isBodyweightCapable ? 'pr-[5.5rem]' : plateButton || isBodyweightCapable ? 'pr-[3.75rem]' : 'pr-8'}` : `text-sm ${plateButton ? 'pr-10' : ''}`} ${isSaved ? 'text-foreground' : 'text-[color:var(--role-ai-text)]'} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[k] ? 'ring-1 ring-destructive' : rowWarnings[k] ? 'ring-1 ring-amber-500' : ''}`}
+                className={`h-11 rounded-[8px] border-0 bg-[color:var(--surface-raised)] shadow-none ${!isBW && !/^[\d.]+$/.test(weightPlaceholderFor(ref)) ? 'placeholder:font-sans placeholder:text-xs placeholder:font-normal' : ''} ${onCard ? `font-mono text-[1.0625rem] font-bold ${plateButton && isBodyweightCapable ? 'pr-[5.5rem]' : plateButton || isBodyweightCapable ? 'pr-[3.75rem]' : 'pr-8'}` : `text-sm ${plateButton ? 'pr-10' : ''}`} ${isSaved ? 'text-foreground' : 'text-[color:var(--role-ai-text)]'} ${isBW ? 'text-muted-foreground' : ''} ${rowErrors[k] ? 'ring-1 ring-destructive' : rowWarnings[k] ? 'ring-1 ring-amber-500' : ''}`}
                 disabled={isBW}
               />
               {/* THE UNIT IN THE BOX (X1b): a number never reaches a screen without its unit. */}
@@ -1344,57 +1404,6 @@ export function SetGrid({
                 <Plus className="size-3" />
                 {target != null ? `Add a drop · ${target}kg` : 'Add a drop'}
               </button>
-            )
-          })()}
-          {/* THE NEXT WEIGHT, OFF THE LAST ONE LIFTED. Only in calibration
-              week, only on an unlogged set whose predecessor is logged, and
-              only ever as a suggestion the box does not adopt by itself.
-              Computed from the previous LOGGED set, never from the
-              prescription — the prescription is the thing being replaced.
-
-              LABELLED IN KILOS, NOT PERCENT — a deviation from the plan,
-              which said `+5%` / `+10%`. Measured in the browser at 27.5kg on
-              a barbell: 5% and 10% both snap to 30kg, so the ladder collapsed
-              to a single rung AND the chip labelled "+5%" named a weight that
-              was really +9%. Percentages are the coaching intent (the cue
-              says "go up 5-10%"); what she can actually put on the bar is a
-              plate step. So the targets stay 5% and 10%, each is snapped to
-              the implement's real step, each is forced at least one step
-              above the one before it, and the chip says the kilos it adds —
-              which is true at every weight. */}
-          {/* NOT ON A BUILD-UP ROW. The chips climb off the PREVIOUS WORKING
-              set, so on warm-up 2 they would offer a next weight derived from
-              working set 1 — a ladder built from the wrong lift entirely. A
-              build-up step already has its number from the prescription. */}
-          {calibrationProbe && !warm && !drop && setNumber > 1 && !isSaved && (() => {
-            const prev = existingLogs.find(l => l.set_number === setNumber - 1)
-            if (!prev || prev.is_bodyweight || !(Number(prev.weight_kg) > 0)) return null
-            const base = Number(prev.weight_kg)
-            // The ladder itself lives in load-prescription.ts (nextSetRungsKg)
-            // so that it stops at a dumbbell or kettlebell limit the person
-            // has told us — "+2 · 32" was offered to someone whose heaviest
-            // dumbbells are 24kg.
-            const rungs = nextSetRungsKg(base, catalogEntry, profile)
-            const opts = [base, ...rungs].map(kg => ({
-              kg,
-              // Trailing .0 trimmed: "+5", not "+5.0", and "+2.5" intact.
-              label: kg === base ? 'same' : `+${Number((kg - base).toFixed(2))}`,
-            }))
-            return (
-              <div className="flex items-center gap-1 flex-wrap px-1 -mt-0.5" data-testid="calibration-cascade">
-                <span className="text-[0.625rem] text-muted-foreground">After {base}kg:</span>
-                {opts.map(o => (
-                  <button
-                    key={o.label}
-                    type="button"
-                    className="hit-slop-44 rounded border border-primary/50 bg-primary/10 px-1.5 py-0.5 text-[0.625rem] text-primary-text"
-                    onClick={() => updateInput(ref, 'weight', String(o.kg))}
-                    aria-label={`Set ${setNumber} at ${o.kg}kg (${o.kg === base ? 'same as set ' + (setNumber - 1) : o.label.slice(1) + 'kg more'})`}
-                  >
-                    {o.label} · {o.kg}
-                  </button>
-                ))}
-              </div>
             )
           })()}
           {rowErrors[k] && (

@@ -150,21 +150,23 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
   // now names the printed number as what it is — set 1's PROBE — and says
   // what to do when the probe is light. Still one instruction, still
   // relating the number to the effort target rather than issuing a second.
-  check('the loaded cue names the printed weight as set 1\'s probe',
-    /set 1 is a probe/i.test(loaded), loaded)
+  // PLAIN WORDS 15 Nov 2026 (his report): set 1 starts at the printed weight, and the app asks how it felt.
+  check('the loaded cue names the printed weight as where set 1 starts, and says the app asks how it felt',
+    /do set 1 at the weight shown, then tell us how it felt/i.test(loaded), loaded)
   check('...rather than sending them off to find one of their own',
     !/work up to a weight/i.test(loaded), loaded)
-  check('...and still says where to finish', /3-4 reps in reserve/.test(loaded), loaded)
+  check('...and has no gym jargon in it (probe, reps in reserve, percentages)', !/probe|in reserve|%/i.test(loaded), loaded)
   // The old version asked them to TYPE what they finished on, because a
   // blank box logged the prescription. In a calibration week that default is
   // gone for sets 2+ (test:calibration-search), so the cue no longer has to
   // beg for the number — it says why the number matters instead.
-  check('...and says the heaviest set becomes next week\'s weight, so the typed number is the point',
-    /heaviest set .*becomes next week/i.test(loaded), loaded)
+  // 15 Nov 2026: the cue is now one short instruction; the explainer behind the chip says what week 2 builds from.
+  check('...and the explainer says week 2 builds from the heaviest set, so the number logged is the point',
+    /week 2 builds from your heaviest set/i.test(read('src/components/exercise/LoadChip.tsx')))
   // One vocabulary. "3-4 more times" and "3-4 reps in reserve" were the same
   // instruction in two costumes, on two branches of one function.
-  check('both variants use one effort target, worded one way',
-    /3-4 reps in reserve/.test(loaded) && /3-4 reps in reserve/.test(loadless), { loaded, loadless })
+  check('one effort target, worded one way, in plain words ("3 or 4 reps still in you")',
+    /3 or 4 reps still in you/.test(loadless) && /3 or 4 reps still in you/.test(read('src/components/exercise/LoadChip.tsx')) && !/in reserve/.test(loaded + loadless), { loaded, loadless })
 
   // The chip above the number carries the other half. Week 1 read exactly
   // like week 7 — "suggested" either way — which left the cue alone in saying
@@ -177,7 +179,7 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
     /source === 'estimate' && calibration\) return 'start here'/.test(chip))
   check('...and only a calibration week does', /if \(source === 'estimate'\) return 'suggested'/.test(chip))
   check('...with an explainer that repeats the cue rather than competing with it',
-    /calibration && source === 'estimate'/.test(chip) && /3-4 reps in reserve/.test(chip))
+    /calibration && source === 'estimate'/.test(chip) && /tap how it felt and the app sets the next weight/.test(chip))
   // A flag, NOT a fifth PrescribedLoadSource: the number's provenance really
   // is an estimate, and inventing a fifth state would have rippled into
   // warmup, plan-adaptations, body-units, the weight-basis offer and the
@@ -217,7 +219,7 @@ console.log('\n2. The coaching line: the most specific true thing, or nothing')
   // exists — routed through one helper so the two cannot drift apart.
   check('...and the box shows that same number, so the tick keeps its promise',
     /placeholder=\{isBW \? 'BW' : weightPlaceholderFor\((\w+)\)\}/.test(setGrid)
-    && /const d = defaultWeightFor\((\w+)\)\s*\n\s*return d === '' \? '[^']+' : d/.test(setGrid))
+    && /const d = defaultWeightFor\((\w+)\)\s*\n\s*if \(d !== ''\) return d/.test(setGrid))
 }
 
 // ---------------------------------------------------------------------------

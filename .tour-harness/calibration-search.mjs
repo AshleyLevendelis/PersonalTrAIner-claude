@@ -125,36 +125,38 @@ check('2. ...and says what it is for, on screen',
   buildUp?.caption)
 check('3. the number is labelled START HERE', (await ev(`(() => { const sec = ${SECTION}; return sec ? /start here/i.test(sec.innerText) : false })()`)) === true)
 const probe = await ev(`(() => { const sec = ${SECTION}; const c = sec && sec.querySelector('[data-testid="probe-chip"]'); return c ? c.textContent.trim() : null })()`)
-check('4. one probe line, not three identical set chips', /Set 1 · probe at ~?[\d.]+kg/.test(probe || '') && (await ev(`(() => { const sec = ${SECTION}; return sec ? /\\bS1: \\d/.test(sec.innerText) : true })()`)) === false, probe)
+check('4. one start line ("start at", plain words since 15 Nov 2026), not three identical set chips', /Set 1 · start at ~?[\d.]+kg/.test(probe || '') && (await ev(`(() => { const sec = ${SECTION}; return sec ? /\\bS1: \\d/.test(sec.innerText) : true })()`)) === false, probe)
 const b1 = await box(1), b2 = await box(2), b3 = await box(3)
 check('5. set 1 is pre-filled with the start weight', !!b1 && /^\d/.test(b1.placeholder), b1)
-check('6. sets 2 and 3 are empty and ask to be typed into', !!b2 && !!b3 && b2.value === '' && b3.value === '' && b2.placeholder === 'type it' && b3.placeholder === 'type it', { b2, b3 })
+check('6. sets 2 and 3 are empty and say which set they wait on, never "type it" (his report, 15 Nov 2026)', !!b2 && !!b3 && b2.value === '' && b3.value === '' && b2.placeholder === 'after set 1' && b3.placeholder === 'after set 2', { b2, b3 })
 await scrollTo('/Ramp up first/i'); await wait(500); await shoot('calibration-search-start')
 
 check('7a. ticking set 1', await tapSave(1))
 await wait(1200)
 check('7b. ...logs it', (await savedState(1)) === 'Set 1 saved', await savedState(1))
-const chips = await ev(`(() => { const sec = ${SECTION}; const c = sec && sec.querySelector('[data-testid="calibration-cascade"]'); if (!c) return null
-  return [...c.querySelectorAll('button')].map(b => ({ label: b.textContent.trim(), aria: b.getAttribute('aria-label') })) })()`)
-check('8. three next-weight chips appear under set 2 — same, and two real steps up',
-  Array.isArray(chips) && chips.length === 3 && /^same/.test(chips[0].label) && /^\+[\d.]+ ·/.test(chips[1].label) && /^\+[\d.]+ ·/.test(chips[2].label), chips)
-const kgs = (chips || []).map(c => parseFloat((c.aria || '').match(/at ([\d.]+)kg/)?.[1] ?? 'NaN'))
-check('9. ...climbing from the weight just logged, three DIFFERENT weights',
-  kgs.length === 3 && kgs[0] === parseFloat(b1?.placeholder) && kgs[1] > kgs[0] && kgs[2] > kgs[1], kgs)
-check('9b. ...and each chip\u2019s label is the kilos it really adds',
-  (chips || []).slice(1).every((c, i) => parseFloat(c.label.slice(1)) === Math.round((kgs[i + 1] - kgs[0]) * 100) / 100), { chips, kgs })
-check('10a. tapping the top chip', (await ev(`(() => { const sec = ${SECTION}; const c = sec && sec.querySelector('[data-testid="calibration-cascade"]'); const b = c && [...c.querySelectorAll('button')].pop(); if (!b) return false; b.click(); return true })()`)) === true)
+// HIS "ASK, THEN FILL" (15 Nov 2026): after set 1, set 2 asks how set 1 felt, and the answer fills its weight.
+const ask = await ev(`(() => { const sec = ${SECTION}; const c = sec && sec.querySelector('[data-testid="probe-feel"]'); if (!c) return null
+  return { text: c.innerText, buttons: [...c.querySelectorAll('button')].map(b => ({ label: b.textContent.trim(), feel: b.getAttribute('data-feel'), kg: parseFloat(b.getAttribute('data-next-kg')), aria: b.getAttribute('aria-label'), h: Math.round(b.getBoundingClientRect().height) })) } })()`)
+check('8. under set 2 it asks "How was set 1 at N kg?" with Easy / About right / Hard',
+  !!ask && new RegExp(`How was set 1 at ${parseFloat(b1?.placeholder)} kg\\?`).test(ask.text) && JSON.stringify(ask.buttons.map(b => b.label)) === JSON.stringify(['Easy', 'About right', 'Hard']), ask)
+const kgOf = f => (ask?.buttons || []).find(b => b.feel === f)?.kg
+check('9. ...About right keeps set 1\u2019s weight, Easy is heavier, Hard is lighter',
+  kgOf('right') === parseFloat(b1?.placeholder) && kgOf('easy') > kgOf('right') && kgOf('hard') < kgOf('right'), { easy: kgOf('easy'), right: kgOf('right'), hard: kgOf('hard') })
+check('9b. ...each answer says out loud the weight it sets, and is a 44px tap',
+  (ask?.buttons || []).length === 3 && ask.buttons.every(b => b.aria.includes(`${b.kg} kg`) && b.h >= 44), ask?.buttons)
+check('10a. tapping Easy', (await ev(`(() => { const sec = ${SECTION}; const b = sec && sec.querySelector('[data-testid="probe-feel"] button[data-feel="easy"]'); if (!b) return false; b.click(); return true })()`)) === true)
 await wait(500)
 const b2after = await box(2)
-check('10b. ...fills set 2\u2019s box with that weight, and only fills it', !!b2after && parseFloat(b2after.value) === kgs[2] && (await savedState(2)) === 'Save set 2', { b2after, kgs })
-await scrollTo('/After \\d/'); await wait(400); await shoot('calibration-search-cascade')
+const said = await ev(`(() => { const sec = ${SECTION}; const r = sec && sec.querySelector('[data-testid="probe-feel-result"]'); return r ? r.textContent.trim() : null })()`)
+check('10b. ...fills set 2\u2019s box with that weight, says so, and only fills it', !!b2after && parseFloat(b2after.value) === kgOf('easy') && said === `Set 2: go up to ${kgOf('easy')} kg.` && (await savedState(2)) === 'Save set 2', { b2after, said })
+await scrollTo('/How was set 1/'); await wait(400); await shoot('calibration-search-cascade')
 
 check('11a. ticking set 3 with nothing typed', await tapSave(3))
 await wait(600)
 const refusal = await ev(`(() => { const sec = ${SECTION}; const p = sec && [...sec.querySelectorAll('p')].find(x => x.className.includes('text-destructive')); return p ? p.textContent.trim() : null })()`)
-check('11b. ...is refused, naming the probe', /set 1 was the probe/i.test(refusal || ''), refusal)
+check('11b. ...is refused, saying what to do', /Tap how set 2 felt, or enter the weight you lifted/.test(refusal || ''), refusal)
 check('11c. ...and nothing was logged for it', (await savedState(3)) === 'Save set 3', await savedState(3))
-await scrollTo('/set 1 was the probe/i'); await wait(400); await shoot('calibration-search-refused')
+await scrollTo('/Tap how set 2 felt/'); await wait(400); await shoot('calibration-search-refused')
 
 // A BODYWEIGHT ROW IN THE SAME SESSION IS NOT PART OF THE SEARCH. Found by
 // reading the first screenshot on 10 Sep 2026, not by a check: a loadless row
@@ -169,9 +171,9 @@ const BW_SECTION = `(() => {
 })()`
 const bwBox2 = await ev(`(() => { const sec = ${BW_SECTION}; const el = sec && sec.querySelector('input[id$="-s2"][id^="setgrid-weight-"]')
   return el ? { value: el.value, placeholder: el.placeholder } : null })()`)
-check('12. a bodyweight lift in the same week keeps its own default, not "type it"',
-  !!bwBox2 && bwBox2.placeholder !== 'type it', bwBox2)
-check('13. ...and has no next-weight chips to climb', (await ev(`(() => { const sec = ${BW_SECTION}; return !!(sec && sec.querySelector('[data-testid="calibration-cascade"]')) })()`)) === false)
+check('12. a bodyweight lift in the same week keeps its own default, not "enter" or "after set"',
+  !!bwBox2 && !/^(enter|after set|type it)/.test(bwBox2.placeholder), bwBox2)
+check('13. ...and is never asked how a set felt', (await ev(`(() => { const sec = ${BW_SECTION}; return !!(sec && sec.querySelector('[data-testid="probe-feel"]')) })()`)) === false)
 check('14a. ticking its second set', (await ev(`(() => { const sec = ${BW_SECTION}; const b = sec && [...sec.querySelectorAll('button')].find(x => x.getAttribute('aria-label') === 'Save set 2'); if (!b) return false; b.click(); return true })()`)) === true)
 await wait(1200)
 check('14b. ...logs it instead of demanding a weight',

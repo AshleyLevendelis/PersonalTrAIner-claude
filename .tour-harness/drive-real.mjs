@@ -227,7 +227,7 @@ while (guard++ < 40) {
       await shot(`${n}-${stop.key}-type`)
       const typed = await evalJs(`(() => {
         const row = document.querySelector('[data-tour="setrow"]')
-        const input = row && [...row.querySelectorAll('input')].find(i => i.placeholder === 'type it')
+        const input = row && [...row.querySelectorAll('input')].find(i => i.placeholder === 'enter')
         if (!input) return { error: 'no empty weight box in the row' }
         const r = input.getBoundingClientRect()
         const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)

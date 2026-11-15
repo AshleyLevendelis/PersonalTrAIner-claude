@@ -125,9 +125,9 @@ function explainerFor(source: LoadSource | undefined, loadGuidance?: string, cal
   // instruction to type what you finished on rather than tap through the
   // prescribed default.
   if (calibration && source === 'estimate') {
-    return 'Week one starts deliberately light — this is where to begin, not what to lift. '
-      + 'Add weight until the last rep leaves 3-4 reps in reserve (easier than your usual target, on purpose), '
-      + 'then type the weight you finished on; week 2 builds from your number.'
+    return 'Week one starts deliberately light: this is where to begin, not what to lift. '
+      + 'After each set, tap how it felt and the app sets the next weight. Stop each set with 3 or 4 reps still in you; '
+      + 'week 2 builds from your heaviest set.'
       + (loadGuidance ? ` ${loadGuidance}` : '')
   }
   if (source === 'assumed_body') {
@@ -225,7 +225,9 @@ export function LoadChip({
 
   return (
     <div className="flex flex-col gap-0.5 mt-0.5">
-      {ex.intensity && (
+      {/* NOT IN THE TESTING WEEK (15 Nov 2026): "RPE 5-6" sat above the start chip saying in gym code what the
+          line below now says in plain words. Every other week keeps it. */}
+      {ex.intensity && !(calibration && source === 'estimate') && (
         <span className="inline-flex items-center gap-0.5 text-[0.625rem] text-muted-foreground">
           {ex.intensity}
         </span>
@@ -272,7 +274,7 @@ export function LoadChip({
           </>
         ) : ex.suggested_load && (
           <span className={`inline-flex items-center gap-0.5 rounded border px-1 py-0 text-[0.625rem] leading-4 ${loadChipClass(source)}`} data-testid={calibration ? 'probe-chip' : undefined}>
-            <Dumbbell className="size-2.5" />{calibration && source === 'estimate' ? `Set 1 · probe at ${ex.suggested_load}` : ex.suggested_load}
+            <Dumbbell className="size-2.5" />{calibration && source === 'estimate' ? `Set 1 · start at ${ex.suggested_load}` : ex.suggested_load}
           </span>
         )}
         {label && <span className="text-[0.5625rem] italic text-muted-foreground/60">{label}</span>}

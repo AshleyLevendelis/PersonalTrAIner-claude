@@ -39,7 +39,8 @@ const openRow = async name => {
 const read = name => ev(`(() => {
   const card = ${cardExpr(name)}
   if (!card) return { found: false, headline: [], prefills: [], text: '', cue: false, effort: null, cascade: false }
-  const num = s => parseFloat(String(s).replace(/[^\\d.]/g, ''))
+  // "after set 1" is a prompt, not a weight (15 Nov 2026: the box says which set it waits on).
+  const num = s => /^after set/.test(String(s)) ? NaN : parseFloat(String(s).replace(/[^\\d.]/g, ''))
   const headline = [...card.querySelectorAll('[data-testid="exercise-load"]')].map(n => num(n.textContent)).filter(n => Number.isFinite(n) && n > 0)
   const boxes = [...card.querySelectorAll('input')].filter(i => /^setgrid-weight-/.test(i.id))
   const prefills = boxes.map(i => i.value || i.placeholder).map(num)
@@ -49,7 +50,7 @@ const read = name => ev(`(() => {
     found: true, headline, prefills, boxes: boxes.length,
     text: card.innerText.replace(/\\s+/g, ' '),
     cue: !!card.querySelector('[data-testid="calibration-cue"]'),
-    cascade: !!card.querySelector('[data-testid="calibration-cascade"]'),
+    cascade: !!card.querySelector('[data-testid="probe-feel"]'),
     effort: eff ? {
       question: eff.querySelector('p')?.textContent ?? '',
       buttons: [...eff.querySelectorAll('button')].map(b => ({ label: b.textContent.trim(), pressed: b.getAttribute('aria-pressed') === 'true', h: Math.round(b.getBoundingClientRect().height) })),
@@ -113,7 +114,7 @@ console.log('\n[2] Too easy last time: today starts heavier and finds the weight
   check('2e. ...and the later sets offer nothing until a set is done (they are found, not prescribed)', card.boxes >= 2 && card.prefills.slice(1).every(p => !Number.isFinite(p)), card.prefills)
   await saveSet(t.name, 1)
   const after = t.name ? ((await read(t.name)) ?? NOTHING) : NOTHING
-  check('2f. once set 1 is in, the next weight is offered off what was lifted', after.cascade === true, after.text.slice(0, 200))
+  check('2f. once set 1 is in, the app asks how it felt and offers the next weight off what was lifted', after.cascade === true, after.text.slice(0, 200))
   await shoot('lift-effort-easy')
 }
 

@@ -74,13 +74,19 @@ import { CornerDownRight } from 'lucide-react'
  * sets and tempo (double progression); the probe still finds the effort, it
  * just cannot climb in weight. The exact words are Ashley's to change.
  */
+/**
+ * PLAIN WORDS, 15 Nov 2026 — his report on a testing-week squat: *"why aren't we giving the user clear instructions
+ * on what to do?"* The sentence above it said "probe", "reps in reserve" and "go up 5-10%", and left the maths to
+ * him. His ruling the same day, "Ask, then fill": the set grid now asks how each set felt and fills the next weight
+ * (SetGrid, probeNextKg), so the line only has to say what to do first.
+ */
 export function calibrationCueText(hasLoad: boolean, atStatedLimit = false): string {
   if (hasLoad && atStatedLimit) {
-    return 'This is the heaviest you\'ve told me you have. If set 1 is easy, add reps rather than weight, and stop each set with 3-4 reps in reserve.'
+    return 'This is the heaviest you\'ve told me you have. If set 1 is easy, add a couple of reps instead of weight, and stop each set with 3 or 4 reps still in you.'
   }
   return hasLoad
-    ? 'Set 1 is a probe. Too easy — 5 or more reps left? Go up 5-10% for set 2, and again if it\'s still easy. Your heaviest set at 3-4 reps in reserve becomes next week\'s weight. Know your weight already? Start there.'
-    : 'Calibration: leave 3-4 reps in reserve. Log what you actually do.'
+    ? 'Find your weight this week: do set 1 at the weight shown, then tell us how it felt and we\'ll set the next one. Know your weight already? Start there.'
+    : 'Testing week: stop each set with 3 or 4 reps still in you, and log what you actually did.'
 }
 
 /**

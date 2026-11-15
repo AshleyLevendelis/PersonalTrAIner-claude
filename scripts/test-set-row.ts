@@ -105,11 +105,11 @@ console.log('\n4. The grid asks the one decision everywhere')
   check('...in words that name the set', sameAsSet(2) === 'weight from set 2')
 }
 
-console.log('\n5. A box that says "type it" never saves a guess (Ashley\'s question, 10 Oct 2026)')
+console.log('\n5. A box with no number ("enter", never "type it") never saves a guess (Ashley\'s question, 10 Oct 2026)')
 {
   const grid = stripComments(readFileSync(join(ROOT, 'src/components/exercise/SetGrid.tsx'), 'utf8'))
   // "type it" is shown exactly when the blank value is '' ...
-  check('"type it" is shown only when the blank box has no number', /const d = defaultWeightFor\(ref\)\s*\n\s*return d === '' \? 'type it' : d/.test(grid))
+  check('"enter" is shown only when the blank box has no number', /const d = defaultWeightFor\(ref\)\s*\n\s*if \(d !== ''\) return d/.test(grid) && /return 'enter'/.test(grid) && !/'type it'/.test(grid))
   // ... a '' blank saves as 0, and 0 is bodyweight only on a lift that is NOT
   // externally loaded; the only '' fallback is for one that IS. So the tick is
   // refused, never filed as bodyweight or as 0 kg.

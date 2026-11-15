@@ -52,7 +52,7 @@ const all: string[] = []
 const said = (o: Partial<Parameters<typeof exerciseCoachLine>[0]>) => { const r = line(o); if (r) all.push(r.text); return r }
 
 check('nothing logged, not a calibration week: the tab\'s own line', said({})?.text === NOTE, said({}))
-check('nothing logged, calibration week, on the probe lift: "Set 1 is a probe. Stop with 3-4 reps in reserve."', said({ probeIndex: 0 })?.text === PROBE_LINE && PROBE_LINE === 'Set 1 is a probe. Stop with 3-4 reps in reserve.', said({ probeIndex: 0 }))
+check('nothing logged, testing week, on the probe lift: the plain start line', said({ probeIndex: 0 })?.text === PROBE_LINE && PROBE_LINE === 'Testing week: start set 1 at the weight shown, and stop with 3 or 4 reps still in you.', said({ probeIndex: 0 }))
 check('...but not when the probe lift is not the one she is on', said({ probeIndex: 1 })?.text === NOTE, said({ probeIndex: 1 }))
 check('set 1 in: "Set 1 done. Hold 72.5 kg for set 2."', said({ logged: [sets(72.5), []] })?.text === 'Set 1 done. Hold 72.5 kg for set 2.', said({ logged: [sets(72.5), []] }))
 check('...holding what she LIFTED, the number the next box logs, not the plan\'s', said({ logged: [sets(75), []] })?.text === 'Set 1 done. Hold 75 kg for set 2.', said({ logged: [sets(75), []] }))
