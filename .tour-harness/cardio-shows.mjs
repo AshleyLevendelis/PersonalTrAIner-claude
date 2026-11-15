@@ -277,6 +277,9 @@ const swapped = await ev('window.__swappedPast ?? null')
 check('8a. the fixture has a swapped day earlier this week', !!swapped?.dayName, swapped)
 if (!swapped) finish()
 const FOOTBALL = 'Football · 60 min · Hard'
+// RE-ANCHORED 15 Nov 2026 (his ruling: the strip starts today): a day earlier this week is behind the back arrow.
+await until(`!!${q('[data-testid="strip-prev"]')}`, 10000)
+await tapExpr(q('[data-testid="strip-prev"]')); await wait(900)
 const cellSel = `button[aria-label^="${swapped.dayName}:"]`
 await until(`${q(cellSel)}?.getAttribute('aria-label')?.includes('Football')`, 10000)
 // RE-ANCHORED 10 Oct 2026 (design handoff 2c): the strip is a day name over

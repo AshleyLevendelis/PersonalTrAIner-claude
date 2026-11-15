@@ -194,7 +194,11 @@ check('2g. the warm-up badge reads the same minutes here as in the programme vie
 // ===========================================================================
 console.log('\n  3. The header shows the day that is OPEN (L17)')
 // ===========================================================================
-check('3a. another day is tapped on the week strip', await tap(`[data-strip-day="${otherDay.day}"]`) === true)
+// RE-ANCHORED 15 Nov 2026 (his ruling: the strip starts today and pages by arrow): the day is THIS week's, by date,
+// paging back first when it is already behind today. A weekday name on the strip can now be next week's day.
+const otherDate = await ev(`(() => { const t = document.querySelector('[data-exercise-strip] [data-strip-date]')?.getAttribute('data-strip-date'); if (!t) return null; const d = new Date(t + 'T12:00:00'); const names = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']; const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7)); const x = new Date(mon); x.setDate(mon.getDate() + ((names.indexOf(${JSON.stringify(otherDay.day)}) + 6) % 7)); return { date: x.toLocaleDateString('en-CA'), behind: x < d } })()`)
+if (otherDate?.behind) { await tap('[data-testid="strip-prev"]'); await wait(900) }
+check('3a. another day is tapped on the week strip', !!otherDate && await tap(`[data-strip-date="${otherDate.date}"]`) === true, otherDate)
 await wait(900)
 const peekHeader = parseLength(await text('[data-testid="hero-meta"]'))
 check('3b. the header now carries THAT day\'s length, not today\'s',

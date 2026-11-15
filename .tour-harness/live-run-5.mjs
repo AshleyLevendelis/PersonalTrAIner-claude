@@ -144,7 +144,10 @@ const openTrainAnyway = async () => {
 await load(`today=${rest?.date ?? ''}`, { tab: 'exercise' })
 const labels = (await openTrainAnyway()) ?? []
 check('C1. EVERY OPTION NAMES ITS SESSION ("Wednesday · Upper Pull & Core"), not a bare day', labels.length > 0 && labels.every(l => /^[A-Z][a-z]+day · \S/.test(l)), labels)
+// RE-ANCHORED 15 Nov 2026 (his ruling: the strip starts today): Monday earlier this week is behind the back arrow.
+await tapExpr(q('[data-testid="strip-prev"]')); await wait(900)
 const strip = await ev(`[...document.querySelectorAll('[data-strip-day]')].map(n => n.getAttribute('aria-label'))`)
+await tapExpr(q('[data-testid="strip-today"]')); await wait(900)
 const monLabel = (strip ?? []).find(l => (l ?? '').startsWith(`${R5?.mondayName}: `)) ?? null
 check('C2. Monday is marked trained on the strip (the input this check stands on)', !!monLabel && /: done/.test(monLabel), { monLabel, strip })
 check('C3. A SESSION ALREADY TRAINED THIS WEEK IS NOT OFFERED (Monday\'s)', !labels.some(l => l.startsWith(`${R5?.mondayName} ·`)), labels)
@@ -183,6 +186,7 @@ await load('', { tab: 'exercise' })
 await until(`document.querySelectorAll('[data-strip-day]').length > 0 && !!window.__run5`, 12000)
 await wait(800)
 const mon = (await ev('window.__run5'))?.mondayName ?? 'Monday'
+await tapExpr(q('[data-testid="strip-prev"]')); await wait(900)
 await tapExpr(q(`[data-strip-day="${mon}"]`))
 await until(`!!document.querySelector('[data-testid="peek-what-you-did"]')`, 6000)
 const peek = await ev(`(() => {
