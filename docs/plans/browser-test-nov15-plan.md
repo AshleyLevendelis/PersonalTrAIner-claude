@@ -21,6 +21,8 @@ Nothing here is built until you say so.
 - **My recommendation:** while Pregnant is ticked, no deficit. The target becomes maintenance, and the screen
   says "Check your calories with your midwife or GP". Fat loss is not offered until it's unticked. I would NOT add
   the extra pregnancy calories (+200-300 kcal later on). That number is a midwife's to give, not the app's.
+- Built as ONE switch: the Pregnant tick drives the exercise rules, the calorie rule and the food rule together, so
+  they can never disagree again (Gemini's review, 15 Nov, agreed). Muscle-growth surplus is also off while ticked.
 - Options: (1) maintenance + midwife line (recommended); (2) keep the deficit but say so plainly on screen;
   (3) leave as ruled.
 
@@ -148,7 +150,8 @@ Nothing here is built until you say so.
 
 - **F1. No account: clearing the browser loses everything.** LATER but **I'd rate it the biggest risk in the app**
   once anyone real uses it. Supabase can link the anonymous account to an email or Google/Apple sign-in without
-  losing data. Worth its own plan next.
+  losing data. Worth its own plan next: a magic link (email, no password) and Google first, Apple later (Gemini's
+  review, 15 Nov, agreed).
 - **F2. kg/lb setting.** YOURS/LATER. Setup already has the toggles; one saved preference, used everywhere.
 - **F3. Reminders on while "On this phone" is off; no "quiet until".** FIX:
   - Grey the switches out and say why.
