@@ -1,4 +1,4 @@
-# Knee flag: which loaded leg work stays (Marcus, 15 Nov 2026) — PLAN, NOT BUILT
+# Knee flag: which loaded leg work stays (Marcus, 15 Nov 2026) — ITEMS 1 AND 2 BUILT
 
 Marcus (52, right-knee surgery) got a leg day of rehab drills: no leg press, no hack squat, a Step-Down labelled
 main lift, a Step-Up offered as its replacement, and the calf exercise cut when time ran short.
@@ -37,3 +37,13 @@ machine leg work (leg press, hack squat, leg curl) at a lighter weight, or keep 
 
 Items 2 and 3 do not touch the filter and can be built without waiting. Measured before and after on the 9,216-plan
 grid with a knee flag, by `measure:` before anything ships.
+
+## Built, 15 Nov 2026 (his answer: "Allow it, lighter")
+- Item 1: Leg Press, Hack Squat and Seated Leg Curl carry `contraindicated_joints: []`; `flaggedJointLoadFactor` prices a
+  lift that loads a flagged KNEE (and is not knee rehab) at x0.8 of the estimate. Knee only: the same rule for every
+  joint would reach 24 more lifts (shoulder 6, including the floor press; wrist 5; hip 9; elbow 4). Next step, mine to
+  decide as a CSCS change, recorded rather than slipped in with this ruling.
+- Item 2: built earlier the same day (the calf day keeps one calf exercise).
+- Item 3: still open (needs the ranker to offer other leg work when the pattern is all rehab).
+- Measured: full-gym knee leg days with loaded machine work 0 -> 234 of 576; lowest score 10.80 both ways.
+  `test:knee-machine-work`.

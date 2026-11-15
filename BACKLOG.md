@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **A KNEE KEEPS MACHINE LEG WORK, LIGHTER (his answer 1 of 15 Nov 2026, "Allow it, lighter"; Marcus's leg day of
+  rehab drills)**. Leg Press, Hack Squat and Seated Leg Curl are no longer removed for a knee on the injuries list
+  (the catalogue says so per lift); free-weight squats, lunges and jumps still are. A lift that loads a flagged knee and
+  is not knee rehab is priced one step lighter, x0.8 of the estimate (Leg Press 110 -> 87.5 kg on the gate's profile);
+  his own logged or stated weights are never touched; Lying Leg Curl (knee rehab) keeps its price. The injury map is
+  now ONE map in the catalogue, read by the filter and the price. MEASURED, 48 knee plans x 16 weeks: full-gym leg days
+  with loaded machine work 0 -> 234 of 576 (home gym has no such machine: 0 of 576, unchanged); lowest plan score 10.80
+  before and after; the step reaches the plan (week-1 Hack Squat 42.5 kg, 52.5 with the step off). CSCS (mine): (1) the
+  effect is real loaded quad and hamstring work instead of drills alone; (2) it takes away nothing (drills still
+  appear; 342 full-gym leg days are still drills only, the ranker's choice); (3) pattern coverage and progression
+  improve; (4) no floor or ceiling moved, the step only lowers; (5) in scope: the app still never decides someone is
+  ready after surgery, and sharp, one-sided or worsening pain still names a professional and changes nothing. NOT done,
+  named: the same step for a shoulder, wrist, hip or elbow would reach 24 more lifts (the nurse's floor press among
+  them), a defensible CSCS change but wider than his ruling, so it is in the plan doc as the next step; a swap away
+  from a step drill still offers only the other step drill (plan item 3). `test:knee-machine-work` (22 checks, 8
+  mutations, 8 caught; one first misapplied to the wrong lift and re-run).
 - [x] **HIS FOUR ANSWERS, 15 Nov 2026 ("Implement all your recommendations")**. (1) After knee surgery, machine leg
   work stays at a lighter weight (entry below when built). (2) The Functional style's line is "Athletic movement &
   strength", for everyone (it said "Explosive & dynamic", and a beginner's functional plan holds almost no explosive

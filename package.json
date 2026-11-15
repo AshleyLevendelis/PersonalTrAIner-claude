@@ -289,6 +289,7 @@
     "test:frozen-weeks": "tsx scripts/test-frozen-weeks.ts",
     "test:balance-swapped-away": "tsx scripts/test-balance-swapped-away.ts",
     "test:calf-day": "tsx scripts/test-calf-day.ts",
+    "test:knee-machine-work": "tsx scripts/test-knee-machine-work.ts",
     "test:short-session": "tsx scripts/test-short-session.ts",
     "measure:short-sessions": "tsx scripts/measure-short-sessions.ts",
     "test:session-length": "tsx scripts/test-session-length.ts",

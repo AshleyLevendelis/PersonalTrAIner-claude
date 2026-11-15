@@ -1,6 +1,6 @@
 import { equipmentTierFor, ownsKitItem, type KitItem } from './kit-list'
 import type { TrainingExperience, UserProfile } from './types'
-import { getExerciseEntry, type ExerciseEntry } from './exercise-db'
+import { getExerciseEntry, INJURED_JOINTS, type ExerciseEntry } from './exercise-db'
 import { KNOWN_WEIGHT_REFERENCE_REPS, KNOWN_WEIGHT_REFERENCE_RPE, percentOf1RM } from './working-weight'
 
 // ---------------------------------------------------------------------------
@@ -1983,6 +1983,29 @@ export function isolationTargetBelowFloor(entry: ExerciseEntry, profile: UserPro
   return reference < LOADING_FLOOR_KG[mode]
 }
 
+/**
+ * A LIFT THAT WORKS A FLAGGED JOINT STARTS LIGHTER (15 Nov 2026; his ruling "Allow it, lighter", after Marcus's knee
+ * surgery). The injury filter removes what is unsafe for a joint; what it keeps but that still loads the joint (a leg
+ * press for a knee) is priced at 80%. CSCS basis: one clear step down from the estimate, the same size as the app's
+ * return-after-a-break ease (6-12 weeks out), so the first sets are comfortably submaximal and the logged sets set the
+ * weight from there. A movement tagged as rehab for that joint is not discounted: it is already prescribed light.
+ */
+export const FLAGGED_JOINT_LOAD_FACTOR = 0.8
+
+/**
+ * THE KNEE ONLY, for now. Measured 15 Nov 2026: the same rule for every joint would reach 24 more lifts (6 for a
+ * shoulder, the nurse's floor press among them; 5 wrist, 9 hip, 4 elbow). Defensible, but wider than his ruling and
+ * the written plan (docs/plans/knee-loaded-work.md), so it is listed there as the next step rather than done here.
+ */
+const LOAD_EASED_JOINTS = new Set(['knee'])
+
+export function flaggedJointLoadFactor(entry: ExerciseEntry, profile: Pick<UserProfile, 'injuries'>): number {
+  const flagged = new Set((profile.injuries ?? []).flatMap(code => INJURED_JOINTS[code] ?? []).filter(j => LOAD_EASED_JOINTS.has(j)))
+  if (flagged.size === 0) return 1
+  if ((entry.indicated_joints ?? []).some(j => flagged.has(j))) return 1
+  return (entry.loads_joints ?? []).some(j => flagged.has(j)) ? FLAGGED_JOINT_LOAD_FACTOR : 1
+}
+
 export function prescribeLoad(
   entry: ExerciseEntry,
   profile: UserProfile,
@@ -2089,6 +2112,8 @@ export function prescribeLoad(
     }
     // A lighter variant takes its share of the price, here and nowhere else (see variantPriceFraction).
     estimate *= variantPriceFraction(entry)
+    // A lift that works a joint on the injuries list starts lighter (15 Nov 2026, his ruling for a knee).
+    estimate *= flaggedJointLoadFactor(entry, profile)
 
     if (options.isCalibrationWeek && !fromKnownWeight) {
       // Week 1 with no known numbers: start meaningfully under the estimate

@@ -2125,6 +2125,10 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Pad above ankles, seated upright', 'Curl heels down and under', 'Squeeze at bottom', 'Control the return'],
     coach_note_swap: 'Same isolated knee-flexion work as the lying version, from a different machine.',
     loads_joints: ['knee'],
+    // NOT CONTRAINDICATED FOR A KNEE, since 15 Nov 2026 (his ruling, after Marcus's knee surgery): a supported machine whose
+    // load the person sets is the usual way back to loaded leg work; it stays in a knee-flagged plan, priced lighter
+    // (load-prescription.ts, flaggedJointLoadFactor). Free-weight squats, lunges and jumps stay out.
+    contraindicated_joints: [],
     style_tags: ['bodybuilding', 'hybrid'],
     substitution_group: 'leg_curl',
     unilateral: false,
@@ -2389,6 +2393,10 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Feet shoulder-width on platform', 'Lower until 90-degree knee angle', 'Do not lock knees at top', 'Keep lower back pressed into seat'],
     coach_note_swap: 'Heavy quad loading without spinal compression.',
     loads_joints: ['knee'],
+    // NOT CONTRAINDICATED FOR A KNEE, since 15 Nov 2026 (his ruling, after Marcus's knee surgery): a supported machine whose
+    // load the person sets is the usual way back to loaded leg work; it stays in a knee-flagged plan, priced lighter
+    // (load-prescription.ts, flaggedJointLoadFactor). Free-weight squats, lunges and jumps stay out.
+    contraindicated_joints: [],
     style_tags: ['bodybuilding', 'hybrid'],
     substitution_group: 'squat',
     unilateral: false,
@@ -2427,6 +2435,10 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Shoulder pads secure', 'Feet lower on platform for quad emphasis', 'Full depth', 'Drive through heels'],
     coach_note_swap: 'Machine-guided squat that isolates quads with back support.',
     loads_joints: ['knee'],
+    // NOT CONTRAINDICATED FOR A KNEE, since 15 Nov 2026 (his ruling, after Marcus's knee surgery): a supported machine whose
+    // load the person sets is the usual way back to loaded leg work; it stays in a knee-flagged plan, priced lighter
+    // (load-prescription.ts, flaggedJointLoadFactor). Free-weight squats, lunges and jumps stay out.
+    contraindicated_joints: [],
     style_tags: ['bodybuilding', 'hybrid'],
     substitution_group: 'squat',
     unilateral: false,
@@ -6468,6 +6480,23 @@ export function getSmartReplacements(
  * Every injury filter reads THIS, never loads_joints directly — that's what
  * keeps "participates" and "is unsafe" from collapsing back into one idea.
  */
+/** Injury code -> flagged joint tags. ONE map, read by the plan's injury filter and the load prescription. */
+export const INJURED_JOINTS: Record<string, string[]> = {
+  lower_back: ['lower_back_axial'],
+  knees: ['knee'],
+  shoulders: ['shoulder'],
+  neck: ['neck'],
+  wrists: ['wrist'],
+  // hips/elbows/ankles were collected at onboarding and mapped to NOTHING, so
+  // a plan built for someone with a bad hip came out byte-for-byte identical
+  // to a healthy person's — they were still handed Deadlifts. Three of the
+  // eight injuries a user can report did nothing at all, and the comment that
+  // used to sit here said so without anyone acting on it.
+  hips: ['hip'],
+  elbows: ['elbow'],
+  ankles: ['ankle'],
+}
+
 export function contraindicatedJoints(entry: ExerciseEntry): string[] {
   return entry.contraindicated_joints ?? entry.loads_joints
 }

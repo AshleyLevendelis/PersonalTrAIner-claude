@@ -5,7 +5,7 @@ import type {
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
 import { getAppNow, getLocalDateString } from './dev-clock'
-import { EXERCISE_DATABASE, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup, getExerciseEntry } from './exercise-db'
+import { EXERCISE_DATABASE, INJURED_JOINTS, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup, getExerciseEntry } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -906,21 +906,8 @@ function getFeaibleRequiredPatterns(
 // Injured joint mapping
 // ---------------------------------------------------------------------------
 
-const INJURED_JOINTS: Record<string, string[]> = {
-  lower_back: ['lower_back_axial'],
-  knees: ['knee'],
-  shoulders: ['shoulder'],
-  neck: ['neck'],
-  wrists: ['wrist'],
-  // hips/elbows/ankles were collected at onboarding and mapped to NOTHING, so
-  // a plan built for someone with a bad hip came out byte-for-byte identical
-  // to a healthy person's — they were still handed Deadlifts. Three of the
-  // eight injuries a user can report did nothing at all, and the comment that
-  // used to sit here said so without anyone acting on it.
-  hips: ['hip'],
-  elbows: ['elbow'],
-  ankles: ['ankle'],
-}
+// The map itself lives in exercise-db.ts since 15 Nov 2026 (`INJURED_JOINTS`), so the load prescription can read the
+// same joints without importing this module.
 
 /**
  * Single source of truth for injury-code -> flagged-joint mapping, exported
