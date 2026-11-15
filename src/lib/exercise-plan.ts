@@ -346,7 +346,11 @@ export const TRACKS: Record<TrackFocus, TrackDefinition> = {
       { patterns: ['single_leg'], tier: 'tier2_compound', required: false },
       { patterns: ['isolation_quad'], tier: 'tier3_isolation', required: false },
       { patterns: ['isolation_hamstring'], tier: 'tier3_isolation', required: false },
-      { patterns: ['isolation_calf'], tier: 'tier3_isolation', required: false },
+      // REQUIRED SINCE 15 Nov 2026 (CSCS, mine; Marcus's "Legs & Calves" day had no calf work). The day is named for
+      // its calves, and measured on 1,152 seeded loading days a calf exercise was missing from 60% at 30-45 minutes
+      // and from every one at 20-30: an optional slot is the first thing a short session sheds. Calf raises cost
+      // about three minutes and load no other joint, so the day keeps one and sheds a quad or hamstring isolation.
+      { patterns: ['isolation_calf'], tier: 'tier3_isolation', required: true },
     ],
   },
   'Shoulders & Abs': {
@@ -6460,10 +6464,14 @@ export function trainingSlotCount(entries: readonly (ExerciseEntry | null | unde
 export function isStructuralSlot(
   entries: readonly (ExerciseEntry | null | undefined)[],
   index: number,
+  /** The day's focus: a day NAMED for its calves keeps its last calf exercise (15 Nov 2026, see 'Legs & Calves'). */
+  dayFocus?: string,
 ): boolean {
   const self = entries[index]
   if (!self) return false
   if (self.mechanics_tier === 'primer') return true
+  if (dayFocus && /\bCalves\b/.test(dayFocus) && self.movement_pattern === 'isolation_calf'
+    && !entries.some((other, i) => i !== index && other?.movement_pattern === 'isolation_calf')) return true
   return isLastCarrierOfPattern(entries, index)
 }
 
@@ -7110,7 +7118,7 @@ export function sizeBlockToRestBudget(
         if (
           entry && entry.mechanics_tier !== 'cardio' &&
           !protectedNames.has(exercises[removeIdx].name) &&
-          !isStructuralSlot(entriesNow, removeIdx)
+          !isStructuralSlot(entriesNow, removeIdx, day.focus)
         ) break
         removeIdx--
       }

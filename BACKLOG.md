@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **A "LEGS & CALVES" DAY KEEPS A CALF EXERCISE (15 Nov 2026, CSCS, mine; Marcus's calf day had none)**. MEASURED
+  on 1,152 seeded loading days per setting (bodybuilding, three days, four goals, three levels, four kits, knee or
+  not): a calf exercise was missing from 687 at 30-45 minutes, 69 at 45-60, 3 at 60-90, and every one at 20-30.
+  Two causes: the calf slot was optional, so a short session shed it first; and in later blocks the time trim
+  protected the calf raise by its NAME, so once it rotated to a seated calf raise nothing protected it. Now the slot is
+  required and the trim protects a day's last calf exercise by what the day is named for. After: 0 missing at every
+  setting. BASIS: the day's name is a promise; calf raises take about three minutes and load no other joint, so the
+  day sheds a quad or hamstring isolation instead (the hinge still trains the hamstrings). REVIEW: training effect as
+  named; takes one isolation slot on the tightest days; patterns and floors unchanged; in scope. VERIFIED:
+  `test:calf-day` (9 checks, 5 mutations caught), and `test:short-session`, `test:session-length`,
+  `test:pattern-floor`, `test:filler-yields`, `test:rest-floors`, `test:session-shortfall`, `test:movement-families`,
+  `test:machine-pack`, `test:dumbbell-pack`, `test:block-phases` pass. The quality grid is in the next full run.
+  Also written, NOT BUILT: `docs/plans/knee-loaded-work.md`, machine leg work for a flagged knee (his decision: it
+  changes the injury filter), with the swap-list half tried and reverted (it left an empty list).
 - [x] **THE FIRST-SESSION CARD NEVER ASKS A HARD SET OF A LIFT THAT LOADS A FLAGGED JOINT (15 Nov 2026, CSCS, mine;
   Marcus after knee surgery was asked his squat and deadlift)**. The card reads the same joints the plan's injury
   filter reads, from the catalogue: a knee asks only the bench, a shoulder only squat and deadlift, a lower back and a
