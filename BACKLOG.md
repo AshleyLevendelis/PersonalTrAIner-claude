@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **PANTRY ITEMS ON THE SHOPPING LIST READ AS A BOTTLE, JAR OR PACK (15 Nov 2026, the coeliac nurse: "Olive oil
+  10 ml")**. A small amount (up to 250 g or ml) of an oil or a condiment reads "1 bottle (uses 10ml)": oils, vinegars
+  and sauces are bottles, honey, pastes, nut-free spreads like tahini and coconut oil are jars, spices and stock are
+  packs. Above 250 it is an amount again; butter and nut butters are bought by weight and stay so; the stepper keeps
+  the real amount so it never looks stuck. Display only: nothing stored changes. VERIFIED: `test:grocery-display`
+  (8 new checks, 7 mutations: 6 caught, 1 found a redundant clause, deleted); `test:bundle` passes.
+  NOT YET DRIVEN in a browser (`verify:grocery`), waiting for the full run to free the machine.
+  NOT DONE, his: soy milk sits under "Dairy & eggs" because the list has six aisles fixed by the database; giving
+  plant milks their own aisle needs a database change, and renaming the aisle is wording.
 - [x] **THE WEEK-BALANCE STEP NEVER ADDS SETS TO AN EXERCISE SHE SWAPPED AWAY (15 Nov 2026, CSCS, mine; the coeliac
   nurse swapped a floor press out for her sore shoulder and the card said "I'll also add 2 sets of floor press on
   Wednesday")**. The step that keeps pressing and pulling in proportion took the first press it found. A swapped slot

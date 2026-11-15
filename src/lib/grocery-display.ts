@@ -124,6 +124,36 @@ function purchaseUnitFor(item: Pick<GroceryItemRow, 'display_name' | 'unit'>) {
  * lost.
  */
 export function formatShoppingQuantity(item: Pick<GroceryItemRow, 'display_name' | 'quantity' | 'unit'>): { primary: string; exact: string } {
+  const amount = formatAmount(item)
+  // A PANTRY ITEM IS BOUGHT AS A BOTTLE OR A JAR (15 Nov 2026, the coeliac nurse: "Olive oil 10 ml" is not something a
+  // shop sells). A small amount of an oil, sauce, spice or stock reads as the container, with what the meals use.
+  const container = pantryContainer(item)
+  if (container) return { primary: `1 ${container} (uses ${amount.primary})`, exact: amount.exact }
+  return amount
+}
+
+/** Most of a pantry item a week can use and still be "one bottle": above this the amount is shown as an amount. */
+const PANTRY_SMALL = 250
+
+/**
+ * The container a pantry item is bought in, when the list holds a small amount of it, else null. By the food table's
+ * own category (condiments and oils) and the name for the container word. Butter, nut butters and
+ * yoghurt are not pantry items here: they are bought by weight.
+ */
+export function pantryContainer(item: Pick<GroceryItemRow, 'display_name' | 'quantity' | 'unit'>): 'bottle' | 'jar' | 'pack' | null {
+  if ((item.unit !== 'g' && item.unit !== 'ml') || !(item.quantity > 0) || item.quantity > PANTRY_SMALL) return null
+  const entry = lookupIngredient(item.display_name)
+  if (!entry) return null
+  const isOil = entry.category === 'fat' && /\boil\b/.test(entry.name)
+  if (entry.category !== 'condiment' && !isOil) return null
+  const name = entry.name
+  if (/\b(honey|mustard|paste|pesto|jam|marmalade|mayonnaise|chutney|tahini|miso|coconut oil)\b/.test(name)) return 'jar'
+  if (isOil || /\b(vinegar|sauce|tamari|aminos|syrup|ketchup|dressing|extract)\b/.test(name)) return 'bottle'
+  return 'pack'
+}
+
+/** The amount itself, rounded to how it is bought: the row's figure before any container word. */
+function formatAmount(item: Pick<GroceryItemRow, 'display_name' | 'quantity' | 'unit'>): { primary: string; exact: string } {
   const exact = formatQuantity(item)
   // MILLILITRES READ LIKE GRAMS (whole-app QA walk, 7 Nov 2026): "1000ml" sat beside "1kg", the same rounding and the
   // same step the stepper already moves in, with litres from 1,000 ("~1.2L").
@@ -163,7 +193,8 @@ export function formatShoppingQuantity(item: Pick<GroceryItemRow, 'display_name'
  * (the exact figure sits beside it) and with a space before the unit.
  */
 export function stepperReadout(item: Pick<GroceryItemRow, 'display_name' | 'quantity' | 'unit'>): string {
-  const { primary } = formatShoppingQuantity(item)
+  // The amount, never the container: a stepper reading "1 bottle" while the grams change would look stuck.
+  const { primary } = formatAmount(item)
   return primary.replace(/^~/, '').replace(/^([\d.]+)(kg|g|ml|L)$/, '$1 $2')
 }
 

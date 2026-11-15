@@ -85,6 +85,26 @@ check('no dated rows: no sentence, so the screen falls back to its memo', covera
   check('under a litre it stays in ml, rounded to the same step as grams', formatShoppingQuantity(ml(333)).primary === '~350ml')
 }
 
+// A PANTRY ITEM IS BOUGHT AS A BOTTLE OR A JAR (15 Nov 2026, the coeliac nurse: "Olive oil 10 ml").
+{
+  const row = (n: string, q: number, u = 'ml') => ({ display_name: n, quantity: q, unit: u })
+  check('10ml of olive oil reads "1 bottle (uses 10ml)"', formatShoppingQuantity(row('olive oil', 10)).primary === '1 bottle (uses 10ml)', formatShoppingQuantity(row('olive oil', 10)))
+  check('honey is a jar, paprika a pack, soy sauce a bottle',
+    formatShoppingQuantity(row('honey', 20, 'g')).primary.startsWith('1 jar') && formatShoppingQuantity(row('paprika', 3, 'g')).primary.startsWith('1 pack')
+    && formatShoppingQuantity(row('soy sauce', 30)).primary.startsWith('1 bottle'),
+    [formatShoppingQuantity(row('honey', 20, 'g')).primary, formatShoppingQuantity(row('paprika', 3, 'g')).primary, formatShoppingQuantity(row('soy sauce', 30)).primary])
+  check('coconut oil is a jar, not a bottle', formatShoppingQuantity(row('coconut oil', 10, 'g')).primary.startsWith('1 jar'), formatShoppingQuantity(row('coconut oil', 10, 'g')).primary)
+  check('a lot of oil is shown as an amount (600ml)', formatShoppingQuantity(row('olive oil', 600)).primary === '600ml', formatShoppingQuantity(row('olive oil', 600)).primary)
+  check('butter, peanut butter and broccoli are not pantry items',
+    formatShoppingQuantity(row('butter', 20, 'g')).primary === '20g' && formatShoppingQuantity(row('peanut butter', 30, 'g')).primary === '30g'
+    && !/bottle|jar|pack/.test(formatShoppingQuantity(row('broccoli', 378, 'g')).primary))
+  check('a small amount of an ordinary food is still an amount (garlic 10g, oats 40g, spinach 50g)',
+    ['garlic', 'oats', 'spinach'].every((n, i) => !/bottle|jar|pack/.test(formatShoppingQuantity(row(n, [10, 40, 50][i], 'g')).primary)),
+    ['garlic', 'oats', 'spinach'].map((n, i) => formatShoppingQuantity(row(n, [10, 40, 50][i], 'g')).primary))
+  check("the stepper keeps the real amount, so it never looks stuck", stepperReadout(row('olive oil', 10)) === '10 ml', stepperReadout(row('olive oil', 10)))
+  check('the exact figure stays', formatShoppingQuantity(row('olive oil', 10)).exact === '10ml', formatShoppingQuantity(row('olive oil', 10)).exact)
+}
+
 console.log(`\n${ran} checks ran`)
 if (failed > 0) { console.error(`${failed} check(s) failed`); process.exit(1) }
 console.log('grocery display: all checks passed')
