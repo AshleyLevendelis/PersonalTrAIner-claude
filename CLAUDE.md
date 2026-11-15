@@ -1606,6 +1606,12 @@ menu" stays true when a copy is also left outside it.
 - **"Hips & pelvis" and "Other (describe)" on the injuries list** (his decision 8): Other asks the three pain questions;
   sharp saves nothing. `test:other-injury`, `verify:profile-fixes` §11
 
+### His rulings of 15 Nov 2026, from the nurse and Marcus reports ("Implement all your recommendations")
+- **A knee on the injuries list keeps machine leg work, lighter**: leg press, hack squat and leg curl stay, a step
+  lighter; free-weight squats, lunges and jumps stay out. `docs/plans/knee-loaded-work.md`
+- **The Functional style reads "Athletic movement & strength"** for everyone. **The dairy aisle is "Dairy, eggs &
+  alternatives"**. **The plate calculator stays for everyone** (adjustable dumbbells take plates).
+
 ### His rulings of 14 Nov 2026, live-test batches 2-3 (Priya and his own phone)
 - **"Leave it as it is" on a goal change undoes the goal: "Undo the goal change"** (over keeping the goal and saying
   so, and over always rebuilding): the goal is saved before the question and moves calories at once, so Leave puts the

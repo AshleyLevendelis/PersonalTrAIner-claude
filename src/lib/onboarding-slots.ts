@@ -149,7 +149,7 @@ export { EQUIPMENT_OPTIONS, INJURY_OPTIONS }
 const INJURY_CARD_OPTIONS: { value: string; icon: string; label: string }[] = [...INJURY_OPTIONS, ...HEALTH_CONDITION_OPTIONS]
 
 export const STYLE_OPTIONS: { value: TrainingStyle; icon: string; label: string; description: string }[] = [
-  { value: 'functional', icon: '🏃', label: 'Functional / athletic', description: 'Explosive & dynamic' },
+  { value: 'functional', icon: '🏃', label: 'Functional / athletic', description: 'Athletic movement & strength' },
   { value: 'bodybuilding', icon: '🏆', label: 'Bodybuilding', description: 'Aesthetics & symmetry' },
   { value: 'combat', icon: '🥊', label: 'Combat / conditioning', description: 'Fight-ready fitness' },
   { value: 'hybrid', icon: '⚙️', label: 'Hybrid', description: 'Best of everything' },

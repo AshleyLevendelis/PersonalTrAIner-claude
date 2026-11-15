@@ -135,7 +135,7 @@ check('"Grocery" 28px bold; the ring 92px reading 3/15; 12 left at 46px', R.titl
 check('the compact title is hidden while the hero is on screen', R.compactOpacity === '0', R.compactOpacity)
 const chipAisles = (R.chipList || []).map(c => c.aisle).join()
 check('one chip per aisle with something left in it (Frozen\'s only item is in the trolley), each counting what is left',
-  chipAisles === 'produce,meat_fish,dairy,dry_goods' && (R.chipList || []).map(c => c.text).join('|') === 'Produce4|Meat & fish3|Dairy & eggs3|Dry goods2', R.chipList)
+  chipAisles === 'produce,meat_fish,dairy,dry_goods' && (R.chipList || []).map(c => c.text).join('|') === 'Produce4|Meat & fish3|Dairy, eggs & alternatives3|Dry goods2', R.chipList)
 check('chips are 32px; the first aisle\'s chip is the active one, lit from the accent\'s own glow',
   (R.chipList || []).length === 4 && R.chipList.every(c => near(c.h, 32)) && R.chipList[0].on && R.chipList.slice(1).every(c => !c.on)
   && R.chipList[0].border === R.tokens.onBorder && R.chipList[0].bg === R.tokens.onBg && R.chipList[1].bg === R.tokens.raised,
@@ -281,7 +281,7 @@ const X1 = await page(`
   const db = (window.__fakeDb?.grocery_items ?? []).find(r => r.id === 'g-9')
   return { onScreen: !!row('Cheddar'), dismissed: db ? db.dismissed === true : true, chip: qa('[data-testid="grocery-chip"]').find(c => c.dataset.aisle === 'dairy')?.textContent.trim() ?? null }
 `)
-check('Remove takes it off the list, through the store, and the aisle\'s count follows', !X1.onScreen && X1.dismissed && X1.chip === 'Dairy & eggs2', X1)
+check('Remove takes it off the list, through the store, and the aisle\'s count follows', !X1.onScreen && X1.dismissed && X1.chip === 'Dairy, eggs & alternatives2', X1)
 
 console.log('\n[4] A tick lands, waits a beat, leaves — and Undo brings it back')
 const K0 = await page(`
@@ -522,7 +522,7 @@ check('no row is named "... cooked"; the rice is "brown rice"', FB1.names.includ
 check('the rice is the dry weight to buy (185g for the week, not 560g), under its own unchanged key', FB1.rice?.quantity === 185 && FB1.rice?.unit === 'g' && FB1.rice?.display_name === 'brown rice', FB1.rice)
 check('...and the row shows it (190g)', /190g/.test(FB1.riceShown || '') && !/560|600/.test(FB1.riceShown || ''), FB1.riceShown)
 check('eggs and butter are under dairy, tofu is in dry goods, chicken is still with the meat', FB1.aisles.egg === 'dairy' && FB1.aisles.butter === 'dairy' && FB1.aisles.tofu === 'dry_goods' && FB1.aisles.chicken === 'meat_fish', FB1.aisles)
-check('...and the aisle is called "Dairy & eggs", on its heading and on its chip', /^Dairy & eggs/.test(FB1.dairyHeading || '') && /^Dairy & eggs\d+$/.test(FB1.dairyChip || ''), [FB1.dairyHeading, FB1.dairyChip])
+check('...and the aisle is called "Dairy, eggs & alternatives", on its heading and on its chip', /^Dairy, eggs & alternatives/.test(FB1.dairyHeading || '') && /^Dairy, eggs & alternatives\d+$/.test(FB1.dairyChip || ''), [FB1.dairyHeading, FB1.dairyChip])
 const FB2 = await page(`
   row('egg')?.scrollIntoView({ block: 'center' })
   row('egg')?.querySelector('[data-testid="grocery-check"]')?.click()

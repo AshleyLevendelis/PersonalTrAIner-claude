@@ -2,6 +2,13 @@
 
 Newest first. One line each.
 
+- [x] **HIS FOUR ANSWERS, 15 Nov 2026 ("Implement all your recommendations")**. (1) After knee surgery, machine leg
+  work stays at a lighter weight (entry below when built). (2) The Functional style's line is "Athletic movement &
+  strength", for everyone (it said "Explosive & dynamic", and a beginner's functional plan holds almost no explosive
+  work). (3) The shopping aisle is "Dairy, eggs & alternatives", so soy milk no longer reads as dairy; no database
+  change. (4) The plate calculator stays for everyone: adjustable dumbbells take plates too. VERIFIED (2, 3):
+  `test:grocery-shopping` (its one-case rule now allows a comma), `test:onboarding-chips`, `test:onboarding-style`,
+  `test:option-icons`, `verify:grocery` (heading and chip read the new name; screenshot read).
 - [x] **FULL RUN AT e2cb488b: 583 of 585 checks ran (stopped at the two-hour limit before the two plan-quality
   checks), 10 failed, all explained (15 Nov 2026)**. Environmental, as always: `test:meal-quality`,
   `test:schema-parity`, `verify:rls` (no database here). Expected: `test:coach-exam-fresh` (the coach changed; the

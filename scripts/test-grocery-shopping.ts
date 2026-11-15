@@ -60,8 +60,8 @@ async function main() {
   console.log('\n1. Aisles')
   // -------------------------------------------------------------------------
   check('eggs are with dairy', aisle('egg') === 'dairy' && aisle('egg white') === 'dairy' && aisle('2 eggs'.replace(/^\d+ /, '')) === 'dairy', [aisle('egg'), aisle('egg white')])
-  check('...and the aisle says so: "Dairy & eggs"', GROCERY_AISLE_LABEL.dairy === 'Dairy & eggs', GROCERY_AISLE_LABEL.dairy)
-  check('the aisle names are in one case ("Meat & fish", "Dry goods"), not two', GROCERY_AISLE_LABEL.meat_fish === 'Meat & fish' && GROCERY_AISLE_LABEL.dry_goods === 'Dry goods' && Object.values(GROCERY_AISLE_LABEL).every(l => /^[A-Z][a-z& ]*$/.test(l)), GROCERY_AISLE_LABEL)
+  check('...and the aisle says so: "Dairy, eggs & alternatives" (his ruling 15 Nov 2026)', GROCERY_AISLE_LABEL.dairy === 'Dairy, eggs & alternatives', GROCERY_AISLE_LABEL.dairy)
+  check('the aisle names are in one case ("Meat & fish", "Dry goods"), not two', GROCERY_AISLE_LABEL.meat_fish === 'Meat & fish' && GROCERY_AISLE_LABEL.dry_goods === 'Dry goods' && Object.values(GROCERY_AISLE_LABEL).every(l => /^[A-Z][a-z&, ]*$/.test(l)), GROCERY_AISLE_LABEL)
   check('butter and ghee are with dairy', aisle('butter') === 'dairy' && aisle('ghee') === 'dairy', [aisle('butter'), aisle('ghee')])
   check('oils, nuts and seeds stay in dry goods', ['olive oil', 'almonds', 'chia seeds', 'peanut butter'].every(n => aisle(n) === 'dry_goods'))
   const meatFree = ['tofu firm', 'tofu silken', 'tempeh', 'seitan', 'seitan strips', 'soy mince', 'quorn mince', 'quorn fillet', 'vegan mince', 'vegan sausage', 'falafel']

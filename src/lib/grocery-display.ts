@@ -23,7 +23,9 @@ import { weekdayShort, weekdayLong, dayOfMonth } from '@/lib/day-labels'
 export const GROCERY_AISLE_LABEL: Record<GroceryCategory, string> = {
   produce: 'Produce',
   meat_fish: 'Meat & fish',
-  dairy: 'Dairy & eggs',
+  // "Dairy, eggs & alternatives" since 15 Nov 2026 (his ruling, the coeliac nurse: soy milk under "Dairy & eggs" read
+  // as if it held dairy). Plant milks and yoghurts sit beside dairy in the shop and stay in this aisle.
+  dairy: 'Dairy, eggs & alternatives',
   dry_goods: 'Dry goods',
   frozen: 'Frozen',
   other: 'Other',
