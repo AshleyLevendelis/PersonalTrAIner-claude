@@ -33,10 +33,10 @@ async function main() {
   console.log('\n1. Back to today, never a read-only copy of it')
   {
     const panel = strip(fs.readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8'))
-    check('"See Wednesday" when Wednesday is today closes the peek', /setPeekDay\(peekMovedTo\.dayName === todayName \? null : peekMovedTo\.dayName\)/.test(panel))
-    check('a tap on today in the strip closes the peek', /onSelectDay=\{d => setPeekDay\(d === todayName \? null : d\)\}/.test(panel))
+    check('"See Wednesday" when Wednesday is today closes the peek', /onClick=\{\(\) => openPeek\(peekMovedTo\.date\)\}/.test(panel) && /if \(!date \|\| date === today\) \{ setPeekDate\(null\); return \}/.test(panel))
+    check('a tap on today in the strip closes the peek', /onSelectDate=\{openPeek\}/.test(panel))
     const row = strip(fs.readFileSync('src/components/exercise/WeekContextRow.tsx', 'utf8'))
-    check('...and the strip passes today\'s tap on (it used to be dropped)', /onClick=\{\(\) => onSelectDay\(d\.dayName\)\}/.test(row) && !/if \(!isToday\) onSelectDay/.test(row))
+    check('...and the strip passes today\'s tap on (it used to be dropped)', /onClick=\{\(\) => onSelectDate\(d\.date\)\}/.test(row) && !/if \(!isToday\) onSelectDate/.test(row))
   }
 
   console.log('\n2-3. The week view: a chosen rest and a missed day')

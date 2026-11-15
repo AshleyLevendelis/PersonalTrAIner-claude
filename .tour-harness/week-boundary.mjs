@@ -152,7 +152,9 @@ check('14. Home still shows seven days', d.labels.length === 7, d.labels)
 check('15. no boundary is drawn on Home, and no note', d.boundaryAt === -1 && d.boundaryMarks === 0 && d.note === null, d)
 await ev(`location.hash = '#/tab/exercise'`); await wait(2500)
 const dx = await readExercise()
-check('16. ...nor on Exercise', dx.marks === 0 && dx.note === null, dx)
+// RE-ANCHORED 15 Nov 2026 (his ruling: the Exercise strip starts today): from a Wednesday it runs into the next plan
+// week, and marks the Monday it starts, which is right; Home's Monday-to-Sunday strip (15) still shows none.
+check('16. ...while Exercise, running from today, marks the Monday the next plan week starts', dx.marks === 1 && /^Week \d+ starts Monday$/.test(dx.note ?? ''), dx)
 
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)

@@ -69,6 +69,9 @@ const cell = day => ev(`(() => { const n = document.querySelector('[aria-label^=
 const escape = async () => { for (const type of ['keyDown', 'keyUp']) await send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await wait(450) }
 const until = async (fn, tries = 24) => { let v = await fn(); for (let i = 0; i < tries && !v; i++) { await wait(300); v = await fn() } return v }
 const untilGone = sel => until(async () => !(await has(sel)))
+// RE-ANCHORED 15 Nov 2026 (his ruling: the strip starts today and pages back by arrow): an earlier day is behind it.
+const showPast = async () => { if (!(await has('[data-testid="strip-today"]'))) { await tap('[data-testid="strip-prev"]'); await wait(900) } }
+const showToday = async () => { if (await has('[data-testid="strip-today"]')) { await tap('[data-testid="strip-today"]'); await wait(900) } }
 
 
 const lead = () => ev(`document.querySelector('[data-testid="peek-missed"]')?.innerText ?? null`)
@@ -86,6 +89,7 @@ const YEST = dayAt(-1)
 console.log(`\nA MISSED DAY SAYS SO — ${YEST} (yesterday), with today free\n`)
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&freetoday=1&n=1#/tab/exercise` })
 await wait(4500)
+await showPast()
 check(`A0. the fixture bites: ${YEST} is a missed training day`, /: missed$/.test(await until(() => cell(YEST)) || ''), await cell(YEST))
 await tap(`[aria-label^="${YEST}:"]`); await wait(900)
 const a1 = await until(lead)
@@ -100,8 +104,11 @@ check('A6. IT IS RECORDED: "You marked … as missed", and not offered again', n
 check('A7. "Do it today"', await clickSel('[data-testid="peek-missed-run"]'))
 // A day she MARKED missed stays missed after the work moves (her 10 Sep ruling: moving changes where it is owed,
 // not whether the day was missed), so the proof is today gaining the session and the day saying where it went.
+const movedAway = !!(await until(() => has('[data-testid="peek-moved-away"]')))
+await showToday()
 const a8 = await until(async () => /: due$/.test(await cell(TODAY_NAME) || '') ? cell(TODAY_NAME) : null)
-check(`A8. THE SESSION MOVED: today (${TODAY_NAME}) now has it, and ${YEST} says it is on today`, /: due$/.test(a8 || '') && !!(await until(() => has('[data-testid="peek-moved-away"]'))), { a8, yest: await cell(YEST) })
+check(`A8. THE SESSION MOVED: today (${TODAY_NAME}) now has it, and ${YEST} says it is on today`, /: due$/.test(a8 || '') && movedAway, { a8, movedAway })
+await showPast()
 check(`A9. ...and ${YEST} is still a missed day, as she said`, /: missed$/.test(await cell(YEST) || ''), await cell(YEST))
 await shoot('missed-day-a-moved')
 
@@ -110,8 +117,10 @@ console.log('\nB TODAY IS ALREADY TAKEN\n')
 let MISSED = null
 await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&n=2#/tab/exercise` })
 await wait(4500)
+const todayCellB = await until(() => cell(TODAY_NAME))
+await showPast()
 for (let n = -1; n >= -6 && !MISSED; n--) { const c = await until(() => cell(dayAt(n)), 6); if (/: missed$/.test(c || '')) MISSED = dayAt(n) }
-check('B0. the fixture bites: an earlier day this week is missed, and today trains', !!MISSED && !/(rest|recovery)/.test(await cell(TODAY_NAME) || ''), { MISSED, today: await cell(TODAY_NAME) })
+check('B0. the fixture bites: an earlier day this week is missed, and today trains', !!MISSED && !!todayCellB && !/(rest|recovery)/.test(todayCellB), { MISSED, today: todayCellB })
 await tap(`[aria-label^="${MISSED}:"]`); await wait(900)
 const b = await until(btns)
 check('B1. "Do it today" is NOT offered while today has its own session', !!b && !b.includes('Do it today'), b)

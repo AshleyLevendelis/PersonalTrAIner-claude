@@ -123,11 +123,22 @@ check('1d. ...while the two numbers are still readable in words',
 // 1e. "TO GO" COUNTS WHAT IS STILL AHEAD (user test 8 Oct 2026, finding 18): it read "4 to go" on
 // a Thursday with Monday and Wednesday already missed. Read against the strip's own cells, so the
 // number and the days cannot disagree; this fixture has missed days behind it, so it binds.
-const ahead = await ev(`(() => {
-  const cells = [...document.querySelectorAll('[aria-label]')].map(n => n.getAttribute('aria-label')).filter(l => /^(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday): /.test(l))
-  const week = cells.slice(-7)
-  return { week, missedBehind: week.filter(l => /: missed$/.test(l)).length, due: week.filter(l => /: due$/.test(l)).length }
-})()`)
+// RE-ANCHORED 15 Nov 2026 (his ruling: the strip starts today and pages; the count stays Monday to Sunday): the days
+// still ahead are the strip's days up to this Sunday, and the missed ones are behind the back arrow, from Monday.
+const stripCells = () => ev(`[...document.querySelectorAll('[data-exercise-strip] [data-strip-date]')].map(n => ({ date: n.getAttribute('data-strip-date'), label: n.getAttribute('aria-label') }))`)
+const nowCells = await stripCells()
+const t0 = new Date(`${nowCells[0]?.date}T12:00:00`)
+const iso = d => d.toLocaleDateString('en-CA')
+const sunday = new Date(t0); sunday.setDate(t0.getDate() + (7 - t0.getDay()) % 7)
+const monday = new Date(t0); monday.setDate(t0.getDate() - (t0.getDay() + 6) % 7)
+await ev(`document.querySelector('[data-testid="strip-prev"]')?.click()`); await wait(900)
+const pastCells = await stripCells()
+await ev(`document.querySelector('[data-testid="strip-today"]')?.click()`); await wait(900)
+const ahead = {
+  week: [...pastCells.filter(c => c.date >= iso(monday)), ...nowCells.filter(c => c.date <= iso(sunday))].map(c => c.label),
+  missedBehind: pastCells.filter(c => c.date >= iso(monday) && /: missed$/.test(c.label)).length,
+  due: nowCells.filter(c => c.date <= iso(sunday) && /: due$/.test(c.label)).length,
+}
 const toGo = Number((track.text.match(/(\d+) to go/i) || [])[1] ?? (/none left/i.test(track.text) ? 0 : -1))
 check('1e. "to go" is the sessions still ahead, not planned minus done (missed days are gone, not to go)',
   ahead.missedBehind > 0 && toGo === ahead.due, { toGo, ahead, text: track.text })

@@ -272,7 +272,8 @@ check('...and the other takes that same day off',
 // from, and never straight off the plan's weekday row.
 const panel = strip(readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8'))
 check('the peek asks the resolved week, not the plan row',
-  /weekTrain\.days\.find\(d => d\.dayName === peekDay\)/.test(panel), null)
+  // RE-ANCHORED 15 Nov 2026: the strip pages, so the peek is found by DATE in the strip's own week.
+  /stripWeek\.days\.find\(d => d\.date === peekDate\)/.test(panel) && /useTrainingWeek\([^)]*stripStart\)/.test(panel), null)
 check('...and shows where the session went when the day is a move ORIGIN',
   /peekMovedTo/.test(panel) && /peek-moved-away/.test(panel), null)
 check('...and labels a peeked day by the day peeked, not by the session it holds',

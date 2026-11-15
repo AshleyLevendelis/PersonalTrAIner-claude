@@ -119,8 +119,11 @@ await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&freetoday
 await wait(4500)
 
 // --- 0. the week, before anything is moved ---------------------------------
+// RE-ANCHORED 15 Nov 2026 (his ruling: the strip starts today): yesterday is behind the back arrow.
+const todayCell0 = await until(() => cell(TODAY_NAME))
+check(`0b. ${TODAY_NAME} (today) has no session of its own`, /: .*(rest|recovery)/.test(todayCell0 || ''), todayCell0)
+await tap('[data-testid="strip-prev"]'); await wait(900)
 check(`0a. ${FROM_NAME} is a training day nobody did`, /: missed$/.test(await until(() => cell(FROM_NAME)) || ''), await cell(FROM_NAME))
-check(`0b. ${TODAY_NAME} (today) has no session of its own`, /: .*(rest|recovery)/.test(await cell(TODAY_NAME) || ''), await cell(TODAY_NAME))
 
 // --- 1. MOVE IT, through the app -------------------------------------------
 check(`1a. peeking ${FROM_NAME}`, await tap(`[aria-label^="${FROM_NAME}:"]`) && (await wait(900), true))

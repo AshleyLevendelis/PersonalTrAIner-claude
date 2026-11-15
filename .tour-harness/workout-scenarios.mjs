@@ -75,6 +75,8 @@ await load('walker=1')
 await ready()
 // The first day BEFORE today the strip calls missed: a walk that was prescribed and not logged.
 const order = DAY_NAMES.slice(1).concat(DAY_NAMES[0])
+// RE-ANCHORED 15 Nov 2026 (his ruling: the strip starts today): earlier days are behind the back arrow.
+await tapExpr(q('[data-testid="strip-prev"]')); await wait(900)
 const pastWalk = await ev(`(() => { const days = ${J(order)}; const t = days.indexOf(${J(TODAY_NAME)});
   for (let i = t - 1; i >= 0; i--) { const n = document.querySelector('[aria-label^="' + days[i] + ':"]'); if (n && /: missed$/.test(n.getAttribute('aria-label'))) return days[i] } return null })()`)
 check('B0. a past walk the strip calls missed exists this week', typeof pastWalk === 'string', pastWalk)

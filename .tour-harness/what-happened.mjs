@@ -197,6 +197,8 @@ check('9e. ...and can be unsaid', (await openSheet()) === 'open' && await clickS
 // day the strip has already given up on. In this fixture there is always one
 // (today-2 or today-3 is a training day, and both sit inside the strip for the
 // day chosen above).
+// RE-ANCHORED 15 Nov 2026 (his ruling: the strip starts today): earlier days are behind the back arrow.
+await tap('[data-testid="strip-prev"]'); await wait(900)
 const pastDay = await ev(`(() => { const days = ${JSON.stringify(NAMES.slice(1).concat(NAMES[0]))}; const todayIdx = days.indexOf(${JSON.stringify(TODAY_NAME)});
   for (let i = todayIdx - 1; i >= 0; i--) { const n = document.querySelector('[aria-label^="' + days[i] + ':"]'); if (n && /: missed$/.test(n.getAttribute('aria-label'))) return days[i] } return null })()`)
 check('10a. a past training day the strip already calls missed exists in this week', typeof pastDay === 'string', pastDay)

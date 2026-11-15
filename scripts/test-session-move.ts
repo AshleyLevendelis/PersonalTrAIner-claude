@@ -258,7 +258,7 @@ check('...and no Start button at all: the CTA keeps its rest-day guard and the l
 check('the way back UNMAKES the move, with the write the chat\'s Undo uses',
   /await setSessionMove\(profileId, today, null\)/.test(panel))
 check('...and then re-reads the week and tells the app',
-  /weekTrain\.refresh\(\); onLogsUpdated\?\.\(\)/.test(panel))
+  /refreshWeeks\(\); onLogsUpdated\?\.\(\)/.test(panel) && /const refreshWeeks = \(\) => \{ weekTrain\.refresh\(\); stripWeek\.refresh\(\) \}/.test(panel))
 check('...and the panel re-reads when the CHAT writes a move — the refresh token reaches it',
   /useTrainingWeek\(profileId, today, liveWeekPlan, planCreatedAt, logsVersion[,)]/.test(panel))
 check('tomorrow is previewed through the hook, so a move onto tomorrow shows there',
