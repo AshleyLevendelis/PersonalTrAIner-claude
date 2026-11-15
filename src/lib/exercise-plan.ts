@@ -15,7 +15,8 @@ import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, stepHoldSeconds, getPhaseTempo, formatTempo, PHASE_CONFIGS, type PhaseConfig, type TrainingPhase,
 } from './periodization'
-import { hasHealthCondition, effortWordsOnly, HEALTH_SET_RPE_CEILING, HEALTH_CONDITIONING_RPE_CEILING } from './health-conditions'
+import { hasHealthCondition, isPregnant, effortWordsOnly, HEALTH_SET_RPE_CEILING, HEALTH_CONDITIONING_RPE_CEILING } from './health-conditions'
+import { pregnancyExclusion, pregnancyWarning } from './pregnancy-rules'
 import { getGoalPolicy, restrictPhaseSequence, resolveConditioningFrequency, RECOVERY_SET_MULTIPLIER, MAIN_LIFT_REST_FLOOR_SECONDS, type GoalPolicy } from './goal-policies'
 import { HEAVY_TRACKS, activityDays, reorderTracksForClassDays, effectiveRecoveryCapacity } from './concurrent-activity'
 import { dayAnchorExercise, anchorScore, canAnchor } from './session-derive'
@@ -1106,6 +1107,39 @@ function stageInjuryFilter(
     }
   }
   trace.pool_size_after_each_stage.injury = result.length
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// STAGE 2b: Pregnancy (his ruling 14 Nov 2026, "Exercise rules only"; pregnancy-rules.ts)
+// ---------------------------------------------------------------------------
+
+/**
+ * No jumping or impact move and no move lying flat while pregnant. Each one left out is replaced the injury stage's
+ * way (same substitution group, from the equipment pool), so the slot keeps its kind of movement; the plan's own
+ * sizing fills any slot the group could not.
+ */
+function stagePregnancyFilter(
+  pool: ExerciseEntry[],
+  equipmentPool: ExerciseEntry[],
+  pregnant: boolean,
+  trace: ConstraintTrace
+): ExerciseEntry[] {
+  if (!pregnant) return pool
+  const poolNames = new Set(pool.map(e => e.name))
+  const added = new Set<string>()
+  const result: ExerciseEntry[] = []
+  const usable = (r: ExerciseEntry, ex: ExerciseEntry) => r.name !== ex.name && !pregnancyExclusion(r) && !poolNames.has(r.name) && !added.has(r.name)
+  for (const ex of pool) {
+    const why = pregnancyExclusion(ex)
+    if (!why) { result.push(ex); continue }
+    trace.injury_filtered.push({ exercise: ex.name, stage: 'injury', reason: why === 'impact' ? 'pregnancy: impact' : 'pregnancy: lying flat' })
+    // SAME GROUP ONLY, as the injury stage. A wider "same movement pattern" fallback was measured (15 Nov 2026) and
+    // removed: it brought kettlebell swings, a ballistic hinge, in for a floor glute bridge, which a coach would not add
+    // for a pregnant trainee by accident. Plan quality was unchanged without it.
+    const replacement = equipmentPool.find(r => r.substitution_group === ex.substitution_group && usable(r, ex))
+    if (replacement) { result.push(replacement); added.add(replacement.name) }
+  }
   return result
 }
 
@@ -5638,7 +5672,9 @@ export function getConstrainedPool(
     e => !e.retired && !exclusions.some(ex => ex.toLowerCase() === e.name.toLowerCase())
   )
   pool = stageEquipmentFilter(pool, profile, throwaway)
+  const equipmentOnly = [...pool]
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], throwaway)
+  pool = stagePregnancyFilter(pool, equipmentOnly, isPregnant(profile), throwaway)
   if (!opts.skipStyle) {
     pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), (equipmentTierFor(profile) || 'full_gym'))
   }
@@ -5689,6 +5725,10 @@ export function getExerciseCompatibilityWarnings(
       ? `Needs ${missing.join(joiner)} — not in the kit you've told me you have.`
       : `Needs ${missing.join(joiner)} — outside your ${tier.replace(/_/g, ' ')} equipment.`)
   }
+
+  // PREGNANT (his "Exercise rules only"): a move the plan leaves out says so when picked from the whole catalogue.
+  const pregnancyWhy = isPregnant(profile) ? pregnancyExclusion(exercise) : null
+  if (pregnancyWhy) warnings.push(pregnancyWarning(pregnancyWhy))
 
   const flaggedJoints = new Set<string>()
   for (const injury of profile.injuries || []) {
@@ -5780,7 +5820,9 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   pool = stageEquipmentFilter(pool, profile, trace)
 
   // STAGE 2: Injury (replacements sourced from equipment-filtered pool only)
+  const equipmentOnly = [...pool]
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], trace)
+  pool = stagePregnancyFilter(pool, equipmentOnly, isPregnant(profile), trace)
 
   // STAGE 3: Style
   pool = stageStyleFilter(pool, trainingStyle, trace, getFlaggedJoints(profile.injuries || []), (equipmentTierFor(profile) || 'full_gym'))

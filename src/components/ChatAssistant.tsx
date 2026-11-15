@@ -2208,6 +2208,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       offer_running_goal: profile.conditioning_preference === 'love' && !isRunningGoal(profile.running_goal),
       // WHAT A DOCTOR HAS SAID TO WATCH (health-conditions.ts, his 14 Nov 2026 ruling), in the app's own words.
       health_conditions: healthConditionsInWords(healthConditionsOf(profile)),
+      pregnant: healthConditionsOf(profile).includes('pregnancy'),
       // A plan pause (his "Add a pause"): the coach never asks about a session while it holds.
       plan_paused_since: profile.plan_paused_since ?? null,
       // THE RUNNING GOAL (running.ts), in the app's own words: the coach quotes this, never a pace (his 13 Nov ruling).

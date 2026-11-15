@@ -631,7 +631,8 @@
     "verify:running-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/running-day.mjs",
     "verify:chat-dislike-redflag": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-dislike-redflag.mjs",
     "test:plan-pause": "tsx scripts/test-plan-pause.ts",
-    "verify:plan-pause": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/plan-pause.mjs"
+    "verify:plan-pause": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/plan-pause.mjs",
+    "test:pregnancy-rules": "tsx scripts/test-pregnancy-rules.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

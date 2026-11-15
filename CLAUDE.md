@@ -1590,17 +1590,18 @@ menu" stays true when a copy is also left outside it.
 - **"Leave it as it is" on a goal change undoes the goal: "Undo the goal change"** (over keeping the goal and saying
   so, and over always rebuilding): the goal is saved before the question and moves calories at once, so Leave puts the
   old goal back and the targets follow. `test:qa-batch3` §1, `test:rebuild-offer`
-- **Pregnancy: "Exercise rules only"** (over "talk to your midwife" copy only and over the full version with calories
-  and food): a due date or trimester the plan reads; no jumping or impact moves; no moves lying flat on the back after
-  about 16 weeks; balance-risky moves flagged; the RPE cap kept; the coach names the midwife. Calories and food are
-  untouched (clinical nutrition). Plan first: `docs/plans/pregnancy-exercise-rules.md`
+- **Pregnancy: "Exercise rules only"**: BUILT 15 Nov 2026. No jumping or impact move and no move lying flat on the back or
+  front while "Pregnant" is ticked, each replaced by one of the same group (never a wider swap: it brought kettlebell swings);
+  the coach is told; calories and food untouched. No due date is stored, so every pregnancy is treated as past week 16
+  (mine, CSCS, the safe side). `test:pregnancy-rules`, `docs/plans/pregnancy-exercise-rules.md`
 - **A moved session survives a change of days: "Keep it, still owed"**: it stays on the day it was moved to as a
-  one-off that week, and the change-days card says so.
+  one-off that week, and the change-days card says so; an injury ease-off still reaches it. `test:qa-batch3` §11
 - **Plan pause: "Add a pause"**: Profile and the coach; while paused no session is due, nothing is missed, no workout
-  reminder or cheerful nudge; meals carry on; resume is eased by the return-after-a-break rules.
+  reminder or cheerful nudge; meals carry on; resume is eased by the return-after-a-break rules. BUILT 15 Nov 2026,
+  `test:plan-pause`, `verify:plan-pause`. Needs migration 20261114180000
 - **After a coach red flag: "Park it, go quiet"**: the open workout ends where it stands (sets kept), the rest banner
   goes, no unprompted cheerful message or workout reminder for 48 hours, the pause is offered, and the next chat open
-  asks how she is, once.
+  asks how she is, once. BUILT: `test:qa-batch3` §13, `verify:chat-dislike-redflag`
 - **An impossible set: "Ask once, then save"**: above 3x the prescribed reps, or over 100 on a loaded lift, the tick
   asks; a confirmed outlier is saved and never raises next week's weights.
 - **Weigh-ins: "Need a week of readings"**: targets move only with weigh-ins on at least 3 days in the last 7 and the

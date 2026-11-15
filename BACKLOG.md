@@ -2,6 +2,57 @@
 
 Newest first. One line each.
 
+- [x] **HIS LIVE-TEST BATCHES 2 AND 3 (Priya and his own phone), BUILT ON "BUILD IT", WITH HIS NINE RULINGS** (14-15 Nov
+  2026). Committed locally on his "commit, never push"; nothing on `main`, nothing deployed.
+  BATCH 2-3 FIXES (no ruling needed): a regenerate keeps one-day meals (a meal out, freestyle, cooked for him, a moved
+  meal); the reps box selects what is in it and fits three digits; Home counts a borrowed day's sets as Exercise does;
+  the page leaves room for the floating bars at 375px; liquids are shopped in ml; the list's line names a meal out; a
+  move to a day holding only another day's moved session says so, and the move card names what the day holds; a
+  rebuild card begun mid-week reads in date order; the coach never gives a blanket "your plan is safe" and logs one
+  meal per call. `test:qa-batch3` §1-9.
+  HIS RULINGS, EACH BUILT:
+  - "Undo the goal change": Leave it as it is puts the old goal back (the goal had already moved calories). §1.
+  - "Keep it, still owed": a change of days leaves a pending moved session's row alone and the card says so; an injury
+    ease-off still reaches a moved session (a first version broke that, caught by `test:adaptations-respect-trained`).
+    §11, 7/7 mutations.
+  - "Ask once, then save": a rep count over 3x the top of the range or 100 on a loaded lift is asked about once; a
+    confirmed one never reaches the top of the range or a best. `test:odd-reps`, 6/6.
+  - "Need a week of readings": targets move only with weigh-ins on 3 of the last 7 days; a pregnant user's never move
+    on weight. THIS CHANGES WHAT A TARGET MOVE MEASURES: moves before 14 Nov are not comparable. `test:weigh-in-targets`.
+  - "Add standard UK packs": crisps, cola, meal-deal sandwiches, chocolate and cereal bars at their usual size, allergens
+    failing safe. §10.
+  - "Ask, and hold Tuesday": "I don't like X" / "I hate X" / "not a fan of X" is asked about ("just this meal, or for
+    good?", two buttons); allergies and "I don't eat X" are still saved at once. A dinner swapped for a plan dish
+    re-makes the next day's lunch and holds that day's other dishes (where the lunch would repeat the dinner's dish, one
+    of the two changes). The card's "other meals" lines became one function (`describeOtherChanges`) because no swap
+    in `test:meal-day-move`'s week now changes more than four meals. §12, 11/11; `verify:chat-dislike-redflag`.
+  - "Park it, go quiet": a symptom in his words answered by a referral ends an open workout (sets kept), puts the coach
+    quiet for 48 hours in the chat and on the phone (`quiet_until` in the Reminders settings), offers the pause, and a
+    later open asks how he is, once. §13, 13/13; driver 4/4. Detection reads HIS words and the referral together.
+  - "Add a pause": Profile, today's card, Home and the coach (`propose_plan_pause`), one function (`handlePlanPause`).
+    Paused days are never due or missed and leave the week's count; nothing unprompted is sent; meals carry on; the
+    break easing applies on resume by itself. NEEDS migration 20261114180000 (his word). `test:plan-pause` 28 checks
+    14/14; `verify:plan-pause` 8 checks 3/3.
+  - "Exercise rules only" (pregnancy): no jumping or impact move and no move lying flat on the back or front, each
+    replaced by one of the same group; the coach is told; the rebuild offer names it. CSCS, MINE: with no due date
+    stored, every pregnancy is treated as past week 16 (the safe side); face-down lying added for the same weeks;
+    hip thrusts (shoulders on a bench), incline presses, seated machines and standing cable flyes stay; a wider
+    "same pattern" fallback was measured and removed because it brought kettlebell swings in for a glute bridge.
+    MEASURED: 401 sampled plans held 22,019 of these moves, 0 when pregnant; plan quality 11.66 -> 11.67, none below
+    7.2; weeks with no pressing 288 of 2,432 either way; the replacement keeps bench-type pressing in 146 of 1,317
+    sampled profiles that would otherwise lose it. The gate's catalogue cross-check found two face-down moves the first
+    list missed (Prone Y-T Raises, Prone Hamstring Curl). `test:pregnancy-rules` 15 checks, 8/8.
+  ALSO: the allergen block's "not even as a comparison" paragraph synced into the shared copy setup reads (its gate had
+  been red since 90c3e392).
+  NOT BUILT, NAMED: a due date (the week-16 relaxation and a "crossing week 16" offer need it, and a migration); the
+  coach exam re-run (prompt changed: his machine); videos curated option; timestamp timezone; "Do it today instead"
+  and "Train anyway" repros; plan-start Mon 9 (needs his rows); a custom meal for one day joining the pool; knock-on kcal
+  lines with numbers off; the allergy-early diet question (plan first).
+  CHECKS: 237 of 247 derived checks pass on the pregnancy commit (the size budget then raised by 6 kB, measured);
+  the rest: four smoke scripts need a database, coach-exam:grade and report:slot-impact fail identically on the main
+  checkout, three long measurement reports hit the 15-minute timeout.
+  DEPLOYS when he says: frontend, `chat-gemini`, `coach-reach-out`, `onboarding-chat`. MIGRATIONS: health_conditions
+  (earlier), plan_paused_since (new).
 - [x] **SCENARIO QA AFTER HIS 14 NOV LIVE TEST: THREE TESTERS, 26 FINDINGS, 19 FIXED** (14 Nov 2026). Three read-only
   testers drove the real screens at 390px: setup (15 personas), training days (12+ scenarios, screen and coach), meals,
   the shopping list and the coach chat.

@@ -55,3 +55,14 @@ outside the CSCS delegation, and would need someone qualified to sign the number
 ## Not in it (named)
 Calories, the food-safety list, postnatal rules, pelvic-girdle-pain rules (a separate decision of his: a pain report
 today changes nothing, by the red-flag rule), heart-rate zones.
+
+## As built (15 Nov 2026)
+- No due date column yet: every pregnancy is treated as past week 16 (no lying flat from the start), the safe side.
+  A due date would let flat moves back before week 16 and drive a "crossing week 16" offer; both need a migration.
+- Lists by name in `src/lib/pregnancy-rules.ts` (impact 7, lying flat/face down 19); variants and machine copies follow
+  their parent. Kept on purpose: hip thrusts, incline presses, seated machines, standing cable flyes, side-lying work.
+- One stage (`stagePregnancyFilter`) after the injury stage, in generation and the shared pool; same-group replacement
+  only. Free search warns. The rebuild offer names the change. The coach is told.
+- Measured on 401 plans: 22,019 of these moves without pregnancy, 0 with; quality 11.66 -> 11.67, none below 7.2; weeks
+  without pressing unchanged (288 of 2,432).
+- Not built: balance-risky single-leg notes (rule 3), the combat/agility -> steady cardio swap (rule 5), a due date.

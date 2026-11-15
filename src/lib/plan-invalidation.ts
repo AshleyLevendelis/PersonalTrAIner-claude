@@ -290,12 +290,18 @@ export function detectPlanInvalidation(
   if ('health_conditions' in patch
       && [...(patch.health_conditions ?? [])].sort().join(',') !== [...(before.health_conditions ?? [])].sort().join(',')) {
     const now = (patch.health_conditions ?? []).length > 0
+    // PREGNANT (his "Exercise rules only"): the rebuild also leaves out jumping and lying-flat moves, and says so.
+    const pregnantNow = (patch.health_conditions ?? []).includes('pregnancy')
+    const pregnantBefore = (before.health_conditions ?? []).includes('pregnancy')
+    const moves = pregnantNow ? ' It also leaves out jumping moves and moves lying flat on your back or front, each swapped for one that works the same muscles.'
+      : pregnantBefore ? ' It also brings back the jumping and lying-flat moves the plan left out.' : ''
     return {
       field: 'health_conditions',
       title: now ? 'Rebuild your plan around this?' : 'Rebuild your plan without the limits?',
-      detail: now
-        ? 'I can rebuild your plan from this week so every set stops short of all-out and your cardio is set by effort, not heart rate. Everything you have already logged stays exactly as it is.'
-        : 'I can rebuild your plan from this week without those limits on effort. Everything you have already logged stays exactly as it is.',
+      detail: (now
+        ? 'I can rebuild your plan from this week so every set stops short of all-out and your cardio is set by effort, not heart rate.'
+        : 'I can rebuild your plan from this week without those limits on effort.')
+        + moves + ' Everything you have already logged stays exactly as it is.',
     }
   }
 

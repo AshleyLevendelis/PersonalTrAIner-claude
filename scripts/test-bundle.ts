@@ -321,9 +321,11 @@ console.log('\n2b. The coach is not on the path to first paint')
   // MOVED 12 Nov 2026: 562 -> 565, the Nutrition Week screens — see the deploy figure above for both ends.
   // MOVED 13 Nov 2026: 565 -> 574, strategy slices 1-3 — see the deploy figure above for both ends.
   // MOVED 13 Nov 2026: 574 -> 582, strategy slice 6 (running) — see the deploy figure above for both ends.
-  headroom('first paint fetches', firstLoadGzip, 582, 'kB gzipped')
+  // MOVED 15 Nov 2026: 582 -> 588, his 14 Nov rulings (pause, red-flag quiet, pregnancy rules, dislike ask); measured 581
+  // on the branch before them and 582 after.
+  headroom('first paint fetches', firstLoadGzip, 588, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 582, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 588, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
