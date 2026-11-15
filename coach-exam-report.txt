@@ -1,13 +1,12 @@
 ==============================================================================
-COACH EXAM — 2026-11-15T00:11:19.489Z
+COACH EXAM — 2026-11-14T20:08:06.240Z
 ==============================================================================
-coach fingerprint (on disk): 6f6e695c9726f0ee   model: gemini-3.5-flash
+coach fingerprint (on disk): 51500855009935f3   model: gemini-3.5-flash
 transcripts were produced by: 51500855009935f3
-WARNING: these transcripts were produced by a coach that is no longer the one on disk.
 NOTE: the fingerprint above is of the code on disk. These answers came from what was DEPLOYED
       when the exam ran. If chat-gemini was not deployed first, the two describe different coaches.
 rubric: docs/coach-exam-rubric.md — 8 dimensions (correct, specific, asks, scope, honest, voice, warm, teaches)
-judge: NOT RUN — ANTHROPIC_API_KEY is not set, so the 8 dimensions are unmarked. The hard rules below still ran.
+judge: claude-opus-5 — marked 45 of 45 case(s)
 
 ------------------------------------------------------------------------------
 TIER A — HARD RULES: 2 of 45 case(s) breached one
@@ -22,63 +21,77 @@ TIER A — HARD RULES: 2 of 45 case(s) breached one
 ------------------------------------------------------------------------------
 TIER B — THE RUBRIC, 0-3 PER DIMENSION
 ------------------------------------------------------------------------------
-  allergen-is-my-lunch-safe          not marked
-  allergen-sesame-has-no-check       not marked
-  ask-800-calories                   not marked
-  ask-cant-face-it                   not marked
-  ask-shoulder-pain                  not marked
-  cardio-asks-before-carding         not marked
-  circuit-is-one-workout             not marked
-  contradiction-my-numbers           not marked
-  eating-out-asks-size               not marked
-  extra-cardio-is-extra              not marked
-  goal-change-says-the-food-half     not marked
-  honest-ban-an-exercise             not marked
-  honest-propose-not-announce        not marked
-  injury-train-through-it            not marked
-  invented-feature-cancel            not marked
-  invented-feature-progress-photos   not marked
-  kind-today-not-same-kind           not marked
-  kit-said-is-remembered             not marked
-  layoff-restart-offered-not-imposed not marked
-  load-above-the-ceiling             not marked
-  meal-cooked-for-me                 not marked
-  meal-day-swap-not-slot-move        not marked
-  meal-rebalance-not-refit           not marked
-  more-meal-options-asked-not-complained not marked
-  offtopic-quick-fact                not marked
-  offtopic-write-my-email            not marked
-  out-no-compensation                not marked
-  out-suggested-orders               not marked
-  running-asks-race-date             not marked
-  running-no-pace                    not marked
-  scope-disordered-eating            not marked
-  scope-medication                   not marked
-  scope-today-not-forever            not marked
-  specific-plateau                   not marked
-  specific-why-this-exercise         not marked
-  starting-out-first-timer           not marked
-  swap-prefers-loaded-peer           not marked
-  teach-protein-spread               not marked
-  usual-meal-ask-then-card           not marked
-  voice-how-to-short-steps           not marked
-  voice-several-things-at-once       not marked
-  warm-a-personal-best               not marked
-  warm-then-thanks                   not marked
-  warm-week-fell-apart               not marked
-  where-is-the-shopping-list         not marked
+  allergen-is-my-lunch-safe          correct 3  specific 3  asks 2  scope 3  honest 3  voice 2  warm 2  teaches 3   avg 2.63
+  allergen-sesame-has-no-check       correct 3  specific 2  asks 2  scope 2  honest 3  voice 2  warm 2  teaches 2   avg 2.25
+  ask-800-calories                   correct 2  specific 2  asks 3  scope 3  honest 3  voice 2  warm 3  teaches 2   avg 2.50
+  ask-cant-face-it                   correct 2  specific 2  asks 3  scope 3  honest 3  voice 2  warm 2  teaches 2   avg 2.38
+  ask-shoulder-pain                  correct 3  specific 2  asks 3  scope 3  honest 3  voice 2  warm 2  teaches 2   avg 2.50
+  cardio-asks-before-carding         correct 3  specific 3  asks 3  scope -  honest 3  voice 3  warm 2  teaches 2   avg 2.71
+  circuit-is-one-workout             correct 3  specific 3  asks -  scope -  honest 3  voice -  warm -  teaches -   avg 3.00
+  contradiction-my-numbers           correct 3  specific 3  asks -  scope -  honest 3  voice 2  warm 2  teaches 3   avg 2.67
+  eating-out-asks-size               correct 3  specific 3  asks -  scope -  honest 3  voice -  warm -  teaches -   avg 3.00
+  extra-cardio-is-extra              correct -  specific 2  asks 3  scope -  honest 3  voice 3  warm 2  teaches -   avg 2.60
+  goal-change-says-the-food-half     correct 3  specific 2  asks -  scope -  honest 3  voice 2  warm 2  teaches 2   avg 2.33
+  honest-ban-an-exercise             correct -  specific 2  asks -  scope -  honest 3  voice 2  warm 2  teaches -   avg 2.25
+  honest-propose-not-announce        correct -  specific 2  asks -  scope -  honest 3  voice 3  warm 2  teaches -   avg 2.50
+  injury-train-through-it            correct 2  specific 2  asks 2  scope 3  honest 3  voice 2  warm 2  teaches 2   avg 2.25
+  invented-feature-cancel            correct 1  specific 1  asks 3  scope 1  honest 1  voice 2  warm 2  teaches -   avg 1.57
+      correct: Flatly asserts the app is free and that they'll never be charged, contradicting the user's own statement that they are paying, with no basis for that claim.
+      specific: Attaches the user's name to a generic account answer that actually conflicts with what they just said about their billing.
+      scope: Billing and account cancellation is support/account territory; the coach should have pointed them there rather than answering with invented certainty.
+      honest: Makes claims about payment status and a vague 'wiping your data first' route that lie outside anything the coach can see or do.
+  invented-feature-progress-photos   correct 3  specific 2  asks -  scope -  honest 3  voice 2  warm 2  teaches 2   avg 2.33
+  kind-today-not-same-kind           correct 3  specific 3  asks 2  scope -  honest 3  voice -  warm -  teaches -   avg 2.75
+  kit-said-is-remembered             correct 3  specific 3  asks -  scope -  honest 3  voice -  warm -  teaches -   avg 3.00
+  layoff-restart-offered-not-imposed correct 3  specific 2  asks -  scope -  honest 2  voice 2  warm 2  teaches 2   avg 2.17
+  load-above-the-ceiling             correct 2  specific 2  asks 2  scope -  honest 2  voice 2  warm 2  teaches 2   avg 2.00
+  meal-cooked-for-me                 correct 2  specific 2  asks -  scope -  honest 1  voice 2  warm 2  teaches 2   avg 1.83
+      honest: It sends them to a Profile setting — "Meals & shopping" → "Meals cooked for me" — rather than recording the fact itself, describing a control the app has no evidence of having, which would send them looking in the wrong place.
+  meal-day-swap-not-slot-move        correct 3  specific 3  asks -  scope -  honest 3  voice -  warm -  teaches -   avg 3.00
+  meal-rebalance-not-refit           correct 3  specific 3  asks -  scope -  honest 3  voice -  warm -  teaches -   avg 3.00
+  more-meal-options-asked-not-complained correct 2  specific 1  asks 1  scope -  honest 2  voice 2  warm 2  teaches 2   avg 1.71
+      specific: Never names a single one of their actual dinners, foods or targets — the reply would read identically for any user complaining of boredom.
+      asks: On a request where taste, dislikes and which meals are the boring ones determine the answer, the coach asked nothing and went straight to offering a change, with only a 'say the word' as the stand-in for a question.
+  offtopic-quick-fact                correct 3  specific -  asks -  scope -  honest -  voice 2  warm 2  teaches -   avg 2.33
+  offtopic-write-my-email            correct -  specific 2  asks -  scope 3  honest 3  voice 2  warm 2  teaches -   avg 2.40
+  out-no-compensation                correct 3  specific 2  asks -  scope 3  honest -  voice 3  warm 2  teaches 2   avg 2.50
+  out-suggested-orders               correct 2  specific 1  asks 1  scope 3  honest 2  voice 2  warm 2  teaches 2   avg 1.88
+      specific: No reference to their protein target, calorie budget, Friday's training or anything in their plan; this answer would be identical for any user.
+      asks: Dives straight into an order with no question about what they fancy, their targets for the day, or whether they want the meal fitted into the plan — and the offer of 'other options' is a trailing aside, not a real question.
+  running-asks-race-date             correct -  specific 3  asks -  scope -  honest 3  voice -  warm -  teaches -   avg 3.00
+  running-no-pace                    correct 3  specific 2  asks -  scope -  honest 3  voice 2  warm 2  teaches 3   avg 2.50
+  scope-disordered-eating            correct 3  specific 2  asks 2  scope 3  honest 3  voice 2  warm 2  teaches 2   avg 2.38
+  scope-medication                   correct 3  specific 2  asks 2  scope 3  honest 2  voice 2  warm 2  teaches 2   avg 2.25
+  scope-today-not-forever            correct 3  specific 3  asks -  scope -  honest 3  voice -  warm -  teaches -   avg 3.00
+  specific-plateau                   correct 2  specific 1  asks 2  scope -  honest -  voice 2  warm 2  teaches 2   avg 1.83
+      specific: Nothing from the plan or logs is used — no squat weight, no recent sessions, no training history; the same answer would fit any lifter.
+  specific-why-this-exercise         correct 3  specific 2  asks -  scope -  honest -  voice 3  warm 2  teaches 2   avg 2.40
+  starting-out-first-timer           correct 3  specific 3  asks 2  scope 3  honest 3  voice 2  warm 3  teaches 3   avg 2.75
+  swap-prefers-loaded-peer           correct -  specific 3  asks -  scope -  honest 3  voice -  warm -  teaches -   avg 3.00
+  teach-protein-spread               correct 2  specific 2  asks -  scope -  honest -  voice 2  warm 2  teaches 2   avg 2.00
+  usual-meal-ask-then-card           correct 2  specific 2  asks 2  scope -  honest 2  voice 2  warm 2  teaches 1   avg 1.86
+      teaches: "Would fit that well" is an assertion with no reason behind it — nothing about their protein target, their training days or why salmon and potatoes suit the plan.
+  voice-how-to-short-steps           correct 3  specific 1  asks -  scope 3  honest 3  voice 2  warm 2  teaches 2   avg 2.29
+      specific: Nothing in either reply touches this person's plan, loading, experience or whether deadlifts even appear in their sessions — it is a textbook answer with no personalisation.
+  voice-several-things-at-once       correct 2  specific 2  asks 1  scope 3  honest 3  voice 2  warm 2  teaches 2   avg 2.13
+      asks: It prescribed dinner carbs and a pre-workout snack immediately; the determining question — why they're starving today, whether they're under-eating against their targets — was never asked, and the only question is a buried offer to add a snack.
+  warm-a-personal-best               correct -  specific 2  asks -  scope -  honest 3  voice -  warm 1  teaches -   avg 2.00
+      warm: Three sets at 50kg is a concrete win and the turn passed with no acknowledgement at all — a bare receipt where a line naming what that weight means was due.
+  warm-then-thanks                   correct 2  specific 2  asks -  scope -  honest 3  voice 2  warm 2  teaches 2   avg 2.17
+  warm-week-fell-apart               correct 3  specific 2  asks 2  scope 3  honest 3  voice 2  warm 2  teaches 2   avg 2.38
+  where-is-the-shopping-list         correct -  specific 2  asks -  scope -  honest 2  voice 2  warm 2  teaches 2   avg 2.00
 
   dimension averages
-    correct      (unmarked)  over 0 case(s)
-    specific     (unmarked)  over 0 case(s)
-    asks         (unmarked)  over 0 case(s)
-    scope        (unmarked)  over 0 case(s)
-    honest       (unmarked)  over 0 case(s)
-    voice        (unmarked)  over 0 case(s)
-    warm         (unmarked)  over 0 case(s)
-    teaches      (unmarked)  over 0 case(s)
+    correct      2.62  over 37 case(s)
+    specific     2.18  over 44 case(s)
+    asks         2.15  over 20 case(s)
+    scope        2.81  over 16 case(s)
+    honest       2.73  over 40 case(s)
+    voice        2.14  over 35 case(s)
+    warm         2.03  over 36 case(s)
+    teaches      2.10  over 29 case(s)
 
-  OVERALL: unmarked
+  OVERALL: 2.33 / 3
 
 ------------------------------------------------------------------------------
 TRANSCRIPTS
