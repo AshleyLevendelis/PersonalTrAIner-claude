@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **A DAY BEFORE THE PLAN BEGAN OPENS AS ONE (his report 15 Nov 2026, live app: a profile made on Sunday the 15th,
+  and tapping Monday the 9th on the Exercise strip opened "MONDAY · Push & Press")**. The strip and the Week list
+  already knew the day was before the plan (14 Nov), but the panel a tapped day opens fell back to the plan's raw
+  weekday row when the day had no session, which brought Monday's workout back. A day before the plan now opens "Monday
+  was before your plan began, so there is no session on it.", with no exercises. `verify:live-test-nov14` +2 checks
+  (C4-C5: tap the day, read the panel), screenshot read; putting the fallback back fails C4. 46 checks reading the
+  panel and `verify:what-happened`, `verify:missed-day`, `verify:week-boundary`, `verify:moved-session` pass.
+  HOW IT WAS MISSED: the 14 Nov fix was checked on the Week list only, and the tapped-day panel is a second reader of
+  the same day.
 - [x] **NO "PEAK" IN A BASE BLOCK (Marcus, 15 Nov 2026; Wave M-C9; CSCS, mine)**. Block 1, "Calibration / Anatomical
   Adaptation", labelled its weeks Building, Peak, Deload. BASIS: anatomical adaptation is an accumulation phase at
   moderate loads to prepare tendon and connective tissue for the blocks after it (the app's own block note says so:

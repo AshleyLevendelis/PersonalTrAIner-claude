@@ -147,6 +147,17 @@ check('C1. the week view is open with seven days', week.length === 7, week.map(d
 check('C2. the days before the plan began read "Before your plan began"', before.length >= 1 && before.every(d => /Before your plan began/.test(d.text)), before)
 check('C3. ...and none of them is drawn as a session', week.filter(d => d.kind === 'session').every(d => !before.some(b => b.date === d.date)) && before.every(d => !/min/.test(d.text)), week)
 await shot('before-plan')
+// C4-C5 (his report 15 Nov 2026): TAPPING a day before the plan on the strip opened that weekday's workout.
+await page.locator('[data-testid="week-pill"]').click({ timeout: 6000 }).catch(() => {})
+await wait(600)
+const firstBefore = before[0]?.date
+const beforeName = firstBefore ? new Date(`${firstBefore}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long' }) : null
+if (beforeName) await page.locator(`[data-strip-day="${beforeName}"]`).first().click({ timeout: 6000 }).catch(() => {})
+await wait(1200)
+const panel = await page.evaluate(() => ({ rest: document.querySelector('[data-testid="peek-rest-day"]')?.textContent?.replace(/\s+/g, ' ').trim() ?? null, rows: document.querySelectorAll('[data-exercise-name]').length, text: document.body.innerText.slice(0, 600) }))
+check('C4. tapping a day before the plan says so, and names no workout', !!beforeName && /was before your plan began/.test(panel.rest ?? ''), { beforeName, rest: panel.rest })
+check('C5. ...and lists no exercises', panel.rows === 0, { rows: panel.rows })
+await shot('before-plan-tapped')
 check('harness: no page errors', errors.length === 0, errors.slice(0, 3))
 
 console.log(`\n${ran} checks ran.${failures ? ` ${failures} FAILED.` : ' His 14 Nov findings hold on screen.'}`)

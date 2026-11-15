@@ -1088,7 +1088,11 @@ export function TodayPanel({
   // may never do.
   const peekCell = peekDay ? weekTrain.days.find(d => d.dayName === peekDay) : null
   const peekMovedTo = peekCell?.movedTo ?? null
-  const peekWorkout = peekDay && !peekMovedTo
+  // A DAY BEFORE THE PLAN BEGAN HAS NO WORKOUT (his report 15 Nov 2026: a profile made on Sunday the 15th opened
+  // "MONDAY · Push & Press" for Monday the 9th). The strip already drew it as before the plan; the fallback to the plan's
+  // weekday row brought the session back. The cell is the answer, as it is everywhere else on this screen.
+  const peekBeforePlan = peekCell?.state === 'before_plan'
+  const peekWorkout = peekDay && !peekMovedTo && !peekBeforePlan
     ? (peekCell?.session ?? liveWeekPlan.find(d => d.day === peekDay))
     : null
   // The peeked day's reference — a swap opened from the peek writes to the
@@ -1505,7 +1509,9 @@ export function TodayPanel({
                   suggested walk or ride is said too (run 5, M47): "a rest or
                   recovery day" over a day the plan gave a 20-minute walk told
                   her less than the plan knew. */}
-              {peekWorkout?.plannedActivity
+              {peekBeforePlan
+                ? `${peekDay} was before your plan began, so there is no session on it.`
+                : peekWorkout?.plannedActivity
                 ? `${peekDay}: ${peekWorkout.plannedActivity.activity}, ${peekWorkout.plannedActivity.duration} minutes.`
                 : peekWorkout?.recommendedCardio
                 ? `${peekDay} is a rest day. Optional: ${prescriptionLine(peekWorkout.recommendedCardio)}.`
