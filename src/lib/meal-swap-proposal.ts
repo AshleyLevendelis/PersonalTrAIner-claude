@@ -23,6 +23,7 @@ import type { ProposalDiff } from './pending-actions-store'
 import type { MealKnockOn } from './meal-knock-on'
 import { withKnockOn } from './meal-food-add'
 import { REBALANCE } from './coach-voice'
+import { shortDate } from './day-labels'
 
 const SLOTS: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']
 
@@ -162,6 +163,26 @@ export async function buildMealSwapProposal(input: BuildMealSwapInput): Promise<
   const saidOld = String(input.rawArgs.old_item ?? '').trim()
   const servedName = input.servedByDate?.[upcomingDay?.date ?? input.today ?? '']?.[slot]
   const currentName = byName(options, saidOld)?.name ?? (saidOld || byName(options, servedName)?.name || servedName || '')
+
+  // THE MEAL NAMED IS THE ONE SERVED THAT DAY, OR THE CARD SAYS WHICH DAY IT IS (15 Nov 2026, browser test: "I don't
+  // like salmon" gave a card swapping Wednesday's "Smoked salmon and quark toast" as if it were today's, with today's
+  // breakfast calories beside it). A dish named from another day is asked about, never swapped on the wrong day.
+  const namedOld = byName(options, saidOld)
+  const servedOld = byName(options, servedName)
+  if (namedOld && servedName && namedOld.name !== (servedOld?.name ?? servedName)) {
+    const onDate = upcomingDay?.date ?? input.today ?? ''
+    const servingDate = Object.entries(input.servedByDate ?? {})
+      .filter(([d]) => d !== onDate)
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .find(([, bySlot]) => (byName(options, bySlot?.[slot])?.name ?? bySlot?.[slot]) === namedOld.name)?.[0]
+    const when = onDate === input.today ? 'today' : `on ${shortDate(onDate)}`
+    return {
+      ok: false,
+      reason: servingDate
+        ? `${namedOld.name} is your ${slot} on ${shortDate(servingDate)}, not ${when}. Want me to swap it on ${shortDate(servingDate)}?`
+        : `Your ${slot} ${when} is ${servedOld?.name ?? servedName}, not ${namedOld.name}. Want me to swap that one?`,
+    }
+  }
 
   const disliked = input.dislikedFoods ?? []
   const prefs = input.dietaryPreferences ?? []

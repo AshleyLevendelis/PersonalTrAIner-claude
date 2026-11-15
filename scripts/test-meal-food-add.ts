@@ -152,5 +152,16 @@ console.log("\n8. It says \"today\", not a date off her own clock")
   check('...while another day is still named — by its weekday, never as a stored date', /Just for Saturday\./.test(otherSaid) && !/\d{4}-\d{2}-\d{2}/.test(otherSaid), otherSaid)
 }
 
+{
+  console.log('\nPacks and the note (15 Nov 2026, browser test: cola opened on "100 g"; the note said nothing else changed)')
+  const { defaultAmountFor } = await import('../src/components/nutrition/MealFoodAddSheet')
+  check('a food sold in a pack opens on one of it: cola is 1 can, crisps 1 bag', JSON.stringify(defaultAmountFor('cola')) === '{"amount":"1","unit":"can"}' && JSON.stringify(defaultAmountFor('crisps')) === '{"amount":"1","unit":"bag"}', [defaultAmountFor('cola'), defaultAmountFor('crisps')])
+  check('...and anything else still opens on 100 g', JSON.stringify(defaultAmountFor('chicken breast')) === '{"amount":"100","unit":"g"}', defaultAmountFor('chicken breast'))
+  const sheet = read('src/components/nutrition/MealFoodAddSheet.tsx')
+  check('picking a food uses that default', /const d = defaultAmountFor\(m\); setFood\(m\); setUnit\(d\.unit\); setAmount\(d\.amount\)/.test(sheet))
+  check('the note names other meals that changed, from the trial it showed', /const others = trial\.knockOn\?\.changes\.length \?\? 0/.test(sheet) && /other meals`\} changed to fit it/.test(sheet))
+  check('...and the Nutrition note no longer claims "the rest of the meal is unchanged"', !/rest of the meal is unchanged/.test(read('src/components/MealPlan.tsx')))
+}
+
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }
 console.log('\nAll meal-food-add checks passed.')

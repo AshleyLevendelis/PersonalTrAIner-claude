@@ -1619,7 +1619,7 @@ function MealSlotRow({
                   })()}
                   {addNote && (
                     <p className="flex items-center justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="meal-add-note">
-                      <span>{addNote}. The rest of the meal is unchanged.</span>
+                      <span>{addNote}.</span>
                       {editUndo && <button type="button" className="hit-slop-44 shrink-0 font-semibold text-primary-text" disabled={undoBusy} onClick={() => void runEditUndo()} data-testid="meal-edit-undo">Undo</button>}
                     </p>
                   )}

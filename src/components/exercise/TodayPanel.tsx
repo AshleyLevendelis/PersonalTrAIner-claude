@@ -1,4 +1,4 @@
-import { PAUSE_WORDS } from '@/lib/plan-pause'
+import { PAUSE_WORDS, isPausedOn, planPausedSince } from '@/lib/plan-pause'
 import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
@@ -951,7 +951,9 @@ export function TodayPanel({
   // invisible: the beginner's whole plan never appeared in tomorrow's preview.
   // Same expression dashboard-data.ts's streak input already uses, and the
   // fallback is for plans stored before the field existed.
-  const tomorrowPreview = isScheduledDay(tomorrowWorkout)
+  // Nothing is previewed for tomorrow while the plan is paused (15 Nov 2026, browser test: "Tomorrow · Monday Full Body
+  // Power" under a paused plan).
+  const tomorrowPreview = isScheduledDay(tomorrowWorkout) && !isPausedOn(addDays(today, 1), planPausedSince(profileId ?? ''))
     ? { dayName: tomorrowName, focus: tomorrowWorkout!.focus, detail: dayDetail(tomorrowWorkout!) }
     : undefined
 

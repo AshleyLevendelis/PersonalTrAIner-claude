@@ -316,14 +316,17 @@ function suggestReplacements(input: BuildMealFoodEditInput, slot: MealSlotName, 
   // (as-weighed.ts) and the boiled potato reads back as the raw one. A food and its cooked or raw twin are one food.
   const sameFood = (f: FoodEntry) => f.name === entry.name || weighedTwinOf(f)?.name === entry.name || weighedTwinOf(entry)?.name === f.name
     || cookedTwinOf(f)?.name === entry.name || cookedTwinOf(entry)?.name === f.name
+  // A DRINK SWAPS FOR THE SAME AMOUNT (15 Nov 2026, browser test: cola offered nothing, because diet cola has no
+  // carbs to match and the macro-match dropped it). A can is a can; the point of the swap is the calories it saves.
+  const sameAmount = group === 'soft drinks'
   const candidates = FOOD_DB
-    .filter(f => swapGroupOf(f.name) === group && !sameFood(f) && f.per100g[key] > 0)
+    .filter(f => swapGroupOf(f.name) === group && !sameFood(f) && (sameAmount || f.per100g[key] > 0))
     .sort((a, b) => (inPantry(b) ? 1 : 0) - (inPantry(a) ? 1 : 0) || distance(a) - distance(b))
     .slice(0, MAX_CANDIDATES_TRIED)
 
   const out: MealSwapSuggestion[] = []
   for (const c of candidates) {
-    const need = Math.round((lost[key] / c.per100g[key]) * 100 / 5) * 5
+    const need = sameAmount ? grams : Math.round((lost[key] / c.per100g[key]) * 100 / 5) * 5
     // ROUGHLY THE SAME AMOUNT OF FOOD, or it is not a swap. Measured against
     // the amount coming out rather than a flat gram floor, because within a
     // single category the densities span fourteen-fold — 5.5g of protein per
@@ -347,7 +350,8 @@ function suggestReplacements(input: BuildMealFoodEditInput, slot: MealSlotName, 
     const kcalDelta = Math.round(c.per100g.kcal * need / 100 - lost.kcal)
     out.push({
       label: line,
-      note: Math.abs(kcalDelta) < 10 ? `same ${key}, about the same calories` : `same ${key}, ${signed(kcalDelta, ' kcal')}`,
+      note: sameAmount ? (Math.abs(kcalDelta) < 10 ? 'same amount, about the same calories' : `same amount, ${signed(kcalDelta, ' kcal')}`)
+        : Math.abs(kcalDelta) < 10 ? `same ${key}, about the same calories` : `same ${key}, ${signed(kcalDelta, ' kcal')}`,
       prompt: `Replace the ${parsed.name} in my ${slot} with ${line}`,
     })
     if (out.length === SUGGESTION_COUNT) break

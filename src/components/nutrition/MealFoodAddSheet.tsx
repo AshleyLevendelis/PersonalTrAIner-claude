@@ -56,6 +56,17 @@ function unitsFor(name: string): string[] {
   return ['g', ...named]
 }
 
+/**
+ * WHAT A FOOD IS ADDED AS, before he changes it: one of the food's own pack ("1 can" of cola, "1 bag" of crisps) when
+ * the table says how it is bought, else 100 g. 15 Nov 2026, browser test: a cola opened on "100 g".
+ */
+export function defaultAmountFor(name: string): { amount: string; unit: string } {
+  const entry = FOOD_DB.find(f => f.name === name)
+  const label = entry?.purchaseUnit?.label
+  if (label && entry?.units?.[label] != null) return { amount: '1', unit: label }
+  return { amount: '100', unit: unitsFor(name)[0] }
+}
+
 export function MealFoodAddSheet({ ctx, knockOn, onPick, onDone, onCancel }: {
   ctx: MealFoodAddContext
   /**
@@ -153,7 +164,12 @@ export function MealFoodAddSheet({ ctx, knockOn, onPick, onDone, onCancel }: {
       return
     }
     // A sentence starts with a capital, whatever the food table calls it (runs 3-4, LOW).
-    onDone(`${(food ?? "").replace(/^./, c => c.toUpperCase())} added to your ${ctx.slot}`, { payload: proposal.payload as MealAdditionPayload, poolIndex: result.poolIndex, previous })
+    // THE NOTE SAYS WHAT MOVED (15 Nov 2026, browser test: a cola added to a snack swapped lunch while the note said
+    // "the rest of the meal is unchanged"). An edited meal re-plans the rest of its day (his 10 Oct ruling); the card
+    // listed it before the tap, and the note after it now says so too.
+    const others = trial.knockOn?.changes.length ?? 0
+    const added = `${(food ?? "").replace(/^./, c => c.toUpperCase())} added to your ${ctx.slot}`
+    onDone(others > 0 ? `${added}. ${others === 1 ? 'One other meal' : `${others} other meals`} changed to fit it` : added, { payload: proposal.payload as MealAdditionPayload, poolIndex: result.poolIndex, previous })
   }
 
   return (
@@ -177,7 +193,7 @@ export function MealFoodAddSheet({ ctx, knockOn, onPick, onDone, onCancel }: {
             <button
               key={m}
               type="button"
-              onClick={() => { setFood(m); setUnit(unitsFor(m)[0]); setQuery(m) }}
+              onClick={() => { const d = defaultAmountFor(m); setFood(m); setUnit(d.unit); setAmount(d.amount); setQuery(m) }}
               className="min-h-[44px] rounded-xl px-3 text-left text-xs hover:bg-[color:var(--surface-base)]"
               data-testid={`meal-food-add-result`}
             >

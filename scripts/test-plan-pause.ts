@@ -40,6 +40,16 @@ console.log('\n1. A paused day is neither due nor missed')
   check('isPausedOn: from the start day on, never before, never with no pause', isPausedOn('2026-11-12', '2026-11-12') && !isPausedOn('2026-11-11', '2026-11-12') && !isPausedOn('2026-11-12', null))
   setPlanPausedSince('p1', '2026-11-12'); const a = planPausedSince('p1'); setPlanPausedSince('p1', null)
   check('the one store every reader asks holds the date and clears on resume', a === '2026-11-12' && planPausedSince('p1') === null && planPausedSince(undefined) === null)
+  // 15 Nov 2026, browser test: paused on a Sunday rest day, Home and Exercise never said so (rest returned first).
+  const rest = (date: string, since: string | null) => classifyDay('Sunday', date, today, plan, undefined, start, [], since)
+  check('a rest day while paused is paused (so Home and Exercise say so); unpaused it is a rest day', rest('2026-11-15', '2026-11-15') === 'paused' && rest('2026-11-15', null) === 'rest', [rest('2026-11-15', '2026-11-15'), rest('2026-11-15', null)])
+  check('...but a rest day before the pause began is still a rest day', rest('2026-11-08', '2026-11-12') === 'rest')
+  const emptyDay = [{ day: 'Sunday', focus: 'Recovery', exercises: [] }] as unknown as WorkoutDay[]
+  check('...and an empty recovery day while paused is paused too', classifyDay('Sunday', '2026-11-15', today, emptyDay, undefined, start, [], '2026-11-12') === 'paused')
+  check('the pause line says a day he would say, never the stored date', PAUSE_WORDS.paused('2026-11-15').startsWith('Plan paused since Sun 15 Nov.') && !/\d{4}-\d{2}-\d{2}/.test(PAUSE_WORDS.alreadyPaused('2026-11-15')), [PAUSE_WORDS.paused('2026-11-15'), PAUSE_WORDS.alreadyPaused('2026-11-15')])
+  check('...and promises the eased first session only after 10 days or more away (that is when it eases)', /10 days or more/.test(PAUSE_WORDS.cardLine) && /10 days or more/.test(PAUSE_WORDS.resumed) && /10 days or more/.test(PAUSE_WORDS.offerResume))
+  check('Home and Exercise preview no session for tomorrow while paused', /isPausedOn\(addDays\(data\.today, 1\), planPausedSince\(profile\.id\)\) \? null/.test(read('src/components/Dashboard.tsx'))
+    && /isScheduledDay\(tomorrowWorkout\) && !isPausedOn\(addDays\(today, 1\), planPausedSince\(profileId \?\? ''\)\)/.test(read('src/components/exercise/TodayPanel.tsx')))
   const hook = read('src/hooks/useTrainingWeek.ts')
   check('every week the app builds asks the store (the strip, the coach\'s weeks, weeks on plan)', (hook.match(/pausedSince: planPausedSince\(profileId\)/g) ?? []).length === 3, (hook.match(/pausedSince: planPausedSince\(profileId\)/g) ?? []).length)
 }

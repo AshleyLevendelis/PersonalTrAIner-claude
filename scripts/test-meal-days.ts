@@ -20,6 +20,7 @@
  */
 process.env.TZ = 'Europe/London'
 
+import { shortDate } from '../src/lib/day-labels'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -301,6 +302,13 @@ async function main() {
     check('today\'s own date is today\'s swap, exactly as before', tonight.ok && tonight.payload.date === undefined && tonight.scopeKey.endsWith(':dinner'), tonight)
     const far = await buildMealSwapProposal({ rawArgs: { meal_slot: 'dinner', old_item: 'Tray bake', new_item: 'Rice pot', date: addDays(today, 9) }, profileId: swapPid, today, upcomingDays })
     check('a date the strip does not show is a question, not a write somewhere nobody can see', !far.ok && /next six days/.test(far.reason), far)
+    // 15 Nov 2026, browser test: a swap naming Wednesday's dish with no date became a card for TODAY. Served map:
+    // tonight is the Tray bake, Monday's is the Rice pot; naming the Rice pot for today asks which day, never cards.
+    const served = { [today]: { dinner: 'Tray bake' }, [monday.date]: { dinner: 'Rice pot' } }
+    const wrongDay = await buildMealSwapProposal({ rawArgs: { meal_slot: 'dinner', old_item: 'Rice pot' }, profileId: swapPid, today, upcomingDays, servedByDate: served })
+    check('naming another day\'s dish for today is asked about, naming the day it is served', !wrongDay.ok && new RegExp(`Rice pot is your dinner on ${shortDate(monday.date)}, not today`).test(wrongDay.reason), wrongDay)
+    const rightDay = await buildMealSwapProposal({ rawArgs: { meal_slot: 'dinner', old_item: 'Tray bake', new_item: 'Rice pot' }, profileId: swapPid, today, upcomingDays, servedByDate: served })
+    check('...while naming the dish that IS served today still cards (the detector binds only on a mismatch)', rightDay.ok, rightDay)
   }
 
   console.log('\n[7] A meal pick that did not save says so')

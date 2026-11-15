@@ -6592,7 +6592,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           targetValue: typeof ga.target_value === 'number' ? ga.target_value : undefined,
         } : null
         const goalQuestion = goal ? goalAsk(goal) : null
+        // "I DON'T LIKE SALMON" ARRIVES HERE TOO, as a record_fact proposal when the coach did not save it outright (15 Nov
+        // 2026, browser test: a "Remember — salmon" Apply card AND the "just this meal, or never?" question). The ask is
+        // his ruling ("Ask, and hold Tuesday"), so the card is not built and the question is the turn, asked once.
+        const dislikeToAsk = result.proposal.kind === 'record_fact' && ga.kind === 'food_preference' && ga.polarity !== 'like'
+          ? foodDislikesToAsk(userSaid ?? '') : []
         if (goalQuestion) refusal = goalQuestion
+        else if (dislikeToAsk.length > 0) refusal = DISLIKE_ASK.turn(dislikeToAsk)
         else {
           built = buildIntentProposal(result.proposal.kind, ga, profile.id, todaySteps)
           if (goal && goal.trackable === 'measurable' && built.diff.rows[0]) {
@@ -6952,8 +6958,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     let coachSavedAFoodDislike = false
     try {
       const result = await callGemini(userText, placeholderId)
-      coachSavedAFoodDislike = result.memoryIntent?.tool === 'record_fact'
-        && result.memoryIntent.rawArgs?.kind === 'food_preference' && result.memoryIntent.rawArgs?.polarity !== 'like'
+      // Either road the coach took with a food dislike (an outright save, or a record_fact proposal the turn above turns
+      // into the question) means the turn has dealt with it: the backstop below must not ask a second time.
+      const dislikeFact = (kind: unknown, a: Record<string, unknown> | undefined) => kind === 'record_fact' && a?.kind === 'food_preference' && a?.polarity !== 'like'
+      coachSavedAFoodDislike = dislikeFact(result.memoryIntent?.tool, result.memoryIntent?.rawArgs)
+        || dislikeFact(result.proposal?.kind, result.proposal?.rawArgs as Record<string, unknown> | undefined)
       const processed = await processResponse(result, userText)
       responseText = processed.text
       action = processed.action

@@ -363,5 +363,17 @@ console.log('\nT. A food is never offered as a swap for itself in another state 
   check('T3. the tester\'s exact case is a potato (the detector is real)', isPotato('305g potato boiled') && !isPotato('300g sweet potato raw'))
 }
 
+{
+  console.log('\nU. A drink swaps for the same amount (15 Nov 2026, browser test: cola offered nothing)')
+  // Diet cola has no carbs to match, so the macro-match dropped it and the swap list was empty.
+  const lines = ['2 egg', '1 slice wholemeal toast', '1 can cola']
+  const r = buildMealFoodRemoveProposal({ ...base({ currentMeal: { name: 'Eggs on toast with a cola', ingredients: lines, macros: macrosOf(lines) } }), rawArgs: { meal_slot: 'lunch', food: 'cola' } })
+  const alts = r.ok ? (r.diff.alternatives ?? []) : []
+  const diet = alts.find(a => /diet cola/.test(a.label))
+  check('U1. taking the cola out offers diet cola', !!diet, r.ok ? alts : r)
+  check('U2. ...at the same amount, a can (330g)', diet?.label === '330g diet cola', diet)
+  check('U3. ...saying the calories it saves, not "same carbs"', /^same amount, -1\d\d kcal$/.test(diet?.note ?? ''), diet?.note)
+}
+
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }
 console.log('\nOne food in a meal can be taken out, swapped or resized — through the same checks as everything else.\n')

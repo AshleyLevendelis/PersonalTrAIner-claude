@@ -2,6 +2,37 @@
 
 Newest first. One line each.
 
+- [x] **HIS BROWSER TEST OF 15 NOV 2026 (Claude in Chrome on the live app, on the "Priya" test profile, desktop width)**:
+  5 passed, 3 failed, 1 not run, 7 more bugs. FIXED, each with a check that was seen to fail on the old code:
+  (1) a paused plan on a REST day said nothing (rest returned before the pause was asked): rest and recovery days
+  while paused are paused, and Home and Exercise preview no session for tomorrow (`test:plan-pause`, 2 mutations);
+  (2) "since 2026-11-15" is "since Sun 15 Nov"; (3) the pause words promised an eased first session after any pause,
+  and the easing starts at 10 days away, so they now say "if you're away 10 days or more"; (4) adding a cola opened on
+  100 g: a food bought in a pack opens on one of it (1 can, 1 bag) (`test:meal-food-add`, 2 mutations); (5) the add
+  note said "the rest of the meal is unchanged" while the day had been re-fitted: the note now names how many other
+  meals changed (the re-fit is his 10 Oct ruling: an edited meal re-plans the rest of its day; the card listed it
+  before the tap); (6) "Swap it" on cola offered nothing, because diet cola has no carbs for the macro match: a soft
+  drink swaps for the same amount and says the calories saved (`test:meal-food-edit` U1-U3, 1 mutation); (7) "I don't
+  like salmon" got a "Remember — salmon" card AND the question when the coach sent it as a proposal: that road now
+  asks the question and nothing else, once (`test:food-exclusions`); (8) the swap card named Wednesday's salmon dish
+  as today's: a dish named from another day is asked about ("X is your breakfast on Wed 18 Nov, not today. Want me to
+  swap it on Wed 18 Nov?"), never carded for the wrong day (`test:meal-days`, 1 mutation).
+  NOT CHANGED, named: the snack's stacked name after add-then-remove ("+ 100g cola without cola") is cosmetic, and
+  the obvious fix (strip back to the base name) collides with the rule that an edited meal must not share the
+  original's name; the "Rebuild without the limits?" card lists exercise swaps unrelated to the condition because a
+  rebuild regenerates the plan and keeps only his own swaps and earned weights, not the plan's other picks (a real
+  change to the rebuild, worth doing, not a one-liner); its "Week 1" for Mon 16 Nov is the plan's own week count
+  (weeks run from the day the plan began, his 6 Oct ruling). Not bugs: no "eased" note after a few minutes' pause
+  (the easing starts at 10 days); two quiet days after chest pain (his "Park it, go quiet").
+- [x] **TESTING WEEK: "HOW WAS SET 1?" (his ruling 15 Nov 2026, "Ask, then fill")**, from his screenshot: "type it"
+  and no clear instructions. After each logged set the next row asks Easy / About right / Hard and fills its weight
+  (about +10% at least one step / same / about -5% at least one step; a stated kit limit still caps it; CSCS basis in
+  `docs/plans/test-week-ask-then-fill.md`); the box says "after set 1", never "type it" (elsewhere "enter"); the
+  testing-week lines are plain words (no probe, reps in reserve, percentages) and "RPE 5-6" is hidden that week only.
+  The question sits ABOVE the row it fills (first drawn below it; the screenshot read out of order) and the worded
+  prompt is in the small face (first cut off, "after s"). `test:calibration-search` (probeNextKg run on binding
+  cases), `verify:calibration-search`, `verify:lift-effort`, `verify:tour-real`; 5 gates re-anchored. Not stored as
+  an effort; next week's weight is still read from the weights logged.
 - [x] **HIS LIVE-TEST BATCHES 2 AND 3 (Priya and his own phone), BUILT ON "BUILD IT", WITH HIS NINE RULINGS** (14-15 Nov
   2026). Pushed on his "Push it", merged to `main` on his "Merge" (15 Nov 2026); nothing deployed.
   PRE-MERGE SWEEP, 576 checks on 91d9da0e: 569 passed. Three need a live database (meal-quality, schema-parity, rls);

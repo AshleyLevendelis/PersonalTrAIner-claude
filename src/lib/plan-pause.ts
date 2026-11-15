@@ -9,6 +9,8 @@
 // the same answer without each being handed the profile.
 // ---------------------------------------------------------------------------
 
+import { shortDate } from './day-labels'
+
 const pausedSince = new Map<string, string | null>()
 
 /** App mirrors the profile's answer here on load and on every change. */
@@ -30,15 +32,18 @@ export function isPausedOn(date: string, since: string | null | undefined): bool
 export const PAUSE_WORDS = {
   pause: 'Pause my plan',
   resume: 'Resume my plan',
-  paused: (since: string) => `Plan paused since ${since}. Nothing is due and nothing counts as missed. Meals carry on.`,
+  // A day he would say ("Sun 15 Nov"), never the stored "2026-11-15" (15 Nov 2026, browser test).
+  paused: (since: string) => `Plan paused since ${shortDate(since)}. Nothing is due and nothing counts as missed. Meals carry on.`,
   card: 'Plan paused',
-  cardLine: 'Nothing is due while your plan is paused. Your first session back will be eased in.',
+  // "Eased in" only after a real break: the easing starts at 10 days away (15 Nov 2026, browser test: a few-minute
+  // pause, no easing, while these words promised it).
+  cardLine: 'Nothing is due while your plan is paused. If you\'re away 10 days or more, your first session back is eased in.',
   notLive: "Pausing isn't switched on yet.",
   done: 'Your plan is paused. Nothing is due and I won\'t send workout reminders until you resume. Meals carry on.',
-  resumed: 'Welcome back. Your plan is running again, and your first session back is eased in.',
+  resumed: 'Welcome back. Your plan is running again. If you\'ve been away 10 days or more, your first session back is eased in.',
   offerPause: 'Pause your plan from today? Nothing will be due or count as missed, and no workout reminders until you resume.',
-  offerResume: 'Start your plan again from today? Your first session back is eased in.',
+  offerResume: 'Start your plan again from today? If you\'ve been away 10 days or more, your first session back is eased in.',
   unchanged: 'Your meals, history and settings stay as they are.',
-  alreadyPaused: (since: string) => `Your plan is already paused, since ${since}.`,
+  alreadyPaused: (since: string) => `Your plan is already paused, since ${shortDate(since)}.`,
   notPaused: "Your plan isn't paused, so there's nothing to resume.",
 }

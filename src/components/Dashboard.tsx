@@ -5,7 +5,8 @@
 // no new visual language invented here.
 // ---------------------------------------------------------------------------
 
-import { PAUSE_WORDS } from '@/lib/plan-pause'
+import { PAUSE_WORDS, isPausedOn, planPausedSince } from '@/lib/plan-pause'
+import { addDays } from '@/lib/session-move'
 import { useShowNumbers } from '@/lib/show-numbers'
 import type * as React from 'react'
 import { Suspense, useEffect, useRef, useState } from 'react'
@@ -458,7 +459,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // heaviest lift, not the running order.
   const lift = data.session.leadLift && !data.session.activity ? leadLiftPhrase(data.session.leadLift, status) : null
   if (lift) glanceParts.push(lift)
-  const tomorrow = data.tomorrow ?? null
+  // NOTHING IS DUE TOMORROW WHILE THE PLAN IS PAUSED (15 Nov 2026, browser test: Home said "Full Body Power · Tomorrow").
+  const tomorrow = isPausedOn(addDays(data.today, 1), planPausedSince(profile.id)) ? null : (data.tomorrow ?? null)
   const sessionGlance = glanceParts.join(' · ')
 
   // THE LATEST PR for the weight panel's footer — the newest, not the biggest.

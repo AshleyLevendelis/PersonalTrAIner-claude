@@ -177,6 +177,9 @@ export function classifyDay(
   const beforePlan = !!planStartStr && dateStr < planStartStr
   if (!workout) {
     if (dashboardDay && dashboardDay.workingLogs.length > 0) return dashboardDay.session?.is_completed ? 'done' : 'partial'
+    // A PAUSED PLAN IS PAUSED ON ITS REST DAYS TOO (15 Nov 2026, browser test: paused on a Sunday rest day, Home and
+    // Exercise never said so). Logged work above still wins.
+    if (!beforePlan && isPausedOn(dateStr, pausedSince)) return 'paused'
     return beforePlan ? 'before_plan' : 'rest'
   }
   // A PRESCRIBED ACTIVITY IS A SESSION, not recovery (user test 8 Oct 2026, finding 19): the
@@ -188,7 +191,7 @@ export function classifyDay(
     // same rule as a day with no row at all, two lines up. It returned
     // 'recovery' before the logged work below was ever asked.
     if (!workout.plannedActivity && dashboardDay && dashboardDay.workingLogs.length > 0) return dashboardDay.session?.is_completed ? 'done' : 'partial'
-    if (!workout.plannedActivity) return beforePlan ? 'before_plan' : 'recovery'
+    if (!workout.plannedActivity) return beforePlan ? 'before_plan' : isPausedOn(dateStr, pausedSince) ? 'paused' : 'recovery'
     if ((dashboardDay?.cardioLogs?.length ?? 0) > 0) return 'done'
   }
 

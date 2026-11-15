@@ -118,7 +118,12 @@ console.log('\n6. The coach (main chat) and Profile')
   const send = chat.slice(chat.indexOf('const sendMessage = async'), chat.indexOf('const handleClearChat'))
   check('after a coach turn that did not record a food dislike, what she typed is read for foods and saved',
     send.length > 1000 && /if \(!failed && !coachSavedAFoodDislike\)[\s\S]{0,120}saveFoodsSaidInPassing\(userText\)/.test(send)
-    && /coachSavedAFoodDislike = result\.memoryIntent\?\.tool === 'record_fact'/.test(send))
+    && /coachSavedAFoodDislike = dislikeFact\(result\.memoryIntent\?\.tool, result\.memoryIntent\?\.rawArgs\)/.test(send))
+  // 15 Nov 2026, browser test: "I don't like salmon" got a "Remember — salmon" card AND the question, because the coach
+  // sent it as a record_fact PROPOSAL and both checks looked only at an outright save.
+  check('a food dislike the coach sent as a proposal is the question, not a card, and the backstop does not ask again',
+    /dislikeFact\(result\.proposal\?\.kind, result\.proposal\?\.rawArgs/.test(send)
+    && /else if \(dislikeToAsk\.length > 0\) refusal = DISLIKE_ASK\.turn\(dislikeToAsk\)/.test(chat))
   const saver = chat.slice(chat.indexOf('const saveFoodsSaidInPassing'), chat.indexOf('const resolveAndSaveMemory'))
   check('...through the same write as Profile\'s Foods to avoid (a hard food dislike), each with an Undo; only what was said firmly (his "Ask, and hold Tuesday")',
     saver.length > 200 && /firmFoodExclusions\(userText\)/.test(saver) && /kind: 'food_preference'/.test(saver) && /polarity: 'dislike', hardness: 'hard'/.test(saver) && /undoToken: row\.id/.test(saver))
