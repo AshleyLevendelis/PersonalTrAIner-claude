@@ -635,7 +635,10 @@
     "test:pregnancy-one-switch": "tsx scripts/test-pregnancy-one-switch.ts",
     "test:pregnancy-rules": "tsx scripts/test-pregnancy-rules.ts",
     "test:other-injury": "tsx scripts/test-other-injury.ts",
-    "test:log-estimate": "tsx scripts/test-log-estimate.ts"
+    "test:log-estimate": "tsx scripts/test-log-estimate.ts",
+    "measure:empty-meals": "tsx scripts/measure-empty-meals.ts",
+    "test:empty-meals": "tsx scripts/test-empty-meals.ts",
+    "verify:empty-meals": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/empty-meals.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

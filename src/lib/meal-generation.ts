@@ -52,6 +52,15 @@ import { MENU_SIZE, menuForSlot } from './meal-menu'
  * repeats roughly halved, and more days on target, not fewer. Ten was
  * rejected as twice the generation for a little more.
  */
+/**
+ * THE SHARE OF ITS MEAL'S PROTEIN A DAY-TESTED DISH MUST CARRY (15 Nov 2026, the coeliac nurse: a vegan, gluten-free
+ * lunch had to carry about 7.6 g of protein per 100 kcal, which our library's bean, lentil and grain dishes do not).
+ * Only for a meal that would otherwise be EMPTY (the library fallback), and only for a dish that also lands a whole day
+ * on target (protein 0.95-1.10x of the day), so the day's protein is unchanged and nobody else's pools move.
+ * MEASURED in measure:empty-meals: the nurse's lunches 2 -> 3, dinners 6 -> 7; the other diets unchanged.
+ */
+export const DAY_TESTED_PROTEIN_FLOOR = 0.85
+
 export const DEFAULT_POOL_SIZE = 7
 export const MAX_GENERATION_ROUNDS = 3
 
@@ -552,6 +561,12 @@ export function verifyProposal(
    * not the generator's business.
    */
   keepPortions = false,
+  /**
+   * A SHARE OF THE MEAL'S PROTEIN A DISH MAY CARRY (15 Nov 2026, the coeliac nurse). 1 everywhere except a dish that
+   * must also land a whole day on target (the library's mustFit path): there the day's own protein band is the guard,
+   * so a dish a little under its meal's share is fine when the other meals carry the rest.
+   */
+  proteinFloorFactor = 1,
 ): PoolOption | null {
   // ONE STATE (18 Oct 2026, runs 7-10, H36/M64): every line a new dish carries is weighed raw or dry, at the weight
   // that carries the same energy, so the card, the day, the leftovers and the list all see the state it is bought in.
@@ -655,7 +670,7 @@ export function verifyProposal(
     rejectLog.push(`[${slot}] "${proposal.name}": post-scale coverage dropped below floor (unexpected — scaling shouldn't change resolution)`)
     return null
   }
-  if (!isWithinCalorieTolerance(finalComputed.kcal, budget.calories) || !meetsProteinFloor(finalComputed.protein, budget.protein)) {
+  if (!isWithinCalorieTolerance(finalComputed.kcal, budget.calories) || !meetsProteinFloor(finalComputed.protein, budget.protein * proteinFloorFactor)) {
     rejectLog.push(`[${slot}] "${proposal.name}": post-scale result (${finalComputed.kcal} kcal, ${finalComputed.protein}g protein) missed target (${budget.calories} kcal, ${budget.protein}g protein) even at a sane scale factor (${scaled.scaleFactor.toFixed(2)}x) — likely a macro-ratio mismatch scaling alone can't fix`)
     return null
   }
@@ -868,7 +883,7 @@ export async function generateMealPools(params: {
     return assembleDay(usable, params.targets, {}, [], { [slot]: option }).withinTolerance
   }
 
-  const considerProposal = (proposal: RawProposal, mustFit = false, cap = poolSize, deep = false): void => {
+  const considerProposal = (proposal: RawProposal, mustFit = false, cap = poolSize, deep = false, leeway = false): void => {
     const slot = proposal.slot as MealSlotName
     if (!activeSlots.includes(slot)) return
     // A deep pass counts what she already has as well: DEEP_POOL_SIZE is a ceiling on the meal, not on one run.
@@ -908,7 +923,7 @@ export async function generateMealPools(params: {
       .filter(r => r.anchor === 'slot' && r.slot === slot)
       .map(r => r.subject)
     const effectiveDislikes = [...(params.dislikedFoods ?? []), ...slotTimingDislikes]
-    const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog, effectiveDislikes, unrecognisedPreferences)
+    const option = verifyProposal(proposal, slot, budget, params.dietaryPreferences, rejectionLog, effectiveDislikes, unrecognisedPreferences, false, mustFit && leeway ? DAY_TESTED_PROTEIN_FLOOR : 1)
     // A LIBRARY DISH IS ADDED ONLY IF IT CAN BE SERVED (19 Oct 2026, H35). Passing the checks is not landing a day:
     // under the 10% bands a "more options" run could add six dishes and leave the week on the same two. The library
     // has hundreds to choose from, so one that cannot land her day is passed over; the meal writer fills the rest.
@@ -971,7 +986,7 @@ export async function generateMealPools(params: {
    * whether the library should seed those too is hers to rule.
    */
   const deepLibrary = params.deepLibrary !== false && params.library !== false
-  const libraryPass = async (deep: boolean, slots: MealSlotName[] = activeSlots): Promise<void> => {
+  const libraryPass = async (deep: boolean, slots: MealSlotName[] = activeSlots, leeway = false): Promise<void> => {
     try {
       const library = params.library === false ? [] : (params.library ?? await loadMealLibrary())
       const liked = steeringLikes(params.likedFoods ?? [], params.favouriteMeals ?? [], params.dislikedFoods ?? [], params.dietaryPreferences).foods
@@ -991,7 +1006,7 @@ export async function generateMealPools(params: {
         // A run asks for `poolSize` more (the top-up asks for up to DEEP_POOL_SIZE less what she has); a new plan's
         // seed asks for the whole DEEP_POOL_SIZE. Never past DEEP_POOL_SIZE a meal either way.
         const cap = !deep ? poolSize : params.appendToExisting ? Math.min(DEEP_POOL_SIZE, existing.length + poolSize) : DEEP_POOL_SIZE
-        for (const dish of candidates) considerProposal(dish, true, cap, deep)
+        for (const dish of candidates) considerProposal(dish, true, cap, deep, leeway)
       }
     } catch (err) {
       // The library is a convenience. Without it the meal writer is asked for everything, as before.
@@ -1069,6 +1084,22 @@ export async function generateMealPools(params: {
   // then every library dish that passes her checks and lands a day, up to DEEP_POOL_SIZE a meal.
   // ONLY WHERE THE WRITER DELIVERED: a meal the writer could not refresh keeps what she had (the 17 Sep rule a
   // regenerate stands on), so the seed never turns a failed run into a replaced meal.
+  // A MEAL THE WRITER LEFT EMPTY IS FILLED FROM THE LIBRARY when nothing is saved for it (15 Nov 2026, the coeliac
+  // nurse: lunch and dinner came back empty and the plan showed breakfast and a snack). Never over saved meals: a
+  // regenerate the writer could not refresh keeps what she had (the 17 Sep rule), so a failed read of what is saved
+  // fills nothing either.
+  if (!params.appendToExisting && params.library !== false) {
+    const empty = activeSlots.filter(slot => (accepted[slot]?.length ?? 0) === 0)
+    if (empty.length > 0) {
+      const saved = await getPools(params.profileId).catch(() => null)
+      const nothingSaved = saved ? empty.filter(slot => (saved[slot]?.length ?? 0) === 0) : []
+      if (nothingSaved.length > 0) {
+        await libraryPass(false, nothingSaved, true)
+        await commitProgress()
+      }
+    }
+  }
+
   if (!params.appendToExisting && deepLibrary) {
     const delivered = activeSlots.filter(slot => (accepted[slot]?.length ?? 0) > 0)
     if (delivered.length > 0) {

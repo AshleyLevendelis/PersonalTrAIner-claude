@@ -263,6 +263,7 @@ const SAM = new URLSearchParams(location.search).get('sam') === '1'
 // the remembered facts with the app's own functions — App's two lines, reproduced, nothing else. With ?sam=1 it is
 // Sam's own setup: the minimalist guess, nothing said about the kit.
 const KIT = new URLSearchParams(location.search).get('kit') === '1'
+const EMPTY_MEALS = new URLSearchParams(location.search).get('emptymeals') === '1'
 // A PLAN PAUSE (his "Add a pause"): ?paused=YYYY-MM-DD is the INPUT, the date the pause began; the page mirrors it
 // into the app's one store exactly as App.tsx does, and nothing else.
 const PAUSED_FROM = new URLSearchParams(location.search).get('paused')
@@ -312,7 +313,8 @@ const profile: UserProfile = {
   // the day — and the refit card listed three meals while the fourth kept its
   // old size. The app now SAYS so (meal-refit's residue line), and the harness
   // stops describing a profile that eats a snack it does not budget for.
-  meals_per_day: 3, include_snacks: true,
+  // NO SNACKS: the page's meals have none and its meal shape says none (15 Nov 2026, a plausible whole).
+  meals_per_day: 3, include_snacks: false,
   fitness_goal: FINISHER || WALKER || MOBILITY || SAM ? 'fat_loss' : 'hypertrophy', preferred_time: 'morning', bmr: 1800, tdee: 2500,
   ...(WALKER ? { start_preference: 'move_more' as const } : {}),
   // ?legcurl=1 — THE ONE-DUMBBELL LIFT, ON A REAL GENERATED PLAN.
@@ -1555,7 +1557,8 @@ function Harness() {
   // holds the same two pieces of state and updates them in the same order:
   // persist the pick, re-read the pool, then move what is on screen.
   const [liveChosen, setLiveChosen] = useState((weekToday ? weekToday.chosen : leftoverDay ? leftoverDay.chosen : chosen) as Record<string, PoolOption>)
-  const [livePools, setLivePools] = useState((TOPUP || DAYMOVE ? topUpPools : LEFTOVERS || WEEK ? leftoverPools : pools) as never as Record<string, PoolOption[]>)
+  // ?emptymeals=1 (15 Nov 2026, the coeliac nurse): three meals chosen, lunch and dinner never saved a dish.
+  const [livePools, setLivePools] = useState((EMPTY_MEALS ? Object.fromEntries(Object.entries(pools).filter(([s]) => s !== 'lunch' && s !== 'dinner')) : TOPUP || DAYMOVE ? topUpPools : LEFTOVERS || WEEK ? leftoverPools : pools) as never as Record<string, PoolOption[]>)
   // ?daymove=1: today's saved picks, as App holds them (manualMealPicks).
   const [dayMovePicks, setDayMovePicks] = useState<Record<string, string>>({})
   // ?stale=1: the pools as App restores them on load, through readPools, and

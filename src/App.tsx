@@ -1,4 +1,5 @@
 import { likeClash } from '@/lib/named-food-clash'
+import { emptyMealsOf } from '@/lib/empty-meal'
 import { ShowNumbersContext } from '@/lib/show-numbers'
 import { couldNot, targetsMoved, mealsDrifted, type TargetMoveCause } from '@/lib/coach-voice'
 import { useState, useEffect, useRef, lazy, Suspense, useMemo } from 'react'
@@ -1741,7 +1742,7 @@ function App() {
                     // generator running and finding nothing that fits is
                     // deterministic advice, not "try again".
                     return { added: [], error: result.generatorReached
-                      ? `I couldn't find any new ${slot} options that fit your targets — loosening a restriction or widening your calorie range would give me more to work with.`
+                      ? `I couldn't find any new ${slot} options that fit your diet, your foods to avoid and your targets. Taking something off your foods to avoid would give me more to work with.`
                       : `I couldn't reach the meal generator just then — try me again in a moment.` }
                   }
                   // Refresh the on-screen pool so the Meals tab shows them
@@ -1820,7 +1821,7 @@ function App() {
         // preserved — on a first build there is nothing to preserve.
         setMealRegenerateError(
           result.generatorReached
-            ? "I couldn't fit any meals to your targets. Try loosening a dietary restriction, widening your calorie range, or turning off a meal slot, then generate below."
+            ? "I couldn't fit any meals to your diet, your foods to avoid and your targets. Take something off your foods to avoid, or change how many meals you have on Profile, then generate below."
             : "I couldn't reach the meal generator to build your meals. Your training plan is ready — generate them below when you're back on a good connection."
         )
       })
@@ -3680,6 +3681,7 @@ function App() {
               onMealKnockOn={mealDays.dayMove.knockOn}
               onMealKnockOnMove={mealDays.dayMove.knockOnMove}
               mealTopUp={mealTopUpPlan ? { ...mealTopUpPlan, building: initialMealBuild } : null}
+              emptyMeals={!initialMealBuild && profile && macros ? emptyMealsOf(Object.keys(computeSlotBudgets(macros, profile.meals_per_day, profile.include_snacks, skipsBreakfast(profile))) as MealSlotName[], mealPools) : []}
               onMealTopUpStart={previewMealTopUpStart}
               onMealTopUpConfirm={handleMealTopUpFromChat}
               onRestartPlan={handleRestartPlan}

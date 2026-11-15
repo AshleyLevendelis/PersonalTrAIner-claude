@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [x] **A MEAL HE CHOSE NEVER ENDS EMPTY WITHOUT A WORD (the coeliac nurse, 15 Nov 2026; Wave N of
+  `docs/plans/browser-test-nov15-plan.md`)**. She chose three meals and a snack and got breakfast and a snack (about 760
+  of 2,053 kcal), shown "0 OF 2 MEALS" with nothing saying why, and the coach invented a reason. CAUSES (traced): a new
+  plan used only the meal writer, and the library topped up only meals the writer had filled, so a meal it left empty
+  stayed empty; each dish had to carry its meal's full protein with no leeway (about 7.6 g per 100 kcal for her); the
+  screen drew no row for a meal that never saved a dish; the coach was told nothing. FIXED: (1) a meal the writer left
+  empty is filled from the library when nothing is saved for it (a regenerate that fails still keeps saved meals, the
+  17 Sep rule; a failed read of what is saved fills nothing); (2) in that fallback only, a dish may carry 85% of its
+  meal's protein when it also lands a whole day on target (the day's 0.95x protein band is unchanged), MEASURED with
+  `measure:empty-meals`, the writer switched off: before, every meal of every diet ended EMPTY; after, the nurse has 6
+  breakfasts, 3 lunches, 7 dinners and 22 snacks (lunches 2 -> 3 and dinners 6 -> 7 from the leeway), and the other
+  diets' pools are unchanged by the leeway; (3) Nutrition draws every meal he chose with no dishes, saying "No lunch yet.
+  Nothing we tried fitted vegan and gluten-free, your foods to avoid (...) and your targets." with Try again, and the
+  planned total waits for the build; (4) the coach is told which meals are empty and never to explain them away; (5)
+  five messages that said "loosen a restriction" or "widen your calorie range" (a diet can be medical; there is no
+  calorie-range setting) now point to the foods to avoid; "Lunch don't fit" grammar gone. The test page's profile said
+  snacks while its meals had none; it now says no snacks (a plausible whole). NOT DONE: Regenerate all asking first; more
+  vegan gluten-free lunches in the library (3 is thin); the protein target for a beginner (mine, CSCS, next).
+  `test:empty-meals` (20 checks, 8 mutations caught), `verify:empty-meals` (5 checks), `measure:empty-meals`. Needs the
+  `chat-gemini` deploy for the coach's half.
 - [ ] **THE MARCUS TEST (15 Nov 2026, a live run as a 52-year-old vegetarian with a tree-nut allergy and an adrenaline
   pen, right-knee surgery, football on Wednesdays; Wave M of `docs/plans/browser-test-nov15-plan.md`)**. Three
   read-only traces found the causes (in the plan). HIS THREE RULINGS THAT DAY, each the recommended option and asked one

@@ -157,8 +157,8 @@ export async function regenerateMealSlot(ctx: MealPlanActionContext, slot: MealS
       ctx.setError(
         result.generatorReached
           ? (hadExistingOptions
-              ? `${couldNot(`fit a new ${label} option`)} I've kept your existing one — try loosening a restriction or widening your calorie range.`
-              : `${label} doesn't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off this slot.`)
+              ? `${couldNot(`fit a new ${label} option`)} I've kept your existing one. Taking something off your foods to avoid gives it more to work with.`
+              : `${label} still has no dishes: nothing we tried fitted your diet, your foods to avoid and your targets. Try again, or take something off your foods to avoid.`)
           : (hadExistingOptions
               ? `${couldNot(`refresh ${label}`)} I've kept your existing options.`
               : `${couldNot(`generate ${label}`)} Try again in a moment.`)
@@ -221,7 +221,7 @@ export async function makeOneNewMeal(ctx: MealPlanActionContext, slot: MealSlotN
     const made = result.accepted[slot]?.[0]
     if (!made) {
       return { error: result.generatorReached
-        ? `${couldNot(`fit a new ${label} to your numbers`)} Yours is as it was. Loosening a restriction or widening your calorie range would give me more to work with.`
+        ? `${couldNot(`fit a new ${label} to your numbers`)} Yours is as it was. Taking something off your foods to avoid would give me more to work with.`
         : notNow }
     }
     // READ BACK, as the other two handlers do: the screen holds what storage holds.
@@ -265,7 +265,7 @@ export async function regenerateAllMeals(ctx: MealPlanActionContext): Promise<vo
       // is genuinely the right advice there).
       ctx.setError(
         result.generatorReached
-          ? "Nothing fits your current targets right now. Try loosening a dietary restriction, widening your calorie range, or turning off a meal slot — then regenerate."
+          ? "Nothing fits your diet, your foods to avoid and your targets right now. Take something off your foods to avoid, or change how many meals you have on Profile, then regenerate."
           : `${couldNot('reach the meal generator')} Your existing plan is unchanged — try again in a moment.`
       )
       return
@@ -317,7 +317,8 @@ export async function regenerateAllMeals(ctx: MealPlanActionContext): Promise<vo
       const neverFilledSlots = failedSlots.filter(s => (priorPools[s]?.length ?? 0) === 0)
       const parts: string[] = []
       if (keptSlots.length > 0) parts.push(`${couldNot(`fit new options for ${keptSlots.map(s => ctx.slotLabel[s]).join(', ')}`)} I've kept what you had.`)
-      if (neverFilledSlots.length > 0) parts.push(`${neverFilledSlots.map(s => ctx.slotLabel[s]).join(', ')} don't fit your current targets. Try loosening a restriction, widening your calorie range, or turning off a slot.`)
+      // Never "loosen a restriction": a diet can be medical (the coeliac nurse, 15 Nov 2026). The avoid list is his to edit.
+      if (neverFilledSlots.length > 0) parts.push(`${neverFilledSlots.map(s => ctx.slotLabel[s]).join(' and ')} ${neverFilledSlots.length === 1 ? "still has" : "still have"} no dishes: nothing we tried fitted your diet, your foods to avoid and your targets. Try again, or take something off your foods to avoid.`)
       ctx.setError(parts.join(' '))
     }
   } catch {

@@ -24,7 +24,8 @@ import { undoMealEdit, type MealEditUndo } from '@/lib/pending-action-executor'
 import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
 import { mealSections } from '@/lib/meal-sections'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
-import { methodToShow, macroOnTarget, isFamiliarOption, type PoolOption } from '@/lib/meal-generation'
+import { methodToShow, macroOnTarget, isFamiliarOption, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
+import { emptyMealLine } from '@/lib/empty-meal'
 import type { MethodRules } from '@/lib/meal-method-check'
 import { formatKitchenQuantity, kitchenLine } from '@/lib/portion-scaler'
 import { groceryHash } from '@/lib/app-route'
@@ -214,7 +215,10 @@ export function MealPlan({
   // per generateMealPools always seeding every active slot to []) but came
   // back with zero options must render honestly, never disappear — silently
   // dropping it lets the day's totals quietly absorb its calories elsewhere.
-  const emptySlots = SLOT_ORDER.filter(s => s in pools && (pools[s]?.length ?? 0) === 0)
+  // AND A MEAL HE CHOSE THAT NEVER SAVED A DISH (15 Nov 2026, the coeliac nurse): the build left lunch and dinner with
+  // no rows at all, so no key, and the screen drew nothing. The meals he chose come from his own shape.
+  const expectedSlots = mealsPerDay != null && targets ? (Object.keys(computeSlotBudgets(targets, mealsPerDay, includeSnacks, skipBreakfast)) as MealSlotName[]) : []
+  const emptySlots = SLOT_ORDER.filter(s => (s in pools || expectedSlots.includes(s)) && (pools[s]?.length ?? 0) === 0)
   /**
    * Audit §2.1, second half — the OFFER. A restriction turned on after these
    * meals were generated invalidates some of them, and the app knew and said
@@ -634,7 +638,8 @@ export function MealPlan({
         </InsightBanner>
       )}
       {/* AN UPCOMING DAY'S PLANNED TOTALS AND VERDICT ARE ITS RINGS CARD NOW (W1, 11 Nov 2026), with its add-to-list. */}
-      {targets && !upcoming && <TotalsHero totals={shown.totals} targets={targets} chosen={chosen} eaten={new Set((Object.keys(loggedBySlot) as MealSlotName[]).filter(sl => (loggedBySlot[sl] ?? []).length > 0))} />}
+      {/* Not while meals are still being built: a half-built day read as "kcal under" (the coeliac nurse, 15 Nov). */}
+      {targets && !upcoming && !isGenerating && <TotalsHero totals={shown.totals} targets={targets} chosen={chosen} eaten={new Set((Object.keys(loggedBySlot) as MealSlotName[]).filter(sl => (loggedBySlot[sl] ?? []).length > 0))} />}
       {aroundLine && (
         <p className="flex items-start justify-between gap-3 text-[0.71875rem] text-muted-foreground" data-testid="around-eaten" data-kind={shown.aroundEaten.kind}>
           <span>{aroundLine}</span>
@@ -731,7 +736,7 @@ export function MealPlan({
             banner already exists to remove. The banner is the only action
             offered in this state. */}
         {!unrecognisedBanner && emptySlots.map(slot => (
-          <EmptySlotRow key={slot} slot={slot} isGenerating={isGenerating} onRegenerate={onRegenerateSlot} />
+          <EmptySlotRow key={slot} slot={slot} isGenerating={isGenerating} onRegenerate={onRegenerateSlot} line={emptyMealLine(slot, dietaryPreferences, avoidFoods)} />
         ))}
       </div>
 
@@ -875,13 +880,13 @@ export function AddDayToGrocery({ upcoming }: { upcoming: UpcomingMealDay }) {
  * of vanishing (its calories/protein must never get silently folded into
  * another slot's portions, which is what assembleDay's repair scale used to
  * do). Per-slot retry, matching every other slot row's own regenerate action. */
-function EmptySlotRow({ slot, isGenerating, onRegenerate }: { slot: MealSlotName; isGenerating: boolean; onRegenerate: (slot: MealSlotName) => Promise<void> }) {
+function EmptySlotRow({ slot, isGenerating, onRegenerate, line }: { slot: MealSlotName; isGenerating: boolean; onRegenerate: (slot: MealSlotName) => Promise<void>; line: string }) {
   const [busy, setBusy] = useState(false)
   return (
-    <div className="flex items-center justify-between gap-3 border-t py-3" style={{ borderColor: 'var(--hairline)' }}>
+    <div className="flex items-center justify-between gap-3 border-t py-3" style={{ borderColor: 'var(--hairline)' }} data-testid="empty-meal" data-slot={slot}>
       <div>
         <p className="ds-label-compact">{SLOT_LABEL[slot]}</p>
-        <p className="text-sm text-muted-foreground">Couldn't generate this meal.</p>
+        <p className="text-sm text-muted-foreground">{isGenerating ? `Still building your ${slot}…` : line}</p>
       </div>
       <Button
         size="sm"
@@ -890,7 +895,7 @@ function EmptySlotRow({ slot, isGenerating, onRegenerate }: { slot: MealSlotName
         onClick={async () => { setBusy(true); try { await onRegenerate(slot) } finally { setBusy(false) } }}
       >
         {busy ? <Loader2 className="size-3.5 animate-spin mr-1.5" /> : <RefreshCw className="size-3.5 mr-1.5" />}
-        Retry
+        Try again
       </Button>
     </div>
   )
