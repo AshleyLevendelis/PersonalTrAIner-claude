@@ -1586,6 +1586,19 @@ menu" stays true when a copy is also left outside it.
   say so. From the next day a surprising weigh-in is held as before. `test:weigh-in-targets` §13,
   `verify:setup-weight-correction`
 
+### His rulings of 15 Nov 2026, the Marcus test (Wave M of `docs/plans/browser-test-nov15-plan.md`)
+- **An allergy refusal says where the setting is, never invites removing it: "Say where it's set"**. "Your nut-free
+  setting is on Profile, under Food, Diet." REPLACES the "if you don't have a nut allergy, change it" half of his 18 Oct
+  ruling. `test:named-food-clash`, `verify:named-food-clash`. Needs the `chat-gemini` deploy for the prompt
+- **A food his diet or allergy keeps out is never saved as a like**, by any writer (chat, Profile, setup).
+  `test:named-food-clash`, `verify:named-food-clash` §6b
+- **An unknown food in a log is estimated only when he asks: "Estimate when asked"**, the assumption on the card before
+  Apply. PARTLY REVERSES his 1 Oct "ask, never estimate" for that case. NOT BUILT yet
+- **An allergy is its own record: "Allergy card, peanuts split"** (food, peanuts and tree nuts separate, adrenaline pen,
+  traces). Meals stay "filtered, not verified". NOT BUILT yet; needs a migration
+- **"Hips & pelvis" and "Other (describe)" on the injuries list** (his decision 8): Other asks the three pain questions;
+  sharp saves nothing. `test:other-injury`, `verify:profile-fixes` §11
+
 ### His rulings of 14 Nov 2026, live-test batches 2-3 (Priya and his own phone)
 - **"Leave it as it is" on a goal change undoes the goal: "Undo the goal change"** (over keeping the goal and saying
   so, and over always rebuilding): the goal is saved before the question and moves calories at once, so Leave puts the

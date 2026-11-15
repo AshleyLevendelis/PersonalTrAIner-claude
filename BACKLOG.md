@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [ ] **THE MARCUS TEST (15 Nov 2026, a live run as a 52-year-old vegetarian with a tree-nut allergy and an adrenaline
+  pen, right-knee surgery, football on Wednesdays; Wave M of `docs/plans/browser-test-nov15-plan.md`)**. Three
+  read-only traces found the causes (in the plan). HIS THREE RULINGS THAT DAY, each the recommended option and asked one
+  at a time: (1) **"Say where it's set"**: the allergy refusal ends "Your nut-free setting is on Profile, under Food,
+  Diet." and never "if you don't have a nut allergy, change it" (REPLACES the second half of his 18 Oct ruling, put to
+  him as a collision; over dropping the sentence and keeping it); (2) **"Estimate when asked"**: an unknown food in a
+  log is estimated only when he says so, the assumption shown before Apply (PARTLY REVERSES his 1 Oct "ask, never
+  estimate" for that one case; over a better question only and over always estimating); (3) **"Allergy card, peanuts
+  split"**: a structured allergy record on Profile (food, peanuts and tree nuts separate, adrenaline pen, traces), over
+  splitting peanuts only and over leaving it. DONE: (1) built, d82255b0; a refused food is never saved as a like, in
+  every writer (chat memory, Profile likes, setup's usual meals), 28d812b2; "Other (describe)" and "Hips & pelvis" on
+  the injuries list (his earlier decision 8), 6cf8f69c; sharp pain offers Pause (decision 6), 75eab0de. One CHANGE TO A
+  SAFETY CHECK, flagged: the coach's injury summary now quotes typed injury words, but only inside "the plan does NOT
+  adjust for these" (the old no-echo check guarded the coach taking them for adjusted-for; re-anchored on that). TO DO:
+  (2), (3) with a migration, allergy questions answered as questions, the food-logging loop, the knee and plan-shape
+  causes (CSCS, mine), logging UX, setup and shopping items.
 - [x] **PREGNANCY AS ONE SWITCH (his three rulings 15 Nov 2026, from the third browser report; wave 1 of
   `docs/plans/browser-test-nov15-plan.md`)**. The test profile (20 weeks pregnant) sat on a 1,448 kcal fat-loss target
   while the coach's own notes said weight loss wasn't appropriate. Asked one at a time, he chose (each the recommended
