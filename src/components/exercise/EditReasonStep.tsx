@@ -28,6 +28,7 @@
 // two.
 // ---------------------------------------------------------------------------
 
+import { canOfferPause, requestPlanPause, PAUSE_WORDS } from '@/lib/plan-pause'
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -91,6 +92,8 @@ export function EditReasonStep({ kind, exerciseName, onAnswer, onSkip, onStepCha
   const [ticking, setTicking] = useState(false)
   const [hurt, setHurtRaw] = useState<Exclude<HurtKind, 'red_flag'> | null>(null)
   const [redFlag, setRedFlagRaw] = useState(false)
+  const [pauseState, setPauseState] = useState<'offer' | 'busy' | 'done' | 'none'>(() => canOfferPause() ? 'offer' : 'none')
+  const [pauseError, setPauseError] = useState<string | null>(null)
   // EVERY STEP CHANGE GOES THROUGH ONE OF THESE, so the parent hears about
   // all of them and a new step cannot be added that forgets to say so.
   const setHurting = (v: boolean) => { onStepChange?.(); setHurtingRaw(v) }
@@ -103,12 +106,22 @@ export function EditReasonStep({ kind, exerciseName, onAnswer, onSkip, onStepCha
     return (
       <div className="space-y-3" data-testid="reason-red-flag">
         <p className="text-sm">{RED_FLAG_ADVICE}</p>
-        {/* The only way out is "leave it alone". Offering "do it anyway" here
-            would put a plan change one tap from a symptom the app has just
-            said it will not train around. */}
+        {/* "Leave it alone" first. Offering "do it anyway" here would put a plan change one tap from a symptom the
+            app has just said it will not train around. And "Pause my plan" (his ruling 15 Nov 2026, "Add Pause", as
+            the chat already offers): it stops the training rather than training around the pain, only on his own
+            tap. Never "skip this exercise": sharp pain is a reason to stop. */}
         <Button className="w-full" onClick={() => onAnswer({ type: 'red_flag' })} data-testid="red-flag-ack">
           Leave my plan as it is
         </Button>
+        {pauseState === 'offer' && (
+          <Button variant="outline" className="w-full" data-testid="red-flag-pause"
+            onClick={async () => { setPauseState('busy'); const failed = await requestPlanPause(); setPauseState(failed ? 'offer' : 'done'); setPauseError(failed) }}>
+            {PAUSE_WORDS.pause}
+          </Button>
+        )}
+        {pauseState === 'busy' && <p className="text-xs text-muted-foreground">Pausing…</p>}
+        {pauseState === 'done' && <p className="text-xs text-muted-foreground" data-testid="red-flag-paused">{PAUSE_WORDS.done}</p>}
+        {pauseError && <p className="text-xs text-destructive">{pauseError}</p>}
       </div>
     )
   }

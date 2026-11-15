@@ -109,6 +109,10 @@ check('2d. ...without naming a condition it cannot diagnose',
   !/tendonitis|impingement|tear|strain|sprain/i.test(advice), advice.slice(0, 200))
 check('2e. ...and it does NOT offer an area picker, so no adaptation can start here',
   !(await has('[data-testid="reason-area"]')))
+// HIS RULING 15 Nov 2026, "Add Pause": "Pause my plan" beside "Leave my plan as it is", and nothing else.
+const redFlagButtons = await ev(`[...document.querySelectorAll('[data-testid="reason-red-flag"] button')].map(b => b.getAttribute('data-testid'))`)
+check('2e2. ...offers "Pause my plan" after "Leave my plan as it is", and no third way (no "skip this exercise")',
+  JSON.stringify(redFlagButtons) === '["red-flag-ack","red-flag-pause"]', redFlagButtons)
 await shoot('hurts-red-flag')
 
 await clickSel('[data-testid="red-flag-ack"]'); await wait(900)
@@ -242,6 +246,18 @@ check('5h. ...readable in full: the note and every kit button sit inside the scr
 await shoot('hurts-kit-nothing-to-change')
 await escape(); await wait(600)
 check('5g. ...and the week is exactly as it was', JSON.stringify(await order()) === JSON.stringify(afterKit), { afterKit, now: await order() })
+
+// --- 7. "Pause my plan" on the sharp-pain step pauses, through the one handler, and changes nothing else ---
+await escape(); await wait(600)
+// Earlier sections may have eased the first victim off today; any row still on the card will do.
+const pauseVictim = (await order())[0]
+check('7a. reopening the sharp-pain answer', !!pauseVictim && await openHurts(pauseVictim) && await clickSel('[data-hurt="red_flag"]') && (await wait(500), await has('[data-testid="red-flag-pause"]')), pauseVictim)
+const beforePause = await order()
+await clickSel('[data-testid="red-flag-pause"]'); await wait(900)
+check('7b. tapping it pauses the plan (the same function Profile and the coach use)', (await ev('window.__planPaused ?? null')) === true)
+check('7c. ...and says so', /paused/i.test(await ev(`document.querySelector('[data-testid="red-flag-paused"]')?.textContent || ''`)))
+check('7d. ...and the session itself is unchanged', JSON.stringify(await order()) === JSON.stringify(beforePause), { beforePause })
+await shoot('hurts-red-flag-paused')
 
 const err = await ev('window.__err ?? null')
 check('6. no uncaught error on the page', err === null, err)

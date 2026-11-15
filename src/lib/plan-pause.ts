@@ -23,6 +23,23 @@ export function planPausedSince(profileId: string | null | undefined): string | 
   return profileId ? pausedSince.get(profileId) ?? null : null
 }
 
+/**
+ * THE ONE PAUSE FUNCTION, reachable from any screen (15 Nov 2026: the sharp-pain step offers "Pause my plan", his
+ * ruling "Add Pause"). App registers its handlePlanPause here, the same function Profile and the coach confirm through.
+ */
+let pauseHandler: { profileId: string; run: (pause: boolean) => Promise<string | null> } | null = null
+export function setPlanPauseHandler(profileId: string, run: (pause: boolean) => Promise<string | null>): void {
+  pauseHandler = { profileId, run }
+}
+/** A pause can be offered: the handler is there and the plan is running. */
+export function canOfferPause(): boolean {
+  return !!pauseHandler && !planPausedSince(pauseHandler.profileId)
+}
+/** Pause through App's handler. Null when done, else the sentence to show. */
+export async function requestPlanPause(): Promise<string | null> {
+  return pauseHandler ? pauseHandler.run(true) : PAUSE_WORDS.notLive
+}
+
 /** Is this date inside a pause that began on `since`? Every day from the start on, until he resumes. */
 export function isPausedOn(date: string, since: string | null | undefined): boolean {
   return !!since && date >= since

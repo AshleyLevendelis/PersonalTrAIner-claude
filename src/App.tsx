@@ -65,7 +65,7 @@ import { readBootSnapshot, saveBootSnapshot, clearBootSnapshot, type BootSnapsho
 import { ensureSignedIn, claimProfile, hasClaimedOnThisPhone, markClaimedOnThisPhone, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
 import { rebuildFromCurrentWeek, type PlanInvalidation } from '@/lib/plan-invalidation'
 import { updateProfileField, savePlanPause } from '@/lib/profile-store'
-import { setPlanPausedSince, PAUSE_WORDS } from '@/lib/plan-pause'
+import { setPlanPausedSince, PAUSE_WORDS, setPlanPauseHandler } from '@/lib/plan-pause'
 import { SignInScreen } from '@/components/SignInScreen'
 
 // ---------------------------------------------------------------------------
@@ -3243,6 +3243,7 @@ function App() {
     handleProfilePatched({ plan_paused_since: since })
     return null
   }
+  if (profile?.id) setPlanPauseHandler(profile.id, handlePlanPause)
 
   const handleProfilePatched = (patch: Partial<UserProfile>) => {
     const previousKg = profile?.weight_kg ?? null

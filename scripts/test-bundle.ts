@@ -455,7 +455,9 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 13 Nov 2026: 1450 -> 1473, strategy slice 6 (running); measured 1434 before and 1448 after.
   // MOVED 15 Nov 2026: 1473 -> 1480, his 14 Nov rulings (the pause, the red flag's quiet, the dislike ask, the moved session kept,
   // odd reps); measured 1466 on the branch before them and 1473.x after.
-  const APP_CHUNK_BUDGET_KB = 1480
+  // MOVED 15 Nov 2026: 1480 -> 1506, pregnancy as one switch and the sharp-pain Pause; MEASURED on a clean worktree of
+  // e373e3b8: 1481 (and 1481 with the Pause). His 15 Sep ruling: 25 kB raw over today's number.
+  const APP_CHUNK_BUDGET_KB = 1506
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -735,7 +737,9 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 14 Nov 2026: 2995 -> 3022, his evening live test (the app's video button, the list-out-of-date line, the
   // pregnancy and sex-question fixes). MEASURED on a clean worktree of c7fe77c3: 2992 before, 2997 after. His 15 Sep
   // ruling, "raise it with room to grow": 25 kB raw over today's number.
-  const TOTAL_BUDGET_KB = 3022
+  // MOVED 15 Nov 2026: 3022 -> 3051, pregnancy as one switch and the sharp-pain Pause; MEASURED on a clean worktree of
+  // e373e3b8: 3026. His 15 Sep ruling: 25 kB raw over today's number.
+  const TOTAL_BUDGET_KB = 3051
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

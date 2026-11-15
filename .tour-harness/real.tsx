@@ -28,7 +28,7 @@
 // holds the real one; if these two ever disagree, believe that gate.
 // ---------------------------------------------------------------------------
 
-import { setPlanPausedSince } from '../src/lib/plan-pause'
+import { setPlanPausedSince, setPlanPauseHandler } from '../src/lib/plan-pause'
 import { swapOnScreen } from '@/lib/screen-swap'
 import { useKeptPlanSender } from '@/hooks/useKeptPlanSender'
 import { banOnScreen } from '@/lib/screen-ban'
@@ -1818,7 +1818,9 @@ function Harness() {
   const [planBornAt, setPlanBornAt] = useState(profile.created_at as string)
   const [pausedSince, setPausedSince] = useState<string | null>(PAUSED_FROM)
   setPlanPausedSince(PROFILE_ID, pausedSince)
-  const planPause = async (pause: boolean): Promise<string | null> => { setPausedSince(pause ? TODAY_ISO : null); return null }
+  const planPause = async (pause: boolean): Promise<string | null> => { setPausedSince(pause ? TODAY_ISO : null); ;(window as unknown as { __planPaused: boolean }).__planPaused = pause; return null }
+  // App registers its one pause function for every screen (plan-pause.ts); this page registers the same stand-in.
+  setPlanPauseHandler(PROFILE_ID, planPause)
   const restartPlan = async (): Promise<string | null> => {
     const weeks = buildRestartedPlan(profile, [])
     if (weeks.length === 0) return "I couldn't start your plan again."
