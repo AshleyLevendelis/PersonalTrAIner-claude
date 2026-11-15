@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **THE EXERCISE SEARCH UNDERSTANDS PLURALS (15 Nov 2026, Marcus: "step-downs" found nothing)**. A typed word has
+  to start a word in the name, and "downs" is longer than "down". The swap, add and logging searches now also try each
+  word without its final "s" ("presses" without "es"), so "step-downs", "leg presses" and "hip thrusts" find their
+  lifts. The strict search that resolves a ban or a logged set is untouched, so a plural can never ban more than
+  before. VERIFIED: `test:exercise-aliases` (5 new checks, 3 mutations caught), `test:machine-versions`,
+  `test:near-copies`, `test:runs34-low`, `test:slot-replacement` pass.
 - [x] **A REHAB DRILL IS NEVER THE DAY'S MAIN LIFT (15 Nov 2026, CSCS, mine; Marcus after knee surgery had "Step-Down
   (Eccentric)" labelled MAIN LIFT)**. His knee flag removed the loaded leg work, and the step-down (a physio-style
   control drill, tagged as indicated for the knee) was the highest-ranked thing left, so it got the label and the main

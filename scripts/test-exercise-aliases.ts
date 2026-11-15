@@ -222,5 +222,15 @@ console.log('\nTHE SEARCH BOXES READ "RDL" (4 Nov 2026, her "add RDL as a search
   check('every search word writes out to words a catalogue name holds', Object.values(SEARCH_WORDS).every(w => EXERCISE_DATABASE.some(e => e.name.toLowerCase().includes(w.split(' ')[0]))))
 }
 
+// PLURALS (15 Nov 2026, Marcus: "step-downs" found nothing).
+{
+  const first = (q: string) => searchExerciseCatalogByWords(q, 5)[0]?.name
+  check('"step-downs" finds the step-down', first('step-downs') === 'Step-Down (Eccentric)', searchExerciseCatalogByWords('step-downs', 5).map(e => e.name))
+  check('"leg presses" finds the leg press', first('leg presses') === 'Leg Press', searchExerciseCatalogByWords('leg presses', 5).map(e => e.name))
+  check('"hip thrusts" finds the hip thrust', first('hip thrusts') === 'Hip Thrust', searchExerciseCatalogByWords('hip thrusts', 5).map(e => e.name))
+  check('the logging box gets plurals too', searchExercisesToLog('step-downs', 5)[0]?.name === 'Step-Down (Eccentric)')
+  check('the strict resolver is untouched ("step-downs" bans nothing it did not before)', searchExerciseCatalog('step-downs', 20).length === 0)
+}
+
 console.log(`\n${ran} checks ran, ${failures} failed`)
 if (failures > 0) process.exit(1)

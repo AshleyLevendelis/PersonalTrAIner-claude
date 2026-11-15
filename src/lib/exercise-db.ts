@@ -6727,7 +6727,11 @@ function catalogWords(text: string): string[] {
 function searchPhrasings(query: string): string[] {
   const words = query.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
   const written = words.map(w => SEARCH_WORDS[w] ?? SEARCH_WORDS[w.replace(/s$/, '')] ?? w).join(' ')
-  return written !== words.join(' ') ? [query, written] : [query]
+  // PLURALS (15 Nov 2026, Marcus: "step-downs" found nothing, because a typed word must be the START of a name's word
+  // and "downs" is longer than "down"). Each word over three letters loses a final "s" (never "ss": press, cross).
+  // "presses" loses "es" (press), since "presse" starts no word.
+  const singular = written.split(' ').map(w => (/sses$/.test(w) ? w.slice(0, -2) : w.length > 3 && /[^s]s$/.test(w) ? w.slice(0, -1) : w)).join(' ')
+  return [...new Set([query, ...(written !== words.join(' ') ? [written] : []), ...(singular !== written ? [singular] : [])])]
 }
 
 export function searchExerciseCatalogByWords(query: string, limit = 20): ExerciseEntry[] {
