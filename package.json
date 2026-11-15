@@ -245,6 +245,7 @@
     "test:coach-exam-fresh": "tsx scripts/test-coach-exam-fresh.ts",
     "test:coach-parity": "tsx scripts/test-coach-parity.ts",
     "test:coach-texting": "tsx scripts/test-coach-texting.ts",
+    "test:break-inline": "tsx scripts/test-break-inline.ts",
     "test:coach-promises": "tsx scripts/test-coach-promises.ts",
     "test:app-tour": "tsx scripts/test-app-tour.ts",
     "test:overlay-artifacts": "tsx scripts/test-overlay-artifacts.ts",

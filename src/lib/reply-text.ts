@@ -14,11 +14,12 @@ export const ACTION_TAG_RE = /\[ACTION:\s*.*?\]/gi
 export const QUICK_REPLIES_RE = /\[QUICK_REPLIES:\s*(.*?)\]/gi
 /** A lesson the coach taught this turn (coach-lessons.ts): the app keeps the record, she never sees the marker. */
 export const LESSON_MARK_RE = /\[LESSON:\s*[a-z0-9-]*\s*\]/gi
-const BREAK_TAG_RE = /^[ \t]*\[BREAK\][ \t]*$/gim
+const BREAK_TAG_RE = /\s*\[BREAK\]\s*/gi
 
-/** A [BREAK] line is a paragraph break, never a word. */
+/** A [BREAK] is a paragraph break, never a word, wherever the model put it: alone on a line, or mid-sentence
+ *  (seen live 15 Nov 2026: three of them printed inside one paragraph). */
 export function applyMessageBreaks(text: string): string {
-  return text.replace(BREAK_TAG_RE, '\n')
+  return text.replace(BREAK_TAG_RE, '\n\n')
 }
 
 /** The reply with every app marker removed, trimmed. */

@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [x] **"[BREAK]" PRINTED INSIDE A COACH REPLY, FIXED** (15 Nov 2026, his screenshot and "Yes, build it"). The coach splits a
+  reply into texts with a [BREAK] marker; the app and the coach server removed it only when it sat ALONE on its line, so
+  three inline ones showed as words mid-paragraph. The voice pass's own shape check already read an inline marker as a
+  line break, so it let the reply through. Now a [BREAK] anywhere becomes a paragraph gap, in both copies of
+  `reply-text` (app and server), case-insensitive. NOT established: whether the first draft or the second-pass edit
+  wrote them inline (no transcript here). `test:break-inline` (14 checks; the old line-only rule as a mutant of each
+  copy: caught, 6 and 5 failures). Also green: coach-texts-you, coach-lessons, coach-texting, voice-pass, chat-groups,
+  no-dead-code, bundle, `verify:chat-bubbles`; `tsc` clean. NOT driven: an inline break rendered on a real chat screen
+  (the function every render path uses is held directly). Needs the `chat-gemini` deploy so the phone and saved replies
+  get it; the app half ships on merge.
+
 - [x] **HIS LIVE-TEST BATCHES 2 AND 3 (Priya and his own phone), BUILT ON "BUILD IT", WITH HIS NINE RULINGS** (14-15 Nov
   2026). Pushed on his "Push it", merged to `main` on his "Merge" (15 Nov 2026); nothing deployed.
   PRE-MERGE SWEEP, 576 checks on 91d9da0e: 569 passed. Three need a live database (meal-quality, schema-parity, rls);
