@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **THE WEEK-BALANCE STEP NEVER ADDS SETS TO AN EXERCISE SHE SWAPPED AWAY (15 Nov 2026, CSCS, mine; the coeliac
+  nurse swapped a floor press out for her sore shoulder and the card said "I'll also add 2 sets of floor press on
+  Wednesday")**. The step that keeps pressing and pulling in proportion took the first press it found. A swapped slot
+  already remembers what it replaced, so any exercise swapped away this week is now never given more sets anywhere in
+  the week; the pressing comes from another press, and the card says which. Less of it is still allowed. BASIS: a
+  lift swapped out for discomfort is the one place extra volume is least wanted; the balance itself still holds.
+  REVIEW: training effect kept (the week still balances), takes nothing away, patterns and floors unchanged, in
+  scope. New plans are unaffected (nothing is "swapped" at generation, so the quality grid cannot move). NOT DONE,
+  named: a REMOVED exercise leaves no marker, so the same step can still top it up elsewhere; and a lift a temporary
+  ease-off now flags is not checked here. VERIFIED: `test:balance-swapped-away` (5 checks, 3 mutations caught, its
+  fixture proved to bind: with nothing swapped the floor press IS the one topped up); `test:edit-keeps-the-bar`,
+  `test:session-edit`, `test:swap-target`, `test:replacement-prescription`, `test:block-swap-reach` pass.
 - [x] **THE COACHES NEVER PROMISE DAYS THAT FOLLOW A ROTA (15 Nov 2026, the night-shift nurse was told her plan would
   flex around her shifts; nothing in the app does that)**. Both coaches' instructions now say training days are fixed
   weekdays: the chat coach offers what exists (move one session, or change the standing days) and the setup coach helps

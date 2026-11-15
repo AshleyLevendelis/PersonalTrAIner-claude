@@ -4949,6 +4949,13 @@ function enforceWeeklyPatternBalance(
   opts: { keepPulling?: boolean } = {},
 ): void {
   const trainingDays = days.filter(d => d.exercises.length > 0)
+  // NEVER TOP UP WHAT WAS SWAPPED AWAY (15 Nov 2026, CSCS; the coeliac nurse, sore shoulder): she swapped out a floor
+  // press and the card offered "I'll also add 2 sets of floor press on Wednesday", because both bumps below take the
+  // first press they find. A swapped slot keeps the name it replaced (`swapped_for`), so any exercise this week was
+  // swapped AWAY from is never given more sets anywhere in it. Trimming it is still allowed: less of it is no harm.
+  const swappedAway = new Set(
+    days.flatMap(d => d.exercises.map(ex => ex.swapped_for?.toLowerCase()).filter((n): n is string => !!n)),
+  )
 
   function patternSetTotal(pattern: 'push' | 'pull'): number {
     let total = 0
@@ -4981,6 +4988,7 @@ function enforceWeeklyPatternBalance(
         if (role !== 'accessory' && role !== 'isolation') continue
         const ceiling = getRoleSetCeiling(role, false)
         const floor = getRoleSetFloor(role)
+        if (direction === 'up' && swappedAway.has(ex.name.toLowerCase())) continue
         if (direction === 'up' && ex.sets < ceiling && (dayMainSets === 0 || ex.sets + 1 <= dayMainSets)) return ex
         if (direction === 'down' && ex.sets > floor) return ex
       }
@@ -5074,6 +5082,7 @@ function enforceWeeklyPatternBalance(
         if (role !== 'accessory' && role !== 'isolation') continue
         const ceiling = getRoleSetCeiling(role, false)
         const floor = getRoleSetFloor(role)
+        if (direction === 'up' && swappedAway.has(ex.name.toLowerCase())) continue
         if (direction === 'up' && ex.sets < ceiling && (dayMainSets === 0 || ex.sets + 1 <= dayMainSets)) return ex
         if (direction === 'down' && ex.sets > floor) return ex
       }

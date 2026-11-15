@@ -287,6 +287,7 @@
     "test:pattern-tags": "tsx scripts/test-movement-pattern-tags.ts",
     "test:rehab-prescribed": "tsx scripts/test-rehab-prescribed.ts",
     "test:frozen-weeks": "tsx scripts/test-frozen-weeks.ts",
+    "test:balance-swapped-away": "tsx scripts/test-balance-swapped-away.ts",
     "test:short-session": "tsx scripts/test-short-session.ts",
     "measure:short-sessions": "tsx scripts/measure-short-sessions.ts",
     "test:session-length": "tsx scripts/test-session-length.ts",

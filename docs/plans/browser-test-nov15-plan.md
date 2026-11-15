@@ -298,6 +298,11 @@ Two read-only traces (code reading; her saved data was not visible). Causes, the
   (default 9pm-8am); setup doesn't ask; the coach can set it.
 - Style "Explosive & dynamic" offered to a beginner with a sore shoulder; no "get started / feel better" goal. Style
   filtering is mine (CSCS: not offered to a beginner); a new goal is HIS.
+  MEASURED 15 Nov 2026: a beginner's Functional plan holds almost no explosive work (7 of 362 week-2 slots across 18
+  profiles, five of them Leg Swings in the warm-up, two kettlebell swings; Hybrid 8 of 340), because the skill filter
+  already keeps plyometrics from beginners. So nothing is hidden and no plan changes. What is untrue is the WORDS: the
+  option's line says "Explosive & dynamic" to everyone. HIS (what the app says): reword it for all (for example
+  "Athletic movement & strength"), say something different to a beginner, or leave it.
 - Equipment asked twice and "Your kit" twice; near-duplicate notes; "Snacks too" assumed: mechanical.
 - Plate calculator for a dumbbell-only user: hidden without a barbell (mechanical).
 
