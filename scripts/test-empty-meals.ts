@@ -50,6 +50,12 @@ async function main() {
   await run('nurse-new')
   const fresh = await getPools('nurse-new') as Partial<Record<MealSlotName, unknown[]>>
   for (const s of ['breakfast', 'lunch', 'dinner', 'snack'] as MealSlotName[]) ok((fresh[s]?.length ?? 0) > 0, `${s} has dishes`, fresh[s]?.length ?? 0)
+  // DEEP ENOUGH TO VARY (15 Nov 2026): 16 vegan, gluten-free dishes with no tofu took her from 6 breakfasts, 3 lunches
+  // and 7 dinners to 7, 9 and 10 (measure:empty-meals); a week needs more than three lunches to differ.
+  for (const s of ['breakfast', 'lunch', 'dinner'] as MealSlotName[]) ok((fresh[s]?.length ?? 0) >= 7, `${s} has at least seven dishes, enough for a week to vary`, fresh[s]?.length ?? 0)
+  // ...and none carries a food made from one she avoids (avocado -> guacamole, oats -> granola).
+  const flat = JSON.stringify(fresh).toLowerCase()
+  ok(!/guacamole|granola|muesli|porridge/.test(flat), 'no dish carries guacamole, granola, muesli or porridge for someone avoiding avocado and oats')
 
   console.log('§2 A regenerate the writer could not refresh keeps what was saved (the 17 Sep rule)')
   db.meal_plan_slots ??= []

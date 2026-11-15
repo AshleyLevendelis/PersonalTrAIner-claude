@@ -2,6 +2,24 @@
 
 Newest first. One line each.
 
+- [x] **"AVOCADO" NOW KEEPS OUT GUACAMOLE, AND 16 VEGAN GLUTEN-FREE DISHES WITHOUT TOFU (the coeliac nurse, 15 Nov 2026;
+  Wave N-A)**. FOUND ON THE WAY, the real defect: Foods to avoid matched WORDS, so her "avocado" let through a taco
+  salad with guacamole, and "oats" would let through granola, muesli and porridge. A short list of foods always made
+  from another (avocado: guacamole; oats: granola, muesli, porridge, flapjack, oatcake; chickpeas: hummus, falafel,
+  gram flour; tomatoes: salsa, passata, ketchup; potatoes: french fries, hash brown, gnocchi) now counts as that food,
+  keyed so plurals reach it. Widening only, the safe direction for a filter; kept tight so it does not overshoot ("chips"
+  and "mash" left out: tortilla chips and mashed banana are not potato). One matcher, so generation, swaps, the coach's
+  reader and Profile all get it; no server copy exists. THEN THE DEPTH: her lunch needs about 7.6 g of protein per 100
+  kcal, and the library held 3 such lunches (lentil and chickpea dishes cannot reach it). 16 new dishes built on soy mince,
+  tempeh and edamame with rice, potato, quinoa, corn tortillas and gluten-free pasta (4 breakfasts, 8 lunches, 4
+  dinners), written raw or dry as bought, each verified for her and four other targets before it went in. MEASURED
+  (measure:empty-meals, writer off): her pools 6/3/7 breakfasts/lunches/dinners -> 7/9/10 (the avoid fix alone took
+  breakfasts to 3 and lunches to 1, correctly: oat dishes and the guacamole salad); vegan at 2000/150 lunch 33 -> 37,
+  dinner 35 -> 39; gluten-free and the rest unchanged within the pool's own noise. `test:enforcement-gaps` (+7 checks,
+  6 mutations caught), `test:empty-meals` (+4: at least seven a meal for her, none made from what she avoids; 3
+  mutations caught), `test:meal-library-depth` (its control excludes the new block too; 1 mutation caught); all 20
+  checks reading the library pass, and `verify:deep-pool`, `verify:meal-top-up`, `verify:empty-meals`,
+  `verify:meal-likes`. CHANGES WHAT AN AVOID MEANS: a profile avoiding tomatoes or potatoes now loses those dishes too.
 - [x] **SETUP: KIT ASKED ONCE, ONE "YOUR KIT" ROW, AN UNASKED SNACK SAID TO BE ONE (the coeliac nurse's test, 15 Nov
   2026; Wave N-C, mechanical)**. (1) She said "only dumbbells" and was then shown the nine kit ticks: an "only:"
   statement in her own words is her whole kit, which is what the ticks ask, so the ticks are not asked after one (a

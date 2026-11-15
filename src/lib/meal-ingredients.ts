@@ -117,6 +117,14 @@ const WORD_EXPANSIONS: Record<string, string[]> = {
   'red meat': ['beef', 'lamb', 'pork', 'mutton', 'venison', 'veal', 'gammon', 'bacon', 'steak', 'mince'],
   'spicy': ['chilli', 'chili', 'jalapeno', 'cayenne', 'sriracha', 'harissa', 'paprika', 'hot sauce'],
   'spicy food': ['chilli', 'chili', 'jalapeno', 'cayenne', 'sriracha', 'harissa', 'paprika', 'hot sauce'],
+  // A FOOD MADE FROM THE ONE AVOIDED, under another name (15 Nov 2026, the coeliac nurse: "avocado" on her foods to
+  // avoid, and a taco salad with guacamole passed). Only foods that are always made from it; keyed singular, so
+  // "oats", "chickpeas", "tomatoes" and "potatoes" reach them too.
+  'avocado': ['guacamole'],
+  'oat': ['granola', 'muesli', 'porridge', 'flapjack', 'oatcake'],
+  'chickpea': ['hummus', 'houmous', 'falafel', 'gram flour'],
+  'tomato': ['salsa', 'passata', 'ketchup'],
+  'potato': ['french fries', 'hash brown', 'gnocchi'],
 }
 
 /**

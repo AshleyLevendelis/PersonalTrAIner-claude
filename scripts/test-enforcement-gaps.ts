@@ -129,6 +129,16 @@ console.log('\n3. Foods to avoid: what the user means is what is matched (§2.3)
   check('"dairy" does NOT catch butternut squash', !caught('dairy', 'butternut squash'))
   check('"gluten" does NOT catch rice noodles', !caught('gluten', 'rice noodles cooked'))
 
+  // A FOOD MADE FROM THE ONE AVOIDED (15 Nov 2026, the coeliac nurse: avocado avoided, guacamole served).
+  check('"avocado" finds guacamole', caught('avocado', 'guacamole'))
+  check('"oats" finds granola and porridge', caught('oats', 'granola') && caught('oats', 'porridge'))
+  check('"chickpeas" finds hummus and falafel', caught('chickpeas', 'hummus') && caught('chickpeas', 'falafel'))
+  check('"tomatoes" finds salsa and passata', caught('tomatoes', 'salsa') && caught('tomatoes', 'tomato passata'))
+  check('"potatoes" finds gnocchi and french fries', caught('potatoes', 'gnocchi') && caught('potatoes', 'french fries'))
+  check('...and does not overshoot: "potatoes" keeps tortilla chips and a stir-fry, "oats" keeps rice', !caught('potatoes', 'tortilla chips') && !caught('potatoes', 'Vegetable stir-fries') && !caught('oats', 'white rice cooked'))
+  check('...and the dish is refused, not only the food: a taco salad with guacamole for someone avoiding avocado',
+    containsPhrase('Soy mince taco salad', ['soy mince', 'black beans', 'salsa', 'guacamole'], 'avocado'))
+
   // The stated limit stays stated: still not a synonym engine.
   check('"almond butter" still does not become "almonds" — the documented limit',
     !caught('almond butter', 'almonds'))

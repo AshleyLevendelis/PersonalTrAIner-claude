@@ -63,7 +63,12 @@ async function main() {
   const deepBlock = deepStart >= 0 && deepEnd > deepStart ? src.slice(deepStart, deepEnd) : ''
   const deepNames = new Set([...deepBlock.matchAll(/d\("(?:breakfast|lunch|dinner|snack)", "((?:[^"\\]|\\.)*)"/g)].map(m => JSON.parse(`"${m[1]}"`) as string))
   check('the deep-pool block is found and holds the 360 dishes added on 9 Nov 2026', deepNames.size === 360 && MEAL_LIBRARY.filter(d => deepNames.has(d.name)).length === 360, deepNames.size)
-  const before = await libraryDepth({ library: MEAL_LIBRARY.filter(d => !names.has(d.name) && !deepNames.has(d.name)) })
+  // ...and the 16 vegan, gluten-free dishes added on 15 Nov 2026 (VEGAN_GLUTEN_FREE), for the same reason.
+  const vgStart = src.indexOf('const VEGAN_GLUTEN_FREE: RawProposal[] = [')
+  const vgEnd = vgStart < 0 ? -1 : src.indexOf('\n]\n', vgStart)
+  const vgNames = new Set([...(vgStart >= 0 && vgEnd > vgStart ? src.slice(vgStart, vgEnd) : '').matchAll(/d\('(?:breakfast|lunch|dinner|snack)', '([^']+)'/g)].map(m => m[1]))
+  check('the vegan, gluten-free block is found and holds its 16 dishes', vgNames.size === 16 && MEAL_LIBRARY.filter(d => vgNames.has(d.name)).length === 16, vgNames.size)
+  const before = await libraryDepth({ library: MEAL_LIBRARY.filter(d => !names.has(d.name) && !deepNames.has(d.name) && !vgNames.has(d.name)) })
   const thinBefore = before.flatMap(r => Object.entries(r.depth).filter(([, n]) => n < 7).map(([slot, n]) => `${r.target} ${r.diet} ${slot} ${n}`))
   check('without them at least 20 meals fall under seven (measured 32), so the pass above is the dishes, not a blind walk', thinBefore.length >= 20, thinBefore.length)
   check('...and the vegan lunch is among them at every target (measured 2-4)', ['1700kcal/135g', '2000kcal/150g', '2300kcal/160g', '2700kcal/170g', '3100kcal/180g', '3040kcal/160g'].every(t => thinBefore.some(x => x.startsWith(`${t} vegan lunch `))), thinBefore.filter(x => x.includes('vegan lunch')))
