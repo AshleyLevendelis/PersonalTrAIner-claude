@@ -108,4 +108,21 @@ await section(5, 'Bodyweight only, he ticks a pull-up bar: that is kept', async 
   check('5a. the bar he ticked is kept', JSON.stringify(draft?.values?.kitTicks) === '["pull_up_bar"]', draft?.values?.kitTicks)
 })
 
+await section(6, 'Her whole kit already said ("only dumbbells"): the ticks are not asked again (15 Nov 2026)', async () => {
+  await send('Page.navigate', { url: `${origin}/?state=kit-said&load=6` })
+  await wait(1800)
+  check('6a. no kit card on screen after she said her kit', (await evj(`document.querySelectorAll('[data-slot-card="kitTicks"]').length`)) === 0)
+  // The coach asks for the ticks anyway: the app refuses the card for a question that no longer applies.
+  await ev(`window.__onbQueue.push(${JSON.stringify({ reply: 'Which of these do you have?', actions: [{ name: 'present_slot', args: { slot_key: 'kitTicks' } }] })})`)
+  await tapEl(`document.querySelector('.ob-composer-fade input')`, 'the composer')
+  await send('Input.insertText', { text: 'ok' })
+  await wait(120)
+  await tapEl(`document.querySelector('button:has(svg.lucide-send)')`, 'the send button')
+  await wait(1500)
+  check('6b. the coach asking for the ticks gets no card', (await evj(`document.querySelectorAll('[data-slot-card="kitTicks"]').length`)) === 0)
+  const draft = await evj(`JSON.parse(localStorage.getItem('fitplan_onboarding_draft') || 'null')`)
+  check('6c. what she said is what is kept', draft?.values?.kitList === 'only: dumbbells' && draft?.values?.kitTicks == null, draft?.values)
+  await shot('said')
+})
+
 finish('Setup shows the kit once, and keeps what he ticks.')

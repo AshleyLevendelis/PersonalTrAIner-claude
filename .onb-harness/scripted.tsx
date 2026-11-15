@@ -202,6 +202,23 @@ if (state === 'kit') {
   ))
 }
 
+if (state === 'kit-said') {
+  // THE WHOLE KIT ALREADY SAID (15 Nov 2026, the coeliac nurse): equipment answered and "only dumbbells" recorded from
+  // her own words. The ticks would ask what she just said, so they are not asked; the coach asking anyway is refused.
+  const { trainingDays: _a, sessionDuration: _b, trainingStyle: _c, conditioningPreference: _d, kitTicks: _e, ...before } = SAM_SO_FAR
+  void _a; void _b; void _c; void _d; void _e
+  const said = { ...before, kitList: 'only: dumbbells' }
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Sam, and I only have dumbbells' },
+      { role: 'assistant', content: 'Got it, dumbbells only.' },
+    ],
+    said,
+    Object.keys(said),
+  ))
+}
+
 if (state === 'review' || state === 'review-card' || state === 'review-notes') {
   // Everything the plan needs is answered, so the review opens by itself —
   // the component's own effect, not a flag set here.

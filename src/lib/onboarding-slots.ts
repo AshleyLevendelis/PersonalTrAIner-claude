@@ -898,6 +898,16 @@ const KIT_TICK_ICONS: Record<KitItem, string> = {
 /** The nine kit items as tick options, in the words Profile's ticks use. */
 const KIT_TICK_OPTIONS: readonly SlotOption[] = KIT_ITEMS.map(item => ({ value: item, icon: KIT_TICK_ICONS[item], label: KIT_ITEM_LABELS[item] }))
 
+/**
+ * THE TICKS ARE NOT ASKED AGAIN WHEN THEY ALREADY LISTED THEIR WHOLE KIT (15 Nov 2026, the coeliac nurse: she said
+ * "only dumbbells" and was then shown the nine ticks, "equipment asked twice"). An "only:" statement in their own words
+ * is the whole kit, which is what the ticks ask; the plan is built from it (kitStatementsFromSetup) and Profile's ticks
+ * change it later. A "has:" or "hasnt:" statement says one thing, so the ticks are still shown, starting from it.
+ */
+function kitTicksAsked(values: OnboardingSlotValues): boolean {
+  return picksHomeKit(values) && saidKit(values)[0]?.mode !== 'only'
+}
+
 /** What the kit statement they VOLUNTEERED says, if any (the kitList slot). */
 function saidKit(values: OnboardingSlotValues): KitStatement[] {
   const s = parseKitSlot(values.kitList)
@@ -964,7 +974,7 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'injuries', question: 'Anything that bothers you when you train, or anything a doctor has said to watch?', inputHint: 'Anything that bothers you?', shortLabel: 'Injuries and health', control: 'multi', required: false, options: INJURY_CARD_OPTIONS, destination: 'column', validate: isSubsetOf(INJURY_CARD_OPTIONS) },
   // AFTER injuries, which must stay in the opening block (her ruling: the only question whose absence can hurt),
   // and still right behind equipment: the ticks start from that answer (picksHomeKit, defaultKitTicks).
-  { key: 'kitTicks', question: 'Which of these do you have?', inputHint: 'Tick everything you have', shortLabel: 'Your kit', control: 'multi', required: false, requiredIf: picksHomeKit, options: KIT_TICK_OPTIONS, destination: 'user_facts', validate: isSubsetOf(KIT_TICK_OPTIONS) },
+  { key: 'kitTicks', question: 'Which of these do you have?', inputHint: 'Tick everything you have', shortLabel: 'Your kit', control: 'multi', required: false, requiredIf: kitTicksAsked, options: KIT_TICK_OPTIONS, destination: 'user_facts', validate: isSubsetOf(KIT_TICK_OPTIONS) },
   { key: 'knowsWorkingLifts', question: 'Do you know what you lift on the barbell back squat, bench press and deadlift?', inputHint: 'Do you know your numbers?', shortLabel: 'Working lifts', control: 'single', required: false, requiredIf: willBeLiftingBarbells, options: KNOWS_LIFTS_OPTIONS, destination: 'column', validate: v => v === true || v === false || v === 'true' || v === 'false' },
   // Only meaningful once someone has said they DO know their numbers.
   { key: 'knownSquatKg', question: liftSetQuestion('back squat'),

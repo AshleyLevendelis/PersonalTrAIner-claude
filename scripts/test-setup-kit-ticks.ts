@@ -45,6 +45,17 @@ async function main() {
     && unconfirmedOptionalSlots(new Set(['equipment']), v({ equipment: 'minimalist' })).includes('kitTicks')
     && !unconfirmedOptionalSlots(new Set(['equipment', 'kitTicks']), v({ equipment: 'minimalist', kitTicks: ['dumbbells'] })).includes('kitTicks'))
 
+  // NOT ASKED AGAIN AFTER THE WHOLE KIT WAS SAID (15 Nov 2026, the coeliac nurse: "only dumbbells", then the ticks).
+  check('"only: dumbbells" said: the ticks are not asked, and the plan is built from what was said',
+    !!def && !isSlotApplicable(def, v({ equipment: 'minimalist', kitList: 'only: dumbbells' }))
+    && !unconfirmedOptionalSlots(new Set(['equipment', 'kitList']), v({ equipment: 'minimalist', kitList: 'only: dumbbells' })).includes('kitTicks')
+    && JSON.stringify(kitStatementsFromSetup(v({ equipment: 'minimalist', kitList: 'only: dumbbells' }))) === JSON.stringify([{ mode: 'only', items: ['dumbbells'] }]),
+    kitStatementsFromSetup(v({ equipment: 'minimalist', kitList: 'only: dumbbells' })))
+  check('"has: bench" or "hasnt: bands" says one thing, so the ticks are still asked', !!def && isSlotApplicable(def, v({ equipment: 'minimalist', kitList: 'has: bench' })) && isSlotApplicable(def, v({ equipment: 'home_gym', kitList: 'hasnt: bands' })))
+  const onbSrc = strip(readFileSync('src/components/onboarding/ConversationalOnboarding.tsx', 'utf8'))
+  check('the summary shows one "Your kit" row: the said kit is not a second row where the ticks apply', /\.filter\(s => !\(s\.key === 'kitList' && isSlotApplicable\(getSlotDef\('kitTicks'\)!, values\)\)\)/.test(onbSrc))
+  check('an unasked snack answer is said to be one on the summary', /def\.key === 'includeSnacks' && !confirmed\.has\('includeSnacks'\) \? ' \(not asked, tap to change\)' : ''/.test(onbSrc))
+
   console.log('\n2. The ticks start as Profile\'s would')
   check('minimalist: the guess, exactly as Profile ticks it', JSON.stringify(defaultKitTicks(v({ equipment: 'minimalist' }))) === JSON.stringify(kitItemsFor({ equipment_access: 'minimalist' })) && JSON.stringify(defaultKitTicks(v({ equipment: 'minimalist' }))) === JSON.stringify(TIER_KIT_ITEMS.minimalist), defaultKitTicks(v({ equipment: 'minimalist' })))
   check('...with anything already said applied ("only: dumbbells, bench")', JSON.stringify(defaultKitTicks(v({ equipment: 'minimalist', kitList: 'only: dumbbells, bench' }))) === JSON.stringify(['dumbbells', 'bench']), defaultKitTicks(v({ equipment: 'minimalist', kitList: 'only: dumbbells, bench' })))

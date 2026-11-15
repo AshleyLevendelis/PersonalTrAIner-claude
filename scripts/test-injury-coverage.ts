@@ -294,7 +294,9 @@ console.log('\n5. How MUCH each injury removes, frozen')
     //   hips       30->34  Kettlebell Deadlift, Reverse Lunge (Bodyweight), Lateral Lunge (Bodyweight), Copenhagen Plank
     //   ankles     27->29  Reverse Lunge (Bodyweight), Lateral Lunge (Bodyweight)
     //   elbows     27->28  Close-Grip Push-Ups (the narrow hand position)
-    lower_back: 34, knees: 50, shoulders: 87, neck: 9, wrists: 42,
+    // 15 Nov 2026, his ruling "Allow it, lighter" (docs/plans/knee-loaded-work.md): machine leg work stays for a knee
+    //   knees      50->47  Leg Press, Hack Squat, Seated Leg Curl (priced one step lighter instead)
+    lower_back: 34, knees: 47, shoulders: 87, neck: 9, wrists: 42,
     hips: 34, ankles: 29, elbows: 28,
   }
   const drift: string[] = []

@@ -2423,6 +2423,9 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                   .filter(s => isSlotRequired(s, values) || confirmed.has(s.key) || s.key === 'includeSnacks')
                   // The date of birth is never a row (its own slot says so): the AGE row is it, and opens the picker.
                   .filter(s => s.key !== 'dateOfBirth')
+                  // ONE "Your kit" row (15 Nov 2026, the coeliac nurse saw two): where the ticks apply they already
+                  // start from what was said, so the said statement is not a second row.
+                  .filter(s => !(s.key === 'kitList' && isSlotApplicable(getSlotDef('kitTicks')!, values)))
                   // 44px TALL, a thumb's height (QA round 3, 8 Nov 2026): the rows were 32px and touch each other, so an
                   // invisible tap area would land on the neighbour; the row itself grows instead.
                   .map(def => (
@@ -2438,6 +2441,8 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
                     <span className="font-medium text-foreground">{def.shortLabel}:</span>{' '}
                     <span className="text-muted-foreground">
                       {isDeclined(def.key, values, confirmed) ? 'Not given' : displaySlotValue(def, values)}
+                      {/* A DEFAULT IS SAID TO BE ONE (15 Nov 2026, the coeliac nurse: "Snacks too" read as her answer). */}
+                      {def.key === 'includeSnacks' && !confirmed.has('includeSnacks') ? ' (not asked, tap to change)' : ''}
                     </span>
                   </button>
                 ))}

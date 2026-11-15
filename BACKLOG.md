@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **SETUP: KIT ASKED ONCE, ONE "YOUR KIT" ROW, AN UNASKED SNACK SAID TO BE ONE (the coeliac nurse's test, 15 Nov
+  2026; Wave N-C, mechanical)**. (1) She said "only dumbbells" and was then shown the nine kit ticks: an "only:"
+  statement in her own words is her whole kit, which is what the ticks ask, so the ticks are not asked after one (a
+  "has:" or "hasnt:" statement says one thing, so they still are); the coach asking anyway gets no card (a question
+  that no longer applies is refused); the plan is built from what she said, and Profile's ticks change it later. His
+  18 Oct "Show ticks once" still holds: they are shown once, unless she already answered them in words. (2) The
+  summary listed "Your kit" twice (the ticks and the said statement); where the ticks apply, the said statement is not
+  a second row. (3) "Snacks: Snacks too" read as her answer; when nobody asked, the row reads "Snacks too (not asked,
+  tap to change)". NOT done, named: no yoga-mat tick (a mat changes no exercise the app prescribes, so it would be a
+  tick that does nothing); three near-duplicate notes in "What I'll remember" (the memory de-duplication in Wave 6).
+  `test:setup-kit-ticks` 23 -> 27 checks, 5 mutations caught; `verify:setup-kit` 14 -> 17 (a coach asking for the
+  ticks after "only dumbbells" gets no card), 1 mutation caught; `verify:onboarding-turns` re-anchored on the snack
+  row's new words. ALSO FOUND, NOT MINE: `report:slot-impact` fails the same with or without this change (four newer
+  slots never measured: startPreference, kitTicks, runningGoal, enjoyedActivities); it is not in the gate list.
 - [x] **"REGENERATE ALL" ASKS FIRST (the coeliac nurse's test, 15 Nov 2026; Wave N, mechanical in the plan)**. One tap
   replaced the app's meals for every day with no word. The tap now opens a question in place: "Make new meals for every
   day? The app's own meals are replaced. Meals you hearted or asked for stay, and so do your meals out and what you've

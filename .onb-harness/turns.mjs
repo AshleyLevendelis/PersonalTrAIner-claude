@@ -441,8 +441,9 @@ await section(12, 'L5 — "3 meals and one snack" records the snack and says so'
 
   await open('review')
   const rows = (await review()).rows
-  check('the summary lists snacks even when nobody mentioned them, because the plan includes one by default',
-    rows.includeSnacks === 'Snacks: Snacks too', rows.includeSnacks)
+  // ...AND SAYS IT WAS NOT ASKED (15 Nov 2026, the coeliac nurse read the default as her own answer).
+  check('the summary lists snacks even when nobody mentioned them, because the plan includes one by default, and says it was not asked',
+    rows.includeSnacks === 'Snacks: Snacks too (not asked, tap to change)', rows.includeSnacks)
 })
 
 await section(13, 'L6 — one sentence saves one goal', async () => {

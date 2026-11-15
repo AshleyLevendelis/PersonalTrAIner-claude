@@ -1999,7 +1999,7 @@ export const FLAGGED_JOINT_LOAD_FACTOR = 0.8
  */
 const LOAD_EASED_JOINTS = new Set(['knee'])
 
-export function flaggedJointLoadFactor(entry: ExerciseEntry, profile: Pick<UserProfile, 'injuries'>): number {
+function flaggedJointLoadFactor(entry: ExerciseEntry, profile: Pick<UserProfile, 'injuries'>): number {
   const flagged = new Set((profile.injuries ?? []).flatMap(code => INJURED_JOINTS[code] ?? []).filter(j => LOAD_EASED_JOINTS.has(j)))
   if (flagged.size === 0) return 1
   if ((entry.indicated_joints ?? []).some(j => flagged.has(j))) return 1
