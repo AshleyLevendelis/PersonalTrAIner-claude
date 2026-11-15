@@ -134,6 +134,15 @@ console.log('\n2. Calibration is named only where the plan actually calibrates')
     laterFirstWeeks.map(w => ({ week: w.week_number, role: weekRole(w).key })))
 }
 
+console.log('\n2c. A base block has no peak (Marcus, 15 Nov 2026)')
+{
+  const all = PLANS.flatMap(([, plan]) => plan)
+  const aaThird = all.filter(w => /anatomical adaptation/i.test(w.phase_label ?? '') && !w.is_deload && !w.isCalibrationWeek && (w.week_in_block ?? ((w.week_number - 1) % 4) + 1) === 3)
+  const laterThird = all.filter(w => !/anatomical adaptation/i.test(w.phase_label ?? '') && !w.is_deload && !w.isCalibrationWeek && (w.week_in_block ?? ((w.week_number - 1) % 4) + 1) === 3)
+  check('week 3 of an Anatomical Adaptation block reads "Building", never "Peak"', aaThird.length > 0 && aaThird.every(w => weekRole(w).label === 'Building'), aaThird.map(w => weekRole(w).label))
+  check('...while week 3 of every other block still reads "Peak"', laterThird.length > 0 && laterThird.every(w => weekRole(w).label === 'Peak'), laterThird.slice(0, 4).map(w => [w.phase_label, weekRole(w).label]))
+}
+
 console.log('\n3. The strip and the paragraph say the same thing about a week')
 {
   // THE POINT OF THIS GATE. weekRole takes its vocabulary from the note that

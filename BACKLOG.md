@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **NO "PEAK" IN A BASE BLOCK (Marcus, 15 Nov 2026; Wave M-C9; CSCS, mine)**. Block 1, "Calibration / Anatomical
+  Adaptation", labelled its weeks Building, Peak, Deload. BASIS: anatomical adaptation is an accumulation phase at
+  moderate loads to prepare tendon and connective tissue for the blocks after it (the app's own block note says so:
+  "Do not rush it"); its third week is more of the same, not a heaviest effort, and "Peak" told him to push in the one
+  block built to hold back. Week 3 of that phase now reads "Building"; every other block keeps "Peak". Label only: no
+  load, set or rep changes (CSCS review: no training effect, nothing taken away, no floor moved, in scope).
+  `test:block-phases` +2 checks (2 mutations caught); `test:program-calendar`, `verify:program-calendar`,
+  `verify:program-titles` pass. ALSO: the first-paint budget crossed at 588 of 588 after today's fixes and moved to
+  596 (8 kB over the measured value, the file's own rule); the deploy re-download has 3 kB left and will be next.
 - [x] **THE "LOG SET" BUTTON FOLLOWS WHAT HE IS DOING (Marcus, 15 Nov 2026; Wave M-D1, part)**. It still said "Log
   warm-up 1 · Bench 20 kg × 8" after he had logged his working sets, because it offered the first open set and a
   warm-up he skipped stayed first. It now offers the first open set AFTER the last one he logged (inside the lift

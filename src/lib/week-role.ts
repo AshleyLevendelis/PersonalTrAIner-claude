@@ -63,13 +63,18 @@ function positionInBlock(week: Pick<MesocycleWeek, 'week_in_block' | 'week_numbe
  * matters: telling someone to push on a week designed for them to back off.
  */
 export function weekRole(
-  week: Pick<MesocycleWeek, 'week_number' | 'week_in_block' | 'is_deload' | 'isCalibrationWeek'>,
+  week: Pick<MesocycleWeek, 'week_number' | 'week_in_block' | 'is_deload' | 'isCalibrationWeek'> & Partial<Pick<MesocycleWeek, 'phase_label'>>,
 ): WeekRole {
   if (week.is_deload) return { key: 'deload', label: 'Deload' }
   if (week.isCalibrationWeek) return { key: 'calibration', label: 'Calibration' }
   switch (positionInBlock(week)) {
     case 1: return { key: 'baseline', label: 'Baseline' }
     case 2: return { key: 'building', label: 'Building' }
+    // A BASE BLOCK HAS NO PEAK (Marcus, 15 Nov 2026: "Peak" in a "Calibration / Anatomical Adaptation" block read as
+    // a contradiction). CSCS (mine): anatomical adaptation accumulates work at moderate loads to prepare tissue for
+    // the blocks after it; its third week is more of the same, not a heaviest effort, so it is still "Building".
+    case 3: if (/anatomical adaptation/i.test(week.phase_label ?? '')) return { key: 'building', label: 'Building' }
+      return { key: 'peak', label: 'Peak' }
     // Week 3 is the block's heaviest working sets. Anything past 3 that is not
     // flagged as a deload should not exist, and reading as "Peak" is the safe
     // way to be wrong: it never tells someone a hard week is an easy one.
