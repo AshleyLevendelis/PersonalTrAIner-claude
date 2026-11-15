@@ -5050,7 +5050,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       preconditions: { paused: pausedNow },
       payload: { pause },
       diff: {
-        lead: pause ? PAUSE_WORDS.offerPause : PAUSE_WORDS.offerResume,
+        lead: ask(pause ? PAUSE_WORDS.offerPause : PAUSE_WORDS.offerResume),
         rows: [{ field: 'Plan', before: pause ? 'Running' : 'Paused', after: pause ? 'Paused from today' : 'Running from today' }],
         unchanged: [PAUSE_WORDS.unchanged],
         rationale: typeof rawArgs.origin_verbatim_quote === 'string' ? rawArgs.origin_verbatim_quote : undefined,

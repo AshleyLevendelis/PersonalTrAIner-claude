@@ -880,7 +880,7 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
   } else if (declaredToday === 'paused' && !done) {
     // THE PLAN IS PAUSED (his ruling 14 Nov 2026, "Add a pause"): nothing is due, so Home offers nothing to start.
     title = PAUSE_WORDS.card
-    sub = 'Nothing is due while it is paused. Resume from Profile or by asking the coach.'
+    sub = 'Nothing is due while it is paused. Resume from Profile, or ask in the chat.'
     right = weekCount
   } else if (declaredToday && !done) {
     title = declaredToday === 'missed' ? 'Marked missed' : 'Rest day, your choice'

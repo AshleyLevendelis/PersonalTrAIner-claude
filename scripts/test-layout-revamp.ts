@@ -100,7 +100,8 @@ console.log('\n3. Home\'s finished day')
   check('the Done panel keeps the lift line (L9: what she lifted, today)',
     /<span data-testid="home-session-glance">\{sessionGlance\}<\/span>/.test(own) && /right = done\s*\?/.test(own)
     // 5 since 10 Nov 2026: a day said missed or rested today has its own branch, which excludes a finished day like the rest.
-    && branches.length === 5 && branches.every(b => !/(^|[^!])\bdone\b/.test(b)), { branches })
+    // 6 since 14 Nov 2026: a paused plan (his "Add a pause") has its own branch, which excludes a finished day too.
+    && branches.length === 6 && branches.every(b => !/(^|[^!])\bdone\b/.test(b)), { branches })
   check('...and offers the summary only when there is one',
     /onSummary=\{card \? \(\) => setSummaryOpen\(true\) : undefined\}/.test(dash) && /\{onSummary && \([\s\S]{0,200}data-home-summary/.test(hero) && /\{done && \([\s\S]{0,900}\{onSummary && \(/.test(hero))
   const store = new Map<string, string>()

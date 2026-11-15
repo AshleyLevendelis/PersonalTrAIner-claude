@@ -244,7 +244,7 @@ console.log('\n13. After a red flag the app parks the session and goes quiet (hi
   check('no reminder while the quiet holds, on the phone\'s server and in the app alike; one again after it',
     [appMoments, serverMoments].every(m => m.momentsToRaise(F as never, quiet as never, t0 + h).length === 0 && m.momentsToRaise(F as never, quiet as never, t0 + 49 * h).length > 0))
   check('...and the server and the chat both hand it the time', /momentsToRaise\(facts, profile\.settings, deps\.now\.getTime\(\)\)/.test(read('supabase/functions/_shared/reach-out.ts'))
-    && /momentsToRaise\(facts, reminderSettings, now\)/.test(read('src/components/ChatAssistant.tsx')))
+    && /momentsToRaise\(facts, \{ \.\.\.reminderSettings, plan_paused_since: profile\.plan_paused_since \?\? null \}, now\)/.test(read('src/components/ChatAssistant.tsx')))
   const base = { now: t0 + h, today: '2026-11-14', cap: 3, unpromptedToday: 0, lastUnpromptedAt: 0, momentsSaidToday: [], said: [], greeting: 'Hey Priya',
     event: { kind: 'due', text: 'Ready for your session?', chips: [], keys: ['due:x'] } as never, hello: () => ({ text: 'Hey Priya — morning!', chips: [] }), moments: [] }
   const checkIn = { text: RED_FLAG_WORDS.checkin('Hey Priya'), chips: RED_FLAG_WORDS.checkinChips, key: 'red-flag-checkin:1' }

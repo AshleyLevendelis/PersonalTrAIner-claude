@@ -448,7 +448,9 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 12 Nov 2026: 1411 -> 1423, the Nutrition Week screens; measured 1386 before and 1398 after.
   // MOVED 13 Nov 2026: 1423 -> 1450, strategy slices 1-3; measured 1419 before slice 3 and 1425 after.
   // MOVED 13 Nov 2026: 1450 -> 1473, strategy slice 6 (running); measured 1434 before and 1448 after.
-  const APP_CHUNK_BUDGET_KB = 1473
+  // MOVED 15 Nov 2026: 1473 -> 1480, his 14 Nov rulings (the pause, the red flag's quiet, the dislike ask, the moved session kept,
+  // odd reps); measured 1466 on the branch before them and 1473.x after.
+  const APP_CHUNK_BUDGET_KB = 1480
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,

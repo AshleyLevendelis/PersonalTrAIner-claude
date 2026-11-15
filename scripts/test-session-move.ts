@@ -234,7 +234,7 @@ check('the hook reads both ends of a move, not only the in-window origins',
   /getSessionMovesInRange\(profileId, from, to\)/.test(hook))
 check('...and one failing read cannot blank the whole strip',
   /getSessionMovesInRange\(profileId, from, to\)\.catch\(/.test(hook))
-check('...and hands the moves to classifyDay', /classifyDay\([^)]*, moves\)/.test(hook))
+check('...and hands the moves to classifyDay', /classifyDay\([^)]*, moves(, pausedSince)?\)/.test(hook))
 
 // A MOVED SESSION LEAVES TODAY. The first version kept it on screen under a
 // banner with "It's still here if you want it today", copying the swapped
