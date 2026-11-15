@@ -18,7 +18,7 @@ import { implausibleLifts } from './lift-plausibility'
 
 export type FirstLiftKey = 'known_squat_kg' | 'known_bench_kg' | 'known_deadlift_kg'
 
-export const FIRST_LIFTS: { key: FirstLiftKey; label: string; catalogue: string }[] = [
+const FIRST_LIFTS: { key: FirstLiftKey; label: string; catalogue: string }[] = [
   { key: 'known_squat_kg', label: 'Barbell back squat', catalogue: 'Barbell Squats' },
   { key: 'known_bench_kg', label: 'Barbell bench press', catalogue: 'Barbell Bench Press' },
   { key: 'known_deadlift_kg', label: 'Barbell deadlift', catalogue: 'Deadlifts' },

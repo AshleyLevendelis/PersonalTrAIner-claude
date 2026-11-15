@@ -140,7 +140,7 @@ const PANTRY_SMALL = 250
  * own category (condiments and oils) and the name for the container word. Butter, nut butters and
  * yoghurt are not pantry items here: they are bought by weight.
  */
-export function pantryContainer(item: Pick<GroceryItemRow, 'display_name' | 'quantity' | 'unit'>): 'bottle' | 'jar' | 'pack' | null {
+function pantryContainer(item: Pick<GroceryItemRow, 'display_name' | 'quantity' | 'unit'>): 'bottle' | 'jar' | 'pack' | null {
   if ((item.unit !== 'g' && item.unit !== 'ml') || !(item.quantity > 0) || item.quantity > PANTRY_SMALL) return null
   const entry = lookupIngredient(item.display_name)
   if (!entry) return null

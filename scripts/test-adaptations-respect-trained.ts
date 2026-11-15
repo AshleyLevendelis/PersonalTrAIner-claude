@@ -145,7 +145,10 @@ async function main() {
   check('the finished Thursday is the SAME day object afterwards', dayOf(knee.mesocycle, 1, 'Thursday') === dayOf(plan, 1, 'Thursday'), namesOf(knee.mesocycle, 1, 'Thursday'))
   check('...and so are the Monday and Tuesday before it', dayOf(knee.mesocycle, 1, 'Monday') === dayOf(plan, 1, 'Monday') && dayOf(knee.mesocycle, 1, 'Tuesday') === dayOf(plan, 1, 'Tuesday'))
   check('no row on the card names a trained day', !knee.touchedSlots.some(s => s.weekNumber === 1 && ['Monday', 'Tuesday', 'Thursday'].includes(s.dayName)), knee.touchedSlots.filter(s => s.weekNumber === 1).map(s => s.dayName))
-  check('something was changed (the check below is not vacuous)', knee.touchedSlots.length >= 6, knee.touchedSlots.length)
+  // 6 until 15 Nov 2026, measured 5 since: the "Legs & Calves" day now keeps its calf raise (test:calf-day), which
+  // took the place of a Dumbbell Leg Curl, so the window holds one fewer knee-loading lift to substitute. A vacuity
+  // guard: it proves the adaptation changed things, not how many.
+  check('something was changed (the check below is not vacuous)', knee.touchedSlots.length >= 5, knee.touchedSlots.length)
 
   let datesChecked = 0, kneeDaysSeen = 0, outsideCompared = 0
   const stillLoaded: string[] = []

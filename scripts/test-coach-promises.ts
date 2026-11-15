@@ -914,7 +914,7 @@ console.log('\nThe coach speaks after a tool runs, and the server reads the mess
   check('the turn carries no prose of its own', /reply: "",/.test(swap))
 
   // The two other handlers that author English go through the same pass.
-  check('a weigh-in reply must quote her number', /mustContain: \[`\$\{weightKg\}`\]/.test(code))
+  check('a weigh-in reply must quote her number (and, since 15 Nov 2026, any reading it replaced)', /mustContain: replaced != null && replaced !== weightKg \? \[`\$\{weightKg\}`, `\$\{replaced\}`\] : \[`\$\{weightKg\}`\]/.test(code))
   check('a logged set must quote the weight it wrote', /mustContain: \[`\$\{resolved\.weightKg\}`\]/.test(code))
 }
 

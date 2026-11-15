@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [x] **FULL RUN AT e2cb488b: 583 of 585 checks ran (stopped at the two-hour limit before the two plan-quality
+  checks), 10 failed, all explained (15 Nov 2026)**. Environmental, as always: `test:meal-quality`,
+  `test:schema-parity`, `verify:rls` (no database here). Expected: `test:coach-exam-fresh` (the coach changed; the
+  exam is re-run on his machine). Fixed: `test:coach-promises` pinned the weigh-in reply's old must-contain line,
+  re-anchored to the new one (it also names a replaced reading); `test:food-swaps` wanted the three foods added for
+  Marcus in a swap group (chips and french fries swap for each other; a chicken burger has no single-food swap);
+  `test:onboarding-chips` holds a described option card to four, and session length now has five, so its options
+  became pills (the one-line descriptions under each length go; "20-30 min" says what it is); `test:no-dead-code`
+  went one over its budget of 40 with two of today's exports used only in their own file, now private;
+  `test:adaptations-respect-trained`'s guard (at least 6 slots changed) measured 5 after the calf-day fix, because
+  the fixture's leg day now holds a calf raise where a knee-loading leg curl was, so it is set to the measured 5;
+  `verify:meal-move` had never seen a refusal until the harness's targets moved, and still asserted the question the
+  8 Nov fix (7e5f1443) deliberately drops when there is nothing to swap to; re-anchored to that rule, mutation caught.
 - [x] **A WEIGH-IN TOLD TO THE COACH IS KEPT TO ONE DECIMAL AND SAYS WHAT IT REPLACED (15 Nov 2026, browser test:
   "79.35 kg" saved and said back, and a second weigh-in the same day silently replaced the morning's)**. The coach's
   server rounds to one decimal, as the weigh-in box does, before it checks or saves; a reading already saved today is

@@ -167,7 +167,7 @@ for (const dest of Object.keys(before)) {
   const previewed = await textOf('meal-move-preview')
   if (previewed) { TO = dest; break }
   const refused = await textOf('meal-move-refusal')
-  if (refused) refusals.push({ slot: dest, said: refused })
+  if (refused) refusals.push({ slot: dest, said: refused, swapButton: await ev(`!!document.querySelector('[data-testid="meal-move-swap-instead"]')`) })
   // Untoggle before trying the next one.
   await tapTestId(`meal-move-to-${dest}`)
   await wait(200)
@@ -183,8 +183,11 @@ console.log(`moving ${FROM} ("${before[FROM]}") to ${TO} ("${before[TO]}")`)
 if (refusals.length > 0) {
   check('2a-i. a destination it cannot fit is refused in plain words',
     refusals.every(r => /can't become/i.test(r.said) && !/scale factor|0\.4|2\.5/i.test(r.said)), refusals)
-  check('2a-ii. ...and offers the nearest thing rather than stopping dead',
-    refusals.every(r => /swap it for something else/i.test(r.said)), refusals)
+  // RE-ANCHORED 15 Nov 2026 to the 8 Nov rule (7e5f1443): the offer is a TAP, "Swap it instead", and when the meal
+  // has nothing to swap to the question is not asked at all (a question with no answer on the screen is a dead end).
+  // This check predated that and had never seen a refusal until the harness's targets moved.
+  check('2a-ii. ...and offers the nearest thing as a tap, or asks nothing when there is nothing to swap to',
+    refusals.every(r => r.swapButton ? /swap it for something else/i.test(r.said) : !/\?\s*$/.test(r.said)), refusals)
 }
 const preview = await textOf('meal-move-preview')
 check('2b. ...and produces a preview rather than moving anything', !!preview, preview)

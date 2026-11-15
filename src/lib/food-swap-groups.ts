@@ -86,6 +86,8 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   'snack bars': ['protein bar generic', 'greek yoghurt bar', 'cereal bar'],
   // 15 Nov 2026, the standard UK packs: a pack swaps for another of its kind, the macro match orders them.
   'crisps': ['crisps', 'ready salted crisps'],
+  // 15 Nov 2026, the takeaway basics (Marcus's chicken burger with chips): hot chips swap for each other.
+  'chips': ['chips', 'french fries'],
   'soft drinks': ['cola', 'diet cola'],
   'meal-deal sandwiches': ['chicken and bacon sandwich', 'chicken sandwich', 'egg mayo sandwich', 'tuna mayo sandwich'],
 }
@@ -99,6 +101,8 @@ export const NO_SWAP: readonly string[] = [
   'cocoa powder', 'parsley', 'mint', 'chives', 'rosemary', 'thyme', 'dried oregano', 'kimchi', 'vegan kimchi',
   // citrus used as seasoning, and aromatics
   'lemon', 'lime', 'calamansi juice', 'onion', 'garlic', 'spring onion', 'shallots',
+  // a takeaway burger is one dish in a bun: nothing in the table does its job as a single food (15 Nov 2026)
+  'chicken burger',
   // sauces, pastes and dressings
   'mayonnaise', 'mayonnaise light', 'ketchup', 'mustard', 'bbq sauce', 'sriracha', 'balsamic vinegar', 'pesto', 'curry paste',
   'gravy granules made', 'worcestershire sauce', 'teriyaki sauce', 'vegetable stock cube', 'vital wheat gluten', 'rice vinegar', 'fish sauce',

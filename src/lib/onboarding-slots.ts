@@ -105,12 +105,14 @@ export const CONDITIONING_PREF_OPTIONS: { value: ConditioningPreference; icon: s
   { value: 'avoid', icon: '🙅', label: 'Not for me', description: 'Keep it to the minimum the goal actually needs' },
 ]
 
-export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: string; description: string }[] = [
-  { value: '20-30', icon: '⏲️', label: '20-30 min', description: 'Short & focused' },
-  { value: '30-45', icon: '⚡', label: '30-45 min', description: 'Quick & efficient' },
-  { value: '45-60', icon: '⏱️', label: '45-60 min', description: 'Standard session' },
-  { value: '60-90', icon: '🏋️', label: '60-90 min', description: 'Extended volume' },
-  { value: '90+', icon: '🔥', label: '90+ min', description: 'Maximum volume' },
+// PILLS, NOT CARDS, SINCE 15 Nov 2026: with "20-30 min" added there are five, and a described option draws as a card two
+// to a row (three rows; test:onboarding-chips holds cards to four). The lengths say what they are, so no line under each.
+export const DURATION_OPTIONS: { value: SessionDuration; icon: string; label: string; description?: string }[] = [
+  { value: '20-30', icon: '⏲️', label: '20-30 min' },
+  { value: '30-45', icon: '⚡', label: '30-45 min' },
+  { value: '45-60', icon: '⏱️', label: '45-60 min' },
+  { value: '60-90', icon: '🏋️', label: '60-90 min' },
+  { value: '90+', icon: '🔥', label: '90+ min' },
 ]
 
 
