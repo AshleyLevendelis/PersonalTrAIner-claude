@@ -42,7 +42,14 @@ cross-contamination", which the app cannot check. His ruling, from three options
   and what it cannot (a branded product's label, traces), and for a swap it names alternatives that fit (tamari or
   coconut aminos for soy sauce, for a coeliac), never only a refusal.
 
-## His questions (one at a time when building)
+## His answers, 15 Nov 2026 (each the recommended option)
+1. **"Your tree-nut allergy"**: with the card recording an allergy, the refusal says "you have a tree-nut allergy";
+   a plain diet tick keeps "your profile says nut-free". PARTLY REPLACES his 18 Oct "Say 'nut-free'".
+2. **"Use your pen, call 999"**: someone with an adrenaline pen who describes a reaction gets the app's own first line,
+   "Use your adrenaline pen now and call 999.", before anything else; nothing on the plan changes.
+3. **"Record it, details later"**: setup records the allergen only; Profile and the coach ask the pen, traces and oats.
+
+## The questions as asked
 1. With an allergy recorded, should the refusal say "your tree-nut allergy" (true now that it is recorded) or keep
    "your profile says nut-free" (his 18 Oct "Say 'nut-free'")? Recommend: "your tree-nut allergy" when the card says
    allergy, the profile wording for a diet tick.

@@ -1596,6 +1596,9 @@ menu" stays true when a copy is also left outside it.
   Apply. PARTLY REVERSES his 1 Oct "ask, never estimate" for that case. NOT BUILT yet
 - **An allergy is its own record: "Allergy card, peanuts split"** (food, peanuts and tree nuts separate, adrenaline pen,
   traces). Meals stay "filtered, not verified". NOT BUILT yet; needs a migration
+- **The allergy card's words, his three answers (`docs/plans/allergy-card.md`)**: "Your tree-nut allergy" once the card
+  records one (a diet tick keeps "your profile says"); "Use your pen, call 999" first for a reaction when he carries a
+  pen; setup records the allergen only ("Record it, details later"). NOT BUILT yet
 - **"Hips & pelvis" and "Other (describe)" on the injuries list** (his decision 8): Other asks the three pain questions;
   sharp saves nothing. `test:other-injury`, `verify:profile-fixes` §11
 
