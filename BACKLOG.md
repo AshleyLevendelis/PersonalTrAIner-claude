@@ -2,6 +2,13 @@
 
 Newest first. One line each.
 
+- [x] **A WEIGH-IN TOLD TO THE COACH IS KEPT TO ONE DECIMAL AND SAYS WHAT IT REPLACED (15 Nov 2026, browser test:
+  "79.35 kg" saved and said back, and a second weigh-in the same day silently replaced the morning's)**. The coach's
+  server rounds to one decimal, as the weigh-in box does, before it checks or saves; a reading already saved today is
+  read before the write and the reply says "in place of the 79.4 kg saved earlier today", or "Same as earlier today"
+  when they match, and the coach's own wording must carry both figures or the app's sentence is used. One weigh-in a
+  day is unchanged. VERIFIED: `test:weigh-in-targets` (3 new source checks, 4 mutations caught). Source checks only:
+  the function is not run here. NEEDS the `chat-gemini` deploy.
 - [x] **A "LEGS & CALVES" DAY KEEPS A CALF EXERCISE (15 Nov 2026, CSCS, mine; Marcus's calf day had none)**. MEASURED
   on 1,152 seeded loading days per setting (bodybuilding, three days, four goals, three levels, four kits, knee or
   not): a calf exercise was missing from 687 at 30-45 minutes, 69 at 45-60, 3 at 60-90, and every one at 20-30.

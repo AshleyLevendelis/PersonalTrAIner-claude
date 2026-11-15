@@ -597,6 +597,12 @@ async function main() {
       check('the coach hands an unchecked weigh-in to the app unsaved, before any write', unchk >= 0 && write > unchk, { unchk, write })
       check('...and a failed read, a missing date and a thrown read each mark it unchecked (a failed read was "no weigh-ins")',
         /if \(!metricsResp\.ok\) \{\s*weighInUnchecked = true/.test(h) && /if \(typeof today !== "string"\) weighInUnchecked = true/.test(h) && /catch \(err\) \{\s*weighInUnchecked = true/.test(h))
+      // ONE DECIMAL, AND A REPLACED READING IS SAID (browser test, 15 Nov 2026).
+      check('the coach keeps a weight to one decimal before checking or saving it',
+        /const weightKg = Math\.round\(Number\(args\.weight_kg\) \* 10\) \/ 10;/.test(h) && h.indexOf('Math.round(Number(args.weight_kg) * 10) / 10') < h.indexOf('weighInQuestion(weightKg'))
+      check('a reading saved earlier today is read before the write', /earlierToday = readings\.find\([^)]*\) => r\.date === today\)\?\.kg \?\? null/.test(h) && h.indexOf('earlierToday = readings.find') < h.indexOf('daily_metrics?on_conflict'))
+      check('...and the reply names it, or says it is the same', /in place of the \$\{replaced\} kg saved earlier today/.test(h) && /Same as earlier today: \*\*\$\{weightKg\} kg\*\*/.test(h)
+        && /mustContain: replaced != null && replaced !== weightKg \? \[`\$\{weightKg\}`, `\$\{replaced\}`\]/.test(h))
     }
     const chatUi = strip(raw('src/components/ChatAssistant.tsx'))
     check('the chat builds that card for the coach\'s proposal', /kind === 'propose_weigh_in'[\s\S]{0,300}buildWeighInProposal\(/.test(chatUi))

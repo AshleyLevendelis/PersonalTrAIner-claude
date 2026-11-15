@@ -3938,7 +3938,8 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // numbers exactly like the tab's own capture field does. A weight far
         // from the last one is not written here at all — see below.
         const profileId = context.profile_id;
-        const weightKg = Number(args.weight_kg);
+        // ONE DECIMAL, as the weigh-in box keeps it (browser test, 15 Nov 2026: "79.35 kg" was saved and said back).
+        const weightKg = Math.round(Number(args.weight_kg) * 10) / 10;
         if (!profileId || !Number.isFinite(weightKg) || weightKg < 25 || weightKg > 350) {
           return new Response(
             JSON.stringify({ reply: "That weight doesn't look right — could you give it to me in kilograms (e.g. 86.4)?" }),
@@ -3970,6 +3971,9 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // app unsaved (`unchecked`): it checks against its own read and asks.
         let weighInAsk: ReturnType<typeof weighInQuestion> = null;
         let weighInUnchecked = false;
+        // A READING ALREADY SAVED TODAY is replaced by this one (one weigh-in a day), and the reply says so rather than
+        // replacing it silently (browser test, 15 Nov 2026).
+        let earlierToday: number | null = null;
         try {
           const readHeaders = { Authorization: `Bearer ${serviceKey}`, Apikey: serviceKey };
           const [metricsResp, targetsResp] = await Promise.all([
@@ -3991,6 +3995,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
             .filter((r: { date?: unknown; calculated_weight_kg?: unknown }) => typeof r.date === "string" && Number(r.calculated_weight_kg) > 0)
             .map((r: { date: string; calculated_weight_kg: unknown }) => ({ date: r.date, kg: Number(r.calculated_weight_kg) }));
           if (typeof today === "string") weighInAsk = weighInQuestion(weightKg, today, readings, anchors);
+          if (typeof today === "string") earlierToday = readings.find((r: { date: string; kg: number }) => r.date === today)?.kg ?? null;
         } catch (err) {
           weighInUnchecked = true;
           console.error("log_weight: could not read the earlier weigh-ins to check against:", err);
@@ -4062,15 +4067,20 @@ Keep this context in mind to ensure your greetings and questions naturally align
         // Not "recalculate from your latest weigh-in": they follow the 7-day
         // average and move once it has shifted a kilo (Ashley's ruling), and
         // this sentence said otherwise until 9 Oct 2026.
-        const weightFloor = `Logged **${weightKg} kg** for today. Your targets follow your 7-day average.`;
+        const replaced = earlierToday != null ? Math.round(earlierToday * 10) / 10 : null;
+        const weightFloor = replaced == null
+          ? `Logged **${weightKg} kg** for today. Your targets follow your 7-day average.`
+          : replaced === weightKg
+            ? `Same as earlier today: **${weightKg} kg**. Your targets follow your 7-day average.`
+            : `Logged **${weightKg} kg** for today, in place of the ${replaced} kg saved earlier today. Your targets follow your 7-day average.`;
         const confirmText = dbSuccess
           ? (await toolReply({
-              outcome: { name, args, response: { status: "saved", weight_kg: weightKg, date: context.current_local_date } },
+              outcome: { name, args, response: { status: "saved", weight_kg: weightKg, date: context.current_local_date, ...(replaced != null ? { replaced_earlier_today_kg: replaced } : {}) } },
               floor: weightFloor,
               preferFirstLegText: true,
               // The figure she gave has to come back to her: a weigh-in reply
-              // quoting a different number is worse than the template.
-              mustContain: [`${weightKg}`],
+              // quoting a different number is worse than the template. And a reading it replaced is named.
+              mustContain: replaced != null && replaced !== weightKg ? [`${weightKg}`, `${replaced}`] : [`${weightKg}`],
             })).reply
           : "I couldn't save that weigh-in — please try again in a moment.";
 
