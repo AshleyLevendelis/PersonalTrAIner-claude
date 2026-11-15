@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **A BEGINNER'S PROTEIN TARGET IS 1.6 g/kg, NOT 2.0 (15 Nov 2026, CSCS, decided by me under his delegation; the
+  coeliac nurse: a vegan, gluten-free beginner given 156 g, which almost no meal she can eat reaches)**. BASIS: muscle
+  gain from resistance training levels off near 1.6 g/kg (Morton et al. 2018 meta-analysis, upper confidence limit
+  2.2); the ISSN position for exercising people is 1.4-2.0 g/kg, with higher figures aimed at lean trained athletes in a
+  deficit, not beginners, who gain readily even while losing fat. So every preset sits 0.4 g/kg lower for a beginner,
+  never below 1.6 (Balanced 1.6, Higher protein 2.0, Lower carb 1.6, Higher carb 1.6), and the periodised mode's 2.2
+  becomes 1.8. Calories and fat are unchanged; the protein that comes off goes to carbs. A custom figure he set is his.
+  Intermediate and advanced are unchanged. REVIEW: (1) training effect unchanged at the evidence plateau; (2) takes away
+  protein above what helps; (3) fundamentals kept (the day's protein band and every meal check still apply); (4) no
+  floor quietly redefined ("default" on the Profile card now reads this person's default); (5) in scope, population
+  nutrition. MEASURED: the nurse 156 -> 125 g; her plan with the writer off: dinners 7 -> 11. THIS CHANGES WHAT A
+  BEGINNER IS PRESCRIBED: protein targets for beginners before 15 Nov are not comparable. `test:beginner-protein` (11
+  checks, 6 mutations caught). Also: "chips" alone in a recipe step is the cut, not a food (two library steps reworded),
+  and five checks pinned to text this session changed were re-anchored on the property. NOT FIXED, found in passing:
+  `report:slot-impact` already fails on the branch (setup questions startPreference, kitTicks, runningGoal,
+  enjoyedActivities are neither measured nor excused).
 - [x] **A MEAL HE CHOSE NEVER ENDS EMPTY WITHOUT A WORD (the coeliac nurse, 15 Nov 2026; Wave N of
   `docs/plans/browser-test-nov15-plan.md`)**. She chose three meals and a snack and got breakfast and a snack (about 760
   of 2,053 kcal), shown "0 OF 2 MEALS" with nothing saying why, and the coach invented a reason. CAUSES (traced): a new

@@ -420,7 +420,7 @@ async function main() {
     check('the row\'s Regenerate makes one dish and SWAPS to it (the swap\'s trial, line and Undo)', /made = await onMakeOneNew\(slot\)/.test(handler) && /await swapTo\(made\.option\.name, made\.option\)/.test(handler), handler.slice(0, 300))
     check('...and a dish that could not be made is said in the meal\'s own sheet, with no Undo', /if \('error' in made\) \{ setTab\('recipe'\); setSwapUndo\(null\); setSwapNote\(\[made\.error\]\); return \}/.test(handler))
     check('...only today: another day\'s row is not handed it', /onMakeOneNew=\{upcoming \? undefined : onMakeOneNew\}/.test(mealPlan))
-    check('a meal with NO options still builds its list the old way (there is nothing else to disturb)', /<EmptySlotRow key=\{slot\} slot=\{slot\} isGenerating=\{isGenerating\} onRegenerate=\{onRegenerateSlot\} \/>/.test(mealPlan))
+    check('a meal with NO options still builds its list the old way (there is nothing else to disturb)', /<EmptySlotRow key=\{slot\} slot=\{slot\} isGenerating=\{isGenerating\} onRegenerate=\{onRegenerateSlot\}[^>]*\/>/.test(mealPlan))
     const hook = read('src/hooks/useMealPlanActions.ts')
     check('the hook hands it out, and App and the harness page pass it to the Nutrition tab', /makeOneNewMeal\(ctx, slot\)/.test(hook) && /onMakeOneNewMeal=\{mealActions\.makeOneNew\}/.test(read('src/App.tsx')) && /onMakeOneNewMeal=\{REGEN \? mealActions\.makeOneNew : undefined\}/.test(read('.tour-harness/real.tsx')))
   }

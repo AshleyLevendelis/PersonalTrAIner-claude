@@ -1544,8 +1544,9 @@ function lookupIngredientUncached(name: string): FoodEntry | null {
  * seeds"), and reading it as bread would hide good steps.
  */
 // A word a method uses about cooking, never the food it names when alone: "toast the oats", "cook until crisp"
-// (15 Nov 2026: the UK pack "crisps" made every "until crisp" an unlisted food, 60 library methods hidden).
-const PROSE_VERBS = new Set(['toast', 'crisp'])
+// (15 Nov 2026: the UK pack "crisps" made every "until crisp" an unlisted food, 60 library methods hidden). And "chips"
+// alone is how the potato is cut ("cut into chips"), since the chips entry was added the same day (Marcus's log).
+const PROSE_VERBS = new Set(['toast', 'crisp', 'chip', 'chips'])
 export function findFoodsNamedIn(text: string): { entry: FoodEntry; words: string[]; from: number; to: number }[] {
   const tokens = normalize(text).split(' ').filter(Boolean)
   const folded = tokens.map(depluralizeToken)

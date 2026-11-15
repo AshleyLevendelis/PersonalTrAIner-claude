@@ -474,7 +474,7 @@ async function main() {
   check('...and each slot is asked for with that slot\'s own budget, so the dishes are fitted to the meal they are offered for', /budget:\s*budgets\[slot\]/.test(fn.slice(libAt, libAt + 900)), fn.slice(libAt, libAt + 900))
   const askBlock = fn.slice(libAt, libAt + 900)
   check('...and is told what she already has and the exotic cap; considerProposal enforces both as well, so only the order would show a slip, and order is all this pins', /haveNames:\s*existing\.map\(o\s*=>\s*o\.name\)/.test(askBlock) && /exoticCuisines:\s*EXOTIC_CUISINES/.test(askBlock), askBlock)
-  check('...every library dish goes through the one function every proposal goes through', /for \(const dish of candidates\) considerProposal\(dish, true, cap, deep\)/.test(fn) && /for \(const proposal of proposals\) considerProposal\(proposal\)/.test(fn))
+  check('...every library dish goes through the one function every proposal goes through', /for \(const dish of candidates\) considerProposal\(dish, true, cap, deep(, leeway)?\)/.test(fn) && /for \(const proposal of proposals\) considerProposal\(proposal\)/.test(fn))
   check('...and that function is the only place a proposal is verified', (fn.match(/verifyProposal\(/g) ?? []).length === 1, (fn.match(/verifyProposal\(/g) ?? []).length)
   const chooser = read('src/lib/meal-library.ts')
   check('the chooser is deterministic: no Math.random', !/Math\.random/.test(chooser))

@@ -40,7 +40,7 @@ check('the coach\'s meal log: no card, and the kind question rather than "how mu
 const add = explainRejection(['[breakfast] "Yoghurt bowl": coverage 40% below 80% floor — unmatched: greek yoghurt'], 'Yoghurt bowl', 'breakfast')
 check('adding a meal by name: the kind question rather than "describe it with more everyday ingredients"', /fat-free \(0%\), low-fat \(2%\) or full-fat\?/.test(add) && !/everyday ingredients/.test(add), add)
 const control = buildMealLogProposal({ rawArgs: { food_name: 'Mystery bowl', meal_slot: 'breakfast' }, computed: { kcal: 57, protein: 1, carbs: 14, fat: 0, unmatched: ['150g dragonfruit jam'], coverage: 0.4 }, profileId: 'p', todayDate: '2026-11-09' })
-check('...while any other uncountable food still gets the amount question (the detector is not firing on everything)', !control.ok && /How much/.test(control.reason) && !/fat-free/.test(control.reason), control)
+check('...while any other uncountable food still gets the amount question (the detector is not firing on everything)', !control.ok && /I don't have \*\*/.test(control.reason) && !/fat-free/.test(control.reason), control)
 
 console.log('\n4. The coach is told to ask, and carries the same table')
 const strip = (t: string) => t.replace(/\/\*[\s\S]*?\*\//g, '')

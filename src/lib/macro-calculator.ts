@@ -259,6 +259,28 @@ export const MACRO_SPLIT_PRESET_VALUES: Record<Exclude<MacroSplitPreset, 'custom
   higher_carb:    { proteinPerKg: 1.8, fatPercent: 0.20, label: 'Higher carb',    description: 'Less protein and fat, more calories left for carbs.' },
 }
 
+/**
+ * A BEGINNER'S PROTEIN SITS 0.4 g/kg LOWER, never below 1.6 (15 Nov 2026, CSCS, mine; the coeliac nurse's 156 g as a
+ * vegan beginner). Basis: muscle gain from resistance training levels off near 1.6 g/kg (Morton et al. 2018
+ * meta-analysis, upper CI 2.2); the ISSN range for exercising people is 1.4-2.0 g/kg, with higher figures meant for
+ * lean trained athletes in a deficit, not beginners, who gain readily even while losing fat. So a beginner's Balanced is
+ * 1.6, Higher protein 2.0, and the periodised (dynamic) 2.2 becomes 1.8. Everyone else is unchanged.
+ */
+const BEGINNER_PROTEIN_OFFSET = 0.4
+const BEGINNER_PROTEIN_FLOOR = 1.6
+
+/** How far this person's protein sits below the table: 0.4 g/kg for a beginner, else 0. */
+function beginnerProteinOffset(profile: Pick<UserProfile, 'training_experience'> | null | undefined): number {
+  return profile?.training_experience === 'beginner' ? BEGINNER_PROTEIN_OFFSET : 0
+}
+
+/** A preset's protein and fat for this person (a beginner's protein 0.4 g/kg lower, floored at 1.6). */
+export function presetSplitFor(preset: Exclude<MacroSplitPreset, 'custom'>, profile: Pick<UserProfile, 'training_experience'> | null | undefined): MacroSplitInput {
+  const { proteinPerKg, fatPercent } = MACRO_SPLIT_PRESET_VALUES[preset]
+  const offset = beginnerProteinOffset(profile)
+  return { proteinPerKg: offset > 0 ? Math.max(BEGINNER_PROTEIN_FLOOR, Math.round((proteinPerKg - offset) * 10) / 10) : proteinPerKg, fatPercent }
+}
+
 export const DEFAULT_MACRO_SPLIT: MacroSplit = {
   preset: 'balanced',
   proteinPerKg: MACRO_SPLIT_PRESET_VALUES.balanced.proteinPerKg,
@@ -276,7 +298,7 @@ export const FAT_FLOOR_PER_KG = 0.6
 export function getProfileMacroSplit(profile: UserProfile): MacroSplit {
   const preset = (profile.macro_split_preset as MacroSplitPreset | undefined) ?? 'balanced'
   if (preset !== 'custom' && preset in MACRO_SPLIT_PRESET_VALUES) {
-    const { proteinPerKg, fatPercent } = MACRO_SPLIT_PRESET_VALUES[preset as Exclude<MacroSplitPreset, 'custom'>]
+    const { proteinPerKg, fatPercent } = presetSplitFor(preset as Exclude<MacroSplitPreset, 'custom'>, profile)
     return { preset, proteinPerKg, fatPercent }
   }
   return {
@@ -392,7 +414,7 @@ function computeDynamicDay(
   const dailyTDEE = Math.round(neatTDEE + eee)
   const calories = applyGoalAdjustment(dailyTDEE, nutritionGoalOf(profile), m.gender)
 
-  const protein = Math.round(2.2 * weight)
+  const protein = Math.round((2.2 - beginnerProteinOffset(profile)) * weight)
   const carbsPerKg = getCarbsPerKg(intensity, nutritionGoalOf(profile))
   let carbs = Math.round(carbsPerKg * weight)
 

@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { RefreshCw, Loader2 } from 'lucide-react'
 import {
   MACRO_SPLIT_PRESET_VALUES, DEFAULT_MACRO_SPLIT, PROTEIN_PER_KG_RANGE, FAT_PERCENT_RANGE,
-  getProfileMacroSplit, computeMacroSplitTargets,
+  getProfileMacroSplit, computeMacroSplitTargets, presetSplitFor,
   type MacroSplitPreset,
 } from '@/lib/macro-calculator'
 import type { UserProfile } from '@/lib/types'
@@ -47,7 +47,7 @@ export function MacroSplitCard({
     if (preset === 'custom') {
       onChange({ macro_split_preset: 'custom', macro_protein_per_kg: split.proteinPerKg, macro_fat_percent: split.fatPercent })
     } else {
-      const values = MACRO_SPLIT_PRESET_VALUES[preset]
+      const values = presetSplitFor(preset, profile)
       onChange({ macro_split_preset: preset, macro_protein_per_kg: values.proteinPerKg, macro_fat_percent: values.fatPercent })
     }
     setDirty(true)
@@ -111,7 +111,7 @@ export function MacroSplitCard({
             <label className="block space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted-foreground">Protein</span>
-                <span className="tabular-mono font-medium">{split.proteinPerKg.toFixed(1)} g/kg{split.proteinPerKg === DEFAULT_MACRO_SPLIT.proteinPerKg ? ' (default)' : ''}</span>
+                <span className="tabular-mono font-medium">{split.proteinPerKg.toFixed(1)} g/kg{split.proteinPerKg === presetSplitFor('balanced', profile).proteinPerKg ? ' (default)' : ''}</span>
               </div>
               <input
                 type="range"

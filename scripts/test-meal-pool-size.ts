@@ -164,7 +164,9 @@ async function main() {
     calls = 0
     db.meal_plan_slots = []
     failWhen = a => a.slots.some(s => s.slot === 'dinner')
-    const result = await generateMealPools({ deepLibrary: false, profileId: 'p2', targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: true })
+    // The writer's failure is what this measures, so the library is off: since 15 Nov 2026 a meal left EMPTY is filled
+    // from the library (test:empty-meals holds that), which is real verified dishes, never "anything".
+    const result = await generateMealPools({ deepLibrary: false, library: false, profileId: 'p2', targets, dietaryPreferences: [], mealsPerDay: 3, includeSnacks: true })
     const dinnerAsked = asked.find(a => a.slots.some(s => s.slot === 'dinner'))
     const lost = (dinnerAsked?.slots ?? []).map(s => s.slot)
     const kept = (['breakfast', 'lunch', 'dinner', 'snack'] as MealSlotName[]).filter(s => !lost.includes(s))

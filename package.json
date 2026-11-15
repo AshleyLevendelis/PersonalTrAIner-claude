@@ -638,7 +638,8 @@
     "test:log-estimate": "tsx scripts/test-log-estimate.ts",
     "measure:empty-meals": "tsx scripts/measure-empty-meals.ts",
     "test:empty-meals": "tsx scripts/test-empty-meals.ts",
-    "verify:empty-meals": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/empty-meals.mjs"
+    "verify:empty-meals": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/empty-meals.mjs",
+    "test:beginner-protein": "tsx scripts/test-beginner-protein.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
