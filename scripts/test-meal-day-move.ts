@@ -898,7 +898,7 @@ async function main() {
 
     const app = read('src/App.tsx')
     check('App gives the hook the way to re-read the options, and what a resized meal is verified against',
-      /reloadPools: async \(\) => \{ if \(profile\?\.id\) setMealPools\(await getPools\(profile\.id\)\) \}/.test(app) && /dietaryPreferences: profile\?\.dietary_preferences/.test(app) && /dislikedFoods: \(\) => effectiveDislikedFoods/.test(app))
+      /reloadPools: async \(\) => \{ if \(profile\?\.id\) setMealPools\(await getPools\(profile\.id\)\) \}/.test(app) && /dietaryPreferences: profile \? mealRestrictionsOf\(profile\) : undefined/.test(app) && /dislikedFoods: \(\) => effectiveDislikedFoods/.test(app))
 
     const sheet = read('src/components/nutrition/MealMoveSheet.tsx')
     check('the sheet offers the other day\'s meals once a day is chosen, the same meal preselected',

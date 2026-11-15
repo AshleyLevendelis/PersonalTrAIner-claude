@@ -244,11 +244,11 @@ let t4 = await text()
 // The reply types itself out: wait for its LAST words, not its first.
 for (let i = 0; i < 40 && !/leave it out\?/.test(t4.slice(t4.lastIndexOf(TURNS.bowl.said))); i++) { await wait(400); t4 = await text() }
 const after4 = t4.slice(t4.lastIndexOf(TURNS.bowl.said))
-check('4c. IT ASKS: names the food it could not count, asks how much, offers to leave it out', /I couldn't count flargle sauce in .+, so I haven't put a total on it yet\. How much was it .*\? Or shall I leave it out\?/.test(after4), after4.slice(0, 500))
+check('4c. IT ASKS: names the food it could not count, never "how much", offers an estimate or to leave it out', /I don't have flargle sauce in my food list, so I haven't put a total on it yet\..*say "estimate it".*Or I can leave it out\./.test(after4) && !/how much/i.test(after4.slice(after4.indexOf('flargle'), after4.indexOf('flargle') + 400)), after4.slice(0, 500))
 check('4d. NO CARD: no "Log this to your dinner?", no new Apply', !/Log this to your dinner\?/.test(after4) && (await applyButtons()) === cardsBefore4, { after: after4.slice(0, 300), apply: await applyButtons() })
 check('4e. ...no total is shown for the meal, and no "Not counted" line', !/kcal/.test(after4) && !/Not counted/.test(after4), after4.slice(0, 400))
 check('4f. ...and nothing was written', (await logged()).length === loggedBefore4, await logged())
-const q4 = await ev(`(() => { const els = [...document.querySelectorAll('p, div, span')].filter(e => e.children.length <= 2 && /I couldn't count/.test(e.textContent || '')); const r = els.length ? els[els.length - 1].getBoundingClientRect() : null; return r ? { top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight } : null })()`)
+const q4 = await ev(`(() => { const els = [...document.querySelectorAll('p, div, span')].filter(e => e.children.length <= 2 && /I don't have flargle/.test(e.textContent || '')); const r = els.length ? els[els.length - 1].getBoundingClientRect() : null; return r ? { top: Math.round(r.top), bottom: Math.round(r.bottom), h: innerHeight } : null })()`)
 check('4g. the question is on screen', !!q4 && q4.top >= 0 && q4.bottom <= q4.h, q4)
 await shoot('meal-log-card-not-counted')
 

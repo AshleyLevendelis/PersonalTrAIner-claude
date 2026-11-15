@@ -62,7 +62,7 @@ const swap = strip('src/lib/meal-swap-proposal.ts')
     /from '\.\/meal-ingredients'/.test(swap) && /from '\.\/diet-rules'/.test(swap))
   const chat = strip('src/components/ChatAssistant.tsx')
   check('the caller actually passes the restrictions in',
-    /dislikedFoods: compileFoodDislikes\(memoryFacts\)/.test(chat) && /dietaryPreferences: profile\.dietary_preferences/.test(chat))
+    /dislikedFoods: compileFoodDislikes\(memoryFacts\)/.test(chat) && /dietaryPreferences: mealRestrictionsOf\(profile\)/.test(chat))
   // The behaviour itself, on Ashley's exact case.
   const almondOats = { name: 'Almond Butter Oats', ing: ['oats', 'almond butter'] }
   const porridge = { name: 'Plain Porridge', ing: ['oats', 'milk'] }

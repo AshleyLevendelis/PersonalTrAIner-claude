@@ -102,7 +102,7 @@ console.log('\n[2] The whole week')
 console.log('\n[3] The wiring')
 {
   const app = read('src/App.tsx')
-  check('App assembles from the shared hook\'s pools', /const mealPools = useServablePools\(storedMealPools, profile\?\.dietary_preferences, memoryFacts\)/.test(app))
+  check('App assembles from the shared hook\'s pools', /const mealPools = useServablePools\(storedMealPools, profile \? mealRestrictionsOf\(profile\) : undefined, memoryFacts\)/.test(app)) // re-anchored 15 Nov 2026: the diet is read through mealRestrictionsOf (pregnancy)
   check('...and nothing that assembles a day reads the stored ones directly',
     !/(buildRotation|assembleRotationDay|checkMealRefit|useMealDays)\([^;]*storedMealPools/.test(app) && !/mealPools=\{storedMealPools\}/.test(app))
   const hook = read('src/hooks/useServablePools.ts')
@@ -119,7 +119,7 @@ console.log('\n[3] The wiring')
 
   const prof = read('src/components/ProfileScreen.tsx')
   check('Profile marks a clashing heart from the stored pools and the same check',
-    /getPools\(profileId\)/.test(prof) && /markRestrictionBreakers\(storedPools, profile\.dietary_preferences \?\? \[\], compileFoodDislikes\(facts\)\)/.test(prof)
+    /getPools\(profileId\)/.test(prof) && /markRestrictionBreakers\(storedPools, mealRestrictionsOf\(profile\), compileFoodDislikes\(facts\)\)/.test(prof)
     && /data-clashes=\{clashingHearts\.has\(name\) \? 'yes' : 'no'\}/.test(prof))
 
   // Already true before today, and the reason the ruling needed no coach

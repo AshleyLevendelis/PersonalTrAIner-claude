@@ -229,7 +229,7 @@ async function main() {
     // hook shared with the browser harness (test:kept-meal-restriction holds
     // what the hook does).
     check('the pools every assembly reads are the stored pools with restriction breakers marked',
-      /const mealPools = useServablePools\(storedMealPools, profile\?\.dietary_preferences, memoryFacts\)/.test(app))
+      /const mealPools = useServablePools\(storedMealPools, profile \? mealRestrictionsOf\(profile\) : undefined, memoryFacts\)/.test(app)) // re-anchored 15 Nov 2026 (mealRestrictionsOf)
     check('...and nothing that assembles a day reads the unmarked ones',
       /const menu = menuFor\(poolsServedOn\(mealPools, /.test(app) && /buildRotation\(menu, macros, [^;]*firstDayAfter\(mealPools, /.test(app) && /pools: mealPools,/.test(app) && /checkMealRefit\(mealDays\.today\?\.pools \?\? mealPools,/.test(app) && /mealPools=\{mealPools\}/.test(app)
       && !/(buildRotation|assembleRotationDay|checkMealRefit|useMealDays)\([^;]*storedMealPools/.test(app) && !/mealPools=\{storedMealPools\}/.test(app))

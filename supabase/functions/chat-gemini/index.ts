@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { acceptEstimates, estimateAssumption, notCountedQuestion } from "../_shared/log-estimate.ts";
 import { cleanCoachResponse } from "./text-like-a-coach.ts";
 import { deliverReply, type ReplyPushDeps } from "./reply-push.ts";
 import { pushServer, sendPush } from "../_shared/push.ts";
@@ -1771,6 +1772,19 @@ const toolDeclarations = [
               unit: { type: "string", description: "g or ml wherever you know the weight; otherwise tbsp, tsp, medium, large, scoop, slice, whole (a count), clove. Never oz, lb or cup: convert to grams or ask the user." },
             },
             required: ["name", "quantity", "unit"],
+          },
+        },
+        estimates: {
+          type: "array",
+          description: "ONLY when the user ASKED you to estimate ('you estimate it', 'best guess') AND a food they ate is not one the app can count (you were told it is not in the food list): one entry per such food, a standard UK portion and its numbers. Never otherwise: the app ignores estimates unless their own message asked, and refuses numbers that do not add up (protein x4 + carbs x4 + fat x9 must make the kcal).",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "The food, as they named it." },
+              portion: { type: "string", description: "The portion you assumed, e.g. '1 regular' or 'a medium portion of'." },
+              kcal: { type: "number" }, protein: { type: "number" }, carbs: { type: "number" }, fat: { type: "number" },
+            },
+            required: ["name", "portion", "kcal", "protein", "carbs", "fat"],
           },
         },
         assumptions: {
@@ -4421,18 +4435,35 @@ Keep this context in mind to ensure your greetings and questions naturally align
         if (!asked) {
           // A FOOD THAT CANNOT BE COUNTED IS ASKED ABOUT FIRST (run 7, M51): never a card whose total quietly
           // leaves it out. The same sentence the client refuses with (meal-log-proposal.ts), so the two agree.
+          // And never "how much" for a food the list lacks (Marcus, 15 Nov 2026): an amount cannot fix that. His ruling
+          // "Estimate when asked": an estimate is used only when HIS message asked for one, and only when it adds up.
           const notCounted = computed.unmatched.map((u: string) => String(u).trim()).filter(Boolean);
-          if (notCounted.length > 0) {
-            const one = notCounted.length === 1;
-            const list = one ? `**${notCounted[0]}**` : `${notCounted.slice(0, -1).map((u: string) => `**${u}**`).join(", ")} and **${notCounted[notCounted.length - 1]}**`;
+          const estimates = notCounted.length > 0 ? acceptEstimates(notCounted, args.estimates, message) : null;
+          if (notCounted.length > 0 && !estimates) {
             return new Response(
-              JSON.stringify({ reply: `I couldn't count ${list} in **${args.food_name}**, so I haven't put a total on it yet. How much ${one ? "was it" : "were they"} (grams, or slices, cups and so on)? Or shall I leave ${one ? "it" : "them"} out?` }),
+              JSON.stringify({ reply: notCountedQuestion(notCounted) }),
               { headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }
           if (doubt) {
             return new Response(
               JSON.stringify({ reply: doubt }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+          if (estimates) {
+            const add = (k: "kcal" | "protein" | "carbs" | "fat") => Math.round(computed[k] + estimates.reduce((n, e) => n + e[k], 0));
+            const estimated = { kcal: add("kcal"), protein: add("protein"), carbs: add("carbs"), fat: add("fat") };
+            return new Response(
+              JSON.stringify({
+                reply: "",
+                proposal: {
+                  kind: "propose_meal_log",
+                  rawArgs: args,
+                  computed: { ...estimated, unmatched: [], coverage: 1 },
+                  assumptions: [...assumptions, ...estimates.map(estimateAssumption)],
+                },
+              }),
               { headers: { ...corsHeaders, "Content-Type": "application/json" } }
             );
           }

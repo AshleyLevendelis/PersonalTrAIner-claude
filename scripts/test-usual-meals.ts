@@ -417,7 +417,7 @@ function main() {
     const row = /kind: 'food_preference',[\s\S]{0,160}?displayText: `likes \$\{(\w+)\}`,\s*polarity: 'like',\s*hardness: 'soft',\s*resolvedRefs: resolveFoodTarget\(\1\)/
     const profRow = /kind: 'food_preference', source: 'manual',\s*rawPhrase: v, displayText: `likes \$\{v\}`,\s*polarity: 'like', hardness: 'soft', resolvedRefs: resolveFoodTarget\(v\)/
     check('at signup each is written as the row Profile writes for a liked food (a soft like, "likes X")', row.test(app) && profRow.test(prof) && /source: 'onboarding',\s*rawPhrase: meal,/.test(app))
-    check('...except one he also said to leave out: an avoid wins', /usual_foods \?\? \[\]\)\.filter\(meal => !\(enrichedProfile\.disliked_foods \?\? \[\]\)\.some\(avoid => avoid\.trim\(\) && containsPhrase\('', \[meal\], avoid\)\)\)/.test(app))
+    check('...except one he also said to leave out: an avoid wins', /usual_foods \?\? \[\]\)\.filter\(meal => !\(enrichedProfile\.disliked_foods \?\? \[\]\)\.some\(avoid => avoid\.trim\(\) && containsPhrase\('', \[meal\], avoid\)\)/.test(app))
     check('the first plan is made with them in mind, before they are rows', /likedFoods: \[\.\.\.new Set\(\[\.\.\.typedFoodLikes, \.\.\.\(forProfile\.usual_foods \?\? \[\]\)\]\)\]/.test(app))
     check('the app keeps his typed reply as the answer when the coach records nothing, and never a question of his own',
       /textQuestionOnScreen\(messages, ws\.confirmed\) === 'usualFoods' && !responseWs\.confirmed\.has\('usualFoods'\) && !trimmed\.includes\('\?'\)/.test(onb) && /applySlot\(responseWs, 'usualFoods', isPlainNone\(trimmed\) \? '' : trimmed, responseWs\.values\)/.test(onb))

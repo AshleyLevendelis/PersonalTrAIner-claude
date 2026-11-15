@@ -21,6 +21,7 @@
 import { MIN_COVERAGE } from './meal-costing'
 import { MAIN_MEAL_MIN_KCAL, assumedLine, tooSmallForMainMeal, whichKindQuestion } from './food-db'
 import { parseIngredientLine } from './portion-scaler'
+import { notCountedQuestion } from './log-estimate'
 import type { MealMacros, MealSlotName } from './meal-store'
 
 /** The four the ledger accepts — meal_events' CHECK constraint, no more and no fewer. */
@@ -108,12 +109,8 @@ export function buildMealLogProposal(input: {
     return { ok: false, reason: `${kindAsk} I'll add up **${mealName}** once I know.` }
   }
   if (notCounted.length > 0) {
-    const list = notCounted.length === 1 ? `**${notCounted[0]}**` : `${notCounted.slice(0, -1).map(u => `**${u}**`).join(', ')} and **${notCounted[notCounted.length - 1]}**`
-    const one = notCounted.length === 1
-    return {
-      ok: false,
-      reason: `I couldn't count ${list} in **${mealName}**, so I haven't put a total on it yet. How much ${one ? 'was it' : 'were they'} (grams, or slices, cups and so on)? Or shall I leave ${one ? 'it' : 'them'} out?`,
-    }
+    // The server's own question, from the one shared file (log-estimate.ts): never "how much" for a food the list lacks.
+    return { ok: false, reason: notCountedQuestion(notCounted) }
   }
 
   // THE SAME FLOOR EVERY GENERATED MEAL PASSES. An under-resolved meal's real

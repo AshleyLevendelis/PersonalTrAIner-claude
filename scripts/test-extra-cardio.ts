@@ -165,7 +165,7 @@ async function main() {
   check('an ease-off that has ended asks nothing', easeOffQuestion('Run', [{ ...knee, expires_at: '2026-10-19T12:00:00' }], now) === null)
   check('a shoulder ease-off is not asked about after a run', easeOffQuestion('Run', [{ ...knee, injury_code: 'shoulders' }], now) === null)
   check('ankles and hips are, and a hike or skipping is', easeOffQuestion('Hike', [{ ...knee, injury_code: 'ankles' }], now)?.text === "How did your ankles feel on the hike? They're being eased off until 22 Oct."
-    && /hips feel on the skipping/.test(easeOffQuestion('Skipping rope', [{ ...knee, injury_code: 'hips' }], now)?.text ?? ''))
+    && /hips and pelvis feel on the skipping/.test(easeOffQuestion('Skipping rope', [{ ...knee, injury_code: 'hips' }], now)?.text ?? ''))
   const both = easeOffQuestion('Football', [{ ...knee, injury_code: 'ankles', expires_at: '2026-10-30T12:00:00' }, knee], now)
   check('two running: ONE question, about the one ending soonest', /knees feel on that session/.test(both?.text ?? ''), both)
   check('the chat asks it after the log, saved before it is shown, never blocking the write', /if \(receipt\.landed\.length > 0\) \{\s*const q = easeOffQuestion\(payload\.activityName, activeAdaptations, getAppNow\(profile\.id\)\)\s*if \(q\) followUp = \{ text: q\.text, chips: \[q\.fine, q\.hurtMessage\] \}/.test(confirm)

@@ -57,7 +57,7 @@ export function easeOffQuestion(activityName: string, adaptations: readonly Acti
   if (running.length === 0) return null
   // One question, about the area ending soonest if two are running (the one most likely to be tested by the run).
   const first = [...running].sort((a, b) => a.expires_at.localeCompare(b.expires_at))[0]
-  const label = (INJURY_OPTIONS.find(o => o.value === first.injury_code)?.label ?? first.injury_code!).toLowerCase()
+  const label = (INJURY_OPTIONS.find(o => o.value === first.injury_code)?.label ?? first.injury_code!).toLowerCase().replace(/ & /g, ' and ')
   const noun = activityNoun(activityName)
   return {
     text: `How did your ${label} feel on ${noun}? They're being eased off until ${endsOn(first.expires_at)}.`,
