@@ -193,3 +193,65 @@ chest-pain and bleeding replies, themes, timers, stopwatch pill, egg merging on 
 Wave 0, then 1, then 2-6. Each fix gets a check that fails on the old code, screens are driven at phone size, and a
 full sweep runs before anything goes to main. Deploys needed: the coach (`chat-gemini`) for A1, A4, B1-B4; a
 database step for the due date (A2) and the pause "back on" date (B1).
+
+## Wave M: Marcus (52, vegetarian, tree-nut allergy with an EpiPen, right-knee surgery), added 15 Nov 2026
+
+Three read-only traces found the causes below (code reading, not runs). Allergy first.
+
+### M-A. Allergy (safety)
+- **A1 A refused allergen was still saved as a like.** The refusal only blocks food CARDS; a "remember I like X" save
+  runs first and then has its words replaced. Fix (mechanical, he asked for it): every write of a liked food (chat
+  memory, Profile likes, setup's usual meals, hearts) checks the person's diet and allergens first; a clash saves
+  nothing and says why. The meal ranker already drops such a like on read, so the receipt "made with it in mind" was
+  also untrue.
+- **A2 How an allergy is kept.** Only as the "Nut-free" diet tag: no severity, no adrenaline, no traces, and one tag
+  for peanuts and tree nuts together. HIS DECISION (allergen band): a structured allergy record or not.
+- **A3 Allergy questions.** The Snickers turn was read as a food log (the prompt forbids that), so the allergy half was
+  dropped; the second reply was the app's refusal, which fires on any food word even in a question and ends "If you
+  don't have a nut allergy, change it on Profile". That last sentence is HIS 18 Oct ruling; the tester says never nudge
+  someone to remove an allergy. HIS DECISION. Mechanical regardless: an allergy QUESTION is answered (what the app can
+  and can't check, "read the label"), never treated as an add request, and every part of a two-part message is answered.
+
+### M-B. Chat food logging
+- **B1 "Chicken burger with chips" looped four times.** The food table has no chips (UK), fries, potato chips or chicken
+  burger; the unknown-food message asks "how much?" whatever amount is given, and nothing remembers it asked. The diet
+  is NOT filtering logs. Fix (mechanical): add those foods to both tables; an unknown food asks what it is or roughly
+  how many calories, never "how much" again after an amount; no identical question twice. "Estimate it for me" goes
+  against his 1 Oct ruling (ask, never estimate): HIS DECISION.
+- **B2 A log in a planned slot.** The sheet still shows the planned dish's ingredients and LEFTOVERS tag, with the note
+  at the bottom. Fix: a slot logged as something else shows the log; the old dish is one line ("Planned: X"), the
+  LEFTOVERS tag goes; the "too far" line names a next step (a bigger dinner or a snack).
+- **B3 "No calves" answered with "I couldn't find Sunday".** Part of "answer every part" (A3).
+- **B4 Eating out.** The control hides once a slot is logged; when shown, its picker may open below the fold. Drive it.
+
+### M-C. Plan and injury
+- **C1-C4 The knee.** The knee filter removes every knee-loading lift whose entry declares no explicit rule (leg press,
+  hack squat), keeps only knee-REHAB moves, and then promotes one (Step-Down) to the day's main lift; the replacement
+  ranker reads the knee only as a filter, so a step-up replaced a step-down. The calf slot is optional and the first to
+  go when the day is over time. MINE (CSCS), recorded in BACKLOG with the basis: a rehab drill is never a main lift;
+  a knee flag keeps knee-friendly loaded work (leg press, leg curl, leg extension at a lighter load) unless he says it
+  hurts; a "& Calves" day keeps one calf exercise; stair patterns are not offered as a replacement for each other when
+  the knee is flagged. The Remembers line "never your plan" stays true; the Injuries "Other" built today is where a
+  surgery note now goes.
+- **C2 "step-downs" not found.** The catalogue search has no plurals. Fix: plural and hyphen forms match; "8 sessions"
+  is right (every remaining week of the block), and the card will say "8 sessions over the next N weeks".
+- **C5/C6 Short sessions, two set counts.** "30-45" is sized as 37 minutes, football cuts sets after the time is set,
+  and a low recovery turns the time top-up off (the spare time becomes mobility). The banner counts two fresh plans,
+  not the stored one. Fix (mechanical): size against the top of the range he gave; the banner counts the stored week.
+- **C7 Football is shown on its day** ("Football tonight") instead of a plain rest card.
+- **C8 Loads.** Bench 27.5 kg is the calibration week's half-weight, by design; the warm-up ramp collapses to the
+  empty bar below about 40 kg. Fix: below a light working weight, fewer warm-up steps; the plate calculator opens at
+  the working weight; the first-session lift question does not ask squat or deadlift numbers of a flagged knee.
+- **C9 Week labels in a calibration block** say Calibration, not "Peak".
+
+### M-D. Session logging
+- D1 the sticky button and rest pill follow the set actually being done, and nothing moves under a finger after a tick;
+  D2 the reps box fits three digits and the odd-reps warning clears when the number changes; D4 one set count
+  everywhere, session history shows the name and a friendly date (W5/6 already has edit/delete); D5 drive a borrowed
+  session and see Monday the next day.
+
+### M-E. Setup, dates, shopping
+- E1 past days of week 1 read as "before your plan started" in the Program list (W3 dates); E2 no "leftovers" on the
+  first day; E3 "Snacks too" asked or left out, 45 max recorded as 45, the tour's overlay no longer hides what it
+  describes; E4 grocery aisles (chilled, bakery, tins, spices), "gravy granules made", near-duplicates merged; E4b the
+  "more options" card and "Freestyle this day" said in plain words.
