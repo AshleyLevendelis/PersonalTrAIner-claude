@@ -1,5 +1,6 @@
 import type * as React from 'react'
-import { Check, ChevronDown, ChevronRight, ChevronUp, MoreHorizontal, History, CalendarDays } from 'lucide-react'
+import { useRef } from 'react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, MoreHorizontal, History, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
@@ -68,8 +69,10 @@ export function WeekContextRow({
   days,
   todayName,
   todayDate,
-  selectedDay,
-  onSelectDay,
+  selectedDate,
+  onSelectDate,
+  onPage,
+  onBackToToday,
   weekNumber,
   totalWeeks,
   blockNumber,
@@ -93,9 +96,16 @@ export function WeekContextRow({
   todayName: string
   /** Today's date, so the line under the strip can say whether the new training week has begun. Optional: without it no line is drawn. */
   todayDate?: string
-  /** The day on screen — today, or the day being peeked at. Defaults to today. */
-  selectedDay?: string
-  onSelectDay: (dayName: string) => void
+  /** The date on screen — today, or the day being peeked at. Defaults to today. */
+  selectedDate?: string
+  onSelectDate: (date: string) => void
+  /**
+   * PAGE THE STRIP (his ruling 15 Nov 2026, "Next 7 days from today but arrow and swipe to see previous and next
+   * days"): -7 or +7. Absent, no arrows are drawn and a swipe does nothing.
+   */
+  onPage?: (step: number) => void
+  /** Shown while the strip is paged away from today: brings it back. */
+  onBackToToday?: () => void
   weekNumber: number
   totalWeeks: number
   blockNumber?: number
@@ -151,6 +161,19 @@ export function WeekContextRow({
 
   const pill = 'hit-slop-44 flex h-[30px] items-center gap-1 whitespace-nowrap rounded-full px-[11px] text-[0.75rem] font-semibold text-primary-text'
   const pillStyle = { background: 'rgba(var(--glow-rgb), .12)', border: '1px solid rgba(var(--glow-rgb), .3)' }
+  // A SWIPE ACROSS THE STRIP PAGES IT: left for later days, right for earlier ones. Mostly sideways and over 40px, so a
+  // scroll down the page or a tap on a day is never read as one.
+  const swipeFrom = useRef<{ x: number; y: number } | null>(null)
+  const onTouchStart = (e: React.TouchEvent) => { const t = e.touches[0]; swipeFrom.current = t ? { x: t.clientX, y: t.clientY } : null }
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const from = swipeFrom.current; swipeFrom.current = null
+    const t = e.changedTouches[0]
+    if (!from || !t || !onPage) return
+    const dx = t.clientX - from.x, dy = t.clientY - from.y
+    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy) * 1.5) onPage(dx < 0 ? 7 : -7)
+  }
+  const first = days[0]?.date, last = days[days.length - 1]?.date
+  const shortDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
 
   return (
     <div data-tour="extoday">
@@ -243,15 +266,18 @@ export function WeekContextRow({
         weekSummary && <div className="mt-2.5 flex items-baseline justify-between gap-3 text-[0.8125rem]" data-testid="week-view-line">{weekSummary.line}</div>
       ) : (
         <>
-          {/* THE DAY STRIP (Exercise Week X1): Monday to Sunday (his 15 Oct ruling), each day's short name over its date
+          {/* THE DAY STRIP (Exercise Week X1): today and the next six days, paged by the arrows or a swipe (his ruling
+              15 Nov 2026; it replaces Monday to Sunday for this strip, while every "this week" count stays Monday to
+              Sunday), each day's short name over its date
               and its mark. Today is outlined mint; the day on screen (a peek) is boxed; a done day carries a tick, a
               session still to come a dot, a missed day the warning dot, a rest day the dash (his 1 Nov "Dash on both").
               Tapping another day keeps the peek it always opened. A hairline before the first day of a new training
               week says where the week changes. */}
-          <div className="mt-4 grid grid-cols-7 gap-1" data-exercise-strip>
+          <div className="mt-4 grid grid-cols-7 gap-1" data-exercise-strip onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
             {days.map((d, i) => {
-              const isToday = d.dayName === todayName
-              const isSelected = d.dayName === (selectedDay ?? todayName)
+              // BY DATE: the strip can hold two Sundays' worth of days as it pages, so a weekday name is not a day.
+              const isToday = todayDate ? d.date === todayDate : d.dayName === todayName
+              const isSelected = d.date === (selectedDate ?? todayDate)
               const dot = stripDot(d.state)
               const rest = dot === 'none'
               const dateNum = Number(d.date.slice(8, 10))
@@ -259,8 +285,9 @@ export function WeekContextRow({
                 <button
                   key={d.date}
                   type="button"
-                  onClick={() => onSelectDay(d.dayName)}
+                  onClick={() => onSelectDate(d.date)}
                   data-strip-day={d.dayName}
+                  data-strip-date={d.date}
                   data-dot={dot}
                   data-week-boundary={i === boundary ? 'start' : undefined}
                   aria-current={isSelected ? 'date' : undefined}
@@ -299,6 +326,23 @@ export function WeekContextRow({
               )
             })}
           </div>
+
+          {onPage && first && last && (
+            <div className="mt-1 flex items-center justify-between gap-2" data-testid="strip-pager">
+              <button type="button" onClick={() => onPage(-7)} className="flex size-11 items-center justify-center rounded-full text-muted-foreground" aria-label="Show the 7 days before" data-testid="strip-prev">
+                <ChevronLeft className="size-4" aria-hidden />
+              </button>
+              <span className="min-w-0 truncate text-center text-[0.6875rem] text-muted-foreground" data-testid="strip-range">
+                {shortDate(first)} – {shortDate(last)}
+                {onBackToToday && (
+                  <button type="button" onClick={onBackToToday} className="hit-slop-44 ml-2 font-semibold text-primary-text" data-testid="strip-today">Today</button>
+                )}
+              </span>
+              <button type="button" onClick={() => onPage(7)} className="flex size-11 items-center justify-center rounded-full text-muted-foreground" aria-label="Show the next 7 days" data-testid="strip-next">
+                <ChevronRight className="size-4" aria-hidden />
+              </button>
+            </div>
+          )}
 
           {boundaryNote && <p className="mt-1.5 text-center text-[0.6875rem] text-muted-foreground" data-testid="week-boundary-note">{boundaryNote}</p>}
 

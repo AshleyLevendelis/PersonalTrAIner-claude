@@ -40,6 +40,11 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   Sunday (one reader, `readTrainingWeeks`). What still turns on the start day is the PLAN's position — "Week N
   of 16", blocks, phases and the calibration week — and the "Week 2 starts Thursday" mark that says so.
   `test:dashboard` §8, `test:coach-week-review`
+- **The Exercise strip starts TODAY: his ruling 15 Nov 2026, "Next 7 days from today but arrow and swipe to see previous
+  and next days"** (from three options; over Mon-Sun with a next-week arrow, and over flipping on Sunday). Today and the
+  six days after it; the arrows and a swipe page seven days back or forward, "Today" returns. It REPLACES "the Home and
+  Exercise strips stay Monday to Sunday" for the Exercise strip only; every "this week" count, the Week view and Home's
+  strip stay Monday to Sunday. A tapped day is a DATE, never a weekday name. `verify:live-test-nov14` C6-C10
 - **A food that can't be counted is asked about before any card — his rule, 15 Oct 2026 (run 7, M51)**, in his
   words: "if a food can't be counted, ask before showing the card; never show a total that quietly leaves it
   out." Both halves: the card builder refuses, the coach's log_meal asks in the same words. `test:meal-amounts`,

@@ -27,7 +27,7 @@ import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId, getExerciseEntry } from '@/lib/exercise-db'
 import { layoffStatus, easesWeights, easeWeightKg, easeAddedKg, layoffWeightFrom, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { getLastWorkingSessionDate } from '@/lib/set-log-store'
-import { addDays } from '@/lib/session-move'
+import { addDays, dayNameOf } from '@/lib/session-move'
 import { restartStillOffered } from '@/lib/plan-restart'
 import { layoffCardLine, layoffLiftNote, layoffRestartOffer } from '@/lib/coach-voice'
 import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds, dayLengthParts, formatDayLength, isMovementPrepRow } from '@/lib/session-duration'
@@ -228,7 +228,11 @@ export function TodayPanel({
     : plan
   const currentMesoWeekObj = hasMesocycle ? mesocycle.find(w => w.week_number === liveWeek) : undefined
 
-  const [peekDay, setPeekDay] = useState<string | null>(null)
+  // THE DAY ON SCREEN IS A DATE, not a weekday (his ruling 15 Nov 2026: the strip runs from today and pages back and
+  // forward, so "Sunday" can be today or next Sunday). peekDay, its weekday name, is derived below.
+  const [peekDate, setPeekDate] = useState<string | null>(null)
+  // How many days the strip has been paged from today: 0, -7, 7, 14...
+  const [stripOffset, setStripOffset] = useState(0)
   // XW3 (his Exercise Week handoff, 12 Nov 2026): the week on one screen, only when "Week" is tapped.
   const [weekOpen, setWeekOpen] = useState(false)
   // "What happened?" — the day on screen (a peeked day, else today).
@@ -309,7 +313,7 @@ export function TodayPanel({
     // verify:finish-check): every other write on this panel refreshes it, and
     // Finish did not, so today's cell stayed "due" and its count read 0 sets
     // until the app reloaded.
-    weekTrain.refresh()
+    refreshWeeks()
     onLogsUpdated?.()
     setSummaryCloseFailed(!!result.serverCloseFailed)
     if (result.nothingLogged) {
@@ -379,6 +383,28 @@ export function TodayPanel({
   }, [todayName, today, profileId])
 
   const weekTrain = useTrainingWeek(profileId, today, liveWeekPlan, planCreatedAt, logsVersion, mesocycle)
+  // THE STRIP'S OWN WINDOW (his ruling 15 Nov 2026, "Next 7 days from today but arrow and swipe to see previous and
+  // next days"): today and the six days after it, or wherever he has paged. Every count of "this week" stays on
+  // weekTrain, Monday to Sunday (his 15 Oct ruling); this one is for the days drawn and the day opened.
+  const stripStart = addDays(today, stripOffset)
+  const stripWeek = useTrainingWeek(profileId, today, liveWeekPlan, planCreatedAt, logsVersion, mesocycle, stripStart)
+  const peekDay = peekDate ? dayNameOf(peekDate) : null
+  const refreshWeeks = () => { weekTrain.refresh(); stripWeek.refresh() }
+  /** Open a date; today closes the peek. The strip pages to the week holding it, so the day opened is always drawn. */
+  const openPeek = (date: string | null) => {
+    if (!date || date === today) { setPeekDate(null); return }
+    setPeekDate(date)
+    const diff = Math.round((new Date(`${date}T12:00:00`).getTime() - new Date(`${today}T12:00:00`).getTime()) / 86_400_000)
+    if (diff < stripOffset || diff >= stripOffset + 7) setStripOffset(Math.floor(diff / 7) * 7)
+  }
+  /** A weekday named by a card ("tomorrow", "it's on Friday now"): the next date with that name, today included. */
+  const peekByName = (name: string) => {
+    for (let i = 0; i < 7; i++) { const d = addDays(today, i); if (dayNameOf(d) === name) { openPeek(d); return } }
+  }
+  /** Page the strip a week back or forward; the open day closes, so the strip and the card below never disagree. */
+  const pageStrip = (step: number) => { setPeekDate(null); setStripOffset(o => o + step) }
+  // A new day starts the strip at today again.
+  useEffect(() => { setStripOffset(0); setPeekDate(null) }, [today])
 
   const effectiveDayName = borrowedDayName ?? todayName
   // TODAY'S CELL, resolved by the hook that already holds the whole week.
@@ -478,7 +504,7 @@ export function TodayPanel({
       return "That didn't save — try again in a moment."
     }
     if (undoText) publishScreenEdit(recordScreenEdit(mesocycle, next.mesocycle, liveWeek, scope, undoText, Date.now()))
-    weekTrain.refresh()
+    refreshWeeks()
     onLogsUpdated?.()
     return null
   }
@@ -508,7 +534,7 @@ export function TodayPanel({
     })
     if (result.receipt.failed.length > 0) return say(result.receipt.failed[0].error)
     onMesocycleUpdated?.(result.mesocycle)
-    weekTrain.refresh()
+    refreshWeeks()
     onLogsUpdated?.()
     return null
   }
@@ -792,15 +818,15 @@ export function TodayPanel({
   }
 
   const openWhatHappened = () => {
-    const dayName = peekDay ?? todayName
-    const cell = weekTrain.days.find(d => d.dayName === dayName)
-    if (cell) setWhatHappened({ date: cell.date, dayName })
+    const date = peekDate ?? today
+    const cell = stripWeek.days.find(d => d.date === date) ?? weekTrain.days.find(d => d.date === date)
+    if (cell) setWhatHappened({ date: cell.date, dayName: cell.dayName })
   }
 
   const handleDoItToday = async (): Promise<boolean> => {
     if (!profileId) return false
     const ok = await setSessionMove(profileId, today, null)
-    if (ok) { weekTrain.refresh(); onLogsUpdated?.() }
+    if (ok) { refreshWeeks(); onLogsUpdated?.() }
     return ok
   }
 
@@ -1086,19 +1112,20 @@ export function TodayPanel({
   // whole session, so she reported the move had not worked. It had. One day
   // was giving two answers, which is the one thing the strip and the day view
   // may never do.
-  const peekCell = peekDay ? weekTrain.days.find(d => d.dayName === peekDay) : null
+  const peekCell = peekDate ? (stripWeek.days.find(d => d.date === peekDate) ?? weekTrain.days.find(d => d.date === peekDate) ?? null) : null
   const peekMovedTo = peekCell?.movedTo ?? null
   // A DAY BEFORE THE PLAN BEGAN HAS NO WORKOUT (his report 15 Nov 2026: a profile made on Sunday the 15th opened
   // "MONDAY · Push & Press" for Monday the 9th). The strip already drew it as before the plan; the fallback to the plan's
   // weekday row brought the session back. The cell is the answer, as it is everywhere else on this screen.
   const peekBeforePlan = peekCell?.state === 'before_plan'
   const peekWorkout = peekDay && !peekMovedTo && !peekBeforePlan
-    ? (peekCell?.session ?? liveWeekPlan.find(d => d.day === peekDay))
+    // The cell's own session, looked up in the plan week ITS date falls in; a day next week is next week's.
+    ? (peekCell ? peekCell.session ?? null : liveWeekPlan.find(d => d.day === peekDay))
     : null
   // The peeked day's reference — a swap opened from the peek writes to the
   // row the session LIVES in (Monday's, for a session moved to Friday), and
   // a day swapped for football or rested on purpose opens none.
-  const peekRef: SessionRef | null = peekCell ? sessionRefFromCell(peekCell, liveWeek) : null
+  const peekRef: SessionRef | null = peekCell ? sessionRefFromCell(peekCell, peekCell.planWeek ?? liveWeek) : null
   // The working sets logged on the peeked day (the week hook already holds
   // them) — "What you did" leads when there are any (run 5, M47).
   const peekDidLogs = peekCell?.workingLogs ?? []
@@ -1106,18 +1133,18 @@ export function TodayPanel({
   // coach's card and the What happened sheet call; a write that does not land says so here.
   const peekWeekOf = (d: string) => getActiveMesocycleWeek(planCreatedAt, new Date(`${d}T12:00:00`), mesocycle?.length || 4)
   const peekMissed = peekCell && profileId
-    ? missedDayView({ cell: peekCell, today, plan: liveWeekPlan, weekOf: peekWeekOf, moves: weekTrain.moves })
+    ? missedDayView({ cell: peekCell, today, plan: liveWeekPlan, weekOf: peekWeekOf, moves: stripWeek.moves })
     : null
   const [missedBusy, setMissedBusy] = useState(false)
   const [missedError, setMissedError] = useState<string | null>(null)
-  useEffect(() => { setMissedError(null) }, [peekDay])
+  useEffect(() => { setMissedError(null) }, [peekDate])
   const runMissed = async (write: () => Promise<boolean>) => {
     setMissedBusy(true); setMissedError(null)
     let ok = false
     try { ok = await write() } catch (e) { console.error('[missed-day]', e) }
     setMissedBusy(false)
     if (!ok) { setMissedError("That didn't save, so nothing changed. Try again in a moment."); return }
-    weekTrain.refresh(); onLogsUpdated?.()
+    refreshWeeks(); onLogsUpdated?.()
   }
 
   // Turn 5: session-progress 2px line — total sets logged today across every
@@ -1387,11 +1414,13 @@ export function TodayPanel({
   return (
     <div className="space-y-3">
       <WeekContextRow
-        days={weekTrain.days}
+        days={stripWeek.days}
         todayName={todayName}
         todayDate={today}
-        selectedDay={peekDay ?? todayName}
-        onSelectDay={d => setPeekDay(d === todayName ? null : d)}
+        selectedDate={peekDate ?? today}
+        onSelectDate={openPeek}
+        onPage={pageStrip}
+        onBackToToday={stripOffset !== 0 ? () => { setPeekDate(null); setStripOffset(0) } : undefined}
         weekNumber={liveWeek}
         totalWeeks={totalWeeks}
         blockNumber={currentMesoWeekObj?.block_number}
@@ -1408,7 +1437,7 @@ export function TodayPanel({
         onToggleExpanded={setWeekNotesOpen}
         hero={heroLeft}
         weekOpen={weekOpen}
-        onToggleWeek={() => { setWeekOpen(o => !o); setPeekDay(null) }}
+        onToggleWeek={() => { setWeekOpen(o => !o); setPeekDate(null) }}
         weekSummary={{
           range: weekRangeLabel(weekTrain.days.map(d => d.date)),
           line: (
@@ -1433,7 +1462,7 @@ export function TodayPanel({
         moves={weekTrain.moves}
         weekOf={d => getActiveMesocycleWeek(planCreatedAt, new Date(`${d}T12:00:00`), mesocycle?.length || 4)}
         weekNumber={liveWeek}
-        onChanged={() => { weekTrain.refresh(); onLogsUpdated?.() }}
+        onChanged={() => { refreshWeeks(); onLogsUpdated?.() }}
         onShorten={shortenToday}
         onLighter={lighterToday}
         onLighterPlan={lighterPlan}
@@ -1470,7 +1499,7 @@ export function TodayPanel({
         <ExerciseWeekView
           days={weekTrain.days}
           todayName={todayName}
-          onOpenDay={d => { setWeekOpen(false); setPeekDay(d === todayName ? null : d) }}
+          onOpenDay={d => { setWeekOpen(false); openPeek(weekTrain.days.find(c => c.dayName === d)?.date ?? null) }}
           renderDay={(cell, limit) => {
             const ref = sessionRefFromCell(cell, liveWeek)
             return cell.session ? (
@@ -1493,10 +1522,10 @@ export function TodayPanel({
             <p className="text-muted-foreground">{peekDay}'s session is on {peekMovedTo.dayName} now.</p>
             {/* Real buttons, not 16px text links (whole-app QA walk, 7 Nov 2026): a gym-floor tap needs 44px. */}
             <div className="mt-3 flex flex-wrap justify-center gap-2">
-              <Button size="sm" variant="outline" className="min-h-11" data-testid="peek-see-moved" onClick={() => setPeekDay(peekMovedTo.dayName === todayName ? null : peekMovedTo.dayName)}>
+              <Button size="sm" variant="outline" className="min-h-11" data-testid="peek-see-moved" onClick={() => openPeek(peekMovedTo.date)}>
                 See {peekMovedTo.dayName} →
               </Button>
-              <PeekBackToToday onClick={() => setPeekDay(null)} />
+              <PeekBackToToday onClick={() => setPeekDate(null)} />
             </div>
           </div>
         ) : !peekWorkout || peekWorkout.exercises.length === 0 ? (
@@ -1518,7 +1547,7 @@ export function TodayPanel({
                 : peekWorkout?.conditioning_note
                 ? `${peekDay} is a rest day. Optional: ${peekWorkout.conditioning_note}`
                 : `${peekDay} is a rest or recovery day.`}
-              <div className="mt-3 flex justify-center"><PeekBackToToday onClick={() => setPeekDay(null)} /></div>
+              <div className="mt-3 flex justify-center"><PeekBackToToday onClick={() => setPeekDate(null)} /></div>
             </div>
           </div>
         ) : (
@@ -1577,7 +1606,7 @@ export function TodayPanel({
                 dayLabel={peekDay}
                 movedFromDayName={peekCell?.movedFrom?.dayName ?? null}
                 sessionLength={sessionEstimate.length}
-                onExit={() => setPeekDay(null)}
+                onExit={() => setPeekDate(null)}
                 onSwap={(exIndex, name) => peekRef && editTarget(peekRef).ok && onOpenSwap(peekRef.planDayName, exIndex, name, peekRef.sayDay)}
                 onBan={handleBan}
                 onOpenDetail={onOpenDetail}
@@ -1592,7 +1621,7 @@ export function TodayPanel({
           toDayName={movedAwayTo.dayName}
           weekTally={{ done: weekTrain.sessionsDone, planned: weekTrain.sessionsPlanned, left: weekTrain.sessionsLeft }}
           tomorrow={tomorrowPreview}
-          onPeek={d => setPeekDay(d)}
+          onPeek={peekByName}
           onDoItToday={handleDoItToday}
         />
       ) : isRestDay ? (
@@ -1600,7 +1629,7 @@ export function TodayPanel({
           dayName={todayName}
           weekTally={{ done: weekTrain.sessionsDone, planned: weekTrain.sessionsPlanned, left: weekTrain.sessionsLeft }}
           tomorrow={tomorrowPreview}
-          onPeek={d => setPeekDay(d)}
+          onPeek={peekByName}
           trainAnywayOptions={trainAnyway}
           onTrainAnyway={setBorrowedDayName}
           onAddCardio={handleAddCardio}
@@ -1610,7 +1639,7 @@ export function TodayPanel({
           workout={workout!}
           weekTally={{ done: weekTrain.sessionsDone, planned: weekTrain.sessionsPlanned, left: weekTrain.sessionsLeft }}
           tomorrow={tomorrowPreview}
-          onPeek={d => setPeekDay(d)}
+          onPeek={peekByName}
           onAddCardio={handleAddCardio}
           raceDate={profile?.running_goal ? profile?.running_race_date ?? null : null}
         />
@@ -1650,7 +1679,7 @@ export function TodayPanel({
             day={weekTrain.days.find(d => d.date === today)}
             session={workout}
             workingSetsToday={logs.filter(l => !l.is_warmup && (l.drop_index ?? 0) === 0).length}
-            onChanged={() => { weekTrain.refresh(); onLogsUpdated?.() }}
+            onChanged={() => { refreshWeeks(); onLogsUpdated?.() }}
           />
           {pausedToday && (
             <InsightBanner tone="ai" className="flex-col" data-testid="plan-paused-card">
@@ -1986,7 +2015,7 @@ export function TodayPanel({
         mesocycle={mesocycle}
         profileId={profileId}
         onMesocycleUpdated={onMesocycleUpdated}
-        onPutBack={() => { weekTrain.refresh(); onLogsUpdated?.() }}
+        onPutBack={() => { refreshWeeks(); onLogsUpdated?.() }}
         loggedToday={loggedWorkingToday}
         bottom={`calc(${TAB_BAR_HEIGHT_PX}px + env(safe-area-inset-bottom) + ${dockHeightPx > 0 ? dockHeightPx + 12 : 0}px + ${
           !peekWorkout && !isRestDay && !isActiveRecovery && workout && (status === 'running' || (status === 'idle' && !heroStartInView)) ? 96 : 12

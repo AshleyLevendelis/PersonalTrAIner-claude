@@ -381,6 +381,13 @@ export function useTrainingWeek(
    * every day uses `plan`, which is what every caller did before 6 Oct 2026.
    */
   mesocycle?: MesocycleWeek[],
+  /**
+   * THE FIRST DAY OF THE WINDOW, when it is not the Monday (his ruling 15 Nov 2026, "Next 7 days from today but arrow
+   * and swipe to see previous and next days"): the Exercise strip runs from today, or from wherever he has paged to.
+   * Its tally then counts THAT window, so a screen showing a "this week" count reads it from a Monday call, never
+   * from this one (his 15 Oct ruling, every "this week" count is Monday to Sunday).
+   */
+  windowStart?: string,
 ): TrainingWeekResult {
   const [dashboard, setDashboard] = useState<WeeklyDashboardDay[]>([])
   // A SECOND READ, deliberately: a move's two ends need not sit in the same
@@ -391,7 +398,7 @@ export function useTrainingWeek(
 
   const refresh = useCallback(() => {
     if (!profileId || !sessionDate) return
-    const monday = mondayOf(new Date(sessionDate + 'T12:00:00'))
+    const monday = windowStart ? new Date(windowStart + 'T12:00:00') : mondayOf(new Date(sessionDate + 'T12:00:00'))
     const sunday = new Date(monday)
     sunday.setDate(sunday.getDate() + 6)
     setLoading(true)
@@ -416,7 +423,7 @@ export function useTrainingWeek(
     // in the body — it exists to force this callback (and the effect below
     // that runs it) to re-fire when a day changed underneath us.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, sessionDate, refreshToken])
+  }, [profileId, sessionDate, refreshToken, windowStart])
 
   useEffect(() => {
     refresh()
@@ -436,7 +443,8 @@ export function useTrainingWeek(
     return () => { off(); if (timer) clearTimeout(timer) }
   }, [profileId, refresh])
 
-  const monday = sessionDate ? mondayOf(new Date(sessionDate + 'T12:00:00')) : new Date(getAppNow(profileId))
+  const monday = windowStart ? new Date(windowStart + 'T12:00:00')
+    : sessionDate ? mondayOf(new Date(sessionDate + 'T12:00:00')) : new Date(getAppNow(profileId))
   const days = buildTrainingWeekDays({ monday, today: sessionDate, plan, mesocycle, planCreatedAt, dashboard, moves, loading, pausedSince: planPausedSince(profileId) })
 
   const { sessionsDone, sessionsPlanned, sessionsLeft } = tallyWeek(days, sessionDate)

@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **THE EXERCISE STRIP STARTS TODAY (his ruling 15 Nov 2026, "Next 7 days from today but arrow and swipe to see
+  previous and next days")**, from three options (over Mon-Sun plus a next-week arrow, and over flipping on Sunday). His
+  report: on a Sunday the strip showed only the week ending, so nothing upcoming. Now: today and the next six days; the
+  arrows (44px) and a sideways swipe page seven days back or forward; the dates show under the strip with "Today" to
+  come back. Every "this week" count, the Week view and Home's strip stay Monday to Sunday (his 15 Oct ruling), read
+  from a separate Monday window. A tapped day is now a DATE, not a weekday name, so next Monday can never open last
+  Monday (it did, under a mutation: "Monday was before your plan began"), and a day opened from a card ("tomorrow")
+  pages the strip to show it. Also: a day in another plan week edits that week, not this one (the peek's week number
+  came from today). `verify:live-test-nov14` C6-C10, screenshot read; 5 mutations, 3 caught; the 2 missed are
+  equivalent where a 7-day strip can reach (a weekday never repeats inside one window, and the old session fallback
+  differs only when another plan week rests on a day this one trains, not in the fixture). Home's strip unchanged:
+  his question was about Exercise.
 - [x] **A DAY BEFORE THE PLAN BEGAN OPENS AS ONE (his report 15 Nov 2026, live app: a profile made on Sunday the 15th,
   and tapping Monday the 9th on the Exercise strip opened "MONDAY · Push & Press")**. The strip and the Week list
   already knew the day was before the plan (14 Nov), but the panel a tapped day opens fell back to the plan's raw

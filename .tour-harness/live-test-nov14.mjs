@@ -152,7 +152,40 @@ await page.locator('[data-testid="week-pill"]').click({ timeout: 6000 }).catch((
 await wait(600)
 const firstBefore = before[0]?.date
 const beforeName = firstBefore ? new Date(`${firstBefore}T12:00:00`).toLocaleDateString('en-GB', { weekday: 'long' }) : null
-if (beforeName) await page.locator(`[data-strip-day="${beforeName}"]`).first().click({ timeout: 6000 }).catch(() => {})
+// C6-C9 (his ruling 15 Nov 2026, "Next 7 days from today but arrow and swipe to see previous and next days").
+const stripDates = () => page.evaluate(() => [...document.querySelectorAll('[data-exercise-strip] [data-strip-date]')].map(n => ({ date: n.getAttribute('data-strip-date'), label: n.textContent.replace(/\s+/g, ' ').trim() })))
+const plusDays = (d, n) => { const x = new Date(`${d}T12:00:00`); x.setDate(x.getDate() + n); return x.toLocaleDateString('en-CA') }
+const s0 = await stripDates()
+const todayIso = s0[0]?.date
+await shot('strip-from-today')
+check('C6. the strip starts today and runs seven days', s0.length === 7 && /^Today/.test(s0[0]?.label ?? '') && s0[6]?.date === plusDays(todayIso, 6), s0)
+// A swipe to the left shows the next seven days.
+await page.evaluate(() => {
+  const el = document.querySelector('[data-exercise-strip]'); const r = el.getBoundingClientRect(); const y = r.top + r.height / 2
+  const touch = x => new Touch({ identifier: 1, target: el, clientX: x, clientY: y })
+  el.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: [touch(r.right - 20)], changedTouches: [touch(r.right - 20)] }))
+  el.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [], changedTouches: [touch(r.left + 20)] }))
+})
+await wait(1000)
+const s1 = await stripDates()
+check('C7. a swipe left shows the next seven days, with a way back to today', s1[0]?.date === plusDays(todayIso, 7) && !s1.some(d => /^Today/.test(d.label)) && await page.locator('[data-testid="strip-today"]').count() === 1, s1)
+await page.locator('[data-testid="strip-today"]').click({ timeout: 6000 }).catch(() => {})
+await wait(800)
+const s2 = await stripDates()
+check('C8. "Today" brings the strip back to today', s2[0]?.date === todayIso, s2)
+// A WEEKDAY IS NOT A DAY: the same weekday a week after a day before the plan is a plan day, and opens as one.
+const sameNameLater = firstBefore ? plusDays(firstBefore, 7) : null
+if (sameNameLater) await page.locator(`[data-strip-date="${sameNameLater}"]`).first().click({ timeout: 6000 }).catch(() => {})
+await wait(1200)
+const later = await page.evaluate(() => ({ rest: document.querySelector('[data-testid="peek-rest-day"]')?.textContent?.replace(/\s+/g, ' ').trim() ?? null, rows: document.querySelectorAll('[data-exercise-name]').length, plan: !!document.querySelector('[data-testid="peek-plan"]'), selected: document.querySelector('[data-exercise-strip] [aria-current="date"]')?.getAttribute('data-strip-date') ?? null }))
+check('C10. the same weekday next week opens as next week\'s day, never as the day before the plan', !!sameNameLater && later.selected === sameNameLater && !/before your plan began/.test(later.rest ?? '') && (later.plan || !!later.rest), { sameNameLater, ...later })
+await page.locator('[data-testid="strip-today"], [data-strip-date="' + todayIso + '"]').first().click({ timeout: 6000 }).catch(() => {})
+await wait(800)
+await page.locator('[data-testid="strip-prev"]').click({ timeout: 6000 }).catch(() => {})
+await wait(1000)
+const s3 = await stripDates()
+check('C9. the back arrow shows the seven days before today, the plan\'s first days among them', s3[0]?.date === plusDays(todayIso, -7) && s3.some(d => d.date === firstBefore), s3)
+if (firstBefore) await page.locator(`[data-strip-date="${firstBefore}"]`).first().click({ timeout: 6000 }).catch(() => {})
 await wait(1200)
 const panel = await page.evaluate(() => ({ rest: document.querySelector('[data-testid="peek-rest-day"]')?.textContent?.replace(/\s+/g, ' ').trim() ?? null, rows: document.querySelectorAll('[data-exercise-name]').length, text: document.body.innerText.slice(0, 600) }))
 check('C4. tapping a day before the plan says so, and names no workout', !!beforeName && /was before your plan began/.test(panel.rest ?? ''), { beforeName, rest: panel.rest })
