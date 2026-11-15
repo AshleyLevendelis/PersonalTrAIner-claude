@@ -309,3 +309,43 @@ Two read-only traces (code reading; her saved data was not visible). Causes, the
 - Side and trigger ("left, overhead, weight on hands"): the "Other (describe)" built today keeps the words for the
   coach; an overhead / weight-on-hands filter is a later build (mine, CSCS), listed.
 - "Are the floor press and dead bug ok?" was half answered: part of "answer every part".
+
+## Wave P: consistency, wording and layout (his "more findings", 15 Nov 2026; after the current fixes)
+
+ALREADY FIXED TODAY (do not redo): "Lunch don't fit... loosen a restriction" (33990c98); "I couldn't count chips in
+Chips" (96dd524e); "Meals planned... kcal under" mid-build (33990c98); the allergy "change it on Profile" line
+(d82255b0); refused foods saved as likes (28d812b2); the nurse's protein (7ed471e6).
+
+ALREADY PLANNED ELSEWHERE IN THIS FILE: A1 week 1 in the past (W3 dates, E1); A5 reminders off state and his "Set your
+own quiet hours" (W5/6, N-C); A6 equipment one control (N-C); C2 Eating out off screen (M-B4); C4 session length under
+30 (N-C, 20-30 min, mine); C9 duplicate notes (W5/6); C12 logging layout (M-D); B4 activity, flexible days, goal option
+(N-C); B3/D "one Log food flow" (W4).
+
+NEW, mechanical (mine):
+- A2 one session length everywhere, warm-up included, from one function (plan, Home, coach, preview).
+- A3 "Starting from": the walking start needs Sedentary + beginner (`isStartingOut`), so the control can do nothing;
+  show it only where it applies, say so where it does not, and offer it at setup to a beginner (N-C fixes activity).
+- A4 schedule: "Leave it as it is" puts the ticked days back (the goal pattern of 14 Nov); buttons "Keep my plan" /
+  "Rebuild"; tick several days, then one rebuild offer.
+- A7 one word for a meal's state (PLANNED vs OPEN).
+- A8 Home card: no "0 of 0", no repeated "none this week", the strip marks training days.
+- A9 Remembers copy: true of what each kind of note does (a sport or injury note changes the plan; a tone note does not).
+- A10 Appearance preview: the person's own numbers, or plainly marked samples.
+- B1 hourglass glyph; "won't eat/do <exercise>" reads "Avoid: <exercise>"; offer cards never echo his sentence as an
+  effect line; "Reply speed" not under "Tone".
+- B2 a plain-words pass for beginners (Anatomical Adaptation, RPE, Full Body Power, Dynamic CSCS, Tabata/EMOM,
+  Minimalist, "standard" tag), with a one-line explainer where the word must stay.
+- B3 labels on the heart, Move, Eating out, Regenerate and "+" buttons; Freestyle explained and confirmed; "What
+  happened?" on a day with no session says so in words.
+- B4 setup: the meals placeholder suits the diet; the days question's minutes match the chip.
+- B5 one answer per bubble (a card's text never joins the previous answer).
+- C1 Nutrition: one status area (target, planned, gap, one fix); warnings hidden in Freestyle.
+- C3 dialog buttons disabled until the preview has loaded.
+- C5 Home hero on a rest day: next session, today's targets, one action.
+- C6 "Did you move today?": one tap first, the details optional behind it.
+- C7 practical quantities (no "17 g passata", "¾ tsp"), 44px Change links.
+- C8 swap options that close a big gap, not six of the same size.
+- C10 Clear chat says what it clears. C11 one Back label; deep links honoured.
+
+HIS (asked when reached): flexible days; a "get started / feel better" goal; one "Log food" flow (merges four entry
+points); a first-week beginner mode.
