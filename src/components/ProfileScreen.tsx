@@ -11,6 +11,8 @@
 // ---------------------------------------------------------------------------
 
 import { PAUSE_WORDS } from '@/lib/plan-pause'
+import { otherInjuryOutcome, PELVIC_PREGNANCY_LINE } from '@/lib/other-injury'
+import { HURT_KINDS, type HurtKind } from '@/lib/edit-reason'
 import { HEALTH_CONDITION_OPTIONS, healthConditionsOf, hasHealthCondition, healthConditionLine, mealRestrictionsOf, isPregnant, pregnancyWeeksOn } from '@/lib/health-conditions'
 import { ENJOYED_ACTIVITY_OPTIONS } from '@/lib/pathway'
 import { RUNNING_GOAL_OPTIONS, isRunningGoal, raceDateWords } from '@/lib/running'
@@ -1431,6 +1433,14 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 </ToggleGroupItem>
               ))}
             </ToggleGroup>
+            {isPregnant(profile) && injuryCodes.includes('hips') && (
+              <p className="text-[0.6875rem] leading-snug text-muted-foreground" data-testid="profile-pelvic-pregnancy">{PELVIC_PREGNANCY_LINE}</p>
+            )}
+            <OtherInjury
+              pregnant={isPregnant(profile)}
+              onTick={(code) => savePatch({ injuries: [...injuryCodes.filter(c => c !== code), code, ...unrecognisedInjuries] })}
+              onSave={(text) => savePatch({ injuries: [...injuryCodes, ...unrecognisedInjuries.filter(u => u.toLowerCase() !== text.toLowerCase()), text] })}
+            />
             {unrecognisedInjuries.length > 0 && (
               /* Kept, not deleted. These were typed when the field was free
                  text; they never changed the plan, and quietly removing them
@@ -2259,5 +2269,46 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** "Other (describe)" on the injuries list (his ruling 15 Nov 2026): what hurts, then the same three questions as any
+ *  pain. The answer is worked out in other-injury.ts; this only draws it. */
+function OtherInjury({ pregnant, onTick, onSave }: { pregnant: boolean; onTick: (code: string) => void; onSave: (text: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState('')
+  const [message, setMessage] = useState<string | null>(null)
+  const answer = (kind: HurtKind) => {
+    const out = otherInjuryOutcome(text, kind, { pregnant, areaLabel: (code) => INJURY_OPTIONS.find(o => o.value === code)?.label ?? code })
+    if (out.action === 'tick') onTick(out.code)
+    if (out.action === 'save') onSave(out.text)
+    setMessage(out.message)
+    if (out.action !== 'none' || kind !== 'niggle') setText('')
+  }
+  if (!open) {
+    return (
+      <button type="button" data-testid="injury-other-open" onClick={() => { setOpen(true); setMessage(null) }}
+        className="h-11 rounded-full border border-dashed px-3 text-[0.6875rem] text-muted-foreground">
+        ＋ Other (describe)
+      </button>
+    )
+  }
+  return (
+    <div className="space-y-2 rounded-lg border p-2.5" data-testid="injury-other">
+      <label htmlFor="injury-other-text" className="text-[0.6875rem] font-medium">What hurts, and where?</label>
+      <Input id="injury-other-text" data-testid="injury-other-text" value={text} onChange={e => { setText(e.target.value); setMessage(null) }}
+        placeholder="e.g. my right big toe" className="h-11 text-sm" />
+      <div className="flex flex-col gap-1.5">
+        {HURT_KINDS.map(k => (
+          <button key={k.kind} type="button" data-testid={`injury-other-${k.kind}`} disabled={!text.trim()}
+            onClick={() => answer(k.kind)}
+            className="min-h-11 rounded-full border px-3 text-left text-[0.75rem] disabled:opacity-50">
+            {k.label}
+          </button>
+        ))}
+      </div>
+      {message && <p className="text-[0.75rem] leading-snug" role="status" data-testid="injury-other-message">{message}</p>}
+      <button type="button" className="h-11 text-[0.6875rem] text-muted-foreground underline" onClick={() => { setOpen(false); setText(''); setMessage(null) }}>Close</button>
+    </div>
   )
 }

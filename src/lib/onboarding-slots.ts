@@ -245,6 +245,8 @@ export function normaliseInjuryCode(raw: string): string | null {
     const singular = code.endsWith('s') ? code.slice(0, -1) : code
     if (key === code || key === label || key === singular) return code
   }
+  // The pelvis is the hip option's own label since 15 Nov 2026 (his "Hips & pelvis"), not a guess.
+  if (key === 'pelvis' || key === 'pelvic') return 'hips'
   return null
 }
 

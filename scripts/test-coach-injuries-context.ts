@@ -57,7 +57,11 @@ console.log('\n1. The summary is correct on its own\n')
   // quoted back, but its PRESENCE still changes the wording rather than
   // being reported as an absence.
   const unrecognisedOnly = buildCoachInjuriesSummary(profileWith(['a dodgy elbow from cricket']))
-  check('unrecognised free text is never echoed verbatim', !/cricket/i.test(unrecognisedOnly), unrecognisedOnly)
+  // CHANGED 15 Nov 2026 ("Other (describe)", his ruling): typed words are now a deliberate entry the Profile says the
+  // coach will know about, so they ARE quoted, but only inside the sentence saying the plan does not adjust for them
+  // (the risk this check existed for was the coach treating them as adjusted for).
+  check('unrecognised free text is quoted only with "does NOT adjust"', /"a dodgy elbow from cricket"/.test(unrecognisedOnly) && /in their own words, which the plan does NOT adjust for automatically: "a dodgy elbow/.test(unrecognisedOnly), unrecognisedOnly)
+  check('...and never as something being worked around', !/working around:[^.]*cricket/i.test(buildCoachInjuriesSummary(profileWith(['knees', 'a dodgy elbow from cricket']))))
   check('...but its presence is not reported as "no injuries on file"',
     !/no injuries/i.test(unrecognisedOnly), unrecognisedOnly)
   check('...distinct wording from the genuinely-empty case',

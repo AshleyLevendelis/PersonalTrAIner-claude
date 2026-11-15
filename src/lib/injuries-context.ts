@@ -19,10 +19,10 @@
 // Built from partitionInjuries (onboarding-slots.ts), the SAME function the
 // Profile screen uses to turn stored injuries into what the plan engine
 // actually acts on — never a second copy of that logic. Only the recognised
-// codes are surfaced: the unrecognised (legacy free-text, pre-picker) half
-// is real stored data but affects no exercise, and surfacing it here would
-// risk the coach treating stale, unstructured text as something adjusted
-// for when nothing was.
+// codes are WORKED AROUND: the unrecognised half affects no exercise. Since
+// 15 Nov 2026 ("Other (describe)", his ruling) it is quoted, but only inside a
+// sentence saying the plan does NOT adjust for it, so the coach cannot take it
+// for something adjusted for.
 // ---------------------------------------------------------------------------
 
 import { partitionInjuries } from './onboarding-slots'
@@ -33,8 +33,8 @@ import { endsOn, isAdaptationActive, type ActiveAdaptationLike } from './effecti
 /**
  * One plain line for the coach's context.
  *
- * `unrecognised` (legacy free text the plan engine cannot act on) is never
- * quoted back — that is the safety property this file exists to hold — but
+ * `unrecognised` (free text the plan engine cannot act on) is quoted only as
+ * NOT adjusted for — that is the safety property this file exists to hold — and
  * its PRESENCE still changes the wording: claiming nothing is "on file" when
  * something genuinely is stored, just not actionable, would be the same
  * overclaim this codebase's honesty rules exist to catch, pointed at an
@@ -61,13 +61,18 @@ export function buildCoachInjuriesSummary(
   const easing = temporary.length > 0
     ? ` Temporarily easing off: ${temporary.join(', ')} — those days of the plan are already adjusted, and it ends on that date or as soon as they say it has cleared.`
     : ''
+  // Their own words for anything outside the eight areas ("Other (describe)", his 15 Nov ruling): the plan cannot
+  // adjust for them, and the Profile tells them the coach knows, so the coach is given the words.
+  const own = unrecognised.length > 0
+    ? ` Also on file in their own words, which the plan does NOT adjust for automatically: ${unrecognised.map(u => `"${u}"`).join(', ')}.`
+    : ''
   if (codes.length === 0) {
-    if (temporary.length > 0) return `Nothing lasting on file.${easing}`
+    if (temporary.length > 0) return `Nothing lasting on file.${easing}${own}`
     return unrecognised.length > 0
-      ? 'Nothing on file that the plan currently adjusts for automatically.'
+      ? `Nothing on file that the plan currently adjusts for automatically.${own}`
       : 'No injuries or sore areas currently on file.'
   }
   const labels = codes.map(c => INJURY_OPTIONS.find(o => o.value === c)?.label ?? c)
   const plural = labels.length > 1
-  return `Currently working around: ${labels.join(', ')} — the plan already avoids exercises that load ${plural ? 'these' : 'this'}.${easing}`
+  return `Currently working around: ${labels.join(', ')} — the plan already avoids exercises that load ${plural ? 'these' : 'this'}.${easing}${own}`
 }

@@ -41,7 +41,7 @@ export const INJURY_OPTIONS: { value: string; icon: string; label: string }[] = 
   { value: 'shoulders', icon: '💪', label: 'Shoulders' },
   { value: 'neck', icon: '🧣', label: 'Neck' },
   { value: 'wrists', icon: '✋', label: 'Wrists' },
-  { value: 'hips', icon: '🦴', label: 'Hips' },
+  { value: 'hips', icon: '🦴', label: 'Hips & pelvis' },
   { value: 'ankles', icon: '🦶', label: 'Ankles' },
   { value: 'elbows', icon: '🤜', label: 'Elbows' },
 ]
