@@ -58,5 +58,17 @@ await clickAt(`document.querySelector('[data-next-set-button]')`)
 const l4 = await until(label, v => v !== l3, 20)
 check('3. ...while a press a moment later logs the next set (the button moves on)', typeof l3 === 'string' && l4 !== l3, { l3, l4 })
 
+// --- 5. FOLLOW WHAT HE IS DOING (Marcus, 15 Nov 2026): he skips a set and ticks the one after it by hand; the button
+// goes on from there and does not go back to the one he skipped.
+const openTicks = () => ev(`[...document.querySelectorAll('[data-exercise-now] [data-set-tick]')].map(t => ({ open: t.dataset.setTick === 'open', set: t.dataset.nextSet ?? null, w: t.dataset.nextWeight ?? '' }))`)
+const ot = (await openTicks()) ?? []
+const open = ot.filter(t => t.open && t.set)
+check('5a. fixture: the lift marked NOW has at least three open sets, the second loggable without typing', open.length >= 3 && open[1].w !== '', ot)
+await clickAt(`[...document.querySelectorAll('[data-exercise-now] [data-set-tick="open"]')].filter(t => t.dataset.nextSet)[1]`)
+await wait(1200)
+const l5 = await label()
+check('5b. after he ticks the set AFTER the next one, the button names the set after that, not the one he skipped', typeof l5 === 'string' && !!open[2] && l5.toLowerCase().includes(open[2].set.toLowerCase()) && !l5.toLowerCase().includes(`log ${open[0].set.toLowerCase()} `), { l5, skipped: open[0]?.set, expected: open[2]?.set })
+await shoot('next-set-follows')
+
 check('4. no uncaught error on the page', (await ev('window.__err ?? null')) === null, await ev('window.__err ?? null'))
 await finish('verify:next-set-now PASSED')

@@ -61,7 +61,7 @@ console.log('\n1. The words on the running button')
     /data-next-reps-box=\{[^}]*`setgrid-reps-\$\{exerciseId\}-\$\{rowKey\(ref\)\}`/.test(grid) && /id=\{`setgrid-reps-\$\{exerciseId\}-\$\{k\}`\}/.test(grid))
 }
 
-console.log('\n2. The button reads the FIRST set still to log, and its lift')
+console.log('\n2. With nothing logged, the button reads the FIRST set still to log, and its lift')
 {
   // A stand-in for the list: two open rows, the first with a tick to save.
   const tick = (data: Record<string, string>, name: string) => ({
@@ -70,12 +70,32 @@ console.log('\n2. The button reads the FIRST set still to log, and its lift')
   })
   const first = tick({ nextSet: 'Set 2', nextWeight: '32.5', nextUnit: 'kg', nextReps: '11', nextWeightBox: 'b1' }, 'T-Bar Rows')
   const second = tick({ nextSet: 'Set 1', nextWeight: '30', nextUnit: 'kg', nextReps: '18', nextWeightBox: 'b2' }, 'Machine Shrug')
-  const root = { querySelector: (sel: string) => sel === '[data-next-set]' ? first : null, all: [first, second] }
+  const root = { querySelector: (sel: string) => sel === '[data-next-set]' ? first : null, querySelectorAll: () => [], all: [first, second] }
   const read = readNextSet(root as unknown as ParentNode)
   check('the first tick in the list is the one read', read?.set === 'Set 2' && read?.name === 'T-Bar Rows' && read?.weight === '32.5' && read?.weightBox === 'b1', read)
-  check('no tick left to save: no button', readNextSet({ querySelector: () => null } as unknown as ParentNode) === null)
-  const noName = readNextSet({ querySelector: () => ({ dataset: { nextSet: 'Set 1' }, closest: () => null }) } as unknown as ParentNode)
+  check('no tick left to save: no button', readNextSet({ querySelector: () => null, querySelectorAll: () => [] } as unknown as ParentNode) === null)
+  const noName = readNextSet({ querySelector: (sel: string) => sel === '[data-next-set]' ? ({ dataset: { nextSet: 'Set 1' }, closest: () => null }) : null, querySelectorAll: () => [] } as unknown as ParentNode)
   check('missing attributes fall back to nothing rather than to a number', noName?.weight === '' && noName?.reps === '' && noName?.unit === 'kg', noName)
+}
+
+console.log('\n2b. The button follows the last set logged, not the first gap (Marcus, 15 Nov 2026)')
+{
+  const t = (setTick: 'saved' | 'open', nextSet?: string) => ({ dataset: { setTick, ...(nextSet ? { nextSet } : {}) }, closest: () => ({ dataset: { exerciseName: 'Bench' } }) })
+  const scope = (ticks: ReturnType<typeof t>[], now: unknown = null) => ({
+    querySelector: (sel: string) => sel === '[data-exercise-now]' ? now : sel === '[data-next-set]' ? (ticks.find(x => x.dataset.nextSet) ?? null) : null,
+    querySelectorAll: (sel: string) => sel === '[data-set-tick]' ? ticks : [],
+  }) as unknown as ParentNode
+  // Warm-up 1 skipped, warm-ups 2-3 and set 1 logged: the next is set 2, not warm-up 1.
+  const skipped = [t('open', 'Warm-up 1'), t('saved'), t('saved'), t('saved'), t('open', 'Set 2'), t('open', 'Set 3')]
+  check('a warm-up he skipped does not hold the button: it offers the set after his last one', readNextSet(scope(skipped))?.set === 'Set 2', readNextSet(scope(skipped)))
+  // He skipped set 1 and logged set 2: the button goes on to set 3, after his LAST set, not back to the skipped one.
+  const twoGaps = [t('open', 'Warm-up 1'), t('saved'), t('open', 'Set 1'), t('saved'), t('open', 'Set 3')]
+  check('a set skipped between two he logged is passed over too: after the LAST one logged', readNextSet(scope(twoGaps))?.set === 'Set 3', readNextSet(scope(twoGaps)))
+  check('nothing logged yet: the first open set', readNextSet(scope([t('open', 'Warm-up 1'), t('open', 'Set 1')]))?.set === 'Warm-up 1')
+  check('everything after his last set done, one gap behind it: the gap', readNextSet(scope([t('open', 'Warm-up 1'), t('saved'), t('saved')]))?.set === 'Warm-up 1')
+  // The exercise marked NOW wins, and the same rule runs inside it.
+  const nowScope = scope([t('open', 'Warm-up 1'), t('saved'), t('open', 'Set 2')])
+  check('inside the exercise marked NOW, the same rule', readNextSet(scope([t('open', 'Set 1')], nowScope))?.set === 'Set 2')
 }
 
 console.log('\n3. The tick says what it would save, by the save path\'s own fallbacks')

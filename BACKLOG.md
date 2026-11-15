@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **THE "LOG SET" BUTTON FOLLOWS WHAT HE IS DOING (Marcus, 15 Nov 2026; Wave M-D1, part)**. It still said "Log
+  warm-up 1 · Bench 20 kg × 8" after he had logged his working sets, because it offered the first open set and a
+  warm-up he skipped stayed first. It now offers the first open set AFTER the last one he logged (inside the lift
+  marked NOW where there is one), falling back to the first open set when nothing is logged or nothing is open after
+  it; a skipped set is still there to tap by hand. Every tick now says whether it is logged, so the button can find
+  the last one. `test:exercise-layout` +5 checks (5 mutations, one caught only after a case with a gap between two
+  logged sets was added); `verify:next-set-now` +2: putting the old rule back reproduces his exact report ("Log warm-up
+  1 · Front Squat 20 kg × 10"). Six drivers that use the button and 26 set-grid checks pass. NOT done from D1: the
+  rest pill naming the previous exercise, and the page moving under a finger after a tick (needs a trace first).
 - [x] **NO UP/DOWN ARROWS INSIDE A NUMBER BOX (Marcus, 15 Nov 2026: "30(" for 300; Wave M-D2)**. The reps box fits
   three digits on a phone (measured, entry below), but his test ran in desktop Chrome, which draws spin arrows inside a
   number box, and they took the room the third digit needed. Hidden app-wide (the base styles); typing and the phone's

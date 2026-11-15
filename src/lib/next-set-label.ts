@@ -37,8 +37,22 @@ export interface NextSet {
  * function for the label and the press, so the button can only ever press the tick it names.
  */
 export function nextSetTick(root: ParentNode): HTMLElement | null {
-  return root.querySelector<HTMLElement>('[data-exercise-now] [data-next-set]')
-    ?? root.querySelector<HTMLElement>('[data-next-set]')
+  const now = root.querySelector<HTMLElement>('[data-exercise-now]')
+  return (now && openTickAfterLastLogged(now)) ?? openTickAfterLastLogged(root)
+}
+
+/**
+ * FOLLOW WHAT HE IS DOING, NOT THE FIRST GAP (Marcus, 15 Nov 2026): the button still said "Log warm-up 1 · Bench 20 kg ×
+ * 8" after he had logged his working sets, because a warm-up he skipped was the first open row. The next set is the
+ * first open one AFTER the last he logged; with none logged yet (or nothing open after it), the first open one. A set
+ * he skipped is still there to tap by hand.
+ */
+function openTickAfterLastLogged(scope: ParentNode): HTMLElement | null {
+  const ticks = [...scope.querySelectorAll<HTMLElement>('[data-set-tick]')]
+  let last = -1
+  ticks.forEach((t, i) => { if (t.dataset.setTick === 'saved') last = i })
+  return ticks.slice(last + 1).find(t => t.dataset.nextSet !== undefined)
+    ?? scope.querySelector<HTMLElement>('[data-next-set]')
 }
 
 /** The set the running button would log (nextSetTick), or null when no open row has one. */

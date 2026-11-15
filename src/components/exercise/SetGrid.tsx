@@ -1287,6 +1287,8 @@ export function SetGrid({
                 // expressions the two boxes show, so the button can only ever
                 // describe what this tick saves — and it presses this tick.
                 data-next-set={!isSaved && !drop ? setLabelLong(ref) : undefined}
+                // Every tick, saved or open, so the running button can find the last set he logged (next-set-label.ts).
+                data-set-tick={isSaved ? 'saved' : 'open'}
                 // EMPTY when there is no weight to take: the button then
                 // opens the box instead of pressing a tick that would refuse.
                 data-next-weight={!isSaved && !drop ? (isBW ? 'BW' : probeNeedsWeight(ref) ? '' : (input.weight || defaultWeightFor(ref))) : undefined}
