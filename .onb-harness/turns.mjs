@@ -936,6 +936,23 @@ await section(30, 'A question about training safely with a condition is never pa
   await shot('health-question-not-parked')
 })
 
+await section(31, 'Daily activity is asked, never guessed from a job (the coeliac nurse, 15 Nov 2026)', async () => {
+  await open('activity')
+  await queue({
+    reply: 'Night shifts are tough. How active is your day-to-day outside training?',
+    actions: [{ name: 'set_slot', args: { slot_key: 'activityLevel', value: 'active' } }],
+  })
+  await say("I'm a nurse, I do three night shifts a week")
+  const d1 = await evj(`__draft()`)
+  check('a job is not an activity level: nothing recorded', (d1?.values?.activityLevel ?? null) === null && !(d1?.confirmedSlots ?? []).includes('activityLevel'), d1?.values?.activityLevel)
+  const cards = await evj(`__cards('activityLevel')`)
+  check('...and the four choices are shown under the question instead', cards.length === 1 && cards[0].labels.length === 4 && cards[0].inView, cards)
+  await queue({ reply: 'Got it.', actions: [{ name: 'set_slot', args: { slot_key: 'activityLevel', value: 'sedentary' } }] })
+  await say("Honestly I'm pretty sedentary outside work")
+  const d2 = await evj(`__draft()`)
+  check('the level he names himself is recorded', d2?.values?.activityLevel === 'sedentary', d2?.values?.activityLevel)
+})
+
 if (!isGone()) {
   try { check('harness: every request in this run was scripted', (await ev(`window.__onbUnscripted`)) === 0) } catch {}
 }

@@ -30,7 +30,7 @@
 // ---------------------------------------------------------------------------
 
 import { ONBOARDING_SLOTS } from '../src/lib/onboarding-slots'
-import { DIETARY_PREFERENCES } from '../src/lib/diet-rules'
+import { DIETARY_PREFERENCES, SELECTABLE_DIETARY_PREFERENCES } from '../src/lib/diet-rules'
 
 let failures = 0
 const check = (name: string, ok: boolean, detail = '') => {
@@ -127,8 +127,11 @@ console.log('\n4. Icons are presentation — the values they sit beside are unto
   check('every dietary option is one diet-rules actually enforces',
     dietValues.every(v => (DIETARY_PREFERENCES as string[]).includes(v)),
     dietValues.filter(v => !(DIETARY_PREFERENCES as string[]).includes(v)))
-  check('...and every enforced preference is offered',
-    (DIETARY_PREFERENCES as string[]).every(p => dietValues.includes(p)),
+  // Every SELECTABLE preference: the pregnancy rule is enforced but never offered (the Pregnant tick switches it on,
+  // his 15 Nov "NHS list, auto-on"), and it must be the only one held back.
+  check('...and every enforced preference is offered, except the one the Pregnant tick switches on',
+    (SELECTABLE_DIETARY_PREFERENCES as string[]).every(p => dietValues.includes(p))
+      && JSON.stringify((DIETARY_PREFERENCES as string[]).filter(p => !(SELECTABLE_DIETARY_PREFERENCES as string[]).includes(p))) === '["pregnancy"]',
     (DIETARY_PREFERENCES as string[]).filter(p => !dietValues.includes(p)))
   // + the five health conditions on the same card (his ruling 14 Nov 2026, "Fold into injuries"): frozen too, because
   // assembleProfile splits on exactly these codes (health-conditions.ts).

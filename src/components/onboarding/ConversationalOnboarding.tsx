@@ -20,7 +20,7 @@ import {
   isSlotApplicable,
   canDeclineSlot,
   NEVER_BLOCKING_SLOTS,
-  APP_ONLY_SLOTS,
+  APP_ONLY_SLOTS, namesActivityLevel,
   assembleProfile,
   toggleValue,
   multiSelection,
@@ -1006,6 +1006,11 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
         // Only the app fills these, from her own words (APP_ONLY_SLOTS): a
         // sport's days are never taken from the model.
         if (APP_ONLY_SLOTS.includes(key)) continue
+        // Daily activity only from his own words naming a level; otherwise the four choices are shown (namesActivityLevel).
+        if (key === 'activityLevel' && !namesActivityLevel(userText)) {
+          if (!presentRequests.includes('activityLevel')) presentRequests.push('activityLevel')
+          continue
+        }
         // A slot's requiredIf gate can close mid-conversation (equipment
         // changed away from barbell-capable after knowsWorkingLifts was
         // already asked, say) — never write into one that's no longer

@@ -1118,6 +1118,17 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
  */
 export const APP_ONLY_SLOTS: readonly SlotKey[] = ['otherSports']
 
+/**
+ * DAILY ACTIVITY IS ASKED, NEVER GUESSED FROM A JOB (15 Nov 2026, the coeliac nurse: "nurse, 3 night shifts a week" was
+ * recorded as Very active with nobody asking, which multiplied her calories by 1.725 and kept her off the beginner
+ * walking start, which needs Sedentary). The coach's set_slot for it stands only when his own words name a level; a job,
+ * a shift pattern or a commute is a reason to show the four choices, not an answer.
+ */
+export function namesActivityLevel(text: string): boolean {
+  return /\b(sedentary|inactive|not (?:very )?active|lightly active|moderately active|very active|highly active)\b/i.test(text ?? '')
+    || ACTIVITY_OPTIONS.some(o => (text ?? '').trim().toLowerCase() === o.label.toLowerCase())
+}
+
 export function getSlotDef(key: string): SlotDef | undefined {
   return ONBOARDING_SLOTS.find(s => s.key === key)
 }

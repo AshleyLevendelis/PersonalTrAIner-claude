@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **SETUP NEVER GUESSES HOW ACTIVE SOMEONE IS FROM THEIR JOB (15 Nov 2026, the coeliac nurse: "I'm a nurse" was
+  recorded as "Very active" without a question, which sets her calorie target)**. The app now keeps an activity level
+  only when the reply names one in words ("pretty sedentary", "lightly active") or taps a chip; a job or a description
+  of a day records nothing and the four chips are shown with the question. The setup coach's prompt also says a job is
+  never an activity level. Mechanical (a guessed input to the calorie sum), no ruling needed. VERIFIED:
+  `verify:onboarding-turns` §31 (a job records nothing and shows the 4 chips; "pretty sedentary" is kept), 172 checks,
+  2 mutations both caught; the 51 setup-reading gates pass. `test:option-icons` re-anchored: pregnancy is the one
+  enforced food rule never offered as a diet chip (the Pregnant tick switches it on, his 15 Nov ruling), and the check
+  now says so rather than failing. NEEDS the `onboarding-chat` deploy for the prompt line; the app's backstop works
+  without it.
 - [x] **A BEGINNER'S PROTEIN TARGET IS 1.6 g/kg, NOT 2.0 (15 Nov 2026, CSCS, decided by me under his delegation; the
   coeliac nurse: a vegan, gluten-free beginner given 156 g, which almost no meal she can eat reaches)**. BASIS: muscle
   gain from resistance training levels off near 1.6 g/kg (Morton et al. 2018 meta-analysis, upper confidence limit

@@ -85,6 +85,21 @@ if (state === 'h14') {
   ))
 }
 
+// Daily activity still unknown (the coeliac nurse, 15 Nov 2026): everything else as Sam's, the activity question next.
+if (state === 'activity') {
+  const { activityLevel: _act, ...before } = SAM_SO_FAR
+  void _act
+  seed(draft(
+    [
+      { role: 'assistant', content: 'Hi — what should I call you?', asksSlot: 'displayName' },
+      { role: 'user', content: 'Sam' },
+      { role: 'assistant', content: 'And what do your days look like outside training?' },
+    ],
+    before,
+    Object.keys(before),
+  ))
+}
+
 if (state === 'm2') {
   // The session-length question is on screen WITH its chips, unanswered — the
   // state the tester was in when they typed a creatine question instead.
