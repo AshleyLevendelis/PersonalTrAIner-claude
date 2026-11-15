@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **A MEAL LOGGED AS SOMETHING ELSE SHOWS WHAT HE ATE (Marcus, 15 Nov 2026; Wave M-B2, mechanical)**. He logged
+  a different lunch, and the sheet kept the planned dish's ingredients, method, tags and "leftovers" line under what he
+  ate, with the explanation at the very bottom. Now the logged meal is the heading (as before) and the planned dish is
+  one line at the top: "Planned: X. You logged something else, so its recipe isn't shown." Its ingredients, method,
+  tags, cook-once lines and "Add food" are not drawn, and the row drops "· leftovers". Move stays (it acts on the plan).
+  `verify:diary-preservation` +2 checks and a screenshot read; 3 mutations through the driver, all caught;
+  `test:diary-preservation` and `test:meal-method` re-anchored; 45 meal-screen checks and four Nutrition drivers pass.
+  NOT done from the same item: the "too far" line naming a next step (a bigger dinner or a snack).
 - [x] **NO "LEFTOVERS" ON THE PLAN'S FIRST DAY (Marcus, 15 Nov 2026; Wave M-E2, mechanical)**. Day one's lunch was
   "last night's dinner" when there was no last night on the plan: the week is a repeating cycle, the first day served
   could be any day of it, and nothing said when the plan began. His first meal day (his profile's start, his own local

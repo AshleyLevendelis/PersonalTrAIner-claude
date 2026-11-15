@@ -77,7 +77,9 @@ check('...so the plan\'s own name is no longer rendered as the heading',
   !/>\s*\{option\.name\}\s*</.test(meal))
 check('when the plan has moved on, the screen says whose details it is showing',
   /const planMovedOn = isLogged && loggedName != null && option != null && loggedName !== option\.name/.test(meal)
-  && /Your plan now shows \{option\.name\} here/.test(meal))
+  && /Planned: \{option\.name\}\. You logged something else, so its recipe isn't shown\./.test(meal)
+  // ...at the top, and the planned dish's ingredients are not drawn under what he ate (Marcus, 15 Nov 2026).
+  && /\{!planMovedOn && option\.ingredients\.length > 0 && \(/.test(meal))
 
 // ---------------------------------------------------------------------------
 console.log('\n[3] An eaten meal is noted, never warned at')

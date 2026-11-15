@@ -1389,7 +1389,7 @@ function MealSlotRow({
           {/* M2 (11 Nov 2026): "· eaten" once logged, "· leftovers" in amber when it is last night's dinner. */}
           <span className={`block text-[0.65625rem] uppercase tracking-[.12em] ${variant === 'upnext' ? 'font-semibold text-primary-text' : 'text-muted-foreground'}`}>
             {SLOT_LABEL[slot]}{variant === 'upnext' ? ' · next' : ''}{variant === 'eaten' && !upcoming ? ' · eaten' : ''}
-            {option?.leftoverFrom === 'dinner' && <span data-testid="meal-row-leftovers" style={{ color: 'var(--role-warn-text)' }}> · leftovers</span>}
+            {option?.leftoverFrom === 'dinner' && !(isLogged && loggedName != null && loggedName !== option.name) && <span data-testid="meal-row-leftovers" style={{ color: 'var(--role-warn-text)' }}> · leftovers</span>}
             {expanded ? ' · open' : ''}
           </span>
           {option ? (
@@ -1550,7 +1550,15 @@ function MealSlotRow({
 
               {tab === 'recipe' && (
                 <>
-                  {option.ingredients.length > 0 && (
+                  {/* LOGGED AS SOMETHING ELSE (Marcus, 15 Nov 2026): the sheet drew the planned dish's ingredients and its
+                      "leftovers" line under what he ate, with the explanation at the bottom. What he logged is the heading;
+                      the plan's dish is one line at the top, and its recipe is not drawn. */}
+                  {planMovedOn && (
+                    <p className="text-[0.71875rem] leading-snug text-muted-foreground" data-testid="meal-planned-instead">
+                      Planned: {option.name}. You logged something else, so its recipe isn't shown.
+                    </p>
+                  )}
+                  {!planMovedOn && option.ingredients.length > 0 && (
                     /* EVERY LINE IS A CONTROL, not a readout. Until 12 Sep 2026 the
                        coach could take a food out of a meal, swap it or resize it and
                        this screen could not — one of the parity gaps CLAUDE.md counts.
@@ -1619,7 +1627,7 @@ function MealSlotRow({
                       screen picks from the food list rather than taking free text,
                       which is strictly more honest — a food the app cannot cost is
                       never offered rather than typed and then refused. */}
-                  {editContextFor(option) && onMealPickApplied && (
+                  {!planMovedOn && editContextFor(option) && onMealPickApplied && (
                     <button
                       type="button"
                       onClick={() => { setAddOpen(prev => !prev); setAddNote(null); setEditUndo(null) }}
@@ -1659,16 +1667,16 @@ function MealSlotRow({
                       repeated dish is indistinguishable from the day-to-day repeat
                       defect fixed the same morning, and the app would look broken to
                       exactly the person most likely to notice. */}
-                  {option.leftoverFrom === 'dinner' && (
+                  {!planMovedOn && option.leftoverFrom === 'dinner' && (
                     <p className="text-[0.71875rem] text-muted-foreground" data-meal-leftover={option.name}>{COOK_ONCE.lunch}</p>
                   )}
                   {/* The batch rows below say it line by line; this sentence stands only where they cannot be drawn. */}
-                  {option.reusedTomorrow === true && !(option.keepForTomorrow && cookAndKeep(option.ingredients, option.keepForTomorrow)) && (
+                  {!planMovedOn && option.reusedTomorrow === true && !(option.keepForTomorrow && cookAndKeep(option.ingredients, option.keepForTomorrow)) && (
                     <p className="text-[0.71875rem] text-muted-foreground" data-meal-cook-extra={option.name}>{COOK_ONCE.dinner}</p>
                   )}
                   {/* COOK X, KEEP Y (runs 7-10, H37): the batch, line by line, so tomorrow's bigger lunch portion is a fact
                       tonight rather than a surprise tomorrow. Amounts in the kitchen's own steps, the card's own wording. */}
-                  {option.reusedTomorrow === true && option.keepForTomorrow && (() => {
+                  {!planMovedOn && option.reusedTomorrow === true && option.keepForTomorrow && (() => {
                     const rows = cookAndKeep(option.ingredients, option.keepForTomorrow)
                     if (!rows) return null
                     const amount = (q: number, unit: string) => `${formatKitchenQuantity(q, unit)}${unit === 'g' || unit === 'ml' ? unit : ` ${unit}`}`
@@ -1700,7 +1708,7 @@ function MealSlotRow({
                       and loses no word of it. Absent on every pool generated before
                       the column existed, and on custom meals and edited meals, which
                       genuinely have no method. */}
-                  {hasMethod && (
+                  {!planMovedOn && hasMethod && (
                     <div className="flex flex-col gap-2" data-meal-method={option.name}>
                       <span className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-muted-foreground">Method</span>
                       <ol className="flex flex-col gap-2">
@@ -1728,7 +1736,7 @@ function MealSlotRow({
                       stops seeing the leak immediately rather than waiting on its
                       next regenerate. */}
                   {/* And never the app's own bookkeeping (a new meal's first day). */}
-                  {displayTags(option.tags).length > 0 && (
+                  {!planMovedOn && displayTags(option.tags).length > 0 && (
                     <div className="flex flex-wrap gap-1.5">
                       {displayTags(option.tags).map(t => (
                         <span key={t} className="rounded-full bg-[color:var(--surface-raised)] px-2 py-0.5 text-[0.625rem] text-muted-foreground">{t}</span>
@@ -1736,14 +1744,6 @@ function MealSlotRow({
                     </div>
                   )}
 
-                  {planMovedOn && (
-                    /* The heading above is what was EATEN; everything in this block —
-                       calories, ingredients, tags — is the slot's CURRENT option.
-                       Without this line the two silently disagree. */
-                    <p className="text-[0.71875rem] leading-snug text-muted-foreground">
-                      Your plan now shows {option.name} here. The details below are that meal, not the one you logged.
-                    </p>
-                  )}
 
                   {/* MOVE and REGENERATE, the two changes to the whole meal that are not a swap. Move is hidden
                       when the screen cannot finish the job (no profile, no targets, no pick path), on the same rule

@@ -98,8 +98,13 @@ await shoot('diary-preservation')
 await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /Leftover chilli/.test(x.textContent||'')); if (b) b.click(); return !!b })()`)
 await wait(1200)
 const expanded = await read()
-check('6. opening the moved-on row says whose details are below it',
-  /Your plan now shows Chicken, rice and roasted peppers here/.test(expanded.text), expanded.sample)
+check('6. opening the moved-on row names the planned dish in one line',
+  /Planned: Chicken, rice and roasted peppers\. You logged something else/.test(expanded.text), expanded.sample)
+// ...and does not draw the planned dish's recipe under what he ate (Marcus, 15 Nov 2026).
+const plannedRows = await ev(`document.querySelectorAll('[data-meal-sheet="lunch"] [data-ingredient-row]').length`)
+check('6a. the planned dish\'s ingredients are not drawn under the logged meal', plannedRows === 0, plannedRows)
+check('6a2. ...and no "Add food" or "leftovers" for a dish he did not eat', (await ev(`!document.querySelector('[data-meal-sheet="lunch"] [data-testid="meal-food-add-open"]') && !document.querySelector('[data-meal-sheet="lunch"] [data-meal-leftover]')`)) === true)
+await shoot('diary-preservation-moved-on')
 
 // THE SHEET'S HEADER: the eaten name over the eaten numbers (whole-app QA walk, 7 Nov 2026: it paired the logged
 // name with the plan's current dish's calories).

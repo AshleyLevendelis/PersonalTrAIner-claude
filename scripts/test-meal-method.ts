@@ -238,7 +238,7 @@ console.log('\n5. It reaches the screen, and only when there is one')
     && !/\{option\.prep\}/.test(card) && !/methodSteps\(option\.prep/.test(card)
     && /const method = option \? methodToShow\(option\.prep, option\.ingredients, methodRules\) : ''/.test(card))
   check('...only when the meal actually has one',
-    /const hasMethod = method\.length > 0/.test(card) && /\{hasMethod && \(/.test(card))
+    /const hasMethod = method\.length > 0/.test(card) && /\{(?:!planMovedOn && )?hasMethod && \(/.test(card))
   // DEFENCE IN DEPTH, and the same reasoning as the dietary re-check that
   // already runs on this screen: verification is where a method naming an
   // amount is dropped, but this is where being wrong costs something. A row
@@ -266,7 +266,8 @@ console.log('\n5. It reaches the screen, and only when there is one')
   check('the card\'s method shows in the recipe tab, once, and only when there is one',
     iRecipe >= 0 && iSwap > iRecipe && iMethod > iRecipe && iMethod < iSwap
     && (card.match(/data-meal-method=/g) ?? []).length === 1
-    && /\{hasMethod && \(\s*<div[^>]*data-meal-method=/.test(card)
+    // (Not drawn when he logged a different meal: that recipe is not what he ate, 15 Nov 2026.)
+    && /\{(?:!planMovedOn && )?hasMethod && \(\s*<div[^>]*data-meal-method=/.test(card)
     && /const hasMethod = method\.length > 0/.test(card), { iRecipe, iMethod, iSwap })
   check('...and below the ingredients, which are where the amounts live',
     iIngredients >= 0 && iMethod >= 0 && iIngredients < iMethod, { iIngredients, iMethod })
