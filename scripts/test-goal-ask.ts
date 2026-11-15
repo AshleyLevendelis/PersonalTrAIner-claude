@@ -65,7 +65,7 @@ const a = chat.indexOf('} else if (APPEND_PROPOSAL_KINDS.has(result.proposal.kin
 const offer = a >= 0 ? chat.slice(a, chat.indexOf('} else if', a + 80)) : ''
 check('the offer branch is found', offer.length > 0)
 const askAt = offer.indexOf('goalAsk(goal)'), buildAt = offer.indexOf('buildIntentProposal(')
-check('...a goal is asked about BEFORE a card is built, and the question is the reply', askAt >= 0 && buildAt > askAt && /if \(goalQuestion\) refusal = goalQuestion\s*else \{/.test(offer), { askAt, buildAt })
+check('...a goal is asked about BEFORE a card is built, and the question is the reply', askAt >= 0 && buildAt > askAt && /if \(goalQuestion\) refusal = goalQuestion\s*(?:else if \(dislikeToAsk\.length > 0\) refusal = [^\n]+\s*)?else \{/.test(offer), { askAt, buildAt })
 check('...the starting number comes from the same lookup the save uses', /baselineValue: goalStart\(ga\)\.baselineValue/.test(offer))
 check('...and the card says both numbers', /built\.diff\.rows\[0\]\.after = goalLabel\(/.test(offer))
 const g0 = chat.indexOf("const metric = String(args.metric || '') as UserGoalRow['metric']"), g1 = chat.indexOf('const row = await createGoal(', g0)
