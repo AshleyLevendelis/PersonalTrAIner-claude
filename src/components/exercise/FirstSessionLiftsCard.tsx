@@ -4,7 +4,7 @@ import { InsightBanner } from '@/components/ui/insight-banner'
 import { addDays } from '@/lib/session-move'
 import { getLastWorkingSessionDate } from '@/lib/set-log-store'
 import {
-  FIRST_LIFTS, FIRST_LIFTS_WORDS, firstLiftsPatch, firstSessionLiftsDue,
+  firstLiftsFor, FIRST_LIFTS_WORDS, firstLiftsPatch, firstSessionLiftsDue,
   type FirstLiftKey, type FirstLiftSet,
 } from '@/lib/first-session-lifts'
 import type { MesocycleWeek, UserProfile } from '@/lib/types'
@@ -90,7 +90,7 @@ export function FirstSessionLiftsCard({
         <p className="text-[0.8125rem] leading-snug text-muted-foreground">{FIRST_LIFTS_WORDS.lead}</p>
       </div>
       <div className="space-y-2">
-        {FIRST_LIFTS.map(({ key, label }) => (
+        {firstLiftsFor(profile ?? {}).map(({ key, label }) => (
           <div key={key} className="grid grid-cols-[1fr_5.5rem_4.5rem] items-center gap-2">
             <span className="text-[0.8125rem]">{label}</span>
             <input

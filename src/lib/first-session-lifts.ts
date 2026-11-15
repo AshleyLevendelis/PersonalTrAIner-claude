@@ -10,18 +10,36 @@
 // ---------------------------------------------------------------------------
 import type { MesocycleWeek, UserProfile } from './types'
 import { isStartingOut } from './starting-out'
-import { allowedEquipmentFor } from './exercise-plan'
+import { allowedEquipmentFor, getFlaggedJoints } from './exercise-plan'
+import { getExerciseEntry } from './exercise-db'
 import { resolveBodyBasis } from './load-prescription'
 import { referenceWeightFromSet } from './working-weight'
 import { implausibleLifts } from './lift-plausibility'
 
 export type FirstLiftKey = 'known_squat_kg' | 'known_bench_kg' | 'known_deadlift_kg'
 
-export const FIRST_LIFTS: { key: FirstLiftKey; label: string }[] = [
-  { key: 'known_squat_kg', label: 'Barbell back squat' },
-  { key: 'known_bench_kg', label: 'Barbell bench press' },
-  { key: 'known_deadlift_kg', label: 'Barbell deadlift' },
+export const FIRST_LIFTS: { key: FirstLiftKey; label: string; catalogue: string }[] = [
+  { key: 'known_squat_kg', label: 'Barbell back squat', catalogue: 'Barbell Squats' },
+  { key: 'known_bench_kg', label: 'Barbell bench press', catalogue: 'Barbell Bench Press' },
+  { key: 'known_deadlift_kg', label: 'Barbell deadlift', catalogue: 'Deadlifts' },
 ]
+
+/**
+ * The lifts the card asks THIS person about (15 Nov 2026, CSCS, mine; Marcus after knee surgery was asked a recent hard
+ * set of squat and deadlift). Never a lift that loads, or is listed as unsafe for, a joint on his injuries list: a
+ * near-maximal set on a flagged joint is not a number to go and find, and the plan already treats those lifts with
+ * care. Read off the catalogue entries, so the card and the plan's injury filter use the same joints.
+ */
+export function firstLiftsFor(profile: Partial<Pick<UserProfile, 'injuries'>>): typeof FIRST_LIFTS {
+  const flagged = getFlaggedJoints(profile.injuries ?? [])
+  if (flagged.size === 0) return FIRST_LIFTS
+  return FIRST_LIFTS.filter(l => {
+    const e = getExerciseEntry(l.catalogue)
+    if (!e) return false
+    const joints = [...(e.loads_joints ?? []), ...(e.contraindicated_joints ?? [])]
+    return !joints.some(j => flagged.has(j))
+  })
+}
 
 export interface FirstLiftsContext {
   profile: UserProfile | null | undefined
@@ -45,7 +63,8 @@ export function firstSessionLiftsDue(ctx: FirstLiftsContext): boolean {
   // A body weight the app was told, not assumed: the plan's skip rule needs it (canSkipCalibration).
   if (resolveBodyBasis(p).assumed) return false
   const allowed = allowedEquipmentFor(p)
-  return allowed === null || allowed.has('barbell')
+  if (!(allowed === null || allowed.has('barbell'))) return false
+  return firstLiftsFor(p).length > 0
 }
 
 export interface FirstLiftSet { weightKg: string; reps: string }
@@ -61,7 +80,7 @@ export type FirstLiftsResult =
  */
 export function firstLiftsPatch(profile: UserProfile, sets: Partial<Record<FirstLiftKey, FirstLiftSet>>): FirstLiftsResult {
   const patch: Partial<UserProfile> = {}
-  for (const { key, label } of FIRST_LIFTS) {
+  for (const { key, label } of firstLiftsFor(profile)) {
     const s = sets[key]
     const w = (s?.weightKg ?? '').trim(), r = (s?.reps ?? '').trim()
     if (!w && !r) continue

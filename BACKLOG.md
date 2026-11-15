@@ -2,6 +2,13 @@
 
 Newest first. One line each.
 
+- [x] **THE FIRST-SESSION CARD NEVER ASKS A HARD SET OF A LIFT THAT LOADS A FLAGGED JOINT (15 Nov 2026, CSCS, mine;
+  Marcus after knee surgery was asked his squat and deadlift)**. The card reads the same joints the plan's injury
+  filter reads, from the catalogue: a knee asks only the bench, a shoulder only squat and deadlift, a lower back and a
+  shoulder asks nothing and the card does not show. A number typed for a lift not asked is not read. BASIS: a recent
+  near-maximal set is the wrong thing to go and find on a joint being protected; the testing week finds a starting
+  weight more gently. VERIFIED: `test:first-session-lifts` (5 new checks, 4 mutations caught). NOT YET DRIVEN
+  (`verify:first-session-lifts`), waiting for the full run to free the machine.
 - [x] **THE EXERCISE SEARCH UNDERSTANDS PLURALS (15 Nov 2026, Marcus: "step-downs" found nothing)**. A typed word has
   to start a word in the name, and "downs" is longer than "down". The swap, add and logging searches now also try each
   word without its final "s" ("presses" without "es"), so "step-downs", "leg presses" and "hip thrusts" find their

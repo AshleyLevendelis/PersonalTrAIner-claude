@@ -9,7 +9,7 @@
 // The screen half is verify:first-session-lifts.
 // ---------------------------------------------------------------------------
 import fs from 'fs'
-import { firstSessionLiftsDue, firstLiftsPatch, FIRST_LIFTS_WORDS, type FirstLiftsContext } from '../src/lib/first-session-lifts'
+import { firstSessionLiftsDue, firstLiftsPatch, firstLiftsFor, FIRST_LIFTS_WORDS, type FirstLiftsContext } from '../src/lib/first-session-lifts'
 import { referenceWeightFromSet } from '../src/lib/working-weight'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
@@ -96,6 +96,19 @@ console.log('\n4. The wiring')
   check('Today renders the card with it', /<FirstSessionLiftsCard[\s\S]{0,400}onSave=\{onFirstSessionLifts\}/.test(today))
   const onb = fs.readFileSync('src/lib/onboarding-slots.ts', 'utf8')
   check('and setup no longer asks the lifts (the reason the card exists)', /'knowsWorkingLifts', 'knownSquatKg', 'knownBenchKg', 'knownDeadliftKg',/.test(strip(onb).replace(/\s+/g, ' ')) || /'knowsWorkingLifts', 'knownSquatKg', 'knownBenchKg', 'knownDeadliftKg',/.test(onb))
+}
+
+// NEVER A LIFT THAT LOADS A FLAGGED JOINT (15 Nov 2026, CSCS; Marcus after knee surgery was asked squat and deadlift).
+{
+  const keys = (inj: string[]) => firstLiftsFor({ injuries: inj as never }).map(l => l.key).join(',')
+  check('no injuries: all three lifts', keys([]) === 'known_squat_kg,known_bench_kg,known_deadlift_kg', keys([]))
+  check('a knee: only the bench is asked', keys(['knees']) === 'known_bench_kg', keys(['knees']))
+  check('a shoulder: squat and deadlift, no bench', keys(['shoulders']) === 'known_squat_kg,known_deadlift_kg', keys(['shoulders']))
+  check('a lower back and a shoulder: nothing to ask, so no card', keys(['lower_back', 'shoulders']) === ''
+    && !firstSessionLiftsDue({ profile: { ...lifter, injuries: ['lower_back', 'shoulders'] } as UserProfile, week: week1, trainedBefore: false, dismissed: false }))
+  const knee = { ...lifter, injuries: ['knees'] } as UserProfile
+  const p = firstLiftsPatch(knee, { known_squat_kg: { weightKg: '100', reps: '5' }, known_bench_kg: { weightKg: '80', reps: '5' } })
+  check('a squat typed for a knee is not saved (only the asked lifts are read)', p.ok && p.patch.known_squat_kg === undefined && p.patch.known_bench_kg != null, p)
 }
 
 console.log(`\n${ran} checks ran, ${failures} failed.`)
