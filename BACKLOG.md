@@ -15,6 +15,8 @@ Newest first. One line each.
   the fixture's leg day now holds a calf raise where a knee-loading leg curl was, so it is set to the measured 5;
   `verify:meal-move` had never seen a refusal until the harness's targets moved, and still asserted the question the
   8 Nov fix (7e5f1443) deliberately drops when there is nothing to swap to; re-anchored to that rule, mutation caught.
+  THE LAST TWO, run on their own at 2fe0e679: `test:quality` passes, 11.66 of 12 on 9,216 plans (11.64 last recorded),
+  0 below the 7.2 floor; `test:audit` passes. So every one of the 585 checks has run against today's changes.
 - [x] **A WEIGH-IN TOLD TO THE COACH IS KEPT TO ONE DECIMAL AND SAYS WHAT IT REPLACED (15 Nov 2026, browser test:
   "79.35 kg" saved and said back, and a second weigh-in the same day silently replaced the morning's)**. The coach's
   server rounds to one decimal, as the weigh-in box does, before it checks or saves; a reading already saved today is
