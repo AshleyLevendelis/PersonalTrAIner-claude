@@ -1291,6 +1291,16 @@ console.log('\nA change that works against the goal is ASKED about, not just war
     /catch \{ seed = \[\] \}/.test(ui))
 }
 
+// NO PROMISE OF DAYS THAT FOLLOW A ROTA (15 Nov 2026, the night-shift nurse): both coaches say days are fixed
+// weekdays, and the chat coach names the two tools that do exist.
+{
+  const onboarding = readFileSync(join(ROOT, 'supabase/functions/onboarding-chat/index.ts'), 'utf8')
+  const rule = chatCode.match(/6a\. TRAINING DAYS ARE FIXED WEEKDAYS[^\n]*/)?.[0] ?? ''
+  check('the chat coach is told days never follow a rota on their own', /Never promise days that adapt/.test(rule))
+  check('...and offers the move and the schedule change instead', /propose_session_move/.test(rule) && /propose_schedule_change/.test(rule))
+  check('the setup coach never says the plan will flex around shifts', /TRAINING DAYS ARE FIXED WEEKDAYS\. Someone on shifts/.test(onboarding))
+}
+
 // THE AUTHORITATIVE EXIT, and it was missing.
 //
 // There is an earlier `if (failures > 0) process.exit(1)` part-way up this

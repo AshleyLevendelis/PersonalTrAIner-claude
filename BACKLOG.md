@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **THE COACHES NEVER PROMISE DAYS THAT FOLLOW A ROTA (15 Nov 2026, the night-shift nurse was told her plan would
+  flex around her shifts; nothing in the app does that)**. Both coaches' instructions now say training days are fixed
+  weekdays: the chat coach offers what exists (move one session, or change the standing days) and the setup coach helps
+  pick the days she can USUALLY make. Building rota-following days is HIS decision (Wave P), not built. VERIFIED by
+  source checks in `test:coach-promises` (3 checks, 3 mutations caught); whether the model obeys is the exam's.
+  NEEDS the `chat-gemini` and `onboarding-chat` deploys.
 - [x] **A "20-30 MIN" SESSION SETTING (15 Nov 2026, CSCS, decided by me under his delegation; the coeliac nurse had 20
   minutes and the shortest choice was 30-45)**. Offered first on setup and Profile, and the coach's session-length card
   can choose it. The plan aims at 23 minutes inside 20-30: the main lift and two accessories (no isolation slot); an
