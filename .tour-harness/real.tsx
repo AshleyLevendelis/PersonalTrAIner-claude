@@ -201,16 +201,18 @@ const THURSDAY = new URLSearchParams(location.search).get('thursday') === '1'
 // it sits in the plan week BEFORE today's), and the plan's age; what the card makes of it is the app's.
 //   easy   - that session at the plan's own number for its week, every set at the bottom of the range, "too easy"
 //            kept on its last set. Today must start heavier and run the find-your-weight search.
-//   kept   - the same session with no answer, in a plan 37 days old: weeks 5 and 6, two loading weeks whose numbers
-//            differ on today's lifts (weeks 1 and 2 do not, on this plan). Done as written, so today takes the
-//            plan's number for THIS week.
-//   deload - the plan is 23 days old, so today is its deload week; the session, in week 3, is 5 kg over the plan.
+//   kept   - the same session with no answer, in a plan 72 days old: weeks 10 and 11, two loading weeks whose numbers
+//            differ on today's lifts (shrugs 22 -> 24 kg; in blocks 1 and 2 this day's dumbbell lifts hold their weight
+//            and add reps). Done as written, so today takes the plan's number for THIS week.
+//   deload - the plan is 79 days old, so today is week 12, a deload; the session, in week 11, is 5 kg over the plan.
+//            (Moved 16 Nov 2026 from 23 days: week 4's lifts are now the same light dumbbell lifts as weeks 1-3, all
+//            10 kg or under, below the fixture's floor.)
 //            Today must be lighter than that session, and must not ask how it felt.
 //   back   - the plan is 30 days old: today is the first week of the next block and the session was in the deload
 //            week, at the deload's own number. Today must be this block's weight, not the deload's.
 //   ask    - no earlier session: the page for logging a lift's sets and answering the question.
 const EFFORT = new URLSearchParams(location.search).get('effort')
-const EFFORT_PLAN_AGE = EFFORT === 'deload' ? 23 : EFFORT === 'back' ? 30 : EFFORT === 'kept' ? 37 : 0
+const EFFORT_PLAN_AGE = EFFORT === 'deload' ? 79 : EFFORT === 'back' ? 30 : EFFORT === 'kept' ? 72 : 0
 // ?away=N — COMING BACK AFTER N DAYS AWAY (8 Oct 2026, layoff.ts). The last working
 // session is N days before today, on a loaded lift of today's own session, logged at the
 // plan's weight with EVERY set at the top of the range — so without the break the card
@@ -580,6 +582,9 @@ const effortTarget = (() => {
   // between the two weeks: without a difference "follows this week's plan" could not be told from "held".
   const loaded = day.exercises.filter(e => (e.suggested_load_kg ?? 0) > 10 && before(e.name) != null)
   const ex = loaded.find(e => before(e.name) !== e.suggested_load_kg) ?? loaded[0]
+  // 'back' since 16 Nov 2026: a new block's accessories are new, so on this day no lift ran through the deload. The
+  // driver reads the weeks and the card; nothing is seeded.
+  if (!ex && EFFORT === 'back') return { kind: EFFORT, name: '', sets: 0, repsLow: 0, liveWeek: liveWeekNo, isDeload: !!nowWeek.is_deload, lastWasDeload: !!thenWeek?.is_deload, printedNowKg: 0, printedThenKg: 0, lastKg: 0, seeded: false, todayLoaded: day.exercises.filter(e => (e.suggested_load_kg ?? 0) > 0).map(e => e.name) }
   if (!ex) return null
   const printedThenKg = before(ex.name) as number
   const repsLow = Number(/\d+/.exec(ex.reps)?.[0] ?? 8)

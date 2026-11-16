@@ -18,7 +18,7 @@ Newest first. One line each.
   is never a cost for being a change. Generated-plan scores are unchanged (the option defaults off). Mutation (option
   removed) caught. Two checks followed the ruling rather than the app: `test:per-side-load` looked for mid-block
   rotations, which no longer exist, and now checks every change between loading weeks, block boundaries included (314
-  rotations, all priced fresh); `verify:layoff`'s 12-days-away case landed today in a deload week whose row is now the
+  rotations, all priced fresh); `verify:lift-effort`'s fixture day holds only accessories, which now keep their weight all block in blocks 1-2 and are new after each deload, so "kept" moved to weeks 10-11 and "deload" to week 12, and "back from the deload" has no subject on that day any more: its section now checks every loaded lift on the new block's first day is opened and none claims to be back from a deload (the arithmetic stays held by `test:lift-effort` 8i-8n); `verify:layoff`'s 12-days-away case landed today in a deload week whose row is now the
   same light 10kg row, under the fixture's floor, so the fixture moves a plan that would start in a deload one week
   back (an input, the app untouched). `test:coach-exam-fresh` is red for the known reason: the coach changed and the
   exam must be re-run on his machine.

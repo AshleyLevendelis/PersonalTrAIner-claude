@@ -135,14 +135,21 @@ console.log('\n[3] A deload week is lighter, and nobody is asked how it felt')
   await shoot('lift-effort-deload')
 }
 
-console.log('\n[3b] The first session back after a deload starts from this block\'s weight')
+console.log('\n[3b] The first session back after a deload: no lift on this day carries over (his 16 Nov ruling)')
 {
-  const { t, card } = await load('back')
-  const top = Math.max(0, ...card.headline)
-  check('harness: last week was the deload, done at the deload\'s own number, and this week\'s plan is heavier', t.lastWasDeload === true && t.isDeload === false && t.lastKg === t.printedThenKg && t.printedNowKg > t.lastKg, t)
-  check('3f. today is this block\'s weight, NOT held at the deload\'s', top === t.printedNowKg && !card.headline.includes(t.lastKg), { headline: card.headline, t })
-  check('3g. ...and the card says it is back from the deload', /back from your deload/i.test(card.text), card.text.slice(0, 300))
-  check('3h. the boxes offer the same number', card.prefills.length > 0 && card.prefills.every(p => p === top), card.prefills)
+  // REPLACED 16 Nov 2026. This section drove "the first session back after a deload starts from this block's weight"
+  // on an accessory that ran from block 1's deload into block 2. His ruling that day ("All three as you suggest")
+  // changes accessories at a new block, and every loaded lift on this fixture's day is an accessory, so that subject
+  // no longer exists on this screen. The arithmetic is held by test:lift-effort 8-series (cardLoadFor, back from a
+  // deload, from a deload, a second deload). What is left to see on the screen: the new block's lifts are new, and
+  // none of them is drawn at a number carried from last week's deload.
+  const { t } = await load('back')
+  check('harness: today is the first week of a new block and last week was the deload', t.lastWasDeload === true && t.isDeload === false, t)
+  // Every loaded lift on today's card, opened and read: a check over one closed row would pass on nothing.
+  const texts = []
+  for (const name of t.todayLoaded ?? []) { await openRow(name); texts.push(((await read(name)) ?? NOTHING).text ?? '') }
+  check('harness: every loaded lift on today\'s card was opened and read (at least two)', texts.length >= 2 && texts.every(x => x.length > 40), texts.map(x => x.length))
+  check('3f. none of them claims to be back from the deload (none of them was in it)', texts.length >= 2 && texts.every(x => !/back from your deload/i.test(x)), texts.map(x => x.slice(0, 120)))
   await shoot('lift-effort-back')
 }
 
