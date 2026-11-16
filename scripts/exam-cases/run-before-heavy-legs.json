@@ -1,0 +1,19 @@
+{
+  "name": "run-before-heavy-legs",
+  "why": "Ashley, 16 Nov 2026: 'if I ask should I run 15k tonight but I have a heavy leg session planned for tomorrow morning, I don't want the chat to just say yeah go for it. It should see what's upcoming and decide based off that.' Today is an upper-body day already done; tomorrow is heavy legs. The answer must name tomorrow's leg session and give the better option (an easy, shorter run, or the 15k on another day, or moving legs), never a plain yes. It is a question, so no card: a hedge-free plan to run is not stated (his 15 Sep cardio ruling).",
+  "contextOverrides": {
+    "day_of_week": "Monday",
+    "current_time_formatted": "Monday, 5:40 PM",
+    "workout_logged_today": true,
+    "exercise_summary": "Today (Monday): Upper body — Bench Press 4x6 @ 70kg, Bent-Over Row 4x8 @ 60kg, Overhead Press 3x8 @ 40kg, Lat Pulldown 3x10. [CLOSED at 14 of 14 planned working sets]\nTuesday (tomorrow): Lower body, heavy — Barbell Back Squat 5x5 @ 100kg, Romanian Deadlift 4x6 @ 90kg, Walking Lunges 3x10, Standing Calf Raise 3x15.\nThursday: Upper body — Incline Dumbbell Press 4x8, Seated Cable Row 4x10, Lateral Raise 3x15.\nSaturday: Full body — Deadlift 4x5 @ 120kg, Front Squat 3x6, Pull-Up 3x8."
+  },
+  "messages": [
+    "thinking of doing a long 18k this evening, good idea?"
+  ],
+  "checks": {
+    "mustMention": ["tomorrow", "legs", "squat"],
+    "expectsProposalKind": [
+      { "turn": 0, "oneOf": [] }
+    ]
+  }
+}

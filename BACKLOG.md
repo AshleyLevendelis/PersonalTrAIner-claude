@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH WEIGHS WHAT IS COMING UP BEFORE IT SAYS YES (his request 16 Nov 2026)**. His words: "if I ask should I
+  run 15k tonight but I have a heavy leg session planned for tomorrow morning, I don't want the chat to just say yeah go
+  for it." Measured: the coach already receives the whole week, today and tomorrow labelled, with each session's
+  exercises and weights, and "the next session after today is tomorrow's ..." in its opening line. What it lacked was
+  any instruction to USE it: its one rule about sessions was "don't lead with them" (his 17 Sep ruling), and no exam
+  case asked. Now a section in its instructions says what is coming up decides the answer. **Mine (CSCS):** long or hard
+  cardio and heavy lower-body lifting compete within about a day; never a plain yes; name the session, say what it
+  costs (tired legs, a flat squat day, injury risk) and give the better option (an easy shorter run, the long run on a
+  day with no legs after it, or moving the session); a running goal puts the run first, otherwise the plan's sessions
+  come first; an upper-body or rest day next is a yes with a reason; a meal change is checked against the day's
+  targets and what was eaten. The answer-first step tells the coach the same, and may now name a duration or distance
+  (only calories, grams, weights, sets and reps are the offer's). New exam case `run-before-heavy-legs` (an 18k the
+  evening before heavy squats; worded unlike the example in the instructions, so it tests the rule, not recall).
+  `test:answer-first` (34 checks; 4 more mutations, all caught). **NOT KNOWN until the exam runs on his machine after
+  the `chat-gemini` deploy:** whether the coach follows it. The rule is code; the judgement is the model's.
 - [x] **A QUESTION GETS ITS ANSWER, THEN THE OFFER: his ruling 16 Nov 2026, "Answer, then offer"** (from three
   options: answer then offer with buttons, answer only with the offer on his yes, or answer only). His report: "it
   doesn't seem to understand the difference between me asking a question and a request." Measured: of the coach's

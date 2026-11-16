@@ -30,9 +30,11 @@ export function askedAQuestion(message: string): boolean {
 export const ANSWER_FIRST_NUDGE =
   "He ASKED a question; he did not ask you to do anything yet. Nothing has been changed. Answer his question in one " +
   "or two short sentences, the way a coach would text it: yes or no (or which), and the main reason, from what you " +
-  "know about him and his plan. Do not say you have done, changed, added or swapped anything. Do not write any " +
-  "number. Do not ask a question and do not offer to do it: the app shows him an offer with Apply and Not now right " +
-  "under your answer.";
+  "know about him and his plan. FIRST read his plan for today and the next two days and what he has done today: if the " +
+  "change would cost an upcoming session (a long or hard run the night before heavy legs, say), say so by name, and " +
+  "the better option. Do not say you have done, changed, added or swapped anything. Do not write calories, grams, " +
+  "weights, sets or reps: the offer's numbers are the app's. Do not ask a question and do not offer to do it: the app " +
+  "shows him an offer with Apply and Not now right under your answer.";
 
 const DID_SOMETHING = /\b(?:i'?ve|i have|i'?ll|i will|i'?m going to|done|added|swapped|changed|moved|updated|logged|booked|scheduled)\b/i;
 
@@ -41,7 +43,8 @@ export function answerProblem(text: string): string | null {
   const t = (text ?? "").trim();
   if (!t) return "empty";
   if (t.length > 320) return "too long";
-  if (/\d/.test(t)) return "carries a number";
+  // The offer's own figures (calories, grams, weights, sets, reps) are the app's; a duration or distance in advice is not.
+  if (/\d\s*(?:kcal|cal(?:orie)?s?\b|g\b|grams?\b|kg\b|kilos?\b|lbs?\b|sets?\b|reps?\b|x\s*\d)/i.test(t)) return "carries a number";
   if (t.includes("?")) return "asks a question";
   if (DID_SOMETHING.test(t) || detectPlanClaim(t)) return "says something was done";
   return null;

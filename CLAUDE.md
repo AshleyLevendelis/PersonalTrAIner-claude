@@ -1605,6 +1605,11 @@ menu" stays true when a copy is also left outside it.
   say so. From the next day a surprising weigh-in is held as before. `test:weigh-in-targets` §13,
   `verify:setup-weight-correction`
 
+- **What is coming up decides the coach's answer: his request 16 Nov 2026** ("should I run 15k tonight" with heavy legs
+  tomorrow must not get "go for it"): the coach reads today and the next two days before saying yes to extra work or a
+  change, names the session it would cost and gives the better option; a running goal puts the run first, otherwise
+  the plan does (CSCS). Prompt section 3b0, `test:answer-first`, exam case `run-before-heavy-legs`. Unproven until the
+  exam runs after the `chat-gemini` deploy
 - **A question gets its answer, then the offer: his ruling 16 Nov 2026, "Answer, then offer"**: when he ASKS and the
   coach reaches for a change, one or two lines of answer (yes or no and why; no number, no claim, no question) sit above
   the app's offer and its Apply / Not now; a request ("swap it", "can you swap it?") goes straight to the offer; an

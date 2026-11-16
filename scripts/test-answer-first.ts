@@ -44,12 +44,20 @@ async function main() {
     ['I\'ve swapped squats for leg press for you.', 'says something was done'],
     ['Done, leg press is in.', 'says something was done'],
     ['Yes: 3 sets of 10 on the leg press.', 'carries a number'],
+    ['Swap it, that keeps you at about 650 kcal.', 'carries a number'],
     ['Yes, it suits you. Want me to swap it?', 'asks a question'],
     ['Yes. ' + 'It is a very reasonable choice for you right now. '.repeat(8), 'too long'],
   ]
   for (const [text, why] of bad) check(`refused (${why}): "${text.slice(0, 40)}"`, answerProblem(text) === why, answerProblem(text))
-  check('the coach is told to answer, claim nothing, write no number and ask nothing',
-    /Answer his question/.test(ANSWER_FIRST_NUDGE) && /Do not say you have done/.test(ANSWER_FIRST_NUDGE) && /Do not write any number/.test(ANSWER_FIRST_NUDGE) && /Do not ask a question/.test(ANSWER_FIRST_NUDGE))
+  check('advice may name a duration or a distance: "Not tonight: keep it to an easy 30 minutes, 15k can wait"',
+    answerProblem('Not tonight: you have heavy legs tomorrow. Keep it to an easy 30 minutes and save the 15k for Saturday.') === null)
+  check('the coach is told to answer, claim nothing, keep the offer\'s figures out and ask nothing',
+    /Answer his question/.test(ANSWER_FIRST_NUDGE) && /Do not say you have done/.test(ANSWER_FIRST_NUDGE) && /Do not write calories, grams/.test(ANSWER_FIRST_NUDGE) && /Do not ask a question/.test(ANSWER_FIRST_NUDGE))
+  check('...and to read today and the next two days of his plan first, and name what a change would cost',
+    /read his plan for today and the next two days/.test(ANSWER_FIRST_NUDGE) && /say so by name/.test(ANSWER_FIRST_NUDGE))
+  const prompt = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
+  check('the coach\'s instructions say what is coming up decides the answer, his 15k example included',
+    /WHAT IS COMING UP DECIDES THE ANSWER/.test(prompt) && /run 15k tonight/.test(prompt) && /never just say yes/.test(prompt) && /His goal decides which one gives way/.test(prompt))
 
   console.log('\n3. The step, end to end, against a fake coach')
   const offer = (extra: Record<string, unknown> = {}) => new Response(JSON.stringify({ reply: '', proposal: { kind: 'propose_exercise_swap', rawArgs: {} }, ...extra }), { headers: { 'Content-Type': 'application/json' } })
