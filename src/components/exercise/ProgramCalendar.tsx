@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react'
-import { calendarShortLabel, type ProgramCalendarRow } from '@/lib/program-calendar'
+import { calendarRowLabel, calendarShortLabel, type ProgramCalendarRow } from '@/lib/program-calendar'
 import { shortPhaseLabel } from '@/lib/periodization'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 
@@ -45,7 +45,7 @@ export function ProgramCalendar({ rows, todayDate, liveCells, loggedDays, browse
         const blockStarts = block != null && block !== lastBlock
         if (block != null) lastBlock = block
         const phase = inPlan[0]?.phaseLabel ?? null
-        const weekLabel = weeks.length === 0 ? '' : weeks.length === 1 ? `W${weeks[0]}` : `W${weeks[0]}–${weeks[weeks.length - 1]}`
+        const rowLabel = calendarRowLabel(row)
         const holdsToday = row.cells.some(c => c.date === todayDate)
         return (
           <div key={row.monday} className="flex flex-col">
@@ -70,7 +70,10 @@ export function ProgramCalendar({ rows, todayDate, liveCells, loggedDays, browse
                 className={`self-center text-center text-[0.6875rem] font-semibold tabular-nums ${weeks.includes(browseWeek) ? '' : 'text-muted-foreground'}`}
                 style={weeks.includes(browseWeek) ? { color: 'var(--primary-text)' } : undefined}
               >
-                {weekLabel}
+                <span className="flex flex-col items-center leading-tight" data-calendar-row-label={rowLabel.kind} aria-label={rowLabel.spoken || undefined}>
+                  <span>{rowLabel.text}</span>
+                  {rowLabel.sub && <span className="text-[0.5rem] font-medium uppercase tracking-[.04em]">{rowLabel.sub}</span>}
+                </span>
               </span>
               {row.cells.map(cell => {
                 const live = liveCells.get(cell.date)
