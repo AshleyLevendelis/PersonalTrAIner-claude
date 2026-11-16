@@ -17,7 +17,7 @@ import { questionAsksSlot, questionPartOf } from '../src/lib/onboarding-chip-mat
 import { weekDayRow } from '../src/lib/exercise-week'
 import { resolveMoveTarget } from '../src/lib/session-move'
 import { dayListState, type GroceryItemRow } from '../src/lib/grocery-store'
-import { formVideoFor, exerciseNamedIn, linkifyBareUrls, asksHowOrVideo } from '../src/lib/exercise-video'
+import { formVideoFor, exerciseNamedIn, linkifyBareUrls, asksHowOrVideo, sessionVideosFor } from '../src/lib/exercise-video'
 import { plainTyped } from '../src/lib/typed-text'
 import { detectFoodExclusions } from '../src/lib/food-exclusions'
 import { raceDateMissing, RACE_DATE_QUESTION } from '../src/lib/running'
@@ -136,7 +136,17 @@ async function main() {
     check('a bare address the coach typed becomes a link the chat can open', linked.includes('[www.youtube.com/results?search_query=Box+Jumps](www.youtube.com/results?search_query=Box+Jumps)'), linked)
     check('...and a link already written as one is left alone', linked.includes('[ok](https://x.com)') && !linked.includes('[[ok]'), linked)
     const chat = strip(fs.readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
-    check('the chat draws the app\'s button from the reply and what he said', /const v = videoForReply\(i, msg\.content\)/.test(chat) && /data-testid="form-video"/.test(chat) && /return formVideoFor\(said\[0\], reply, said\[1\]\)/.test(chat))
+    check('the chat draws the app\'s button from the reply and what he said', /videoForReply\(i, msg\.content\)/.test(chat) && /data-testid="form-video"/.test(chat) && /formVideoFor\(said\[0\], reply, said\[1\]\)/.test(chat) && /sessionVideosFor\(said\[0\], todayPlan/.test(chat))
+    // HIS SCREENSHOT, 16 Nov 2026: "Show me videos of today's exercises" got ONE button, Scapular Pull-Ups, which is not in
+    // the session: "today's" leaves a lone "s", and the exercise search found a name starting with it.
+    const ask = "Show me videos of today's exercises"
+    check('"today\'s" does not name an exercise (a lone letter is not a word)', exerciseNamedIn(ask) === null && formVideoFor(ask, 'Tap the button below for each of today\'s lifts!') === null, exerciseNamedIn(ask))
+    const todays = ['Arm Circles', 'Barbell Bench Press', 'Push Press', 'Lateral Raises', 'Skull Crushers', 'Neutral-Grip Dumbbell Press']
+    const buttons = sessionVideosFor(ask, todays)
+    check('...it gets a button for EACH exercise of today\'s session, in order', JSON.stringify(buttons.map(b => b.exercise)) === JSON.stringify(todays), buttons.map(b => b.exercise))
+    check('...each to a YouTube search built from its own name', buttons.every(b => b.url === `https://www.youtube.com/results?search_query=${encodeURIComponent(`${b.exercise} exercise form tutorial`)}`))
+    check('...but never for a how-to, a named exercise, or a day with no session', sessionVideosFor('how do I brace my core', todays).length === 0 && sessionVideosFor('show me a video of today\'s bench press', todays).length === 0 && sessionVideosFor(ask, []).length === 0)
+    check('...and no more than eight buttons', sessionVideosFor(ask, Array.from({ length: 12 }, (_, i) => `Move ${i}`)).length === 8)
     const coach = fs.readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
     check('the coach is told never to type a link', /NEVER type a link or a web address/.test(coach) && !/youtube\.com\/results/.test(coach))
   }

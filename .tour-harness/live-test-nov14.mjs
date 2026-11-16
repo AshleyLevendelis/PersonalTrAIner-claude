@@ -78,6 +78,13 @@ check('A7. its reply carries the button again, named from what he asked before',
 const typed = await page.evaluate(() => [...document.querySelectorAll('a')].filter(a => /youtube\.com\/watch\?v=abc123/.test(a.getAttribute('href') || '')).map(a => ({ href: a.getAttribute('href'), target: a.getAttribute('target') })))
 check('A8. the address the coach typed is now a link the chat opens in a new tab', typed.length === 1 && typed[0].target === '_blank', typed)
 check('A9. a plain question gets no video button', await say('did I train well this week?') && (await videoButtons()).length === 2)
+// HIS SCREENSHOT, 16 Nov 2026: "Show me videos of today's exercises" drew ONE button, for an exercise not in the session.
+const sessionNames = await page.evaluate(() => window.__todaysExercises ?? null)
+check('A9c. "Show me videos of today\'s exercises" is sent', await say("Show me videos of today's exercises"))
+const v3 = await until(videoButtons, v => Array.isArray(v) && v.length > 2)
+const added = (v3 ?? []).slice(2).map(b => b.text.replace(/^Watch a video: /, ''))
+check('A9d. it draws a button for EACH exercise of today\'s session (not one, and not one that is not in it)', added.length >= 3 && new Set(added).size === added.length && !added.includes('Scapular Pull-Ups') && (!Array.isArray(sessionNames) || JSON.stringify(added) === JSON.stringify(sessionNames)), { added, sessionNames })
+await shot('video-session')
 await shot('video-2')
 check('A9b. "I\'ve signed up for a 10k" with no date: the app asks when, and draws no Apply', await say("I've signed up for a 10k and I want to train for it")
   && await until(() => body(), b => /When is it\?/.test(b ?? '')).then(b => /When is it\?/.test(b ?? ''))

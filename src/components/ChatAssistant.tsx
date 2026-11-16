@@ -16,7 +16,7 @@ import { weekdayLong, dayLabel } from '@/lib/day-labels'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, Activity, ChevronRight, Check, PlayCircle } from 'lucide-react'
-import { formVideoFor, linkifyBareUrls } from '@/lib/exercise-video'
+import { formVideoFor, linkifyBareUrls, sessionVideosFor } from '@/lib/exercise-video'
 import { chatContextPills } from '@/lib/chat-context-strip'
 import { useShowNumbers } from '@/lib/show-numbers'
 import { sessionSetCount } from '@/lib/session-count'
@@ -8486,7 +8486,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const videoForReply = (index: number, reply: string) => {
     const said: string[] = []
     for (let j = index - 1; j >= 0 && said.length < 2; j--) if (messages[j].role === 'user') said.push(messages[j].content)
-    return formVideoFor(said[0], reply, said[1])
+    const one = formVideoFor(said[0], reply, said[1])
+    if (one) return [one]
+    // Asked for videos of the session, naming no exercise: one button for each of today's.
+    return sessionVideosFor(said[0], todayPlan ? todayPlan.exercises.map(e => e.name) : [])
   }
 
   const markdownComponents = {
@@ -8800,18 +8803,23 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                             {(() => {
                               // "SHOW ME A VIDEO" (his live test, 14 Nov 2026): the link is the app's, built from the
                               // exercise he named, never a URL the coach typed.
-                              const v = videoForReply(i, msg.content)
-                              return v && (
-                                <a
-                                  data-testid="form-video"
-                                  href={v.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-primary/60 px-3.5 text-[0.8125rem] font-medium text-primary-text"
-                                >
-                                  <PlayCircle className="size-4" aria-hidden />
-                                  Watch a video: {v.exercise}
-                                </a>
+                              const videos = videoForReply(i, msg.content)
+                              return videos.length > 0 && (
+                                <div className="mt-2 flex flex-col items-start gap-1.5">
+                                  {videos.map(v => (
+                                    <a
+                                      key={v.exercise}
+                                      data-testid="form-video"
+                                      href={v.url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-primary/60 px-3.5 text-[0.8125rem] font-medium text-primary-text"
+                                    >
+                                      <PlayCircle className="size-4" aria-hidden />
+                                      Watch a video: {v.exercise}
+                                    </a>
+                                  ))}
+                                </div>
                               )
                             })()}
                           </>

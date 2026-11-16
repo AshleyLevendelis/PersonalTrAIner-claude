@@ -246,6 +246,8 @@ const swapTarget = (() => {
   return full ? { full, loose: loosely(full) } : null
 })()
 ;(window as unknown as { __swapTarget: unknown }).__swapTarget = swapTarget
+// The names on today's session, as the plan holds them, for verify:live-test-nov14's "videos of today's exercises".
+;(window as unknown as { __todaysExercises: unknown }).__todaysExercises = (mesocycle[0].days.find(d => d.day === DAYS[todayIdx])?.exercises ?? []).map(e => e.name)
 
 // THE SESSION THAT WAS MOVED ONTO TODAY, by name — for verify:moved-edit
 // (9 Oct 2026). Under ?movedin=1 today's own row is empty and __swapTarget is

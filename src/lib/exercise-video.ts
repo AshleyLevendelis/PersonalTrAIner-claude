@@ -32,7 +32,9 @@ export function exerciseNamedIn(text: string | null | undefined, opts: { wholeNa
   if (whole || opts.wholeNameOnly) return whole ?? null
   // A shorter or reordered name ("lunges", "a barbell back squat"): the app's own exercise search over his words, the
   // longest run of words that finds something winning, so "back squat" is tried before "squat".
-  const words = t.trim().split(' ').filter(w => w && !STOP.has(w))
+  // A LONE LETTER IS NOT A WORD (his screenshot, 16 Nov 2026): "today's" leaves an "s", which the exercise search matched
+  // to Scapular Pull-Ups by its first letter, and "Show me videos of today's exercises" got that one button.
+  const words = t.trim().split(' ').filter(w => w.length > 1 && !STOP.has(w))
   for (let n = Math.min(3, words.length); n >= 1; n--) {
     for (let i = 0; i + n <= words.length; i++) {
       const hit = searchExerciseCatalogByWords(words.slice(i, i + n).join(' '), 1)[0]
@@ -67,6 +69,30 @@ export function formVideoFor(userText: string | null | undefined, replyText: str
   const asksForVideo = /\b(videos?|tutorials?|demo|show me)\b/i.test(userText)
   const exercise = exerciseNamedIn(userText) ?? exerciseNamedIn(replyText, { wholeNameOnly: true }) ?? (asksForVideo ? exerciseNamedIn(earlierUserText) : null)
   return exercise ? { exercise, url: formVideoUrl(exercise) } : null
+}
+
+const SESSION_WORDS = /\b(today|todays|session|workout|plan|routine|lifts?|exercises|movements?|them|these|all)\b/i
+const MOST_BUTTONS = 8
+
+/**
+ * "SHOW ME VIDEOS OF TODAY'S EXERCISES" (his screenshot, 16 Nov 2026): the coach said "for each of today's lifts" and the
+ * app drew one button, for an exercise that was not in the session. A request for videos that names no exercise but
+ * speaks of the session gets one button for each exercise of today's session, in its order, the catalogue's own name.
+ * Never for a how-to ("how do I brace my core"), which asks about one thing.
+ */
+export function sessionVideosFor(userText: string | null | undefined, sessionExercises: readonly string[]): { exercise: string; url: string }[] {
+  if (!userText || sessionExercises.length === 0) return []
+  if (!/\b(videos?|tutorials?|demos?|show me)\b/i.test(userText) || !SESSION_WORDS.test(userText)) return []
+  if (exerciseNamedIn(userText)) return []
+  const seen = new Set<string>()
+  const out: { exercise: string; url: string }[] = []
+  for (const name of sessionExercises) {
+    if (!name || seen.has(name)) continue
+    seen.add(name)
+    out.push({ exercise: name, url: formVideoUrl(name) })
+    if (out.length >= MOST_BUTTONS) break
+  }
+  return out
 }
 
 /**

@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **"SHOW ME VIDEOS OF TODAY'S EXERCISES" DREW ONE BUTTON, FOR AN EXERCISE NOT IN THE SESSION (his screenshots 16 Nov
+  2026)**. Two defects. (1) CAUSE, reproduced: "today's" leaves a lone "s", the exercise search treated it as a word and
+  matched Scapular Pull-Ups by its first letter, so the app drew "Watch a video: Scapular Pull-Ups" on a Push & Press day.
+  A lone letter is no longer a word. (2) The coach said "for each of today's lifts" and the app could only ever draw one
+  button. A request for videos that names no exercise but speaks of the session (today, workout, plan, lifts, all) now
+  gets one button for each exercise of today's session, in order, up to eight, each to a YouTube search built from the
+  catalogue's own name; never for a how-to, a named exercise, or a day with no session. Decided unprompted (mechanical:
+  the app was not keeping the coach's promise); the wording is the coach's, unchanged. `test:live-test-nov14` §7 +6
+  checks, `verify:live-test-nov14` A9c-A9d, screenshot read; 3 mutations (lone letter back, session buttons removed, only
+  the first button), all caught. No server change, so no deploy beyond the frontend.
 - [x] **THE EXERCISE STRIP STARTS TODAY (his ruling 15 Nov 2026, "Next 7 days from today but arrow and swipe to see
   previous and next days")**, from three options (over Mon-Sun plus a next-week arrow, and over flipping on Sunday). His
   report: on a Sunday the strip showed only the week ending, so nothing upcoming. Now: today and the next six days; the
