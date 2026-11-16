@@ -47,6 +47,7 @@ import { checkMealRefit, isRefitDeclined, declineRefit, type MealRefit } from '@
 import { supabase } from '@/lib/supabase'
 import { describeRebuild } from '@/lib/rebuild-card'
 import { saveMesocycle, saveMesocycleWeek, saveScopedEdit, restoreMesocycle } from '@/lib/mesocycle-persistence'
+import { snapPlanStart } from '@/lib/plan-week'
 import { buildRestartedPlan } from '@/lib/plan-restart'
 import { repriceForCorrectedProfile, repriceableWeekNumbers, describeReprice } from '@/lib/reprice-plan'
 import { type SwapScope } from '@/lib/mesocycle-edit'
@@ -2049,7 +2050,7 @@ function App() {
       setLatestWeightKg(enrichedProfile.weight_kg ?? null)
       setExercisePlan(workout)
       setMesocycle(mesocycleData)
-      setMesocycleCreatedAt(new Date().toISOString())
+      setMesocycleCreatedAt(snapPlanStart(new Date().toISOString(), mesocycleData[0]?.days))
     }
 
     if (data) {
@@ -2662,7 +2663,7 @@ function App() {
       await saveMesocycle(profile.id, weeks, bornAt)
       setMesocycle(weeks)
       setExercisePlan(weeks[0].days)
-      setMesocycleCreatedAt(bornAt)
+      setMesocycleCreatedAt(snapPlanStart(bornAt, weeks[0]?.days))
       setLogsVersion(v => v + 1)
       bumpCoachData()
       return null

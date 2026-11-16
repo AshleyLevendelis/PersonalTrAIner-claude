@@ -441,7 +441,7 @@ export function SwapDialog({
               </p>
             </button>
             {/* FOR GOOD IS A DIFFERENT THING, offered beside it (her 10 Oct ruling):
-                a block swap ends when the plan changes exercises; a ban does not. */}
+                a block swap ends when the next block changes exercises; a ban does not. */}
             {onDislike && target && (
               <button
                 type="button"

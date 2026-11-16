@@ -201,16 +201,18 @@ const THURSDAY = new URLSearchParams(location.search).get('thursday') === '1'
 // it sits in the plan week BEFORE today's), and the plan's age; what the card makes of it is the app's.
 //   easy   - that session at the plan's own number for its week, every set at the bottom of the range, "too easy"
 //            kept on its last set. Today must start heavier and run the find-your-weight search.
-//   kept   - the same session with no answer, in a plan 37 days old: weeks 5 and 6, two loading weeks whose numbers
-//            differ on today's lifts (weeks 1 and 2 do not, on this plan). Done as written, so today takes the
-//            plan's number for THIS week.
-//   deload - the plan is 23 days old, so today is its deload week; the session, in week 3, is 5 kg over the plan.
+//   kept   - the same session with no answer, in a plan 72 days old: weeks 10 and 11, two loading weeks whose numbers
+//            differ on today's lifts (shrugs 22 -> 24 kg; in blocks 1 and 2 this day's dumbbell lifts hold their weight
+//            and add reps). Done as written, so today takes the plan's number for THIS week.
+//   deload - the plan is 79 days old, so today is week 12, a deload; the session, in week 11, is 5 kg over the plan.
+//            (Moved 16 Nov 2026 from 23 days: week 4's lifts are now the same light dumbbell lifts as weeks 1-3, all
+//            10 kg or under, below the fixture's floor.)
 //            Today must be lighter than that session, and must not ask how it felt.
 //   back   - the plan is 30 days old: today is the first week of the next block and the session was in the deload
 //            week, at the deload's own number. Today must be this block's weight, not the deload's.
 //   ask    - no earlier session: the page for logging a lift's sets and answering the question.
 const EFFORT = new URLSearchParams(location.search).get('effort')
-const EFFORT_PLAN_AGE = EFFORT === 'deload' ? 23 : EFFORT === 'back' ? 30 : EFFORT === 'kept' ? 37 : 0
+const EFFORT_PLAN_AGE = EFFORT === 'deload' ? 79 : EFFORT === 'back' ? 30 : EFFORT === 'kept' ? 72 : 0
 // ?away=N — COMING BACK AFTER N DAYS AWAY (8 Oct 2026, layoff.ts). The last working
 // session is N days before today, on a loaded lift of today's own session, logged at the
 // plan's weight with EVERY set at the top of the range — so without the break the card
@@ -220,6 +222,15 @@ const EFFORT_PLAN_AGE = EFFORT === 'deload' ? 23 : EFFORT === 'back' ? 30 : EFFO
 // chosen here; what the card makes of it is the app's.
 const AWAY = Math.max(0, Number(new URLSearchParams(location.search).get('away') ?? '0') || 0)
 const ABSURD = new URLSearchParams(location.search).get('absurd') === '1'
+// The plan is made N+9 days ago so it is past its first week, and moved a week further back when that would put today in a
+// DELOAD week (every 4th): a deload's lighter loads are not "last time's weight", so a break measured on one tests the
+// deload, not the break. Found 16 Nov 2026: away=12 lands in week 4, and once exercises stopped changing inside a block
+// (his ruling that day) week 4's row was the same light 10kg row, under the fixture's 10kg floor, so no target existed.
+function awayPlanAge(away: number): number {
+  let age = away + 9
+  while ((Math.floor(age / 7) + 1) % 4 === 0) age += 7
+  return age
+}
 const LEG_CURL = new URLSearchParams(location.search).get('legcurl') === '1'
 // ?offstyle=1 — A FULL GYM AND A FUNCTIONAL TRAINEE, which is the only pairing
 // where the swap shortlist has anything to demote. Ashley, 18 Sep 2026: offered
@@ -336,7 +347,7 @@ const profile: UserProfile = {
   // NINE DAYS OLD, not today: a plan created today has no elapsed
   // scheduled days, so the consistency score correctly shows nothing and the
   // harness could never see it render.
-  created_at: EFFORT_PLAN_AGE > 0 ? (() => { const d = daysAgo(EFFORT_PLAN_AGE); d.setHours(8, 0, 0, 0); return d.toISOString() })() : AWAY > 0 ? (() => { const d = daysAgo(AWAY + 9); d.setHours(8, 0, 0, 0); return d.toISOString() })() : THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - (JOINED_TODAY ? 0 : 9) * 86400000).toISOString(),
+  created_at: EFFORT_PLAN_AGE > 0 ? (() => { const d = daysAgo(EFFORT_PLAN_AGE); d.setHours(8, 0, 0, 0); return d.toISOString() })() : AWAY > 0 ? (() => { const d = daysAgo(awayPlanAge(AWAY)); d.setHours(8, 0, 0, 0); return d.toISOString() })() : THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - (JOINED_TODAY ? 0 : 9) * 86400000).toISOString(),
   ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
   ...(RUNNER ? { running_goal: '5k', running_base_minutes: 30 } : {}),
 } as UserProfile
@@ -571,6 +582,9 @@ const effortTarget = (() => {
   // between the two weeks: without a difference "follows this week's plan" could not be told from "held".
   const loaded = day.exercises.filter(e => (e.suggested_load_kg ?? 0) > 10 && before(e.name) != null)
   const ex = loaded.find(e => before(e.name) !== e.suggested_load_kg) ?? loaded[0]
+  // 'back' since 16 Nov 2026: a new block's accessories are new, so on this day no lift ran through the deload. The
+  // driver reads the weeks and the card; nothing is seeded.
+  if (!ex && EFFORT === 'back') return { kind: EFFORT, name: '', sets: 0, repsLow: 0, liveWeek: liveWeekNo, isDeload: !!nowWeek.is_deload, lastWasDeload: !!thenWeek?.is_deload, printedNowKg: 0, printedThenKg: 0, lastKg: 0, seeded: false, todayLoaded: day.exercises.filter(e => (e.suggested_load_kg ?? 0) > 0).map(e => e.name) }
   if (!ex) return null
   const printedThenKg = before(ex.name) as number
   const repsLow = Number(/\d+/.exec(ex.reps)?.[0] ?? 8)

@@ -40,7 +40,7 @@ console.log('\n1. The day the next block starts')
 
 console.log('\n2. What the swap says')
 {
-  check('with a date: the day it ends, and why', blockSwapLine(shortDate('2026-10-05', '2026-09-20')) === 'Swaps it until Mon 5 Oct, when your next block starts and your plan changes exercises.', blockSwapLine(shortDate('2026-10-05', '2026-09-20')))
+  check('with a date: the day it ends, and why', blockSwapLine(shortDate('2026-10-05', '2026-09-20')) === 'Swaps it until Mon 5 Oct, when your next block starts and some exercises change.', blockSwapLine(shortDate('2026-10-05', '2026-09-20')))
   check('on the last block: for the rest of the plan', blockSwapLine(null) === 'Swaps it for the rest of your plan.')
 }
 

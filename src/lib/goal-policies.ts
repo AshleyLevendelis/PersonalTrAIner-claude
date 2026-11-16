@@ -33,19 +33,8 @@ export interface GoalPolicy {
   setVolumeMultiplier: number
   /** Target conditioning sessions per week (dedicated day, post-session, or independent block — see assignConditioningNotes). Fractional values round at the call site. */
   conditioningFrequencyPerWeek: number
-  /**
-   * How many weeks a MAIN lift holds its variation before rotating. Declared
-   * for completeness/documentation, but NOT currently wired to a behavior
-   * difference: Part 2 established "main lifts rotate only at block
-   * boundaries" as an unconditional rule, because the whole double-
-   * progression system depends on a main lift staying put long enough to
-   * track a baseline against. Every policy below is 4 (one full block) for
-   * that reason — this field exists so a future change to that rule has a
-   * declared home, not so it can be tuned today.
-   */
-  mainRotationWeeks: number
-  /** How many weeks an ACCESSORY holds its variation before rotating within a block (2 = the Part 2 default). */
-  accessoryRotationWeeks: number
+  // No rotation cadence any more (his ruling 16 Nov 2026): every exercise holds for the whole block, main lifts for the
+  // whole plan; only accessories change, at a new block. docs/plans/exercise-consistency.md.
   /** Training phases this goal may ever enter. Phases outside this list get remapped to the nearest allowed one before intensity/load are computed. */
   allowedPhases: TrainingPhase[]
   /**
@@ -172,8 +161,6 @@ const HYPERTROPHY_POLICY: GoalPolicy = {
   label: 'Muscle Growth',
   setVolumeMultiplier: 1.0,
   conditioningFrequencyPerWeek: 1,
-  mainRotationWeeks: 4,
-  accessoryRotationWeeks: 2,
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'power', 'consolidation'],
   progressionEmphasis: 'load',
   coachNote: 'Volume drives growth here — the program is built around moderate-rep working sets taken close to failure, with load climbing week to week within each block.',
@@ -198,8 +185,6 @@ const FAT_LOSS_POLICY: GoalPolicy = {
   // recovery, so full hypertrophy-level volume isn't recoverable here.
   setVolumeMultiplier: 0.875,
   conditioningFrequencyPerWeek: 2.5,
-  mainRotationWeeks: 4,
-  accessoryRotationWeeks: 2,
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'metabolic'],
   // Deliberately 'load', not 'reps' or 'maintain' — the point is to keep
   // pushing the main lifts so muscle has a reason to stick around in a
@@ -226,8 +211,6 @@ const CONDITIONING_POLICY: GoalPolicy = {
   label: 'Endurance / Conditioning',
   setVolumeMultiplier: 0.85,
   conditioningFrequencyPerWeek: 4,
-  mainRotationWeeks: 4,
-  accessoryRotationWeeks: 2,
   // No strength or power block — capped at hypertrophy/metabolic work.
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'metabolic'],
   progressionEmphasis: 'reps',
@@ -256,14 +239,10 @@ const FUNCTIONAL_POLICY: GoalPolicy = {
   label: 'General Health / Maintenance',
   setVolumeMultiplier: 0.9,
   conditioningFrequencyPerWeek: 1.5,
-  mainRotationWeeks: 4,
-  // Faster accessory rotation than every other goal — variety over strict
-  // overload. (Main lifts still hold for the block; see mainRotationWeeks.)
-  accessoryRotationWeeks: 1,
   allowedPhases: ['anatomical_adaptation', 'hypertrophy', 'strength', 'power', 'consolidation'],
   progressionEmphasis: 'maintain',
-  coachNote: 'This program favors variety and movement quality over chasing a number on the bar — exercises rotate faster, and the aim is consistent, sustainable training rather than maximal overload.',
-  coachNoteLoadless: 'This program favors variety and movement quality over chasing a number — exercises rotate faster, and the aim is consistent, sustainable training rather than maximal overload.',
+  coachNote: 'This program favors variety and movement quality over chasing a number on the bar — your main lifts stay the same, your other exercises change with each new block, and the aim is consistent, sustainable training rather than maximal overload.',
+  coachNoteLoadless: 'This program favors variety and movement quality over chasing a number — your main lifts stay the same, your other exercises change with each new block, and the aim is consistent, sustainable training rather than maximal overload.',
   // Standard rep ranges (variety is the differentiator here, not rep
   // scheme), slightly fuller tier1 recovery (supports power/explosive work
   // where experience allows), fewer isolation slots in favor of unilateral/

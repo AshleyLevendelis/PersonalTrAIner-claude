@@ -7811,9 +7811,7 @@ export function generateMesocycle(
       phaseConfig = { ...phaseConfig, sets_multiplier: phaseConfig.sets_multiplier * scale }
     }
 
-    // Variations rotate ONCE PER BLOCK, not per week. Changing them weekly
-    // would make progression impossible to read; holding them for four weeks
-    // gives enough repetitions to actually improve at the movement.
+    // Accessory variations rotate ONCE PER BLOCK, never inside one; main lifts do not rotate at all (below).
     const rotatedBlockDays = baseWeek.map(day => {
       // Per-day dedup: a block rotation is computed independently per
       // exercise, with no visibility into what its day-mates just resolved
@@ -7833,11 +7831,18 @@ export function generateMesocycle(
         const e = findEntry(ex.name)
         return e ? getMovementFamily(e) : null
       })
+      // THE MAIN LIFTS ARE THE ANCHORS (his question 16 Nov 2026; docs/plans/exercise-consistency.md). The first one or
+      // two compound lifts of each day keep their exercise in every block, so the strength record is read off one lift
+      // for the whole plan; only sets, reps and rest change with the phase. Accessories still rotate by block. The
+      // tiers are read off the BASE day, before anything rotates.
+      const baseTiers = classifyRotationTiers(day.exercises)
       const exercises = day.exercises.map((ex, exIdx) => {
         const avoidFamilies = new Set(
           dayFamiliesByIndex.filter((f, i) => f && i !== exIdx) as string[]
         )
-        const rotated = rotateVariation(ex.name, blockIndex, poolForRotation(pool, equipmentTierFor(profile)), experience, profile, usedNamesThisDay, avoidFamilies)
+        const rotated = baseTiers[exIdx] === 'main'
+          ? ex.name
+          : rotateVariation(ex.name, blockIndex, poolForRotation(pool, equipmentTierFor(profile)), experience, profile, usedNamesThisDay, avoidFamilies)
         usedNamesThisDay.add(rotated)
         // THE PROXY ABOVE IS ONLY GOOD UNTIL A SLOT HAS ROTATED. One substitution_group can hold several families
         // ('tricep_extension' holds pushdowns, kickbacks and overhead work), so a slot can rotate into a family
@@ -8033,52 +8038,13 @@ export function generateMesocycle(
         // within-tier (an accessory is only ever replaced by an accessory),
         // so the RANK the anchor is chosen on cannot change — only the name.
         const promotedAnchor = dayAnchorExercise(day.exercises)
-        // Fixed for this week (main/core never rotate weekly), so these
-        // names are known up front — seeding the avoidance set with them
-        // means an accessory rotation can never collide with a sibling slot
-        // on the same day, whether that sibling is fixed or an
-        // already-resolved accessory earlier in this same array.
-        const usedWeeklyNames = new Set<string>(
-          day.exercises
-            .filter((_, i) => rotationTiers[dayIdx][i] !== 'accessory')
-            .map(ex => ex.name)
-        )
-        // Each slot's family as the week will actually hold it: the block's name until that slot's own weekly
-        // rotation below has run, then what it rotated to (same reason as the block-level rotation's update).
-        const weekFamilyByIndex = day.exercises.map(ex => {
-          const e = findEntry(ex.name)
-          return e ? getMovementFamily(e) : null
-        })
         const exercises: Exercise[] = day.exercises.map((ex, exIdx) => {
-          // Accessories rotate on a 2-week sub-cycle within the block (weeks
-          // 1-2 stay on the block's starting variation, weeks 3-4 move one
-          // step further through the same constrained-pool candidate list
-          // rotateVariation() already builds for block-boundary rotation —
-          // same substitution group, same tier, skill-appropriate, never a
-          // downgrade). Main lifts and core/carry work stay on whatever the
-          // block-level rotation above picked, for the whole block.
-          const tier = rotationTiers[dayIdx][exIdx]
-          // Accessory rotation cadence is goal-tunable (Part 4) — 'maintain'
-          // policies rotate faster (variety over strict overload) than the
-          // hypertrophy-default 2-week fortnight. Main/core stay on whatever
-          // the block-level rotation above picked, for the whole block,
-          // regardless of goal — see GoalPolicy.mainRotationWeeks.
-          //
-          // Beginners/novices need REPETITION to actually learn a movement
-          // (expConfig.repeat_movements_for_practice — declared in
-          // experience-config.ts but never wired up until now) — a
-          // mid-block accessory swap works against that the same way it
-          // would for a main lift, so they hold the block-level variation
-          // for all four weeks. Intermediate+ keep the sub-cycle.
-          const rotatesWeekly = tier === 'accessory' && !expConfig.repeat_movements_for_practice
-          const weeklyFamilies = new Set(weekFamilyByIndex.filter((f, i) => f && i !== exIdx) as string[])
-          const weeklyName = rotatesWeekly
-            ? rotateVariation(ex.name, Math.floor((w - 1) / policy.accessoryRotationWeeks), poolForRotation(pool, equipmentTierFor(profile)), experience, profile, usedWeeklyNames, weeklyFamilies)
-            : ex.name
-          if (rotatesWeekly) usedWeeklyNames.add(weeklyName)
-          const weeklyEntry = findEntry(weeklyName)
-          if (weeklyEntry) weekFamilyByIndex[exIdx] = getMovementFamily(weeklyEntry)
-
+          // THE SAME EXERCISE ALL BLOCK (his question 16 Nov 2026, with Gemini's answer; docs/plans/exercise-consistency.md;
+          // CSCS: progress is read off the same movement four times, and a lift first met in week 3 of 4 gets two
+          // sessions before the block ends). Every slot keeps the block's exercise for all four weeks, the deload
+          // included; accessories move on at the next block instead. It replaced a weekly accessory rotation (week 3
+          // for most goals, every week for functional) that nothing of his had asked for.
+          const weeklyName = ex.name
           const dbEntry = getExerciseEntry(weeklyName)
           const isPrimer = dbEntry?.mechanics_tier === 'primer'
           const category = dbEntry ? categorize(dbEntry) : null

@@ -45,6 +45,11 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   six days after it; the arrows and a swipe page seven days back or forward, "Today" returns. It REPLACES "the Home and
   Exercise strips stay Monday to Sunday" for the Exercise strip only; every "this week" count, the Week view and Home's
   strip stay Monday to Sunday. A tapped day is a DATE, never a weekday name. `verify:live-test-nov14` C6-C10
+- **Week 1 begins on the coming Monday when the days before it hold no session; a calendar row holding two plan weeks
+  reads its dates — his ruling 16 Nov 2026** (over universal Monday weeks, which he proposed and which would cut a
+  mid-week start's calibration week). It narrows his 6 Oct "the day you started" for rest-day starts only: a Sunday
+  trainer keeps the Sunday. One function (`snapPlanStart`) where a plan is read back or made. `test:week-one-start`,
+  `verify:live-test-nov14` D1-D2
 - **A food that can't be counted is asked about before any card — his rule, 15 Oct 2026 (run 7, M51)**, in his
   words: "if a food can't be counted, ask before showing the card; never show a total that quietly leaves it
   out." Both halves: the card builder refuses, the coach's log_meal asks in the same words. `test:meal-amounts`,
@@ -147,6 +152,11 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   lowers, `docs/plans/variant-pricing.md`); his rulings "Known kit + a few" (five new kit ticks) and "Searchable,
   log-only" (near-copies are found and logged under their own name, never prescribed). `test:exercise-library`,
   `test:variant-pricing`
+- **The same exercises all block; main lifts for the whole plan; accessories change at a new block — his ruling 16 Nov
+  2026, "All three as you suggest"** (his question, from Gemini's advice). It replaced a weekly accessory rotation and a
+  per-block rotation of every lift that no ruling had asked for. The quality score's Selection rules flipped with it
+  (`exercise_changed_within_block`, `main_lift_changed_between_blocks`): **Selection scores before 16 Nov are not
+  comparable**. `test:exercise-consistency`, `test:block-swap-reach`, `docs/plans/exercise-consistency.md`
 - Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
   — `chosen-not-shuffled` since 16 Sep 2026 (19 checks, 10 mutations), which
   CALLS the ranker rather than reading it. It holds the tie-break to its job:
@@ -1594,6 +1604,10 @@ menu" stays true when a copy is also left outside it.
   day that disagrees with setup corrects it, and any saved Profile weight change does; the targets follow at once and
   say so. From the next day a surprising weigh-in is held as before. `test:weigh-in-targets` §13,
   `verify:setup-weight-correction`
+
+- **The coach's intervals start with one tap: his request 16 Nov 2026.** A coach reply naming work, rest and rounds
+  carries "10 × 30s, 30s rest · Start · 10s countdown" (his own countdown setting); one tap starts the round timer at those numbers on Tools. Read off the
+  coach's words by the app; anything less specific gets no button. `test:coach-intervals`, `verify:live-test-nov14` A12-A15
 
 ### His rulings of 15 Nov 2026, the Marcus test (Wave M of `docs/plans/browser-test-nov15-plan.md`)
 - **An allergy refusal says where the setting is, never invites removing it: "Say where it's set"**. "Your nut-free

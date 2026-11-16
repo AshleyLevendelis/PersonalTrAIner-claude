@@ -817,7 +817,7 @@ export function blockSwapLine(until: string | null, why: 'block' | 'rotation' = 
   // stops there, and the line says so rather than naming a block end it never reaches (QA walk, 10 Nov 2026).
   return why === 'rotation'
     ? `Swaps it until ${until}, when your plan moves this slot on to its next exercise.`
-    : `Swaps it until ${until}, when your next block starts and your plan changes exercises.`
+    : `Swaps it until ${until}, when your next block starts and some exercises change.`
 }
 
 /**

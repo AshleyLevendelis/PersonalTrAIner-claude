@@ -32,6 +32,7 @@
     "sync:shared": "node scripts/sync-shared-code.mjs",
     "test:shared-code-sync": "node scripts/sync-shared-code.mjs --check",
     "test:live-test-nov14": "tsx scripts/test-live-test-nov14.ts",
+    "test:coach-intervals": "tsx scripts/test-coach-intervals.ts",
     "test:qa-training-nov14": "tsx scripts/test-qa-training-nov14.ts",
     "test:qa-meals-nov14": "tsx scripts/test-qa-meals-nov14.ts",
     "test:qa-batch3": "tsx scripts/test-qa-batch3.ts",
@@ -644,7 +645,9 @@
     "measure:empty-meals": "tsx scripts/measure-empty-meals.ts",
     "test:empty-meals": "tsx scripts/test-empty-meals.ts",
     "verify:empty-meals": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/empty-meals.mjs",
-    "test:beginner-protein": "tsx scripts/test-beginner-protein.ts"
+    "test:beginner-protein": "tsx scripts/test-beginner-protein.ts",
+    "test:week-one-start": "tsx scripts/test-week-one-start.ts",
+    "test:exercise-consistency": "tsx scripts/test-exercise-consistency.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

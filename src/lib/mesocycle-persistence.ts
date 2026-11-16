@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 import type { MesocycleWeek } from './types'
 import { toRow, fromRow, type MesocycleWeekRow } from './mesocycle-shape'
+import { snapPlanStart } from './plan-week'
 
 // ---------------------------------------------------------------------------
 // Full-fidelity mesocycle round-trip (see the mesocycle_weeks migration for
@@ -94,7 +95,10 @@ export async function restoreMesocycle(profileId: string): Promise<RestoredMesoc
   // WITH THE PHONE'S OWN UNSENT CHANGES ON TOP (keptPlanWeeks, below): a swap made with no signal is part of the plan
   // the moment it is made, and a read that lands before it has been sent must not draw the plan without it.
   const kept = keptPlanWeeks(profileId)
-  return { weeks: rows.map(fromRow).map(w => kept.get(w.week_number) ?? w), createdAt }
+  const weeks = rows.map(fromRow).map(w => kept.get(w.week_number) ?? w)
+  // WHERE WEEK 1 BEGINS (snapPlanStart): the stored stamp stays as written; every reader of the plan's start gets the
+  // snapped one, so a plan made on a rest-day Sunday begins on Monday everywhere at once.
+  return { weeks, createdAt: createdAt ? snapPlanStart(createdAt, weeks[0]?.days) : createdAt }
 }
 
 /** Upserts a single week — used by targeted mesocycle edits (swap/ban) so a full resave isn't needed for a one-week patch. */

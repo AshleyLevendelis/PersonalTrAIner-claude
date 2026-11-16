@@ -15,8 +15,11 @@ import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { weekdayLong, dayLabel } from '@/lib/day-labels'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, Activity, ChevronRight, Check, PlayCircle } from 'lucide-react'
+import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, Activity, ChevronRight, Check, PlayCircle, Timer } from 'lucide-react'
 import { formVideoFor, linkifyBareUrls, sessionVideosFor } from '@/lib/exercise-video'
+import { parseIntervalSuggestion } from '@/lib/timer-engine'
+import { startLabel } from '@/lib/round-setup'
+import { useTimers } from '@/hooks/useTimers'
 import { chatContextPills } from '@/lib/chat-context-strip'
 import { useShowNumbers } from '@/lib/show-numbers'
 import { sessionSetCount } from '@/lib/session-count'
@@ -8482,6 +8485,18 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const isInterrupted = (msg: ChatMessage) =>
     msg.role === 'assistant' && (msg.status === 'pending' || msg.status === 'streaming' || msg.status === 'failed')
 
+  // THE INTERVALS THE COACH SUGGESTED, STARTED IN ONE TAP (his request, 16 Nov 2026): the timer is set to the reply's
+  // own numbers, its get-ready countdown is his, and it opens full screen on the Tools tab, the round timer's home. A
+  // round already running is never restarted: the button then opens it.
+  const timers = useTimers()
+  const intervalLeadIn = timers.timerPrefs.countdownSeconds
+  const startSuggestedIntervals = (config: { rounds: number; workSeconds: number; restSeconds: number }) => {
+    const live = timers.mode === 'round' && !!timers.roundConfig && (timers.running || timers.isRoundComplete || timers.isActive)
+    if (!live) timers.startRound({ ...config, leadInSeconds: intervalLeadIn })
+    timers.setRoundFullScreen(true)
+    window.location.hash = tabHash('tools')
+  }
+
   /** The video button for the coach reply at `index`: read off what he said just before it (and the message before that). */
   const videoForReply = (index: number, reply: string) => {
     const said: string[] = []
@@ -8807,7 +8822,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                               // "SHOW ME A VIDEO" (his live test, 14 Nov 2026): the link is the app's, built from the
                               // exercise he named, never a URL the coach typed.
                               const videos = videoForReply(i, msg.content)
-                              return videos.length > 0 && (
+                              const intervals = parseIntervalSuggestion(msg.content)
+                              const timerButton = intervals && (
+                                <button
+                                  type="button"
+                                  data-testid="start-intervals"
+                                  onClick={() => startSuggestedIntervals(intervals)}
+                                  className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-primary/60 px-3.5 text-[0.8125rem] font-medium text-primary-text"
+                                >
+                                  <Timer className="size-4" aria-hidden />
+                                  {blockShape(intervals)} · {startLabel(intervalLeadIn)}
+                                </button>
+                              )
+                              if (videos.length === 0) return timerButton
+                              return (
                                 <div className="mt-2 flex flex-col items-start gap-1.5">
                                   {videos.map(v => (
                                     <a
@@ -8822,6 +8850,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                       Watch a video: {v.exercise}
                                     </a>
                                   ))}
+                                  {timerButton}
                                 </div>
                               )
                             })()}

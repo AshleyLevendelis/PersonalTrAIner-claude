@@ -30,8 +30,8 @@ check('a meal holding a bare one counts nothing for it: it is listed as not coun
 
 console.log('\n2. The question names the kinds, not an amount')
 const q = whichKindQuestion('greek yoghurt')
-check('the question asks fat-free, low-fat or full-fat, in the words he chose', q === 'Was the Greek yoghurt fat-free (0%), low-fat (2%) or full-fat?', q)
-check('...and keeps the spelling it was told ("Greek yogurt")', whichKindQuestion('greek yogurt') === 'Was the Greek yogurt fat-free (0%), low-fat (2%) or full-fat?', whichKindQuestion('greek yogurt'))
+check('the question asks fat-free, low-fat or full-fat, in the words he chose', q === 'Which Greek yoghurt: fat-free (0%), low-fat (2%) or full-fat?', q)
+check('...and keeps the spelling it was told ("Greek yogurt")', whichKindQuestion('greek yogurt') === 'Which Greek yogurt: fat-free (0%), low-fat (2%) or full-fat?', whichKindQuestion('greek yogurt'))
 check('...and a food that names its kind gets no question', whichKindQuestion('greek yoghurt 0%') === null && whichKindQuestion('chicken') === null)
 
 console.log('\n3. Every surface asks the kind')
@@ -48,6 +48,14 @@ const coach = strip(readFileSync('supabase/functions/chat-gemini/index.ts', 'utf
 check('the coach\'s log_meal instruction asks the kind of a bare Greek yoghurt instead of assuming one', /Greek yoghurt said with no fat level is ASKED about, never assumed/.test(coach) && !/'greek yoghurt' could be 0% or full-fat/.test(coach))
 const shared = readFileSync('supabase/functions/_shared/food-db.ts', 'utf8')
 check('the coach\'s food table holds the same rule (the synced copy)', /export function whichKindQuestion/.test(shared) && !/'0% greek yogurt', 'greek yoghurt',/.test(shared))
+
+// 16 Nov 2026, his screenshot: "Can I have Greek yoghurt ... for breakfast?" was asked "Was the Greek yoghurt ...?", a
+// question about a meal already eaten. The same question serves a meal planned, asked about or logged, so it reads in
+// no tense: every food whose kind is asked is asked the same way, with no "was".
+for (const food of ['greek yoghurt', 'beef mince', 'calamari']) {
+  const q = whichKindQuestion(food) ?? ''
+  check(`the kind question for ${food} reads for a meal still to come ("${q}")`, q.length > 0 && !/\bwas\b/i.test(q), q)
+}
 
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} greek-yoghurt check(s) FAILED.`); process.exit(1) }

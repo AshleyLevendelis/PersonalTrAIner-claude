@@ -2,6 +2,77 @@
 
 Newest first. One line each.
 
+- [x] **"CAN I HAVE GREEK YOGHURT ... FOR BREAKFAST?" WAS ASKED "WAS THE GREEK YOGHURT ...?" (his screenshot 16 Nov 2026)**.
+  The app's which-kind question (his 9 Nov "Ask which") was written for a meal already eaten, and the same question
+  serves a meal asked about or planned. All three now read in no tense: "Which Greek yoghurt: fat-free (0%), low-fat
+  (2%) or full-fat?", "Which calamari: ...", "What fat is the beef mince: ...". Both food tables (the coach's copy
+  needs the `chat-gemini` deploy). `test:greek-yoghurt-asked` gains a check per food (2 mutations, both caught); 46
+  food-table checks pass. SEEN IN THE SAME SCREENSHOT, model behaviour, NOT fixed here: the coach said "around 44g of
+  protein" before any amount existed and "hits your ~496 kcal" for a bowl the app's own table costs at 410 kcal and
+  42g protein (380g 0% yoghurt, 15g almonds, 100g berries, 20g honey); after "you tell me what to have" it asked a
+  second time instead of adding the dish; one emoji. The numbers in chat text are the model's; a card's are the app's.
+- [x] **THE SAME-EXERCISES RULE MARKED HIS OWN SWAPS DOWN (full sweep, 16 Nov 2026)**. The new score rule "an exercise
+  changed inside a block" also fired on a swap he ASKS for, so the swap card warned "the week stops covering everything
+  it should" for a free accessory swap (`test:edit-tradeoff`, `verify:swap-request` 4f-4g). The rule judges a generated
+  plan; the trade-off engine now scores with the two consistency rules off (`skipConsistency`), so a change he asked for
+  is never a cost for being a change. Generated-plan scores are unchanged (the option defaults off). Mutation (option
+  removed) caught. Two checks followed the ruling rather than the app: `test:per-side-load` looked for mid-block
+  rotations, which no longer exist, and now checks every change between loading weeks, block boundaries included (314
+  rotations, all priced fresh); `verify:lift-effort`'s fixture day holds only accessories, which now keep their weight all block in blocks 1-2 and are new after each deload, so "kept" moved to weeks 10-11 and "deload" to week 12, and "back from the deload" has no subject on that day any more: its section now checks every loaded lift on the new block's first day is opened and none claims to be back from a deload (the arithmetic stays held by `test:lift-effort` 8i-8n); `verify:layoff`'s 12-days-away case landed today in a deload week whose row is now the
+  same light 10kg row, under the fixture's floor, so the fixture moves a plan that would start in a deload one week
+  back (an input, the app untouched). `test:coach-exam-fresh` is red for the known reason: the coach changed and the
+  exam must be re-run on his machine.
+- [x] **THE COACH'S INTERVALS START WITH ONE TAP (his request 16 Nov 2026)**: "When the coach suggests a timed workout,
+  like using an interval, it should offer to start the interval clock for you with just one button." A coach reply that
+  names the work, the rest AND the rounds ("30 seconds of jumping followed by 30 seconds of rest for 10 rounds") now
+  carries "10 × 30s, 30s rest · Start · 10s countdown" (his own countdown setting); one tap starts the round timer at those numbers, full screen, on Tools
+  (with his own countdown lead-in; a round already running is opened, not replaced). Read by the APP off the coach's own
+  words (`parseIntervalSuggestion`), so no deploy: a total ("for 10 minutes") is never taken as the work, and a reply
+  missing any of the three gets no button ("Rest 90 seconds between sets", "3 sets of 10 with 60s rest", "Walk for 30
+  minutes"). Wording of the button is mine, inside his request; it names the countdown it will run, as every timer start does (`test:round-timer` caught the first version not saying it). `test:coach-intervals` (14 checks; 7 mutations, 6
+  caught, the 7th removes a guard the types need and crashes), `verify:live-test-nov14` A12-A15 (2 mutations, both
+  caught). Not checked: a reply that words intervals some other way gets no button, which is the safe failure.
+- [x] **"VIDEOS FOR ALL MY LIFTS" GAVE ONE WARM-UP VIDEO (his report 16 Nov 2026)**. "Actually, show me video for all
+  todays lifts" matched a single catalogue entry off a stray word ("all" -> Wall, "lift" -> Deadlifts, "today's" ->
+  Scapular) and that one beat the session list. A named exercise now needs EVERY word asked to be in its name (a word
+  of 4+ letters may be the start of one), so a whole-session ask reaches all of today's lifts (up to 8 buttons), while
+  "lunges" and "barbell back squat" still find theirs. `test:live-test-nov14` (77 checks; the loose match restored is
+  caught 3 times), `verify:live-test-nov14`.
+- [x] **THE SAME EXERCISES ALL BLOCK; MAIN LIFTS FOR THE WHOLE PLAN; ACCESSORIES CHANGE AT A NEW BLOCK (his question 16 Nov
+  2026, quoting Gemini; his ruling "All three as you suggest")**. MEASURED first, 108 seeded plans: main lifts kept 100%
+  inside a block but only 45.5% into a new block; accessories kept 79.4% inside a block (new ones at week 3, and weeks 2
+  and 4 for functional). TRACED (engine-tracer): every slot was re-rotated from the base week by block number through an
+  alphabetical list (so any main lift with an alternative changed at every block), a weekly accessory rotation ran on a
+  cadence (2 weeks, functional 1), and the quality score's `accessory_never_rotates` rewarded the mid-block swap. No
+  ruling of his introduced any of it. CSCS (mine, basis in docs/plans/exercise-consistency.md): progress is read off the
+  same movement, a lift met at week 3 of 4 gets two sessions; rotate accessories between blocks for overuse and
+  interest; the main lifts are the anchors. His three (wording and a score's meaning): functional's note no longer says
+  "exercises rotate faster" (now: main lifts stay, other exercises change each block); the score rule is replaced by
+  `exercise_changed_within_block` and `main_lift_changed_between_blocks` (**Selection scores before 16 Nov 2026 are not
+  comparable**); the whole-block swap line now ends "...and some exercises change." AFTER, same 108 plans: 100% kept
+  inside a block (every tier), main lifts 100% across blocks, accessories 19.9% kept at a new block (about 80% rotate,
+  up from about half, since none moved mid-block). CSCS review: (1) more exposures per lift, readable progression; (2)
+  loses mid-block novelty, functional's weekly change; (3) pattern coverage unchanged, overload better; (4) no floor or
+  ceiling redefined, the score's meaning is (said above); the block-transition audit passes (17,423 combos, 0 failed)
+  with main lifts now crossing blocks; (5) in scope. `test:exercise-consistency` 11 checks (3 mutations caught),
+  `test:block-swap-reach` re-anchored (a new plan's accessory swap reaches week 4; a plan SAVED before today still
+  rotates at week 3 and the reach rule still stops there; putting the week-3 swap back fails it). Existing plans keep
+  their exercises until rebuilt.
+- [x] **WEEK 1 BEGINS ON THE MONDAY WHEN NOTHING IS LOST; A CALENDAR ROW HOLDING TWO WEEKS READS ITS DATES (his ruling 16 Nov
+  2026, "yes", after his own catch that Sunday is not everyone's rest day)**. His calendar: a plan made on Sunday the
+  15th (a rest day) put a row of the 9th-15th holding one rest tile above "W1–2", "W2–3"... Options put to him: snap
+  Sunday starts only / keep it and label rows by dates / always start on a Monday (he proposed universal Monday
+  alignment; told it reverses his 6 Oct ruling and cuts a mid-week start's calibration week, he chose the two-step
+  version). BUILT: (1) a plan whose days from its start up to the coming Monday hold NO session in week 1 (a walk
+  counts as a session) begins on that Monday, so his reads W1, W2, W3, W4; someone who trains on Sundays keeps the
+  Sunday, nothing skipped. One function (snapPlanStart), applied where a plan is read back and where one is made, so
+  every screen and the coach get one start; the stored stamp is untouched. (2) A calendar row holding two plan weeks
+  reads its dates ("16–22" over "Nov", "28–4" over "Sep–Oct"), spoken as both weeks; a one-week row stays "W3".
+  CSCS review: (1) no session moves or is lost, only rest days fall before the start; (2) week 1, the calibration week,
+  stays whole; (3) blocks, deloads and progression keep their order; (4) no floor or ceiling changes meaning; (5) in
+  scope. `test:week-one-start` 14 checks (3 mutations caught), `verify:live-test-nov14` D1-D2 (a SAVED Sunday plan
+  through the real start; removing the snap at read-back caught), both screenshots read (snapped W1-W7; un-snapped date
+  labels fit the 34px column).
 - [x] **"SHOW ME VIDEOS TO TODAYS WORKOUTS" STILL DREW ONE BUTTON (his second screenshot, 16 Nov 2026)**. The coach's reply
   happened to name the Barbell Bench Press, the app read that one mention as "the exercise he means", and it won over the
   one-button-each list built the same morning. A request for the session, naming no exercise, now takes the session list

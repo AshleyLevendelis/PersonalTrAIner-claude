@@ -238,7 +238,7 @@ console.log('\n6. A block baseline never survives a rotation')
 // ---------------------------------------------------------------------------
 {
   // The invariant, run over real generated mesocycles: whenever a slot's
-  // exercise CHANGES between two loading weeks of the same block, the new
+  // exercise CHANGES between two loading weeks (since 16 Nov 2026, only at a new block), the new
   // exercise's displayed load must be a number that exercise could have been
   // given on its own — within the same 125% band the audit enforces.
   const BODIES = [
@@ -261,9 +261,15 @@ console.log('\n6. A block baseline never survives a rotation')
     console.debug = d; console.warn = warn
     resetRandomSource()
 
+    // RE-ANCHORED 16 Nov 2026 (his ruling "All three as you suggest"): exercises no longer change INSIDE a block, so a
+    // slot's exercise now changes only at a new block. The invariant is unchanged: compare each loading week with the
+    // loading week before it (a deload in between is skipped), across a block boundary too.
     for (let i = 1; i < meso.length; i++) {
-      const prev = meso[i - 1], week = meso[i]
-      if (prev.is_deload || week.is_deload || prev.block_number !== week.block_number) continue
+      const week = meso[i]
+      let k = i - 1
+      while (k >= 0 && meso[k].is_deload) k--
+      const prev = meso[k]
+      if (!prev || week.is_deload) continue
       for (const day of week.days) {
         const prevDay = prev.days.find(x => x.day === day.day)
         if (!prevDay) continue
@@ -289,7 +295,7 @@ console.log('\n6. A block baseline never survives a rotation')
       }
     }
   }
-  check(`saw ${rotations} mid-block rotations to check`, rotations > 20, String(rotations))
+  check(`saw ${rotations} rotations to check`, rotations > 20, String(rotations))
   check('not one rotated-in exercise inherited a load it could not have earned',
     offences.length === 0, offences.slice(0, 3).join(' | '))
 }

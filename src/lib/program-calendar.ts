@@ -113,3 +113,30 @@ export function calendarShortLabel(focus: string | null, kind: CalendarDayKind):
   const first = (focus ?? '').trim().split(/[\s&,/+-]+/).filter(Boolean)[0] ?? ''
   return first.length > 7 ? `${first.slice(0, 6)}.` : first
 }
+
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+/**
+ * WHAT A ROW IS CALLED (his ruling 16 Nov 2026, "label every row by its dates" for a plan that does not start on a
+ * Monday). A row that holds exactly one plan week is that week: "W3". A row that holds two (a plan begun on a
+ * Thursday changes week on a Thursday, so its Monday-to-Sunday rows each hold the end of one week and the start of the
+ * next) used to read "W1–2", which looked like a range of weeks. It now reads its dates, "16–22" over "Nov", and the
+ * cells still say which plan week each day is in. A row outside the plan has no label.
+ */
+export function calendarRowLabel(row: ProgramCalendarRow): { kind: 'week' | 'dates' | 'none'; text: string; sub: string | null; spoken: string } {
+  const weeks = [...new Set(row.cells.filter(c => c.planWeek != null).map(c => c.planWeek as number))]
+  if (weeks.length === 0) return { kind: 'none', text: '', sub: null, spoken: '' }
+  if (weeks.length === 1) return { kind: 'week', text: `W${weeks[0]}`, sub: null, spoken: `Week ${weeks[0]}` }
+  const first = row.cells[0].date
+  const last = row.cells[6].date
+  const m1 = Number(first.slice(5, 7)) - 1
+  const m2 = Number(last.slice(5, 7)) - 1
+  const d1 = Number(first.slice(8, 10))
+  const d2 = Number(last.slice(8, 10))
+  return {
+    kind: 'dates',
+    text: `${d1}–${d2}`,
+    sub: m1 === m2 ? MONTHS_SHORT[m1] : `${MONTHS_SHORT[m1]}–${MONTHS_SHORT[m2]}`,
+    spoken: `${d1} ${MONTHS_SHORT[m1]} to ${d2} ${MONTHS_SHORT[m2]}, weeks ${weeks[0]} and ${weeks[weeks.length - 1]}`,
+  }
+}

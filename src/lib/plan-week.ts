@@ -1,4 +1,5 @@
 import { getActiveMesocycleWeek } from './calculations'
+import { dayHasSession } from './day-verbs'
 import type { MesocycleWeek, WorkoutDay } from './types'
 
 // ---------------------------------------------------------------------------
@@ -54,4 +55,33 @@ export function planDaysForDate(
   if (!own) return { week: undefined, days: liveDays }
   const todays = planWeekForDate(today, mesocycle, planCreatedAt, liveDays)
   return { week: own.week, days: own.week === todays?.week ? liveDays : own.days }
+}
+
+const WEEKDAY_BY_INDEX = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+
+/**
+ * WHERE WEEK 1 BEGINS (his ruling 16 Nov 2026, "yes" to Sunday-snap plus date labels). A plan made on a day whose
+ * remaining days up to Monday hold NO session in week 1 begins on that Monday: week 1 is then a whole Monday-to-Sunday
+ * week and the calendar reads W1, W2, W3. Made on his Sunday 15th (a rest day) it begins Monday the 16th, so the row of
+ * the 9th to the 15th, holding one rest tile, is gone.
+ *
+ * ONLY WHEN NOTHING IS LOST. Someone who trains on Sundays keeps the Sunday: snapping would have skipped a session, and
+ * the plan stays as he ruled on 6 Oct ("the day you started"); their rows are labelled by dates instead. A plan made on
+ * a Monday, or with no week 1 to read, is returned as it was.
+ *
+ * Reads the stamp and returns a stamp, so every reader of the plan's start sees the one answer. Applied where the plan
+ * is loaded or made (App), never in the week arithmetic, which stays a function of a date and a start alone.
+ */
+export function snapPlanStart(createdAt: string, week1Days: readonly WorkoutDay[] | undefined): string {
+  if (!week1Days || week1Days.length === 0) return createdAt
+  const start = new Date(createdAt)
+  if (Number.isNaN(start.getTime())) return createdAt
+  const weekday = start.getDay()
+  if (weekday === 1) return createdAt
+  const untilMonday = (8 - weekday) % 7 || 7
+  for (let i = 0; i < untilMonday; i++) {
+    const name = WEEKDAY_BY_INDEX[(weekday + i) % 7]
+    if (dayHasSession(week1Days.find(d => d.day === name))) return createdAt
+  }
+  return new Date(start.getFullYear(), start.getMonth(), start.getDate() + untilMonday, 12, 0, 0).toISOString()
 }

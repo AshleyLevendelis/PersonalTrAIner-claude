@@ -558,3 +558,35 @@ export function roundLogSummary(config: RoundConfig): RoundLogSummary {
       : detail,
   }
 }
+
+// ---------------------------------------------------------------------------
+// THE COACH SUGGESTED INTERVALS: ONE TAP STARTS THEM (his request, 16 Nov 2026, after "Skipping rope is a great pick
+// for 10 minutes! Try 30 seconds of jumping followed by 30 seconds of rest for 10 rounds" left him to set the same
+// numbers in Tools by hand). The APP reads the reply and draws the button, the way the video button is the app's: the
+// coach never writes a control. Read only when all three numbers are there, work, rest and rounds, never guessed.
+// ---------------------------------------------------------------------------
+const DURATION = String.raw`(\d+(?:\.\d+)?)\s*(s|secs?|seconds?|mins?|minutes?)\b`
+const toSeconds = (n: string, unit: string) => Math.round(parseFloat(n) * (/^m/i.test(unit) ? 60 : 1))
+
+/** "30 seconds of jumping followed by 30 seconds of rest for 10 rounds", "10 rounds of 40s on / 20s off", "8 × 20s on, 10s rest". Null when any of the three is missing, or the numbers are not a sensible round timer. */
+export function parseIntervalSuggestion(text: string | null | undefined): RoundConfig | null {
+  if (!text) return null
+  const t = text.replace(/[×x](?=\s*\d)/g, ' x ')
+  const durations = [...t.matchAll(new RegExp(DURATION, 'gi'))].map(m => {
+    const at = m.index ?? 0
+    const end = at + m[0].length
+    // What follows, up to the next duration or the end of the clause; and the few words before it.
+    const after = t.slice(end, end + 24).split(/\d/)[0].split(/[.;!?\n]/)[0].toLowerCase()
+    return { at, seconds: toSeconds(m[1], m[2]), after, before: t.slice(Math.max(0, at - 16), at).toLowerCase() }
+  })
+  const isRest = (d: { after: string; before: string }) => /\b(rest|off|recover|recovery|easy|break)\b/.test(d.after) || /\b(rest|off|recover)\b\s*(of|for)?\s*$/.test(d.before)
+  // A TOTAL is not the work ("a great pick for 10 minutes! Try 30 seconds of jumping..."): the work is the duration
+  // nearest BEFORE the rest, else the first one after it.
+  const rest = durations.find(isRest)
+  const work = rest ? ([...durations.filter(d => d.at < rest.at && !isRest(d))].pop() ?? durations.find(d => d.at > rest.at && !isRest(d))) : undefined
+  const rounds = /(\d+)\s*(?:rounds?|sets?|times|intervals|reps of)\b/i.exec(t)?.[1] ?? /\b(\d+)\s*x\s*\d/i.exec(t)?.[1] ?? /\bx\s*(\d+)\b/i.exec(t)?.[1]
+  if (!work || !rest || !rounds) return null
+  const config = { rounds: parseInt(rounds, 10), workSeconds: work.seconds, restSeconds: rest.seconds }
+  if (config.rounds < 2 || config.rounds > 50 || config.workSeconds < 5 || config.workSeconds > 900 || config.restSeconds < 5 || config.restSeconds > 900) return null
+  return config
+}

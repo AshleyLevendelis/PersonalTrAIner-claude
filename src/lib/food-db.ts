@@ -1364,10 +1364,10 @@ function calamariNeedsKind(said: string): boolean {
 }
 
 const WHICH_KIND: { matches: (said: string) => boolean; question: (said: string) => string }[] = [
-  { matches: said => /^greek yogh?urt$/.test(said), question: said => `Was the ${said} fat-free (0%), low-fat (2%) or full-fat?` },
+  { matches: said => /^greek yogh?urt$/.test(said), question: said => `Which ${said}: fat-free (0%), low-fat (2%) or full-fat?` },
   // His "Ask" for plain mince, 10 Nov 2026: the pack says the fat, and the five are the levels UK packs carry.
-  { matches: said => /^(?:raw )?(?:beef mince|minced beef|mince beef|ground beef|beef steak mince|steak mince|minced steak|mince)(?: raw)?$/.test(said), question: () => 'What fat was the beef mince: 5%, 10%, 12%, 15% or 20%? It says on the pack.' },
-  { matches: calamariNeedsKind, question: () => 'Was the calamari breaded or fried in flour, or plain (grilled or boiled)?' },
+  { matches: said => /^(?:raw )?(?:beef mince|minced beef|mince beef|ground beef|beef steak mince|steak mince|minced steak|mince)(?: raw)?$/.test(said), question: () => 'What fat is the beef mince: 5%, 10%, 12%, 15% or 20%? It says on the pack.' },
+  { matches: calamariNeedsKind, question: () => 'Which calamari: breaded or fried in flour, or plain (grilled or boiled)?' },
 ]
 
 /** The question for a food named without its kind ("greek yoghurt"), or null when the name is not one of those. */
