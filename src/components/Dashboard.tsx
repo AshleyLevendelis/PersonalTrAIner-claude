@@ -563,6 +563,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         swappedFor={swappedFor}
         declaredToday={declaredToday}
         nextUp={nextUp}
+        todayLift={lift}
         topPr={prCount > 0 && topPr ? `${topPrLift ?? ''} ${topPr}`.trim() : null}
         onSummary={card ? () => setSummaryOpen(true) : undefined}
         cta={showCta && (
@@ -849,7 +850,7 @@ export function RingCell({ k, share, color, glow, icon, value, label, onClick, a
  * the week under a hairline. Every state the old row had is here: not yet planned, moved, rest, done (with its
  * time, PRs and the summary), and the session itself. data-tour and data-home-hero keep their names.
  */
-export function SessionHero({ status, data, week, sessionGlance, done, minutes, setsLogged, setsPlanned, prCount, topPr, onSummary, cta, footer, swappedFor = null, declaredToday = null, nextUp = null }: {
+export function SessionHero({ status, data, week, sessionGlance, done, minutes, setsLogged, setsPlanned, prCount, topPr, onSummary, cta, footer, swappedFor = null, declaredToday = null, nextUp = null, todayLift = null }: {
   status: DashboardData['session']['status']
   data: DashboardData
   week: ReturnType<typeof useTrainingWeek>
@@ -869,6 +870,8 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
   declaredToday?: 'missed' | 'rest_chosen' | 'paused' | null
   /** Today is done and a session is next: the card shows it, with today as one line (his report 16 Nov 2026). */
   nextUp?: NextSession | null
+  /** What he lifted today ("Bench 22.5kg today"), kept on today's line when the card has moved on (L9). */
+  todayLift?: string | null
 }) {
   const weekCount = `${week.sessionsDone} of ${week.sessionsPlanned} session${week.sessionsPlanned === 1 ? '' : 's'} done`
   const ordinal = sessionOrdinal(week.days, data.today)
@@ -971,6 +974,7 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
         <div className={`${nextUp ? 'mt-3.5 rounded-[12px] px-3 py-2' : 'mt-1'} flex items-center justify-between gap-3`} style={nextUp ? { background: 'var(--surface-sunken)' } : undefined} data-home-today-done={nextUp ? '' : undefined}>
           <p className="min-w-0 tabular-nums text-[0.71875rem] text-muted-foreground" data-home-done-stats>
             {nextUp && <span className="font-semibold text-primary-text">✓ Today · {data.session.focus ?? 'Session'} · </span>}
+            {nextUp && todayLift && <><span data-testid="home-session-glance">{todayLift}</span> · </>}
             {minutes != null ? `${minutes} min` : '—'} · {setsLogged}/{setsPlanned} sets · <span className={prCount > 0 ? 'glow-mint text-primary-text' : ''} data-home-pr={prCount > 0 ? '' : undefined}>{prCount} PR{prCount === 1 ? '' : 's'}{topPr ? ` · ${topPr}` : ''}</span>
           </p>
           {onSummary && (
