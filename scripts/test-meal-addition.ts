@@ -200,7 +200,10 @@ console.log('\n5. The verification is not optional')
   // statically as well, because a future refactor could route around it while
   // leaving a function of the same name in place.
   const mod = readFileSync(join(ROOT, 'src/lib/meal-addition.ts'), 'utf8')
-  check('buildMealAdditionProposal calls verifyProposal, on the dish fitted from what was asked', /const fitted = asked \? sizeToProtein\(proposal, budget\) : fitDishToBudget\(proposal, budget\)\.dish/.test(mod) && /verifyProposal\(fitted, slot, budget/.test(mod))
+  check('buildMealAdditionProposal calls verifyProposal, on the dish sized from what was named', /const fitted = sizeToProtein\(proposal, budget\)/.test(mod) && /verifyProposal\(fitted, slot, budget/.test(mod))
+  // Told "add it", the old calorie fit gave 1,070g of raw potatoes for one lunch (16 Nov 2026 driver). Same plate now.
+  const toldPlate = build({ meal_slot: 'lunch', meal_name: 'Chicken and potatoes', ingredients: ['200g roast chicken breast', '275g new potatoes boiled', '60g smoked salmon'] })
+  check('an instruction to add gets the same normal plate: no food over 450 g', toldPlate.ok && toldPlate.payload.option.ingredients.every(i => !/^g$/i.test(i.unit) || i.quantity <= 450), toldPlate.ok ? toldPlate.payload.option.ingredients.map(formatPortion) : toldPlate.reason)
   check('...and returns null-checks it rather than falling through', /if \(!option\) return \{ ok: false/.test(mod))
   check('the payload carries the VERIFIED option, not the raw args',
     /payload: \{ slot, date, option: \{ \.\.\.option, tags: tagsMyMeal\(option\.tags\) \} \}/.test(mod) && !/payload: \{[^}]*rawArgs/.test(mod))

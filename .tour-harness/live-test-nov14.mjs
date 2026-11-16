@@ -41,6 +41,7 @@ await page.addInitScript(() => {
       const said = String(JSON.parse((init && init.body) || '{}').message || '')
       const reply = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })
       if (/skipping rope/i.test(said)) return reply({ reply: 'Skipping rope is a great pick for 10 minutes! Try 30 seconds of jumping followed by 30 seconds of rest for 10 rounds.' })
+      if (/should i have the chicken salad/i.test(said)) return reply({ reply: 'Yes, it suits today: plenty of protein and light enough for the afternoon.', answer_first: true, proposal: { kind: 'propose_meal_addition', rawArgs: { meal_slot: 'lunch', meal_name: 'Chicken salad with potatoes', ingredients: ['200g roast chicken breast', '275g new potatoes boiled', '60g smoked salmon'], origin_verbatim_quote: 'Should I have the chicken salad for lunch?' } } })
       if (/how much of each/i.test(said)) return reply({ reply: '', proposal: { kind: 'propose_meal_addition', rawArgs: { meal_slot: 'lunch', meal_name: 'Roast chicken, new potatoes & smoked salmon', ingredients: ['200g roast chicken breast', '275g new potatoes boiled', '60g smoked salmon'], origin_verbatim_quote: 'Tell me how much of each to have', as_suggestion: true } } })
       if (/plank/i.test(said)) return reply({ reply: 'Hold a plank and use the stopwatch to see how long you last.' })
       if (/track/i.test(said)) return reply({ reply: 'Run 4 laps and use the lap timer so you can see your pacing.' })
@@ -145,6 +146,21 @@ const howMuch = await until(() => page.evaluate(() => { const t = [...document.q
 check('A26. the answer is the app\'s: portions with cooked weights, about N kcal and Ng protein, then the offer', !!howMuch && /about \d+g cooked/.test(howMuch.text) && /That's about \d+ kcal and \d+g protein, against about \d+ kcal and \d+g for your lunch\. Want it as your lunch\?/.test(howMuch.text), howMuch)
 check('A27. ...with buttons to put it in or not', !!howMuch && howMuch.btns.length >= 2 && howMuch.btns.includes('Not now'), howMuch?.btns)
 await shot('how-much-answer')
+
+// A QUESTION GETS ITS ANSWER ABOVE THE OFFER (his ruling 16 Nov 2026, "Answer, then offer"): his report, "it doesn't
+// seem to understand the difference between me asking a question and a request".
+check('A28. "Should I have the chicken salad for lunch?" is sent', await say('Should I have the chicken salad for lunch?'))
+const answered = await until(() => page.evaluate(() => {
+  const b = [...document.querySelectorAll('[data-testid="chat-bubble"]')].find(n => /it suits today/.test(n.textContent || ''))
+  if (!b) return null
+  const text = b.textContent.trim()
+  const btns = [...document.querySelectorAll('button')].filter(x => b.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING).map(x => x.textContent.trim()).filter(x => /^(Apply|Not now)$/.test(x))
+  return { text, btns }
+}), v => !!v && /Chicken salad/.test(v.text))
+check('A29. the coach\'s answer comes first, then the app\'s offer in the same bubble',
+  !!answered && answered.text.indexOf('it suits today') >= 0 && answered.text.indexOf('it suits today') < answered.text.indexOf('Chicken salad'), answered?.text)
+check('A30. ...and the offer still has its Apply and Not now', !!answered && answered.btns.includes('Apply') && answered.btns.includes('Not now'), answered?.btns)
+await shot('question-answer-first')
 
 // A long change row: the offer's own row, with the two halves given his screenshot's lengths.
 await page.goto(`${origin}/.tour-harness/chat.html?day=mid&n=2`)

@@ -23,7 +23,6 @@ import { splitCompoundFoodLine } from './ingredient-units'
 
 import { whichKindQuestion, computeMealMacros } from './food-db'
 import { cookedHint } from './as-weighed'
-import { fitDishToBudget } from './meal-library'
 import { parseIngredientLine, withParsedQuantity, kitchenRound } from './portion-scaler'
 import { computeSlotBudgets, verifyProposal, type PoolOption, type RawProposal } from './meal-generation'
 import { tagsMyMeal, type MealSlotName } from './meal-store'
@@ -254,9 +253,12 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
   // calories land where they land: the answer says so, and the rest of the day is the day's own business. Every safety
   // check still runs (keepPortions keeps the amounts, never the checks).
   const asked = rawArgs.as_suggestion === true
-  const fitted = asked ? sizeToProtein(proposal, budget) : fitDishToBudget(proposal, budget).dish
+  // ONE PLATE, HOWEVER HE PUT IT (CSCS, mine, 16 Nov 2026): told "add it", the calorie fit gave 1,070g of raw potatoes
+  // for one lunch, the plate his question had just been spared. Asked or told, a dish the coach names is sized the same
+  // way (protein first, carbs within 30%), and the amounts are kept as sized.
+  const fitted = sizeToProtein(proposal, budget)
   const rejectLog: string[] = []
-  const option = verifyProposal(fitted, slot, budget, input.dietaryPreferences, rejectLog, input.dislikedFoods ?? [], undefined, asked)
+  const option = verifyProposal(fitted, slot, budget, input.dietaryPreferences, rejectLog, input.dislikedFoods ?? [], undefined, true)
   if (!option) return { ok: false, reason: explainRejection(rejectLog, dishName, slot) }
 
   const date = normaliseDate(rawArgs.date, input.todayDate)

@@ -1605,6 +1605,12 @@ menu" stays true when a copy is also left outside it.
   say so. From the next day a surprising weigh-in is held as before. `test:weigh-in-targets` §13,
   `verify:setup-weight-correction`
 
+- **A question gets its answer, then the offer: his ruling 16 Nov 2026, "Answer, then offer"**: when he ASKS and the
+  coach reaches for a change, one or two lines of answer (yes or no and why; no number, no claim, no question) sit above
+  the app's offer and its Apply / Not now; a request ("swap it", "can you swap it?") goes straight to the offer; an
+  answer failing its checks is dropped, never the offer. It narrows the old "an offer turn shows only the app's words"
+  for questions. Every coach-added dish is sized protein first (CSCS). `test:answer-first`, `verify:live-test-nov14`
+  A28-A30. Needs the `chat-gemini` deploy
 - **"How much should I have?" is the app's to answer: his ruling 16 Nov 2026, "App sizes it"**: the coach's meal
   tool, asked as a question, returns an offer whose words are the app's own portions (raw, with cooked weights) and its
   own calories and protein against the meal's share; the coach never writes meal grams or totals, and a menu on offer is

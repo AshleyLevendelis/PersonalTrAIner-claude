@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **A QUESTION GETS ITS ANSWER, THEN THE OFFER: his ruling 16 Nov 2026, "Answer, then offer"** (from three
+  options: answer then offer with buttons, answer only with the offer on his yes, or answer only). His report: "it
+  doesn't seem to understand the difference between me asking a question and a request." Measured: of the coach's
+  change tools only four ask whether he asked or told, and every turn that ends in an offer threw the coach's words away
+  (a deliberate rule, so a sentence can never claim a change that has not happened). So "should I swap squats for leg
+  press?" got "I can swap ..." with Apply and no answer. Now, when HE ASKED (the last sentence ends in "?" or starts
+  should / can I / is / what ...; "can you ...", "could you ..." and "please" stay requests), a second short coach call
+  writes one or two lines (yes or no and why) and they sit above the app's own offer, Apply and Not now unchanged. The
+  answer is used only if it claims nothing was done, carries no number (the numbers are the offer's), asks nothing and
+  is short; otherwise the turn is the offer alone, as before. The screen refuses a change-claim again. When the offer
+  itself is refused (a dish the app cannot fit), the app's refusal stands alone: a "yes" above "I couldn't fit it"
+  would contradict itself. "How much should I have?" keeps the app's own answer. Every tool's reply passes through the
+  one step (it wraps the whole tool block). Found on the way, mine (CSCS): told "add it", a dish was still sized by
+  calories, 1,070 g of raw potatoes for one lunch; every coach-added dish is now sized like the "how much" answer.
+  `test:answer-first` (30 checks, 12 mutations, all caught), `test:meal-addition`, `verify:live-test-nov14` A28-A30.
+  Needs the `chat-gemini` deploy; whether the coach's answers are GOOD is the exam's to say.
 - [x] **"HOW MUCH OF EACH SHOULD I HAVE?" IS ANSWERED BY THE APP: his ruling 16 Nov 2026, "App sizes it"** (from three
   options: the app works it out, the coach keeps answering but is checked, or leave it). His live test: told the coach
   lunch had roast chicken, new potatoes and smoked salmon and asked how much of each; the coach wrote its own grams and a

@@ -7,6 +7,7 @@ import type { NotificationSettings } from "../_shared/coach-moments.ts";
 import { GEMINI_MODEL, coachShortLine } from "../_shared/gemini.ts";
 import { writeOpener } from "../_shared/reminder-writer.ts";
 import { voicePass } from "./voice-pass.ts";
+import { answerFirst } from "./answer-first.ts";
 import { assumedLine, computeMealMacros, doubtAboutLoggedMeal, type MealIngredientLine } from "../_shared/food-db.ts";
 import { readIngredientText, splitCompoundFoodLine } from "../_shared/ingredient-units.ts";
 import { weighInQuestion } from "../_shared/weigh-in-check.ts";
@@ -3255,6 +3256,8 @@ Keep this context in mind to ensure your greetings and questions naturally align
     const functionCallPart = parts.find((p: { functionCall?: unknown }) => p.functionCall);
 
     if (functionCallPart) {
+      // A QUESTION GETS ITS ANSWER ABOVE THE OFFER (his ruling 16 Nov 2026, "Answer, then offer"): answer-first.ts.
+      const toolResponse = await (async (): Promise<Response> => {
       const { name, args } = functionCallPart.functionCall;
       const textPart = parts.find((p: { text?: string }) => p.text);
       // THE COACH'S OWN WORDS AFTER A TOOL RUNS. Handlers below that author a
@@ -5356,6 +5359,8 @@ Keep this context in mind to ensure your greetings and questions naturally align
         JSON.stringify({ reply: confirmationText }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+      })();
+      return await answerFirst(toolResponse, { message, contents, firstParts: parts, name: functionCallPart.functionCall.name, args: functionCallPart.functionCall.args, callLeg, log: console.log });
     }
 
     if (finishReason === "MAX_TOKENS") {
