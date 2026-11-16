@@ -41,6 +41,8 @@ await page.addInitScript(() => {
       const said = String(JSON.parse((init && init.body) || '{}').message || '')
       const reply = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })
       if (/skipping rope/i.test(said)) return reply({ reply: 'Skipping rope is a great pick for 10 minutes! Try 30 seconds of jumping followed by 30 seconds of rest for 10 rounds.' })
+      if (/plank/i.test(said)) return reply({ reply: 'Hold a plank and use the stopwatch to see how long you last.' })
+      if (/track/i.test(said)) return reply({ reply: 'Run 4 laps and use the lap timer so you can see your pacing.' })
       if (/box jumps/i.test(said)) return reply({ reply: '1. Stand a foot from the box.\n2. Swing your arms and jump.\n3. Land softly, then step down.' })
       if (/video/i.test(said)) return reply({ reply: 'Here is a great tutorial: www.youtube.com/watch?v=abc123' })
       if (/signed up for a 10k/i.test(said)) return reply({ reply: '', proposal: { kind: 'propose_running_goal', rawArgs: { goal: '10k', reason: 'Signed up for a 10k.' } } })
@@ -105,6 +107,35 @@ const started = await page.evaluate(() => {
 })
 check('A14. ...and tapping it starts the round timer at those numbers and opens Tools', started.mode === 'round' && started.config?.rounds === 10 && started.config?.workSeconds === 30 && started.config?.restSeconds === 30 && /tools/.test(started.hash), started)
 check('A15. a reply with no intervals in it carries no timer button', await page.evaluate(() => [...document.querySelectorAll('[data-testid="start-intervals"]')].length === 1))
+
+// AND ANY TIMER (his request, 16 Nov 2026): a stopwatch or a lap timer the coach names gets its own start button.
+const readTimer = () => page.evaluate(() => {
+  const key = Object.keys(localStorage).find(k => k.startsWith('fitplan_timers_v1:'))
+  const rec = key ? JSON.parse(localStorage.getItem(key) || 'null') : null
+  return { hash: location.hash, mode: rec?.mode ?? null, running: rec?.running ?? null, rounds: rec?.roundConfig?.rounds ?? null }
+})
+const lastTimerButton = () => page.evaluate(() => { const all = [...document.querySelectorAll('[data-testid="start-timer"]')]; const b = all[all.length - 1]; if (!b) return null; const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), kind: b.getAttribute('data-timer-kind'), h: Math.round(r.height), count: all.length } })
+const tapLastTimer = () => page.evaluate(() => { const all = [...document.querySelectorAll('[data-testid="start-timer"]')]; all[all.length - 1]?.click() })
+check('A16. "Plank?" is sent while the round is still running', await say('Plank?'))
+const busy = await until(lastTimerButton, v => !!v)
+check('A17. a stopwatch suggestion over a running round says the round is running, and tapping it leaves the round alone', !!busy && busy.text === 'A round is running · Open it' && (await tapLastTimer(), await wait(600), (await readTimer()).mode === 'round' && (await readTimer()).rounds === 10), { busy, after: await readTimer() })
+await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith('fitplan_timers_v1:')) localStorage.removeItem(k) })
+await page.goto(`${origin}/.tour-harness/chat.html?day=mid&n=9`)
+await until(() => page.evaluate(() => !!document.querySelector('textarea')), v => v === true, 120)
+check('A18. "Plank?" is sent with no timer running', await say('Plank?'))
+const sw = await until(lastTimerButton, v => !!v)
+check('A19. the reply carries "Start the stopwatch", a full-height tap', !!sw && sw.kind === 'stopwatch' && sw.text === 'Start the stopwatch' && sw.h >= 44, sw)
+await shot('stopwatch-button')
+await tapLastTimer(); await wait(700)
+const swOn = await readTimer()
+check('A20. ...and tapping it starts the stopwatch running and opens Tools', swOn.mode === 'stopwatch' && swOn.running === true && /tools/.test(swOn.hash), swOn)
+check('A21. "Track?" is sent', await say('Track?'))
+const lp = await until(() => lastTimerButton(), v => !!v && v.kind === 'lap')
+check('A22. the reply carries "Start the lap timer"', !!lp && lp.text === 'Start the lap timer', lp)
+await tapLastTimer(); await wait(700)
+const lpOn = await readTimer()
+check('A23. ...and tapping it starts the lap timer from zero, in place of the stopwatch', lpOn.mode === 'lap' && lpOn.running === true, lpOn)
+check('A24. no button under his own messages: one per coach reply that named a timer', (await lastTimerButton())?.count === 2, await lastTimerButton())
 
 // A long change row: the offer's own row, with the two halves given his screenshot's lengths.
 await page.goto(`${origin}/.tour-harness/chat.html?day=mid&n=2`)

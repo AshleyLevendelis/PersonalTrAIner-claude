@@ -1607,7 +1607,11 @@ menu" stays true when a copy is also left outside it.
 
 - **The coach's intervals start with one tap: his request 16 Nov 2026.** A coach reply naming work, rest and rounds
   carries "10 × 30s, 30s rest · Start · 10s countdown" (his own countdown setting); one tap starts the round timer at those numbers on Tools. Read off the
-  coach's words by the app; anything less specific gets no button. `test:coach-intervals`, `verify:live-test-nov14` A12-A15
+  coach's words by the app; anything less specific gets no button. `test:coach-intervals`, `verify:live-test-nov14` A12-A15.
+  **And any timer, the same day ("a round timer, a normal lap timer, or just a stopwatch")**: a reply naming the
+  stopwatch or the lap timer gets "Start the stopwatch" / "Start the lap timer", which starts it and opens it on Tools;
+  never over a running round ("A round is running · Open it"). The coach is told to name the timer (needs the
+  `chat-gemini` deploy). `verify:live-test-nov14` A16-A24
 
 ### His rulings of 15 Nov 2026, the Marcus test (Wave M of `docs/plans/browser-test-nov15-plan.md`)
 - **An allergy refusal says where the setting is, never invites removing it: "Say where it's set"**. "Your nut-free

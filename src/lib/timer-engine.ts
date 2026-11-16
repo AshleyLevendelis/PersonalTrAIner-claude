@@ -590,3 +590,24 @@ export function parseIntervalSuggestion(text: string | null | undefined): RoundC
   if (config.rounds < 2 || config.rounds > 50 || config.workSeconds < 5 || config.workSeconds > 900 || config.restSeconds < 5 || config.restSeconds > 900) return null
   return config
 }
+
+/**
+ * WHICH TIMER THE COACH SUGGESTED (his request, 16 Nov 2026: "It could suggest a round timer, a normal lap timer, or
+ * just a stopwatch ... the app should be able to give a button to start it from there"). Read off the coach's own
+ * words, most specific first: a round needs its three numbers (parseIntervalSuggestion); the lap timer and the
+ * stopwatch need to be NAMED, or asked for in the words a coach uses for them ("time each lap", "for time", "time
+ * how long"). Anything vaguer gets no button: a stray "lap of the park" or "rest 90 seconds" is not a timer.
+ */
+export type TimerSuggestion =
+  | { kind: 'round'; config: RoundConfig }
+  | { kind: 'lap' }
+  | { kind: 'stopwatch' }
+
+export function parseTimerSuggestion(text: string | null | undefined): TimerSuggestion | null {
+  if (!text) return null
+  const config = parseIntervalSuggestion(text)
+  if (config) return { kind: 'round', config }
+  if (/\blap[- ]?timer\b|\btime (?:each|every|your) (?:lap|length|split)s?\b/i.test(text)) return { kind: 'lap' }
+  if (/\bstop[- ]?watch\b|\btime (?:how long|yourself)\b|\bfor time\b/i.test(text)) return { kind: 'stopwatch' }
+  return null
+}

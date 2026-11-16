@@ -2,7 +2,7 @@
 // workout ... it should offer to start the interval clock for you with just one button."
 // Holds the reader that turns the coach's words into a round: work, rest and rounds all named, or no button.
 import { readFileSync } from 'node:fs'
-import { blockShape, parseIntervalSuggestion } from '../src/lib/timer-engine'
+import { blockShape, parseIntervalSuggestion, parseTimerSuggestion } from '../src/lib/timer-engine'
 
 let ran = 0
 let failures = 0
@@ -38,9 +38,31 @@ check('null input is safe', parseIntervalSuggestion(null) === null)
 const c = parseIntervalSuggestion(cases[0][0])
 check('the button label reads the round', !!c && blockShape(c) === '10 × 30s, 30s rest', c ? blockShape(c) : 'null')
 
+// §3b ANY TIMER (his request, 16 Nov 2026: "a round timer, a normal lap timer, or just a stopwatch")
+const kind = (t: string) => parseTimerSuggestion(t)?.kind ?? 'none'
+const kinds: [string, string][] = [
+  ['Try 30 seconds of jumping followed by 30 seconds of rest for 10 rounds.', 'round'],
+  ['Run 4 laps of the track and use the lap timer so you can see your pacing.', 'lap'],
+  ['Swim 10 lengths and time each length.', 'lap'],
+  ['Hold a plank and use the stopwatch to see how long you last.', 'stopwatch'],
+  ['Do 50 burpees for time.', 'stopwatch'],
+  ['Time how long the 2k row takes you.', 'stopwatch'],
+  ['Take a lap of the park to cool down.', 'none'],
+  ['Rest 90 seconds between sets.', 'none'],
+  ['Great work today, time to rest up.', 'none'],
+  ['Stop when your form breaks.', 'none'],
+]
+for (const [text, want] of kinds) check(`"${text.slice(0, 44)}" asks for ${want}`, kind(text) === want, kind(text))
+check('a full round beats a timer word in the same reply (the numbers are the more specific ask)',
+  kind('Use the stopwatch if you like, but do 8 rounds of 20s on, 10s rest.') === 'round')
+
 // §4 The chat draws the button from the coach's own words and starts that round (source; the driver taps it)
 const src = readFileSync('src/components/ChatAssistant.tsx', 'utf8').replace(/\/\/.*$/gm, '')
-check('a coach bubble is read with parseIntervalSuggestion(', /parseIntervalSuggestion\(msg\.content\)/.test(src))
+check('a coach bubble is read with parseTimerSuggestion(, and only a coach bubble', /msg\.role === 'assistant' \? parseTimerSuggestion\(msg\.content\)/.test(src))
+check('a stopwatch or lap timer starts in one step (startClock()', /timers\.startClock\(/.test(src))
+check('...and never over a live round (the round is opened instead)', /else if \(roundLive\)/.test(src))
+const coach = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
+check('the coach is told to name the timer it suggests', /A TIMER YOU SUGGEST STARTS FROM YOUR MESSAGE/.test(coach) && /"the stopwatch"/.test(coach) && /"the lap timer"/.test(coach))
 check('the tap starts the round', /timers\.startRound\(/.test(src))
 
 console.log(`${ran} checks ran, ${failures} failed`)

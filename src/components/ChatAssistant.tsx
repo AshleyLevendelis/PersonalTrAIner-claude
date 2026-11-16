@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, Activity, ChevronRight, Check, PlayCircle, Timer } from 'lucide-react'
 import { formVideoFor, linkifyBareUrls, sessionVideosFor } from '@/lib/exercise-video'
-import { parseIntervalSuggestion } from '@/lib/timer-engine'
+import { parseTimerSuggestion, type TimerSuggestion } from '@/lib/timer-engine'
 import { startLabel } from '@/lib/round-setup'
 import { useTimers } from '@/hooks/useTimers'
 import { chatContextPills } from '@/lib/chat-context-strip'
@@ -8490,11 +8490,26 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // round already running is never restarted: the button then opens it.
   const timers = useTimers()
   const intervalLeadIn = timers.timerPrefs.countdownSeconds
-  const startSuggestedIntervals = (config: { rounds: number; workSeconds: number; restSeconds: number }) => {
-    const live = timers.mode === 'round' && !!timers.roundConfig && (timers.running || timers.isRoundComplete || timers.isActive)
-    if (!live) timers.startRound({ ...config, leadInSeconds: intervalLeadIn })
-    timers.setRoundFullScreen(true)
+  // AND ANY TIMER (his request the same day: "a round timer, a normal lap timer, or just a stopwatch"). A stopwatch or
+  // lap timer starts at once and its sheet opens on Tools, the way the dock's timer chip opens it. A live round is
+  // never wiped for one: the button then says the round is running and opens it.
+  const roundLive = timers.mode === 'round' && !!timers.roundConfig && (timers.running || timers.isRoundComplete || timers.isActive)
+  const startSuggestedTimer = (suggestion: TimerSuggestion) => {
+    if (suggestion.kind === 'round') {
+      if (!roundLive) timers.startRound({ ...suggestion.config, leadInSeconds: intervalLeadIn })
+      timers.setRoundFullScreen(true)
+    } else if (roundLive) {
+      timers.setRoundFullScreen(true)
+    } else {
+      timers.startClock(suggestion.kind)
+      timers.requestScreenOpen()
+    }
     window.location.hash = tabHash('tools')
+  }
+  const timerButtonLabel = (suggestion: TimerSuggestion): string => {
+    if (suggestion.kind === 'round') return `${blockShape(suggestion.config)} · ${startLabel(intervalLeadIn)}`
+    if (roundLive) return 'A round is running · Open it'
+    return suggestion.kind === 'lap' ? 'Start the lap timer' : 'Start the stopwatch'
   }
 
   /** The video button for the coach reply at `index`: read off what he said just before it (and the message before that). */
@@ -8822,16 +8837,17 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                               // "SHOW ME A VIDEO" (his live test, 14 Nov 2026): the link is the app's, built from the
                               // exercise he named, never a URL the coach typed.
                               const videos = videoForReply(i, msg.content)
-                              const intervals = parseIntervalSuggestion(msg.content)
-                              const timerButton = intervals && (
+                              const suggestion = msg.role === 'assistant' ? parseTimerSuggestion(msg.content) : null
+                              const timerButton = suggestion && (
                                 <button
                                   type="button"
-                                  data-testid="start-intervals"
-                                  onClick={() => startSuggestedIntervals(intervals)}
+                                  data-testid={suggestion.kind === 'round' ? 'start-intervals' : 'start-timer'}
+                                  data-timer-kind={suggestion.kind}
+                                  onClick={() => startSuggestedTimer(suggestion)}
                                   className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-primary/60 px-3.5 text-[0.8125rem] font-medium text-primary-text"
                                 >
                                   <Timer className="size-4" aria-hidden />
-                                  {blockShape(intervals)} · {startLabel(intervalLeadIn)}
+                                  {timerButtonLabel(suggestion)}
                                 </button>
                               )
                               if (videos.length === 0) return timerButton
