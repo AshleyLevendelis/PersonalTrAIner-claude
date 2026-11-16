@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH CAN START ANY TIMER FROM THE CHAT (his request 16 Nov 2026)**: "a round timer, a normal lap timer, or
+  just a stopwatch ... the app should be able to give a button to start it from there". A coach reply is read by the
+  APP for which timer it suggests, most specific first: a round needs work, rest and rounds (the button reads "10 ×
+  30s, 30s rest · Start · 10s countdown"); a lap timer needs "lap timer" or "time each lap/length"; a stopwatch needs
+  "stopwatch", "for time", "time how long" or "time yourself". Anything vaguer gets no button ("a lap of the park",
+  "rest 90 seconds"). "Start the lap timer" and "Start the stopwatch" start it running from zero and open its screen on
+  Tools by the dock chip's own route (`verify:timer-chip`); a running round is never wiped for one: that button reads
+  "A round is running · Open it" and opens the round. Only coach messages get one. The coach's instructions now tell it
+  to name the timer plainly and never send him to Tools to start it (needs the `chat-gemini` deploy; until then the
+  button appears only when the coach happens to use those words). Button wording is mine, inside his request.
+  `test:coach-intervals` (28 checks; 5 mutations, all caught), `verify:live-test-nov14` A16-A24 (3 mutations, all
+  caught). Not driven: the stopwatch sheet opening on the real Tools tab from a chat tap (the chat page has no Tools);
+  the route it uses is the dock chip's, which is.
 - [x] **"CAN I HAVE GREEK YOGHURT ... FOR BREAKFAST?" WAS ASKED "WAS THE GREEK YOGHURT ...?" (his screenshot 16 Nov 2026)**.
   The app's which-kind question (his 9 Nov "Ask which") was written for a meal already eaten, and the same question
   serves a meal asked about or planned. All three now read in no tense: "Which Greek yoghurt: fat-free (0%), low-fat

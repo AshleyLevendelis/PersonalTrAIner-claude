@@ -110,6 +110,12 @@ export interface TimersValue {
   reset: () => void
   lap: () => void
   startRound: (config: RoundConfig) => void
+  /**
+   * Stopwatch or lap timer, STARTED in one step (the coach's timer button, 16 Nov 2026). Already that mode and running:
+   * nothing changes. Otherwise the timer starts from zero, keeping the round choice the record carries. Never call it
+   * over a live round: the caller checks, because a mode switch wipes the round.
+   */
+  startClock: (mode: 'stopwatch' | 'lap') => void
   /** Round mode only — banks elapsed time and drops the anchor. `stop()` would erase the round, not pause it. */
   pauseRound: () => void
   /** Round mode only — re-anchors to `now - banked` so the schedule continues where it stopped. */
@@ -209,6 +215,19 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
   const start = useCallback(() => {
     if (!profileId) return
     persist({ ...record, running: true, startedAtIso: new Date(nowMs()).toISOString() })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, persist, record])
+
+  const startClock = useCallback((mode: 'stopwatch' | 'lap') => {
+    if (!profileId) return
+    if (record.mode === mode && record.running) return
+    persist({
+      ...defaultTimerRecord(mode),
+      selectedRoundConfig: record.selectedRoundConfig ?? null,
+      customRoundConfig: record.customRoundConfig ?? null,
+      running: true,
+      startedAtIso: new Date(nowMs()).toISOString(),
+    })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist, record])
 
@@ -515,6 +534,7 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     skipLeadIn,
     lap,
     startRound,
+    startClock,
   }
 
   return <TimersContext.Provider value={value}>{children}</TimersContext.Provider>
