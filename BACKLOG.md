@@ -15,7 +15,8 @@ Newest first. One line each.
   itself is refused (a dish the app cannot fit), the app's refusal stands alone: a "yes" above "I couldn't fit it"
   would contradict itself. "How much should I have?" keeps the app's own answer. Every tool's reply passes through the
   one step (it wraps the whole tool block). Found on the way, mine (CSCS): told "add it", a dish was still sized by
-  calories, 1,070 g of raw potatoes for one lunch; every coach-added dish is now sized like the "how much" answer.
+  calories, 1,070 g of raw potatoes for one lunch; every coach-added dish is now sized like the "how much" answer. His OWN meals (Profile, My meals) keep their own
+  sizing exactly as before (his "My usual meals first"): caught by `test:usual-meals` in the related-checks run.
   `test:answer-first` (30 checks, 12 mutations, all caught), `test:meal-addition`, `verify:live-test-nov14` A28-A30.
   Needs the `chat-gemini` deploy; whether the coach's answers are GOOD is the exam's to say.
 - [x] **"HOW MUCH OF EACH SHOULD I HAVE?" IS ANSWERED BY THE APP: his ruling 16 Nov 2026, "App sizes it"** (from three

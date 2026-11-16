@@ -64,6 +64,8 @@ export interface BuildMealAdditionInput {
   dislikedFoods?: string[]
   /** Today, as YYYY-MM-DD — used when the model names no date. */
   todayDate: string
+  /** HIS OWN meal (Profile, My meals): the verifier's own re-portioning, as it always was (his "My usual meals first"), never the coach's plate sizing. */
+  libraryFit?: boolean
 }
 
 export type MealAdditionResult =
@@ -256,9 +258,9 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
   // ONE PLATE, HOWEVER HE PUT IT (CSCS, mine, 16 Nov 2026): told "add it", the calorie fit gave 1,070g of raw potatoes
   // for one lunch, the plate his question had just been spared. Asked or told, a dish the coach names is sized the same
   // way (protein first, carbs within 30%), and the amounts are kept as sized.
-  const fitted = sizeToProtein(proposal, budget)
+  const fitted = input.libraryFit ? proposal : sizeToProtein(proposal, budget)
   const rejectLog: string[] = []
-  const option = verifyProposal(fitted, slot, budget, input.dietaryPreferences, rejectLog, input.dislikedFoods ?? [], undefined, true)
+  const option = verifyProposal(fitted, slot, budget, input.dietaryPreferences, rejectLog, input.dislikedFoods ?? [], undefined, !input.libraryFit)
   if (!option) return { ok: false, reason: explainRejection(rejectLog, dishName, slot) }
 
   const date = normaliseDate(rawArgs.date, input.todayDate)
