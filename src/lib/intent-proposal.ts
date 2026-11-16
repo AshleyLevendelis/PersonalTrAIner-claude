@@ -21,6 +21,8 @@ export const APPEND_PROPOSAL_KINDS = new Set([
   'record_fact', 'record_goal', 'add_to_grocery_list', 'check_off_grocery_item', 'log_water',
   // A whole upcoming day onto the list (27 Sep 2026) — the strip's button.
   'add_day_to_grocery_list',
+  // Taking items off the list (16 Nov 2026), when the coach could not read it as an instruction.
+  'remove_from_grocery_list',
   // log_steps is the only member that ALWAYS arrives here — the others land
   // on this path only when classifyImperative could not read the request as a
   // command. Ashley's ruling, 5 Sep 2026: a step count always gets a card.
@@ -41,6 +43,7 @@ export const INTENT_PROPOSAL_VERB: Record<string, string> = {
   add_to_grocery_list: 'add',
   add_day_to_grocery_list: 'add',
   check_off_grocery_item: 'check off',
+  remove_from_grocery_list: 'take off',
   log_water: 'log',
   log_steps: 'log',
 }
@@ -111,6 +114,9 @@ export function buildIntentProposal(
     field = 'Add to list'
     const date = typeof rawArgs.date === 'string' ? rawArgs.date.trim() : ''
     after = /^\d{4}-\d{2}-\d{2}$/.test(date) ? `${weekdayLong(date)}'s meals` : spoken
+  } else if (kind === 'remove_from_grocery_list') {
+    field = 'Take off list'
+    after = Array.isArray(rawArgs.item_phrases) ? (rawArgs.item_phrases as unknown[]).map(String).filter(Boolean).join(', ') || spoken : spoken
   } else if (kind === 'check_off_grocery_item') {
     field = 'Check off'
     after = firstOf(rawArgs.item_phrase)

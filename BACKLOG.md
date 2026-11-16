@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **EVERYTHING FROM THE CHAT: OPEN ANY SCREEN, AND TAKE THINGS OFF THE SHOPPING LIST (his request 16 Nov 2026)**.
+  His screenshot: "Open the plate calculator" got the coach's directions ("on the Tools tab ... tap the plate calculator
+  row"), the one thing the app promises never to do; and "I want to be able to do everything from chat. Open plate
+  calculator, open recent session history, grocery list. Add things and remove things from the grocery list, open my
+  program. Everything." Measured: the shopping list and the program had their own links; the plate calculator, the
+  session history and Profile could only be opened by a tap; adding, adding a day and ticking off were already chat
+  tools, removing was not. Now: (1) a plain ask to open a screen ("open", "show me", "take me to", "pull up",
+  "where's", at most 90 characters, a screen named) is answered by the APP before the coach is asked: the screen opens
+  at once and the chat keeps "Opened the plate calculator." with a button to open it again (read back from that line,
+  so it survives a reload). Plate calculator (a weight named starts it there), session history, shopping list,
+  program, Profile, and each tab. One channel (`open-request.ts`) each screen takes its own request from, including a
+  screen that mounts because the chat just brought him to it. Opening happens at once rather than behind a button
+  because he gave the instruction (the timer buttons answer a coach SUGGESTION). (2) The coach has
+  `remove_from_grocery_list`: each phrase must name exactly one line (none or several is said back, never guessed), the
+  receipt says what went and its Undo puts the same rows back; a hinted removal is an offer. The coach is told never to
+  give directions to a tab or a row. Found on the way: the first Undo passed the rows as "after" to the put-back, which
+  would have deleted them again; a check now holds the direction. `test:open-from-chat` (50 checks, 13 mutations, all
+  caught, one only after a long message was added), `verify:live-test-nov14` A31-A35, `verify:tools-2a` §7 (1 mutation,
+  caught). Needs the `chat-gemini` deploy for the remove tool and the coach line; opening works without it.
 - [x] **AND IT LOOKS BACK, NOT ONLY AHEAD: his follow-up 16 Nov 2026, "Ahead and before"**. The coach now reads the last
   two days (the plan's done marks, the workout and cardio logs) as well as today and the next two. Mine (CSCS): two hard
   days on the same muscles back to back is what to avoid, whichever way round; heavy legs yesterday makes hard running

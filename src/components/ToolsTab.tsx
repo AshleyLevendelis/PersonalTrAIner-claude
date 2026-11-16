@@ -9,6 +9,7 @@ import { History, BookOpen, Timer, ChevronRight, TimerReset, ArrowLeft, Flag, Sh
 const RoundTimerSheet = lazyWithReload(() => import('@/components/timers/RoundTimerSheet').then(m => ({ default: m.RoundTimerSheet })))
 const StopwatchPanel = lazyWithReload(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.StopwatchPanel })))
 import { PlateCalculator } from '@/components/PlateCalculator'
+import { onOpenRequest, takeOpenRequest } from '@/lib/open-request'
 import { PlateCard } from '@/components/PlateCard'
 import { nextBarbellLift, weekEyebrow, programProgress, lastRoundLine, PLATE_CARD_DEFAULT_KG } from '@/lib/tools-card'
 import { startLabel } from '@/lib/round-setup'
@@ -226,6 +227,19 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
     setTimersOpen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timers.screenOpenRequested])
+
+  // OPENED FROM THE CHAT (his request 16 Nov 2026, "do everything from chat"): the plate calculator and the session
+  // history open here when the chat asks, including when this tab mounts because the chat just brought him to it.
+  useEffect(() => {
+    const take = () => {
+      const req = takeOpenRequest(['plate', 'history'])
+      if (!req) return
+      if (req.target === 'plate') { setPlateStartKg(req.kg ?? PLATE_CARD_DEFAULT_KG); setPlateOpen(true) }
+      else setHistoryOpen(true)
+    }
+    take()
+    return onOpenRequest(take)
+  }, [])
 
   // WHAT THE IDLE CARD DESCRIBES, resolved in ONE place and handed to both the
   // card and the chips. A fallback computed twice is a card describing Tabata

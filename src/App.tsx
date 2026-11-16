@@ -25,6 +25,7 @@ import { AppTour, replayAppTour } from '@/components/AppTour'
 import { isDevAccount, getSessionDateContext, getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { useKeptPlanSender } from '@/hooks/useKeptPlanSender'
 import { useAppRoute, tabHash, groceryHash, isTab, isKnownTabHash, type Tab } from '@/lib/app-route'
+import { onOpenRequest, takeOpenRequest } from '@/lib/open-request'
 
 import { calculateCalories, getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, staticTDEEFor, resolveBodyMetrics } from '@/lib/macro-calculator'
@@ -711,6 +712,12 @@ function App() {
   const [exerciseExclusions, setExerciseExclusions] = useState<string[]>(() => boot?.exclusions ?? [])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
   const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | 'dietary' | 'myMeals' | undefined>(undefined)
+  // "Open my profile" from the chat (his request 16 Nov 2026, "do everything from chat"): Profile is App's own sheet.
+  useEffect(() => {
+    const take = () => { if (takeOpenRequest(['profile'])) { setProfileInfoSection(undefined); setProfileInfoOpen(true) } }
+    take()
+    return onOpenRequest(take)
+  }, [])
   const [newPlanConfirmOpen, setNewPlanConfirmOpen] = useState(false)
   const [newPlanResetting, setNewPlanResetting] = useState(false)
   /** Injury/equipment plan_adaptations still active when the New Plan dialog opens — New Plan creates a brand-new profile row (see handleReset), which orphans anything tied to the old profile_id, including these. Fetched fresh on open (Part 3, injury-persistence fix) so the loss is named and consented-to rather than silent. */
