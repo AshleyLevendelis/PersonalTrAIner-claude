@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **"CAN I HAVE GREEK YOGHURT ... FOR BREAKFAST?" WAS ASKED "WAS THE GREEK YOGHURT ...?" (his screenshot 16 Nov 2026)**.
+  The app's which-kind question (his 9 Nov "Ask which") was written for a meal already eaten, and the same question
+  serves a meal asked about or planned. All three now read in no tense: "Which Greek yoghurt: fat-free (0%), low-fat
+  (2%) or full-fat?", "Which calamari: ...", "What fat is the beef mince: ...". Both food tables (the coach's copy
+  needs the `chat-gemini` deploy). `test:greek-yoghurt-asked` gains a check per food (2 mutations, both caught); 46
+  food-table checks pass. SEEN IN THE SAME SCREENSHOT, model behaviour, NOT fixed here: the coach said "around 44g of
+  protein" before any amount existed and "hits your ~496 kcal" for a bowl the app's own table costs at 410 kcal and
+  42g protein (380g 0% yoghurt, 15g almonds, 100g berries, 20g honey); after "you tell me what to have" it asked a
+  second time instead of adding the dish; one emoji. The numbers in chat text are the model's; a card's are the app's.
 - [x] **THE SAME-EXERCISES RULE MARKED HIS OWN SWAPS DOWN (full sweep, 16 Nov 2026)**. The new score rule "an exercise
   changed inside a block" also fired on a swap he ASKS for, so the swap card warned "the week stops covering everything
   it should" for a free accessory swap (`test:edit-tradeoff`, `verify:swap-request` 4f-4g). The rule judges a generated

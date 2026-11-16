@@ -238,7 +238,7 @@ function main() {
     const nut = planMyMeal({ ...ctx, dietaryPreferences: ['nut-free'] }, { name: 'Peanut banana', slot: 'snack', lines: nutLines })
     check('...and refused for someone nut-free, naming the food', !nut.ok && /peanut butter/.test(nut.reason) && /nut-free/.test(nut.reason), nut)
     const mince = planMyMeal(ctx, { name: 'Chilli', slot: 'dinner', lines: '200g beef mince\n70g dry rice' })
-    check('...and plain mince is still asked about, never guessed', !mince.ok && /What fat was the beef mince/.test(mince.reason), mince)
+    check('...and plain mince is still asked about, never guessed', !mince.ok && /What fat is the beef mince/.test(mince.reason), mince)
     // WHAT THE CARD PROMISES FOLLOWS WHAT THE DISH CAN DO.
     check('a meal that can be part of a day on his targets is told it comes first', porridge.ok && /come first/.test(porridge.card.what) && !/won't come up often/.test(porridge.card.what), porridge.ok ? porridge.card.what : '')
     const huge = planMyMeal(ctx, { name: 'Rice mountain', slot: 'dinner', lines: '900g dry rice\n500g butter' })

@@ -45,7 +45,7 @@ check('a meal holding a bare one counts nothing for it: it is listed as not coun
 
 console.log('\n3. The question names the fat levels, never an amount')
 const q = whichKindQuestion('beef mince')
-check('the question asks the fat and says where to find it', q === 'What fat was the beef mince: 5%, 10%, 12%, 15% or 20%? It says on the pack.', q)
+check('the question asks the fat and says where to find it', q === 'What fat is the beef mince: 5%, 10%, 12%, 15% or 20%? It says on the pack.', q)
 check('...for every bare name', ['mince', 'ground beef', 'minced beef', 'steak mince', 'raw beef mince', 'beef mince raw'].every(n => whichKindQuestion(n) === q))
 check('...and none for a named level or another mince', [whichKindQuestion('beef mince 5% fat'), whichKindQuestion('lean mince'), whichKindQuestion('turkey mince'), whichKindQuestion('lamb mince')].every(x => x === null))
 check('...and Greek yoghurt keeps its own question', /fat-free \(0%\)/.test(whichKindQuestion('greek yoghurt') ?? ''))
@@ -65,7 +65,7 @@ check('the coach\'s log_meal instruction asks the fat of plain beef mince instea
 const writer = strip(readFileSync('supabase/functions/generate-meals/index.ts', 'utf8'))
 check('the meal writer is told to name the fat of Greek yoghurt and beef mince, since a bare one drops its dish', /Name the fat level where the numbers depend on it: Greek yoghurt as 0%, 2% or full fat[^.]*beef mince with its fat/.test(writer))
 const shared = readFileSync('supabase/functions/_shared/food-db.ts', 'utf8')
-check('the coach\'s food table holds the same rule (the synced copy)', /f\('beef mince 12% fat'/.test(shared) && /What fat was the beef mince/.test(shared) && !/\['beef mince', 'ground beef'/.test(shared))
+check('the coach\'s food table holds the same rule (the synced copy)', /f\('beef mince 12% fat'/.test(shared) && /What fat is the beef mince/.test(shared) && !/\['beef mince', 'ground beef'/.test(shared))
 
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} mince check(s) FAILED.`); process.exit(1) }

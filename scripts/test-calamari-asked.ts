@@ -30,7 +30,7 @@ function check(name: string, ok: boolean, detail?: unknown) {
 const text = (p: string) => readFileSync(p, 'utf8')
 const code = (p: string) => text(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
 const found = (line: string) => lookupIngredient(parseIngredientLine(line).name)?.name ?? null
-const QUESTION = 'Was the calamari breaded or fried in flour, or plain (grilled or boiled)?'
+const QUESTION = 'Which calamari: breaded or fried in flour, or plain (grilled or boiled)?'
 
 console.log('1. The food table: a bare name is a miss, a word for the kind settles it')
 const BARE = ['150g calamari', '150g Calamari', '150g calamari rings', '150g frozen calamari rings', '150g fresh calamari', '150g raw calamari', '150g cooked calamari', '1 portion calamari', '150g calamares']
