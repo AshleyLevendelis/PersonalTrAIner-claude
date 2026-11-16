@@ -26,6 +26,7 @@ import { setSupabaseClient } from '@/lib/supabase'
 import { makeFakeSupabase, type Db } from './fake-supabase'
 import { setDevClockOverride } from '@/lib/dev-clock'
 import { generateMesocycle, setRandomSource } from '@/lib/exercise-plan'
+import { toRow } from '@/lib/mesocycle-shape'
 import { seededRngFromKey } from '@/lib/seeded-random'
 import { computeMealMacros } from '@/lib/food-db'
 import { computeTargets } from '@/lib/nutrition-targets'
@@ -38,7 +39,11 @@ const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 // ?plan-today: the plan began TODAY (an INPUT: when he finished setup), his live test of 14 Nov 2026, so the days of this
 // Monday-to-Sunday week before it are before the plan. verify:live-test-nov14.
 const PLAN_TODAY = new URLSearchParams(location.search).has('plan-today')
-const created = new Date(anchorNowMs() - (PLAN_TODAY ? 0 : 9) * 86400000).toISOString()
+// ?plan-sunday: the plan was made last SUNDAY evening and is saved (an INPUT: when he finished setup, and the saved rows
+// a returning phone reads), his 16 Nov 2026 calendar. verify:live-test-nov14 section D.
+const PLAN_SUNDAY = new URLSearchParams(location.search).has('plan-sunday')
+const sundayBefore = (() => { const d = new Date(anchorNowMs()); d.setDate(d.getDate() - d.getDay()); d.setHours(20, 0, 0, 0); return d })()
+const created = PLAN_SUNDAY ? sundayBefore.toISOString() : new Date(anchorNowMs() - (PLAN_TODAY ? 0 : 9) * 86400000).toISOString()
 const TRAIN_TODAY = new URLSearchParams(location.search).has('session-day')
 // The anchor's Wednesday is "Rest day · optional cardio" on this profile, a planned day with no lifting. ?no-cardio:
 // she would rather avoid cardio (an INPUT), and the generator then leaves Wednesday a plain rest day with no plan
@@ -107,7 +112,7 @@ const meal = (slot: string, idx: number, name: string, ingredients: { name: stri
 
 const db: Db = {
   fitness_profiles: [profileRow],
-  mesocycle_weeks: [], exercise_plans: [],
+  mesocycle_weeks: PLAN_SUNDAY ? weeks.map(w => ({ ...toRow(PROFILE_ID, w), created_at: created })) : [], exercise_plans: [],
   meal_plan_slots: [
     meal('breakfast', 0, 'Porridge with berries', [{ name: 'dry oats', quantity: 90, unit: 'g' }, { name: 'whole milk', quantity: 300, unit: 'ml' }, { name: 'blueberries', quantity: 100, unit: 'g' }]),
     meal('lunch', 0, 'Chicken and rice', [{ name: 'raw chicken breast', quantity: 205, unit: 'g' }, { name: 'dry white rice', quantity: 90, unit: 'g' }]),

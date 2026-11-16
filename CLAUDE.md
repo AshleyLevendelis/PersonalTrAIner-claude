@@ -45,6 +45,11 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   six days after it; the arrows and a swipe page seven days back or forward, "Today" returns. It REPLACES "the Home and
   Exercise strips stay Monday to Sunday" for the Exercise strip only; every "this week" count, the Week view and Home's
   strip stay Monday to Sunday. A tapped day is a DATE, never a weekday name. `verify:live-test-nov14` C6-C10
+- **Week 1 begins on the coming Monday when the days before it hold no session; a calendar row holding two plan weeks
+  reads its dates — his ruling 16 Nov 2026** (over universal Monday weeks, which he proposed and which would cut a
+  mid-week start's calibration week). It narrows his 6 Oct "the day you started" for rest-day starts only: a Sunday
+  trainer keeps the Sunday. One function (`snapPlanStart`) where a plan is read back or made. `test:week-one-start`,
+  `verify:live-test-nov14` D1-D2
 - **A food that can't be counted is asked about before any card — his rule, 15 Oct 2026 (run 7, M51)**, in his
   words: "if a food can't be counted, ask before showing the card; never show a total that quietly leaves it
   out." Both halves: the card builder refuses, the coach's log_meal asks in the same words. `test:meal-amounts`,

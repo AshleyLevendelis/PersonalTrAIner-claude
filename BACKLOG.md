@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [x] **WEEK 1 BEGINS ON THE MONDAY WHEN NOTHING IS LOST; A CALENDAR ROW HOLDING TWO WEEKS READS ITS DATES (his ruling 16 Nov
+  2026, "yes", after his own catch that Sunday is not everyone's rest day)**. His calendar: a plan made on Sunday the
+  15th (a rest day) put a row of the 9th-15th holding one rest tile above "W1–2", "W2–3"... Options put to him: snap
+  Sunday starts only / keep it and label rows by dates / always start on a Monday (he proposed universal Monday
+  alignment; told it reverses his 6 Oct ruling and cuts a mid-week start's calibration week, he chose the two-step
+  version). BUILT: (1) a plan whose days from its start up to the coming Monday hold NO session in week 1 (a walk
+  counts as a session) begins on that Monday, so his reads W1, W2, W3, W4; someone who trains on Sundays keeps the
+  Sunday, nothing skipped. One function (snapPlanStart), applied where a plan is read back and where one is made, so
+  every screen and the coach get one start; the stored stamp is untouched. (2) A calendar row holding two plan weeks
+  reads its dates ("16–22" over "Nov", "28–4" over "Sep–Oct"), spoken as both weeks; a one-week row stays "W3".
+  CSCS review: (1) no session moves or is lost, only rest days fall before the start; (2) week 1, the calibration week,
+  stays whole; (3) blocks, deloads and progression keep their order; (4) no floor or ceiling changes meaning; (5) in
+  scope. `test:week-one-start` 14 checks (3 mutations caught), `verify:live-test-nov14` D1-D2 (a SAVED Sunday plan
+  through the real start; removing the snap at read-back caught), both screenshots read (snapped W1-W7; un-snapped date
+  labels fit the 34px column).
 - [x] **"SHOW ME VIDEOS TO TODAYS WORKOUTS" STILL DREW ONE BUTTON (his second screenshot, 16 Nov 2026)**. The coach's reply
   happened to name the Barbell Bench Press, the app read that one mention as "the exercise he means", and it won over the
   one-button-each list built the same morning. A request for the session, naming no exercise, now takes the session list
