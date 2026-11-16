@@ -8486,10 +8486,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const videoForReply = (index: number, reply: string) => {
     const said: string[] = []
     for (let j = index - 1; j >= 0 && said.length < 2; j--) if (messages[j].role === 'user') said.push(messages[j].content)
+    // ASKED FOR VIDEOS OF THE SESSION, NAMING NO EXERCISE: one button for each of today's, BEFORE the single-exercise
+    // reading. His 16 Nov 2026 screenshot, "Show me videos to todays workouts": the coach's reply happened to name the
+    // Barbell Bench Press, and that one mention won, so the one-button-each list never came.
+    const many = sessionVideosFor(said[0], todayPlan ? todayPlan.exercises.map(e => e.name) : [])
+    if (many.length > 0) return many
     const one = formVideoFor(said[0], reply, said[1])
-    if (one) return [one]
-    // Asked for videos of the session, naming no exercise: one button for each of today's.
-    return sessionVideosFor(said[0], todayPlan ? todayPlan.exercises.map(e => e.name) : [])
+    return one ? [one] : []
   }
 
   const markdownComponents = {

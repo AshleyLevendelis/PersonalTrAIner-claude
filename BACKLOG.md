@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **"SHOW ME VIDEOS TO TODAYS WORKOUTS" STILL DREW ONE BUTTON (his second screenshot, 16 Nov 2026)**. The coach's reply
+  happened to name the Barbell Bench Press, the app read that one mention as "the exercise he means", and it won over the
+  one-button-each list built the same morning. A request for the session, naming no exercise, now takes the session list
+  first; the single-exercise reading (his words, the reply's whole name, what he said before) is the fallback.
+  HOW IT WAS MISSED: the morning's check asked "today's exercises" and a harness reply that names nothing, so the case
+  where the reply names an exercise had no check. `test:live-test-nov14` §7 +3 checks (the order is pinned, and the
+  reply case is shown to exist); 1 mutation (the old order), caught. His phone may still run the build from before
+  the first fix (the old Scapular reply was still on screen), so both reach it with this merge.
 - [x] **"SHOW ME VIDEOS OF TODAY'S EXERCISES" DREW ONE BUTTON, FOR AN EXERCISE NOT IN THE SESSION (his screenshots 16 Nov
   2026)**. Two defects. (1) CAUSE, reproduced: "today's" leaves a lone "s", the exercise search treated it as a word and
   matched Scapular Pull-Ups by its first letter, so the app drew "Watch a video: Scapular Pull-Ups" on a Push & Press day.

@@ -146,6 +146,11 @@ async function main() {
     check('...it gets a button for EACH exercise of today\'s session, in order', JSON.stringify(buttons.map(b => b.exercise)) === JSON.stringify(todays), buttons.map(b => b.exercise))
     check('...each to a YouTube search built from its own name', buttons.every(b => b.url === `https://www.youtube.com/results?search_query=${encodeURIComponent(`${b.exercise} exercise form tutorial`)}`))
     check('...but never for a how-to, a named exercise, or a day with no session', sessionVideosFor('how do I brace my core', todays).length === 0 && sessionVideosFor('show me a video of today\'s bench press', todays).length === 0 && sessionVideosFor(ask, []).length === 0)
+    // HIS SECOND SCREENSHOT, 16 Nov 2026: "Show me videos to todays workouts", and the coach's reply named the bench press.
+    const ask2 = 'Show me videos to todays workouts'
+    check('"todays workouts" (no apostrophe) is a request for the session too', sessionVideosFor(ask2, todays).length === todays.length, sessionVideosFor(ask2, todays).length)
+    check('...and the session list comes BEFORE a lone exercise the coach\'s reply happened to name', chat.indexOf('sessionVideosFor(said[0], todayPlan') > 0 && chat.indexOf('sessionVideosFor(said[0], todayPlan') < chat.indexOf('formVideoFor(said[0], reply, said[1])'))
+    check('...so with that reply a lone-exercise reading exists to be outranked', formVideoFor(ask2, 'guides for today\'s Push & Press session, like the Barbell Bench Press.')?.exercise === 'Barbell Bench Press')
     check('...and no more than eight buttons', sessionVideosFor(ask, Array.from({ length: 12 }, (_, i) => `Move ${i}`)).length === 8)
     const coach = fs.readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
     check('the coach is told never to type a link', /NEVER type a link or a web address/.test(coach) && !/youtube\.com\/results/.test(coach))
