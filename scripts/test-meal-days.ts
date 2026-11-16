@@ -353,7 +353,7 @@ async function main() {
     const dayTool = fn.slice(fn.indexOf('name: "add_day_to_grocery_list"'), fn.indexOf('name: "check_off_grocery_item"'))
     check('the coach has a tool to put a day on the list, which needs the day', dayTool.length > 0 && /required: \["origin_verbatim_quote", "date"\]/.test(dayTool))
     check('...gated like add_to_grocery_list: an instruction acts, a statement becomes an offer',
-      /name === "add_to_grocery_list" \|\| name === "check_off_grocery_item" \|\| name === "add_day_to_grocery_list"\) \{[\s\S]{0,1200}?classifyImperative\([\s\S]{0,700}?groceryIntent/.test(fn))
+      /name === "add_to_grocery_list" \|\| name === "check_off_grocery_item" \|\| name === "add_day_to_grocery_list"(?: \|\| name === "remove_from_grocery_list")?\) \{[\s\S]{0,1200}?classifyImperative\([\s\S]{0,700}?groceryIntent/.test(fn))
     const swapTool = fn.slice(fn.indexOf('name: "propose_meal_swap"'), fn.indexOf('name: "propose_meal_addition"'))
     check('the coach\'s swap takes a date', /\bdate: \{/.test(swapTool))
     check('the coach is told the upcoming days, by the section the client fills', /UPCOMING MEALS/.test(fn) && /\$\{context\.upcoming_meal_summary\}/.test(fn))

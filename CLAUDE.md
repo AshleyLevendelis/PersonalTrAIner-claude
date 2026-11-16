@@ -1605,6 +1605,12 @@ menu" stays true when a copy is also left outside it.
   say so. From the next day a surprising weigh-in is held as before. `test:weigh-in-targets` §13,
   `verify:setup-weight-correction`
 
+- **Everything from the chat: his request 16 Nov 2026** ("open plate calculator, session history, grocery list ... open
+  my program. Everything"): a plain ask to open a screen is answered by the app before the coach, the screen opens at
+  once and the chat keeps a line with an open-again button (plate calculator, session history, shopping list, program,
+  Profile, each tab; one channel, `open-request.ts`); the coach can take items off the shopping list with an Undo, and
+  never gives directions to a tab. `test:open-from-chat`, `verify:live-test-nov14` A31-A35, `verify:tools-2a` §7.
+  Needs the `chat-gemini` deploy for the remove tool
 - **What is coming up decides the coach's answer: his request 16 Nov 2026** ("should I run 15k tonight" with heavy legs
   tomorrow must not get "go for it"): the coach reads the last two days, today and the next two (his "Ahead and before") before saying yes to extra work or a
   change, names the session it would cost and gives the better option; a running goal puts the run first, otherwise

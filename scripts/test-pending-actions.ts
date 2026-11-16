@@ -766,6 +766,7 @@ async function main() {
     { kind: 'log_water', rawArgs: { origin_verbatim_quote: 'had some water I guess', amount_ml: 300 } },
     { kind: 'log_steps', rawArgs: { origin_verbatim_quote: 'I walked 9000 steps today', steps: 9000 } },
     { kind: 'add_day_to_grocery_list', rawArgs: { origin_verbatim_quote: 'maybe put monday on the list', date: '2026-09-28' } },
+    { kind: 'remove_from_grocery_list', rawArgs: { origin_verbatim_quote: "I don't think I need the oats", item_phrases: ['oats'] } },
   ]
 
   // EVERY MEMBER, DERIVED — not just the ones someone remembered to list.

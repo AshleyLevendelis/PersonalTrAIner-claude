@@ -1,3 +1,4 @@
+import { requestOpen } from '../src/lib/open-request'
 // ---------------------------------------------------------------------------
 // THE TOUR, AGAINST THE REAL SCREENS.
 //
@@ -2045,4 +2046,10 @@ function Harness() {
 ;(window as unknown as { __TOUR_STEPS__: unknown }).__TOUR_STEPS__ = TOUR_STEPS
 
 if (!window.location.hash) window.location.hash = tabHash('dashboard')
+// ?open=plate|history (16 Nov 2026, "open the plate calculator" from the chat): the chat's own request, made before the
+// app draws, the way the chat makes it when it moves him to Tools. Input only: the screen decides what it opens.
+{
+  const OPEN = new URLSearchParams(location.search).get('open')
+  if (OPEN === 'plate' || OPEN === 'history') requestOpen(OPEN, OPEN === 'plate' ? 100 : null)
+}
 createRoot(document.getElementById('root')!).render(<StrictMode><AppErrorBoundary><Harness /></AppErrorBoundary></StrictMode>)

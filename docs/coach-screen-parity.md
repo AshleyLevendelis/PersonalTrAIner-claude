@@ -27,6 +27,7 @@ it is wrong.
 | `add_to_grocery_list` | SCREEN | Tools → Grocery list, the add row. |
 | `ban_exercise` | SCREEN | The exercise row's menu. Wired to chat 14 Sep 2026; it was the last screen-only capability. |
 | `check_off_grocery_item` | SCREEN | Tapping an item on the grocery list. |
+| `remove_from_grocery_list` | SCREEN | Swiping or deleting an item on the grocery list (and its Undo). |
 | `log_meal` | SCREEN | Nutrition → the meal's log control. |
 | `log_steps` | SCREEN | Home → Today so far. |
 | `log_water` | SCREEN | Home → Today so far. |

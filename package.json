@@ -648,7 +648,8 @@
     "test:beginner-protein": "tsx scripts/test-beginner-protein.ts",
     "test:week-one-start": "tsx scripts/test-week-one-start.ts",
     "test:exercise-consistency": "tsx scripts/test-exercise-consistency.ts",
-    "test:answer-first": "tsx scripts/test-answer-first.ts"
+    "test:answer-first": "tsx scripts/test-answer-first.ts",
+    "test:open-from-chat": "tsx scripts/test-open-from-chat.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

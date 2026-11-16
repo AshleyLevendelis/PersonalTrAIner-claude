@@ -38,6 +38,7 @@ await page.addInitScript(() => {
   const realFetch = window.fetch
   window.fetch = async (url, init) => {
     if (String(url).includes('chat-gemini')) {
+      window.__coachCalls = (window.__coachCalls || 0) + 1
       const said = String(JSON.parse((init && init.body) || '{}').message || '')
       const reply = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })
       if (/skipping rope/i.test(said)) return reply({ reply: 'Skipping rope is a great pick for 10 minutes! Try 30 seconds of jumping followed by 30 seconds of rest for 10 rounds.' })
@@ -161,6 +162,23 @@ check('A29. the coach\'s answer comes first, then the app\'s offer in the same b
   !!answered && answered.text.indexOf('it suits today') >= 0 && answered.text.indexOf('it suits today') < answered.text.indexOf('Chicken salad'), answered?.text)
 check('A30. ...and the offer still has its Apply and Not now', !!answered && answered.btns.includes('Apply') && answered.btns.includes('Not now'), answered?.btns)
 await shot('question-answer-first')
+
+// "OPEN THE PLATE CALCULATOR" (his request 16 Nov 2026, "I want to be able to do everything from chat"): the app opens
+// it itself, with no coach call and no directions to a tab, and leaves a button to open it again.
+const callsBefore = await page.evaluate(() => window.__coachCalls || 0)
+check('A31. "Open the plate calculator" is sent', await say('Open the plate calculator'))
+const opened = await until(() => page.evaluate(() => {
+  const b = [...document.querySelectorAll('[data-testid="chat-bubble"]')].find(n => /Opened the plate calculator\./.test(n.textContent || ''))
+  const btn = document.querySelector('[data-testid="open-screen"][data-open-target="plate"]')
+  return b ? { text: b.textContent.trim(), button: btn ? btn.textContent.trim() : null, hash: window.location.hash, calls: window.__coachCalls || 0 } : null
+}), v => !!v && !!v.button)
+check('A32. the app answers itself: "Opened the plate calculator." with an "Open the plate calculator" button', !!opened && /Opened the plate calculator\./.test(opened.text) && opened.button === 'Open the plate calculator', opened)
+check('A33. ...and moves to Tools, where the calculator lives', opened?.hash === '#/tab/tools', opened?.hash)
+check('A34. ...without asking the coach (no directions to a tab can come back)', !!opened && opened.calls === callsBefore && !/Tools tab/.test(opened.text), { before: callsBefore, after: opened?.calls })
+await shot('open-plate')
+await page.evaluate(() => { window.location.hash = '' })
+check('A35. "show me my shopping list" opens the list\'s own page', await say('show me my shopping list') && (await until(() => page.evaluate(() => window.location.hash), v => v === '#/nutrition/grocery')) === '#/nutrition/grocery')
+await page.evaluate(() => { window.location.hash = '' })
 
 // A long change row: the offer's own row, with the two halves given his screenshot's lengths.
 await page.goto(`${origin}/.tour-harness/chat.html?day=mid&n=2`)

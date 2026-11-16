@@ -19,6 +19,7 @@ import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, Mes
 import { formVideoFor, linkifyBareUrls, sessionVideosFor } from '@/lib/exercise-video'
 import { parseTimerSuggestion, type TimerSuggestion } from '@/lib/timer-engine'
 import { startLabel } from '@/lib/round-setup'
+import { openButtonLabel, openTargetInReply, openedLine, parseOpenRequest, requestOpen } from '@/lib/open-request'
 import { useTimers } from '@/hooks/useTimers'
 import { chatContextPills } from '@/lib/chat-context-strip'
 import { useShowNumbers } from '@/lib/show-numbers'
@@ -142,7 +143,7 @@ import { checkFactConflict, checkGoalConflict } from '@/lib/memory-reconcile'
 import { classifyConfirmationReply } from '@/lib/confirmation-reply'
 import { getPRCache } from '@/lib/pr-engine'
 import { loadDashboardData, type DashboardData } from '@/lib/dashboard-data'
-import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
+import { getAllItems as getAllGroceryItems, addItemLocal, setCheckedLocal, undoAddLocal, deleteItemLocal, restoreRowsLocal, type GroceryItemRow, type GroceryCategory } from '@/lib/grocery-store'
 import { GROCERY_AISLE_LABEL, chatGroceryAmount } from '@/lib/grocery-display'
 import { logWater, undoLog as undoWaterLog, subscribeWaterStore } from '@/lib/water-store'
 import { subscribeCardioLogStore, deleteCardioLog, isPlausibleCardioDuration, isPlausibleDistanceKm } from '@/lib/cardio-log-store'
@@ -2528,7 +2529,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // VISION-ARCHITECTURE.md §5.4 — the first IMMEDIATE-action chat door
     // with no confirmation card (append-only ⇒ execute + receipt + undo).
     // Same I1 shape as memoryIntent: the server never writes grocery_items.
-    groceryIntent?: { tool: 'add_to_grocery_list' | 'check_off_grocery_item' | 'add_day_to_grocery_list'; rawArgs: Record<string, unknown> }
+    groceryIntent?: { tool: 'add_to_grocery_list' | 'check_off_grocery_item' | 'add_day_to_grocery_list' | 'remove_from_grocery_list'; rawArgs: Record<string, unknown> }
     // Same I1/IMMEDIATE shape again, for water_logs.
     waterIntent?: { tool: 'log_water'; rawArgs: Record<string, unknown> }
     // How a finished session felt (session-feel.ts). Same I1 shape once more:
@@ -5591,7 +5592,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * and `created` (JSON-encoded) since undo needs all three to reverse a
    * merge-onto-an-existing-line correctly, not just delete a row.
    */
-  const resolveAndSaveGrocery = async (intent: { tool: 'add_to_grocery_list' | 'check_off_grocery_item' | 'add_day_to_grocery_list'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
+  const resolveAndSaveGrocery = async (intent: { tool: 'add_to_grocery_list' | 'check_off_grocery_item' | 'add_day_to_grocery_list' | 'remove_from_grocery_list'; rawArgs: Record<string, unknown> }): Promise<{ text: string; receipt?: ChatReceiptView }> => {
     const args = intent.rawArgs
     const profileId = profile.id
     if (!profileId) return { text: "I can't update that yet — your profile hasn't finished setting up." }
@@ -5617,6 +5618,38 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           rows: [{ label: `${day.dayName}'s meals`, detail: Object.values(day.meals).join(', ') }],
           status: 'done',
           undoToken: date,
+          resolvedAt: new Date().toISOString(),
+        },
+      }
+    }
+
+    if (intent.tool === 'remove_from_grocery_list') {
+      // TAKING THINGS OFF THE LIST BY CHAT (his request 16 Nov 2026, "add things and remove things"). Each phrase must
+      // name exactly one line; one that matches none or several is said back, never guessed. The removed rows ride in
+      // the receipt so its Undo puts back exactly what went.
+      const phrases = (Array.isArray(args.item_phrases) ? args.item_phrases : [args.item_phrase]).map(p => String(p ?? '').trim()).filter(Boolean)
+      if (phrases.length === 0) return { text: '' }
+      const current = await getAllGroceryItems(profileId)
+      const removed: GroceryItemRow[] = []
+      const unsure: string[] = []
+      for (const phrase of phrases) {
+        const lower = phrase.toLowerCase()
+        const matches = current.filter(i => !removed.includes(i) && (i.display_name.toLowerCase().includes(lower) || lower.includes(i.display_name.toLowerCase())))
+        if (matches.length === 1) removed.push(matches[0])
+        else unsure.push(matches.length === 0 ? `I don't see "${phrase}" on your list.` : `A few items match "${phrase}": ${matches.map(m => m.display_name).join(', ')}. Which one?`)
+      }
+      for (const row of removed) deleteItemLocal(row)
+      if (removed.length > 0) await onGroceryChanged?.()
+      if (removed.length === 0) return { text: unsure.join(' ') }
+      const names = removed.map(r => r.display_name).join(', ')
+      return {
+        text: [`Took ${names} off your list.`, ...unsure].join(' '),
+        receipt: {
+          kind: 'grocery_item_removed',
+          title: 'Taken off your list',
+          rows: removed.map(r => ({ label: r.display_name, detail: CATEGORY_LABEL_FOR_RECEIPT[r.category] })),
+          status: 'done',
+          undoToken: JSON.stringify(removed),
           resolvedAt: new Date().toISOString(),
         },
       }
@@ -6948,6 +6981,23 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       }
     }
 
+    // "OPEN THE PLATE CALCULATOR" (his request 16 Nov 2026, "I want to be able to do everything from chat"): a plain
+    // ask to open a screen is the app's to answer, at once, with no coach call. The coach had answered with directions
+    // to the Tools tab, the one thing the app promises never to do. The screen opens; the chat keeps a line and a
+    // button to open it again.
+    const openAsk = parseOpenRequest(userText)
+    if (openAsk) {
+      persistUserMessage(userText)
+      const line = openedLine(openAsk.target)
+      setMessages(prev => [...prev, { role: 'assistant' as const, content: line, status: 'complete' as const }])
+      if (profile.id) {
+        void supabase.from('chat_messages').insert({ profile_id: profile.id, role: 'assistant', content: line, status: 'complete' })
+          .then(({ error }) => { if (error) console.error('open request: the line was not saved', error) })
+      }
+      requestOpen(openAsk.target, openAsk.kg)
+      return
+    }
+
     setIsLoading(true)
 
     // Save user message immediately (fire-and-forget, 0ms latency)
@@ -8021,7 +8071,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       try {
       saveResult = row.kind === 'record_fact' || row.kind === 'record_goal'
         ? await resolveAndSaveMemory(intent as Parameters<typeof resolveAndSaveMemory>[0])
-        : row.kind === 'add_to_grocery_list' || row.kind === 'check_off_grocery_item' || row.kind === 'add_day_to_grocery_list'
+        : row.kind === 'add_to_grocery_list' || row.kind === 'check_off_grocery_item' || row.kind === 'add_day_to_grocery_list' || row.kind === 'remove_from_grocery_list'
         ? await resolveAndSaveGrocery(intent as Parameters<typeof resolveAndSaveGrocery>[0])
         : row.kind === 'log_steps'
         ? await resolveAndSaveSteps(intent as Parameters<typeof resolveAndSaveSteps>[0])
@@ -8189,6 +8239,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const removed = await onRemoveMealDayFromGrocery(receipt.undoToken)
       await onGroceryChanged?.()
       if (!removed) return { refused: RECEIPTS_UNDONE.failed, keep: true } // leave the Undo button so the user can retry
+    } else if (receipt.kind === 'grocery_item_removed') {
+      // Puts back exactly the rows the chat took off (their own ids, amounts and ticks).
+      if (!isWithinUndoWindow(receipt.resolvedAt ?? null)) return { refused: RECEIPTS_UNDONE.tooLate, keep: false }
+      let rows: GroceryItemRow[]
+      try { rows = JSON.parse(receipt.undoToken) } catch { return { refused: RECEIPTS_UNDONE.cannot, keep: false } }
+      restoreRowsLocal(rows)
+      await onGroceryChanged?.()
     } else if (receipt.kind === 'grocery_item_added') {
       // §5.4/§2.5 — undoToken is a JSON-encoded list of {id, addedQuantity,
       // created} (one per item added this turn), since undoing a merge onto
@@ -8856,6 +8913,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                   {timerButtonLabel(suggestion)}
                                 </button>
                               )
+                              // "OPEN THE PLATE CALCULATOR" (his request 16 Nov 2026): under the app's own "Opened ..." line, a button
+                              // to open it again, read back from that line so it survives a reload.
+                              const openTarget = msg.role === 'assistant' ? openTargetInReply(msg.content) : null
+                              if (openTarget) return (
+                                <button
+                                  type="button"
+                                  data-testid="open-screen"
+                                  data-open-target={openTarget}
+                                  onClick={() => requestOpen(openTarget)}
+                                  className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-primary/60 px-3.5 text-[0.8125rem] font-medium text-primary-text"
+                                >
+                                  {openButtonLabel(openTarget)}
+                                </button>
+                              )
                               if (videos.length === 0) return timerButton
                               return (
                                 <div className="mt-2 flex flex-col items-start gap-1.5">
@@ -8977,7 +9048,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                     : msg.receipt.kind === 'memory_context_fact_saved' ? () => onOpenProfile?.('context')
                                     : undefined
                                   }
-                                  onViewGrocery={msg.receipt.kind === 'grocery_item_added' || msg.receipt.kind === 'grocery_day_added' ? onOpenGrocery : undefined}
+                                  onViewGrocery={msg.receipt.kind === 'grocery_item_added' || msg.receipt.kind === 'grocery_day_added' || msg.receipt.kind === 'grocery_item_removed' ? onOpenGrocery : undefined}
                                   onViewDashboard={msg.receipt.kind === 'water_logged' ? onOpenDashboard : undefined}
                                   onViewExercise={msg.receipt.kind === 'steps_logged' ? onOpenExercise : undefined}
                                   tone={msg.receipt.kind === 'water_logged' ? 'water' : undefined}

@@ -2008,6 +2008,19 @@ const toolDeclarations = [
     },
   },
   {
+    name: "remove_from_grocery_list",
+    description:
+      "Takes items OFF the user's grocery list altogether (his request 16 Nov 2026: 'add things and remove things from the grocery list'). Call when the user instructs a removal ('take the oats off my list', 'remove the milk and eggs', 'I don't need the rice, delete it'). Not for something they have BOUGHT: that is check_off_grocery_item. IMMEDIATE: the app removes it and the receipt carries an Undo.",
+    parameters: {
+      type: "object",
+      properties: {
+        origin_verbatim_quote: { type: "string", description: "Exact substring of the user's message instructing the removal." },
+        item_phrases: { type: "array", items: { type: "string" }, description: "Each item to remove, as the user named it." },
+      },
+      required: ["origin_verbatim_quote", "item_phrases"],
+    },
+  },
+  {
     name: "log_water",
     description:
       "Logs water intake (VISION-ARCHITECTURE.md §5.3/§5.4). IMMEDIATE, append-only — call the moment the user instructs a log ('log a glass of water', 'add 500ml of water', 'I just drank a bottle'). A mere statement about thirst or intent ('I should drink more water') without an instruction to log something now should get an offer instead, same as add_to_grocery_list.",
@@ -2959,6 +2972,8 @@ GROCERY LIST (VISION-ARCHITECTURE.md §5.4):
 - Call add_to_grocery_list the moment the user instructs an add. A mere statement ("we're out of eggs") without an instruction should get a plain-text offer instead ("Want me to add eggs to your list?"), never a silent call.
 - Call add_day_to_grocery_list when they ask to shop for a whole day's meals ("add Monday's meals to my list", "put tomorrow on the shopping list"), with that day's date from UPCOMING MEALS. Same rule: an instruction, not a statement.
 - Call check_off_grocery_item when the user instructs a check-off.
+- Call remove_from_grocery_list when the user tells you to take items OFF the list (not bought, just not wanted). Never send him to the list to delete it himself.
+- OPENING A SCREEN IS THE APP'S (his request 16 Nov 2026, "I want to be able to do everything from chat"): "open the plate calculator", "show me my session history", "take me to my program" are answered by the app before you see them, and it opens the screen. If one reaches you anyway, never give directions to a tab or a row ("go to Tools, tap ..."): say in one line what he will find there and that the app can open it if he says "open" and its name.
 - If the user asks what's on their list, answer directly from the snapshot below — do not call a tool for a read.
 ${context.grocery_list_summary ? `\nCURRENT GROCERY LIST:\n${context.grocery_list_summary}` : "\nCURRENT GROCERY LIST: empty."}
 
@@ -5261,7 +5276,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
         );
       }
 
-      if (name === "add_to_grocery_list" || name === "check_off_grocery_item" || name === "add_day_to_grocery_list") {
+      if (name === "add_to_grocery_list" || name === "check_off_grocery_item" || name === "add_day_to_grocery_list" || name === "remove_from_grocery_list") {
         // VISION-ARCHITECTURE.md §5.4 — the first IMMEDIATE-action chat
         // door with no confirmation card at all (append-only ⇒ Decision #1:
         // execute + receipt + undo). D2 gates it the same as record_fact:
