@@ -126,7 +126,9 @@ async function main() {
     for (const t of ['how do I brace my core', 'what should I eat for dinner', 'how do I stay motivated']) check(`"${t}": no video button`, formVideoFor(t, 'Some advice.') === null)
     check('"show me a video" with a reply holding only a web address: named from before, never from the address', formVideoFor('show me a video', 'Here is a great tutorial: www.youtube.com/watch?v=abc123', 'how do I do box jumps?')?.exercise === 'Box Jumps')
     // Each guard on a case where it alone decides (measured: a word search finds "Rear Delt Flyes" in "pressing on").
-    const prose = "Keep pressing on, you're doing well"
+    // Re-anchored 16 Nov 2026 (a hit must now contain each word as a word of its own, so "pressing on" names nothing at
+    // all): a reply that names a lift loosely, which a word search does find.
+    const prose = "Great squat work, you're doing well"
     check('...the coach\'s prose is not searched word by word: a reply of encouragement names nothing', exerciseNamedIn(prose) !== null && exerciseNamedIn(prose, { wholeNameOnly: true }) === null
       && formVideoFor('show me a video', prose, 'how do I do box jumps?')?.exercise === 'Box Jumps')
     check('...and a web address is not words ("com" is not a Compound Chest Press)', exerciseNamedIn('see www.example.com') === null)
@@ -151,6 +153,12 @@ async function main() {
     check('"todays workouts" (no apostrophe) is a request for the session too', sessionVideosFor(ask2, todays).length === todays.length, sessionVideosFor(ask2, todays).length)
     check('...and the session list comes BEFORE a lone exercise the coach\'s reply happened to name', chat.indexOf('sessionVideosFor(said[0], todayPlan') > 0 && chat.indexOf('sessionVideosFor(said[0], todayPlan') < chat.indexOf('formVideoFor(said[0], reply, said[1])'))
     check('...so with that reply a lone-exercise reading exists to be outranked', formVideoFor(ask2, 'guides for today\'s Push & Press session, like the Barbell Bench Press.')?.exercise === 'Barbell Bench Press')
+    // HIS THIRD SCREENSHOT, 16 Nov 2026: "all" found "Bodyweight Hip Hinge to Wall", "lift" found Deadlifts.
+    const ask3 = 'Actually, show me video for all todays lifts'
+    check('"show me video for all todays lifts" names no exercise ("all" is not "Wall", "lift" is not "Deadlifts")', exerciseNamedIn(ask3) === null, exerciseNamedIn(ask3))
+    check('...so it gets a button for each of today\'s exercises', sessionVideosFor(ask3, todays).length === todays.length, sessionVideosFor(ask3, todays).length)
+    check('a word inside a name is not that exercise ("out" is not Ab Wheel Rollout, "caps" not Scapular Pull-Ups)', exerciseNamedIn('show me a video, I want to work out') === null && exerciseNamedIn('show me videos for my caps') === null, [exerciseNamedIn('show me a video, I want to work out'), exerciseNamedIn('show me videos for my caps')])
+    check('...while "show me lunges" and "how do I do a barbell back squat" still find their lift', /lunge/i.test(exerciseNamedIn('show me lunges') ?? '') && /squat/i.test(exerciseNamedIn('how do I do a barbell back squat') ?? ''), [exerciseNamedIn('show me lunges'), exerciseNamedIn('how do I do a barbell back squat')])
     check('...and no more than eight buttons', sessionVideosFor(ask, Array.from({ length: 12 }, (_, i) => `Move ${i}`)).length === 8)
     const coach = fs.readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
     check('the coach is told never to type a link', /NEVER type a link or a web address/.test(coach) && !/youtube\.com\/results/.test(coach))

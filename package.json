@@ -32,6 +32,7 @@
     "sync:shared": "node scripts/sync-shared-code.mjs",
     "test:shared-code-sync": "node scripts/sync-shared-code.mjs --check",
     "test:live-test-nov14": "tsx scripts/test-live-test-nov14.ts",
+    "test:coach-intervals": "tsx scripts/test-coach-intervals.ts",
     "test:qa-training-nov14": "tsx scripts/test-qa-training-nov14.ts",
     "test:qa-meals-nov14": "tsx scripts/test-qa-meals-nov14.ts",
     "test:qa-batch3": "tsx scripts/test-qa-batch3.ts",

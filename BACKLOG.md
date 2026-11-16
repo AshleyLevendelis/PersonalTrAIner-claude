@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH'S INTERVALS START WITH ONE TAP (his request 16 Nov 2026)**: "When the coach suggests a timed workout,
+  like using an interval, it should offer to start the interval clock for you with just one button." A coach reply that
+  names the work, the rest AND the rounds ("30 seconds of jumping followed by 30 seconds of rest for 10 rounds") now
+  carries "Start the timer · 10 × 30s, 30s rest"; one tap starts the round timer at those numbers, full screen, on Tools
+  (with his own countdown lead-in; a round already running is opened, not replaced). Read by the APP off the coach's own
+  words (`parseIntervalSuggestion`), so no deploy: a total ("for 10 minutes") is never taken as the work, and a reply
+  missing any of the three gets no button ("Rest 90 seconds between sets", "3 sets of 10 with 60s rest", "Walk for 30
+  minutes"). Wording of the button is mine, inside his request. `test:coach-intervals` (14 checks; 7 mutations, 6
+  caught, the 7th removes a guard the types need and crashes), `verify:live-test-nov14` A12-A15 (2 mutations, both
+  caught). Not checked: a reply that words intervals some other way gets no button, which is the safe failure.
+- [x] **"VIDEOS FOR ALL MY LIFTS" GAVE ONE WARM-UP VIDEO (his report 16 Nov 2026)**. "Actually, show me video for all
+  todays lifts" matched a single catalogue entry off a stray word ("all" -> Wall, "lift" -> Deadlifts, "today's" ->
+  Scapular) and that one beat the session list. A named exercise now needs EVERY word asked to be in its name (a word
+  of 4+ letters may be the start of one), so a whole-session ask reaches all of today's lifts (up to 8 buttons), while
+  "lunges" and "barbell back squat" still find theirs. `test:live-test-nov14` (77 checks; the loose match restored is
+  caught 3 times), `verify:live-test-nov14`.
 - [x] **THE SAME EXERCISES ALL BLOCK; MAIN LIFTS FOR THE WHOLE PLAN; ACCESSORIES CHANGE AT A NEW BLOCK (his question 16 Nov
   2026, quoting Gemini; his ruling "All three as you suggest")**. MEASURED first, 108 seeded plans: main lifts kept 100%
   inside a block but only 45.5% into a new block; accessories kept 79.4% inside a block (new ones at week 3, and weeks 2

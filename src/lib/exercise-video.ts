@@ -37,11 +37,22 @@ export function exerciseNamedIn(text: string | null | undefined, opts: { wholeNa
   const words = t.trim().split(' ').filter(w => w.length > 1 && !STOP.has(w))
   for (let n = Math.min(3, words.length); n >= 1; n--) {
     for (let i = 0; i + n <= words.length; i++) {
-      const hit = searchExerciseCatalogByWords(words.slice(i, i + n).join(' '), 1)[0]
-      if (hit) return hit.name
+      const asked = words.slice(i, i + n)
+      const hit = searchExerciseCatalogByWords(asked.join(' '), 1)[0]
+      if (hit && namesEveryWord(hit.name, asked)) return hit.name
     }
   }
   return null
+}
+
+/**
+ * A SEARCH HIT MUST CONTAIN EVERY WORD HE SAID AS A WORD OF ITS OWN (his screenshot, 16 Nov 2026: "show me video for
+ * all todays lifts" found "Bodyweight Hip Hinge to Wall" by the "all" inside "Wall", and "lift" found Deadlifts, so a
+ * request for the whole session got one warm-up's button). "lunges" still finds Lunge, "back squat" Barbell Back Squat.
+ */
+function namesEveryWord(name: string, asked: string[]): boolean {
+  const tokens = singular(norm(name)).trim().split(' ')
+  return asked.every(w => tokens.some(t => t === w || (w.length >= 4 && t.startsWith(w))))
 }
 
 const STOP = new Set(['how', 'do', 'does', 'did', 'i', 'you', 'we', 'to', 'a', 'an', 'the', 'me', 'my', 'show', 'video', 'videos',

@@ -1605,6 +1605,10 @@ menu" stays true when a copy is also left outside it.
   say so. From the next day a surprising weigh-in is held as before. `test:weigh-in-targets` §13,
   `verify:setup-weight-correction`
 
+- **The coach's intervals start with one tap: his request 16 Nov 2026.** A coach reply naming work, rest and rounds
+  carries "Start the timer · 10 × 30s, 30s rest"; one tap starts the round timer at those numbers on Tools. Read off the
+  coach's words by the app; anything less specific gets no button. `test:coach-intervals`, `verify:live-test-nov14` A12-A15
+
 ### His rulings of 15 Nov 2026, the Marcus test (Wave M of `docs/plans/browser-test-nov15-plan.md`)
 - **An allergy refusal says where the setting is, never invites removing it: "Say where it's set"**. "Your nut-free
   setting is on Profile, under Food, Diet." REPLACES the "if you don't have a nut allergy, change it" half of his 18 Oct

@@ -40,6 +40,7 @@ await page.addInitScript(() => {
     if (String(url).includes('chat-gemini')) {
       const said = String(JSON.parse((init && init.body) || '{}').message || '')
       const reply = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })
+      if (/skipping rope/i.test(said)) return reply({ reply: 'Skipping rope is a great pick for 10 minutes! Try 30 seconds of jumping followed by 30 seconds of rest for 10 rounds.' })
       if (/box jumps/i.test(said)) return reply({ reply: '1. Stand a foot from the box.\n2. Swing your arms and jump.\n3. Land softly, then step down.' })
       if (/video/i.test(said)) return reply({ reply: 'Here is a great tutorial: www.youtube.com/watch?v=abc123' })
       if (/signed up for a 10k/i.test(said)) return reply({ reply: '', proposal: { kind: 'propose_running_goal', rawArgs: { goal: '10k', reason: 'Signed up for a 10k.' } } })
@@ -89,6 +90,21 @@ await shot('video-2')
 check('A9b. "I\'ve signed up for a 10k" with no date: the app asks when, and draws no Apply', await say("I've signed up for a 10k and I want to train for it")
   && await until(() => body(), b => /When is it\?/.test(b ?? '')).then(b => /When is it\?/.test(b ?? ''))
   && await page.evaluate(() => ![...document.querySelectorAll('button')].some(b => /^Apply/.test(b.textContent.trim()))))
+
+// HIS REQUEST, 16 Nov 2026: the coach suggests intervals, and one tap starts the round timer at those numbers.
+check('A12. "Skipping rope?" is sent', await say('Skipping rope?'))
+const tb = await until(() => page.evaluate(() => { const b = document.querySelector('[data-testid="start-intervals"]'); if (!b) return null; const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), h: Math.round(r.height) } }), v => !!v)
+check('A13. the reply carries a one-tap "Start the timer" at its own numbers, 10 × 30s with 30s rest', !!tb && tb.text === 'Start the timer · 10 × 30s, 30s rest' && tb.h >= 44, tb)
+await shot('intervals-button')
+await page.locator('[data-testid="start-intervals"]').first().click({ timeout: 6000 }).catch(() => {})
+await wait(800)
+const started = await page.evaluate(() => {
+  const key = Object.keys(localStorage).find(k => k.startsWith('fitplan_timers_v1:'))
+  const rec = key ? JSON.parse(localStorage.getItem(key) || 'null') : null
+  return { hash: location.hash, mode: rec?.mode ?? null, config: rec?.roundConfig ?? null }
+})
+check('A14. ...and tapping it starts the round timer at those numbers and opens Tools', started.mode === 'round' && started.config?.rounds === 10 && started.config?.workSeconds === 30 && started.config?.restSeconds === 30 && /tools/.test(started.hash), started)
+check('A15. a reply with no intervals in it carries no timer button', await page.evaluate(() => [...document.querySelectorAll('[data-testid="start-intervals"]')].length === 1))
 
 // A long change row: the offer's own row, with the two halves given his screenshot's lengths.
 await page.goto(`${origin}/.tour-harness/chat.html?day=mid&n=2`)
