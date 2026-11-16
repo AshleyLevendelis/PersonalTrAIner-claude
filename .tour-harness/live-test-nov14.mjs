@@ -94,7 +94,7 @@ check('A9b. "I\'ve signed up for a 10k" with no date: the app asks when, and dra
 // HIS REQUEST, 16 Nov 2026: the coach suggests intervals, and one tap starts the round timer at those numbers.
 check('A12. "Skipping rope?" is sent', await say('Skipping rope?'))
 const tb = await until(() => page.evaluate(() => { const b = document.querySelector('[data-testid="start-intervals"]'); if (!b) return null; const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), h: Math.round(r.height) } }), v => !!v)
-check('A13. the reply carries a one-tap "Start the timer" at its own numbers, 10 × 30s with 30s rest', !!tb && tb.text === 'Start the timer · 10 × 30s, 30s rest' && tb.h >= 44, tb)
+check('A13. the reply carries a one-tap "Start the timer" at its own numbers, 10 × 30s with 30s rest', !!tb && /^10 × 30s, 30s rest · Start (now|· \d+s countdown)$/.test(tb.text) && tb.h >= 44, tb)
 await shot('intervals-button')
 await page.locator('[data-testid="start-intervals"]').first().click({ timeout: 6000 }).catch(() => {})
 await wait(800)
