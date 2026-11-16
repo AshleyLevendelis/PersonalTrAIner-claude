@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **AND IT LOOKS BACK, NOT ONLY AHEAD: his follow-up 16 Nov 2026, "Ahead and before"**. The coach now reads the last
+  two days (the plan's done marks, the workout and cardio logs) as well as today and the next two. Mine (CSCS): two hard
+  days on the same muscles back to back is what to avoid, whichever way round; heavy legs yesterday makes hard running
+  or another heavy leg day today riskier and less useful, so it names yesterday's session and gives the easier option.
+  New exam case `hard-run-after-heavy-legs` (hill sprints the morning after heavy squats). `test:answer-first`
+  35 checks, 2 more mutations caught. Same caveat: proven only when the exam runs after the `chat-gemini` deploy.
 - [x] **THE COACH WEIGHS WHAT IS COMING UP BEFORE IT SAYS YES (his request 16 Nov 2026)**. His words: "if I ask should I
   run 15k tonight but I have a heavy leg session planned for tomorrow morning, I don't want the chat to just say yeah go
   for it." Measured: the coach already receives the whole week, today and tomorrow labelled, with each session's

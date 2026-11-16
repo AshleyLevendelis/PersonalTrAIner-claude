@@ -53,11 +53,12 @@ async function main() {
     answerProblem('Not tonight: you have heavy legs tomorrow. Keep it to an easy 30 minutes and save the 15k for Saturday.') === null)
   check('the coach is told to answer, claim nothing, keep the offer\'s figures out and ask nothing',
     /Answer his question/.test(ANSWER_FIRST_NUDGE) && /Do not say you have done/.test(ANSWER_FIRST_NUDGE) && /Do not write calories, grams/.test(ANSWER_FIRST_NUDGE) && /Do not ask a question/.test(ANSWER_FIRST_NUDGE))
-  check('...and to read today and the next two days of his plan first, and name what a change would cost',
-    /read his plan for today and the next two days/.test(ANSWER_FIRST_NUDGE) && /say so by name/.test(ANSWER_FIRST_NUDGE))
+  check('...and to read both ways first (the last two days and the next two, his "Ahead and before"), and name what a change would cost',
+    /read both ways/.test(ANSWER_FIRST_NUDGE) && /last two days/.test(ANSWER_FIRST_NUDGE) && /next two days/.test(ANSWER_FIRST_NUDGE) && /say so by name/.test(ANSWER_FIRST_NUDGE))
   const prompt = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
   check('the coach\'s instructions say what is coming up decides the answer, his 15k example included',
     /WHAT IS COMING UP DECIDES THE ANSWER/.test(prompt) && /run 15k tonight/.test(prompt) && /never just say yes/.test(prompt) && /His goal decides which one gives way/.test(prompt))
+  check('...and that it looks back as well as ahead (his "Ahead and before")', /read BOTH WAYS/.test(prompt) && /Looking back counts as much as looking ahead/.test(prompt) && /back to back/.test(prompt))
 
   console.log('\n3. The step, end to end, against a fake coach')
   const offer = (extra: Record<string, unknown> = {}) => new Response(JSON.stringify({ reply: '', proposal: { kind: 'propose_exercise_swap', rawArgs: {} }, ...extra }), { headers: { 'Content-Type': 'application/json' } })

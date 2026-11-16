@@ -1606,9 +1606,9 @@ menu" stays true when a copy is also left outside it.
   `verify:setup-weight-correction`
 
 - **What is coming up decides the coach's answer: his request 16 Nov 2026** ("should I run 15k tonight" with heavy legs
-  tomorrow must not get "go for it"): the coach reads today and the next two days before saying yes to extra work or a
+  tomorrow must not get "go for it"): the coach reads the last two days, today and the next two (his "Ahead and before") before saying yes to extra work or a
   change, names the session it would cost and gives the better option; a running goal puts the run first, otherwise
-  the plan does (CSCS). Prompt section 3b0, `test:answer-first`, exam case `run-before-heavy-legs`. Unproven until the
+  the plan does (CSCS). Prompt section 3b0, `test:answer-first`, exam cases `run-before-heavy-legs`, `hard-run-after-heavy-legs`. Unproven until the
   exam runs after the `chat-gemini` deploy
 - **A question gets its answer, then the offer: his ruling 16 Nov 2026, "Answer, then offer"**: when he ASKS and the
   coach reaches for a change, one or two lines of answer (yes or no and why; no number, no claim, no question) sit above

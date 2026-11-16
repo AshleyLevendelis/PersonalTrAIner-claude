@@ -30,8 +30,9 @@ export function askedAQuestion(message: string): boolean {
 export const ANSWER_FIRST_NUDGE =
   "He ASKED a question; he did not ask you to do anything yet. Nothing has been changed. Answer his question in one " +
   "or two short sentences, the way a coach would text it: yes or no (or which), and the main reason, from what you " +
-  "know about him and his plan. FIRST read his plan for today and the next two days and what he has done today: if the " +
-  "change would cost an upcoming session (a long or hard run the night before heavy legs, say), say so by name, and " +
+  "know about him and his plan. FIRST read both ways: what he did over the last two days and today (the plan's done " +
+  "marks and his logs), and his plan for the next two days. If the change would pile onto tired legs or cost an " +
+  "upcoming session (a long or hard run the night before heavy legs, or the day after them, say), say so by name, and " +
   "the better option. Do not say you have done, changed, added or swapped anything. Do not write calories, grams, " +
   "weights, sets or reps: the offer's numbers are the app's. Do not ask a question and do not offer to do it: the app " +
   "shows him an offer with Apply and Not now right under your answer.";
