@@ -233,8 +233,11 @@ console.log('\n1. The libraries are cached separately from the app')
   // MOVED 15 Nov 2026: his 14 Nov rulings (pause, red-flag quiet, pregnancy rules, dislike ask, UK packs) took it to
   // 425, and the pre-merge sweep's fixes (UK packs in swap groups, "crisp" read as cooking) to 426: MEASURED 426 through
   // this gate on the change. The other three were raised the same day and have room. "Raise it with room to grow": 8 gz.
-  headroom('a deploy re-downloads', appGzip, 434, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, under 434`, appGzip < 434, appGzip)
+  // MOVED 16 Nov 2026: the coach batch of his 16 Nov requests (timers from the chat, "how much should I have", answer
+  // then offer, open any screen from the chat, take things off the list) took it to 434: MEASURED 434 through this gate
+  // on cec97249. His 15 Sep ruling, "raise it with room to grow": 8 gz over today.
+  headroom('a deploy re-downloads', appGzip, 442, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, under 442`, appGzip < 442, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -741,7 +744,9 @@ console.log('\n3. Nothing has crept back up')
   // ruling, "raise it with room to grow": 25 kB raw over today's number.
   // MOVED 15 Nov 2026: 3022 -> 3051, pregnancy as one switch and the sharp-pain Pause; MEASURED on a clean worktree of
   // e373e3b8: 3026. His 15 Sep ruling: 25 kB raw over today's number.
-  const TOTAL_BUDGET_KB = 3051
+  // MOVED 16 Nov 2026: 3051 -> 3080, the same 16 Nov coach batch; MEASURED 3055 through this gate on cec97249. His
+  // 15 Sep ruling: 25 kB raw over today's number.
+  const TOTAL_BUDGET_KB = 3080
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

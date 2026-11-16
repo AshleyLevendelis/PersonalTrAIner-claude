@@ -236,7 +236,7 @@ async function main() {
     check('...and only the arms that write their own card (the day swap, the calorie move) end as "handled" (plus the no-Undo guard)', (core.match(/return 'handled'/g) ?? []).length === 3
       && (core.match(/setMessages\([\s\S]{0,1200}?\)\)\s*\n\s*return 'handled'/g) ?? []).length === 2 && /return \(!receipt\?\.undoToken \|\| !profile\.id\) return 'handled'|if \(!receipt\?\.undoToken \|\| !profile\.id\) return 'handled'/.test(core) && /setMessages\([\s\S]{0,900}\)\)\s*\n\s*return 'handled'/.test(core), (core.match(/return 'handled'/g) ?? []).length)
     check('...the bare-return detector fires on a bare return', (/\breturn\s*(?:\n|\/\/|\}|$)/.test('if (x) return\n')))
-    check('...a window that has passed is said, not swallowed', (core.match(/if \(!isWithinUndoWindow\([^)]*\)\) return \{ refused: RECEIPTS_UNDONE\.tooLate, keep: false \}/g) ?? []).length === 7)
+    check('...a window that has passed is said, not swallowed', (core.match(/if \(!isWithinUndoWindow\([^)]*\)\) return \{ refused: RECEIPTS_UNDONE\.tooLate, keep: false \}/g) ?? []).length === 8)
     const wrapAt = chat.indexOf('const handleUndoReceipt = async')
     const wrap = wrapAt >= 0 ? chat.slice(wrapAt, chat.indexOf('const isInterrupted', wrapAt)) : ''
     check('the wrapper catches a throw and says the undo failed', /catch \(err\) \{[\s\S]{0,120}out = \{ refused: RECEIPTS_UNDONE\.failed, keep: true \}/.test(wrap))

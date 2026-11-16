@@ -21,6 +21,10 @@ Newest first. One line each.
   would have deleted them again; a check now holds the direction. `test:open-from-chat` (50 checks, 13 mutations, all
   caught, one only after a long message was added), `verify:live-test-nov14` A31-A35, `verify:tools-2a` §7 (1 mutation,
   caught). Needs the `chat-gemini` deploy for the remove tool and the coach line; opening works without it.
+  Related-checks run on cec97249: 333 of 338; `test:meal-quality` environmental; four were gates counting the old
+  set (the grocery tools' list in `test:meal-days`, the append kinds in `test:pending-actions`, the Undo guards in
+  `test:rebuild-honours`, now 8) and the bundle (re-download 434 kB measured, budget 442; total 3,055 measured, budget
+  3,080, his "room to grow").
 - [x] **AND IT LOOKS BACK, NOT ONLY AHEAD: his follow-up 16 Nov 2026, "Ahead and before"**. The coach now reads the last
   two days (the plan's done marks, the workout and cardio logs) as well as today and the next two. Mine (CSCS): two hard
   days on the same muscles back to back is what to avoid, whichever way round; heavy legs yesterday makes hard running
