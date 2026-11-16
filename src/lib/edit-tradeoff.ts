@@ -221,8 +221,8 @@ export function scoreDrop(
   exclusions?: string[],
 ): ScoreDrop | null {
   const key = `tradeoff:${profile.id ?? 'anon'}`
-  const b = scorePlan(profile, before, key, { skipComparisons: true, exclusions })
-  const a = scorePlan(profile, after, key, { skipComparisons: true, exclusions })
+  const b = scorePlan(profile, before, key, { skipComparisons: true, skipConsistency: true, exclusions })
+  const a = scorePlan(profile, after, key, { skipComparisons: true, skipConsistency: true, exclusions })
   let worst: ScoreDrop | null = null
   for (const dimension of DIMENSION_KEYS) {
     const lost = b.dimensions[dimension].points - a.dimensions[dimension].points

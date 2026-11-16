@@ -220,6 +220,15 @@ const EFFORT_PLAN_AGE = EFFORT === 'deload' ? 23 : EFFORT === 'back' ? 30 : EFFO
 // chosen here; what the card makes of it is the app's.
 const AWAY = Math.max(0, Number(new URLSearchParams(location.search).get('away') ?? '0') || 0)
 const ABSURD = new URLSearchParams(location.search).get('absurd') === '1'
+// The plan is made N+9 days ago so it is past its first week, and moved a week further back when that would put today in a
+// DELOAD week (every 4th): a deload's lighter loads are not "last time's weight", so a break measured on one tests the
+// deload, not the break. Found 16 Nov 2026: away=12 lands in week 4, and once exercises stopped changing inside a block
+// (his ruling that day) week 4's row was the same light 10kg row, under the fixture's 10kg floor, so no target existed.
+function awayPlanAge(away: number): number {
+  let age = away + 9
+  while ((Math.floor(age / 7) + 1) % 4 === 0) age += 7
+  return age
+}
 const LEG_CURL = new URLSearchParams(location.search).get('legcurl') === '1'
 // ?offstyle=1 — A FULL GYM AND A FUNCTIONAL TRAINEE, which is the only pairing
 // where the swap shortlist has anything to demote. Ashley, 18 Sep 2026: offered
@@ -336,7 +345,7 @@ const profile: UserProfile = {
   // NINE DAYS OLD, not today: a plan created today has no elapsed
   // scheduled days, so the consistency score correctly shows nothing and the
   // harness could never see it render.
-  created_at: EFFORT_PLAN_AGE > 0 ? (() => { const d = daysAgo(EFFORT_PLAN_AGE); d.setHours(8, 0, 0, 0); return d.toISOString() })() : AWAY > 0 ? (() => { const d = daysAgo(AWAY + 9); d.setHours(8, 0, 0, 0); return d.toISOString() })() : THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - (JOINED_TODAY ? 0 : 9) * 86400000).toISOString(),
+  created_at: EFFORT_PLAN_AGE > 0 ? (() => { const d = daysAgo(EFFORT_PLAN_AGE); d.setHours(8, 0, 0, 0); return d.toISOString() })() : AWAY > 0 ? (() => { const d = daysAgo(awayPlanAge(AWAY)); d.setHours(8, 0, 0, 0); return d.toISOString() })() : THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - (JOINED_TODAY ? 0 : 9) * 86400000).toISOString(),
   ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
   ...(RUNNER ? { running_goal: '5k', running_base_minutes: 30 } : {}),
 } as UserProfile

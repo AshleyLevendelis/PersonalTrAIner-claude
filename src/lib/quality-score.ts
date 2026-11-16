@@ -764,7 +764,7 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
 const PUSH_PATTERNS = new Set(['push'])
 const PULL_PATTERNS = new Set(['pull'])
 
-function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclusions: string[] = []): DimensionResult {
+function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclusions: string[] = [], skipConsistency = false): DimensionResult {
   const block1 = mesocycle.filter(w => w.block_number === 1).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
   const [w1, w2, w3] = block1
   const week1 = mesocycle.find(w => w.week_number === 1)
@@ -792,9 +792,11 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
     // plan whose accessories did NOT change at week 3: the score now rewards the opposite, so Selection scores from
     // before 16 Nov 2026 are not comparable.
     // (1) No exercise changes name inside any block, on the same day and slot, week to week.
+    // A PERSON'S OWN EDIT is not a plan that rotates: "just today" swaps one week by design, and a swap he asked for is
+    // never marked down for changing what he asked to change (skipConsistency, the trade-off engine's option).
     const byNumber = new Map(mesocycle.map(w => [w.week_number, w]))
     let changedInBlock: string | null = null
-    for (const w of mesocycle) {
+    if (!skipConsistency) for (const w of mesocycle) {
       const prev = byNumber.get(w.week_number - 1)
       if (!prev || prev.block_number !== w.block_number) continue
       for (const day of w.days) {
@@ -813,7 +815,7 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
     // (2) Each day's main lift is the same in the first week of every block.
     const firstWeeks = mesocycle.filter(w => (w.week_in_block ?? 1) === 1).sort((a, b) => a.week_number - b.week_number)
     let mainChanged: string | null = null
-    if (week1) for (const day of week1.days) {
+    if (week1 && !skipConsistency) for (const day of week1.days) {
       const main = day.exercises.find(ex => ex.tier === 'tier_1_primary')?.name
       if (!main) continue
       for (const fw of firstWeeks) {
@@ -1349,6 +1351,12 @@ export interface ScoreOptions {
    */
   skipComparisons?: boolean
   /**
+   * Skip the two "same exercises all block, same main lifts all plan" rules (his ruling 16 Nov 2026). Those judge a
+   * GENERATED plan; a swap or removal he asks for changes an exercise by definition, and the trade-off engine must not
+   * call that a cost. Deltas only, like skipComparisons.
+   */
+  skipConsistency?: boolean
+  /**
    * The trainee's own banned exercises — ADDED 22 Sep 2026. Every peer pool
    * scoreSelection builds used to hardcode `[]` here, so a trainee who had
    * banned every loaded option in a pattern could be marked down for the
@@ -1368,7 +1376,7 @@ export function scorePlan(profile: UserProfile, mesocycle: MesocycleWeek[], comb
     timeFit: scoreTimeFit(profile, mesocycle),
     structure: scoreStructure(mesocycle, profile),
     progression: scoreProgression(profile, mesocycle),
-    selection: scoreSelection(profile, mesocycle, opts?.exclusions ?? []),
+    selection: scoreSelection(profile, mesocycle, opts?.exclusions ?? [], opts?.skipConsistency === true),
     goalAlignment: scoreGoalAlignment(profile, mesocycle, comboKey, opts),
     primerFit: scorePrimerFit(profile, mesocycle),
   }

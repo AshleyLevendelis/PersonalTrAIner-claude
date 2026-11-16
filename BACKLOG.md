@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [x] **THE SAME-EXERCISES RULE MARKED HIS OWN SWAPS DOWN (full sweep, 16 Nov 2026)**. The new score rule "an exercise
+  changed inside a block" also fired on a swap he ASKS for, so the swap card warned "the week stops covering everything
+  it should" for a free accessory swap (`test:edit-tradeoff`, `verify:swap-request` 4f-4g). The rule judges a generated
+  plan; the trade-off engine now scores with the two consistency rules off (`skipConsistency`), so a change he asked for
+  is never a cost for being a change. Generated-plan scores are unchanged (the option defaults off). Mutation (option
+  removed) caught. Two checks followed the ruling rather than the app: `test:per-side-load` looked for mid-block
+  rotations, which no longer exist, and now checks every change between loading weeks, block boundaries included (314
+  rotations, all priced fresh); `verify:layoff`'s 12-days-away case landed today in a deload week whose row is now the
+  same light 10kg row, under the fixture's floor, so the fixture moves a plan that would start in a deload one week
+  back (an input, the app untouched). `test:coach-exam-fresh` is red for the known reason: the coach changed and the
+  exam must be re-run on his machine.
 - [x] **THE COACH'S INTERVALS START WITH ONE TAP (his request 16 Nov 2026)**: "When the coach suggests a timed workout,
   like using an interval, it should offer to start the interval clock for you with just one button." A coach reply that
   names the work, the rest AND the rounds ("30 seconds of jumping followed by 30 seconds of rest for 10 rounds") now
