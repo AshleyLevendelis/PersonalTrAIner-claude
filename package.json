@@ -650,7 +650,8 @@
     "test:exercise-consistency": "tsx scripts/test-exercise-consistency.ts",
     "test:answer-first": "tsx scripts/test-answer-first.ts",
     "test:open-from-chat": "tsx scripts/test-open-from-chat.ts",
-    "test:meal-like-offer": "tsx scripts/test-meal-like-offer.ts"
+    "test:meal-like-offer": "tsx scripts/test-meal-like-offer.ts",
+    "test:home-next-session": "tsx scripts/test-home-next-session.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
