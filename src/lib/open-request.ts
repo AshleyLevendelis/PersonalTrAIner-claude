@@ -31,7 +31,8 @@ export const OPEN_TARGET_NAME: Record<OpenTarget, string> = {
 
 // Longest names first within each, so "session history" wins over a bare "history" and "shopping list" over "list".
 const TARGET_WORDS: [OpenTarget, RegExp][] = [
-  ['plate', /\bplate(?:s)?\s*(?:calculator|calc|loader|maths?)\b|\bplate calculator\b/],
+  // The only calculator in the app, so "open the calculator at 120kg" is the plate calculator (his live test, 16 Nov).
+  ['plate', /\bplate(?:s)?\s*(?:calculator|calc|loader|maths?)\b|\bplate calculator\b|\b(?<!calorie |macro |tdee )(?:calculator|calc)\b/],
   ['history', /\b(?:(?:recent|past|last|previous|my)\s+)*(?:session|workout|training)\s+(?:history|log)s?\b|\bhistory\b|\bpast (?:sessions|workouts)\b|\brecent (?:sessions|workouts)\b/],
   ['grocery', /\b(?:grocery|groceries|shopping)(?:\s+list)?\b/],
   ['program', /\b(?:program(?:me)?|training plan|full plan|plan for the (?:block|weeks?))\b/],
@@ -53,15 +54,20 @@ export function parseOpenRequest(text: string): { target: OpenTarget; kg: number
   // "show me how to squat", "can you see my knee": the verb alone is not enough, a screen must be named.
   for (const [target, words] of TARGET_WORDS) {
     if (!words.test(t)) continue
-    const kgMatch = target === 'plate' ? /(\d{2,3}(?:\.\d)?)\s*(?:kg|kilos?)\b/.exec(t) : null
-    return { target, kg: kgMatch ? Number(kgMatch[1]) : null }
+    return { target, kg: target === 'plate' ? kgInText(t) : null }
   }
   return null
 }
 
-/** The app's own line when it opens a screen. */
-export function openedLine(target: OpenTarget): string {
-  return `Opened ${OPEN_TARGET_NAME[target]}.`
+/** A weight named in a message ("at 120kg", "100 kilos"), or null. */
+export function kgInText(text: string): number | null {
+  const m = /(\d{1,3}(?:\.\d+)?)\s*(?:kg|kilos?)\b/i.exec(text ?? '')
+  return m ? Number(m[1]) : null
+}
+
+/** The app's own line when it opens a screen. The plate calculator's weight is in it, so the button reopens there. */
+export function openedLine(target: OpenTarget, kg: number | null = null): string {
+  return target === 'plate' && kg ? `Opened ${OPEN_TARGET_NAME[target]} at ${kg} kg.` : `Opened ${OPEN_TARGET_NAME[target]}.`
 }
 
 /** The button under that line. */
@@ -69,13 +75,14 @@ export function openButtonLabel(target: OpenTarget): string {
   return `Open ${OPEN_TARGET_NAME[target]}`
 }
 
-/** Read the app's own line back (after a reload), so the button comes back with it. */
-export function openTargetInReply(content: string): OpenTarget | null {
+/** Read the app's own line back (after a reload), so the button comes back with it, at the same weight. */
+export function openTargetInReply(content: string): { target: OpenTarget; kg: number | null } | null {
   const t = (content ?? '').trim()
   for (const target of Object.keys(OPEN_TARGET_NAME) as OpenTarget[]) {
-    if (t === openedLine(target)) return target
+    if (t === openedLine(target)) return { target, kg: null }
   }
-  return null
+  const atKg = /^Opened the plate calculator at (\d{1,3}(?:\.\d+)?) kg\.$/.exec(t)
+  return atKg ? { target: 'plate', kg: Number(atKg[1]) } : null
 }
 
 // --- the channel -------------------------------------------------------------------------------------------------

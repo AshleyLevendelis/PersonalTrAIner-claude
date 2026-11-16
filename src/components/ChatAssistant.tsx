@@ -19,7 +19,8 @@ import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, Mes
 import { formVideoFor, linkifyBareUrls, sessionVideosFor } from '@/lib/exercise-video'
 import { parseTimerSuggestion, type TimerSuggestion } from '@/lib/timer-engine'
 import { startLabel } from '@/lib/round-setup'
-import { openButtonLabel, openTargetInReply, openedLine, parseOpenRequest, requestOpen } from '@/lib/open-request'
+import { MEAL_LIKE_OFFER, datesLabel, wholeMealLike } from '@/lib/meal-like-offer'
+import { kgInText, openButtonLabel, openTargetInReply, openedLine, parseOpenRequest, requestOpen } from '@/lib/open-request'
 import { useTimers } from '@/hooks/useTimers'
 import { chatContextPills } from '@/lib/chat-context-strip'
 import { useShowNumbers } from '@/lib/show-numbers'
@@ -38,7 +39,7 @@ import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach } from
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, waitingOnAnswer, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { weeklyAverage, weeklyAverageLine, finishedDaysThisWeek } from '@/lib/weekly-average'
-import { swapPoolMeal, setMealPick, recordMealEvent, getEatenByDate, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
+import { swapPoolMeal, setMealPick, getMealPicksForDate, clearMealPick, recordMealEvent, getEatenByDate, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
 import { buildCoachEatenSummary, eatenWindow } from '@/lib/coach-eaten'
 import { buildCoachWeekReview, weekReviewDates } from '@/lib/coach-week-review'
 import { changeSinceStart } from '@/lib/weight-trend'
@@ -6780,7 +6781,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       if (result.memoryIntent.tool === 'record_fact' && args?.kind === 'food_preference' && args?.polarity !== 'like' && toAsk.length > 0) {
         return { text: DISLIKE_ASK.turn(toAsk) }
       }
-      return textBesideSave(await resolveAndSaveMemory(result.memoryIntent), result.reply)
+      const saved = textBesideSave(await resolveAndSaveMemory(result.memoryIntent), result.reply)
+      // A MEAL HE LIKES CAN GO IN THE PLAN (16 Nov 2026): a like that is a whole meal for a named meal is followed by the
+      // app's offer, with buttons. Each button is his instruction to the add-a-meal route, so nothing is written here.
+      const likedMeal = result.memoryIntent.tool === 'record_fact' && args?.kind === 'food_preference' && args?.polarity === 'like' ? wholeMealLike(userSaid ?? '') : null
+      if (likedMeal && saved.receipt) return { ...saved, text: [saved.text?.trim(), MEAL_LIKE_OFFER.turn(likedMeal.meal, likedMeal.slot)].filter(Boolean).join('\n\n') }
+      return saved
     }
     if (result.groceryIntent) {
       return resolveAndSaveGrocery(result.groceryIntent)
@@ -6985,13 +6991,27 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // ask to open a screen is the app's to answer, at once, with no coach call. The coach had answered with directions
     // to the Tools tab, the one thing the app promises never to do. The screen opens; the chat keeps a line and a
     // button to open it again.
+    // "JUST REMEMBER IT" (16 Nov 2026): the answer to the app's own offer after a meal he likes. The like is already saved;
+    // the app says so, and nothing else happens. No coach call.
+    if (userText.trim() === MEAL_LIKE_OFFER.justRemember) {
+      persistUserMessage(userText)
+      const lineId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : undefined
+      setMessages(prev => [...prev, { id: lineId, role: 'assistant' as const, content: MEAL_LIKE_OFFER.remembered, status: 'complete' as const, created_at: new Date().toISOString() }])
+      if (profile.id) void supabase.from('chat_messages').insert({ ...(lineId ? { id: lineId } : {}), profile_id: profile.id, role: 'assistant', content: MEAL_LIKE_OFFER.remembered, status: 'complete' })
+        .then(({ error }) => { if (error) console.error('meal like: the line was not saved', error) })
+      return
+    }
+
     const openAsk = parseOpenRequest(userText)
     if (openAsk) {
       persistUserMessage(userText)
-      const line = openedLine(openAsk.target)
-      setMessages(prev => [...prev, { role: 'assistant' as const, content: line, status: 'complete' as const }])
+      const line = openedLine(openAsk.target, openAsk.kg)
+      // THE LINE CARRIES ITS SAVED ROW'S ID FROM THE START (his live test, 16 Nov: every line showed twice). A line with
+      // no id was unknown to the history re-read, which added the saved copy beside it.
+      const lineId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : undefined
+      setMessages(prev => [...prev, { id: lineId, role: 'assistant' as const, content: line, status: 'complete' as const, created_at: new Date().toISOString() }])
       if (profile.id) {
-        void supabase.from('chat_messages').insert({ profile_id: profile.id, role: 'assistant', content: line, status: 'complete' })
+        void supabase.from('chat_messages').insert({ ...(lineId ? { id: lineId } : {}), profile_id: profile.id, role: 'assistant', content: line, status: 'complete' })
           .then(({ error }) => { if (error) console.error('open request: the line was not saved', error) })
       }
       requestOpen(openAsk.target, openAsk.kg)
@@ -7033,6 +7053,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         || dislikeFact(result.proposal?.kind, result.proposal?.rawArgs as Record<string, unknown> | undefined)
       const processed = await processResponse(result, userText)
       responseText = processed.text
+      // A COACH REPLY WEARING THE APP'S "Opened ..." LINE IS MADE TRUE (his live test, 16 Nov): the coach copied the line
+      // from the chat above and nothing opened. The screen opens now, at the weight he named.
+      const mimic = openTargetInReply(responseText)
+      if (mimic && !processed.action && !processed.pendingAction) {
+        const kg = mimic.kg ?? (mimic.target === 'plate' ? kgInText(userText) : null)
+        responseText = openedLine(mimic.target, kg)
+        requestOpen(mimic.target, kg)
+      }
       action = processed.action
       pendingAction = processed.pendingAction
       receipt = processed.receipt
@@ -7503,6 +7531,18 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         try { await setMealPick(editProfileId, p.date, p.slot, p.option.name); return true } catch { return false }
       })
       receipt = result.receipt
+      // EVERY DAY, WHEN ASKED (16 Nov 2026, "every breakfast this week"): the one option is picked for each later day by the
+      // same path an upcoming day's pick takes. A day that does not save is said, never passed over.
+      if (receipt.failed.length === 0 && payload.alsoDates?.length) {
+        for (const d of payload.alsoDates) {
+          let saved = false
+          try {
+            saved = onUpcomingMealPickApplied ? await onUpcomingMealPickApplied(d, payload.slot, payload.option.name) : (await setMealPick(editProfileId, d, payload.slot, payload.option.name), true)
+          } catch { saved = false }
+          if (saved) receipt.landed.push(`${payload.slot} ${d}: ${payload.option.name}`)
+          else receipt.failed.push({ op: 'save', error: `${payload.option.name} didn't go in for ${datesLabel([d])}. Try again in a moment.` })
+        }
+      }
       const ok = receipt.failed.length === 0
       const EDIT_TITLES: Partial<Record<typeof row.kind, string>> = {
         propose_custom_meal: 'Set as your meal',
@@ -8514,6 +8554,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         if (!(await undoEatenCorrection(profile.id, payload))) return { refused: RECEIPTS_UNDONE.failed, keep: true }
         const removed = await undoMealAddition(profile.id, payload)
         if (!removed) return { refused: RECEIPTS_UNDONE.failed, keep: true }
+        // The later days it was put in come off too, where they still hold it.
+        for (const d of payload.alsoDates ?? []) {
+          const picks = await getMealPicksForDate(profile.id, d)
+          if (picks[payload.slot] === payload.option.name && !(await clearMealPick(profile.id, d, payload.slot))) return { refused: RECEIPTS_UNDONE.failed, keep: true }
+        }
         // Nothing to restore as the on-screen pick: the slot had whatever
         // assembleDay chose before this, and clearing the pick is what makes
         // the Nutrition tab fall back to it. onMealSwapApplied can't express
@@ -8915,16 +8960,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                               )
                               // "OPEN THE PLATE CALCULATOR" (his request 16 Nov 2026): under the app's own "Opened ..." line, a button
                               // to open it again, read back from that line so it survives a reload.
-                              const openTarget = msg.role === 'assistant' ? openTargetInReply(msg.content) : null
-                              if (openTarget) return (
+                              const opened = msg.role === 'assistant' ? openTargetInReply(msg.content) : null
+                              if (opened) return (
                                 <button
                                   type="button"
                                   data-testid="open-screen"
-                                  data-open-target={openTarget}
-                                  onClick={() => requestOpen(openTarget)}
+                                  data-open-target={opened.target}
+                                  onClick={() => requestOpen(opened.target, opened.kg)}
                                   className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-primary/60 px-3.5 text-[0.8125rem] font-medium text-primary-text"
                                 >
-                                  {openButtonLabel(openTarget)}
+                                  {openButtonLabel(opened.target)}
                                 </button>
                               )
                               if (videos.length === 0) return timerButton

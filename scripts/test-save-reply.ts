@@ -44,7 +44,7 @@ async function main() {
   check("the app's question back wins when nothing was saved", textBesideSave(asked, 'That sounds hard.').text === asked.text)
   check("the coach's words fill a save that returned nothing", textBesideSave({ text: '' }, 'That sounds hard.').text === 'That sounds hard.')
   const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
-  check('the chat routes every memory save through it, with the reply the server sent', /if \(result\.memoryIntent\) \{[\s\S]{0,900}?return textBesideSave\(await resolveAndSaveMemory\(result\.memoryIntent\), result\.reply\)/.test(chat))
+  check('the chat routes every memory save through it, with the reply the server sent', /if \(result\.memoryIntent\) \{[\s\S]{0,900}?(?:return|const saved =) textBesideSave\(await resolveAndSaveMemory\(result\.memoryIntent\), result\.reply\)/.test(chat))
 
   console.log('\n2. What the reply may say')
   const banned = ['Saved to memory.', "I've recorded that.", 'Added that to your profile.', "I've noted it.", 'I saved that in your memory.']

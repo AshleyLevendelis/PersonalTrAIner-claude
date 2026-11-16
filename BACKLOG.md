@@ -2,6 +2,39 @@
 
 Newest first. One line each.
 
+- [x] **A MEAL HE LIKES REACHES THE PLAN (16 Nov 2026, step 1 of his meal-planning brief; his "Implement the meal plan fix").**
+  His screenshot: "I like having greek yoghurt with fruit and almonds for breakfast" was saved as a like and nothing on
+  the plan moved. Traced: a like is only a ranking key over dishes the plan already has; with no dish containing those
+  foods it changes nothing he can see, and the coach's add-a-meal tool took one date only. Now: a like that is a WHOLE
+  meal for a named meal of the day ("X with Y for breakfast"; one food is a like, a question is not) is followed by the
+  app's offer, in its words, with buttons: "Put X in tomorrow's breakfast", "Have X every breakfast this week" and "Just
+  remember it". A button is his instruction to the coach's existing add-a-meal route, so the dish is built, checked
+  against his diet and avoids, sized by the app and shown with Apply before anything is written ("App sizes it", "Text +
+  small buttons"). The add-a-meal tool gained `days`: one option, picked for each day from the date to the last day the
+  plan shows (today + 6), the card naming the days ("every day from Thu 17 Sep to Tue 22 Sep"); Undo takes it off every
+  day still holding it; a day that does not save is said. "Just remember it" is answered by the app with no coach call.
+  CSCS (mine, recorded): "every day" is OFFERED for breakfast and a snack only. A repeated breakfast or snack costs
+  little because lunch and dinner still rotate and carry the vegetables and fish; the same lunch or dinner every day
+  takes most of a week's variety (the 19 Sep and 28 Sep variety findings). Asked for in words, any meal may repeat.
+  Decided by me, not asked: the button wording, and that a vague food ("fruit") is the coach's choice shown on the card
+  before Apply rather than a question first (a bare greek yoghurt is still asked about, his 9 Nov ruling).
+  `test:meal-like-offer` (28 checks; 9 mutations, 9 caught after one case was added), `verify:live-test-nov14` A39-A45
+  (driven: offer, the week card, six picks written on Apply, none before, all gone on Undo, "Just remember it" with no
+  coach call). Needs the `chat-gemini` deploy for the coach's `days` and its instruction line; the offer and "Just
+  remember it" are frontend. NOT built yet (the brief's later steps): quick/cook tags and assembly dishes, the lazy day,
+  the staple check with bridge swaps (his rulings needed), a whole-day fridge rebuild, grab-and-go swaps.
+- [x] **OPEN FROM CHAT, HIS LIVE TEST (16 Nov 2026): the plate calculator opened at 40 kg, and every line showed twice.**
+  Traced, three causes. (1) "Open the calculator at 120kg" named no "plate", so it went to the coach, which COPIED the
+  app's "Opened the plate calculator." from the chat above: the app drew the open-again button under it, and that button
+  opened at the default 40 kg because the line carried no weight. (2) The open-again button never carried a weight, so
+  even "at 100kg" reopened at 40. (3) The line was put on screen with no id; the chat's history re-read did not know it
+  and added the saved copy beside it (measured in the gate: an id-less line comes back twice, the same line with its id
+  once). Now: "calculator"/"calc" alone is the plate calculator (the only one; "calorie calculator" is not); the line
+  names the weight ("Opened the plate calculator at 120 kg.") and the button reopens there; the line carries its saved
+  row's id from the start; a coach reply copying the line is made TRUE (the screen opens, at the weight he named) and the
+  coach is told never to write it. The screen half was already right (`verify:tools-2a` 7a opens at 100 kg).
+  `test:open-from-chat` (58 checks), `verify:live-test-nov14` A36-A38. Needs the `chat-gemini` deploy for the coach line
+  only; the rest is frontend.
 - [x] **EVERYTHING FROM THE CHAT: OPEN ANY SCREEN, AND TAKE THINGS OFF THE SHOPPING LIST (his request 16 Nov 2026)**.
   His screenshot: "Open the plate calculator" got the coach's directions ("on the Tools tab ... tap the plate calculator
   row"), the one thing the app promises never to do; and "I want to be able to do everything from chat. Open plate

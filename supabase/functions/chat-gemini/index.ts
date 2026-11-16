@@ -515,7 +515,11 @@ const toolDeclarations = [
         },
         date: {
           type: "string",
-          description: "The date it should become their meal for, as YYYY-MM-DD. Omit for today.",
+          description: "The date it should become their meal for, as YYYY-MM-DD. Omit for today. 'Tomorrow's breakfast' is tomorrow's date.",
+        },
+        days: {
+          type: "integer",
+          description: "Only when he asks for it EVERY day ('every breakfast this week', 'every day'): how many days in a row from `date`, up to 7. 'This week' with no start said starts tomorrow, days 7 (the app stops at the last day his plan shows and says which days). Omit for one day.",
         },
         reason: {
           type: "string",
@@ -2973,7 +2977,8 @@ GROCERY LIST (VISION-ARCHITECTURE.md §5.4):
 - Call add_day_to_grocery_list when they ask to shop for a whole day's meals ("add Monday's meals to my list", "put tomorrow on the shopping list"), with that day's date from UPCOMING MEALS. Same rule: an instruction, not a statement.
 - Call check_off_grocery_item when the user instructs a check-off.
 - Call remove_from_grocery_list when the user tells you to take items OFF the list (not bought, just not wanted). Never send him to the list to delete it himself.
-- OPENING A SCREEN IS THE APP'S (his request 16 Nov 2026, "I want to be able to do everything from chat"): "open the plate calculator", "show me my session history", "take me to my program" are answered by the app before you see them, and it opens the screen. If one reaches you anyway, never give directions to a tab or a row ("go to Tools, tap ..."): say in one line what he will find there and that the app can open it if he says "open" and its name.
+- OPENING A SCREEN IS THE APP'S (his request 16 Nov 2026, "I want to be able to do everything from chat"): "open the plate calculator", "show me my session history", "take me to my program" are answered by the app before you see them, and it opens the screen. If one reaches you anyway, never give directions to a tab or a row ("go to Tools, tap ..."): say in one line what he will find there and that the app can open it if he says "open" and its name. Never write the app's own "Opened ..." line yourself: it is the app's, said only when it has opened the screen. A "how many plates for 120kg" question you answer yourself, plates per side.
+- A MEAL HE LIKES REACHES THE PLAN (16 Nov 2026): when he says he likes or usually has a whole meal for a meal of the day ('I like greek yoghurt with fruit and almonds for breakfast'), save the like with record_fact as before; the app then offers to put it in his plan, with buttons. When he taps one ('Put greek yoghurt with fruit and almonds in tomorrow's breakfast', 'Have ... every breakfast this week'), that IS his instruction: call propose_meal_addition with the dish, its slot, rough ingredients and the date (and days for every day). A vague food in it ('fruit') is a choice you make in the ingredients (berries, a banana), never asked about first: the card shows it before he taps Apply, and he can say otherwise.
 - If the user asks what's on their list, answer directly from the snapshot below — do not call a tool for a read.
 ${context.grocery_list_summary ? `\nCURRENT GROCERY LIST:\n${context.grocery_list_summary}` : "\nCURRENT GROCERY LIST: empty."}
 

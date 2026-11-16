@@ -206,7 +206,7 @@ console.log('\n5. The verification is not optional')
   check('an instruction to add gets the same normal plate: no food over 450 g', toldPlate.ok && toldPlate.payload.option.ingredients.every(i => !/^g$/i.test(i.unit) || i.quantity <= 450), toldPlate.ok ? toldPlate.payload.option.ingredients.map(formatPortion) : toldPlate.reason)
   check('...and returns null-checks it rather than falling through', /if \(!option\) return \{ ok: false/.test(mod))
   check('the payload carries the VERIFIED option, not the raw args',
-    /payload: \{ slot, date, option: \{ \.\.\.option, tags: tagsMyMeal\(option\.tags\) \} \}/.test(mod) && !/payload: \{[^}]*rawArgs/.test(mod))
+    /payload: \{ slot, date, option: \{ \.\.\.option, tags: tagsMyMeal\(option\.tags\) \}(?:, \.\.\.\(alsoDates\.length \? \{ alsoDates \} : \{\}\))? \}/.test(mod) && !/payload: \{[^}]*rawArgs/.test(mod))
 }
 
 console.log('\n6. "How much should I have?" is answered by the app (his ruling 16 Nov 2026, "App sizes it")')

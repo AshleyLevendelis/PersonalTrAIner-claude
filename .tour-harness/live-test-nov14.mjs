@@ -43,6 +43,9 @@ await page.addInitScript(() => {
       const reply = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })
       if (/skipping rope/i.test(said)) return reply({ reply: 'Skipping rope is a great pick for 10 minutes! Try 30 seconds of jumping followed by 30 seconds of rest for 10 rounds.' })
       if (/should i have the chicken salad/i.test(said)) return reply({ reply: 'Yes, it suits today: plenty of protein and light enough for the afternoon.', answer_first: true, proposal: { kind: 'propose_meal_addition', rawArgs: { meal_slot: 'lunch', meal_name: 'Chicken salad with potatoes', ingredients: ['200g roast chicken breast', '275g new potatoes boiled', '60g smoked salmon'], origin_verbatim_quote: 'Should I have the chicken salad for lunch?' } } })
+      // A meal he likes (16 Nov 2026): the like is saved; the button he taps is his instruction to add it.
+      if (/^I like having greek yoghurt/i.test(said)) return reply({ reply: '', memoryIntent: { tool: 'record_fact', rawArgs: { origin_verbatim_quote: said, kind: 'food_preference', domain: 'food', polarity: 'like', hardness: 'soft', target_phrase: 'greek yoghurt with fruit and almonds' } } })
+      if (/every breakfast this week/i.test(said)) return reply({ reply: '', proposal: { kind: 'propose_meal_addition', rawArgs: { meal_slot: 'breakfast', meal_name: 'Greek yoghurt with berries and almonds', ingredients: ['250g low-fat greek yoghurt', '100g blueberries', '20g almonds'], date: '2026-09-17', days: 7, origin_verbatim_quote: said } } })
       if (/how much of each/i.test(said)) return reply({ reply: '', proposal: { kind: 'propose_meal_addition', rawArgs: { meal_slot: 'lunch', meal_name: 'Roast chicken, new potatoes & smoked salmon', ingredients: ['200g roast chicken breast', '275g new potatoes boiled', '60g smoked salmon'], origin_verbatim_quote: 'Tell me how much of each to have', as_suggestion: true } } })
       if (/plank/i.test(said)) return reply({ reply: 'Hold a plank and use the stopwatch to see how long you last.' })
       if (/track/i.test(said)) return reply({ reply: 'Run 4 laps and use the lap timer so you can see your pacing.' })
@@ -176,6 +179,53 @@ check('A32. the app answers itself: "Opened the plate calculator." with an "Open
 check('A33. ...and moves to Tools, where the calculator lives', opened?.hash === '#/tab/tools', opened?.hash)
 check('A34. ...without asking the coach (no directions to a tab can come back)', !!opened && opened.calls === callsBefore && !/Tools tab/.test(opened.text), { before: callsBefore, after: opened?.calls })
 await shot('open-plate')
+// His live test, 16 Nov: "Open the calculator at 120kg" went to the coach (no "plate"), and every line showed twice.
+await page.evaluate(() => { window.location.hash = '' })
+check('A36. "Open the calculator at 120kg" is sent', await say('Open the calculator at 120kg'))
+const at120 = await until(() => page.evaluate(() => {
+  const lines = [...document.querySelectorAll('[data-testid="chat-bubble"]')].filter(n => /Opened the plate calculator at 120 kg\./.test(n.textContent || ''))
+  return lines.length ? { count: lines.length, calls: window.__coachCalls || 0 } : null
+}), v => !!v)
+check('A37. ...the app opens the plate calculator at 120 kg itself, and says the weight', !!at120 && at120.calls === callsBefore, at120)
+await new Promise(r => setTimeout(r, 1500))
+const lineCount = await page.evaluate(() => [...document.querySelectorAll('[data-testid="chat-bubble"]')].filter(n => /Opened the plate calculator/.test(n.textContent || '')).length)
+check('A38. ...and each "Opened" line is shown once', lineCount === 2, lineCount)
+// A MEAL HE LIKES REACHES THE PLAN (16 Nov 2026): his screenshot's sentence was saved as a like and nothing moved.
+await page.evaluate(() => { window.location.hash = '' })
+check('A39. "I like having greek yoghurt with fruit and almonds for breakfast" is sent', await say('I like having greek yoghurt with fruit and almonds for breakfast'))
+const offer = await until(() => page.evaluate(() => {
+  const b = [...document.querySelectorAll('[data-testid="chat-bubble"]')].find(n => /Want it in your plan too\?/.test(n.textContent || ''))
+  const chips = [...document.querySelectorAll('[data-testid="chat-quick-replies"] button')].map(c => c.textContent.trim())
+  return b ? { chips } : null
+}), v => !!v && v.chips.length > 0)
+check('A40. the like is followed by the app\'s offer, with tomorrow, every breakfast this week and just remember',
+  !!offer && offer.chips.includes("Put greek yoghurt with fruit and almonds in tomorrow's breakfast") && offer.chips.includes('Have greek yoghurt with fruit and almonds every breakfast this week') && offer.chips.includes('Just remember it'), offer)
+await shot('meal-like-offer')
+await page.getByRole('button', { name: 'Have greek yoghurt with fruit and almonds every breakfast this week' }).click({ timeout: 5000 }).catch(() => {})
+const weekCard = await until(() => page.evaluate(() => {
+  const b = [...document.querySelectorAll('[data-testid="chat-bubble"]')].reverse().find(n => /every day from/.test(n.textContent || ''))
+  const apply = [...document.querySelectorAll('button')].filter(x => /^Apply/.test(x.textContent.trim())).pop()
+  return b ? { text: b.textContent.trim(), apply: !!apply && !!(b.compareDocumentPosition(apply) & Node.DOCUMENT_POSITION_FOLLOWING) } : null
+}), v => !!v)
+check('A41. the button reaches an offer naming every day, Thu 17 Sep to Tue 22 Sep, with Apply', !!weekCard && /every day from Thu 17 Sep to Tue 22 Sep/.test(weekCard.text) && weekCard.apply, weekCard)
+const picksBefore = await page.evaluate(() => (window.__mealPicks?.() ?? []).length)
+check('A42. ...and nothing is written before Apply', picksBefore === 0, picksBefore)
+await shot('meal-like-week')
+await page.evaluate(() => { [...document.querySelectorAll('button')].filter(x => /^Apply/.test(x.textContent.trim())).pop()?.click() })
+const likeWeek = ['2026-09-17', '2026-09-18', '2026-09-19', '2026-09-20', '2026-09-21', '2026-09-22']
+const picked = await until(() => page.evaluate(() => (window.__mealPicks?.() ?? []).filter(p => p.slot === 'breakfast' && p.meal_name === 'Greek yoghurt with berries and almonds').map(p => p.date).sort()), v => Array.isArray(v) && v.length >= 6, 60)
+check('A43. Apply makes it the breakfast on each of the six days', JSON.stringify(picked) === JSON.stringify(likeWeek), picked)
+await shot('meal-like-applied')
+await page.evaluate(() => { [...document.querySelectorAll('button')].reverse().find(x => x.textContent.trim() === 'Undo')?.click() })
+const undone = await until(() => page.evaluate(() => (window.__mealPicks?.() ?? []).filter(p => p.slot === 'breakfast' && p.meal_name === 'Greek yoghurt with berries and almonds').length), v => v === 0, 60)
+check('A44. Undo takes it off every one of those days', undone === 0, undone)
+await page.evaluate(() => { window.location.hash = '' })
+check('A45. "Just remember it" is answered by the app, with no coach call', await (async () => {
+  const before = await page.evaluate(() => window.__coachCalls || 0)
+  await say('Just remember it')
+  const ok = await until(() => page.evaluate(() => [...document.querySelectorAll('[data-testid="chat-bubble"]')].some(n => /It's in your likes, and the plan stays as it is\./.test(n.textContent || ''))), v => v === true)
+  return ok === true && (await page.evaluate(() => window.__coachCalls || 0)) === before
+})())
 await page.evaluate(() => { window.location.hash = '' })
 check('A35. "show me my shopping list" opens the list\'s own page', await say('show me my shopping list') && (await until(() => page.evaluate(() => window.location.hash), v => v === '#/nutrition/grocery')) === '#/nutrition/grocery')
 await page.evaluate(() => { window.location.hash = '' })
