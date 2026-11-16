@@ -62,6 +62,7 @@ check('a coach bubble is read with parseTimerSuggestion(, and only a coach bubbl
 check('a stopwatch or lap timer starts in one step (startClock()', /timers\.startClock\(/.test(src))
 check('...and never over a live round (the round is opened instead)', /else if \(roundLive\)/.test(src))
 const coach = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
+check('...and that asked to start one, it CAN: no "cannot", no sending him to Tools', /WHEN HE ASKS YOU TO START A TIMER, YOU CAN/.test(coach) && /Never say you can't start it, never tell him to go to Tools or tap Timers/.test(coach))
 check('the coach is told to name the timer it suggests', /A TIMER YOU SUGGEST STARTS FROM YOUR MESSAGE/.test(coach) && /"the stopwatch"/.test(coach) && /"the lap timer"/.test(coach))
 check('the tap starts the round', /timers\.startRound\(/.test(src))
 
