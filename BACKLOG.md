@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH SAID IT COULDN'T START A TIMER, ABOVE A START BUTTON THAT WORKED (his live test, 16 Nov 2026)**.
+  Asked "start a timer of 3 rounds of 30 seconds with 30 seconds rest", the live coach replied "I can't start the timer
+  directly from here ... head over to the Tools tab", and the app's "3 × 30s, 30s rest · Start · 10s countdown" button
+  sat under that reply and started it. Cause: the live coach is the one before today's instruction (the `chat-gemini`
+  deploy is pending), and even today's line spoke only of timers the coach SUGGESTS, not one he ASKS for. The line now
+  says, on both copies of the app description: asked to start a timer, say back exactly what will run and the button is
+  under the reply; never say it can't, never send him to Tools or Timers; asked with no numbers, ask for rounds, work
+  and rest in one question. New exam case `timer-starts-from-the-reply` (two turns: no numbers, then numbers), so the
+  scores are stale until the exam runs. `test:coach-intervals` (29 checks; the new line's removal caught). Whether the
+  model obeys is the exam's to judge. Needs the `chat-gemini` deploy.
 - [x] **THE COACH CAN START ANY TIMER FROM THE CHAT (his request 16 Nov 2026)**: "a round timer, a normal lap timer, or
   just a stopwatch ... the app should be able to give a button to start it from there". A coach reply is read by the
   APP for which timer it suggests, most specific first: a round needs work, rest and rounds (the button reads "10 ×

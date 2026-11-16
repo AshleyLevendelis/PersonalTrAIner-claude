@@ -1,0 +1,13 @@
+{
+  "name": "timer-starts-from-the-reply",
+  "why": "His live test, 16 Nov 2026: asked to start a 3 x 30s round timer, the coach said it could not and sent him to the Tools tab, while the app's own start button sat under that very reply and worked. The app reads the coach's words for the timer, so the coach CAN start one: it says the numbers back. A coach that says it cannot, or routes him to Tools or Timers, is wrong on the second turn; on the first (no numbers) it should ask for rounds, work and rest.",
+  "messages": [
+    "can you start a round timer?",
+    "3 rounds of 30 seconds with 30 seconds rest"
+  ],
+  "checks": {
+    "mustMention": [
+      "30"
+    ]
+  }
+}
