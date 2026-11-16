@@ -787,40 +787,43 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
       }
     }
 
-    // Accessory rotation at the sub-cycle boundary — checked at the WEEK
-    // level (any accessory anywhere changing counts) rather than per-day,
-    // since a single day's constrained pool can legitimately have zero
-    // alternatives even when the week as a whole has room to rotate.
-    // Beginners/novices deliberately hold accessories for the whole block
-    // (expConfig.repeat_movements_for_practice — they need repetition to
-    // learn a movement, not week-3 variety), so this check only applies to
-    // intermediate/advanced, whose accessories ARE supposed to sub-cycle.
-    const experience = profile.training_experience || 'novice'
-    let anyAccessoryRotated = experience === 'beginner' || experience === 'novice'
-    let anyAccessoryHadAlternative = false
-    const pool = getConstrainedPool(profile, exclusions)
-    for (const day of w2.days) {
-      const dayW3 = w3.days.find(d => d.day === day.day)
-      if (!dayW3) continue
-      day.exercises.forEach((ex, i) => {
-        if (ex.tier !== 'tier_2_secondary' && ex.tier !== 'tier_3_isolation') return
-        const entry = dbEntry(ex.name)
-        if (!entry || entry.movement_pattern === 'core' || entry.movement_pattern === 'carry') return
-        const altCount = pool.filter(p =>
-          p.substitution_group === entry.substitution_group &&
-          p.movement_pattern === entry.movement_pattern &&
-          p.mechanics_tier === entry.mechanics_tier
-        ).length
-        if (altCount > 1) anyAccessoryHadAlternative = true
-        if (dayW3.exercises[i]?.name !== ex.name) anyAccessoryRotated = true
-      })
+    // THE SAME EXERCISE ALL BLOCK, AND THE MAIN LIFTS FOR THE WHOLE PLAN (his ruling 16 Nov 2026, "All three as you
+    // suggest"; docs/plans/exercise-consistency.md). This REPLACED 'accessory_never_rotates', which took points off a
+    // plan whose accessories did NOT change at week 3: the score now rewards the opposite, so Selection scores from
+    // before 16 Nov 2026 are not comparable.
+    // (1) No exercise changes name inside any block, on the same day and slot, week to week.
+    const byNumber = new Map(mesocycle.map(w => [w.week_number, w]))
+    let changedInBlock: string | null = null
+    for (const w of mesocycle) {
+      const prev = byNumber.get(w.week_number - 1)
+      if (!prev || prev.block_number !== w.block_number) continue
+      for (const day of w.days) {
+        const pd = prev.days.find(d => d.day === day.day)
+        if (!pd) continue
+        day.exercises.forEach((ex, i) => {
+          const before = pd.exercises[i]?.name
+          if (!changedInBlock && before && before !== ex.name) changedInBlock = `${day.day} week ${w.week_number}: ${before} -> ${ex.name}`
+        })
+      }
     }
-    if (anyAccessoryHadAlternative && !anyAccessoryRotated) {
-      violatedRules.add('accessory_never_rotates')
-      deductions.push({
-        rule: 'accessory_never_rotates', weekNumber: 3,
-        detail: 'No accessory changed variation at the week-3 sub-cycle boundary despite alternatives being available',
-      })
+    if (changedInBlock) {
+      violatedRules.add('exercise_changed_within_block')
+      deductions.push({ rule: 'exercise_changed_within_block', detail: `An exercise changed inside a block: ${changedInBlock}` })
+    }
+    // (2) Each day's main lift is the same in the first week of every block.
+    const firstWeeks = mesocycle.filter(w => (w.week_in_block ?? 1) === 1).sort((a, b) => a.week_number - b.week_number)
+    let mainChanged: string | null = null
+    if (week1) for (const day of week1.days) {
+      const main = day.exercises.find(ex => ex.tier === 'tier_1_primary')?.name
+      if (!main) continue
+      for (const fw of firstWeeks) {
+        const other = fw.days.find(d => d.day === day.day)?.exercises.find(ex => ex.tier === 'tier_1_primary')?.name
+        if (!mainChanged && other && other !== main) mainChanged = `${day.day}: ${main} -> ${other} in week ${fw.week_number}`
+      }
+    }
+    if (mainChanged) {
+      violatedRules.add('main_lift_changed_between_blocks')
+      deductions.push({ rule: 'main_lift_changed_between_blocks', detail: `A main lift changed at a new block: ${mainChanged}` })
     }
   }
 

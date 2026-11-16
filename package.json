@@ -645,7 +645,8 @@
     "test:empty-meals": "tsx scripts/test-empty-meals.ts",
     "verify:empty-meals": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/empty-meals.mjs",
     "test:beginner-protein": "tsx scripts/test-beginner-protein.ts",
-    "test:week-one-start": "tsx scripts/test-week-one-start.ts"
+    "test:week-one-start": "tsx scripts/test-week-one-start.ts",
+    "test:exercise-consistency": "tsx scripts/test-exercise-consistency.ts"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

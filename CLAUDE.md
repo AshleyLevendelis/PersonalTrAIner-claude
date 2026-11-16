@@ -152,6 +152,11 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   lowers, `docs/plans/variant-pricing.md`); his rulings "Known kit + a few" (five new kit ticks) and "Searchable,
   log-only" (near-copies are found and logged under their own name, never prescribed). `test:exercise-library`,
   `test:variant-pricing`
+- **The same exercises all block; main lifts for the whole plan; accessories change at a new block — his ruling 16 Nov
+  2026, "All three as you suggest"** (his question, from Gemini's advice). It replaced a weekly accessory rotation and a
+  per-block rotation of every lift that no ruling had asked for. The quality score's Selection rules flipped with it
+  (`exercise_changed_within_block`, `main_lift_changed_between_blocks`): **Selection scores before 16 Nov are not
+  comparable**. `test:exercise-consistency`, `test:block-swap-reach`, `docs/plans/exercise-consistency.md`
 - Chosen, not shuffled, with reasons on screen ("Why this exercise / weight")
   — `chosen-not-shuffled` since 16 Sep 2026 (19 checks, 10 mutations), which
   CALLS the ranker rather than reading it. It holds the tie-break to its job:

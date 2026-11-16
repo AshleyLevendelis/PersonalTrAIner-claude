@@ -2,6 +2,26 @@
 
 Newest first. One line each.
 
+- [x] **THE SAME EXERCISES ALL BLOCK; MAIN LIFTS FOR THE WHOLE PLAN; ACCESSORIES CHANGE AT A NEW BLOCK (his question 16 Nov
+  2026, quoting Gemini; his ruling "All three as you suggest")**. MEASURED first, 108 seeded plans: main lifts kept 100%
+  inside a block but only 45.5% into a new block; accessories kept 79.4% inside a block (new ones at week 3, and weeks 2
+  and 4 for functional). TRACED (engine-tracer): every slot was re-rotated from the base week by block number through an
+  alphabetical list (so any main lift with an alternative changed at every block), a weekly accessory rotation ran on a
+  cadence (2 weeks, functional 1), and the quality score's `accessory_never_rotates` rewarded the mid-block swap. No
+  ruling of his introduced any of it. CSCS (mine, basis in docs/plans/exercise-consistency.md): progress is read off the
+  same movement, a lift met at week 3 of 4 gets two sessions; rotate accessories between blocks for overuse and
+  interest; the main lifts are the anchors. His three (wording and a score's meaning): functional's note no longer says
+  "exercises rotate faster" (now: main lifts stay, other exercises change each block); the score rule is replaced by
+  `exercise_changed_within_block` and `main_lift_changed_between_blocks` (**Selection scores before 16 Nov 2026 are not
+  comparable**); the whole-block swap line now ends "...and some exercises change." AFTER, same 108 plans: 100% kept
+  inside a block (every tier), main lifts 100% across blocks, accessories 19.9% kept at a new block (about 80% rotate,
+  up from about half, since none moved mid-block). CSCS review: (1) more exposures per lift, readable progression; (2)
+  loses mid-block novelty, functional's weekly change; (3) pattern coverage unchanged, overload better; (4) no floor or
+  ceiling redefined, the score's meaning is (said above); the block-transition audit passes (17,423 combos, 0 failed)
+  with main lifts now crossing blocks; (5) in scope. `test:exercise-consistency` 11 checks (3 mutations caught),
+  `test:block-swap-reach` re-anchored (a new plan's accessory swap reaches week 4; a plan SAVED before today still
+  rotates at week 3 and the reach rule still stops there; putting the week-3 swap back fails it). Existing plans keep
+  their exercises until rebuilt.
 - [x] **WEEK 1 BEGINS ON THE MONDAY WHEN NOTHING IS LOST; A CALENDAR ROW HOLDING TWO WEEKS READS ITS DATES (his ruling 16 Nov
   2026, "yes", after his own catch that Sunday is not everyone's rest day)**. His calendar: a plan made on Sunday the
   15th (a rest day) put a row of the 9th-15th holding one rest tile above "W1–2", "W2–3"... Options put to him: snap

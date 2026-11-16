@@ -43,20 +43,29 @@ const slotOf = (m: MesocycleWeek[], week: number, day: string, i: number) => m.f
 const J = (x: unknown) => JSON.stringify(x)
 
 // ---------------------------------------------------------------------------
-console.log('1. Reach: a slot the plan rotates at week 3 is swapped in weeks 1-2 only')
+console.log('1. Reach: a whole-block swap reaches the weeks that still hold the lift')
 const INTER = profile({ training_experience: 'intermediate' })
-const inter = build(INTER, 'block-swap-reach|intermediate')
-check('fixture: the plan has a calibration week and block 1 is weeks 1-4', inter.some(w => w.isCalibrationWeek) && [1, 2, 3, 4].every(n => inter.find(w => w.week_number === n)?.block_number === 1))
-// The first loaded accessory slot whose exercise changes between week 2 and week 3: the rotation, found, not assumed.
+const built = build(INTER, 'block-swap-reach|intermediate')
+check('fixture: the plan has a calibration week and block 1 is weeks 1-4', built.some(w => w.isCalibrationWeek) && [1, 2, 3, 4].every(n => built.find(w => w.week_number === n)?.block_number === 1))
+// A NEW PLAN HOLDS EVERY EXERCISE ALL BLOCK (his ruling 16 Nov 2026), so a loaded accessory's whole-block swap reaches
+// week 4. The first loaded accessory slot of week 2, found, not assumed.
 let found: { day: string; i: number } | null = null
-for (const d of inter.find(w => w.week_number === 2)!.days) {
+for (const d of built.find(w => w.week_number === 2)!.days) {
   d.exercises.forEach((e, i) => {
-    const w3 = slotOf(inter, 3, d.day, i)
-    if (!found && w3 && w3.name !== e.name && typeof e.suggested_load_kg === 'number' && e.suggested_load_kg > 0) found = { day: d.day, i }
+    if (!found && (e.tier === 'tier_2_secondary' || e.tier === 'tier_3_isolation') && typeof e.suggested_load_kg === 'number' && e.suggested_load_kg > 0) found = { day: d.day, i }
   })
 }
-check('fixture: a loaded slot that rotates to a different exercise at week 3 exists', found != null)
-const R = found ?? { day: 'Monday', i: 0 }
+check('fixture: a loaded accessory slot exists', found != null)
+const F = found ?? { day: 'Monday', i: 0 }
+check('a NEW plan: a loaded accessory holds its exercise all block, so its whole-block swap reaches weeks 2-4', J(blockSwapWeeks(built, 2, F.day, F.i)) === J([2, 3, 4]), blockSwapWeeks(built, 2, F.day, F.i))
+check('...and its line names the next block', blockSwapEnd(built, 2, INTER.created_at, F.day, F.i)?.why === 'block', blockSwapEnd(built, 2, INTER.created_at, F.day, F.i))
+// A PLAN SAVED BEFORE 16 NOV 2026 still moves that slot on at week 3 (an INPUT: the shape such a saved plan has). The
+// reach rule must still stop the swap at week 2 there, so the plan's own week-3 pick is never overwritten.
+const rotatedTo = (await quiet(async () => getReplacementCandidates(slotOf(built, 2, F.day, F.i)!.name, INTER, [])))
+  .find(c => c.exercise.name !== slotOf(built, 2, F.day, F.i)!.name)?.exercise.name ?? 'Cable Lateral Raises'
+const inter = (JSON.parse(JSON.stringify(built)) as MesocycleWeek[])
+for (const n of [3, 4]) { const d = inter.find(w => w.week_number === n)!.days.find(x => x.day === F.day)!; d.exercises[F.i] = { ...d.exercises[F.i], name: rotatedTo } }
+const R = F
 const outgoing = slotOf(inter, 2, R.day, R.i)!
 const pick = (await quiet(async () => getReplacementCandidates(outgoing.name, INTER, [])))
   .find(c => c.exercise.name !== outgoing.name && c.exercise.name !== slotOf(inter, 3, R.day, R.i)?.name)
