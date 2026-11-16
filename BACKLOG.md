@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [x] **"HOW MUCH OF EACH SHOULD I HAVE?" IS ANSWERED BY THE APP: his ruling 16 Nov 2026, "App sizes it"** (from three
+  options: the app works it out, the coach keeps answering but is checked, or leave it). His live test: told the coach
+  lunch had roast chicken, new potatoes and smoked salmon and asked how much of each; the coach wrote its own grams and a
+  total the plate did not reach, and a later turn read the menu as a meal he had eaten. Now: asked as a QUESTION, the
+  coach's meal tool comes back as an offer whose words ARE the answer, all from the app's food table: "By the app's own
+  food figures, for your lunch: 220g raw chicken breast (about 160g cooked), 410g raw new potatoes (about 360g cooked),
+  50g smoked salmon. That's about 651 kcal and 67g protein, against about 1216 kcal and 64g for your lunch. Want it as
+  your lunch?" with Apply / Not now; nothing is written until the tap. The coach is told never to write grams, calories
+  or protein for a meal itself, and that a menu on offer is not a meal eaten. An instruction to add ("add it") keeps the
+  old card. **Sizing, mine (CSCS):** protein first (the protein foods scaled to the meal's protein share, 0.4-2.5x),
+  then carbs toward the meal's calories, cut as needed but grown by 30% at most; fat foods left as he named them. The
+  first try (calorie-sized) gave 146g protein for a 64g lunch and 940g of potatoes; a coach serves a normal plate and
+  says the gap in numbers, so a big-calorie lunch stays short and the card's existing "leaves the day short" line says
+  so. The amounts are said once (the card's "Portions adjusted" line is dropped when he asked). `test:meal-addition` §6
+  (13 checks; 9 mutations, all caught, one only after a case where the protein sizing binds was added),
+  `verify:live-test-nov14` A25-A27 (the driver now waits for the typing to finish; a mid-sentence screenshot had
+  read as a cut-off question). Needs the `chat-gemini` deploy for the coach's half.
 - [x] **THE COACH SAID IT COULDN'T START A TIMER, ABOVE A START BUTTON THAT WORKED (his live test, 16 Nov 2026)**.
   Asked "start a timer of 3 rounds of 30 seconds with 30 seconds rest", the live coach replied "I can't start the timer
   directly from here ... head over to the Tools tab", and the app's "3 × 30s, 30s rest · Start · 10s countdown" button

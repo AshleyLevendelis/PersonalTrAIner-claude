@@ -41,6 +41,7 @@ await page.addInitScript(() => {
       const said = String(JSON.parse((init && init.body) || '{}').message || '')
       const reply = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })
       if (/skipping rope/i.test(said)) return reply({ reply: 'Skipping rope is a great pick for 10 minutes! Try 30 seconds of jumping followed by 30 seconds of rest for 10 rounds.' })
+      if (/how much of each/i.test(said)) return reply({ reply: '', proposal: { kind: 'propose_meal_addition', rawArgs: { meal_slot: 'lunch', meal_name: 'Roast chicken, new potatoes & smoked salmon', ingredients: ['200g roast chicken breast', '275g new potatoes boiled', '60g smoked salmon'], origin_verbatim_quote: 'Tell me how much of each to have', as_suggestion: true } } })
       if (/plank/i.test(said)) return reply({ reply: 'Hold a plank and use the stopwatch to see how long you last.' })
       if (/track/i.test(said)) return reply({ reply: 'Run 4 laps and use the lap timer so you can see your pacing.' })
       if (/box jumps/i.test(said)) return reply({ reply: '1. Stand a foot from the box.\n2. Swing your arms and jump.\n3. Land softly, then step down.' })
@@ -136,6 +137,14 @@ await tapLastTimer(); await wait(700)
 const lpOn = await readTimer()
 check('A23. ...and tapping it starts the lap timer from zero, in place of the stopwatch', lpOn.mode === 'lap' && lpOn.running === true, lpOn)
 check('A24. no button under his own messages: one per coach reply that named a timer', (await lastTimerButton())?.count === 2, await lastTimerButton())
+
+// "HOW MUCH SHOULD I HAVE?" IS ANSWERED BY THE APP (his ruling 16 Nov 2026, "App sizes it"): the coach's dish comes back
+// as the app's own portions and numbers, said as the answer, with the offer's buttons; nothing is added before a tap.
+check('A25. "Tell me how much of each to have" is sent', await say('Tell me how much of each to have'))
+const howMuch = await until(() => page.evaluate(() => { const t = [...document.querySelectorAll('*')].find(n => n.children.length === 0 && /By the app's own food figures, for your lunch:/.test(n.textContent || '')); if (!t) return null; const after = [...document.querySelectorAll('button')].filter(x => t.compareDocumentPosition(x) & Node.DOCUMENT_POSITION_FOLLOWING).map(x => x.textContent.trim()); const btns = after.filter(x => /^(Apply|Add it|Not now)$/.test(x)); return { text: t.closest('[data-testid="chat-bubble"]')?.textContent.trim() ?? t.textContent.trim(), btns } }), v => !!v && /Want it as your lunch\?/.test(v.text))
+check('A26. the answer is the app\'s: portions with cooked weights, about N kcal and Ng protein, then the offer', !!howMuch && /about \d+g cooked/.test(howMuch.text) && /That's about \d+ kcal and \d+g protein, against about \d+ kcal and \d+g for your lunch\. Want it as your lunch\?/.test(howMuch.text), howMuch)
+check('A27. ...with buttons to put it in or not', !!howMuch && howMuch.btns.length >= 2 && howMuch.btns.includes('Not now'), howMuch?.btns)
+await shot('how-much-answer')
 
 // A long change row: the offer's own row, with the two halves given his screenshot's lengths.
 await page.goto(`${origin}/.tour-harness/chat.html?day=mid&n=2`)

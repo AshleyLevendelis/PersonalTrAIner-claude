@@ -16,7 +16,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { buildMealAdditionProposal } from '../src/lib/meal-addition'
+import { buildMealAdditionProposal, formatPortion } from '../src/lib/meal-addition'
 import { FORBIDDEN_TAGS, DIETARY_PREFERENCES } from '../src/lib/diet-rules'
 import { FOOD_DB } from '../src/lib/food-db'
 import { computeSlotBudgets } from '../src/lib/meal-generation'
@@ -200,10 +200,54 @@ console.log('\n5. The verification is not optional')
   // statically as well, because a future refactor could route around it while
   // leaving a function of the same name in place.
   const mod = readFileSync(join(ROOT, 'src/lib/meal-addition.ts'), 'utf8')
-  check('buildMealAdditionProposal calls verifyProposal', /verifyProposal\(proposal, slot, budget/.test(mod))
+  check('buildMealAdditionProposal calls verifyProposal, on the dish fitted from what was asked', /const fitted = asked \? sizeToProtein\(proposal, budget\) : fitDishToBudget\(proposal, budget\)\.dish/.test(mod) && /verifyProposal\(fitted, slot, budget/.test(mod))
   check('...and returns null-checks it rather than falling through', /if \(!option\) return \{ ok: false/.test(mod))
   check('the payload carries the VERIFIED option, not the raw args',
     /payload: \{ slot, date, option: \{ \.\.\.option, tags: tagsMyMeal\(option\.tags\) \} \}/.test(mod) && !/payload: \{[^}]*rawArgs/.test(mod))
+}
+
+console.log('\n6. "How much should I have?" is answered by the app (his ruling 16 Nov 2026, "App sizes it")')
+{
+  // His live test: told the coach what lunch had on offer and asked how much of each. The coach wrote its own grams and a
+  // total the plate did not reach. Asked as a QUESTION, the dish now comes back as an offer whose lead IS the answer:
+  // the app's own sized portions and the app's own calories and protein, never the coach's figures.
+  const lunch = { meal_slot: 'lunch', meal_name: 'Roast chicken, new potatoes & smoked salmon', ingredients: ['200g roast chicken breast', '275g new potatoes boiled', '60g smoked salmon'], as_suggestion: true }
+  const asked = build(lunch)
+  const lead = asked.ok ? (asked.diff as { lead?: string }).lead ?? '' : ''
+  const opt = asked.ok ? asked.payload.option : null
+  check('the dish asked about is sized and costed by the app', asked.ok && !!opt, asked.ok ? 'ok' : asked.reason)
+  check('...and the line answers with the app\'s own portions, as the option holds them',
+    !!opt && opt.ingredients.length >= 3 && opt.ingredients.every(line => lead.includes(formatPortion(line))), lead)
+  check('...and the app\'s own calories and protein, as the option holds them',
+    !!opt && lead.includes(`${Math.round(opt.macros.calories)} kcal`) && lead.includes(`${Math.round(opt.macros.protein)}g protein`), lead)
+  // The plate a coach would serve: a chicken-heavy dish sized to the lunch's calories carried 2.3x the lunch's protein
+  // (his live test). Fitted, protein stays near the meal's own share; 1.3x is the ceiling a cook's re-portioning reaches.
+  const lunchBudget = computeSlotBudgets(TARGETS, 3, false).lunch
+  check('...and is a plate a coach would serve: protein near the lunch\'s own share, not double it',
+    !!opt && !!lunchBudget && opt.macros.protein <= lunchBudget.protein * 1.3, { protein: opt?.macros.protein, target: lunchBudget?.protein })
+  check('...and a canteen plate, not a mountain: no food over 450 g as the answer gives it (the calorie-filled plate had 1,070 g of potatoes)',
+    !!opt && opt.ingredients.every(i => !/^g$/i.test(i.unit) || i.quantity <= 450), opt?.ingredients.map(formatPortion))
+  check('...and says its calories against the lunch\'s own, never that it hits them', !!lunchBudget && lead.includes(`against about ${Math.round(lunchBudget.calories)} kcal`) && !/hits?|on target/i.test(lead), lead)
+  // A case where the sizing BINDS: the coach's chicken is half what the lunch's protein needs, so it must grow.
+  const small = build({ ...lunch, ingredients: ['100g roast chicken breast', '275g new potatoes boiled'] })
+  const smallP = small.ok ? small.payload.option.macros.protein : 0
+  check('...and a plate short of protein is brought up to the lunch\'s protein, not left short',
+    small.ok && !!lunchBudget && smallP >= lunchBudget.protein * 0.9 && smallP <= lunchBudget.protein * 1.3, { protein: smallP, target: lunchBudget?.protein, reason: small.ok ? '' : small.reason })
+  // Under the lunch's calories, the potatoes grow toward them, by 30% at most (CSCS: a normal plate). 275g boiled is
+  // 315g raw as the app counts it, so the answer's raw grams are read against 315.
+  const potIn = 315, potOut = opt?.ingredients.find(i => /potato/i.test(i.food ?? i.raw ?? formatPortion(i)))
+  const potG = potOut ? potOut.quantity : 0
+  check('...and a plate under the lunch\'s calories gets more potato, by 30% at most',
+    !!opt && !!lunchBudget && opt.macros.calories < lunchBudget.calories && potG > potIn * 1.15 && potG <= potIn * 1.3 + 10, { potato: potOut && formatPortion(potOut), kcal: opt?.macros.calories })
+  check('...and says each amount once: no second "portions adjusted" line under the answer', asked.ok && !(asked.diff.implications ?? []).some(i => /Portions adjusted/.test(i.text)), asked.ok ? asked.diff.implications : null)
+  check('...and offers it, it does not say it was added', /Want it as your lunch\?$/.test(lead) && !/added/i.test(lead), lead)
+  const told = build({ ...lunch, as_suggestion: undefined })
+  check('an instruction to add keeps its own headline (no "how much" answer)', told.ok && !(told.diff as { lead?: string }).lead, told.ok ? (told.diff as { lead?: string }).lead : told.reason)
+  const server = readFileSync(join(ROOT, 'supabase/functions/chat-gemini/index.ts'), 'utf8')
+  check('the coach\'s server sends a dish asked about to the app as an offer, not as its own words',
+    /!additionClassification\.imperative && Array\.isArray\(args\.ingredients\)[\s\S]{0,300}reply: "", proposal: \{ kind: "propose_meal_addition", rawArgs: \{ \.\.\.args, as_suggestion: true \} \}/.test(server))
+  check('the coach is told never to write a meal\'s grams or calories itself', /HOW MUCH IS THE APP'S TO SAY/.test(server) && /Never write grams, calories or protein for a meal in your own reply/.test(server))
+  check('...and that what is on offer is not what was eaten', /WHAT IS ON OFFER IS NOT WHAT WAS EATEN/.test(server))
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed`); process.exit(1) }

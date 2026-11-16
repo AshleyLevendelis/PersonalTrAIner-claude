@@ -1605,6 +1605,11 @@ menu" stays true when a copy is also left outside it.
   say so. From the next day a surprising weigh-in is held as before. `test:weigh-in-targets` §13,
   `verify:setup-weight-correction`
 
+- **"How much should I have?" is the app's to answer: his ruling 16 Nov 2026, "App sizes it"**: the coach's meal
+  tool, asked as a question, returns an offer whose words are the app's own portions (raw, with cooked weights) and its
+  own calories and protein against the meal's share; the coach never writes meal grams or totals, and a menu on offer is
+  not a meal eaten. Sizing (CSCS): protein to the meal's share, carbs toward its calories by 30% at most, the gap said in
+  numbers. `test:meal-addition` §6, `verify:live-test-nov14` A25-A27. Needs the `chat-gemini` deploy
 - **The coach's intervals start with one tap: his request 16 Nov 2026.** A coach reply naming work, rest and rounds
   carries "10 × 30s, 30s rest · Start · 10s countdown" (his own countdown setting); one tap starts the round timer at those numbers on Tools. Read off the
   coach's words by the app; anything less specific gets no button. `test:coach-intervals`, `verify:live-test-nov14` A12-A15.
