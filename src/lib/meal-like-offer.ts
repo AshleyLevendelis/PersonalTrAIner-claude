@@ -18,6 +18,7 @@
 // ---------------------------------------------------------------------------
 
 import type { MealSlotName } from './meal-store'
+import { addDays } from './meal-rotation'
 
 const SLOT_WORDS: [RegExp, MealSlotName][] = [
   [/^breakfast$/, 'breakfast'],
@@ -64,20 +65,14 @@ export const MEAL_LIKE_OFFER = {
 /** How many days a meal added "every day" covers: from its date to the last day the plan shows (today + 6). */
 export function repeatDates(date: string, days: number, todayDate: string): string[] {
   const n = Math.max(1, Math.min(7, Math.floor(Number.isFinite(days) ? days : 1)))
-  const last = addDaysIso(todayDate, 6)
+  const last = addDays(todayDate, 6)
   const out: string[] = []
   for (let i = 0; i < n; i++) {
-    const d = addDaysIso(date, i)
+    const d = addDays(date, i)
     if (d > last) break
     out.push(d)
   }
   return out
-}
-
-function addDaysIso(date: string, n: number): string {
-  const [y, m, d] = date.split('-').map(Number)
-  const dt = new Date(Date.UTC(y, m - 1, d + n))
-  return dt.toISOString().slice(0, 10)
 }
 
 /** "Tue 17 Nov to Sun 22 Nov", or the one date. */
