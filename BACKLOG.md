@@ -2,6 +2,27 @@
 
 Newest first. One line each.
 
+- [x] **A MEAL HE LIKES REACHES THE PLAN (16 Nov 2026, step 1 of his meal-planning brief; his "Implement the meal plan fix").**
+  His screenshot: "I like having greek yoghurt with fruit and almonds for breakfast" was saved as a like and nothing on
+  the plan moved. Traced: a like is only a ranking key over dishes the plan already has; with no dish containing those
+  foods it changes nothing he can see, and the coach's add-a-meal tool took one date only. Now: a like that is a WHOLE
+  meal for a named meal of the day ("X with Y for breakfast"; one food is a like, a question is not) is followed by the
+  app's offer, in its words, with buttons: "Put X in tomorrow's breakfast", "Have X every breakfast this week" and "Just
+  remember it". A button is his instruction to the coach's existing add-a-meal route, so the dish is built, checked
+  against his diet and avoids, sized by the app and shown with Apply before anything is written ("App sizes it", "Text +
+  small buttons"). The add-a-meal tool gained `days`: one option, picked for each day from the date to the last day the
+  plan shows (today + 6), the card naming the days ("every day from Thu 17 Sep to Tue 22 Sep"); Undo takes it off every
+  day still holding it; a day that does not save is said. "Just remember it" is answered by the app with no coach call.
+  CSCS (mine, recorded): "every day" is OFFERED for breakfast and a snack only. A repeated breakfast or snack costs
+  little because lunch and dinner still rotate and carry the vegetables and fish; the same lunch or dinner every day
+  takes most of a week's variety (the 19 Sep and 28 Sep variety findings). Asked for in words, any meal may repeat.
+  Decided by me, not asked: the button wording, and that a vague food ("fruit") is the coach's choice shown on the card
+  before Apply rather than a question first (a bare greek yoghurt is still asked about, his 9 Nov ruling).
+  `test:meal-like-offer` (28 checks; 9 mutations, 9 caught after one case was added), `verify:live-test-nov14` A39-A45
+  (driven: offer, the week card, six picks written on Apply, none before, all gone on Undo, "Just remember it" with no
+  coach call). Needs the `chat-gemini` deploy for the coach's `days` and its instruction line; the offer and "Just
+  remember it" are frontend. NOT built yet (the brief's later steps): quick/cook tags and assembly dishes, the lazy day,
+  the staple check with bridge swaps (his rulings needed), a whole-day fridge rebuild, grab-and-go swaps.
 - [x] **OPEN FROM CHAT, HIS LIVE TEST (16 Nov 2026): the plate calculator opened at 40 kg, and every line showed twice.**
   Traced, three causes. (1) "Open the calculator at 120kg" named no "plate", so it went to the coach, which COPIED the
   app's "Opened the plate calculator." from the chat above: the app drew the open-again button under it, and that button

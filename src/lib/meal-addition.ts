@@ -26,6 +26,7 @@ import { cookedHint } from './as-weighed'
 import { parseIngredientLine, withParsedQuantity, kitchenRound } from './portion-scaler'
 import { computeSlotBudgets, verifyProposal, type PoolOption, type RawProposal } from './meal-generation'
 import { tagsMyMeal, type MealSlotName } from './meal-store'
+import { datesLabel, repeatDates } from './meal-like-offer'
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 
@@ -42,6 +43,8 @@ export interface MealAdditionArgs {
   reason?: unknown
   /** The coach was ASKED how much (his ruling 16 Nov 2026, "App sizes it"): the card is said as the answer. */
   as_suggestion?: unknown
+  /** "Every breakfast this week" (16 Nov 2026): how many days in a row from `date`, clamped to the days the plan shows. */
+  days?: unknown
 }
 
 export interface MealAdditionPayload {
@@ -49,6 +52,8 @@ export interface MealAdditionPayload {
   date: string
   /** The VERIFIED option — re-portioned and re-measured by verifyProposal. Never the model's own numbers. */
   option: PoolOption
+  /** The days after `date` it is also that meal for ("every breakfast this week"). Absent for one day. */
+  alsoDates?: string[]
 }
 
 export interface BuildMealAdditionInput {
@@ -265,19 +270,27 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
 
   const date = normaliseDate(rawArgs.date, input.todayDate)
   const m = option.macros
+  // EVERY DAY, WHEN ASKED (16 Nov 2026): one dish, one option, picked for each day from `date` to the last day the plan
+  // shows. The card names the days, so a week asked late in the week says where it stops.
+  const allDates = repeatDates(date, Number(rawArgs.days ?? 1), input.todayDate)
+  const alsoDates = allDates.slice(1)
+  const forWhen = alsoDates.length > 0 ? `every day from ${datesLabel(allDates)}` : date
 
   return {
     ok: true,
-    scopeKey: `${input.profileId}:propose_meal_addition:${slot}:${date}`,
+    scopeKey: `${input.profileId}:propose_meal_addition:${slot}:${date}${alsoDates.length ? `+${alsoDates.length}` : ''}`,
     preconditions: { slot, date, mealName: option.name },
     // HIS OWN MEAL (11 Nov 2026, "My usual meals first"): marked so the week's menu and the day's pick put it first.
-    payload: { slot, date, option: { ...option, tags: tagsMyMeal(option.tags) } },
+    payload: { slot, date, option: { ...option, tags: tagsMyMeal(option.tags) }, ...(alsoDates.length ? { alsoDates } : {}) },
     diff: {
       // AN ANSWER TO "HOW MUCH?" (his ruling 16 Nov 2026, "App sizes it"): the amounts and the numbers are the app's and are
       // said as the answer, in the lead; the buttons offer to put it in. Nothing is written until the tap.
       ...(rawArgs.as_suggestion === true
         ? { lead: `By the app's own food figures, for your ${slot}: ${option.ingredients.map(i => { const hint = cookedHint(i); return hint ? `${formatPortion(i)} (${hint})` : formatPortion(i) }).join(', ')}. That's about ${Math.round(m.calories)} kcal and ${Math.round(m.protein)}g protein, against about ${Math.round(budget.calories)} kcal and ${Math.round(budget.protein)}g for your ${slot}. Want it as your ${slot}?` }
-        : {}),
+        // WHICH DAYS, BEFORE THE TAP (16 Nov 2026): a meal for another day, or for every day, says so in the headline.
+        : date !== input.todayDate || alsoDates.length > 0
+          ? { lead: `I can add **${option.name}** to your ${slot}, ${alsoDates.length > 0 ? `every day from ${datesLabel(allDates)}` : `for ${datesLabel([date])}`}:` }
+          : {}),
       rows: [
         { field: 'Adding to', before: slot, after: option.name },
         { field: 'Calories', before: `${Math.round(budget.calories)} kcal target`, after: `${Math.round(m.calories)} kcal` },
@@ -291,7 +304,7 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
       implications: [
         // When he asked how much, the answer above already lists every amount; saying it twice would say it two ways.
         ...(rawArgs.as_suggestion === true ? [] : [{ severity: 'info' as const, text: `Portions adjusted to fit your ${slot} target — ${option.ingredients.map(formatPortion).join(', ')}` }]),
-        { severity: 'info', text: `Joins your ${slot} options, and becomes your ${slot} for ${date}.` },
+        { severity: 'info', text: `Joins your ${slot} options, and becomes your ${slot} for ${forWhen}.` },
       ],
       rationale: typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined,
       reversible: true,

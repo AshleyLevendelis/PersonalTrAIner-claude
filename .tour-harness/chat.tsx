@@ -823,6 +823,8 @@ function Harness() {
     dietaryPreferences: profile.dietary_preferences,
     dislikedFoods: () => [],
   })
+  // The saved picks, on every page of this harness (verify:live-test-nov14 reads a meal added for every day of the week).
+  useEffect(() => { (window as unknown as Record<string, unknown>).__mealPicks = () => db.meal_plan_picks }, [])
   useEffect(() => {
     if (!DAYMOVE) return
     const w = window as unknown as Record<string, unknown>

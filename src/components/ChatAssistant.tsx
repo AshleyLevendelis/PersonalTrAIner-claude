@@ -19,6 +19,7 @@ import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, Mes
 import { formVideoFor, linkifyBareUrls, sessionVideosFor } from '@/lib/exercise-video'
 import { parseTimerSuggestion, type TimerSuggestion } from '@/lib/timer-engine'
 import { startLabel } from '@/lib/round-setup'
+import { MEAL_LIKE_OFFER, datesLabel, wholeMealLike } from '@/lib/meal-like-offer'
 import { kgInText, openButtonLabel, openTargetInReply, openedLine, parseOpenRequest, requestOpen } from '@/lib/open-request'
 import { useTimers } from '@/hooks/useTimers'
 import { chatContextPills } from '@/lib/chat-context-strip'
@@ -38,7 +39,7 @@ import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach } from
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, waitingOnAnswer, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { weeklyAverage, weeklyAverageLine, finishedDaysThisWeek } from '@/lib/weekly-average'
-import { swapPoolMeal, setMealPick, recordMealEvent, getEatenByDate, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
+import { swapPoolMeal, setMealPick, getMealPicksForDate, clearMealPick, recordMealEvent, getEatenByDate, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
 import { buildCoachEatenSummary, eatenWindow } from '@/lib/coach-eaten'
 import { buildCoachWeekReview, weekReviewDates } from '@/lib/coach-week-review'
 import { changeSinceStart } from '@/lib/weight-trend'
@@ -6780,7 +6781,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       if (result.memoryIntent.tool === 'record_fact' && args?.kind === 'food_preference' && args?.polarity !== 'like' && toAsk.length > 0) {
         return { text: DISLIKE_ASK.turn(toAsk) }
       }
-      return textBesideSave(await resolveAndSaveMemory(result.memoryIntent), result.reply)
+      const saved = textBesideSave(await resolveAndSaveMemory(result.memoryIntent), result.reply)
+      // A MEAL HE LIKES CAN GO IN THE PLAN (16 Nov 2026): a like that is a whole meal for a named meal is followed by the
+      // app's offer, with buttons. Each button is his instruction to the add-a-meal route, so nothing is written here.
+      const likedMeal = result.memoryIntent.tool === 'record_fact' && args?.kind === 'food_preference' && args?.polarity === 'like' ? wholeMealLike(userSaid ?? '') : null
+      if (likedMeal && saved.receipt) return { ...saved, text: [saved.text?.trim(), MEAL_LIKE_OFFER.turn(likedMeal.meal, likedMeal.slot)].filter(Boolean).join('\n\n') }
+      return saved
     }
     if (result.groceryIntent) {
       return resolveAndSaveGrocery(result.groceryIntent)
@@ -6985,6 +6991,17 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // ask to open a screen is the app's to answer, at once, with no coach call. The coach had answered with directions
     // to the Tools tab, the one thing the app promises never to do. The screen opens; the chat keeps a line and a
     // button to open it again.
+    // "JUST REMEMBER IT" (16 Nov 2026): the answer to the app's own offer after a meal he likes. The like is already saved;
+    // the app says so, and nothing else happens. No coach call.
+    if (userText.trim() === MEAL_LIKE_OFFER.justRemember) {
+      persistUserMessage(userText)
+      const lineId = typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : undefined
+      setMessages(prev => [...prev, { id: lineId, role: 'assistant' as const, content: MEAL_LIKE_OFFER.remembered, status: 'complete' as const, created_at: new Date().toISOString() }])
+      if (profile.id) void supabase.from('chat_messages').insert({ ...(lineId ? { id: lineId } : {}), profile_id: profile.id, role: 'assistant', content: MEAL_LIKE_OFFER.remembered, status: 'complete' })
+        .then(({ error }) => { if (error) console.error('meal like: the line was not saved', error) })
+      return
+    }
+
     const openAsk = parseOpenRequest(userText)
     if (openAsk) {
       persistUserMessage(userText)
@@ -7514,6 +7531,18 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         try { await setMealPick(editProfileId, p.date, p.slot, p.option.name); return true } catch { return false }
       })
       receipt = result.receipt
+      // EVERY DAY, WHEN ASKED (16 Nov 2026, "every breakfast this week"): the one option is picked for each later day by the
+      // same path an upcoming day's pick takes. A day that does not save is said, never passed over.
+      if (receipt.failed.length === 0 && payload.alsoDates?.length) {
+        for (const d of payload.alsoDates) {
+          let saved = false
+          try {
+            saved = onUpcomingMealPickApplied ? await onUpcomingMealPickApplied(d, payload.slot, payload.option.name) : (await setMealPick(editProfileId, d, payload.slot, payload.option.name), true)
+          } catch { saved = false }
+          if (saved) receipt.landed.push(`${payload.slot} ${d}: ${payload.option.name}`)
+          else receipt.failed.push({ op: 'save', error: `${payload.option.name} didn't go in for ${datesLabel([d])}. Try again in a moment.` })
+        }
+      }
       const ok = receipt.failed.length === 0
       const EDIT_TITLES: Partial<Record<typeof row.kind, string>> = {
         propose_custom_meal: 'Set as your meal',
@@ -8525,6 +8554,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         if (!(await undoEatenCorrection(profile.id, payload))) return { refused: RECEIPTS_UNDONE.failed, keep: true }
         const removed = await undoMealAddition(profile.id, payload)
         if (!removed) return { refused: RECEIPTS_UNDONE.failed, keep: true }
+        // The later days it was put in come off too, where they still hold it.
+        for (const d of payload.alsoDates ?? []) {
+          const picks = await getMealPicksForDate(profile.id, d)
+          if (picks[payload.slot] === payload.option.name && !(await clearMealPick(profile.id, d, payload.slot))) return { refused: RECEIPTS_UNDONE.failed, keep: true }
+        }
         // Nothing to restore as the on-screen pick: the slot had whatever
         // assembleDay chose before this, and clearing the pick is what makes
         // the Nutrition tab fall back to it. onMealSwapApplied can't express
