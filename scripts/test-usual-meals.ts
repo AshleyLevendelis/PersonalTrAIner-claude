@@ -199,8 +199,8 @@ function main() {
       const typed = ['150g chicken breast raw', '70g white rice dry', '100g broccoli']
       const lunchBudget = (computeSlotBudgets(TARGETS, 3, true) as Record<MealSlotName, MacroTargets>).lunch
       const reportioned = fitDishToBudget({ slot: 'lunch', name: 'Chicken and rice', ingredients: typed, prep: '', cuisine: '' }, lunchBudget).dish.ingredients
-      const byEnergy = buildMealAdditionProposal({ ...base, rawArgs: { meal_name: 'Chicken and rice', meal_slot: 'lunch', ingredients: typed } })
-      const byShape = buildMealAdditionProposal({ ...base, rawArgs: { meal_name: 'Chicken and rice', meal_slot: 'lunch', ingredients: reportioned } })
+      const byEnergy = buildMealAdditionProposal({ ...base, libraryFit: true, rawArgs: { meal_name: 'Chicken and rice', meal_slot: 'lunch', ingredients: typed } })
+      const byShape = buildMealAdditionProposal({ ...base, libraryFit: true, rawArgs: { meal_name: 'Chicken and rice', meal_slot: 'lunch', ingredients: reportioned } })
       check('harness: re-portioning moves this dish, and the coach\'s builder accepts both versions', reportioned.join() !== typed.join() && byEnergy.ok && byShape.ok, reportioned)
       check('...the dish kept is one the coach\'s builder made, from his lines re-portioned', byShape.ok && JSON.stringify(byShape.payload.option) === JSON.stringify(ok.payload.option), ok.payload.option.ingredients)
       const grams = (o: PoolOption, food: RegExp) => o.ingredients.find(i => food.test(i.name))?.quantity ?? 0
@@ -224,7 +224,7 @@ function main() {
     check('...and so is one holding a food he avoids', !avoided.ok, avoided)
     // A USUAL MEAL THAT CANNOT BE SIZED IS KEPT, NOT REFUSED. Porridge and a banana is leaner than a breakfast here.
     const porridgeLines = ['80g oats', '300ml semi-skimmed milk', '120g banana']
-    const sizedPorridge = buildMealAdditionProposal({ ...base, rawArgs: { meal_name: 'Porridge with banana', meal_slot: 'breakfast', ingredients: porridgeLines } })
+    const sizedPorridge = buildMealAdditionProposal({ ...base, libraryFit: true, rawArgs: { meal_name: 'Porridge with banana', meal_slot: 'breakfast', ingredients: porridgeLines } })
     check('harness: the sizing builder refuses this porridge (so the next checks are about the fallback)', sizedPorridge.ok === false, sizedPorridge.ok ? sizedPorridge.payload.option.ingredients : '')
     const porridge = planMyMeal(ctx, { name: 'Porridge with banana', slot: 'breakfast', lines: porridgeLines.join('\n') })
     check('...and the form keeps it, at his amounts', porridge.ok === true, porridge.ok ? '' : porridge.reason)
@@ -248,7 +248,7 @@ function main() {
     // EVERY VERSION IS VALID AND NONE LANDS: 400g of chicken is a lunch nobody's day fits around at any size. It is
     // kept as he wrote it, not as the first size tried.
     const chickenOnly = planMyMeal(ctx, { name: 'Chicken only', slot: 'lunch', lines: '400g chicken breast' })
-    const sizedChicken = buildMealAdditionProposal({ ...base, rawArgs: { meal_name: 'Chicken only', meal_slot: 'lunch', ingredients: ['400g chicken breast'] } })
+    const sizedChicken = buildMealAdditionProposal({ ...base, libraryFit: true, rawArgs: { meal_name: 'Chicken only', meal_slot: 'lunch', ingredients: ['400g chicken breast'] } })
     check('harness: sizing ACCEPTS this lunch, so "kept as written" below is a choice and not the only version left', sizedChicken.ok === true, sizedChicken.ok ? '' : sizedChicken.reason)
     check('a meal no size of which fits a day is kept at his amounts, and told it will not come up often',
       chickenOnly.ok && /^Kept at your amounts: /.test(chickenOnly.card.portions) && /won't come up often/.test(chickenOnly.card.what), chickenOnly.ok ? chickenOnly.card : chickenOnly)
@@ -269,7 +269,7 @@ function main() {
       }
       const bigBase = { ...base, targets: big, todayDate: '2026-11-09' }
       const lines = ['3 eggs', '2 slices wholemeal bread']
-      const byEnergy = buildMealAdditionProposal({ ...bigBase, rawArgs: { meal_name: 'Eggs on toast', meal_slot: 'breakfast', ingredients: lines } })
+      const byEnergy = buildMealAdditionProposal({ ...bigBase, libraryFit: true, rawArgs: { meal_name: 'Eggs on toast', meal_slot: 'breakfast', ingredients: lines } })
       const asWritten = buildCustomMealProposal({ ...bigBase, rawArgs: { name: 'Eggs on toast', meal_slot: 'breakfast', food_lines: lines } })
       check('harness: on this real plan the sized version is valid and does NOT land a day, and the typed one does',
         byEnergy.ok && asWritten.ok && dishLandsADay(real, SLOTS, big, 'breakfast', byEnergy.payload.option, '2026-11-09') === false && dishLandsADay(real, SLOTS, big, 'breakfast', asWritten.payload.option, '2026-11-09') === true,

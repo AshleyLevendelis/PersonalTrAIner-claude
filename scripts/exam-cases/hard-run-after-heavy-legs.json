@@ -1,0 +1,19 @@
+{
+  "name": "hard-run-after-heavy-legs",
+  "why": "Ashley, 16 Nov 2026, 'Ahead and before': the coach weighs what was done in the last days as well as what is coming. Yesterday was a heavy leg session, closed in full; today is a rest day. Hard intervals today would be a second hard day on tired legs back to back. The answer must name yesterday's leg work and give the better option (easy or short, or another day), never a plain yes. A question, so no card.",
+  "contextOverrides": {
+    "day_of_week": "Wednesday",
+    "current_time_formatted": "Wednesday, 7:10 AM",
+    "workout_logged_today": false,
+    "exercise_summary": "Tuesday: Lower body, heavy — Barbell Back Squat 5x5 @ 100kg, Romanian Deadlift 4x6 @ 90kg, Walking Lunges 3x10, Standing Calf Raise 3x15. [CLOSED at 16 of 16 planned working sets]\nToday (Wednesday): rest day.\nThursday (tomorrow): Upper body — Incline Dumbbell Press 4x8, Seated Cable Row 4x10, Lateral Raise 3x15.\nSaturday: Full body — Deadlift 4x5 @ 120kg, Front Squat 3x6, Pull-Up 3x8."
+  },
+  "messages": [
+    "fancy a hard hill sprint session this morning, is that a good shout?"
+  ],
+  "checks": {
+    "mustMention": ["yesterday", "legs", "squat"],
+    "expectsProposalKind": [
+      { "turn": 0, "oneOf": [] }
+    ]
+  }
+}

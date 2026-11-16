@@ -21,8 +21,9 @@ import { splitCompoundFoodLine } from './ingredient-units'
 // the model's raw arguments and stores nothing.
 // ---------------------------------------------------------------------------
 
-import { whichKindQuestion } from './food-db'
-import { parseIngredientLine } from './portion-scaler'
+import { whichKindQuestion, computeMealMacros } from './food-db'
+import { cookedHint } from './as-weighed'
+import { parseIngredientLine, withParsedQuantity, kitchenRound } from './portion-scaler'
 import { computeSlotBudgets, verifyProposal, type PoolOption, type RawProposal } from './meal-generation'
 import { tagsMyMeal, type MealSlotName } from './meal-store'
 import type { MacroTargets } from './types'
@@ -39,6 +40,8 @@ export interface MealAdditionArgs {
   cuisine?: unknown
   date?: unknown
   reason?: unknown
+  /** The coach was ASKED how much (his ruling 16 Nov 2026, "App sizes it"): the card is said as the answer. */
+  as_suggestion?: unknown
 }
 
 export interface MealAdditionPayload {
@@ -61,6 +64,8 @@ export interface BuildMealAdditionInput {
   dislikedFoods?: string[]
   /** Today, as YYYY-MM-DD — used when the model names no date. */
   todayDate: string
+  /** HIS OWN meal (Profile, My meals): the verifier's own re-portioning, as it always was (his "My usual meals first"), never the coach's plate sizing. */
+  libraryFit?: boolean
 }
 
 export type MealAdditionResult =
@@ -182,6 +187,34 @@ export function explainRejection(log: string[], dishName: string, slot: MealSlot
  * exactly what was shown on the card and re-runs nothing — the model's own
  * ingredient quantities never reach the database.
  */
+/** The protein foods sized to the meal's protein; carbs kept at the offered portion, cut only to stay inside its calories. */
+function sizeToProtein(dish: RawProposal, budget: MacroTargets): RawProposal {
+  const parsed = dish.ingredients.map(parseIngredientLine)
+  const m = computeMealMacros(parsed)
+  const role = m.lines.map(l => {
+    if (!l.entry || !l.macros || !/^(g|ml)$/i.test(l.input.unit)) return 'F' as const
+    const cat = l.entry.category
+    if (cat === 'protein' || (cat === 'dairy' && l.entry.per100g.protein >= 8)) return 'P' as const
+    return cat === 'carb' ? 'C' as const : 'F' as const
+  })
+  const sum = (r: 'P' | 'C' | 'F', k: 'kcal' | 'protein') => m.lines.reduce((t, l, i) => t + (role[i] === r && l.macros ? l.macros[k] : 0), 0)
+  const pProt = sum('P', 'protein')
+  const otherProt = sum('C', 'protein') + sum('F', 'protein')
+  const a = pProt > 0 ? Math.min(2.5, Math.max(0.4, (budget.protein - otherProt) / pProt)) : 1
+  const kcalAfterP = sum('F', 'kcal') + a * sum('P', 'kcal')
+  const cKcal = sum('C', 'kcal')
+  // Carbs then fill toward the meal's calories: cut as far as needed, but grown by 30% at most (CSCS, mine, 16 Nov
+  // 2026): a plate answering "how much" is a normal plate, never 900g of potatoes to close a gap, and what is left
+  // short is said in numbers in the answer.
+  const b = cKcal > 0 ? Math.min(1.3, Math.max(0.4, (budget.calories - kcalAfterP) / cKcal)) : 1
+  const lines = dish.ingredients.map((text, i) => {
+    const factor = role[i] === 'P' ? a : role[i] === 'C' ? b : 1
+    if (factor === 1) return text
+    return withParsedQuantity(text, Math.max(5, kitchenRound(parsed[i].quantity * factor, parsed[i].unit))) ?? text
+  })
+  return { ...dish, ingredients: lines }
+}
+
 export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAdditionResult {
   const { rawArgs } = input
   const dishName = String(rawArgs.meal_name ?? '').trim()
@@ -211,8 +244,23 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
 
   // THE ENFORCEMENT. Everything above is normalisation; this line is the
   // reason a user-added meal is no less safe than a generated one.
+  // THE PLATE A COACH WOULD SERVE (16 Nov 2026, his live test and "App sizes it"; CSCS, mine): scaling a whole dish to a
+  // meal's calories carries its protein with it, so a chicken-heavy plate sized to a 1,200 kcal lunch held 146 g of
+  // protein against 64. The library's own fitter moves the protein foods and the carb foods within ranges a cook would
+  // call the same dish, so the plate lands on the meal's whole budget; verification below is unchanged.
+  // "HOW MUCH SHOULD I HAVE?" IS SIZED TO HIS PROTEIN, NOT FILLED TO HIS CALORIES (16 Nov 2026; CSCS, mine). A canteen
+  // plate of chicken, potatoes and salmon carries almost no fat, so filling it to a 1,200 kcal lunch meant 940 g of
+  // cooked potatoes, which no coach would serve. Asked as a question, the protein foods are sized to the meal's protein,
+  // the carbs stay at the ordinary portion he was offered (only ever cut, to stay inside the meal's calories), and the
+  // calories land where they land: the answer says so, and the rest of the day is the day's own business. Every safety
+  // check still runs (keepPortions keeps the amounts, never the checks).
+  const asked = rawArgs.as_suggestion === true
+  // ONE PLATE, HOWEVER HE PUT IT (CSCS, mine, 16 Nov 2026): told "add it", the calorie fit gave 1,070g of raw potatoes
+  // for one lunch, the plate his question had just been spared. Asked or told, a dish the coach names is sized the same
+  // way (protein first, carbs within 30%), and the amounts are kept as sized.
+  const fitted = input.libraryFit ? proposal : sizeToProtein(proposal, budget)
   const rejectLog: string[] = []
-  const option = verifyProposal(proposal, slot, budget, input.dietaryPreferences, rejectLog, input.dislikedFoods ?? [])
+  const option = verifyProposal(fitted, slot, budget, input.dietaryPreferences, rejectLog, input.dislikedFoods ?? [], undefined, !input.libraryFit)
   if (!option) return { ok: false, reason: explainRejection(rejectLog, dishName, slot) }
 
   const date = normaliseDate(rawArgs.date, input.todayDate)
@@ -225,6 +273,11 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
     // HIS OWN MEAL (11 Nov 2026, "My usual meals first"): marked so the week's menu and the day's pick put it first.
     payload: { slot, date, option: { ...option, tags: tagsMyMeal(option.tags) } },
     diff: {
+      // AN ANSWER TO "HOW MUCH?" (his ruling 16 Nov 2026, "App sizes it"): the amounts and the numbers are the app's and are
+      // said as the answer, in the lead; the buttons offer to put it in. Nothing is written until the tap.
+      ...(rawArgs.as_suggestion === true
+        ? { lead: `By the app's own food figures, for your ${slot}: ${option.ingredients.map(i => { const hint = cookedHint(i); return hint ? `${formatPortion(i)} (${hint})` : formatPortion(i) }).join(', ')}. That's about ${Math.round(m.calories)} kcal and ${Math.round(m.protein)}g protein, against about ${Math.round(budget.calories)} kcal and ${Math.round(budget.protein)}g for your ${slot}. Want it as your ${slot}?` }
+        : {}),
       rows: [
         { field: 'Adding to', before: slot, after: option.name },
         { field: 'Calories', before: `${Math.round(budget.calories)} kcal target`, after: `${Math.round(m.calories)} kcal` },
@@ -236,7 +289,8 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
       // portions are the app's, not the model's, and the meal becomes that
       // day's pick as well as joining the slot's options.
       implications: [
-        { severity: 'info', text: `Portions adjusted to fit your ${slot} target — ${option.ingredients.map(formatPortion).join(', ')}` },
+        // When he asked how much, the answer above already lists every amount; saying it twice would say it two ways.
+        ...(rawArgs.as_suggestion === true ? [] : [{ severity: 'info' as const, text: `Portions adjusted to fit your ${slot} target — ${option.ingredients.map(formatPortion).join(', ')}` }]),
         { severity: 'info', text: `Joins your ${slot} options, and becomes your ${slot} for ${date}.` },
       ],
       rationale: typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined,

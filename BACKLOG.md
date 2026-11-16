@@ -2,6 +2,61 @@
 
 Newest first. One line each.
 
+- [x] **AND IT LOOKS BACK, NOT ONLY AHEAD: his follow-up 16 Nov 2026, "Ahead and before"**. The coach now reads the last
+  two days (the plan's done marks, the workout and cardio logs) as well as today and the next two. Mine (CSCS): two hard
+  days on the same muscles back to back is what to avoid, whichever way round; heavy legs yesterday makes hard running
+  or another heavy leg day today riskier and less useful, so it names yesterday's session and gives the easier option.
+  New exam case `hard-run-after-heavy-legs` (hill sprints the morning after heavy squats). `test:answer-first`
+  35 checks, 2 more mutations caught. Same caveat: proven only when the exam runs after the `chat-gemini` deploy.
+- [x] **THE COACH WEIGHS WHAT IS COMING UP BEFORE IT SAYS YES (his request 16 Nov 2026)**. His words: "if I ask should I
+  run 15k tonight but I have a heavy leg session planned for tomorrow morning, I don't want the chat to just say yeah go
+  for it." Measured: the coach already receives the whole week, today and tomorrow labelled, with each session's
+  exercises and weights, and "the next session after today is tomorrow's ..." in its opening line. What it lacked was
+  any instruction to USE it: its one rule about sessions was "don't lead with them" (his 17 Sep ruling), and no exam
+  case asked. Now a section in its instructions says what is coming up decides the answer. **Mine (CSCS):** long or hard
+  cardio and heavy lower-body lifting compete within about a day; never a plain yes; name the session, say what it
+  costs (tired legs, a flat squat day, injury risk) and give the better option (an easy shorter run, the long run on a
+  day with no legs after it, or moving the session); a running goal puts the run first, otherwise the plan's sessions
+  come first; an upper-body or rest day next is a yes with a reason; a meal change is checked against the day's
+  targets and what was eaten. The answer-first step tells the coach the same, and may now name a duration or distance
+  (only calories, grams, weights, sets and reps are the offer's). New exam case `run-before-heavy-legs` (an 18k the
+  evening before heavy squats; worded unlike the example in the instructions, so it tests the rule, not recall).
+  `test:answer-first` (34 checks; 4 more mutations, all caught). **NOT KNOWN until the exam runs on his machine after
+  the `chat-gemini` deploy:** whether the coach follows it. The rule is code; the judgement is the model's.
+- [x] **A QUESTION GETS ITS ANSWER, THEN THE OFFER: his ruling 16 Nov 2026, "Answer, then offer"** (from three
+  options: answer then offer with buttons, answer only with the offer on his yes, or answer only). His report: "it
+  doesn't seem to understand the difference between me asking a question and a request." Measured: of the coach's
+  change tools only four ask whether he asked or told, and every turn that ends in an offer threw the coach's words away
+  (a deliberate rule, so a sentence can never claim a change that has not happened). So "should I swap squats for leg
+  press?" got "I can swap ..." with Apply and no answer. Now, when HE ASKED (the last sentence ends in "?" or starts
+  should / can I / is / what ...; "can you ...", "could you ..." and "please" stay requests), a second short coach call
+  writes one or two lines (yes or no and why) and they sit above the app's own offer, Apply and Not now unchanged. The
+  answer is used only if it claims nothing was done, carries no number (the numbers are the offer's), asks nothing and
+  is short; otherwise the turn is the offer alone, as before. The screen refuses a change-claim again. When the offer
+  itself is refused (a dish the app cannot fit), the app's refusal stands alone: a "yes" above "I couldn't fit it"
+  would contradict itself. "How much should I have?" keeps the app's own answer. Every tool's reply passes through the
+  one step (it wraps the whole tool block). Found on the way, mine (CSCS): told "add it", a dish was still sized by
+  calories, 1,070 g of raw potatoes for one lunch; every coach-added dish is now sized like the "how much" answer. His OWN meals (Profile, My meals) keep their own
+  sizing exactly as before (his "My usual meals first"): caught by `test:usual-meals` in the related-checks run.
+  `test:answer-first` (30 checks, 12 mutations, all caught), `test:meal-addition`, `verify:live-test-nov14` A28-A30.
+  Needs the `chat-gemini` deploy; whether the coach's answers are GOOD is the exam's to say.
+- [x] **"HOW MUCH OF EACH SHOULD I HAVE?" IS ANSWERED BY THE APP: his ruling 16 Nov 2026, "App sizes it"** (from three
+  options: the app works it out, the coach keeps answering but is checked, or leave it). His live test: told the coach
+  lunch had roast chicken, new potatoes and smoked salmon and asked how much of each; the coach wrote its own grams and a
+  total the plate did not reach, and a later turn read the menu as a meal he had eaten. Now: asked as a QUESTION, the
+  coach's meal tool comes back as an offer whose words ARE the answer, all from the app's food table: "By the app's own
+  food figures, for your lunch: 220g raw chicken breast (about 160g cooked), 410g raw new potatoes (about 360g cooked),
+  50g smoked salmon. That's about 651 kcal and 67g protein, against about 1216 kcal and 64g for your lunch. Want it as
+  your lunch?" with Apply / Not now; nothing is written until the tap. The coach is told never to write grams, calories
+  or protein for a meal itself, and that a menu on offer is not a meal eaten. An instruction to add ("add it") keeps the
+  old card. **Sizing, mine (CSCS):** protein first (the protein foods scaled to the meal's protein share, 0.4-2.5x),
+  then carbs toward the meal's calories, cut as needed but grown by 30% at most; fat foods left as he named them. The
+  first try (calorie-sized) gave 146g protein for a 64g lunch and 940g of potatoes; a coach serves a normal plate and
+  says the gap in numbers, so a big-calorie lunch stays short and the card's existing "leaves the day short" line says
+  so. The amounts are said once (the card's "Portions adjusted" line is dropped when he asked). `test:meal-addition` §6
+  (13 checks; 9 mutations, all caught, one only after a case where the protein sizing binds was added),
+  `verify:live-test-nov14` A25-A27 (the driver now waits for the typing to finish; a mid-sentence screenshot had
+  read as a cut-off question). Needs the `chat-gemini` deploy for the coach's half.
 - [x] **THE COACH SAID IT COULDN'T START A TIMER, ABOVE A START BUTTON THAT WORKED (his live test, 16 Nov 2026)**.
   Asked "start a timer of 3 rounds of 30 seconds with 30 seconds rest", the live coach replied "I can't start the timer
   directly from here ... head over to the Tools tab", and the app's "3 × 30s, 30s rest · Start · 10s countdown" button

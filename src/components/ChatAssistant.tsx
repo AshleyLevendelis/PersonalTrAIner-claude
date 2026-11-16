@@ -2488,6 +2488,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * being built before anything calls them.
    */
   interface ChatApiResponse {
+    /** The coach's short answer sits above this turn's offer: he asked a question (his "Answer, then offer"). */
+    answer_first?: boolean
     reply: string
     action?: PlanAction
     // I1: the edge function returns INTENT only, never a pending_actions
@@ -2671,7 +2673,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       throw new Error('Invalid response from AI')
     }
     return {
-      reply: data.reply, action: data.action, proposal: data.proposal, receipt: data.receipt, offer: data.offer, logWorkout: data.logWorkout,
+      reply: data.reply, answer_first: data.answer_first === true, action: data.action, proposal: data.proposal, receipt: data.receipt, offer: data.offer, logWorkout: data.logWorkout,
       // Bug fix: memoryIntent was validated server-side (M1-M5) and read by
       // processResponse below, but never actually threaded through here —
       // every memory save silently fell through to the offer/action path
@@ -6720,7 +6722,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           ? { ...m, pendingAction: { ...m.pendingAction, status: 'stale' } }
           : m))
       }
-      return { text: describeProposalClientSide(pendingAction), pendingAction }
+      // A QUESTION GETS ITS ANSWER FIRST (his ruling 16 Nov 2026, "Answer, then offer"): the server sends the coach's
+      // short answer only when he asked and it passed its checks; this side refuses one claiming a change all the same.
+      const answer = result.answer_first && typeof result.reply === 'string' ? result.reply.trim() : ''
+      const offerWords = describeProposalClientSide(pendingAction)
+      return { text: answer && !detectPlanClaim(answer) ? `${answer}\n\n${offerWords}` : offerWords, pendingAction }
     }
     if (result.receipt) {
       return { text: result.receipt.title, receipt: result.receipt }

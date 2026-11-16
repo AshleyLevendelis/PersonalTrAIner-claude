@@ -102,7 +102,7 @@ export function planMyMeal(ctx: MyMealContext, draft: MyMealDraft): MyMealPlan {
   const foodLines = draft.lines.split('\n').map(l => l.trim()).filter(Boolean)
   const active = Object.keys(computeSlotBudgets(ctx.targets, ctx.mealsPerDay, ctx.includeSnacks, ctx.skipBreakfast)) as MealSlotName[]
   const budget = computeSlotBudgets(ctx.targets, ctx.mealsPerDay, ctx.includeSnacks, ctx.skipBreakfast)[draft.slot]
-  const sizedFrom = (lines: string[]) => buildMealAdditionProposal({ rawArgs: { meal_name: name, meal_slot: draft.slot, ingredients: lines }, ...shared })
+  const sizedFrom = (lines: string[]) => buildMealAdditionProposal({ rawArgs: { meal_name: name, meal_slot: draft.slot, ingredients: lines }, ...shared, libraryFit: true })
   const lands = (o: PoolOption) => dishLandsADay(ctx.pools, active, ctx.targets, draft.slot, o, ctx.todayDate)
 
   // THREE VERSIONS OF THE SAME MEAL, best first, each through a builder the coach already uses, so every refusal that
