@@ -44,6 +44,10 @@ async function main() {
   for (const [text, want] of opens) check(`"${text}" opens ${want}`, m.parseOpenRequest(text)?.target === want, m.parseOpenRequest(text))
   const plate100 = m.parseOpenRequest('open the plate calculator for 100kg')
   check('a weight named with the plate calculator starts it there', plate100?.target === 'plate' && plate100.kg === 100, plate100)
+  // His live test, 16 Nov: "Open the calculator at 120kg" went to the coach, which copied the app's line and opened nothing.
+  const calc120 = m.parseOpenRequest('Open the calculator at 120kg')
+  check('"Open the calculator at 120kg" is the plate calculator, at 120 kg (the only calculator in the app)', calc120?.target === 'plate' && calc120.kg === 120, calc120)
+  check('"open my calorie calculator" is not the plate calculator', m.parseOpenRequest('open my calorie calculator')?.target !== 'plate', m.parseOpenRequest('open my calorie calculator'))
   const notOpens = [
     'add eggs to my grocery list',
     'remove the milk from my shopping list',
@@ -60,8 +64,12 @@ async function main() {
 
   console.log('\n2. The app\'s own line, and the button read back from it')
   for (const t of ['plate', 'history', 'grocery', 'program', 'profile'] as const) {
-    check(`the line for ${t} reads back as ${t} (so the button survives a reload)`, m.openTargetInReply(m.openedLine(t)) === t)
+    check(`the line for ${t} reads back as ${t} (so the button survives a reload)`, m.openTargetInReply(m.openedLine(t))?.target === t)
   }
+  check('the plate calculator\'s line names the weight', m.openedLine('plate', 120) === 'Opened the plate calculator at 120 kg.', m.openedLine('plate', 120))
+  const back = m.openTargetInReply(m.openedLine('plate', 120))
+  check('...and its button reopens it at that weight, not the default', back?.target === 'plate' && back.kg === 120, back)
+  check('a line with no weight reopens with none', m.openTargetInReply(m.openedLine('plate'))?.kg === null)
   check('the button names the screen', m.openButtonLabel('plate') === 'Open the plate calculator' && m.openButtonLabel('history') === 'Open your session history', [m.openButtonLabel('plate'), m.openButtonLabel('history')])
   check('a coach sentence is never read as the app\'s line', m.openTargetInReply('You can open the plate calculator on the Tools tab.') === null)
 
@@ -87,9 +95,19 @@ async function main() {
   const ask = chat.indexOf('const openAsk = parseOpenRequest(userText)')
   const coachCall = chat.indexOf('const result = await callGemini(userText, placeholderId)')
   check('the chat reads an open request before it asks the coach', ask > 0 && coachCall > 0 && ask < coachCall, { ask, coachCall })
-  const openBranch = ask > 0 ? chat.slice(ask, ask + 900) : ''
-  check('...opens the screen, keeps the app\'s own line, and does not go on to the coach', /requestOpen\(openAsk\.target, openAsk\.kg\)/.test(openBranch) && /openedLine\(openAsk\.target\)/.test(openBranch) && /\n\s*return\n/.test(openBranch))
-  check('...and draws the open-again button under that line', /openTargetInReply\(msg\.content\)/.test(chat) && /onClick=\{\(\) => requestOpen\(openTarget\)\}/.test(chat))
+  const openBranch = ask > 0 ? chat.slice(ask, ask + 1600) : ''
+  check('...opens the screen, keeps the app\'s own line, and does not go on to the coach', /requestOpen\(openAsk\.target, openAsk\.kg\)/.test(openBranch) && /openedLine\(openAsk\.target, openAsk\.kg\)/.test(openBranch) && /\n\s*return\n/.test(openBranch))
+  check('...and draws the open-again button under that line, at the line\'s weight', /openTargetInReply\(msg\.content\)/.test(chat) && /onClick=\{\(\) => requestOpen\(opened\.target, opened\.kg\)\}/.test(chat))
+  // His live test, 16 Nov: every "Opened ..." line showed twice. The line had no id, so the history re-read added the saved copy.
+  const { addServerMessages } = await import('../src/lib/chat-history-merge')
+  const before = [{ id: 'u1', role: 'user' as const, content: 'hi', status: 'complete' as const, created_at: '2026-11-16T18:00:00Z' }]
+  const saved = { id: 'L1', role: 'assistant' as const, content: 'Opened the plate calculator.', status: 'complete' as const, created_at: '2026-11-16T18:01:00Z' }
+  const noId = addServerMessages([...before, { ...saved, id: undefined }], [before[0], saved]).filter(x => x.content === saved.content).length
+  const withId = addServerMessages([...before, saved], [before[0], saved]).filter(x => x.content === saved.content).length
+  check('a line on screen with no id is shown twice after a re-read (the cause), once with its saved id', noId === 2 && withId === 1, { noId, withId })
+  check('...and the chat gives the line its saved row\'s id before it is shown and saved', /setMessages\(prev => \[\.\.\.prev, \{ id: lineId,/.test(openBranch) && /insert\(\{ \.\.\.\(lineId \? \{ id: lineId \} : \{\}\)/.test(openBranch))
+  const mimicAt = chat.indexOf('const mimic = openTargetInReply(responseText)')
+  check('a coach reply copying the app\'s line is made true: the screen opens, at the weight he named', mimicAt > 0 && /requestOpen\(mimic\.target, kg\)/.test(chat.slice(mimicAt, mimicAt + 500)) && /kgInText\(userText\)/.test(chat.slice(mimicAt, mimicAt + 500)))
   const tools = read('src/components/ToolsTab.tsx')
   check('Tools opens the plate calculator and the session history when asked', /takeOpenRequest\(\['plate', 'history'\]\)/.test(tools) && /setPlateOpen\(true\)/.test(tools.slice(tools.indexOf("takeOpenRequest(['plate'"))) && /setHistoryOpen\(true\)/.test(tools.slice(tools.indexOf("takeOpenRequest(['plate'"))))
   const app = read('src/App.tsx')

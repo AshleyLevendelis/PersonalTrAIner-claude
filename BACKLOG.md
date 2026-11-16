@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **OPEN FROM CHAT, HIS LIVE TEST (16 Nov 2026): the plate calculator opened at 40 kg, and every line showed twice.**
+  Traced, three causes. (1) "Open the calculator at 120kg" named no "plate", so it went to the coach, which COPIED the
+  app's "Opened the plate calculator." from the chat above: the app drew the open-again button under it, and that button
+  opened at the default 40 kg because the line carried no weight. (2) The open-again button never carried a weight, so
+  even "at 100kg" reopened at 40. (3) The line was put on screen with no id; the chat's history re-read did not know it
+  and added the saved copy beside it (measured in the gate: an id-less line comes back twice, the same line with its id
+  once). Now: "calculator"/"calc" alone is the plate calculator (the only one; "calorie calculator" is not); the line
+  names the weight ("Opened the plate calculator at 120 kg.") and the button reopens there; the line carries its saved
+  row's id from the start; a coach reply copying the line is made TRUE (the screen opens, at the weight he named) and the
+  coach is told never to write it. The screen half was already right (`verify:tools-2a` 7a opens at 100 kg).
+  `test:open-from-chat` (58 checks), `verify:live-test-nov14` A36-A38. Needs the `chat-gemini` deploy for the coach line
+  only; the rest is frontend.
 - [x] **EVERYTHING FROM THE CHAT: OPEN ANY SCREEN, AND TAKE THINGS OFF THE SHOPPING LIST (his request 16 Nov 2026)**.
   His screenshot: "Open the plate calculator" got the coach's directions ("on the Tools tab ... tap the plate calculator
   row"), the one thing the app promises never to do; and "I want to be able to do everything from chat. Open plate

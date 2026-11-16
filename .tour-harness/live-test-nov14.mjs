@@ -176,6 +176,17 @@ check('A32. the app answers itself: "Opened the plate calculator." with an "Open
 check('A33. ...and moves to Tools, where the calculator lives', opened?.hash === '#/tab/tools', opened?.hash)
 check('A34. ...without asking the coach (no directions to a tab can come back)', !!opened && opened.calls === callsBefore && !/Tools tab/.test(opened.text), { before: callsBefore, after: opened?.calls })
 await shot('open-plate')
+// His live test, 16 Nov: "Open the calculator at 120kg" went to the coach (no "plate"), and every line showed twice.
+await page.evaluate(() => { window.location.hash = '' })
+check('A36. "Open the calculator at 120kg" is sent', await say('Open the calculator at 120kg'))
+const at120 = await until(() => page.evaluate(() => {
+  const lines = [...document.querySelectorAll('[data-testid="chat-bubble"]')].filter(n => /Opened the plate calculator at 120 kg\./.test(n.textContent || ''))
+  return lines.length ? { count: lines.length, calls: window.__coachCalls || 0 } : null
+}), v => !!v)
+check('A37. ...the app opens the plate calculator at 120 kg itself, and says the weight', !!at120 && at120.calls === callsBefore, at120)
+await new Promise(r => setTimeout(r, 1500))
+const lineCount = await page.evaluate(() => [...document.querySelectorAll('[data-testid="chat-bubble"]')].filter(n => /Opened the plate calculator/.test(n.textContent || '')).length)
+check('A38. ...and each "Opened" line is shown once', lineCount === 2, lineCount)
 await page.evaluate(() => { window.location.hash = '' })
 check('A35. "show me my shopping list" opens the list\'s own page', await say('show me my shopping list') && (await until(() => page.evaluate(() => window.location.hash), v => v === '#/nutrition/grocery')) === '#/nutrition/grocery')
 await page.evaluate(() => { window.location.hash = '' })
