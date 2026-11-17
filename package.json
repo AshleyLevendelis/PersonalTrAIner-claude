@@ -659,6 +659,7 @@
     "test:meal-like-offer": "tsx scripts/test-meal-like-offer.ts",
     "test:home-next-session": "tsx scripts/test-home-next-session.ts",
     "test:past-lifts": "tsx scripts/test-past-lifts.ts",
+    "test:coach-screen-numbers": "tsx scripts/test-coach-screen-numbers.ts",
     "verify:chat-real-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-real-day.mjs"
   },
   "dependencies": {

@@ -30,6 +30,7 @@ import { isMovementPrepRow } from './session-duration'
 import type { Exercise, ExerciseSetLog, WorkoutDay } from './types'
 import { filterLoggableSets, isDropRow } from './session-derive'
 import { sessionSetCount } from './session-count'
+import { getActiveMesocycleWeek } from './calculations'
 import { buildCoachTechniqueSummary } from './exercise-technique'
 import { sessionForDate, dayNameOf, addDays, type SessionMove } from './session-move'
 import { describeExerciseTempo } from './periodization'
@@ -192,6 +193,9 @@ export interface CoachToday {
   /** Sets logged today and planned for today — how "part-done" is known. */
   setsLogged: number
   setsPlanned: number
+  /** The count EVERY SCREEN shows for today (sessionSetCount on the strip's dated cell; stage 3, 17 Nov 2026). When
+   *  present it is the header's "N of M": the coach's own join reads a different session row after a move or swap. */
+  screenCount?: { logged: number; planned: number } | null
   /** True once the session has been closed out, not merely logged against. */
   finished: boolean
   /** The next scheduled session after today, when there is one within the week. */
@@ -455,8 +459,8 @@ export function buildTodayHeader(today: CoachToday): string {
   // plan: working sets on planned exercises. Without that join the two bare
   // numbers the caller sent are all there is, and they are used as they were.
   const totals = today.work ? todayWorkTotals(today.work) : null
-  const setsLogged = totals ? totals.logged : today.setsLogged
-  const setsPlanned = totals ? totals.planned : today.setsPlanned
+  const setsLogged = today.screenCount?.logged ?? (totals ? totals.logged : today.setsLogged)
+  const setsPlanned = today.screenCount?.planned ?? (totals ? totals.planned : today.setsPlanned)
   // CLOSED IS NOT THE SAME AS DONE (H23). A session finished at 7 of 9 sets
   // used to be announced as "ALREADY DONE — finished and logged", and the
   // coach then recited the two missing sets as work. "They closed it" and
@@ -868,8 +872,9 @@ export function buildCoachPhaseBrief({
   // MOMENT TWO: the week turned over since they last spoke to you. Computed
   // from the plan's own start date rather than a stored flag, so it stays
   // right after a rebuild and cannot drift out of sync with the plan.
-  const weekStart = new Date(planCreatedAt).getTime() + (activeWeek - 1) * 7 * DAY_MS
-  const weekJustChanged = !!lastChatAt && new Date(lastChatAt).getTime() < weekStart && activeWeek > 1
+  // Stage 3, 17 Nov 2026: the screens' rule (whole local days from the start date, getActiveMesocycleWeek), not
+  // milliseconds from the creation instant, which turned the week over at the hour the plan was made.
+  const weekJustChanged = !!lastChatAt && activeWeek > 1 && getActiveMesocycleWeek(planCreatedAt, new Date(lastChatAt), totalWeeks) < activeWeek
 
   if (planIsNew) {
     lines.push(

@@ -3094,6 +3094,8 @@ UPCOMING MEALS — the next six days, exactly as the Nutrition tab's day strip s
 ${context.upcoming_meal_summary}` : ''}
 ${context.show_numbers === false ? `
 NUMBERS OFF (his Profile setting, the starter tier): he chose not to see calories or macros. Never quote a calorie, kcal, gram or macro figure to him, even when the data below has one; talk about meals, portions (a palm of protein, a fist of carbs) and how the day went. Weights on the bar and minutes are fine.
+` : ''}${typeof context.today_calories === 'string' && context.today_calories && context.show_numbers !== false ? `
+CALORIES LEFT TODAY, exactly as their screen shows it: ${context.today_calories}. When calories left today come up, quote this figure; never work it out yourself from the totals below (they are read separately and can be a meal behind).
 ` : ''}${context.eaten_by_day_read === true && typeof context.eaten_by_day === 'string' ? `
 WHAT THEY LOGGED AS EATEN — totals from their meal log, today first. Logged, not eaten-in-fact: "nothing logged" means nothing was logged. This is the only record of a past day anywhere in the app; no screen shows it.
 ${context.eaten_by_day}` : context.eaten_by_day_read === false ? `

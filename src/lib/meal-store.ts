@@ -381,8 +381,14 @@ function mergeEvents(serverEvents: MealEventRecord[], profileId: string, date: s
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
+/** Which meal events count as EATEN, the one rule for the screens' day total and the coach's past days (stage 3,
+ *  17 Nov 2026: getEatenByDate had its own copy of this list, held equal by nothing). */
+export function isEatenEvent(e: { eventType: string }): boolean {
+  return e.eventType === 'confirmed' || e.eventType === 'swapped_in' || e.eventType === 'extra'
+}
+
 function eatenFrom(events: MealEventRecord[]): MealMacros {
-  return sumMacros(events.filter(e => e.eventType === 'confirmed' || e.eventType === 'swapped_in' || e.eventType === 'extra'))
+  return sumMacros(events.filter(isEatenEvent))
 }
 
 /** What a screen can know about today without asking the network. */
@@ -551,7 +557,7 @@ export async function getEatenByDate(
   const byDate: Record<string, EatenDay> = {}
   for (const date of dates) byDate[date] = { kcal: 0, protein: 0, carbs: 0, fat: 0, meals: 0 }
   for (const e of [...serverEvents, ...localOnly]) {
-    if (e.eventType !== 'confirmed' && e.eventType !== 'swapped_in' && e.eventType !== 'extra') continue
+    if (!isEatenEvent(e)) continue
     const d = byDate[e.date] ?? (byDate[e.date] = { kcal: 0, protein: 0, carbs: 0, fat: 0, meals: 0 })
     d.kcal += e.macros?.kcal ?? 0
     d.protein += e.macros?.protein ?? 0

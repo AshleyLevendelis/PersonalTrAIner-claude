@@ -60,9 +60,9 @@ check('...and nothing for a date the week does not hold', todayScreenCell(days a
 const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
 const usesCell = (chat.match(/todayScreenCell\(trainingWeek\.days, activeSession\.date\)/g) ?? []).length
 check('the chat strip AND the coach\'s context take today\'s cell from the one function', usesCell >= 2, usesCell)
-check('the coach\'s header is given the screens\' count', /screenCount: sessionSetCount\(/.test(chat))
+check('the coach\'s header is given the screens\' count', /screenCount: .*todayScreenCell\(trainingWeek\.days, activeSession\.date\).*sessionSetCount\(cell\.session, cell\.workingLogs\)/.test(chat))
 const ctx = strip(readFileSync('src/lib/chat-plan-context.ts', 'utf8'))
-check('...and the header prefers it over its own join', /today\.screenCount\s*\?\?/.test(ctx))
+check("...and the header prefers it over its own join", /today\.screenCount\?\.logged \?\?/.test(ctx) && /today\.screenCount\?\.planned \?\?/.test(ctx))
 
 console.log('\n2. Calories left: the app says it, in the screen\'s words; the coach never subtracts')
 const line = coachTodayCalories(2400, 990.6)
@@ -89,7 +89,7 @@ check('the three eaten kinds count', ['confirmed', 'swapped_in', 'extra'].every(
 check('...and nothing else does', !['skipped', 'planned', 'removed', ''].some(t => isEatenEvent({ eventType: t })))
 const store = strip(readFileSync('src/lib/meal-store.ts', 'utf8'))
 const body = (name: string) => { const i = store.indexOf(name); return i < 0 ? '' : store.slice(i, store.indexOf('\n}\n', i)) }
-check('the screens\' total (eatenFrom) uses it', /isEatenEvent\(/.test(body('function eatenFrom')))
+check('the screens\' total (eatenFrom) uses it', /filter\(isEatenEvent\)/.test(body('function eatenFrom')))
 check('the coach\'s past days (getEatenByDate) use it, with no copy of the list', /isEatenEvent\(/.test(body('export async function getEatenByDate')) && !/'swapped_in'/.test(body('export async function getEatenByDate')))
 
 console.log(`\n${ran} checks ran.`)
