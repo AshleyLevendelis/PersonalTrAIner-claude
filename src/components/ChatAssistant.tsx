@@ -38,6 +38,10 @@ import { groupMessages, bubblePositions, bubbleRadius, groupTimestamp, timeLabel
 import { supabase } from '@/lib/supabase'
 import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
+import { chatStarters } from '@/lib/chat-starters'
+import { stuckLifts, lowProtein, tirednessBuilding, coachPatternLines } from '@/lib/coach-patterns'
+import { loadChatSummary, saveChatSummaryLocally, messagesToSummarise, nextSummary, type ChatSummary } from '@/lib/chat-summary'
+import { isMissingColumnError } from '@/lib/missing-column'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, hasUnreadCoachMessage, waitingOnAnswer, loadSeenAttention, saveSeenAttention } from '@/lib/chat-unread'
 import { weeklyAverage, weeklyAverageLine, finishedDaysThisWeek } from '@/lib/weekly-average'
 import { swapPoolMeal, setMealPick, getMealPicksForDate, clearMealPick, recordMealEvent, getEatenByDate, getTodayLedger, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
@@ -60,7 +64,7 @@ import { getDurationBudgetSeconds } from '@/lib/session-duration'
 import { MOVEMENT_DEMANDS, TIMES_OF_DAY, canonicalDay, activityDays, describeActivity, reorderTracksForClassDays, HEAVY_TRACKS, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
 import { getSplitForDays, generateMesocycle, setRandomSource, resetRandomSource } from '@/lib/exercise-plan'
 import { seededRngFromKey } from '@/lib/seeded-random'
-import type { ConcurrentActivity, FitnessGoal } from '@/lib/types'
+import type { ConcurrentActivity, FitnessGoal, ExerciseSetLog } from '@/lib/types'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
 import { mealOnDay as mealOnDayFor } from '@/lib/meal-on-day'
@@ -536,6 +540,9 @@ const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan — 
 /** The cards that would put a food on her plate: a named food her restrictions keep out never gets one (H41). */
 const FOOD_OFFER_KINDS = new Set(['propose_meal_swap', 'propose_meal_addition', 'propose_custom_meal', 'propose_meal_food_add', 'propose_meal_food_replace'])
 
+/** How long a cleared chat can be put back (the app's other Undo lines use ten seconds or more). */
+const CLEAR_UNDO_MS = 10_000
+
 export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, emptyMeals = [], onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onPlanPause, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onEatingOut, onMealKnockOn, onMealKnockOnMove, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // "Show numbers" off (slice 4b): no calorie figure in the chat's own pills or cards (QA, 14 Nov 2026).
   const showNumbers = useShowNumbers()
@@ -886,6 +893,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     return () => unsubs.forEach(u => u())
   }, [])
   const [workoutLogHistory, setWorkoutLogHistory] = useState('')
+  /** The same 14 days of sets, as rows, for the patterns the app looks for (coach-patterns.ts). */
+  const recentLogsRef = useRef<ExerciseSetLog[]>([])
   const [cardioLogHistory, setCardioLogHistory] = useState('')
   const [quickRepliesDismissed, setQuickRepliesDismissed] = useState(false)
 
@@ -1002,6 +1011,50 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const block = ctx.before.find(w => w.week_number === ctx.weekNumber)?.block_number ?? 1
     return { verdict: assessEdit(ctx), key: askKey(ctx, block), scope: ctx.scope, reasoned }
   }
+  /** The running summary of chats older than the coach's window (chat-summary.ts); the phone's copy, then the profile's. */
+  const chatSummaryRef = useRef<ChatSummary | null>(loadChatSummary(profile.id, (profile as { chat_summary?: unknown }).chat_summary))
+  const summarising = useRef(false)
+  /** Folds the messages that have left the window into the summary: one short coach call, checked before it is kept. */
+  const maybeSummarise = async (all: ChatMessage[]) => {
+    if (!profile.id || summarising.current) return
+    const batch = messagesToSummarise(all.map(m => ({ role: m.role, content: m.content ?? '', created_at: m.created_at, status: m.status })), chatSummaryRef.current)
+    if (batch.length === 0) return
+    summarising.current = true
+    try {
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-gemini`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'summarise', turns: batch.map(m => ({ role: m.role, content: m.content })), previous: chatSummaryRef.current?.text ?? null, context: { profile_id: profile.id } }),
+      })
+      const written = res.ok ? ((await res.json()) as { summary?: unknown }).summary : null
+      const next = nextSummary(typeof written === 'string' ? written : null, batch, chatSummaryRef.current)
+      if (!next.kept) { if (next.problem) console.warn('[chat] summary not kept:', next.problem); return }
+      chatSummaryRef.current = next.summary
+      saveChatSummaryLocally(profile.id, next.summary)
+      const { error } = await supabase.from('fitness_profiles').update({ chat_summary: next.summary }).eq('id', profile.id)
+      if (error && !isMissingColumnError(error, 'chat_summary')) console.error('[chat] summary not saved to the profile', error)
+    } catch {
+      // No signal or no coach: the previous summary stands and the next batch tries again.
+    } finally {
+      summarising.current = false
+    }
+  }
+  // Older messages that have left the coach's window are folded into the summary once a reply has landed (never while
+  // one is being written), checked before it is kept. maybeSummarise does nothing until a batch is due.
+  useEffect(() => {
+    if (isLoading) return
+    const last = messages[messages.length - 1]
+    if (last?.role === 'assistant' && last.status !== 'pending') void maybeSummarise(messages)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, isLoading])
+  /** A clear waiting out its Undo window (handleClearChat): the delete runs on flush, Undo puts the messages back. */
+  const clearUndo = useRef<{ flush: () => void; undo: () => void } | null>(null)
+  const [clearedAt, setClearedAt] = useState<number | null>(null)
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') clearUndo.current?.flush() }
+    document.addEventListener('visibilitychange', onHide)
+    return () => { document.removeEventListener('visibilitychange', onHide); clearUndo.current?.flush() }
+  }, [])
   /** Clear-chat's armed state — see handleClearChat for why this is not a window.confirm. */
   const [clearArmed, setClearArmed] = useState(false)
   const clearArmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1029,7 +1082,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const selfScrollTopRef = useRef<number | null>(null)
   const scrollToBottom = useCallback((smooth = false) => {
     requestAnimationFrame(() => {
-      if (scrollRef.current) {
+      // A jump queued before a long reply landed must not undo the stop at his message (anchorLongReply): by the time
+      // this frame runs the chat may no longer be following the bottom.
+      if (scrollRef.current && isNearBottomRef.current) {
         scrollRef.current.scrollTo({
           top: scrollRef.current.scrollHeight,
           behavior: smooth ? 'smooth' : 'instant',
@@ -1039,11 +1094,33 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     })
   }, [])
 
+  /** Stops the window at his message when the reply under it is taller than the window. True when it did. */
+  const anchorLongReply = useCallback((): boolean => {
+    const el = scrollRef.current
+    const groups = el ? [...el.querySelectorAll<HTMLElement>('[data-testid="chat-group"]')] : []
+    const last = groups[groups.length - 1], before = groups[groups.length - 2]
+    if (!el || last?.dataset.role !== 'assistant' || before?.dataset.role !== 'user') return false
+    const top = before.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 8
+    if (el.scrollHeight - top <= el.clientHeight) return false
+    el.scrollTo({ top, behavior: 'instant' })
+    // NOT marked as the chat's own bottom-following scroll: handleScroll would read that as "still at the bottom" and
+    // the next resize would follow the bottom again, past the start of the answer.
+    selfScrollTopRef.current = null
+    isNearBottomRef.current = false
+    setShowScrollPill(true)
+    return true
+  }, [])
+
   // Fix #6: ResizeObserver-based scroll instead of setTimeout/useEffect[messages]
   useEffect(() => {
     const content = contentRef.current
     if (!content) return
     const observer = new ResizeObserver(() => {
+      // A LONG REPLY STARTS AT HIS MESSAGE, NOT AT ITS END (17 Nov 2026). Replies now appear all at once ("All at
+      // once"), so following the bottom jumped straight past his question and the start of the answer. When the reply
+      // to his message is taller than the window, the window stops at his message, the answer below it, and "Jump to
+      // latest" offers the rest.
+      if (isNearBottomRef.current && anchorLongReply()) return
       if (isNearBottomRef.current) {
         scrollToBottom()
         setShowScrollPill(false)
@@ -1058,7 +1135,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const scroller = scrollRef.current
     if (scroller) observer.observe(scroller)
     return () => observer.disconnect()
-  }, [scrollToBottom])
+  }, [scrollToBottom, anchorLongReply])
 
   useEffect(() => {
     if (isFirstRenderRef.current && messages.length > 0 && historyLoaded) {
@@ -1940,7 +2017,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // logged on the Exercise tab is in the next message's context.
     void cardioHistoryForCoach(profile.id, getLocalDateString(getAppNow(profile.id)), 14).then(setCardioLogHistory)
     try {
-      setWorkoutLogHistory(formatLogsForAI(await getRecentLogsWithWarmups(profile.id, 14, activeSession.date)))
+      const recent = await getRecentLogsWithWarmups(profile.id, 14, activeSession.date)
+      recentLogsRef.current = recent
+      setWorkoutLogHistory(formatLogsForAI(recent))
     } catch (err) {
       console.error('Failed to load workout logs:', err)
     }
@@ -2268,6 +2347,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       meal_summary: mealSummary,
       empty_meals: emptyMealsForCoach(emptyMeals),
       upcoming_meal_summary: buildCoachUpcomingSummary(upcomingMeals ?? []),
+      // THE RUNNING SUMMARY OF OLDER CHATS (17 Nov 2026): what has left the 20-message window, checked (chat-summary.ts).
+      chat_summary: chatSummaryRef.current?.text ?? null,
       // WHAT THEY LOGGED AS EATEN, today and the seven days before (H26). The
       // flag says it was read, so the coach can tell "nothing logged" from
       // "could not see".
@@ -2599,11 +2680,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // THE TURN'S FACTS, READ TOGETHER (his "make it fast", 17 Nov 2026). These were four reads one after another, and the
   // reply placeholder was saved before any of them started. Now the independent ones run at once, and sendMessage
   // starts them before it saves the placeholder, so the wait is the slowest read rather than the sum.
-  const readTurnFacts = async (): Promise<{ eatenByDay: string | null; weekReview: ReturnType<typeof buildCoachWeekReview> | null }> => {
+  const readTurnFacts = async (): Promise<{ eatenByDay: string | null; weekReview: ReturnType<typeof buildCoachWeekReview> | null; patterns: string[] }> => {
     // THIS TURN'S EATEN LOG, read now rather than from a copy loaded earlier, so
     // a meal logged on Nutrition a moment ago is in it (H26).
     const eatenToday = getLocalDateString(getAppNow(profile.id))
-    if (!profile.id) return { eatenByDay: null, weekReview: null }
+    if (!profile.id) return { eatenByDay: null, weekReview: null, patterns: [] }
     const [todayEaten, weekEaten, reviewWeeks] = await Promise.all([
       getEatenByDate(profile.id, eatenWindow(eatenToday)).catch(() => null),
       // THE WEEK'S AVERAGE (slice 4d), the same line Nutrition's Week view shows, on the end of the eaten summary so the
@@ -2619,7 +2700,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const weekReview = reviewWeeks
       ? buildCoachWeekReview(reviewWeeks, await getEatenByDate(profile.id, weekReviewDates(reviewWeeks.lastWeek, eatenToday)).catch(() => null), eatenToday)
       : null
-    return { eatenByDay, weekReview }
+    // PATTERNS THE APP SEES (17 Nov 2026): a stuck lift, low protein on his last three logged days, "Too hard" piling up.
+    const patterns = coachPatternLines({
+      stuck: stuckLifts(recentLogsRef.current),
+      protein: macros ? lowProtein(todayEaten, eatenToday, macros.protein) : null,
+      proteinTargetG: macros?.protein ?? 0,
+      tooHard: tirednessBuilding(recentLogsRef.current, eatenToday),
+    })
+    return { eatenByDay, weekReview, patterns }
   }
 
   const callGemini = async (userMessage: string, placeholderId?: string, facts?: ReturnType<typeof readTurnFacts>): Promise<ChatApiResponse> => {
@@ -2638,7 +2726,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // read as an open one. The outcome goes on first, the time around it.
       .map(m => ({ role: m.role, content: stampTurnTime(m.role === 'assistant' ? stampTurnOutcome(m.content, turnOutcomeOf(m)) : m.content, m.created_at, historyNow) }))
 
-    const { eatenByDay, weekReview } = await (facts ?? readTurnFacts())
+    const { eatenByDay, weekReview, patterns } = await (facts ?? readTurnFacts())
 
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-gemini`
     const controller = new AbortController()
@@ -2652,7 +2740,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       body: JSON.stringify({
         message: userMessage,
         history,
-        context: buildContext(eatenByDay, weekReview),
+        context: { ...buildContext(eatenByDay, weekReview), patterns_seen: patterns.length > 0 ? patterns.join('\n') : null },
         // THE ROW THIS REPLY GOES IN (6 Nov 2026): the coach's server saves the
         // reply there itself and texts her phone if she has left the app, so a
         // reply is never lost to a closed page. It writes only into this row.
@@ -7003,7 +7091,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // is her saying "I'm here now": follow from this message on.
     isNearBottomRef.current = true
     setShowScrollPill(false)
-    scrollToBottom(true)
+    // INSTANT, NOT SMOOTH (17 Nov 2026): replies now land all at once, and a smooth scroll still running when one
+    // landed carried the window past the start of a long answer (anchorLongReply).
+    scrollToBottom()
     setInput('')
 
     // Fix — confirmation-card stuck loop: a clear free-text yes/no to a
@@ -7210,6 +7300,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // never does (see TypewriterMarkdown.tsx / findOpenPendingActionIndex's
     // sibling render check below).
     if (placeholderId && cleanedText) setAnimatingMessageId(placeholderId)
+    // ...and once it is drawn, a long one is read from its start (a smooth scroll begun on send would carry on past it).
+    requestAnimationFrame(() => requestAnimationFrame(() => { anchorLongReply() }))
     setIsLoading(false)
     setQuickRepliesDismissed(false)
 
@@ -7319,17 +7411,44 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     setLastFailedInput(null)
     if (profile.id) {
       clearChatCache(profile.id)
-      // The comment above promises "a reload doesn't resurrect the old
-      // conversation" -- a promise this .then() used to make no attempt to
-      // keep. A failed delete left every old row in place while the screen
-      // showed a fresh greeting, so the FIRST time anyone would learn the
-      // clear didn't take was reloading and watching the old conversation
-      // come back. Logged now; still fire-and-forget (the local reset
-      // already happened and there's no undo to offer), but at least
-      // traceable instead of a silent no-op.
-      supabase.from('chat_messages').delete().eq('profile_id', profile.id).then(({ error }) => {
-        if (error) console.error('handleClearChat: server-side delete failed -- old messages will reappear on the next reload', error)
-      })
+      // UNDO AFTER CLEARING (17 Nov 2026, the chat review; his "Undo line" rulings of 8 Nov in the same shape). The
+      // conversation goes from the screen at once and the delete WAITS ten seconds with an Undo; Undo puts every
+      // message back as it was. The delete still happens: when the window ends, or at once if the app is hidden or
+      // the chat closes first, so a clear is never quietly lost. A failed delete is logged (a reload would show the
+      // old conversation again).
+      if (clearUndo.current) clearUndo.current.flush()
+      const kept = messages
+      const keptSummary = chatSummaryRef.current
+      const profileId = profile.id
+      // The summary goes with the conversation; Undo brings both back.
+      chatSummaryRef.current = null
+      saveChatSummaryLocally(profileId, null)
+      let done = false
+      const flush = () => {
+        if (done) return
+        done = true
+        if (clearUndo.current?.flush === flush) clearUndo.current = null
+        setClearedAt(null)
+        void supabase.from('fitness_profiles').update({ chat_summary: null }).eq('id', profileId).then(() => {})
+        supabase.from('chat_messages').delete().eq('profile_id', profileId).then(({ error }) => {
+          if (error) console.error('handleClearChat: server-side delete failed -- old messages will reappear on the next reload', error)
+        })
+      }
+      const timer = setTimeout(flush, CLEAR_UNDO_MS)
+      clearUndo.current = {
+        flush: () => { clearTimeout(timer); flush() },
+        undo: () => {
+          if (done) return
+          done = true
+          clearTimeout(timer)
+          clearUndo.current = null
+          setClearedAt(null)
+          setMessages(kept)
+          chatSummaryRef.current = keptSummary
+          saveChatSummaryLocally(profileId, keptSummary)
+        },
+      }
+      setClearedAt(Date.now())
     }
   }
 
@@ -7361,7 +7480,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if (quickRepliesDismissed || isLoading) return []
     const lastMsg = messages[messages.length - 1]
     if (!lastMsg || lastMsg.role !== 'assistant') return []
-    return lastMsg.quickReplies || []
+    // An empty chat (only the greeting) offers what he can ask, unless the greeting brought its own chips.
+    return chatStarters(messages)
   }
 
   /**
@@ -8805,17 +8925,25 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           </Button>
           {headerAction}
         </div>
+        {clearedAt != null && (
+          <div data-testid="chat-cleared-undo" role="status" className="flex items-center justify-between gap-3 border-t border-[color:var(--hairline)] px-4 py-1 text-[0.8125rem] text-muted-foreground">
+            <span>Chat cleared.</span>
+            <button type="button" onClick={() => clearUndo.current?.undo()} className="inline-flex min-h-[44px] items-center font-semibold text-primary-text">Undo</button>
+          </div>
+        )}
         {/* THE CONTEXT STRIP (design 2b): where today stands, in pills, and
             gone entirely when there is nothing to say. */}
         {contextPills.length > 0 && (
           <div data-testid="chat-context-strip" className="flex gap-2 overflow-x-auto border-t border-[color:var(--hairline)] px-4 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {contextPills.map(p => p.kind === 'done' ? (
-              <span key={p.kind} data-context-pill={p.kind} className="flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[color:var(--hairline)] px-[11px] text-[0.71875rem] text-[color:var(--text-tertiary)]" style={{ background: 'var(--surface-raised)' }}>
+              // "SESSION DONE" OPENS EXERCISE (17 Nov 2026, the chat review): it looked like every other pill and was the
+              // only one that did nothing when tapped.
+              <button type="button" key={p.kind} data-context-pill={p.kind} onClick={() => openStripLink('exercise')} aria-label={`${p.text} — open Exercise`} className="hit-slop-44 flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[color:var(--hairline)] px-[11px] text-[0.71875rem] text-[color:var(--text-tertiary)]" style={{ background: 'var(--surface-raised)' }}>
                 <span aria-hidden className="flex size-3.5 items-center justify-center rounded-full text-primary-text" style={{ background: 'color-mix(in oklab, var(--primary) 20%, transparent)' }}>
                   <Check className="size-[9px]" strokeWidth={3.2} />
                 </span>
                 {p.text}
-              </span>
+              </button>
             ) : (
               <button
                 key={p.kind}

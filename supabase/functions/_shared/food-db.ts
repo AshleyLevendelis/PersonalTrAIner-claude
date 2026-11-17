@@ -1189,7 +1189,7 @@ const PIECE_WEIGHTS: Record<string, Record<string, number>> = {
   // count is the medium). Raw is the same potato before the bake: USDA raw 130 g a medium, small and large by the
   // same ratio (17 Nov 2026: "2 large" had cost 262 g, a large read as 1.15 of a medium, and "1" weighed more than
   // "1 medium").
-  'sweet potato baked': { medium: 114 },
+  'sweet potato baked': { medium: 114 },               // USDA: sweet potato, baked in skin, 1 medium 114 g
   'spinach': { handful: 30 },                          // USDA: raw spinach, 1 cup (a generous handful) 30 g
   'mixed salad leaves': { handful: 36 },               // USDA: lettuce, shredded, 1 cup 36 g
   'rocket': { handful: 20 },                           // USDA: arugula, raw, 1 cup 20 g

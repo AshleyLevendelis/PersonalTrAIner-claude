@@ -2320,6 +2320,25 @@ async function handleChatRequest(req: Request): Promise<Response> {
       );
     }
 
+    // THE RUNNING SUMMARY OF OLDER CHATS (17 Nov 2026, the chat review). The app sends the messages that have left the
+    // coach's 20-message window and the summary so far; this writes the new summary in a short call and the APP checks
+    // it before keeping it (src/lib/chat-summary.ts: no number that is not in the messages, no clinical label he did not
+    // use). Nothing is stored here. Null means "keep the previous summary".
+    if (body?.mode === "summarise") {
+      const turns = Array.isArray(body.turns) ? body.turns as { role?: unknown; content?: unknown }[] : [];
+      const lines = turns
+        .filter(t => (t.role === "user" || t.role === "assistant") && typeof t.content === "string")
+        .map(t => `${t.role === "user" ? "Him" : "Coach"}: ${String(t.content).slice(0, 600)}`)
+        .slice(-40);
+      const previous = typeof body.previous === "string" ? body.previous.slice(0, 1500) : "";
+      const prompt = `You keep a short running summary of a coaching chat so the coach remembers it after the messages scroll away.
+${previous ? `The summary so far:\n${previous}\n\n` : ""}Older messages to fold in:\n${lines.join("\n")}
+
+Write the updated summary: at most 10 short lines, each starting "- ". Keep only what a coach would want to remember: what he said about his body, injuries, sleep, stress, food, schedule and preferences; what he asked to change and whether it was done; advice the coach gave that is worth checking on later (mark those lines "to check:"). Drop small talk. Use his own words for anything about his health; never add a diagnosis or label. Never add a number that is not in the messages or the summary above. Plain text only, no headings.`;
+      const written = lines.length > 0 ? await coachShortLine(prompt, 8000, { maxTokens: 600, temperature: 0.2 }) : null;
+      return new Response(JSON.stringify({ summary: written }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (!message || typeof message !== "string") {
       return new Response(
         JSON.stringify({ error: "message is required" }),
@@ -3098,6 +3117,14 @@ UPCOMING MEALS — the next six days, exactly as the Nutrition tab's day strip s
 ${context.upcoming_meal_summary}` : ''}
 ${context.show_numbers === false ? `
 NUMBERS OFF (his Profile setting, the starter tier): he chose not to see calories or macros. Never quote a calorie, kcal, gram or macro figure to him, even when the data below has one; talk about meals, portions (a palm of protein, a fist of carbs) and how the day went. Weights on the bar and minutes are fine.
+` : ''}${typeof context.patterns_seen === 'string' && context.patterns_seen.trim() ? `
+PATTERNS THE APP SEES IN THEIR LOGS (facts the app worked out; nothing here is a diagnosis):
+${String(context.patterns_seen).slice(0, 800)}
+Coach to AT MOST ONE of these, once, and only when it fits the conversation (never as an opener to an unrelated question). A stuck lift: name it and offer one fix (a rep target to beat before adding weight, or a small drop and rebuild). Low protein: one easy addition from foods they already eat. "Too hard" piling up: ask how sleep and recovery are, and offer a lighter day. One or two sentences, never a lecture, never a number not in these lines.
+` : ''}${typeof context.chat_summary === 'string' && context.chat_summary.trim() ? `
+EARLIER IN YOUR CHATS (the app's running summary of messages older than the conversation below; his own words where it matters):
+${String(context.chat_summary).slice(0, 1500)}
+Use it the way a coach uses memory: do not recite it. When a line marked "to check:" bears on today, ask about it once, in passing. Never treat it as newer than the messages below.
 ` : ''}${typeof context.today_calories === 'string' && context.today_calories && context.show_numbers !== false ? `
 CALORIES LEFT TODAY, exactly as their screen shows it: ${context.today_calories}. When calories left today come up, quote this figure; never work it out yourself from the totals below (they are read separately and can be a meal behind).
 ` : ''}${context.eaten_by_day_read === true && typeof context.eaten_by_day === 'string' ? `

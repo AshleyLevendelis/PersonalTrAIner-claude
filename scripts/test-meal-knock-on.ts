@@ -160,7 +160,9 @@ async function main() {
     const said = banana.ok ? text(banana.diff) : []
     check('the add-a-food card no longer says the rest of the day "re-fits around it"', banana.ok && !said.some(t => /re-?fits? around/i.test(t)), said)
     check('...it still says the food joins at her amount', said.some(t => /100g banana joins it at the amount you said/.test(t)), said)
-    check('...and how far the meal now is from its usual share, as a figure it computed', said.some(t => /^That is \d+ kcal (over|under) the usual lunch share\.$/.test(t)), said)
+    // Since 17 Nov 2026 the share line is said only past the day's 5% calorie band (shareLineIfReal); a 100g banana is
+    // inside it, so the card says nothing about the share. The past-the-band case is held in test:offer-fixes §5.
+    check('...and no "usual share" line for a gap inside the day\'s band (a 100g banana)', !said.some(t => /usual lunch share/.test(t)), said)
     check('...and names the day in words ("today"), never as a stored date', said.some(t => /^Just for today\. On other days your lunch stays /.test(t)) && !said.some(t => /\d{4}-\d{2}-\d{2}/.test(t)), said)
     const tuesday = addFood(serving, dates[2], 'lunch', ['100g banana'])
     check('...and another day by its weekday', tuesday.ok && text(tuesday.diff).some(t => /^Just for Tuesday\. On other days your lunch stays /.test(t)) && !text(tuesday.diff).some(t => /\d{4}-\d{2}-\d{2}/.test(t)), tuesday.ok ? text(tuesday.diff) : tuesday)
