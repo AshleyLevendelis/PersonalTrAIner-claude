@@ -138,6 +138,14 @@ check('1b swap: the facts say what changes before the tap — the lift on her pl
   (swap?.changeLines ?? []).some(l => l.includes(target?.full ?? 'NO-NAME') && /→\s*Leg Press/i.test(l)), swap?.changeLines)
 check('1c swap: both scopes are offered, each under its own label', (swap?.buttons ?? []).some(b => b.label === 'Whole block'), swap?.buttons?.map(b => b.label))
 await shoot('offer-text-swap')
+// ONE LINE, NUMBERS ON TAP (his ruling 17 Nov 2026): the offer arrives with its details folded away and a "Details"
+// that opens them. This driver does NOT auto-open them (driver-kit's openOfferDetails stays off here).
+const folded = await ev(`(() => { const o = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); const d = o?.querySelector('[data-testid="offer-details"]'); const t = o?.querySelector('[data-testid="offer-details-toggle"]'); return { hidden: !!d && d.hidden, toggle: t?.textContent?.trim() ?? null, visibleText: o?.innerText ?? '' } })()`)
+check('1e swap: the details arrive folded, behind "Details"', folded?.hidden === true && folded?.toggle === 'Details', folded)
+await ev(`[...document.querySelectorAll('[data-testid="proposal-card"]')].pop()?.querySelector('[data-testid="offer-details-toggle"]')?.click()`)
+await wait(200)
+const opened = await ev(`(() => { const o = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); const d = o?.querySelector('[data-testid="offer-details"]'); return { hidden: !!d && d.hidden, text: d?.innerText ?? '' } })()`)
+check('1f swap: one tap on Details shows them', opened?.hidden === false && opened.text.trim().length > 0, opened)
 await ev(`(() => { const b = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop()?.querySelectorAll('button'); const n = b && [...b].find(x => x.textContent.trim().startsWith('Keep ')); if (n) n.click() })()`)
 const declined = await until(() => offer(), v => v?.status === 'declined', 40)
 check('1d swap: "Keep <lift>" declines it, and the offer says so in words', declined?.status === 'declined' && (await ev(`[...document.querySelectorAll('[data-testid="proposal-terminal-note"]')].pop()?.textContent ?? ''`)) === 'Left as it was.', declined?.status)

@@ -90,7 +90,7 @@ export async function startDriver(o) {
   await send('Page.enable'); await send('Runtime.enable')
   // OFFER DETAILS OPENED, for a driver whose subject is what an offer SAYS (17 Nov 2026, his "One line, numbers on
   // tap"): the change rows, what stays and what happens next now sit behind "Details". Opening them is the tap he
-  // makes; the collapsed default itself is held by verify:offer-details, which leaves this off.
+  // makes; the folded default itself is held by verify:offer-text (1e-1f), which leaves this off.
   if (openOfferDetails) await send('Page.addScriptToEvaluateOnNewDocument', { source: OPEN_OFFER_DETAILS_SCRIPT })
   if (mobile) await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile: true })
   else await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })

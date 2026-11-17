@@ -748,7 +748,9 @@ console.log('\n3. Nothing has crept back up')
   // e373e3b8: 3026. His 15 Sep ruling: 25 kB raw over today's number.
   // MOVED 16 Nov 2026: 3051 -> 3080, the same 16 Nov coach batch; MEASURED 3055 through this gate on cec97249. His
   // 15 Sep ruling: 25 kB raw over today's number.
-  const TOTAL_BUDGET_KB = 3080
+  // MOVED 17 Nov 2026: 3080 -> 3100, the chat review (photos, the memory summary, patterns, the offer fixes, one-line
+  // offers); MEASURED 3088 through this gate on the branch head that day. Headroom 12 kB, printed every run.
+  const TOTAL_BUDGET_KB = 3100
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
