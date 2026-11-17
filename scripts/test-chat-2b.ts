@@ -66,13 +66,16 @@ check('nothing to say: no pills', chatContextPills(base).length === 0 && chatCon
 check('...and the screen draws the strip only when there is a pill', /\{contextPills\.length > 0 && \(\s*<div data-testid="chat-context-strip"/.test(chat))
 
 console.log('\n[2] The strip reads what Home and Nutrition read')
+const numbers = readFileSync('src/lib/coach-screen-numbers.ts', 'utf8')
 const call = (chat.match(/const contextPills = chatContextPills\(\{([\s\S]*?)\n  \}\)/) || [])[1] ?? ''
 check('the screen builds its pills with the strip function', call.length > 0)
 check('session status and focus: Home\'s aggregate (proactiveData is loadDashboardData)', /status: proactiveData\.session\.status/.test(call) && /focus: proactiveData\.session\.focus/.test(call), call.slice(0, 300))
 check('the set count: sessionSetCount over today\'s cell of the training week, as Home', /count: sessionSetCount\(stripCell\?\.session, stripCell\?\.workingLogs\)/.test(call)
-  && /const stripCell = trainingWeek\.days\.find\(d => d\.date === activeSession\.date\)/.test(chat))
+  && /const stripCell = todayScreenCell\(trainingWeek\.days, activeSession\.date\)/.test(chat)
+  // Stage 3 (17 Nov 2026): the dated cell is found by the reader the coach's context shares (coach-screen-numbers.ts).
+  && /\.find\(d => d\.date === date\)/.test(numbers))
 check('the minutes: the finish card first, then Home\'s session minutes', /minutes: readSessionSummary\(profile\.id, activeSession\.date\)\?\.summary\.durationMinutes \?\? proactiveData\?\.sessionMinutes/.test(call))
-check('calories eaten: the meal ledger\'s snapshot, else Home\'s figure; against the target Nutrition uses', /getLedgerSnapshot\(profile\.id, activeSession\.date\)\?\.eaten\.kcal \?\? proactiveData\?\.caloriesEaten/.test(chat) && /target: macros\.calories, eaten: stripEaten/.test(call))
+check('calories eaten: the meal ledger\'s snapshot, else Home\'s figure; against the target Nutrition uses', /const stripEaten = screenEatenKcal\(profile\.id, activeSession\.date, proactiveData\?\.caloriesEaten\)/.test(chat) && /getLedgerSnapshot\(profileId, date\)\?\.eaten\.kcal \?\? fallback/.test(numbers) && /target: macros\.calories, eaten: stripEaten/.test(call))
 check('...and the words come from the phrasebook (kcalLeftOrOver), never a second sum', /kcalLeftOrOver\(target - eaten\)/.test(stripSrc))
 check('the strip re-reads when a meal is logged', /subscribeMealStore\(\(\) => setLedgerTick/.test(chat))
 
