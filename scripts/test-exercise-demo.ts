@@ -24,6 +24,7 @@ import { fileURLToPath } from 'url'
 import { EXERCISE_DATABASE, MUSCLE_GROUPS } from '../src/lib/exercise-db'
 import { readMuscleMap, SHAPES_ON } from '../src/lib/muscle-map'
 import { BODY_SHAPES } from '../src/lib/body-paths'
+import { execSync } from 'node:child_process'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const raw = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -102,8 +103,9 @@ console.log('\n1b. The mapping to the drawing\'s own slugs\n')
 
   const byName = (n: string) => readMuscleMap(live.find(e => e.name === n)!)
   const chin = byName('Chin-Ups')
-  check('Chin-Ups: biceps, abs and obliques on the front', ['biceps', 'abs', 'obliques'].every(s => s in chin.lit.front) && Object.keys(chin.lit.front).length === 3, chin.lit.front)
-  check('Chin-Ups: lats and teres major land on the upper back, on the back view', 'upper-back' in chin.lit.back && Object.keys(chin.lit.back).length === 1, chin.lit.back)
+  const primaryOn = (v: 'front' | 'back') => Object.entries(chin.lit[v]).filter(([, t]) => t === 'primary').map(([s]) => s).sort()
+  check('Chin-Ups: biceps, abs and obliques are the primary shapes on the front', JSON.stringify(primaryOn('front')) === JSON.stringify(['abs', 'biceps', 'obliques']), chin.lit.front)
+  check('Chin-Ups: lats and teres major land on the upper back, the only primary shape on the back view', JSON.stringify(primaryOn('back')) === JSON.stringify(['upper-back']), chin.lit.back)
   check('core lights BOTH abs and obliques on the front',
     'abs' in readMuscleMap({ primary_muscles: ['core'] }).lit.front && 'obliques' in readMuscleMap({ primary_muscles: ['core'] }).lit.front)
   check('a slug is only recorded on a view where the drawing has it (no biceps on the back)',
@@ -139,6 +141,63 @@ console.log('\n1b. The mapping to the drawing\'s own slugs\n')
   check('the colour tiers are the accent, a paler accent, and the panel\'s own raised purple',
     /secondary: \{ fill: 'var\(--primary\)', opacity: 0\.\d+/.test(map) && /off: \{ fill: 'var\(--surface-raised\)'/.test(map)
     && /primary: \{ fill: 'var\(--primary\)', opacity: 1/.test(map))
+}
+
+console.log('\n1c. Secondary muscles: real assistors, said once, decided for every exercise\n')
+{
+  // Exercises with NOTHING honest to add. Absent is a decision, never a gap: a new exercise must either carry
+  // `secondary_muscles` or be added here with its reason, so a forgotten one fails rather than going unlit.
+  //   bench and chest presses, push-ups, dips: the primary list already is the whole prime-mover and brace set.
+  //   hip adduction and back extension machines: single-joint, no honest assistor.   Burpees: not a place on a body.
+  //   bent-knee calf raise: its target IS the soleus, which the primary "calves" already covers.
+  const NONE = new Set([
+    'Archer Push-Ups', 'Assisted Dip Machine', 'Back Extension Machine', 'Barbell Bench Press', 'Barbell Floor Press', 'Bent-Knee Calf Raise (Bodyweight)', 'Burpees', 'Chest Dips', 'Chest Press Machine', 'Close-Grip Bench Press', 'Close-Grip Push-Ups', 'Decline Push-Ups', 'Deficit Push-Ups', 'Dumbbell Bench Press', 'Dumbbell Floor Press', 'Dumbbell Squeeze Press', 'Hip Adduction Machine', 'Incline Barbell Bench Press', 'Incline Dumbbell Press', 'Incline Machine Press', 'Incline Push-Ups', 'Neutral-Grip Dumbbell Press', 'Push-Ups', 'Seated Dip Machine', 'Single-Arm Dumbbell Bench Press', 'Smith Machine Bench Press', 'Tricep Dips'
+  ])
+  const missingDecision = live.filter(e => !e.secondary_muscles?.length && !NONE.has(e.name))
+  check('every exercise has secondary muscles or is on the named "nothing to add" list', missingDecision.length === 0,
+    missingDecision.map(e => e.name))
+  const staleNone = [...NONE].filter(n => { const e = live.find(x => x.name === n); return !e || !!e.secondary_muscles?.length })
+  check('...and nothing on that list has gone stale (renamed, retired, or given secondaries)', staleNone.length === 0, staleNone)
+  const withSecondary = live.filter(e => e.secondary_muscles?.length)
+  console.log(`     ${withSecondary.length} of ${live.length} have secondary muscles, ${NONE.size} deliberately none`)
+  check('it read a real catalogue (sanity check on this check)', withSecondary.length > 200, withSecondary.length)
+
+  // Same vocabulary as primary: a spelling the map has never seen is already caught by section 1's unrecognised
+  // check, which reads both tiers; this pins that the secondary tier really is read.
+  const odd = readMuscleMap({ primary_muscles: ['chest'], secondary_muscles: ['flux capacitor'] })
+  const realWarn = console.warn; console.warn = () => {}
+  const oddSecondary = readMuscleMap({ primary_muscles: ['chest'], secondary_muscles: ['flux capacitor'] }).unrecognised
+  console.warn = realWarn
+  check('an unknown SECONDARY spelling is caught the same way as a primary one', oddSecondary.includes('flux capacitor') && odd !== undefined)
+
+  // Said once: a secondary that repeats a primary (or a synonym spelling of one) is padding, and the caption would
+  // print it twice.
+  const SAME = [['quads', 'quadriceps'], ['upper traps', 'upper trapezius', 'traps'], ['biceps', 'biceps brachii'],
+    ['glutes', 'glute max'], ['shoulders', 'anterior deltoid', 'front deltoid'], ['forearms', 'forearm flexors', 'forearm extensors'],
+    ['core', 'rectus abdominis'], ['erectors', 'erector spinae'], ['triceps', 'triceps (long head)']]
+  const groupOf = (m: string) => SAME.find(g => g.includes(m)) ?? [m]
+  const repeats = withSecondary.flatMap(e => e.secondary_muscles!.filter(sm =>
+    e.primary_muscles.some(pm => groupOf(pm).includes(sm.toLowerCase()) || pm.toLowerCase() === sm.toLowerCase())).map(sm => `${e.name}: ${sm}`))
+  check('no secondary repeats a primary muscle or a synonym spelling of one', repeats.length === 0, repeats)
+  const dupes = withSecondary.filter(e => new Set(e.secondary_muscles!.map(m => m.toLowerCase())).size !== e.secondary_muscles!.length)
+  check('no secondary list repeats itself', dupes.length === 0, dupes.map(e => e.name))
+  const tooMany = withSecondary.filter(e => e.secondary_muscles!.length > 4)
+  check('four or fewer a lift: a list that long stops saying which ones matter', tooMany.length === 0, tooMany.map(e => e.name))
+  const shapes = withSecondary.filter(e => e.secondary_muscles!.some(m => m !== m.trim().toLowerCase()))
+  check('written in the catalogue\'s own lower-case spelling', shapes.length === 0, shapes.map(e => e.name))
+
+  // DISPLAY ONLY. The volume metric, the pool filters and the prescription all read primary_muscles; none may read
+  // this field, or adding it would silently change what they measure.
+  const readers = ['src', 'supabase/functions'].flatMap(d =>
+    execSync(`grep -rln "secondary_muscles" ${d} || true`, { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean))
+  const allowed = ['src/lib/exercise-db.ts', 'src/lib/muscle-map.ts']
+  check('only the catalogue and the muscle map read secondary_muscles — no engine, no coach', readers.every(f => allowed.includes(f)) && readers.length === allowed.length, readers)
+
+  // The ruling's own case, end to end.
+  const chin = readMuscleMap(live.find(e => e.name === 'Chin-Ups')!)
+  check('Chin-Ups: the secondary tier is drawn and the primary tier is untouched',
+    chin.lit.back.trapezius === 'secondary' && chin.lit.back['upper-back'] === 'primary' && chin.lit.front.biceps === 'primary', chin.lit)
+  check('...and its secondary names are listed for the caption', chin.secondaryNames.includes('Lower trapezius'), chin.secondaryNames)
 }
 
 console.log('\n2. The map works with no signal, because it is drawn not fetched\n')
