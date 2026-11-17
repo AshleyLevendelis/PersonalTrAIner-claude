@@ -837,7 +837,7 @@ const HOUSEHOLD_UNITS: Record<string, Record<string, number>> = {
   'oats': { cup: 85 }, 'bulgur wheat cooked': { cup: 182 }, 'polenta cooked': { cup: 240 }, 'millet cooked': { cup: 174 },
   'buckwheat cooked': { cup: 168 }, 'barley': { cup: 157 }, 'egg noodles cooked': { cup: 160 }, 'rice noodles cooked': { cup: 176 },
   'potato boiled': { whole: 170, cup: 156 }, 'potato baked': { whole: 200 }, 'mashed potato': { cup: 210 },
-  'sweet potato baked': { whole: 130, cup: 200 }, 'sweet potato raw': { whole: 130 }, 'plantain': { whole: 150 },
+  'sweet potato baked': { whole: 114, small: 60, medium: 114, large: 180, cup: 200 }, 'sweet potato raw': { whole: 130, small: 70, medium: 130, large: 205 }, 'plantain': { whole: 150 },
   'breadcrumbs': { cup: 108 }, 'plain flour': { cup: 125 }, 'cornmeal': { cup: 157 }, 'granola': { cup: 110, handful: 40 },
   'muesli': { cup: 85, handful: 40 }, 'cornflakes': { cup: 28 }, 'popcorn': { cup: 8, handful: 15 }, 'tortilla chips': { handful: 30 },
   'weetabix': { whole: 19 }, 'crackers': { whole: 5 }, 'rye crispbread': { whole: 10 }, 'croissant': { whole: 57 },
@@ -1172,6 +1172,10 @@ const PIECE_WEIGHTS: Record<string, Record<string, number>> = {
   'radish': { medium: 4.5 },                           // USDA: radish, 1 medium 4.5 g
   'sweetcorn': { cob: 90, ear: 90 },                   // USDA: sweet corn, 1 medium ear yields 90 g
   'potato baked': { medium: 173 },                     // USDA: baked potato, flesh and skin, 1 medium 173 g
+  // USDA: sweet potato, baked in skin, small 60 g, medium 114 g, large 180 g (the entry carries all three, and a bare
+  // count is the medium). Raw is the same potato before the bake: USDA raw 130 g a medium, small and large by the
+  // same ratio (17 Nov 2026: "2 large" had cost 262 g, a large read as 1.15 of a medium, and "1" weighed more than
+  // "1 medium").
   'sweet potato baked': { medium: 114 },               // USDA: sweet potato, baked in skin, 1 medium 114 g
   'spinach': { handful: 30 },                          // USDA: raw spinach, 1 cup (a generous handful) 30 g
   'mixed salad leaves': { handful: 36 },               // USDA: lettuce, shredded, 1 cup 36 g

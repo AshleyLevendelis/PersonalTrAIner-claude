@@ -15,10 +15,10 @@
       }
     ]
   },
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "09be5840cefa77ea",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -86,19 +86,21 @@
             "1 side salad"
           ],
           "date": "2026-09-16",
-          "origin_verbatim_quote": "beef lasagne with a side salad for lunch tomorrow"
+          "origin_verbatim_quote": "the staff restaurant is doing beef lasagne with a side salad for lunch tomorrow"
         }
       },
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "oh and from now on my Sunday dinners get cooked for me at my mum's",
-      "reply": "That's lovely, Sunday dinner at your mum's is standard! 😊\n\nYou can set that up on your Profile under Meals & shopping by ticking Sunday dinners under \"Meals cooked for me\". Doing this means the app automatically budgets for it every week and keeps those meals off your shopping list.\n\nWhenever Sunday rolls around, just let me know what she made and I'll keep your day on track!",
-      "raw": "That's lovely, Sunday dinner at your mum's is standard! 😊\n[BREAK]\nYou can set that up on your Profile under Meals & shopping by ticking Sunday dinners under \"Meals cooked for me\". Doing this means the app automatically budgets for it every week and keeps those meals off your shopping list.\n[BREAK]\nWhenever Sunday rolls around, just let me know what she made and I'll keep your day on track!",
+      "reply": "That sounds lovely! You can set that up in the app by going to Profile, tapping Meals & shopping, and ticking Sunday dinner under Meals cooked for me.\n\nThat way the app automatically handles those as estimated meals on your plan and leaves those ingredients off your shopping list!",
+      "raw": "That sounds lovely! You can set that up in the app by going to Profile, tapping Meals & shopping, and ticking Sunday dinner under Meals cooked for me.\n[BREAK]\nThat way the app automatically handles those as estimated meals on your plan and leaves those ingredients off your shopping list!",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

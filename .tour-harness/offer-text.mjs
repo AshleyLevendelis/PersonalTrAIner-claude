@@ -71,7 +71,8 @@ const READ = String.raw`((n) => {
   const confirmRow = [...o.querySelectorAll('[data-testid="offer-buttons"] button')]
   // The offer's own answers. Not the Listen icon on the coach's bubble (her 31 Oct 2026 ruling): it reads the
   // message aloud and answers nothing, and it is checked by verify:chat-2b and verify:chat-bubbles.
-  const answers = [...o.querySelectorAll('button')].filter(b => !b.hasAttribute('data-listen'))
+  // The Details toggle (17 Nov 2026) sits inside the bubble and is not an answer to the offer.
+  const answers = [...o.querySelectorAll('button')].filter(b => !b.hasAttribute('data-listen') && b.dataset.testid !== 'offer-details-toggle')
   const buttons = answers.map(b => {
     const r = b.getBoundingClientRect(), pill = b.firstElementChild, pr = pill ? pill.getBoundingClientRect() : null, ps = cs(pill)
     return { label: (b.textContent || '').trim(), h: r.height, w: r.width, pillH: pr ? pr.height : 999, pillFont: ps ? parseFloat(ps.fontSize) : 99, pillShadow: ps ? ps.boxShadow : '?', shadow: cs(b).boxShadow, inConfirmRow: confirmRow.includes(b) }
@@ -89,7 +90,8 @@ const READ = String.raw`((n) => {
     // RE-ANCHORED 31 Oct 2026 (design 2b): a single replacement is said on its own soft line under the bubble (the
     // preview), a list stays in the bubble. Either way it is a change line OF THIS OFFER, said before the tap.
     changeLines: [...o.querySelectorAll('[data-offer-line="change"]')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
-    factLines: facts ? [...facts.children].map(e => e.textContent.replace(/\s+/g, ' ').trim()) : [],
+    // Each said line of the offer, wherever it sits (since 17 Nov 2026 most sit inside the folded Details).
+    factLines: facts ? [...facts.querySelectorAll('[data-offer-line]')].map(e => e.textContent.replace(/\s+/g, ' ').trim()) : [],
     warns: facts ? [...facts.querySelectorAll('[data-severity="warn"]')].map(e => e.textContent.trim()) : [],
     ruled: [o, facts, bubble].filter(Boolean).some(e => parseFloat(cs(e).borderLeftWidth) > 1),
     buttons,
@@ -138,6 +140,14 @@ check('1b swap: the facts say what changes before the tap — the lift on her pl
   (swap?.changeLines ?? []).some(l => l.includes(target?.full ?? 'NO-NAME') && /→\s*Leg Press/i.test(l)), swap?.changeLines)
 check('1c swap: both scopes are offered, each under its own label', (swap?.buttons ?? []).some(b => b.label === 'Whole block'), swap?.buttons?.map(b => b.label))
 await shoot('offer-text-swap')
+// ONE LINE, NUMBERS ON TAP (his ruling 17 Nov 2026): the offer arrives with its details folded away and a "Details"
+// that opens them. This driver does NOT auto-open them (driver-kit's openOfferDetails stays off here).
+const folded = await ev(`(() => { const o = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); const d = o?.querySelector('[data-testid="offer-details"]'); const t = o?.querySelector('[data-testid="offer-details-toggle"]'); return { hidden: !!d && d.hidden, toggle: t?.textContent?.trim() ?? null, visibleText: o?.innerText ?? '' } })()`)
+check('1e swap: the details arrive folded, behind "Details"', folded?.hidden === true && folded?.toggle === 'Details', folded)
+await ev(`[...document.querySelectorAll('[data-testid="proposal-card"]')].pop()?.querySelector('[data-testid="offer-details-toggle"]')?.click()`)
+await wait(200)
+const opened = await ev(`(() => { const o = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); const d = o?.querySelector('[data-testid="offer-details"]'); return { hidden: !!d && d.hidden, text: d?.innerText ?? '' } })()`)
+check('1f swap: one tap on Details shows them', opened?.hidden === false && opened.text.trim().length > 0, opened)
 await ev(`(() => { const b = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop()?.querySelectorAll('button'); const n = b && [...b].find(x => x.textContent.trim().startsWith('Keep ')); if (n) n.click() })()`)
 const declined = await until(() => offer(), v => v?.status === 'declined', 40)
 check('1d swap: "Keep <lift>" declines it, and the offer says so in words', declined?.status === 'declined' && (await ev(`[...document.querySelectorAll('[data-testid="proposal-terminal-note"]')].pop()?.textContent ?? ''`)) === 'Left as it was.', declined?.status)

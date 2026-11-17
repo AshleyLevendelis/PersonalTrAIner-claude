@@ -2,10 +2,10 @@
   "case": "warm-week-fell-apart",
   "why": "Ashley, 6 Nov 2026, 'Warm coach': a rough week is met with kindness before any fix, and never with guilt. 'A why on every answer': it should leave them knowing why one bad week costs little next to the weeks around it, in a line, not a lecture.",
   "checks": {},
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "13f74bb2872e8672",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,12 +58,13 @@
   "turns": [
     {
       "user": "honestly this week has been a write off. only trained once and I've been eating rubbish",
-      "reply": "It happens, Ashley — one off week doesn't undo all your hard work, so there's no need to stress or try to \"make up\" for anything.\n\nThe best move right now is just picking back up with your next planned meal and getting today's session done.\n\nHow are you feeling about getting today's lower body session done?",
-      "raw": "It happens, Ashley — one off week doesn't undo all your hard work, so there's no need to stress or try to \"make up\" for anything.\n[BREAK]\nThe best move right now is just picking back up with your next planned meal and getting today's session done.\n[BREAK]\nHow are you feeling about getting today's lower body session done?\n[QUICK_REPLIES: \"Let me at it\" | \"Short on time today\" | \"Need a rest day\"]",
+      "reply": "I hear you, Ashley—let’s focus on today rather than stressing over the last few days. \n\n\nOne off week doesn't undo your progress because consistency is built over months, not seven perfect days in a row.\n\n\nDo you have the time and energy to get a session in today, or do you need a reset? 🧘",
+      "raw": "I hear you, Ashley—let’s focus on today rather than stressing over the last few days. \n\n[BREAK]\nOne off week doesn't undo your progress because consistency is built over months, not seven perfect days in a row.\n\n[BREAK]\nDo you have the time and energy to get a session in today, or do you need a reset? 🧘",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

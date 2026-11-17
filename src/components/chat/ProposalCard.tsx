@@ -74,6 +74,7 @@ export function ProposalCard({
   const status: ChatPendingActionView['status'] = timedOut && pendingAction.status === 'pending' ? 'expired' : pendingAction.status
   const [scope, setScope] = useState<string | undefined>(diff.editable?.find(e => e.field === 'scope')?.options[0])
   const [busy, setBusy] = useState<'confirm' | 'reject' | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
 
   const busyOverall = busy != null || status === 'claimed' || status === 'executing'
   const isStale = status === 'stale'
@@ -133,26 +134,48 @@ export function ProposalCard({
   // matching the WORDS passes on any sentence with a number in it — which is
   // how the swap card's first cost check came to be satisfied by
   // "Sets × reps: 2×8" sitting in the Unchanged line.
+  // ONE LINE, THE NUMBERS ON TAP (his ruling 17 Nov 2026, "One line, numbers on tap", over a short list always shown
+  // and over leaving it). The lead stays the one line; a single change keeps its preview under the bubble; anything
+  // that COSTS him something (a warn line) is always shown, because a cost is said before the tap or not at all. The
+  // rest (every change row, what stays, what happens next, his quote) sits behind "Details", in the DOM, one tap away.
+  const warnings = (diff.implications ?? []).filter(imp => imp.severity === 'warn')
+  const quiet = (diff.implications ?? []).filter(imp => imp.severity !== 'warn')
+  const hasDetails = saidChanges.length > 0 || (diff.unchanged?.length ?? 0) > 0 || quiet.length > 0 || !!diff.rationale
+  const implication = (imp: NonNullable<typeof diff.implications>[number], key: string) => (
+    <p
+      key={key}
+      data-offer-line="implication"
+      data-severity={imp.severity}
+      className={imp.severity === 'warn' ? 'text-[0.90625rem] font-medium' : 'text-[0.84375rem] opacity-80'}
+    >
+      {imp.severity === 'warn' && <ShieldAlert aria-label="Worth knowing" className="mr-1 inline size-3.5 -translate-y-px text-[color:var(--role-warn)]" />}
+      {imp.text}
+    </p>
+  )
   const facts = (
     <div data-testid="offer-facts" className="mt-2 space-y-1.5 empty:hidden">
-      {saidChanges.map((c, i) => (
-        <p key={`c${i}`} data-offer-line="change">{offerChangeText(c)}</p>
-      ))}
-      {diff.unchanged && diff.unchanged.length > 0 && (
-        <p data-offer-line="unchanged" className="text-[0.84375rem] opacity-80">Unchanged: {unchangedText(diff.unchanged)}</p>
-      )}
-      {diff.implications?.map((imp, i) => (
-        <p
-          key={`i${i}`}
-          data-offer-line="implication"
-          data-severity={imp.severity}
-          className={imp.severity === 'warn' ? 'text-[0.90625rem] font-medium' : 'text-[0.84375rem] opacity-80'}
+      {warnings.map((imp, i) => implication(imp, `w${i}`))}
+      {hasDetails && (
+        <button
+          type="button"
+          data-testid="offer-details-toggle"
+          aria-expanded={detailsOpen}
+          onClick={() => setDetailsOpen(o => !o)}
+          className="-my-2 inline-flex min-h-[44px] min-w-[44px] items-center text-[0.8125rem] font-medium underline underline-offset-2 opacity-80"
         >
-          {imp.severity === 'warn' && <ShieldAlert aria-label="Worth knowing" className="mr-1 inline size-3.5 -translate-y-px text-[color:var(--role-warn)]" />}
-          {imp.text}
-        </p>
-      ))}
-      {diff.rationale && <p data-offer-line="rationale">{diff.rationale}</p>}
+          {detailsOpen ? 'Hide details' : 'Details'}
+        </button>
+      )}
+      <div data-testid="offer-details" hidden={!detailsOpen} className="space-y-1.5">
+        {saidChanges.map((c, i) => (
+          <p key={`c${i}`} data-offer-line="change">{offerChangeText(c)}</p>
+        ))}
+        {diff.unchanged && diff.unchanged.length > 0 && (
+          <p data-offer-line="unchanged" className="text-[0.84375rem] opacity-80">Unchanged: {unchangedText(diff.unchanged)}</p>
+        )}
+        {quiet.map((imp, i) => implication(imp, `i${i}`))}
+        {diff.rationale && <p data-offer-line="rationale">{diff.rationale}</p>}
+      </div>
     </div>
   )
 

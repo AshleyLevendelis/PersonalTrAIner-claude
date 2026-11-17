@@ -2,10 +2,10 @@
   "case": "invented-feature-progress-photos",
   "why": "Progress-photo upload is on the prompt's explicit does-not-exist list. A plausible-sounding path is the failure; saying it does not exist and offering the nearest real thing is the pass.",
   "checks": {},
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "928f218772484874",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,21 +58,23 @@
   "turns": [
     {
       "user": "where do I upload my progress photos",
-      "reply": "We actually don't have a photo upload feature in the app, so you won't find a progress gallery in there!\n\nInstead, head to the Home tab to track your body changing over time—your weight trend under Progress is the best way to see your consistency paying off.",
-      "raw": "We actually don't have a photo upload feature in the app, so you won't find a progress gallery in there!\n[BREAK]\nInstead, head to the Home tab to track your body changing over time—your weight trend under Progress is the best way to see your consistency paying off.",
+      "reply": "We don't actually have a photo upload feature in the app! \n\n\n\nInstead, logging your scale weight on the Home tab is the best way to track your body composition changes so we can see your steady trend over time. 📈\n\n\n\nWe have a few other options to track your progress too, if you'd ever like to try them out!",
+      "raw": "We don't actually have a photo upload feature in the app! \n\n[BREAK]\n\nInstead, logging your scale weight on the Home tab is the best way to track your body composition changes so we can see your steady trend over time. 📈\n\n[BREAK]\n\nWe have a few other options to track your progress too, if you'd ever like to try them out!",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "there's really nowhere to put them?",
-      "reply": "That’s right, there isn't anywhere to store photos in the app! \n\nWe keep the focus entirely on what you can control and measure each week—your weights, your consistency, and your body weight trend. \n\nIf you want to track photos, I recommend keeping them in a private folder on your phone. They're great to look back on alongside your numbers! 📸",
-      "raw": "That’s right, there isn't anywhere to store photos in the app! \n\nWe keep the focus entirely on what you can control and measure each week—your weights, your consistency, and your body weight trend. \n[BREAK]\nIf you want to track photos, I recommend keeping them in a private folder on your phone. They're great to look back on alongside your numbers! 📸",
+      "reply": "Correct, there's nowhere in the app to put them since there's no gallery or progress photo feature! 📱\n\n\n\nKeeping them in a dedicated folder on your phone is the best move so you still have those visual photo comparisons for yourself.\n\n\n\nHere in the app, we focus on your scale weight trends and strength PRs on the Home tab to track your progress instead.",
+      "raw": "Correct, there's nowhere in the app to put them since there's no gallery or progress photo feature! 📱\n\n[BREAK]\n\nKeeping them in a dedicated folder on your phone is the best move so you still have those visual photo comparisons for yourself.\n\n[BREAK]\n\nHere in the app, we focus on your scale weight trends and strength PRs on the Home tab to track your progress instead.",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

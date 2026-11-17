@@ -2,10 +2,10 @@
   "case": "voice-several-things-at-once",
   "why": "Ashley, 24 Sep 2026: a voice note that asks several things must get every part answered, each on its own line starting with what it answers, so she can see nothing was dropped. No headers, no bold. And no closing question unless an answer genuinely changes what happens next.",
   "checks": {},
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "2bc0f45580822eae",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,12 +58,13 @@
   "turns": [
     {
       "user": "ok so a few things, I'm starving today so I think I need more carbs, what should I have before training tomorrow morning, and is it fine that I skipped the stretching at the end yesterday",
-      "reply": "Bump your carbs at dinner tonight with rice to top up your muscle glycogen, though oats or potatoes work too. \n\n\nBefore tomorrow's lift, grab a banana 30 to 45 minutes out for fast-acting energy that won't sit heavy, or try toast with honey. Want me to add a quick pre-workout snack to your plan? 🥪\n\n\nSkipping your stretch yesterday is totally fine since it just helps you wind down. As long as your main lifts are done, you haven't missed anything that hurts your progression.",
-      "raw": "Bump your carbs at dinner tonight with rice to top up your muscle glycogen, though oats or potatoes work too. \n\n[BREAK]\nBefore tomorrow's lift, grab a banana 30 to 45 minutes out for fast-acting energy that won't sit heavy, or try toast with honey. Want me to add a quick pre-workout snack to your plan? 🥪\n\n[BREAK]\nSkipping your stretch yesterday is totally fine since it just helps you wind down. As long as your main lifts are done, you haven't missed anything that hurts your progression.\n\n[QUICK_REPLIES: \"Add pre-workout snack\" | \"I'm good for now\"]",
+      "reply": "Up your lunch or dinner carbs today with an extra serving of rice to give your body the quick fuel it’s asking for, or pick another favorite carb. 🍌\n\nBefore training tomorrow, grab a banana 30–60 minutes out to top up muscle glycogen without feeling heavy. \n\nSkipping stretching is totally fine for one day because missing it occasionally won't ruin your recovery.",
+      "raw": "Up your lunch or dinner carbs today with an extra serving of rice to give your body the quick fuel it’s asking for, or pick another favorite carb. 🍌\n\nBefore training tomorrow, grab a banana 30–60 minutes out to top up muscle glycogen without feeling heavy. \n\nSkipping stretching is totally fine for one day because missing it occasionally won't ruin your recovery.",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

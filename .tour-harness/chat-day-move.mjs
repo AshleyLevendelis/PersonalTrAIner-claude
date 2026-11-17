@@ -17,6 +17,7 @@
 // boot App.tsx: that App hands the chat this same controller as it hands the
 // Move sheet is held by test:meal-day-move.
 // ---------------------------------------------------------------------------
+import { OPEN_OFFER_DETAILS_SCRIPT } from './driver-kit.mjs'
 import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
@@ -65,6 +66,8 @@ const check = (name, ok, detail) => {
 }
 
 await send('Page.enable'); await send('Runtime.enable')
+// His "One line, numbers on tap" (17 Nov 2026): this driver reads what an offer says, so it opens Details as he would.
+await send('Page.addScriptToEvaluateOnNewDocument', { source: OPEN_OFFER_DETAILS_SCRIPT })
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 await send('Emulation.setFocusEmulationEnabled', { enabled: true })
 

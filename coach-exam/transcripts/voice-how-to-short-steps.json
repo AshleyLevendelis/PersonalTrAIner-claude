@@ -2,10 +2,10 @@
   "case": "voice-how-to-short-steps",
   "why": "Ashley, 24 Sep 2026, after reading four paragraphs on how to deadlift: a how-to is up to three short steps, with the full guide one tap away (\"short steps\"). The first turn should be three lines or fewer plus the offer; the second, asked for, may be longer but still short lines, not paragraphs.",
   "checks": {},
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "497d3df9b9606739",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,21 +58,23 @@
   "turns": [
     {
       "user": "how do I do a deadlift",
-      "reply": "Here is how to set up a solid conventional deadlift:\n\n1. Stand feet hip-width apart, bar over mid-foot (about an inch from shins).\n2. Bend at hips to grip just outside legs, keeping arms straight and shins touching the bar.\n3. Wedge hips down, chest up, and pull straight up against your legs to stand tall.\n\nThis setup keeps the bar close to your center of gravity, which protects your lower back and lets you lift the most weight safely! 🏋️",
-      "raw": "Here is how to set up a solid conventional deadlift:\n\n1. Stand feet hip-width apart, bar over mid-foot (about an inch from shins).\n2. Bend at hips to grip just outside legs, keeping arms straight and shins touching the bar.\n3. Wedge hips down, chest up, and pull straight up against your legs to stand tall.\n[BREAK]\nThis setup keeps the bar close to your center of gravity, which protects your lower back and lets you lift the most weight safely! 🏋️\n\n[QUICK_REPLIES: \"Full form guide\" | \"Got it\"]",
+      "reply": "Think of the deadlift as a hip hinge, not a squat—you are pushing your hips back to load your glutes and hamstrings while keeping your spine safe and flat. \n\n\nHere is how to do it:\n\n1. Set your feet hip-width apart with the bar over the middle of your foot.\n2. Push your hips straight back until your hands reach the bar, keeping your lower back flat.\n3. Brace your core, wedge your hips in, and push the floor away to stand tall.",
+      "raw": "Think of the deadlift as a hip hinge, not a squat—you are pushing your hips back to load your glutes and hamstrings while keeping your spine safe and flat. \n\n[BREAK]\nHere is how to do it:\n\n1. Set your feet hip-width apart with the bar over the middle of your foot.\n2. Push your hips straight back until your hands reach the bar, keeping your lower back flat.\n3. Brace your core, wedge your hips in, and push the floor away to stand tall.\n\n[QUICK_REPLIES: \"Full form guide\" | \"Got it\"]",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "Full form guide",
-      "reply": "Here is the complete setup breakdown for a clean, strong conventional deadlift:\n\n1. Foot Position — Feet hip-width apart, toes turned slightly out, bar directly over mid-foot.\n2. Grip & Hip Hinge — Hinge down at the hips without moving the bar, gripping just outside your shins.\n3. Setting the Spine — Pull your chest up, pull the slack out of the bar, and squeeze your armpits down toward your hips.\n4. The Drive — Push the floor away with your legs to start the pull, keeping the bar touching your shins and thighs all the way up.\n5. Lockout — Stand tall by squeezing your glutes at the top without leaning back at the lower back.\n6. The Return — Hinge at the hips first to lower the bar past your knees before bending your legs to touch the floor.",
-      "raw": "Here is the complete setup breakdown for a clean, strong conventional deadlift:\n\n1. Foot Position — Feet hip-width apart, toes turned slightly out, bar directly over mid-foot.\n2. Grip & Hip Hinge — Hinge down at the hips without moving the bar, gripping just outside your shins.\n3. Setting the Spine — Pull your chest up, pull the slack out of the bar, and squeeze your armpits down toward your hips.\n4. The Drive — Push the floor away with your legs to start the pull, keeping the bar touching your shins and thighs all the way up.\n5. Lockout — Stand tall by squeezing your glutes at the top without leaning back at the lower back.\n6. The Return — Hinge at the hips first to lower the bar past your knees before bending your legs to touch the floor.\n\n[QUICK_REPLIES: \"Got it\" | \"Common mistakes?\"]",
+      "reply": "Here is the step-by-step breakdown:\n\n1. Setup: Feet hip-width apart, bar resting right over the middle of your feet, an inch from your shins.\n2. Grip: Hinge at the hips to reach down and grip the bar just outside your knees with straight arms.\n3. Position: Pull your chest up slightly to flatten your back, and pull your shoulder blades back down toward your back pockets to engage your lats.\n4. Brace: Take a deep breath into your belly and brace your core like you're about to get punched.\n5. The Pull: Push through the middle of your feet and drive the floor away, keeping the bar sliding close to your body.\n6. Lockout: Stand fully upright by squeezing your glutes at the top—don't lean back or arch your lower back.\n7. The Lower: Push your hips back first until the bar passes your knees, then bend your knees to lower it to the floor under control.\n\nFocus on keeping the bar close to your shins the whole way up to protect your lower back.",
+      "raw": "Here is the step-by-step breakdown:\n\n1. Setup: Feet hip-width apart, bar resting right over the middle of your feet, an inch from your shins.\n2. Grip: Hinge at the hips to reach down and grip the bar just outside your knees with straight arms.\n3. Position: Pull your chest up slightly to flatten your back, and pull your shoulder blades back down toward your back pockets to engage your lats.\n4. Brace: Take a deep breath into your belly and brace your core like you're about to get punched.\n5. The Pull: Push through the middle of your feet and drive the floor away, keeping the bar sliding close to your body.\n6. Lockout: Stand fully upright by squeezing your glutes at the top—don't lean back or arch your lower back.\n7. The Lower: Push your hips back first until the bar passes your knees, then bend your knees to lower it to the floor under control.\n\nFocus on keeping the bar close to your shins the whole way up to protect your lower back.",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

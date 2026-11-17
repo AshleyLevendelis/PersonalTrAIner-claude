@@ -14,7 +14,7 @@
 // ---------------------------------------------------------------------------
 import { startDriver } from './driver-kit.mjs'
 
-const d = await startDriver({ port: 9883, page: 'chat.html', name: 'chat-offer-replace', timeoutMs: 300_000 })
+const d = await startDriver({ openOfferDetails: true, port: 9883, page: 'chat.html', name: 'chat-offer-replace', timeoutMs: 300_000 })
 const { origin, send, ev, check, until, wait, shoot, finish } = d
 
 // The coach only parses: "swap my dinner" with no dish named, so the app picks the next option each time.

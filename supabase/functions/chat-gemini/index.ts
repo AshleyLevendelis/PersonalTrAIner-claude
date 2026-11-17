@@ -8,6 +8,7 @@ import { deliverReply, type ReplyPushDeps } from "./reply-push.ts";
 import { pushServer, sendPush } from "../_shared/push.ts";
 import type { NotificationSettings } from "../_shared/coach-moments.ts";
 import { GEMINI_MODEL, coachShortLine } from "../_shared/gemini.ts";
+import { withoutPhotoAllergenClaims, PHOTO_MAX_BASE64, PHOTO_MIME } from "../_shared/photo-safety.ts";
 import { writeOpener } from "../_shared/reminder-writer.ts";
 import { voicePass } from "./voice-pass.ts";
 import { answerFirst } from "./answer-first.ts";
@@ -2215,10 +2216,25 @@ interface ConcurrentActivity {
 // texted to her phone (6 Nov 2026, "like a WhatsApp notification"): see
 // reply-push.ts. After the response, never before it, so she never waits on a
 // push to see her answer; and a failure there never touches the reply itself.
+async function withoutPhotoClaims(res: Response): Promise<Response> {
+  const body = await res.clone().json().catch(() => null) as { reply?: unknown } | null;
+  if (!body || typeof body.reply !== "string") return res;
+  const fixed = withoutPhotoAllergenClaims(body.reply);
+  if (fixed.removed === 0) return res;
+  console.log(`photo-safety removed=${fixed.removed}`);
+  return new Response(JSON.stringify({ ...body, reply: fixed.reply }), { status: res.status, headers: res.headers });
+}
+
 Deno.serve(async (req: Request) => {
+  // WHERE THE WAIT GOES (his "make it fast", 17 Nov 2026): one line per turn with the whole time on the server, beside
+  // one line per model call below. Times and sizes only, never anything he typed.
+  const turnStart = Date.now();
   const request = req.method === "POST" ? await req.clone().json().catch(() => null) : null;
   // ...and a sentence quoting a past lift his logged sets do not hold leaves it too (past-performance.ts).
-  const res = await guardPastLifts(await cleanCoachResponse(await handleChatRequest(req)), (request as { context?: { workout_log_history?: unknown } } | null)?.context?.workout_log_history);
+  const guarded = await guardPastLifts(await cleanCoachResponse(await handleChatRequest(req)), (request as { context?: { workout_log_history?: unknown } } | null)?.context?.workout_log_history);
+  // A PHOTO NEVER MAKES A FOOD ALLERGY-SAFE (17 Nov 2026): on a turn with a photo, a "safe" / "X-free" sentence leaves
+  // the reply and the app's own line is said instead (_shared/photo-safety.ts). Every other turn passes untouched.
+  const res = (request as { image?: unknown } | null)?.image ? await withoutPhotoClaims(guarded) : guarded;
   if (request && (request as { placeholder_id?: unknown }).placeholder_id) {
     const job = (async () => {
       const body = await res.clone().json().catch(() => null);
@@ -2229,6 +2245,7 @@ Deno.serve(async (req: Request) => {
     if (runtime?.waitUntil) runtime.waitUntil(job);
     else await job;
   }
+  console.log(`timing turn ms=${Date.now() - turnStart} status=${res.status}`);
   return res;
 });
 
@@ -2314,6 +2331,25 @@ async function handleChatRequest(req: Request): Promise<Response> {
         JSON.stringify({ opener: written?.by === "coach" ? written.text : null }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
+    }
+
+    // THE RUNNING SUMMARY OF OLDER CHATS (17 Nov 2026, the chat review). The app sends the messages that have left the
+    // coach's 20-message window and the summary so far; this writes the new summary in a short call and the APP checks
+    // it before keeping it (src/lib/chat-summary.ts: no number that is not in the messages, no clinical label he did not
+    // use). Nothing is stored here. Null means "keep the previous summary".
+    if (body?.mode === "summarise") {
+      const turns = Array.isArray(body.turns) ? body.turns as { role?: unknown; content?: unknown }[] : [];
+      const lines = turns
+        .filter(t => (t.role === "user" || t.role === "assistant") && typeof t.content === "string")
+        .map(t => `${t.role === "user" ? "Him" : "Coach"}: ${String(t.content).slice(0, 600)}`)
+        .slice(-40);
+      const previous = typeof body.previous === "string" ? body.previous.slice(0, 1500) : "";
+      const prompt = `You keep a short running summary of a coaching chat so the coach remembers it after the messages scroll away.
+${previous ? `The summary so far:\n${previous}\n\n` : ""}Older messages to fold in:\n${lines.join("\n")}
+
+Write the updated summary: at most 10 short lines, each starting "- ". Keep only what a coach would want to remember: what he said about his body, injuries, sleep, stress, food, schedule and preferences; what he asked to change and whether it was done; advice the coach gave that is worth checking on later (mark those lines "to check:"). Drop small talk. Use his own words for anything about his health; never add a diagnosis or label. Never add a number that is not in the messages or the summary above. Plain text only, no headings.`;
+      const written = lines.length > 0 ? await coachShortLine(prompt, 8000, { maxTokens: 600, temperature: 0.2 }) : null;
+      return new Response(JSON.stringify({ summary: written }), { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (!message || typeof message !== "string") {
@@ -3094,6 +3130,16 @@ UPCOMING MEALS — the next six days, exactly as the Nutrition tab's day strip s
 ${context.upcoming_meal_summary}` : ''}
 ${context.show_numbers === false ? `
 NUMBERS OFF (his Profile setting, the starter tier): he chose not to see calories or macros. Never quote a calorie, kcal, gram or macro figure to him, even when the data below has one; talk about meals, portions (a palm of protein, a fist of carbs) and how the day went. Weights on the bar and minutes are fine.
+` : ''}${body?.image ? `
+THIS MESSAGE CAME WITH A PHOTO (read once; the app keeps only what you estimate). A MEAL: name what you see and estimate each food's amount in grams, say it is an estimate from a photo, and log it with log_meal only if he says he ate it or asks you to (the card shows your estimate before he applies it). A MENU: suggest two or three orders that suit his targets, with a reason each. A LABEL: read the per-100g figures and the pack size back to him and ask him to check them. NEVER say from a photo that a food is safe, or free of an allergen: a photo cannot show a sauce, a coating or a kitchen. If an allergy comes up, say he must check the label or ask the kitchen.
+` : ''}` : ''}${typeof context.patterns_seen === 'string' && context.patterns_seen.trim() ? `
+PATTERNS THE APP SEES IN THEIR LOGS (facts the app worked out; nothing here is a diagnosis):
+${String(context.patterns_seen).slice(0, 800)}
+Coach to AT MOST ONE of these, once, and only when it fits the conversation (never as an opener to an unrelated question). A stuck lift: name it and offer one fix (a rep target to beat before adding weight, or a small drop and rebuild). Low protein: one easy addition from foods they already eat. "Too hard" piling up: ask how sleep and recovery are, and offer a lighter day. One or two sentences, never a lecture, never a number not in these lines.
+` : ''}${typeof context.chat_summary === 'string' && context.chat_summary.trim() ? `
+EARLIER IN YOUR CHATS (the app's running summary of messages older than the conversation below; his own words where it matters):
+${String(context.chat_summary).slice(0, 1500)}
+Use it the way a coach uses memory: do not recite it. When a line marked "to check:" bears on today, ask about it once, in passing. Never treat it as newer than the messages below.
 ` : ''}${typeof context.today_calories === 'string' && context.today_calories && context.show_numbers !== false ? `
 CALORIES LEFT TODAY, exactly as their screen shows it: ${context.today_calories}. When calories left today come up, quote this figure; never work it out yourself from the totals below (they are read separately and can be a meal behind).
 ` : ''}${context.eaten_by_day_read === true && typeof context.eaten_by_day === 'string' ? `
@@ -3185,7 +3231,11 @@ Keep this context in mind to ensure your greetings and questions naturally align
       }
     }
 
-    contents.push({ role: "user", parts: [{ text: message }] });
+    // A PHOTO WITH THE MESSAGE (17 Nov 2026, the chat review; his ruling "Read it, then discard"): sent to the model with
+    // this one turn and kept nowhere, here or in the chat. Only a jpeg, png or webp under the size cap is passed on.
+    const photo = body?.image && typeof body.image === "object" && typeof body.image.data === "string" && PHOTO_MIME.test(String(body.image.mime ?? ""))
+      && body.image.data.length <= PHOTO_MAX_BASE64 ? { mimeType: String(body.image.mime), data: body.image.data as string } : null;
+    contents.push({ role: "user", parts: photo ? [{ inlineData: photo }, { text: message }] : [{ text: message }] });
 
     // ONE FUNCTION FOR EVERY MODEL CALL THIS TURN. The first leg runs with
     // tools. The second pass a tool handler may run afterwards (tool-reply.ts)
@@ -3194,8 +3244,9 @@ Keep this context in mind to ensure your greetings and questions naturally align
     // what the tool did, and cannot call a second tool the single-call
     // executor below would never run. The spend cap above counts the
     // request, not the calls (see _shared/spend-cap.ts).
-    const callGemini = async (turns: unknown[], withTools = true) =>
-      await fetch(
+    const callGemini = async (turns: unknown[], withTools = true) => {
+      const callStart = Date.now();
+      const r = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
         {
           method: "POST",
@@ -3219,6 +3270,9 @@ Keep this context in mind to ensure your greetings and questions naturally align
           }),
         }
       );
+      console.log(`timing model-call ms=${Date.now() - callStart} tools=${withTools} prompt_chars=${systemPrompt.length} turns=${turns.length}`);
+      return r;
+    };
     /** A leg for tool-reply.ts: never throws and never returns a Response. */
     const callLeg = async (turns: unknown[], withTools: boolean): Promise<GeminiLegResult> => {
       try {

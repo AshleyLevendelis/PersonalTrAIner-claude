@@ -3,7 +3,7 @@ import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, f
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 import { tagsMyMeal, type MealSlotName } from './meal-store'
-import { shareLine } from './meal-food-add'
+import { shareLineIfReal } from './meal-food-add'
 import { dayLabel } from './day-labels'
 import { tagsPinOnly } from './meal-new-from'
 import { ELSEWHERE_TAG, assumedMealName } from './meals-elsewhere'
@@ -127,7 +127,7 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
       // What the rest of the plan does is read off a trial by the caller and
       // added to this card (withKnockOn in meal-food-add.ts) — this line used
       // to assert "The rest of the day re-fits around it" (test log H9).
-      ...(vsBudget !== 0 ? [{ severity: 'info' as const, text: shareLine(slot, vsBudget) }] : []),
+      ...((t => t ? [{ severity: 'info' as const, text: t }] : [])(shareLineIfReal(slot, vsBudget, input.targets.calories))),
       cookedForMe
         ? { severity: 'info', text: `Kept as ${poss(dayLabel(date, input.todayDate))} ${slot} only. It isn't added to your own meals and is never on your shopping list.` }
         : { severity: 'info', text: `Joins your ${slot} options, and becomes your ${slot} for ${dayLabel(date, input.todayDate)}.` },

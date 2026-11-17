@@ -9,8 +9,12 @@
 
 export type RevealSpeed = 'off' | 'slow' | 'normal' | 'fast'
 
-/** Normal is ~50ms/word, frame-aligned — see TypewriterMarkdown.tsx for the measurement that set it. */
-export const DEFAULT_REVEAL_SPEED: RevealSpeed = 'normal'
+/**
+ * A reply appears ALL AT ONCE by default: his ruling 17 Nov 2026, "All at once", over a capped typing effect and
+ * over keeping it. The word-by-word replay added about 3 seconds to a normal answer AFTER it had already arrived.
+ * Slow / Normal / Fast stay on Profile for anyone who wants the effect back.
+ */
+export const DEFAULT_REVEAL_SPEED: RevealSpeed = 'off'
 
 const VALUES: RevealSpeed[] = ['off', 'slow', 'normal', 'fast']
 

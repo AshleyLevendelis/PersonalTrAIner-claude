@@ -331,9 +331,11 @@ console.log('\n2b. The coach is not on the path to first paint')
   // on the branch before them and 582 after.
   // MOVED 15 Nov 2026: 588 -> 596, the Marcus and coeliac-nurse fixes (regenerate ask, kit once, first-day lunch,
   // logged-meal sheet, odd-reps, the Log set button, base-block labels); measured 588 at the head of them, 8 kB over.
-  headroom('first paint fetches', firstLoadGzip, 596, 'kB gzipped')
+  // MOVED 17 Nov 2026: 596 -> 604, the chat review merged with main's secondary muscles (catalogue data in the first
+  // chunk); MEASURED 596 through this gate on the merge, each half under the line alone.
+  headroom('first paint fetches', firstLoadGzip, 604, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 596, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 604, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -748,12 +750,16 @@ console.log('\n3. Nothing has crept back up')
   // e373e3b8: 3026. His 15 Sep ruling: 25 kB raw over today's number.
   // MOVED 16 Nov 2026: 3051 -> 3080, the same 16 Nov coach batch; MEASURED 3055 through this gate on cec97249. His
   // 15 Sep ruling: 25 kB raw over today's number.
+  // MOVED 17 Nov 2026: 3080 -> 3100, the chat review (photos, the memory summary, patterns, the offer fixes, one-line
+  // offers); MEASURED 3088 through this gate on the branch head that day. Headroom 12 kB, printed every run.
   // MOVED 17 Nov 2026: 3080 -> 3140, the body drawing's shapes (src/lib/body-paths.ts, 41 kB raw / 19 gz, vendored from
   // react-native-body-highlighter under its MIT licence). MEASURED through this gate on a clean worktree of 08baca3
   // and on the change: total 3074 -> 3115 raw. The shapes are their OWN chunk, loaded when a figure is first drawn,
   // so the other three budgets did not move (deploy 438 gz, first paint 594 gz, app 1510 -> 1511 raw): only this
   // total, which counts every file on disk, took the data. His 15 Sep ruling: 25 kB raw over today's number (3115 + 25).
-  const TOTAL_BUDGET_KB = 3140
+  // MERGED 17 Nov 2026: the chat review and the body drawing together, MEASURED 3128 through this gate on the merge.
+  // His 15 Sep ruling: 25 kB raw over today's number (3128 + 25).
+  const TOTAL_BUDGET_KB = 3153
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

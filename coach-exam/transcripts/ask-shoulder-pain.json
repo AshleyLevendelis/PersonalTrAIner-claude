@@ -10,10 +10,10 @@
       "sports therapist"
     ]
   },
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "b7d7cd8054a4f3db",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -66,21 +66,31 @@
   "turns": [
     {
       "user": "my shoulder hurts when I press",
-      "reply": "Sorry to hear that, Ashley — let's figure out what's going on so we can adjust safely.\n\nIs it a sharp pain, or more of a dull ache, and is it right at the joint or in the muscle around it? Also, does it hurt on all pressing movements or just when going overhead?",
-      "raw": "Sorry to hear that, Ashley — let's figure out what's going on so we can adjust safely.\n\nIs it a sharp pain, or more of a dull ache, and is it right at the joint or in the muscle around it? Also, does it hurt on all pressing movements or just when going overhead?\n\n[QUICK_REPLIES: \"Sharp, at the joint\" | \"Dull ache, in muscle\" | \"Only overhead\" | \"All pressing\"]",
+      "reply": "",
+      "raw": "",
       "error": null,
       "action": null,
-      "proposal": null,
-      "saved": null
+      "proposal": {
+        "kind": "propose_exercise_swap",
+        "args": {
+          "day": "Tuesday",
+          "old_item": "Walking Lunges",
+          "new_item": "Dumbbell Reverse Lunge",
+          "reason": "User reports shoulder pain during overhead pressing movements."
+        }
+      },
+      "saved": null,
+      "refused": null
     },
     {
       "user": "it's sharp, right at the front, and only on the right side. been about a week",
-      "reply": "That sharp, one-sided joint pain that's lasted a week is something to get checked out properly by a physio or doctor. Sharp pain right in the joint isn't something we should train through or try to coach around on our own.\n\nI'd advise taking a break from any pressing movements for now and getting a professional opinion on that shoulder so you don't aggravate it. \n\nWe can easily keep your lower body and pull sessions going while leaving your right shoulder completely out of the equation. How are you feeling about focusing on lower body and pull work for a bit?",
-      "raw": "That sharp, one-sided joint pain that's lasted a week is something to get checked out properly by a physio or doctor. Sharp pain right in the joint isn't something we should train through or try to coach around on our own.\n\nI'd advise taking a break from any pressing movements for now and getting a professional opinion on that shoulder so you don't aggravate it. \n\nWe can easily keep your lower body and pull sessions going while leaving your right shoulder completely out of the equation. How are you feeling about focusing on lower body and pull work for a bit?\n\n[QUICK_REPLIES: \"Sounds good, let's adapt\" | \"I'll see a physio\" | \"What else can I do?\"]",
+      "reply": "That sharp, one-sided pain at the front of your shoulder isn't something we should try to train through or auto-adjust in the app. Because it's a localized, sharp issue that's lasted a week, the safest move is to get a physio or doctor to take a look at it in person. \n\nIn the meantime, stop any pressing or movements that provoke it. Once a professional checks it out and gives you the green light, we can build your upper-body work around whatever they recommend.",
+      "raw": "That sharp, one-sided pain at the front of your shoulder isn't something we should try to train through or auto-adjust in the app. Because it's a localized, sharp issue that's lasted a week, the safest move is to get a physio or doctor to take a look at it in person. \n\nIn the meantime, stop any pressing or movements that provoke it. Once a professional checks it out and gives you the green light, we can build your upper-body work around whatever they recommend.",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

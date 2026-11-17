@@ -192,7 +192,7 @@ async function main() {
     check('pregnancy said in words is ticked on the injuries card, unless that card was answered', /saysPregnant\(userText\) && !pregnancyAnswered\(ws\.values\) && !ws\.confirmed\.has\('injuries'\)/.test(onb) && /injuries: \[\.\.\.\(\(ws\.values\.injuries as string\[\] \| null\) \?\? \[\]\), 'pregnancy'\]/.test(onb))
     check('...and a skipped injuries card keeps it', /const kept = key === 'injuries' && pregnancyAnswered\(ws\.values\) \? \['pregnancy'\] : null/.test(onb) && /\[key\]: kept \}/.test(onb))
     const chatSrc = strip(fs.readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
-    check('the chat makes what he types plain too', /const userText = plainTyped\(input\.trim\(\)\)/.test(chatSrc))
+    check('the chat makes what he types plain too', /const userText = photo \? photoMessageText\(plainTyped\(input\.trim\(\)\)\) : plainTyped\(input\.trim\(\)\)/.test(chatSrc))
     const meal = strip(fs.readFileSync('src/components/MealPlan.tsx', 'utf8'))
     check('Nutrition never tells someone who just set up to "Complete onboarding"', !/Complete onboarding/.test(meal))
   }

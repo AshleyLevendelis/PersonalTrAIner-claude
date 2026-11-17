@@ -15,10 +15,10 @@
       }
     ]
   },
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "076fbbeecb0026cf",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -81,16 +81,18 @@
           "origin_verbatim_quote": "begin the whole programme over again from the first week"
         }
       },
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "hmm, will that wipe my history?",
-      "reply": "Nope, not at all! Starting fresh from Week 1 only rebuilds your upcoming training schedule. \n\nYour past history, logged workouts, PRs, and saved food preferences stay completely untouched. \n\nIt just gives you a clean calibration week to safely find your working weights again without losing any of your progress! 💪",
-      "raw": "Nope, not at all! Starting fresh from Week 1 only rebuilds your upcoming training schedule. \n[BREAK]\nYour past history, logged workouts, PRs, and saved food preferences stay completely untouched. \n\nIt just gives you a clean calibration week to safely find your working weights again without losing any of your progress! 💪",
+      "reply": "No, not at all! Your past logs, PRs, body weight history, and saved preferences stay exactly as they are. \n\nA restart just resets your active training schedule back to Week 1 with a calibration week so we can get your working weights dialed back in safely after the break. 🏋️",
+      "raw": "No, not at all! Your past logs, PRs, body weight history, and saved preferences stay exactly as they are. \n[BREAK]\nA restart just resets your active training schedule back to Week 1 with a calibration week so we can get your working weights dialed back in safely after the break. 🏋️",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

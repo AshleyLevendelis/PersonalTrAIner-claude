@@ -2,6 +2,33 @@
 
 Newest first. One line each.
 
+- [x] **THE CHAT REVIEW, BUILT (17 Nov 2026, his "Build it all" on a merged list of my suggestions and another session's)**.
+  His rulings that day, each from three options: **"One line, numbers on tap"** (an offer is its lead; a cost is always
+  shown; the rest is behind Details); **"Eaten stay, later ones fit"** (already the app's behaviour since 10 Oct, so
+  recorded, not rebuilt); **"All at once"** (no word-by-word replay); **"Read it, then discard"** (a photo is sent once
+  and never stored). Built and checked: (1) offer fixes, each confirmed in the code first: amounts only he said (a
+  swap with none is sized to the replaced food's calories and says so; an addition with a guessed amount asks), no
+  "raw"/"dry" in dish names, USDA sweet potato sizes (small 60 / medium 114 / large 180 g baked; "2 large" had cost
+  262 g), no "Just today" choice he already answered, the "usual share" line only past the day's 5% band, a meal edit
+  for another day priced on that day (it used today's); (2) speed: replies at once, the turn's reads in parallel and
+  before the placeholder, timing lines in the coach's logs; (3) memory: a running summary of what left the 20-message
+  window, written by a short coach call and kept only with no new number and no clinical label (migration
+  `20261117120000_add_chat_summary`, phone copy until then); (4) patterns, CSCS mine: a lift stuck three sessions at
+  one weight with no rep gained (the standard double-progression stall; two is noise), protein under 80% on his last
+  three LOGGED days (one off day is not a pattern, an unlogged day is never a low day), "Too hard" on three lifts in
+  a week (his own answer, not a guess); the coach is told to coach to at most one, once; (5) photos of a meal, menu or
+  label, with an app net that takes out any "safe"/"X-free" sentence on a photo turn; (6) starters on an empty chat,
+  Undo after Clear (the delete waits ten seconds, runs at once if the app hides), "Session done" opens Exercise, and a
+  long reply now stops at his message (a queued jump to the bottom checks it still applies; sending jumps instantly).
+  Checks: test:chat-speed (10, 5/5), test:offer-fixes (33, 15 mutations), test:chat-extras (11), verify:chat-clear-undo
+  (8, 3/3), test:chat-summary (23, 8/8), test:coach-patterns (19, 11/11), test:meal-photos (16, 7/7),
+  verify:chat-send-scroll re-run; five offer drivers now open Details as he would (driver-kit OPEN_OFFER_DETAILS_SCRIPT).
+  **NOT BUILT, waiting for the exam (rule 5)**: caching the coach's fixed instructions, sending only the tools a message
+  needs, streaming (`docs/plans/coach-speed.md`). Not proven: anything the model does with the memory, patterns or
+  photo lines (exam after the `chat-gemini` deploy); photos never run on a real phone; one mutation of the long-reply
+  anchor read MISSED by the harness while a direct run showed the defect (timing-sensitive; noted, not resolved).
+  Needs: the `chat-gemini` deploy and the chat_summary migration.
+
 - [x] **SECONDARY MUSCLES ADDED TO THE EXERCISE DATA (17 Nov 2026, his "Add secondary muscles to the exercise data"; the follow-on to the body diagram below).** New optional field `secondary_muscles` on the catalogue entry
   (`src/lib/exercise-db.ts`): muscles that do real assisting or stabilising work and are NOT already primary. 238 of 265 live exercises carry one (1 to 4 each, from the same vocabulary the map reads); 27 deliberately have none, each
   named in `test:exercise-demo` with its reason: bench and chest presses and push-ups and dips (the primary list already is the whole prime-mover set), hip adduction and back extension machines (no honest assistor), Burpees (not a

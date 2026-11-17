@@ -1644,6 +1644,15 @@ menu" stays true when a copy is also left outside it.
   `chat-gemini` deploy). `verify:live-test-nov14` A16-A24
 
 ### His rulings of 17 Nov 2026
+- **The chat review, "Build it all"**, with four rulings, each from three options: **"One line, numbers on tap"** (an
+  offer is its lead line; a cost line always shows; the rest sits behind Details); **"Eaten stay, later ones fit"**
+  (already true since 10 Oct, recorded); **"All at once"** (no word-by-word replay; Profile can still slow it); **"Read
+  it, then discard"** (a photo of a meal, menu or label is sent once and never stored; on a photo turn the app takes
+  out any "safe"/"X-free" sentence). Also built: amounts only he said, a running memory summary (migration
+  20261117120000), patterns the app sees, Undo after Clear, starters, "Session done" opens Exercise.
+  `test:offer-fixes`, `test:chat-summary`, `test:coach-patterns`, `test:meal-photos`, `test:chat-extras`,
+  `test:chat-speed`, `verify:chat-clear-undo`. Caching, fewer tools and streaming wait for an exam run
+  (`docs/plans/coach-speed.md`). Needs the `chat-gemini` deploy
 - **Every exercise's How to has "Find a video on YouTube": his ruling "YouTube search"** (over hand-picked videos and
   none): a search for its form in a new tab, the chat's own link. It REVERSES "never a button that opens a search" for
   How to; the checked player on Summary stays. `verify:exercise-video`

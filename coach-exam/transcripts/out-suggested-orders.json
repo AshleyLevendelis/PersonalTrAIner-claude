@@ -2,10 +2,10 @@
   "case": "out-suggested-orders",
   "why": "His 13 Nov 2026 strategy, slice 5: a named restaurant gets 2 or 3 suggested orders from what it actually serves, one reason each tied to his day, and an offer to mark the meal out. Never a dish that clashes with a restriction, never 'it is nut-free', never a precise calorie figure (the app logs a meal out as a range, his ruling 'A range').",
   "checks": {},
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "c8589316d0e47018",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,12 +58,13 @@
   "turns": [
     {
       "user": "I'm going to an Italian restaurant on Friday night, what should I order?",
-      "reply": "Go for Chicken Piccata or Marsala with a side of roasted vegetables! 🍝\n\nIt gives you a solid hit of protein from the lean chicken without being loaded with heavy cream sauces.\n\nWe have a few other great options too if you're craving pasta instead!",
-      "raw": "Go for Chicken Piccata or Marsala with a side of roasted vegetables! 🍝\n\nIt gives you a solid hit of protein from the lean chicken without being loaded with heavy cream sauces.\n[BREAK]\nWe have a few other great options too if you're craving pasta instead!\n\n[QUICK_REPLIES: \"Chicken Piccata\" | \"Pasta with red sauce\" | \"Show other ideas\"]",
+      "reply": "Your cleanest bet is grilled chicken or sea bass with roasted veggies to keep your protein high and go easy on extra oils. \n\nIf you're craving pasta instead, a tomato-based sauce with a side of chicken works great too! [BREAK]\n\nWant me to mark Friday's dinner as eating out in your plan so your target adjusts for it?",
+      "raw": "Your cleanest bet is grilled chicken or sea bass with roasted veggies to keep your protein high and go easy on extra oils. \n\nIf you're craving pasta instead, a tomato-based sauce with a side of chicken works great too! [BREAK]\n\nWant me to mark Friday's dinner as eating out in your plan so your target adjusts for it?\n\n[QUICK_REPLIES: \"Yes, mark it eating out\" | \"No, I'm good!\"]",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

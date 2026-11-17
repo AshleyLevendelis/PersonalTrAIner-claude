@@ -33,7 +33,7 @@
 import { startDriver } from './driver-kit.mjs'
 import { ANCHOR_ISO } from './anchor.mjs'
 
-const d = await startDriver({ port: 9905, page: 'real.html', name: 'eating-out' })
+const d = await startDriver({ openOfferDetails: true, port: 9905, page: 'real.html', name: 'eating-out' })
 const { origin, send, ev, check, until, wait, clickAt, shoot, finish } = d
 
 const TODAY = ANCHOR_ISO

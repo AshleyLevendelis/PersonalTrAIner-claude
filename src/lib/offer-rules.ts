@@ -48,7 +48,9 @@ export const COACH_ACTIONS: Record<string, CoachAction> = {
   propose_concurrent_activity: { family: 'plan', screen: 'screen', card: 'propose_concurrent_activity', rule: { words: ['standing', 'definite'] } },
   propose_schedule_change: { family: 'plan', screen: 'screen', card: 'propose_schedule_change', rule: S },
   propose_style_change: { family: 'plan', screen: 'screen', card: 'propose_style_change', rule: S },
-  propose_goal_change: { family: 'plan', screen: 'screen', card: 'propose_goal_change', rule: S },
+  // A GOAL IS LASTING BY ITS NATURE (exam 17 Nov 2026: "start building muscle instead" read as a one-off because of
+  // "instead", and the app refused the right card). No one-occasion reading applies to a change of goal.
+  propose_goal_change: { family: 'plan', screen: 'screen', card: 'propose_goal_change', rule: none('a goal is lasting by nature; "instead" is not an occasion') },
   propose_session_length: { family: 'day', screen: 'screen', card: 'propose_session_length', rule: S },
   propose_running_goal: { family: 'plan', screen: 'screen', card: 'propose_running_goal', rule: S },
   propose_injury_as_lasting: { family: 'plan', screen: 'screen', card: 'propose_injury_as_lasting', rule: S },
@@ -124,6 +126,18 @@ export function isOneOffMention(message: string | null | undefined): boolean {
 /** True when the message asks for something from now on, rather than for one day. */
 export function saysForGood(message: string | null | undefined): boolean {
   return FOR_GOOD.test(String(message ?? ''))
+}
+
+/**
+ * WHETHER AN OFFER STILL NEEDS ITS "Just today / Whole block" CHOICE (17 Nov 2026, the chat review): "swap squats for
+ * today" got both buttons, one of them a question he had already answered. When his own words settle the scope the
+ * offer keeps the scope the tool chose and drops the choice; when they do not, he is asked. Only the two scopes a
+ * change to his plan can have are read here; any other choice on a card is left alone.
+ */
+export function scopeChoiceNeeded(scope: string, message: string | null | undefined): boolean {
+  if (scope === 'today' && isOneOffMention(message) && !saysForGood(message)) return false
+  if (scope === 'permanent' && saysForGood(message)) return false
+  return true
 }
 
 export interface WordsProblem {

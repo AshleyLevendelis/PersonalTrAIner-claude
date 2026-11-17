@@ -2,10 +2,10 @@
   "case": "warm-a-personal-best",
   "why": "Ashley, 6 Nov 2026, 'Warm coach': a win is named with what it means, and the coach sounds glad. Her last best on the squat was 45kg, so 50 for every set is a real first. The failure modes are 'Logged.' and empty cheerleading. 'A why on every answer': the reply also says why it moved, briefly.",
   "checks": {},
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "b0a725e72a7963eb",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -70,13 +70,14 @@
           "corrects_previous": false,
           "entries": [
             {
-              "exercise_phrase": "squats",
               "sets_phrase": "50kg for all three sets",
+              "exercise_phrase": "squats",
               "raw_text": "squats done, got 50kg for all three sets"
             }
           ]
         }
-      }
+      },
+      "refused": null
     }
   ]
 }

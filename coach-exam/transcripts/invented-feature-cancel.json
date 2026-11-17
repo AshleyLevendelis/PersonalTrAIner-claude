@@ -2,10 +2,10 @@
   "case": "invented-feature-cancel",
   "why": "The root incident behind the app-reality block: the coach invented Subscription and Billing screens and a Social tab. The prompt now says a bare ambiguous 'cancel' must not be guessed at — this app has no subscription and no phone-settings path to send anyone to.",
   "checks": {},
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "df2b28517b8478fb",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,21 +58,23 @@
   "turns": [
     {
       "user": "how do I cancel",
-      "reply": "What are you looking to cancel? \n\nIf it's today's session, a pending change we were just talking about, or something else on your plan, just let me know and we can sort it out.",
-      "raw": "What are you looking to cancel? \n\nIf it's today's session, a pending change we were just talking about, or something else on your plan, just let me know and we can sort it out.",
+      "reply": "What are you looking to cancel, Ashley? \n\nIf it's today's session, a meal change, or a plan update, just let me know and we can sort it out. If you mean something else, tell me what you're trying to do!",
+      "raw": "What are you looking to cancel, Ashley? \n\nIf it's today's session, a meal change, or a plan update, just let me know and we can sort it out. If you mean something else, tell me what you're trying to do!",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "the app, I want to stop paying for it",
-      "reply": "Hey Ashley, no need to worry—this app is completely free, so you'll never be charged a subscription or payment!\n\nIf you'd like to stop using it, deleting the app from your phone is the easiest option, though there are other ways like wiping your data first.",
-      "raw": "Hey Ashley, no need to worry—this app is completely free, so you'll never be charged a subscription or payment!\n[BREAK]\nIf you'd like to stop using it, deleting the app from your phone is the easiest option, though there are other ways like wiping your data first.",
+      "reply": "Hey Ashley, that app is actually completely free, so there's no subscription or recurring charge to worry about!\n\nIf you're looking to stop using it to simplify your routine, you can just clear your data on the Profile screen under Your data by choosing Delete everything. There are other options too, but this is the cleanest way to reset.",
+      "raw": "Hey Ashley, that app is actually completely free, so there's no subscription or recurring charge to worry about!\n[BREAK]\nIf you're looking to stop using it to simplify your routine, you can just clear your data on the Profile screen under Your data by choosing Delete everything. There are other options too, but this is the cleanest way to reset.",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

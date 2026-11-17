@@ -38,6 +38,7 @@ export const SHARED_FILES = [
   { source: 'src/lib/log-estimate.ts', copy: 'supabase/functions/_shared/log-estimate.ts' },
   { source: 'src/lib/offer-rules.ts', copy: 'supabase/functions/_shared/offer-rules.ts' },
   { source: 'src/lib/definite-mention.ts', copy: 'supabase/functions/_shared/definite-mention.ts' },
+  { source: 'src/lib/photo-safety.ts', copy: 'supabase/functions/_shared/photo-safety.ts' },
 ]
 
 const header = (source) => `// ===========================================================================
