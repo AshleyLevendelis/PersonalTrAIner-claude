@@ -93,7 +93,7 @@ async function main() {
   console.log('\n4. Wired: the chat answers first, and each screen listens')
   const chat = read('src/components/ChatAssistant.tsx')
   const ask = chat.indexOf('const openAsk = parseOpenRequest(userText)')
-  const coachCall = chat.indexOf('const result = await callGemini(userText, placeholderId)')
+  const coachCall = chat.indexOf('const result = await callGemini(userText, placeholderId')
   check('the chat reads an open request before it asks the coach', ask > 0 && coachCall > 0 && ask < coachCall, { ask, coachCall })
   const openBranch = ask > 0 ? chat.slice(ask, ask + 1600) : ''
   check('...opens the screen, keeps the app\'s own line, and does not go on to the coach', /requestOpen\(openAsk\.target, openAsk\.kg\)/.test(openBranch) && /openedLine\(openAsk\.target, openAsk\.kg\)/.test(openBranch) && /\n\s*return\n/.test(openBranch))

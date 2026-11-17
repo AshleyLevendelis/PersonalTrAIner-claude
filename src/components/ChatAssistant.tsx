@@ -1,5 +1,5 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
-import { offerWordsProblem } from '@/lib/offer-rules'
+import { offerWordsProblem, scopeChoiceNeeded } from '@/lib/offer-rules'
 import { healthConditionsOf, healthConditionsInWords, mealRestrictionsOf, noteForProfile, isPregnant, saidPregnant, askedToPause, PREGNANCY_TICK_WORDS } from '@/lib/health-conditions'
 import { plainTyped } from '@/lib/typed-text'
 import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays, raceDateMissing, RACE_DATE_QUESTION } from '@/lib/running'
@@ -63,6 +63,7 @@ import { seededRngFromKey } from '@/lib/seeded-random'
 import type { ConcurrentActivity, FitnessGoal } from '@/lib/types'
 import { adjustDayVolume, isVolumeAdjustable } from '@/lib/volume-adjust'
 import { buildMealAdditionProposal, type MealAdditionPayload } from '@/lib/meal-addition'
+import { mealOnDay as mealOnDayFor } from '@/lib/meal-on-day'
 import { buildMealLogProposal, type MealLogPayload, type MealLogComputed } from '@/lib/meal-log-proposal'
 import { buildCustomMealProposal } from '@/lib/custom-meal'
 import { buildMealFoodAddProposal, withKnockOn } from '@/lib/meal-food-add'
@@ -6093,6 +6094,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     return clash.allergen ? { ...inner, text: refusal } : inner
   }
 
+  const mealOnDay = (slotName: string, rawDate: unknown) =>
+    mealOnDayFor(mealPlan, upcomingMeals, slotName, rawDate, getSessionDateContext(profile.id).date)
+
   const processResponseInner = async (result: ChatApiResponse, userSaid = ''): Promise<{
     text: string
     action?: PlanAction
@@ -6243,9 +6247,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           refusal = "I need your height, weight, age and sex before I can fit a day around a meal — you can add them in Profile."
         } else {
           const slotName = String(result.proposal.rawArgs.meal_slot ?? '').trim().toLowerCase()
-          const current = mealPlan.find(m => m.meal.toLowerCase() === slotName)?.items[0]
+          const onDay = mealOnDay(slotName, result.proposal.rawArgs.date)
+          const current = onDay.item
+          if (onDay.unseen) { refusal = onDay.unseen } else {
           const foodAdd = buildMealFoodAddProposal({
             rawArgs: result.proposal.rawArgs,
+            userSaid,
             currentMeal: current
               ? { name: current.name, ingredients: current.ingredients ?? [], macros: { calories: current.calories, protein: current.protein, carbs: current.carbs, fat: current.fat } }
               : null,
@@ -6264,6 +6271,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           // screen's sheet is handed. No trial available: the card says so.
           if (foodAdd.ok) built = { scopeKey: foodAdd.scopeKey, preconditions: foodAdd.preconditions, payload: foodAdd.payload as unknown as Record<string, unknown>, diff: withKnockOn(foodAdd.diff, await mealKnockOn(foodAdd.payload)) }
           else refusal = foodAdd.reason
+          }
         }
       } else if (result.proposal.kind === 'propose_meal_move') {
         // MOVING A WHOLE MEAL TO ANOTHER SLOT. Resolved here, not on the
@@ -6326,12 +6334,15 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         } else {
           const rawArgs = result.proposal.rawArgs ?? {}
           const slotName = String(rawArgs.meal_slot ?? '').trim().toLowerCase()
-          const current = mealPlan.find(m => m.meal.toLowerCase() === slotName)?.items[0]
+          const onDay = mealOnDay(slotName, rawArgs.date)
+          const current = onDay.item
           const build =
             result.proposal.kind === 'propose_meal_food_remove' ? buildMealFoodRemoveProposal
             : result.proposal.kind === 'propose_meal_food_replace' ? buildMealFoodReplaceProposal
             : buildMealFoodResizeProposal
+          if (onDay.unseen) { refusal = onDay.unseen } else {
           const edit = build({
+            userSaid,
             rawArgs,
             currentMeal: current
               ? { name: current.name, ingredients: current.ingredients ?? [], macros: { calories: current.calories, protein: current.protein, carbs: current.carbs, fat: current.fat } }
@@ -6354,6 +6365,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           // test #11: an amount change swapped tonight's dinner and no card said so).
           if (edit.ok) built = { scopeKey: edit.scopeKey, preconditions: edit.preconditions, payload: edit.payload as unknown as Record<string, unknown>, diff: withKnockOn(edit.diff, await mealKnockOn(edit.payload)) }
           else refusal = edit.reason
+          }
         }
       } else if (result.proposal.kind === 'propose_custom_meal' && result.proposal.rawArgs) {
         // Same gate as an addition — verifyProposal, in keepPortions mode.
@@ -6684,6 +6696,17 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
       if (!built) {
         return { text: refusal ?? UNKNOWN_PROPOSAL_REFUSAL, outcome: 'refused' }
+      }
+
+      // A SCOPE HE HAS ALREADY SAID IS NOT ASKED AGAIN (17 Nov 2026): "for today" keeps one Apply, no "Just today".
+      {
+        const scopeNow = (built.payload as { scope?: unknown }).scope
+        const editable = built.diff.editable
+        if (typeof scopeNow === 'string' && editable?.some(e => e.field === 'scope' && e.options.includes('today') && e.options.includes('permanent'))
+          && !scopeChoiceNeeded(scopeNow, userSaid)) {
+          const rest = editable.filter(e => e.field !== 'scope')
+          built = { ...built, diff: { ...built.diff, editable: rest.length > 0 ? rest : undefined } }
+        }
       }
 
       // ---------------------------------------------------------------

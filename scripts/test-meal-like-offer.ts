@@ -76,7 +76,7 @@ const chat = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8'
 const save = chat.indexOf('const likedMeal =')
 check('after a like is saved, a whole meal gets the offer (polarity like only)', save > 0 && /polarity === 'like' \? wholeMealLike\(userSaid/.test(chat.slice(save, save + 300)) && /MEAL_LIKE_OFFER\.turn\(likedMeal\.meal, likedMeal\.slot\)/.test(chat.slice(save, save + 600)))
 const remember = chat.indexOf('if (userText.trim() === MEAL_LIKE_OFFER.justRemember)')
-const coachCall = chat.indexOf('const result = await callGemini(userText, placeholderId)')
+const coachCall = chat.indexOf('const result = await callGemini(userText, placeholderId')
 check('"Just remember it" is answered by the app, before the coach', remember > 0 && remember < coachCall && /MEAL_LIKE_OFFER\.remembered/.test(chat.slice(remember, remember + 800)) && /\n\s*return\n/.test(chat.slice(remember, remember + 900)))
 const each = chat.indexOf('for (const d of payload.alsoDates) {')
 check('Apply picks the meal for each later day, and says a day that did not save', each > 0 && /onUpcomingMealPickApplied\(d, payload\.slot, payload\.option\.name\)/.test(chat.slice(each, each + 500)) && /receipt\.failed\.push/.test(chat.slice(each, each + 600)))

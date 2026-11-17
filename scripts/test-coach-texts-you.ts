@@ -206,7 +206,7 @@ async function main() {
   console.log('\n8. The wiring, read from the source (that each one RUNS is verify:coach-texts-you)')
   {
     const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
-    check('the chat tells the coach which row its reply goes in', /placeholder_id: placeholderId \?\? null/.test(chat) && /callGemini\(userText, placeholderId\)/.test(chat))
+    check('the chat tells the coach which row its reply goes in', /placeholder_id: placeholderId \?\? null/.test(chat) && /callGemini\(userText, placeholderId[,)]/.test(chat))
     check('...on a retry too', /callGemini\(userMsg\.content, failedMsg\.id\)/.test(chat))
     check('every read of the chat\'s rows goes through rowToMessage (three of them)', (chat.match(/\.map\(rowToMessage\)/g) ?? []).length === 3, (chat.match(/\.map\(rowToMessage\)/g) ?? []).length)
     check('the chat re-reads on return: visible again, focus, arriving at the chat, and the service worker\'s word',

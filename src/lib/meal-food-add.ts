@@ -5,6 +5,9 @@ import type { ProposalDiff } from './pending-actions-store'
 import type { MealSlotName } from './meal-store'
 import type { MealKnockOn } from './meal-knock-on'
 import { dayLabel } from './day-labels'
+import { dishNameWords } from './as-weighed'
+import { amountSaid } from './amount-said'
+import { parseIngredientLine } from './portion-scaler'
 import { KNOCK_ON, oneDayEdit } from './coach-voice'
 import { tagsPinOnly, tagsAfterEaten } from './meal-new-from'
 
@@ -46,6 +49,8 @@ export interface CurrentMealForSlot {
 
 export interface BuildMealFoodAddInput {
   rawArgs: Record<string, unknown>
+  /** His message, which every amount on the card must come from (amount-said.ts). Absent: not checked. */
+  userSaid?: string
   /** Null when the slot has no meal today — there is nothing to add to. */
   currentMeal: CurrentMealForSlot | null
   profileId: string
@@ -75,6 +80,17 @@ export const shareLine = (slot: string, vsBudget: number): string =>
   `That is ${Math.abs(vsBudget)} kcal ${vsBudget > 0 ? 'over' : 'under'} the usual ${slot} share.`
 
 /**
+ * THE SHARE LINE ONLY WHEN IT MATTERS (17 Nov 2026, the chat review: "warn about calories only when the day is really
+ * off target"). The line fired for any gap at all ("12 kcal under the usual lunch share"), which reads as a warning
+ * about nothing. It is said only past the day's own calorie band (5% of the day, the band "on target" uses), and the
+ * day's own verdict, read off the trial, stays the warning that counts.
+ */
+export function shareLineIfReal(slot: string, vsBudget: number, dayKcal: number): string | null {
+  if (!(dayKcal > 0) || Math.abs(vsBudget) <= dayKcal * 0.05) return null
+  return shareLine(slot, vsBudget)
+}
+
+/**
  * The card with what the trial found added to it (meal-knock-on.ts): every
  * other meal that changes, a day taken off target, the shopping list. No
  * trial (null) — the card says it could not check, rather than saying nothing
@@ -94,7 +110,9 @@ export function buildMealFoodAddProposal(input: BuildMealFoodAddInput): MealFood
     return { ok: false, reason: 'Tell me what to add and how much — like "a banana" or "100g rice" — and I\'ll work out the numbers.' }
   }
   // Same rule as a custom meal: the amount is hers, so it has to be stated.
-  const missingAmounts = foodLines.filter(l => !/\d/.test(l) && !/\b(a|an|one|half|quarter)\b/i.test(l))
+  // ...and the amount on the line is one HE said, never the coach's guess (17 Nov 2026: "2 large" he never wrote).
+  const missingAmounts = foodLines.filter(l => (!/\d/.test(l) && !/\b(a|an|one|half|quarter)\b/i.test(l)) || !amountSaid(l, input.userSaid))
+    .map(l => dishNameWords(parseIngredientLine(l).name || l))
   if (missingAmounts.length > 0) {
     return { ok: false, reason: `How much ${missingAmounts.length === 1 ? 'of the ' + missingAmounts[0] : 'of each — ' + missingAmounts.join(', ')}? Grams, or counts like "2 eggs", both work.` }
   }
@@ -122,7 +140,7 @@ export function buildMealFoodAddProposal(input: BuildMealFoodAddInput): MealFood
 
   const proposal: RawProposal = {
     slot,
-    name: `${currentMeal.name} + ${added}`,
+    name: `${currentMeal.name} + ${dishNameWords(added)}`,
     ingredients: [...currentMeal.ingredients, ...foodLines],
     prep: '',
     cuisine: '',
@@ -153,7 +171,7 @@ export function buildMealFoodAddProposal(input: BuildMealFoodAddInput): MealFood
       // 9 Oct 2026). What the rest of the plan does is now READ OFF A TRIAL by
       // the caller and added to this card (withKnockOn, below); the builder
       // states only what it computed itself.
-      ...(vsBudget !== 0 ? [{ severity: 'info' as const, text: shareLine(slot, vsBudget) }] : []),
+      ...((t => t ? [{ severity: 'info' as const, text: t }] : [])(shareLineIfReal(slot, vsBudget, input.targets.calories))),
       // "today" or the weekday, never "2026-09-16" — meal-food-edit.ts's rule:
       // a date she can read off her own phone's clock is not information, it
       // is the app talking to itself in front of her.

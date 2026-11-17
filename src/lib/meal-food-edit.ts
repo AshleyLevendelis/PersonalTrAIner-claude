@@ -1,6 +1,8 @@
 import { verifyProposal, computeSlotBudgets, type RawProposal } from './meal-generation'
 import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, type MealAdditionPayload } from './meal-addition'
 import { parseIngredientLines, withQuantity } from './portion-scaler'
+import { dishNameWords } from './as-weighed'
+import { unsaidAmounts, sizedToReplace } from './amount-said'
 import { FOOD_DB, lookupIngredient, unitToGrams, weighedTwinOf, cookedTwinOf, type FoodEntry, type Macros100g } from './food-db'
 import { swapGroupOf } from './food-swap-groups'
 import type { MacroTargets } from './types'
@@ -53,6 +55,8 @@ import { dayLabel } from './day-labels'
 
 export interface BuildMealFoodEditInput {
   rawArgs: Record<string, unknown>
+  /** His message, which an amount on the card must come from (amount-said.ts). Absent: not checked. */
+  userSaid?: string
   /** Null when the slot has no meal today — there is nothing to edit. */
   currentMeal: CurrentMealForSlot | null
   profileId: string
@@ -104,7 +108,7 @@ export const MIN_FOODS_PER_MEAL = 1
  */
 /** Just the food, without its amount — for naming, never for matching. */
 function foodNameOf(line: string): string {
-  return parseIngredientLines([line])[0]?.name ?? line
+  return dishNameWords(parseIngredientLines([line])[0]?.name ?? line)
 }
 
 export function matchIngredient(lines: string[], phrase: string):
@@ -398,10 +402,20 @@ export function buildMealFoodReplaceProposal(input: BuildMealFoodEditInput): Mea
   if (vague.length > 0) {
     return { ok: false, reason: `How much ${vague.join(', ')}? Grams, or counts like "2 eggs", both work.` }
   }
+  // AN AMOUNT HE DID NOT SAY IS NEVER THE COACH'S GUESS (17 Nov 2026, "2 large"): one food going in is sized to the
+  // calories of the one it replaces, and the card says so; anything else is asked.
+  let sizedNote: string | null = null
+  if (unsaidAmounts(withLines, input.userSaid).length > 0) {
+    const sized = withLines.length === 1 ? sizedToReplace(withLines[0], removed) : null
+    if (!sized) return { ok: false, reason: `How much ${withLines.map(foodNameOf).join(', ')}? Grams, or counts like "2 eggs", both work.` }
+    withLines.splice(0, 1, sized)
+    sizedNote = `Sized to match the ${foodNameOf(removed)} it replaces, about the same calories. Say an amount if you'd like a different one.`
+  }
   const ingredients = [...meal.ingredients.slice(0, index), ...withLines, ...meal.ingredients.slice(index + 1)]
   return settle(input, c, ingredients, `${meal.name} with ${withLines.map(foodNameOf).join(', ')} instead of ${foodNameOf(removed)}`, 'propose_meal_food_replace',
     { field: 'Swapping', before: removed, after: withLines.join(', ') },
     [
+      ...(sizedNote ? [{ severity: 'info' as const, text: sizedNote }] : []),
       { severity: 'info', text: `Everything else in your ${slot} stays exactly as it is.` },
       { severity: 'info', text: `Checked against your dietary settings the same way any new meal is.` },
       { severity: 'info', text: oneDayEdit(slot, dayLabel(normaliseDate(input.rawArgs.date, input.todayDate), input.todayDate), meal.name) },
@@ -428,8 +442,8 @@ export function buildMealFoodResizeProposal(input: BuildMealFoodEditInput): Meal
   // A SECOND RESIZE OF THE SAME FOOD REPLACES THE FIRST'S WORDS (whole-app QA walk, 7 Nov 2026): the name grew a
   // clause per tap, "Overnight Oats with 60g oats with 80g oats with 70g oats". The same connector, so the dish keeps
   // its identity (meal-dish-identity's " with ").
-  const lastClause = ` with ${before}`
-  const resizedName = meal.name.endsWith(lastClause) ? `${meal.name.slice(0, -lastClause.length)} with ${after}` : `${meal.name} with ${after}`
+  const lastClause = ` with ${dishNameWords(before)}`
+  const resizedName = meal.name.endsWith(lastClause) ? `${meal.name.slice(0, -lastClause.length)} with ${dishNameWords(after)}` : `${meal.name} with ${dishNameWords(after)}`
   return settle(input, c, ingredients, resizedName, 'propose_meal_food_resize',
     { field: 'Changing', before, after },
     [

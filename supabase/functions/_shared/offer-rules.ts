@@ -139,6 +139,18 @@ export function saysForGood(message: string | null | undefined): boolean {
   return FOR_GOOD.test(String(message ?? ''))
 }
 
+/**
+ * WHETHER AN OFFER STILL NEEDS ITS "Just today / Whole block" CHOICE (17 Nov 2026, the chat review): "swap squats for
+ * today" got both buttons, one of them a question he had already answered. When his own words settle the scope the
+ * offer keeps the scope the tool chose and drops the choice; when they do not, he is asked. Only the two scopes a
+ * change to his plan can have are read here; any other choice on a card is left alone.
+ */
+export function scopeChoiceNeeded(scope: string, message: string | null | undefined): boolean {
+  if (scope === 'today' && isOneOffMention(message) && !saysForGood(message)) return false
+  if (scope === 'permanent' && saysForGood(message)) return false
+  return true
+}
+
 export interface WordsProblem {
   rule: WordsRule
   /** For the coach's retry: what was wrong, in a clause. */

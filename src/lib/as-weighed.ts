@@ -43,6 +43,15 @@ export function asWeighed<L extends MealIngredientLine>(line: L): L {
   return { ...line, name, quantity: twinGrams, unit: 'g' }
 }
 
+/**
+ * A food as it reads in a DISH NAME (17 Nov 2026, the chat review): "Porridge + 200g potato", never "... raw potato". A
+ * line is weighed raw or dry so the amount is right; the state word belongs beside the number, not in what the dish is
+ * called. Only the weighing words go; a cooking word that says what the dish IS ("roast", "grilled") stays.
+ */
+export function dishNameWords(text: string): string {
+  return text.replace(/\b(?:raw|dry|uncooked)\s+/gi, '').replace(/\s+/g, ' ').trim()
+}
+
 export function asWeighedLines<L extends MealIngredientLine>(lines: L[]): L[] {
   return lines.map(asWeighed)
 }
