@@ -1644,6 +1644,10 @@ menu" stays true when a copy is also left outside it.
   `chat-gemini` deploy). `verify:live-test-nov14` A16-A24
 
 ### His rulings of 17 Nov 2026
+- **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over
+  marking once with both). The judge is stamped on the scores; scores marked by another judge are stale (re-grade the
+  same transcripts, no need to re-run the coach). **Judged marks before 17 Nov are not comparable with marks after.**
+  `test:coach-exam-fresh`, `test:coach-exam-judge`
 - **The chat review, "Build it all"**, with four rulings, each from three options: **"One line, numbers on tap"** (an
   offer is its lead line; a cost line always shows; the rest sits behind Details); **"Eaten stay, later ones fit"**
   (already true since 10 Oct, recorded); **"All at once"** (no word-by-word replay; Profile can still slow it); **"Read

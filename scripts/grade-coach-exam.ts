@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { hardRuleViolations, appRefusals, realTabNames, coachLine, coachToolNames, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
-import { coachFingerprint, rubricFingerprint } from './coach-fingerprint.ts'
+import { coachFingerprint, rubricFingerprint, JUDGE_MODEL } from './coach-fingerprint.ts'
 
 // ---------------------------------------------------------------------------
 // THE COACH EXAM, PART 2 OF 3 — mark the transcripts.
@@ -62,7 +62,6 @@ function loadRubric(): { text: string; dimensions: string[] } {
 interface Marks { [dimension: string]: number | null }
 interface Judgement { marks: Marks; reasons: Record<string, string> }
 
-const JUDGE_MODEL = 'claude-opus-5'
 
 // THE JUDGE IS TOLD WHAT THE COACH CAN DO. Found in the graded run of 26 Sep
 // 2026: the coach closed with "Want me to add these tempo cues to your dumbbell

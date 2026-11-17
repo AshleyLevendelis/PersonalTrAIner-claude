@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH EXAM'S JUDGE IS NOW FABLE 5.2 (17 Nov 2026, his ruling "Switch to Fable", asked from three options:
+  switch, keep Opus 5, or mark once with both).** A stronger marker catches subtler coaching mistakes; the cost is that
+  judged marks before and after are NOT COMPARABLE. So the judge is now stamped like the coach and the marking guide:
+  `JUDGE_MODEL` lives in `scripts/coach-fingerprint.ts`, the grader writes it, and `test:coach-exam-fresh` calls scores
+  marked by a different judge (or none recorded) stale, with "re-grade the same transcripts" as the fix. 4 new checks,
+  4 mutations, 4 caught (harness's baseline refusal bypassed by counting FAIL lines against the gate's real stale
+  baseline of 4, since the current scores are already stale for the coach change). Not yet run against the real API
+  (needs his key); the next exam run on his machine is the first Fable marking. Also started the same day: an
+  eight-area audit of the whole app by Fable 5.2 auditors (findings to follow in their own entry).
+
 - [x] **THE CHAT REVIEW, BUILT (17 Nov 2026, his "Build it all" on a merged list of my suggestions and another session's)**.
   His rulings that day, each from three options: **"One line, numbers on tap"** (an offer is its lead; a cost is always
   shown; the rest is behind Details); **"Eaten stay, later ones fit"** (already the app's behaviour since 10 Oct, so

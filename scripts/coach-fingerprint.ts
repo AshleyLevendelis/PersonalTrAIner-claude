@@ -134,3 +134,10 @@ export function examCaseStamps(root: string = ROOT): Record<string, string> {
   }
   return out
 }
+
+/**
+ * THE EXAM'S JUDGE. His ruling 17 Nov 2026, "Switch to Fable": the judge moved from claude-opus-5 to Fable 5.2, a
+ * stronger marker. Marks from two judges are not comparable, so the judge is stamped on the scores like the coach and
+ * the rubric, and a different judge makes them stale (re-grade the same transcripts; the coach need not run again).
+ */
+export const JUDGE_MODEL = 'claude-fable-5-2'

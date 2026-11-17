@@ -2,7 +2,7 @@ import { existsSync, readFileSync, mkdtempSync, mkdirSync, writeFileSync } from 
 import { tmpdir } from 'os'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { coachFingerprint, rubricFingerprint, examCaseStamps, FINGERPRINT_PARTS, type CoachFingerprint } from './coach-fingerprint.ts'
+import { coachFingerprint, rubricFingerprint, examCaseStamps, FINGERPRINT_PARTS, JUDGE_MODEL, type CoachFingerprint } from './coach-fingerprint.ts'
 
 // ---------------------------------------------------------------------------
 // THE PART OF THE COACH EXAM THAT RUNS IN EVERY SWEEP, BECAUSE IT IS FREE.
@@ -54,6 +54,8 @@ export interface Scores {
   /** The question each case answered (examCaseStamps), carried from the transcripts. */
   caseStamps?: Record<string, string>
   model?: string
+  /** The model that marked the answers (grade-coach-exam.ts writes it). */
+  judge?: string | null
   ranAt?: string
   baselinePending?: boolean
   cases?: Record<string, unknown>
@@ -74,10 +76,18 @@ export interface Verdict {
  * BOTH can be true at once — a scores file can be for an old coach AND hold
  * no cases — so problems is a list rather than a single reason.
  */
-export function freshnessVerdict(scores: Scores, current: CoachFingerprint, rubric: string = rubricFingerprint(ROOT), questions: Record<string, string> = examCaseStamps(ROOT)): Verdict {
+export function freshnessVerdict(scores: Scores, current: CoachFingerprint, rubric: string = rubricFingerprint(ROOT), questions: Record<string, string> = examCaseStamps(ROOT), judge: string = JUDGE_MODEL): Verdict {
   if (scores.baselinePending) return { state: 'pending', problems: [] }
 
   const problems: string[] = []
+  // THE MARKER MOVED (his "Switch to Fable", 17 Nov 2026). Marks from two judges are not comparable; like a changed
+  // guide, the fix is to mark the same transcripts again.
+  if (scores.judge !== judge) {
+    problems.push(
+      `the judge has changed since these answers were marked — marked by ${scores.judge ?? '(no judge recorded)'}, ` +
+      `the judge now is ${judge}. Re-grade the same transcripts; the coach need not be run again for this`,
+    )
+  }
   // THE STANDARD MOVED, as distinct from the coach. Its own sentence, because
   // its fix is different and cheaper: mark the same transcripts again
   // (npm run coach-exam:grade), with no need to play the conversations again.
@@ -146,6 +156,7 @@ const MATCHING: Scores = {
   rubric: rubricFingerprint(ROOT),
   caseStamps: examCaseStamps(ROOT),
   model: current.model,
+  judge: JUDGE_MODEL,
   ranAt: '2026-09-20T00:00:00Z',
   cases: { 'ask-shoulder-pain': {}, 'scope-medication': {} },
 }
@@ -175,6 +186,12 @@ check('...including the model, when that is what moved',
 // A MATCHING FINGERPRINT OVER AN EMPTY RUN IS THE SUBTLE ONE: every hash
 // agrees, so the comparison this gate is named for passes, and nothing was
 // measured. It has to fail on the case count alone.
+const reJudge = v({ ...MATCHING, judge: 'claude-opus-5' })
+check('scores marked by a DIFFERENT judge are stale, even for the same coach and guide (his "Switch to Fable")',
+  reJudge.state === 'stale' && reJudge.problems.some(p => /judge has changed/.test(p) && /claude-opus-5/.test(p)), reJudge.problems)
+check('...and the reason says to re-grade, not to run the coach again', reJudge.problems.some(p => /Re-grade the same transcripts/.test(p)))
+check('...and scores with no judge recorded are stale too', v({ ...MATCHING, judge: undefined }).state === 'stale')
+check('the judge is Fable 5.2', JUDGE_MODEL === 'claude-fable-5-2', JUDGE_MODEL)
 const reRubric = v({ ...MATCHING, rubric: 'oldrubrichash00' })
 check('scores marked against a DIFFERENT marking guide are stale, even for the same coach',
   reRubric.state === 'stale' && reRubric.problems.length === 1, reRubric)
