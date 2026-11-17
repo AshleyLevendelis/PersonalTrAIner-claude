@@ -77,6 +77,7 @@
     "test:cardio-effort": "tsx scripts/test-cardio-effort.ts",
     "test:chat-cardio": "tsx scripts/test-chat-cardio.ts",
     "test:reach-out": "tsx scripts/test-reach-out.ts",
+    "test:push-link": "tsx scripts/test-push-link.ts",
     "verify:reach-out-function": "node scripts/smoke-reach-out.mjs",
     "test:exercise-history": "tsx scripts/test-exercise-history.ts",
     "test:plan-adaptations-separation": "tsx scripts/test-plan-adaptations-separation.ts",

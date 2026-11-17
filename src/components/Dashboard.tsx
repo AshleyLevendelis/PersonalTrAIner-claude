@@ -19,6 +19,7 @@ import { tabHash } from '@/lib/app-route'
 import { loadDashboardData, leadLiftPhrase, homeGreeting, LIFT_SHORT_NAME, type DashboardData } from '@/lib/dashboard-data'
 import { changeSinceStart } from '@/lib/weight-trend'
 import { momentFactsFrom, sendFactsAhead } from '@/lib/moment-facts'
+import { keepPhoneLinked } from '@/lib/push-link'
 import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
 import { stepsTargetFor } from '@/lib/steps-target'
 import { getStepsForDate, logStepsManual, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, type DailyStepsRow } from '@/lib/steps-store'
@@ -216,6 +217,11 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const [loadError, setLoadError] = useState(false)
   /** Bumping this re-runs the load effect — the Retry button's whole mechanism. */
   const [retryVersion, setRetryVersion] = useState(0)
+
+  // THIS PHONE STAYS LINKED TO THE PROFILE ON SCREEN (his report 17 Nov 2026, no reminders ever arriving): a phone
+  // that said yes to notifications is written back for this profile once a day, so a new profile or a dropped row
+  // cannot leave the coach with no phone to reach while Profile still reads "On".
+  useEffect(() => { if (profile.id) void keepPhoneLinked(profile.id) }, [profile.id])
 
   useEffect(() => {
     // Deliberately NOT gated on `macros`. computeTargets returns null for
