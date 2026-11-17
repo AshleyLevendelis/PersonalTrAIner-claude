@@ -1,4 +1,5 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
+import { isOneOffMention, oneOffSportReply } from '@/lib/one-off-sport'
 import { healthConditionsOf, healthConditionsInWords, mealRestrictionsOf, noteForProfile, isPregnant, saidPregnant, askedToPause, PREGNANCY_TICK_WORDS } from '@/lib/health-conditions'
 import { plainTyped } from '@/lib/typed-text'
 import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays, raceDateMissing, RACE_DATE_QUESTION } from '@/lib/running'
@@ -6572,6 +6573,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           if (moved.ok) built = { scopeKey: moved.scopeKey, preconditions: moved.preconditions, payload: moved.payload as unknown as Record<string, unknown>, diff: moved.diff }
           else refusal = moved.reason
         }
+      } else if (result.proposal.kind === 'propose_concurrent_activity' && result.proposal.rawArgs && isOneOffMention(userSaid)) {
+        // A ONE-OFF IS NEVER A STANDING CLASS (his report 17 Nov 2026, "Im doing myay thai this evening"): the plan is
+        // left alone and he is asked once whether it is every week, whatever the coach reached for.
+        refusal = oneOffSportReply(String(result.proposal.rawArgs.name ?? ''))
       } else if (result.proposal.kind === 'propose_concurrent_activity' && result.proposal.rawArgs) {
         const activity = buildConcurrentActivityProposal(result.proposal.rawArgs)
         if (activity) built = { scopeKey: activity.scopeKey, preconditions: activity.preconditions, payload: activity.payload as unknown as Record<string, unknown>, preImage: activity.preImage, diff: activity.diff }

@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { isOneOffMention, oneOffSportReply } from "../_shared/one-off-sport.ts";
 import { acceptEstimates, estimateAssumption, notCountedQuestion } from "../_shared/log-estimate.ts";
 import { cleanCoachResponse } from "./text-like-a-coach.ts";
 import { guardPastLifts } from "./past-performance.ts";
@@ -3423,6 +3424,24 @@ Keep this context in mind to ensure your greetings and questions naturally align
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
+      }
+
+      if (name === "propose_concurrent_activity" && isOneOffMention(message)) {
+        // A ONE-OFF IS NEVER A STANDING CLASS (his report 17 Nov 2026: "Im doing myay thai this evening" got an offer to
+        // rebuild sixteen weeks). The tool description already says so; this holds it in code. Nothing is proposed or
+        // recorded: the coach answers what he said and may ask once whether it is every week.
+        const spoken = await toolReply({
+          outcome: { name, args, response: { status: "not_proposed", note: "they described one occasion, not a weekly class; nothing was recorded and the plan is unchanged" } },
+          nudge: "(System: they told you about ONE occasion, not a class they do every week, so nothing was recorded and their plan is unchanged. Reply to what they said as their coach texting: two or three short lines, useful for tonight and tomorrow's training. Never say the plan or the schedule changed. You may ask once whether it is every week. Plain text only on this attempt; tool calls are unavailable.)",
+          floor: oneOffSportReply(String(args.name ?? "")),
+          preferFirstLegText: true,
+          checks: [...todayChecks, {
+            test: (t: string) => detectPlanClaim(t) ? "it says the plan changed" : null,
+            nudge: () => "(System: your reply said their plan or schedule changed, and nothing changed. Reply again without saying anything was changed.)",
+            floor: oneOffSportReply(String(args.name ?? "")),
+          }],
+        });
+        return new Response(JSON.stringify({ reply: spoken.reply }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       if (name === "propose_concurrent_activity") {

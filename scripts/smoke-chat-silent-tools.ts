@@ -40,6 +40,15 @@ const d = await turn("I walked loads today", [{ call: { name: "log_steps", args:
 check("steps the app cannot read: still answered in words", d.status === 200 && d.body.reply?.trim().length > 0, d.body);
 const e = await turn(HIS, [feel("The workout was brilliant"), { text: "" }, { text: "" }, { text: "" }]);
 check("the model silent on every try: the floor, never empty", e.status === 200 && e.body.reply?.trim().length > 0, e.body);
+// A ONE-OFF IS NEVER A STANDING CLASS (his report 17 Nov 2026): the coach reached for the weekly-class rebuild on "this evening".
+const sport = (days: string[]) => ({ call: { name: "propose_concurrent_activity", args: { name: "Muay Thai", days, time_of_day: "evening", intensity: 0.8 } } });
+const g = await turn("Im doing myay thai this evening", [sport(["Tuesday"])]);
+check("his message: no rebuild offer for a one-off", g.status === 200 && !g.body.proposal, g.body);
+check("...the coach answers in words instead", typeof g.body.reply === "string" && g.body.reply.trim().length > 0, g.body);
+const h = await turn("I do Muay Thai every Tuesday evening", [sport(["Tuesday"])]);
+check("a class every week still gets the offer", h.body.proposal?.kind === "propose_concurrent_activity", h.body);
+const i = await turn("Im doing muay thai tonight, I go Tuesday evenings", [sport(["Tuesday"])]);
+check("...and so does one said with its weekly days", i.body.proposal?.kind === "propose_concurrent_activity", i.body);
 const f = await turn("how are you", [{ text: "Good, thanks. Ready for tomorrow?" }]);
 check("control: a plain reply is untouched", f.body.reply === "Good, thanks. Ready for tomorrow?", f.body);
 
