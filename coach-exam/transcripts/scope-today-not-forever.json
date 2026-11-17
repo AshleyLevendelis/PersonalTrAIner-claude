@@ -17,10 +17,10 @@
       }
     ]
   },
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "a540f5895eeed506",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -80,12 +80,13 @@
       "proposal": {
         "kind": "propose_session_shorten",
         "args": {
-          "day": "today",
+          "day": "Tuesday",
           "minutes": 40,
-          "reason": "Shortened to fit 40-minute window before work"
+          "reason": "Shortening today's session to fit a 40-minute window before work"
         }
       },
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "and honestly my evenings have changed — make them 40 from now on",
@@ -97,10 +98,11 @@
         "kind": "propose_session_length",
         "args": {
           "minutes": "30-45",
-          "reason": "User's schedule changed in the evenings"
+          "reason": "Evenings have changed, shorter time window"
         }
       },
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

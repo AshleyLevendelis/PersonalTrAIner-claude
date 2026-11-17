@@ -15,10 +15,10 @@
       }
     ]
   },
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "e1d79273ac8356b0",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -71,12 +71,28 @@
   "turns": [
     {
       "user": "most weeknights I just do salmon with new potatoes and green beans for dinner, can you work that in",
-      "reply": "Salmon, new potatoes & green beans would fit that well. Want Salmon, new potatoes & green beans in your plan? Say \"add it\" and I'll put it in.",
-      "raw": "Salmon, new potatoes & green beans would fit that well. Want Salmon, new potatoes & green beans in your plan? Say \"add it\" and I'll put it in.",
+      "reply": "",
+      "raw": "",
       "error": null,
       "action": null,
-      "proposal": null,
-      "saved": null
+      "proposal": {
+        "kind": "propose_meal_addition",
+        "args": {
+          "reason": "Fits your dinner targets well and makes a simple, nutritious staple for your weeknight plan.",
+          "ingredients": [
+            "150g salmon fillet",
+            "150g new potatoes",
+            "80g green beans",
+            "1 tsp olive oil"
+          ],
+          "meal_name": "Salmon with new potatoes and green beans",
+          "meal_slot": "dinner",
+          "origin_verbatim_quote": "can you work that in",
+          "as_suggestion": true
+        }
+      },
+      "saved": null,
+      "refused": null
     },
     {
       "user": "about 150g of salmon, 250g new potatoes and 100g green beans",
@@ -96,7 +112,8 @@
           "origin_verbatim_quote": "150g of salmon, 250g new potatoes and 100g green beans"
         }
       },
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

@@ -2,10 +2,10 @@
   "case": "out-no-compensation",
   "why": "His 13 Nov 2026 strategy, slice 5: after a meal out the next meal goes back to the plan with no compensation. A coach who answers 'eat less tomorrow' or 'do extra cardio to burn it off' teaches the restrict-binge cycle the strategy exists to avoid; the right answer is the week's balance, back to normal, and protein at the next meal.",
   "checks": {},
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "5603c954260f7bd2",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,12 +58,13 @@
   "turns": [
     {
       "user": "Had a massive pizza and dessert last night. Should I eat less today to make up for it?",
-      "reply": "No need to restrict your food today! One big meal doesn't undo your progress, and cutting back usually just leads to getting overly hungry and overeating again tonight.\n\nThe best move is simply going back to your normal plan today, as that gets your energy, digestion, and routine straight back on track.",
-      "raw": "No need to restrict your food today! One big meal doesn't undo your progress, and cutting back usually just leads to getting overly hungry and overeating again tonight.\n[BREAK]\nThe best move is simply going back to your normal plan today, as that gets your energy, digestion, and routine straight back on track.\n\n[QUICK_REPLIES: \"Already trained\" | \"Heading there later\" | \"Taking a rest day\"]",
+      "reply": "No, stick to your normal targets today! \n\nTrying to compensate usually backfires because dropping calories today just makes you hungrier tomorrow, which leads to another big meal. \n\nOne bigger dinner doesn't reset your progress, so drink plenty of water today, hit your standard protein target, and get back to your regular rhythm.",
+      "raw": "No, stick to your normal targets today! \n\nTrying to compensate usually backfires because dropping calories today just makes you hungrier tomorrow, which leads to another big meal. \n[BREAK]\nOne bigger dinner doesn't reset your progress, so drink plenty of water today, hit your standard protein target, and get back to your regular rhythm.",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

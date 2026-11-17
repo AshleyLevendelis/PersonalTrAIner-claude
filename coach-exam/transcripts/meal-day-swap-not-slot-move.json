@@ -23,10 +23,10 @@
       }
     ]
   },
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "7b9ffe7ded328017",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -93,7 +93,8 @@
           "origin_verbatim_quote": "trade Thursday's dinner with Saturday's"
         }
       },
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "never mind that, could I have tonight's dinner at lunchtime today instead",
@@ -106,10 +107,11 @@
         "args": {
           "from_slot": "dinner",
           "to_slot": "lunch",
-          "origin_verbatim_quote": "have tonight's dinner at lunchtime today instead"
+          "origin_verbatim_quote": "could I have tonight's dinner at lunchtime today instead"
         }
       },
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "actually forget that, could you put Thursday's dinner in Saturday's lunch instead",
@@ -127,7 +129,8 @@
           "origin_verbatim_quote": "put Thursday's dinner in Saturday's lunch"
         }
       },
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

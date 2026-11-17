@@ -1,0 +1,82 @@
+{
+  "case": "run-before-heavy-legs",
+  "why": "Ashley, 16 Nov 2026: 'if I ask should I run 15k tonight but I have a heavy leg session planned for tomorrow morning, I don't want the chat to just say yeah go for it. It should see what's upcoming and decide based off that.' Today is an upper-body day already done; tomorrow is heavy legs. The answer must name tomorrow's leg session and give the better option (an easy, shorter run, or the 15k on another day, or moving legs), never a plain yes. It is a question, so no card: a hedge-free plan to run is not stated (his 15 Sep cardio ruling).",
+  "checks": {
+    "mustMention": [
+      "tomorrow",
+      "legs",
+      "squat"
+    ],
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      }
+    ]
+  },
+  "fingerprint": "6f06af39991cc724",
+  "caseStamp": "eba3d8851edc7483",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-11-17T21:26:50.252Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "Monday, 5:40 PM",
+    "day_of_week": "Monday",
+    "workout_logged_today": true,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym",
+      "exercises_that_fit": "chest press: Barbell Bench Press, Dumbbell Bench Press, Barbell Floor Press, Dumbbell Floor Press, Neutral-Grip Dumbbell Press, Incline Dumbbell Press; overhead press: Landmine Press, Overhead Press, Dumbbell Shoulder Press, Arnold Press, Band Shoulder Press, Pike Push-Ups; row: Chest-Supported Row, Barbell Rows, Dumbbell Rows, Bent-Over Dumbbell Row, T-Bar Rows, Landmine Row; pull-down / pull-up: Kneeling Band Lat Pulldown, Pull-Ups, Chin-Ups, Dumbbell Pullover, Band Lat Pulldown, Single-Arm Band Pulldown; shoulder raise: Lateral Raises, Front Raises, Band Lateral Raise, Backpack Lateral Raise, Backpack Front Raise; traps: Shrugs, Dumbbell Shrugs, Band Shrug, Backpack Shrug; hinge: Deadlifts, Trap Bar Deadlift, Romanian Deadlifts, Good Mornings, Kettlebell Swing (Heavy), Glute Bridge; hamstrings: Sliding Leg Curl, Single-Leg Sliding Leg Curl, Seated Band Leg Curl, Dumbbell Leg Curl; squat: Barbell Squats, Goblet Squats, Wall Sit, Spanish Squat, Air Squat, Box Squat (Bodyweight); quads: Banded Terminal Knee Extension, Chair Leg Extension, Seated Short-Arc Quad Set; single-leg: Walking Lunges, Dumbbell Reverse Lunge, Bulgarian Split Squats, Split Squat (Bodyweight), Step-Ups (Bodyweight), Low Box Step-Up; carry: Farmer's Walk, Suitcase Carry, Overhead Carry, Trap Bar Carry, Loaded Backpack Walk, Farmer Squat Hold (Isometric Carry); calves: Single-Leg Dumbbell Calf Raise, Calf Raises (Bodyweight), Single-Leg Calf Raise (Bodyweight), Single-Leg Calf Raise Hold, Bent-Knee Calf Raise (Bodyweight); biceps: Barbell Curls, Dumbbell Curls, Hammer Curls, Band Curl, Incline Dumbbell Curls; triceps: Tricep Dips, Band Tricep Pushdown, Band Tricep Kickback, Dumbbell Tricep Kickback, Lying Dumbbell Tricep Extension, Overhead Tricep Extension; cardio: Jump Rope, Burpees, Mountain Climbers, High Knees, Jumping Jacks, Shadow Boxing; core: Plank, Dead Bug, Pallof Press, Hanging Leg Raises, Ab Wheel Rollout, Russian Twist"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [],
+    "streak_days": 4,
+    "exercise_summary": "Today (Monday): Upper body — Bench Press 4x6 @ 70kg, Bent-Over Row 4x8 @ 60kg, Overhead Press 3x8 @ 40kg, Lat Pulldown 3x10. [CLOSED at 14 of 14 planned working sets]\nTuesday (tomorrow): Lower body, heavy — Barbell Back Squat 5x5 @ 100kg, Romanian Deadlift 4x6 @ 90kg, Walking Lunges 3x10, Standing Calf Raise 3x15.\nThursday: Upper body — Incline Dumbbell Press 4x8, Seated Cable Row 4x10, Lateral Raise 3x15.\nSaturday: Full body — Deadlift 4x5 @ 120kg, Front Squat 3x6, Pull-Up 3x8.",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "thinking of doing a long 18k this evening, good idea?",
+      "reply": "I’d hold off on the 18k tonight since you’ve got a heavy leg session tomorrow morning with Back Squats at 100kg and Romanian Deadlifts. \n\nRunning 18k tonight will leave your legs fatigued and under-recovered, which will hit your strength, compromise your squat technique, and bump up your injury risk.\n\nInstead, let's keep it to a short, easy 5k at a conversational pace tonight so you don't trash your legs for tomorrow. We have a couple of other options too if you'd prefer to adjust the week! 🏃",
+      "raw": "I’d hold off on the 18k tonight since you’ve got a heavy leg session tomorrow morning with Back Squats at 100kg and Romanian Deadlifts. \n[BREAK]\nRunning 18k tonight will leave your legs fatigued and under-recovered, which will hit your strength, compromise your squat technique, and bump up your injury risk.\n[BREAK]\nInstead, let's keep it to a short, easy 5k at a conversational pace tonight so you don't trash your legs for tomorrow. We have a couple of other options too if you'd prefer to adjust the week! 🏃",
+      "error": null,
+      "action": null,
+      "proposal": null,
+      "saved": null,
+      "refused": null
+    }
+  ]
+}
