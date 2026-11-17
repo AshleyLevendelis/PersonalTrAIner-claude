@@ -1,0 +1,17 @@
+{
+  "name": "swap-question-answer-then-offer",
+  "why": "His ruling 16 Nov 2026, 'Answer, then offer': a question that reaches for a change gets one or two lines of answer and then the offer. The offer here is an exercise swap for today; the app places the answer above the card, so the exam sees the card.",
+  "messages": [
+    "every squat rack is taken, would the leg press do the job instead today?"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_exercise_swap"
+        ]
+      }
+    ]
+  }
+}

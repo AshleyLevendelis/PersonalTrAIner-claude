@@ -45,8 +45,10 @@ const sport = (days: string[]) => ({ call: { name: "propose_concurrent_activity"
 const g = await turn("Im doing myay thai this evening", [sport(["Tuesday"])]);
 check("his message: no rebuild offer for a one-off", g.status === 200 && !g.body.proposal, g.body);
 check("...the coach answers in words instead", typeof g.body.reply === "string" && g.body.reply.trim().length > 0, g.body);
+check("...and the refusal is counted by tool and rule, with none of his words", g.body.offerRefused?.tool === "propose_concurrent_activity" && g.body.offerRefused?.rule === "standing" && !JSON.stringify(g.body.offerRefused).toLowerCase().includes("thai"), g.body);
 const h = await turn("I do Muay Thai every Tuesday evening", [sport(["Tuesday"])]);
 check("a class every week still gets the offer", h.body.proposal?.kind === "propose_concurrent_activity", h.body);
+check("...and an offer that is built carries no refusal", !h.body.offerRefused, h.body);
 const i = await turn("Im doing muay thai tonight, I go Tuesday evenings", [sport(["Tuesday"])]);
 check("...and so does one said with its weekly days", i.body.proposal?.kind === "propose_concurrent_activity", i.body);
 // THE SAME CHECKPOINT FOR EVERY TOOL (stage 1): a one-day change asked from now on, and a run off a maybe.

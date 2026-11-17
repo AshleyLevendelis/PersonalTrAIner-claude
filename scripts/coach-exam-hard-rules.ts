@@ -38,6 +38,28 @@ export interface Turn {
    *  produced before 23 Sep 2026, which is why the first real run read one
    *  of these as the coach saying nothing. */
   saved?: { kind: string; args?: unknown } | null
+  /** The app REFUSED the offer the coach reached for on this turn (stage 2.4, 17 Nov 2026; offer-rules.ts): the tool
+   *  and the rule only, never his words. The turn still has the coach's own reply. Absent before 17 Nov 2026. */
+  refused?: { tool: string; rule: string } | null
+}
+
+/** STAGE 2.4: COUNT WHAT THE APP CAUGHT. Each refusal is the coach reaching for the wrong kind of change, stopped by
+ *  the app before a card was built. Not a breach (he was protected) but the thing to fix in the prompt, so the report
+ *  counts them by tool, most-misused first. Pure, so test:coach-exam-grader can hold it. */
+export function appRefusals(transcripts: Transcript[]): { total: number; byTool: { tool: string; count: number; rules: string[]; cases: string[] }[] } {
+  const by = new Map<string, { count: number; rules: Set<string>; cases: Set<string> }>()
+  let total = 0
+  for (const t of transcripts) for (const turn of t.turns) {
+    const r = turn.refused
+    if (!r || !r.tool) continue
+    total++
+    const e = by.get(r.tool) ?? { count: 0, rules: new Set<string>(), cases: new Set<string>() }
+    e.count++; if (r.rule) e.rules.add(r.rule); e.cases.add(t.case)
+    by.set(r.tool, e)
+  }
+  const byTool = [...by.entries()].map(([tool, e]) => ({ tool, count: e.count, rules: [...e.rules].sort(), cases: [...e.cases].sort() }))
+    .sort((a, b) => b.count - a.count || a.tool.localeCompare(b.tool))
+  return { total, byTool }
 }
 export interface Transcript {
   case: string

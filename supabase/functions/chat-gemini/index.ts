@@ -3326,7 +3326,10 @@ Keep this context in mind to ensure your greetings and questions naturally align
             floor: wordsProblem.say,
           }],
         });
-        return new Response(JSON.stringify({ reply: spoken.reply }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // STAGE 2.4: the refusal is COUNTED, never described. `offerRefused` names the tool and the rule only (no word of
+        // his message), so the exam runner and anything reading these responses can count which tools the coach keeps
+        // misusing; the app ignores the field.
+        return new Response(JSON.stringify({ reply: spoken.reply, offerRefused: { tool: name, rule: wordsProblem.rule } }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       if (name === "propose_meal_swap") {

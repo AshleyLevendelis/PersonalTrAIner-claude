@@ -1,0 +1,22 @@
+{
+  "name": "one-off-class-no-rebuild",
+  "why": "Ashley, 17 Nov 2026: 'Im doing myay thai this evening' got an offer to rebuild sixteen weeks around 'Muay Thai, Tuesday evenings'. One occasion is not a standing class. Since stage 1 the app refuses that offer before a card is built (offer-rules.ts) and the exam report counts the refusal under THE APP CAUGHT; a refusal here means the coach still reached for the wrong change. Turn two says it is weekly, and only then is the standing-class offer right. Worded unlike the prompt so the prompt cannot be the answer key.",
+  "messages": [
+    "got a kickboxing class after work tonight, looking forward to it",
+    "actually it's every Thursday, I go most weeks"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      },
+      {
+        "turn": 1,
+        "oneOf": [
+          "propose_concurrent_activity"
+        ]
+      }
+    ]
+  }
+}

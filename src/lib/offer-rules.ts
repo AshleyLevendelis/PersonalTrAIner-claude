@@ -116,8 +116,19 @@ export interface WordsProblem {
 }
 
 /** The first rule his words break for this tool, or null. Unknown tools pass (the gate keeps the list complete). */
+/** THE CARD NAME IS NOT ALWAYS THE TOOL NAME (found 17 Nov 2026, stage 2). The coach's server answers a few tools
+ *  with a card of a different name, and the app's backstop reads the CARD: `ban_exercise` arrives as
+ *  `propose_exercise_ban`, so "I don't want squats today" turned into a ban was never checked on the app's side. Every
+ *  such card names its tool here; test:offer-rules derives the card names from the server and fails on one with no
+ *  rule. */
+export const CARD_KIND_TOOL: Record<string, string> = {
+  propose_exercise_ban: 'ban_exercise',
+  propose_meal_log: 'log_meal',
+  propose_weigh_in: 'log_weight',
+}
+
 export function offerWordsProblem(tool: string, message: string | null | undefined, opts: { hedged: boolean }): WordsProblem | null {
-  const rule = OFFER_RULES[tool]
+  const rule = OFFER_RULES[tool] ?? OFFER_RULES[CARD_KIND_TOOL[tool] ?? '']
   if (!rule || !('words' in rule)) return null
   for (const w of rule.words) {
     if (w === 'standing' && isOneOffMention(message)) {

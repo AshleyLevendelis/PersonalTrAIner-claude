@@ -3,7 +3,7 @@
 // his message right (his own "this evening" among them); the app's sentences; and the wiring on both sides, in front of
 // every tool's own branch. The real function is driven by verify:chat-silent-tools, the screen by verify:chat-one-off-sport.
 import { readFileSync } from 'node:fs'
-import { OFFER_RULES, isOneOffMention, saysForGood, offerWordsProblem } from '../src/lib/offer-rules'
+import { OFFER_RULES, CARD_KIND_TOOL, isOneOffMention, saysForGood, offerWordsProblem } from '../src/lib/offer-rules'
 import { isHedged } from '../src/lib/definite-mention'
 
 let ran = 0
@@ -29,6 +29,15 @@ const ruled = Object.entries(OFFER_RULES).filter(([, r]) => 'words' in r).map(([
 check('the lasting changes, the one-day changes and the something-on-a-day ones are all ruled',
   ['propose_concurrent_activity', 'propose_schedule_change', 'propose_goal_change', 'propose_session_length', 'ban_exercise', 'propose_volume_change',
     'propose_session_shorten', 'propose_session_kind_today', 'propose_rest_day', 'propose_session_move', 'propose_cardio_session'].every(t => ruled.includes(t)), ruled)
+
+// EVERY CARD THE APP CAN RECEIVE IS RULED TOO (17 Nov 2026): the app's backstop reads the card's kind, which is not
+// always the tool's name. Card kinds are read off the server's `kind: "propose_..."` returns, not listed by hand.
+const cardKinds = [...new Set([...server.matchAll(/kind: "(propose_[a-z_]+)"/g)].map(m => m[1]))]
+check('the card kinds are read off the server (and there are many)', cardKinds.length >= 40, cardKinds.length)
+const unruledCards = cardKinds.filter(k => !(k in OFFER_RULES) && !(CARD_KIND_TOOL[k] in OFFER_RULES))
+check('every card kind the app can receive reaches a rule', unruledCards.length === 0, unruledCards)
+check('a ban card is held to the ban tool\'s rule on the app\'s side ("not today" is not "never")',
+  offerWordsProblem('propose_exercise_ban', "I don't want to do squats today", { hedged: false })?.rule === 'standing')
 
 console.log('\n2. One occasion (a lasting change is not offered)')
 for (const m of ['Im doing myay thai this evening', 'Going to boxing tonight', 'playing football tomorrow',
@@ -74,7 +83,7 @@ const firstBranch = srv.indexOf('if (name === "propose_meal_swap")')
 check('the coach\'s server checks before the first tool branch', check1 > 0 && firstBranch > 0 && check1 < firstBranch)
 const block = check1 > 0 ? srv.slice(check1, firstBranch) : ''
 check('...answers in words through the checked reply path, with the app\'s sentence as the floor', /toolReply\(/.test(block) && /floor: wordsProblem\.say/.test(block))
-check('...and proposes nothing', /return new Response\(JSON\.stringify\(\{ reply: spoken\.reply \}\)/.test(block) && !/proposal:/.test(block))
+check('...and proposes nothing', /return new Response\(JSON\.stringify\(\{ reply: spoken\.reply, offerRefused: \{ tool: name, rule: wordsProblem\.rule \} \}\)/.test(block) && !/proposal:/.test(block))
 const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
 const c1 = chat.indexOf("const wordsProblem = offerWordsProblem(result.proposal.kind, userSaid, { hedged: isHedged(userSaid ?? '') })")
 const c2 = chat.indexOf("} else if (result.proposal.kind === 'propose_meal_swap' && result.proposal.rawArgs) {")

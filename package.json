@@ -658,7 +658,8 @@
     "test:open-from-chat": "tsx scripts/test-open-from-chat.ts",
     "test:meal-like-offer": "tsx scripts/test-meal-like-offer.ts",
     "test:home-next-session": "tsx scripts/test-home-next-session.ts",
-    "test:past-lifts": "tsx scripts/test-past-lifts.ts"
+    "test:past-lifts": "tsx scripts/test-past-lifts.ts",
+    "verify:chat-real-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-real-day.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",
