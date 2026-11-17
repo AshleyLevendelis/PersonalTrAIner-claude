@@ -36,6 +36,7 @@ import { useEffect, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Trophy, Play } from 'lucide-react'
+import { formVideoUrl } from '@/lib/exercise-video'
 import { getExerciseEntry, getExerciseId, jointListDisplay } from '@/lib/exercise-db'
 import { formatCompletedSummary } from '@/lib/session-derive'
 import {
@@ -304,6 +305,23 @@ export function ExerciseDetailPanel({
               HOW TO — unchanged from the panel that shipped, moved into a tab.
               --------------------------------------------------------------- */}
           <TabsContent value="howto" className="mt-4">
+            {/* A VIDEO FOR EVERY EXERCISE, AS A SEARCH: his ruling 17 Nov 2026, "YouTube search", from three options (over
+                hand-picked videos and over none). It REPLACES the rule on the Summary tab's player that a button opening a
+                search was never to be drawn: the label says it is a search, so it promises no particular video. The
+                checked player on Summary stays where one exists. */}
+            {exerciseName && (
+              <a
+                href={formVideoUrl(exerciseName)}
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="howto-video-search"
+                className="hit-slop-44 mb-5 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[0.8125rem] font-semibold text-primary-text"
+                style={{ background: 'var(--surface-raised)' }}
+              >
+                <Play className="size-3.5 shrink-0" aria-hidden />
+                Find a video on YouTube
+              </a>
+            )}
             {!entry ? (
               <p className="text-sm text-muted-foreground">
                 I don&apos;t have notes on this one — it isn&apos;t in the exercise catalogue.

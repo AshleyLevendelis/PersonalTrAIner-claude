@@ -65,7 +65,8 @@ const STOP = new Set(['how', 'do', 'does', 'did', 'i', 'you', 'we', 'to', 'a', '
   'knee', 'knees', 'hip', 'hips', 'posture', 'brace', 'breathe', 'breathing', 'stay', 'motivated', 'eat', 'cook', 'meal',
   'meals', 'sleep', 'lose', 'gain', 'weight', 'fat', 'muscle', 'build', 'grip'])
 
-function formVideoUrl(exercise: string): string {
+/** A YouTube search for this exercise's form: what the chat's video button and the How to tab's link both open. */
+export function formVideoUrl(exercise: string): string {
   return `https://www.youtube.com/results?search_query=${encodeURIComponent(`${exercise} exercise form tutorial`)}`
 }
 

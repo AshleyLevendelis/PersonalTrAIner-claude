@@ -560,6 +560,7 @@
     "verify:swap-unknown-name": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/swap-unknown-name.mjs",
     "verify:kit-for-good": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/kit-for-good.mjs",
     "verify:kit-this-one": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/kit-this-one.mjs",
+    "verify:exercise-video": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/exercise-video.mjs",
     "verify:one-calorie-target": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/one-calorie-target.mjs",
     "verify:named-food-clash": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/named-food-clash.mjs",
     "verify:chat-food-avoid": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-food-avoid.mjs",
