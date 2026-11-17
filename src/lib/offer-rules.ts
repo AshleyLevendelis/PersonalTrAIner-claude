@@ -24,69 +24,88 @@ const S: OfferRule = { words: ['standing'] }
 const T: OfferRule = { words: ['today'] }
 const none = (why: string): OfferRule => ({ none: why })
 
-export const OFFER_RULES: Record<string, OfferRule> = {
-  // Lasting changes to the plan.
-  propose_concurrent_activity: { words: ['standing', 'definite'] },
-  propose_schedule_change: S,
-  propose_style_change: S,
-  propose_goal_change: S,
-  propose_session_length: S,
-  propose_running_goal: S,
-  propose_injury_as_lasting: S,
-  propose_volume_change: S,
-  propose_kit_change: S,
-  ban_exercise: S,
-  // One day's changes.
-  propose_session_shorten: T,
-  propose_session_kind_today: T,
-  propose_session_rebuild: T,
-  propose_rest_day: T,
-  propose_session_move: T,
-  propose_session_activity_swap: { words: ['today', 'definite'] },
-  propose_cardio_session: { words: ['definite'] },
-  // Every other tool, and what holds it instead.
-  propose_meal_swap: none('one meal on one day; the card names the day'),
-  propose_meal_addition: none('asked-for meals only; a question gets the app-sized answer (answer-first)'),
-  propose_custom_meal: none('a meal he describes; the builder costs and checks every line'),
-  propose_meal_food_add: none('one food in one meal; the food must be in the food list'),
-  propose_meal_food_remove: none('one food he named; the builder finds it in the meal'),
-  propose_meal_food_replace: none('one food he named; swaps are checked against his diet'),
-  propose_meal_food_resize: none('one food he named; the builder finds it in the meal'),
-  propose_meal_move: none('two meals on one day; the card shows both sizes'),
-  propose_meal_day_move: none('two named days within the week; the trial shows every knock-on'),
-  propose_meal_refit: none('offered off the app\'s own drift verdict, not his words'),
-  propose_eating_out: none('one meal on one day; the size is asked by the app'),
-  propose_meal_rebalance: none('the app asks how much before the card'),
-  propose_meal_top_up: none('offered off the app\'s own short-pool verdict'),
-  propose_plan_pause: none('a pause asked for or offered after a red flag; resume is one tap'),
-  propose_plan_restart: none('offered only after a long break the app measured'),
-  propose_exercise_swap: none('the card offers Just today or Whole block; he picks the scope'),
-  propose_exercise_remove: none('the card offers Just today or Whole block; he picks the scope'),
-  propose_exercise_add: none('the card offers Just today or Whole block; he picks the scope'),
-  propose_exercise_reorder: none('one day\'s order; a superset moves together'),
-  propose_injury_adaptation: none('pain is triaged first (edit-reason); a sharp one changes nothing'),
-  propose_injury_recovered: none('ends a change he has; nothing new is added'),
-  propose_equipment_adaptation: none('a temporary kit change, seven days, stated on the card'),
-  propose_missed_session: none('a past day only; offer-still-holds refuses a trained day'),
-  propose_circuit_log: none('built only from rounds, times and effort in his words (message-evidence)'),
-  propose_cardio_log: none('past-tense cardio in his words (message-evidence)'),
-  log_workout_session: none('a session he says he did; written with an Undo'),
-  log_workout: none('sets in his words; the exercise must be named or on today\'s log'),
-  log_weight: none('a surprising weigh-in is asked about first (weigh-in-check)'),
-  log_meal: none('a food that cannot be counted is asked about before any card'),
-  log_workout_set: none('sets in his words; odd reps are asked about once'),
-  record_fact: none('his verbatim quote must be in his message'),
-  record_goal: none('his verbatim quote must be in his message'),
-  record_context_fact: none('his verbatim quote must be in his message'),
-  set_display_name: none('his verbatim quote must be in his message'),
-  record_session_feel: none('his verbatim quote must be in his message'),
-  add_to_grocery_list: none('an instruction, not a statement (imperative classifier)'),
-  add_day_to_grocery_list: none('an instruction, not a statement (imperative classifier)'),
-  check_off_grocery_item: none('an instruction, not a statement (imperative classifier)'),
-  remove_from_grocery_list: none('an instruction, not a statement (imperative classifier)'),
-  log_water: none('an amount in his words; Undo on the receipt'),
-  log_steps: none('always a card, confirmed by his tap'),
+/** Where an action lives, for the master list's readers (and the parity document's grouping). */
+export type ActionFamily = 'meals' | 'exercise' | 'day' | 'plan' | 'logging' | 'memory' | 'shopping'
+
+/**
+ * THE MASTER LIST OF EVERYTHING THE COACH CAN DO: stage 4 of docs/plans/coach-reaches-everything.md (17 Nov 2026).
+ * Each action is defined ONCE, here: its family, whether a screen control does the same (`screen`, held equal to
+ * docs/coach-screen-parity.md), the card the app receives when it is an offer (`card`, absent for an instant save),
+ * and the words rule every offer passes (stage 1). OFFER_RULES and CARD_KIND_TOOL below are DERIVED from it, and
+ * test:coach-actions holds it equal to the coach's declared tools, its handlers, the cards it returns, the cards the
+ * app handles and the parity document, so none of those can gain or lose an action without this list changing.
+ * NOT DONE, by decision: the coach's tool DESCRIPTIONS (the words the model reads) are still written in chat-gemini;
+ * generating them from here would move 58 long texts and needs an exam run to prove it changed nothing.
+ */
+export interface CoachAction {
+  family: ActionFamily
+  screen: 'screen' | 'exception'
+  card?: string
+  rule: OfferRule
 }
+
+export const COACH_ACTIONS: Record<string, CoachAction> = {
+  propose_concurrent_activity: { family: 'plan', screen: 'screen', card: 'propose_concurrent_activity', rule: { words: ['standing', 'definite'] } },
+  propose_schedule_change: { family: 'plan', screen: 'screen', card: 'propose_schedule_change', rule: S },
+  propose_style_change: { family: 'plan', screen: 'screen', card: 'propose_style_change', rule: S },
+  propose_goal_change: { family: 'plan', screen: 'screen', card: 'propose_goal_change', rule: S },
+  propose_session_length: { family: 'day', screen: 'screen', card: 'propose_session_length', rule: S },
+  propose_running_goal: { family: 'plan', screen: 'screen', card: 'propose_running_goal', rule: S },
+  propose_injury_as_lasting: { family: 'plan', screen: 'screen', card: 'propose_injury_as_lasting', rule: S },
+  propose_volume_change: { family: 'plan', screen: 'screen', card: 'propose_volume_change', rule: S },
+  propose_kit_change: { family: 'plan', screen: 'screen', card: 'propose_kit_change', rule: S },
+  ban_exercise: { family: 'exercise', screen: 'screen', card: 'propose_exercise_ban', rule: S },
+  propose_session_shorten: { family: 'day', screen: 'screen', card: 'propose_session_shorten', rule: T },
+  propose_session_kind_today: { family: 'day', screen: 'screen', card: 'propose_session_kind_today', rule: T },
+  propose_session_rebuild: { family: 'day', screen: 'screen', card: 'propose_session_rebuild', rule: T },
+  propose_rest_day: { family: 'day', screen: 'screen', card: 'propose_rest_day', rule: T },
+  propose_session_move: { family: 'day', screen: 'screen', card: 'propose_session_move', rule: T },
+  propose_session_activity_swap: { family: 'day', screen: 'screen', card: 'propose_session_activity_swap', rule: { words: ['today', 'definite'] } },
+  propose_cardio_session: { family: 'day', screen: 'screen', card: 'propose_cardio_session', rule: { words: ['definite'] } },
+  propose_meal_swap: { family: 'meals', screen: 'screen', card: 'propose_meal_swap', rule: none('one meal on one day; the card names the day') },
+  propose_meal_addition: { family: 'meals', screen: 'exception', card: 'propose_meal_addition', rule: none('asked-for meals only; a question gets the app-sized answer (answer-first)') },
+  propose_custom_meal: { family: 'meals', screen: 'exception', card: 'propose_custom_meal', rule: none('a meal he describes; the builder costs and checks every line') },
+  propose_meal_food_add: { family: 'meals', screen: 'screen', card: 'propose_meal_food_add', rule: none('one food in one meal; the food must be in the food list') },
+  propose_meal_food_remove: { family: 'meals', screen: 'screen', card: 'propose_meal_food_remove', rule: none('one food he named; the builder finds it in the meal') },
+  propose_meal_food_replace: { family: 'meals', screen: 'screen', card: 'propose_meal_food_replace', rule: none('one food he named; swaps are checked against his diet') },
+  propose_meal_food_resize: { family: 'meals', screen: 'screen', card: 'propose_meal_food_resize', rule: none('one food he named; the builder finds it in the meal') },
+  propose_meal_move: { family: 'meals', screen: 'screen', card: 'propose_meal_move', rule: none('two meals on one day; the card shows both sizes') },
+  propose_meal_day_move: { family: 'meals', screen: 'screen', card: 'propose_meal_day_move', rule: none('two named days within the week; the trial shows every knock-on') },
+  propose_meal_refit: { family: 'meals', screen: 'screen', card: 'propose_meal_refit', rule: none('offered off the app\'s own drift verdict, not his words') },
+  propose_eating_out: { family: 'meals', screen: 'screen', card: 'propose_eating_out', rule: none('one meal on one day; the size is asked by the app') },
+  propose_meal_rebalance: { family: 'meals', screen: 'screen', card: 'propose_meal_rebalance', rule: none('the app asks how much before the card') },
+  propose_meal_top_up: { family: 'meals', screen: 'screen', card: 'propose_meal_top_up', rule: none('offered off the app\'s own short-pool verdict') },
+  propose_plan_pause: { family: 'plan', screen: 'screen', card: 'propose_plan_pause', rule: none('a pause asked for or offered after a red flag; resume is one tap') },
+  propose_plan_restart: { family: 'plan', screen: 'screen', card: 'propose_plan_restart', rule: none('offered only after a long break the app measured') },
+  propose_exercise_swap: { family: 'exercise', screen: 'screen', card: 'propose_exercise_swap', rule: none('the card offers Just today or Whole block; he picks the scope') },
+  propose_exercise_remove: { family: 'exercise', screen: 'screen', rule: none('the card offers Just today or Whole block; he picks the scope') },
+  propose_exercise_add: { family: 'exercise', screen: 'screen', card: 'propose_exercise_add', rule: none('the card offers Just today or Whole block; he picks the scope') },
+  propose_exercise_reorder: { family: 'exercise', screen: 'screen', rule: none('one day\'s order; a superset moves together') },
+  propose_injury_adaptation: { family: 'plan', screen: 'screen', card: 'propose_injury_adaptation', rule: none('pain is triaged first (edit-reason); a sharp one changes nothing') },
+  propose_injury_recovered: { family: 'plan', screen: 'screen', card: 'propose_injury_recovered', rule: none('ends a change he has; nothing new is added') },
+  propose_equipment_adaptation: { family: 'plan', screen: 'screen', card: 'propose_equipment_adaptation', rule: none('a temporary kit change, seven days, stated on the card') },
+  propose_missed_session: { family: 'day', screen: 'screen', card: 'propose_missed_session', rule: none('a past day only; offer-still-holds refuses a trained day') },
+  propose_circuit_log: { family: 'logging', screen: 'screen', card: 'propose_circuit_log', rule: none('built only from rounds, times and effort in his words (message-evidence)') },
+  propose_cardio_log: { family: 'logging', screen: 'screen', card: 'propose_cardio_log', rule: none('past-tense cardio in his words (message-evidence)') },
+  log_workout_session: { family: 'logging', screen: 'screen', rule: none('a session he says he did; written with an Undo') },
+  log_workout: { family: 'logging', screen: 'screen', rule: none('sets in his words; the exercise must be named or on today\'s log') },
+  log_weight: { family: 'logging', screen: 'screen', card: 'propose_weigh_in', rule: none('a surprising weigh-in is asked about first (weigh-in-check)') },
+  log_meal: { family: 'logging', screen: 'screen', card: 'propose_meal_log', rule: none('a food that cannot be counted is asked about before any card') },
+  log_workout_set: { family: 'logging', screen: 'screen', rule: none('sets in his words; odd reps are asked about once') },
+  record_fact: { family: 'memory', screen: 'screen', rule: none('his verbatim quote must be in his message') },
+  record_goal: { family: 'memory', screen: 'screen', rule: none('his verbatim quote must be in his message') },
+  record_context_fact: { family: 'memory', screen: 'screen', rule: none('his verbatim quote must be in his message') },
+  set_display_name: { family: 'memory', screen: 'screen', rule: none('his verbatim quote must be in his message') },
+  record_session_feel: { family: 'memory', screen: 'exception', rule: none('his verbatim quote must be in his message') },
+  add_to_grocery_list: { family: 'shopping', screen: 'screen', rule: none('an instruction, not a statement (imperative classifier)') },
+  add_day_to_grocery_list: { family: 'shopping', screen: 'screen', rule: none('an instruction, not a statement (imperative classifier)') },
+  check_off_grocery_item: { family: 'shopping', screen: 'screen', rule: none('an instruction, not a statement (imperative classifier)') },
+  remove_from_grocery_list: { family: 'shopping', screen: 'screen', rule: none('an instruction, not a statement (imperative classifier)') },
+  log_water: { family: 'logging', screen: 'screen', rule: none('an amount in his words; Undo on the receipt') },
+  log_steps: { family: 'logging', screen: 'screen', rule: none('always a card, confirmed by his tap') },
+}
+
+export const OFFER_RULES: Record<string, OfferRule> = Object.fromEntries(Object.entries(COACH_ACTIONS).map(([tool, a]) => [tool, a.rule]))
 
 // ONE OCCASION, AND NOTHING REGULAR: "this evening", "tonight", "today", "tomorrow", "instead".
 const ONE_OCCASION = /\b(?:tonight|tonite|today|tomorrow|later(?:\s+on)?|this\s+(?:morning|afternoon|evening|eve|weekend|week)|right\s+now|instead)\b/i
@@ -121,11 +140,8 @@ export interface WordsProblem {
  *  `propose_exercise_ban`, so "I don't want squats today" turned into a ban was never checked on the app's side. Every
  *  such card names its tool here; test:offer-rules derives the card names from the server and fails on one with no
  *  rule. */
-export const CARD_KIND_TOOL: Record<string, string> = {
-  propose_exercise_ban: 'ban_exercise',
-  propose_meal_log: 'log_meal',
-  propose_weigh_in: 'log_weight',
-}
+export const CARD_KIND_TOOL: Record<string, string> = Object.fromEntries(
+  Object.entries(COACH_ACTIONS).filter(([tool, a]) => a.card && a.card !== tool).map(([tool, a]) => [a.card as string, tool]))
 
 export function offerWordsProblem(tool: string, message: string | null | undefined, opts: { hedged: boolean }): WordsProblem | null {
   const rule = OFFER_RULES[tool] ?? OFFER_RULES[CARD_KIND_TOOL[tool] ?? '']

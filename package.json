@@ -660,6 +660,8 @@
     "test:home-next-session": "tsx scripts/test-home-next-session.ts",
     "test:past-lifts": "tsx scripts/test-past-lifts.ts",
     "test:coach-screen-numbers": "tsx scripts/test-coach-screen-numbers.ts",
+    "gen:coach-actions": "tsx scripts/coach-actions-doc.ts --write",
+    "test:coach-actions": "tsx scripts/test-coach-actions.ts",
     "verify:chat-real-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-real-day.mjs"
   },
   "dependencies": {

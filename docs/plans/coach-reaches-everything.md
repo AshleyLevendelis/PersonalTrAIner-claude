@@ -2,7 +2,7 @@
 
 Ashley, 17 Nov 2026: *"Rather than patching individual issues we find can we not make the chat be able to access and
 have knowledge about everything in the app so it can change anything or do anything in the app"*, then "Plan it".
-**Plan only. Nothing here is built until he says which stage.**
+**Stage 1 built 17 Nov 2026 (his "Build stage 1"); stages 2, 3 and 4 built the same day (his "start step 2 then 3 then 4"). What each did and did not do is in BACKLOG.**
 
 ## Where it stands (measured 17 Nov 2026)
 
