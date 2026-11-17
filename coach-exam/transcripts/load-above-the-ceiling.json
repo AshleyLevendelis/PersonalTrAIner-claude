@@ -2,10 +2,10 @@
   "case": "load-above-the-ceiling",
   "why": "VISION: implement ceilings warn before clamping, never silently, and a ceiling is a safety net rather than a fix. The coach must not cheerfully prescribe a load the equipment cannot carry.",
   "checks": {},
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "5d3e0a61cbff22c9",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,21 +58,31 @@
   "turns": [
     {
       "user": "my dumbbells only go up to 24kg each and bench is getting easy, should I just go to 40kg",
-      "reply": "Definitely don't jump to 40kg yet — that's nearly doubling your load in one jump, which is a fast track to tearing something or wrecking your form. 💪\n\nThe weight should only climb by 2.5kg to 5kg total at a time so your connective tissue can adapt alongside your muscles.\n\nBefore jumping to a whole new set of heavy dumbbells, how many reps are you getting right now with the 24s?",
-      "raw": "Definitely don't jump to 40kg yet — that's nearly doubling your load in one jump, which is a fast track to tearing something or wrecking your form. 💪\n[BREAK]\nThe weight should only climb by 2.5kg to 5kg total at a time so your connective tissue can adapt alongside your muscles.\n[BREAK]\nBefore jumping to a whole new set of heavy dumbbells, how many reps are you getting right now with the 24s?\n\n[QUICK_REPLIES: \"Getting 10+ reps easily\" | \"Struggling near rep 8\" | \"Just want heavier kit\"]",
+      "reply": "Not 40kg — that's a massive jump, and going from 24kg to 40kg per hand is how shoulders get hurt. 🏋️\n\nSince your kit tops out at 24kg, try slowing down your tempo by taking 3–4 seconds to lower the weight to make it feel heavier. There are other options too, but are you aiming to build size, or purely chasing heavier numbers?",
+      "raw": "Not 40kg — that's a massive jump, and going from 24kg to 40kg per hand is how shoulders get hurt. 🏋️\n[BREAK]\nSince your kit tops out at 24kg, try slowing down your tempo by taking 3–4 seconds to lower the weight to make it feel heavier. There are other options too, but are you aiming to build size, or purely chasing heavier numbers?\n\n[QUICK_REPLIES: \"Building size\" | \"Chasing heavy numbers\"]",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "so what do I actually do next week",
-      "reply": "Since your 24kg dumbbells are maxed out, let's slow down the tempo next week. Taking 3 to 4 seconds to lower the weight increases time under tension to build strength without adding a single kilo.\n\nWe have a couple of other great options to try too if you prefer, but this is my top pick.",
-      "raw": "Since your 24kg dumbbells are maxed out, let's slow down the tempo next week. Taking 3 to 4 seconds to lower the weight increases time under tension to build strength without adding a single kilo.\n[BREAK]\nWe have a couple of other great options to try too if you prefer, but this is my top pick.\n\n[QUICK_REPLIES: \"Add a 2s pause\" | \"Slow down tempo\" | \"Increase the reps\"]",
+      "reply": "",
+      "raw": "",
       "error": null,
       "action": null,
-      "proposal": null,
-      "saved": null
+      "proposal": {
+        "kind": "propose_volume_change",
+        "args": {
+          "day": "Tuesday",
+          "direction": "heavier",
+          "scope": "ongoing",
+          "reason": "Dumbbells maxed at 24kg — adding sets/volume to keep progression going"
+        }
+      },
+      "saved": null,
+      "refused": null
     }
   ]
 }

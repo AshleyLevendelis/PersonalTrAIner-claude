@@ -4,10 +4,10 @@
   "checks": {
     "expectsProposal": true
   },
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "98f39d4fa8cbbf1d",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -71,16 +71,18 @@
           "reason": "User preference — dislikes movement"
         }
       },
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "so they're gone for good?",
-      "reply": "Not quite yet! I've set up a card for you to confirm the ban. \n\n\nTapping Confirm permanently removes them from your exercise pool so the plan won't schedule them again, but you can also choose Not now if you prefer.",
-      "raw": "Not quite yet! I've set up a card for you to confirm the ban. \n\n[BREAK]\nTapping Confirm permanently removes them from your exercise pool so the plan won't schedule them again, but you can also choose Not now if you prefer.",
+      "reply": "Once you tap Confirm on the card below, yes — they'll be completely removed from every week of your plan going forward. \n\nUntil you tap Confirm, your plan stays as it is. Take a look at the card and hit Confirm when you're ready!",
+      "raw": "Once you tap Confirm on the card below, yes — they'll be completely removed from every week of your plan going forward. \n\nUntil you tap Confirm, your plan stays as it is. Take a look at the card and hit Confirm when you're ready!",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

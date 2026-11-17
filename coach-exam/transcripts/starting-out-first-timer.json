@@ -7,10 +7,10 @@
       "GP"
     ]
   },
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "e9f48b6eb99fa513",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -62,21 +62,23 @@
   "turns": [
     {
       "user": "I've literally never exercised in my life, I'm 52 and I'm nervous about starting",
-      "reply": "Welcome! First off, taking this step is huge, and it is completely normal to feel nervous. Starting something totally new at 52 takes real guts, but you are in the right place and we are going to take this one steady step at a time. \n\nIf you have any underlying health conditions or concerns, it's always a good idea to check in with your doctor before starting a new routine. \n\nYour plan is built for beginners, starting with simple, manageable movements like easy walks to get your momentum going without overwhelming your body. You don't need to prove anything or push to exhaustion—showing up is the only victory that matters right now.\n\nHow are you feeling about starting with today's 20-minute walk?",
-      "raw": "Welcome! First off, taking this step is huge, and it is completely normal to feel nervous. Starting something totally new at 52 takes real guts, but you are in the right place and we are going to take this one steady step at a time. \n\nIf you have any underlying health conditions or concerns, it's always a good idea to check in with your doctor before starting a new routine. \n\nYour plan is built for beginners, starting with simple, manageable movements like easy walks to get your momentum going without overwhelming your body. You don't need to prove anything or push to exhaustion—showing up is the only victory that matters right now.\n\nHow are you feeling about starting with today's 20-minute walk?",
+      "reply": "Welcome! It is completely normal to feel nervous starting out, but taking this first step is huge and I'm really glad you're here. \n\nWe'll take everything at your pace — no rushing, no crazy gym routines, just simple, manageable steps to build your confidence and strength safely. \n\nBefore we dive into anything, if you have any underlying health conditions or medical concerns, it's always a good idea to clear starting a new routine with your doctor first.\n\nHow are you feeling about starting with just a simple 20-minute daily walk to build the habit?",
+      "raw": "Welcome! It is completely normal to feel nervous starting out, but taking this first step is huge and I'm really glad you're here. \n\nWe'll take everything at your pace — no rushing, no crazy gym routines, just simple, manageable steps to build your confidence and strength safely. \n\nBefore we dive into anything, if you have any underlying health conditions or medical concerns, it's always a good idea to clear starting a new routine with your doctor first.\n\nHow are you feeling about starting with just a simple 20-minute daily walk to build the habit?",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "ok that helps. what should today look like",
-      "reply": "Today is nice and straightforward: just a 20-minute walk at an easy, comfortable pace where you can hold a conversation. \n\nWe are using this to build your routine and get your body moving comfortably, not to wear you out. \n\nIt's great to do it all in one go to set the tone for your morning, but we can split it into two 10-minute walks if needed. 🚶",
-      "raw": "Today is nice and straightforward: just a 20-minute walk at an easy, comfortable pace where you can hold a conversation. \n[BREAK]\nWe are using this to build your routine and get your body moving comfortably, not to wear you out. \n[BREAK]\nIt's great to do it all in one go to set the tone for your morning, but we can split it into two 10-minute walks if needed. 🚶\n[QUICK_REPLIES: \"Yes, I can do that!\" | \"I'd prefer to split it\" | \"I need a shorter walk\"]",
+      "reply": "Let’s keep today super simple with a 20-minute walk at a comfortable pace! 🚶\n\nWe want to keep it light so you can easily hold a conversation, which helps get your body used to the habit without pushing too hard.",
+      "raw": "Let’s keep today super simple with a 20-minute walk at a comfortable pace! 🚶\n[BREAK]\nWe want to keep it light so you can easily hold a conversation, which helps get your body used to the habit without pushing too hard.",
       "error": null,
       "action": null,
       "proposal": null,
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }

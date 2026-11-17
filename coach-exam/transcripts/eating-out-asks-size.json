@@ -23,10 +23,10 @@
       }
     ]
   },
-  "fingerprint": "51500855009935f3",
+  "fingerprint": "6f06af39991cc724",
   "caseStamp": "e4ef0b4583c3273a",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-14T19:35:28.906Z",
+  "ranAt": "2026-11-17T21:26:50.252Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -88,10 +88,11 @@
         "args": {
           "date": "2026-09-18",
           "meal_slot": "dinner",
-          "origin_verbatim_quote": "table booked for friday evening"
+          "origin_verbatim_quote": "we've got a table booked for friday evening"
         }
       },
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "it'll be a proper blowout, three courses",
@@ -104,10 +105,11 @@
         "args": {
           "date": "2026-09-18",
           "meal_slot": "dinner",
-          "origin_verbatim_quote": "we've got a table booked for friday evening"
+          "origin_verbatim_quote": "table booked for friday evening"
         }
       },
-      "saved": null
+      "saved": null,
+      "refused": null
     },
     {
       "user": "I'm going to order the steak frites with a side salad",
@@ -119,16 +121,16 @@
         "kind": "propose_custom_meal",
         "args": {
           "meal_slot": "dinner",
-          "name": "Steak frites & side salad",
           "food_lines": [
-            "1 serving steak frites",
+            "1 steak frites",
             "1 side salad"
           ],
           "date": "2026-09-18",
           "origin_verbatim_quote": "I'm going to order the steak frites with a side salad"
         }
       },
-      "saved": null
+      "saved": null,
+      "refused": null
     }
   ]
 }
