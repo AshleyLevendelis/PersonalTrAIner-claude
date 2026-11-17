@@ -36,7 +36,8 @@ export const SHARED_FILES = [
   { source: 'src/lib/weigh-in-check.ts', copy: 'supabase/functions/_shared/weigh-in-check.ts' },
   { source: 'src/lib/ingredient-units.ts', copy: 'supabase/functions/_shared/ingredient-units.ts' },
   { source: 'src/lib/log-estimate.ts', copy: 'supabase/functions/_shared/log-estimate.ts' },
-  { source: 'src/lib/one-off-sport.ts', copy: 'supabase/functions/_shared/one-off-sport.ts' },
+  { source: 'src/lib/offer-rules.ts', copy: 'supabase/functions/_shared/offer-rules.ts' },
+  { source: 'src/lib/definite-mention.ts', copy: 'supabase/functions/_shared/definite-mention.ts' },
 ]
 
 const header = (source) => `// ===========================================================================

@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { isOneOffMention, oneOffSportReply } from "../_shared/one-off-sport.ts";
+import { offerWordsProblem } from "../_shared/offer-rules.ts";
+import { isHedged } from "../_shared/definite-mention.ts";
 import { acceptEstimates, estimateAssumption, notCountedQuestion } from "../_shared/log-estimate.ts";
 import { cleanCoachResponse } from "./text-like-a-coach.ts";
 import { guardPastLifts } from "./past-performance.ts";
@@ -3306,6 +3307,28 @@ Keep this context in mind to ensure your greetings and questions naturally align
         return r;
       };
 
+      // EVERY OFFER PASSES ONE CHECKPOINT (stage 1 of his plan, docs/plans/coach-reaches-everything.md; his ruling
+      // 17 Nov 2026, "Coach answers"). Before any tool's branch: if his words cannot license this kind of change (a
+      // lasting change off one occasion, a one-day change asked for from now on, something on a day off a hedge),
+      // nothing is proposed or written, and the coach answers what he said in its own words. The rules are
+      // offer-rules.ts, shared with the app, which holds the same line as a backstop.
+      const wordsProblem = offerWordsProblem(name, message, { hedged: isHedged(message) });
+      if (wordsProblem) {
+        console.log(`offer-check refused tool=${name} rule=${wordsProblem.rule}`);
+        const spoken = await toolReply({
+          outcome: { name, args, response: { status: "not_offered", note: `${wordsProblem.why}; nothing was proposed or recorded` } },
+          nudge: `(System: nothing was offered or changed, because ${wordsProblem.why}. Reply to what they actually said as their coach texting: two or three short lines that are useful to them now. Never say their plan, schedule or day changed. You may ask once, plainly, whether they want the lasting change. Plain text only on this attempt; tool calls are unavailable.)`,
+          floor: wordsProblem.say,
+          preferFirstLegText: true,
+          checks: [...todayChecks, {
+            test: (t: string) => detectPlanClaim(t) ? "it says the plan changed" : null,
+            nudge: () => "(System: your reply said their plan or day changed, and nothing changed. Reply again without saying anything was changed.)",
+            floor: wordsProblem.say,
+          }],
+        });
+        return new Response(JSON.stringify({ reply: spoken.reply }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       if (name === "propose_meal_swap") {
         // A COURIER, like propose_meal_addition and propose_exercise_swap.
         //
@@ -3424,24 +3447,6 @@ Keep this context in mind to ensure your greetings and questions naturally align
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
-      }
-
-      if (name === "propose_concurrent_activity" && isOneOffMention(message)) {
-        // A ONE-OFF IS NEVER A STANDING CLASS (his report 17 Nov 2026: "Im doing myay thai this evening" got an offer to
-        // rebuild sixteen weeks). The tool description already says so; this holds it in code. Nothing is proposed or
-        // recorded: the coach answers what he said and may ask once whether it is every week.
-        const spoken = await toolReply({
-          outcome: { name, args, response: { status: "not_proposed", note: "they described one occasion, not a weekly class; nothing was recorded and the plan is unchanged" } },
-          nudge: "(System: they told you about ONE occasion, not a class they do every week, so nothing was recorded and their plan is unchanged. Reply to what they said as their coach texting: two or three short lines, useful for tonight and tomorrow's training. Never say the plan or the schedule changed. You may ask once whether it is every week. Plain text only on this attempt; tool calls are unavailable.)",
-          floor: oneOffSportReply(String(args.name ?? "")),
-          preferFirstLegText: true,
-          checks: [...todayChecks, {
-            test: (t: string) => detectPlanClaim(t) ? "it says the plan changed" : null,
-            nudge: () => "(System: your reply said their plan or schedule changed, and nothing changed. Reply again without saying anything was changed.)",
-            floor: oneOffSportReply(String(args.name ?? "")),
-          }],
-        });
-        return new Response(JSON.stringify({ reply: spoken.reply }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       if (name === "propose_concurrent_activity") {

@@ -1,5 +1,5 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
-import { isOneOffMention, oneOffSportReply } from '@/lib/one-off-sport'
+import { offerWordsProblem } from '@/lib/offer-rules'
 import { healthConditionsOf, healthConditionsInWords, mealRestrictionsOf, noteForProfile, isPregnant, saidPregnant, askedToPause, PREGNANCY_TICK_WORDS } from '@/lib/health-conditions'
 import { plainTyped } from '@/lib/typed-text'
 import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays, raceDateMissing, RACE_DATE_QUESTION } from '@/lib/running'
@@ -6108,8 +6108,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // pending_actions row means a later "yes" has nothing to resolve and
       // goes back through the model, which can misclassify it again and loop.
       let kindOverride: string | null = null
+      // EVERY OFFER PASSES ONE CHECKPOINT (stage 1, docs/plans/coach-reaches-everything.md): the coach's server already
+      // refuses an offer his words cannot license and answers in words; this is the same rule (offer-rules.ts) held on
+      // the phone too, so a coach that has not been redeployed still cannot build the card. The app's sentence here.
+      const wordsProblem = offerWordsProblem(result.proposal.kind, userSaid, { hedged: isHedged(userSaid ?? '') })
 
-      if (result.proposal.kind === 'propose_meal_swap' && result.proposal.rawArgs) {
+      if (wordsProblem) {
+        refusal = wordsProblem.say
+      } else if (result.proposal.kind === 'propose_meal_swap' && result.proposal.rawArgs) {
         // The client chooses the target, not the server — see
         // meal-swap-proposal.ts. `mealOptionsSeen` is what makes "you've seen
         // the lot" a fact rather than a guess: it is every option this
@@ -6573,10 +6579,6 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           if (moved.ok) built = { scopeKey: moved.scopeKey, preconditions: moved.preconditions, payload: moved.payload as unknown as Record<string, unknown>, diff: moved.diff }
           else refusal = moved.reason
         }
-      } else if (result.proposal.kind === 'propose_concurrent_activity' && result.proposal.rawArgs && isOneOffMention(userSaid)) {
-        // A ONE-OFF IS NEVER A STANDING CLASS (his report 17 Nov 2026, "Im doing myay thai this evening"): the plan is
-        // left alone and he is asked once whether it is every week, whatever the coach reached for.
-        refusal = oneOffSportReply(String(result.proposal.rawArgs.name ?? ''))
       } else if (result.proposal.kind === 'propose_concurrent_activity' && result.proposal.rawArgs) {
         const activity = buildConcurrentActivityProposal(result.proposal.rawArgs)
         if (activity) built = { scopeKey: activity.scopeKey, preconditions: activity.preconditions, payload: activity.payload as unknown as Record<string, unknown>, preImage: activity.preImage, diff: activity.diff }

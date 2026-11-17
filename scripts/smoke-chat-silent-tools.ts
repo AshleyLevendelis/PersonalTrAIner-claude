@@ -49,6 +49,13 @@ const h = await turn("I do Muay Thai every Tuesday evening", [sport(["Tuesday"])
 check("a class every week still gets the offer", h.body.proposal?.kind === "propose_concurrent_activity", h.body);
 const i = await turn("Im doing muay thai tonight, I go Tuesday evenings", [sport(["Tuesday"])]);
 check("...and so does one said with its weekly days", i.body.proposal?.kind === "propose_concurrent_activity", i.body);
+// THE SAME CHECKPOINT FOR EVERY TOOL (stage 1): a one-day change asked from now on, and a run off a maybe.
+const j = await turn("I only have 45 minutes from now on", [{ call: { name: "propose_session_shorten", args: { minutes: 45 } } }]);
+check("a today-only shorten is not offered for 'from now on', and the coach answers", !j.body.proposal && j.body.reply?.trim().length > 0, j.body);
+const k = await turn("I might go for a run Wednesday", [{ call: { name: "propose_cardio_session", args: { activity: "Run", day: "Wednesday" } } }]);
+check("a run off a maybe is not offered, and the coach answers", !k.body.proposal && k.body.reply?.trim().length > 0, k.body);
+const l = await turn("I only have 45 minutes today", [{ call: { name: "propose_session_shorten", args: { minutes: 45 } } }]);
+check("...and '45 minutes today' still gets the offer", l.body.proposal?.kind === "propose_session_shorten", l.body);
 const f = await turn("how are you", [{ text: "Good, thanks. Ready for tomorrow?" }]);
 check("control: a plain reply is untouched", f.body.reply === "Good, thanks. Ready for tomorrow?", f.body);
 

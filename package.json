@@ -78,7 +78,7 @@
     "test:chat-cardio": "tsx scripts/test-chat-cardio.ts",
     "test:reach-out": "tsx scripts/test-reach-out.ts",
     "test:push-link": "tsx scripts/test-push-link.ts",
-    "test:one-off-sport": "tsx scripts/test-one-off-sport.ts",
+    "test:offer-rules": "tsx scripts/test-offer-rules.ts",
     "verify:chat-silent-tools": "npx -y deno@2.9.6 run --allow-net --allow-env --allow-read --no-lock --quiet scripts/smoke-chat-silent-tools.ts",
     "verify:reach-out-function": "node scripts/smoke-reach-out.mjs",
     "test:exercise-history": "tsx scripts/test-exercise-history.ts",
