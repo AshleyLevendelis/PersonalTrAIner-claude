@@ -1647,6 +1647,17 @@ menu" stays true when a copy is also left outside it.
 - **Every exercise's How to has "Find a video on YouTube": his ruling "YouTube search"** (over hand-picked videos and
   none): a search for its form in a new tab, the chat's own link. It REVERSES "never a button that opens a search" for
   How to; the checked player on Summary stays. `verify:exercise-video`
+- **Every coach offer passes one checkpoint (stage 1 of `docs/plans/coach-reaches-everything.md`), and a refused one is
+  answered by the coach: his ruling "Coach answers"** (over the app's sentence alone and over asking back): each of
+  the coach's tools has a rule about what his words must say (a lasting change never off "tonight" alone, a one-day
+  change never off "from now on", nothing put on a day off a maybe); a new tool without one fails the gate; on a
+  refusal nothing is built and the coach replies in its own words, the app's sentence the fallback. `test:offer-rules`,
+  `verify:chat-silent-tools`, `verify:chat-one-off-sport`. Needs the `chat-gemini` deploy
+- **Stages 2-4 of the same plan, his "start step 2 then 3 then 4" (17 Nov 2026)**: every report becomes an exam case and
+  the exam counts what the app caught (`test:coach-exam-grader` §13, `verify:chat-real-day`, the handover
+  `after-every-coach-deploy.md`); the coach's today numbers come from the screens' readers (`test:coach-screen-numbers`);
+  and every coach action is defined once in `COACH_ACTIONS`, everything else held to it (`test:coach-actions`,
+  `docs/coach-actions.md` generated). A new coach tool needs a row there or the checks fail
 
 ### His rulings of 15 Nov 2026, the Marcus test (Wave M of `docs/plans/browser-test-nov15-plan.md`)
 - **An allergy refusal says where the setting is, never invites removing it: "Say where it's set"**. "Your nut-free

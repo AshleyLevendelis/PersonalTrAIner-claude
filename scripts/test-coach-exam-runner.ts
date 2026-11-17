@@ -4,7 +4,7 @@ import os from 'os'
 import { join, dirname } from 'path'
 import { spawn } from 'child_process'
 import { fileURLToPath } from 'url'
-import { hardRuleViolations, coachLine, type Transcript } from './coach-exam-hard-rules.ts'
+import { hardRuleViolations, appRefusals, coachLine, type Transcript } from './coach-exam-hard-rules.ts'
 import { examCaseStamps } from './coach-fingerprint.ts'
 
 // ---------------------------------------------------------------------------
@@ -280,6 +280,20 @@ async function main() {
     check('a logged workout is recorded as a save', turn0?.saved?.kind === 'log_workout', turn0)
     const rules = r.transcript ? hardRuleViolations(r.transcript).map(v => v.rule) : ['no transcript']
     check('...and silence does NOT fire on it', !rules.includes('silence'), rules)
+  }
+
+  // STAGE 2.4 (17 Nov 2026): the app refused the offer the coach reached for (his words did not allow it). The coach
+  // still answered in words; the response names the tool and rule only. The runner records it, the grader counts it.
+  console.log('\n[4d] a refused offer — words, counted, not a card')
+  {
+    const coach = await fakeCoach(() => ({ body: { reply: 'Enjoy the class tonight.', offerRefused: { tool: 'propose_concurrent_activity', rule: 'standing' } } }))
+    const r = await runExam(wantsCard.name, coach.port)
+    await coach.close()
+    const turn0 = r.transcript?.turns?.[0]
+    check('a refusal is recorded with its tool and rule', turn0?.refused?.tool === 'propose_concurrent_activity' && turn0?.refused?.rule === 'standing', turn0)
+    check('...and the coach\'s words are kept as the reply', turn0?.reply === 'Enjoy the class tonight.', turn0)
+    check('...and no card is recorded for it', !turn0?.proposal, turn0)
+    check('the grader counts it', r.transcript ? appRefusals([r.transcript]).total >= 1 : false)
   }
 
   console.log('\n[5] --dry is still the free path, and still calls nothing')

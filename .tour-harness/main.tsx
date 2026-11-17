@@ -7,6 +7,9 @@ import { AppTour } from '@/components/AppTour'
 import { BottomDockHeightProvider } from '@/hooks/useBottomDockHeight'
 import { BottomTabBar } from '@/components/BottomTabBar'
 import { useAppRoute, tabHash, isTab, type Tab } from '@/lib/app-route'
+// The tour reads the workout in progress (its practice set is taken back off, 17 Nov 2026), so it sits inside the
+// app's own session provider here, as it does in App.tsx.
+import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import '@/index.css'
 
 function Harness() {
@@ -42,4 +45,4 @@ function Harness() {
     </BottomDockHeightProvider>
   )
 }
-createRoot(document.getElementById('root')!).render(<StrictMode><Harness /></StrictMode>)
+createRoot(document.getElementById('root')!).render(<StrictMode><ActiveSessionProvider profileId="harness-profile" planCreatedAt={new Date(2026, 0, 5).toISOString()} totalWeeks={16} refreshToken={0}><Harness /></ActiveSessionProvider></StrictMode>)

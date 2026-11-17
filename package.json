@@ -78,6 +78,7 @@
     "test:chat-cardio": "tsx scripts/test-chat-cardio.ts",
     "test:reach-out": "tsx scripts/test-reach-out.ts",
     "test:push-link": "tsx scripts/test-push-link.ts",
+    "test:offer-rules": "tsx scripts/test-offer-rules.ts",
     "verify:chat-silent-tools": "npx -y deno@2.9.6 run --allow-net --allow-env --allow-read --no-lock --quiet scripts/smoke-chat-silent-tools.ts",
     "verify:reach-out-function": "node scripts/smoke-reach-out.mjs",
     "test:exercise-history": "tsx scripts/test-exercise-history.ts",
@@ -561,6 +562,7 @@
     "verify:kit-for-good": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/kit-for-good.mjs",
     "verify:kit-this-one": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/kit-this-one.mjs",
     "verify:exercise-video": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/exercise-video.mjs",
+    "verify:chat-one-off-sport": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-one-off-sport.mjs",
     "verify:one-calorie-target": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/one-calorie-target.mjs",
     "verify:named-food-clash": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/named-food-clash.mjs",
     "verify:chat-food-avoid": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-food-avoid.mjs",
@@ -656,7 +658,11 @@
     "test:open-from-chat": "tsx scripts/test-open-from-chat.ts",
     "test:meal-like-offer": "tsx scripts/test-meal-like-offer.ts",
     "test:home-next-session": "tsx scripts/test-home-next-session.ts",
-    "test:past-lifts": "tsx scripts/test-past-lifts.ts"
+    "test:past-lifts": "tsx scripts/test-past-lifts.ts",
+    "test:coach-screen-numbers": "tsx scripts/test-coach-screen-numbers.ts",
+    "gen:coach-actions": "tsx scripts/coach-actions-doc.ts --write",
+    "test:coach-actions": "tsx scripts/test-coach-actions.ts",
+    "verify:chat-real-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-real-day.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

@@ -40,6 +40,24 @@ const d = await turn("I walked loads today", [{ call: { name: "log_steps", args:
 check("steps the app cannot read: still answered in words", d.status === 200 && d.body.reply?.trim().length > 0, d.body);
 const e = await turn(HIS, [feel("The workout was brilliant"), { text: "" }, { text: "" }, { text: "" }]);
 check("the model silent on every try: the floor, never empty", e.status === 200 && e.body.reply?.trim().length > 0, e.body);
+// A ONE-OFF IS NEVER A STANDING CLASS (his report 17 Nov 2026): the coach reached for the weekly-class rebuild on "this evening".
+const sport = (days: string[]) => ({ call: { name: "propose_concurrent_activity", args: { name: "Muay Thai", days, time_of_day: "evening", intensity: 0.8 } } });
+const g = await turn("Im doing myay thai this evening", [sport(["Tuesday"])]);
+check("his message: no rebuild offer for a one-off", g.status === 200 && !g.body.proposal, g.body);
+check("...the coach answers in words instead", typeof g.body.reply === "string" && g.body.reply.trim().length > 0, g.body);
+check("...and the refusal is counted by tool and rule, with none of his words", g.body.offerRefused?.tool === "propose_concurrent_activity" && g.body.offerRefused?.rule === "standing" && !JSON.stringify(g.body.offerRefused).toLowerCase().includes("thai"), g.body);
+const h = await turn("I do Muay Thai every Tuesday evening", [sport(["Tuesday"])]);
+check("a class every week still gets the offer", h.body.proposal?.kind === "propose_concurrent_activity", h.body);
+check("...and an offer that is built carries no refusal", !h.body.offerRefused, h.body);
+const i = await turn("Im doing muay thai tonight, I go Tuesday evenings", [sport(["Tuesday"])]);
+check("...and so does one said with its weekly days", i.body.proposal?.kind === "propose_concurrent_activity", i.body);
+// THE SAME CHECKPOINT FOR EVERY TOOL (stage 1): a one-day change asked from now on, and a run off a maybe.
+const j = await turn("I only have 45 minutes from now on", [{ call: { name: "propose_session_shorten", args: { minutes: 45 } } }]);
+check("a today-only shorten is not offered for 'from now on', and the coach answers", !j.body.proposal && j.body.reply?.trim().length > 0, j.body);
+const k = await turn("I might go for a run Wednesday", [{ call: { name: "propose_cardio_session", args: { activity: "Run", day: "Wednesday" } } }]);
+check("a run off a maybe is not offered, and the coach answers", !k.body.proposal && k.body.reply?.trim().length > 0, k.body);
+const l = await turn("I only have 45 minutes today", [{ call: { name: "propose_session_shorten", args: { minutes: 45 } } }]);
+check("...and '45 minutes today' still gets the offer", l.body.proposal?.kind === "propose_session_shorten", l.body);
 const f = await turn("how are you", [{ text: "Good, thanks. Ready for tomorrow?" }]);
 check("control: a plain reply is untouched", f.body.reply === "Good, thanks. Ready for tomorrow?", f.body);
 

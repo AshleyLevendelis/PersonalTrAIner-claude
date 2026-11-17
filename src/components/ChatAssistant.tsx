@@ -1,4 +1,5 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
+import { offerWordsProblem } from '@/lib/offer-rules'
 import { healthConditionsOf, healthConditionsInWords, mealRestrictionsOf, noteForProfile, isPregnant, saidPregnant, askedToPause, PREGNANCY_TICK_WORDS } from '@/lib/health-conditions'
 import { plainTyped } from '@/lib/typed-text'
 import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays, raceDateMissing, RACE_DATE_QUESTION } from '@/lib/running'
@@ -26,7 +27,7 @@ import { chatContextPills } from '@/lib/chat-context-strip'
 import { useShowNumbers } from '@/lib/show-numbers'
 import { sessionSetCount } from '@/lib/session-count'
 import { readSessionSummary } from '@/lib/session-summary-store'
-import { getLedgerSnapshot } from '@/lib/meal-store'
+import { todayScreenCell, screenEatenKcal, coachTodayCalories } from '@/lib/coach-screen-numbers'
 import { tabHash } from '@/lib/app-route'
 import { readAloud } from '@/lib/read-aloud'
 import { ListenButton } from '@/components/chat/ListenButton'
@@ -2034,6 +2035,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         focus: todayRow?.focus ?? null,
         isGymSession: (todayRow?.exercises.length ?? 0) > 0,
         setsLogged: activeSession.logs.length,
+        // THE SCREENS' COUNT (stage 3, 17 Nov 2026): the same dated cell and function the chat strip and Home draw, so
+        // the coach's "N of M" cannot differ from the pill above it. Withheld while the week is still being read.
+        screenCount: trainingWeek.loading ? null : (() => { const cell = todayScreenCell(trainingWeek.days, activeSession.date); return cell ? sessionSetCount(cell.session, cell.workingLogs) : null })(),
         setsPlanned: todayRow?.exercises.reduce((n, e) => n + (e.sets ?? 0), 0) ?? 0,
         // TODAY, JOINED (H23): each planned exercise with its logged working
         // sets, what was added, the finisher and today's cardio. The header's
@@ -2280,6 +2284,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // each field is only ever set when there's something real to report,
       // never a placeholder the model would have to paper over.
       weeks_on_plan: weeksOnPlanSentence(proactiveData?.weeksOnPlan ?? null),
+      // CALORIES LEFT TODAY, as the strip and Nutrition say it (stage 3, 17 Nov 2026): the coach quotes this line and
+      // never subtracts for itself (it had eaten and target apart, and did the arithmetic on a different read).
+      today_calories: (() => { const eaten = screenEatenKcal(profile.id, activeSession.date, proactiveData?.caloriesEaten); return macros && macros.calories > 0 && eaten != null ? coachTodayCalories(macros.calories, eaten) : null })(),
       weight_trend_summary: proactiveData?.weightTrend && proactiveData.weightTrend.ratePerWeekKg != null
         ? `rolling average ${proactiveData.weightTrend.rollingAvgKg.toFixed(1)}kg, trending ${proactiveData.weightTrend.ratePerWeekKg >= 0 ? '+' : ''}${proactiveData.weightTrend.ratePerWeekKg.toFixed(2)}kg/week (${proactiveData.weightTrend.sampleCount} weigh-ins)${proactiveData.weightTrend.onTrackForGoal === false ? ', off track for their stated goal' : ''}`
         : null,
@@ -6107,8 +6114,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // pending_actions row means a later "yes" has nothing to resolve and
       // goes back through the model, which can misclassify it again and loop.
       let kindOverride: string | null = null
+      // EVERY OFFER PASSES ONE CHECKPOINT (stage 1, docs/plans/coach-reaches-everything.md): the coach's server already
+      // refuses an offer his words cannot license and answers in words; this is the same rule (offer-rules.ts) held on
+      // the phone too, so a coach that has not been redeployed still cannot build the card. The app's sentence here.
+      const wordsProblem = offerWordsProblem(result.proposal.kind, userSaid, { hedged: isHedged(userSaid ?? '') })
 
-      if (result.proposal.kind === 'propose_meal_swap' && result.proposal.rawArgs) {
+      if (wordsProblem) {
+        refusal = wordsProblem.say
+      } else if (result.proposal.kind === 'propose_meal_swap' && result.proposal.rawArgs) {
         // The client chooses the target, not the server — see
         // meal-swap-proposal.ts. `mealOptionsSeen` is what makes "you've seen
         // the lot" a fact rather than a guess: it is every option this
@@ -8673,8 +8686,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const [ledgerTick, setLedgerTick] = useState(0)
   useEffect(() => subscribeMealStore(() => setLedgerTick(t => t + 1)), [])
   void ledgerTick
-  const stripCell = trainingWeek.days.find(d => d.date === activeSession.date)
-  const stripEaten = profile.id ? getLedgerSnapshot(profile.id, activeSession.date)?.eaten.kcal ?? proactiveData?.caloriesEaten ?? null : null
+  const stripCell = todayScreenCell(trainingWeek.days, activeSession.date)
+  const stripEaten = screenEatenKcal(profile.id, activeSession.date, proactiveData?.caloriesEaten)
   const contextPills = chatContextPills({
     session: proactiveData ? { status: proactiveData.session.status, focus: proactiveData.session.focus } : null,
     running: activeSession.status === 'running',

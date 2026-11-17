@@ -1,0 +1,15 @@
+{
+  "name": "dislike-asked-not-saved",
+  "why": "His ruling 14 Nov 2026, 'Ask, and hold Tuesday': a bare 'not a fan of X' could mean this meal or never, and the APP asks which with two buttons. The coach records nothing on that turn and does not write the question itself; no card either.",
+  "messages": [
+    "not really a fan of the salmon you've put in tonight"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      }
+    ]
+  }
+}

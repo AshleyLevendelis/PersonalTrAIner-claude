@@ -1,4 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { offerWordsProblem } from "../_shared/offer-rules.ts";
+import { isHedged } from "../_shared/definite-mention.ts";
 import { acceptEstimates, estimateAssumption, notCountedQuestion } from "../_shared/log-estimate.ts";
 import { cleanCoachResponse } from "./text-like-a-coach.ts";
 import { guardPastLifts } from "./past-performance.ts";
@@ -3092,6 +3094,8 @@ UPCOMING MEALS — the next six days, exactly as the Nutrition tab's day strip s
 ${context.upcoming_meal_summary}` : ''}
 ${context.show_numbers === false ? `
 NUMBERS OFF (his Profile setting, the starter tier): he chose not to see calories or macros. Never quote a calorie, kcal, gram or macro figure to him, even when the data below has one; talk about meals, portions (a palm of protein, a fist of carbs) and how the day went. Weights on the bar and minutes are fine.
+` : ''}${typeof context.today_calories === 'string' && context.today_calories && context.show_numbers !== false ? `
+CALORIES LEFT TODAY, exactly as their screen shows it: ${context.today_calories}. When calories left today come up, quote this figure; never work it out yourself from the totals below (they are read separately and can be a meal behind).
 ` : ''}${context.eaten_by_day_read === true && typeof context.eaten_by_day === 'string' ? `
 WHAT THEY LOGGED AS EATEN — totals from their meal log, today first. Logged, not eaten-in-fact: "nothing logged" means nothing was logged. This is the only record of a past day anywhere in the app; no screen shows it.
 ${context.eaten_by_day}` : context.eaten_by_day_read === false ? `
@@ -3304,6 +3308,31 @@ Keep this context in mind to ensure your greetings and questions naturally align
         console.log(`tool-reply tool=${o.outcome.name} source=${r.source} legs=${r.legs}`);
         return r;
       };
+
+      // EVERY OFFER PASSES ONE CHECKPOINT (stage 1 of his plan, docs/plans/coach-reaches-everything.md; his ruling
+      // 17 Nov 2026, "Coach answers"). Before any tool's branch: if his words cannot license this kind of change (a
+      // lasting change off one occasion, a one-day change asked for from now on, something on a day off a hedge),
+      // nothing is proposed or written, and the coach answers what he said in its own words. The rules are
+      // offer-rules.ts, shared with the app, which holds the same line as a backstop.
+      const wordsProblem = offerWordsProblem(name, message, { hedged: isHedged(message) });
+      if (wordsProblem) {
+        console.log(`offer-check refused tool=${name} rule=${wordsProblem.rule}`);
+        const spoken = await toolReply({
+          outcome: { name, args, response: { status: "not_offered", note: `${wordsProblem.why}; nothing was proposed or recorded` } },
+          nudge: `(System: nothing was offered or changed, because ${wordsProblem.why}. Reply to what they actually said as their coach texting: two or three short lines that are useful to them now. Never say their plan, schedule or day changed. You may ask once, plainly, whether they want the lasting change. Plain text only on this attempt; tool calls are unavailable.)`,
+          floor: wordsProblem.say,
+          preferFirstLegText: true,
+          checks: [...todayChecks, {
+            test: (t: string) => detectPlanClaim(t) ? "it says the plan changed" : null,
+            nudge: () => "(System: your reply said their plan or day changed, and nothing changed. Reply again without saying anything was changed.)",
+            floor: wordsProblem.say,
+          }],
+        });
+        // STAGE 2.4: the refusal is COUNTED, never described. `offerRefused` names the tool and the rule only (no word of
+        // his message), so the exam runner and anything reading these responses can count which tools the coach keeps
+        // misusing; the app ignores the field.
+        return new Response(JSON.stringify({ reply: spoken.reply, offerRefused: { tool: name, rule: wordsProblem.rule } }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
       if (name === "propose_meal_swap") {
         // A COURIER, like propose_meal_addition and propose_exercise_swap.

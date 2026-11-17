@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
-import { rebuildAgainstProfile, untrainedPlanContext, type PlanEditContext } from '../src/lib/plan-adaptations'
+import { rebuildAgainstProfile, untrainedPlanContext, restoreDisplacedSessions, type PlanEditContext } from '../src/lib/plan-adaptations'
 import { buildDayGuard, planDayDate, type PlanCalendar } from '../src/lib/plan-guard'
 import { NO_ACTIVE_ADAPTATIONS } from '../src/lib/effective-constraints'
 import { resolveRebuildStart, describeRebuild } from '../src/lib/rebuild-card'
@@ -244,6 +244,72 @@ async function main() {
     check('the refusal sentences say nothing was changed', [RECEIPTS_UNDONE.tooLate, RECEIPTS_UNDONE.cannot, RECEIPTS_UNDONE.failed].every(t => /nothing was changed/.test(t)) && /10 minutes/.test(RECEIPTS_UNDONE.tooLate))
     const card = code('src/components/chat/ReceiptCard.tsx')
     check('the card takes its Undo away when the ten minutes end, not at its next re-render', /setTimeout\(\(\) => setUndoExpired\(true\), left\)/.test(card) && /\{undoAvailable && !undoExpired && onUndo && \(/.test(card) && /undoUntil=\{undoWindowEndsAt\(msg\.receipt\.resolvedAt\)\}/.test(chat))
+  }
+
+  console.log('\n8. A kept day stays kept, and does not leave a session twice (his report 17 Nov 2026)')
+  {
+    // (a) The rebuild KEEPS a trained day, and the carry step's week-wide tail must not reach it afterwards.
+    const w3 = plan[2]
+    const loadedDays = w3.days.filter(d => d.exercises.some(e => e.suggested_load_kg != null))
+    const lifted = loadedDays.flatMap(d => d.exercises.map((e, i) => ({ d: d.day, i, e }))).find(x => /Dumbbell/.test(x.e.name) && x.e.suggested_load_kg != null && x.e.suggested_load_kg >= 6 && x.e.suggested_load_kg <= 16)
+    const keptName = loadedDays.find(d => d.day !== lifted?.d)?.day ?? ''
+    // The kept day is left as the week-wide tail would NOT leave it (a per-set ladder one set longer than its sets,
+    // which the tail's reconcile pass resizes), so a tail that reaches it changes it. The earned weight on another day
+    // is what makes the tail run at all.
+    const earnedKg = lifted ? lifted.e.suggested_load_kg! + 4 : 0
+    const fixture = plan.map(w => w.week_number !== 3 ? w : { ...w, days: w.days.map(d => {
+      if (d.day === lifted?.d) return { ...d, exercises: d.exercises.map((e, i) => i === lifted.i ? { ...e, suggested_load_kg: earnedKg, suggested_load: `${earnedKg}kg` } : e) }
+      if (d.day === keptName) return { ...d, exercises: d.exercises.map(e => e.suggested_load_kg != null ? { ...e, per_set_load: Array.from({ length: (e.sets ?? 3) + 1 }, () => e.suggested_load_kg!) } : e) }
+      return d
+    }) })
+    const keptCtx: PlanEditContext = { ...untrainedPlanContext(cal(SUN)), fromDate: '2026-10-19', isProtected: (w, d) => w === 3 && d === keptName }
+    const before = JSON.stringify(fixture[2].days.find(d => d.day === keptName))
+    const rebuilt = await silently(() => rebuildAgainstProfile(sam, [], fixture, [3], keptCtx, 'gate:kept'))
+    const after = JSON.stringify(rebuilt[2].days.find(d => d.day === keptName))
+    check('the fixture keeps a loaded day and carries an earned weight on another', !!lifted && !!keptName && keptName !== lifted.d, { keptName, lifted: lifted?.d })
+    check('a kept day comes out of the rebuild exactly as it went in, after the carry step', before === after, { keptName })
+    check('...while the rest of the week did change (the rebuild ran)', JSON.stringify(rebuilt[2].days.filter(d => d.day !== keptName)) !== JSON.stringify(fixture[2].days.filter(d => d.day !== keptName)))
+
+    // (b) His week: Tuesday kept (trained Pull & Hinge); the fresh week moved Pull & Hinge to Thursday and put Upper
+    // Pull & Core on Tuesday. The kept day must not leave Pull & Hinge twice and Upper Pull & Core gone.
+    const day = (name: string, focus: string, cardio?: string) => ({ day: name, focus, exercises: [{ name: `${focus} lift`, sets: 3, reps: '8-10' }], ...(cardio ? { recommendedCardio: { modality: cardio } } : {}) }) as never
+    const original = { week_number: 1, days: [day('Tuesday', 'Pull & Hinge'), day('Thursday', 'Squat & Carry'), day('Friday', 'Upper Pull & Core')] } as unknown as MesocycleWeek
+    const fresh = { week_number: 1, days: [day('Tuesday', 'Upper Pull & Core'), day('Thursday', 'Pull & Hinge', 'bike'), day('Friday', 'Squat & Carry')] } as unknown as MesocycleWeek
+    const may = (d: string) => d !== 'Tuesday'
+    const fixed = restoreDisplacedSessions(original, fresh, may)
+    const finalFoci = fixed.days.map(d => (may(d.day) ? d.focus : original.days.find(o => o.day === d.day)!.focus))
+    check('his week: Thursday gets the session Tuesday displaced', fixed.days.find(d => d.day === 'Thursday')?.focus === 'Upper Pull & Core', fixed.days.map(d => `${d.day}:${d.focus}`))
+    check('...so every session is in the week once', new Set(finalFoci).size === 3 && finalFoci.length === 3, finalFoci)
+    check('...and Thursday keeps its own cardio', (fixed.days.find(d => d.day === 'Thursday') as { recommendedCardio?: { modality?: string } })?.recommendedCardio?.modality === 'bike')
+    const already = { ...fresh, days: [...fresh.days, day('Saturday', 'Upper Pull & Core')] } as unknown as MesocycleWeek
+    check('nothing moves when the displaced session is already elsewhere in the week', restoreDisplacedSessions(original, already, may) === already)
+    const noKept = restoreDisplacedSessions(original, fresh, () => true)
+    check('nothing moves when no day is kept', noKept === fresh)
+
+    // (c) The real rebuild, his card: a class on a training day the week has already trained, so the fresh week moves
+    // sessions around a day that is kept. No week may come out holding one session twice.
+    const twice: string[] = []
+    let cases = 0
+    for (const classDay of ['Monday', 'Tuesday', 'Thursday', 'Saturday']) {
+      const withClass = { ...sam, concurrent_activities: [{ name: 'Muay Thai', days: [classDay], intensity: 0.8, movement_demands: [] }] } as unknown as UserProfile
+      const rebuiltClass = await silently(() => rebuildAgainstProfile(withClass, [], plan, [2], { ...untrainedPlanContext(cal(SUN)), isProtected: (w, d) => w === 2 && d === classDay }, `gate:class:${classDay}`))
+      const foci = rebuiltClass[1].days.filter(d => d.exercises.length > 0).map(d => d.focus)
+      cases++
+      if (new Set(foci).size !== foci.length) twice.push(`${classDay}: ${foci.join(', ')}`)
+    }
+    check(`a class on a kept training day never leaves one session twice in the week (${cases} days tried)`, twice.length === 0 && cases === 4, twice)
+
+    // (d) His card said "Shrugs 16 kg (was 38)": Thursday's new Shrugs set against Tuesday's, which was kept at 38.
+    const shrugs = (kg: number, reps: string) => ({ name: 'Shrugs', sets: 3, reps, suggested_load_kg: kg, suggested_load: `${kg}kg` })
+    const wk = (days: unknown[]) => ({ week_number: 1, block_number: 1, days }) as unknown as MesocycleWeek
+    const cardBefore = [wk([{ day: 'Tuesday', focus: 'Pull & Hinge', exercises: [shrugs(38, '13-15')] }, { day: 'Thursday', focus: 'Squat & Carry', exercises: [] }])]
+    const cardAfter = [wk([{ day: 'Tuesday', focus: 'Pull & Hinge', exercises: [shrugs(38, '13-15')] }, { day: 'Thursday', focus: 'Pull & Hinge', exercises: [shrugs(16, '8-10')] }])]
+    const cardStart = resolveRebuildStart(undefined, { liveWeek: 1, today: SUN, planCreatedAt: CREATED, totalWeeks: plan.length })
+    const cardLines = 'refusal' in cardStart ? [] : describeRebuild(cardBefore, cardAfter, { start: cardStart, planCreatedAt: CREATED })
+    check('his card: a lift kept on its own day is not reported as falling on another', cardLines.length > 0 && !cardLines.some(l => /Shrugs 16 kg \(was 38\)/.test(l)), cardLines)
+    const movedAfter = [wk([{ day: 'Tuesday', focus: 'Pull & Hinge', exercises: [] }, { day: 'Thursday', focus: 'Pull & Hinge', exercises: [shrugs(16, '8-10')] }])]
+    const movedLines = 'refusal' in cardStart ? [] : describeRebuild(cardBefore, movedAfter, { start: cardStart, planCreatedAt: CREATED })
+    check('...but a lift that MOVED to another day at a lower weight still says so', movedLines.some(l => /Shrugs 16 kg \(was 38\)/.test(l)), movedLines)
   }
 
   console.log(`\n${checks} checks ran.`)

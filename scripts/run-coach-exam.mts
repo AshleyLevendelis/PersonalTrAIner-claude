@@ -210,6 +210,17 @@ function readSaved(j: Record<string, unknown>): { kind: string; args: unknown } 
   return null
 }
 
+/** STAGE 2.4 (17 Nov 2026): the app REFUSED an offer the coach reached for (offer-rules.ts: a lasting change off
+ *  "tonight", a one-day change asked for from now on, something on a day off a maybe). The response then carries the
+ *  coach's words and `offerRefused: { tool, rule }`, never any of his message. Recorded so the report can count which
+ *  tools the coach keeps misusing; the refused turn is not silence (it has words) and not a card (none was built). */
+function readRefused(j: Record<string, unknown>): { tool: string; rule: string } | null {
+  const r = j.offerRefused
+  if (!r || typeof r !== 'object') return null
+  const tool = String((r as Record<string, unknown>).tool ?? '').trim()
+  return tool ? { tool, rule: String((r as Record<string, unknown>).rule ?? '') } : null
+}
+
 /** The stand-in for the card's own sentence — see the note at its use. It says
  *  it is the app talking so a model reading it back cannot mistake it for
  *  something it said itself. */
@@ -234,6 +245,7 @@ for (const c of cases) {
     const reply = strip(raw)
     const proposal = readProposal(j)
     const saved = readSaved(j)
+    const refused = readRefused(j)
     history.push({ role: 'user', content: text })
     // WHAT THE NEXT TURN SEES, and why it must not be nothing. The app pushes
     // the CARD's own sentence into its message list and sends that list as
@@ -249,9 +261,10 @@ for (const c of cases) {
 
     console.log(`  USER:  ${text}`)
     console.log(`  COACH: ${reply || (proposal ? `(card: ${proposal.kind})` : saved ? `(saved: ${saved.kind})` : '*** NO TEXT ***')}`)
+    if (refused) console.log(`         [the app refused ${refused.tool} (${refused.rule})]`)
     if (j._error) console.log(`         [transport: ${j._error}]`)
 
-    turnRecords.push({ user: text, reply, raw, error: j._error ?? null, action: j.action ?? null, proposal, saved })
+    turnRecords.push({ user: text, reply, raw, error: j._error ?? null, action: j.action ?? null, proposal, saved, refused })
   }
 
   fs.writeFileSync(path.join(OUT_DIR, `${c.name}.json`), JSON.stringify({

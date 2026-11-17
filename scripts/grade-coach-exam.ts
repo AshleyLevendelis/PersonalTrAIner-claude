@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { hardRuleViolations, realTabNames, coachLine, coachToolNames, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
+import { hardRuleViolations, appRefusals, realTabNames, coachLine, coachToolNames, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
 import { coachFingerprint, rubricFingerprint } from './coach-fingerprint.ts'
 
 // ---------------------------------------------------------------------------
@@ -251,6 +251,15 @@ async function main() {
   }
   say()
 
+  // STAGE 2.4: what the app caught. Not a breach; the prompt work list.
+  const caught = appRefusals(marked.map(m => m.transcript))
+  say('-'.repeat(78))
+  say(`THE APP CAUGHT: ${caught.total} offer(s) the coach reached for that his words did not allow`)
+  say('-'.repeat(78))
+  if (caught.total === 0) say('  none')
+  for (const r of caught.byTool) say(`  ${r.tool} x${r.count} (${r.rules.join(', ')}) in ${r.cases.join(', ')}`)
+  say()
+
   const perDim: Record<string, number[]> = Object.fromEntries(dimensions.map(d => [d, []]))
   const caseAverages: Record<string, number | null> = {}
   say('-'.repeat(78))
@@ -324,6 +333,7 @@ async function main() {
     overall,
     dimensionAverages: Object.fromEntries(dimensions.map(d => [d, perDim[d].length ? perDim[d].reduce((a, b) => a + b, 0) / perDim[d].length : null])),
     hardRuleBreaches: breached.length,
+    appRefusals: caught,
     cases: Object.fromEntries(marked.map(m => [m.name, {
       average: caseAverages[m.name],
       marks: m.judgement?.marks ?? null,

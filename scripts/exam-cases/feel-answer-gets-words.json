@@ -1,0 +1,18 @@
+{
+  "name": "feel-answer-gets-words",
+  "why": "Ashley, 17 Nov 2026: the morning hello asked how his body felt, he answered 'the workout was brilliant ... my muscles are aching', and the chat showed 'That came back empty'. The feel is saved by the app; the coach must ALSO answer in words (the silence rule catches an empty turn). No change is offered for an ordinary ache.",
+  "contextOverrides": {
+    "workout_logged_today": false
+  },
+  "messages": [
+    "yesterday's session was great, quads are pretty sore this morning though"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      }
+    ]
+  }
+}

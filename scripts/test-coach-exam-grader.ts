@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { hardRuleViolations, realTabNames, coachLine, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
+import { hardRuleViolations, appRefusals, realTabNames, coachLine, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -393,6 +393,31 @@ const clean = t([
 const cleanRules = rules(clean)
 if (cleanRules.length === 0) pass('no rule fires on a good conversation')
 else fail('a rule fired on a good conversation', cleanRules)
+
+console.log('\n[13] what the app caught (stage 2.4): refusals are counted by tool, never a breach')
+{
+  const tr = (name: string, turns: Transcript['turns']): Transcript => ({ case: name, turns })
+  const a = tr('one-off-a', [
+    { user: 'boxing tonight', reply: 'Enjoy it! Keep tomorrow easy.', refused: { tool: 'propose_concurrent_activity', rule: 'standing' } },
+    { user: 'and every week?', reply: 'Which days?', refused: null },
+  ])
+  const b = tr('one-off-b', [
+    { user: 'spin this morning', reply: 'Nice.', refused: { tool: 'propose_concurrent_activity', rule: 'standing' } },
+    { user: '45 from now on', reply: 'Got it.', refused: { tool: 'propose_session_shorten', rule: 'today' } },
+  ])
+  const c = tr('clean', [{ user: 'hi', reply: 'Hey!' }])
+  const got = appRefusals([a, b, c])
+  if (got.total === 3) pass('every refused turn is counted (3 across two cases), a turn without one is not')
+  else fail('refusal total', got)
+  if (got.byTool[0]?.tool === 'propose_concurrent_activity' && got.byTool[0]?.count === 2 && got.byTool[1]?.tool === 'propose_session_shorten')
+    pass('the most-misused tool comes first, with its count')
+  else fail('refusal order/count', got.byTool)
+  if (JSON.stringify(got.byTool[0]?.cases) === JSON.stringify(['one-off-a', 'one-off-b']) && JSON.stringify(got.byTool[1]?.rules) === JSON.stringify(['today']))
+    pass('each tool names the cases and the rules that caught it')
+  else fail('refusal cases/rules', got.byTool)
+  if (rules(a).length === 0) pass('a refused turn with words is never a hard-rule breach (not silence)')
+  else fail('a refused turn tripped a hard rule', rules(a))
+}
 
 console.log('')
 if (failures > 0) {

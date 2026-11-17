@@ -1,0 +1,17 @@
+{
+  "name": "holiday-pause",
+  "why": "Plan pause (his 'Add a pause', 14 Nov 2026): two weeks away should pause the plan, so nothing is missed and no workout reminder is sent, rather than leave a fortnight of missed sessions. The coach's tool is propose_plan_pause; a schedule change, a rest day or a missed-session card is the wrong one.",
+  "messages": [
+    "I'm away for a fortnight from Saturday with no gym, can you hold everything until I'm home?"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": [
+          "propose_plan_pause"
+        ]
+      }
+    ]
+  }
+}

@@ -134,7 +134,14 @@ export function describeRebuild(
     const b = before.find(x => x.week_number === w.week_number)
     for (const d of w.days) for (const e of d.exercises) {
       if (e.suggested_load_kg == null) continue
-      const old = b?.days.flatMap(x => x.exercises).find(x => x.name === e.name && x.suggested_load_kg != null)
+      // THE SAME LIFT ON THE SAME DAY, else where it was before only when it has LEFT that day (his report 17 Nov 2026:
+      // Thursday's new Shrugs were set against Tuesday's, which the rebuild kept at its weight: "Shrugs 16 kg (was 38)"
+      // described two different days).
+      const sameDay = b?.days.find(x => x.day === d.day)?.exercises.find(x => x.name === e.name && x.suggested_load_kg != null)
+      const moved = b?.days.find(x => x.day !== d.day
+        && x.exercises.some(y => y.name === e.name && y.suggested_load_kg != null)
+        && !w.days.find(n => n.day === x.day)?.exercises.some(y => y.name === e.name))
+      const old = sameDay ?? moved?.exercises.find(x => x.name === e.name && x.suggested_load_kg != null)
       if (!old || old.suggested_load_kg == null || old.suggested_load_kg <= e.suggested_load_kg) continue
       const label = `${e.name} ${e.suggested_load_kg} kg (was ${old.suggested_load_kg})`
       if (old.reps !== e.reps) { if (!restarted.some(x => x.startsWith(e.name))) restarted.push(label) }
