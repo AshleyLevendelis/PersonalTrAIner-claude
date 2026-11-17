@@ -7,6 +7,7 @@
 
 import { PAUSE_WORDS, isPausedOn, planPausedSince } from '@/lib/plan-pause'
 import { addDays } from '@/lib/session-move'
+import { nextSessionAfter, nextSessionGlance, type NextSession } from '@/lib/home-next-session'
 import { useShowNumbers } from '@/lib/show-numbers'
 import type * as React from 'react'
 import { Suspense, useEffect, useRef, useState } from 'react'
@@ -462,6 +463,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   // NOTHING IS DUE TOMORROW WHILE THE PLAN IS PAUSED (15 Nov 2026, browser test: Home said "Full Body Power · Tomorrow").
   const tomorrow = isPausedOn(addDays(data.today, 1), planPausedSince(profile.id)) ? null : (data.tomorrow ?? null)
   const sessionGlance = glanceParts.join(' · ')
+  // HOME LOOKS AHEAD ONCE TODAY IS DONE (his report 16 Nov 2026): the card shows the next session, today one line on it.
+  const nextUp = done && !isPausedOn(data.today, planPausedSince(profile.id)) ? nextSessionAfter(week.days, data.today, addDays(data.today, 1), tomorrow) : null
 
   // THE LATEST PR for the weight panel's footer — the newest, not the biggest.
   const latestPr = [...data.recentPRs].sort((a, b) => b.date.localeCompare(a.date))[0] ?? null
@@ -514,6 +517,10 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
   const recentCount = data.recentPRs.length
   const tomorrowSub = tomorrow && !tomorrow.rest && tomorrow.minutes != null ? `Tomorrow · ~${tomorrow.minutes} min` : 'Tomorrow'
+  // With tomorrow already on the main card, the small tile says what comes after it, so nothing is said twice.
+  const nextAfter = nextUp?.when === 'Tomorrow' && nextUp.date ? nextSessionAfter(week.days, nextUp.date, '', null) : null
+  const tileTitle = nextUp?.when === 'Tomorrow' ? (nextAfter ? nextAfter.focus : 'Nothing else this week') : (tomorrow ? (tomorrow.rest ? 'Rest day' : tomorrow.focus) : '—')
+  const tileSub = nextUp?.when === 'Tomorrow' ? (nextAfter ? `Then ${nextAfter.when}` : 'After tomorrow') : tomorrowSub
 
   return (
     // TAB POLISH, DESIGN 2c (31 Oct 2026, her "build, keep my rulings"): two boxes only, the session card and the
@@ -555,6 +562,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
         prCount={prCount}
         swappedFor={swappedFor}
         declaredToday={declaredToday}
+        nextUp={nextUp}
+        todayLift={lift}
         topPr={prCount > 0 && topPr ? `${topPrLift ?? ''} ${topPr}`.trim() : null}
         onSummary={card ? () => setSummaryOpen(true) : undefined}
         cta={showCta && (
@@ -661,8 +670,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
               <CalendarDays className="size-4" />
             </span>
             <span className="flex min-w-0 flex-col">
-              <span className="line-clamp-2 text-[0.9375rem] font-bold leading-[1.1]">{tomorrow ? (tomorrow.rest ? 'Rest day' : tomorrow.focus) : '—'}</span>
-              <span className="mt-1 line-clamp-2 text-[0.6875rem] leading-[1.3] text-muted-foreground">{tomorrowSub}</span>
+              <span className="line-clamp-2 text-[0.9375rem] font-bold leading-[1.1]">{tileTitle}</span>
+              <span className="mt-1 line-clamp-2 text-[0.6875rem] leading-[1.3] text-muted-foreground">{tileSub}</span>
             </span>
           </div>
         </div>
@@ -841,7 +850,7 @@ export function RingCell({ k, share, color, glow, icon, value, label, onClick, a
  * the week under a hairline. Every state the old row had is here: not yet planned, moved, rest, done (with its
  * time, PRs and the summary), and the session itself. data-tour and data-home-hero keep their names.
  */
-export function SessionHero({ status, data, week, sessionGlance, done, minutes, setsLogged, setsPlanned, prCount, topPr, onSummary, cta, footer, swappedFor = null, declaredToday = null }: {
+export function SessionHero({ status, data, week, sessionGlance, done, minutes, setsLogged, setsPlanned, prCount, topPr, onSummary, cta, footer, swappedFor = null, declaredToday = null, nextUp = null, todayLift = null }: {
   status: DashboardData['session']['status']
   data: DashboardData
   week: ReturnType<typeof useTrainingWeek>
@@ -859,10 +868,15 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
   swappedFor?: string | null
   /** Today said missed, or made a rest day, on the day menu: Home says so, as Exercise does. */
   declaredToday?: 'missed' | 'rest_chosen' | 'paused' | null
+  /** Today is done and a session is next: the card shows it, with today as one line (his report 16 Nov 2026). */
+  nextUp?: NextSession | null
+  /** What he lifted today ("Bench 22.5kg today"), kept on today's line when the card has moved on (L9). */
+  todayLift?: string | null
 }) {
   const weekCount = `${week.sessionsDone} of ${week.sessionsPlanned} session${week.sessionsPlanned === 1 ? '' : 's'} done`
   const ordinal = sessionOrdinal(week.days, data.today)
-  const started = status === 'in_progress' || done
+  const nextOrdinal = nextUp?.date ? sessionOrdinal(week.days, nextUp.date) : null
+  const started = (status === 'in_progress' || done) && !nextUp
   let title: string
   let sub: React.ReactNode = null
   let right: React.ReactNode = null
@@ -887,6 +901,10 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
   } else if (declaredToday && !done) {
     title = declaredToday === 'missed' ? 'Marked missed' : 'Rest day, your choice'
     sub = `${data.session.focus ?? "Today's session"} is still on Exercise if you want it`
+    right = weekCount
+  } else if (nextUp) {
+    title = nextUp.focus
+    sub = nextSessionGlance(nextUp) || null
     right = weekCount
   } else if (swappedFor && !done) {
     title = `Swapped for ${swappedFor}`
@@ -922,11 +940,13 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
         boxShadow: '0 10px 30px rgba(0, 0, 0, .35)',
       }}
       data-tour="hero"
-      data-home-hero={done ? 'done' : status}
+      data-home-hero={nextUp ? 'next' : done ? 'done' : status}
     >
       <div className="flex items-center justify-between gap-3">
         <span className="whitespace-nowrap text-[0.625rem] font-semibold uppercase tracking-[.12em] text-primary-text" data-home-eyebrow>
-          Today{ordinal ? ` · Session ${ordinal.n} of ${ordinal.of}` : ''}
+          {nextUp
+            ? `${nextUp.when}${nextOrdinal ? ` · Session ${nextOrdinal.n} of ${nextOrdinal.of}` : ''}`
+            : `Today${ordinal ? ` · Session ${ordinal.n} of ${ordinal.of}` : ''}`}
         </span>
         {right && <span className="min-w-0 truncate text-[0.6875rem] text-text-tertiary">{right}</span>}
       </div>
@@ -951,8 +971,10 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
         </div>
       )}
       {done && (
-        <div className="mt-1 flex items-center justify-between gap-3">
+        <div className={`${nextUp ? 'mt-3.5 rounded-[12px] px-3 py-2' : 'mt-1'} flex items-center justify-between gap-3`} style={nextUp ? { background: 'var(--surface-sunken)' } : undefined} data-home-today-done={nextUp ? '' : undefined}>
           <p className="min-w-0 tabular-nums text-[0.71875rem] text-muted-foreground" data-home-done-stats>
+            {nextUp && <span className="font-semibold text-primary-text">✓ Today · {data.session.focus ?? 'Session'} · </span>}
+            {nextUp && todayLift && <><span data-testid="home-session-glance">{todayLift}</span> · </>}
             {minutes != null ? `${minutes} min` : '—'} · {setsLogged}/{setsPlanned} sets · <span className={prCount > 0 ? 'glow-mint text-primary-text' : ''} data-home-pr={prCount > 0 ? '' : undefined}>{prCount} PR{prCount === 1 ? '' : 's'}{topPr ? ` · ${topPr}` : ''}</span>
           </p>
           {onSummary && (

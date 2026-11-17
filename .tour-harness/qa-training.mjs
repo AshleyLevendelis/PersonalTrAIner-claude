@@ -209,6 +209,30 @@ check('T11c. ...and one tap on it returns to today', t11back === true, t11back)
 const err = await ev('window.__err ?? null')
 check('no uncaught error on the page', err === null, err)
 
+console.log('\nT20. Once today is done, Home shows the next session (his report 16 Nov 2026)\n')
+await open('done=1', 'dashboard')
+const t20 = await ev(`(() => {
+  const hero = document.querySelector('[data-home-hero]')
+  const tile = document.querySelector('[data-home-tomorrow]')
+  const doneRow = document.querySelector('[data-home-today-done]')
+  return {
+    state: hero?.getAttribute('data-home-hero') ?? null,
+    eyebrow: hero?.querySelector('[data-home-eyebrow]')?.textContent?.trim() ?? null,
+    title: hero?.querySelector('[data-home-title]')?.textContent?.trim() ?? null,
+    doneRow: doneRow?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
+    summary: !!hero?.querySelector('[data-home-summary]'),
+    start: !!document.querySelector('[data-home-cta]'),
+    tile: tile?.textContent?.replace(/\\s+/g, ' ').trim() ?? null,
+    nextDue: [...document.querySelectorAll('[data-home-hero] [data-home-week] [aria-label]')].map(n => n.getAttribute('aria-label')),
+  }
+})()`)
+check('T20a. the main card turns to the next session once today is done', t20.state === 'next', t20)
+check('T20b. ...its eyebrow says when ("Tomorrow" or the weekday) and which session', /^(Tomorrow|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)( · Session \d+ of \d+)?$/.test(t20.eyebrow ?? ''), t20.eyebrow)
+check('T20c. ...today stays as one line on it, done, with its time and sets', /^✓ Today · /.test(t20.doneRow ?? '') && /sets/.test(t20.doneRow ?? ''), t20.doneRow)
+check('T20d. ...the next session is not today\'s, and nothing offers to start it', !!t20.title && !(t20.doneRow ?? '').includes(`· ${t20.title} ·`) && t20.start === false, t20)
+check('T20e. ...and the small tile does not repeat it', !!t20.tile && !(/^Tomorrow/.test(t20.eyebrow ?? '') && t20.tile.startsWith(t20.title ?? '\u0000')), t20.tile)
+await shoot('qa-t20-home-next')
+
 console.log(`\n${ran} checks ran`)
 console.log(failures === 0 ? 'All QA training checks passed.\n' : `${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()

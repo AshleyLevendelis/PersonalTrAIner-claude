@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **HOME LOOKS AHEAD ONCE TODAY IS DONE (his report 16 Nov 2026, a screenshot at 21:39 of Home still showing the
+  finished "Push & Press"): "It should switch to see the upcoming tomorrow's workout."** Now, once today's session is
+  done, Home's main card shows the NEXT session: "Tomorrow · Session 2 of 4 · Pull & Hinge", its exercises and minutes,
+  or the weekday when tomorrow is a rest ("Friday · Session 3 of 4"). Only a day still due counts (one he missed,
+  rested, swapped, paused, moved or already trained is passed over); past the week's end, tomorrow's own plan. Today
+  stays as one line on the card ("✓ Today · Push & Press · 33 min · 14/14 sets · 0 PRs", with Summary when the phone
+  has it); nothing offers to start the next session early. The small tile under it no longer repeats tomorrow: it
+  says what comes after. Paused, or nothing left, keeps today's done card as before. What he LIFTED today stays on today's line ("Bench 22.5kg today", his L9 ruling), found when the card switch dropped it and `verify:what-a-pr-is` went red; three source checks re-anchored on the property (the tile's rest/dash wording, L9). Decided by me, not asked: the
+  card's words and keeping today as one line (his request named the switch, not the layout).
+  `test:home-next-session` (12 checks; 5 mutations, all caught), `verify:qa-training` T20 (5 checks; 3 mutations, 2
+  caught on screen, the third, the tile, caught by the logic test: the test page's tomorrow is a rest day). Frontend
+  only.
 - [x] **A MEAL HE LIKES REACHES THE PLAN (16 Nov 2026, step 1 of his meal-planning brief; his "Implement the meal plan fix").**
   His screenshot: "I like having greek yoghurt with fruit and almonds for breakfast" was saved as a like and nothing on
   the plan moved. Traced: a like is only a ranking key over dishes the plan already has; with no dish containing those

@@ -134,7 +134,7 @@ async function main() {
   const card = cardAt < 0 ? '' : home.slice(cardAt, home.indexOf('</section>', cardAt))
   check('the latest PR and tomorrow are the two halves of one card', /data-home-latest-pr/.test(card) && /data-home-tomorrow/.test(card) && card.indexOf('data-home-latest-pr') < card.indexOf('data-home-tomorrow'))
   check('...the PR\'s figure through the phrasebook (a reps best is reps, never "0 kg")', /personalBest\(bestReadingOf\(latestPr\.metric, latestPr\.value, latestPr\.setReps\)\)/.test(card))
-  check('...tomorrow its session and length, or a rest day, or a dash while the plan is unknown', /\{tomorrow \? \(tomorrow\.rest \? 'Rest day' : tomorrow\.focus\) : '—'\}/.test(card) && /`Tomorrow · ~\$\{tomorrow\.minutes\} min`/.test(home))
+  check('...tomorrow its session and length, or a rest day, or a dash while the plan is unknown', /\{tileTitle\}/.test(card) && /: \(tomorrow \? \(tomorrow\.rest \? 'Rest day' : tomorrow\.focus\) : '—'\)/.test(home) && /`Tomorrow · ~\$\{tomorrow\.minutes\} min`/.test(home))
   const openAt = card.indexOf('{progressOpen && (')
   check('...and under them, one tap away: recent PRs, the weight with its weigh-in, the volume', openAt > card.indexOf('data-home-progress-toggle') && card.indexOf('data-home-progress-toggle') > 0
     && ['data-home-recent-prs', 'data-home-weight', '<WeighInCard ', 'data-home-volume'].every(s => card.indexOf(s) > openAt))

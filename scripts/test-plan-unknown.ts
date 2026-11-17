@@ -214,7 +214,7 @@ check('...with no Start button under it — there is nothing to start yet',
 check('the estimate chip is withheld too', /: status === 'not_started'\s*\?\s*data\.session\.sessionLength && <span data-testid="home-session-length">/.test(homeCode)
   && /const showCta = homeOffersStart\(status, swappedFor\)/.test(homeCode))
 check('the Tomorrow line is dropped rather than guessed',
-  /const tomorrow = [^\n]*\(data\.tomorrow \?\? null\)/.test(homeCode) && /\{tomorrow \? \(tomorrow\.rest \? 'Rest day' : tomorrow\.focus\) : '—'\}/.test(homeCode)
+  /const tomorrow = [^\n]*\(data\.tomorrow \?\? null\)/.test(homeCode) && /\(tomorrow \? \(tomorrow\.rest \? 'Rest day' : tomorrow\.focus\) : '—'\)/.test(homeCode)
   && /tomorrow: !planKnown \? null/.test(stripComments(readFileSync('src/lib/dashboard-data.ts', 'utf8'))))
 check('an unknown day is never written to the cache the next cold open reads',
   /if \(fresh\.session\.status !== 'unknown'\) saveDashboardCache/.test(homeCode))
