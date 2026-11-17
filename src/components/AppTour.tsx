@@ -5,6 +5,7 @@ import { TOUR_STEPS, SET_STEP_KEY, MEALS_STEP_KEY } from '@/lib/app-tour-steps'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { useViewportInset } from '@/hooks/useViewportInset'
+import { useActiveSession } from '@/hooks/useActiveSession'
 
 // ---------------------------------------------------------------------------
 // The post-onboarding app tour ("tap-to-learn").
@@ -26,8 +27,9 @@ import { useViewportInset } from '@/hooks/useViewportInset'
 // THE TAPS ARE REAL, which is the other half of the same decision. A nav stop
 // advances because the hash actually changed; the set stop advances because
 // the row actually saved. Nothing is simulated, so nothing can claim
-// something happened that did not — and the set logged at stop 7 is a genuine
-// week-1 calibration set, which is the point rather than a side effect.
+// something happened that did not. The set logged at the set stop is then
+// taken back off when the tour moves on (his ruling 17 Nov 2026, "Practice,
+// then removed"): it is practice, never a week-1 calibration set.
 // ---------------------------------------------------------------------------
 
 const STEPS = TOUR_STEPS
@@ -221,6 +223,23 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
   const phase: Phase = state.status === 'active' ? state.phase : 'info'
   const running = state.status === 'active'
   useEffect(() => { onRunningChange?.(running) }, [running, onRunningChange])
+
+  // THE SET STOP IS PRACTICE (his ruling 17 Nov 2026, "Practice, then removed", over asking after the tap and over
+  // keeping it). The tick saves for real so he sees it work, and the moment the tour moves on, or is closed, the set is
+  // taken back off and a session it opened goes back to not started: nothing counts, the coach never sees it, and the
+  // first week's weight-finding never reads a set nobody lifted. It REVERSES the header's "a genuine week-1 calibration
+  // set": the tour usually runs straight after setup, on the sofa.
+  // Held in a ref: the session's functions are rebuilt as it refreshes, and a re-run of the effect would take the set
+  // off while the stop is still showing it.
+  const session = useActiveSession()
+  const practiceFns = useRef(session)
+  practiceFns.current = session
+  const onSetStop = running && stepIndex === SET_STEP_INDEX
+  useEffect(() => {
+    if (!onSetStop) return
+    practiceFns.current.beginPractice()
+    return () => practiceFns.current.endPractice()
+  }, [onSetStop])
 
   // The visible numbering skips the set stop when it does not apply.
   const totalSteps = STEPS.length - (setStepSkipped ? 1 : 0)

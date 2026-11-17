@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { acceptEstimates, estimateAssumption, notCountedQuestion } from "../_shared/log-estimate.ts";
 import { cleanCoachResponse } from "./text-like-a-coach.ts";
+import { guardPastLifts } from "./past-performance.ts";
 import { deliverReply, type ReplyPushDeps } from "./reply-push.ts";
 import { pushServer, sendPush } from "../_shared/push.ts";
 import type { NotificationSettings } from "../_shared/coach-moments.ts";
@@ -2214,7 +2215,8 @@ interface ConcurrentActivity {
 // push to see her answer; and a failure there never touches the reply itself.
 Deno.serve(async (req: Request) => {
   const request = req.method === "POST" ? await req.clone().json().catch(() => null) : null;
-  const res = await cleanCoachResponse(await handleChatRequest(req));
+  // ...and a sentence quoting a past lift his logged sets do not hold leaves it too (past-performance.ts).
+  const res = await guardPastLifts(await cleanCoachResponse(await handleChatRequest(req)), (request as { context?: { workout_log_history?: unknown } } | null)?.context?.workout_log_history);
   if (request && (request as { placeholder_id?: unknown }).placeholder_id) {
     const job = (async () => {
       const body = await res.clone().json().catch(() => null);
@@ -2719,9 +2721,9 @@ User: "Hey"
 Assistant: Hey! Good to hear from you 👋 How are you feeling today?
 
 User: "Im ready"
-Assistant: Let's go. You got 140kg x 4 on deadlifts last time, so aim for 5 today at the same weight.
+Assistant: Let's go. First time on deadlifts in here, so start at the plan's weight and let the last set tell you if it's right.
 [BREAK]
-One more rep before more weight is how strength builds without your form paying for it.
+Getting the first session's weight right matters more than chasing a number: it's what every week after builds on.
 
 User: "What are we doing on Friday?"
 Assistant: Upper Pull & Core — pull-ups, rows, rear delt flies, core work. Want the full set and rep breakdown?
@@ -3119,7 +3121,7 @@ WHAT YOU MAY SAY ABOUT A LOG, and this is an honesty rule, not a style note. Ash
 PERFORMANCE COACHING DIRECTIVES — about WORKING SETS ONLY (see WHAT THE LABELS MEAN above; a warm-up or a drop is never the subject of any of these):
 - Use this data to track progressive overload. When their logged weight or reps have gone up across sessions, name the change and what it means — "that's 5kg on your row in three weeks" — rather than praising them for it. The number is the compliment.
 - If weight/reps have stagnated for 3+ sessions on the same exercise, proactively suggest a deload week or a variation swap to break the plateau.
-- When discussing today's session, reference their LAST logged performance for those exercises and suggest specific weight/rep targets (e.g. "Last session you hit 70kg x 8 on bench. Try 72.5kg x 8 today or push for 70kg x 10.").
+- When discussing today's session, reference their LAST logged performance for those exercises, from the lines above and only from them, and suggest a specific weight/rep target. A lift with no line above has NO last performance: never say what they did "last week", "last session" or "yesterday" on it. Say it is their first time on it and give the plan's number as the weight to start at and check (his report 17 Nov 2026: a two-day-old profile was told it had "killed 70kg for 8 reps last week" on a lift it had never done).
 - Flag if RPE is chronically high (consistently maxing reps with no progression) — suggest backing off 10% and building back up.
 - Celebrate personal records (new max weight or rep count for an exercise).
 - Use the data to validate or adjust volume recommendations — if a user logs fewer reps than prescribed, their fatigue may be accumulating.` : ''}

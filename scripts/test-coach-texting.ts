@@ -85,7 +85,9 @@ async function main() {
   // the handler's result goes through cleanCoachResponse, and every return in the body returns that.
   const serveStart = src.indexOf('Deno.serve(')
   const serveBody = serveStart < 0 ? '' : src.slice(serveStart, src.indexOf('\n});', serveStart) + 4)
-  const cleanedRes = serveBody.match(/(?:const|let)\s+(\w+)\s*=\s*await\s+cleanCoachResponse\(\s*await\s+handleChatRequest\(req\)\s*\)/)
+  // 17 Nov 2026: the cleaned response may be wrapped by a later check on the way out (guardPastLifts), which only
+  // ever takes a sentence out of the same reply; the response is still the cleaned one.
+  const cleanedRes = serveBody.match(/(?:const|let)\s+(\w+)\s*=\s*await\s+(?:guardPastLifts\(\s*await\s+)?cleanCoachResponse\(\s*await\s+handleChatRequest\(req\)\s*\)/)
   const inline = /Deno\.serve\(\s*async\s*\(req[^)]*\)\s*=>\s*cleanCoachResponse\(\s*await\s+handleChatRequest\(req\)\s*\)\s*\)/.test(src)
   const returns = [...serveBody.matchAll(/\breturn\s+([^;\n]+)/g)].map(m => m[1].trim())
   check('...and it hands every response to cleanCoachResponse(', inline

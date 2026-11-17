@@ -1611,6 +1611,9 @@ menu" stays true when a copy is also left outside it.
   Profile, each tab; one channel, `open-request.ts`); the coach can take items off the shopping list with an Undo, and
   never gives directions to a tab. `test:open-from-chat`, `verify:live-test-nov14` A31-A35, `verify:tools-2a` §7.
   Needs the `chat-gemini` deploy for the remove tool
+- **The tour's set is practice: his ruling 17 Nov 2026, "Practice, then removed"**: the tour's tick saves so he sees it
+  work, and is deleted when the tour moves on (session back to not started); it never counts, never reaches the coach,
+  never feeds week 1's weight-finding. `verify:tour-real`
 - **A meal he likes reaches the plan: his request 16 Nov 2026** (step 1 of his meal-planning brief): a like that is a
   whole meal for a named meal is followed by the app's offer (tomorrow / every breakfast this week / just remember), each
   button his instruction to the add-a-meal route, sized and checked, Apply before anything is written; "every day" is

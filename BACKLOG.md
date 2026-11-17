@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [x] **THE TOUR'S SET IS PRACTICE: his ruling 17 Nov 2026, "Practice, then removed"** (from three options, over
+  asking "did you really do it?" after the tap and over keeping it). His question: does a set logged during the tour
+  get remembered by the coach, or marked as done? It did, by design ("a genuine week-1 calibration set"): it counted
+  as a set done today, the coach saw it as a lift, and week 1's weight-finding read it, though the tour runs straight
+  after setup, usually nowhere near a bar. Now the tick still saves for real (so he sees it work, and the tour's gate
+  is unchanged), and the moment the tour moves past the stop, or is closed, the set is deleted, the rest timer cleared
+  and a session the practice opened goes back to not started; a session already running is left running. The stop's
+  copy says so ("This one was practice, so I'll take it off when we move on"). `verify:tour-real` (2 new checks: the
+  set is saved during the stop and gone after, with Exercise offering Start again; 5 mutations: 4 caught, the fifth,
+  dropping only the status line, is an equivalent mutant: the record patch and refresh set the same status, and
+  removing the whole reset is caught). Frontend only.
+- [x] **THE COACH INVENTED A PAST LIFT (his report 17 Nov 2026, a profile started the day before):** "Aim for 72.5kg
+  ... on your trap bar deadlifts today because you killed 70kg for 8 reps last week." He had never done one. Traced
+  (investigator, from the code): the coach is sent only real logged sets, read fresh per profile, and the trap bar was
+  not in them; its instructions carried a worked example, "Last session you hit 70kg x 8 on bench. Try 72.5kg x 8
+  today", and today's plan figure was 72.5kg, so it copied the example as his history. A second example ("You got
+  140kg x 4 on deadlifts last time") sat under "Im ready", the same turn shape. Fixed: both examples gone; the coach is
+  told a lift with no logged line has no last performance (say it's the first time, start at the plan's weight); and
+  every reply now leaves through a check that takes out a sentence claiming a past lift ("last week/session/time",
+  "yesterday", "you killed/lifted/pressed ... kg") whose weights appear nowhere in the logged sets sent that turn,
+  keeping today's target in a mixed sentence and never emptying a reply. `test:past-lifts` (15 checks; 6 mutations,
+  all caught after two cases were lengthened), exam case `no-invented-last-week` (makes the scores stale). Needs the
+  `chat-gemini` deploy. NOT a bug, answered: "0 PRs" after his first-ever session is the 9 Oct CSCS rule (M12): a
+  first log is a baseline, there is nothing to have beaten; his first PR comes the first time he beats Monday's sets.
 - [x] **HOME LOOKS AHEAD ONCE TODAY IS DONE (his report 16 Nov 2026, a screenshot at 21:39 of Home still showing the
   finished "Push & Press"): "It should switch to see the upcoming tomorrow's workout."** Now, once today's session is
   done, Home's main card shows the NEXT session: "Tomorrow · Session 2 of 4 · Pull & Hinge", its exercises and minutes,

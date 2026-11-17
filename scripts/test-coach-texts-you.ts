@@ -216,7 +216,7 @@ async function main() {
     const fn = strip(readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8'))
     const serve = fn.slice(fn.indexOf('Deno.serve('), fn.indexOf('function replyPushDeps'))
     check('chat-gemini sends the reply AFTER building the response, never instead of it',
-      /const res = await cleanCoachResponse\(await handleChatRequest\(req\)\)/.test(serve) && /deliverReply\(request, body, res\.status, replyPushDeps\(\)\)/.test(serve) && /return res;/.test(serve), serve.slice(0, 400))
+      /const res = await (?:guardPastLifts\()?await cleanCoachResponse\(await handleChatRequest\(req\)\)/.test(serve) && /deliverReply\(request, body, res\.status, replyPushDeps\(\)\)/.test(serve) && /return res;/.test(serve), serve.slice(0, 400))
     check('...and lets the platform finish it after the answer has gone (waitUntil)', /waitUntil\(job\)/.test(serve))
     const deps = fn.slice(fn.indexOf('function replyPushDeps'))
     check('its row write names the row AND the profile AND the coach', /chat_messages\?id=eq\.\$\{id\}&profile_id=eq\.\$\{profileId\}&role=eq\.assistant/.test(deps))
