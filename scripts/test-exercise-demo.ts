@@ -22,7 +22,8 @@ import { readFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { EXERCISE_DATABASE, MUSCLE_GROUPS } from '../src/lib/exercise-db'
-import { readMuscleMap } from '../src/lib/muscle-map'
+import { readMuscleMap, SHAPES_ON } from '../src/lib/muscle-map'
+import { BODY_SHAPES } from '../src/lib/body-paths'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 const raw = (p: string) => readFileSync(join(ROOT, p), 'utf8')
@@ -72,7 +73,72 @@ console.log('\n1. Every exercise can answer "what does this work?"\n')
   check('the volume metric\'s denominator is untouched — still 11 groups',
     MUSCLE_GROUPS.length === 11, MUSCLE_GROUPS)
   check('...and the map keeps its own region list rather than borrowing it',
-    /MuscleRegion/.test(mapLib) && !/MUSCLE_GROUPS/.test(mapLib))
+    /MuscleSlug/.test(mapLib) && !/MUSCLE_GROUPS/.test(mapLib))
+}
+
+console.log('\n1b. The mapping to the drawing\'s own slugs\n')
+{
+  // THE BODY SHAPES ARE VENDORED FROM react-native-body-highlighter, and its
+  // licence travels with them (MIT requires the notice).
+  const paths = raw('src/lib/body-paths.ts')   // raw on purpose: the licence IS a comment
+  check('the vendored shapes carry the library licence and say where they came from',
+    /MIT License/.test(paths) && /ELABBASSI Hicham/.test(paths) && /react-native-body-highlighter 3\.2\.0/.test(paths))
+  const frontSlugs = new Set(BODY_SHAPES.front.map(([s]) => s))
+  const backSlugs = new Set(BODY_SHAPES.back.map(([s]) => s))
+  check('the drawing has real shapes on both views', BODY_SHAPES.front.length >= 15 && BODY_SHAPES.back.length >= 15,
+    [BODY_SHAPES.front.length, BODY_SHAPES.back.length])
+  check('every shape is a non-empty path', [...BODY_SHAPES.front, ...BODY_SHAPES.back].every(([, ds]) => ds.length > 0 && ds.every(d => /^M/i.test(d))))
+
+  // The written-out list of shapes per view (so the mapping never imports the path data) cannot drift from the data.
+  const same = (a: ReadonlySet<string>, b: Set<string>) => a.size === b.size && [...a].every(x => b.has(x))
+  check('the mapping\'s list of shapes per view is exactly what the vendored data draws',
+    same(SHAPES_ON.front, frontSlugs) && same(SHAPES_ON.back, backSlugs),
+    { front: [...SHAPES_ON.front], back: [...SHAPES_ON.back] })
+
+  // Every slug a live exercise lights must be a shape the drawing HAS, on at least one view.
+  const lit = new Set(live.flatMap(e => readMuscleMap(e).regions))
+  const missing = [...lit].filter(s => !frontSlugs.has(s) && !backSlugs.has(s))
+  check('every slug the catalogue lights up exists on the drawing', missing.length === 0 && lit.size > 10, [...missing, lit.size])
+
+  const byName = (n: string) => readMuscleMap(live.find(e => e.name === n)!)
+  const chin = byName('Chin-Ups')
+  check('Chin-Ups: biceps, abs and obliques on the front', ['biceps', 'abs', 'obliques'].every(s => s in chin.lit.front) && Object.keys(chin.lit.front).length === 3, chin.lit.front)
+  check('Chin-Ups: lats and teres major land on the upper back, on the back view', 'upper-back' in chin.lit.back && Object.keys(chin.lit.back).length === 1, chin.lit.back)
+  check('core lights BOTH abs and obliques on the front',
+    'abs' in readMuscleMap({ primary_muscles: ['core'] }).lit.front && 'obliques' in readMuscleMap({ primary_muscles: ['core'] }).lit.front)
+  check('a slug is only recorded on a view where the drawing has it (no biceps on the back)',
+    !('biceps' in chin.lit.back) && !('upper-back' in chin.lit.front))
+  check('anterior deltoid is front only; rear deltoid is back only',
+    'deltoids' in readMuscleMap({ primary_muscles: ['anterior deltoid'] }).lit.front
+    && !('deltoids' in readMuscleMap({ primary_muscles: ['anterior deltoid'] }).lit.back)
+    && 'deltoids' in readMuscleMap({ primary_muscles: ['rear deltoid'] }).lit.back
+    && !('deltoids' in readMuscleMap({ primary_muscles: ['rear deltoid'] }).lit.front))
+  // Where the library has an exact shape, use it rather than the nearest.
+  check('adductors, tibialis and ankles use their own shapes, not a neighbour',
+    'adductors' in readMuscleMap({ primary_muscles: ['adductors'] }).lit.front
+    && 'tibialis' in readMuscleMap({ primary_muscles: ['tibialis anterior'] }).lit.front
+    && 'ankles' in readMuscleMap({ primary_muscles: ['ankle stabilisers'] }).lit.front)
+
+  // Secondary: paler tier, primary wins. No catalogue entry has the field today.
+  const both = readMuscleMap({ primary_muscles: ['chest'], secondary_muscles: ['triceps', 'chest'] })
+  check('a secondary muscle is tiered secondary and a primary one stays primary',
+    both.lit.front.triceps === 'secondary' && both.lit.front.chest === 'primary', both.lit.front)
+  check('a primary is never downgraded by a secondary naming the same shape',
+    readMuscleMap({ primary_muscles: ['chest'], secondary_muscles: ['chest'] }).lit.front.chest === 'primary')
+
+  // THE WARNING. A muscle with no mapping is logged and listed, never skipped quietly.
+  const warnings: string[] = []
+  const realWarn = console.warn
+  console.warn = (...a: unknown[]) => { warnings.push(a.join(' ')) }
+  const odd = readMuscleMap({ primary_muscles: ['flux capacitor', 'chest'] })
+  readMuscleMap({ primary_muscles: ['flux capacitor'] })
+  console.warn = realWarn
+  check('an unmapped muscle is listed as unrecognised, and the mapped one still lights',
+    odd.unrecognised.length === 1 && odd.unrecognised[0] === 'flux capacitor' && 'chest' in odd.lit.front, odd)
+  check('...and it logs ONE warning naming the muscle', warnings.length === 1 && /flux capacitor/.test(warnings[0]), warnings)
+  check('the colour tiers are the accent, a paler accent, and the panel\'s own raised purple',
+    /secondary: \{ fill: 'var\(--primary\)', opacity: 0\.\d+/.test(map) && /off: \{ fill: 'var\(--surface-raised\)'/.test(map)
+    && /primary: \{ fill: 'var\(--primary\)', opacity: 1/.test(map))
 }
 
 console.log('\n2. The map works with no signal, because it is drawn not fetched\n')
@@ -81,7 +147,21 @@ console.log('\n2. The map works with no signal, because it is drawn not fetched\
   // anything fetched from elsewhere is blank on a gym floor. This is the
   // check that keeps the map on the right side of that.
   check('no image is loaded', !/<img|<image\b/.test(map))
-  check('nothing is fetched at render time', !/fetch\(|XMLHttpRequest|import\(/.test(map))
+  check('nothing is fetched at render time', !/fetch\(|XMLHttpRequest/.test(map))
+  // The shapes are their own chunk, loaded on first draw. That is the ONE dynamic import the map may have, it must
+  // name the own-bundle module, and the build's asset manifest (which the service worker saves to the phone) must
+  // list every built .js so the chunk is there with no signal.
+  // (`typeof import('…')` in a type is erased at build and is not a load, so it is not counted.)
+  const dynamic = map.match(/(?<!typeof\s)import\(\s*(['"`])[^'"`]*\1\s*\)/g) ?? []
+  check('the one dynamic import is the shapes chunk, an own-bundle module',
+    dynamic.length === 1 && /import\(\s*'@\/lib\/body-paths'\s*\)/.test(dynamic[0]), dynamic)
+  check('...so the 45 kB of path data is not imported statically by the map or its mapping',
+    !/from '@\/lib\/body-paths'/.test(map.replace(/import type[^\n]*\n/g, '').replace(/type Shapes[^\n]*\n/, ''))
+    && !/import \{[^}]*\} from '\.\/body-paths'/.test(mapLib.replace(/import type[^\n]*\n/g, '')))
+  check('...and the build lists every .js it makes for the service worker, so that chunk is saved offline',
+    /\.\(js\|css\)\$/.test(read('vite-asset-manifest.ts')) && /asset-manifest\.json/.test(read('public/sw.js')))
+  check('a chunk that cannot load says so and leaves the muscle names',
+    /failed &&/.test(map) && /couldn&apos;t load/.test(map) && /\{names\.join/.test(map))
   check('no external host appears at all', !/https?:\/\//.test(map))
   check('it is drawn as SVG in the bundle', /<svg/.test(map) && /viewBox/.test(map))
   // Red already means "avoid with" on this same panel. Lighting the muscles

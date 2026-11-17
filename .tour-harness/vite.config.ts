@@ -17,6 +17,6 @@ export default defineConfig({
   build: {
     outDir: path.resolve(__dirname, 'dist'),
     emptyOutDir: true,
-    rollupOptions: { input: [path.resolve(__dirname, 'tour-harness.html'), path.resolve(__dirname, 'real.html'), path.resolve(__dirname, 'chat.html'), path.resolve(__dirname, 'profile.html'), path.resolve(__dirname, 'grocery.html'), path.resolve(__dirname, 'app-boot.html')] },
+    rollupOptions: { input: [path.resolve(__dirname, 'tour-harness.html'), path.resolve(__dirname, 'real.html'), path.resolve(__dirname, 'chat.html'), path.resolve(__dirname, 'profile.html'), path.resolve(__dirname, 'grocery.html'), path.resolve(__dirname, 'app-boot.html'), path.resolve(__dirname, 'muscle-map.html')] },
   },
 })

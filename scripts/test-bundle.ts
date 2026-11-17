@@ -748,7 +748,12 @@ console.log('\n3. Nothing has crept back up')
   // e373e3b8: 3026. His 15 Sep ruling: 25 kB raw over today's number.
   // MOVED 16 Nov 2026: 3051 -> 3080, the same 16 Nov coach batch; MEASURED 3055 through this gate on cec97249. His
   // 15 Sep ruling: 25 kB raw over today's number.
-  const TOTAL_BUDGET_KB = 3080
+  // MOVED 17 Nov 2026: 3080 -> 3140, the body drawing's shapes (src/lib/body-paths.ts, 41 kB raw / 19 gz, vendored from
+  // react-native-body-highlighter under its MIT licence). MEASURED through this gate on a clean worktree of 08baca3
+  // and on the change: total 3074 -> 3115 raw. The shapes are their OWN chunk, loaded when a figure is first drawn,
+  // so the other three budgets did not move (deploy 438 gz, first paint 594 gz, app 1510 -> 1511 raw): only this
+  // total, which counts every file on disk, took the data. His 15 Sep ruling: 25 kB raw over today's number (3115 + 25).
+  const TOTAL_BUDGET_KB = 3140
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

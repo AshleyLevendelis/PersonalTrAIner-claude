@@ -29,60 +29,94 @@
 // ---------------------------------------------------------------------------
 
 import type { ExerciseEntry } from './exercise-db'
+import type { BodySlug, BodyView } from './body-paths'
+
+// ---------------------------------------------------------------------------
+// THE ONE MAPPING FILE: the catalogue's muscle names -> the drawing's slugs.
+//
+// The slugs are the body library's own (`BodySlug`, body-paths.ts), read from
+// its published type, not guessed. THE LIBRARY HAS NO LATS, NO TERES, NO
+// RHOMBOIDS, NO HIP FLEXORS, NO SERRATUS: where the catalogue names a muscle
+// the drawing has no shape for, it maps to the NEAREST slug and says so in a
+// comment. The caption under the figure always lists the catalogue's own
+// words, so the drawing may approximate and the words never do.
+//
+// A muscle this file has never seen is not skipped quietly: it logs a warning
+// the first time it is read and is listed in `unrecognised`, which
+// `test:exercise-demo` turns into a failure for every live exercise.
+// ---------------------------------------------------------------------------
 
 /** Where on the drawing a muscle is painted. Display only — nothing is counted from these. */
-export type MuscleRegion =
-  | 'chest' | 'shoulders' | 'biceps' | 'forearms' | 'abs' | 'quads'
-  | 'traps' | 'lats' | 'upperBack' | 'rearDelts' | 'triceps' | 'erectors'
-  | 'glutes' | 'hamstrings' | 'calves'
+export type MuscleSlug = BodySlug
+
+/** A slug, optionally only on one view. Most muscles are lit wherever the drawing has them. */
+type Target = MuscleSlug | { slug: MuscleSlug; only: BodyView }
+const front = (slug: MuscleSlug): Target => ({ slug, only: 'front' })
+const back = (slug: MuscleSlug): Target => ({ slug, only: 'back' })
 
 /**
- * Free-text `primary_muscles` -> region. The catalogue writes anatomy by hand
- * (62 distinct spellings across 200 entries), so this is a lookup rather than
+ * Free-text `primary_muscles` -> slugs. The catalogue writes anatomy by hand
+ * (62 distinct spellings across 267 entries), so this is a lookup rather than
  * a rule. Anything absent is deliberate, not forgotten: see UNPAINTABLE.
  */
-const REGION_BY_MUSCLE: Record<string, MuscleRegion[]> = {
+const SLUGS_BY_MUSCLE: Record<string, Target[]> = {
   // --- front -------------------------------------------------------------
   'chest': ['chest'], 'upper chest': ['chest'], 'lower chest': ['chest'],
-  'serratus anterior': ['chest'],
-  'shoulders': ['shoulders'], 'anterior deltoid': ['shoulders'],
-  'front deltoid': ['shoulders'], 'lateral deltoid': ['shoulders'],
-  // Under the deltoid on a drawing this size; named exactly in the caption.
-  'rotator cuff': ['shoulders'], 'external rotators': ['shoulders'],
+  // No serratus slug. It sits on the side of the ribcage beside the external
+  // obliques, which is the nearest shape the drawing has.
+  'serratus anterior': ['obliques'],
+  // "Shoulders" and the lateral head are visible from both sides. The
+  // anterior head is the front of the shoulder and the rear head the back, so
+  // those two are restricted to their view rather than lighting both.
+  'shoulders': ['deltoids'], 'lateral deltoid': ['deltoids'],
+  'anterior deltoid': [front('deltoids')], 'front deltoid': [front('deltoids')],
+  'rear deltoid': [back('deltoids')],
+  // The cuff lies under the deltoid; no slug of its own.
+  'rotator cuff': ['deltoids'], 'external rotators': ['deltoids'],
   'biceps': ['biceps'], 'biceps brachii': ['biceps'],
   'biceps brachii (long head)': ['biceps'],
-  // Deep to the biceps on the front of the upper arm, same visible region —
-  // the approximation rule's own example ("a rotator cuff sits under the
-  // deltoid"), applied here.
+  // Deep to the biceps on the front of the upper arm, same visible region.
   'brachialis': ['biceps'],
-  'forearms': ['forearms'], 'brachioradialis': ['forearms'], 'grip': ['forearms'],
-  'wrist flexors': ['forearms'], 'wrist extensors': ['forearms'],
-  'forearm flexors': ['forearms'], 'forearm extensors': ['forearms'],
-  'forearm rotators': ['forearms'], 'pronator teres': ['forearms'],
-  'supinator': ['forearms'], 'common extensor tendon': ['forearms'],
-  'core': ['abs'], 'rectus abdominis': ['abs'], 'transverse abdominis': ['abs'],
-  'obliques': ['abs'],
-  'quadriceps': ['quads'], 'quads': ['quads'],
-  'hip flexors': ['quads'], 'adductors': ['quads'],
-  'tensor fasciae latae': ['glutes'],
+  // The drawing has one forearm slug, so flexors, extensors, rotators and
+  // grip all land on it.
+  'forearms': ['forearm'], 'brachioradialis': ['forearm'], 'grip': ['forearm'],
+  'wrist flexors': ['forearm'], 'wrist extensors': ['forearm'],
+  'forearm flexors': ['forearm'], 'forearm extensors': ['forearm'],
+  'forearm rotators': ['forearm'], 'pronator teres': ['forearm'],
+  'supinator': ['forearm'], 'common extensor tendon': ['forearm'],
+  // Core is the abs AND the obliques on the front of the drawing.
+  'core': ['abs', 'obliques'], 'rectus abdominis': ['abs'],
+  // Deepest abdominal layer, drawn under the abs.
+  'transverse abdominis': ['abs'],
+  'obliques': ['obliques'],
+  'quadriceps': ['quadriceps'], 'quads': ['quadriceps'],
+  // No hip-flexor slug; they sit at the top of the thigh, which is the quad shape.
+  'hip flexors': ['quadriceps'],
+  'adductors': ['adductors'],
+  // Outer hip, no slug: the glute shape on the back is the nearest.
+  'tensor fasciae latae': ['gluteal'],
   // --- back --------------------------------------------------------------
-  'traps': ['traps'], 'upper traps': ['traps'], 'upper trapezius': ['traps'],
-  'lats': ['lats'],
-  'rhomboids': ['upperBack'], 'mid traps': ['upperBack'],
-  'lower trapezius': ['upperBack'], 'teres major': ['upperBack'],
-  'upper back': ['upperBack'],
-  'rear deltoid': ['rearDelts'],
+  'traps': ['trapezius'], 'upper traps': ['trapezius'], 'upper trapezius': ['trapezius'],
+  // THERE IS NO LATS SLUG. The back's "upper-back" shape is the whole sheet of
+  // back muscle between the shoulder blades and the waist, which is where the
+  // lats, rhomboids and teres major are, so all of them land on it.
+  'lats': ['upper-back'], 'teres major': ['upper-back'],
+  'rhomboids': ['upper-back'], 'upper back': ['upper-back'],
+  // The middle and lower trapezius are the lower half of the trapezius shape.
+  'mid traps': ['trapezius'], 'lower trapezius': ['trapezius'],
   'triceps': ['triceps'], 'triceps (long head)': ['triceps'],
-  'erectors': ['erectors'], 'erector spinae': ['erectors'],
-  'quadratus lumborum': ['erectors'],
-  'glutes': ['glutes'], 'glute max': ['glutes'], 'glute medius': ['glutes'],
-  'glute minimus': ['glutes'],
-  'hamstrings': ['hamstrings'],
+  'erectors': ['lower-back'], 'erector spinae': ['lower-back'],
+  'quadratus lumborum': ['lower-back'],
+  'glutes': ['gluteal'], 'glute max': ['gluteal'], 'glute medius': ['gluteal'],
+  'glute minimus': ['gluteal'],
+  'hamstrings': ['hamstring'],
   'calves': ['calves'], 'gastrocnemius': ['calves'], 'soleus': ['calves'],
-  'tibialis anterior': ['calves'], 'peroneals': ['calves'],
-  'ankle stabilisers': ['calves'],
+  // Peroneals run down the outside of the shin and calf; nearest is the calf.
+  'peroneals': ['calves'],
+  'tibialis anterior': ['tibialis'],
+  'ankle stabilisers': ['ankles'],
   // --- deliberately plural ------------------------------------------------
-  'legs': ['quads', 'hamstrings', 'calves'],
+  'legs': ['quadriceps', 'hamstring', 'calves'],
 }
 
 /**
@@ -92,11 +126,20 @@ const REGION_BY_MUSCLE: Record<string, MuscleRegion[]> = {
  */
 const UNPAINTABLE = new Set(['cardiovascular system', 'full body'])
 
+export type MuscleTier = 'primary' | 'secondary'
+
+/** What to fill on each view, and how strongly. */
+export type LitSlugs = Record<BodyView, Partial<Record<MuscleSlug, MuscleTier>>>
+
 export type MuscleMapReading = {
-  /** Regions to fill in. Empty when nothing can be painted. */
-  regions: MuscleRegion[]
+  /** Every slug to fill in, on either view. Empty when nothing can be painted. */
+  regions: MuscleSlug[]
+  /** The same, per view and tier: primary wins where both name one shape. */
+  lit: LitSlugs
   /** The catalogue's own words, verbatim, sentence-cased for display. */
   names: string[]
+  /** Secondary muscles in the catalogue's words. Empty for every entry today. */
+  secondaryNames: string[]
   /**
    * Set only when nothing can be painted — the honest sentence to show
    * INSTEAD of an unlit figure, which reads as a bug rather than as an answer.
@@ -111,20 +154,75 @@ function tidy(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-export function readMuscleMap(entry: Pick<ExerciseEntry, 'primary_muscles'>): MuscleMapReading {
-  const regions: MuscleRegion[] = []
+/**
+ * Which shapes each view of the drawing actually has: biceps exist on the
+ * front only, glutes on the back only. WRITTEN OUT HERE, not read off the
+ * shapes, so this file never imports the 45 kB of path data (which loads as
+ * its own chunk when a figure is first drawn); `test:exercise-demo` fails if
+ * this list and the data ever disagree.
+ */
+export const SHAPES_ON: Record<BodyView, ReadonlySet<MuscleSlug>> = {
+  front: new Set<MuscleSlug>([
+    'chest', 'obliques', 'abs', 'biceps', 'triceps', 'neck', 'trapezius', 'deltoids', 'adductors',
+    'quadriceps', 'knees', 'tibialis', 'calves', 'forearm', 'hands', 'ankles', 'feet', 'head', 'hair',
+  ]),
+  back: new Set<MuscleSlug>([
+    'neck', 'trapezius', 'deltoids', 'upper-back', 'triceps', 'lower-back', 'forearm', 'gluteal',
+    'adductors', 'hamstring', 'calves', 'ankles', 'feet', 'hands', 'head', 'hair',
+  ]),
+}
+
+const warned = new Set<string>()
+
+/**
+ * The catalogue has no secondary-muscle field today, so this reads one only
+ * if an entry carries it. The type is declared here and not on the catalogue
+ * entry, which this change does not touch.
+ */
+export type MuscleMapInput = Pick<ExerciseEntry, 'primary_muscles'> & { secondary_muscles?: string[] }
+
+export function readMuscleMap(entry: MuscleMapInput): MuscleMapReading {
+  const lit: LitSlugs = { front: {}, back: {} }
   const unrecognised: string[] = []
-  for (const raw of entry.primary_muscles) {
-    const m = raw.trim().toLowerCase()
-    if (UNPAINTABLE.has(m)) continue
-    const mapped = REGION_BY_MUSCLE[m]
-    if (!mapped) { unrecognised.push(raw); continue }
-    for (const r of mapped) if (!regions.includes(r)) regions.push(r)
+
+  const paint = (muscles: string[], tier: MuscleTier) => {
+    for (const raw of muscles) {
+      const m = raw.trim().toLowerCase()
+      if (UNPAINTABLE.has(m)) continue
+      const targets = SLUGS_BY_MUSCLE[m]
+      if (!targets) {
+        unrecognised.push(raw)
+        if (!warned.has(m)) {
+          warned.add(m)
+          console.warn(`[muscle-map] no body shape mapped for muscle "${raw}" — it will not be highlighted`)
+        }
+        continue
+      }
+      for (const t of targets) {
+        const slug = typeof t === 'string' ? t : t.slug
+        const views: BodyView[] = typeof t === 'string' ? ['front', 'back'] : [t.only]
+        for (const v of views) {
+          if (!SHAPES_ON[v].has(slug)) continue
+          lit[v][slug] = tier
+        }
+      }
+    }
+  }
+  // ORDER IS THE RULE: primary is painted last, so where both name one shape
+  // the primary wins and a secondary can never downgrade it.
+  paint(entry.secondary_muscles ?? [], 'secondary')
+  paint(entry.primary_muscles, 'primary')
+
+  const regions: MuscleSlug[] = []
+  for (const v of ['front', 'back'] as const) {
+    for (const slug of Object.keys(lit[v]) as MuscleSlug[]) if (!regions.includes(slug)) regions.push(slug)
   }
   const names = entry.primary_muscles.map(tidy)
   return {
     regions,
+    lit,
     names,
+    secondaryNames: (entry.secondary_muscles ?? []).map(tidy),
     // "Works your whole body" is true of Burpees and says more than a grey
     // outline does. The words are the catalogue's, not a guess.
     wordsOnly: regions.length === 0 ? `Works ${names.join(' and ').toLowerCase()}.` : undefined,
