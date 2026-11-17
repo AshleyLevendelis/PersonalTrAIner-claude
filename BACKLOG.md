@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **SECONDARY MUSCLES ADDED TO THE EXERCISE DATA (17 Nov 2026, his "Add secondary muscles to the exercise data"; the follow-on to the body diagram below).** New optional field `secondary_muscles` on the catalogue entry
+  (`src/lib/exercise-db.ts`): muscles that do real assisting or stabilising work and are NOT already primary. 238 of 265 live exercises carry one (1 to 4 each, from the same vocabulary the map reads); 27 deliberately have none, each
+  named in `test:exercise-demo` with its reason: bench and chest presses and push-ups and dips (the primary list already is the whole prime-mover set), hip adduction and back extension machines (no honest assistor), Burpees (not a
+  place on a body), bent-knee calf raise (its target IS the soleus, which "calves" covers). **CSCS decision, mine (basis: standard prime-mover / synergist / stabiliser classification, e.g. the lat pulldown's synergists are teres major
+  and lower trapezius with grip from the forearms; a hip thrust's quads and adductors; a front squat's erectors holding the torso):** where nothing honest could be added the field is ABSENT, never padded. **Display only:** the field
+  is read by the muscle map and nothing else (a gate greps `src` and the coach's functions for any other reader), so the volume metric (`MUSCLE_GROUPS`, `test:muscle-balance`), the pool filters, plan generation and every
+  prescription are untouched and no earlier number moves. Scope check (CSCS question 5): not diagnosis or rehab. The drawing shows a secondary as the accent at 45%, with an "Also:" line under the names. NOT done: serratus anterior
+  is never used as a secondary (the library has no serratus shape; the map's nearest is the obliques, which would light the wrong place on a bench press). `test:exercise-demo` 62 checks (10 mutations on the new rules, all caught).
+  Found and fixed on the way: two gate checks written when only primary existed (Chin-Ups lighting "exactly three" shapes) are now scoped to the primary tier; a synonym group wrongly treated gastrocnemius and soleus as "calves".
+  SWEEP: every `test:*` gate except `test:quality` (22 min; plan generation does not read the field), `test:audit`, and the three that need a live database: 397 passed, 1 failed, `test:coach-exam-fresh`, which says the coach's
+  prompt and rules and 11 newer exam questions changed since the exam last ran: from the 16-17 Nov coach work, not this change (no coach file touched); it needs the exam run on his machine. Browser drivers run: `verify:muscle-map`,
+  `verify:gym-offline`; the rest were not re-run (no other screen reads this field). Frontend only; no edge function, no migration.
 - [x] **THE BODY DIAGRAM ON AN EXERCISE'S SUMMARY TAB IS NOW A REAL BODY (17 Nov 2026, his request, "replace the crude rounded rectangles with react-native-body-highlighter").** `src/lib/muscle-map.ts`
   (the ONE mapping file: the catalogue's muscle names to the drawing's slugs), `src/lib/body-paths.ts` (the shapes), `src/components/exercise/MuscleMap.tsx` (the renderer). Front and Back side by side, same labels; primary in the
   accent, secondary in the same accent at 45%, unworked in the panel's own raised purple. Core lights abs AND obliques. **DEVIATION FROM THE BRIEF, DECIDED UNPROMPTED (mechanical, not asked): the PACKAGE IS NOT INSTALLED.** The brief
