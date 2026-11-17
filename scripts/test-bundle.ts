@@ -462,7 +462,9 @@ console.log('\n3. Nothing has crept back up')
   // odd reps); measured 1466 on the branch before them and 1473.x after.
   // MOVED 15 Nov 2026: 1480 -> 1506, pregnancy as one switch and the sharp-pain Pause; MEASURED on a clean worktree of
   // e373e3b8: 1481 (and 1481 with the Pause). His 15 Sep ruling: 25 kB raw over today's number.
-  const APP_CHUNK_BUDGET_KB = 1506
+  // MOVED 17 Nov 2026: 1506 -> 1531, the phone kept linked to the profile on screen (no reminders ever arrived); MEASURED
+  // on a clean worktree of main 9f8e0ef2: 1505 (1 left), and 1506 after. His 15 Sep ruling: 25 kB raw over today's number.
+  const APP_CHUNK_BUDGET_KB = 1531
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,

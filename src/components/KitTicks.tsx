@@ -24,11 +24,17 @@ import type { KitChangePlan, KitController } from '@/lib/kit-change'
 import type { UserProfile } from '@/lib/types'
 import { shortDate } from '@/lib/plan-guard'
 
-export function KitTicks({ profile, kit }: { profile: UserProfile; kit: KitController }) {
+/**
+ * `startWithout`: items already unticked when the ticks open (his report 17 Nov 2026, "I haven't got the kit" on a band
+ * exercise: the ticks opened all ticked and Save only appears once something changes, so he could not see how to say
+ * "no bands"). The change is shown and priced at once; nothing is saved until Save.
+ */
+export function KitTicks({ profile, kit, startWithout = [] }: { profile: UserProfile; kit: KitController; startWithout?: readonly KitItem[] }) {
   const current = kitItemsFor(profile)
   const currentKey = current.join(',')
   const stated = (profile.kit_statements ?? []).length > 0
-  const [draft, setDraft] = useState<KitItem[]>(current)
+  const opening = current.filter(i => !startWithout.includes(i))
+  const [draft, setDraft] = useState<KitItem[]>(opening)
   const [preview, setPreview] = useState<KitChangePlan | null>(null)
   const [checking, setChecking] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -37,7 +43,7 @@ export function KitTicks({ profile, kit }: { profile: UserProfile; kit: KitContr
 
   // A saved change (or one made by the coach) re-derives `current`; the ticks
   // follow it rather than holding a draft of something already saved.
-  useEffect(() => { setDraft(current); setPreview(null) }, [currentKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setDraft(opening); setPreview(null) }, [currentKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const statements = statementsForTicks(current, draft)
   const changed = statements.length > 0

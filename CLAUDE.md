@@ -1643,6 +1643,11 @@ menu" stays true when a copy is also left outside it.
   never over a running round ("A round is running · Open it"). The coach is told to name the timer (needs the
   `chat-gemini` deploy). `verify:live-test-nov14` A16-A24
 
+### His rulings of 17 Nov 2026
+- **Every exercise's How to has "Find a video on YouTube": his ruling "YouTube search"** (over hand-picked videos and
+  none): a search for its form in a new tab, the chat's own link. It REVERSES "never a button that opens a search" for
+  How to; the checked player on Summary stays. `verify:exercise-video`
+
 ### His rulings of 15 Nov 2026, the Marcus test (Wave M of `docs/plans/browser-test-nov15-plan.md`)
 - **An allergy refusal says where the setting is, never invites removing it: "Say where it's set"**. "Your nut-free
   setting is on Profile, under Food, Diet." REPLACES the "if you don't have a nut allergy, change it" half of his 18 Oct
