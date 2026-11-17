@@ -139,11 +139,12 @@ export const TOUR_STEPS: TourStep[] = [
   {
     key: 'set', tab: 'exercise', target: 'setrow', gate: true,
     tapHint: 'Tap the ✓ to log the set', teaser: 'Your turn — log a set.',
-    copy: "Logged — that easy. Leave the fields blank and I'll take the prescribed numbers; your rest timer starts on its own.",
+    // PRACTICE (his ruling 17 Nov 2026): the set comes back off when the tour moves on, and the copy says so.
+    copy: "Logged — that easy. Leave the fields blank and I'll take the prescribed numbers; your rest timer starts on its own. This one was practice, so I'll take it off when we move on.",
     // "Leave the fields blank" is false on a row that just made them type, so
     // the claim is narrowed to where it holds rather than dropped.
     typedWeightTapHint: "Type the weight you're using, then tap the ✓",
-    typedWeightCopy: "Logged — that easy. Wherever I've given you a weight, leave the fields blank and I'll take the prescribed numbers; your rest timer starts on its own.",
+    typedWeightCopy: "Logged — that easy. Wherever I've given you a weight, leave the fields blank and I'll take the prescribed numbers; your rest timer starts on its own. This one was practice, so I'll take it off when we move on.",
   },
   {
     // CORRECTED 13 Sep 2026, TWICE OVER.

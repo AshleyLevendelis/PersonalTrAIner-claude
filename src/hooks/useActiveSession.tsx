@@ -123,6 +123,12 @@ export interface ActiveSessionValue extends ActiveSessionIdentity, RestState {
   setsFor: (exerciseId: string, exerciseName?: string) => ExerciseSetLog[]
   refresh: () => void
   logSet: (input: SaveSetInput) => ExerciseSetLog | null
+  /**
+   * THE TOUR'S SET IS PRACTICE (his ruling 17 Nov 2026, "Practice, then removed"): sets logged between beginPractice and
+   * endPractice are taken back off when the tour moves on, and a session the practice opened goes back to not started.
+   */
+  beginPractice: () => void
+  endPractice: () => void
   deleteSet: typeof deleteSet
   /** Send a set the server refused again — the Retry on a row marked "didn't save". Raw store function, like deleteSet. */
   retrySet: typeof retryFailedSet
@@ -555,8 +561,10 @@ export function ActiveSessionProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [identity.profileId, identity.date, identity.dayName, identity.liveWeek])
 
+  const practice = useRef<{ wasIdle: boolean; sets: SaveSetInput[] } | null>(null)
   const logSet = useCallback((input: SaveSetInput): ExerciseSetLog | null => {
     const result = saveSet(input)
+    if (result && practice.current) practice.current.sets.push(input)
     // A REFUSED SET OPENS NOTHING. saveSet returns null when the weight is one
     // nobody lifts (set-plausibility.ts) and nothing was written — so marking
     // the session running, reopening a finished one, or refreshing every
@@ -910,6 +918,27 @@ export function ActiveSessionProvider({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistRest])
 
+  const beginPractice = useCallback(() => {
+    if (practice.current) return
+    practice.current = { wasIdle: statusRef.current === 'idle', sets: [] }
+  }, [])
+  const endPractice = useCallback(() => {
+    const p = practice.current
+    practice.current = null
+    if (!p || p.sets.length === 0) return
+    for (const set of p.sets) {
+      deleteSet({ userId: set.userId, date: set.date, exerciseId: set.exerciseId, setNumber: set.setNumber, isWarmup: set.isWarmup ?? false, dropIndex: set.dropIndex ?? 0 })
+    }
+    dismissRest()
+    // A session the practice set opened goes back to not started: nothing was trained.
+    if (p.wasIdle) {
+      patchRecord({ status: 'idle', startedAtIso: undefined, finishedAtIso: undefined, prSnapshotAtStart: undefined })
+      setStatus('idle')
+      setStartedAtIso(null)
+    }
+    refresh()
+  }, [dismissRest, patchRecord, refresh])
+
   // Tick + resync, extracted to useDeadlineTick (shared with the standalone
   // stopwatch/lap/round timers) — the DISPLAYED value is always
   // `restEndsAt - now`, recomputed fresh each tick, never from the tick
@@ -962,6 +991,8 @@ export function ActiveSessionProvider({
     startRest,
     adjustRest,
     dismissRest,
+    beginPractice,
+    endPractice,
     restEndsAt,
     restLabel,
     restRemainingMs,

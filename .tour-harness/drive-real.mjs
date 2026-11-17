@@ -46,6 +46,8 @@ const evalJs = async expr => {
   return r.result?.result?.value
 }
 let failures = 0
+let practiceSaved = null
+let practiceBefore = null
 const check = (name, ok, detail) => {
   if (ok) console.log(`  ✓ ${name}`)
   else { failures++; console.error(`  ✗ ${name}${detail !== undefined ? ` — ${JSON.stringify(detail)}` : ''}`) }
@@ -220,6 +222,7 @@ while (guard++ < 40) {
     // A ROW WITH NO WEIGHT TO OFFER is the whole row, not its ✓: the tour
     // asks for a weight to be typed, so the box has to be reachable through
     // the spotlight. Follow the instruction the way a person would.
+    if (key === 'setrow') practiceBefore = await evalJs(`(window.__fakeDb?.exercise_set_logs ?? []).length`)
     const needsWeight = key === 'setrow' && await evalJs(`(() => { const el = document.querySelector('[data-tour="setrow"]'); return !!el && el.getAttribute('data-needs-weight') === 'true' })()`)
     if (needsWeight && !typedWeightRow) {
       typedWeightRow = true
@@ -251,10 +254,19 @@ while (guard++ < 40) {
     check(`${label}: the real ${key} is reachable through the hole`, res === 'ok', res)
     if (res !== 'ok') break
     await wait(1600)
+    // THE SET STOP IS PRACTICE (his ruling 17 Nov 2026): the tap really saves, so he sees it work...
+    if (key === 'setrow') practiceSaved = await evalJs(`(window.__fakeDb?.exercise_set_logs ?? []).length`) - (practiceBefore ?? 0)
   } else {
     await clickCta(); await wait(1100)
   }
 }
+// ...and once the tour has moved on, it is gone: nothing counts, the coach never sees it, and today is not started.
+await wait(2500)
+await evalJs(`location.hash = '#/tab/exercise'`)
+await wait(1500)
+const afterTour = await evalJs(`({ sets: (window.__fakeDb?.exercise_set_logs ?? []).length, running: /Session running/.test(document.body.innerText) || !document.querySelector('[data-testid="hero-start"]') })`)
+check('the tour\'s practice set was really saved while its stop was showing', practiceSaved === 1, practiceSaved)
+check('...and is taken back off once the tour moves on, with no session left running (Exercise offers Start again)', afterTour?.sets === practiceBefore && afterTour?.running === false, afterTour)
 if (errors.length) console.log('\n  page errors: ' + errors.slice(0, 3).join(' | '))
 console.log(failures === 0 ? '\nEvery stop landed on its real target.\n' : `\n${failures} FAILED\n`)
 chrome.kill(); server.close()
