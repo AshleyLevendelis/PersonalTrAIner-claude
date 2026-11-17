@@ -2,6 +2,32 @@
 
 Newest first. One line each.
 
+- [x] **THE CHAT REVIEW, BUILT (17 Nov 2026, his "Build it all" on a merged list of my suggestions and another session's)**.
+  His rulings that day, each from three options: **"One line, numbers on tap"** (an offer is its lead; a cost is always
+  shown; the rest is behind Details); **"Eaten stay, later ones fit"** (already the app's behaviour since 10 Oct, so
+  recorded, not rebuilt); **"All at once"** (no word-by-word replay); **"Read it, then discard"** (a photo is sent once
+  and never stored). Built and checked: (1) offer fixes, each confirmed in the code first: amounts only he said (a
+  swap with none is sized to the replaced food's calories and says so; an addition with a guessed amount asks), no
+  "raw"/"dry" in dish names, USDA sweet potato sizes (small 60 / medium 114 / large 180 g baked; "2 large" had cost
+  262 g), no "Just today" choice he already answered, the "usual share" line only past the day's 5% band, a meal edit
+  for another day priced on that day (it used today's); (2) speed: replies at once, the turn's reads in parallel and
+  before the placeholder, timing lines in the coach's logs; (3) memory: a running summary of what left the 20-message
+  window, written by a short coach call and kept only with no new number and no clinical label (migration
+  `20261117120000_add_chat_summary`, phone copy until then); (4) patterns, CSCS mine: a lift stuck three sessions at
+  one weight with no rep gained (the standard double-progression stall; two is noise), protein under 80% on his last
+  three LOGGED days (one off day is not a pattern, an unlogged day is never a low day), "Too hard" on three lifts in
+  a week (his own answer, not a guess); the coach is told to coach to at most one, once; (5) photos of a meal, menu or
+  label, with an app net that takes out any "safe"/"X-free" sentence on a photo turn; (6) starters on an empty chat,
+  Undo after Clear (the delete waits ten seconds, runs at once if the app hides), "Session done" opens Exercise, and a
+  long reply now stops at his message (a queued jump to the bottom checks it still applies; sending jumps instantly).
+  Checks: test:chat-speed (10, 5/5), test:offer-fixes (33, 15 mutations), test:chat-extras (11), verify:chat-clear-undo
+  (8, 3/3), test:chat-summary (23, 8/8), test:coach-patterns (19, 11/11), test:meal-photos (16, 7/7),
+  verify:chat-send-scroll re-run; five offer drivers now open Details as he would (driver-kit OPEN_OFFER_DETAILS_SCRIPT).
+  **NOT BUILT, waiting for the exam (rule 5)**: caching the coach's fixed instructions, sending only the tools a message
+  needs, streaming (`docs/plans/coach-speed.md`). Not proven: anything the model does with the memory, patterns or
+  photo lines (exam after the `chat-gemini` deploy); photos never run on a real phone; one mutation of the long-reply
+  anchor read MISSED by the harness while a direct run showed the defect (timing-sensitive; noted, not resolved).
+  Needs: the `chat-gemini` deploy and the chat_summary migration.
 - [x] **STAGES 2, 3 AND 4 OF "THE COACH REACHES EVERYTHING" (17 Nov 2026, his "Merge and start step 2 then 3 then 4. Don't ask for my Merge confirmation")** (`docs/plans/coach-reaches-everything.md`).
   **STAGE 2, TEST THE COACH THE WAY HE USES IT.** (1) Seven exam cases from November reports (one-off class tonight, an answer about how he felt, shifts, a fortnight away, pregnancy and eating less, the squat racks taken, "not a fan of the salmon"); 57 cases. (2) The app's refusal of a coach offer now names the tool and rule in the response (`offerRefused`, never his words); the exam runner records it and the report has a new section, THE APP CAUGHT, counting by tool which offers the coach reached for that his words did not allow: not a breach, the prompt work list. (3) `verify:chat-real-day`: one conversation through a day, the coach stubbed to make each known mistake (a ban off "today", a standing class off "tonight", today's shorten off "from now on", a run off a maybe); every one refused, and the right offers made the same day still arrive with Apply. (4) **FOUND AND FIXED**: a ban arrives at the app as `propose_exercise_ban`, not `ban_exercise`, so the app's own backstop never checked it ("I don't want squats today" turned into a ban); card names now map to their tool's rule, derived from the server. (5) `docs/handover/after-every-coach-deploy.md`: the exam after every coach deploy, with the live refusal count read from the function logs (tool and rule only). Decision 2 of the plan (counting refusals) built WITHOUT a new table: the log line and the exam report carry it, no migration. Checks: test:coach-exam-grader §13 (4 checks, 4 mutations), test:coach-exam-runner [4d] (4, 2), verify:chat-silent-tools (+2, 2), test:offer-rules (+3, 3), verify:chat-real-day (20 checks, 3 mutations), all caught.
   **STAGE 3, ONE PICTURE.** A survey of every figure the coach is given (investigator, from the code) found most already share the screens' readers and four did not. Now: today's "N of M sets" is the chat strip's own count off the same dated cell (it read a different session row after a move or swap); calories left is sent as the strip's own line and the coach is told to quote it, never subtract (it did the arithmetic itself, on a separate read); the "week has turned over" moment uses whole local days like every screen (it used milliseconds from the creation instant, so a plan made at 22:00 turned over at 22:00); which meal events count as eaten is one function for the screens' total and the coach's history (two copies before). `src/lib/coach-screen-numbers.ts`; test:coach-screen-numbers (20 checks; 9 mutations, 8 caught, the 9th a wording-only edit of the prompt line, recorded as equivalent). test:chat-2b re-anchored onto the shared readers (2 mutations caught). NOT done: latest weight, the week's "N of M" readers' inputs, and the BMR/TDEE derivation still come by different routes (survey rows 10, 13, 16); named, not built.

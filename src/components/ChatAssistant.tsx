@@ -16,7 +16,7 @@ import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { weekdayLong, dayLabel } from '@/lib/day-labels'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, Activity, ChevronRight, Check, PlayCircle, Timer } from 'lucide-react'
+import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, Activity, ChevronRight, Check, PlayCircle, Timer, Camera } from 'lucide-react'
 import { formVideoFor, linkifyBareUrls, sessionVideosFor } from '@/lib/exercise-video'
 import { parseTimerSuggestion, type TimerSuggestion } from '@/lib/timer-engine'
 import { startLabel } from '@/lib/round-setup'
@@ -39,6 +39,7 @@ import { supabase } from '@/lib/supabase'
 import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { chatStarters } from '@/lib/chat-starters'
+import { preparePhoto, photoMessageText } from '@/lib/photo-prepare'
 import { stuckLifts, lowProtein, tirednessBuilding, coachPatternLines } from '@/lib/coach-patterns'
 import { loadChatSummary, saveChatSummaryLocally, messagesToSummarise, nextSummary, type ChatSummary } from '@/lib/chat-summary'
 import { isMissingColumnError } from '@/lib/missing-column'
@@ -893,6 +894,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     return () => unsubs.forEach(u => u())
   }, [])
   const [workoutLogHistory, setWorkoutLogHistory] = useState('')
+  /** A photo attached to the next message (photo-prepare.ts): sent once with it, then dropped. */
+  const [photo, setPhoto] = useState<{ mime: 'image/jpeg'; data: string } | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const sendingPhotoRef = useRef<{ mime: 'image/jpeg'; data: string } | null>(null)
   /** The same 14 days of sets, as rows, for the patterns the app looks for (coach-patterns.ts). */
   const recentLogsRef = useRef<ExerciseSetLog[]>([])
   const [cardioLogHistory, setCardioLogHistory] = useState('')
@@ -2062,7 +2067,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // Fix #4: System prompt context assembled once per call, separate from conversation window
   // eatenByDay: read fresh by callGemini for this turn (H26); null = the log could not be read.
   // weekReview: this week and last, Monday to Sunday, as the strip counts them (run 7, M50); null = unread.
-  const buildContext = (eatenByDay: string | null = null, weekReview: string | null = null) => {
+  const buildContext = (eatenByDay: string | null = null, weekReview: string | null = null, patterns: string[] = []) => {
     const activeWeek = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, getAppNow(profile.id), mesocycle.length > 0 ? mesocycle.length : 4)
     // Split out from `.days` (not just `?.days || exercisePlan` inline) so
     // the week's own coach_note is still reachable below — that's where a
@@ -2349,6 +2354,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       upcoming_meal_summary: buildCoachUpcomingSummary(upcomingMeals ?? []),
       // THE RUNNING SUMMARY OF OLDER CHATS (17 Nov 2026): what has left the 20-message window, checked (chat-summary.ts).
       chat_summary: chatSummaryRef.current?.text ?? null,
+      // PATTERNS THE APP SEES (coach-patterns.ts), worked out this turn with the eaten log.
+      patterns_seen: patterns.length > 0 ? patterns.join('\n') : null,
       // WHAT THEY LOGGED AS EATEN, today and the seven days before (H26). The
       // flag says it was read, so the coach can tell "nothing logged" from
       // "could not see".
@@ -2740,14 +2747,17 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       body: JSON.stringify({
         message: userMessage,
         history,
-        context: { ...buildContext(eatenByDay, weekReview), patterns_seen: patterns.length > 0 ? patterns.join('\n') : null },
+        context: buildContext(eatenByDay, weekReview, patterns),
         // THE ROW THIS REPLY GOES IN (6 Nov 2026): the coach's server saves the
         // reply there itself and texts her phone if she has left the app, so a
         // reply is never lost to a closed page. It writes only into this row.
         placeholder_id: placeholderId ?? null,
+        // THE PHOTO, ONCE (his "Read it, then discard"): not saved anywhere; the server reads it for this turn only.
+        ...(sendingPhotoRef.current ? { image: sendingPhotoRef.current } : {}),
       }),
       signal: controller.signal,
     })
+    sendingPhotoRef.current = null
     clearTimeout(timeout)
 
     if (!response.ok) {
@@ -7078,11 +7088,14 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   }
 
   const sendMessage = async () => {
-    if (!input.trim() || isLoading) return
+    if ((!input.trim() && !photo) || isLoading) return
     if (navigator.vibrate) navigator.vibrate(10)
 
     // A phone's curly apostrophe is made plain before the app's readers see it (plainTyped, QA 14 Nov 2026).
-    const userText = plainTyped(input.trim())
+    // A PHOTO goes with this one message and is then dropped; the chat keeps only a line saying one was sent.
+    sendingPhotoRef.current = photo
+    setPhoto(null)
+    const userText = photo ? photoMessageText(plainTyped(input.trim())) : plainTyped(input.trim())
     const now = new Date().toISOString()
     const userMessage: ChatMessage = { role: 'user', content: userText, status: 'complete', created_at: now }
     setMessages(prev => [...prev, userMessage])
@@ -8867,7 +8880,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // ONE ROUND BUTTON, THE WHATSAPP WAY (Ashley, 6 Nov 2026, with screenshots):
   // the mic while the box is empty, send as soon as there is text. It stays the
   // mic while she is dictating (as "stop"), even as her words fill the box.
-  const showMic = speech.isSupported && (speech.isListening || !input.trim())
+  const showMic = speech.isSupported && (speech.isListening || (!input.trim() && !photo))
   const dockOffsetPx = dockHeightPx > 0 ? dockHeightPx + (composerKeyboardOpen ? 16 : 12) : 0
   const chatScreenBottom = composerKeyboardOpen
     ? `${composerInsetPx + dockOffsetPx}px`
@@ -9382,7 +9395,37 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       {/* DESIGN 2b (31 Oct 2026): a 52px pill, and since 6 Nov 2026 ONE button in
           it (her WhatsApp ruling): the mic while the box is empty, send once
           there is text. Where the phone cannot listen, it is always send. */}
-      <div data-testid="chat-composer-pill" className="flex min-h-[52px] items-end gap-1.5 rounded-[26px] border border-[color:var(--hairline)] bg-[color:var(--surface-raised)] py-[3px] pl-4 pr-[3px]">
+      {photo && (
+        <div data-testid="chat-photo-attached" className="mb-1.5 flex items-center justify-between gap-3 px-2 text-[0.8125rem] text-muted-foreground">
+          <span>Photo attached. It is read once and not kept.</span>
+          <button type="button" onClick={() => setPhoto(null)} className="inline-flex min-h-[44px] items-center font-semibold text-primary-text">Remove</button>
+        </div>
+      )}
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        hidden
+        data-testid="chat-photo-input"
+        onChange={async e => {
+          const file = e.target.files?.[0]
+          e.target.value = ''
+          if (!file) return
+          const prepared = await preparePhoto(file)
+          if (prepared) setPhoto(prepared)
+        }}
+      />
+      <div data-testid="chat-composer-pill" className="flex min-h-[52px] items-end gap-1.5 rounded-[26px] border border-[color:var(--hairline)] bg-[color:var(--surface-raised)] py-[3px] pl-1 pr-[3px]">
+        <button
+          type="button"
+          data-testid="chat-photo-button"
+          aria-label="Add a photo of a meal, menu or label"
+          onClick={() => photoInputRef.current?.click()}
+          className="flex size-11 shrink-0 items-center justify-center rounded-full text-muted-foreground"
+        >
+          <Camera className="size-5" />
+        </button>
         <Textarea
           ref={composerRef}
           value={input}
@@ -9401,7 +9444,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             data-composer-lead=""
             {...keepsComposerFocus}
             onClick={() => { sendMessage(); refocusComposer(composerRef.current) }}
-            disabled={!input.trim() || isLoading}
+            disabled={(!input.trim() && !photo) || isLoading}
             size="icon"
             variant="default"
             className="hit-slop-44 size-11 shrink-0 rounded-full glow-mint-box"

@@ -8,6 +8,7 @@ import { deliverReply, type ReplyPushDeps } from "./reply-push.ts";
 import { pushServer, sendPush } from "../_shared/push.ts";
 import type { NotificationSettings } from "../_shared/coach-moments.ts";
 import { GEMINI_MODEL, coachShortLine } from "../_shared/gemini.ts";
+import { withoutPhotoAllergenClaims, PHOTO_MAX_BASE64, PHOTO_MIME } from "../_shared/photo-safety.ts";
 import { writeOpener } from "../_shared/reminder-writer.ts";
 import { voicePass } from "./voice-pass.ts";
 import { answerFirst } from "./answer-first.ts";
@@ -2215,13 +2216,25 @@ interface ConcurrentActivity {
 // texted to her phone (6 Nov 2026, "like a WhatsApp notification"): see
 // reply-push.ts. After the response, never before it, so she never waits on a
 // push to see her answer; and a failure there never touches the reply itself.
+async function withoutPhotoClaims(res: Response): Promise<Response> {
+  const body = await res.clone().json().catch(() => null) as { reply?: unknown } | null;
+  if (!body || typeof body.reply !== "string") return res;
+  const fixed = withoutPhotoAllergenClaims(body.reply);
+  if (fixed.removed === 0) return res;
+  console.log(`photo-safety removed=${fixed.removed}`);
+  return new Response(JSON.stringify({ ...body, reply: fixed.reply }), { status: res.status, headers: res.headers });
+}
+
 Deno.serve(async (req: Request) => {
   // WHERE THE WAIT GOES (his "make it fast", 17 Nov 2026): one line per turn with the whole time on the server, beside
   // one line per model call below. Times and sizes only, never anything he typed.
   const turnStart = Date.now();
   const request = req.method === "POST" ? await req.clone().json().catch(() => null) : null;
   // ...and a sentence quoting a past lift his logged sets do not hold leaves it too (past-performance.ts).
-  const res = await guardPastLifts(await cleanCoachResponse(await handleChatRequest(req)), (request as { context?: { workout_log_history?: unknown } } | null)?.context?.workout_log_history);
+  const guarded = await guardPastLifts(await cleanCoachResponse(await handleChatRequest(req)), (request as { context?: { workout_log_history?: unknown } } | null)?.context?.workout_log_history);
+  // A PHOTO NEVER MAKES A FOOD ALLERGY-SAFE (17 Nov 2026): on a turn with a photo, a "safe" / "X-free" sentence leaves
+  // the reply and the app's own line is said instead (_shared/photo-safety.ts). Every other turn passes untouched.
+  const res = (request as { image?: unknown } | null)?.image ? await withoutPhotoClaims(guarded) : guarded;
   if (request && (request as { placeholder_id?: unknown }).placeholder_id) {
     const job = (async () => {
       const body = await res.clone().json().catch(() => null);
@@ -3117,7 +3130,9 @@ UPCOMING MEALS — the next six days, exactly as the Nutrition tab's day strip s
 ${context.upcoming_meal_summary}` : ''}
 ${context.show_numbers === false ? `
 NUMBERS OFF (his Profile setting, the starter tier): he chose not to see calories or macros. Never quote a calorie, kcal, gram or macro figure to him, even when the data below has one; talk about meals, portions (a palm of protein, a fist of carbs) and how the day went. Weights on the bar and minutes are fine.
-` : ''}${typeof context.patterns_seen === 'string' && context.patterns_seen.trim() ? `
+` : ''}${body?.image ? `
+THIS MESSAGE CAME WITH A PHOTO (read once; the app keeps only what you estimate). A MEAL: name what you see and estimate each food's amount in grams, say it is an estimate from a photo, and log it with log_meal only if he says he ate it or asks you to (the card shows your estimate before he applies it). A MENU: suggest two or three orders that suit his targets, with a reason each. A LABEL: read the per-100g figures and the pack size back to him and ask him to check them. NEVER say from a photo that a food is safe, or free of an allergen: a photo cannot show a sauce, a coating or a kitchen. If an allergy comes up, say he must check the label or ask the kitchen.
+` : ''}` : ''}${typeof context.patterns_seen === 'string' && context.patterns_seen.trim() ? `
 PATTERNS THE APP SEES IN THEIR LOGS (facts the app worked out; nothing here is a diagnosis):
 ${String(context.patterns_seen).slice(0, 800)}
 Coach to AT MOST ONE of these, once, and only when it fits the conversation (never as an opener to an unrelated question). A stuck lift: name it and offer one fix (a rep target to beat before adding weight, or a small drop and rebuild). Low protein: one easy addition from foods they already eat. "Too hard" piling up: ask how sleep and recovery are, and offer a lighter day. One or two sentences, never a lecture, never a number not in these lines.
@@ -3216,7 +3231,11 @@ Keep this context in mind to ensure your greetings and questions naturally align
       }
     }
 
-    contents.push({ role: "user", parts: [{ text: message }] });
+    // A PHOTO WITH THE MESSAGE (17 Nov 2026, the chat review; his ruling "Read it, then discard"): sent to the model with
+    // this one turn and kept nowhere, here or in the chat. Only a jpeg, png or webp under the size cap is passed on.
+    const photo = body?.image && typeof body.image === "object" && typeof body.image.data === "string" && PHOTO_MIME.test(String(body.image.mime ?? ""))
+      && body.image.data.length <= PHOTO_MAX_BASE64 ? { mimeType: String(body.image.mime), data: body.image.data as string } : null;
+    contents.push({ role: "user", parts: photo ? [{ inlineData: photo }, { text: message }] : [{ text: message }] });
 
     // ONE FUNCTION FOR EVERY MODEL CALL THIS TURN. The first leg runs with
     // tools. The second pass a tool handler may run afterwards (tool-reply.ts)

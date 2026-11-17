@@ -86,7 +86,7 @@ async function main() {
   const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
   check('the weeks come from readTrainingWeeks, the reader Home uses', (() => { const i = chat.indexOf('const readTurnFacts = async'); const body = i < 0 ? '' : chat.slice(i, chat.indexOf('const callGemini = async', i)); return /readTrainingWeeks\(profile\.id, eatenToday, liveWeekDays/.test(body) && /const turnFacts = readTurnFacts\(\)/.test(chat) })())
   check('...the block is built from them and the meal totals for those dates', /buildCoachWeekReview\(reviewWeeks, await getEatenByDate\(profile\.id, weekReviewDates\(reviewWeeks\.lastWeek, eatenToday\)\)/.test(chat))
-  check('...and the request carries it', /context: buildContext\(eatenByDay, weekReview\)/.test(chat) && /week_review: weekReview,/.test(chat) && /week_review_read: weekReview != null,/.test(chat))
+  check('...and the request carries it', /context: buildContext\(eatenByDay, weekReview[,)]/.test(chat) && /week_review: weekReview,/.test(chat) && /week_review_read: weekReview != null,/.test(chat))
 
   console.log('\n4. The coach is shown it and told how to use it')
   const prompt = strip(readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8'))

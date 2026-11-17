@@ -28,8 +28,14 @@ const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/cs
  * @param {{ port: number, page: string, name: string, width?: number, height?: number, mobile?: boolean, timeoutMs?: number }} o
  *   `page` is the harness page to serve at "/", e.g. 'real.html'. `mobile: false` is a DESKTOP window (real scrollbars).
  */
+/** Opens every offer's "Details" as it appears (the tap he makes), for drivers whose subject is what an offer says. */
+export const OPEN_OFFER_DETAILS_SCRIPT = `
+  new MutationObserver(() => { for (const b of document.querySelectorAll('[data-testid="offer-details-toggle"][aria-expanded="false"]')) { if (!b.dataset.autoOpened) { b.dataset.autoOpened = '1'; b.click() } } })
+    .observe(document, { childList: true, subtree: true })
+`
+
 export async function startDriver(o) {
-  const { port, page, name, width = 390, height = 844, mobile = true, timeoutMs = 240_000 } = o
+  const { port, page, name, width = 390, height = 844, mobile = true, timeoutMs = 240_000, openOfferDetails = false } = o
   // NO NETWORK AT ALL, for the page and for a service worker alike (10 Nov 2026, verify:gym-offline): while `down`,
   // every request dies on the wire. A page-level "offline" switch leaves a worker's own fetches working, so it cannot
   // show that a file came from the phone's cache; nothing answering can.
@@ -82,6 +88,10 @@ export async function startDriver(o) {
     writeFileSync(new URL(`./${file}.png`, import.meta.url).pathname, Buffer.from(s.result.data, 'base64'))
   }
   await send('Page.enable'); await send('Runtime.enable')
+  // OFFER DETAILS OPENED, for a driver whose subject is what an offer SAYS (17 Nov 2026, his "One line, numbers on
+  // tap"): the change rows, what stays and what happens next now sit behind "Details". Opening them is the tap he
+  // makes; the collapsed default itself is held by verify:offer-details, which leaves this off.
+  if (openOfferDetails) await send('Page.addScriptToEvaluateOnNewDocument', { source: OPEN_OFFER_DETAILS_SCRIPT })
   if (mobile) await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 2, mobile: true })
   else await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: 1, mobile: false })
 
