@@ -665,7 +665,7 @@ export async function rebuildAgainstProfile(
       label: original.label,
       phase_label: original.phase_label,
     }
-    const spliced = keepDays(original, identity, mayChange)
+    const spliced = keepDays(original, restoreDisplacedSessions(original, identity, mayChange), mayChange)
     return carryHerChoices(original, spliced, cautiousWeek ? cautiousProfile : clone, exclusions, mayChange, calibrates(mesocycle))
   }))
 }
@@ -737,7 +737,34 @@ async function carryHerChoices(
     }
   }
   for (const dayName of touched) week = settleWeek(week, dayName, profile).week
-  return week
+  // THE TAIL WORKS ON THE WHOLE WEEK, so the kept days are put back after it (his report 17 Nov 2026: a rebuild card
+  // said "days you've already trained stay exactly as they are" and listed today's finished session as "new
+  // exercises"; settleWeek's week-wide passes had reached it). Protected is a property of the result.
+  return keepDays(original, week, mayChange)
+}
+
+/**
+ * A KEPT DAY CANNOT LEAVE THE WEEK HOLDING ONE SESSION TWICE AND ANOTHER NOT AT ALL (his report 17 Nov 2026: a
+ * rebuild kept Tuesday's trained Pull & Hinge, the fresh week had moved Pull & Hinge to Thursday and put Upper Pull &
+ * Core on Tuesday, so the week read Pull & Hinge twice and lost Upper Pull & Core). The fresh week is generated
+ * without knowing which days are kept; when a kept day's session turns up again on a day that may change, and the
+ * session the kept day displaced is nowhere else in the week, that day gets the displaced session instead.
+ * Basis (CSCS): the week's split exists to cover every pattern once per rotation; the same session twice in a week
+ * with another missing is a coverage loss, not a schedule choice. Day-level cardio stays with the day it was put on.
+ */
+export function restoreDisplacedSessions(original: MesocycleWeek, fresh: MesocycleWeek, mayChange: (dayName: string) => boolean): MesocycleWeek {
+  let days = fresh.days
+  for (const kept of original.days) {
+    if (mayChange(kept.day) || kept.exercises.length === 0) continue
+    const displaced = fresh.days.find(d => d.day === kept.day)
+    if (!displaced || displaced.exercises.length === 0 || displaced.focus === kept.focus) continue
+    const finalFoci = days.map(d => (mayChange(d.day) ? d.focus : original.days.find(o => o.day === d.day)?.focus ?? d.focus))
+    if (finalFoci.includes(displaced.focus)) continue
+    const twin = days.find(d => mayChange(d.day) && d.day !== kept.day && d.focus === kept.focus && d.exercises.length > 0)
+    if (!twin) continue
+    days = days.map(d => (d === twin ? { ...displaced, day: twin.day, recommendedCardio: twin.recommendedCardio } : d))
+  }
+  return days === fresh.days ? fresh : { ...fresh, days }
 }
 
 export interface RebuildForWeightBasisParams {
