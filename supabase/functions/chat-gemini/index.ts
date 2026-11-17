@@ -2216,6 +2216,9 @@ interface ConcurrentActivity {
 // reply-push.ts. After the response, never before it, so she never waits on a
 // push to see her answer; and a failure there never touches the reply itself.
 Deno.serve(async (req: Request) => {
+  // WHERE THE WAIT GOES (his "make it fast", 17 Nov 2026): one line per turn with the whole time on the server, beside
+  // one line per model call below. Times and sizes only, never anything he typed.
+  const turnStart = Date.now();
   const request = req.method === "POST" ? await req.clone().json().catch(() => null) : null;
   // ...and a sentence quoting a past lift his logged sets do not hold leaves it too (past-performance.ts).
   const res = await guardPastLifts(await cleanCoachResponse(await handleChatRequest(req)), (request as { context?: { workout_log_history?: unknown } } | null)?.context?.workout_log_history);
@@ -2229,6 +2232,7 @@ Deno.serve(async (req: Request) => {
     if (runtime?.waitUntil) runtime.waitUntil(job);
     else await job;
   }
+  console.log(`timing turn ms=${Date.now() - turnStart} status=${res.status}`);
   return res;
 });
 
@@ -3194,8 +3198,9 @@ Keep this context in mind to ensure your greetings and questions naturally align
     // what the tool did, and cannot call a second tool the single-call
     // executor below would never run. The spend cap above counts the
     // request, not the calls (see _shared/spend-cap.ts).
-    const callGemini = async (turns: unknown[], withTools = true) =>
-      await fetch(
+    const callGemini = async (turns: unknown[], withTools = true) => {
+      const callStart = Date.now();
+      const r = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`,
         {
           method: "POST",
@@ -3219,6 +3224,9 @@ Keep this context in mind to ensure your greetings and questions naturally align
           }),
         }
       );
+      console.log(`timing model-call ms=${Date.now() - callStart} tools=${withTools} prompt_chars=${systemPrompt.length} turns=${turns.length}`);
+      return r;
+    };
     /** A leg for tool-reply.ts: never throws and never returns a Response. */
     const callLeg = async (turns: unknown[], withTools: boolean): Promise<GeminiLegResult> => {
       try {

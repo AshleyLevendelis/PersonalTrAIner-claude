@@ -2595,7 +2595,33 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   }
 
 
-  const callGemini = async (userMessage: string, placeholderId?: string): Promise<ChatApiResponse> => {
+  // THE TURN'S FACTS, READ TOGETHER (his "make it fast", 17 Nov 2026). These were four reads one after another, and the
+  // reply placeholder was saved before any of them started. Now the independent ones run at once, and sendMessage
+  // starts them before it saves the placeholder, so the wait is the slowest read rather than the sum.
+  const readTurnFacts = async (): Promise<{ eatenByDay: string | null; weekReview: ReturnType<typeof buildCoachWeekReview> | null }> => {
+    // THIS TURN'S EATEN LOG, read now rather than from a copy loaded earlier, so
+    // a meal logged on Nutrition a moment ago is in it (H26).
+    const eatenToday = getLocalDateString(getAppNow(profile.id))
+    if (!profile.id) return { eatenByDay: null, weekReview: null }
+    const [todayEaten, weekEaten, reviewWeeks] = await Promise.all([
+      getEatenByDate(profile.id, eatenWindow(eatenToday)).catch(() => null),
+      // THE WEEK'S AVERAGE (slice 4d), the same line Nutrition's Week view shows, on the end of the eaten summary so the
+      // coach reads it without a new field: a day over is not a failure if the week lands, and nothing is cut to make up.
+      macros ? getEatenByDate(profile.id, finishedDaysThisWeek(eatenToday)).catch(() => null) : Promise.resolve(null),
+      // THE WEEK AS THE SCREENS COUNT IT (run 7, M50): this week and last, Monday to Sunday, each day in the
+      // strip's own words, with that day's logged meals, read now for this turn.
+      readTrainingWeeks(profile.id, eatenToday, liveWeekDays, mesocycle, planCreatedAt ?? profile.created_at, trainingWeek.moves).catch(() => null),
+    ])
+    const eatenSummary = buildCoachEatenSummary(todayEaten, eatenToday)
+    const weekAvg = eatenSummary != null && weekEaten && macros ? weeklyAverage(weekEaten, eatenToday, macros) : null
+    const eatenByDay = eatenSummary != null && weekAvg ? `${eatenSummary}\n${weeklyAverageLine(weekAvg)}` : eatenSummary
+    const weekReview = reviewWeeks
+      ? buildCoachWeekReview(reviewWeeks, await getEatenByDate(profile.id, weekReviewDates(reviewWeeks.lastWeek, eatenToday)).catch(() => null), eatenToday)
+      : null
+    return { eatenByDay, weekReview }
+  }
+
+  const callGemini = async (userMessage: string, placeholderId?: string, facts?: ReturnType<typeof readTurnFacts>): Promise<ChatApiResponse> => {
     // Fix #4: Only send conversation turns (last 20), context goes separately as system prompt
     // EVERY TURN SAYS WHEN IT WAS SAID — see stampTurnTime. History is
     // restored with no date filter, so this morning's conversation is replayed
@@ -2611,27 +2637,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // read as an open one. The outcome goes on first, the time around it.
       .map(m => ({ role: m.role, content: stampTurnTime(m.role === 'assistant' ? stampTurnOutcome(m.content, turnOutcomeOf(m)) : m.content, m.created_at, historyNow) }))
 
-    // THIS TURN'S EATEN LOG, read now rather than from a copy loaded earlier, so
-    // a meal logged on Nutrition a moment ago is in it (H26).
-    const eatenToday = getLocalDateString(getAppNow(profile.id))
-    const eatenSummary = profile.id
-      ? buildCoachEatenSummary(await getEatenByDate(profile.id, eatenWindow(eatenToday)).catch(() => null), eatenToday)
-      : null
-    // THE WEEK'S AVERAGE (slice 4d), the same line Nutrition's Week view shows, on the end of the eaten summary so the
-    // coach reads it without a new field: a day over is not a failure if the week lands, and nothing is cut to make up.
-    const weekEaten = profile.id && macros && eatenSummary != null
-      ? await getEatenByDate(profile.id, finishedDaysThisWeek(eatenToday)).catch(() => null)
-      : null
-    const weekAvg = weekEaten && macros ? weeklyAverage(weekEaten, eatenToday, macros) : null
-    const eatenByDay = eatenSummary != null && weekAvg ? `${eatenSummary}\n${weeklyAverageLine(weekAvg)}` : eatenSummary
-    // THE WEEK AS THE SCREENS COUNT IT (run 7, M50): this week and last, Monday to Sunday, each day in the
-    // strip's own words, with that day's logged meals, read now for this turn.
-    const reviewWeeks = profile.id
-      ? await readTrainingWeeks(profile.id, eatenToday, liveWeekDays, mesocycle, planCreatedAt ?? profile.created_at, trainingWeek.moves).catch(() => null)
-      : null
-    const weekReview = reviewWeeks && profile.id
-      ? buildCoachWeekReview(reviewWeeks, await getEatenByDate(profile.id, weekReviewDates(reviewWeeks.lastWeek, eatenToday)).catch(() => null), eatenToday)
-      : null
+    const { eatenByDay, weekReview } = await (facts ?? readTurnFacts())
 
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat-gemini`
     const controller = new AbortController()
@@ -7036,6 +7042,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // Save user message immediately (fire-and-forget, 0ms latency)
     persistUserMessage(userText)
 
+    // The turn's facts start reading NOW, alongside the placeholder save, not after it.
+    const turnFacts = readTurnFacts()
+    turnFacts.catch(() => {})
     // Insert DB placeholder for assistant response
     const placeholderId = await insertPlaceholder()
 
@@ -7058,7 +7067,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     let coachSavedAFoodDislike = false
     try {
-      const result = await callGemini(userText, placeholderId)
+      const result = await callGemini(userText, placeholderId, turnFacts)
       // Either road the coach took with a food dislike (an outright save, or a record_fact proposal the turn above turns
       // into the question) means the turn has dealt with it: the backstop below must not ask a second time.
       const dislikeFact = (kind: unknown, a: Record<string, unknown> | undefined) => kind === 'record_fact' && a?.kind === 'food_preference' && a?.polarity !== 'like'

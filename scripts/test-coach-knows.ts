@@ -56,13 +56,17 @@ console.log('\n1. What they logged as eaten, per day (H26)')
   check('a log that could not be read is null, never a week of zeros', buildCoachEatenSummary(null, today) === null)
 }
 
+const turnFactsBody = (chat: string) => { const i = chat.indexOf('const readTurnFacts = async'); return i < 0 ? '' : chat.slice(i, chat.indexOf('const callGemini = async', i)) }
 console.log('\n2. The coach is handed it, read fresh for the turn')
 {
   const chat = strip(read('src/components/ChatAssistant.tsx'))
   const store = strip(read('src/lib/meal-store.ts'))
   check('the message reads the eaten log as it is sent',
-    // Since strategy slice 4 the summary is read into eatenSummary and the week's average is put on its end.
-    /const eatenSummary = profile\.id\s*\?\s*buildCoachEatenSummary\(await getEatenByDate\(profile\.id, eatenWindow\(eatenToday\)\)/.test(chat)
+    // Since strategy slice 4 the summary is read into eatenSummary and the week's average is put on its end. Since
+    // 17 Nov 2026 the turn's reads run together in readTurnFacts, which sendMessage starts afresh for every message.
+    /getEatenByDate\(profile\.id, eatenWindow\(eatenToday\)\)/.test(turnFactsBody(chat))
+    && /const eatenSummary = buildCoachEatenSummary\(todayEaten, eatenToday\)/.test(turnFactsBody(chat))
+    && /const turnFacts = readTurnFacts\(\)/.test(chat)
     && /const eatenByDay = eatenSummary != null && weekAvg \? `\$\{eatenSummary\}\\n\$\{weeklyAverageLine\(weekAvg\)\}` : eatenSummary/.test(chat))
   check('...and builds this turn\'s context from it', /context: buildContext\(eatenByDay[,)]/.test(chat))
   check('...as a block, and whether it could be read', /eaten_by_day: eatenByDay,/.test(chat) && /eaten_by_day_read: eatenByDay != null,/.test(chat))
