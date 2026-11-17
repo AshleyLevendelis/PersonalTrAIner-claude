@@ -145,6 +145,7 @@
     "test:deploy-path": "tsx scripts/test-deploy-path.ts",
     "test:functions-deployable": "tsx scripts/test-functions-deployable.ts",
     "test:exercise-demo": "tsx scripts/test-exercise-demo.ts",
+    "verify:muscle-map": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/muscle-map.mjs",
     "test:plate-math": "tsx scripts/test-plate-math.ts",
     "check:demo-coverage": "tsx scripts/check-demo-coverage.ts",
     "test:meal-log": "tsx scripts/test-meal-log.ts",
