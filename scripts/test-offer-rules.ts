@@ -27,11 +27,13 @@ const noReason = Object.entries(OFFER_RULES).filter(([, r]) => 'none' in r && !(
 check('a tool with no words rule says what checks it instead', noReason.length === 0, noReason)
 const ruled = Object.entries(OFFER_RULES).filter(([, r]) => 'words' in r).map(([t]) => t)
 check('the lasting changes, the one-day changes and the something-on-a-day ones are all ruled',
-  ['propose_concurrent_activity', 'propose_schedule_change', 'propose_goal_change', 'propose_session_length', 'ban_exercise', 'propose_volume_change',
+  ['propose_concurrent_activity', 'propose_schedule_change', 'propose_session_length', 'ban_exercise', 'propose_volume_change',
     'propose_session_shorten', 'propose_session_kind_today', 'propose_rest_day', 'propose_session_move', 'propose_cardio_session'].every(t => ruled.includes(t)), ruled)
 
 // EVERY CARD THE APP CAN RECEIVE IS RULED TOO (17 Nov 2026): the app's backstop reads the card's kind, which is not
 // always the tool's name. Card kinds are read off the server's `kind: "propose_..."` returns, not listed by hand.
+// A GOAL IS LASTING BY ITS NATURE (exam 17 Nov 2026): "start building muscle instead" had been refused as a one-off.
+check('a goal change is never refused as a one-off ("...instead")', offerWordsProblem('propose_goal_change', 'I want to stop cutting and start building muscle instead', { hedged: false }) === null)
 const cardKinds = [...new Set([...server.matchAll(/kind: "(propose_[a-z_]+)"/g)].map(m => m[1]))]
 check('the card kinds are read off the server (and there are many)', cardKinds.length >= 40, cardKinds.length)
 const unruledCards = cardKinds.filter(k => !(k in OFFER_RULES) && !(CARD_KIND_TOOL[k] in OFFER_RULES))

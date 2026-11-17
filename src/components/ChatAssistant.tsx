@@ -541,6 +541,14 @@ const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan — 
 /** The cards that would put a food on her plate: a named food her restrictions keep out never gets one (H41). */
 const FOOD_OFFER_KINDS = new Set(['propose_meal_swap', 'propose_meal_addition', 'propose_custom_meal', 'propose_meal_food_add', 'propose_meal_food_replace'])
 
+/** "Most weeknights I do…", "I usually have…": a meal he already eats, which is his to size. */
+const USUAL_MEAL = /\b(?:usually|normally|typically|always|most (?:week)?(?:days|nights|mornings|evenings)|every (?:day|night|morning|evening|weekday)|my usual|my go-to)\b/i
+
+/** The meal cards a bare "I'm not a fan of X" must not jump to (it is asked about first). */
+const MEAL_CHANGE_KINDS = new Set(['propose_meal_swap', 'propose_meal_food_replace', 'propose_meal_food_remove', 'propose_meal_regenerate'])
+/** Words that ask for the change itself, so a dislike said with them is a request, not a remark. */
+const ASKS_FOR_A_CHANGE = /\b(?:swap|change|replace|switch|instead|something else|different|another|take (?:it|that|the \w+) (?:out|off)|remove|get rid)\b/i
+
 /** How long a cleared chat can be put back (the app's other Undo lines use ten seconds or more). */
 const CLEAR_UNDO_MS = 10_000
 
@@ -6204,6 +6212,20 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     /** Set when this reply is the app declining to build a card — so the history says the request is closed. */
     outcome?: TurnOutcome
   }> => {
+    // "NOT REALLY A FAN OF THE SALMON" IS ASKED ABOUT, NEVER SWAPPED ON SIGHT (coach exam 17 Nov 2026, his "Ask, and hold
+    // Tuesday"): the coach went straight to a meal swap card. A like-verb dislike with no change asked for is the
+    // question "just this meal, or never?"; asked once, by the app, before any card. "Swap it" still gets the card.
+    // A MEAL HE USUALLY EATS, DESCRIBED WITH NO AMOUNTS, IS ASKED ABOUT FIRST (coach exam 17 Nov 2026; his 1 Sep rule and
+    // his 11 Nov "My usual meals first"): the coach carded his salmon dinner with portions it made up. The app asks how
+    // much of each, in one question, and the card comes on his answer.
+    if (result.proposal && (result.proposal.kind === 'propose_meal_addition' || result.proposal.kind === 'propose_custom_meal')
+      && USUAL_MEAL.test(userSaid ?? '') && !/\d/.test(userSaid ?? '')) {
+      return { text: "Love that. How much of each do you usually have? Grams are best, or counts like \"2 eggs\".", outcome: 'refused' }
+    }
+    if (result.proposal && MEAL_CHANGE_KINDS.has(result.proposal.kind) && !ASKS_FOR_A_CHANGE.test(userSaid ?? '')) {
+      const toAsk = foodDislikesToAsk(userSaid ?? '')
+      if (toAsk.length > 0) return { text: DISLIKE_ASK.turn(toAsk), outcome: 'refused' }
+    }
     if (result.proposal && profile.id) {
       // I1: the client is the ONLY writer of pending_actions — this INSERT
       // is what actually creates the row the edge function only described.

@@ -50,7 +50,8 @@ const STATEMENT = new RegExp([
   String.raw`\b(?:i|we)\s+(?:do\s*n[o']?t|don'?t|won'?t|will\s+not|never|no\s+longer|refuse\s+to)\s+(?:eat|touch|like|do)\b`,
   String.raw`\b(?:i|we)\s+(?:can'?t|cannot|can\s+not)\s+(?:eat|have|stand)\b`,
   String.raw`\b(?:i|we)\s+(?:avoid|hate)\b`,
-  String.raw`\bnot\s+a\s+fan\s+of\b`,
+  // "not really a fan of", "not a big fan of" (coach exam 17 Nov 2026: "not really a fan of the salmon" was missed).
+  String.raw`\bnot\s+(?:really\s+|much\s+of\s+)?a\s+(?:big\s+|huge\s+)?fan\s+of\b`,
   String.raw`\b(?:allergic|intolerant)\s+to\b`,
   String.raw`\bnever\s+(?:give|serve|put)\s+me\b`,
 ].join('|'), 'gi')
@@ -59,7 +60,7 @@ const STATEMENT = new RegExp([
 const NOT_A_BAN = /\b(?:much|many|often|usually|normally|mostly|really|a lot|lots|too much|that much|enough|before|after|during|until|unless|except|when|if|whenever|on (?:weekdays|weekends|week days|school nights)|at night|in the (?:morning|evening|afternoon)|for (?:breakfast|lunch|dinner|tea)|most days|every day|some days|sometimes)\b/i
 
 /** Where what was said about food stops. */
-const CLAUSE_END = /\s+(?:because|cos|cuz|since|but|though|although|so|as|which|who)\s+|\s+[-–—]\s+|\(/i
+const CLAUSE_END = /\s+(?:because|cos|cuz|since|but|though|although|so|as|which|who|you(?:'ve|'d|'re)?|tonight|today)\b|\s+[-–—]\s+|\(/i
 
 /**
  * The foods a message says she does not eat, each one checked to be a food.
@@ -76,7 +77,7 @@ export function detectFoodExclusions(text: string): string[] {
  * fan of") is asked about, "just this meal, or never?"; an allergy, "I don't eat X", "I can't eat X", "I avoid X",
  * "no X for me" and "never give me X" are still saved at once.
  */
-const ASKED = /\b(?:i|we)\s+(?:do\s*n[o']?t|don'?t)\s+like\b|\b(?:i|we)\s+hate\b|\bnot\s+a\s+fan\s+of\b/i
+const ASKED = /\b(?:i|we)\s+(?:do\s*n[o']?t|don'?t)\s+like\b|\b(?:i|we)\s+hate\b|\bnot\s+(?:really\s+|much\s+of\s+)?a\s+(?:big\s+|huge\s+)?fan\s+of\b/i
 
 /** The foods said firmly enough to save at once. */
 export function firmFoodExclusions(text: string): string[] {

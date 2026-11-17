@@ -15,6 +15,8 @@ import { buildMealFoodAddProposal } from '../src/lib/meal-food-add'
 import { readFileSync } from 'node:fs'
 import { shareLineIfReal } from '../src/lib/meal-food-add'
 import { mealOnDay } from '../src/lib/meal-on-day'
+import { foodDislikesToAsk } from '../src/lib/food-exclusions'
+import { offerWordsProblem } from '../src/lib/offer-rules'
 
 let ran = 0
 let failures = 0
@@ -81,6 +83,16 @@ const blind = mealOnDay(plan, upcoming, 'breakfast', '2026-11-20', '2026-11-17')
 check('a day it cannot see is said, with no meal to price', !blind.item && /won't change it blind/.test(blind.unseen ?? ''), blind)
 check('both meal-edit doors use it', (chat.match(/const onDay = mealOnDay\(slotName, /g) ?? []).length === 2 && !/const current = mealPlan\.find\(m => m\.meal\.toLowerCase\(\) === slotName\)\?\.items\[0\]/.test(chat))
 check('a day whose meal it cannot see is said, never priced blind', (chat.match(/if \(onDay\.unseen\) \{ refusal = onDay\.unseen \}/g) ?? []).length === 2)
+
+console.log('\n6. The exam of 17 Nov 2026: three things the app now holds itself')
+check('"not really a fan of the salmon you\'ve put in tonight" is a dislike to ask about', JSON.stringify(foodDislikesToAsk("not really a fan of the salmon you've put in tonight")) === '["salmon"]', foodDislikesToAsk("not really a fan of the salmon you've put in tonight"))
+check('...and so is "not a big fan of tuna"', JSON.stringify(foodDislikesToAsk('I am not a big fan of tuna')) === '["tuna"]')
+const dis = chat.indexOf('MEAL_CHANGE_KINDS.has(result.proposal.kind)')
+check('a bare dislike becomes the question before any meal-change card', dis > 0 && /if \(toAsk\.length > 0\) return \{ text: DISLIKE_ASK\.turn\(toAsk\), outcome: 'refused' \}/.test(chat.slice(dis, dis + 400)) && dis < chat.indexOf("    if (result.proposal && profile.id) {"))
+check('...unless he asked for the change ("swap it")', /!ASKS_FOR_A_CHANGE\.test\(userSaid \?\? ''\)/.test(chat.slice(dis - 50, dis + 200)))
+const usual = chat.indexOf("USUAL_MEAL.test(userSaid ?? '')")
+check('a usual meal with no amounts is asked "how much of each" before a card', usual > 0 && /How much of each do you usually have\?/.test(chat.slice(usual, usual + 300)) && usual < chat.indexOf("    if (result.proposal && profile.id) {"))
+check('a goal change is never refused as a one-off ("...instead")', offerWordsProblem('propose_goal_change', 'I want to stop cutting and start building muscle instead', { hedged: false }) === null)
 
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} FAILED.`); process.exit(1) }
