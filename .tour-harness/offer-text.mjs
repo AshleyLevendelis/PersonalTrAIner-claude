@@ -71,7 +71,8 @@ const READ = String.raw`((n) => {
   const confirmRow = [...o.querySelectorAll('[data-testid="offer-buttons"] button')]
   // The offer's own answers. Not the Listen icon on the coach's bubble (her 31 Oct 2026 ruling): it reads the
   // message aloud and answers nothing, and it is checked by verify:chat-2b and verify:chat-bubbles.
-  const answers = [...o.querySelectorAll('button')].filter(b => !b.hasAttribute('data-listen'))
+  // The Details toggle (17 Nov 2026) sits inside the bubble and is not an answer to the offer.
+  const answers = [...o.querySelectorAll('button')].filter(b => !b.hasAttribute('data-listen') && b.dataset.testid !== 'offer-details-toggle')
   const buttons = answers.map(b => {
     const r = b.getBoundingClientRect(), pill = b.firstElementChild, pr = pill ? pill.getBoundingClientRect() : null, ps = cs(pill)
     return { label: (b.textContent || '').trim(), h: r.height, w: r.width, pillH: pr ? pr.height : 999, pillFont: ps ? parseFloat(ps.fontSize) : 99, pillShadow: ps ? ps.boxShadow : '?', shadow: cs(b).boxShadow, inConfirmRow: confirmRow.includes(b) }
@@ -89,7 +90,8 @@ const READ = String.raw`((n) => {
     // RE-ANCHORED 31 Oct 2026 (design 2b): a single replacement is said on its own soft line under the bubble (the
     // preview), a list stays in the bubble. Either way it is a change line OF THIS OFFER, said before the tap.
     changeLines: [...o.querySelectorAll('[data-offer-line="change"]')].map(e => e.textContent.replace(/\s+/g, ' ').trim()),
-    factLines: facts ? [...facts.children].map(e => e.textContent.replace(/\s+/g, ' ').trim()) : [],
+    // Each said line of the offer, wherever it sits (since 17 Nov 2026 most sit inside the folded Details).
+    factLines: facts ? [...facts.querySelectorAll('[data-offer-line]')].map(e => e.textContent.replace(/\s+/g, ' ').trim()) : [],
     warns: facts ? [...facts.querySelectorAll('[data-severity="warn"]')].map(e => e.textContent.trim()) : [],
     ruled: [o, facts, bubble].filter(Boolean).some(e => parseFloat(cs(e).borderLeftWidth) > 1),
     buttons,

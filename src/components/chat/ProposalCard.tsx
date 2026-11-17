@@ -161,7 +161,7 @@ export function ProposalCard({
           data-testid="offer-details-toggle"
           aria-expanded={detailsOpen}
           onClick={() => setDetailsOpen(o => !o)}
-          className="-my-2 inline-flex min-h-[44px] items-center text-[0.8125rem] font-medium underline underline-offset-2 opacity-80"
+          className="-my-2 inline-flex min-h-[44px] min-w-[44px] items-center text-[0.8125rem] font-medium underline underline-offset-2 opacity-80"
         >
           {detailsOpen ? 'Hide details' : 'Details'}
         </button>

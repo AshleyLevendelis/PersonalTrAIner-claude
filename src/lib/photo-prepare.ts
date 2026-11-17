@@ -1,6 +1,6 @@
 // A PHOTO FOR THE COACH, MADE SMALL ON THE PHONE (17 Nov 2026, his "Read it, then discard"). The picture is shrunk to
 // at most 1024px on its longest side and sent once as a JPEG; it is never uploaded anywhere else or kept.
-export const PHOTO_MAX_SIDE = 1024
+const PHOTO_MAX_SIDE = 1024
 export const PHOTO_DEFAULT_ASK = "What's in this photo?"
 /** The text of his message as it is kept in the chat: the photo itself never is, so the line says one was sent. */
 export function photoMessageText(text: string): string {

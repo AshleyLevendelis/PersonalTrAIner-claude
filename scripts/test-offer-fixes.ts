@@ -84,6 +84,13 @@ check('a day it cannot see is said, with no meal to price', !blind.item && /won'
 check('both meal-edit doors use it', (chat.match(/const onDay = mealOnDay\(slotName, /g) ?? []).length === 2 && !/const current = mealPlan\.find\(m => m\.meal\.toLowerCase\(\) === slotName\)\?\.items\[0\]/.test(chat))
 check('a day whose meal it cannot see is said, never priced blind', (chat.match(/if \(onDay\.unseen\) \{ refusal = onDay\.unseen \}/g) ?? []).length === 2)
 
+console.log('\n5b. One line, numbers on tap: a cost is never folded away')
+const card = readFileSync('src/components/chat/ProposalCard.tsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+const warnAt = card.indexOf('{warnings.map((imp, i) => implication(imp, `w${i}`))}'), foldAt = card.indexOf('data-testid="offer-details"')
+check('a cost (warn) line is drawn before, and outside, the folded details', warnAt > 0 && foldAt > warnAt, { warnAt, foldAt })
+check('...and only the quiet lines go inside', /const quiet = \(diff\.implications \?\? \[\]\)\.filter\(imp => imp\.severity !== 'warn'\)/.test(card) && /\{quiet\.map\(/.test(card.slice(foldAt)))
+check('the details start folded', /useState\(false\)/.test(card.slice(card.indexOf('const [detailsOpen'), card.indexOf('const [detailsOpen') + 60)))
+
 console.log('\n6. The exam of 17 Nov 2026: three things the app now holds itself')
 check('"not really a fan of the salmon you\'ve put in tonight" is a dislike to ask about', JSON.stringify(foodDislikesToAsk("not really a fan of the salmon you've put in tonight")) === '["salmon"]', foodDislikesToAsk("not really a fan of the salmon you've put in tonight"))
 check('...and so is "not a big fan of tuna"', JSON.stringify(foodDislikesToAsk('I am not a big fan of tuna')) === '["tuna"]')
