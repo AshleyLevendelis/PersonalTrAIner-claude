@@ -5228,6 +5228,25 @@ Keep this context in mind to ensure your greetings and questions naturally align
         );
       }
 
+      // A TOOL CALL THAT ARRIVES WITH NO WORDS IS NEVER ANSWERED WITH NOTHING (his report 17 Nov 2026: "how did your
+      // body feel this morning?", he answered, and the chat said "That came back empty"). The model often sends a
+      // save call with no text beside it; these branches used to pass that empty text straight back. Now the coach
+      // answers what he said through the checked tool-reply path, with a floor that is never empty.
+      const spokenBeside = async (kept: boolean) => (await toolReply({
+        outcome: { name, args, response: kept
+          ? { status: "kept_for_next_time", note: "the app keeps this; reply to what they said" }
+          : { status: "not_kept", note: "nothing was kept; reply to what they said" } },
+        nudge: SAVE_NUDGE,
+        floor: "Thanks for telling me.",
+        preferFirstLegText: true,
+        forbid: [ANNOUNCES_THE_SAVE],
+        checks: [...todayChecks, {
+          test: (t: string) => detectPlanClaim(t) ? "it says the plan changed" : null,
+          nudge: () => "(System: your reply said their plan or day changed, and nothing changed. Reply again to what they said without saying anything was changed.)",
+          floor: "Thanks for telling me.",
+        }],
+      })).reply;
+
       if (name === "set_display_name") {
         // Same shape as record_context_fact above: IMMEDIATE, forwarded not
         // written (I1), and gated on a real verbatim quote so a name can
@@ -5239,7 +5258,7 @@ Keep this context in mind to ensure your greetings and questions naturally align
         const proposed = String(args.display_name || "").trim();
         if (!quote || !proposed || !message.toLowerCase().includes(quote.toLowerCase())) {
           return new Response(
-            JSON.stringify({ reply: textPart?.text || "" }),
+            JSON.stringify({ reply: await spokenBeside(false) }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
@@ -5270,13 +5289,13 @@ Keep this context in mind to ensure your greetings and questions naturally align
         const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
         if (!quote || !validFelt || !validDate || !message.toLowerCase().includes(quote.toLowerCase())) {
           return new Response(
-            JSON.stringify({ reply: textPart?.text || "" }),
+            JSON.stringify({ reply: await spokenBeside(false) }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }
         return new Response(
           JSON.stringify({
-            reply: textPart?.text || "",
+            reply: await spokenBeside(true),
             feelIntent: { tool: name, rawArgs: args },
           }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -5332,9 +5351,9 @@ Keep this context in mind to ensure your greetings and questions naturally align
         const steps = typeof args.steps === "number" ? args.steps : NaN;
         if (!Number.isFinite(steps) || !validDate) {
           // Nothing to propose. Let whatever the model already said stand
-          // rather than inventing a confirmation for a call we dropped.
+          // rather than inventing a confirmation for a call we dropped (and never nothing: the coach answers).
           return new Response(
-            JSON.stringify({ reply: textPart?.text || "" }),
+            JSON.stringify({ reply: await spokenBeside(false) }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
           );
         }

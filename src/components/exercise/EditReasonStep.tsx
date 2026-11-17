@@ -38,6 +38,8 @@ import {
 } from '@/lib/edit-reason'
 import { INJURY_OPTIONS, EQUIPMENT_OPTIONS } from '@/lib/picker-options'
 import { KitTicks } from '@/components/KitTicks'
+import { getExerciseEntry } from '@/lib/exercise-db'
+import { kitItemForEquipment, kitItemsFor, KIT_ITEM_LABELS, type KitItem } from '@/lib/kit-list'
 import type { KitController } from '@/lib/kit-change'
 import type { UserProfile } from '@/lib/types'
 
@@ -90,6 +92,7 @@ export function EditReasonStep({ kind, exerciseName, onAnswer, onSkip, onStepCha
   const [hurting, setHurtingRaw] = useState(false)
   const [kitting, setKittingRaw] = useState(false)
   const [ticking, setTicking] = useState(false)
+  const [startWithout, setStartWithout] = useState<KitItem[]>([])
   const [hurt, setHurtRaw] = useState<Exclude<HurtKind, 'red_flag'> | null>(null)
   const [redFlag, setRedFlagRaw] = useState(false)
   const [pauseState, setPauseState] = useState<'offer' | 'busy' | 'done' | 'none'>(() => canOfferPause() ? 'offer' : 'none')
@@ -150,6 +153,13 @@ export function EditReasonStep({ kind, exerciseName, onAnswer, onSkip, onStepCha
     )
   }
 
+  // The kit this exercise needs that the profile says he has: what "I haven't got the kit" most likely means.
+  const missingKit: KitItem[] = kit
+    ? [...new Set((getExerciseEntry(exerciseName)?.equipment ?? []).map(kitItemForEquipment).filter((i): i is KitItem => !!i))]
+      .filter(i => kitItemsFor(kit.profile).includes(i))
+    : []
+  const missingKitWords = missingKit.map(i => KIT_ITEM_LABELS[i].toLowerCase()).join(' or ')
+
   // --- Which kit. Only reached from "I haven't got the kit". -----------------
   //
   // WHY A PICKER AND NOT JUST A DIFFERENT EXERCISE. The swap list below is
@@ -161,11 +171,21 @@ export function EditReasonStep({ kind, exerciseName, onAnswer, onSkip, onStepCha
       <div className="space-y-2" data-testid="reason-kit">
         {kit && (
           ticking
-            ? <div data-testid="reason-kit-ticks"><KitTicks profile={kit.profile} kit={kit.controller} /></div>
+            ? <div data-testid="reason-kit-ticks"><KitTicks profile={kit.profile} kit={kit.controller} startWithout={startWithout} /></div>
             : (
-              <Button variant="outline" className={CHIP} disabled={busy} data-testid="reason-kit-for-good" onClick={() => { onStepChange?.(); setTicking(true) }}>
-                Update what I have, for good
-              </Button>
+              <>
+                {/* THE KIT THIS EXERCISE NEEDS, ONE TAP (his report 17 Nov 2026: "I wanted to swap out an exercise because
+                    I don't have bands. But I didn't have the option to"). It opens the same ticks with that kit already
+                    unticked, so what changes and Save are on screen at once. */}
+                {missingKit.length > 0 && (
+                  <Button variant="outline" className={CHIP} disabled={busy} data-testid="reason-kit-this-one" onClick={() => { onStepChange?.(); setStartWithout(missingKit); setTicking(true) }}>
+                    I don't have {missingKitWords}
+                  </Button>
+                )}
+                <Button variant="outline" className={CHIP} disabled={busy} data-testid="reason-kit-for-good" onClick={() => { onStepChange?.(); setStartWithout([]); setTicking(true) }}>
+                  {missingKit.length > 0 ? 'Update everything I have' : 'Update what I have, for good'}
+                </Button>
+              </>
             )
         )}
         <p className="text-sm">{kit ? `Or just for the next ${EQUIPMENT_SWITCH_DAYS} days, what have you got?` : 'What have you got today?'}</p>
