@@ -273,5 +273,21 @@ console.log('\n[10] The screen (source; the driver reads the pixels)')
   check('10j. three buttons, each a full-height tap target, each saying which is chosen', /min-h-\[44px\] flex-1/.test(grid) && /aria-pressed=\{felt === effort\}/.test(grid))
 }
 
+console.log('\n[outgrown] Far past the top of the range moves more than one step (18 Nov 2026, outgrown.ts)')
+{
+  const { outgrownWeightKg, outgrownMargin } = await import('../src/lib/outgrown')
+  check('O1. the margin is half the range and never under 3 reps', outgrownMargin(8, 12) === 3 && outgrownMargin(6, 15) === 5 && outgrownMargin(10, 11) === 3)
+  check('O2. 100 kg x 20 on 8-12: the 10% cap, laid on whole steps', outgrownWeightKg(100, [20, 20, 20], 8, 12, 2.5) === 110)
+  check('O3. worked from the WEAKEST set: 100 x 20, 20, 15 on 8-12', outgrownWeightKg(100, [20, 20, 15], 8, 12, 2.5) === 105, outgrownWeightKg(100, [20, 20, 15], 8, 12, 2.5))
+  check('O4. one set short of the margin: no jump (the ordinary rule applies)', outgrownWeightKg(100, [20, 20, 14], 8, 12, 2.5) === null)
+  check('O5. never less than one step', outgrownWeightKg(20, [30, 30], 8, 12, 2.5) === 22.5)
+  const r = await ask(session('2026-09-23', [[100, 20], [100, 20], [100, 20]]))
+  check('O6. on the card: 100 x 20 three times against 8-10 is 110, not 102.5', r?.weightKg === 110 && /Well past 10 reps/.test(r?.note ?? ''), r)
+  const plain = await ask(session('2026-09-23', topped(100)))
+  check('O7. hitting just the top is still one step', plain?.weightKg === 102.5, plain)
+  const wild = await ask(session('2026-09-23', [[100, 40], [100, 40], [100, 40]]))
+  check('O8. reps the odd-reps guard distrusts never earn a jump (held)', wild?.weightKg === 100, wild)
+}
+
 console.log(`\n${ran} checks ran, ${failures} failed`)
 if (failures > 0) process.exit(1)

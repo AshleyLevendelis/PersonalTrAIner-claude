@@ -5,7 +5,7 @@ Load prescription is safety-adjacent, so this is the plan first. Source: `docs/p
 the line numbers are the trace's and are leads until each change is made. Decisions are training decisions (mine under
 his 18 Sep delegation) except where marked his.
 
-## 1. A deload as heavy as its loading weeks (CONFIRMED defect; build first)
+## 1. A deload as heavy as its loading weeks (CONFIRMED defect) - BUILT 18 Nov 2026 (`block-weight.ts`, `test:block-weight`)
 - `block-review.ts` (a stalled main lift is held at its last weight) and `load-suggestions.ts` `confirmLoadSuggestion`
   (a confirmed "start heavier") each price ONE load off the block's first week and write it into EVERY week of the new
   block. Neither has an `is_deload` branch. The generator's deload is 70% (`DELOAD_LOAD_FRACTION`).
@@ -24,7 +24,7 @@ his 18 Sep delegation) except where marked his.
 - **Check:** after the block review and after a confirmed suggestion, the new block's deload `suggested_load_kg` is at
   most 0.7x its last loading week (rounded to the implement) and below it; the sentence makes no top-of-range claim.
 
-## 2. A lift away for weeks while training went on (gap; build second)
+## 2. A lift away for weeks while training went on - BUILT 18 Nov 2026 (`liftLayoff`, `test:layoff`, `verify:layoff` S0-S4)
 - `layoffStatus` is only ever fed the ANY-lift last date. `getLastSessionSets` reads a lift's last session with no age
   limit; `rec.lastDate` exists and is used only to find the plan week. `cardLoadFor`'s `keptUp` can then raise the
   card to THIS week's printed number, which climbed through weeks the lift was never trained (50 kg in week 2, back in
@@ -38,7 +38,7 @@ his 18 Sep delegation) except where marked his.
 - **Check:** other lifts logged daily, this one last logged 30+ days ago at 50 kg: today's card is at most 45
   (eased), never this week's higher printed number; logged 5 days ago it behaves as now.
 
-## 3. Far more reps than asked at the same weight (gap; build third)
+## 3. Far more reps than asked at the same weight - BUILT 18 Nov 2026
 - Card: `hitTopOnAllSets` gives one implement step whatever the margin. Calibration anchor
   (`calibrationAnchorsFor`) compares weight only, so 40 x 20 against a printed 40 anchors nothing. Over 3x the top of
   the range the set counts as "not at top" and the weight is HELD (40 x 40 is treated worse than 40 x 20; that is the
@@ -52,8 +52,12 @@ his 18 Sep delegation) except where marked his.
   guard distrusts, never in a deload, never past a stated kit limit. Basis: the "2-for-2" rule (NSCA) raises load when
   the top of the range is beaten by two or more reps; a 10% ceiling per session is the same ceiling the
   find-your-weight search uses (`findWeightStartKg`), so one rule bounds both.
-- **Check:** 3 x 20 at 40 kg against 8-12 gives 44 (the 10% cap), not 42.5; 3 x 12 gives exactly one step; 3 x 40 is
-  held; the calibration anchor writes week 2 above 40 for 40 x 20.
+- **Check:** 3 x 20 at 100 kg against 8-12 gives 110 (the 10% cap, on whole steps); worked from the weakest set
+  (20, 20, 15 gives 105); 3 x 12 gives exactly one step; 3 x 40 is held; the calibration anchor writes week 2 above the
+  guess for far more reps at it, and says the weight came from easy sets at the guess. CORRECTED while building: this
+  said 40 x 20 gives 44. Laid on whole steps, 10% of 40 is one 2.5 kg step, so at light weights the rule changes
+  nothing; it binds from about 50 kg up. BUILT 18 Nov 2026 (`outgrown.ts`; `test:lift-effort` O1-O8,
+  `test:calibration-search`; 8 mutations caught).
 
 ## 4. Only the Finish button anchors a testing week (gap; build fourth)
 - `applyCalibrationAnchors` has ONE caller (Finish). "I did it, not in the app", the coach's logs, a session closed by

@@ -6,6 +6,7 @@ import { categorize, getLoadIncrementKg, isExternallyLoaded, getLoadingCeilingKg
 import { getLastSessionSets, getSetsForDate, isMalformedZeroWeight } from './set-log-store'
 import type { ExerciseTier, ExerciseSetLog, Exercise, UserProfile } from './types'
 import { effortFromRpe, type LiftEffort } from './lift-effort'
+import { outgrownWeightKg } from './outgrown'
 
 // ---------------------------------------------------------------------------
 // All progression reads run against the unified store (exercise_set_logs via
@@ -468,6 +469,12 @@ export async function getDoubleProgressionRecommendation(
 
   const hitTopOnAllSets = working.every(s => s.reps_completed >= prescribedRepRangeHigh && !repsLookImpossible(s.reps_completed, prescribedRepRangeHigh))
   if (hitTopOnAllSets) {
+    // CLEARLY OUTGROWN (18 Nov 2026, outgrown.ts): far past the top on every set moves more than one step.
+    const big = ctx.repRangeLow != null ? outgrownWeightKg(lastWeight, working.map(s => s.reps_completed), ctx.repRangeLow, prescribedRepRangeHigh, increment) : null
+    if (big != null && big > lastWeight + increment) {
+      return { ...said, weightKg: big, lastWeightKg: lastWeight, didProgress: true,
+        note: `Well past ${prescribedRepRangeHigh} reps on every set last time, so up to ${big}kg. Reps reset toward the bottom of the range.` }
+    }
     const weightKg = lastWeight + increment
     return { ...said, weightKg, lastWeightKg: lastWeight, didProgress: true,
       note: `Hit ${prescribedRepRangeHigh} reps on every set last time — up to ${weightKg}kg. Reps reset toward the bottom of the range.` }
