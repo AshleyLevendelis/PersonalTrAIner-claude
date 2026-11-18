@@ -90,7 +90,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   implement gets one too, at **half the working load**, read off the app's own
   warm-up ladder rather than invented (18 Sep 2026, CSCS delegation; his 17 Sep
   ruling gave it a number, this is the "kept light" half) — `primer-load`,
-  `load-ceilings`, `load-ceiling-units`,
+  `load-ceilings`, `ceiling-units`,
   `per-side-load`, `single-implement`, `load-display`, `loadless-notes`
 - The time cap is kept, and a shortfall says why — `session-length`,
   `session-shortfall`, `cardio-share-score`, `main-lift-rest`
@@ -953,7 +953,7 @@ menu" stays true when a copy is also left outside it.
     `verify:setup-answers` §6, `rebuild-offer`
 - Weights actually lifted flow into the printed plan — automatic from
   calibration week, offered after — `calibration-search`,
-  `beat-target-offer`, `logged-reanchor`
+  `beat-target`, `logged-reanchor`
 - Nothing recorded is lost by any of this — `diary-preservation`,
   `replace-without-losing`, `memory`
 
@@ -1121,9 +1121,9 @@ menu" stays true when a copy is also left outside it.
 - It asks before prescribing and uses the answer — prompt rule, kept in sync
   by `coach-rules-sync`; whether it HAPPENS is `UNGUARDED`
 - It notices patterns and coaches to them — `block-review`,
-  `beat-target-offer`, `session-feel`, `coach-opener` (missed yesterday —
+  `beat-target`, `session-feel`, `coach-opener` (missed yesterday —
   and it stops asking once a miss is declared), `coach-nudge`,
-  `activity-streak`; a missed WEEK gets a chat prefill, not a follow-up
+  `coach-rhythm` (weeks on plan, which replaced the streak 13 Nov 2026); a missed WEEK gets a chat prefill, not a follow-up
 - It holds its scope — doctor, physio, dietitian at the right moment —
   `starting-out` for the first-timer note; otherwise `UNGUARDED`
 - One voice, every time — **half guarded since 15 Sep 2026, and the split is
@@ -1335,7 +1335,7 @@ menu" stays true when a copy is also left outside it.
   saying — the last of the eight was unlocked that day. Every answer can be
   changed now
 - Progress is visible — history, PRs, weight trend, streak —
-  `exercise-history`, `dashboard`, `activity-streak`, `home-week-strip`,
+  `exercise-history`, `dashboard`, `history-streak`, `coach-rhythm`, `home-week-strip`,
   and since 16 Sep 2026 **for bodyweight training too**:
   `bodyweight-progress` (55 checks, 15 mutations),
   `verify:bodyweight-progress` (19 checks, 6 mutations).
@@ -1473,7 +1473,7 @@ menu" stays true when a copy is also left outside it.
   the weight, then tap ✓), and the spotlight covers the whole row so the box
   it asks for can actually be reached. `verify:tour-real`, `app-tour`
 - Safety ships correct or not at all — `injury-adaptation-safety`,
-  `joint-tag-states`, `rehab-prescribed`, `food-db-parity`, `diet-tag-sync`,
+  `joint-tags`, `rehab-prescribed`, `food-db-parity`, `diet-tag-sync`,
   `load-ceilings`, `set-plausibility`, `lift-plausibility`, `starting-out`
 - **The coach chat is grouped bubbles on a full page** — Ashley, 26 Sep 2026,
   twice that day, layout only both times. Same sender within five minutes is
@@ -1525,7 +1525,7 @@ menu" stays true when a copy is also left outside it.
   `test:grocery-display`, `test:grocery-screen`
 - Works one-handed on a phone on a gym floor — `verify:tap-targets`,
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
-  `installable`, `a11y`, `verify:walk`
+  `installable`, `a11y`, `verify:screens`
 
 ### His strategy of 13 Nov 2026 (`docs/plans/measurement.md` and the slice plans after it)
 - **Measurement first: every unprompted coach message is kept with whether he answered** (slice 1). Its own table, so Clear

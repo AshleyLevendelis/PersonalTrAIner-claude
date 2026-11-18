@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **CLAUDE.md NAMED SEVEN CHECKS THAT DO NOT EXIST, 18 Nov 2026 (the full pass, step 1).** Every check name in "What
+  the app must have" was compared with the list of checks that can actually be run (458 names, 422 direct matches; the
+  rest are section references, drivers named by their script, and these). Stale names corrected in place: `verify:walk`
+  is `verify:screens`; `activity-streak` was deleted on 13 Nov when weeks-on-plan replaced the streak, and its claims
+  are held by `coach-rhythm` and `history-streak`; `load-ceiling-units` is `ceiling-units`; `joint-tag-states` is
+  `joint-tags`; `beat-target-offer` is `beat-target`. No claim lost its check: each renamed gate exists and runs. Every
+  test script and every browser driver in the repository is registered. How it went stale: a gate was renamed or
+  deleted and only the line being worked on was updated, the "two lines about one fact" shape again.
 - [x] **HOW HARD WAS IT, 1 TO 10, on the session summary, 18 Nov 2026: his "Build the 1–10"** (from three options:
   the three words as now, a dial like his screenshot, or a 1-10 tap row; my recommendation). "How hard was it?" with
   ten numbers in two rows of five (44px each), words under them (1-3 Easy, 4-6 Moderate, 7-8 Hard, 9-10 All-out), one
