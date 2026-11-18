@@ -102,8 +102,8 @@ export function resolveBodyMetrics(profile: UserProfile): BodyMetrics | null {
  * ENERGY is never read off this: BMR, the day's burn and a sport's calories use the real bodyweight, because moving a
  * body costs what the body weighs.
  */
-export const REFERENCE_WEIGHT_BMI = 30
-export const EXCESS_WEIGHT_COUNTED = 0.25
+const REFERENCE_WEIGHT_BMI = 30
+const EXCESS_WEIGHT_COUNTED = 0.25
 
 export function nutritionReferenceWeightKg(weightKg: number, heightCm: number | null | undefined): number {
   if (!(Number(heightCm) > 0) || !(weightKg > 0)) return weightKg

@@ -110,6 +110,16 @@ export function formatPortion(i: { name: string; quantity: number; unit: string 
 }
 
 /**
+ * A portion as a card says it: the amount as bought, with the cooked weight beside a raw or dry line (his 18 Oct
+ * "Dry, plus cooked hint"). ONE function since 18 Nov 2026: the custom-meal card said "Your portions, untouched —
+ * 275g raw chicken breast" to someone who had typed 200g, with nothing to say the 200 was read as cooked.
+ */
+export function portionWithHint(i: { name: string; quantity: number; unit: string }): string {
+  const hint = cookedHint(i)
+  return hint ? `${formatPortion(i)} (${hint})` : formatPortion(i)
+}
+
+/**
  * verifyProposal writes a precise diagnostic into its rejectLog. These are
  * written for a developer reading a generation run, not for someone who just
  * asked for a curry, so they are translated here — TRANSLATED, not replaced:
@@ -286,7 +296,7 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
       // AN ANSWER TO "HOW MUCH?" (his ruling 16 Nov 2026, "App sizes it"): the amounts and the numbers are the app's and are
       // said as the answer, in the lead; the buttons offer to put it in. Nothing is written until the tap.
       ...(rawArgs.as_suggestion === true
-        ? { lead: `By the app's own food figures, for your ${slot}: ${option.ingredients.map(i => { const hint = cookedHint(i); return hint ? `${formatPortion(i)} (${hint})` : formatPortion(i) }).join(', ')}. That's about ${Math.round(m.calories)} kcal and ${Math.round(m.protein)}g protein, against about ${Math.round(budget.calories)} kcal and ${Math.round(budget.protein)}g for your ${slot}. Want it as your ${slot}?` }
+        ? { lead: `By the app's own food figures, for your ${slot}: ${option.ingredients.map(portionWithHint).join(', ')}. That's about ${Math.round(m.calories)} kcal and ${Math.round(m.protein)}g protein, against about ${Math.round(budget.calories)} kcal and ${Math.round(budget.protein)}g for your ${slot}. Want it as your ${slot}?` }
         // WHICH DAYS, BEFORE THE TAP (16 Nov 2026): a meal for another day, or for every day, says so in the headline.
         : date !== input.todayDate || alsoDates.length > 0
           ? { lead: `I can add **${option.name}** to your ${slot}, ${alsoDates.length > 0 ? `every day from ${datesLabel(allDates)}` : `for ${datesLabel([date])}`}:` }
@@ -303,7 +313,7 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
       // day's pick as well as joining the slot's options.
       implications: [
         // When he asked how much, the answer above already lists every amount; saying it twice would say it two ways.
-        ...(rawArgs.as_suggestion === true ? [] : [{ severity: 'info' as const, text: `Portions adjusted to fit your ${slot} target — ${option.ingredients.map(formatPortion).join(', ')}` }]),
+        ...(rawArgs.as_suggestion === true ? [] : [{ severity: 'info' as const, text: `Portions adjusted to fit your ${slot} target — ${option.ingredients.map(portionWithHint).join(', ')}` }]),
         { severity: 'info', text: `Joins your ${slot} options, and becomes your ${slot} for ${forWhen}.` },
       ],
       rationale: typeof rawArgs.reason === 'string' && rawArgs.reason.trim() ? rawArgs.reason.trim() : undefined,

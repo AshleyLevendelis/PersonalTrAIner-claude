@@ -19,6 +19,7 @@
     "test:logging-roundtrip": "tsx scripts/test-logging-roundtrip.ts",
     "test:meal-roundtrip": "tsx scripts/test-meal-roundtrip.ts",
     "test:meal-quality": "tsx scripts/run-meal-quality.ts",
+    "test:meal-facts": "tsx scripts/test-meal-facts.ts",
     "test:reference-weight": "tsx scripts/test-reference-weight.ts",
     "test:macro-split": "tsx scripts/test-macro-split.ts",
     "test:injury-separation": "tsx scripts/test-injury-exclusion-separation.ts",

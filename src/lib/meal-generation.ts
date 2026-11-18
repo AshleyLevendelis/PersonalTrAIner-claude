@@ -30,7 +30,7 @@
 
 import { checkMethod, type MethodRules } from './meal-method-check'
 import { supabase, resolveEnv } from './supabase'
-import { computeMealMacros, kindsItCouldBe, lookupIngredient, type Macros100g } from './food-db'
+import { computeMealMacros, kindsItCouldBe, lookupIngredient, toTasteLine, type Macros100g } from './food-db'
 import { asWeighedLines } from './as-weighed'
 import { validateMealAgainstDiet } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
@@ -570,7 +570,8 @@ export function verifyProposal(
 ): PoolOption | null {
   // ONE STATE (18 Oct 2026, runs 7-10, H36/M64): every line a new dish carries is weighed raw or dry, at the weight
   // that carries the same energy, so the card, the day, the leftovers and the list all see the state it is bought in.
-  const parsed = asWeighedLines(parseIngredientLines(proposal.ingredients))
+  // A seasoning with no amount is kept as a pinch of it (18 Nov 2026, food-db.ts toTasteLine), never asked about.
+  const parsed = asWeighedLines(parseIngredientLines(proposal.ingredients)).map(toTasteLine)
   if (parsed.length === 0) {
     rejectLog.push(`[${slot}] "${proposal.name}": no ingredients parsed`)
     return null

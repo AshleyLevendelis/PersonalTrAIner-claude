@@ -159,7 +159,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('gammon', ['gammon steak', 'ham steak'], { kcal: 145, protein: 24, carbs: 0.5, fat: 5 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
   f('ham', ['sliced ham', 'deli ham'], { kcal: 107, protein: 18, carbs: 1.5, fat: 3 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true }),
   f('chorizo', ['chorizo sausage'], { kcal: 455, protein: 24, carbs: 1.9, fat: 38 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true, pregnancy_avoid: true }),
-  f('pork sausage', ['pork sausages', 'breakfast sausage'], { kcal: 296, protein: 13, carbs: 8, fat: 24 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true, contains_gluten: true }),
+  f('pork sausage', ['pork sausages', 'breakfast sausage'], { kcal: 296, protein: 13, carbs: 8, fat: 24 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true, contains_gluten: true, contains_sulphites: true }), // sulphites: UK sausages are preserved with sodium metabisulphite (18 Nov 2026)
 
   // ===== PROTEIN: fish & seafood ======================================
   f('salmon', ['salmon fillet', 'baked salmon', 'grilled salmon'], { kcal: 208, protein: 20, carbs: 0, fat: 13 }, 'protein', { contains_fish: true }),
@@ -417,8 +417,8 @@ export const FOOD_DB: FoodEntry[] = [
   f('kiwi', ['kiwi fruit'], { kcal: 61, protein: 1.1, carbs: 15, fat: 0.5 }, 'fruit', {}),
   f('watermelon', [], { kcal: 30, protein: 0.6, carbs: 7.6, fat: 0.2 }, 'fruit', { is_high_fodmap: true }),
   f('pear', ['pears'], { kcal: 57, protein: 0.4, carbs: 15, fat: 0.1 }, 'fruit', { is_high_fodmap: true }, { medium: 178 }, { avgGrams: 178, label: 'pear' }),
-  f('lemon', ['lemon juice'], { kcal: 29, protein: 1.1, carbs: 9.3, fat: 0.3 }, 'fruit', {}),
-  f('lime', ['lime juice'], { kcal: 30, protein: 0.7, carbs: 10.5, fat: 0.2 }, 'fruit', {}),
+  f('lemon', ['lemon juice', 'lemon zest'], { kcal: 29, protein: 1.1, carbs: 9.3, fat: 0.3 }, 'fruit', {}, { squeeze: 8, wedge: 8 }),
+  f('lime', ['lime juice', 'lime zest'], { kcal: 30, protein: 0.7, carbs: 10.5, fat: 0.2 }, 'fruit', {}, { squeeze: 8, wedge: 8 }),
 
   // ===== CONDIMENTS / SAUCES / MISC ===================================
   f('soy sauce', ['light soy sauce', 'dark soy sauce', 'reduced salt soy sauce', 'low sodium soy sauce'], { kcal: 53, protein: 8, carbs: 4.9, fat: 0.6 }, 'condiment', { contains_soy: true, contains_gluten: true }, { tbsp: 18 }),
@@ -439,10 +439,15 @@ export const FOOD_DB: FoodEntry[] = [
   f('tomato passata', ['passata'], { kcal: 32, protein: 1.6, carbs: 5.5, fat: 0.3 }, 'condiment', {}),
   f('chopped tomatoes canned', ['tinned tomatoes', 'canned tomatoes', 'chopped tomatoes', 'tinned chopped tomatoes'], { kcal: 32, protein: 1.6, carbs: 5.5, fat: 0.3 }, 'condiment', {}),
   f('marinara sauce', ['marinara'], { kcal: 42, protein: 1.5, carbs: 7, fat: 1 }, 'condiment', {}),
-  f('curry paste', ['thai curry paste', 'tikka paste'], { kcal: 168, protein: 3, carbs: 12, fat: 12 }, 'condiment', { is_high_fodmap: true }, { tbsp: 20 }),
+  f('curry paste', ['tikka paste', 'indian curry paste', 'korma paste', 'madras paste', 'balti paste', 'tandoori paste'], { kcal: 168, protein: 3, carbs: 12, fat: 12 }, 'condiment', { is_high_fodmap: true }, { tbsp: 20 }),
+  // THAI PASTES ARE THEIR OWN FOOD (18 Nov 2026): red, green and massaman pastes are made with shrimp paste, and often
+  // fish sauce, so "thai curry paste" used to pass shellfish-free, fish-free, vegetarian and vegan as the Indian one.
+  // A dish written for someone who eats neither names the vegan paste, which is what they would have to buy.
+  f('thai curry paste', ['thai red curry paste', 'thai green curry paste', 'red curry paste', 'green curry paste', 'massaman curry paste', 'massaman paste', 'yellow curry paste', 'laksa paste', 'panang curry paste'], { kcal: 168, protein: 3, carbs: 12, fat: 12 }, 'condiment', { is_high_fodmap: true, contains_shellfish: true, contains_fish: true }, { tbsp: 20 }),
+  f('vegan thai curry paste', ['vegan curry paste', 'vegetarian thai curry paste', 'vegan red curry paste', 'vegan green curry paste'], { kcal: 168, protein: 3, carbs: 12, fat: 12 }, 'condiment', { is_high_fodmap: true }, { tbsp: 20 }),
   f('coconut cream', [], { kcal: 330, protein: 3.6, carbs: 6.7, fat: 34 }, 'fat', {}),
   f('gravy granules made', ['gravy'], { kcal: 65, protein: 1.2, carbs: 9, fat: 2.6 }, 'condiment', { contains_gluten: true }),
-  f('worcestershire sauce', [], { kcal: 78, protein: 0, carbs: 19.5, fat: 0 }, 'condiment', { contains_fish: true }, { tbsp: 17 }),
+  f('worcestershire sauce', [], { kcal: 78, protein: 0, carbs: 19.5, fat: 0 }, 'condiment', { contains_fish: true, contains_gluten: true }, { tbsp: 17 }), // gluten: made with barley malt vinegar (18 Nov 2026)
   f('teriyaki sauce', [], { kcal: 89, protein: 5.9, carbs: 16, fat: 0 }, 'condiment', { contains_soy: true, contains_gluten: true }, { tbsp: 18 }),
   f('vegetable stock cube', ['stock cube'], { kcal: 233, protein: 8, carbs: 40, fat: 5 }, 'condiment', { contains_celery: true, is_high_fodmap: true }),
   // Soy lecithin is a near-ubiquitous emulsifier in commercial chocolate —
@@ -503,7 +508,7 @@ export const FOOD_DB: FoodEntry[] = [
   // from the name (almonds/hazelnuts are common). Absent reads as safe, so
   // true is the only fail-safe state this schema can express.
   f('muesli', [], { kcal: 362, protein: 9.7, carbs: 66, fat: 6 }, 'carb', { is_grain: true, is_high_carb: true, contains_nuts: true }),
-  f('cornflakes', ['corn flakes'], { kcal: 357, protein: 7.5, carbs: 84, fat: 0.9 }, 'carb', { is_grain: true, is_high_carb: true }),
+  f('cornflakes', ['corn flakes'], { kcal: 357, protein: 7.5, carbs: 84, fat: 0.9 }, 'carb', { is_grain: true, is_high_carb: true, contains_gluten: true }), // gluten: flavoured with barley malt extract; Coeliac UK lists ordinary cornflakes as not gluten-free (18 Nov 2026)
   f('weetabix', ['bran cereal'], { kcal: 338, protein: 11, carbs: 69, fat: 2.5 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }),
   f('brioche', [], { kcal: 375, protein: 8.5, carbs: 50, fat: 15 }, 'carb', { is_grain: true, contains_gluten: true, contains_egg: true, contains_dairy: true, is_high_carb: true }),
   // MISSING FOODS, 10 Nov 2026: asked for by the library's writers and not in the table. Label or USDA figures, as recalled.
@@ -515,7 +520,7 @@ export const FOOD_DB: FoodEntry[] = [
   f('gluten free bread', [], { kcal: 250, protein: 3, carbs: 48, fat: 4 }, 'carb', { is_grain: true, is_high_carb: true }, { slice: 30 }),
   f('gluten free pasta', ['rice pasta', 'corn pasta'], { kcal: 160, protein: 3.5, carbs: 34, fat: 0.8 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('millet cooked', ['millet'], { kcal: 119, protein: 3.5, carbs: 23.7, fat: 1 }, 'carb', { is_grain: true, is_high_carb: true }),
-  f('buckwheat cooked', ['buckwheat', 'soba noodles'], { kcal: 92, protein: 3.4, carbs: 19.9, fat: 0.6 }, 'carb', { is_grain: true, is_high_carb: true }),
+  f('buckwheat cooked', ['buckwheat'], { kcal: 92, protein: 3.4, carbs: 19.9, fat: 0.6 }, 'carb', { is_grain: true, is_high_carb: true }),
 
   // ===== FAT: more oils / dairy fats ======================================
   f('sesame oil', [], { kcal: 884, protein: 0, carbs: 0, fat: 100 }, 'fat', { contains_sesame: true }, { tbsp: 14, tsp: 4.5 }),
@@ -626,7 +631,7 @@ export const FOOD_DB: FoodEntry[] = [
 
   // --- sauces & pastes -------------------------------------------------------
   f('oyster sauce', [], { kcal: 51, protein: 1.4, carbs: 11, fat: 0.3 }, 'condiment', { contains_shellfish: true }, { tbsp: 18 }),
-  f('hoisin sauce', [], { kcal: 220, protein: 2.6, carbs: 44, fat: 3.4 }, 'condiment', { contains_soy: true, contains_gluten: true, is_refined_sugar: true }, { tbsp: 18 }),
+  f('hoisin sauce', [], { kcal: 220, protein: 2.6, carbs: 44, fat: 3.4 }, 'condiment', { contains_soy: true, contains_gluten: true, is_refined_sugar: true, contains_sesame: true }, { tbsp: 18 }), // sesame: made with sesame paste or oil (18 Nov 2026)
   f('sweet chili sauce', [], { kcal: 197, protein: 0.6, carbs: 49, fat: 0.1 }, 'condiment', { is_refined_sugar: true }, { tbsp: 18 }),
   f('tamarind paste', ['tamarind soup base mix', 'tamarind soup base powder'], { kcal: 239, protein: 2.8, carbs: 62.5, fat: 0.6 }, 'condiment', { is_high_fodmap: true }, { tbsp: 15 }),
   f('white vinegar', [], { kcal: 18, protein: 0, carbs: 0.4, fat: 0 }, 'condiment', {}, { tbsp: 15 }),
@@ -672,7 +677,7 @@ export const FOOD_DB: FoodEntry[] = [
   // recalled). Mid-range, made to add up.
   f('injera flatbread', ['injera'], { kcal: 145, protein: 4.5, carbs: 30, fat: 0.8 }, 'carb', { is_grain: true, is_high_carb: true }),
   f('calamansi juice', ['calamansi'], { kcal: 29, protein: 0.5, carbs: 9.5, fat: 0.2 }, 'fruit', {}),
-  f('water', ['warm water', 'cold water', 'boiling water'], { kcal: 0, protein: 0, carbs: 0, fat: 0 }, 'other', {}),
+  f('water', ['warm water', 'cold water', 'boiling water', 'ice', 'ice cubes', 'sparkling water', 'tap water'], { kcal: 0, protein: 0, carbs: 0, fat: 0 }, 'other', {}),
   f('black coffee', ['coffee', 'cold brew coffee', 'brewed coffee', 'filter coffee'], { kcal: 1, protein: 0.1, carbs: 0, fat: 0 }, 'other', {}),
 
   // ===== THE SAME FOOD IN ANOTHER STATE (11 Oct 2026) =====================
@@ -736,6 +741,81 @@ export const FOOD_DB: FoodEntry[] = [
   // A seasoning a method names had no entry at all, so the check on recipe
   // steps could not see it (M19: the prawn salad's "chilli flakes").
   f('chilli flakes', ['chili flakes', 'red pepper flakes', 'crushed chillies', 'crushed red pepper', 'dried chilli flakes'], { kcal: 314, protein: 12, carbs: 50, fat: 17 }, 'condiment', {}, { tsp: 1.5 }), // USDA 02031 pepper, red or cayenne
+
+  // ===== 18 Nov 2026: foods people say every day that the table did not know (the Fable pass on meals) =====
+  // Found by reading ordinary lines through the real lookup: "salt" itself was an unknown food, so "salt and pepper"
+  // in a meal he described was asked about in grams; tomato puree and a fresh chilli were misses; and the foods a log
+  // is full of (a pizza slice, a pint, fish fingers, ice cream) could only be asked about.
+  f('salt', ['sea salt', 'table salt', 'rock salt', 'salt and pepper', 'salt and black pepper', 'seasoning'], { kcal: 0, protein: 0, carbs: 0, fat: 0 }, 'condiment', {}, { tsp: 6, pinch: 0.4 }),
+  f('tomato puree', ['tomato paste', 'tomato purée', 'double concentrate tomato puree'], { kcal: 82, protein: 4.3, carbs: 18.9, fat: 0.5 }, 'condiment', {}, { tbsp: 16, tsp: 5 }), // USDA 11546 tomato paste, canned
+  f('chilli', ['red chilli', 'green chilli', 'fresh chilli', 'chilli pepper', 'jalapeno', 'birds eye chilli', 'finger chilli'], { kcal: 40, protein: 1.9, carbs: 8.8, fat: 0.4 }, 'veg', {}, { whole: 15 }), // USDA 11819 peppers, hot chili, red, raw
+  // A PRODUCT IS NOT ITS MAIN INGREDIENT. "stick" and "ring" are harmless words for a cut of the same food ("carrot
+  // sticks", "pepper rings"), so these three resolved to plain crab, onion and mozzarella and passed gluten-free,
+  // egg-free and fish-free. Each is its own food with what the product is made of; the longer name wins the lookup.
+  f('crab sticks', ['crab stick', 'seafood sticks', 'seafood stick', 'surimi', 'crabsticks'], { kcal: 104, protein: 7.2, carbs: 15.9, fat: 1.3 }, 'protein', { contains_fish: true, contains_shellfish: true, contains_egg: true, contains_gluten: true }, { whole: 16 }), // pack: UK seafood sticks, as recalled; made from white fish, wheat starch and egg white, with crab flavouring
+  f('onion rings', ['battered onion rings', 'onion ring'], { kcal: 250, protein: 3.5, carbs: 30, fat: 12.5 }, 'carb', { contains_gluten: true, is_high_fodmap: true }, { whole: 18 }), // pack: UK frozen battered onion rings, oven baked, as recalled
+  f('mozzarella sticks', ['mozzarella stick', 'breaded mozzarella', 'mozzarella dippers'], { kcal: 320, protein: 14, carbs: 26, fat: 18 }, 'fat', { contains_dairy: true, contains_gluten: true, contains_egg: true }, { whole: 22 }), // USDA 21610 mozzarella sticks, fried (rounded)
+  // Soba is sold as a wheat and buckwheat blend; it used to be an alias of plain buckwheat and so passed gluten-free.
+  f('soba noodles cooked', ['soba noodles', 'soba', 'buckwheat noodles'], { kcal: 99, protein: 5.1, carbs: 21.4, fat: 0.1 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { cup: 114 }), // USDA 20115 noodles, japanese, soba, cooked
+  f('fish fingers', ['fish finger', 'fish sticks', 'cod fish fingers'], { kcal: 200, protein: 14.3, carbs: 16.6, fat: 8.9 }, 'protein', { contains_fish: true, contains_gluten: true }, { whole: 28 }), // CoFID: fish fingers, cod, grilled
+  f('breaded chicken', ['chicken goujons', 'chicken tenders', 'chicken dippers', 'breaded chicken breast', 'southern fried chicken', 'chicken schnitzel'], { kcal: 220, protein: 18, carbs: 15, fat: 10 }, 'protein', { contains_meat: true, contains_gluten: true }), // pack: UK breaded chicken breast pieces, oven baked, as recalled
+  f('chicken nuggets', ['chicken nugget', 'nuggets'], { kcal: 250, protein: 15, carbs: 17, fat: 14 }, 'protein', { contains_meat: true, contains_gluten: true }, { whole: 18 }), // CoFID: chicken nuggets, takeaway (rounded)
+  f('battered fish', ['battered cod', 'battered haddock', 'fish in batter', 'cod in batter', 'chip shop fish'], { kcal: 247, protein: 16.1, carbs: 11.7, fat: 15.4 }, 'protein', { contains_fish: true, contains_gluten: true }, { whole: 180, fillet: 180 }), // CoFID: cod in batter, fried
+  f('sausage roll', ['sausage rolls'], { kcal: 360, protein: 9, carbs: 26, fat: 24 }, 'other', { contains_meat: true, contains_pork: true, is_processed_meat: true, contains_gluten: true, contains_sulphites: true, is_high_carb: true }, { whole: 100, small: 60, mini: 30 }), // CoFID: sausage rolls, flaky pastry (rounded); a bakery roll is about 100 g
+  f('rye bread', ['dark rye bread', 'pumpernickel'], { kcal: 259, protein: 8.5, carbs: 48, fat: 3.3 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { slice: 32 }), // USDA 18060 bread, rye
+  f('ice cream', ['vanilla ice cream', 'dairy ice cream'], { kcal: 207, protein: 3.5, carbs: 23.6, fat: 11 }, 'dairy', { contains_dairy: true, is_refined_sugar: true, is_high_carb: true }, { scoop: 60 }), // USDA 19095 ice creams, vanilla
+  f('custard', ['ready made custard', 'vanilla custard'], { kcal: 100, protein: 2.9, carbs: 15.5, fat: 2.9 }, 'dairy', { contains_dairy: true, is_refined_sugar: true }, { tbsp: 16 }), // pack: UK ready-to-serve custard, as recalled
+  f('sultanas', ['sultana'], { kcal: 275, protein: 2.7, carbs: 69.4, fat: 0.4 }, 'fruit', { is_high_carb: true, is_high_fodmap: true }, { handful: 30, tbsp: 10 }), // CoFID: sultanas
+  f('pizza', ['margherita pizza', 'cheese pizza', 'cheese and tomato pizza'], { kcal: 250, protein: 11, carbs: 31, fat: 9 }, 'other', { is_grain: true, contains_gluten: true, contains_dairy: true, is_high_carb: true }, { slice: 110, whole: 330 }), // CoFID: pizza, cheese and tomato (rounded); a slice of a large pizza is about 110 g, a 10-inch pizza about 330 g
+  f('beer', ['lager', 'ale', 'bitter', 'pale ale', 'ipa'], { kcal: 41, protein: 0.3, carbs: 3, fat: 0 }, 'other', { contains_alcohol: true, contains_gluten: true }, { pint: 568, can: 440, bottle: 330, glass: 284 }), // CoFID: lager, about 4% (a pint is 568 ml)
+  // Drinks
+  f('orange juice', ['fresh orange juice', 'oj', 'orange juice with bits'], { kcal: 45, protein: 0.7, carbs: 10.4, fat: 0.2 }, 'fruit', { is_high_carb: true }, { glass: 200, carton: 250 }), // USDA 09206 orange juice, raw
+  f('apple juice', ['cloudy apple juice'], { kcal: 46, protein: 0.1, carbs: 11.3, fat: 0.1 }, 'fruit', { is_high_carb: true, is_high_fodmap: true }, { glass: 200, carton: 250 }), // USDA 09016 apple juice, unsweetened
+  f('tea', ['black tea', 'green tea', 'herbal tea', 'cup of tea', 'peppermint tea', 'fruit tea'], { kcal: 1, protein: 0.1, carbs: 0, fat: 0 }, 'other', {}, { cup: 240, mug: 260 }), // CoFID: tea, black, infusion
+  f('tea with milk', ['milky tea', 'tea with semi skimmed milk', 'builders tea', 'tea and milk'], { kcal: 7, protein: 0.5, carbs: 0.7, fat: 0.2 }, 'dairy', { contains_dairy: true }, { cup: 240, mug: 260 }), // CoFID: tea, infusion, with semi-skimmed milk
+  f('cappuccino', ['cappuccino whole milk'], { kcal: 40, protein: 2.2, carbs: 3.3, fat: 1.8 }, 'dairy', { contains_dairy: true }, { small: 240, medium: 350, large: 450, cup: 240 }), // high-street cappuccino with whole milk, as recalled (about 140 kcal a medium)
+  f('flat white', ['flat white whole milk'], { kcal: 58, protein: 3.2, carbs: 4.6, fat: 3.1 }, 'dairy', { contains_dairy: true }, { small: 180, medium: 240, cup: 240 }), // high-street flat white with whole milk, as recalled (about 140 kcal)
+  f('hot chocolate', ['hot chocolate made with milk', 'drinking chocolate'], { kcal: 80, protein: 3.5, carbs: 11, fat: 2.5 }, 'dairy', { contains_dairy: true, is_refined_sugar: true }, { mug: 260, cup: 240 }), // CoFID: drinking chocolate made up with semi-skimmed and whole milk (between the two)
+  f('milkshake', ['chocolate milkshake', 'strawberry milkshake', 'vanilla milkshake'], { kcal: 88, protein: 3.7, carbs: 13, fat: 2.5 }, 'dairy', { contains_dairy: true, is_refined_sugar: true, is_high_carb: true }, { small: 300, medium: 400, large: 500 }), // CoFID: milkshake, thick, takeaway
+  f('fruit smoothie', ['smoothie', 'bottled smoothie'], { kcal: 55, protein: 0.6, carbs: 12.5, fat: 0.2 }, 'fruit', { is_high_carb: true }, { glass: 250, bottle: 250 }), // pack: UK bottled fruit smoothie, as recalled
+  f('energy drink', ['red bull', 'monster energy', 'lucozade energy'], { kcal: 45, protein: 0, carbs: 11, fat: 0 }, 'other', { is_refined_sugar: true, is_high_carb: true }, { can: 250 }), // pack: 250 ml can, as recalled
+  f('cider', ['dry cider', 'apple cider', 'pear cider'], { kcal: 40, protein: 0, carbs: 3.5, fat: 0 }, 'other', { contains_alcohol: true, contains_sulphites: true }, { pint: 568, can: 440, bottle: 500, glass: 284 }), // CoFID: cider, between dry (36) and sweet (42)
+  f('spirits', ['gin', 'vodka', 'whisky', 'whiskey', 'rum', 'tequila', 'brandy'], { kcal: 222, protein: 0, carbs: 0, fat: 0 }, 'other', { contains_alcohol: true }, { shot: 25, single: 25, double: 50, measure: 25 }), // CoFID: spirits, 40% volume (a UK single is 25 ml)
+  // Biscuits, cakes and spreads
+  f('digestive biscuit', ['digestive', 'digestives', 'digestive biscuits', 'biscuit', 'biscuits'], { kcal: 465, protein: 6.3, carbs: 68.6, fat: 20.3 }, 'carb', { is_grain: true, contains_gluten: true, is_refined_sugar: true, is_high_carb: true }, { whole: 15 }), // CoFID: biscuits, digestive, plain
+  f('chocolate chip cookie', ['cookie', 'cookies', 'chocolate cookie'], { kcal: 490, protein: 5.5, carbs: 64, fat: 24 }, 'carb', { is_grain: true, contains_gluten: true, contains_dairy: true, contains_egg: true, contains_soy: true, is_refined_sugar: true, is_high_carb: true }, { whole: 25, large: 60 }), // CoFID: cookies, chocolate chip (rounded)
+  f('sponge cake', ['cake', 'victoria sponge', 'birthday cake', 'chocolate cake', 'slice of cake'], { kcal: 400, protein: 4.5, carbs: 52, fat: 20 }, 'carb', { is_grain: true, contains_gluten: true, contains_dairy: true, contains_egg: true, is_refined_sugar: true, is_high_carb: true }, { slice: 75 }), // CoFID: sponge cake with jam and buttercream (rounded)
+  f('blueberry muffin', ['chocolate muffin', 'chocolate chip muffin', 'bakery muffin'], { kcal: 380, protein: 5, carbs: 50, fat: 18 }, 'carb', { is_grain: true, contains_gluten: true, contains_dairy: true, contains_egg: true, is_refined_sugar: true, is_high_carb: true }, { whole: 110 }), // CoFID: muffins, American style (rounded)
+  f('doughnut', ['donut', 'jam doughnut', 'ring doughnut', 'glazed doughnut'], { kcal: 403, protein: 6.1, carbs: 47.2, fat: 22.4 }, 'carb', { is_grain: true, contains_gluten: true, contains_dairy: true, contains_egg: true, is_refined_sugar: true, is_high_carb: true }, { whole: 60 }), // CoFID: doughnuts, ring
+  f('scone', ['plain scone', 'fruit scone'], { kcal: 364, protein: 7.2, carbs: 53.8, fat: 14.6 }, 'carb', { is_grain: true, contains_gluten: true, contains_dairy: true, is_high_carb: true }, { whole: 60, large: 100 }), // CoFID: scones, plain
+  f('flapjack', ['oat flapjack'], { kcal: 493, protein: 4.8, carbs: 62.4, fat: 27 }, 'carb', { is_grain: true, contains_dairy: true, is_refined_sugar: true, is_high_carb: true }, { whole: 60 }), // CoFID: flapjacks (oats are tagged as the oats entry is)
+  f('marmalade', ['orange marmalade'], { kcal: 261, protein: 0.1, carbs: 69.5, fat: 0 }, 'condiment', { is_refined_sugar: true }, { tbsp: 20, tsp: 7 }), // CoFID: marmalade
+  f('chocolate spread', ['nutella', 'hazelnut spread', 'chocolate hazelnut spread'], { kcal: 539, protein: 6.3, carbs: 57.5, fat: 30.9 }, 'fat', { contains_nuts: true, contains_dairy: true, contains_soy: true, is_refined_sugar: true }, { tbsp: 15, tsp: 5 }), // pack: hazelnut chocolate spread
+  f('yeast extract', ['marmite', 'vegemite'], { kcal: 260, protein: 34, carbs: 30, fat: 0.5 }, 'condiment', { contains_gluten: true, contains_celery: true }, { tsp: 8 }), // pack: Marmite (made from barley, wheat, oats and rye; contains celery)
+  // Savoury sides and deli
+  f('hash brown', ['hash browns'], { kcal: 200, protein: 2.3, carbs: 24, fat: 10 }, 'carb', { is_high_carb: true }, { whole: 45 }), // pack: UK frozen hash browns, oven baked, as recalled
+  f('yorkshire pudding', ['yorkshire puddings', 'yorkshire'], { kcal: 208, protein: 6.6, carbs: 24.7, fat: 9.9 }, 'carb', { is_grain: true, contains_gluten: true, contains_dairy: true, contains_egg: true }, { whole: 20, large: 60 }), // CoFID: Yorkshire pudding
+  f('stuffing', ['sage and onion stuffing'], { kcal: 123, protein: 3.4, carbs: 23, fat: 1.4 }, 'carb', { is_grain: true, contains_gluten: true, is_high_fodmap: true }, { tbsp: 25, ball: 40 }), // pack: sage and onion stuffing mix, made up
+  f('potato salad', [], { kcal: 239, protein: 1.6, carbs: 12.2, fat: 20.8 }, 'carb', { contains_egg: true }, { tbsp: 45 }), // CoFID: potato salad with mayonnaise
+  f('garlic bread', ['garlic baguette'], { kcal: 365, protein: 7.8, carbs: 45, fat: 17 }, 'carb', { is_grain: true, contains_gluten: true, contains_dairy: true, is_high_carb: true, is_high_fodmap: true }, { slice: 22 }), // CoFID: garlic bread (rounded)
+  f('poppadom', ['poppadoms', 'papadum', 'papad'], { kcal: 501, protein: 11.5, carbs: 28.3, fat: 38.8 }, 'carb', { is_legume: true }, { whole: 13 }), // CoFID: poppadoms, fried
+  f('vegetable samosa', ['samosa', 'samosas'], { kcal: 217, protein: 5.1, carbs: 30, fat: 9.3 }, 'carb', { is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 60 }), // CoFID: samosas, vegetable, retail
+  f('spring roll', ['vegetable spring roll', 'spring rolls'], { kcal: 220, protein: 4.5, carbs: 26, fat: 11 }, 'carb', { is_grain: true, contains_gluten: true, contains_soy: true }, { whole: 60, mini: 20 }), // CoFID: spring rolls, vegetable, takeaway (rounded)
+  f('prawn crackers', [], { kcal: 570, protein: 0.5, carbs: 59, fat: 39 }, 'carb', { contains_shellfish: true, is_high_carb: true }, { handful: 20, bag: 60 }), // CoFID: prawn crackers, takeaway
+  f('beef burger', ['beef burger patty', 'burger patty', 'beef patty', 'quarter pounder patty', 'beefburger'], { kcal: 326, protein: 26.5, carbs: 0.1, fat: 24.4 }, 'protein', { contains_meat: true }, { whole: 78 }), // CoFID: beefburgers, 100% beef, grilled (a quarter pounder cooks to about 78 g)
+  f('black pudding', [], { kcal: 297, protein: 10.3, carbs: 16.6, fat: 21.5 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true, is_grain: true, contains_gluten: true }, { slice: 30 }), // CoFID: black pudding, fried
+  f('scotch egg', ['scotch eggs'], { kcal: 241, protein: 12, carbs: 13.1, fat: 16 }, 'protein', { contains_egg: true, contains_meat: true, contains_pork: true, is_processed_meat: true, contains_gluten: true, contains_sulphites: true }, { whole: 113, mini: 20 }), // CoFID: Scotch eggs, retail
+  f('pork pie', ['pork pies'], { kcal: 363, protein: 10.8, carbs: 23.7, fat: 25.7 }, 'protein', { contains_meat: true, contains_pork: true, is_processed_meat: true, is_grain: true, contains_gluten: true }, { whole: 140, mini: 50, slice: 60 }), // CoFID: pork pie, individual
+  f('cornish pasty', ['pasty', 'pasties'], { kcal: 267, protein: 6.7, carbs: 25, fat: 16.3 }, 'other', { contains_meat: true, is_grain: true, contains_gluten: true, is_high_carb: true }, { whole: 250 }), // CoFID: Cornish pasty
+  f('chicken wings', ['chicken wing', 'roast chicken wings'], { kcal: 290, protein: 26.9, carbs: 0, fat: 19.5 }, 'protein', { contains_meat: true }, { whole: 34 }), // USDA 05102 chicken wing, meat and skin, roasted (one wing, bone removed, 34 g)
+  f('sun dried tomatoes', ['sundried tomatoes', 'sun-dried tomatoes'], { kcal: 213, protein: 5.1, carbs: 23.3, fat: 14.1 }, 'veg', {}, { tbsp: 14 }), // USDA 11956 tomatoes, sun-dried, packed in oil, drained
+  f('gherkins', ['gherkin', 'pickles', 'pickle', 'pickled gherkins', 'cornichons', 'dill pickle'], { kcal: 14, protein: 0.9, carbs: 2.6, fat: 0.1 }, 'veg', {}, { whole: 35, slice: 7 }), // CoFID: gherkins, pickled
+  f('melon', ['cantaloupe', 'honeydew melon', 'galia melon', 'cantaloupe melon'], { kcal: 34, protein: 0.8, carbs: 8.2, fat: 0.2 }, 'fruit', {}, { slice: 100, cup: 160 }), // USDA 09181 melons, cantaloupe
+  f('kefir', ['milk kefir', 'kefir drink'], { kcal: 60, protein: 3.4, carbs: 4.6, fat: 3.2 }, 'dairy', { contains_dairy: true }, { glass: 200, bottle: 250 }), // pack: whole milk kefir, as recalled
+  f('casein protein powder', ['casein', 'casein powder', 'micellar casein'], { kcal: 360, protein: 80, carbs: 4, fat: 1.5 }, 'protein', { contains_dairy: true }, { scoop: 30 }), // pack: micellar casein, as recalled
+  f('creatine', ['creatine monohydrate'], { kcal: 0, protein: 0, carbs: 0, fat: 0 }, 'other', {}, { scoop: 5, tsp: 5 }),
+  f('sweetener', ['stevia', 'artificial sweetener', 'sweetener tablet', 'canderel', 'splenda'], { kcal: 0, protein: 0, carbs: 0, fat: 0 }, 'condiment', {}, { tsp: 1, tablet: 0.1 }),
+  f('red wine', ['wine', 'white wine', 'rose wine', 'prosecco'], { kcal: 85, protein: 0.1, carbs: 2.6, fat: 0 }, 'other', { contains_alcohol: true, contains_sulphites: true }, { glass: 175, bottle: 750 }), // USDA 14096 wine, table, red; a UK medium glass is 175 ml
 ]
 
 // ---------------------------------------------------------------------------
@@ -842,7 +922,7 @@ const HOUSEHOLD_UNITS: Record<string, Record<string, number>> = {
   'muesli': { cup: 85, handful: 40 }, 'cornflakes': { cup: 28 }, 'popcorn': { cup: 8, handful: 15 }, 'tortilla chips': { handful: 30 },
   'weetabix': { whole: 19 }, 'crackers': { whole: 5 }, 'rye crispbread': { whole: 10 }, 'croissant': { whole: 57 },
   // dairy and fats by the cup
-  'milk whole': { cup: 244 }, 'milk skimmed': { cup: 245 }, 'milk semi skimmed': { cup: 244 }, 'soy milk': { cup: 243 },
+  'milk whole': { cup: 244, pint: 585 }, 'milk skimmed': { cup: 245, pint: 588 }, 'milk semi skimmed': { cup: 244, pint: 586 }, 'soy milk': { cup: 243 }, // a UK pint is 568 ml; milk weighs about 1.03 g per ml
   'almond milk': { cup: 240 }, 'oat milk': { cup: 240 }, 'greek yoghurt 0%': { cup: 245 }, 'greek yoghurt full fat': { cup: 245 },
   'natural yoghurt': { cup: 245 }, 'soy yoghurt': { cup: 245 }, 'coconut yoghurt': { cup: 245 }, 'cottage cheese': { cup: 226 },
   'ricotta cheese': { cup: 246 }, 'cheddar cheese': { cup: 113 }, 'mozzarella': { cup: 112 }, 'feta cheese': { cup: 150 },
@@ -1657,10 +1737,56 @@ function lookupForLine(line: MealIngredientLine): FoodEntry | null {
   // a food word) misses it. Look the FOOD up past the amount and the measure word the reader could not weigh, so
   // the line says what it is: a known food with an unknown amount, never an unknown food. It stays unweighed.
   if (line.unread) {
+    // "black pepper to taste", "fresh basil for garnish": the food is everything before the words that say there is
+    // no amount (18 Nov 2026; it was looked up with them attached, and so was an unknown food).
+    const bare = line.name.replace(/[\s,]*\b(?:to taste|as needed|for serving|for garnish|for frying)\b.*$/i, '').trim()
+    if (bare && bare !== line.name) {
+      const said = lookupIngredient(bare)
+      if (said) return said
+    }
     const food = line.name.replace(/^\s*(?:[\d½¼¾⅓⅔.\/-]+\s*)*/, '').replace(/^\S+\s+(?:of\s+)?/, '')
-    if (food && food !== line.name) return lookupIngredient(food)
+    if (food && food !== line.name) return lookupIngredient(food) ?? lookupIngredient(food.replace(/^\s*(?:[\d½¼¾⅓⅔.\/-]+\s*)+/, ''))
   }
   return null
+}
+
+/**
+ * SEASONINGS NEED NO AMOUNT (18 Nov 2026). "Salt and pepper", "fresh basil" or "chilli flakes" with no amount is how
+ * people say it, and the energy in the pinch they mean is nothing a day's numbers can see. The reader is right that the
+ * line has no amount; asking "how many grams of salt?" was the wrong consequence. So for these foods only, a line whose
+ * amount was not given is counted at nothing and understood. A line that DOES give an amount ("2 tbsp paprika") is
+ * costed as written, and their allergen tags are read as ever. Oil, butter, sauces, cheese and anything else with real
+ * energy are deliberately not here: "a drizzle of olive oil" is still asked about.
+ */
+const TO_TASTE_FOODS: ReadonlySet<string> = new Set([
+  'salt', 'black pepper', 'water', 'lemon', 'lime', 'chilli flakes', 'chilli', 'garlic',
+  'paprika', 'cumin', 'cinnamon', 'turmeric', 'dried oregano', 'curry powder', 'garam masala', 'ginger', 'nutmeg',
+  'coriander', 'parsley', 'basil', 'mint', 'dill', 'chives', 'rosemary', 'thyme', 'bay leaves', 'vanilla extract',
+  'sweetener', 'tea', 'creatine',
+].filter(n => FOOD_DB.some(e => e.name === n)))
+
+/** True when this food, said with no amount, is a seasoning the numbers can ignore. */
+export function isToTaste(entry: FoodEntry | null): boolean {
+  return !!entry && TO_TASTE_FOODS.has(entry.name)
+}
+
+/**
+ * A seasoning line with no amount, as a line a meal can keep: "salt and pepper" becomes one pinch of it, "squeeze of
+ * lemon" one squeeze, so the card never prints the reader's placeholder ("1g pinch of salt"). Any other line is
+ * returned untouched.
+ */
+export function toTasteLine(line: MealIngredientLine): MealIngredientLine {
+  if (!line.unread) return line
+  const entry = lookupForLine(line)
+  if (!isToTaste(entry)) return line
+  const said = line.name
+    .replace(/[\s,]*\b(?:to taste|as needed|for serving|for garnish)\b.*$/i, '')
+    .replace(/^\s*(?:the\s+)?(?:juice|zest|rind)\s+of\s+(?:[\d½¼¾.\/-]+\s*)?/i, '')
+    .replace(/^\s*(?:(?:a|an)\s+)?(?:pinch|squeeze|sprinkle|dash|grind|twist|wedge|handful|sprig)(?:es|s)?\s+(?:of\s+)?/i, '')
+    .trim()
+  const name = said && lookupIngredient(said) === entry ? said : entry!.name
+  const unit = entry!.name === 'lemon' || entry!.name === 'lime' ? 'squeeze' : entry!.name === 'water' ? 'splash' : 'pinch'
+  return { name, quantity: 1, unit }
 }
 
 /**
@@ -1681,7 +1807,14 @@ export function computeMealMacros(ingredients: MealIngredientLine[]): ComputedMe
 
   for (const line of ingredients) {
     const entry = lookupForLine(line)
-    const { grams, basis } = resolveAmount(entry, line.unit, line.quantity, line.name)
+    const read = resolveAmount(entry, line.unit, line.quantity, line.name)
+    // A seasoning said with no amount ("salt and pepper", "black pepper to taste") counts as nothing, and is understood.
+    if (isToTaste(entry) && (line.unread || read.grams == null)) {
+      linesWithAmount++
+      lines.push({ input: line, entry, grams: 0, basis: 'counted', macros: { kcal: 0, protein: 0, carbs: 0, fat: 0 }, understood: true })
+      continue
+    }
+    const { grams, basis } = read
     // The reader's own verdict first ("to taste", no amount). Then, for a food that RESOLVED, whether this
     // file can weigh its unit. A food that did not resolve is unmatched either way, so its unit is not asked about.
     const understood = !line.unread && (entry ? grams != null : true)
