@@ -129,9 +129,9 @@ console.log('\n4. Icons are presentation — the values they sit beside are unto
     dietValues.filter(v => !(DIETARY_PREFERENCES as string[]).includes(v)))
   // Every SELECTABLE preference: the pregnancy rule is enforced but never offered (the Pregnant tick switches it on,
   // his 15 Nov "NHS list, auto-on"), and it must be the only one held back.
-  check('...and every enforced preference is offered, except the one the Pregnant tick switches on',
+  check('...and every enforced preference is offered, except the four nobody picks (the Pregnant tick\'s, and the allergy card\'s three)',
     (SELECTABLE_DIETARY_PREFERENCES as string[]).every(p => dietValues.includes(p))
-      && JSON.stringify((DIETARY_PREFERENCES as string[]).filter(p => !(SELECTABLE_DIETARY_PREFERENCES as string[]).includes(p))) === '["pregnancy"]',
+      && JSON.stringify((DIETARY_PREFERENCES as string[]).filter(p => !(SELECTABLE_DIETARY_PREFERENCES as string[]).includes(p))) === '["pregnancy","peanut-free","tree-nut-free","oat-free"]',
     (DIETARY_PREFERENCES as string[]).filter(p => !dietValues.includes(p)))
   // + the five health conditions on the same card (his ruling 14 Nov 2026, "Fold into injuries"): frozen too, because
   // assembleProfile splits on exactly these codes (health-conditions.ts).

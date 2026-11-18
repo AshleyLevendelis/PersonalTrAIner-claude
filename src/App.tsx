@@ -1147,7 +1147,7 @@ function App() {
       // The due date (pregnancy, 15 Nov 2026), absent before its migration: read as none.
       due_date: typeof profileRow.due_date === 'string' ? profileRow.due_date : null,
       // The allergy card (18 Nov 2026), absent before its migration: read as none.
-      allergies: allergiesOf(profileRow),
+      allergies: allergiesOf({ allergies: profileRow.allergies }),
       // The coach's running memory of the chat (chat-summary.ts). Written to the profile since 17 Nov 2026 and never
       // read back: on a new phone, or after the browser cleared its storage, the summary in the database was ignored
       // (test:profile-restore, red from the day the column was added). Absent before its migration runs.

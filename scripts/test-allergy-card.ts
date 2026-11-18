@@ -119,7 +119,7 @@ function main() {
   ok('the coach is sent the record in words', /allergies:\s*allergiesOf\(profile\)\.map\(allergyLine\)/.test(chat) && /context\.allergies\.join\(/.test(coach))
   ok('Profile has the Allergies row above Diet and saves through the one save', profile.indexOf('label="Allergies"') > 0 && profile.indexOf('label="Allergies"') < profile.indexOf('label="Diet"') && /savePatch\(\{\s*allergies:\s*next\s*\}\)/.test(profile))
   ok('a save before the database step says so', /'due_date',\s*'allergies'\]/.test(profile))
-  ok('the profile is loaded with the record, and the shopping list is handed its lines', /allergies:\s*allergiesOf\(profileRow\)/.test(app) && /labelLines=\{allergyLabelLines\(allergiesOf\(profile\)\)\}/.test(app) && /labelLines\.map\(/.test(grocery))
+  ok('the profile is loaded with the record, and the shopping list is handed its lines', /allergies:\s*allergiesOf\(\{\s*allergies:\s*profileRow\.allergies\s*\}\)/.test(app) && /labelLines=\{allergyLabelLines\(allergiesOf\(profile\)\)\}/.test(app) && /labelLines\.map\(/.test(grocery))
   ok('the database step exists', existsSync(join(ROOT, 'supabase/migrations/20261118120000_add_allergies.sql')))
 
   console.log(`\n${ran} checks ran`)

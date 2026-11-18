@@ -253,7 +253,7 @@ check('unknown injury string flags nothing (documented inert path)', getFlaggedJ
 
 console.log('\n7. Dietary options stay derived from diet-rules')
 // 15 Nov 2026: every rule but 'pregnancy', which only the Pregnant tick switches on (never offered).
-check('dietary option count matches DIETARY_PREFERENCES, less the pregnancy rule', DIETARY_OPTIONS.length === DIETARY_PREFERENCES.length - 1 && !DIETARY_OPTIONS.some(o => (o.value as string) === 'pregnancy'))
+check('dietary option count matches DIETARY_PREFERENCES, less the four rules nobody picks (pregnancy, and the allergy card\'s three)', DIETARY_OPTIONS.length === DIETARY_PREFERENCES.length - 4 && !DIETARY_OPTIONS.some(o => ['pregnancy', 'peanut-free', 'tree-nut-free', 'oat-free'].includes(o.value as string)))
 
 console.log('\n8. Helpers')
 check('toggleValue adds', JSON.stringify(toggleValue(['a'], 'b')) === JSON.stringify(['a', 'b']))
