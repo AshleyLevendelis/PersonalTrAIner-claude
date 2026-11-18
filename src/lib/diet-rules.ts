@@ -156,7 +156,7 @@ export const FORBIDDEN_TAGS: Record<DietaryPreference, TagKey[]> = {
 export const DIETARY_PREFERENCES: DietaryPreference[] = Object.keys(FORBIDDEN_TAGS) as DietaryPreference[]
 
 /** Rules nobody picks: the Pregnant tick switches on 'pregnancy', the allergy card the other three. */
-export const DERIVED_ONLY_PREFERENCES: DietaryPreference[] = ['pregnancy', 'peanut-free', 'tree-nut-free', 'oat-free']
+const DERIVED_ONLY_PREFERENCES: DietaryPreference[] = ['pregnancy', 'peanut-free', 'tree-nut-free', 'oat-free']
 
 /** The ones a person picks: every rule except the derived ones. */
 export const SELECTABLE_DIETARY_PREFERENCES: DietaryPreference[] = DIETARY_PREFERENCES.filter(p => !DERIVED_ONLY_PREFERENCES.includes(p))

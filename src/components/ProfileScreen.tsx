@@ -10,7 +10,6 @@
 // not retire — see that file's original doc comment for why).
 // ---------------------------------------------------------------------------
 
-import { AllergiesEditor } from '@/components/profile/AllergiesEditor'
 import { allergiesOf, allergyLine } from '@/lib/allergies'
 import { PAUSE_WORDS } from '@/lib/plan-pause'
 import { otherInjuryOutcome, PELVIC_PREGNANCY_LINE } from '@/lib/other-injury'
@@ -25,7 +24,7 @@ import { loadSwitches, remindersSummary } from '@/lib/coach-reach-out'
 import { splitFoodList } from '@/lib/food-list'
 import { containsPhrase } from '@/lib/meal-ingredients'
 import { isStartingOut } from '@/lib/starting-out'
-import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { useEffect, useMemo, useRef, useState, Suspense, lazy } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -245,6 +244,9 @@ function SheetRow({ label, value, onOpen }: { label: string; value: string; onOp
     </button>
   )
 }
+
+// Off first paint (18 Nov 2026: the sheet's editor put first paint 1 kB over its ceiling): fetched when the sheet opens.
+const AllergiesEditor = lazy(() => import('@/components/profile/AllergiesEditor').then(m => ({ default: m.AllergiesEditor })))
 
 type ProfileSheet =
   | 'body' | 'goal' | 'injuries'
@@ -1753,7 +1755,9 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         </div>
       )
       case 'allergies': return (
-        <AllergiesEditor allergies={allergiesOf(profile)} onChange={next => savePatch({ allergies: next })} />
+        <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+          <AllergiesEditor allergies={allergiesOf(profile)} onChange={next => savePatch({ allergies: next })} />
+        </Suspense>
       )
       case 'diet': return (
         <div className="space-y-3 text-sm">

@@ -410,6 +410,8 @@
     "verify:coach-speaks-first": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-speaks-first.mjs",
     "verify:coach-hello": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/coach-hello.mjs",
     "verify:edit-undo": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/edit-undo.mjs",
+    "verify:allergy-profile": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/allergy-profile.mjs",
+    "verify:allergy-card": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/allergy-card.mjs",
     "verify:profile-fixes": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-fixes.mjs",
     "verify:home-tools-fixes": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/home-tools-fixes.mjs",
     "verify:chat-offer-replace": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-offer-replace.mjs",

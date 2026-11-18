@@ -336,9 +336,14 @@ console.log('\n2b. The coach is not on the path to first paint')
   // logged-meal sheet, odd-reps, the Log set button, base-block labels); measured 588 at the head of them, 8 kB over.
   // MOVED 17 Nov 2026: 596 -> 604, the chat review merged with main's secondary muscles (catalogue data in the first
   // chunk); MEASURED 596 through this gate on the merge, each half under the line alone.
-  headroom('first paint fetches', firstLoadGzip, 604, 'kB gzipped')
+  // MOVED 18 Nov 2026: 604 -> 612. Crossed at 605 by the allergy card (three food rules, their tags and the Profile
+  // row are first-paint code: the meal filters run at first paint). Two things were taken OFF first paint first: the
+  // sheet's editor is fetched when it opens, and the chat's half lives in its own file (allergy-chat.ts); that brought
+  // 605 to 604, MEASURED through this gate, which is where the day's earlier meal work (new foods and plate rules in
+  // the first chunk) had already left it: 596 on 17 Nov, 603 by this morning's sweep. 612 is 8 kB over today's 604.
+  headroom('first paint fetches', firstLoadGzip, 612, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 604, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 612, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))

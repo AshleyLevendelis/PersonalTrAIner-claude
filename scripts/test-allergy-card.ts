@@ -5,11 +5,12 @@ import { join } from 'path'
 import { FOOD_DB } from '../src/lib/food-db'
 import { validateMealAgainstDiet, SELECTABLE_DIETARY_PREFERENCES, DIETARY_PREFERENCES } from '../src/lib/diet-rules'
 import { mealRestrictionsOf } from '../src/lib/health-conditions'
-import { allergiesOf, allergyRestrictions, allergyForRule, allergyName, carriesPen, describesReaction, REACTION_FIRST_LINE,
-  labelLines, allergyLine, allergensSaid, recordFor, withoutSafetyPromises, NO_PROMISE_LINE, ALLERGEN_RULES, ALLERGY_OFFER_WORDS,
-  type AllergyRecord } from '../src/lib/allergies'
+import { allergiesOf, allergyRestrictions, allergyForRule, allergyName, labelLines, allergyLine, type AllergyRecord } from '../src/lib/allergies'
+import { carriesPen, describesReaction, REACTION_FIRST_LINE, allergensSaid, recordFor, withoutSafetyPromises, NO_PROMISE_LINE, ALLERGEN_RULES, ALLERGY_OFFER_WORDS } from '../src/lib/allergy-chat'
 import { namedFoodClash, clashSentence, allergyRefusal, likeRefusal } from '../src/lib/named-food-clash'
 import { detectAllergenTags } from '../src/lib/onboarding-slots'
+import { ask } from '../src/lib/coach-voice'
+import { PREGNANCY_TICK_WORDS } from '../src/lib/health-conditions'
 
 const ROOT = process.cwd()
 let ran = 0, failures = 0
@@ -87,6 +88,8 @@ function main() {
   ok('"I\'m coeliac" is gluten, recorded as coeliac', allergensSaid("I'm coeliac").join() === 'gluten' && recordFor('gluten', "I'm coeliac").coeliac === true && recordFor('gluten', 'allergic to wheat').coeliac === null)
   ok('a denial records nothing', allergensSaid("I'm not allergic to nuts").length === 0 && allergensSaid('I have no allergies').length === 0)
   ok('a food with no allergy word records nothing', allergensSaid('I love peanut butter').length === 0 && allergensSaid('can I have eggs for breakfast').length === 0)
+  ok('an offer that is already a question is said as written, never "Want me to Shall I"', ask(ALLERGY_OFFER_WORDS.offer('tree-nut allergy')).startsWith('Shall I record your tree-nut allergy on your profile?') && ask(PREGNANCY_TICK_WORDS.offer).startsWith('Shall I tick Pregnant') && !/Want me to Shall/.test(ask(PREGNANCY_TICK_WORDS.offer)))
+  ok('a verb phrase still becomes "Want me to ...?"', ask('swap it for a goblet squat.') === 'Want me to swap it for a goblet squat?')
   ok('the offer names it and promises nothing', /Shall I record your tree-nut allergy/.test(ALLERGY_OFFER_WORDS.offer('tree-nut allergy')) && /filtered, not verified/.test(ALLERGY_OFFER_WORDS.offer('x')))
 
   console.log('\n[6] The coach never promises what the app cannot check')
@@ -111,6 +114,7 @@ function main() {
   ok('the pen line is added before the coach is asked', chat.indexOf('content: REACTION_FIRST_LINE') > 0 && chat.indexOf('content: REACTION_FIRST_LINE') < chat.indexOf("await offerFromApp('propose_pregnancy_tick'"))
   ok('the refusal and the like refusal are given the record', /allergyRefusal\(clash,\s*allergiesOf\(profile\)\)/.test(chat) && /likeRefusal\(c,\s*allergiesOf\(profile\)\)/.test(chat))
   ok('the coach\'s words go through the promise check when an allergen rule is on', /ALLERGEN_RULES\.includes\(r\)/.test(chat) && /withoutSafetyPromises\(out\.text\)\.reply/.test(chat))
+  ok('a described reaction is never answered with the food refusal', /if \(describesReaction\(userSaid\)\) \{[\s\S]{0,260}return processResponseInner\(result, userSaid\)/.test(chat) && chat.indexOf('if (describesReaction(userSaid))') < chat.indexOf('const clash = namedFoodClash(userSaid'))
   ok('the chat offers the card and its confirm writes the column', /offerFromApp\('propose_allergy_record'/.test(chat) && /update\(\{\s*allergies:\s*next\s*\}\)/.test(chat) && /isMissingColumnError\(error,\s*'allergies'\)/.test(chat))
   ok('the coach is sent the record in words', /allergies:\s*allergiesOf\(profile\)\.map\(allergyLine\)/.test(chat) && /context\.allergies\.join\(/.test(coach))
   ok('Profile has the Allergies row above Diet and saves through the one save', profile.indexOf('label="Allergies"') > 0 && profile.indexOf('label="Allergies"') < profile.indexOf('label="Diet"') && /savePatch\(\{\s*allergies:\s*next\s*\}\)/.test(profile))

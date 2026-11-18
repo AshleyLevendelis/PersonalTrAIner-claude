@@ -131,6 +131,11 @@ const iso = (offsetDays: number) => {
 // ?diet=nut-free (comma-separated): the person's dietary restrictions, for verify:named-food-clash (runs 7-10, H41).
 // INPUT only: what the profile says she cannot eat; what the app does with it is the app's.
 const DIET = (new URLSearchParams(location.search).get('diet') ?? '').split(',').map(s => s.trim()).filter(Boolean)
+// THE ALLERGY CARD (18 Nov 2026): ?allergies=tree nuts:pen:avoid,gluten:coeliac — INPUT only, the app reads it.
+const ALLERGIES = (new URLSearchParams(location.search).get('allergies') ?? '').split(',').map(s => s.trim()).filter(Boolean).map(s => {
+  const [allergen, ...flags] = s.split(':')
+  return { allergen, pen: flags.includes('pen') ? true : null, traces: flags.includes('avoid') ? 'avoid' : null, coeliac: flags.includes('coeliac') ? true : null, oats: null }
+})
 
 const profile: UserProfile = {
   id: PROFILE_ID,
@@ -141,6 +146,7 @@ const profile: UserProfile = {
   workout_split_preference: 'upper_lower',
   training_days: DAYS.map((day, i) => ({ day, available: availableIdx.has(i) })),
   weekly_schedule: {}, dietary_preferences: DIET, concurrent_activities: [],
+  allergies: ALLERGIES as never,
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
   created_at: new Date(anchorNowMs() - 9 * 86400000).toISOString(),

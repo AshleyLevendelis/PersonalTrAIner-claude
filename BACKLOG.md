@@ -2,6 +2,34 @@
 
 Newest first. One line each.
 
+- [x] **THE ALLERGY CARD, BUILT (18 Nov 2026, his "Build the leftovers"; his rulings of 15 Nov; `docs/plans/allergy-card.md`).**
+  WHAT WAS WRONG: a tree-nut allergy was a "Nut-free" diet tick that also banned peanuts and said nothing of how
+  serious it is; a coeliac was a "Gluten-free" tick plus a note that changed nothing, and the coach promised her
+  "everything strictly avoids cross-contamination". WHAT CHANGED: one record per allergy on the profile (`allergies`,
+  migration 20261118120000): allergen, adrenaline pen, traces, and for gluten coeliac and oats. The allergen switches
+  on the meal filters through `mealRestrictionsOf`, the one reader every meal path uses, so kept meals, likes, swaps,
+  the meal writer and the day search all obey it with no second list. Three rules nobody picks: `peanut-free`,
+  `tree-nut-free`, `oat-free`; the nut split is worked out from two name lists and a nut food on neither carries
+  BOTH (the safe side); "Nut-free" is unchanged. Profile has an Allergies row above Diet; the chat offers the card
+  when he says he is allergic (nothing saved before the tap); the refusal says "you have a tree-nut allergy" when one
+  is recorded and "your profile says" for a diet tick; someone who carries a pen and describes a reaction gets "Use
+  your adrenaline pen now and call 999." under his message before the coach answers; the shopping list says "check
+  the label" for traces and coeliac; with any allergen rule on, a coach sentence that promises safety, a guarantee or
+  no traces is replaced by the app's own line. DECIDED BY HIM: all of the above (15 Nov, three answers). MINE,
+  mechanical: the promise check runs in the app, not the server, so it holds before the coach is deployed.
+  FOUND BY THE BROWSER DRIVER, not by 95 green logic checks: "my lips are swelling after that pesto" was answered
+  "Pesto has tree nuts in it... so I won't suggest it" (a described reaction now leaves the coach's reply alone and
+  builds no food card); and every app-raised offer read "Want me to Shall I...", THE PREGNANT TICK'S INCLUDED, live
+  since 15 Nov (an offer that is already a question is now said as written). VERIFIED: `test:allergy-card` 98 checks,
+  15 mutations caught of 15 applied (one did not apply and is not counted); `verify:allergy-card` 19 checks, 6
+  browser mutations caught; `verify:allergy-profile` 12 checks, 2 caught; screenshots read. First paint crossed its
+  ceiling by under 1 kB: the editor was moved off first paint and the chat half into its own file (605 -> 604), then
+  the ceiling moved 604 -> 612 with the measured note. NOT VERIFIED: nothing on the live app; what the deployed coach
+  says with the record in front of it (exam). NOT BUILT: the "may contain" line on meal cards; setup recording the
+  card (his answer 3 allows the tick). Scope review: food filtering on the app's own list and saying plainly what it
+  cannot check; the reaction line is first aid, his call; no clinical nutrition.
+  THE ARTIFACT CHECK that led here: `docs/audits/artifact-leftovers-2026-11-18.md` (twelve pages, about 400 listed
+  items; what is still open, grouped, with the build order).
 - [x] **MERGED TO `main` AT 203517ad (PR #30), 18 Nov 2026, on his word ("Merge it now", from three options: merge, questions first, hold).**
   The 18 commits of the meals, coach and plans pass. Verified after the merge: `main`'s tree is identical to the
   swept branch, and `main`'s coach server file is now the one that parses. LIVE: the frontend only (ships on merge).

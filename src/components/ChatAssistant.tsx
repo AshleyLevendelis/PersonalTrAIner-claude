@@ -99,7 +99,8 @@ import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options
 import { compileFoodDislikes, compileSoftExercisePreferences } from '@/lib/fact-compiler'
 import { coachSwapPick, swapOptionsBlock } from '@/lib/coach-swap-pick'
 import { namedFoodClash, namedFoodKindAsk, clashSentence, allergyRefusal, likeClash, likeRefusal } from '@/lib/named-food-clash'
-import { allergiesOf, carriesPen, describesReaction, REACTION_FIRST_LINE, allergyLine, allergensSaid, recordFor, allergyName, ALLERGY_OFFER_WORDS, withoutSafetyPromises, ALLERGEN_RULES, type Allergen } from '@/lib/allergies'
+import { allergiesOf, allergyLine, allergyName, type Allergen } from '@/lib/allergies'
+import { carriesPen, describesReaction, REACTION_FIRST_LINE, allergensSaid, recordFor, ALLERGY_OFFER_WORDS, withoutSafetyPromises, ALLERGEN_RULES } from '@/lib/allergy-chat'
 import { firmFoodExclusions, foodDislikesToAsk, DISLIKE_ASK, mergeFoodsToAvoid } from '@/lib/food-exclusions'
 import { isRedFlagTurn, readRedFlag, writeRedFlag, redFlagStateAt, unpromptedAfterRedFlag, RED_FLAG_WORDS } from '@/lib/red-flag'
 import { PAUSE_WORDS } from '@/lib/plan-pause'
@@ -6197,6 +6198,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     return { ...out, text: withoutSafetyPromises(out.text).reply }
   }
   const processResponseChecked = async (result: ChatApiResponse, userSaid = ''): ReturnType<typeof processResponseInner> => {
+    // HE IS DESCRIBING A REACTION, NOT ASKING FOR THE FOOD (found by verify:allergy-card, 18 Nov 2026: "my lips are
+    // swelling after that pesto" was answered "Pesto has tree nuts in it... so I won't suggest it"). The refusal is for
+    // a food he wants; here the coach's own reply stands and no food card is built.
+    if (describesReaction(userSaid)) {
+      if (result.proposal && FOOD_OFFER_KINDS.has(result.proposal.kind)) return { text: result.reply ?? '' }
+      return processResponseInner(result, userSaid)
+    }
     const clash = namedFoodClash(userSaid, mealRestrictionsOf(profile), [...compileFoodDislikes(memoryFacts), ...(profile.disliked_foods ?? [])])
     if (!clash) {
       // A FOOD WHOSE KIND DECIDES IT (his ruling 10 Nov 2026, "Ask which": a gluten-free person's bare "calamari").

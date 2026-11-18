@@ -966,6 +966,9 @@ export function whenSaid(date: string, today: string): string {
 }
 
 export function ask(verbPhrase: string): string {
+  // ALREADY A QUESTION (18 Nov 2026, read off a screenshot: "Want me to Shall I record your tree-nut allergy...?", and
+  // the Pregnant tick's offer read the same way): words that open with their own question are said as written.
+  if (/^(shall i|should i|want me to|do you want|would you like)\b/i.test(verbPhrase.trim())) return verbPhrase.trim()
   const trimmed = verbPhrase.trim().replace(/[.?!:]+$/, '')
   return `Want me to ${trimmed}?`
 }
