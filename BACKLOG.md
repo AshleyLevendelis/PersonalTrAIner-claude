@@ -2,6 +2,37 @@
 
 Newest first. One line each.
 
+- [x] **LEFTOVERS FROM THE ARTIFACT CHECK, BUILT 18 Nov 2026 (his "Build the leftovers"; `docs/audits/artifact-leftovers-2026-11-18.md`).**
+  Each a training or mechanical decision (mine under the 18 Sep delegation; basis in `docs/plans/weights-leftovers-2026-11-18.md`).
+  (1) **A moved meal light on protein says so** (Edit page §14): a meal moved into a bigger slot keeps its own foods and
+  is resized on calories, so a carb-led snack moved to dinner arrived with a fraction of dinner's protein and the card
+  said nothing. Now: "X is light on protein for dinner: about N g, where dinner usually carries about M g", under 85%
+  of the slot's share (the day-test floor). Never refused, never on a snack. `test:meal-move` §11 (4 mutations, one
+  caught only after a binding snack case was added).
+  (2) **Three goal warnings written on 14 Sep could never fire**: moving the block's main lift last in a strength
+  phase, banning it, and an ongoing volume cut in a building phase. No caller passed those kinds. Wired;
+  `verify:tradeoff-reach` sits the chat in a building week and a strength week found from the plan's own phases and
+  sees each question and its "Do it anyway" (14 checks; 4 browser mutations caught). Still unreached: the third
+  same-day shortening (needs a per-weekday count nothing keeps).
+  (3) **A deload stays a deload** (CONFIRMED defect): the block review's held weight and a confirmed "Start heavier"
+  each copied ONE load, priced off week 1, into every week of the block, so the recovery week was as heavy as the
+  loading weeks and the card showed it under "Deload week: lighter on purpose". One function now prices each week as
+  itself, the deload at 70%. And the suggestion said "You've consistently hit the top of your range" while its
+  trigger never looks at the range: it now says "You improved on X in most sessions last block". `test:block-weight`
+  (28 checks, 6 mutations, one caught only after the fixture used a real lift).
+  (4) **One lift away for weeks while training went on** comes back eased by the same bands as a break, asked of
+  that lift's own last session; the stronger of the two applies, never both, never a restart offer; its note and
+  label say how long ("you last did this one 4 weeks ago", "eased: not done lately"), never "your break". Before: last
+  time plus a step, or this week's printed number that climbed through weeks it was never trained. `test:layoff`
+  (+18 checks, 7 mutations), `verify:layoff` S0-S4 (3 browser mutations), screenshot read.
+  (5) **Far more reps than asked at the same weight moves more than one step**: every set past the top by half the
+  range's width (at least 3 reps) is worked from the weakest set's estimated max back to the top of the range, capped
+  at 10% a session on whole steps; on the card and in the testing week's anchor, whose sentence then names the easy
+  sets, never a set not lifted. Binds from about 50 kg up (10% of a lighter weight is one step). `test:lift-effort`
+  O1-O8, `test:calibration-search` (8 mutations).
+  NOT BUILT YET from the same list: the testing week anchoring from every way a session can be logged (only Finish
+  anchors today; the coach and "did it, not in the app" do not); the coach's past-day log dropping its date; the rest
+  of the artifact list, grouped in the audit doc. NOT VERIFIED: anything live.
 - [x] **THE ALLERGY CARD, BUILT (18 Nov 2026, his "Build the leftovers"; his rulings of 15 Nov; `docs/plans/allergy-card.md`).**
   WHAT WAS WRONG: a tree-nut allergy was a "Nut-free" diet tick that also banned peanuts and said nothing of how
   serious it is; a coeliac was a "Gluten-free" tick plus a note that changed nothing, and the coach promised her
