@@ -23,7 +23,7 @@ import { getActiveMesocycleWeek } from './calculations'
 import { getExerciseHistory, type ExerciseHistorySession } from './exercise-history'
 import { getExerciseId, getExerciseEntry } from './exercise-db'
 import { isMainLiftSlot } from './mesocycle-edit'
-import { prescribeLoad } from './load-prescription'
+import { writeBlockWeight } from './block-weight'
 import { saveMesocycleWeek } from './mesocycle-persistence'
 
 /**
@@ -180,34 +180,11 @@ export async function checkForBlockReview(
       const entry = getExerciseEntry(ex.name)
       if (!entry) continue
 
-      const load = prescribeLoad(entry, profile, {
-        targetRpeLabel: ex.intensity || '',
-        isFirstBlock: false,
-        sets: ex.sets,
-        repRangeLabel: ex.reps,
-        forceStartingWeightKg: heldWeightKg,
-      })
-
       const note = `Held steady at ${heldWeightKg}kg — no real progress last block. You can log heavier if it feels right; this is a starting point, not a limit.`
       const dayName = day.day
       const exerciseName = ex.name
 
-      workingMesocycle = workingMesocycle.map(week => {
-        if (week.block_number !== currentWeek.block_number) return week
-        const targetDay = week.days.find(d => d.day === dayName)
-        const targetEx = targetDay?.exercises[exIndex]
-        if (!targetDay || !targetEx || targetEx.name !== exerciseName) return week
-        const patchedEx: Exercise = {
-          ...targetEx,
-          suggested_load: load.display,
-          suggested_load_kg: load.starting_weight_kg,
-          per_set_load: load.per_set,
-          load_guidance: load.basis,
-          block_hold_note: note,
-        }
-        const days = week.days.map(d => (d.day === dayName ? { ...d, exercises: d.exercises.map((e, i) => (i === exIndex ? patchedEx : e)) } : d))
-        return { ...week, days }
-      })
+      workingMesocycle = writeBlockWeight(workingMesocycle, profile, { blockNumber: currentWeek.block_number, dayName, exIndex, exerciseName, weightKg: heldWeightKg, holdNote: note })
 
       anyPatch = true
       messages.push(`Note on ${exerciseName}: ${note}`)
