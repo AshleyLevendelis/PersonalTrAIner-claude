@@ -9248,13 +9248,22 @@ export function generateMesocycle(
         // the filler to fill either, so the two never fight over the same
         // day.
         trimWeekRestForBudget(days, totalBudgetSeconds, trimLog, policy.minLoadedMainLiftRestSeconds, profile.training_style || 'hybrid')
-        applyDurationFiller(days, profile, policy, totalBudgetSeconds, getSessionMinimumSeconds(profile.session_duration_preference || '45-60'))
-        // Runs last, after rotation, periodization and duration-budget
-        // trimming have all had their say — see enforceWeeklyPatternBalance's
-        // doc comment. Deload weeks are exempt (like the duration filler
-        // above): their volume is deliberately, uniformly cut, and nudging
-        // set counts would fight that.
+        // Runs after rotation, periodization and duration-budget trimming
+        // have all had their say — see enforceWeeklyPatternBalance's doc
+        // comment. Deload weeks are exempt (like the duration filler below):
+        // their volume is deliberately, uniformly cut, and nudging set counts
+        // would fight that.
         enforceWeeklyPatternBalance(days, { keepPulling: keepPullingThisPlan })
+        // THE FILLER SIZES ITSELF ON THE DAY AS IT WILL SHIP (18 Nov 2026).
+        // It used to run just BEFORE the balance pass, which then took a set
+        // off some days: a day that was long enough when the filler looked
+        // landed a minute or two under the time asked for with nothing added.
+        // MEASURED on test:session-length's grid (576 loading sessions a
+        // tier): 12 / 38 / 27 sessions under the minimum, and 58 of the 65 in
+        // the two longer tiers carried no filler at all. The balance pass
+        // reads no time and the filler changes no exercise, so the order
+        // between them only ever decided what the filler measured.
+        applyDurationFiller(days, profile, policy, totalBudgetSeconds, getSessionMinimumSeconds(profile.session_duration_preference || '45-60'))
 
         // FINAL SAFETY TRIM, against the stated MAXIMUM rather than the
         // midpoint budget the pass above already aimed at.
@@ -9276,10 +9285,11 @@ export function generateMesocycle(
         // Rest is also the one lever this is allowed to pull — trimming sets
         // here would fight the very pass that just set them.
         //
-        // AND NOT BEFORE THE OPTIONAL FILLER HAS GONE. A day the pattern-
-        // balance pass bumped over the maximum still had its filler, sized
-        // before the bump — and rest is what Ashley ruled on 18 Sep must not
-        // pay for time, least of all for optional mobility.
+        // AND NOT BEFORE THE OPTIONAL FILLER HAS GONE. Rest is what Ashley
+        // ruled on 18 Sep must not pay for time, least of all for optional
+        // mobility. (Since 18 Nov 2026 the filler is sized after the balance
+        // pass, so a bump can no longer push a filled day over; this stays
+        // as the guard on that order.)
         {
           const sessionMaxSeconds = getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
           for (let i = 0; i < days.length; i++) days[i] = yieldFillerTo(days[i], sessionMaxSeconds)

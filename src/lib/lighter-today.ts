@@ -1,7 +1,7 @@
 import type { MesocycleWeek, UserProfile, WorkoutDay } from './types'
 import { adjustDayVolume, isVolumeAdjustable } from './volume-adjust'
 import { settleWeek } from './settle-week'
-import { estimateDaySeconds } from './session-duration'
+import { dayLengthParts } from './session-duration'
 
 // ---------------------------------------------------------------------------
 // "MAKE IT EASIER TODAY" — SHOWN FIRST, THEN DONE, THEN UNDOABLE (2 Nov 2026,
@@ -77,8 +77,9 @@ export function planLighterToday(input: {
     const was = day.exercises.find(e => e.name === ex.name)
     if (was && (was.sets ?? 0) !== (ex.sets ?? 0)) lines.push(`${ex.name}: ${was.sets} → ${ex.sets} ${ex.sets === 1 ? 'set' : 'sets'}`)
   }
-  const before = Math.round(estimateDaySeconds(day) / 60)
-  const now = Math.round(estimateDaySeconds(after) / 60)
+  // The session's work, as the header says it (18 Nov 2026): an optional close-out is not part of either number.
+  const before = dayLengthParts(day).workMinutes
+  const now = dayLengthParts(after).workMinutes
   if (now < before) lines.push(`About ${before} → ${now} min.`)
   lines.push('Weights and reps stay the same. Only today changes; the rest of your week is as it was.')
   return { ok: true, mesocycle: mesocycle.map(w => (w.week_number === weekNumber ? finalWeek : w)), lines }

@@ -19,7 +19,8 @@
 // ---------------------------------------------------------------------------
 import { startDriver } from './driver-kit.mjs'
 
-const d = await startDriver({ port: 9650, page: 'real.html', name: 'meal-knock-on', timeoutMs: 300_000 })
+// The coach half reads what an offer SAYS, so it opens Details as he would (his 17 Nov "One line, numbers on tap").
+const d = await startDriver({ openOfferDetails: true, port: 9650, page: 'real.html', name: 'meal-knock-on', timeoutMs: 300_000 })
 const { origin, send, ev, check, until, wait, go, clickAt, shoot, finish } = d
 
 const weekdayOf = date => new Date(`${date}T12:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })
@@ -130,7 +131,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
       const json = b => new Response(JSON.stringify(b), { status: 200, headers: { 'Content-Type': 'application/json' } })
       // The model only PARSES: which meal, which food, how much. The card is the app's.
       // (The same answer to the follow-up tap: the app may ask a trade-off question before it shows the card.)
-      return json({ reply: '', proposal: { kind: 'propose_meal_food_add', rawArgs: { meal_slot: 'lunch', food_lines: ['${chosen?.amount ?? 100}g ${chosen?.food ?? 'banana'}'], origin_verbatim_quote: 'add a banana to my lunch' } } })
+      return json({ reply: '', proposal: { kind: 'propose_meal_food_add', rawArgs: { meal_slot: 'lunch', food_lines: ['${chosen?.amount ?? 100}g ${chosen?.food ?? 'banana'}'], origin_verbatim_quote: said } } })
     }
     return realFetch(url, init)
   }
@@ -138,7 +139,11 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
 await send('Page.navigate', { url: `${origin}/.tour-harness/chat.html?daymove=1&n=1` })
 await until(() => ev(`!!document.querySelector('textarea')`), v => v === true, 60)
 await until(() => ev(`window.__weekMeals ? Object.keys(window.__weekMeals()).length : 0`), v => v === 7, 60)
-await ev(`(() => { const t = document.querySelector('textarea'); Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(t, 'add a banana to my lunch'); t.dispatchEvent(new Event('input', { bubbles: true })) })()`)
+// RE-ANCHORED 18 Nov 2026: an amount on a coach card is one HE said (17 Nov, amount-said.ts). This typed "add a
+// banana" while the stand-in coach wrote "200g banana", which the app now rightly asks about instead of carding. The
+// subject here is the knock-on, so he says the amount the coach then writes.
+const SAID = `add ${chosen?.amount ?? 100}g of ${chosen?.food ?? 'banana'} to my lunch`
+await ev(`(() => { const t = document.querySelector('textarea'); Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set.call(t, ${JSON.stringify(SAID)}); t.dispatchEvent(new Event('input', { bubbles: true })) })()`)
 await wait(300)
 check('4a. the request is sent', await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /send/i.test(x.getAttribute('aria-label') || '')); if (!b || b.disabled) return false; b.click(); return true })()`))
 // RE-ANCHORED 20 Oct 2026 (Ashley, "text + small buttons always"): there is no card heading to find any more, so the

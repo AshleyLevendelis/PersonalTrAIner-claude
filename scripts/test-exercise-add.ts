@@ -417,7 +417,9 @@ async function main() {
     /data-scope="today"/.test(sheet) && /data-scope="permanent"/.test(sheet))
   check('the sheet says the new length before the tap', /data-testid="add-length"/.test(sheet))
   check('...read off a trial of the real edit, not a second model',
-    /addExerciseToSession\(\{[\s\S]{0,300}?scope: 'today'/.test(panel) && /estimateDaySeconds\(afterDay\)/.test(panel))
+    // RE-ANCHORED 18 Nov 2026: this pinned `estimateDaySeconds(afterDay)`, the raw total. The property is that the
+    // TRIAL's own day is what gets measured; it is now measured with the header's reader (work, optional apart).
+    /addExerciseToSession\(\{[\s\S]{0,300}?scope: 'today'/.test(panel) && /dayLengthParts\(afterDay\)/.test(panel))
 
   check('the coach declares the tool', /name: "propose_exercise_add"/.test(chat))
   // BOUNDED AT THE NEXT HANDLER, not at a fixed character count — a fixed
@@ -596,6 +598,28 @@ async function main() {
     }
     check('no addition, today only, changes a set on any other day', adds > 0 && touched === 0, { adds, touched, seen })
     check('...on a grid where the week-balance pass WOULD have moved another day (the check binds)', wouldRebalance > 0, { adds, wouldRebalance })
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\nA CARD STATES THE SESSION\'S LENGTH AS THE HEADER DOES (18 Nov 2026)')
+  // -------------------------------------------------------------------------
+  // A day with an optional close-out reads "~49 min · + 8 optional" on its header. The add card (screen and coach),
+  // the shorten card and the shorten choices each measured the day WITH the optional minutes, so a card promised
+  // "about 57 min" and the header then showed 49. One reader for all of them: dayLengthParts. Source checks only;
+  // the screens are driven by verify:exercise-add 4d and verify:shorten-today 2c, whose fixture day carries a filler.
+  {
+    const code = (p: string) => read(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const chat = code('src/components/ChatAssistant.tsx')
+    const sheet = code('src/components/exercise/WhatHappenedSheet.tsx')
+    const panel = code('src/components/exercise/TodayPanel.tsx')
+    const impact = panel.slice(panel.indexOf('const additionImpact'), panel.indexOf('const removalBalanceCost'))
+    check('the detector sees a raw total: it fires on the old expression', /estimateDaySeconds\(/.test('Math.round(estimateDaySeconds(day) / 60)'))
+    // No raw total and no optional minutes added back: "work + optional" is the same wrong number by another road
+    // (a mutation to exactly that was missed by the first version of this check).
+    check('the coach\'s cards never measure a day with its optional minutes in it', !/estimateDaySeconds\(/.test(chat) && !/optionalMinutes/.test(chat) && /dayLengthParts\(afterDay\)\.workMinutes/.test(chat))
+    check('...and the shorten card\'s "before" is the header\'s own words', /field: 'Time', before: formatDayLength\(dayLengthParts\(day\)\)/.test(chat))
+    check('the screen\'s add card reads the work minutes off the trial day', impact.length > 0 && /dayLengthParts\(afterDay\)\.workMinutes/.test(impact) && !/estimateDaySeconds\(/.test(impact))
+    check('the shorten choices are measured against the session\'s work', /dayLengthParts\(day\)\.workMinutes/.test(sheet) && !/estimateDaySeconds\(/.test(sheet) && !/optionalMinutes/.test(sheet))
   }
 
   console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`)

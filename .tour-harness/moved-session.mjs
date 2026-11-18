@@ -25,6 +25,7 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
+import { OPEN_OFFER_DETAILS_SCRIPT } from './driver-kit.mjs'
 import { ANCHOR_ISO, anchorDate, DAY_NAMES, iso as anchorIso } from './anchor.mjs'
 
 const DIST = new URL('./dist/', import.meta.url).pathname
@@ -73,6 +74,9 @@ const TODAY = iso(0), TOMORROW = iso(1)
 const YESTERDAY_NAME = nameOf(-1), TOMORROW_NAME = nameOf(1), TODAY_NAME = nameOf(0)
 
 await send('Page.enable'); await send('Runtime.enable')
+// His "One line, numbers on tap" (17 Nov 2026): this driver reads what an offer SAYS, so it opens Details as he would.
+// The folded default itself is held by verify:offer-text (1e-1f).
+await send('Page.addScriptToEvaluateOnNewDocument', { source: OPEN_OFFER_DETAILS_SCRIPT })
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 await send('Emulation.setFocusEmulationEnabled', { enabled: true })
 

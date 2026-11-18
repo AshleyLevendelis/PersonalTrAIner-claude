@@ -187,8 +187,12 @@ if (!sawDetail) {
     /best set, in reps/i.test(summary) && !/strength trend/i.test(summary), summary.slice(0, 400))
   check('2f. ...and it is not still telling us to log it twice',
     !/Log this exercise twice/i.test(summary), summary.slice(0, 400))
+  // RE-ANCHORED 18 Nov 2026: this read the FIRST svg path in the sheet. Since the muscle map became a real body
+  // drawing (17 Nov) that is one of its outlines, and a correct chart read as "no line". The chart is the svg that
+  // has both a path and circles (a dot per session), the same finder the geometry check below uses.
   check('2g. ...and a line was actually drawn', await ev(`(() => {
-    const p = document.querySelector('[role="dialog"] svg path[d]')
+    const svg = [...document.querySelectorAll('[role="dialog"] svg')].find(s => s.querySelector('path[d]') && s.querySelector('circle'))
+    const p = svg?.querySelector('path[d]')
     return !!p && (p.getAttribute('d').match(/L/g) ?? []).length >= 1
   })()`))
   // A DOT PER SESSION, EACH ON THE LINE.

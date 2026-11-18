@@ -6,6 +6,7 @@
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { planLighterToday, undoLighterToday, dayFingerprint } from '../src/lib/lighter-today'
+import { dayLengthParts, estimateDaySeconds } from '../src/lib/session-duration'
 import type { MesocycleWeek, UserProfile } from '../src/lib/types'
 
 let ran = 0
@@ -83,6 +84,24 @@ check('a deload week says it is already lighter', !!dl && !dl.ok && /deload/.tes
 const empty = WEEK.days.find(d => d.exercises.length === 0)
 const em = empty ? planLighterToday({ mesocycle: MESO, profile: PROFILE, weekNumber: WEEK.week_number, dayName: empty.day, sayDay: 'Today' }) : null
 check('an empty day says there is no session', !!em && !em.ok && /no session here/.test(em.refusal), em)
+
+console.log('\n5. The length it says is the session\'s, as the header says it (18 Nov 2026)')
+// A day carrying an OPTIONAL close-out reads "~44 min · + 8 optional" on its header. The line here was worked out from
+// the day with the optional minutes in it, so it quoted a number no screen showed. Constructed, so the case binds:
+// the same day with an 8-minute optional mobility flow on the end.
+{
+  const withFiller = { ...DAY, mobilityFiller: { activity: 'Mobility & Movement Prep Flow', duration: 8, targetRpe: 2, timing: 'post_session' as const, reason: 'Optional', is_filler: true } }
+  const meso = MESO.map(w => (w.week_number === WEEK.week_number ? { ...w, days: w.days.map(d => (d.day === DAY.day ? withFiller : d)) } : w)) as MesocycleWeek[]
+  const p5 = planLighterToday({ mesocycle: meso, profile: PROFILE, weekNumber: WEEK.week_number, dayName: DAY.day, sayDay: 'Today' })
+  const line = p5.ok ? p5.lines.find(l => /^About \d+ → \d+ min\.$/.test(l)) ?? null : null
+  const said = line ? /^About (\d+) → (\d+) min\.$/.exec(line)!.slice(1).map(Number) : null
+  const parts = dayLengthParts(withFiller as never)
+  const after5 = p5.ok ? p5.mesocycle.find(w => w.week_number === WEEK.week_number)!.days.find(d => d.day === DAY.day)! : null
+  check('the fixture binds: the day\'s optional minutes make its total differ from its work', parts.optionalMinutes === 8 && Math.round(estimateDaySeconds(withFiller as never) / 60) === parts.workMinutes + 8, parts)
+  check('it states a length line for a day that got shorter', !!said, p5.ok ? p5.lines : p5.refusal)
+  check('the "before" is the session\'s work, the number on its header', !!said && said[0] === parts.workMinutes, { said, work: parts.workMinutes })
+  check('...and the "after" is the eased session\'s work', !!said && !!after5 && said[1] === dayLengthParts(after5).workMinutes, { said, after: after5 ? dayLengthParts(after5).workMinutes : null })
+}
 
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.error(`${failures} lighter-today check(s) FAILED.`); process.exit(1) }

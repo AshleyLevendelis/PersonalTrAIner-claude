@@ -785,7 +785,10 @@ export function TodayPanel({
     if (!result.changed) return nothing
     const afterWeek = result.mesocycle.find(w => w.week_number === liveWeek)
     const afterDay = afterWeek?.days.find(d => d.day === priced.planDay)
-    const minutes = afterDay ? Math.round(estimateDaySeconds(afterDay) / 60) : null
+    // THE NUMBER THE HEADER WILL SHOW (18 Nov 2026): the session's work, not the day with its optional close-out in
+    // it. On a day carrying optional mobility the card said "about 57 min" and the header then read "~49 min · + 8
+    // optional". Over the cap means the WORK is over it; optional time is never counted against what he asked for.
+    const minutes = afterDay ? dayLengthParts(afterDay).workMinutes : null
     const capMinutes = Math.round(getSessionMaximumSeconds(profile.session_duration_preference) / 60)
     const overBy = minutes != null && minutes > capMinutes ? minutes - capMinutes : null
     const impact = describeEditImpact(mesocycle.find(w => w.week_number === liveWeek), afterWeek, priced.planDay)

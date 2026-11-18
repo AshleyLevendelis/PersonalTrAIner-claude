@@ -149,7 +149,15 @@ console.log('\n  2. The Exercise tab on the walk day: "Also today", never "Finis
 await go(`sam=1&today=${walkDay.date}`, '#/tab/exercise', 4200)
 const shown = await targets()
 const walkShown = (shown?.days ?? []).find(d => d.day === walkDay.day) ?? null
-const otherShown = (shown?.days ?? []).find(d => d.day === otherDay.day) ?? null
+// RE-ANCHORED 18 Nov 2026: "a pair of days written into a check is a fixture". The day to peek was chosen on the
+// FIRST load, by a length different from the walk day's there; on this load (today = the walk day) the two came
+// out at the same minute and 3b failed on a correct header. The peeked day is now found HERE, on the screen under
+// test, by the property 3b needs: a training day whose length differs from today's as shown.
+const walkMinutesShown = walkShown ? Math.round(walkShown.totalSeconds / 60) : null
+const peekDay = (shown?.days ?? []).find(d => d.day !== walkDay.day && Math.round(d.totalSeconds / 60) !== walkMinutesShown) ?? null
+check('2z. on this load another day runs a different length from today\'s, so the header has a wrong answer available', !!peekDay,
+  (shown?.days ?? []).map(d => `${d.day} ${Math.round(d.totalSeconds / 60)}`))
+const otherShown = peekDay
 // RE-ANCHORED 12 Nov 2026 (Exercise Week X1): today's length is the Today card's time; a peek keeps its meta line.
 const header = await text('[data-testid="hero-length"]')
 const headerLen = parseLength(header)
@@ -196,7 +204,7 @@ console.log('\n  3. The header shows the day that is OPEN (L17)')
 // ===========================================================================
 // RE-ANCHORED 15 Nov 2026 (his ruling: the strip starts today and pages by arrow): the day is THIS week's, by date,
 // paging back first when it is already behind today. A weekday name on the strip can now be next week's day.
-const otherDate = await ev(`(() => { const t = document.querySelector('[data-exercise-strip] [data-strip-date]')?.getAttribute('data-strip-date'); if (!t) return null; const d = new Date(t + 'T12:00:00'); const names = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']; const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7)); const x = new Date(mon); x.setDate(mon.getDate() + ((names.indexOf(${JSON.stringify(otherDay.day)}) + 6) % 7)); return { date: x.toLocaleDateString('en-CA'), behind: x < d } })()`)
+const otherDate = await ev(`(() => { const t = document.querySelector('[data-exercise-strip] [data-strip-date]')?.getAttribute('data-strip-date'); if (!t) return null; const d = new Date(t + 'T12:00:00'); const names = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']; const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7)); const x = new Date(mon); x.setDate(mon.getDate() + ((names.indexOf(${JSON.stringify((peekDay ?? otherDay).day)}) + 6) % 7)); return { date: x.toLocaleDateString('en-CA'), behind: x < d } })()`)
 if (otherDate?.behind) { await tap('[data-testid="strip-prev"]'); await wait(900) }
 check('3a. another day is tapped on the week strip', !!otherDate && await tap(`[data-strip-date="${otherDate.date}"]`) === true, otherDate)
 await wait(900)

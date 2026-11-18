@@ -135,7 +135,7 @@ import { assessMealEdit, mealAskKey, type MealEditKind, type MealEditContext } f
 import { settleWeek } from '@/lib/settle-week'
 import { shortenOrFloor, SHORTEST_VERSION_MINUTES } from '@/lib/exercise-plan'
 import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
-import { estimateDaySeconds } from '@/lib/session-duration'
+import { dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
 import { restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { offerStillHolds, fingerprintWeeks, undoStillFits, weeksUndoWrites, dayStillAsWritten } from '@/lib/offer-still-holds'
@@ -3137,8 +3137,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const afterWeek = trial.mesocycle.find(w => w.week_number === activeSession.liveWeek)
     const afterDay = afterWeek?.days.find(d => d.day === dayName)
     const impact = describeEditImpact(week, afterWeek, dayName)
-    const wasMinutes = Math.round(estimateDaySeconds(day) / 60)
-    const nowMinutes = afterDay ? Math.round(estimateDaySeconds(afterDay) / 60) : wasMinutes
+    // The header's own reader (18 Nov 2026): a session's length is its work, optional time named beside it.
+    const wasMinutes = dayLengthParts(day).workMinutes
+    const nowMinutes = afterDay ? dayLengthParts(afterDay).workMinutes : wasMinutes
 
     const advice = adviseEdit({
       profile, before: mesocycle, after: trial.mesocycle, weekNumber: activeSession.liveWeek,
@@ -4043,7 +4044,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       diff: {
         lead: ask(floor ? `do the short version of ${on.sayDay}, about ${trial.achievedMinutes} minutes` : `cut ${on.sayDay} down to about ${trial.achievedMinutes} minutes`),
         rows: [
-          { field: 'Time', before: `~${Math.round(estimateDaySeconds(day) / 60)} min`, after: `~${trial.achievedMinutes} min` },
+          { field: 'Time', before: formatDayLength(dayLengthParts(day)), after: `~${trial.achievedMinutes} min` },
           { field: 'Exercises', before: String(day.exercises.length), after: String(after.exercises.length) },
         ],
         unchanged: [`Your main lift — every set of it`],
