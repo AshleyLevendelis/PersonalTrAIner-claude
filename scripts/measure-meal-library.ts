@@ -50,9 +50,11 @@ export function strictLineProblems(text: string): string[] {
 
 
 /** How one dish fares against the whole grid, through the real verifier, with no diet. */
-export function servability(x: RawProposal): { pass: number; of: number; why: string; dens: number; kcal: number } {
+export function servability(x: RawProposal): { pass: number; of: number; why: string; dens: number; kcal: number; servedAt: number[]; refusedAt: number[] } {
   let pass = 0, of = 0
   let why = ''
+  // The size of the meal (its calories) in each case, by outcome: a dish limited by the PLATE is served at the smaller meals only.
+  const servedAt: number[] = [], refusedAt: number[] = []
   for (const shape of SHAPES) {
     for (const g of TARGET_GRID) {
       const budget = computeSlotBudgets(g.targets, shape.mealsPerDay, shape.includeSnacks)[x.slot as MealSlotName]
@@ -61,12 +63,13 @@ export function servability(x: RawProposal): { pass: number; of: number; why: st
       const log: string[] = []
       // AS THE APP SERVES IT: re-portioned to the meal's own budget first.
       const opt = verifyProposal(fitDishToBudget(x, budget).dish, x.slot as MealSlotName, budget, [], log)
+      ;(opt ? servedAt : refusedAt).push(budget.calories)
       if (opt) pass++
       else if (!why) why = (log[0] ?? '').replace(/^\[[a-z]+\]\s*"[^"]*":\s*/, '').slice(0, 90)
     }
   }
   const asWritten = computeMealMacros(x.ingredients.map(parseIngredientLine))
-  return { pass, of, why, dens: asWritten.kcal > 0 ? (100 * asWritten.protein) / asWritten.kcal : 0, kcal: asWritten.kcal }
+  return { pass, of, why, dens: asWritten.kcal > 0 ? (100 * asWritten.protein) / asWritten.kcal : 0, kcal: asWritten.kcal, servedAt, refusedAt }
 }
 
 const slots: MealSlotName[] = ['breakfast', 'lunch', 'dinner', 'snack']

@@ -1643,6 +1643,22 @@ menu" stays true when a copy is also left outside it.
   never over a running round ("A round is running · Open it"). The coach is told to name the timer (needs the
   `chat-gemini` deploy). `verify:live-test-nov14` A16-A24
 
+### The Fable pass of 18 Nov 2026 (his "bug fixes, improvements, mainly on nutrition"; decisions are mine unless marked his)
+- **Someone who eats meat is fed meat** (nutrition, mine): a dish built on a stand-in for a food he eats anyway (tofu,
+  tempeh, Quorn, vegan sausages; soy yoghurt for someone who eats dairy) is ranked after every other and a plan stops
+  taking them at 30 dishes a meal; a food he likes still lifts its dishes. Measured 55 of 112 meals before, 0-2 after.
+  `test:real-plates` §4-5
+- **A plate somebody would eat** (mine): bread, wraps and bagels in half or whole pieces, never more than a plate takes,
+  the rest of the dish making up the calories; a main meal at most 1,100 g as it sits on the plate. His own portions are
+  never touched. **Days on target and variety figures before 18 Nov are not comparable** (the pools changed).
+  `test:real-plates` §1-3
+- **Protein for a very heavy person follows a reference weight** (CSCS, mine): above a BMI of 30 a quarter of the extra
+  weight counts for protein, the fat floor and per-kilo carbs; energy reads the real weight. `test:reference-weight`
+- **A food the app cannot count in a meal he describes is asked about; seasonings need no grams; a packaged product
+  carries every allergen its usual recipe has.** `test:meal-facts`, `test:food-db-parity` §6
+- **OPEN, HIS**: whether protein a little over or fat a little under with calories on target is a miss on a muscle-gain
+  plan (his 18 Oct bands say yes); "usually contains" allergens on existing foods.
+
 ### His rulings of 17 Nov 2026
 - **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over
   marking once with both). The judge is stamped on the scores; scores marked by another judge are stale (re-grade the

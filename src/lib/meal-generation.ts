@@ -34,7 +34,7 @@ import { computeMealMacros, kindsItCouldBe, lookupIngredient, toTasteLine, type 
 import { asWeighedLines } from './as-weighed'
 import { validateMealAgainstDiet } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
-import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor, snapPieces, unrealisticPlate, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
+import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor, settlePieces, unrealisticPlate, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
 import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, MY_MEAL_TAG, type MealSlotName } from './meal-store'
 import { isMissingColumnError } from './missing-column'
@@ -667,14 +667,12 @@ export function verifyProposal(
   }
 
   // A PLATE SOMEBODY WOULD EAT (18 Nov 2026, portion-scaler.ts): pieces in halves, and no dish served as a kilo and a
-  // half of food or two and a half bagels. His own portions are facts and are never touched or refused for this.
-  if (!keepPortions) {
-    scaled.ingredients = snapPieces(scaled.ingredients)
-    const plate = unrealisticPlate(scaled.ingredients, slot === 'snack')
-    if (plate) {
-      rejectLog.push(`[${slot}] "${proposal.name}": not a realistic portion — ${plate}`)
-      return null
-    }
+  // half of food or two and a half bagels. His own portions never reach here (they were returned above, as stated).
+  scaled.ingredients = settlePieces(scaled.ingredients)
+  const plate = unrealisticPlate(scaled.ingredients, slot === 'snack')
+  if (plate) {
+    rejectLog.push(`[${slot}] "${proposal.name}": not a realistic portion — ${plate}`)
+    return null
   }
 
   const finalComputed = computeMealMacros(scaled.ingredients)

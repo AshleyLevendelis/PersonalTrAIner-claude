@@ -252,31 +252,41 @@ function main() {
     check('harness: sizing ACCEPTS this lunch, so "kept as written" below is a choice and not the only version left', sizedChicken.ok === true, sizedChicken.ok ? '' : sizedChicken.reason)
     check('a meal no size of which fits a day is kept at his amounts, and told it will not come up often',
       chickenOnly.ok && /^Kept at your amounts: /.test(chickenOnly.card.portions) && /won't come up often/.test(chickenOnly.card.what), chickenOnly.ok ? chickenOnly.card : chickenOnly)
-    // THE FIRST VERSION THAT LANDS, NOT THE FIRST VERSION. Found by measuring real plans, not written by hand: at
-    // 3,100 kcal, eggs on toast sized to breakfast by energy cannot be part of a day on target, and as he eats it, can.
+    // THE FIRST VERSION THAT LANDS, NOT THE FIRST VERSION. Found by measuring real plans, not written by hand: on a
+    // big-appetite plan there are meals that, sized to breakfast by energy, cannot be part of a day on target, and as he
+    // eats them, can. RE-ANCHORED 18 Nov 2026: WHICH meal that is moved when the plate rules changed the pools (it was
+    // eggs on toast at 3,100 kcal; that one now lands sized). A meal written into a check is a fixture, so the case is
+    // FOUND by its property among a few real plans and a few ordinary meals, and the check that one exists is kept.
     {
-      const big: MacroTargets = { calories: 3100, protein: 180, fat: 96, carbs: 379 }
-      const budgets = computeSlotBudgets(big, 3, true) as Record<MealSlotName, MacroTargets>
-      const real: Pools = {}
-      for (const sl of SLOTS) {
-        const out: PoolOption[] = []
-        for (const d of MEAL_LIBRARY) {
-          if (d.slot !== sl || out.length >= 100) continue
-          const o = verifyProposal(fitDishToBudget(d, budgets[sl]).dish, sl, budgets[sl], [], [])
-          if (o) out.push(o)
+      const plans: MacroTargets[] = [{ calories: 3100, protein: 180, fat: 96, carbs: 379 }, { calories: 3040, protein: 160, fat: 95, carbs: 387 }, { calories: 2700, protein: 170, fat: 84, carbs: 316 }]
+      const ordinary: [string, string[]][] = [['Eggs on toast', ['3 eggs', '2 slices wholemeal bread']], ['Cheese omelette', ['3 eggs', '40g cheddar cheese', '1 tsp butter']], ['Bacon and eggs', ['3 rashers bacon', '2 eggs', '1 slice wholemeal bread']]]
+      let found: { big: MacroTargets; real: Pools; name: string; lines: string[] } | null = null
+      const sizes: number[][] = []
+      for (const big of plans) {
+        const budgets = computeSlotBudgets(big, 3, true) as Record<MealSlotName, MacroTargets>
+        const real: Pools = {}
+        for (const sl of SLOTS) {
+          const out: PoolOption[] = []
+          for (const d of MEAL_LIBRARY) {
+            if (d.slot !== sl || out.length >= 100) continue
+            const o = verifyProposal(fitDishToBudget(d, budgets[sl]).dish, sl, budgets[sl], [], [])
+            if (o) out.push(o)
+          }
+          real[sl] = out
         }
-        real[sl] = out
+        sizes.push(SLOTS.map(sl => real[sl]!.length))
+        const bigBase = { ...base, targets: big, todayDate: '2026-11-09' }
+        for (const [name, lines] of ordinary) {
+          if (found) break
+          const byEnergy = buildMealAdditionProposal({ ...bigBase, libraryFit: true, rawArgs: { meal_name: name, meal_slot: 'breakfast', ingredients: lines } })
+          const asWritten = buildCustomMealProposal({ ...bigBase, rawArgs: { name, meal_slot: 'breakfast', food_lines: lines } })
+          if (byEnergy.ok && asWritten.ok && dishLandsADay(real, SLOTS, big, 'breakfast', byEnergy.payload.option, '2026-11-09') === false && dishLandsADay(real, SLOTS, big, 'breakfast', asWritten.payload.option, '2026-11-09') === true) found = { big, real, name, lines }
+        }
       }
-      const bigBase = { ...base, targets: big, todayDate: '2026-11-09' }
-      const lines = ['3 eggs', '2 slices wholemeal bread']
-      const byEnergy = buildMealAdditionProposal({ ...bigBase, libraryFit: true, rawArgs: { meal_name: 'Eggs on toast', meal_slot: 'breakfast', ingredients: lines } })
-      const asWritten = buildCustomMealProposal({ ...bigBase, rawArgs: { name: 'Eggs on toast', meal_slot: 'breakfast', food_lines: lines } })
-      check('harness: on this real plan the sized version is valid and does NOT land a day, and the typed one does',
-        byEnergy.ok && asWritten.ok && dishLandsADay(real, SLOTS, big, 'breakfast', byEnergy.payload.option, '2026-11-09') === false && dishLandsADay(real, SLOTS, big, 'breakfast', asWritten.payload.option, '2026-11-09') === true,
-        SLOTS.map(sl => real[sl]!.length))
-      const eggs = planMyMeal({ ...bigBase, pools: real }, { name: 'Eggs on toast', slot: 'breakfast', lines: lines.join('\n') })
+      check('harness: on a real plan there is an ordinary breakfast whose sized version is valid and does NOT land a day, while the typed one does', found !== null, sizes)
+      const eggs = found ? planMyMeal({ ...base, targets: found.big, todayDate: '2026-11-09', pools: found.real }, { name: found.name, slot: 'breakfast', lines: found.lines.join('\n') }) : null
       check('...so it is kept as he eats it and told it comes first, not kept in a size that never comes up',
-        eggs.ok && /^Kept at your amounts: /.test(eggs.card.portions) && /come first/.test(eggs.card.what), eggs.ok ? eggs.card : eggs)
+        !!eggs && eggs.ok && /^Kept at your amounts: /.test(eggs.card.portions) && /come first/.test(eggs.card.what), eggs && eggs.ok ? eggs.card : eggs)
     }
     check('the judgement is the day search\'s own, asked of both dishes', porridge.ok && huge.ok
       && dishLandsADay(ctx.pools, ['breakfast', 'lunch', 'dinner', 'snack'], TARGETS, 'breakfast', porridge.payload.option, base.todayDate) === true

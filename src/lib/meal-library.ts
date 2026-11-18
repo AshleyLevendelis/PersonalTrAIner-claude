@@ -2,7 +2,7 @@ import type { RawProposal } from './meal-generation'
 import type { MealSlotName } from './meal-store'
 import type { CookingTimePreference } from './types'
 import { containsPhrase } from './meal-ingredients'
-import { parseIngredientLine, withParsedQuantity, kitchenRound, scaleToTarget, meetsProteinFloor, isWithinCalorieTolerance } from './portion-scaler'
+import { parseIngredientLine, withParsedQuantity, kitchenRound, scaleToTarget, meetsProteinFloor, isWithinCalorieTolerance, settlePieces, unrealisticPlate } from './portion-scaler'
 import { computeMealMacros } from './food-db'
 import type { MacroTargets } from './types'
 
@@ -78,9 +78,10 @@ export interface LibraryWants {
 // protein per 100 kcal): with protein foods held at 0.55x or more and carb foods at 2x or less, the typical meat dish
 // still carried 1.2x its meal's protein, so those people's days landed only because the plan fed them tofu and vegan
 // sausages (half of all meals). A coach feeding a lean bulk does exactly this: less meat, more rice. Still the same
-// dish: the protein food never under 0.4x, the starch never over 2.6x. A FAT factor (oil, nuts, avocado between half
+// dish: the protein food never under HALF the recipe's (0.4x was tried: "turkey patties" with 60 g of turkey is not
+// the dish, and 0.5x landed as many days), the starch never over 2.6x. A FAT factor (oil, nuts, avocado between half
 // and double) was built and measured too: it moved almost no dish, so it is not here.
-const PROTEIN_FACTORS = Array.from({ length: 20 }, (_, i) => Math.round((0.40 + i * 0.05) * 100) / 100)
+const PROTEIN_FACTORS = Array.from({ length: 18 }, (_, i) => Math.round((0.50 + i * 0.05) * 100) / 100)
 const CARB_FACTORS = Array.from({ length: 22 }, (_, i) => Math.round((0.5 + i * 0.1) * 100) / 100)
 /** Aim a little over the protein target, so the floor still holds after amounts are rounded. */
 const PROTEIN_AIM = 1.08
@@ -151,7 +152,10 @@ export function fitDishToBudget(dish: RawProposal, budget: MacroTargets): { dish
     const fm = computeMealMacros(fittedParsed)
     const scaled = scaleToTarget(fittedParsed, { kcal: fm.kcal, protein: fm.protein, carbs: fm.carbs, fat: fm.fat }, target)
     if (scaled.rejectedReason) continue
-    const after = computeMealMacros(scaled.ingredients)
+    // The meal check's own plate rules (bread in whole pieces, no plate nobody would eat), so a dish that proves itself here is one it accepts.
+    const plated = settlePieces(scaled.ingredients)
+    if (unrealisticPlate(plated, dish.slot === 'snack')) continue
+    const after = computeMealMacros(plated)
     if (after.coverage < 1 || !meetsProteinFloor(after.protein, budget.protein * FIT_PROTEIN_MARGIN) || !isWithinCalorieTolerance(after.kcal, budget.calories, FIT_CALORIE_TOLERANCE)) continue
     return { dish: lines === dish.ingredients ? dish : { ...dish, ingredients: lines }, loss: cand.loss }
   }

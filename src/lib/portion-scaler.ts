@@ -140,7 +140,9 @@ const QUARTER_GLYPH: Record<string, string> = { '0.25': '¼', '0.5': '½', '0.75
  */
 export function formatKitchenQuantity(quantity: number, unit: string): string {
   const plain = String(Number.isInteger(quantity) ? quantity : Math.round(quantity * 10) / 10)
-  if (!VOLUME_UNITS.has(unit.toLowerCase().trim())) return plain
+  const u = unit.toLowerCase().trim()
+  // Half of a counted thing is said as a half: "1½ slices", "½ bagel" (it read "1.5 slices", 18 Nov 2026).
+  if (!VOLUME_UNITS.has(u)) return u !== 'g' && u !== 'ml' && quantity > 0 && quantity % 1 === 0.5 ? `${Math.floor(quantity) || ''}½` : plain
   const whole = Math.floor(quantity)
   const glyph = QUARTER_GLYPH[String(Math.round((quantity - whole) * 100) / 100)]
   if (quantity === whole) return String(whole)
@@ -249,19 +251,49 @@ function pieceFood(line: MealIngredientLine): { each: number; step: number; max:
   return rule && each ? { each, ...rule } : null
 }
 
-/** A piece food's grams, moved to the nearest step of a piece (never under one step). Every other line is untouched. */
-export function snapPieces(ingredients: MealIngredientLine[]): MealIngredientLine[] {
+/**
+ * A piece food's grams, moved to the nearest step of a piece (never under one step) and written to a kitchen step
+ * ("145g bagel" is a bagel and a half). With `capAtMax`, never more pieces than a plate takes. Every other line is
+ * untouched.
+ */
+export function snapPieces(ingredients: MealIngredientLine[], capAtMax = false): MealIngredientLine[] {
   let changed = false
   const out = ingredients.map(line => {
     const p = pieceFood(line)
     if (!p) return line
-    const pieces = Math.max(p.step, Math.round(line.quantity / p.each / p.step) * p.step)
-    const grams = Math.round(pieces * p.each)
+    const nearest = Math.max(p.step, Math.round(line.quantity / p.each / p.step) * p.step)
+    const pieces = capAtMax ? Math.min(nearest, p.max) : nearest
+    const grams = kitchenRound(pieces * p.each, 'g')
     if (grams === line.quantity) return line
     changed = true
     return { ...line, quantity: grams }
   })
   return changed ? out : ingredients
+}
+
+/** How far the rest of a dish may move to make up for its bread being served in whole pieces. */
+const SETTLE_MIN = 0.6
+const SETTLE_MAX = 1.6
+
+/**
+ * A DISH WITH ITS BREAD IN WHOLE PIECES AND THE SAME CALORIES. The pieces go to the nearest half or whole piece, never
+ * more than a plate takes, and the REST of the dish (its gram lines: the filling, the yoghurt, the rice) gives back or
+ * makes up the calories that moved, in kitchen steps. Without this a sandwich for a big lunch was refused outright for
+ * needing seven slices, and a snack at exactly its size was refused because rounding 47 g of pitta up to a whole one
+ * took it 15% over. When the rest would have to move by more than SETTLE_MIN to SETTLE_MAX the pieces are still
+ * snapped and the caller's own calorie check decides. For dishes the app portions; his own portions never come here.
+ */
+export function settlePieces(ingredients: MealIngredientLine[]): MealIngredientLine[] {
+  const snapped = snapPieces(ingredients, true)
+  if (snapped === ingredients) return ingredients
+  const moved = computeMealMacros(snapped).kcal - computeMealMacros(ingredients).kcal
+  if (Math.abs(moved) < 1) return snapped
+  const isRest = (l: MealIngredientLine) => GRAM_LIKE_UNITS.has(l.unit.toLowerCase().trim()) && pieceFood(l) === null
+  const restKcal = computeMealMacros(snapped.filter(isRest)).kcal
+  if (!(restKcal > 0)) return snapped
+  const factor = (restKcal - moved) / restKcal
+  if (factor < SETTLE_MIN || factor > SETTLE_MAX) return snapped
+  return snapped.map(l => (isRest(l) ? { ...l, quantity: kitchenRound(l.quantity * factor, l.unit) } : l))
 }
 
 /** "2½ slices", "1 wrap", "½ pitta" for a gram line of a piece food that sits on a step; null for anything else. */
@@ -270,7 +302,8 @@ export function pieceHint(line: MealIngredientLine): string | null {
   if (!p) return null
   const pieces = line.quantity / p.each
   const onStep = Math.round(pieces / p.step) * p.step
-  if (onStep <= 0 || Math.abs(pieces - onStep) * p.each > 1.5) return null
+  // Within 3 g of a step: the grams are written to a kitchen step, so a bagel and a half (142.5 g) reads 145.
+  if (onStep <= 0 || Math.abs(pieces - onStep) * p.each > 3) return null
   const whole = Math.floor(onStep)
   const half = onStep - whole >= 0.5
   const n = `${whole > 0 ? whole : ''}${half ? '½' : ''}`
@@ -283,7 +316,7 @@ export function unrealisticPlate(ingredients: MealIngredientLine[], isSnack: boo
   let liquid = 0
   for (const line of ingredients) {
     const p = pieceFood(line)
-    if (p && line.quantity / p.each > p.max + 0.01) return `${Math.round((line.quantity / p.each) * 10) / 10} ${pluralWord(p.word)} of ${line.name} on one plate`
+    if (p && line.quantity / p.each > p.max + 0.25) return `${Math.round((line.quantity / p.each) * 10) / 10} ${pluralWord(p.word)} of ${line.name} on one plate`
     const entry = lookupIngredient(line.name)
     const bought = unitToGrams(entry, line.unit, line.quantity, line.name)
     if (!entry || bought == null) continue

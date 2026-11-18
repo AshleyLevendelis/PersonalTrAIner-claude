@@ -2,6 +2,74 @@
 
 Newest first. One line each.
 
+- [x] **A PLATE SOMEBODY WOULD EAT, MADE OF FOOD HE EATS (18 Nov 2026, the Fable pass on meals; nutrition decisions,
+  mine, not asked; two questions for him at the end).** FOUND by serving four weeks of meals to six people through the
+  app's own functions and READING the plates, not the totals.
+  (1) **Half of a meat-eater's meals were meat substitutes.** Dishes are ranked by how well they fit the meal's numbers,
+  and for a muscle-gain target (about 5 g of protein per 100 kcal) the plant dishes fit best. Measured over 28 days,
+  built the way the real builder builds (seven a meal, then every dish that lands a day): a 75 kg man gaining muscle,
+  no dietary preference, was served a dish built on tofu, tempeh, Quorn, vegan sausages or soy yoghurt at **55 of 112
+  meals (29 of 56 lunches and dinners)**; a 58 kg woman 60 of 112; fat-loss plans about 25 of 112. Nothing was wrong
+  with any dish and every day read "on target". But a plan is worth the share of it that gets eaten.
+  DECIDED: for someone who eats meat (not vegetarian, vegan or pescatarian), a dish built on a meat stand-in is ranked
+  after every other dish (a sort KEY: a penalty of 6 points was built first and measured as not enough), and a plan
+  stops taking them once a meal has 30 dishes (`STAND_IN_FLOOR`). The same for dairy stand-ins and someone who eats
+  dairy. A food he says he likes still lifts its dishes; lentils, beans and chickpeas are ordinary food, not stand-ins.
+  After: **0 to 2 of 112**.
+  (2) **Plates nobody would eat.** Bread, wraps and bagels are written in grams so a dish can be fitted to anybody, and
+  nothing asked whether the result was food: 13 g of pitta in a "pitta pocket", 240 g of bagel, a 1.8 kg lunch.
+  DECIDED: a food eaten in pieces is served in half or whole pieces (never under half a piece), never more pieces than
+  a plate takes (4 slices, 2 bagels, 2 wraps...), and the REST of the dish makes up the calories the pieces moved
+  (`settlePieces`, within 0.6-1.6x; beyond that the dish is refused). A main meal weighs at most 1,100 g AS IT SITS ON
+  THE PLATE (rice and pasta at cooked weight, a liquid counting half), a snack half. Limits of 900-1,200 g were
+  measured; 1,100 keeps 92-100 dishes a meal for everyone to about 3,300 kcal. The card says the pieces beside the
+  grams ("145g bagel (1½ bagels)") and counted measures are plural ("2 slices wholemeal bread", "1½ slices").
+  His own portions are never touched (they return before these rules).
+  (3) **Re-portioning range widened** so real dishes fit a lean bulk: the protein food 0.5-1.35x the recipe (was
+  0.55; 0.4 was tried and rejected: "turkey patties" with 60 g of turkey is not the dish, and 0.5 landed as many
+  days), the starch 0.5-2.6x (was 2.0). A FAT factor (oil, nuts, avocado half to double) and a 0.9x per-meal protein
+  floor for day-tested dishes were both BUILT, MEASURED and REMOVED: neither was a clear win.
+  MEASURED AFTER (six people, 28 days, days on target): **26, 28, 28, 20, 28, 25** (were 27-28 with the stand-ins).
+  Every miss is 13-19 g of protein over or 15-20 g of fat under WITH CALORIES ON TARGET. Different dishes in four
+  weeks 57-93 (were 72-103).
+  CSCS / nutrition review: (1) effect: protein floor per meal and per day unchanged; (2) takes away: variety (above),
+  and on a lean muscle-gain target about 1 day in 4 now reads a small protein-over or fat-under instead of "on target";
+  (3) fundamentals hold (energy on target every day; fat stays over 0.8 g per kg on the worst day); (4) "on target"
+  itself is NOT redefined; (5) population-level nutrition, inside scope.
+  ALSO in this batch, from the checks the previous commit broke: the ~65 new foods are in swap groups; soba has a dry
+  twin for the shopping list; **packaged products carry every allergen their usual recipe has** (a sausage roll: egg
+  and milk; breaded chicken: egg, milk, soy, celery, mustard; and so on), because a product that was UNKNOWN was
+  refused for every restriction and an entry must not be weaker than that; recipe steps are no longer hidden because
+  "cakes", "smoothie", "orange juice" and "salt and pepper" became foods; the unknown-food sentence uses the app's
+  existing words ("in my food data"); two drivers (meal-log-card, unit-ask) open an offer's Details as he would (his 17
+  Nov one-line offers; they had been red since that build). One library soup nobody could be served was rewritten.
+  `test:real-plates` (38 checks; 27 mutations: 25 caught after two checks were tightened, 1 dead guard found and
+  deleted, 1 equivalent mutant: an early return that returns the same list). Re-anchored on properties, not numbers:
+  `test:meal-library` (a protein-dense dish few are served must be LEAN or limited by the PLATE to the smaller meals),
+  `test:usual-meals` (its case is found by property, not named). Bundle budgets moved to today's measured numbers.
+  NOT proven: any of it on his own saved plan (a plan made before today keeps its dishes until he regenerates or asks
+  for more), and on a phone. NOT built: a "more meals a day" suggestion for very big eaters (a 3,800 kcal man's lunch
+  is 1,370 kcal, which no plate holds: 22 lunches fit him); low-carb dishes (keto has no library lunches or dinners).
+  **QUESTIONS FOR HIM**: (a) on a muscle-gain plan, should a day that is 15 g over on protein (or 15 g under on fat)
+  with calories on target read as a miss? His 18 Oct bands say yes; a coach would say no. (b) "usually contains"
+  allergens on EXISTING foods (bread and soy, mayonnaise and mustard, stock and celery...) still need his one ruling.
+  Needs the `chat-gemini` and `generate-meals` deploys (the synced food table); frontend on merge.
+
+- [x] **A FOOD THE APP CANNOT COUNT IS ASKED ABOUT; SEASONINGS NEED NO GRAMS; A PRODUCT IS NOT ITS MAIN INGREDIENT (18
+  Nov 2026, the Fable pass on meals).** FOUND by putting ordinary lines through the real builders. "200g chicken, 250g
+  rice, 60g chocolate brownie" came back as a 659 kcal card that LISTED the brownie and counted none of it (the meal
+  check allows a fifth of a dish's WEIGHT to be unknown; his 15 Oct rule for a logged meal was not held for a meal he
+  describes): now asked about, in the app's words, nothing saved. "Salt" was an unknown food, so "salt and pepper"
+  was asked about in grams: salt, pepper, herbs, spices, a squeeze of lemon said with no amount count as nothing and
+  are understood (oil, butter and anything with real energy are still asked about; a seasoning WITH an amount is
+  costed). "200g chicken breast" shown back as "275g raw chicken breast" under "Your portions, untouched": the card
+  now says "as the app weighs them" with the cooked weight beside it. Crab sticks were plain crab, onion rings plain
+  onion, soba plain buckwheat (all passed gluten-free); cornflakes and Worcestershire sauce passed gluten-free, hoisin
+  sesame-free, Thai curry paste shellfish-free and vegan: each corrected, Thai paste split from Indian, six library
+  dishes renamed to the paste they use. About 65 everyday foods added (a pizza slice, a pint, fish fingers, ice
+  cream...), and a pint is read as the drink's own measure. `test:meal-facts` (41 checks; 20 mutations, 19 caught, 1
+  equivalent). Needs the `chat-gemini` and `generate-meals` deploys.
+
 - [x] **PROTEIN FOR A VERY HEAVY PERSON IS WORKED OUT FROM A REFERENCE WEIGHT (18 Nov 2026, the Fable pass on meals; CSCS decision, mine, not asked).**
   FOUND by serving two weeks of meals from the library to ten different people with the app's own functions: a 120 kg
   woman of 160 cm on fat loss was set **240 g of protein inside 1,808 kcal** (2.0 g per kg of TOTAL weight, 53% of her
