@@ -4,10 +4,10 @@
   "checks": {
     "expectsProposal": true
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "7d8d26b45c30bd06",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -67,9 +67,8 @@
       "proposal": {
         "kind": "propose_session_move",
         "args": {
-          "from_date": "2026-09-15",
-          "to_date": "2026-09-17",
-          "reason": "work commitment tonight",
+          "to_date": "Thursday",
+          "reason": "Work commitment tonight",
           "also_doing_duration_minutes": null
         }
       },
@@ -78,8 +77,8 @@
     },
     {
       "user": "thanks",
-      "reply": "Any time! Let me know how Thursday's session goes once you get to it 💪",
-      "raw": "Any time! Let me know how Thursday's session goes once you get to it 💪\n\n[QUICK_REPLIES: \"Will do\" | \"Got a question first\"]",
+      "reply": "Any time! Let me know how Thursday's session goes, or if anything else comes up before then. 💪",
+      "raw": "Any time! Let me know how Thursday's session goes, or if anything else comes up before then. 💪",
       "error": null,
       "action": null,
       "proposal": null,

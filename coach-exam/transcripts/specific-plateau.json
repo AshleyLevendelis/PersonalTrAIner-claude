@@ -2,10 +2,10 @@
   "case": "specific-plateau",
   "why": "A plain training question where generic advice and the right answer look different. The context holds the actual lift, the actual weight and the actual completed session, so a coach that reads them can say what to do next week and a coach that does not can only say 'progressive overload'.",
   "checks": {},
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "91eb55ecbe167936",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,8 +58,8 @@
   "turns": [
     {
       "user": "my squat's been stuck for a bit, what should I do",
-      "reply": "Plateaus happen! To get past this stall, let's start by dropping the load slightly today on your 3x8 @ 45kg Barbell Back Squats. \n\nTaking a small step back gives your muscles room to recover and rebuild momentum, though we can always try a movement variation later if needed. \n\nWhere do you feel like you're struggling most during the squat right now? 💪",
-      "raw": "Plateaus happen! To get past this stall, let's start by dropping the load slightly today on your 3x8 @ 45kg Barbell Back Squats. \n[BREAK]\nTaking a small step back gives your muscles room to recover and rebuild momentum, though we can always try a movement variation later if needed. \n[BREAK]\nWhere do you feel like you're struggling most during the squat right now? 💪\n\n[QUICK_REPLIES: \"Stuck coming out of bottom\" | \"Form feels shaky\" | \"Just feel beat up\"]",
+      "reply": "Squats can stall when fatigue builds up, so we usually need to tweak your intensity or volume to get you progressing again. 🏋️‍♂️\n\n\nBefore we make any changes, how many reps are you actually hitting on that top set of 45kg right now?",
+      "raw": "Squats can stall when fatigue builds up, so we usually need to tweak your intensity or volume to get you progressing again. 🏋️‍♂️\n\n[BREAK]\nBefore we make any changes, how many reps are you actually hitting on that top set of 45kg right now?\n\n[QUICK_REPLIES: \"All 8 reps\" | \"5 to 7 reps\" | \"Fewer than 5\"]",
       "error": null,
       "action": null,
       "proposal": null,
@@ -68,8 +68,8 @@
     },
     {
       "user": "ok, and how long before I'd expect that to move",
-      "reply": "You'll usually see it move within two to three weeks. \n\n\nTaking that small step back lets cumulative fatigue clear while keeping the movement fresh, so when you build back up to 45kg, your legs are actually ready to push past it 💪",
-      "raw": "You'll usually see it move within two to three weeks. \n\n[BREAK]\nTaking that small step back lets cumulative fatigue clear while keeping the movement fresh, so when you build back up to 45kg, your legs are actually ready to push past it 💪\n\n[QUICK_REPLIES: \"Makes sense!\" | \"Should we swap it now?\" | \"What about rep ranges?\"]",
+      "reply": "With a 10% weight drop to clear leg fatigue, you'll usually see your squat moving again within two to three weeks. \n\n\nThis reset gives your nervous system a break while keeping the muscle working so you can push right through 45kg.\n\n\nHow many reps were you actually landing on that top set of 45kg?",
+      "raw": "With a 10% weight drop to clear leg fatigue, you'll usually see your squat moving again within two to three weeks. \n\n[BREAK]\nThis reset gives your nervous system a break while keeping the muscle working so you can push right through 45kg.\n\n[BREAK]\nHow many reps were you actually landing on that top set of 45kg?\n\n[QUICK_REPLIES: \"All 8 reps\" | \"5 to 7 reps\" | \"Fewer than 5\"]",
       "error": null,
       "action": null,
       "proposal": null,

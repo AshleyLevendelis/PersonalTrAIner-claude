@@ -15,10 +15,10 @@
       }
     ]
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "94aba0b719bf6a9f",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -71,8 +71,8 @@
   "turns": [
     {
       "user": "got a kickboxing class after work tonight, looking forward to it",
-      "reply": "That sounds awesome! Enjoy the class 🥊\n\nSince you've got kickboxing tonight, are you planning to treat that as your main workout for the day, or were you hoping to get your leg session in too?",
-      "raw": "That sounds awesome! Enjoy the class 🥊\n\nSince you've got kickboxing tonight, are you planning to treat that as your main workout for the day, or were you hoping to get your leg session in too? [QUICK_REPLIES: \"Just kickboxing\" | \"Doing both\" | \"Resting legs\"]",
+      "reply": "Awesome, kickboxing is fantastic conditioning and great for upper body power! 🥊\n\n\n\nI recommend moving today's leg session (Squats, RDLs, and Lunges) to tomorrow so you can give 100% to class without cooking your legs or messing up recovery, though we could also just lighten today's lift. \n\n\n\nWhich direction would you prefer to take?",
+      "raw": "Awesome, kickboxing is fantastic conditioning and great for upper body power! 🥊\n\n[BREAK]\n\nI recommend moving today's leg session (Squats, RDLs, and Lunges) to tomorrow so you can give 100% to class without cooking your legs or messing up recovery, though we could also just lighten today's lift. \n\n[BREAK]\n\nWhich direction would you prefer to take?\n\n[QUICK_REPLIES: \"Lighten today's leg workout\" | \"Move leg session to tomorrow\"]",
       "error": null,
       "action": null,
       "proposal": null,
@@ -93,7 +93,7 @@
             "Thursday"
           ],
           "time_of_day": "evening",
-          "reason": "Regular Thursday kickboxing class after work"
+          "reason": "Kickboxing class every Thursday evening"
         }
       },
       "saved": null,

@@ -15,10 +15,10 @@
       "switch"
     ]
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "319aaf4bdd1b27de",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -71,8 +71,8 @@
   "turns": [
     {
       "user": "I work shifts at the hospital and which days I'm off changes every week",
-      "reply": "Working shifts is tough when a rigid routine assumes every week is identical, but we can easily adapt your plan around your roster. 🩺\n\n\n\nI'll move your sessions to your off days this week so you get them done without burning out. What days do you have off?",
-      "raw": "Working shifts is tough when a rigid routine assumes every week is identical, but we can easily adapt your plan around your roster. 🩺\n\n[BREAK]\n\nI'll move your sessions to your off days this week so you get them done without burning out. What days do you have off?",
+      "reply": "Hospital shifts are tough for rigid routines, so flexibility is key here! \n\nWhenever your roster comes out, just let me know your off days for the week and we can use propose_schedule_change to adjust your plan to match your availability, though we have other options like propose_session_move if things change mid-week.\n\nWhat does your schedule look like for this upcoming week?",
+      "raw": "Hospital shifts are tough for rigid routines, so flexibility is key here! \n\nWhenever your roster comes out, just let me know your off days for the week and we can use propose_schedule_change to adjust your plan to match your availability, though we have other options like propose_session_move if things change mid-week.\n\nWhat does your schedule look like for this upcoming week?",
       "error": null,
       "action": null,
       "proposal": null,

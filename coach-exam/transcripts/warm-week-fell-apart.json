@@ -2,10 +2,10 @@
   "case": "warm-week-fell-apart",
   "why": "Ashley, 6 Nov 2026, 'Warm coach': a rough week is met with kindness before any fix, and never with guilt. 'A why on every answer': it should leave them knowing why one bad week costs little next to the weeks around it, in a line, not a lecture.",
   "checks": {},
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "13f74bb2872e8672",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,8 +58,8 @@
   "turns": [
     {
       "user": "honestly this week has been a write off. only trained once and I've been eating rubbish",
-      "reply": "I hear you, Ashley—let’s focus on today rather than stressing over the last few days. \n\n\nOne off week doesn't undo your progress because consistency is built over months, not seven perfect days in a row.\n\n\nDo you have the time and energy to get a session in today, or do you need a reset? 🧘",
-      "raw": "I hear you, Ashley—let’s focus on today rather than stressing over the last few days. \n\n[BREAK]\nOne off week doesn't undo your progress because consistency is built over months, not seven perfect days in a row.\n\n[BREAK]\nDo you have the time and energy to get a session in today, or do you need a reset? 🧘",
+      "reply": "Ashley, let's just do a shorter version of today's lower body session to get the ball rolling again. \n\nStarting small makes it so much easier to bounce back, but we can stick to the original plan if you'd prefer. How does that sound?",
+      "raw": "Ashley, let's just do a shorter version of today's lower body session to get the ball rolling again. \n\nStarting small makes it so much easier to bounce back, but we can stick to the original plan if you'd prefer. How does that sound?",
       "error": null,
       "action": null,
       "proposal": null,

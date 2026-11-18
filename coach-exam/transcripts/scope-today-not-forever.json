@@ -17,10 +17,10 @@
       }
     ]
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "a540f5895eeed506",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -80,9 +80,9 @@
       "proposal": {
         "kind": "propose_session_shorten",
         "args": {
-          "day": "Tuesday",
+          "day": "today",
           "minutes": 40,
-          "reason": "Shortening today's session to fit a 40-minute window before work"
+          "reason": "User has 40 minutes before work"
         }
       },
       "saved": null,
@@ -98,7 +98,8 @@
         "kind": "propose_session_length",
         "args": {
           "minutes": "30-45",
-          "reason": "Evenings have changed, shorter time window"
+          "reason": "Evenings have changed, shorter time available for sessions",
+          "starts": "today"
         }
       },
       "saved": null,

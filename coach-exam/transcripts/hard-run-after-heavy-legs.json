@@ -14,10 +14,10 @@
       }
     ]
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "e093e188ef52de0b",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "Wednesday, 7:10 AM",
@@ -70,8 +70,8 @@
   "turns": [
     {
       "user": "fancy a hard hill sprint session this morning, is that a good shout?",
-      "reply": "I'd save the hill sprints for another time since your legs are still recovering from yesterday's heavy squats and RDLs. 🚴\n\nAn easy run today is your best bet to help you recover for Saturday's deadlifts, but we can always shuffle your lifting days if you're set on hills!",
-      "raw": "I'd save the hill sprints for another time since your legs are still recovering from yesterday's heavy squats and RDLs. 🚴\n[BREAK]\nAn easy run today is your best bet to help you recover for Saturday's deadlifts, but we can always shuffle your lifting days if you're set on hills!\n[QUICK_REPLIES: \"Easy run instead\" | \"Keep hill sprints\" | \"Just a walk\"]",
+      "reply": "That's a bit risky for your heavy leg session tomorrow! [BREAK]\nHard hill sprints pack a massive amount of fatigue into your hamstrings and calves, which means you'll start your 5 sets of squats at 100kg and Romanian deadlifts at 90kg on an empty tank. [BREAK]\nGo for an easy 20–30 minute conversational run instead to get fresh air without compromising tomorrow, or we have a couple of other light options. 🏃",
+      "raw": "That's a bit risky for your heavy leg session tomorrow! [BREAK]\nHard hill sprints pack a massive amount of fatigue into your hamstrings and calves, which means you'll start your 5 sets of squats at 100kg and Romanian deadlifts at 90kg on an empty tank. [BREAK]\nGo for an easy 20–30 minute conversational run instead to get fresh air without compromising tomorrow, or we have a couple of other light options. 🏃\n\n[QUICK_REPLIES: \"Easy run instead\" | \"Brisk walk\" | \"I'll rest today\"]",
       "error": null,
       "action": null,
       "proposal": null,
