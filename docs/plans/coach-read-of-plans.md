@@ -11,6 +11,9 @@ below was counted before anything was changed. Every decision here is a training
 3,380 of 21,000 loaded slots asked for more than 20 reps, 889 for more than 25 ("Overhead Tricep Extension 3x24-29").
 A loaded lift's range now ends its block at 20 or fewer; weightless lifts are not capped. Basis: NSCA muscular
 endurance is 12 or more reps and coaches write 12 to 20; past that a loaded set is limited by discomfort.
+Extended the same day to every lift whose resistance can be raised, number or no number (a cable "by feel", a
+machine, a band): "Cable Woodchops 3x19-24" was still climbing. 0 of 23,208 such slots are over 20 now. Bodyweight
+alone is not capped.
 
 ### 2. Side lifts given 3 to 5 reps
 In strength and power blocks every lift's range drops by 3 or 4 reps, down to the experience floor (3 for advanced,

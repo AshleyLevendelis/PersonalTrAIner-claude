@@ -1664,8 +1664,8 @@ menu" stays true when a copy is also left outside it.
 - **A screen the coach names is one tap away**: one of the shopping list, plate calculator, session history or full
   program named in a coach reply gets the app's "Open ..." button under it; two named get none. `test:open-from-chat`
   §6, `verify:live-test-nov14` A46-A49
-- **Plans read as a coach** (CSCS, mine; `docs/plans/coach-read-of-plans.md`): no loaded lift is prescribed past 20
-  reps; only the day's main lift goes under six; a warm-up drill keeps one dose in every block and week (explosive 5,
+- **Plans read as a coach** (CSCS, mine; `docs/plans/coach-read-of-plans.md`): no lift whose resistance can be raised
+  (a weight, a stack, a machine, a band) is prescribed past 20 reps, bodyweight alone is not capped; only the day's main lift goes under six; a warm-up drill keeps one dose in every block and week (explosive 5,
   activation 10; Ankle Alphabet is timed); a dumbbell leg curl takes a third of the machine's price and a kickback half
   an extension's; a week's lower-body main lifts alternate squat and hinge; a build-up set earns its row only if it is
   heavier than the one before and lighter than the working weight. **Rep and weight figures from before 18 Nov are not

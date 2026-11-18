@@ -36,8 +36,8 @@ Newest first. One line each.
   (4) **The coach's running memory of the chat was saved to the profile and never read back** on reopen (column
   `chat_summary`, added 17 Nov; `test:profile-restore` red since). On a new phone the saved summary was ignored.
   Restored with the profile.
-  SEEN AND LEFT, each named: a band exercise still climbs past 20 reps ("Pallof Press 3 x 19-24"; the ceiling covers
-  weighted lifts, and a band has no number to raise: his or a later CSCS pass); the "Add an email" prompt covers Home
+  SEEN ON THE WALK AND FIXED IN THE PLAN ENTRY BELOW: a band or cable exercise still climbed past 20 reps ("Pallof
+  Press 3 x 19-24"). SEEN AND LEFT, each named: the "Add an email" prompt covers Home
   on the first open after a week (by design); Profile's header shows "kg goal —" with no way to set one (already on
   his list).
 - [x] **READING GENERATED PLANS AS A COACH (18 Nov 2026, the Fable pass on plans; `docs/plans/coach-read-of-plans.md`).**
@@ -53,6 +53,12 @@ Newest first. One line each.
   TWO EXTRA MECHANISMS BUILT, MEASURED ON 60 PLANS AND REMOVED (forcing a lowered lift to climb reps; stopping its
   weight climbing): neither changed the ceiling result and both repeated more week-pairs (83 to 95 against 77). A
   missed mutation asked the question; the measurement answered it. After: 0 of 21,000 over 20.
+  **EXTENDED THE SAME DAY to every lift whose resistance can be raised**, number or no number: the phone walk showed
+  "Cable Woodchops 3 x 19-24" (the card says "choose by feel"), an Ab Crunch Machine and a band Pallof Press still
+  climbing past 20, because the first rule asked whether the lift had a priced weight. A cable, a machine or a band
+  can be made harder; at 20 clean reps the answer is more resistance. After: 0 of 23,208 such slots over 20; quality
+  and repeated week-pairs unchanged (11.758, 75). Bodyweight alone is still not capped (1,805 of 12,836 over 20: reps
+  are the only lever it has).
   (2) **Only the day's main lift goes under six reps.** About 470 of 43,524 slots were a side lift with a range
   starting under six in a strength or power block ("Walking Lunges 2x3-5 @38 kg a hand", "Dumbbell Lateral Lunge
   2x3-5", "Push-Ups 4x4-6 Bodyweight", "Band Lat Pulldown 3x4-6"). BASIS: NSCA gives the heavy strength loads to core
@@ -79,11 +85,16 @@ Newest first. One line each.
   what it has). After: 0 one-sided weeks in 60, never more than one apart.
   MEASURED ON THE SAME SEEDED PLANS: mean quality 11.745 -> 11.758; repeated week-pairs 74 -> 75; days over length not
   moved (the sweep's `session-length` holds it). CSCS review answers are in the plan doc.
-  `test:rep-ceiling` (18 checks; 8 mutations, 7 caught and the eighth found an unused value, deleted),
+  `test:rep-ceiling` (21 checks; 12 mutations: 11 caught, and one found an unused value, deleted),
   `test:coach-read` (31 checks; 20 mutations, 19 caught, 1 equivalent: counting the current day among "later" days
-  changes nothing, because a day that is choosing is never itself fixed). NOT DONE: band and bodyweight lifts over 20
-  reps (2,468 of about 22,000; reps are their only lever, and a band has no number to raise); session names ("Full
-  Body Power" on a beginner's 13-15 rep day) are wording, his.
+  changes nothing, because a day that is choosing is never itself fixed). THREE OLDER CHECKS PINNED NUMBERS THESE
+  CHANGES MOVED ON PURPOSE and were re-anchored in `test:replacement-prescription`: the band kickback's example range
+  (16-19, now 13-16), "Dumbbell Leg Curl is priced as the machine" (now: exactly its own third), and the deload
+  agreement floor (93%, measured 92.8%: the same understood difference a little more often, both sides 20 or under).
+  NOT DONE: session names ("Full Body Power" on a beginner's 13-15 rep day) are wording, his. FOUND AND NOT REACHABLE:
+  the `upper_lower` split has two squat days and no hinge day (18 quad sets to 3 hamstring sets in the plan read);
+  setup always stores `ai_recommendation` and no screen changes it, so nobody gets that week. If a split picker is
+  ever built, that template is fixed first. (The whole-app test page uses it, which is how it was seen.)
 - [x] **THE COACH: THEIR LEVEL, THEIR SPORT, AND A SCREEN IT NAMES ONE TAP AWAY (18 Nov 2026, the Fable pass on the
   coach; his brief: advice "world class and sport specific if the user wants it", "appropriate for all users at all
   levels", and a chat that can "quickly and easily do things for the user").** FOUND by reading what the coach is told:
