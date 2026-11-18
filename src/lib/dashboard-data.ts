@@ -20,6 +20,7 @@ import { getTotalForDate as getWaterTotalForDate } from './water-store'
 import { getPRCache, getRecordsBeaten, refreshPRCacheFromDB, type PRMetric, type RecordBeaten } from './pr-engine'
 import { formatLoad, labelModeForEntry, isPerSideLoad, type LoadLabelMode } from './load-prescription'
 import { getExerciseEntry } from './exercise-db'
+import { isMainLiftSlot } from './mesocycle-edit'
 import { breakDayKg, layoffStatus, NO_LAYOFF, type LayoffStatus } from './layoff'
 import { getLastWorkingSessionDate } from './set-log-store'
 import { getDoubleProgressionRecommendation } from './progression-engine'
@@ -87,7 +88,7 @@ export interface TodaySession {
   sessionLength: string | null
   /** Minutes still to go, once sets have been logged. Null before that. */
   minutesLeft: number | null
-  /** The heaviest external load in the session — see leadLiftPhrase for how it is said. */
+  /** The session's main lift where it carries a weight, else its heaviest external load (byLead) — see leadLiftPhrase for how it is said. */
   leadLift: LeadLift | null
   /**
    * A day the plan schedules with no lifting (active recovery): its cardio in the plan's words, so Home names the day
@@ -171,6 +172,15 @@ function loggedSessionFocus(exerciseNames: string[]): string {
 export function homeGreeting(hour: number, firstName: string): string {
   const period = hour < 5 ? 'Hi' : hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening'
   return firstName ? `${period}, ${firstName}` : period
+}
+
+/**
+ * WHICH LIFT HOME NAMES (18 Nov 2026, phone walk): the day's MAIN lift where it carries a weight, else the heaviest
+ * thing moved. A Squat & Carry day read "7 exercises · Calf Raises from ~40kg" because the calf raise was the biggest
+ * number on the card; the session is built around the Front Squat. A sort order, so it is one line to ask about.
+ */
+export function byLead(a: { main: boolean; moved: number }, b: { main: boolean; moved: number }): number {
+  return (Number(b.main) - Number(a.main)) || (b.moved - a.moved)
 }
 
 export function leadLiftPhrase(lead: LeadLift, status: TodaySession['status']): string | null {
@@ -502,10 +512,11 @@ export async function loadDashboardData(input: LoadDashboardDataInput): Promise<
         labelMode: entry ? labelModeForEntry(entry) : 'total' as LoadLabelMode,
         loggedKg: logged.length > 0 ? Math.max(...logged) : null,
         moved: entry && isPerSideLoad(entry) ? kg * 2 : kg,
+        main: isMainLiftSlot(e),
       }
     })
-    .sort((a, b) => b.moved - a.moved)
-    .map(({ moved: _moved, ...lead }) => lead)[0] ?? null
+    .sort(byLead)
+    .map(({ moved: _moved, main: _main, ...lead }) => lead)[0] ?? null
 
   const session: TodaySession = !planKnown
     ? { status: 'unknown', focus: null, exerciseNames: [], setsLogged: 0, setsPlanned: 0,

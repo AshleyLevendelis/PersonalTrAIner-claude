@@ -171,7 +171,7 @@ import { takeChatPrefill, CHAT_PREFILL_EVENT } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 import { useTrainingWeek, readTrainingWeeks } from '@/hooks/useTrainingWeek'
 import { lessonDue, lessonBrief, lessonTaughtIn, taughtFromRows, actionDataWithLesson, type TaughtLesson } from '@/lib/coach-lessons'
-import { pickOpener, movementList, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
+import { pickOpener, sessionMovements, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import { cleanReplyText, applyMessageBreaks, ACTION_TAG_RE, QUICK_REPLIES_RE } from '@/lib/reply-text'
 import { rowToMessage, addServerMessages } from '@/lib/chat-history-merge'
 import { recordMomentSent, markMomentAnswered, type MomentLogRow } from '@/lib/moment-log'
@@ -658,7 +658,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     // A ROW WITH NO EXERCISES IS NOT A SESSION (1 Nov 2026): Home and todayPlan both ask exercises.length.
     if (todaySession && todaySession.exercises.length > 0) {
-      const movements = movementList(todaySession.exercises.map(e => e.name))
+      const movements = sessionMovements(todaySession.exercises)
       // PAST THE HOUR, ASK WHETHER IT HAPPENED — never "today was X. How'd it go?" (1 Nov 2026). This bubble
       // is drawn before any log has been read, so it cannot know a session happened; the composed opener
       // that replaces it does, and says "How'd it go?" only then.
@@ -702,10 +702,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // A walk day carries its whole prescription in plannedActivity and has
     // no exercises to list, so mapping the (empty) exercise list produced
     // "Day one is today: Walk — ." in the app's very first message.
-    const brief = (day: { focus: string; exercises: { name: string }[]; plannedActivity?: { duration?: number; targetRpe?: number } | null }) => ({
+    const brief = (day: { focus: string; exercises: { name: string; tier?: string | null }[]; plannedActivity?: { duration?: number; targetRpe?: number } | null }) => ({
       focus: day.focus,
       movements: day.exercises.length > 0
-        ? movementList(day.exercises.map(e => e.name))
+        ? sessionMovements(day.exercises)
         : day.plannedActivity?.duration != null
           ? `${day.plannedActivity.duration} minutes, easy pace`
           : '',
@@ -1025,7 +1025,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     return { verdict: assessEdit(ctx), key: askKey(ctx, block), scope: ctx.scope, reasoned }
   }
   /** The running summary of chats older than the coach's window (chat-summary.ts); the phone's copy, then the profile's. */
-  const chatSummaryRef = useRef<ChatSummary | null>(loadChatSummary(profile.id, (profile as { chat_summary?: unknown }).chat_summary))
+  const chatSummaryRef = useRef<ChatSummary | null>(loadChatSummary(profile.id, profile.chat_summary))
   const summarising = useRef(false)
   /** Folds the messages that have left the window into the summary: one short coach call, checked before it is kept. */
   const maybeSummarise = async (all: ChatMessage[]) => {
@@ -1342,7 +1342,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const todayPlan = todayMovedTo
     ? undefined
     : todayResolved.day && todayResolved.day.exercises.length > 0 ? todayResolved.day : undefined
-  const movementsOf = (d: WorkoutDay) => movementList(d.exercises.map(e => e.name))
+  const movementsOf = (d: WorkoutDay) => sessionMovements(d.exercises)
 
   // -------------------------------------------------------------------------
   // THE ONE LOOKUP EVERY EXERCISE-GRAIN EDIT GOES THROUGH (H15, 9 Oct 2026).

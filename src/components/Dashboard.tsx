@@ -462,8 +462,8 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     // In progress, the minutes left are the card's right-hand status instead (said once).
     glanceParts.push(`${data.session.exerciseCount} exercise${data.session.exerciseCount === 1 ? '' : 's'}`)
   }
-  // DELIBERATE DEVIATION FROM THE HANDOFF, kept: no "next" — the app knows the
-  // heaviest lift, not the running order.
+  // DELIBERATE DEVIATION FROM THE HANDOFF, kept: no "next" — the app names the
+  // session's main lift (else its heaviest), not the running order.
   const lift = data.session.leadLift && !data.session.activity ? leadLiftPhrase(data.session.leadLift, status) : null
   if (lift) glanceParts.push(lift)
   // NOTHING IS DUE TOMORROW WHILE THE PLAN IS PAUSED (15 Nov 2026, browser test: Home said "Full Body Power · Tomorrow").

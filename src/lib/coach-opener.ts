@@ -180,6 +180,16 @@ export function movementList(names: string[]): string {
   return names.slice(0, 3).join(', ') + (names.length > 3 ? ' and more' : '')
 }
 
+/**
+ * A SESSION'S EXERCISES AS THAT PHRASE, LEAD WITH THE WORK (18 Nov 2026, phone walk): the welcome said "Today is Squat &
+ * Carry — Clamshell, Front Squat, Overhead Carry and more", naming the warm-up drill first because it is first on the
+ * card. A coach names the lifts. Warm-up drills are left out, unless they are all the session holds.
+ */
+export function sessionMovements(exercises: { name: string; tier?: string | null }[]): string {
+  const work = exercises.filter(e => e.tier !== 'tier_0_primer')
+  return movementList((work.length > 0 ? work : exercises).map(e => e.name))
+}
+
 export function pickOpener(input: OpenerInput): Opener {
   const { hour, cutoffHour, awaitingFeel, missedYesterday, planKnown, todaySession, todayLogged, tomorrowSession, movedTo, noticed, lastOrdinaryKind } = input
 

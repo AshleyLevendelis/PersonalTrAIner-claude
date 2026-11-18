@@ -26,7 +26,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { pickOpener, missedYesterdayFrom, movementList, type OpenerInput } from '../src/lib/coach-opener'
+import { pickOpener, missedYesterdayFrom, movementList, sessionMovements, type OpenerInput } from '../src/lib/coach-opener'
 import { pickAccountabilityCheckIn, type AccountabilityInput } from '../src/lib/accountability'
 import type { ChatMessage } from '../src/lib/types'
 import { attentionReasons, nextSeenAttention, hasUnseenAttention, loadSeenAttention, saveSeenAttention } from '../src/lib/chat-unread'
@@ -588,7 +588,12 @@ console.log('\n10. A session\'s exercises read as a phrase, never as four dots (
   check('...so the opener\'s sentence ends in one full stop', !/\.\.|…\./.test(said) && /and more/.test(said), said)
   const src = readFileSync(join(ROOT, 'src/components/ChatAssistant.tsx'), 'utf8')
   check('every list of a session\'s exercises in the chat goes through it (no hand-built "..." left)',
-    !/exercises\.map\(e => e\.name\)\.slice\(0, 3\)/.test(src) && !/length > 3 \? '(\.\.\.|…)'/.test(src) && (src.match(/movementList\(/g) ?? []).length >= 3)
+    !/exercises\.map\(e => e\.name\)\.slice\(0, 3\)/.test(src) && !/length > 3 \? '(\.\.\.|…)'/.test(src) && (src.match(/sessionMovements\(/g) ?? []).length >= 3 && !/movementList\(/.test(src))
+  // 18 Nov 2026 (phone walk): the welcome named the warm-up drill first ("Clamshell, Front Squat, Overhead Carry and more").
+  const day = [{ name: 'Clamshell', tier: 'tier_0_primer' }, { name: 'Front Squat', tier: 'tier_1_primary' }, { name: 'Overhead Carry', tier: 'tier_2_secondary' }, { name: 'Pallof Press', tier: 'tier_3_isolation' }, { name: 'Calf Raises', tier: 'tier_3_isolation' }]
+  check('a session is named by its lifts, not by its warm-up drill', sessionMovements(day) === 'Front Squat, Overhead Carry, Pallof Press and more', sessionMovements(day))
+  check('...a session that is only warm-up drills still names them', sessionMovements([{ name: 'Clamshell', tier: 'tier_0_primer' }, { name: 'Leg Swings', tier: 'tier_0_primer' }]) === 'Clamshell, Leg Swings')
+  check('...and one with no tiers recorded (a logged day) is listed as it stands', sessionMovements([{ name: 'Squat' }, { name: 'Lunge' }]) === 'Squat, Lunge')
 }
 
 if (failures > 0) { console.error(`\n${failures} check(s) failed\n`); process.exit(1) }
