@@ -2,6 +2,32 @@
 
 Newest first. One line each.
 
+- [x] **PROTEIN FOR A VERY HEAVY PERSON IS WORKED OUT FROM A REFERENCE WEIGHT (18 Nov 2026, the Fable pass on meals; CSCS decision, mine, not asked).**
+  FOUND by serving two weeks of meals from the library to ten different people with the app's own functions: a 120 kg
+  woman of 160 cm on fat loss was set **240 g of protein inside 1,808 kcal** (2.0 g per kg of TOTAL weight, 53% of her
+  energy); the 50 g carb floor engaged, fat was floored at 72 g off the same weight, **no library breakfast fitted (pools
+  0/11/19/26) and all 14 days read about 500 kcal under**. A 130 kg man: 260 g, 11 of 14 days on target. Everyone else
+  in the ten: 14 of 14. So the people most likely to want a fat-loss app got a plan that could not be served.
+  BASIS: protein needs follow lean mass, not total mass. Sports-nutrition practice sets protein for people with high
+  body fat from a reference weight (ISSN protein position stand 2017; Helms et al., about 1 g per cm of height or goal
+  weight); dietetic practice uses an adjusted weight counting a quarter of the excess, because about a quarter of excess
+  weight is lean tissue. DECIDED: up to a BMI of 30 the reference weight IS the bodyweight (nobody at or under it moves
+  by a gram; the 9,216-plan grid and every BMI<=30 fixture are untouched), above it a quarter of the extra counts
+  (`nutritionReferenceWeightKg`, continuous, so a weigh-in crossing the line moves nothing suddenly). Used for protein,
+  the fat floor and the periodised day's carbs; ENERGY (BMR, the day's burn, a sport's calories) still reads the real
+  weight. Considered and not chosen: anchoring at a BMI of 25 (the textbook adjusted weight; it would lower protein
+  5-12% for muscular people between 25 and 30 for no gain) and a flat cap at the BMI-30 weight (154 g for her; fits
+  slightly more dishes but ignores the extra lean mass a bigger body does carry). MEASURED after: her 240 g -> 175 g
+  (140 g as a beginner), pools 36/79/89/77, 14 of 14 days on target; his 260 -> 208 g, 14 of 14.
+  CSCS review: (1) training effect: protein stays 1.6-2.0 g per kg of reference weight, about 2.4-3.0 g per kg of
+  fat-free mass, above the muscle-retention range for a deficit; (2) takes away: 65 g of protein she could not eat
+  anyway, and gives back about 90 g of carbs for training; (3) fundamentals hold; (4) redefines "g/kg" for BMI>30 only,
+  and the targets sheet now SAYS so ("Protein and fat are worked out from 88 kg rather than your full weight, because
+  protein needs follow muscle, not total weight."; the wording is his to change, and never names a BMI or a label);
+  (5) inside scope: population-level performance nutrition, not a clinical diet. **Protein targets for BMI>30 before 18
+  Nov are not comparable.** `test:reference-weight` (28 checks; 12 mutations, 12 caught). Frontend only. NOT done: the
+  coach is not yet told the reference weight (it is handed the targets, and has no per-kilo line in its instructions).
+
 - [x] **THE COACH EXAM'S JUDGE IS NOW FABLE 5.2 (17 Nov 2026, his ruling "Switch to Fable", asked from three options:
   switch, keep Opus 5, or mark once with both).** A stronger marker catches subtler coaching mistakes; the cost is that
   judged marks before and after are NOT COMPARABLE. So the judge is now stamped like the coach and the marking guide:

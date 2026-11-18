@@ -85,6 +85,33 @@ export function resolveBodyMetrics(profile: UserProfile): BodyMetrics | null {
   return { weightKg: weight_kg, heightCm: height_cm, age, gender }
 }
 
+/**
+ * THE WEIGHT PER-KILO NUTRITION IS WORKED OUT FROM (18 Nov 2026, CSCS, mine). Protein, the fat floor and the periodised
+ * carbs were all "grams per kg of TOTAL bodyweight", which is right for most people and wrong for someone carrying a lot
+ * of fat: a 120 kg woman of 160 cm was set 240 g of protein inside 1,808 kcal (53% of her energy), the 50 g carb floor
+ * engaged, no breakfast in the library could fit it and every day of her plan read about 500 kcal under.
+ *
+ * Basis: protein needs follow lean mass, not total mass. Sports-nutrition practice sets protein for people with a high
+ * body fat from a reference weight (ISSN position stand 2017; Helms et al. suggest target weight or about 1 g per cm of
+ * height), and dietetic practice uses an ADJUSTED weight that counts a quarter of the excess, because about a quarter
+ * of excess weight is lean tissue. So: up to a BMI of 30 the reference weight IS the bodyweight (nobody at or under it
+ * moves by a gram), and above it only a quarter of the extra counts. It is continuous, so a weigh-in crossing the line
+ * moves nothing suddenly. Measured on the meal library: 240 g -> 175 g for her (140 g as a beginner), pools 0/11/19/26
+ * -> 36/79/89/77 dishes a meal, days on target 0 of 14 -> 14 of 14.
+ *
+ * ENERGY is never read off this: BMR, the day's burn and a sport's calories use the real bodyweight, because moving a
+ * body costs what the body weighs.
+ */
+export const REFERENCE_WEIGHT_BMI = 30
+export const EXCESS_WEIGHT_COUNTED = 0.25
+
+export function nutritionReferenceWeightKg(weightKg: number, heightCm: number | null | undefined): number {
+  if (!(Number(heightCm) > 0) || !(weightKg > 0)) return weightKg
+  const atBmi = REFERENCE_WEIGHT_BMI * ((heightCm as number) / 100) ** 2
+  if (weightKg <= atBmi) return weightKg
+  return Math.round((atBmi + EXCESS_WEIGHT_COUNTED * (weightKg - atBmi)) * 10) / 10
+}
+
 export function computeBMR(m: BodyMetrics): number {
   if (m.gender === 'male') {
     return Math.round(10 * m.weightKg + 6.25 * m.heightCm - 5 * m.age + 5)
@@ -369,7 +396,7 @@ function computeStaticMacros(profile: UserProfile, m: BodyMetrics): MacroTargets
   }
 
   const split = getProfileMacroSplit(profile)
-  const result = computeMacroSplitTargets(m.weightKg, calorieTarget, split)
+  const result = computeMacroSplitTargets(nutritionReferenceWeightKg(m.weightKg, m.heightCm), calorieTarget, split)
   return { calories: result.calories, protein: result.protein, carbs: result.carbs, fat: result.fat }
 }
 
@@ -415,12 +442,14 @@ function computeDynamicDay(
   const dailyTDEE = Math.round(neatTDEE + eee)
   const calories = applyGoalAdjustment(dailyTDEE, nutritionGoalOf(profile), m.gender)
 
-  const protein = Math.round((2.2 - beginnerProteinOffset(profile)) * weight)
+  // Per-kilo grams come off the reference weight (nutritionReferenceWeightKg); the energy above used the real one.
+  const refWeight = nutritionReferenceWeightKg(weight, m.heightCm)
+  const protein = Math.round((2.2 - beginnerProteinOffset(profile)) * refWeight)
   const carbsPerKg = getCarbsPerKg(intensity, nutritionGoalOf(profile))
-  let carbs = Math.round(carbsPerKg * weight)
+  let carbs = Math.round(carbsPerKg * refWeight)
 
   let fat = Math.round((calories - protein * 4 - carbs * 4) / 9)
-  const fatFloor = Math.round(0.6 * weight)
+  const fatFloor = Math.round(FAT_FLOOR_PER_KG * refWeight)
 
   if (fat < fatFloor) {
     fat = fatFloor
@@ -514,6 +543,8 @@ export interface MacroDerivation {
   split: MacroSplit
   /** False for the conditioning goal, whose fixed percentage split ignores the macro-split control entirely. */
   splitApplies: boolean
+  /** The weight the per-kilo grams were worked out from; equals the bodyweight up to a BMI of 30. */
+  referenceWeightKg: number
 }
 
 /**
@@ -542,5 +573,5 @@ export function getMacroDerivation(profile: UserProfile): MacroDerivation | null
     : 'Maintenance adjustment'
   const splitApplies = goal !== 'conditioning'
   const split = splitApplies ? getProfileMacroSplit(profile) : DEFAULT_MACRO_SPLIT
-  return { bmr, tdee, surplusKcal, surplusLabel, target, split, splitApplies }
+  return { bmr, tdee, surplusKcal, surplusLabel, target, split, splitApplies, referenceWeightKg: nutritionReferenceWeightKg(m.weightKg, m.heightCm) }
 }
