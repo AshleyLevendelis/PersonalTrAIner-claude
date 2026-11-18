@@ -33,6 +33,8 @@ export interface LayoffStatus {
   daysAway: number
   /** What the first session back's weights are multiplied by (1 = unchanged). */
   factor: number
+  /** True when this is ONE lift's own gap (liftLayoff), not a break in all training: the card says so in different words. */
+  perLift?: boolean
 }
 
 /** Lowest day count of each band, heaviest band last. */
@@ -58,6 +60,24 @@ export function layoffStatus(lastSessionDate: string | null, today: string): Lay
   let hit: (typeof BANDS)[number] | null = null
   for (const b of BANDS) if (daysAway >= b.from) hit = b
   return hit ? { band: hit.band, daysAway, factor: hit.factor } : { ...NO_LAYOFF, daysAway }
+}
+
+/**
+ * THE EASING FOR ONE LIFT (18 Nov 2026; docs/plans/weights-leftovers-2026-11-18.md, gap 2). The bands above were only
+ * ever asked of the last session of ANY lift, so a lift dropped for a block (a swap, an injury ease-off, a rotation)
+ * came back at its old weight plus a step, or at this week's printed number, which had climbed through weeks it was
+ * never trained. The same bands, asked of the lift's own last session; the stronger of the two applies, never both.
+ * A single lift never raises the restart offer (that is about the whole plan): its top band is the 80% easing.
+ * Basis (CSCS): strength holds for two to three weeks without a stimulus and falls after, and it is specific to the
+ * movement trained, so a month away from one lift is a month away whatever else was done.
+ */
+export function liftLayoff(whole: LayoffStatus, liftLastDate: string | null | undefined, today: string): LayoffStatus {
+  const own = layoffStatus(liftLastDate ?? null, today)
+  if (own.band === 'none') return whole
+  const mine: LayoffStatus = { band: own.band === 'restart' ? 'ease80' : own.band, daysAway: own.daysAway, factor: own.factor, perLift: true }
+  if (whole.band === 'none') return mine
+  // Both apply: the heavier easing wins; on a tie the whole-training break keeps its own words and restart offer.
+  return mine.factor < whole.factor ? mine : whole
 }
 
 /** True when the first session back's weights are reduced (not merely held). */

@@ -1497,6 +1497,17 @@ export function layoffLiftNote(s: { band: string }, fromKg: number, toKg: number
   return `Eased to ${fmt(toKg)} from ${fmt(fromKg)} after your break. Easy reps today; it climbs back from here.`
 }
 
+/**
+ * The card's note when ONE lift has been away while training went on (layoff.ts liftLayoff, 18 Nov 2026). It says how
+ * long, because "after your break" would be false: he has not had one.
+ */
+export function staleLiftNote(daysAway: number, fromKg: number, toKg: number, added = false): string {
+  const fmt = (kg: number) => `${added ? '+' : ''}${kg}kg`
+  const ago = daysAway < 14 ? `${daysAway} days ago` : `${Math.round(daysAway / 7)} weeks ago`
+  if (toKg >= fromKg) return `Held at ${fmt(fromKg)}: you last did this one ${ago}. No increase this session.`
+  return `Eased to ${fmt(toKg)} from ${fmt(fromKg)}: you last did this one ${ago}. It climbs back from here.`
+}
+
 /** The restart offer after a very long break (her ruling, 8 Oct 2026: offer, never automatic). */
 export function layoffRestartOffer(daysAway: number): string {
   return `It's been ${breakLength(daysAway)}. Want to start your plan again from week 1, with a calibration week to find your weights? Today is eased either way.`

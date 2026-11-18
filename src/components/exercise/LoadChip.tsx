@@ -32,7 +32,7 @@ import type { PrescribedLoadSource } from '@/lib/load-prescription'
 // when estimate — this renders a real glyph for every state that has copy).
 // ---------------------------------------------------------------------------
 
-export type LoadSource = PrescribedLoadSource | 'logged' | 'eased'
+export type LoadSource = PrescribedLoadSource | 'logged' | 'eased' | 'eased_lift'
 
 const ESTIMATE_CHIP_CLASS = 'border-dashed border-muted-foreground/40 text-muted-foreground/70'
 // Fainter still than an estimate, and italic: the visual order on screen has
@@ -68,6 +68,9 @@ export function loadSourceLabel(source: LoadSource | undefined, calibration = fa
   // THE FIRST SESSION BACK AFTER A BREAK (layoff.ts): the number is LESS than last
   // session, so "from your last session" over it would be a claim it does not meet.
   if (source === 'eased') return 'eased after your break'
+  // ONE LIFT AWAY WHILE TRAINING WENT ON (layoff.ts liftLayoff, 18 Nov 2026): less than last session too, and there
+  // was no break, so neither of the two labels above would be true.
+  if (source === 'eased_lift') return 'eased: not done lately'
   return null
 }
 
@@ -145,6 +148,9 @@ function explainerFor(source: LoadSource | undefined, loadGuidance?: string, cal
   if (source === 'logged') {
     return 'Calculated from your last session on this lift.' + (loadGuidance ? ` ${loadGuidance}` : '')
   }
+  if (source === 'eased_lift') {
+    return 'Eased because you have not done this lift for a few weeks. It climbs back from your next session.' + (loadGuidance ? ` ${loadGuidance}` : '')
+  }
   if (source === 'eased') {
     return 'Eased for your first session back after a break. It climbs back from your next session.' + (loadGuidance ? ` ${loadGuidance}` : '')
   }
@@ -221,7 +227,7 @@ export function LoadChip({
   // lifted, so the estimate's ceiling is no longer what is holding it.
   // ...EXCEPT a limit the person told us about, which a logged (or eased) set
   // cannot move: the heaviest dumbbell they own is still the heaviest they own.
-  const ceiling = (source === 'logged' || source === 'eased') && ex.load_hold !== 'stated_limit' ? null : ceilingLabel(ex)
+  const ceiling = (source === 'logged' || source === 'eased' || source === 'eased_lift') && ex.load_hold !== 'stated_limit' ? null : ceilingLabel(ex)
 
   return (
     <div className="flex flex-col gap-0.5 mt-0.5">

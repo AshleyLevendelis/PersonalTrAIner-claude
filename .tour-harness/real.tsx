@@ -223,6 +223,10 @@ const EFFORT_PLAN_AGE = EFFORT === 'deload' ? 79 : EFFORT === 'back' ? 30 : EFFO
 // chosen here; what the card makes of it is the app's.
 const AWAY = Math.max(0, Number(new URLSearchParams(location.search).get('away') ?? '0') || 0)
 const ABSURD = new URLSearchParams(location.search).get('absurd') === '1'
+// ?away=N&trained=1 — ONE LIFT AWAY WHILE TRAINING WENT ON (18 Nov 2026, liftLayoff): the same old session on the
+// target lift, PLUS a working session on another lift two days ago, so there is no break in training at all and only
+// the target lift is stale. INPUT only.
+const TRAINED = new URLSearchParams(location.search).get('trained') === '1'
 // The plan is made N+9 days ago so it is past its first week, and moved a week further back when that would put today in a
 // DELOAD week (every 4th): a deload's lighter loads are not "last time's weight", so a break measured on one tests the
 // deload, not the break. Found 16 Nov 2026: away=12 lands in week 4, and once exercises stopped changing inside a block
@@ -998,6 +1002,11 @@ const db: Db = {
   // CURRENT plan week, and it falls on one of the four available weekdays.
   // (1 and 3 days back are neither, which is why the first fixture read 0/1.)
   exercise_set_logs: [
+    ...(AWAY > 0 && TRAINED ? [1, 2, 3].map(n => ({
+      id: `tr${n}`, user_id: PROFILE_ID, session_id: 'trained-sess', exercise_id: getExerciseId('Hip Thrust'), exercise_name: 'Hip Thrust', set_number: n,
+      weight_kg: 60, reps_completed: 8, is_bodyweight: false, is_warmup: false,
+      completed_at: new Date(anchorNowMs() - 2 * 86400000).toISOString(), date: isoOf(new Date(anchorNowMs() - 2 * 86400000)),
+    })) : []),
     ...(AWAY > 0 || FIRST_LIFTS ? [] : [1]).map((back, i) => ({
       id: `l${i}`, user_id: PROFILE_ID, exercise_name: 'Barbell Squats', set_number: 1,
       weight_kg: 60, reps_completed: 8, is_bodyweight: false, is_warmup: false,

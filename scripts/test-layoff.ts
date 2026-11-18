@@ -25,8 +25,8 @@
  * What a test cannot prove is that the card USES any of this — that is verify:layoff.
  */
 import { readFileSync } from 'fs'
-import { layoffStatus, easeWeightKg, easeAddedKg, layoffWeightFrom, easesWeights, breakDayKg, NO_LAYOFF, type LayoffStatus } from '../src/lib/layoff'
-import { layoffCardLine, layoffLiftNote, layoffRestartOffer, welcomeBackOpener, PLAN_RESTART } from '../src/lib/coach-voice'
+import { layoffStatus, easeWeightKg, easeAddedKg, layoffWeightFrom, easesWeights, breakDayKg, liftLayoff, NO_LAYOFF, type LayoffStatus } from '../src/lib/layoff'
+import { layoffCardLine, layoffLiftNote, layoffRestartOffer, welcomeBackOpener, staleLiftNote, PLAN_RESTART } from '../src/lib/coach-voice'
 import { pickOpener, type OpenerInput } from '../src/lib/coach-opener'
 import { buildCoachExerciseSummary } from '../src/lib/chat-plan-context'
 import { getExerciseEntry } from '../src/lib/exercise-db'
@@ -236,6 +236,39 @@ console.log('\nHome says the card\'s weight (QA walk, 10 Nov 2026): one function
   check('held (10-20 days): last time\'s weight, no increment and no easing', away12.band === 'hold' && breakDayKg(40, 30, away12, bench) === 30 && breakDayKg(30, null, away12, bench) === 30)
   const home = readFileSync('src/lib/dashboard-data.ts', 'utf8')
   check('Home\'s lead lift is priced through it (the driver, verify:layoff A2, reads the screen)', /breakDayKg\(e\.suggested_load_kg/.test(home))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n[one lift away while training went on] (18 Nov 2026; docs/plans/weights-leftovers-2026-11-18.md)')
+{
+  const TODAY = '2026-11-18'
+  const daysAgo = (n: number) => new Date(Date.parse(`${TODAY}T12:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10)
+  const bench = getExerciseEntry('Barbell Bench Press')
+  const training = layoffStatus(daysAgo(2), TODAY)                 // he trained two days ago: no break at all
+  check('the fixture: no whole-training break', training.band === 'none')
+  const fresh = liftLayoff(training, daysAgo(7), TODAY)
+  check('a lift done a week ago is untouched', fresh.band === 'none' && !fresh.perLift)
+  const held = liftLayoff(training, daysAgo(14), TODAY)
+  check('a lift last done 14 days ago is held: no increase, no easing', held.band === 'hold' && held.perLift === true && layoffWeightFrom(50, held, bench) === 50)
+  const month = liftLayoff(training, daysAgo(30), TODAY)
+  check('a lift last done 30 days ago comes back at about 90%', month.band === 'ease90' && month.perLift === true && layoffWeightFrom(50, month, bench) === 45, layoffWeightFrom(50, month, bench))
+  const long = liftLayoff(training, daysAgo(120), TODAY)
+  check('a lift away four months is eased to 80% and never raises the restart offer', long.band === 'ease80' && long.factor === 0.8 && layoffWeightFrom(50, long, bench) === 40)
+  check('never above last time, whatever this week prints (the 50 -> 57.5 defect)', [14, 30, 60, 120].every(n => layoffWeightFrom(50, liftLayoff(training, daysAgo(n), TODAY), bench) <= 50))
+  check('a lift never logged has no gap to ease', liftLayoff(training, null, TODAY) === training && liftLayoff(training, undefined, TODAY) === training)
+  // Both apply: the heavier easing wins, never both stacked.
+  const wholeBreak = layoffStatus(daysAgo(30), TODAY)             // everything stopped a month ago (90%)
+  check('whole break 90%, this lift away longer (80%): the lift\'s own easing wins', liftLayoff(wholeBreak, daysAgo(60), TODAY).factor === 0.8 && liftLayoff(wholeBreak, daysAgo(60), TODAY).perLift === true)
+  check('on a tie the whole-training break keeps its own words', liftLayoff(wholeBreak, daysAgo(30), TODAY) === wholeBreak)
+  const restart = layoffStatus(daysAgo(100), TODAY)
+  check('a restart-length break is never downgraded by a lift', liftLayoff(restart, daysAgo(100), TODAY) === restart)
+  check('never both stacked: the result is one band\'s factor', [0.8, 0.9, 1].includes(liftLayoff(wholeBreak, daysAgo(60), TODAY).factor))
+  check('the note says how long, and never "your break"', staleLiftNote(30, 50, 45) === 'Eased to 45kg from 50kg: you last did this one 4 weeks ago. It climbs back from here.' && !/break/.test(staleLiftNote(30, 50, 45)))
+  check('held reads as held, in days under a fortnight', staleLiftNote(12, 50, 50) === 'Held at 50kg: you last did this one 12 days ago. No increase this session.')
+  check('added weight keeps its plus', /Eased to \+5kg from \+10kg/.test(staleLiftNote(60, 10, 5, true)))
+  const panel = readFileSync('src/components/exercise/TodayPanel.tsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+  check('today\'s card asks it of each lift\'s own last date, before the plan-week raise', /const lay = liftLayoff\(layoff, \(rec as \{ lastDate\?: string \| null \}\)\.lastDate \?\? null, today\)/.test(panel) && panel.indexOf('const lay = liftLayoff(') < panel.indexOf('const card = cardLoadFor('))
+  check('...and the per-lift case uses its own sentence', /lay\.perLift \? staleLiftNote\(lay\.daysAway, from, to, added\) : layoffLiftNote\(lay, from, to, added\)/.test(panel))
 }
 
 console.log(`\n${ran} checks ran`)
