@@ -33,6 +33,10 @@ export const ALLERGEN_FOOD_PATTERNS: Partial<Record<DietaryPreference, RegExp>> 
   'mustard-free': /\bmustard\b/i,
   'lupin-free': /\blupins?\b/i,
   'sulphite-free': /\b(sulphites?|sulfites?|sulphur dioxide|sulfur dioxide)\b/i,
+  // The allergy card's three: for the recipe-step check and the named-food check. Never set from setup's words.
+  'peanut-free': /\b(peanuts?|groundnuts?|satay|suya)\b/i,
+  'tree-nut-free': /\b(almonds?|walnuts?|cashews?|pistachios?|pecans?|hazelnuts?|brazil nuts?|macadamias?|pine nuts?|pesto|nutella|marzipan|praline|tree nuts?)\b/i,
+  'oat-free': /\b(oats?|oatmeal|oatcakes?|porridge|granola|muesli|flapjacks?)\b/i,
 }
 
 /**

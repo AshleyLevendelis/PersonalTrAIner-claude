@@ -1382,6 +1382,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_plan_restart: { done: 'Plan started again', failed: "I couldn't start your plan again" },
   propose_plan_pause: { done: 'Done', failed: "I couldn't change your plan's pause" },
   propose_pregnancy_tick: { done: 'Done', failed: "I couldn't save that to your profile" },
+  propose_allergy_record: { done: 'Allergy recorded', failed: "I couldn't save that to your profile" },
   propose_meal_day_move: { done: 'Swapped over', failed: "I couldn't swap those meals" },
   propose_meal_rebalance: { done: 'Moved', failed: "I couldn't move those calories" },
   propose_eating_out: { done: 'Eating out added', failed: "I couldn't mark that meal as out" },

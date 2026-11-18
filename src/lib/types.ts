@@ -144,6 +144,8 @@ export interface UserProfile {
   health_conditions?: string[] | null
   /** The due date, asked under the Pregnant tick (his ruling 15 Nov 2026, "Ask due date"). Column `due_date` (migration 20261115120000); missing before it runs. */
   due_date?: string | null
+  /** The allergy card (allergies.ts; his ruling 15 Nov 2026, "Allergy card, peanuts split"). Column `allergies` (migration 20261118120000); missing before it runs, read as none. Always read through allergiesOf. */
+  allergies?: import('./allergies').AllergyRecord[] | null
   /** The coach's running summary of older chat turns and the time it runs to (chat-summary.ts). Column `chat_summary` (migration 20261117120000); missing before it runs. */
   chat_summary?: { text: string; through: string } | null
   /** A plan pause (his ruling 14 Nov 2026, "Add a pause"): the local date it began, null while the plan runs. */

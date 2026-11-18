@@ -99,6 +99,7 @@ import { EQUIPMENT_OPTIONS, describeEquipmentAccess } from '@/lib/picker-options
 import { compileFoodDislikes, compileSoftExercisePreferences } from '@/lib/fact-compiler'
 import { coachSwapPick, swapOptionsBlock } from '@/lib/coach-swap-pick'
 import { namedFoodClash, namedFoodKindAsk, clashSentence, allergyRefusal, likeClash, likeRefusal } from '@/lib/named-food-clash'
+import { allergiesOf, carriesPen, describesReaction, REACTION_FIRST_LINE, allergyLine, allergensSaid, recordFor, allergyName, ALLERGY_OFFER_WORDS, withoutSafetyPromises, ALLERGEN_RULES, type Allergen } from '@/lib/allergies'
 import { firmFoodExclusions, foodDislikesToAsk, DISLIKE_ASK, mergeFoodsToAvoid } from '@/lib/food-exclusions'
 import { isRedFlagTurn, readRedFlag, writeRedFlag, redFlagStateAt, unpromptedAfterRedFlag, RED_FLAG_WORDS } from '@/lib/red-flag'
 import { PAUSE_WORDS } from '@/lib/plan-pause'
@@ -2314,6 +2315,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // WHAT A DOCTOR HAS SAID TO WATCH (health-conditions.ts, his 14 Nov 2026 ruling), in the app's own words.
       health_conditions: healthConditionsInWords(healthConditionsOf(profile)),
       pregnant: healthConditionsOf(profile).includes('pregnancy'),
+      // The allergy card, in words (allergies.ts): what is recorded, the pen, traces.
+      allergies: allergiesOf(profile).map(allergyLine),
       // A plan pause (his "Add a pause"): the coach never asks about a session while it holds.
       plan_paused_since: profile.plan_paused_since ?? null,
       // THE RUNNING GOAL (running.ts), in the app's own words: the coach quotes this, never a pace (his 13 Nov ruling).
@@ -5528,7 +5531,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // A FOOD HE CAN'T HAVE IS NEVER SAVED AS A LIKE (Marcus test, 15 Nov 2026): the same matcher as the refusal.
         if (kind === 'food_preference' && polarity === 'like') {
           const c = likeClash(targetPhrase, mealRestrictionsOf(profile), [...compileFoodDislikes(memoryFacts), ...(profile.disliked_foods ?? [])])
-          if (c) return { text: likeRefusal(c) }
+          if (c) return { text: likeRefusal(c, allergiesOf(profile)) }
         }
         const conflict = checkFactConflict({ kind, polarity, resolvedRefs: resolution.resolvedRefs }, memoryFacts)
         if (conflict.needsConfirmation) return { text: conflict.message }
@@ -6187,6 +6190,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    * refuses a card and leaves prose alone. docs/plans/runs-7-10-batch-1-safety.md.
    */
   const processResponse = async (result: ChatApiResponse, userSaid = ''): ReturnType<typeof processResponseInner> => {
+    const out = await processResponseChecked(result, userSaid)
+    // WITH AN ALLERGEN RULE ON, THE COACH'S WORDS NEVER PROMISE WHAT THE APP CANNOT CHECK (allergies.ts). The app's own
+    // sentences never match; a coach sentence that does is replaced by the app's honest line.
+    if (!out.text || !mealRestrictionsOf(profile).some(r => ALLERGEN_RULES.includes(r))) return out
+    return { ...out, text: withoutSafetyPromises(out.text).reply }
+  }
+  const processResponseChecked = async (result: ChatApiResponse, userSaid = ''): ReturnType<typeof processResponseInner> => {
     const clash = namedFoodClash(userSaid, mealRestrictionsOf(profile), [...compileFoodDislikes(memoryFacts), ...(profile.disliked_foods ?? [])])
     if (!clash) {
       // A FOOD WHOSE KIND DECIDES IT (his ruling 10 Nov 2026, "Ask which": a gluten-free person's bare "calamari").
@@ -6197,7 +6207,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const plain = await processResponseInner(result, userSaid)
       return kindAsk && !result.proposal && !plain.pendingAction && !plain.receipt && !plain.action && !plain.clarification ? { ...plain, text: kindAsk } : plain
     }
-    const refusal = allergyRefusal(clash) ?? clashSentence(clash)
+    const refusal = allergyRefusal(clash, allergiesOf(profile)) ?? clashSentence(clash)
     if (result.proposal && FOOD_OFFER_KINDS.has(result.proposal.kind)) {
       return { text: refusal, outcome: 'refused' }
     }
@@ -7126,6 +7136,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const now = new Date().toISOString()
     const userMessage: ChatMessage = { role: 'user', content: userText, status: 'complete', created_at: now }
     setMessages(prev => [...prev, userMessage])
+    // HE CARRIES A PEN AND DESCRIBES A REACTION (his answer 2, 15 Nov 2026, "Use your pen, call 999"): the app's own
+    // first-aid line goes under his message at once, before the coach has answered. Nothing on the plan changes.
+    if (carriesPen(allergiesOf(profile)) && describesReaction(userText)) {
+      setMessages(prev => [...prev, { role: 'assistant' as const, content: REACTION_FIRST_LINE, status: 'complete' as const }])
+    }
     // WHAT SHE SENDS IS ON SCREEN (1 Nov 2026, whole-app test): scrolled up, or after a long reply, the chat only
     // followed new messages while she was already near the bottom, so her own message landed out of sight. Sending
     // is her saying "I'm here now": follow from this message on.
@@ -7386,6 +7401,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // the words asked for. Nothing changes until it is tapped.
     if (!failed && !pendingAction) {
       if (saidPregnant(userText) && !isPregnant(profile)) await offerFromApp('propose_pregnancy_tick', buildPregnancyTickProposal(userText))
+      // "I'M ALLERGIC TO TREE NUTS" offers the allergy card (his ruling 15 Nov 2026); never saved silently.
+      else if (allergensSaid(userText).some(x => !allergiesOf(profile).some(r => r.allergen === x))) {
+        await offerFromApp('propose_allergy_record', buildAllergyRecordProposal(userText, allergensSaid(userText).filter(x => !allergiesOf(profile).some(r => r.allergen === x))))
+      }
       else if (askedToPause(userText) && !profile.plan_paused_since) {
         const pp = buildPlanPauseProposal({ action: 'pause', origin_verbatim_quote: userText })
         if (pp.ok) await offerFromApp('propose_plan_pause', pp)
@@ -7401,6 +7420,24 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const pa: ChatPendingActionView = { id: row.id, kind: row.kind, status: row.status, diff: row.diff, expiresAt: row.expires_at }
       setMessages(prev => [...prev, { role: 'assistant' as const, content: describeProposalClientSide(pa), status: 'complete' as const, pendingAction: pa }])
     } catch { /* an offer that could not be stored is simply not shown */ }
+  }
+
+  /** "Record your tree-nut allergy?": the allergy card's offer from the chat (docs/plans/allergy-card.md). */
+  const buildAllergyRecordProposal = (said: string, allergens: Allergen[]) => {
+    const records = allergens.map(x => recordFor(x, said))
+    const names = records.map(allergyName).join(' and ')
+    return {
+      scopeKey: `${profile.id}:propose_allergy_record`,
+      preconditions: { recorded: allergiesOf(profile).map(r => r.allergen).join(',') },
+      payload: { records } as Record<string, unknown>,
+      diff: {
+        lead: ask(ALLERGY_OFFER_WORDS.offer(names)),
+        rows: [{ field: 'Allergies', before: allergiesOf(profile).map(allergyLine).join('; ') || 'None recorded', after: [...allergiesOf(profile), ...records].map(allergyLine).join('; ') }],
+        unchanged: [ALLERGY_OFFER_WORDS.unchanged],
+        rationale: said,
+        reversible: false,
+      },
+    }
   }
 
   /** "Tick Pregnant?": the one switch for exercise, calories and food (his rulings 15 Nov 2026). */
@@ -7837,6 +7874,18 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       rows = ok ? receipt.landed.map(line => { const [label, ...rest] = line.split(': '); return { label, detail: rest.join(': ') } }) : []
       undoToken = ok ? row.id : undefined
       onLogsUpdated?.()
+    } else if (row.kind === 'propose_allergy_record') {
+      // The same column Profile's Allergies row writes (one record, two roads).
+      const added = allergiesOf({ allergies: (row.payload as { records?: unknown }).records })
+      const next = [...allergiesOf(profile), ...added.filter(a => !allergiesOf(profile).some(r => r.allergen === a.allergen))]
+      const { error } = await supabase.from('fitness_profiles').update({ allergies: next }).eq('id', profile.id)
+      const ok = !error
+      const why = error && isMissingColumnError(error, 'allergies') ? ALLERGY_OFFER_WORDS.notOn : ALLERGY_OFFER_WORDS.failed
+      receipt = ok ? { landed: added.map(allergyLine), failed: [] } : { landed: [], failed: [{ op: 'propose_allergy_record', error: why }] }
+      title = ok ? RECEIPTS['propose_allergy_record'].done : why
+      rows = ok ? [{ label: added.map(allergyLine).join('; '), detail: ALLERGY_OFFER_WORDS.done }] : []
+      undoToken = undefined
+      if (ok) onProfileChanged({ allergies: next })
     } else if (row.kind === 'propose_pregnancy_tick') {
       // The same column and the same rebuild offer as Profile's tick (one switch, two roads).
       const next = [...new Set([...healthConditionsOf(profile), 'pregnancy'])]

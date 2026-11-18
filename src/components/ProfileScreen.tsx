@@ -10,6 +10,8 @@
 // not retire — see that file's original doc comment for why).
 // ---------------------------------------------------------------------------
 
+import { AllergiesEditor } from '@/components/profile/AllergiesEditor'
+import { allergiesOf, allergyLine } from '@/lib/allergies'
 import { PAUSE_WORDS } from '@/lib/plan-pause'
 import { otherInjuryOutcome, PELVIC_PREGNANCY_LINE } from '@/lib/other-injury'
 import { likeClash, likeRefusal as likeRefusalWords } from '@/lib/named-food-clash'
@@ -247,13 +249,13 @@ function SheetRow({ label, value, onOpen }: { label: string; value: string; onOp
 type ProfileSheet =
   | 'body' | 'goal' | 'injuries'
   | 'schedule' | 'equipment' | 'lifts' | 'style' | 'exavoid'
-  | 'diet' | 'likes' | 'avoid' | 'meals'
+  | 'allergies' | 'diet' | 'likes' | 'avoid' | 'meals'
   | 'tone' | 'remembers' | 'appearance' | 'reminders'
 
 const SHEET_TITLE: Record<ProfileSheet, string> = {
   body: 'Height & weight', goal: 'Goal', injuries: 'Injuries',
   schedule: 'Schedule', equipment: 'Equipment', lifts: 'Known lifts', style: 'Style & recovery', exavoid: 'Exercises to avoid',
-  diet: 'Diet', likes: 'Foods you like', avoid: 'Foods to avoid', meals: 'Meals & shopping',
+  allergies: 'Allergies', diet: 'Diet', likes: 'Foods you like', avoid: 'Foods to avoid', meals: 'Meals & shopping',
   tone: 'Reply speed', remembers: 'What your Personal TrAIner remembers', appearance: 'Appearance', reminders: 'Reminders',
 }
 
@@ -1096,7 +1098,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       onProfileChanged(revertPatch)
       // A SETTING WHOSE DATABASE STEP HAS NOT RUN is not a connection problem, and saying so would send him to
       // check his signal for nothing.
-      if ((['enjoyed_activities', 'meal_variety', 'show_numbers', 'running_goal', 'health_conditions', 'due_date'] as const).some(c => c in patch && isMissingColumnError(err, c))) {
+      if ((['enjoyed_activities', 'meal_variety', 'show_numbers', 'running_goal', 'health_conditions', 'due_date', 'allergies'] as const).some(c => c in patch && isMissingColumnError(err, c))) {
         setSaveError("That setting isn't switched on yet, so it couldn't be saved. Nothing else has changed.")
         return
       }
@@ -1750,6 +1752,9 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             </div>
         </div>
       )
+      case 'allergies': return (
+        <AllergiesEditor allergies={allergiesOf(profile)} onChange={next => savePatch({ allergies: next })} />
+      )
       case 'diet': return (
         <div className="space-y-3 text-sm">
             {/* Dietary-safety round 2 — the two lanes are now visibly
@@ -2160,6 +2165,8 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             </ProfileGroup>
 
             <ProfileGroup label="Food">
+              {/* ABOVE Diet (his ruling 15 Nov 2026, "Allergy card, peanuts split"): an allergy is its own record. */}
+              <SheetRow label="Allergies" value={listOrNone(allergiesOf(profile).map(allergyLine), 'None recorded')} onOpen={() => setSheet('allergies')} />
               <SheetRow label="Diet" value={listOrNone((profile.dietary_preferences ?? []).map(v => DIETARY_OPTIONS.find(o => o.value === v)?.label ?? v), 'No restrictions')} onOpen={() => setSheet('diet')} />
               <SheetRow label="Foods you like" value={listOrNone(foodLikeValues, 'None yet')} onOpen={() => setSheet('likes')} />
               <SheetRow label="Foods to avoid" value={listOrNone(hardFoodDislikeValues, 'None')} onOpen={() => setSheet('avoid')} />

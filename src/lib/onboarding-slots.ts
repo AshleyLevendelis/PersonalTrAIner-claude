@@ -305,6 +305,10 @@ const DIETARY_META: Record<DietaryPreference, { icon: string; label: string }> =
   'low-fodmap': { icon: '🧬', label: 'Low-FODMAP' },
   // Never offered (SELECTABLE_DIETARY_PREFERENCES leaves it out); the label is what a violation names.
   pregnancy: { icon: '🤰', label: 'Pregnancy-safe' },
+  // Never offered either: the allergy card switches these on (docs/plans/allergy-card.md).
+  'peanut-free': { icon: '🥜', label: 'Peanut-free' },
+  'tree-nut-free': { icon: '🌰', label: 'Tree-nut-free' },
+  'oat-free': { icon: '🌾', label: 'Oat-free' },
 }
 
 export const DIETARY_OPTIONS: { value: DietaryPreference; icon: string; label: string }[] =
@@ -342,7 +346,8 @@ export function detectAllergenTags(text: string): DietaryPreference[] {
   if (!ALLERGEN_SIGNAL.test(text)) return []
   const hits: DietaryPreference[] = []
   for (const [tag, pattern] of Object.entries(ALLERGEN_FOOD_PATTERNS) as [DietaryPreference, RegExp][]) {
-    if (pattern.test(text)) hits.push(tag)
+    // The allergy card's rules are never set from setup's words: a peanut allergy said here is still the nut-free tick.
+    if (SELECTABLE_DIETARY_PREFERENCES.includes(tag) && pattern.test(text)) hits.push(tag)
   }
   return hits
 }

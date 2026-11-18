@@ -19,6 +19,8 @@
 // "moderate to vigorous" without reaching maximal, and every phase still trains.
 // ---------------------------------------------------------------------------
 
+import { allergiesOf, allergyRestrictions } from './allergies'
+
 export const HEALTH_CONDITION_OPTIONS: { value: string; icon: string; label: string }[] = [
   { value: 'high_blood_pressure', icon: '🩺', label: 'High blood pressure' },
   { value: 'heart_condition', icon: '❤️', label: 'A heart condition' },
@@ -71,12 +73,18 @@ export const PREGNANCY_CALORIE_LINE = 'While you\'re pregnant your target is mai
 
 /**
  * EVERY FOOD RULE THE MEALS OBEY: the diets he picked, plus the pregnancy rule while the tick is on ("NHS list,
- * auto-on"). Never saved: the picker edits `dietary_preferences`, this reads it.
+ * auto-on") and the rules his recorded allergies switch on. Never saved: the picker edits `dietary_preferences`, this reads it.
  */
-export function mealRestrictionsOf(profile: { dietary_preferences?: readonly string[] | null; health_conditions?: readonly string[] | null } | null | undefined): string[] {
-  const picked = [...(profile?.dietary_preferences ?? [])].filter(p => p !== 'pregnancy')
-  return isPregnant(profile) ? [...picked, 'pregnancy'] : picked
+export function mealRestrictionsOf(profile: { dietary_preferences?: readonly string[] | null; health_conditions?: readonly string[] | null; allergies?: unknown } | null | undefined): string[] {
+  const picked = [...(profile?.dietary_preferences ?? [])].filter(p => !DERIVED_RULES.includes(p))
+  const out = isPregnant(profile) ? [...picked, 'pregnancy'] : picked
+  // The allergy card's rules (his ruling 15 Nov 2026): never saved among the picks, switched on by what is recorded.
+  for (const rule of allergyRestrictions(allergiesOf(profile))) if (!out.includes(rule)) out.push(rule)
+  return out
 }
+
+/** Rules nobody picks: a stored copy of one is ignored, only the tick or the allergy card switches it on. */
+const DERIVED_RULES: readonly string[] = ['pregnancy', 'peanut-free', 'tree-nut-free', 'oat-free']
 
 /**
  * HOW FAR ALONG, from the due date ("Ask due date"): whole weeks, 40 at the due date. Null with no date, and the app
