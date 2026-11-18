@@ -2,6 +2,16 @@
 
 Newest first. One line each.
 
+- [x] **MERGED TO `main` AT 203517ad (PR #30), 18 Nov 2026, on his word ("Merge it now", from three options: merge, questions first, hold).**
+  The 18 commits of the meals, coach and plans pass. Verified after the merge: `main`'s tree is identical to the
+  swept branch, and `main`'s coach server file is now the one that parses. LIVE: the frontend only (ships on merge).
+  NOT LIVE until his machine does it: the `chat-gemini` deploy, then the coach exam in full (new judge, three new
+  questions, one edited). One prompt for both, plus a check of the earlier migrations nobody has confirmed:
+  `docs/handover/machine-todo-2026-11-18.md`. STILL HIS, asked one at a time after the merge: protein a little over
+  / fat a little under on a muscle-gain plan; "usually contains" allergens on existing foods; keto and low-carb
+  (no library dishes that fit, a carb target the filter cannot land); the reference-weight sentence; richer in-chat
+  controls against "a coach wouldn't send a card"; session names such as "Full Body Power" on a beginner's easy
+  day; whether optional mobility gives way (and what it says) when he adds an exercise.
 - [x] **THE CONFIRMING SWEEP OF 18 NOV 2026 (on 4ffd5aed, a settled tree in its own worktree): 618 ran, 614 passed, 0 real failures.**
   The four red ones were each read in their own output, not ticked off by name: `test:meal-quality` ("VITE_SUPABASE_URL
   / VITE_SUPABASE_ANON_KEY must be set"), `test:schema-parity` ("Failed to link to TEST ... Nothing was run against
