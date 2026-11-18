@@ -32,6 +32,8 @@ import { computeMealMacros } from '@/lib/food-db'
 import { computeTargets } from '@/lib/nutrition-targets'
 import { ANCHOR_ISO, anchorNowMs, iso as isoOf } from './anchor.mjs'
 import type { UserProfile } from '@/lib/types'
+import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
+import { isExternallyLoaded } from '@/lib/load-prescription'
 
 const PROFILE_ID = '00000000-0000-4000-8000-00000000b007'
 const USER_ID = '00000000-0000-4000-8000-0000000000a1'
@@ -114,6 +116,29 @@ const profileRow = {
 setRandomSource(seededRngFromKey('app-boot'))
 const weeks = generateMesocycle(profileRow as unknown as UserProfile)
 
+// ?testing-day-unfinished: last week was the plan's testing week, and on its Thursday he lifted the day's first loaded
+// lift 20 kg over the printed guess and never tapped Finish (INPUTS: the date, the lift by its place in that day, what
+// he lifted; a session row left open, as the six-hour window leaves one). The app decides what next week then reads.
+// &testing-day-used: those sets were already used once and the weight was brought down afterwards (an INPUT: the plan
+// as an earlier anchor and a later correction left it, the stamp on week 1's slot and later weeks at the lower number).
+const UNFINISHED_TESTING = new URLSearchParams(location.search).has('testing-day-unfinished')
+const testingThursday = isoOf(new Date(new Date(created).getTime() + 3 * 86400000))
+const testingLift = (() => {
+  const d = weeks[0]?.days.find(x => x.day === 'Thursday')
+  const i = d ? d.exercises.findIndex(e => e.suggested_load_kg != null && !!getExerciseEntry(e.name) && isExternallyLoaded(getExerciseEntry(e.name)!)) : -1
+  return d && i >= 0 ? { index: i, name: d.exercises[i].name, printedKg: d.exercises[i].suggested_load_kg! } : null
+})()
+;(window as unknown as Record<string, unknown>).__testingLift = testingLift
+if (new URLSearchParams(location.search).has('testing-day-used') && testingLift) {
+  const d = weeks[0].days.find(x => x.day === 'Thursday')!
+  d.exercises[testingLift.index] = { ...d.exercises[testingLift.index], calibration_anchored_kg: testingLift.printedKg + 20 }
+}
+const testingSets = UNFINISHED_TESTING && testingLift ? [1, 2, 3].map(n => ({
+  id: `tw${n}`, user_id: PROFILE_ID, session_id: 'ws-testing', exercise_id: getExerciseId(testingLift.name), exercise_name: testingLift.name,
+  set_number: n, weight_kg: testingLift.printedKg + 20, reps_completed: 8, is_bodyweight: false, is_warmup: false, drop_index: 0, unit: 'kg', rpe: null,
+  completed_at: new Date(new Date(created).getTime() + 3 * 86400000 + 10 * 3600000 + n * 180000).toISOString(), date: testingThursday,
+})) : []
+
 const meal = (slot: string, idx: number, name: string, ingredients: { name: string; quantity: number; unit: string }[]) => {
   const m = computeMealMacros(ingredients)
   return {
@@ -139,7 +164,9 @@ const db: Db = {
     { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 86400000)), weight_kg: WEIGH },
     { id: 'm2', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 5 * 86400000)), weight_kg: 80.4 },
   ],
-  daily_steps: [], water_logs: [], exercise_set_logs: [], workout_sessions: [], cardio_logs: [],
+  daily_steps: [], water_logs: [], exercise_set_logs: testingSets,
+  workout_sessions: testingSets.length ? [{ id: 'ws-testing', profile_id: PROFILE_ID, date: testingThursday, is_completed: false, felt: null }] : [],
+  cardio_logs: [],
   meal_events: [], meal_plan_picks: [], favorite_meals: [],
   // ?list-stale: tomorrow is on the shopping list, built from a dinner the day no longer serves (an INPUT: a row as the
   // list writes it, his live test of 14 Nov 2026, a dinner since marked as eating out). verify:live-test-nov14.

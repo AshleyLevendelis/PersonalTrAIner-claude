@@ -64,7 +64,7 @@ import { checkForConsistencyHold } from '@/lib/block-consistency'
 import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion } from '@/lib/load-suggestions'
 import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOffer, planHasAssumedBodyLoads } from '@/lib/weight-basis-offer'
 import { checkForBeatTargetOffer, confirmBeatTargetOffer, declineBeatTargetOffer } from '@/lib/beat-target-offer'
-import { applyCalibrationAnchors, calibrationAnchorMessage } from '@/lib/calibration-anchor'
+import { applyCalibrationAnchors, calibrationAnchorMessage, sweepCalibrationWeek } from '@/lib/calibration-anchor'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { readBootSnapshot, saveBootSnapshot, clearBootSnapshot, type BootSnapshot } from '@/lib/boot-cache'
 import { ensureSignedIn, claimProfile, hasClaimedOnThisPhone, markClaimedOnThisPhone, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
@@ -651,6 +651,8 @@ function App() {
 
   const mealPlan = chosenToMealPlanDays(chosenMeals)
   const [isRestoring, setIsRestoring] = useState(() => !boot)
+  /** True once the plan on screen has been read from the server this session, not only drawn from the phone's copy. */
+  const [planFromServer, setPlanFromServer] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [setupError, setSetupError] = useState<string | null>(null)
   /**
@@ -1389,6 +1391,10 @@ function App() {
     if (!freshMesoMissing) {
       setExercisePlan(cur => (stillAsKept(cur, boot?.exercisePlan) ? restoredExercises : cur))
       setMesocycle(cur => (stillAsKept(cur, boot?.mesocycle) ? restoredMesocycle : cur))
+      // The server's plan is in: only now may anything automatic write to it (the testing-week sweep below). Before
+      // this the screen may be showing the copy kept on the phone, and a week saved from that copy could go over a
+      // newer one on the server.
+      setPlanFromServer(restoredMesocycle.length > 0)
     }
     setIsRestoring(false)
 
@@ -2698,8 +2704,10 @@ function App() {
         sessionDate: date,
         dayName,
       })
+      // The plan as saved is the plan on screen: a week that only gained its "already used" stamp is adopted too,
+      // or the next edit of week 1 would save the copy without it.
+      if (r.changedWeeks.length > 0) setMesocycle(r.next)
       if (r.applied.length === 0 || r.nextWeekNumber == null) return
-      setMesocycle(r.next)
       // Null when next week's own number did not move (a later week of the
       // block did): the plan is adopted either way, and nothing is announced
       // that the person could not go and see.
@@ -2709,6 +2717,34 @@ function App() {
       console.error('[calibration-anchor] failed to re-anchor the program:', err)
     }
   }
+
+  // THE TESTING WEEK COUNTS HOWEVER IT WAS LOGGED (18 Nov 2026). Finish anchors today's session above; this covers
+  // every testing-week day already behind him that Finish never saw: a session the six-hour window closed, one
+  // logged through "I did it, not in the app", one the coach logged, a set added after Finish. Same rule, same
+  // sentence. Runs once the plan has been read from the server (never on the phone's kept copy alone), when the day
+  // turns, and after a log lands from another surface.
+  const mesocycleNow = useRef(mesocycle)
+  mesocycleNow.current = mesocycle
+  const planReady = mesocycle.length > 0 && planFromServer
+  const sweepToday = profile?.id ? getLocalDateString(getAppNow(profile.id)) : null
+  useEffect(() => {
+    if (!profile?.id || !planReady || !sweepToday) return
+    let live = true
+    sweepCalibrationWeek({
+      profileId: profile.id,
+      profile,
+      current: () => mesocycleNow.current,
+      planCreatedAt: mesocycleCreatedAt ?? profile.created_at,
+      today: sweepToday,
+      adopt: next => { if (live) setMesocycle(next) },
+    }).then(r => {
+      if (!live || r.applied.length === 0 || r.nextWeekNumber == null) return
+      const said = calibrationAnchorMessage(r.nextWeekNumber, r.applied)
+      if (said) setAdaptationMessages(prev => [...prev, { text: said }])
+    }).catch(err => console.error('[calibration-anchor] the sweep failed:', err))
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, planReady, mesocycleCreatedAt, sweepToday, logsVersion, coachDataVersion])
 
   /**
    * The write behind a ban — recording the preference, rewriting the plan,

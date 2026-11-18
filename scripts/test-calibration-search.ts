@@ -30,7 +30,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
-import { calibrationAnchorsFor, planCalibrationAnchors, calibrationAnchorMessage } from '../src/lib/calibration-anchor'
+import { calibrationAnchorsFor, planCalibrationAnchors, calibrationAnchorMessage, planCalibrationSweep, calibrationSweepDates } from '../src/lib/calibration-anchor'
 import { patchBlockFromLiftedKg } from '../src/lib/beat-target-offer'
 import { getExerciseEntry, getExerciseId } from '../src/lib/exercise-db'
 import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, DELOAD_LOAD_FRACTION, nextSetRungsKg, probeNextKg } from '../src/lib/load-prescription'
@@ -91,6 +91,15 @@ const log = (setNumber: number, kg: number, extra: Partial<ExerciseSetLog> = {},
   set_number: setNumber, weight_kg: kg, reps_completed: 10, is_bodyweight: false, ...extra,
 })
 
+/**
+ * A week with the "already used" stamp taken off: what it PRINTS. The stamp (18 Nov 2026) is the one thing an anchor
+ * may add to the testing week; every check that the week is "untouched" compares this, so a changed number, name, set
+ * count or rep range still fails.
+ */
+const printed = (w: typeof week1) => JSON.stringify({ ...w, days: w.days.map(d => ({ ...d, exercises: d.exercises.map(e => { const { calibration_anchored_kg: _stamp, ...rest } = e; return rest }) })) })
+/** The later weeks an anchor moved: every changed week but the testing week itself. */
+const movedWeeks = (r: { changedWeeks: { week_number: number }[] }, testingWeek = 1) => r.changedWeeks.map(w => w.week_number).filter(n => n !== testingWeek)
+
 // ---------------------------------------------------------------------------
 console.log('\n0. The fixture is what the checks below assume')
 // ---------------------------------------------------------------------------
@@ -132,7 +141,10 @@ check('every later loading week of the block now carries the lifted number',
   laterLoading.every(w => kgIn(plan.next.find(n => n.week_number === w.week_number)!) === heavier),
   laterLoading.map(w => ({ n: w.week_number, before: kgIn(w), after: kgIn(plan.next.find(n => n.week_number === w.week_number)!) })))
 check('the calibration week itself is untouched — it is the record of what was printed',
-  plan.next[0] === meso[0] && kgIn(plan.next[0]) === plannedKg)
+  printed(plan.next[0]) === printed(meso[0]) && kgIn(plan.next[0]) === plannedKg)
+check('...and it carries the weight it was anchored from, on that slot only',
+  plan.next[0].days.find(d => d.day === day.day)!.exercises[exIndex].calibration_anchored_kg === heavier
+  && plan.next[0].days.flatMap(d => d.exercises).filter(e => e.calibration_anchored_kg != null).length === 1)
 const deloadAfter = deloadWeek ? plan.next.find(n => n.week_number === deloadWeek.week_number)! : null
 check('the block\'s deload backs off from the NEW number, so it stays a deload',
   !!deloadAfter && kgIn(deloadAfter) === roundToPlate(heavier * DELOAD_LOAD_FRACTION, mode) && kgIn(deloadAfter)! < heavier,
@@ -150,7 +162,8 @@ check('other days are untouched',
     return w.days.every((d, i) => d.day === day.day || after.days[i] === d)
   }))
 check('the changed weeks are exactly the ones the shell must save',
-  plan.changedWeeks.map(w => w.week_number).sort().join() === block1.filter(w => (w.week_in_block ?? 1) > 1).map(w => w.week_number).sort().join(),
+  movedWeeks(plan, week1.week_number).sort().join() === block1.filter(w => (w.week_in_block ?? 1) > 1).map(w => w.week_number).sort().join()
+  && plan.changedWeeks.some(w => w.week_number === week1.week_number),
   plan.changedWeeks.map(w => w.week_number))
 check('the printed row says where the number came from', laterLoading.every(w => {
   const e = plan.next.find(n => n.week_number === w.week_number)!.days.find(d => d.day === day.day)!.exercises[exIndex]
@@ -445,7 +458,7 @@ console.log('\n6. The sentence and the plan agree, when the person has said what
   const none = planCalibrationAnchors(limitPlan, atLimit, 1, lDay, [log(1, limit + 6, {}, 'Romanian Deadlifts')])
   const rdlApplied = none.applied.filter(a => a.exerciseName === 'Romanian Deadlifts')
   check('a lift that cannot move the plan is not reported as applied', rdlApplied.length === 0, none.applied)
-  check('...no week is rewritten for it', none.changedWeeks.length === 0 && none.next === limitPlan, none.changedWeeks.map(w => w.week_number))
+  check('...no week is rewritten for it', movedWeeks(none).length === 0 && none.next.every((w, i) => printed(w) === printed(limitPlan[i])), none.changedWeeks.map(w => w.week_number))
   check('...and there is no sentence at all', calibrationAnchorMessage(2, none.applied) === null, calibrationAnchorMessage(2, none.applied))
 
   // "PATCHED" MEANS THE NUMBER MOVED, where a clamp INSIDE the prescription
@@ -466,7 +479,7 @@ console.log('\n6. The sentence and the plan agree, when the person has said what
   const bagKg = (w: typeof week1) => w.days.find(d => d.day === 'Tuesday')!.exercises[bagIndex]?.suggested_load_kg
   check('the fixture has a Backpack Row already at 20kg in weeks 1 to 3', bagIndex >= 0 && [0, 1, 2].every(i => bagKg(bagPlan[i]) === 20), bagIndex >= 0 && [0, 1, 2].map(i => bagKg(bagPlan[i])))
   const bag = planCalibrationAnchors(bagPlan, sam, 1, 'Tuesday', [log(1, 26, {}, 'Backpack Row')])
-  check('a logged 26kg on it rewrites no week and is not reported as applied', bag.applied.length === 0 && bag.changedWeeks.length === 0 && bag.next === bagPlan, { applied: bag.applied, changed: bag.changedWeeks.map(w => w.week_number) })
+  check('a logged 26kg on it rewrites no week and is not reported as applied', bag.applied.length === 0 && movedWeeks(bag).length === 0 && bag.next.every((w, i) => printed(w) === printed(bagPlan[i])), { applied: bag.applied, changed: bag.changedWeeks.map(w => w.week_number) })
 
   // ...and where ROUNDING hands it back. A deload's target is 70% of the
   // reachable weight (16.8kg for 24), which rounds to the 16kg dumbbell; a
@@ -510,6 +523,104 @@ console.log('\n6. The sentence and the plan agree, when the person has said what
   // And the ordinary case is untouched: no limit in the way, the lifted
   // number is the written number and the sentence still says so.
   check('with nothing in the way the sentence still reads "from your Nkg set"', !!msg && msg.includes(`from your ${heavier}kg set`), msg)
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n9. The testing week counts however it was logged, and its evidence is used once (18 Nov 2026)')
+// ---------------------------------------------------------------------------
+{
+  const sets = [log(1, plannedKg), log(2, heavier), log(3, heavier - 5)]
+  const slot = (plan: typeof meso, weekNumber: number) => plan.find(w => w.week_number === weekNumber)!.days.find(d => d.day === day.day)!.exercises[exIndex]
+  const w2n = laterLoading[0].week_number
+
+  // USED ONCE. The same sets, asked again, write nothing.
+  const again = planCalibrationAnchors(plan.next, profile, week1.week_number, day.day, sets)
+  check('the same sets asked a second time apply nothing and change no week', again.applied.length === 0 && again.changedWeeks.length === 0 && again.next === plan.next,
+    { applied: again.applied.length, changed: again.changedWeeks.map(w => w.week_number) })
+
+  // A WEIGHT LOWERED AFTERWARDS STAYS LOWERED. The plan after the anchor, with week 2 since brought down.
+  const lower = (base: typeof meso) => base.map(w => w.week_number !== w2n ? w : { ...w, days: w.days.map(d => d.day !== day.day ? d : { ...d, exercises: d.exercises.map((e, i) => i === exIndex ? { ...e, suggested_load_kg: plannedKg } : e) }) })
+  const lowered = lower(plan.next)
+  const afterLowering = planCalibrationAnchors(lowered, profile, week1.week_number, day.day, sets)
+  check('a week lowered after the anchor is not raised again by the same sets', slot(afterLowering.next, w2n).suggested_load_kg === plannedKg && afterLowering.changedWeeks.length === 0,
+    { week2: slot(afterLowering.next, w2n).suggested_load_kg, changed: afterLowering.changedWeeks.map(w => w.week_number) })
+  // ...and it is the stamp that holds it: the same plan without one is raised (so the check above cannot pass by accident).
+  const unstamped = lowered.map(w => w.week_number !== week1.week_number ? w : { ...w, days: w.days.map(d => ({ ...d, exercises: d.exercises.map(e => { const { calibration_anchored_kg: _s, ...rest } = e; return rest }) })) })
+  const withoutStamp = planCalibrationAnchors(unstamped, profile, week1.week_number, day.day, sets)
+  check('...and without the stamp those sets WOULD raise it (the stamp is what holds it)', slot(withoutStamp.next, w2n).suggested_load_kg === heavier, slot(withoutStamp.next, w2n).suggested_load_kg)
+
+  // STAMPED EVEN WHEN NO WEEK MOVES. A set above the guess that every later week already meets is still evidence used:
+  // if those weeks are lowered later, the same set must not lift them back.
+  // The plan an OLDER build's Finish left: every later week already at the lifted number, no stamp on week 1.
+  const olderBuild = plan.next.map(w => w.week_number !== week1.week_number ? w : { ...w, days: w.days.map(d => ({ ...d, exercises: d.exercises.map(e => { const { calibration_anchored_kg: _s, ...rest } = e; return rest }) })) })
+  const meets = planCalibrationAnchors(olderBuild, profile, week1.week_number, day.day, sets)
+  check('a set every later week already meets moves none of them, and is still stamped as used',
+    meets.applied.length === 0 && movedWeeks(meets, week1.week_number).length === 0 && slot(meets.next, week1.week_number).calibration_anchored_kg === heavier
+    && meets.changedWeeks.map(w => w.week_number).join() === String(week1.week_number),
+    { applied: meets.applied.length, changed: meets.changedWeeks.map(w => w.week_number), stamp: slot(meets.next, week1.week_number).calibration_anchored_kg })
+
+  // A HEAVIER SET LATER IS NEW EVIDENCE (a set added after Finish).
+  const more = roundToPlate(heavier + 2 * plateStepKg(mode), mode)
+  const added = planCalibrationAnchors(plan.next, profile, week1.week_number, day.day, [...sets, log(4, more)])
+  check('a heavier set logged later anchors again, from that set', added.applied.length === 1 && added.applied[0].liftedKg === more && slot(added.next, w2n).suggested_load_kg === more,
+    { applied: added.applied.map(a => a.liftedKg), week2: slot(added.next, w2n).suggested_load_kg, more })
+  check('...and the stamp moves up with it', slot(added.next, week1.week_number).calibration_anchored_kg === more, slot(added.next, week1.week_number).calibration_anchored_kg)
+
+  // THE SWEEP IS THE SAME DECISION, FOLDED OVER DAYS. A second day with its own loaded lift.
+  const otherDay = week1.days.find(d => d.day !== day.day && d.exercises.some(e => e.suggested_load_kg != null && isExternallyLoaded(getExerciseEntry(e.name)!) && e.name !== ex.name && !day.exercises.some(x => x.name === e.name)))
+  const otherIndex = otherDay ? otherDay.exercises.findIndex(e => e.suggested_load_kg != null && isExternallyLoaded(getExerciseEntry(e.name)!) && e.name !== ex.name && !day.exercises.some(x => x.name === e.name)) : -1
+  const other = otherDay && otherIndex >= 0 ? otherDay.exercises[otherIndex] : null
+  check('the fixture has a second day with a loaded lift of its own', !!other, week1.days.map(d => d.day))
+  const otherHeavier = other ? roundToPlate(other.suggested_load_kg! * 1.6, loadingMode(getExerciseEntry(other.name)!)) : 0
+  const otherSets = other ? [log(1, otherHeavier, {}, other.name), log(2, otherHeavier, {}, other.name)] : []
+  const swept = planCalibrationSweep(meso, profile, week1.week_number, [
+    { date: '2026-09-07', dayName: day.day, sets },
+    { date: '2026-09-08', dayName: otherDay?.day ?? 'none', sets: otherSets },
+  ])
+  check('a sweep over two days anchors each day\'s lift', swept.applied.length === 2 && swept.applied.some(a => a.exerciseName === ex.name) && swept.applied.some(a => a.exerciseName === other?.name),
+    swept.applied.map(a => a.exerciseName))
+  const byHand = planCalibrationAnchors(planCalibrationAnchors(meso, profile, week1.week_number, day.day, sets).next, profile, week1.week_number, otherDay?.day ?? 'none', otherSets)
+  check('...and writes exactly what two Finishes would have', JSON.stringify(swept.next) === JSON.stringify(byHand.next))
+  check('...pointing at the week after', swept.nextWeekNumber === week1.week_number + 1, swept.nextWeekNumber)
+  const wrongDay = planCalibrationSweep(meso, profile, week1.week_number, [{ date: '2026-09-08', dayName: otherDay?.day ?? 'none', sets }])
+  check('sets for a lift that day does not hold anchor nothing', wrongDay.applied.length === 0 && wrongDay.changedWeeks.length === 0 && wrongDay.nextWeekNumber === null,
+    { applied: wrongDay.applied.length, changed: wrongDay.changedWeeks.length })
+  check('a sweep with no days is nothing at all', planCalibrationSweep(meso, profile, week1.week_number, []).next === meso)
+  const sweptAgain = planCalibrationSweep(swept.next, profile, week1.week_number, [
+    { date: '2026-09-07', dayName: day.day, sets },
+    { date: '2026-09-08', dayName: otherDay?.day ?? 'none', sets: otherSets },
+  ])
+  check('a second sweep of the same days changes nothing', sweptAgain.changedWeeks.length === 0 && sweptAgain.applied.length === 0 && sweptAgain.next === swept.next)
+
+  // WHICH DATES IT READS. A plan begun on Monday 7 Sep at 09:00; then one begun on a Thursday evening.
+  const monday = '2026-09-07T09:00:00'
+  const dates = (createdAt: string | undefined, today: string, plan = meso) => calibrationSweepDates(plan, createdAt, today)
+  check('mid testing week it reads the days already behind him', dates(monday, '2026-09-10')?.dates.join() === '2026-09-07,2026-09-08,2026-09-09', dates(monday, '2026-09-10'))
+  check('...and names the testing week', dates(monday, '2026-09-10')?.weekNumber === week1.week_number)
+  check('on day one there is nothing behind him yet', dates(monday, '2026-09-07') === null, dates(monday, '2026-09-07'))
+  check('today is never one of them (Finish owns today)', [8, 9, 10, 11, 12, 13, 14, 16, 20].every(d => {
+    const today = `2026-09-${String(d).padStart(2, '0')}`
+    return !(dates(monday, today)?.dates ?? []).some(x => x >= today)
+  }))
+  check('in week 2 it reads the whole testing week', dates(monday, '2026-09-16')?.dates.join() === '2026-09-07,2026-09-08,2026-09-09,2026-09-10,2026-09-11,2026-09-12,2026-09-13', dates(monday, '2026-09-16'))
+  const block2 = meso.find(w => w.block_number !== week1.block_number)
+  const block2Start = block2 ? (() => { const d = new Date(monday); d.setDate(d.getDate() + (block2.week_number - 1) * 7); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })() : ''
+  check('the fixture has a second block to stand in', !!block2, meso.map(w => w.block_number))
+  check('once the plan is in the next block it reads nothing', dates(monday, block2Start) === null, { block2Start, got: dates(monday, block2Start) })
+  const lastDayOfBlock1 = block2 ? (() => { const d = new Date(`${block2Start}T12:00:00`); d.setDate(d.getDate() - 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })() : ''
+  check('...and on the last day of the testing week\'s block it still does', (dates(monday, lastDayOfBlock1)?.dates.length ?? 0) === 7, { lastDayOfBlock1, got: dates(monday, lastDayOfBlock1) })
+  check('a plan with no testing week reads nothing', dates(monday, '2026-09-16', meso.map(w => ({ ...w, isCalibrationWeek: false }))) === null)
+  check('a plan with no start date reads nothing', dates(undefined, '2026-09-16') === null)
+  const thursday = '2026-09-10T18:30:00'
+  check('a plan begun on a Thursday has a testing week that runs Thursday to Wednesday',
+    dates(thursday, '2026-09-18')?.dates.join() === '2026-09-10,2026-09-11,2026-09-12,2026-09-13,2026-09-14,2026-09-15,2026-09-16', dates(thursday, '2026-09-18'))
+
+  // WIRED. The app runs the sweep and adopts a plan that only gained its stamp (source; the driver proves it is reached).
+  const appSrc = strip(read('src/App.tsx'))
+  check('the app calls the sweep', /sweepCalibrationWeek\(/.test(appSrc))
+  const finishFn = appSrc.slice(appSrc.indexOf('const handleCalibrationSessionFinished'), appSrc.indexOf('const mesocycleNow'))
+  check('Finish adopts the plan whenever a week changed, before deciding whether there is anything to say',
+    finishFn.indexOf('r.changedWeeks.length > 0') >= 0 && finishFn.indexOf('r.applied.length === 0') >= 0 && finishFn.indexOf('r.changedWeeks.length > 0') < finishFn.indexOf('r.applied.length === 0'))
 }
 
 console.log(failures === 0 ? '\nAll calibration-search checks passed.' : `\n${failures} calibration-search check(s) FAILED`)
