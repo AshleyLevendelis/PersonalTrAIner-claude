@@ -5,7 +5,7 @@ import type {
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
 import { getAppNow, getLocalDateString } from './dev-clock'
-import { EXERCISE_DATABASE, INJURED_JOINTS, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup, getExerciseEntry } from './exercise-db'
+import { EXERCISE_DATABASE, INJURED_JOINTS, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, EXPLOSIVE_PREP_GROUPS, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup, getExerciseEntry } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -14,7 +14,7 @@ import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields,
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
-  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, stepHoldSeconds, getPhaseTempo, formatTempo, PHASE_CONFIGS, type PhaseConfig, type TrainingPhase,
+  shiftReps, repFloorFor, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, stepHoldSeconds, getPhaseTempo, formatTempo, PHASE_CONFIGS, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { hasHealthCondition, isPregnant, noteForProfile, lateInPregnancy, LATE_PREGNANCY_SET_RPE_CEILING, effortWordsOnly, HEALTH_SET_RPE_CEILING, HEALTH_CONDITIONING_RPE_CEILING } from './health-conditions'
 import { pregnancyExclusion, pregnancyWarning } from './pregnancy-rules'
@@ -449,6 +449,14 @@ export function isWeekSupportLeg(focus: string, entry: ExerciseEntry): boolean {
 /** True for a track whose own work is legs — used to decide whether the WEEK already trains them twice. */
 function isLegTrack(focus: TrackFocus): boolean {
   return trackTrainsLegs(TRACKS[focus])
+}
+
+/** The lower-body pattern a track's main-lift slot is FIXED to: a squat, a hinge, or null (no lower main lift, or it may be either). */
+function fixedLowerMainPattern(track: TrackDefinition): 'knee_dominant' | 'hip_hinge' | null {
+  const slot = track.slots.find(s => s.tier === 'tier1_compound')
+  if (!slot) return null
+  const squat = slot.patterns.includes('knee_dominant'), hinge = slot.patterns.includes('hip_hinge')
+  return squat && !hinge ? 'knee_dominant' : hinge && !squat ? 'hip_hinge' : null
 }
 
 /** The same question asked of the track itself, for code that holds the definition rather than its name. */
@@ -2684,6 +2692,8 @@ function selectExercisesForTrack(
    * trains legs once elsewhere.
    */
   weekTrainsLegsElsewhere: boolean = false,
+  /** Later days of this week whose main lift is fixed to a squat or to a hinge (lowerMainToPrefer, below). */
+  lowerMainsLater: { squat: number; hinge: number } = { squat: 0, hinge: 0 },
 ): { primer: ExerciseEntry | null; rehab: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string>; uncoveredPatterns: MovementPattern[]; selectionNotes: Map<string, string> } {
   const counts = applyIsolationSlotShift(countsIn, policy.isolationSlotShift)
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
@@ -2866,6 +2876,29 @@ function selectExercisesForTrack(
     return false
   }
 
+  /**
+   * A WEEK'S LOWER-BODY MAIN LIFTS ALTERNATE (18 Nov 2026, CSCS; docs/plans/coach-read-of-plans.md).
+   *
+   * A full-body day's main lift may be a squat or a hinge, and each day picked on its own. Measured on 80 plans: 7
+   * had two full-body days both built on a deadlift variant (Sumo Deadlift, then Deadlifts) and 4 of those had no
+   * squat main lift anywhere in the week (a two-day beginner deadlifting both days). Where a day may be built on
+   * either, it takes the pattern the rest of the week holds less of: the days already built (weeklyAppearanceCount)
+   * and the later days whose main lift is fixed (a Squat & Carry day is a squat, a Pull & Hinge day a hinge).
+   * Level, or nothing to compare: no preference, the ranking decides as before. A preference the pool cannot meet
+   * (a flagged knee, no bar) falls back to the slot's own patterns.
+   */
+  function lowerMainToPrefer(slot: TrackSlot): MovementPattern | null {
+    if (slot.tier !== 'tier1_compound' || !slot.patterns.includes('knee_dominant') || !slot.patterns.includes('hip_hinge')) return null
+    let squat = lowerMainsLater.squat, hinge = lowerMainsLater.hinge
+    for (const [name, n] of weeklyAppearanceCount ?? []) {
+      const e = getExerciseEntry(name)
+      if (e?.mechanics_tier !== 'tier1_compound') continue
+      if (e.movement_pattern === 'knee_dominant') squat += n
+      else if (e.movement_pattern === 'hip_hinge') hinge += n
+    }
+    return squat === hinge ? null : squat < hinge ? 'knee_dominant' : 'hip_hinge'
+  }
+
   function fillSlot(slot: TrackSlot): void {
     // Preferred tier wins over "fresh this week" — reusing the same main
     // lift on a second day (normal in full-body/PPL splits) is a better
@@ -2874,7 +2907,9 @@ function selectExercisesForTrack(
     // preferred tier + fresh -> preferred tier + reused ok -> any tier +
     // fresh -> any tier + reused ok -> nearest-pattern substitute (required
     // slots only, logged) -> give up (required slots only, logged).
+    const preferredLowerMain = lowerMainToPrefer(slot)
     const pick =
+      (preferredLowerMain ? findForSlot([preferredLowerMain], slot.tier, true) ?? findForSlot([preferredLowerMain], slot.tier, false) : null) ??
       findForSlot(slot.patterns, slot.tier, true, slot.groups) ??
       findForSlot(slot.patterns, slot.tier, false, slot.groups) ??
       findForSlot(slot.patterns, null, true, slot.groups) ??
@@ -3441,6 +3476,20 @@ function shiftRestSeconds(seconds: number, multiplier: number): number {
   return Math.max(20, Math.round(seconds * multiplier))
 }
 
+
+/**
+ * A WARM-UP DRILL'S REPS, BY WHAT THE DRILL IS (18 Nov 2026, CSCS; docs/plans/coach-read-of-plans.md).
+ *
+ * Every rep-counted primer started at 5 and was then moved by the block like a working lift: 3 arm circles in a
+ * strength block for an advanced lifter, 9 in a conditioning block, 8 in every block for a beginner (the experience
+ * floor), and one more each week on some goals. Movement prep is not periodised: explosive prep (jumps, slams, plyo
+ * push-ups, swings) is a few fast reps with full quality; activation and mobility drills are done for about ten
+ * controlled ones. The same in every block and week (generateMesocycle leaves a primer's reps at this base).
+ */
+export function movementPrepReps(entry: ExerciseEntry): string {
+  return EXPLOSIVE_PREP_GROUPS.includes(entry.substitution_group) ? '5' : '10'
+}
+
 /**
  * The prescription for every non-'reps' unit — a hold duration, a measured
  * carry distance, a work:rest interval. These are the STARTING values: unlike
@@ -3523,8 +3572,8 @@ function assignSetsRepsFromConfig(
   policy: GoalPolicy,
   sessionDurationPreference?: SessionDuration,
 ): { sets: number; reps: string; rest: string; restSeconds: number } {
-  // Primers are not scaled — a 5-rep activation drill is a 5-rep activation
-  // drill regardless of how long you have been training.
+  // Primers are not scaled — a warm-up drill's dose is the same however long you have been training, and (since
+  // 18 Nov 2026) in every block and week: see movementPrepReps.
   //
   // NOT SCALED IS NOT THE SAME AS NOT MEASURED, and this branch used to
   // conflate them: it returned before the prescription_type dispatch below,
@@ -3543,7 +3592,7 @@ function assignSetsRepsFromConfig(
     const fixed = fixedUnitPrescription(entry, sessionDurationPreference)
     return fixed
       ? { ...fixed, sets: 2, rest: '30s', restSeconds: 30 }
-      : { sets: 2, reps: '5', rest: '30s', restSeconds: 30 }
+      : { sets: 2, reps: movementPrepReps(entry), rest: '30s', restSeconds: 30 }
   }
 
   // A beginner never drops below 2 working sets — one set is not a stimulus.
@@ -3585,7 +3634,7 @@ function assignSetsRepsFromConfig(
       restSeconds = Math.max(restSeconds, mainLiftRestFloor(entry, policy))
       return {
         sets: scaleSets(config.setRange[tierKey]),
-        reps: snapToRepBracket(applyRepFloor(shiftRepRange(config.repRange[tierKey], policy.repRangeShift[tierKey]), experience.min_reps)),
+        reps: snapToRepBracket(applyRepFloor(shiftRepRange(config.repRange[tierKey], policy.repRangeShift[tierKey]), repFloorFor(experience.min_reps, null, tierKey === 'tier1'))),
         rest: `${restSeconds}s`,
         restSeconds,
       }
@@ -5976,8 +6025,10 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const trackFocus = resolvedTracks[index]
     const track = TRACKS[trackFocus]
     const legDaysElsewhere = resolvedTracks.filter((focus, i) => i !== index && isLegTrack(focus)).length
+    const laterFixed = resolvedTracks.slice(index + 1).map(focus => fixedLowerMainPattern(TRACKS[focus]))
+    const lowerMainsLater = { squat: laterFixed.filter(p => p === 'knee_dominant').length, hinge: laterFixed.filter(p => p === 'hip_hinge').length }
 
-    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle, legDaysElsewhere >= 2)
+    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle, legDaysElsewhere >= 2, lowerMainsLater)
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
@@ -7535,6 +7586,8 @@ export function repRangeForIncomingExercise(
   const base = assignSetsRepsFromConfig(entry, styleConfig, expConfig, policy, profile.session_duration_preference).reps
 
   const isPrimer = entry.mechanics_tier === 'primer'
+  // Movement prep is not periodised (movementPrepReps): the same reps in every block and week.
+  if (isPrimer) return base
   const isMainCompound = entry.mechanics_tier === 'tier1_compound'
   const isDeload = !!week.is_deload
   const w = Math.min(Math.max(1, week.week_in_block ?? 1), 4)
@@ -7544,7 +7597,7 @@ export function repRangeForIncomingExercise(
   // price it from. A primer is neither a weightless working lift nor a loaded
   // one for this purpose.
   const isBodyweight = !isPrimer && (!isExternallyLoaded(entry) || category == null)
-  const repFloor = Math.max(expConfig.min_reps, isMainCompound ? (phaseConfig.main_lift_rep_floor ?? 0) : 0)
+  const repFloor = repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound)
 
   // A lift that has just arrived has no block baseline, so the two questions
   // generation asks of one are asked of its own starting estimate instead.
@@ -8274,7 +8327,7 @@ export function generateMesocycle(
           // bump re-derives its range from the same base, and if it clamped to
           // a lower floor than the week's own reps did, it could hand back
           // 4-6 as the "bumped" version of 6-8 and replace it.
-          const repFloor = Math.max(expConfig.min_reps, isMainCompound ? (phaseConfig.main_lift_rep_floor ?? 0) : 0)
+          const repFloor = repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound)
           const rampLoadCandidate = !isBodyweight && (policy.progressionEmphasis === 'load' || isCarry || isMainCompound)
 
           // A percentage-sized step snapped to the loading mode's real
@@ -8372,7 +8425,9 @@ export function generateMesocycle(
               ?? shiftReps(phaseReps, rampSteps, repFloor)
             restForWeek = adjustRest(ex.rest, restShift)
           } else {
-            reps = shiftReps(phaseReps, rampSteps, repFloor)
+            // MOVEMENT PREP IS NOT PERIODISED: a warm-up drill keeps its base reps in every block and week
+            // (movementPrepReps), as a warm-up hold above keeps its base seconds.
+            reps = isPrimer ? baseReps : shiftReps(phaseReps, rampSteps, repFloor)
             restForWeek = adjustRest(ex.rest, restShift)
           }
 

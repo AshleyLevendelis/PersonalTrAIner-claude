@@ -707,6 +707,29 @@ export function shortPhaseLabel(label: string): string {
   return label
 }
 
+/**
+ * ONLY THE DAY'S MAIN LIFT GOES UNDER SIX REPS (18 Nov 2026, CSCS; docs/plans/coach-read-of-plans.md).
+ *
+ * A strength or power block lowers every range by three or four reps, and the only floor under it was the experience
+ * floor (3 for advanced, 4 for intermediate). Measured on 120 people's plans: about 470 of 43,524 slots were a lift
+ * that is not the day's main lift with a range starting under six: "Walking Lunges 2x3-5 @38 kg a hand", "Renegade
+ * Row 2x3-5", "Push-Ups 4x4-6 Bodyweight", "Band Lat Pulldown 3x4-6". Heavy low-rep loads belong to the core lift
+ * (NSCA: assistance exercises no heavier than an 8RM, which is six reps with two in reserve); a one-sided or
+ * balance-limited lift at a 3-5 rep load is limited by control, and a weightless lift at four reps is an easy set.
+ *
+ * A SEPARATE NUMBER from the experience floor, which keeps its meaning for the main lift.
+ */
+export const ASSISTANCE_REP_FLOOR = 6
+
+/**
+ * The lowest a range may START for one lift: the experience floor, raised to the phase's main-lift floor for the
+ * day's main lift and to the assistance floor for everything else. ONE function, read by generation, by the swap
+ * helper and by the base assignment, because three copies of this had to agree.
+ */
+export function repFloorFor(experienceMinReps: number, phase: Pick<PhaseConfig, 'main_lift_rep_floor'> | null, isMainLift: boolean): number {
+  return Math.max(experienceMinReps, isMainLift ? (phase?.main_lift_rep_floor ?? 0) : ASSISTANCE_REP_FLOOR)
+}
+
 /** Shifts a rep range up or down while keeping its spread. */
 // Seconds floor for a time-based hold/interval shift — deliberately NOT
 // `minReps` (calibrated for rep counts like 3-8; using it as a seconds
