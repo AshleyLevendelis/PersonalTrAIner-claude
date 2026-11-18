@@ -29,10 +29,13 @@ export function GroceryScreen({
   todaysPicks,
   pinsByDate,
   mealShape,
+  labelLines,
   onClose,
   headerAction,
 }: {
   profileId?: string
+  /** The allergy card's "check the label" lines (allergies.ts). */
+  labelLines?: string[]
   mealPools: Partial<Record<MealSlotName, PoolOption[]>>
   targets: MacroTargets | null
   softLikedFoods: string[]
@@ -65,6 +68,7 @@ export function GroceryScreen({
         todaysPicks={todaysPicks}
         pinsByDate={pinsByDate}
         mealShape={mealShape}
+        labelLines={labelLines}
         header={({ left, compact }) => (
           <header data-testid="grocery-topbar" className="shrink-0 bg-background" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
             <div className="relative flex h-[52px] items-center pl-3 pr-1.5">

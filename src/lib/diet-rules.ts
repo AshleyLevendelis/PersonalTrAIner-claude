@@ -46,6 +46,11 @@ export type DietaryPreference =
   // NEVER CHOSEN OR SAVED: switched on by the "Pregnant" tick (his ruling 15 Nov 2026, "NHS list, auto-on") through
   // mealRestrictionsOf; the diet pickers leave it out (SELECTABLE_DIETARY_PREFERENCES).
   | 'pregnancy'
+  // NEVER CHOSEN OR SAVED EITHER: switched on by an allergy on the allergy card (his ruling 15 Nov 2026, "Allergy
+  // card, peanuts split") through mealRestrictionsOf. "Nut-free" stays the picker's tick and still means both nuts.
+  | 'peanut-free'
+  | 'tree-nut-free'
+  | 'oat-free'
 
 type TagKey = keyof FoodTags
 
@@ -129,6 +134,10 @@ export const FORBIDDEN_TAGS: Record<DietaryPreference, TagKey[]> = {
   // The NHS "foods to avoid in pregnancy" the table holds (docs/plans/pregnancy-one-switch.md): cold cured meats,
   // liver, cold-smoked fish, raw shellfish. Tuna and oily fish are LIMITS, watched over the week, never banned here.
   pregnancy: ['pregnancy_avoid'],
+  // The allergy card's three (docs/plans/allergy-card.md). A food on neither nut list carries both tags.
+  'peanut-free': ['contains_peanuts'],
+  'tree-nut-free': ['contains_tree_nuts'],
+  'oat-free': ['contains_oats'],
 }
 
 /**
@@ -146,8 +155,11 @@ export const FORBIDDEN_TAGS: Record<DietaryPreference, TagKey[]> = {
  */
 export const DIETARY_PREFERENCES: DietaryPreference[] = Object.keys(FORBIDDEN_TAGS) as DietaryPreference[]
 
-/** The ones a person picks: every rule except 'pregnancy', which only the Pregnant tick switches on. */
-export const SELECTABLE_DIETARY_PREFERENCES: DietaryPreference[] = DIETARY_PREFERENCES.filter(p => p !== 'pregnancy')
+/** Rules nobody picks: the Pregnant tick switches on 'pregnancy', the allergy card the other three. */
+const DERIVED_ONLY_PREFERENCES: DietaryPreference[] = ['pregnancy', 'peanut-free', 'tree-nut-free', 'oat-free']
+
+/** The ones a person picks: every rule except the derived ones. */
+export const SELECTABLE_DIETARY_PREFERENCES: DietaryPreference[] = DIETARY_PREFERENCES.filter(p => !DERIVED_ONLY_PREFERENCES.includes(p))
 
 export interface DietViolation {
   ingredient: string

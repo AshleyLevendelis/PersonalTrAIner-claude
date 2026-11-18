@@ -53,6 +53,15 @@ export interface FoodTags {
   contains_egg?: boolean
   contains_gluten?: boolean
   contains_nuts?: boolean
+  /**
+   * THE NUT SPLIT (his ruling 15 Nov 2026, "Allergy card, peanuts split"). Never written on an entry: worked out in
+   * f() from contains_nuts and the two name lists below, so a new nut food that nobody classified carries BOTH (the
+   * safe side). "Nut-free" still reads contains_nuts and means both.
+   */
+  contains_peanuts?: boolean
+  contains_tree_nuts?: boolean
+  /** Oats, for a coeliac who avoids all oats (the allergy card). Worked out in f() from the name. */
+  contains_oats?: boolean
   contains_soy?: boolean
   contains_honey?: boolean
   contains_alcohol?: boolean
@@ -132,7 +141,23 @@ function f(
   units?: Record<string, number>,
   purchaseUnit?: PurchaseUnit,
 ): FoodEntry {
-  return { name, aliases, per100g, category, tags, units, purchaseUnit }
+  return { name, aliases, per100g, category, tags: withDerivedTags(name, aliases, tags), units, purchaseUnit }
+}
+
+/** Nut foods that are peanuts and nothing else. Suya spice is ground peanuts. */
+const PEANUT_ONLY = new Set(['peanut butter', 'peanuts', 'peanut oil', 'suya spice rub'])
+/** Nut foods that are tree nuts and nothing else. Anything tagged contains_nuts and on NEITHER list carries both. */
+const TREE_NUT_ONLY = new Set(['almond butter', 'almonds', 'walnuts', 'cashews', 'pistachios', 'pesto', 'almond milk',
+  'brazil nuts', 'pecans', 'hazelnuts', 'almond flour', 'chocolate spread'])
+
+function withDerivedTags(name: string, aliases: string[], tags: FoodTags): FoodTags {
+  const out: FoodTags = { ...tags }
+  if (tags.contains_nuts) {
+    if (!TREE_NUT_ONLY.has(name)) out.contains_peanuts = true
+    if (!PEANUT_ONLY.has(name)) out.contains_tree_nuts = true
+  }
+  if ([name, ...aliases].some(n => /\b(oats?|oatmeal|oatcakes?|porridge|granola|muesli|flapjacks?)\b/i.test(n))) out.contains_oats = true
+  return out
 }
 
 export const FOOD_DB: FoodEntry[] = [

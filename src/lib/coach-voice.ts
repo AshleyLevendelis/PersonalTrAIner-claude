@@ -966,6 +966,9 @@ export function whenSaid(date: string, today: string): string {
 }
 
 export function ask(verbPhrase: string): string {
+  // ALREADY A QUESTION (18 Nov 2026, read off a screenshot: "Want me to Shall I record your tree-nut allergy...?", and
+  // the Pregnant tick's offer read the same way): words that open with their own question are said as written.
+  if (/^(shall i|should i|want me to|do you want|would you like)\b/i.test(verbPhrase.trim())) return verbPhrase.trim()
   const trimmed = verbPhrase.trim().replace(/[.?!:]+$/, '')
   return `Want me to ${trimmed}?`
 }
@@ -1382,6 +1385,7 @@ export const RECEIPTS: Record<string, ReceiptTitles> = {
   propose_plan_restart: { done: 'Plan started again', failed: "I couldn't start your plan again" },
   propose_plan_pause: { done: 'Done', failed: "I couldn't change your plan's pause" },
   propose_pregnancy_tick: { done: 'Done', failed: "I couldn't save that to your profile" },
+  propose_allergy_record: { done: 'Allergy recorded', failed: "I couldn't save that to your profile" },
   propose_meal_day_move: { done: 'Swapped over', failed: "I couldn't swap those meals" },
   propose_meal_rebalance: { done: 'Moved', failed: "I couldn't move those calories" },
   propose_eating_out: { done: 'Eating out added', failed: "I couldn't mark that meal as out" },
@@ -1491,6 +1495,17 @@ export function layoffLiftNote(s: { band: string }, fromKg: number, toKg: number
   const fmt = (kg: number) => `${added ? '+' : ''}${kg}kg`
   if (s.band === 'hold' || toKg >= fromKg) return `Held at ${fmt(fromKg)} after your break — no increase this session.`
   return `Eased to ${fmt(toKg)} from ${fmt(fromKg)} after your break. Easy reps today; it climbs back from here.`
+}
+
+/**
+ * The card's note when ONE lift has been away while training went on (layoff.ts liftLayoff, 18 Nov 2026). It says how
+ * long, because "after your break" would be false: he has not had one.
+ */
+export function staleLiftNote(daysAway: number, fromKg: number, toKg: number, added = false): string {
+  const fmt = (kg: number) => `${added ? '+' : ''}${kg}kg`
+  const ago = daysAway < 14 ? `${daysAway} days ago` : `${Math.round(daysAway / 7)} weeks ago`
+  if (toKg >= fromKg) return `Held at ${fmt(fromKg)}: you last did this one ${ago}. No increase this session.`
+  return `Eased to ${fmt(toKg)} from ${fmt(fromKg)}: you last did this one ${ago}. It climbs back from here.`
 }
 
 /** The restart offer after a very long break (her ruling, 8 Oct 2026: offer, never automatic). */

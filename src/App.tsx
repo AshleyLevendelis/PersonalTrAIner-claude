@@ -20,6 +20,7 @@ import { BottomDock } from '@/components/BottomDock'
 import { ActiveSessionProvider } from '@/hooks/useActiveSession'
 import { TimersProvider } from '@/hooks/useTimers'
 import { isPregnant, mealRestrictionsOf } from '@/lib/health-conditions'
+import { allergiesOf, labelLines as allergyLabelLines } from '@/lib/allergies'
 import { BottomDockHeightProvider, useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { AppTour, replayAppTour } from '@/components/AppTour'
 import { isDevAccount, getSessionDateContext, getAppNow, getLocalDateString } from '@/lib/dev-clock'
@@ -1145,6 +1146,8 @@ function App() {
       health_conditions: Array.isArray(profileRow.health_conditions) ? profileRow.health_conditions : [],
       // The due date (pregnancy, 15 Nov 2026), absent before its migration: read as none.
       due_date: typeof profileRow.due_date === 'string' ? profileRow.due_date : null,
+      // The allergy card (18 Nov 2026), absent before its migration: read as none.
+      allergies: allergiesOf({ allergies: profileRow.allergies }),
       // The coach's running memory of the chat (chat-summary.ts). Written to the profile since 17 Nov 2026 and never
       // read back: on a new phone, or after the browser cleared its storage, the summary in the database was ignored
       // (test:profile-restore, red from the day the column was added). Absent before its migration runs.
@@ -3548,6 +3551,7 @@ function App() {
               <Suspense fallback={<ScreenLoading />}>
               <GroceryScreen
                 profileId={profile.id}
+                labelLines={allergyLabelLines(allergiesOf(profile))}
                 mealPools={mealPools}
                 targets={macros}
                 softLikedFoods={compiledSoftFoodPreferences}

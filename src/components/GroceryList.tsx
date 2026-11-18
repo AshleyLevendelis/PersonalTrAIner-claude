@@ -52,6 +52,8 @@ interface GroceryListProps {
   targets: MacroTargets | null
   /** Same object App gives the meal rotation — see GenerateGroceryListInput. */
   mealShape: MealShape
+  /** What the allergy card adds for things the app cannot see (allergies.ts labelLines): said under the list's own limit line. */
+  labelLines?: string[]
   /** Bumped externally (e.g. after a chat-added item) to force a reload without remounting. */
   refreshToken?: number
   /**
@@ -72,7 +74,7 @@ const TOAST_MS = 5000
 /** Breathing room between the sticky chips and an aisle a chip has scrolled to. */
 const AISLE_GAP_PX = 12
 
-export function GroceryList({ profileId, mealPools, targets, softLikedFoods, todaysPicks, pinsByDate, refreshToken, mealShape, header }: GroceryListProps) {
+export function GroceryList({ profileId, mealPools, targets, softLikedFoods, todaysPicks, pinsByDate, refreshToken, mealShape, header, labelLines = [] }: GroceryListProps) {
   const [items, setItems] = useState<GroceryItemRow[]>([])
   // The tick's Undo runs from the toast seconds later: it reads the list as it is THEN, not as it was at the tick.
   const itemsRef = useRef(items)
@@ -609,6 +611,7 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
                 <span data-testid="grocery-elsewhere">{ELSEWHERE_WORDS.listLine(elsewhereCount)} </span>
               )}
               <span className="text-text-tertiary" data-testid="allergen-limit">Ingredients are filtered, not verified. Check labels if you have an allergy.</span>
+              {labelLines.map(l => <span key={l} className="block text-text-tertiary" data-testid="grocery-label-line">{l}</span>)}
             </p>
           )}
         </div>

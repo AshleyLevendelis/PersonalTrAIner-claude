@@ -119,6 +119,10 @@ function buildDietarySafetyBlock(preferences: string[]): string {
   if (has("mustard-free")) rules.push("MUSTARD-FREE: no mustard of any kind, including dijon, wholegrain, mustard powder, and dressings built on it.");
   if (has("lupin-free")) rules.push("LUPIN-FREE: no lupin flour or lupin-containing bread and baked goods.");
   if (has("sulphite-free")) rules.push("SULPHITE-FREE: no sulphite-preserved dried fruit, wine or wine vinegars, or products declaring sulphur dioxide.");
+  // The allergy card's three (docs/plans/allergy-card.md): switched on by a recorded allergy, never picked.
+  if (has("peanut-free")) rules.push("PEANUT-FREE: no peanuts, peanut butter, peanut oil, satay or suya, and no mixed nuts, trail mix, cereal, granola or protein bars. Tree nuts are allowed unless another rule says otherwise.");
+  if (has("tree-nut-free")) rules.push("TREE-NUT-FREE: no almonds, walnuts, cashews, pistachios, pecans, hazelnuts or brazil nuts, their butters, milks and flours, pesto or chocolate-hazelnut spread, and no mixed nuts, trail mix, granola, muesli or cereal bars. Peanuts are allowed unless another rule says otherwise.");
+  if (has("oat-free")) rules.push("OAT-FREE: no oats of any kind (porridge, oatmeal, oatcakes, oat milk, oat flour, granola, muesli, flapjacks).");
   if (has("pregnancy")) rules.push("PREGNANCY (NHS foods to avoid): no cold cured meats (salami, chorizo, pepperoni, prosciutto), no liver or pâté, no cold-smoked fish (smoked salmon, gravlax), no raw shellfish (oysters), no mould-ripened or soft blue cheese. Cooked ham, pasteurised and hard cheeses and cooked shellfish are fine. Keep tuna and oily fish to one meal each in the week.");
   if (has("low-fodmap")) rules.push("LOW-FODMAP: avoid garlic, onion, wheat, and high-fructose fruit where possible.");
   // Mediterranean is a STYLE, not a restriction — diet-rules.ts gives it no

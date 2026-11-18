@@ -15,11 +15,13 @@ import { calamariSaid, findFoodsNamedIn, foodTextWords, kindsItCouldBe, lookupIn
 import { FORBIDDEN_TAGS, type DietaryPreference } from './diet-rules'
 import { ALLERGEN_FOOD_PATTERNS } from './allergen-words'
 import { containsPhrase } from './meal-ingredients'
+import { allergyForRule, allergyName, type AllergyRecord } from './allergies'
 
 /** The allergen filters: the restrictions whose clash opens the reply with her sentence (the allergen band). */
 const ALLERGEN_RESTRICTIONS: DietaryPreference[] = [
   'nut-free', 'dairy-free', 'gluten-free', 'egg-free', 'soy-free', 'shellfish-free', 'fish-free',
   'celery-free', 'sesame-free', 'mustard-free', 'lupin-free', 'sulphite-free',
+  'peanut-free', 'tree-nut-free', 'oat-free',
 ]
 
 /** What a restriction keeps out, in the words the sentence uses ("has tree nuts in it"). */
@@ -27,6 +29,7 @@ const CONTAINS_WORDS: Partial<Record<DietaryPreference, string>> = {
   'nut-free': 'tree nuts', 'dairy-free': 'dairy', 'gluten-free': 'gluten', 'egg-free': 'egg', 'soy-free': 'soy',
   'shellfish-free': 'shellfish', 'fish-free': 'fish', 'celery-free': 'celery', 'sesame-free': 'sesame',
   'mustard-free': 'mustard', 'lupin-free': 'lupin', 'sulphite-free': 'sulphites',
+  'peanut-free': 'peanuts', 'tree-nut-free': 'tree nuts', 'oat-free': 'oats',
   vegetarian: 'meat or fish', vegan: 'animal products', pescatarian: 'meat', halal: 'pork or alcohol', kosher: 'pork or shellfish',
 }
 
@@ -136,9 +139,19 @@ export function namedFoodClash(message: string, dietaryPreferences: string[], di
  * allergy and an adrenaline pen read it as a nudge to remove the allergy: it now says WHERE the setting lives and
  * never invites changing it. Nothing else follows. Null for a diet or the avoid list.
  */
-export function allergyRefusal(c: FoodClash): string | null {
+export function allergyRefusal(c: FoodClash, allergies: readonly AllergyRecord[] = []): string | null {
   if (!c.allergen || !c.restriction) return null
+  if (allergyForRule(allergies, c.restriction)) return `${clashSentence(c, allergies)} Your allergies are on Profile, under Food, Allergies.`
   return `${clashSentence(c)} Your ${c.restriction} setting is on Profile, under Food, Diet.`
+}
+
+/**
+ * WHY, in the sentence. With the allergy recorded on the allergy card it is true to say so (his answer 1, 15 Nov 2026:
+ * "Your tree-nut allergy"); a plain diet tick keeps "your profile says nut-free", which never claims an allergy.
+ */
+function becauseOf(restriction: string, allergies: readonly AllergyRecord[]): string {
+  const a = allergyForRule(allergies, restriction)
+  return a ? `you have ${a.allergen === 'gluten' && a.coeliac ? '' : /^[aeiou]/i.test(allergyName(a)) ? 'an ' : 'a '}${allergyName(a)}` : `your profile says ${restriction}`
 }
 
 function capitalise(s: string): string {
@@ -154,7 +167,7 @@ function isPlural(food: string): boolean {
  * HER SENTENCE (18 Oct 2026): "Almond butter has tree nuts in it, and your profile says nut-free, so I won't suggest
  * it or add it to your meals." The same shape for every restriction; the avoid list says it is on the list.
  */
-export function clashSentence(c: FoodClash): string {
+export function clashSentence(c: FoodClash, allergies: readonly AllergyRecord[] = []): string {
   const food = capitalise(c.food)
   const plural = isPlural(c.food)
   const it = plural ? 'them' : 'it'
@@ -162,7 +175,7 @@ export function clashSentence(c: FoodClash): string {
     const has = plural ? 'have' : 'has'
     // Peanuts are not tree nuts; the nut-free filter keeps out both, and the sentence names the right one.
     const what = c.restriction === 'nut-free' && /peanut/i.test(c.food) ? 'peanuts' : CONTAINS_WORDS[c.restriction] ?? 'something'
-    return `${food} ${has} ${what} in ${it}, and your profile says ${c.restriction}, so I won't suggest ${it} or add ${it} to your meals.`
+    return `${food} ${has} ${what} in ${it}, and ${becauseOf(c.restriction, allergies)}, so I won't suggest ${it} or add ${it} to your meals.`
   }
   const are = plural ? 'are' : 'is'
   return `${food} ${are} on your avoid list, so I won't suggest ${it} or add ${it} to your meals.`
@@ -183,13 +196,13 @@ export function likeClash(phrase: string, restrictions: readonly string[], avoid
 }
 
 /** "Almond butter has tree nuts in it, and your profile says nut-free, so I haven't saved it as a food you like." */
-export function likeRefusal(c: FoodClash): string {
+export function likeRefusal(c: FoodClash, allergies: readonly AllergyRecord[] = []): string {
   const food = capitalise(c.food)
   const plural = isPlural(c.food)
   const it = plural ? 'them' : 'it'
   if (c.restriction) {
     const what = c.restriction === 'nut-free' && /peanut/i.test(c.food) ? 'peanuts' : CONTAINS_WORDS[c.restriction] ?? 'something'
-    return `${food} ${plural ? 'have' : 'has'} ${what} in ${it}, and your profile says ${c.restriction}, so I haven't saved ${it} as a food you like.`
+    return `${food} ${plural ? 'have' : 'has'} ${what} in ${it}, and ${becauseOf(c.restriction, allergies)}, so I haven't saved ${it} as a food you like.`
   }
   return `${food} ${plural ? 'are' : 'is'} on your avoid list, so I haven't saved ${it} as a food you like.`
 }

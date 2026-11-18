@@ -325,5 +325,30 @@ check('...and undoes what already landed when a later leg fails',
 check('...reporting nothing as landed when it rolled back',
   /landed: \[\],\s*\n?\s*failed:/.test(body))
 
+// ---------------------------------------------------------------------------
+console.log('\n11. A moved meal that lands light on protein says so, in numbers')
+// ---------------------------------------------------------------------------
+{
+  const toast = withRealMacros({ name: 'Banana and Honey Toast', ingredients: ['120g banana', '70g white bread', '20g honey'], macros: { calories: 0, protein: 0, carbs: 0, fat: 0 } }, 'snack')
+  const dinner = withRealMacros(chickenDinner(), 'dinner')
+  const up = move({ rawArgs: { from_slot: 'snack', to_slot: 'dinner' }, mealsBySlot: { snack: toast, dinner } })
+  check('the swap is built (sanity: the case below is reached)', up.ok === true, up)
+  const texts = up.ok ? (up.diff.implications ?? []).map(i => i.text) : []
+  const line = texts.find(t => /light on protein/.test(t))
+  const toastLeg = up.ok ? up.payload.legs.find(l => l.originalName === 'Banana and Honey Toast') : undefined
+  check('the toast really does land under 85% of dinner\'s protein (the fixture binds)', !!toastLeg && toastLeg.afterProtein < BUDGETS.dinner!.protein * 0.85, toastLeg && [toastLeg.afterProtein, BUDGETS.dinner!.protein])
+  check('the card says it is light on protein for dinner', !!line && /^Banana and Honey Toast is light on protein for dinner: about \d+ g, where dinner usually carries about \d+ g\.$/.test(line), texts)
+  check('...with the meal\'s own number and the slot\'s', !!line && !!toastLeg && line.includes(`about ${Math.round(toastLeg.afterProtein)} g`) && line.includes(`about ${Math.round(BUDGETS.dinner!.protein)} g`), line)
+  check('the chicken going to the snack is never called light (a snack is not held to it)', texts.filter(t => /light on protein/.test(t)).length === 1, texts)
+  // A SNACK IS NOT HELD TO IT, on a case where it would bind: plain rice and banana arriving as the snack.
+  const rice = withRealMacros({ name: 'Rice and Banana', ingredients: ['220g white rice', '120g banana'], macros: { calories: 0, protein: 0, carbs: 0, fat: 0 } }, 'lunch')
+  const down = move({ rawArgs: { from_slot: 'lunch', to_slot: 'snack' }, mealsBySlot: { lunch: rice } })
+  const riceLeg = down.ok ? down.payload.legs.find(l => l.originalName === 'Rice and Banana') : undefined
+  check('rice and banana lands under 85% of the snack\'s protein (so the exemption is what keeps it quiet)', !!riceLeg && riceLeg.slot === 'snack' && riceLeg.afterProtein < riceLeg.slotProtein * 0.85, riceLeg && [riceLeg.afterProtein, riceLeg.slotProtein])
+  check('...and the card does not call a snack light on protein', down.ok === true && !(down.diff.implications ?? []).some(i => /light on protein/.test(i.text)), down.ok && down.diff.implications)
+  const fine = move({ rawArgs: { from_slot: 'dinner', to_slot: 'lunch' }, mealsBySlot: { dinner, lunch: withRealMacros(chickenDinner(0.9), 'lunch') } })
+  check('two protein-led meals swapping say nothing about protein', fine.ok === true && !(fine.diff.implications ?? []).some(i => /light on protein/.test(i.text)), fine.ok && fine.diff.implications)
+}
+
 console.log(failures === 0 ? '\nAll meal-move checks passed.' : `\n${failures} check(s) failed.`)
 process.exit(failures === 0 ? 0 : 1)

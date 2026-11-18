@@ -2,6 +2,92 @@
 
 Newest first. One line each.
 
+- [x] **WEIGHT, WEEK BY WEEK on Home, 18 Nov 2026: his "Add all three"** (from three options, after screenshots of another
+  app's weight screen; over the weekly line alone and over the list alone). Behind the Weight row in Progress: a graph
+  of every weigh-in as a faint dot with each week's average as a line through the middle of its week, a 3M / 6M / 1Y
+  choice (3M first; one year read once, the ranges are cuts of it), and a list of weeks, newest first ("This week",
+  "9-15 Nov"), each with its average to one decimal and the change from the week before ("0.39 kg ↓"); tap a week for
+  its days. A week is Monday to Sunday (his 15 Oct rule). A week after a week with no weigh-ins shows no change, never
+  one against an older week. **The readings are the ones the calorie targets trust**: a weigh-in the targets set aside
+  (a surprising figure not confirmed the next day) is left out here too, so the graph and the targets cannot
+  disagree. Mine: change in grams to two places as in his screenshot, no colour for up or down (whether down is good
+  depends on the goal; the arrow says which way). A failed read says so with Try again, never an empty history.
+  Kept off first paint (loaded when the row opens). `test:weight-weeks` (32 checks, 12 mutations caught),
+  `verify:weight-history` (20 checks, 9 browser mutations, one caught only after its check asked that no week jump from its neighbour rather than that every week stay under 85 kg), screenshots read: the first showed "Sun,, 30 Aug" and
+  the browser's "Sept", so month and day names are now written by the app, never the browser. The existing 14-point
+  sparkline above it is unchanged. Not built: body-fat or other synced measures (his screenshot's second app), the
+  workout difficulty dial (third screenshot) — not asked for.
+  The overall size budget moved 3183 -> 3211 by his 15 Sep rule (3186 measured + 25); the other three did not move.
+  Found on the way: the disk was full of 24,000 browser profiles left in the temp folder by past test runs.
+- [x] **LEFTOVERS FROM THE ARTIFACT CHECK, BUILT 18 Nov 2026 (his "Build the leftovers"; `docs/audits/artifact-leftovers-2026-11-18.md`).**
+  Each a training or mechanical decision (mine under the 18 Sep delegation; basis in `docs/plans/weights-leftovers-2026-11-18.md`).
+  (1) **A moved meal light on protein says so** (Edit page §14): a meal moved into a bigger slot keeps its own foods and
+  is resized on calories, so a carb-led snack moved to dinner arrived with a fraction of dinner's protein and the card
+  said nothing. Now: "X is light on protein for dinner: about N g, where dinner usually carries about M g", under 85%
+  of the slot's share (the day-test floor). Never refused, never on a snack. `test:meal-move` §11 (4 mutations, one
+  caught only after a binding snack case was added).
+  (2) **Three goal warnings written on 14 Sep could never fire**: moving the block's main lift last in a strength
+  phase, banning it, and an ongoing volume cut in a building phase. No caller passed those kinds. Wired;
+  `verify:tradeoff-reach` sits the chat in a building week and a strength week found from the plan's own phases and
+  sees each question and its "Do it anyway" (14 checks; 4 browser mutations caught). Still unreached: the third
+  same-day shortening (needs a per-weekday count nothing keeps).
+  (3) **A deload stays a deload** (CONFIRMED defect): the block review's held weight and a confirmed "Start heavier"
+  each copied ONE load, priced off week 1, into every week of the block, so the recovery week was as heavy as the
+  loading weeks and the card showed it under "Deload week: lighter on purpose". One function now prices each week as
+  itself, the deload at 70%. And the suggestion said "You've consistently hit the top of your range" while its
+  trigger never looks at the range: it now says "You improved on X in most sessions last block". `test:block-weight`
+  (28 checks, 6 mutations, one caught only after the fixture used a real lift).
+  (4) **One lift away for weeks while training went on** comes back eased by the same bands as a break, asked of
+  that lift's own last session; the stronger of the two applies, never both, never a restart offer; its note and
+  label say how long ("you last did this one 4 weeks ago", "eased: not done lately"), never "your break". Before: last
+  time plus a step, or this week's printed number that climbed through weeks it was never trained. `test:layoff`
+  (+18 checks, 7 mutations), `verify:layoff` S0-S4 (3 browser mutations), screenshot read.
+  (5) **Far more reps than asked at the same weight moves more than one step**: every set past the top by half the
+  range's width (at least 3 reps) is worked from the weakest set's estimated max back to the top of the range, capped
+  at 10% a session on whole steps; on the card and in the testing week's anchor, whose sentence then names the easy
+  sets, never a set not lifted. Binds from about 50 kg up (10% of a lighter weight is one step). `test:lift-effort`
+  O1-O8, `test:calibration-search` (8 mutations).
+  NOT BUILT YET from the same list: the testing week anchoring from every way a session can be logged (only Finish
+  anchors today; the coach and "did it, not in the app" do not); the coach's past-day log dropping its date; the rest
+  of the artifact list, grouped in the audit doc. NOT VERIFIED: anything live.
+- [x] **THE ALLERGY CARD, BUILT (18 Nov 2026, his "Build the leftovers"; his rulings of 15 Nov; `docs/plans/allergy-card.md`).**
+  WHAT WAS WRONG: a tree-nut allergy was a "Nut-free" diet tick that also banned peanuts and said nothing of how
+  serious it is; a coeliac was a "Gluten-free" tick plus a note that changed nothing, and the coach promised her
+  "everything strictly avoids cross-contamination". WHAT CHANGED: one record per allergy on the profile (`allergies`,
+  migration 20261118120000): allergen, adrenaline pen, traces, and for gluten coeliac and oats. The allergen switches
+  on the meal filters through `mealRestrictionsOf`, the one reader every meal path uses, so kept meals, likes, swaps,
+  the meal writer and the day search all obey it with no second list. Three rules nobody picks: `peanut-free`,
+  `tree-nut-free`, `oat-free`; the nut split is worked out from two name lists and a nut food on neither carries
+  BOTH (the safe side); "Nut-free" is unchanged. Profile has an Allergies row above Diet; the chat offers the card
+  when he says he is allergic (nothing saved before the tap); the refusal says "you have a tree-nut allergy" when one
+  is recorded and "your profile says" for a diet tick; someone who carries a pen and describes a reaction gets "Use
+  your adrenaline pen now and call 999." under his message before the coach answers; the shopping list says "check
+  the label" for traces and coeliac; with any allergen rule on, a coach sentence that promises safety, a guarantee or
+  no traces is replaced by the app's own line. DECIDED BY HIM: all of the above (15 Nov, three answers). MINE,
+  mechanical: the promise check runs in the app, not the server, so it holds before the coach is deployed.
+  FOUND BY THE BROWSER DRIVER, not by 95 green logic checks: "my lips are swelling after that pesto" was answered
+  "Pesto has tree nuts in it... so I won't suggest it" (a described reaction now leaves the coach's reply alone and
+  builds no food card); and every app-raised offer read "Want me to Shall I...", THE PREGNANT TICK'S INCLUDED, live
+  since 15 Nov (an offer that is already a question is now said as written). VERIFIED: `test:allergy-card` 98 checks,
+  15 mutations caught of 15 applied (one did not apply and is not counted); `verify:allergy-card` 19 checks, 6
+  browser mutations caught; `verify:allergy-profile` 12 checks, 2 caught; screenshots read. First paint crossed its
+  ceiling by under 1 kB: the editor was moved off first paint and the chat half into its own file (605 -> 604), then
+  the ceiling moved 604 -> 612 with the measured note. NOT VERIFIED: nothing on the live app; what the deployed coach
+  says with the record in front of it (exam). NOT BUILT: the "may contain" line on meal cards; setup recording the
+  card (his answer 3 allows the tick). Scope review: food filtering on the app's own list and saying plainly what it
+  cannot check; the reaction line is first aid, his call; no clinical nutrition.
+  THE ARTIFACT CHECK that led here: `docs/audits/artifact-leftovers-2026-11-18.md` (twelve pages, about 400 listed
+  items; what is still open, grouped, with the build order).
+- [x] **MERGED TO `main` AT 203517ad (PR #30), 18 Nov 2026, on his word ("Merge it now", from three options: merge, questions first, hold).**
+  The 18 commits of the meals, coach and plans pass. Verified after the merge: `main`'s tree is identical to the
+  swept branch, and `main`'s coach server file is now the one that parses. LIVE: the frontend only (ships on merge).
+  NOT LIVE until his machine does it: the `chat-gemini` deploy, then the coach exam in full (new judge, three new
+  questions, one edited). One prompt for both, plus a check of the earlier migrations nobody has confirmed:
+  `docs/handover/machine-todo-2026-11-18.md`. STILL HIS, asked one at a time after the merge: protein a little over
+  / fat a little under on a muscle-gain plan; "usually contains" allergens on existing foods; keto and low-carb
+  (no library dishes that fit, a carb target the filter cannot land); the reference-weight sentence; richer in-chat
+  controls against "a coach wouldn't send a card"; session names such as "Full Body Power" on a beginner's easy
+  day; whether optional mobility gives way (and what it says) when he adds an exercise.
 - [x] **THE CONFIRMING SWEEP OF 18 NOV 2026 (on 4ffd5aed, a settled tree in its own worktree): 618 ran, 614 passed, 0 real failures.**
   The four red ones were each read in their own output, not ticked off by name: `test:meal-quality` ("VITE_SUPABASE_URL
   / VITE_SUPABASE_ANON_KEY must be set"), `test:schema-parity` ("Failed to link to TEST ... Nothing was run against

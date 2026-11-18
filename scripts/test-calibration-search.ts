@@ -114,6 +114,17 @@ check('a bodyweight row is not evidence', calibrationAnchorsFor(week1, day, [log
 check('a heavier set on a DIFFERENT lift does not anchor this one',
   calibrationAnchorsFor(week1, day, [log(1, heavier, {}, 'Some Other Lift'), log(1, plannedKg)]).every(a => a.exIndex !== exIndex))
 
+// THE SAME WEIGHT FOR FAR MORE REPS THAN ASKED (18 Nov 2026, outgrown.ts) is a heavier weight, read from the sets.
+{
+  const range = (ex.reps ?? '').match(/\d+/g)!.map(Number)
+  const top = Math.max(...range)
+  const many = top + 12
+  const atReps = calibrationAnchorsFor(week1, day, [log(1, plannedKg, { reps_completed: many }), log(2, plannedKg, { reps_completed: many })])
+  check('the planned weight for far more reps than the top of the range anchors the lift above the guess', atReps.length === 1 && atReps[0].liftedKg > plannedKg, { atReps, reps: ex.reps })
+  check('...by at most 10% in one session', atReps[0] != null && atReps[0].liftedKg <= plannedKg * 1.1 + 2.5 + 1e-9, atReps[0])
+  check('...and says it came from reps at the planned weight, never a set he did not lift', atReps[0]?.fromRepsAtKg === plannedKg && /from your easy sets at/.test(calibrationAnchorMessage(2, atReps) ?? ''), calibrationAnchorMessage(2, atReps))
+  check('just the top of the range at the planned weight still anchors nothing', calibrationAnchorsFor(week1, day, [log(1, plannedKg, { reps_completed: top }), log(2, plannedKg, { reps_completed: top })]).length === 0)
+}
 const plan = planCalibrationAnchors(meso, profile, week1.week_number, day.day, [log(1, plannedKg), log(2, heavier), log(3, heavier - 5)])
 check('planning from the calibration week applies that anchor', plan.applied.length === 1 && plan.applied[0].liftedKg === heavier, plan.applied)
 check('...and points at the week after it', plan.nextWeekNumber === week1.week_number + 1, plan.nextWeekNumber)

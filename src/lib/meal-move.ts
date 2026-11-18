@@ -41,6 +41,15 @@ import type { CurrentMealForSlot } from './meal-food-add'
 // the almond butter through the swap path.
 // ---------------------------------------------------------------------------
 
+/**
+ * Below this share of the slot's usual protein a moved meal is called light. 0.85 is the floor the app already holds a
+ * day to when it tests a new dish (DAY_TESTED_PROTEIN_FLOOR): the same line, asked of one meal. Basis (population
+ * sports nutrition, mine under the 18 Sep delegation): protein spread across the day's meals at roughly a quarter to a
+ * third each supports muscle protein synthesis better than one large dose; a main meal well under its share is worth
+ * saying, never worth refusing. A snack is not held to it.
+ */
+const MOVED_MEAL_PROTEIN_FLOOR = 0.85
+
 export interface MealMoveLeg {
   /** Where this meal is going. */
   slot: MealSlotName
@@ -51,6 +60,9 @@ export interface MealMoveLeg {
   beforeKcal: number
   afterKcal: number
   originalName: string
+  /** Its protein after the resize, and the protein the slot it lands in usually carries (for the light-on-protein line). */
+  afterProtein: number
+  slotProtein: number
 }
 
 export interface MealMovePayload {
@@ -204,6 +216,8 @@ function legFor(
       beforeKcal: moved.beforeKcal,
       afterKcal: moved.afterKcal,
       originalName: meal.name,
+      afterProtein: moved.option.macros.protein,
+      slotProtein: budget.protein,
     },
   }
 }
@@ -279,6 +293,17 @@ export function buildMealMoveProposal(input: BuildMealMoveInput): MealMoveResult
       severity: 'info',
       text: resized.map(l => `${l.originalName}: portions ${l.afterKcal < l.beforeKcal ? 'reduced' : 'increased'} to fit ${slotWords(l.slot)}.`).join(' '),
     })
+  }
+
+  // LIGHT ON PROTEIN FOR WHERE IT LANDS (18 Nov 2026; the 14 Sep edit report's §14, never built). A moved meal keeps
+  // its own foods and is resized on calories, so a carb-led snack moved to dinner arrives at dinner's size with a
+  // fraction of dinner's protein, and the move path (his own portions) skips the protein floor a new meal must meet.
+  // He asked for the move, so he gets it (his 14 Sep "resize it to fit"); the card says what it costs, in numbers.
+  for (const l of legs) {
+    if (l.slot === 'snack' || l.slotProtein <= 0) continue
+    if (l.afterProtein < l.slotProtein * MOVED_MEAL_PROTEIN_FLOOR) {
+      implications.push({ severity: 'warn', text: `${l.originalName} is light on protein for ${slotWords(l.slot)}: about ${Math.round(l.afterProtein)} g, where ${slotWords(l.slot)} usually carries about ${Math.round(l.slotProtein)} g.` })
+    }
   }
 
   return {

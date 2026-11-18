@@ -54,6 +54,18 @@ const WEIGH = Number(new URLSearchParams(location.search).get('weigh')) || 80
 // ?setup-typo: he signed up TODAY and setup kept 187 kg (his live report, 14 Nov 2026). INPUTS only: the weight on the
 // profile, the sign-up weigh-in, and the sign-up target row as the app writes it at sign-up (anchorTargetsAtSignUp:
 // the targets computeTargets gives for the profile, anchored at its weight). verify:setup-weight-correction.
+const WEIGH_HISTORY = new URLSearchParams(location.search).has('weigh-history')
+/** Seeded by date, never random: the same rows every run. Skips every fifth day; day 40 back is the 9 kg-off reading. */
+function weighHistory() {
+  const rows: { id: string; profile_id: string; date: string; weight_kg: number }[] = []
+  for (let back = 125; back >= 0; back--) {
+    if (back % 5 === 3) continue
+    const wobble = [0.3, -0.2, 0.1, -0.4, 0.2, 0, -0.1][back % 7]
+    const kg = back === 40 ? 93 : Math.round((80 + back * 0.043 + wobble) * 10) / 10
+    rows.push({ id: `w${back}`, profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - back * 86400000)), weight_kg: kg })
+  }
+  return rows
+}
 const SETUP_TYPO = new URLSearchParams(location.search).has('setup-typo')
 
 // ?clear-storage: a phone with nothing kept from an earlier visit, wiped HERE, before anything of the app's runs, so a
@@ -119,7 +131,9 @@ const db: Db = {
     meal('dinner', 0, 'Salmon and potatoes', [{ name: 'salmon', quantity: 170, unit: 'g' }, { name: 'raw potato', quantity: 350, unit: 'g' }]),
     meal('snack', 0, 'Yoghurt and banana', [{ name: 'greek yoghurt 0%', quantity: 170, unit: 'g' }, { name: 'banana', quantity: 120, unit: 'g' }]),
   ],
-  daily_metrics: SETUP_TYPO ? [
+  // ?weigh-history: about four months of weigh-ins, most days, falling about 0.3 kg a week with day-to-day wobble, plus
+  // one reading 9 kg off that the targets set aside (an INPUT; verify:weight-history reads the graph and week list).
+  daily_metrics: WEIGH_HISTORY ? weighHistory() : SETUP_TYPO ? [
     { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs())), weight_kg: 187 },
   ] : [
     { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 86400000)), weight_kg: WEIGH },

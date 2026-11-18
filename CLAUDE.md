@@ -1683,6 +1683,10 @@ menu" stays true when a copy is also left outside it.
 - **A session's length is its work, on every card**: the add card (screen and coach), the shorten card and its choices
   and "make it easier" quote the header's number; optional mobility is named beside it, never inside it.
   `test:exercise-add`, `test:lighter-today` §5, `verify:exercise-add` 4d, `verify:shorten-today` 2c
+- **Weight, week by week: his ruling 18 Nov 2026, "Add all three"** (from another app's screen): behind Home's Weight
+  row, a graph with each Monday-to-Sunday week's average as a line, a 3M / 6M / 1Y choice and a list of weeks (average,
+  change from the week before, tap for the days), from the readings the calorie targets trust only.
+  `test:weight-weeks`, `verify:weight-history`
 - **OPEN, HIS**: whether protein a little over or fat a little under with calories on target is a miss on a muscle-gain
   plan (his 18 Oct bands say yes); "usually contains" allergens on existing foods.
 
@@ -1722,12 +1726,20 @@ menu" stays true when a copy is also left outside it.
 - **A food his diet or allergy keeps out is never saved as a like**, by any writer (chat, Profile, setup).
   `test:named-food-clash`, `verify:named-food-clash` §6b
 - **An unknown food in a log is estimated only when he asks: "Estimate when asked"**, the assumption on the card before
-  Apply. PARTLY REVERSES his 1 Oct "ask, never estimate" for that case. NOT BUILT yet
-- **An allergy is its own record: "Allergy card, peanuts split"** (food, peanuts and tree nuts separate, adrenaline pen,
-  traces). Meals stay "filtered, not verified". NOT BUILT yet; needs a migration
-- **The allergy card's words, his three answers (`docs/plans/allergy-card.md`)**: "Your tree-nut allergy" once the card
-  records one (a diet tick keeps "your profile says"); "Use your pen, call 999" first for a reaction when he carries a
-  pen; setup records the allergen only ("Record it, details later"). NOT BUILT yet
+  Apply. PARTLY REVERSES his 1 Oct "ask, never estimate" for that case. BUILT (`test:log-estimate`; this line said NOT BUILT until 18 Nov)
+- **An allergy is its own record: "Allergy card, peanuts split"** (15 Nov 2026). BUILT 18 Nov 2026 on his "Build the
+  leftovers": Profile, Food, Allergies (above Diet): the 14 allergens, then the adrenaline pen, "may contain" traces,
+  and for gluten coeliac and oats. Peanuts and tree nuts are separate food rules (a food nobody classified carries
+  both); "Nut-free" stays the diet tick and still means both. The pen is told to the coach; traces and coeliac change
+  what is SAID (check the label, on the shopping list too), never a filter. Meals stay "filtered, not verified".
+  `test:allergy-card` (98 checks, 15 mutations), `verify:allergy-card` (19, 6), `verify:allergy-profile` (12, 2),
+  `docs/plans/allergy-card.md`. Needs migration 20261118120000 and the `chat-gemini` and `generate-meals` deploys
+- **The allergy card's words, his three answers**: "you have a tree-nut allergy" once the card records one (a diet
+  tick keeps "your profile says"); "Use your adrenaline pen now and call 999." under his message at once when he
+  carries a pen and describes a reaction (and a described reaction is never answered with a food refusal); setup
+  records the allergen only. BUILT 18 Nov 2026. **And with any allergen rule on, a coach sentence that promises safety,
+  a guarantee or freedom from traces is replaced by the app's own line** (the coeliac tester's "strictly avoids
+  cross-contamination"). The chat offers the card when he says he is allergic; nothing is saved before the tap.
 - **"Hips & pelvis" and "Other (describe)" on the injuries list** (his decision 8): Other asks the three pain questions;
   sharp saves nothing. `test:other-injury`, `verify:profile-fixes` §11
 

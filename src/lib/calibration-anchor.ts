@@ -29,7 +29,8 @@
 import type { MesocycleWeek, UserProfile, WorkoutDay, ExerciseSetLog } from './types'
 import { getActiveMesocycleWeek } from './calculations'
 import { getExerciseEntry, getExerciseId } from './exercise-db'
-import { isExternallyLoaded, statedCeilingKg } from './load-prescription'
+import { isExternallyLoaded, statedCeilingKg, getLoadIncrementKg, categorize } from './load-prescription'
+import { outgrownWeightKg } from './outgrown'
 import { getSetsForDate } from './set-log-store'
 import { saveMesocycleWeek } from './mesocycle-persistence'
 import { patchBlockFromLiftedKg, type LiftedAnchor } from './beat-target-offer'
@@ -39,6 +40,8 @@ export interface CalibrationAnchor {
   exerciseName: string
   plannedKg: number
   liftedKg: number
+  /** Set when the weight was worked out from far more reps than asked (outgrown.ts): the heaviest set actually lifted. */
+  fromRepsAtKg?: number
   /**
    * What next week's row for this lift reads AFTER the re-anchor, taken from
    * the patched plan itself — the number and the printed string ("~24kg per
@@ -80,11 +83,18 @@ export function calibrationAnchorsFor(
     const entry = getExerciseEntry(ex.name)
     if (!entry || !isExternallyLoaded(entry)) return
     const id = getExerciseId(ex.name)
-    const heaviest = working
-      .filter(s => (s.exercise_id ?? getExerciseId(s.exercise_name)) === id)
-      .reduce((m, s) => Math.max(m, Number(s.weight_kg)), 0)
+    const mine = working.filter(s => (s.exercise_id ?? getExerciseId(s.exercise_name)) === id)
+    const lifted = mine.reduce((m, s) => Math.max(m, Number(s.weight_kg)), 0)
+    // THE SAME WEIGHT FOR FAR MORE REPS THAN ASKED IS A HEAVIER WEIGHT (18 Nov 2026, outgrown.ts): 40 kg x 20 against
+    // 8-12 used to anchor nothing, because only a heavier number counted. Read from the sets at the heaviest weight.
+    const range = (ex.reps ?? '').match(/\d+/g)?.map(Number) ?? []
+    const atTop = mine.filter(s => Number(s.weight_kg) === lifted).map(s => s.reps_completed)
+    const outgrown = range.length >= 2 && lifted > 0
+      ? outgrownWeightKg(lifted, atTop, Math.min(...range), Math.max(...range), getLoadIncrementKg(entry, categorize(entry), lifted))
+      : null
+    const heaviest = Math.max(lifted, outgrown ?? 0)
     if (heaviest > ex.suggested_load_kg) {
-      out.push({ exIndex, exerciseName: ex.name, plannedKg: ex.suggested_load_kg, liftedKg: heaviest })
+      out.push({ exIndex, exerciseName: ex.name, plannedKg: ex.suggested_load_kg, liftedKg: heaviest, ...(heaviest > lifted ? { fromRepsAtKg: lifted } : {}) })
     }
   })
   return out
@@ -108,6 +118,8 @@ export function calibrationAnchorMessage(nextWeekNumber: number, applied: Calibr
   if (told.length === 0) return null
   const parts = told.map(a => {
     const n = a.nextWeek
+    // Worked out from reps: the sentence names what he lifted, never a set he did not do.
+    if (a.fromRepsAtKg != null && (!n || n.kg >= a.liftedKg)) return `${a.exerciseName} at ${a.liftedKg}kg, from your easy sets at ${a.fromRepsAtKg}kg`
     if (!n || n.kg >= a.liftedKg) return `${a.exerciseName} from your ${a.liftedKg}kg set`
     const label = n.label.replace(/^~/, '')
     return n.atStatedLimit

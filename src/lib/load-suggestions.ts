@@ -25,7 +25,7 @@ import { getBlockDateRange, toProgressPoint, improved, lastLoggedWeight, MIN_SES
 import { getExerciseHistory, type ExerciseHistorySession } from './exercise-history'
 import { getExerciseId, getExerciseEntry } from './exercise-db'
 import { isMainLiftSlot } from './mesocycle-edit'
-import { prescribeLoad } from './load-prescription'
+import { writeBlockWeight } from './block-weight'
 import { saveMesocycleWeek } from './mesocycle-persistence'
 import { supabase } from './supabase'
 
@@ -78,7 +78,10 @@ export function shouldSuggestBump(proposedWeightKg: number, currentWeightKg: num
 }
 
 function suggestionText(exerciseName: string, currentKg: number, proposedKg: number): string {
-  return `You've consistently hit the top of your range on ${exerciseName} — if those reps have been clean, want to start at ${proposedKg}kg instead of ${currentKg}kg next block?`
+  // SAYS WHAT THE TRIGGER TESTS (18 Nov 2026). It read "You've consistently hit the top of your range", and the
+  // trigger (didExerciseOverachieveInBlock) never looks at the top of any range: it asks whether most sessions
+  // improved on the one before. A sentence about the app's own evidence is a claim, so it says that.
+  return `You improved on ${exerciseName} in most sessions last block. If those reps were clean, want to start at ${proposedKg}kg instead of ${currentKg}kg this block?`
 }
 
 export interface LoadSuggestionCheckResult {
@@ -224,30 +227,8 @@ export async function confirmLoadSuggestion(
   const anchorEx = anchorDay?.exercises[suggestion.exercise_index]
   if (!anchorEx || anchorEx.name !== suggestion.exercise_name) return null
 
-  const load = prescribeLoad(entry, profile, {
-    targetRpeLabel: anchorEx.intensity || '',
-    isFirstBlock: false,
-    sets: anchorEx.sets,
-    repRangeLabel: anchorEx.reps,
-    forceStartingWeightKg: suggestion.proposed_weight_kg,
-  })
-
-  const patchedWeeks = mesocycle
+  const patchedWeeks = writeBlockWeight(mesocycle, profile, { blockNumber: suggestion.block_number, dayName: suggestion.day_name, exIndex: suggestion.exercise_index, exerciseName: suggestion.exercise_name, weightKg: suggestion.proposed_weight_kg })
     .filter(w => w.block_number === suggestion.block_number)
-    .map(week => {
-      const targetDay = week.days.find(d => d.day === suggestion.day_name)
-      const targetEx = targetDay?.exercises[suggestion.exercise_index]
-      if (!targetDay || !targetEx || targetEx.name !== suggestion.exercise_name) return week
-      const patchedEx: Exercise = {
-        ...targetEx,
-        suggested_load: load.display,
-        suggested_load_kg: load.starting_weight_kg,
-        per_set_load: load.per_set,
-        load_guidance: load.basis,
-      }
-      const days = week.days.map(d => (d.day === suggestion.day_name ? { ...d, exercises: d.exercises.map((e, i) => (i === suggestion.exercise_index ? patchedEx : e)) } : d))
-      return { ...week, days }
-    })
 
   await Promise.all(patchedWeeks.map(w => saveMesocycleWeek(profileId, w)))
   await supabase.from('load_suggestions').update({ status: 'confirmed', resolved_at: new Date().toISOString() }).eq('id', suggestionId)

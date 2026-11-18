@@ -1,5 +1,12 @@
 # The allergy card (his ruling 15 Nov 2026, "Allergy card, peanuts split")
 
+**BUILT 18 Nov 2026** on his "Build the leftovers". As planned, with these differences, each deliberate: the nut split
+is worked out from two name lists (a nut food on neither carries BOTH tags, so a new one is safe by default) rather
+than written on each entry; the oat rule is `oat-free`; the coach's promise check runs in the app (so it works before
+the coach deploy) on any profile with an allergen rule on; a described reaction is never answered with the food
+refusal (found by the browser driver). NOT built: the meal cards do not print the "may contain" line (the shopping
+list and Profile do); setup still files a said allergy as the diet tick, as his answer 3 allows.
+
 Two live tests found the same gap from both ends. Marcus (tree-nut allergy, carries an adrenaline pen) was stored as a
 "Nut-free" diet tick that also bans peanuts and says nothing about how serious it is. A coeliac tester was stored as a
 "Gluten-free" tick plus a free-text note ("needs certified gluten-free foods") that "doesn't change your plan by

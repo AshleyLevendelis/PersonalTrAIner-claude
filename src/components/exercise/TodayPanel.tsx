@@ -25,11 +25,11 @@ import { planDaysForDate } from '@/lib/plan-week'
 import { readBorrowedDay, writeBorrowedDay, trainAnywayOptions } from '@/lib/borrowed-day'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId, getExerciseEntry } from '@/lib/exercise-db'
-import { layoffStatus, easesWeights, easeWeightKg, easeAddedKg, layoffWeightFrom, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
+import { layoffStatus, easesWeights, easeWeightKg, easeAddedKg, layoffWeightFrom, liftLayoff, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { getLastWorkingSessionDate } from '@/lib/set-log-store'
 import { addDays, dayNameOf } from '@/lib/session-move'
 import { restartStillOffered } from '@/lib/plan-restart'
-import { layoffCardLine, layoffLiftNote, layoffRestartOffer } from '@/lib/coach-voice'
+import { layoffCardLine, layoffLiftNote, layoffRestartOffer, staleLiftNote } from '@/lib/coach-voice'
 import { estimateDaySeconds, getSessionMaximumSeconds, getSessionMinimumSeconds, dayLengthParts, formatDayLength, isMovementPrepRow } from '@/lib/session-duration'
 import { describeSessionShortfall } from '@/lib/session-shortfall'
 import { effectiveRecoveryCapacity, volumeNotice, activityCountsAsLoad, countWorkingSets } from '@/lib/concurrent-activity'
@@ -843,7 +843,7 @@ export function TodayPanel({
   // Its own map, never merged with progressedLoads: one is the weight of the
   // bar and the other is what you hang off yourself.
   const [progressedAddedLoads, setProgressedAddedLoads] = useState<Record<string, number>>({})
-  const [progressionNotes, setProgressionNotes] = useState<Record<string, { note: string; didProgress: boolean; findWeight?: boolean }>>({})
+  const [progressionNotes, setProgressionNotes] = useState<Record<string, { note: string; didProgress: boolean; findWeight?: boolean; staleEased?: boolean }>>({})
   // Answered or dismissed THIS session. The durable record is on the profile;
   // this only stops the card lingering after a tap, since `profile` is a prop
   // and does not refetch mid-session.
@@ -914,7 +914,7 @@ export function TodayPanel({
       if (cancelled) return
       const nextLoads: Record<string, number> = {}
       const nextAdded: Record<string, number> = {}
-      const nextNotes: Record<string, { note: string; didProgress: boolean; findWeight?: boolean }> = {}
+      const nextNotes: Record<string, { note: string; didProgress: boolean; findWeight?: boolean; staleEased?: boolean }> = {}
       for (const [name, rec, kind] of results) {
         if (!rec) continue
         // Kept in separate maps on purpose: one is the weight of the bar,
@@ -923,17 +923,21 @@ export function TodayPanel({
         // THE FIRST SESSION BACK AFTER A BREAK: no increment in any band (a session
         // that earned one before the break is not evidence about today), and in the
         // easing bands the weight comes down from LAST time's weight.
-        if (layoff.band !== 'none') {
+        // ...AND THE SAME FOR ONE LIFT THAT HAS BEEN AWAY WHILE TRAINING WENT ON (18 Nov 2026, liftLayoff): the
+        // stronger of the whole-training break and this lift's own gap. Its note says how long, never "your break".
+        const lay = liftLayoff(layoff, (rec as { lastDate?: string | null }).lastDate ?? null, today)
+        if (lay.band !== 'none') {
+          const say = (from: number, to: number, added = false) => lay.perLift ? staleLiftNote(lay.daysAway, from, to, added) : layoffLiftNote(lay, from, to, added)
           if (kind === 'added') {
             const last = (rec as { lastAddedKg: number }).lastAddedKg
-            const eased = easeAddedKg(last, layoff)
+            const eased = easeAddedKg(last, lay)
             nextAdded[name] = eased
-            nextNotes[name] = { note: layoffLiftNote(layoff, last, eased, true), didProgress: false }
+            nextNotes[name] = { note: say(last, eased, true), didProgress: false }
           } else {
             const last = (rec as { lastWeightKg: number }).lastWeightKg
-            const eased = layoffWeightFrom(last, layoff, getExerciseEntry(name))
+            const eased = layoffWeightFrom(last, lay, getExerciseEntry(name))
             nextLoads[name] = eased
-            nextNotes[name] = { note: layoffLiftNote(layoff, last, eased), didProgress: false }
+            nextNotes[name] = { note: say(last, eased), didProgress: false, staleEased: !!lay.perLift && eased < last }
           }
           continue
         }
@@ -2063,7 +2067,7 @@ function ExerciseList({
   currentMesoWeekObj?: MesocycleWeek
   progressedLoads: Record<string, number>
   progressedAddedLoads: Record<string, number>
-  progressionNotes: Record<string, { note: string; didProgress: boolean; findWeight?: boolean }>
+  progressionNotes: Record<string, { note: string; didProgress: boolean; findWeight?: boolean; staleEased?: boolean }>
   /** The first session back after a break (layoff.ts): eases every number on the row. */
   layoff: LayoffStatus
   /** Reaches SetGrid via ExerciseRow, to judge a typed weight — see set-plausibility.ts. */
@@ -2098,6 +2102,7 @@ function ExerciseList({
     // Eased after a break: whether the number came off the log or off the plan, it is
     // neither "from your last session" nor the plan's suggestion any more.
     if (easesWeights(layoff)) return 'eased'
+    if (progressionNotes[ex.name]?.staleEased) return 'eased_lift'
     if (progressedLoads[ex.name] != null) return 'logged'
     return ex.load_source ?? 'estimate'
   }

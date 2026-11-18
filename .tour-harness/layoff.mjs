@@ -126,6 +126,24 @@ if (other) { await openLift(other.name); await wait(1500) }
 const o30 = other ? await readLift(other.name) : { found: false, headline: [] }
 check('9. a lift with no history shows less than the plan printed (the calendar ramp kept climbing)', o30.found && o30.headline.length > 0 && o30.headline.every(kg => kg < (other?.planKg ?? 0)), { headline: o30.headline, plan: other?.planKg })
 
+// --- A1b. ONE LIFT away 30 days while training went on (18 Nov 2026, liftLayoff) ------------------------------
+console.log('A1b. One lift away thirty days, everything else trained two days ago')
+await open('away=30&trained=1')
+const ts = await ev('window.__awayTarget ?? null')
+check('S0. the fixture: the same lift 30 days ago, and another lift trained two days ago', !!ts && ts.days === 30 && ts.lastKg > 0, ts)
+check('S1. there is NO break line on the card (he has not had a break)', !(await has('[data-testid="layoff-line"]')), await text('[data-testid="layoff-line"]'))
+await openLift(ts?.name ?? '@@'); await wait(1500)
+const ls = await readLift(ts?.name ?? '@@')
+const lastS = ts?.lastKg ?? 0
+check('S2. the stale lift is eased below last time (about 90%), not last time plus a step and not this week\'s number', ls.found && ls.headline.length > 0 && ls.headline.every(kg => kg < lastS && kg >= lastS * 0.9 - 2.5), { headline: ls.headline, lastS })
+check('S3. its note says how long it has been, and never "your break"', /Eased to [\d.]+kg from [\d.]+kg: you last did this one 4 weeks ago/.test(ls.text) && !/after your break/i.test(ls.text), ls.text)
+check('S3b. the label over the weight says it was eased, never "from your last session" (it is less than that)', /eased: not done lately/i.test(ls.text) && !/from your last session/i.test(ls.text), ls.text)
+const otherS = ts?.others?.[0] ?? null
+if (otherS) { await openLift(otherS.name); await wait(1500) }
+const os = otherS ? await readLift(otherS.name) : { found: false, headline: [] }
+check('S4. a lift with no history on the same card keeps the plan\'s number (nothing else is eased)', !otherS || (os.found && os.headline.length > 0 && os.headline.every(kg => kg === otherS.planKg)), { headline: os.headline, plan: otherS?.planKg })
+await shootLift(ts?.name ?? '@@', 'layoff-one-lift-stale')
+
 // --- A2. Home says the card's weight, not the plan's from before the break (QA walk, 10 Nov 2026) --------------
 await open('away=30', 'home')
 const homeText = (await ev(`document.body.innerText`)) ?? ''
