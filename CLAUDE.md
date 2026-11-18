@@ -1683,6 +1683,10 @@ menu" stays true when a copy is also left outside it.
 - **A session's length is its work, on every card**: the add card (screen and coach), the shorten card and its choices
   and "make it easier" quote the header's number; optional mobility is named beside it, never inside it.
   `test:exercise-add`, `test:lighter-today` §5, `verify:exercise-add` 4d, `verify:shorten-today` 2c
+- **Weight, week by week: his ruling 18 Nov 2026, "Add all three"** (from another app's screen): behind Home's Weight
+  row, a graph with each Monday-to-Sunday week's average as a line, a 3M / 6M / 1Y choice and a list of weeks (average,
+  change from the week before, tap for the days), from the readings the calorie targets trust only.
+  `test:weight-weeks`, `verify:weight-history`
 - **OPEN, HIS**: whether protein a little over or fat a little under with calories on target is a miss on a muscle-gain
   plan (his 18 Oct bands say yes); "usually contains" allergens on existing foods.
 
