@@ -18,6 +18,7 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
+import { OPEN_OFFER_DETAILS_SCRIPT } from './driver-kit.mjs'
 import { anchorDate } from './anchor.mjs'
 
 const DIST = new URL('./dist/', import.meta.url).pathname
@@ -45,6 +46,9 @@ const send = (m, p = {}) => new Promise(r => { const i = ++id; pend.set(i, r); w
 const ev = async x => (await send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true })).result?.result?.value
 const shoot = async name => { const s = await send('Page.captureScreenshot', { format: 'png' }); writeFileSync(new URL(`./${name}.png`, import.meta.url).pathname, Buffer.from(s.result.data, 'base64')) }
 await send('Page.enable'); await send('Runtime.enable')
+// His "One line, numbers on tap" (17 Nov 2026): this driver reads what an offer SAYS, so it opens Details as he would.
+// The folded default itself is held by verify:offer-text (1e-1f).
+await send('Page.addScriptToEvaluateOnNewDocument', { source: OPEN_OFFER_DETAILS_SCRIPT })
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 await send('Emulation.setFocusEmulationEnabled', { enabled: true })
 
@@ -156,7 +160,7 @@ const loadChat = async () => {
 // RE-ANCHORED 31 Oct 2026: the offer's ANSWERS. The Listen icon on the coach's bubble (her 31 Oct ruling) reads the
 // message aloud and answers nothing; verify:chat-2b holds it.
 const offer = () => ev(`(() => { const c = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); if (!c) return null;
-  return { status: c.getAttribute('data-card-status'), text: c.innerText.replace(/\\s+/g, ' '), btns: [...c.querySelectorAll('button:not([data-listen])')].map(b => (b.textContent || '').trim()) } })()`)
+  return { status: c.getAttribute('data-card-status'), text: c.innerText.replace(/\\s+/g, ' '), btns: [...c.querySelectorAll('button:not([data-listen]):not([data-testid="offer-details-toggle"])')].map(b => (b.textContent || '').trim()) } })()`)
 const db = expr => ev(`(() => { const d = window.__fakeDb; return ${expr} })()`)
 
 check('B0. the chat is up', !!(await loadChat()))

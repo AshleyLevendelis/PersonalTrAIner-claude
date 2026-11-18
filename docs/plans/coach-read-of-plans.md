@@ -74,6 +74,25 @@ the minimum). The cause was older: the optional top-up sized itself before the w
 set off. It now runs after. 12 / 38 / 27 of 576 -> 0 / 0 / 0; 171 -> 0 of 5,700 loading days across 120 varied plans;
 none over the maximum; quality unchanged. Basis: spare time goes to optional mobility, not more volume (house rule).
 
+### 7. A thin day that had reached its exercise count (found by the same sweep)
+Once the top-up was measured on the finished day, `test:day-purpose` (P4) went red on days it could not see before: a
+bodyweight beginner's Chest & Triceps day on a 30-45 plan was two push-up variations and chair dips, seven working
+sets and 23 minutes, with trunk work unused in the pool. The 9 Oct rule gives a thin day borrowed work before
+mobility but triggered on a day that could not reach its exercise COUNT; with no kit the count is reached and the
+session is still short.
+
+**Decision: a day of nine working sets or fewer that is ten minutes or more short takes work until it is not.** From
+its borrow list in order, then one more of a pattern of its own; only work the push:pull and squat:hinge counts do not
+see (trunk, arms, shoulders, traps, calves); never a main lift; one movement per family; never a third of one
+pattern; never a movement the week holds twice. Added once, to the plan every week is built from, so the block keeps
+the same exercises. Basis: optional mobility is not training volume (house rule), and trunk and small-muscle work is
+what a coach adds to a short day because it costs little recovery and takes nothing from the next main lift.
+- Measured: that chest day is 13 working sets and 32 minutes with a reverse crunch and a plank; 517 days on the
+  9,216-profile grid take work (539 movements); no session under or over the time asked for; quality unchanged.
+- What it takes away: optional mobility on those days (days carrying a top-up 26.2% -> 25.6% on 120 plans).
+- `test:thin-day` (18 checks; 8 mutations, 7 caught; the eighth, taking a warm-up drill, is not reachable on any of
+  the 9,216 profiles and is kept for parity with the two older borrow rules).
+
 ## CSCS review (the five questions)
 1. Training effect: heavy work stays on the main lift; side lifts and warm-ups sit in the ranges that train what they
    are for; squat and hinge are both trained as main lifts.

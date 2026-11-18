@@ -33,8 +33,9 @@ the derived scale of the category against its known family (goblet 0.35 of the s
 ## The rule
 
 `price_fraction` on a catalogue entry, a number strictly between 0 and 1: the share of its category's price this
-exercise takes. Read through one function; a value outside (0, 1) is ignored, so it can only ever lower a number. Never
-set on an isolation entry (the floor-swap pre-check reads the isolation reference directly and would disagree).
+exercise takes. Read through one function; a value outside (0, 1) is ignored, so it can only ever lower a number.
+An isolation entry may carry one since 18 Nov 2026: the floor-swap pre-check (`isolationTargetBelowFloor`) reads the
+same fractioned figure the price starts from, so the two cannot disagree (`test:variant-pricing` §2).
 
 ## The entries and their fractions (CSCS; the basis is the usual strength-coaching ratio, taken at its LOW end)
 
@@ -47,6 +48,8 @@ set on an isolation entry (the floor-swap pre-check reads the isolation referenc
 | Renegade Row | row | 0.45 | rowing from a push-up plank: the trunk, not the back, limits it, about 40-50% of a supported row |
 | Dumbbell Front Squat | squat | 0.40 | the pair held at the shoulders, rack and grip limited, as two-dumbbell leg work (`single_leg_dumbbell` 0.4) |
 | Suitcase Deadlift | deadlift | 0.60 | ONE dumbbell; the per-side rule halves it, so the hand holds 0.30 of the deadlift's price, which side-bending strength limits |
+| Dumbbell Leg Curl | leg curl (isolation) | 0.33 | ONE dumbbell held between the feet: the grip of the feet, not the hamstrings, limits it (18 Nov 2026; 0.4 still gave an advanced 95 kg lifter 26 kg) |
+| Dumbbell Tricep Kickback | triceps (isolation) | 0.50 | hardest where the arm is weakest; half a lying extension's price (18 Nov 2026) |
 
 Landmine Squat stays out: what its number would mean (plates on the sleeve, or the felt load at the hands) is not
 settled anywhere in the app, and a number whose unit is unclear is the "number without its unit" rule.

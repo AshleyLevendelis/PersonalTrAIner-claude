@@ -1980,7 +1980,10 @@ export function isolationTargetBelowFloor(entry: ExerciseEntry, profile: UserPro
   // same substitution as load: with the old 75kg male stand-in, a 50kg woman
   // never got the lower-floor dumbbell sibling and was handed a 20kg barbell
   // curl. Nothing to add here; it just had to be true at the chokepoint.
-  return reference < LOADING_FLOOR_KG[mode]
+  // THE SAME FIGURE THE PRICE STARTS FROM (18 Nov 2026): a lighter variant's share is applied here too, so this
+  // pre-check and prescribeLoad cannot disagree about a fractioned barbell isolation lift. No entry in that position
+  // exists today (the two fractioned isolation lifts are dumbbell ones, which this function does not reach).
+  return reference * variantPriceFraction(entry) < LOADING_FLOOR_KG[mode]
 }
 
 /**

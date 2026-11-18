@@ -2078,6 +2078,13 @@ function adjustCountsForExperience(
 const WEEKLY_APPEARANCE_CAP = 2
 
 /**
+ * A THIN DAY, in the two numbers the day-purpose gate has used since Sam's report (9 Oct 2026): nine working sets or
+ * fewer, with ten minutes or more of its time left over. Read by the last step of balanceWeeklyStructure.
+ */
+const THIN_DAY_WORKING_SETS = 9
+const THIN_DAY_SPARE_SECONDS = 10 * 60
+
+/**
  * Redistributes accessory slots between isolation (tier3) and compound-
  * accessory (tier2) without changing the total accessory count — a goal's
  * isolationSlotShift moves slot BUDGET (what kind of accessory work fills
@@ -4956,6 +4963,56 @@ function balanceWeeklyStructure(
       reason: `push:pull ratio ${(pushCount / pullCount).toFixed(2)} is outside the 1:1-1:1.5 band and no swap, add, or remove could correct it`,
     })
     break
+  }
+
+  // A DAY THAT REACHED ITS EXERCISE COUNT AND IS STILL THIN BORROWS TOO (18 Nov 2026, decided as a CSCS coach).
+  //
+  // The 9 Oct rule gives a day borrowed work "before its spare time is handed to optional mobility", and triggers on
+  // a day that cannot reach its exercise COUNT. The count is sized for loaded work and its rests. With no kit the
+  // same count is a much shorter session: MEASURED, a bodyweight beginner's Chest & Triceps day on a 30-45 plan was
+  // two push-up variations and chair dips, seven working sets and 23 minutes, with a plank, a dead bug and a reverse
+  // crunch sitting in the pool. It reached its count, so nothing was borrowed; the week's push:pull balance forbids
+  // more pressing; and the day shipped seven minutes under the time asked for (the filler looked before the balance
+  // pass then) or, once the filler looked after it, with fourteen minutes of optional mobility. The day-purpose gate
+  // (P4) could not see the first state and went red on the second.
+  //
+  // So, last in this pass: a day of nine working sets or fewer that is ten minutes or more short of its budget takes
+  // work until it is not, or until there is none to take. In order: the track's borrow list (each source once), then
+  // one more of a pattern of its own; never a third movement of one pattern. Only work the push:pull and squat:hinge counts
+  // do not see (core, arms, shoulders, traps, calves), so nothing this adds can be taken straight back by the
+  // balance above or by the per-week set balance; never a tier-1; one movement per family; never a movement the week
+  // already holds twice. BASIS: a session's main work is its training effect and optional mobility is not volume
+  // (the house rule since 23 Sep); trunk and small-muscle work is what a coach adds to a short day, because it costs
+  // little recovery and takes nothing from the next session's main lifts.
+  const thinBudgetSeconds = getDurationBudgetSeconds(profile.session_duration_preference || '45-60')
+  const weekAppearances = (name: string): number => days.reduce((n, d) => n + (d.exercises.some(ex => ex.name === name) ? 1 : 0), 0)
+  for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+    const track = TRACKS[days[dayIdx].focus as TrackFocus]
+    if (!track || days[dayIdx].exercises.length === 0) continue
+    const isThin = (): boolean => {
+      const workingSets = days[dayIdx].exercises.reduce((n, ex) => n + (findEntry(ex.name)?.mechanics_tier === 'primer' ? 0 : ex.sets), 0)
+      return workingSets <= THIN_DAY_WORKING_SETS && thinBudgetSeconds - estimateDaySeconds(days[dayIdx]) >= THIN_DAY_SPARE_SECONDS
+    }
+    const takeable = (e: ExerciseEntry): boolean =>
+      e.mechanics_tier !== 'primer' && e.mechanics_tier !== 'cardio' && e.mechanics_tier !== 'tier1_compound' &&
+      classifyForBalance(e.movement_pattern) === null &&
+      !dayForbidden(dayIdx).has(e.movement_pattern) &&
+      !dayFamilies(dayIdx).has(getMovementFamily(e)) &&
+      weekAppearances(e.name) < WEEKLY_APPEARANCE_CAP &&
+      // Never a THIRD movement of one pattern on the day, whichever list it comes from (two triceps movements, not
+      // four; two trunk movements, not three). Binds on 5 days of the 9,216-profile grid, all on the day's own list.
+      days[dayIdx].exercises.filter(ex => { const x = findEntry(ex.name); return !!x && x.mechanics_tier !== 'primer' && x.movement_pattern === e.movement_pattern }).length < 2
+    const ownPatterns = [...track.primary_patterns, ...track.secondary_patterns]
+    const sources: ((e: ExerciseEntry) => boolean)[] = [
+      ...(track.borrow ?? []).map(source => (e: ExerciseEntry) =>
+        (source.groups?.includes(e.substitution_group) ?? false) || (source.patterns?.includes(e.movement_pattern) ?? false)),
+      (e: ExerciseEntry) => ownPatterns.includes(e.movement_pattern),
+    ]
+    for (const matches of sources) {
+      if (!isThin()) break
+      const candidate = pool.find(e => matches(e) && takeable(e))
+      if (candidate) addExercise(dayIdx, candidate, 'the day reached its exercise count and was still ten minutes short')
+    }
   }
 }
 
