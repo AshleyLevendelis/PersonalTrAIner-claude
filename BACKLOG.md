@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [x] **THE CONFIRMING SWEEP OF 18 NOV 2026 (on 4ffd5aed, a settled tree in its own worktree): 618 ran, 614 passed, 0 real failures.**
+  The four red ones were each read in their own output, not ticked off by name: `test:meal-quality` ("VITE_SUPABASE_URL
+  / VITE_SUPABASE_ANON_KEY must be set"), `test:schema-parity` ("Failed to link to TEST ... Nothing was run against
+  it"), `verify:rls` ("No database to read, and no key given") — no database from a cloud session — and
+  `test:coach-exam-fresh`, which is right to be red: the judge changed (his 17 Nov "Switch to Fable"), the coach's
+  instructions changed (sections 1g, 1h and the rest of this pass), three new questions were never answered and one
+  was edited. It goes green only after the `chat-gemini` deploy and an exam run on his machine. Plan quality 11.66 of
+  12 on 9,216 profiles, 0 below the 7.2 floor; `test:audit` passed. PROVEN BY TEST AND BROWSER DRIVER ONLY: nothing
+  in this pass has run on the live app or against the real coach, and `main` still holds a coach server file that
+  does not parse (fixed on this branch; `test:functions-parse`), so `chat-gemini` must not be deployed from `main`
+  until this branch is merged. Deploys after a merge: frontend on merge, and `chat-gemini` (the only function whose
+  files differ from `main`: its own file and the shared food table and amount reader it alone imports). No new
+  migration in this pass.
 - [x] **THE FULL SWEEP OF 18 NOV 2026 (on 19cce1f3; 617 ran, 596 passed): seventeen real failures, all fixed; two of them root causes.**
   (1) **SESSIONS UNDER THE TIME ASKED FOR.** `test:session-length` went red (38 and 27 of 576 loading sessions under
   the minimum, ceilings 6% and 4%); before the day's plan changes it stood at 32 and 20, just inside. TRACED, not
