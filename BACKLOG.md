@@ -2,7 +2,7 @@
 
 Newest first. One line each.
 
-- [x] **THE FULL SWEEP OF 18 NOV 2026 (on 19cce1f3): nine real failures, all fixed; one of them a root cause.**
+- [x] **THE FULL SWEEP OF 18 NOV 2026 (on 19cce1f3; 617 ran, 596 passed): seventeen real failures, all fixed; two of them root causes.**
   (1) **SESSIONS UNDER THE TIME ASKED FOR.** `test:session-length` went red (38 and 27 of 576 loading sessions under
   the minimum, ceilings 6% and 4%); before the day's plan changes it stood at 32 and 20, just inside. TRACED, not
   loosened: the optional top-up (the mobility close-out a short day gets) sized itself just BEFORE the weekly
@@ -40,6 +40,39 @@ Newest first. One line each.
   (5) `verify:day-length` chose its second day on one load and compared on another (the two came out at the same
   minute); it finds the day on the screen under test. `verify:bodyweight-progress` read the first drawing in the
   sheet, which is the body map since 17 Nov; it reads the chart.
+  (6) **A THIN DAY THAT HAD REACHED ITS EXERCISE COUNT.** With (1) in, `test:day-purpose` P4 went red on days it could
+  not see before. A bodyweight beginner's Chest & Triceps day on a 30-45 plan was two push-up variations and chair
+  dips: 7 working sets, 23 minutes, a plank and a reverse crunch unused in the pool. Before (1) it shipped seven
+  minutes under the time asked for with nothing added (invisible to P4, whose trigger needs ten minutes of optional
+  mobility); after (1) it carried fourteen minutes of mobility. Neither is what a coach writes. The 9 Oct borrow rule
+  triggers on a day that cannot reach its exercise COUNT; the count is sized for loaded work and its rests, so with no
+  kit it is reached and the session is still short. DECIDED (mine, CSCS: what a short session is filled with): a day
+  of nine working sets or fewer that is ten minutes or more short of its budget takes work until it is not, from its
+  borrow list in order and then one of its own patterns; only work the push:pull and squat:hinge counts do not see
+  (trunk, arms, shoulders, traps, calves), so the balance passes cannot take it straight back; never a main lift, a
+  second of a family, a third of one pattern, or a movement the week already holds twice. BASIS: optional mobility is
+  not training volume (the house rule since 23 Sep); trunk and small-muscle work is what a coach adds to a short day
+  because it costs little recovery and takes nothing from the next session's main lifts. Added once, to the plan every
+  week is built from, so "the same exercises all block" holds. MEASURED: that day is 13 working sets and 32 minutes
+  with a reverse crunch and a plank; 517 days on the 9,216-profile grid take work (539 movements); on 120 varied plans
+  no session is under or over the time asked for and days carrying an optional top-up go 26.2% -> 25.6%; mean quality
+  11.758, unchanged. CSCS review: training effect up on the thinnest days; takes away optional mobility only;
+  pattern coverage and balance untouched by construction; no floor redefined; programming only. NEW GATE
+  `test:thin-day` (18 checks over 1,728 base plans, `THIN_DAY_GRID=full` for all 9,216; 8 mutations, 7 caught: the
+  eighth, taking a warm-up drill, is not reachable on any of the 9,216 profiles and the guard is kept for parity with
+  the two older borrow rules). A MISSED mutation here was the useful kind twice: "fewer than two of a pattern" read
+  as inert until the taken counts were compared (it binds on 5 days), and then it turned out to guard only one of the
+  two lists, so it now guards both.
+  (7) **A PRICING RULE MY TWO DUMBBELL RE-PRICES BROKE.** `test:variant-pricing` held "no lighter-variant share on an
+  isolation entry", because the pre-check that swaps a barbell curl for a dumbbell one when the target is under the
+  empty bar read the whole reference, not the share. The pre-check now reads the same figure the price starts from,
+  so they cannot disagree; nothing changes today (the two entries are dumbbell lifts, which the pre-check does not
+  reach). Re-anchored on that property, 1 mutation caught.
+  (8) **FOUR MORE DRIVERS.** `verify:extra-cardio` and `verify:workout-scenarios-chat`: the Details fold again.
+  `verify:chat-composer`: "ONE button" counted the camera that his 17 Nov photo ruling put beside it; it counts the
+  action button (mic or send, never both) and the camera on its own line. `verify:warmups-one-tap`: pinned four
+  warm-up rows; build-up sets must climb since this morning, so the squat has three; the count is read off the screen.
+  `test:rebuild-honours`: its lift is found by the property it needs (one the rebuild keeps at the same reps).
   ENVIRONMENTAL OR EXPECTED, unchanged: `test:meal-quality`, `test:schema-parity`, `verify:rls` (no database here),
   `test:coach-exam-fresh` (stale until the exam is run on his machine after a deploy).
 - [x] **THE COACH'S SERVER CODE DID NOT PARSE, AND THAT VERSION IS ON `main` (found 18 Nov 2026 by the full sweep).**

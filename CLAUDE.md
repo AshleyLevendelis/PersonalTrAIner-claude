@@ -1676,6 +1676,10 @@ menu" stays true when a copy is also left outside it.
 - **A session reaches the time asked for** (CSCS, mine): the optional top-up is sized on the day as it ships, after the
   weekly balance pass (it ran before, and the pass then took a set off). Sessions under the minimum: 171 -> 0 of 5,700
   loading days. `test:session-length` (ceilings 1%)
+- **A thin day takes work, not mobility** (CSCS, mine): a day of nine working sets or fewer that is ten minutes short
+  takes trunk or small-muscle work (never a main lift, a third of one pattern, or work the push:pull count sees), added
+  to the plan every week is built from. A bodyweight beginner's chest day: 7 sets and 23 minutes -> 13 sets and 32.
+  `test:thin-day`, `test:day-purpose` P4
 - **A session's length is its work, on every card**: the add card (screen and coach), the shorten card and its choices
   and "make it easier" quote the header's number; optional mobility is named beside it, never inside it.
   `test:exercise-add`, `test:lighter-today` §5, `verify:exercise-add` 4d, `verify:shorten-today` 2c
@@ -3050,6 +3054,10 @@ old — the commands were right and the context was missing.
   (`verify:moved-session`, `verify:moved-edit`, `verify:rebuild-card`, `verify:meal-knock-on`) stayed red, unseen,
   through a merge to `main`, until the next full sweep. A driver names what is ON SCREEN, so the derivation is: grep
   `.tour-harness/*.mjs` for the element that changed (`proposal-card` here), and run every driver it names.
+- **A MISSED MUTATION ASKS TWO QUESTIONS, AND "IS THE GUARD INERT?" IS THE SECOND.** 18 Nov 2026: a limit read as
+  inert on 9,216 profiles because no check looked at what it limits; comparing what the run PRODUCED with and without
+  it showed it binding on five days. First ask whether any check could see the difference; only then whether there is
+  one. (It then turned out to guard one of two lists.)
 - **A KNOWN, ACCEPTED DRIFT IS A DEFECT WITH A NOTE ON IT.** 18 Nov 2026: "a couple of minutes under, understood" had
   sat beside a 3-6% ceiling since September. A change elsewhere pushed more days into it and the ceiling failed; the
   cause was one line in the wrong order, and fixing it took the count to zero. When a ceiling exists to tolerate a
