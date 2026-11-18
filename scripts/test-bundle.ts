@@ -236,8 +236,11 @@ console.log('\n1. The libraries are cached separately from the app')
   // MOVED 16 Nov 2026: the coach batch of his 16 Nov requests (timers from the chat, "how much should I have", answer
   // then offer, open any screen from the chat, take things off the list) took it to 434: MEASURED 434 through this gate
   // on cec97249. His 15 Sep ruling, "raise it with room to grow": 8 gz over today.
-  headroom('a deploy re-downloads', appGzip, 442, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, under 442`, appGzip < 442, appGzip)
+  // MOVED 18 Nov 2026: 442 -> 453, the foods a log is full of (about 65 entries in the food table, which every screen
+  // that counts a meal reads, so it is first-paint code) and the realistic-plate rules. MEASURED 445 through this gate on
+  // the change. His 15 Sep ruling, "raise it with room to grow": 8 gz over today.
+  headroom('a deploy re-downloads', appGzip, 453, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, under 453`, appGzip < 453, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -466,7 +469,9 @@ console.log('\n3. Nothing has crept back up')
   // e373e3b8: 1481 (and 1481 with the Pause). His 15 Sep ruling: 25 kB raw over today's number.
   // MOVED 17 Nov 2026: 1506 -> 1531, the phone kept linked to the profile on screen (no reminders ever arrived); MEASURED
   // on a clean worktree of main 9f8e0ef2: 1505 (1 left), and 1506 after. His 15 Sep ruling: 25 kB raw over today's number.
-  const APP_CHUNK_BUDGET_KB = 1531
+  // MOVED 18 Nov 2026: 1531 -> 1566, the foods a log is full of (about 65 food-table entries) and the realistic-plate
+  // rules; MEASURED 1541 through this gate on the change. His 15 Sep ruling: 25 kB raw over today's number.
+  const APP_CHUNK_BUDGET_KB = 1566
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -759,7 +764,9 @@ console.log('\n3. Nothing has crept back up')
   // total, which counts every file on disk, took the data. His 15 Sep ruling: 25 kB raw over today's number (3115 + 25).
   // MERGED 17 Nov 2026: the chat review and the body drawing together, MEASURED 3128 through this gate on the merge.
   // His 15 Sep ruling: 25 kB raw over today's number (3128 + 25).
-  const TOTAL_BUDGET_KB = 3153
+  // MOVED 18 Nov 2026: 3153 -> 3183, the same food-table entries; MEASURED 3158 through this gate on the change.
+  // His 15 Sep ruling: 25 kB raw over today's number (3158 + 25).
+  const TOTAL_BUDGET_KB = 3183
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

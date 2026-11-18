@@ -37,6 +37,13 @@ import { ALLERGEN_FOOD_PATTERNS, DIET_WORD_PATTERNS } from './allergen-words'
  * the meal. The gate prints what each answer would cost the library.
  */
 export const UNLISTED_ALLOWED: readonly string[] = ['salt', 'pepper', 'black pepper', 'ground black pepper', 'water', 'boiling water', 'cold water', 'warm water', 'ice']
+/** The same allowance by the FOOD the words reach (18 Nov 2026): salt and water became foods the table knows, under more names ("salt and pepper", "ice cubes"). */
+const UNLISTED_ALLOWED_FOODS: ReadonlySet<string> = new Set(['salt', 'water'])
+/**
+ * What a step makes the food INTO, never a food in the dish (18 Nov 2026): "shape into cakes", "blend into a smoothie".
+ * Cake and smoothie became foods he can log; in a recipe step the bare word is the shape.
+ */
+const DISH_FORMS: ReadonlySet<string> = new Set(['cake', 'cakes', 'smoothie', 'smoothies'])
 
 export interface MethodRules {
   dietaryPreferences?: readonly string[]
@@ -51,7 +58,7 @@ export type MethodHidden =
 const known = (p: string): p is DietaryPreference => Object.prototype.hasOwnProperty.call(FORBIDDEN_TAGS, p)
 const singular = (w: string) => (w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w)
 /** How a method describes what was done to a listed food, never another food: "top with mashed potato" when the list has potato. */
-const PREPARED_AS = new Set(['mashed', 'mash'])
+const PREPARED_AS = new Set(['mashed', 'mash', 'juice', 'juiced', 'zest', 'zested'])
 
 /**
  * The method as it may be shown, or '' with the reason. `prep` should already
@@ -60,7 +67,7 @@ const PREPARED_AS = new Set(['mashed', 'mash'])
 export function checkMethod(prep: string | undefined, ingredientNames: readonly string[], rules: MethodRules = {}): { text: string; hidden: MethodHidden | null } {
   const text = (prep ?? '').trim()
   if (!text) return { text: '', hidden: null }
-  const hits = findFoodsNamedIn(text)
+  const hits = findFoodsNamedIn(text).filter(h => !(h.words.length === 1 && DISH_FORMS.has(h.words[0])))
   const words = foodTextWords(text)
 
   // 1. RESTRICTIONS — the safety half. Runs whatever the truth rule below says.
@@ -109,7 +116,7 @@ export function checkMethod(prep: string | undefined, ingredientNames: readonly 
   const listedWords = [...new Set(ingredientNames.flatMap(n => foodTextWords(n, true)))]
   const isListedWord = (w: string) => listedWords.includes(w) || (w.length >= 4 && listedWords.some(l => l.endsWith(w)))
   for (const hit of hits) {
-    if (UNLISTED_ALLOWED.includes(hit.words.join(' '))) continue
+    if (UNLISTED_ALLOWED.includes(hit.words.join(' ')) || UNLISTED_ALLOWED_FOODS.has(hit.entry.name)) continue
     if (listedEntries.has(hit.entry.name)) continue
     const foodWords = foodTextWords(hit.words.join(' '), true).filter(w => !HARMLESS_WORDS.has(w) && !PREPARED_AS.has(w))
     if (foodWords.length === 0 || !foodWords.every(isListedWord)) return { text: '', hidden: { reason: 'unlisted', food: hit.words.join(' ') } }

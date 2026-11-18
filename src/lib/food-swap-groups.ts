@@ -34,22 +34,25 @@
 export const SWAP_GROUPS: Record<string, readonly string[]> = {
   // --- protein ---
   'lean meat': ['chicken breast', 'turkey breast', 'pork loin', 'venison', 'beef rump steak', 'beef steak sirloin', 'chicken drumstick', 'chicken breast raw', 'turkey breast raw', 'pork loin raw'],
-  'richer meat': ['chicken thigh', 'duck breast', 'lamb chop', 'pork chop', 'beef brisket', 'pork belly', 'chicken thigh raw'],
+  'richer meat': ['chicken thigh', 'duck breast', 'lamb chop', 'pork chop', 'beef brisket', 'pork belly', 'chicken thigh raw', 'chicken wings', 'beef burger'],
   'mince': ['chicken mince', 'turkey mince', 'beef mince 5% fat', 'beef mince 10% fat', 'beef mince 12% fat', 'beef mince 15% fat', 'beef mince 20% fat', 'lamb mince', 'pork mince', 'soy mince', 'quorn mince', 'vegan mince', 'soy mince dry'],
-  'cured meat and sausages': ['bacon', 'ham', 'smoked turkey breast', 'gammon', 'chorizo', 'pepperoni', 'salami', 'pork sausage', 'vegan sausage', 'bacon medallions'],
+  'cured meat and sausages': ['bacon', 'ham', 'smoked turkey breast', 'gammon', 'chorizo', 'pepperoni', 'salami', 'pork sausage', 'vegan sausage', 'bacon medallions', 'black pudding'],
   'white fish': ['cod', 'haddock', 'tilapia', 'sea bass', 'red snapper', 'tuna steak fresh', 'cod raw', 'haddock raw'],
   'oily fish': ['salmon', 'mackerel', 'trout'],
-  'tinned and smoked fish': ['tuna canned in water', 'sardines canned', 'smoked salmon'],
+  'tinned and smoked fish': ['tuna canned in water', 'sardines canned', 'smoked salmon', 'crab sticks'],
+  // 18 Nov 2026: breaded and battered fish and chicken swap for each other, and the savoury pastries for each other.
+  'breaded and battered': ['fish fingers', 'battered fish', 'breaded chicken', 'chicken nuggets'],
+  'savoury pastries': ['sausage roll', 'pork pie', 'cornish pasty', 'scotch egg'],
   'shellfish': ['mussels in shell', 'calamari fried', 'prawns', 'crab meat', 'mussels', 'squid', 'scallops', 'lobster', 'oysters', 'prawns raw'],
   'eggs': ['egg', 'egg white'],
-  'protein powder': ['whey protein powder', 'vegan protein powder'],
+  'protein powder': ['whey protein powder', 'vegan protein powder', 'casein protein powder'],
   'tofu and meat-free pieces': ['tofu firm', 'smoked tofu', 'tofu silken', 'tempeh', 'seitan', 'seitan strips', 'quorn fillet', 'falafel'],
   'beans and pulses': ['chickpeas canned', 'kidney beans canned', 'chickpeas', 'lentils red', 'lentils green', 'brown lentils', 'red lentils dry', 'green lentils dry', 'black beans', 'kidney beans', 'pinto beans', 'butter beans', 'cannellini beans', 'haricot beans', 'baked beans', 'split peas', 'edamame'],
   // --- dairy and its stand-ins ---
   'yoghurt': ['greek style yoghurt', 'greek yoghurt 0%', 'greek yoghurt 2%', 'greek yoghurt full fat', 'natural yoghurt', 'skyr', 'quark', 'cottage cheese', 'cottage cheese low fat', 'soy yoghurt', 'coconut yoghurt'],
   'soft cheese': ['ricotta light', 'ricotta cheese', 'cream cheese', 'cream cheese light'],
   'cheese': ['cheddar cheese', 'mozzarella', 'mozzarella part skim', 'mozzarella light', 'feta cheese', 'halloumi', 'parmesan', 'paneer', 'sulguni cheese'],
-  'milk': ['milk whole', 'milk semi skimmed', 'milk skimmed', 'soy milk', 'almond milk', 'oat milk'],
+  'milk': ['milk whole', 'milk semi skimmed', 'milk skimmed', 'soy milk', 'almond milk', 'oat milk', 'kefir'],
   'cream': ['double cream', 'single cream', 'sour cream', 'creme fraiche', 'half fat creme fraiche', 'heavy cream', 'coconut cream', 'coconut milk canned', 'coconut milk light'],
   // --- fats ---
   'cooking fat': ['olive oil', 'vegetable oil', 'coconut oil', 'sesame oil', 'peanut oil', 'safflower oil', 'ghee', 'butter'],
@@ -61,8 +64,8 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   'rice and grains': ['risotto rice', 'white rice cooked', 'brown rice cooked', 'basmati rice cooked', 'couscous cooked', 'quinoa cooked', 'bulgur wheat cooked', 'millet cooked', 'buckwheat cooked', 'barley', 'polenta cooked',
     'white rice dry', 'brown rice dry', 'basmati rice dry', 'couscous dry', 'quinoa dry'],
   'pasta and noodles': ['pasta cooked', 'wholewheat pasta cooked', 'gluten free pasta', 'protein pasta', 'egg noodles cooked', 'rice noodles cooked', 'gnocchi',
-    'pasta dry', 'wholewheat pasta dry', 'egg noodles dry', 'rice noodles dry'],
-  'bread': ['burger bun', 'white bread', 'wholemeal bread', 'gluten free bread', 'bagel', 'brioche', 'croissant', 'french toast'],
+    'pasta dry', 'wholewheat pasta dry', 'egg noodles dry', 'rice noodles dry', 'soba noodles cooked', 'soba noodles dry'],
+  'bread': ['burger bun', 'white bread', 'wholemeal bread', 'gluten free bread', 'bagel', 'brioche', 'croissant', 'french toast', 'rye bread'],
   'wraps and flatbreads': ['tortilla wrap', 'corn tortilla', 'pitta bread', 'naan bread', 'chapati', 'injera flatbread'],
   'starchy veg': ['potato boiled', 'potato baked', 'potato raw', 'mashed potato', 'sweet potato baked', 'sweet potato raw', 'taro root', 'yellow yam', 'plantain', 'parsnip', 'butternut squash'],
   'breakfast cereal': ['oats', 'granola', 'muesli', 'cornflakes', 'weetabix'],
@@ -70,14 +73,14 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   'flour': ['wholemeal flour', 'gram flour', 'plain flour', 'cornmeal', 'lupin flour', 'oat flour', 'almond flour', 'coconut flour', 'rice flour'],
   // --- fruit ---
   'berries': ['strawberries', 'blueberries', 'raspberries', 'blackberries', 'mixed berries', 'cherries'],
-  'sweet fruit': ['banana', 'apple', 'orange', 'grapes', 'mango', 'pineapple', 'kiwi', 'watermelon', 'pear', 'peach', 'plum', 'grapefruit', 'passion fruit', 'papaya', 'pomegranate', 'figs'],
-  'dried fruit': ['dates', 'raisins', 'dried apricots'],
+  'sweet fruit': ['banana', 'apple', 'orange', 'grapes', 'mango', 'pineapple', 'kiwi', 'watermelon', 'melon', 'pear', 'peach', 'plum', 'grapefruit', 'passion fruit', 'papaya', 'pomegranate', 'figs'],
+  'dried fruit': ['dates', 'raisins', 'dried apricots', 'sultanas'],
   // --- vegetables ---
   'leafy veg': ['spinach', 'kale', 'mixed salad leaves', 'rocket', 'watercress', 'bok choy', 'cabbage'],
   'salad veg': ['tomato', 'cherry tomatoes', 'cucumber', 'bell pepper', 'radish', 'celery', 'bean sprouts'],
   'cooked veg': ['broccoli', 'cauliflower', 'green beans', 'peas', 'asparagus', 'brussels sprouts', 'courgette', 'aubergine', 'mushroom', 'carrot', 'leek', 'fennel', 'artichoke', 'okra', 'turnip', 'celeriac', 'pumpkin', 'bamboo shoots', 'sweetcorn', 'beetroot', 'water chestnuts'],
   // --- the few sauces and extras that do have a like-for-like ---
-  'sweetener': ['honey', 'maple syrup', 'sugar white', 'brown sugar', 'jam'],
+  'sweetener': ['honey', 'maple syrup', 'sugar white', 'brown sugar', 'jam', 'marmalade', 'chocolate spread'],
   'soy sauce': ['soy sauce', 'tamari'],
   'tomato base': ['tomato passata', 'chopped tomatoes canned', 'marinara sauce'],
   'broth': ['beef broth', 'chicken broth', 'vegetable broth'],
@@ -87,8 +90,15 @@ export const SWAP_GROUPS: Record<string, readonly string[]> = {
   // 15 Nov 2026, the standard UK packs: a pack swaps for another of its kind, the macro match orders them.
   'crisps': ['crisps', 'ready salted crisps'],
   // 15 Nov 2026, the takeaway basics (Marcus's chicken burger with chips): hot chips swap for each other.
-  'chips': ['chips', 'french fries'],
-  'soft drinks': ['cola', 'diet cola'],
+  'chips': ['chips', 'french fries', 'hash brown'],
+  'soft drinks': ['cola', 'diet cola', 'energy drink'],
+  // 18 Nov 2026, the foods a log is full of: a drink, a pudding or a biscuit swaps for another of its kind.
+  'juices and smoothies': ['orange juice', 'apple juice', 'fruit smoothie'],
+  'milky hot drinks': ['latte whole milk', 'cappuccino', 'flat white', 'tea with milk', 'hot chocolate'],
+  'alcoholic drinks': ['beer', 'cider', 'red wine', 'spirits'],
+  'puddings': ['ice cream', 'custard', 'milkshake'],
+  'biscuits and cakes': ['digestive biscuit', 'chocolate chip cookie', 'sponge cake', 'blueberry muffin', 'doughnut', 'scone', 'flapjack'],
+  'takeaway sides': ['onion rings', 'mozzarella sticks', 'vegetable samosa', 'spring roll', 'prawn crackers', 'poppadom', 'garlic bread'],
   'meal-deal sandwiches': ['chicken and bacon sandwich', 'chicken sandwich', 'egg mayo sandwich', 'tuna mayo sandwich'],
 }
 
@@ -115,7 +125,9 @@ export const NO_SWAP: readonly string[] = [
   'cayenne pepper', 'chilli flakes', 'tajin seasoning', 'capers', 'nutritional yeast', 'anchovies', 'breadcrumbs', 'pancake mix',
   // one-offs: nothing else does their job
   'egg yolk', 'chicken liver', 'beef jerky', 'coconut flakes', 'coconut flesh', 'ackee', 'rice paper wrappers',
-  'water', 'black coffee', 'coconut water', 'latte whole milk',
+  'water', 'black coffee', 'coconut water', 'tea', 'pizza', 'yorkshire pudding', 'stuffing', 'potato salad',
+  // 18 Nov 2026: seasonings, pastes and pickles (flavour, never a food to replace), and two supplements
+  'salt', 'chilli', 'tomato puree', 'thai curry paste', 'vegan thai curry paste', 'yeast extract', 'sun dried tomatoes', 'gherkins', 'sweetener', 'creatine',
 ]
 
 const GROUP_OF: ReadonlyMap<string, string> = new Map(

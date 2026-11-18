@@ -93,7 +93,7 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
     if (!kindAsk && notCounted.length > 0) {
       const list = notCounted.length === 1 ? notCounted[0] : `${notCounted.slice(0, -1).join(', ')} and ${notCounted[notCounted.length - 1]}`
       const it = notCounted.length === 1 ? 'it' : 'them'
-      return { ok: false, reason: `I don't have ${list} in my food list, so I can't put a number on ${it} and I haven't added this yet. Tell me what ${notCounted.length === 1 ? "it's" : "they're"} made of (or the calories on the pack), or say "leave ${it} out" and I'll add the rest.` }
+      return { ok: false, reason: `I don't have ${list} in my food data, so I can't put a number on ${it} and I haven't added this yet. Tell me what ${notCounted.length === 1 ? "it's" : "they're"} made of (or the calories on the pack), or say "leave ${it} out" and I'll add the rest.` }
     }
   }
 

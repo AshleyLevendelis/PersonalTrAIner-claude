@@ -23,7 +23,7 @@ import { splitCompoundFoodLine } from './ingredient-units'
 
 import { whichKindQuestion, computeMealMacros } from './food-db'
 import { cookedHint } from './as-weighed'
-import { parseIngredientLine, withParsedQuantity, kitchenRound } from './portion-scaler'
+import { parseIngredientLine, withParsedQuantity, kitchenRound, kitchenLine, pieceHint } from './portion-scaler'
 import { computeSlotBudgets, verifyProposal, type PoolOption, type RawProposal } from './meal-generation'
 import { tagsMyMeal, type MealSlotName } from './meal-store'
 import { datesLabel, repeatDates } from './meal-like-offer'
@@ -103,10 +103,8 @@ export function normaliseDate(value: unknown, fallback: string): string {
  * half a teaspoon read "1tsp" on a line headed "your portions, untouched" (1 Oct 2026).
  */
 export function formatPortion(i: { name: string; quantity: number; unit: string }): string {
-  const q = i.quantity >= 10 ? Math.round(i.quantity) : Math.round(i.quantity * 10) / 10
-  if (i.unit === 'g' || i.unit === 'ml') return `${q}${i.unit} ${i.name}`
-  if (i.unit === 'whole') return `${q} ${i.name}`
-  return `${q} ${i.unit} ${i.name}`
+  // The meal card's own words (18 Nov 2026): "3 eggs", "1¾ tsp olive oil". This printed "3 egg" and "1.8 tsp".
+  return kitchenLine(i.unit === 'g' || i.unit === 'ml' ? (i.quantity >= 10 ? Math.round(i.quantity) : Math.round(i.quantity * 10) / 10) : i.quantity, i.unit, i.name)
 }
 
 /**
@@ -115,7 +113,7 @@ export function formatPortion(i: { name: string; quantity: number; unit: string 
  * 275g raw chicken breast" to someone who had typed 200g, with nothing to say the 200 was read as cooked.
  */
 export function portionWithHint(i: { name: string; quantity: number; unit: string }): string {
-  const hint = cookedHint(i)
+  const hint = cookedHint(i) ?? pieceHint(i)
   return hint ? `${formatPortion(i)} (${hint})` : formatPortion(i)
 }
 
@@ -189,7 +187,7 @@ export function explainRejection(log: string[], dishName: string, slot: MealSlot
   if (/not slot-appropriate/i.test(line)) {
     return `${dishName} doesn't really work as a ${slot}. Want it in a different slot?`
   }
-  if (/missed target|scale factor|no ingredients parsed/i.test(line)) {
+  if (/missed target|scale factor|no ingredients parsed|not a realistic portion/i.test(line)) {
     return `I couldn't portion ${dishName} to fit your ${slot} target without distorting it — the macro balance is too far from what that meal needs to be. It'd fit better as a different slot, or alongside a change to the rest of the day.`
   }
   return `I couldn't add ${dishName} to your ${slot} — I wasn't able to verify it against your targets.`

@@ -40,6 +40,13 @@ export interface LibraryWants {
   rotation?: number
   /** The meal's own budget. When given, each dish is first re-portioned to it (fitDishToBudget) and the ones that fit best rise. */
   budget?: MacroTargets
+  /**
+   * He eats meat / he eats dairy (18 Nov 2026). When true, dishes built on a stand-in for it (Quorn, seitan, soy mince,
+   * tofu, tempeh; soy yoghurt, vegan protein powder) sink behind the ones built on the food itself, unless he has said
+   * he likes that stand-in. Left undefined, nothing changes.
+   */
+  eatsMeat?: boolean
+  eatsDairy?: boolean
   /** Cap on how many are handed back. Left off, every dish for the meal is ranked and returned: the caller stops once it has enough, and a cap would cut before its diet and dislike checks had seen the dishes behind it. */
   limit?: number
 }
@@ -67,8 +74,14 @@ export interface LibraryWants {
 // scales the whole dish to the calorie budget and applies every rule, as ever.
 // ---------------------------------------------------------------------------
 
-const PROTEIN_FACTORS = Array.from({ length: 17 }, (_, i) => Math.round((0.55 + i * 0.05) * 100) / 100)
-const CARB_FACTORS = Array.from({ length: 16 }, (_, i) => Math.round((0.5 + i * 0.1) * 100) / 100)
+// WIDENED 18 Nov 2026 (the Fable pass on meals; nutrition, mine). Measured on muscle-gain targets (about 5 g of
+// protein per 100 kcal): with protein foods held at 0.55x or more and carb foods at 2x or less, the typical meat dish
+// still carried 1.2x its meal's protein, so those people's days landed only because the plan fed them tofu and vegan
+// sausages (half of all meals). A coach feeding a lean bulk does exactly this: less meat, more rice. Still the same
+// dish: the protein food never under 0.4x, the starch never over 2.6x. A FAT factor (oil, nuts, avocado between half
+// and double) was built and measured too: it moved almost no dish, so it is not here.
+const PROTEIN_FACTORS = Array.from({ length: 20 }, (_, i) => Math.round((0.40 + i * 0.05) * 100) / 100)
+const CARB_FACTORS = Array.from({ length: 22 }, (_, i) => Math.round((0.5 + i * 0.1) * 100) / 100)
 /** Aim a little over the protein target, so the floor still holds after amounts are rounded. */
 const PROTEIN_AIM = 1.08
 
@@ -170,6 +183,42 @@ function cuisineIsFavourite(cuisine: string, favourites: readonly string[]): boo
   return favourites.some(f => norm(f).length > 0 && c.includes(norm(f)))
 }
 
+// ---------------------------------------------------------------------------
+// SOMEONE WHO EATS MEAT IS FED MEAT (18 Nov 2026, the Fable pass on meals; nutrition, mine).
+//
+// FOUND by printing real weeks. The dishes are ranked by how well they fit the meal's numbers, and for a muscle-gain
+// target (lots of carbohydrate, protein at 5 g per 100 kcal) the plant dishes fit best, so a 75 kg man with no dietary
+// preference was served vegan sausages, tempeh, tofu and vegan protein pancakes for most of his main meals; a third of
+// every omnivore's breakfasts and snacks were soy yoghurt or tofu. Nothing was wrong with any dish. But a plan is only
+// as good as the share of it that gets eaten, and nobody who has not asked for meat-free food sticks to a week of it.
+// So for someone who eats meat, a dish built on a meat stand-in sinks behind the ones built on meat, fish, eggs, dairy
+// or pulses; the same for dairy stand-ins and someone who eats dairy. It is a preference, not a ban: they are still
+// there when a meal is thin, a food he says he likes still lifts its dishes, and anyone vegetarian, vegan,
+// pescatarian or dairy-free is untouched. Lentils, beans and chickpeas are ordinary food and are not stand-ins.
+// ---------------------------------------------------------------------------
+const MEAT_STAND_IN = /\b(?:quorn|seitan|soya? mince|vegan mince|vegan sausages?|vegan burgers?|meat[- ]free|tempeh|tofu)\b/i
+const DAIRY_STAND_IN = /\b(?:soya? yoghurt|soya? milk|vegan protein powder|vegan cheese|coconut yoghurt)\b/i
+/**
+ * How many dishes a meal may hold before stand-in dishes stop being added to it. A SORT KEY alone was measured and was
+ * not enough: a plan takes up to 100 dishes a meal, a muscle-gain target has fewer than 100 that fit without them, so
+ * they filled the rest and the day's search (which knows only the numbers) served them anyway. Below this many, a
+ * meal is thin and a stand-in dish is better than no choice.
+ */
+export const STAND_IN_FLOOR = 30
+
+/**
+ * True when the dish is built on a stand-in for something this person eats anyway, and holds nothing he has said he
+ * likes. Such a dish is ranked after every other, and a plan stops taking them once a meal has STAND_IN_FLOOR dishes.
+ */
+export function sinksAsStandIn(dish: RawProposal, wants: Pick<LibraryWants, 'eatsMeat' | 'eatsDairy' | 'likedFoods'>): boolean {
+  const text = dish.ingredients.join(' | ')
+  const standIn = (wants.eatsMeat === true && MEAT_STAND_IN.test(text)) || (wants.eatsDairy === true && DAIRY_STAND_IN.test(text))
+  if (!standIn) return false
+  if (!wants.likedFoods || wants.likedFoods.length === 0) return true
+  const names = dish.ingredients.map(line => parseIngredientLine(line).name)
+  return !wants.likedFoods.some(f => containsPhrase(dish.name, names, f))
+}
+
 /**
  * The dishes to try for one meal, best first. Steering, in order of weight:
  * a cuisine she named (+4), a food she likes in the dish (+2 each, at most
@@ -188,6 +237,7 @@ export function chooseFromLibrary(library: readonly RawProposal[], wants: Librar
   let exoticTaken = (exotic ? wants.haveCuisines.some(c => exotic.has(c)) : false)
 
   const fixed = new Map<RawProposal, number>()
+  const sinks = new Set<RawProposal>()
   const fitted = new Map<RawProposal, RawProposal>()
   for (const d of pool) {
     let score = 0
@@ -204,6 +254,8 @@ export function chooseFromLibrary(library: readonly RawProposal[], wants: Librar
       const hits = wants.likedFoods.filter(f => containsPhrase(d.name, names, f)).length
       score += Math.min(4, hits * 2)
     }
+    // A stand-in for a food he eats anyway goes behind every other dish (a KEY, compared before the score below).
+    if (sinksAsStandIn(d, wants)) sinks.add(d)
     const quick = QUICK.test(d.prep)
     if (wants.cookingTime === 'quick' && quick) score += 2
     if (wants.cookingTime === 'loves_cooking' && !quick) score += 1
@@ -214,6 +266,7 @@ export function chooseFromLibrary(library: readonly RawProposal[], wants: Librar
   const chosen: RawProposal[] = []
   while (chosen.length < limit && remaining.length > 0) {
     let best = -1
+    let bestSinks = true
     let bestScore = -Infinity
     let bestTie = Infinity
     for (let i = 0; i < remaining.length; i++) {
@@ -222,8 +275,10 @@ export function chooseFromLibrary(library: readonly RawProposal[], wants: Librar
       if (!seen.has(norm(d.cuisine))) score += 2
       if (exotic && exotic.has(d.cuisine) && exoticTaken) score -= 6
       const tie = rotationHash(d.name, rotation)
-      if (score > bestScore || (score === bestScore && tie < bestTie)) {
+      const dSinks = sinks.has(d)
+      if (best < 0 || (dSinks !== bestSinks ? !dSinks : score > bestScore || (score === bestScore && tie < bestTie))) {
         best = i
+        bestSinks = dSinks
         bestScore = score
         bestTie = tie
       }

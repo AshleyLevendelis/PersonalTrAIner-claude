@@ -11,7 +11,7 @@
 // M1's generation pipeline is what needed this logic, not that function.
 // ---------------------------------------------------------------------------
 
-import { lookupIngredient, unitToGrams, computeMealMacros, type MealIngredientLine, type Macros100g } from './food-db'
+import { lookupIngredient, unitToGrams, computeMealMacros, cookedTwinOf, weighedFactor, type MealIngredientLine, type Macros100g } from './food-db'
 import { readIngredientText } from './ingredient-units'
 
 /** Below this, a scale is "close enough" not to bother touching quantities (mirrors macro-calibration's 0.03 no-op threshold). */
@@ -185,18 +185,131 @@ export function kitchenLine(quantity: number, unit: string, name: string): strin
   if (u === 'g' || u === 'ml') return `${q}${u} ${name}`
   if (u === 'whole' || u === '') return `${q} ${quantity === 1 ? name : pluralName(name)}`
   if (u === 'clove' || u === 'cloves') return `${q} ${name} ${quantity === 1 ? 'clove' : 'cloves'}`
-  return `${q} ${unit} ${name}`
+  // More than one of a counted measure is said in the plural: "2 slices wholemeal bread" (it read "2 slice", 18 Nov 2026).
+  return `${q} ${quantity > 1 ? COUNT_UNIT_PLURALS[u] ?? unit : unit} ${name}`
+}
+
+/** Counted measures and their plurals. Spoons ("2 tbsp") are never pluralised. */
+const COUNT_UNIT_PLURALS: Record<string, string> = {
+  slice: 'slices', cup: 'cups', scoop: 'scoops', tin: 'tins', can: 'cans', handful: 'handfuls', rasher: 'rashers', fillet: 'fillets',
+  wedge: 'wedges', glass: 'glasses', piece: 'pieces', bar: 'bars', pot: 'pots', sachet: 'sachets', pinch: 'pinches', bottle: 'bottles',
+  pint: 'pints', mug: 'mugs', bowl: 'bowls', bag: 'bags', pack: 'packs', packet: 'packets', carton: 'cartons', stick: 'sticks',
+  sprig: 'sprigs', bunch: 'bunches', ball: 'balls', shot: 'shots', square: 'squares',
+}
+
+// ---------------------------------------------------------------------------
+// A PLATE SOMEBODY WOULD ACTUALLY EAT (18 Nov 2026, the Fable pass on meals; CSCS / nutrition, mine).
+//
+// FOUND by printing the weeks the app serves and reading them. The library writes bread, wraps and bagels in GRAMS so
+// a dish can be fitted to anybody's meal, and nothing after the fit asked whether the result was food: a snack "pitta
+// pocket" was served with 13 g of pitta (a fifth of one), a breakfast with 240 g of bagel (two and a half), a
+// 100 kg man's lunch with 840 g of potato on a 1.8 kg plate, 420 g of Quorn fillets, 200 g of dry rice.
+//
+// Three rules, each about the plate and none about the numbers (the dish is still checked against its calories and
+// protein AFTER them, from the amounts shown):
+//   1. A food eaten in pieces is served in half or whole pieces: 1 wrap, 1½ bagels, 3 slices. Never less than one step.
+//   2. No more pieces than anybody puts on a plate (2 bagels, 2 wraps, 4 slices of bread...).
+//   3. A main meal weighs at most PLATE_MAX_G AS IT SITS ON THE PLATE (rice and pasta at their cooked weight, meat at
+//      its cooked weight), a snack half that; a liquid (broth, milk, tinned tomatoes) counts half, because a soup is
+//      mostly water. Basis: a large plated meal is 500 to 700 g; past about a kilo people do not finish it, which is an
+//      adherence problem a calorie count cannot see. Someone whose meal cannot be reached inside it gets the denser
+//      dishes, which is what a coach would hand them.
+// MEASURED over 28 days for five people (1,362 to 3,843 kcal), limits of 900 to 1,200 g tried: at 1,100 g everyone up
+// to 3,300 kcal keeps 92 to 100 dishes a meal and the same days on target (25 to 28 of 28, as before); a 3,843 kcal
+// man keeps 29 lunches (11 at 1,000 g, which is too few). His lunch is 1,383 kcal, which no ordinary plate holds: the
+// real answer for him is more meals or a side, which is not built (BACKLOG).
+// ---------------------------------------------------------------------------
+
+/** Foods bought and eaten in pieces: the step they are served in, the most on one plate, and what one is called. */
+const PIECE_FOODS: Record<string, { step: number; max: number; word: string }> = {
+  'bagel': { step: 0.5, max: 2, word: 'bagel' },
+  'tortilla wrap': { step: 0.5, max: 2, word: 'wrap' },
+  'corn tortilla': { step: 1, max: 4, word: 'tortilla' },
+  'pitta bread': { step: 0.5, max: 2, word: 'pitta' },
+  'burger bun': { step: 0.5, max: 2, word: 'bun' },
+  'wholemeal bread': { step: 0.5, max: 4, word: 'slice' },
+  'white bread': { step: 0.5, max: 4, word: 'slice' },
+  'rye bread': { step: 0.5, max: 4, word: 'slice' },
+  'naan bread': { step: 0.5, max: 1.5, word: 'naan' },
+  'croissant': { step: 1, max: 2, word: 'croissant' },
+  'rice cakes': { step: 1, max: 6, word: 'rice cake' },
+  'rye crispbread': { step: 1, max: 6, word: 'crispbread' },
+  'oatcakes': { step: 1, max: 6, word: 'oatcake' },
+  'weetabix': { step: 1, max: 4, word: 'biscuit' },
+  'chapati': { step: 1, max: 3, word: 'chapati' },
+}
+export const PLATE_MAX_G = 1100
+
+/** A gram line of a food eaten in pieces: what one piece weighs and how it is served. Null for everything else. */
+function pieceFood(line: MealIngredientLine): { each: number; step: number; max: number; word: string } | null {
+  if (!GRAM_LIKE_UNITS.has(line.unit.toLowerCase().trim())) return null
+  const entry = lookupIngredient(line.name)
+  const rule = entry ? PIECE_FOODS[entry.name] : undefined
+  const each = entry?.units?.whole ?? entry?.units?.slice
+  return rule && each ? { each, ...rule } : null
+}
+
+/** A piece food's grams, moved to the nearest step of a piece (never under one step). Every other line is untouched. */
+export function snapPieces(ingredients: MealIngredientLine[]): MealIngredientLine[] {
+  let changed = false
+  const out = ingredients.map(line => {
+    const p = pieceFood(line)
+    if (!p) return line
+    const pieces = Math.max(p.step, Math.round(line.quantity / p.each / p.step) * p.step)
+    const grams = Math.round(pieces * p.each)
+    if (grams === line.quantity) return line
+    changed = true
+    return { ...line, quantity: grams }
+  })
+  return changed ? out : ingredients
+}
+
+/** "2½ slices", "1 wrap", "½ pitta" for a gram line of a piece food that sits on a step; null for anything else. */
+export function pieceHint(line: MealIngredientLine): string | null {
+  const p = pieceFood(line)
+  if (!p) return null
+  const pieces = line.quantity / p.each
+  const onStep = Math.round(pieces / p.step) * p.step
+  if (onStep <= 0 || Math.abs(pieces - onStep) * p.each > 1.5) return null
+  const whole = Math.floor(onStep)
+  const half = onStep - whole >= 0.5
+  const n = `${whole > 0 ? whole : ''}${half ? '½' : ''}`
+  return `${n} ${onStep > 1 ? pluralWord(p.word) : p.word}`
+}
+
+/** Why this plate is not one to serve (too many pieces of something, or simply too much food), or null. */
+export function unrealisticPlate(ingredients: MealIngredientLine[], isSnack: boolean): string | null {
+  let solid = 0
+  let liquid = 0
+  for (const line of ingredients) {
+    const p = pieceFood(line)
+    if (p && line.quantity / p.each > p.max + 0.01) return `${Math.round((line.quantity / p.each) * 10) / 10} ${pluralWord(p.word)} of ${line.name} on one plate`
+    const entry = lookupIngredient(line.name)
+    const bought = unitToGrams(entry, line.unit, line.quantity, line.name)
+    if (!entry || bought == null) continue
+    // AS IT SITS ON THE PLATE: rice, pasta and oats are bought dry and eaten at two to three times the weight, meat
+    // and fish raw and eaten lighter. The food table's own cooked twin gives the factor (the cooked hint's).
+    const cooked = cookedTwinOf(entry)
+    const factor = cooked ? weighedFactor(cooked, entry) : null
+    const grams = factor ? bought / factor : bought
+    if (/\b(?:broth|stock|milk|water|juice|passata|chopped tomatoes)\b/.test(entry.name)) liquid += grams
+    else solid += grams
+  }
+  const weight = solid + liquid / 2
+  const limit = isSnack ? PLATE_MAX_G / 2 : PLATE_MAX_G
+  return weight > limit ? `a ${Math.round(weight)} g plate (the most is ${limit} g)` : null
 }
 
 /**
  * Scales every ingredient line's quantity by scaleFactor and rounds each to
- * an amount somebody can measure (kitchenRound, above). A scaleFactor within
+ * an amount somebody can measure (kitchenRound, above), with a food eaten in
+ * pieces kept on half or whole pieces (snapPieces). A scaleFactor within
  * SCALE_NOOP_THRESHOLD of 1 is left untouched.
  */
 export function scaleIngredients(ingredients: MealIngredientLine[], scaleFactor: number): MealIngredientLine[] {
   if (Math.abs(scaleFactor - 1) < SCALE_NOOP_THRESHOLD) return ingredients
 
-  return ingredients.map(line => ({ ...line, quantity: kitchenRound(line.quantity * scaleFactor, line.unit) }))
+  return snapPieces(ingredients.map(line => ({ ...line, quantity: kitchenRound(line.quantity * scaleFactor, line.unit) })))
 }
 
 export function isWithinCalorieTolerance(actualCalories: number, targetCalories: number, tolerance = CALORIE_TOLERANCE): boolean {

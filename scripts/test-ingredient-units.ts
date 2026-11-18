@@ -98,7 +98,7 @@ const TABLE: [string, number, string][] = [
 
 /** Lines whose amount cannot be known from the line: they must be marked unread, never costed. */
 const UNREAD: [string, string][] = [
-  ['salt and pepper to taste', 'to taste'], ['juice of 1 lemon', 'juice'], ['1 pint milk whole', 'pint'], ['1 knob butter', 'knob'], ['1 sachet honey', 'sachet'],
+  ['olive oil to taste', 'to taste'], ['juice of 1 orange', 'juice'], ['1 pint chicken breast', 'pint'], ['1 knob butter', 'knob'], ['1 sachet honey', 'sachet'],
   ['some rice', 'no amount'], ['', 'empty'], ['150g', 'no food'], ['1 cup chicken breast', 'a cup of a food with no cup weight'], ['1 can chicken breast', 'a can of a food with no can weight'],
   ['1 handful chicken breast', 'a handful of a food with no handful weight'],
   ['eggs 3', 'a count written last has no unit to read'], ['chicken breast 150', 'a bare number last'], ['chicken breast 5% fat', 'a percentage is not an amount'], ['vitamin c 500mg', 'milligrams are not an exact unit here'],
@@ -233,7 +233,7 @@ async function main() {
     }
   }
   check(`for ${sample.length} lines and ${diets.length} diets, a line is never allowed where its own food is refused, and a line that resolves to no food is never allowed`, permissive.length === 0, permissive.slice(0, 5))
-  const dietLines: [string, string, boolean][] = [['1 tin tuna', 'vegan', false], ['1 tin tuna', 'vegetarian', false], ['8 oz chicken breast', 'vegetarian', false], ['1 lb beef mince 5% fat', 'vegetarian', false], ['2 cans chickpeas', 'vegan', true], ['a pinch of salt', 'vegan', false]]
+  const dietLines: [string, string, boolean][] = [['1 tin tuna', 'vegan', false], ['1 tin tuna', 'vegetarian', false], ['8 oz chicken breast', 'vegetarian', false], ['1 lb beef mince 5% fat', 'vegetarian', false], ['2 cans chickpeas', 'vegan', true], ['a pinch of zorp', 'vegan', false], ['a pinch of salt', 'vegan', true]]
   const verdicts = dietLines.filter(([l, d, want]) => validateMealAgainstDiet([parseIngredientLine(l)], [d]).ok !== want)
   check('the measured verdicts hold: a tin of tuna and 8 oz of chicken are refused for a vegetarian, a pinch of an unknown food is refused for a vegan (fail-closed), chickpeas pass', verdicts.length === 0, verdicts)
 
@@ -244,8 +244,8 @@ async function main() {
   check('the control: her own dinner in ounces, cups and counts is accepted as costed', customOk.ok && customOk.payload.option.macros.protein > 60, customOk.ok ? undefined : customOk.reason)
   const customAsk = buildCustomMealProposal({ ...customBase, rawArgs: { meal_slot: 'dinner', food_lines: ['150g chicken breast', '1 knob butter'], name: 'My dinner' } })
   check('a line she typed that cannot be read gets one question that quotes it and asks for grams; no card, nothing to confirm', !customAsk.ok && /1 knob butter/.test(customAsk.reason) && /how many grams/i.test(customAsk.reason) && !('payload' in customAsk), customAsk)
-  const customTwo = buildCustomMealProposal({ ...customBase, rawArgs: { meal_slot: 'dinner', food_lines: ['150g chicken breast', '1 knob butter', '1 pint milk whole'], name: 'My dinner' } })
-  check('two unreadable lines are asked about together, both quoted, "each"', !customTwo.ok && /1 knob butter/.test(customTwo.reason) && /1 pint milk whole/.test(customTwo.reason) && /each/i.test(customTwo.reason), customTwo)
+  const customTwo = buildCustomMealProposal({ ...customBase, rawArgs: { meal_slot: 'dinner', food_lines: ['150g chicken breast', '1 knob butter', '1 sachet honey'], name: 'My dinner' } })
+  check('two unreadable lines are asked about together, both quoted, "each"', !customTwo.ok && /1 knob butter/.test(customTwo.reason) && /1 sachet honey/.test(customTwo.reason) && /each/i.test(customTwo.reason), customTwo)
   const customNone = buildCustomMealProposal({ ...customBase, rawArgs: { meal_slot: 'dinner', food_lines: ['150g chicken breast', 'some rice'], name: 'My dinner' } })
   // Two different questions for two different situations: no amount at all gets the friendlier "how much of the X, grams or counts" wording
   // (custom-meal's own check, which runs first), an amount that is there but cannot be read gets the "couldn't read it" ask. Without this
@@ -257,7 +257,7 @@ async function main() {
   const addAsk = buildMealFoodAddProposal({ ...addBase, rawArgs: { meal_slot: 'breakfast', food_lines: ['1 knob butter'], origin_verbatim_quote: 'add butter' } })
   check('adding a food to a meal: a readable one is accepted, an unreadable one is asked about and quoted', addOk.ok && !addAsk.ok && /1 knob butter/.test(addAsk.reason) && /how many grams/i.test(addAsk.reason), { ok: addOk.ok, ask: addAsk })
 
-  check('a portion is said as a person would, not "name 1cup": "227g chicken breast", "1 cup rice", "2 carrots", and half a teaspoon is not rounded to one', formatPortion({ name: 'chicken breast', quantity: 227, unit: 'g' }) === '227g chicken breast' && formatPortion({ name: 'white rice cooked', quantity: 1, unit: 'cup' }) === '1 cup white rice cooked' && formatPortion({ name: 'carrots', quantity: 2, unit: 'whole' }) === '2 carrots' && formatPortion({ name: 'honey', quantity: 0.5, unit: 'tsp' }) === '0.5 tsp honey' && formatPortion({ name: 'milk', quantity: 250.4, unit: 'ml' }) === '250ml milk')
+  check('a portion is said as a person would, not "name 1cup": "227g chicken breast", "1 cup rice", "2 carrots", and half a teaspoon is not rounded to one', formatPortion({ name: 'chicken breast', quantity: 227, unit: 'g' }) === '227g chicken breast' && formatPortion({ name: 'white rice cooked', quantity: 1, unit: 'cup' }) === '1 cup white rice cooked' && formatPortion({ name: 'carrots', quantity: 2, unit: 'whole' }) === '2 carrots' && formatPortion({ name: 'honey', quantity: 0.5, unit: 'tsp' }) === '½ tsp honey' && formatPortion({ name: 'egg', quantity: 3, unit: 'whole' }) === '3 eggs' && formatPortion({ name: 'wholemeal bread', quantity: 2, unit: 'slice' }) === '2 slices wholemeal bread' && formatPortion({ name: 'wholemeal bread', quantity: 1, unit: 'slice' }) === '1 slice wholemeal bread' && formatPortion({ name: 'olive oil', quantity: 2, unit: 'tbsp' }) === '2 tbsp olive oil' && formatPortion({ name: 'milk', quantity: 250.4, unit: 'ml' }) === '250ml milk')
   check('the unreadable-amount question says "your dinner", not "My dinner" (the default name of a meal she typed in)', !customAsk.ok && /haven't added your dinner/.test(customAsk.reason) && !/added My dinner/.test(customAsk.reason), customAsk)
 
   console.log('\n7. The coach and the meal writer are told, and the coach asks')
