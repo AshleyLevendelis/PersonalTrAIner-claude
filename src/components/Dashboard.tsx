@@ -797,7 +797,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
       {card && (
         <Suspense fallback={null}>
-          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={card} />
+          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={card} effortFor={profile.id ? { profileId: profile.id, date: data.today } : undefined} />
         </Suspense>
       )}
     </div>

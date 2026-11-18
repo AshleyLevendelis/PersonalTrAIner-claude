@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [x] **HOW HARD WAS IT, 1 TO 10, on the session summary, 18 Nov 2026: his "Build the 1–10"** (from three options:
+  the three words as now, a dial like his screenshot, or a 1-10 tap row; my recommendation). "How hard was it?" with
+  ten numbers in two rows of five (44px each), words under them (1-3 Easy, 4-6 Moderate, 7-8 Hard, 9-10 All-out), one
+  tap saves it to that day's session and says "8 · Hard · saved"; changeable; read back when the summary opens again;
+  optional; a failed save says so. It REPLACES his 2 Sep "ask it in the chat" for anyone who taps: the tap also writes
+  the feel word, so the chat no longer asks; a session not rated is still asked about in the chat as before.
+  **And per lift stays Too easy / About right / Too hard**, his question answered with my recommendation (a three-way
+  weight decision, asked 6-8 times a session; a 1-10 there is slower for the same result).
+  CSCS (mine), the mapping to the chat's feel words: 1-3 easy, 4-8 good, 9-10 hard, never "rough". Basis: the score is
+  Foster's session RPE, where 7-8 ("very hard") is what a well-built loading session should feel like; counting it
+  as "hard" would make three ordinary training days trigger the coach's "offer to ease off" (three hard in a row).
+  Only 9-10, maximal, counts towards that. "Rough" is how a session felt in himself, which an effort number cannot say.
+  The coach is told the numbers he gave ("SESSION EFFORT HE RATED (1-10 ...): 8, 6, 9"), so it can quote them and never
+  invent one. Not built: effort x minutes as a weekly training load (the reason the scale was chosen; the number is now
+  kept so it can be). `test:session-effort` (23 checks, 12 mutations, two caught only after a read-back check and a
+  crash-safe wrapper were added), `verify:session-effort` (9 checks, 5 browser mutations), screenshot read.
+  Needs migration `20261118140000_add_session_effort` (until then the feel word saves and the number waits).
 - [x] **WEIGHT, WEEK BY WEEK on Home, 18 Nov 2026: his "Add all three"** (from three options, after screenshots of another
   app's weight screen; over the weekly line alone and over the list alone). Behind the Weight row in Progress: a graph
   of every weigh-in as a faint dot with each week's average as a line through the middle of its week, a 3M / 6M / 1Y

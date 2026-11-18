@@ -39,6 +39,7 @@ app has the new screens. Two more facts you need:
 4. Database changes. Read PRODUCTION's own record in the dashboard SQL editor (a read):
      select version from supabase_migrations.schema_migrations order by version desc limit 15;
    Compare with supabase/migrations. The newest; report any missing from PRODUCTION:
+     20261118140000_add_session_effort (NEW, on the working branch until merged: the 1-10 on the summary),
      20261118120000_add_allergies (NEW, on main since ce7e6de6: the allergy card on Profile needs it),
      20261117120000_add_chat_summary, 20261115120000_add_due_date, 20261114180000_add_plan_paused_since,
      20261114150000_health_conditions, 20261114120000_running_goal, 20261113140000_flexible_nutrition,

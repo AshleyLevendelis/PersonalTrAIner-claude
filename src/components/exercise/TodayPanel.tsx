@@ -1785,7 +1785,7 @@ export function TodayPanel({
               ? <TrainerNudge line text={coachLine.text} tag="Training" clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
               : <TrainerNudge line text={coachLine.text} tag="Training" openChat askPrefill={`Tell me more about this: "${coachLine.text}"`} data-testid="exercise-coach-line" />
           )}
-          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} savedCardio={summarySavedCardio} />
+          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} savedCardio={summarySavedCardio} effortFor={profileId && !summaryNothingLogged ? { profileId, date: today } : undefined} />
           {finishCheck && (
             <Suspense fallback={null}>
               <FinishCheckSheet

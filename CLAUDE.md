@@ -1687,6 +1687,10 @@ menu" stays true when a copy is also left outside it.
   row, a graph with each Monday-to-Sunday week's average as a line, a 3M / 6M / 1Y choice and a list of weeks (average,
   change from the week before, tap for the days), from the readings the calorie targets trust only.
   `test:weight-weeks`, `verify:weight-history`
+- **How hard was it, 1 to 10, on the session summary: his ruling 18 Nov 2026, "Build the 1–10"** (over the three words
+  and a dial): one tap, saved with the day; it replaces the chat's "how did it feel" for a session he rated. Per lift
+  stays Too easy / About right / Too hard (his question, my recommendation). Mine (CSCS): 1-3 easy, 4-8 good, 9-10 hard
+  for the coach's ease-off rule. `test:session-effort`, `verify:session-effort`. Needs migration 20261118140000
 - **OPEN, HIS**: whether protein a little over or fat a little under with calories on target is a miss on a muscle-gain
   plan (his 18 Oct bands say yes); "usually contains" allergens on existing foods.
 

@@ -26,11 +26,41 @@
 import { supabase } from './supabase'
 import { getLocalDateString } from './dev-clock'
 import { FEEL_SCALE, type SessionFeel } from './types'
+import { isMissingColumnError } from './missing-column'
 
 export interface AnsweredSession {
   date: string
   felt: SessionFeel
   note?: string | null
+  /** The 1-10 effort he tapped on the summary, when he did. */
+  effort?: number | null
+}
+
+// ---------------------------------------------------------------------------
+// HOW HARD THE SESSION WAS, 1 TO 10 (his ruling 18 Nov 2026, "Build the 1–10", over the three words and over a dial):
+// one tap on the session summary. It is the coaching standard "session effort" score, which times the minutes is the
+// session's training load.
+// MINE (CSCS), how it feeds the chat's back-off rule, which reads the four feel words: 1-3 'easy', 4-8 'good', 9-10
+// 'hard'. 7-8 is what a well-built loading session SHOULD feel like (Foster's scale: "very hard"), so it is not a
+// warning; only 9-10, maximal, counts towards "three hard sessions running, offer to ease off". It is never 'rough':
+// that word is how a session felt in himself, which an effort number cannot say.
+// ---------------------------------------------------------------------------
+export const EFFORT_MIN = 1
+export const EFFORT_MAX = 10
+
+/** The words under a score: 1-3 Easy, 4-6 Moderate, 7-8 Hard, 9-10 All-out. */
+export function effortWord(n: number): string {
+  return n <= 3 ? 'Easy' : n <= 6 ? 'Moderate' : n <= 8 ? 'Hard' : 'All-out'
+}
+
+/** The feel word the chat's back-off rule reads, from a 1-10 score. */
+export function effortToFelt(n: number): SessionFeel {
+  return n <= 3 ? 'easy' : n <= 8 ? 'good' : 'hard'
+}
+
+/** A whole number from 1 to 10, or null. */
+export function validEffort(n: unknown): number | null {
+  return typeof n === 'number' && Number.isInteger(n) && n >= EFFORT_MIN && n <= EFFORT_MAX ? n : null
 }
 
 export interface SessionAwaitingFeel {
@@ -56,6 +86,8 @@ export const FEEL_RUN_WINDOW = 3
 export interface FeelRun {
   /** The answers considered, most recent first. */
   recent: SessionFeel[]
+  /** The 1-10 effort for the same sessions, null where none was tapped. */
+  efforts?: (number | null)[]
   /**
    * True when the recent run is bad enough that the coach should raise it and
    * offer to reduce the dose.
@@ -77,10 +109,11 @@ const atLeast = (f: SessionFeel, floor: SessionFeel): boolean =>
 /** Pure — the whole back-off decision, so it can be gated without a database. */
 export function feelRun(answers: AnsweredSession[]): FeelRun {
   const recent = answers.slice(0, FEEL_RUN_WINDOW).map(a => a.felt)
-  if (recent.length < FEEL_RUN_WINDOW) return { recent, needsBackoff: false }
+  const efforts = answers.slice(0, FEEL_RUN_WINDOW).map(a => a.effort ?? null)
+  if (recent.length < FEEL_RUN_WINDOW) return { recent, efforts, needsBackoff: false }
   const roughs = recent.filter(f => f === 'rough').length
   const allHardOrWorse = recent.every(f => atLeast(f, 'hard'))
-  return { recent, needsBackoff: roughs >= 2 || allHardOrWorse }
+  return { recent, efforts, needsBackoff: roughs >= 2 || allHardOrWorse }
 }
 
 /**
@@ -113,6 +146,10 @@ export function buildFeelBrief(
     )
   } else if (run.recent.length > 0) {
     parts.push(`HOW RECENT SESSIONS FELT: ${run.recent.join(', ')} (most recent first).`)
+  }
+  // The 1-10 he tapped on the summary, beside the words, so the coach can quote the number he gave and never invent one.
+  if ((run.efforts ?? []).some(e => e != null)) {
+    parts.push(`SESSION EFFORT HE RATED (1-10, most recent first): ${(run.efforts ?? []).map(e => e ?? 'not rated').join(', ')}. 7-8 is a normal hard training day; 9-10 is maximal.`)
   }
   return parts.join('\n')
 }
@@ -157,6 +194,38 @@ export async function recordSessionFeel(
   return !error
 }
 
+/**
+ * Saves the 1-10 onto the day's EXISTING session row, with its feel word, so the chat stops asking how it felt.
+ * Before the effort column exists on a database, the feel word alone is saved and the call still says yes: the
+ * chat stops asking either way, and only the number waits for the migration.
+ */
+export async function recordSessionEffort(profileId: string, date: string, effort: number): Promise<boolean> {
+  const n = validEffort(effort)
+  if (n == null) return false
+  const { data: existing, error: readErr } = await supabase
+    .from('workout_sessions').select('id').eq('profile_id', profileId).eq('date', date).maybeSingle()
+  if (readErr || !existing?.id) {
+    console.error('recordSessionEffort: no session row on', date, readErr ?? '')
+    return false
+  }
+  const payload: Record<string, unknown> = { effort: n, felt: effortToFelt(n), updated_at: new Date().toISOString() }
+  let { error } = await supabase.from('workout_sessions').update(payload).eq('id', existing.id)
+  if (error && isMissingColumnError(error, 'effort')) {
+    delete payload.effort
+    ;({ error } = await supabase.from('workout_sessions').update(payload).eq('id', existing.id))
+  }
+  if (error) console.error('recordSessionEffort: update failed', error)
+  return !error
+}
+
+/** The 1-10 already saved for a day, or null (none, no row, no column yet, or a failed read). */
+export async function readSessionEffort(profileId: string, date: string): Promise<number | null> {
+  const { data, error } = await supabase
+    .from('workout_sessions').select('*').eq('profile_id', profileId).eq('date', date).maybeSingle()
+  if (error || !data) return null
+  return validEffort((data as { effort?: unknown }).effort)
+}
+
 export interface FeelContext {
   awaiting: SessionAwaitingFeel | null
   run: FeelRun
@@ -193,7 +262,7 @@ export async function loadFeelContext(profileId: string, todayDate: string): Pro
       .limit(ASK_WITHIN_DAYS + 1),
     supabase
       .from('workout_sessions')
-      .select('date, felt, felt_note')
+      .select('*')
       .eq('profile_id', profileId)
       .not('felt', 'is', null)
       .order('date', { ascending: false })
@@ -224,6 +293,7 @@ export async function loadFeelContext(profileId: string, todayDate: string): Pro
     date: r.date as string,
     felt: r.felt as SessionFeel,
     note: r.felt_note as string | null,
+    effort: validEffort((r as { effort?: unknown }).effort),
   }))
 
   return {
