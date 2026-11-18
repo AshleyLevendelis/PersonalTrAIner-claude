@@ -68,6 +68,12 @@ rest of the week holds less of (days already built, and later days whose main li
 trained weekly is the first thing a coach checks on a programme; two heavy hinge sessions with no squat main lift is
 a coverage gap and loads the lower back twice. Where an injury or the kit leaves only one pattern, the day keeps it.
 
+### 6. Sessions a minute or two under the time asked for (found by the full sweep, 18 Nov)
+The lower rep ceiling shortened some days, and `test:session-length` went over its ceilings (38 and 27 of 576 under
+the minimum). The cause was older: the optional top-up sized itself before the weekly balance pass, which then took a
+set off. It now runs after. 12 / 38 / 27 of 576 -> 0 / 0 / 0; 171 -> 0 of 5,700 loading days across 120 varied plans;
+none over the maximum; quality unchanged. Basis: spare time goes to optional mobility, not more volume (house rule).
+
 ## CSCS review (the five questions)
 1. Training effect: heavy work stays on the main lift; side lifts and warm-ups sit in the ranges that train what they
    are for; squat and hinge are both trained as main lifts.

@@ -2,6 +2,46 @@
 
 Newest first. One line each.
 
+- [x] **THE FULL SWEEP OF 18 NOV 2026 (on 19cce1f3): nine real failures, all fixed; one of them a root cause.**
+  (1) **SESSIONS UNDER THE TIME ASKED FOR.** `test:session-length` went red (38 and 27 of 576 loading sessions under
+  the minimum, ceilings 6% and 4%); before the day's plan changes it stood at 32 and 20, just inside. TRACED, not
+  loosened: the optional top-up (the mobility close-out a short day gets) sized itself just BEFORE the weekly
+  push:pull balance pass, which then took a set off some days, so a day long enough when the filler looked landed a
+  minute or two short with nothing added (58 of the 65 short sessions carried no filler at all). The old note called
+  this "a known and accepted couple-of-minutes drift"; the lower rep ceiling only pushed more days into it. FIXED by
+  order: the filler runs after the balance pass (the pass reads no time, the filler changes no exercise). MEASURED:
+  12 / 38 / 27 of 576 -> 0 / 0 / 0; across 120 varied plans 171 -> 0 of 5,700 loading days under the minimum, none
+  over the maximum, days carrying an optional top-up 23.3% -> 26.2%, mean quality unchanged (11.758 on 60 seeded
+  plans). The gate's ceilings came down to 1% (a mutation back to the old order is caught). CSCS review: spare time
+  goes to optional mobility, never to more volume (the house rule since 23 Sep); nothing is taken away; no floor
+  changes meaning.
+  (2) **ONE NUMBER FOR A SESSION'S LENGTH.** A day with an optional close-out reads "~49 min · + 8 optional" on its
+  header, and four other places measured the day WITH the optional minutes: the add-an-exercise card ("becomes about
+  57 min") on the screen and from the coach, the shorten card's "before", the shorten choices (a 44-minute session was
+  offered "45 min") and "make it easier" ("About 52 -> 47 min"). The harness's day only gained a filler today, which
+  is why two drivers went red; the fault was on every such day (about a quarter of loading days). All five now read
+  the header's own reader (`dayLengthParts`): a session's length is its work, optional time named beside it. No words
+  changed, only the number. `test:exercise-add` (5 new source checks; 5 mutations, two caught only after the check
+  also refused "work + optional"), `test:lighter-today` §5 (4 checks on a constructed day with a filler, 2 mutations),
+  `verify:exercise-add` 4d and `verify:shorten-today` 2c (each caught its mutation in a browser).
+  NOT BUILT, named: adding an exercise to a day that has optional mobility leaves the mobility there even if the two
+  together pass the session maximum (the header then reads e.g. "~55 min · + 8 optional" on a 45-60 plan). Generation
+  never ships that; letting the optional part give way on an add needs a sentence saying so, which is his.
+  (3) **CHECKS THAT ASSUMED THE OLD DUMBBELL LEG CURL PRICE.** `test:single-implement` pinned ">= 20 kg" and a 12 kg
+  ceiling that "clamps"; the lift is 8 kg now (a third of the machine's price, this morning's entry). Re-anchored on
+  the property his 10 Sep report was about, the HALVING: the same entry declared as a pair is given half, per hand,
+  and this one the whole figure; the ceiling used is one that binds (half the lift's own figure). 2 mutations caught;
+  `verify:single-implement`'s floor sits between the whole (8) and the halved (4) figure, caught in a browser.
+  (4) **FOUR CHAT DRIVERS NEVER LEARNED THE "DETAILS" FOLD** (his 17 Nov "One line, numbers on tap"): five drivers were
+  taught to open Details that day and `verify:moved-session`, `verify:moved-edit`, `verify:rebuild-card` and
+  `verify:meal-knock-on` were not, and no full sweep ran before the merge. They open Details now, as he would. The
+  knock-on driver also typed "add a banana" while its stand-in coach wrote "200g banana", which the 17 Nov "amounts
+  only he said" rule rightly asks about; it says its amount now.
+  (5) `verify:day-length` chose its second day on one load and compared on another (the two came out at the same
+  minute); it finds the day on the screen under test. `verify:bodyweight-progress` read the first drawing in the
+  sheet, which is the body map since 17 Nov; it reads the chart.
+  ENVIRONMENTAL OR EXPECTED, unchanged: `test:meal-quality`, `test:schema-parity`, `verify:rls` (no database here),
+  `test:coach-exam-fresh` (stale until the exam is run on his machine after a deploy).
 - [x] **THE COACH'S SERVER CODE DID NOT PARSE, AND THAT VERSION IS ON `main` (found 18 Nov 2026 by the full sweep).**
   The photo build of 17 Nov (1af36943) left one stray "` : ''}" in the coach's instructions
   (`supabase/functions/chat-gemini/index.ts`). The file has been invalid TypeScript since, through PR #29 into `main`
