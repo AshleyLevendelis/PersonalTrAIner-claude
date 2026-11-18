@@ -146,7 +146,11 @@ async function main() {
   check('a warm-up move in a loading week: exactly what generation printed', pct('loading/primer') === 1, tally['loading/primer']?.bad)
   check('a loaded lift in a loading week: what generation printed at least 95% of the time', pct('loading/loaded') >= 0.95, { pct: pct('loading/loaded'), eg: tally['loading/loaded']?.bad })
   check('...and every difference is the one understood kind (reps walked where a notch is too big a jump)', loadedMismatchNotARamp.length === 0, loadedMismatchNotARamp.slice(0, 4))
-  check('a loaded lift on a deload: at least 93%', pct('deload/loaded') >= 0.93, { pct: pct('deload/loaded'), eg: tally['deload/loaded']?.bad })
+  // 93% UNTIL 18 NOV 2026, measured 92.8% after the rep ceiling lowered the high ranges (docs/plans/coach-read-of-plans.md).
+  // The misses are the same understood kind as below, a little more often: at fewer reps the helper's fresh estimate
+  // is heavier, so it is less often "already at the lightest thing that exists" where generation's still-climbing
+  // weight is, and it eases the reps up two where generation held them. Both read 20 or under.
+  check('a loaded lift on a deload: at least 92% (measured 92.8%)', pct('deload/loaded') >= 0.92, { pct: pct('deload/loaded'), eg: tally['deload/loaded']?.bad })
   check('a weightless lift on a deload: at least 88% (the two-rep cut it cannot see)', pct('deload/bodyweight') >= 0.88, { pct: pct('deload/bodyweight'), eg: tally['deload/bodyweight']?.bad })
   check('...and never more than four reps away on any deload', deloadOff.length === 0, deloadOff.slice(0, 4))
   check(`...with the four-rep kind staying rare (${deloadFour} of ${(tally['deload/loaded']?.n ?? 0) + (tally['deload/bodyweight']?.n ?? 0)} deload slots, under 3%)`, deloadFour / ((tally['deload/loaded']?.n ?? 0) + (tally['deload/bodyweight']?.n ?? 0)) < 0.03, deloadFour)
@@ -163,7 +167,9 @@ async function main() {
   const samPlan = silenced(() => build(sam(), 'sam:2', PRE_PACK))
   const cleared = sam({ injuries: [] })
   const wk2Before = samPlan.find(w => w.week_number === 2)!.days.find(d => d.day === 'Monday')!.exercises.find(e => e.name === 'Band Tricep Kickback')
-  check('the plan has the band kickback on Monday, walked up to 16-19', wk2Before?.reps === '16-19', wk2Before?.reps)
+  // 16-19 UNTIL 18 NOV 2026: a band is resistance that can be raised, so its range is lowered like a weight's and ends
+  // its block at 20 or under (exercise-plan.ts resistanceCanRise). Still walked up one from week 1.
+  check('the plan has the band kickback on Monday, walked up to 13-16', wk2Before?.reps === '13-16', wk2Before?.reps)
   const banned = await silencedAsync(() => banExerciseFromMesocycle({ mesocycle: samPlan, profile: cleared, bannedName: 'Band Tricep Kickback', exclusions: ['Band Tricep Kickback', ...PRE_PACK] }))
   const ote = getExerciseEntry('Overhead Tricep Extension')!
   const rows = banned.flatMap(w => w.days.flatMap(d => d.exercises.filter(e => e.name === 'Overhead Tricep Extension').map(e => ({ w, e }))))
@@ -372,12 +378,13 @@ async function main() {
   check('a one-implement lift in another category is where it was (Goblet Squats, 32kg)', at('Goblet Squats') === 32, at('Goblet Squats'))
   // ...and the one-dumbbell ISOLATION lift in another category, which is the
   // neighbour a careless widening would actually reach. Held by its relation
-  // to its own category's machine rather than by a kilo figure, because that
-  // figure is itself in question: Dumbbell Leg Curl is priced exactly as a
-  // leg-curl machine (a 48kg dumbbell between the feet for this lifter),
-  // reported in BACKLOG as the same defect class and NOT changed here.
+  // to its own category's machine rather than by a kilo figure. UNTIL 18 NOV 2026 that relation was "the same as the
+  // machine" (a 48kg dumbbell between the feet), reported then as a defect and not changed. It now carries its own
+  // price_fraction, a third of the machine's (docs/plans/coach-read-of-plans.md), so the property is: exactly its own
+  // third, within a notch. The triceps factor on top of that would take it to about a fifth.
   const at15 = (n: string) => prescribeLoad(getExerciseEntry(n)!, im, { targetRpeLabel: 'RPE 7-8', sets: 3, repRangeLabel: '15-18' }).starting_weight_kg!
-  check('the factor has not spread to Dumbbell Leg Curl (still within a notch of the leg-curl machine)', Math.abs(at15('Dumbbell Leg Curl') - at15('Lying Leg Curl')) <= 2.5, { dumbbell: at15('Dumbbell Leg Curl'), machine: at15('Lying Leg Curl') })
+  const curlShare = getExerciseEntry('Dumbbell Leg Curl')!.price_fraction ?? 1
+  check('the factor has not spread to Dumbbell Leg Curl (its own third of the leg-curl machine, within a notch)', curlShare === 0.33 && Math.abs(at15('Dumbbell Leg Curl') - at15('Lying Leg Curl') * curlShare) <= 2, { dumbbell: at15('Dumbbell Leg Curl'), machine: at15('Lying Leg Curl') })
 
   // -------------------------------------------------------------------------
   console.log('\n[5] What is deliberately unchanged')

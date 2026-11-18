@@ -3920,6 +3920,16 @@ export function loadedRepCeilingCut(phaseReps: string): number {
   return Math.max(0, top + MAX_WEEKLY_REP_STEPS_IN_BLOCK + MAX_FROZEN_LOAD_REP_BUMP - LOADED_REP_CEILING)
 }
 /** The top of a rep range ("15-20" is 20, "12" is 12); null for anything not counted in reps. */
+/**
+ * WHICH LIFTS THE CEILING COVERS: every lift whose resistance can be raised (a weight, a stack, a machine, a band),
+ * whether or not the app can put a number on it. The first version covered only lifts with a priced weight, and a
+ * Cable Woodchop ("Choose by feel"), an Ab Crunch Machine and a band Pallof Press still read 3 x 19-24 (phone walk,
+ * 18 Nov 2026): at 20 clean reps the answer is more resistance, not more reps. Bodyweight alone is not covered: reps
+ * are the only lever it has.
+ */
+export function resistanceCanRise(entry: ExerciseEntry): boolean {
+  return isExternallyLoaded(entry) || isBandEquipped(entry)
+}
 function repRangeTop(reps: string): number | null {
   const m = reps.match(/^(\d+)\s*-\s*(\d+)$/) ?? reps.match(/^(\d+)$/)
   return m ? Number(m[2] ?? m[1]) : null
@@ -7606,7 +7616,7 @@ export function repRangeForIncomingExercise(
     : prescribeLoad(entry, profile, { targetRpeLabel: intensity, repRangeLabel: reps }).starting_weight_kg
 
   // Generation's rep ceiling for a loaded lift (loadedRepCeilingCut), from the phase's range alone.
-  const ceilingCut = (): number => (isBodyweight || isPrimer ? 0 : loadedRepCeilingCut(shiftReps(base, phaseConfig.rep_shift, repFloor)))
+  const ceilingCut = (): number => (resistanceCanRise(entry) ? loadedRepCeilingCut(shiftReps(base, phaseConfig.rep_shift, repFloor)) : 0)
   if (isDeload) {
     // A deload's default move is a lighter weight and reps eased UP by two.
     // Where there is no weight to take off — a weightless lift, a warm-up
@@ -8356,7 +8366,7 @@ export function generateMesocycle(
           // lowered before the ramp and before the weight is priced, and the lift keeps whichever lever it had. Forcing
           // a lowered lift to climb reps at one weight was built and measured too (60 plans): it changed nothing for the
           // ceiling and repeated 6 to 18 more week-pairs, so it is not here.
-          const repCeilingCut = !isBodyweight && !isPrimer && !isCarry && (dbEntry?.prescription_type ?? 'reps') === 'reps'
+          const repCeilingCut = !!dbEntry && resistanceCanRise(dbEntry) && !isPrimer && !isCarry && (dbEntry.prescription_type ?? 'reps') === 'reps'
             ? loadedRepCeilingCut(shiftReps(baseReps, phaseConfig.rep_shift, repFloor))
             : 0
           // THE PHASE'S RANGE FIRST, THEN THE RAMP CLIMBS FROM IT — and the

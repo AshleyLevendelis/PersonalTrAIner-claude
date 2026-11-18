@@ -70,11 +70,19 @@ async function main() {
   const topOf = (reps: unknown): number | null => { const m = String(reps).match(/^(\d+)\s*-\s*(\d+)$/) ?? String(reps).match(/^(\d+)$/); return m ? Number(m[2] ?? m[1]) : null }
   const loaded = (e: { suggested_load_kg?: number | null }) => typeof e.suggested_load_kg === 'number' && e.suggested_load_kg > 0
   const over: string[] = [], overDeload: string[] = []
-  let loadedSlots = 0, weightlessOver = 0, atCeiling = 0
+  let loadedSlots = 0, weightlessOver = 0, atCeiling = 0, byFeelSlots = 0
+  const byFeelOver: string[] = []
   for (const { who, plan } of plans) for (const w of plan) for (const d of w.days) for (const e of d.exercises) {
     const top = topOf(e.reps)
     if (top == null) continue
-    if (!loaded(e)) { if (top > 20) weightlessOver++; continue }
+    const entry = getExerciseEntry(e.name)
+    if (entry?.mechanics_tier === 'primer') continue
+    if (!loaded(e)) {
+      // No number on the card. A cable, a machine or a band can still be made harder; bodyweight alone cannot.
+      if (entry && ep.resistanceCanRise(entry)) { byFeelSlots++; if (top > 20) byFeelOver.push(`${e.name} ${e.sets}x${e.reps} ${e.suggested_load ?? ''} W${w.week_number} ${JSON.stringify(who)}`) }
+      else if (top > 20) weightlessOver++
+      continue
+    }
     loadedSlots++
     if (top >= 18) atCeiling++
     if (top > 20) (w.is_deload ? overDeload : over).push(`${e.name} ${e.sets}x${e.reps} @${e.suggested_load_kg} W${w.week_number} ${w.phase_label} ${JSON.stringify(who)}`)
@@ -83,7 +91,9 @@ async function main() {
   check('no loaded lift is prescribed past 20 reps in any loading week', over.length === 0, over.slice(0, 4))
   check('...or in any recovery week (a deload eases reps up by two, and still stops at 20)', overDeload.length === 0, overDeload.slice(0, 4))
   check('the ceiling binds: many loaded lifts sit at 18 to 20 reps (they were 22 to 29)', atCeiling > 100, atCeiling)
-  check('a weightless lift is NOT capped: reps are the only lever it has, and some plans do ask more than 20', weightlessOver > 0, weightlessOver)
+  check('a lift with no number that can still be made harder (a cable, a machine, a band) is held to 20 too: "Cable Woodchops 3x19-24" (200 or more such slots read)', byFeelSlots >= 200 && byFeelOver.length === 0, { byFeelSlots, eg: byFeelOver.slice(0, 4) })
+  check('the rule for which lifts: a weight, a stack or a band, never bodyweight alone', ['Cable Woodchops', 'Ab Crunch Machine', 'Pallof Press', 'Band Lat Pulldown', 'Dumbbell Curls'].every(n => ep.resistanceCanRise(getExerciseEntry(n)!)) && ['Push-Ups', 'Reverse Crunch', 'Hanging Leg Raises'].every(n => !ep.resistanceCanRise(getExerciseEntry(n)!)))
+  check('a bodyweight lift is NOT capped: reps are the only lever it has, and some plans do ask more than 20', weightlessOver > 0, weightlessOver)
 
   console.log('\n3. A lowered lift still progresses')
   // The ceiling lowers a RANGE; it is not a cap on the printed number. Across block 1's three loading weeks an
@@ -131,6 +141,21 @@ async function main() {
       if (helper !== e.reps) differ.push(`${e.name}: plan ${e.reps}, helper ${helper}`)
     }
   }
+  // ...and for a lift with no number that can still be made harder (a band, a cable, a machine by feel): the helper
+  // must lower its range as generation did, in every loading week.
+  let byFeelCompared = 0; const byFeelDiffer: string[] = []
+  for (const { profile, plan } of plans) for (const w of plan) {
+    if (w.is_deload) continue
+    for (const d of w.days) for (const e of d.exercises) {
+      const entry = getExerciseEntry(e.name)
+      if (!entry || entry.mechanics_tier === 'primer' || loaded(e) || !ep.resistanceCanRise(entry) || topOf(e.reps) == null) continue
+      const helper = ep.repRangeForIncomingExercise(entry, profile, w)
+      if (helper == null) continue
+      byFeelCompared++
+      if ((topOf(helper) ?? 0) > 20) byFeelDiffer.push(`${e.name} W${w.week_number}: plan ${e.reps}, helper ${helper}`)
+    }
+  }
+  check('a lift with no number swapped in mid-plan is never printed past 20 either (150 or more read)', byFeelCompared >= 150 && byFeelDiffer.length === 0, { byFeelCompared, eg: byFeelDiffer.slice(0, 4) })
   check('week 1 isolation lifts were compared (20 or more)', compared >= 20, compared)
   check('the plan and the swap helper print the same range for at least nine in ten of them', differ.length <= compared * 0.1, { compared, differ: differ.slice(0, 4) })
   check('...and the helper never prints a loaded lift past 20 either', plans.every(({ profile, plan }) => plan.every(w => w.days.every(d => d.exercises.every(e => {
