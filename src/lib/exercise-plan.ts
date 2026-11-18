@@ -3840,6 +3840,42 @@ const RELATED_PRESS_FRACTION_CEILING = 0.55 // curls/laterals/shrugs vs. the day
 const UNILATERAL_VS_MAIN_FRACTION_CEILING = 0.65 // unilateral accessory vs. the day's bilateral main, same broad pattern
 const SAME_MUSCLE_GROUP_MAX_RATIO = 2 // heaviest same-group accessory vs. lightest, within the week
 
+// ---------------------------------------------------------------------------
+// NO LOADED LIFT IS PRESCRIBED PAST 20 REPS (18 Nov 2026, the Fable pass on plans; CSCS decision, mine).
+//
+// FOUND by generating 120 different people's plans and reading the cards: 3,380 of 21,000 loaded exercise slots (16%)
+// asked for more than 20 reps and 889 (4%) for more than 25, up to "Overhead Tricep Extension 3x24-29 @ 18kg". Nothing
+// miscalculated. An adaptation or conditioning phase lifts every range by 3 or 4 reps, a lift whose next weight is too
+// big a jump climbs a rep or two a week instead of adding weight, and nothing ever said where that stops: an isolation
+// lift's 15-20 became 18-23, then 20-25, then 22-27.
+// BASIS: the NSCA's muscular-endurance prescription is 12 reps or more at 67% of a best lift or less, and in practice
+// coaches write 12-20; past about 20 a set is a test of how long the muscle can burn rather than a strength or size
+// stimulus, takes over a minute, and at the moderate effort these phases ask for is too far from the limit to count.
+// A weightless lift (a press-up, an air squat) has no weight to add, so reps are its lever and it is not capped.
+// HOW: the phase's range for that lift is lowered just far enough that its LAST loading week tops out at 20, so the
+// weeks still climb (11-16, 13-18, 15-20) and the weight is priced for the reps actually asked (a little heavier).
+// ---------------------------------------------------------------------------
+export const LOADED_REP_CEILING = 20
+/** The most a rep range climbs inside one block by its weekly steps (weeks 2 and 3). */
+const MAX_WEEKLY_REP_STEPS_IN_BLOCK = 2
+/**
+ * How many reps a loaded lift's phase range is lowered by so that its last loading week still tops out at the ceiling:
+ * room for its two weekly steps and for the reps a held weight can buy (MAX_FROZEN_LOAD_REP_BUMP). Asked of the RANGE
+ * alone, never of whether this lift's next weight is affordable: that question has two askers (generation, from the
+ * block's baseline, and repRangeForIncomingExercise, from a fresh estimate) and they do not always agree, and a rule
+ * that depended on it printed two different ranges for one lift.
+ */
+export function loadedRepCeilingCut(phaseReps: string): number {
+  const top = repRangeTop(phaseReps)
+  if (top == null) return 0
+  return Math.max(0, top + MAX_WEEKLY_REP_STEPS_IN_BLOCK + MAX_FROZEN_LOAD_REP_BUMP - LOADED_REP_CEILING)
+}
+/** The top of a rep range ("15-20" is 20, "12" is 12); null for anything not counted in reps. */
+function repRangeTop(reps: string): number | null {
+  const m = reps.match(/^(\d+)\s*-\s*(\d+)$/) ?? reps.match(/^(\d+)$/)
+  return m ? Number(m[2] ?? m[1]) : null
+}
+
 // Most extra reps a lift may accumulate while its weight sits at the
 // unverified ramp's ceiling — see frozenLoadStreakByLift. shiftReps enforces a
 // floor and no ceiling of its own, and a rep range carries its block's intent:
@@ -7516,6 +7552,8 @@ export function repRangeForIncomingExercise(
     ? null
     : prescribeLoad(entry, profile, { targetRpeLabel: intensity, repRangeLabel: reps }).starting_weight_kg
 
+  // Generation's rep ceiling for a loaded lift (loadedRepCeilingCut), from the phase's range alone.
+  const ceilingCut = (): number => (isBodyweight || isPrimer ? 0 : loadedRepCeilingCut(shiftReps(base, phaseConfig.rep_shift, repFloor)))
   if (isDeload) {
     // A deload's default move is a lighter weight and reps eased UP by two.
     // Where there is no weight to take off — a weightless lift, a warm-up
@@ -7524,23 +7562,25 @@ export function repRangeForIncomingExercise(
     // week harder, so they stay at the phase's range (generation's
     // `deloadLoadLeverDead`). See the approximation note above for the further
     // two-rep cut this cannot see.
-    const loadingReps = shiftReps(base, phaseConfig.rep_shift, repFloor)
+    const loadingReps = shiftReps(base, phaseConfig.rep_shift - ceilingCut(), repFloor)
     const kg = isExternallyLoaded(entry) ? startingKg(loadingReps) : null
     const atFloor = kg != null && kg * DELOAD_LOAD_FRACTION < getEquipmentFloorKg(entry)
     const leverDead = !isExternallyLoaded(entry) || atFloor
-    return leverDead ? loadingReps : shiftReps(base, phaseConfig.rep_shift + 2, repFloor)
+    return leverDead ? loadingReps : shiftReps(base, phaseConfig.rep_shift - ceilingCut() + 2, repFloor)
   }
-  const phaseReps = shiftReps(base, phaseConfig.rep_shift, repFloor)
+  const uncutPhaseReps = shiftReps(base, phaseConfig.rep_shift, repFloor)
 
   // IS ONE NOTCH OF THIS IMPLEMENT TOO BIG A JUMP? (generation's
   // `loadStepUnaffordable`: more than 12% of the weight in one step.)
   let loadStepUnaffordable = false
-  const start = startingKg(phaseReps)
+  const start = startingKg(uncutPhaseReps)
   if (start != null && start > 0 && category != null) {
     loadStepUnaffordable = getLoadIncrementKg(entry, category, start) / start > 0.12
   }
   const rampReps = isBodyweight || loadStepUnaffordable
     || ((policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isMainCompound)
+  // Generation's rep ceiling for a loaded lift (loadedRepCeilingCut).
+  const phaseReps = shiftReps(base, phaseConfig.rep_shift - ceilingCut(), repFloor)
   return shiftReps(phaseReps, rampReps ? w - 1 : 0, repFloor)
 }
 
@@ -8259,6 +8299,13 @@ export function generateMesocycle(
           }
           const rampLoad = rampLoadCandidate && !loadStepUnaffordable
           const rampReps = (isBodyweight || loadStepUnaffordable || ((policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isMainCompound)) && !isCarry
+          // A LOADED LIFT'S RANGE ENDS ITS BLOCK AT 20 REPS OR FEWER (loadedRepCeilingCut, above): the phase's range is
+          // lowered before the ramp and before the weight is priced, and the lift keeps whichever lever it had. Forcing
+          // a lowered lift to climb reps at one weight was built and measured too (60 plans): it changed nothing for the
+          // ceiling and repeated 6 to 18 more week-pairs, so it is not here.
+          const repCeilingCut = !isBodyweight && !isPrimer && !isCarry && (dbEntry?.prescription_type ?? 'reps') === 'reps'
+            ? loadedRepCeilingCut(shiftReps(baseReps, phaseConfig.rep_shift, repFloor))
+            : 0
           // THE PHASE'S RANGE FIRST, THEN THE RAMP CLIMBS FROM IT — and the
           // frozen-load bump, further down, climbs from the week's own range.
           // A floor (the experience floor, or a phase's main-lift floor) is
@@ -8283,9 +8330,10 @@ export function generateMesocycle(
                 ? (deloadNeedsRepCut ? phaseConfig.rep_shift - 2 : phaseConfig.rep_shift)
                 : phaseConfig.rep_shift + 2)
             : phaseConfig.rep_shift
+          // The rep ceiling's cut (above) comes off the phase's range before the ramp and before the weight is priced.
           const rampSteps = !isDeload && rampReps ? w - 1 : 0
-          const repShift = phaseRepShift + rampSteps
-          const phaseReps = shiftReps(baseReps, phaseRepShift, repFloor)
+          // (A deload eases reps up by two from the lowered range, which is three under the ceiling at most.)
+          const phaseReps = shiftReps(baseReps, phaseRepShift - repCeilingCut, repFloor)
           const restShift = isDeload ? 0 : phaseConfig.rest_adjust_seconds
 
           // Interval and steady-state cardio don't go through the reps-
@@ -8598,6 +8646,7 @@ export function generateMesocycle(
               const streak = frozenLoadStreakByLift.get(dbEntry.name) ?? 0
               let bump = alreadyDecided ?? Math.min(streak + 1, MAX_FROZEN_LOAD_REP_BUMP)
               let bumpedReps = shiftReps(reps, bump, repFloor)
+
               // ESCALATE WITHIN THE WEEK. shiftReps clamps to the rep floor, so
               // in a negative-shift phase a small bump can land on exactly the
               // range already shown (an intermediate's 6-8 under Power's -4 is
