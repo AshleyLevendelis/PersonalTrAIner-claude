@@ -12,7 +12,7 @@ import { MealPlan, SLOT_ORDER, SLOT_LABEL, type UpcomingMealDay } from '@/compon
 import { MealDayStrip } from '@/components/nutrition/MealDayStrip'
 import { MacroSplitCard } from '@/components/MacroSplitCard'
 import { TrainerNudge } from '@/components/TrainerNudge'
-import { mealsDrifted, MORE_MEALS } from '@/lib/coach-voice'
+import { mealsDrifted, MORE_MEALS, referenceWeightLine } from '@/lib/coach-voice'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot, getEatenByDate } from '@/lib/meal-store'
 import { weeklyAverage, finishedDaysThisWeek, weeklyAverageLine, weeklyLoggedLine, type WeeklyAverage } from '@/lib/weekly-average'
@@ -27,7 +27,7 @@ import type { PoolOption } from '@/lib/meal-generation'
 import { skipsBreakfast } from '@/lib/meal-generation'
 import type { MealDayMoveController } from '@/lib/meal-day-move'
 import type { EatingOutController } from '@/lib/eating-out'
-import { calculateWeeklySchedule, getMacroDerivation, sportFuelNote } from '@/lib/macro-calculator'
+import { calculateWeeklySchedule, getMacroDerivation, sportFuelNote, nutritionReferenceWeightKg } from '@/lib/macro-calculator'
 import { macroShortfallLine } from '@/lib/macro-shortfall'
 import { paceClock } from '@/lib/pace'
 import { getAppNow } from '@/lib/dev-clock'
@@ -803,6 +803,9 @@ export function NutritionDisplay({
                   ? `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · protein ${derivation.split.proteinPerKg.toFixed(1)} g/kg · fat ${Math.round(derivation.split.fatPercent * 100)}% · carbs the remainder.`
                   : `From ${effectiveProfile.weight_kg} kg, ${effectiveProfile.height_cm} cm, ${effectiveProfile.age} y · a fixed 20% protein / 25% fat / 55% carb split for conditioning goals.`}
               </p>
+              {derivation.splitApplies && effectiveProfile.weight_kg != null && derivation.referenceWeightKg < effectiveProfile.weight_kg && (
+                <p data-testid="reference-weight-note" className="mt-1.5 text-[0.6875rem] leading-normal text-muted-foreground">{referenceWeightLine(derivation.referenceWeightKg)}</p>
+              )}
               {/* ANOTHER SPORT'S FUEL, said where the number is explained (7 Nov 2026). */}
               {effectiveProfile.weight_kg && sportFuelNote(effectiveProfile, effectiveProfile.weight_kg) && (
                 <p data-testid="sport-fuel-note" className="mt-1.5 text-[0.6875rem] leading-normal text-muted-foreground">{sportFuelNote(effectiveProfile, effectiveProfile.weight_kg)}</p>
@@ -849,7 +852,7 @@ export function NutritionDisplay({
           {derivation && (
             <MacroSplitCard
               profile={profile}
-              effectiveWeightKg={effectiveProfile.weight_kg!}
+              effectiveWeightKg={nutritionReferenceWeightKg(effectiveProfile.weight_kg!, effectiveProfile.height_cm)}
               calorieTarget={derivation.target.calories}
               applies={mode === 'STANDARD_STATIC' && profile.fitness_goal !== 'conditioning'}
               disabledReason={

@@ -21,7 +21,7 @@
 // Docs: docs/plans/usual-meals-first.md.
 // ---------------------------------------------------------------------------
 
-import { buildMealAdditionProposal, formatPortion, type MealAdditionPayload } from './meal-addition'
+import { buildMealAdditionProposal, portionWithHint, type MealAdditionPayload } from './meal-addition'
 import { buildCustomMealProposal } from './custom-meal'
 import { dishLandsADay } from './meal-top-up'
 import { computeSlotBudgets } from './meal-generation'
@@ -136,7 +136,7 @@ export function planMyMeal(ctx: MyMealContext, draft: MyMealDraft): MyMealPlan {
   // Every food is counted raw or dry (his 18 Oct ruling), so "150g chicken breast" as he typed it is held as 205g
   // raw. The cooked weight is said beside it, as the meal cards say it, or "kept at your amounts" would show a
   // number he never typed.
-  const portions = option.ingredients.map(i => { const hint = cookedHint(i); return hint ? `${formatPortion(i)} (${hint})` : formatPortion(i) }).join(', ')
+  const portions = option.ingredients.map(portionWithHint).join(', ')
   return {
     ok: true,
     payload: chosen.built.payload,

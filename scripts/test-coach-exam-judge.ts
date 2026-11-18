@@ -187,8 +187,8 @@ async function main() {
     check('the judge is sent the warm and teaches standards and asked for both marks (her 6 Nov rulings)',
       /DIMENSION: warm/.test(system) && /DIMENSION: teaches/.test(system) && /"warm": 0-3 or null/.test(system) && /"teaches": 0-3 or null/.test(system))
     check('...and both land in the scoreboard as their own dimensions', avgs.warm === 2 && avgs.teaches === 0, avgs)
-    check('the report names the judge and how many cases it marked', /claude-opus-5 — marked 2 of 2/.test(judgeLine(r.report)), judgeLine(r.report))
-    check('the scoreboard names the judge', r.scores?.judge === 'claude-opus-5', r.scores?.judge)
+    check('the report names the judge and how many cases it marked', /claude-fable-5-2 — marked 2 of 2/.test(judgeLine(r.report)), judgeLine(r.report))
+    check('the scoreboard names the judge', r.scores?.judge === 'claude-fable-5-2', r.scores?.judge)
     // The transcripts here are stamped "gate", and the coach on disk is not.
     check('the scores name the coach that ANSWERED, never the one on disk', r.scores?.fingerprint === 'gate', r.scores?.fingerprint)
     // THE QUESTIONS, likewise (3 Nov 2026): carried from the transcripts, never computed from the cases on disk.
@@ -206,7 +206,7 @@ async function main() {
     check('the fake was reached — so this is the key path and not a silent skip', api.seen.length >= 1, api.seen.length)
     check('...exactly once, not once per case', api.seen.length === 1, api.seen.length)
     check('the report says the judge did NOT run, and why', /NOT RUN — the Anthropic API rejected ANTHROPIC_API_KEY \(401\)/.test(judgeLine(r.report)), judgeLine(r.report))
-    check('...and does not name a judge that marked nothing', !/judge: claude-opus-5/.test(r.report), judgeLine(r.report))
+    check('...and does not name a judge that marked nothing', !/judge: claude-fable-5-2/.test(r.report), judgeLine(r.report))
     check('the scoreboard records no judge', r.scores?.judge === null, r.scores?.judge)
     check('the grader exits non-zero — a key was set, so tier B was asked for and did not happen', r.code !== 0, r.code)
     check('...naming the key as the reason', /FAIL: the Anthropic API rejected/.test(r.out), r.out.slice(-300))

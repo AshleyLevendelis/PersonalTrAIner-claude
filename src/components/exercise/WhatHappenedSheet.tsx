@@ -33,7 +33,7 @@ import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
 import { isExternallyLoaded } from '@/lib/load-prescription'
 import type { TrainingWeekDay } from '@/hooks/useTrainingWeek'
 import type { WorkoutDay } from '@/lib/types'
-import { estimateDaySeconds } from '@/lib/session-duration'
+import { dayLengthParts } from '@/lib/session-duration'
 import { SHORTEST_VERSION_MINUTES } from '@/lib/exercise-plan'
 import { dayVerbs, dayHasSession, type DayVerb } from '@/lib/day-verbs'
 import { buildSessionKindTodayProposal, type SessionKind, type SessionKindOption, type SessionKindOffer, type SessionKindPlan } from '@/lib/session-kind'
@@ -269,7 +269,10 @@ export function WhatHappenedSheet({
     // session moved onto, that row is empty and no times were offered (H19).
     const day = session
     if (!day || day.exercises.length === 0) return [] as number[]
-    const nowMinutes = estimateDaySeconds(day) / 60
+    // THE SESSION'S LENGTH IS ITS WORK (18 Nov 2026): the header says "~44 min · + 8 optional", and a day with an
+    // optional mobility close-out was measured here WITH it (52), so "45 min" was offered against a 44-minute
+    // session. One reader, the header's own (dayLengthParts).
+    const nowMinutes = dayLengthParts(day).workMinutes
     return SHORTEN_CHOICES.filter(m => m <= nowMinutes - 5)
   }, [session])
 

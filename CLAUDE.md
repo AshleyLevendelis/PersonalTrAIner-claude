@@ -1643,7 +1643,54 @@ menu" stays true when a copy is also left outside it.
   never over a running round ("A round is running · Open it"). The coach is told to name the timer (needs the
   `chat-gemini` deploy). `verify:live-test-nov14` A16-A24
 
+### The Fable pass of 18 Nov 2026 (his "bug fixes, improvements, mainly on nutrition"; decisions are mine unless marked his)
+- **Someone who eats meat is fed meat** (nutrition, mine): a dish built on a stand-in for a food he eats anyway (tofu,
+  tempeh, Quorn, vegan sausages; soy yoghurt for someone who eats dairy) is ranked after every other and a plan stops
+  taking them at 30 dishes a meal; a food he likes still lifts its dishes. Measured 55 of 112 meals before, 0-2 after.
+  `test:real-plates` §4-5
+- **A plate somebody would eat** (mine): bread, wraps and bagels in half or whole pieces, never more than a plate takes,
+  the rest of the dish making up the calories; a main meal at most 1,100 g as it sits on the plate. His own portions are
+  never touched. **Days on target and variety figures before 18 Nov are not comparable** (the pools changed).
+  `test:real-plates` §1-3
+- **Protein for a very heavy person follows a reference weight** (CSCS, mine): above a BMI of 30 a quarter of the extra
+  weight counts for protein, the fat floor and per-kilo carbs; energy reads the real weight. `test:reference-weight`
+- **A food the app cannot count in a meal he describes is asked about; seasonings need no grams; a packaged product
+  carries every allergen its usual recipe has.** `test:meal-facts`, `test:food-db-parity` §6
+- **The coach is told how to coach a level and a sport** (CSCS, mine): everyday words for a beginner, the language for
+  an advanced lifter; for someone with a sport, what transfers from their own plan, timing around matches, and never a
+  water cut. Prompt sections 1g and 1h; exam cases `sport-what-transfers-from-my-plan`,
+  `sport-making-weight-is-not-coached`, `level-beginner-gets-plain-words`. Unproven until the exam runs after the
+  `chat-gemini` deploy.
+- **A screen the coach names is one tap away**: one of the shopping list, plate calculator, session history or full
+  program named in a coach reply gets the app's "Open ..." button under it; two named get none. `test:open-from-chat`
+  §6, `verify:live-test-nov14` A46-A49
+- **Plans read as a coach** (CSCS, mine; `docs/plans/coach-read-of-plans.md`): no lift whose resistance can be raised
+  (a weight, a stack, a machine, a band) is prescribed past 20 reps, bodyweight alone is not capped; only the day's main lift goes under six; a warm-up drill keeps one dose in every block and week (explosive 5,
+  activation 10; Ankle Alphabet is timed); a dumbbell leg curl takes a third of the machine's price and a kickback half
+  an extension's; a week's lower-body main lifts alternate squat and hinge; a build-up set earns its row only if it is
+  heavier than the one before and lighter than the working weight. **Rep and weight figures from before 18 Nov are not
+  comparable for those lifts.** `test:rep-ceiling`, `test:coach-read`, `test:session-derive` §9b
+- **Home names the day's main lift** (else the heaviest thing moved), and the chat names a session by its lifts, not its
+  warm-up drill. `test:what-a-pr-is`, `test:coach-opener` §10
+- **Every edge function file parses**: `test:functions-parse` (the coach's file did not, 17-18 Nov, on `main` too).
+- **A session reaches the time asked for** (CSCS, mine): the optional top-up is sized on the day as it ships, after the
+  weekly balance pass (it ran before, and the pass then took a set off). Sessions under the minimum: 171 -> 0 of 5,700
+  loading days. `test:session-length` (ceilings 1%)
+- **A thin day takes work, not mobility** (CSCS, mine): a day of nine working sets or fewer that is ten minutes short
+  takes trunk or small-muscle work (never a main lift, a third of one pattern, or work the push:pull count sees), added
+  to the plan every week is built from. A bodyweight beginner's chest day: 7 sets and 23 minutes -> 13 sets and 32.
+  `test:thin-day`, `test:day-purpose` P4
+- **A session's length is its work, on every card**: the add card (screen and coach), the shorten card and its choices
+  and "make it easier" quote the header's number; optional mobility is named beside it, never inside it.
+  `test:exercise-add`, `test:lighter-today` §5, `verify:exercise-add` 4d, `verify:shorten-today` 2c
+- **OPEN, HIS**: whether protein a little over or fat a little under with calories on target is a miss on a muscle-gain
+  plan (his 18 Oct bands say yes); "usually contains" allergens on existing foods.
+
 ### His rulings of 17 Nov 2026
+- **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over
+  marking once with both). The judge is stamped on the scores; scores marked by another judge are stale (re-grade the
+  same transcripts, no need to re-run the coach). **Judged marks before 17 Nov are not comparable with marks after.**
+  `test:coach-exam-fresh`, `test:coach-exam-judge`
 - **The chat review, "Build it all"**, with four rulings, each from three options: **"One line, numbers on tap"** (an
   offer is its lead line; a cost line always shows; the rest sits behind Details); **"Eaten stay, later ones fit"**
   (already true since 10 Oct, recorded); **"All at once"** (no word-by-word replay; Profile can still slow it); **"Read
@@ -3002,6 +3049,26 @@ old — the commands were right and the context was missing.
   next sweep. **`test:no-dead-code` is the same kind**: it scans every export
   in `src/`, so a change that adds or removes an export runs it. 28 Sep 2026:
   one new exported constant left it red for a commit.
+- **A CHANGE THAT FOLDS TEXT AWAY BREAKS EVERY DRIVER THAT READ THAT TEXT, AND THE FILE-GREP DERIVATION NAMES NONE OF
+  THEM.** 17 Nov 2026: offers were folded behind "Details"; five drivers were taught to open it and four more
+  (`verify:moved-session`, `verify:moved-edit`, `verify:rebuild-card`, `verify:meal-knock-on`) stayed red, unseen,
+  through a merge to `main`, until the next full sweep. A driver names what is ON SCREEN, so the derivation is: grep
+  `.tour-harness/*.mjs` for the element that changed (`proposal-card` here), and run every driver it names.
+- **A MISSED MUTATION ASKS TWO QUESTIONS, AND "IS THE GUARD INERT?" IS THE SECOND.** 18 Nov 2026: a limit read as
+  inert on 9,216 profiles because no check looked at what it limits; comparing what the run PRODUCED with and without
+  it showed it binding on five days. First ask whether any check could see the difference; only then whether there is
+  one. (It then turned out to guard one of two lists.)
+- **A KNOWN, ACCEPTED DRIFT IS A DEFECT WITH A NOTE ON IT.** 18 Nov 2026: "a couple of minutes under, understood" had
+  sat beside a 3-6% ceiling since September. A change elsewhere pushed more days into it and the ceiling failed; the
+  cause was one line in the wrong order, and fixing it took the count to zero. When a ceiling exists to tolerate a
+  residual, trace the residual before raising the ceiling.
+- **`supabase/functions` IS OUTSIDE EVERY FAST CHECK, AND A FILE THAT DOES NOT PARSE READS FINE AS TEXT.** 18 Nov 2026:
+  the photo build of 17 Nov left one stray "` : ''}" in the coach's instructions; `chat-gemini/index.ts` was invalid
+  TypeScript from then on, was merged to `main`, and a deploy from `main` would have failed at the bundle. `tsc` covers
+  `src`, the source checks read the file as text, and the derivation I ran listed `test:` gates only, so the deno smokes
+  that import the file never ran until a full sweep. **A change under `supabase/functions` runs `test:functions-parse`
+  (seconds) and the `verify:` smokes whose script imports that file; a derivation that lists only `test:` names is half
+  a derivation.**
 - **A FIX MADE IN RESPONSE TO A SWEEP IS NOT COVERED BY THAT SWEEP.** 16 Sep
   2026: yesterday's sweep found two real failures, both were fixed, and the
   sweep was reported clean without being re-run. One of those fixes — pulling a

@@ -85,6 +85,28 @@ export function openTargetInReply(content: string): { target: OpenTarget; kg: nu
   return atKg ? { target: 'plate', kg: Number(atKg[1]) } : null
 }
 
+/**
+ * A SCREEN THE COACH NAMES IS ONE TAP AWAY (18 Nov 2026, the Fable pass on the coach; his brief: the chat should
+ * "quickly and easily do things for the user"). The coach is told never to give directions to a tab, so when its reply
+ * is ABOUT a screen ("that's on your shopping list now", "the plate calculator will tell you") there was nothing to tap.
+ * Read off the coach's own words, the way the timer buttons are: only a name that can mean one screen, only when the
+ * reply names exactly ONE of them, and never on the app's own "Opened ..." line (which carries its own button).
+ * "Your plan", "your meals" and "today's session" are deliberately not here: the coach says them in half its replies,
+ * and a button under every message is noise.
+ */
+const NAMED_SCREENS: [OpenTarget, RegExp][] = [
+  ['grocery', /\b(?:shopping|grocery) list\b/i],
+  ['plate', /\bplate calculator\b/i],
+  ['history', /\bsession history\b/i],
+  ['program', /\bfull program(?:me)?\b/i],
+]
+export function screenNamedInReply(content: string): OpenTarget | null {
+  const t = content ?? ''
+  if (openTargetInReply(t)) return null
+  const named = NAMED_SCREENS.filter(([, re]) => re.test(t)).map(([target]) => target)
+  return named.length === 1 ? named[0] : null
+}
+
 // --- the channel -------------------------------------------------------------------------------------------------
 
 const OPEN_EVENT = 'app-open-request'

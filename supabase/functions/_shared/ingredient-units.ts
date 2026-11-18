@@ -126,6 +126,10 @@ const FOOD_DEPENDENT: [RegExp, string][] = [
   [/^(?:bottles?)\b/i, 'bottle'],
   [/^(?:cartons?)\b/i, 'carton'],
   [/^(?:sachets?)\b/i, 'sachet'],
+  // A PINT IS THE FOOD'S OWN (18 Nov 2026): it was "asked about" as a measure that differs by country, which made the
+  // commonest way anyone says how much beer or milk they had unreadable. Like a can or a glass, it is understood only
+  // where the food's own table gives it a weight (a UK pint: beer 568 g, milk 585 g), and asked about everywhere else.
+  [/^(?:pints?)\b/i, 'pint'],
 ]
 
 /** Loose amounts that weigh a fraction of a gram or a few, the same for every food. */
@@ -137,7 +141,7 @@ const LOOSE: [RegExp, string][] = [
 ]
 
 /** Measures that differ by country or have no weight at all: asked about, never guessed. */
-const AMBIGUOUS_UNITS = /^(?:pints?|quarts?|gallons?|knobs?|glugs?|squeezes?|sprinkles?|couple|few|some|several)\b/i
+const AMBIGUOUS_UNITS = /^(?:quarts?|gallons?|knobs?|glugs?|squeezes?|sprinkles?|couple|few|some|several)\b/i
 
 const CONTAINER_UNITS = new Set(['can', 'jar', 'pack', 'bag', 'bottle', 'carton'])
 

@@ -21,7 +21,7 @@ import { formVideoFor, linkifyBareUrls, sessionVideosFor } from '@/lib/exercise-
 import { parseTimerSuggestion, type TimerSuggestion } from '@/lib/timer-engine'
 import { startLabel } from '@/lib/round-setup'
 import { MEAL_LIKE_OFFER, datesLabel, wholeMealLike } from '@/lib/meal-like-offer'
-import { kgInText, openButtonLabel, openTargetInReply, openedLine, parseOpenRequest, requestOpen } from '@/lib/open-request'
+import { kgInText, openButtonLabel, openTargetInReply, openedLine, parseOpenRequest, requestOpen, screenNamedInReply } from '@/lib/open-request'
 import { useTimers } from '@/hooks/useTimers'
 import { chatContextPills } from '@/lib/chat-context-strip'
 import { useShowNumbers } from '@/lib/show-numbers'
@@ -32,7 +32,7 @@ import { tabHash } from '@/lib/app-route'
 import { readAloud } from '@/lib/read-aloud'
 import { ListenButton } from '@/components/chat/ListenButton'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { computeBMR, staticTDEEFor, resolveBodyMetrics } from '@/lib/macro-calculator'
+import { computeBMR, staticTDEEFor, resolveBodyMetrics, nutritionReferenceWeightKg } from '@/lib/macro-calculator'
 import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
 import { groupMessages, bubblePositions, bubbleRadius, groupTimestamp, timeLabel } from '@/lib/chat-groups'
 import { supabase } from '@/lib/supabase'
@@ -135,7 +135,7 @@ import { assessMealEdit, mealAskKey, type MealEditKind, type MealEditContext } f
 import { settleWeek } from '@/lib/settle-week'
 import { shortenOrFloor, SHORTEST_VERSION_MINUTES } from '@/lib/exercise-plan'
 import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
-import { estimateDaySeconds } from '@/lib/session-duration'
+import { dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
 import { restoreMesocycle } from '@/lib/mesocycle-persistence'
 import { offerStillHolds, fingerprintWeeks, undoStillFits, weeksUndoWrites, dayStillAsWritten } from '@/lib/offer-still-holds'
@@ -171,7 +171,7 @@ import { takeChatPrefill, CHAT_PREFILL_EVENT } from '@/lib/chat-prefill-store'
 import { loadFeelContext, buildFeelBrief, feelRun, recordSessionFeel, type FeelContext } from '@/lib/session-feel'
 import { useTrainingWeek, readTrainingWeeks } from '@/hooks/useTrainingWeek'
 import { lessonDue, lessonBrief, lessonTaughtIn, taughtFromRows, actionDataWithLesson, type TaughtLesson } from '@/lib/coach-lessons'
-import { pickOpener, movementList, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
+import { pickOpener, sessionMovements, missedYesterdayFrom, readLastOrdinaryKind, rememberOrdinaryKind, PLAN_UNKNOWN_TEXT, type Opener } from '@/lib/coach-opener'
 import { cleanReplyText, applyMessageBreaks, ACTION_TAG_RE, QUICK_REPLIES_RE } from '@/lib/reply-text'
 import { rowToMessage, addServerMessages } from '@/lib/chat-history-merge'
 import { recordMomentSent, markMomentAnswered, type MomentLogRow } from '@/lib/moment-log'
@@ -658,7 +658,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
 
     // A ROW WITH NO EXERCISES IS NOT A SESSION (1 Nov 2026): Home and todayPlan both ask exercises.length.
     if (todaySession && todaySession.exercises.length > 0) {
-      const movements = movementList(todaySession.exercises.map(e => e.name))
+      const movements = sessionMovements(todaySession.exercises)
       // PAST THE HOUR, ASK WHETHER IT HAPPENED — never "today was X. How'd it go?" (1 Nov 2026). This bubble
       // is drawn before any log has been read, so it cannot know a session happened; the composed opener
       // that replaces it does, and says "How'd it go?" only then.
@@ -702,10 +702,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // A walk day carries its whole prescription in plannedActivity and has
     // no exercises to list, so mapping the (empty) exercise list produced
     // "Day one is today: Walk — ." in the app's very first message.
-    const brief = (day: { focus: string; exercises: { name: string }[]; plannedActivity?: { duration?: number; targetRpe?: number } | null }) => ({
+    const brief = (day: { focus: string; exercises: { name: string; tier?: string | null }[]; plannedActivity?: { duration?: number; targetRpe?: number } | null }) => ({
       focus: day.focus,
       movements: day.exercises.length > 0
-        ? movementList(day.exercises.map(e => e.name))
+        ? sessionMovements(day.exercises)
         : day.plannedActivity?.duration != null
           ? `${day.plannedActivity.duration} minutes, easy pace`
           : '',
@@ -1025,7 +1025,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     return { verdict: assessEdit(ctx), key: askKey(ctx, block), scope: ctx.scope, reasoned }
   }
   /** The running summary of chats older than the coach's window (chat-summary.ts); the phone's copy, then the profile's. */
-  const chatSummaryRef = useRef<ChatSummary | null>(loadChatSummary(profile.id, (profile as { chat_summary?: unknown }).chat_summary))
+  const chatSummaryRef = useRef<ChatSummary | null>(loadChatSummary(profile.id, profile.chat_summary))
   const summarising = useRef(false)
   /** Folds the messages that have left the window into the summary: one short coach call, checked before it is kept. */
   const maybeSummarise = async (all: ChatMessage[]) => {
@@ -1342,7 +1342,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   const todayPlan = todayMovedTo
     ? undefined
     : todayResolved.day && todayResolved.day.exercises.length > 0 ? todayResolved.day : undefined
-  const movementsOf = (d: WorkoutDay) => movementList(d.exercises.map(e => e.name))
+  const movementsOf = (d: WorkoutDay) => sessionMovements(d.exercises)
 
   // -------------------------------------------------------------------------
   // THE ONE LOOKUP EVERY EXERCISE-GRAIN EDIT GOES THROUGH (H15, 9 Oct 2026).
@@ -2370,6 +2370,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       eaten_by_day: eatenByDay,
       eaten_by_day_read: eatenByDay != null,
       week_review: weekReview,
+      // THE WEIGHT HIS PROTEIN AND FAT ARE WORKED OUT FROM (18 Nov 2026, macro-calculator.ts): sent only when it is lower
+      // than his weight, so the coach never works protein out per kilo of his full weight and contradicts the targets. Read off the
+      // same weight the targets themselves use (targetBasisKg), so the two cannot disagree.
+      nutrition_reference_weight_kg: (ref => (targetBasisKg != null && ref < targetBasisKg ? ref : null))(nutritionReferenceWeightKg(targetBasisKg ?? 0, profile.height_cm)),
       // THE STARTER TIER (slice 4b): false means he chose not to see calories or macros, so the coach quotes none.
       show_numbers: profile.show_numbers !== false,
       week_review_read: weekReview != null,
@@ -3133,8 +3137,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const afterWeek = trial.mesocycle.find(w => w.week_number === activeSession.liveWeek)
     const afterDay = afterWeek?.days.find(d => d.day === dayName)
     const impact = describeEditImpact(week, afterWeek, dayName)
-    const wasMinutes = Math.round(estimateDaySeconds(day) / 60)
-    const nowMinutes = afterDay ? Math.round(estimateDaySeconds(afterDay) / 60) : wasMinutes
+    // The header's own reader (18 Nov 2026): a session's length is its work, optional time named beside it.
+    const wasMinutes = dayLengthParts(day).workMinutes
+    const nowMinutes = afterDay ? dayLengthParts(afterDay).workMinutes : wasMinutes
 
     const advice = adviseEdit({
       profile, before: mesocycle, after: trial.mesocycle, weekNumber: activeSession.liveWeek,
@@ -4039,7 +4044,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       diff: {
         lead: ask(floor ? `do the short version of ${on.sayDay}, about ${trial.achievedMinutes} minutes` : `cut ${on.sayDay} down to about ${trial.achievedMinutes} minutes`),
         rows: [
-          { field: 'Time', before: `~${Math.round(estimateDaySeconds(day) / 60)} min`, after: `~${trial.achievedMinutes} min` },
+          { field: 'Time', before: formatDayLength(dayLengthParts(day)), after: `~${trial.achievedMinutes} min` },
           { field: 'Exercises', before: String(day.exercises.length), after: String(after.exercises.length) },
         ],
         unchanged: [`Your main lift — every set of it`],
@@ -9180,7 +9185,21 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                   {openButtonLabel(opened.target)}
                                 </button>
                               )
-                              if (videos.length === 0) return timerButton
+                              // A SCREEN THE COACH NAMES IS ONE TAP AWAY (18 Nov 2026, open-request.ts): never on a reminder
+                              // (it has its own shortcut), and under the timer or video button when there is one.
+                              const named = msg.role === 'assistant' && !msg.reminder ? screenNamedInReply(msg.content) : null
+                              const namedButton = named && (
+                                <button
+                                  type="button"
+                                  data-testid="open-named-screen"
+                                  data-open-target={named}
+                                  onClick={() => requestOpen(named, named === 'plate' ? kgInText(msg.content) : null)}
+                                  className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-primary/60 px-3.5 text-[0.8125rem] font-medium text-primary-text"
+                                >
+                                  {openButtonLabel(named)}
+                                </button>
+                              )
+                              if (videos.length === 0) return namedButton ? <div className="flex flex-col items-start">{timerButton}{namedButton}</div> : timerButton
                               return (
                                 <div className="mt-2 flex flex-col items-start gap-1.5">
                                   {videos.map(v => (
@@ -9197,6 +9216,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                     </a>
                                   ))}
                                   {timerButton}
+                                  {namedButton}
                                 </div>
                               )
                             })()}

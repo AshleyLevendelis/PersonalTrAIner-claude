@@ -5,7 +5,7 @@ import type {
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
 import { getAppNow, getLocalDateString } from './dev-clock'
-import { EXERCISE_DATABASE, INJURED_JOINTS, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup, getExerciseEntry } from './exercise-db'
+import { EXERCISE_DATABASE, INJURED_JOINTS, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, EXPLOSIVE_PREP_GROUPS, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup, getExerciseEntry } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
@@ -14,7 +14,7 @@ import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields,
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
-  shiftReps, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, stepHoldSeconds, getPhaseTempo, formatTempo, PHASE_CONFIGS, type PhaseConfig, type TrainingPhase,
+  shiftReps, repFloorFor, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, stepHoldSeconds, getPhaseTempo, formatTempo, PHASE_CONFIGS, type PhaseConfig, type TrainingPhase,
 } from './periodization'
 import { hasHealthCondition, isPregnant, noteForProfile, lateInPregnancy, LATE_PREGNANCY_SET_RPE_CEILING, effortWordsOnly, HEALTH_SET_RPE_CEILING, HEALTH_CONDITIONING_RPE_CEILING } from './health-conditions'
 import { pregnancyExclusion, pregnancyWarning } from './pregnancy-rules'
@@ -449,6 +449,14 @@ export function isWeekSupportLeg(focus: string, entry: ExerciseEntry): boolean {
 /** True for a track whose own work is legs — used to decide whether the WEEK already trains them twice. */
 function isLegTrack(focus: TrackFocus): boolean {
   return trackTrainsLegs(TRACKS[focus])
+}
+
+/** The lower-body pattern a track's main-lift slot is FIXED to: a squat, a hinge, or null (no lower main lift, or it may be either). */
+function fixedLowerMainPattern(track: TrackDefinition): 'knee_dominant' | 'hip_hinge' | null {
+  const slot = track.slots.find(s => s.tier === 'tier1_compound')
+  if (!slot) return null
+  const squat = slot.patterns.includes('knee_dominant'), hinge = slot.patterns.includes('hip_hinge')
+  return squat && !hinge ? 'knee_dominant' : hinge && !squat ? 'hip_hinge' : null
 }
 
 /** The same question asked of the track itself, for code that holds the definition rather than its name. */
@@ -2070,6 +2078,13 @@ function adjustCountsForExperience(
 const WEEKLY_APPEARANCE_CAP = 2
 
 /**
+ * A THIN DAY, in the two numbers the day-purpose gate has used since Sam's report (9 Oct 2026): nine working sets or
+ * fewer, with ten minutes or more of its time left over. Read by the last step of balanceWeeklyStructure.
+ */
+const THIN_DAY_WORKING_SETS = 9
+const THIN_DAY_SPARE_SECONDS = 10 * 60
+
+/**
  * Redistributes accessory slots between isolation (tier3) and compound-
  * accessory (tier2) without changing the total accessory count — a goal's
  * isolationSlotShift moves slot BUDGET (what kind of accessory work fills
@@ -2684,6 +2699,8 @@ function selectExercisesForTrack(
    * trains legs once elsewhere.
    */
   weekTrainsLegsElsewhere: boolean = false,
+  /** Later days of this week whose main lift is fixed to a squat or to a hinge (lowerMainToPrefer, below). */
+  lowerMainsLater: { squat: number; hinge: number } = { squat: 0, hinge: 0 },
 ): { primer: ExerciseEntry | null; rehab: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string>; uncoveredPatterns: MovementPattern[]; selectionNotes: Map<string, string> } {
   const counts = applyIsolationSlotShift(countsIn, policy.isolationSlotShift)
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
@@ -2866,6 +2883,29 @@ function selectExercisesForTrack(
     return false
   }
 
+  /**
+   * A WEEK'S LOWER-BODY MAIN LIFTS ALTERNATE (18 Nov 2026, CSCS; docs/plans/coach-read-of-plans.md).
+   *
+   * A full-body day's main lift may be a squat or a hinge, and each day picked on its own. Measured on 80 plans: 7
+   * had two full-body days both built on a deadlift variant (Sumo Deadlift, then Deadlifts) and 4 of those had no
+   * squat main lift anywhere in the week (a two-day beginner deadlifting both days). Where a day may be built on
+   * either, it takes the pattern the rest of the week holds less of: the days already built (weeklyAppearanceCount)
+   * and the later days whose main lift is fixed (a Squat & Carry day is a squat, a Pull & Hinge day a hinge).
+   * Level, or nothing to compare: no preference, the ranking decides as before. A preference the pool cannot meet
+   * (a flagged knee, no bar) falls back to the slot's own patterns.
+   */
+  function lowerMainToPrefer(slot: TrackSlot): MovementPattern | null {
+    if (slot.tier !== 'tier1_compound' || !slot.patterns.includes('knee_dominant') || !slot.patterns.includes('hip_hinge')) return null
+    let squat = lowerMainsLater.squat, hinge = lowerMainsLater.hinge
+    for (const [name, n] of weeklyAppearanceCount ?? []) {
+      const e = getExerciseEntry(name)
+      if (e?.mechanics_tier !== 'tier1_compound') continue
+      if (e.movement_pattern === 'knee_dominant') squat += n
+      else if (e.movement_pattern === 'hip_hinge') hinge += n
+    }
+    return squat === hinge ? null : squat < hinge ? 'knee_dominant' : 'hip_hinge'
+  }
+
   function fillSlot(slot: TrackSlot): void {
     // Preferred tier wins over "fresh this week" — reusing the same main
     // lift on a second day (normal in full-body/PPL splits) is a better
@@ -2874,7 +2914,9 @@ function selectExercisesForTrack(
     // preferred tier + fresh -> preferred tier + reused ok -> any tier +
     // fresh -> any tier + reused ok -> nearest-pattern substitute (required
     // slots only, logged) -> give up (required slots only, logged).
+    const preferredLowerMain = lowerMainToPrefer(slot)
     const pick =
+      (preferredLowerMain ? findForSlot([preferredLowerMain], slot.tier, true) ?? findForSlot([preferredLowerMain], slot.tier, false) : null) ??
       findForSlot(slot.patterns, slot.tier, true, slot.groups) ??
       findForSlot(slot.patterns, slot.tier, false, slot.groups) ??
       findForSlot(slot.patterns, null, true, slot.groups) ??
@@ -3441,6 +3483,20 @@ function shiftRestSeconds(seconds: number, multiplier: number): number {
   return Math.max(20, Math.round(seconds * multiplier))
 }
 
+
+/**
+ * A WARM-UP DRILL'S REPS, BY WHAT THE DRILL IS (18 Nov 2026, CSCS; docs/plans/coach-read-of-plans.md).
+ *
+ * Every rep-counted primer started at 5 and was then moved by the block like a working lift: 3 arm circles in a
+ * strength block for an advanced lifter, 9 in a conditioning block, 8 in every block for a beginner (the experience
+ * floor), and one more each week on some goals. Movement prep is not periodised: explosive prep (jumps, slams, plyo
+ * push-ups, swings) is a few fast reps with full quality; activation and mobility drills are done for about ten
+ * controlled ones. The same in every block and week (generateMesocycle leaves a primer's reps at this base).
+ */
+export function movementPrepReps(entry: ExerciseEntry): string {
+  return EXPLOSIVE_PREP_GROUPS.includes(entry.substitution_group) ? '5' : '10'
+}
+
 /**
  * The prescription for every non-'reps' unit — a hold duration, a measured
  * carry distance, a work:rest interval. These are the STARTING values: unlike
@@ -3523,8 +3579,8 @@ function assignSetsRepsFromConfig(
   policy: GoalPolicy,
   sessionDurationPreference?: SessionDuration,
 ): { sets: number; reps: string; rest: string; restSeconds: number } {
-  // Primers are not scaled — a 5-rep activation drill is a 5-rep activation
-  // drill regardless of how long you have been training.
+  // Primers are not scaled — a warm-up drill's dose is the same however long you have been training, and (since
+  // 18 Nov 2026) in every block and week: see movementPrepReps.
   //
   // NOT SCALED IS NOT THE SAME AS NOT MEASURED, and this branch used to
   // conflate them: it returned before the prescription_type dispatch below,
@@ -3543,7 +3599,7 @@ function assignSetsRepsFromConfig(
     const fixed = fixedUnitPrescription(entry, sessionDurationPreference)
     return fixed
       ? { ...fixed, sets: 2, rest: '30s', restSeconds: 30 }
-      : { sets: 2, reps: '5', rest: '30s', restSeconds: 30 }
+      : { sets: 2, reps: movementPrepReps(entry), rest: '30s', restSeconds: 30 }
   }
 
   // A beginner never drops below 2 working sets — one set is not a stimulus.
@@ -3585,7 +3641,7 @@ function assignSetsRepsFromConfig(
       restSeconds = Math.max(restSeconds, mainLiftRestFloor(entry, policy))
       return {
         sets: scaleSets(config.setRange[tierKey]),
-        reps: snapToRepBracket(applyRepFloor(shiftRepRange(config.repRange[tierKey], policy.repRangeShift[tierKey]), experience.min_reps)),
+        reps: snapToRepBracket(applyRepFloor(shiftRepRange(config.repRange[tierKey], policy.repRangeShift[tierKey]), repFloorFor(experience.min_reps, null, tierKey === 'tier1'))),
         rest: `${restSeconds}s`,
         restSeconds,
       }
@@ -3839,6 +3895,52 @@ export function enforceSetHierarchy(exercises: Exercise[]): Exercise[] {
 const RELATED_PRESS_FRACTION_CEILING = 0.55 // curls/laterals/shrugs vs. the day's main press
 const UNILATERAL_VS_MAIN_FRACTION_CEILING = 0.65 // unilateral accessory vs. the day's bilateral main, same broad pattern
 const SAME_MUSCLE_GROUP_MAX_RATIO = 2 // heaviest same-group accessory vs. lightest, within the week
+
+// ---------------------------------------------------------------------------
+// NO LOADED LIFT IS PRESCRIBED PAST 20 REPS (18 Nov 2026, the Fable pass on plans; CSCS decision, mine).
+//
+// FOUND by generating 120 different people's plans and reading the cards: 3,380 of 21,000 loaded exercise slots (16%)
+// asked for more than 20 reps and 889 (4%) for more than 25, up to "Overhead Tricep Extension 3x24-29 @ 18kg". Nothing
+// miscalculated. An adaptation or conditioning phase lifts every range by 3 or 4 reps, a lift whose next weight is too
+// big a jump climbs a rep or two a week instead of adding weight, and nothing ever said where that stops: an isolation
+// lift's 15-20 became 18-23, then 20-25, then 22-27.
+// BASIS: the NSCA's muscular-endurance prescription is 12 reps or more at 67% of a best lift or less, and in practice
+// coaches write 12-20; past about 20 a set is a test of how long the muscle can burn rather than a strength or size
+// stimulus, takes over a minute, and at the moderate effort these phases ask for is too far from the limit to count.
+// A weightless lift (a press-up, an air squat) has no weight to add, so reps are its lever and it is not capped.
+// HOW: the phase's range for that lift is lowered just far enough that its LAST loading week tops out at 20, so the
+// weeks still climb (11-16, 13-18, 15-20) and the weight is priced for the reps actually asked (a little heavier).
+// ---------------------------------------------------------------------------
+export const LOADED_REP_CEILING = 20
+/** The most a rep range climbs inside one block by its weekly steps (weeks 2 and 3). */
+const MAX_WEEKLY_REP_STEPS_IN_BLOCK = 2
+/**
+ * How many reps a loaded lift's phase range is lowered by so that its last loading week still tops out at the ceiling:
+ * room for its two weekly steps and for the reps a held weight can buy (MAX_FROZEN_LOAD_REP_BUMP). Asked of the RANGE
+ * alone, never of whether this lift's next weight is affordable: that question has two askers (generation, from the
+ * block's baseline, and repRangeForIncomingExercise, from a fresh estimate) and they do not always agree, and a rule
+ * that depended on it printed two different ranges for one lift.
+ */
+export function loadedRepCeilingCut(phaseReps: string): number {
+  const top = repRangeTop(phaseReps)
+  if (top == null) return 0
+  return Math.max(0, top + MAX_WEEKLY_REP_STEPS_IN_BLOCK + MAX_FROZEN_LOAD_REP_BUMP - LOADED_REP_CEILING)
+}
+/** The top of a rep range ("15-20" is 20, "12" is 12); null for anything not counted in reps. */
+/**
+ * WHICH LIFTS THE CEILING COVERS: every lift whose resistance can be raised (a weight, a stack, a machine, a band),
+ * whether or not the app can put a number on it. The first version covered only lifts with a priced weight, and a
+ * Cable Woodchop ("Choose by feel"), an Ab Crunch Machine and a band Pallof Press still read 3 x 19-24 (phone walk,
+ * 18 Nov 2026): at 20 clean reps the answer is more resistance, not more reps. Bodyweight alone is not covered: reps
+ * are the only lever it has.
+ */
+export function resistanceCanRise(entry: ExerciseEntry): boolean {
+  return isExternallyLoaded(entry) || isBandEquipped(entry)
+}
+function repRangeTop(reps: string): number | null {
+  const m = reps.match(/^(\d+)\s*-\s*(\d+)$/) ?? reps.match(/^(\d+)$/)
+  return m ? Number(m[2] ?? m[1]) : null
+}
 
 // Most extra reps a lift may accumulate while its weight sits at the
 // unverified ramp's ceiling — see frozenLoadStreakByLift. shiftReps enforces a
@@ -4861,6 +4963,56 @@ function balanceWeeklyStructure(
       reason: `push:pull ratio ${(pushCount / pullCount).toFixed(2)} is outside the 1:1-1:1.5 band and no swap, add, or remove could correct it`,
     })
     break
+  }
+
+  // A DAY THAT REACHED ITS EXERCISE COUNT AND IS STILL THIN BORROWS TOO (18 Nov 2026, decided as a CSCS coach).
+  //
+  // The 9 Oct rule gives a day borrowed work "before its spare time is handed to optional mobility", and triggers on
+  // a day that cannot reach its exercise COUNT. The count is sized for loaded work and its rests. With no kit the
+  // same count is a much shorter session: MEASURED, a bodyweight beginner's Chest & Triceps day on a 30-45 plan was
+  // two push-up variations and chair dips, seven working sets and 23 minutes, with a plank, a dead bug and a reverse
+  // crunch sitting in the pool. It reached its count, so nothing was borrowed; the week's push:pull balance forbids
+  // more pressing; and the day shipped seven minutes under the time asked for (the filler looked before the balance
+  // pass then) or, once the filler looked after it, with fourteen minutes of optional mobility. The day-purpose gate
+  // (P4) could not see the first state and went red on the second.
+  //
+  // So, last in this pass: a day of nine working sets or fewer that is ten minutes or more short of its budget takes
+  // work until it is not, or until there is none to take. In order: the track's borrow list (each source once), then
+  // one more of a pattern of its own; never a third movement of one pattern. Only work the push:pull and squat:hinge counts
+  // do not see (core, arms, shoulders, traps, calves), so nothing this adds can be taken straight back by the
+  // balance above or by the per-week set balance; never a tier-1; one movement per family; never a movement the week
+  // already holds twice. BASIS: a session's main work is its training effect and optional mobility is not volume
+  // (the house rule since 23 Sep); trunk and small-muscle work is what a coach adds to a short day, because it costs
+  // little recovery and takes nothing from the next session's main lifts.
+  const thinBudgetSeconds = getDurationBudgetSeconds(profile.session_duration_preference || '45-60')
+  const weekAppearances = (name: string): number => days.reduce((n, d) => n + (d.exercises.some(ex => ex.name === name) ? 1 : 0), 0)
+  for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
+    const track = TRACKS[days[dayIdx].focus as TrackFocus]
+    if (!track || days[dayIdx].exercises.length === 0) continue
+    const isThin = (): boolean => {
+      const workingSets = days[dayIdx].exercises.reduce((n, ex) => n + (findEntry(ex.name)?.mechanics_tier === 'primer' ? 0 : ex.sets), 0)
+      return workingSets <= THIN_DAY_WORKING_SETS && thinBudgetSeconds - estimateDaySeconds(days[dayIdx]) >= THIN_DAY_SPARE_SECONDS
+    }
+    const takeable = (e: ExerciseEntry): boolean =>
+      e.mechanics_tier !== 'primer' && e.mechanics_tier !== 'cardio' && e.mechanics_tier !== 'tier1_compound' &&
+      classifyForBalance(e.movement_pattern) === null &&
+      !dayForbidden(dayIdx).has(e.movement_pattern) &&
+      !dayFamilies(dayIdx).has(getMovementFamily(e)) &&
+      weekAppearances(e.name) < WEEKLY_APPEARANCE_CAP &&
+      // Never a THIRD movement of one pattern on the day, whichever list it comes from (two triceps movements, not
+      // four; two trunk movements, not three). Binds on 5 days of the 9,216-profile grid, all on the day's own list.
+      days[dayIdx].exercises.filter(ex => { const x = findEntry(ex.name); return !!x && x.mechanics_tier !== 'primer' && x.movement_pattern === e.movement_pattern }).length < 2
+    const ownPatterns = [...track.primary_patterns, ...track.secondary_patterns]
+    const sources: ((e: ExerciseEntry) => boolean)[] = [
+      ...(track.borrow ?? []).map(source => (e: ExerciseEntry) =>
+        (source.groups?.includes(e.substitution_group) ?? false) || (source.patterns?.includes(e.movement_pattern) ?? false)),
+      (e: ExerciseEntry) => ownPatterns.includes(e.movement_pattern),
+    ]
+    for (const matches of sources) {
+      if (!isThin()) break
+      const candidate = pool.find(e => matches(e) && takeable(e))
+      if (candidate) addExercise(dayIdx, candidate, 'the day reached its exercise count and was still ten minutes short')
+    }
   }
 }
 
@@ -5940,8 +6092,10 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const trackFocus = resolvedTracks[index]
     const track = TRACKS[trackFocus]
     const legDaysElsewhere = resolvedTracks.filter((focus, i) => i !== index && isLegTrack(focus)).length
+    const laterFixed = resolvedTracks.slice(index + 1).map(focus => fixedLowerMainPattern(TRACKS[focus]))
+    const lowerMainsLater = { squat: laterFixed.filter(p => p === 'knee_dominant').length, hinge: laterFixed.filter(p => p === 'hip_hinge').length }
 
-    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle, legDaysElsewhere >= 2)
+    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle, legDaysElsewhere >= 2, lowerMainsLater)
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
@@ -7499,6 +7653,8 @@ export function repRangeForIncomingExercise(
   const base = assignSetsRepsFromConfig(entry, styleConfig, expConfig, policy, profile.session_duration_preference).reps
 
   const isPrimer = entry.mechanics_tier === 'primer'
+  // Movement prep is not periodised (movementPrepReps): the same reps in every block and week.
+  if (isPrimer) return base
   const isMainCompound = entry.mechanics_tier === 'tier1_compound'
   const isDeload = !!week.is_deload
   const w = Math.min(Math.max(1, week.week_in_block ?? 1), 4)
@@ -7508,7 +7664,7 @@ export function repRangeForIncomingExercise(
   // price it from. A primer is neither a weightless working lift nor a loaded
   // one for this purpose.
   const isBodyweight = !isPrimer && (!isExternallyLoaded(entry) || category == null)
-  const repFloor = Math.max(expConfig.min_reps, isMainCompound ? (phaseConfig.main_lift_rep_floor ?? 0) : 0)
+  const repFloor = repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound)
 
   // A lift that has just arrived has no block baseline, so the two questions
   // generation asks of one are asked of its own starting estimate instead.
@@ -7516,6 +7672,8 @@ export function repRangeForIncomingExercise(
     ? null
     : prescribeLoad(entry, profile, { targetRpeLabel: intensity, repRangeLabel: reps }).starting_weight_kg
 
+  // Generation's rep ceiling for a loaded lift (loadedRepCeilingCut), from the phase's range alone.
+  const ceilingCut = (): number => (resistanceCanRise(entry) ? loadedRepCeilingCut(shiftReps(base, phaseConfig.rep_shift, repFloor)) : 0)
   if (isDeload) {
     // A deload's default move is a lighter weight and reps eased UP by two.
     // Where there is no weight to take off — a weightless lift, a warm-up
@@ -7524,23 +7682,25 @@ export function repRangeForIncomingExercise(
     // week harder, so they stay at the phase's range (generation's
     // `deloadLoadLeverDead`). See the approximation note above for the further
     // two-rep cut this cannot see.
-    const loadingReps = shiftReps(base, phaseConfig.rep_shift, repFloor)
+    const loadingReps = shiftReps(base, phaseConfig.rep_shift - ceilingCut(), repFloor)
     const kg = isExternallyLoaded(entry) ? startingKg(loadingReps) : null
     const atFloor = kg != null && kg * DELOAD_LOAD_FRACTION < getEquipmentFloorKg(entry)
     const leverDead = !isExternallyLoaded(entry) || atFloor
-    return leverDead ? loadingReps : shiftReps(base, phaseConfig.rep_shift + 2, repFloor)
+    return leverDead ? loadingReps : shiftReps(base, phaseConfig.rep_shift - ceilingCut() + 2, repFloor)
   }
-  const phaseReps = shiftReps(base, phaseConfig.rep_shift, repFloor)
+  const uncutPhaseReps = shiftReps(base, phaseConfig.rep_shift, repFloor)
 
   // IS ONE NOTCH OF THIS IMPLEMENT TOO BIG A JUMP? (generation's
   // `loadStepUnaffordable`: more than 12% of the weight in one step.)
   let loadStepUnaffordable = false
-  const start = startingKg(phaseReps)
+  const start = startingKg(uncutPhaseReps)
   if (start != null && start > 0 && category != null) {
     loadStepUnaffordable = getLoadIncrementKg(entry, category, start) / start > 0.12
   }
   const rampReps = isBodyweight || loadStepUnaffordable
     || ((policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isMainCompound)
+  // Generation's rep ceiling for a loaded lift (loadedRepCeilingCut).
+  const phaseReps = shiftReps(base, phaseConfig.rep_shift - ceilingCut(), repFloor)
   return shiftReps(phaseReps, rampReps ? w - 1 : 0, repFloor)
 }
 
@@ -8234,7 +8394,7 @@ export function generateMesocycle(
           // bump re-derives its range from the same base, and if it clamped to
           // a lower floor than the week's own reps did, it could hand back
           // 4-6 as the "bumped" version of 6-8 and replace it.
-          const repFloor = Math.max(expConfig.min_reps, isMainCompound ? (phaseConfig.main_lift_rep_floor ?? 0) : 0)
+          const repFloor = repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound)
           const rampLoadCandidate = !isBodyweight && (policy.progressionEmphasis === 'load' || isCarry || isMainCompound)
 
           // A percentage-sized step snapped to the loading mode's real
@@ -8259,6 +8419,13 @@ export function generateMesocycle(
           }
           const rampLoad = rampLoadCandidate && !loadStepUnaffordable
           const rampReps = (isBodyweight || loadStepUnaffordable || ((policy.progressionEmphasis === 'reps' || policy.progressionEmphasis === 'maintain') && !isMainCompound)) && !isCarry
+          // A LOADED LIFT'S RANGE ENDS ITS BLOCK AT 20 REPS OR FEWER (loadedRepCeilingCut, above): the phase's range is
+          // lowered before the ramp and before the weight is priced, and the lift keeps whichever lever it had. Forcing
+          // a lowered lift to climb reps at one weight was built and measured too (60 plans): it changed nothing for the
+          // ceiling and repeated 6 to 18 more week-pairs, so it is not here.
+          const repCeilingCut = !!dbEntry && resistanceCanRise(dbEntry) && !isPrimer && !isCarry && (dbEntry.prescription_type ?? 'reps') === 'reps'
+            ? loadedRepCeilingCut(shiftReps(baseReps, phaseConfig.rep_shift, repFloor))
+            : 0
           // THE PHASE'S RANGE FIRST, THEN THE RAMP CLIMBS FROM IT — and the
           // frozen-load bump, further down, climbs from the week's own range.
           // A floor (the experience floor, or a phase's main-lift floor) is
@@ -8283,9 +8450,10 @@ export function generateMesocycle(
                 ? (deloadNeedsRepCut ? phaseConfig.rep_shift - 2 : phaseConfig.rep_shift)
                 : phaseConfig.rep_shift + 2)
             : phaseConfig.rep_shift
+          // The rep ceiling's cut (above) comes off the phase's range before the ramp and before the weight is priced.
           const rampSteps = !isDeload && rampReps ? w - 1 : 0
-          const repShift = phaseRepShift + rampSteps
-          const phaseReps = shiftReps(baseReps, phaseRepShift, repFloor)
+          // (A deload eases reps up by two from the lowered range, which is three under the ceiling at most.)
+          const phaseReps = shiftReps(baseReps, phaseRepShift - repCeilingCut, repFloor)
           const restShift = isDeload ? 0 : phaseConfig.rest_adjust_seconds
 
           // Interval and steady-state cardio don't go through the reps-
@@ -8324,7 +8492,9 @@ export function generateMesocycle(
               ?? shiftReps(phaseReps, rampSteps, repFloor)
             restForWeek = adjustRest(ex.rest, restShift)
           } else {
-            reps = shiftReps(phaseReps, rampSteps, repFloor)
+            // MOVEMENT PREP IS NOT PERIODISED: a warm-up drill keeps its base reps in every block and week
+            // (movementPrepReps), as a warm-up hold above keeps its base seconds.
+            reps = isPrimer ? baseReps : shiftReps(phaseReps, rampSteps, repFloor)
             restForWeek = adjustRest(ex.rest, restShift)
           }
 
@@ -8598,6 +8768,7 @@ export function generateMesocycle(
               const streak = frozenLoadStreakByLift.get(dbEntry.name) ?? 0
               let bump = alreadyDecided ?? Math.min(streak + 1, MAX_FROZEN_LOAD_REP_BUMP)
               let bumpedReps = shiftReps(reps, bump, repFloor)
+
               // ESCALATE WITHIN THE WEEK. shiftReps clamps to the rep floor, so
               // in a negative-shift phase a small bump can land on exactly the
               // range already shown (an intermediate's 6-8 under Power's -4 is
@@ -9134,13 +9305,22 @@ export function generateMesocycle(
         // the filler to fill either, so the two never fight over the same
         // day.
         trimWeekRestForBudget(days, totalBudgetSeconds, trimLog, policy.minLoadedMainLiftRestSeconds, profile.training_style || 'hybrid')
-        applyDurationFiller(days, profile, policy, totalBudgetSeconds, getSessionMinimumSeconds(profile.session_duration_preference || '45-60'))
-        // Runs last, after rotation, periodization and duration-budget
-        // trimming have all had their say — see enforceWeeklyPatternBalance's
-        // doc comment. Deload weeks are exempt (like the duration filler
-        // above): their volume is deliberately, uniformly cut, and nudging
-        // set counts would fight that.
+        // Runs after rotation, periodization and duration-budget trimming
+        // have all had their say — see enforceWeeklyPatternBalance's doc
+        // comment. Deload weeks are exempt (like the duration filler below):
+        // their volume is deliberately, uniformly cut, and nudging set counts
+        // would fight that.
         enforceWeeklyPatternBalance(days, { keepPulling: keepPullingThisPlan })
+        // THE FILLER SIZES ITSELF ON THE DAY AS IT WILL SHIP (18 Nov 2026).
+        // It used to run just BEFORE the balance pass, which then took a set
+        // off some days: a day that was long enough when the filler looked
+        // landed a minute or two under the time asked for with nothing added.
+        // MEASURED on test:session-length's grid (576 loading sessions a
+        // tier): 12 / 38 / 27 sessions under the minimum, and 58 of the 65 in
+        // the two longer tiers carried no filler at all. The balance pass
+        // reads no time and the filler changes no exercise, so the order
+        // between them only ever decided what the filler measured.
+        applyDurationFiller(days, profile, policy, totalBudgetSeconds, getSessionMinimumSeconds(profile.session_duration_preference || '45-60'))
 
         // FINAL SAFETY TRIM, against the stated MAXIMUM rather than the
         // midpoint budget the pass above already aimed at.
@@ -9162,10 +9342,11 @@ export function generateMesocycle(
         // Rest is also the one lever this is allowed to pull — trimming sets
         // here would fight the very pass that just set them.
         //
-        // AND NOT BEFORE THE OPTIONAL FILLER HAS GONE. A day the pattern-
-        // balance pass bumped over the maximum still had its filler, sized
-        // before the bump — and rest is what Ashley ruled on 18 Sep must not
-        // pay for time, least of all for optional mobility.
+        // AND NOT BEFORE THE OPTIONAL FILLER HAS GONE. Rest is what Ashley
+        // ruled on 18 Sep must not pay for time, least of all for optional
+        // mobility. (Since 18 Nov 2026 the filler is sized after the balance
+        // pass, so a bump can no longer push a filled day over; this stays
+        // as the guard on that order.)
         {
           const sessionMaxSeconds = getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
           for (let i = 0; i < days.length; i++) days[i] = yieldFillerTo(days[i], sessionMaxSeconds)

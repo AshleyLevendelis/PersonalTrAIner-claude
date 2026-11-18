@@ -155,13 +155,21 @@ async function main() {
     const w3 = swapped[2]
     // A dumbbell lift well under her 24 kg limit, so the earned weight is one the kit can carry (a bag's strap limit
     // would clamp it, rightly, and the check would be measuring the clamp).
-    const lifted = w3.days.flatMap(d => d.exercises.map((e, i) => ({ d: d.day, i, e }))).find(x => /Dumbbell/.test(x.e.name) && x.e.suggested_load_kg != null && x.e.suggested_load_kg >= 6 && x.e.suggested_load_kg <= 16 && !x.e.swapped_for)
+    // RE-ANCHORED 18 Nov 2026: "a pair written into a check is a fixture". The lift was the FIRST dumbbell lift in the
+    // week inside the weight window; once two dumbbell lifts were re-priced that became an accessory the re-seeded
+    // rebuild does not pick again, and both checks failed on a lift that was simply not there. The lift is now found by
+    // the property the check needs: one the plain rebuild ALSO holds, at the same reps.
+    const plain = await silently(() => rebuildAgainstProfile(sam, [], swapped, [3], { ...untrainedPlanContext(cal(SUN)), fromDate: '2026-10-19' }, 'gate:load'))
+    const plainRows = plain[2].days.flatMap(d => d.exercises)
+    const lifted = w3.days.flatMap(d => d.exercises.map((e, i) => ({ d: d.day, i, e }))).find(x => /Dumbbell/.test(x.e.name) && x.e.suggested_load_kg != null && x.e.suggested_load_kg >= 6 && x.e.suggested_load_kg <= 16 && !x.e.swapped_for
+      && plainRows.some(e => e.name === x.e.name && e.reps === x.e.reps))
+    check('the fixture has a dumbbell lift the rebuild keeps at the same reps (so an earned weight has somewhere to land)', !!lifted, w3.days.flatMap(d => d.exercises).filter(e => /Dumbbell/.test(e.name)).map(e => `${e.name} ${e.reps} ${e.suggested_load_kg}`))
     const earnedKg = lifted ? lifted.e.suggested_load_kg! + 4 : 0
     const earned = lifted ? swapped.map(w => w.week_number !== 3 ? w : { ...w, days: w.days.map(d => d.day !== lifted.d ? d : { ...d, exercises: d.exercises.map((e, i) => i === lifted.i ? { ...e, suggested_load_kg: earnedKg, suggested_load: `${earnedKg}kg` } : e) }) }) : swapped
     const kept = await silently(() => rebuildAgainstProfile(sam, [], earned, [3], { ...untrainedPlanContext(cal(SUN)), fromDate: '2026-10-19' }, 'gate:load'))
     const after = kept[2].days.flatMap(d => d.exercises).find(e => e.name === lifted?.e.name && e.reps === lifted?.e.reps)
     check('a weight the plan had moved up to is kept at the same reps (never back to the estimate)', !!lifted && !!after && (after.suggested_load_kg ?? 0) >= earnedKg - 2.5, { lift: lifted?.e.name, earnedKg, after: after?.suggested_load_kg })
-    const plainKg = (await silently(() => rebuildAgainstProfile(sam, [], swapped, [3], { ...untrainedPlanContext(cal(SUN)), fromDate: '2026-10-19' }, 'gate:load')))[2].days.flatMap(d => d.exercises).find(e => e.name === lifted?.e.name)?.suggested_load_kg
+    const plainKg = plainRows.find(e => e.name === lifted?.e.name)?.suggested_load_kg
     check('...the contrast: without the earned weight the rebuild prints less', plainKg != null && plainKg < earnedKg, { plainKg, earnedKg })
   }
 

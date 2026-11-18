@@ -97,11 +97,19 @@ async function main() {
   const underHalf = served.filter(x => x.pass / Math.max(1, x.of) < 0.5)
   check('no dish is one nobody can be served (across six real targets and two meal shapes)', never.length === 0, never)
   check('...and none is served to fewer than one target in six (2 of 12 cases). It was "half" until 30 Sep 2026, when lean dishes were added for the high-energy targets: they serve the leaner half of the grid on purpose', weak.length === 0, weak)
-  check('...and a dish served to under half is a LEAN one (under 7 g of protein per 100 kcal as written): a protein-dense dish that few can be served is a defect, a lean one is meant for the leaner targets', underHalf.every(x => x.dens < 7), underHalf.filter(x => x.dens >= 7).map(x => `${x.d.name} ${x.dens.toFixed(1)}`))
-  check('the library is servable on average: 78% or better in every meal (measured 82, 89, 91 and 94 on 30 Sep 2026; it was 85 before the lean dishes)', SLOTS.every(s => {
-    const r = served.filter(x => x.d.slot === s)
-    return r.reduce((a, x) => a + x.pass / Math.max(1, x.of), 0) / r.length >= 0.78
-  }))
+  // 18 Nov 2026, the plate rules: a sandwich, a soup or a jacket potato cannot be a 970 kcal lunch (four slices of bread at
+  // most, 1,100 g on the plate), so such a dish is served at the SMALLER meals and refused at the bigger ones. That is
+  // the rule working, and it has a shape a defect does not: every meal it is served at is smaller than the middle of
+  // the meals it is refused at.
+  const median0 = (xs: number[]) => { const a = [...xs].sort((p, q) => p - q); return a[Math.floor(a.length / 2)] }
+  const sizeLimited = (x: { servedAt: number[]; refusedAt: number[] }) => x.servedAt.length > 0 && x.refusedAt.length > 0 && Math.max(...x.servedAt) < median0(x.refusedAt)
+  const unexplained = underHalf.filter(x => x.dens >= 7 && !sizeLimited(x))
+  check('...and a dish served to under half is a LEAN one (under 7 g of protein per 100 kcal as written) or one the PLATE limits to the smaller meals: a protein-dense dish that few can be served for any other reason is a defect', unexplained.length === 0, unexplained.map(x => `${x.d.name} ${x.dens.toFixed(1)} served at ${x.servedAt.join(',')} refused at ${x.refusedAt.join(',')}`))
+  check('...the plate does limit some (so that half of the rule is not idle), and never a dinner-sized majority: under 40 of them', underHalf.filter(x => x.dens >= 7).length >= 3 && underHalf.filter(x => x.dens >= 7).length < 40, underHalf.filter(x => x.dens >= 7).length)
+  // MOVED 18 Nov 2026: 78 -> 72. Measured 87, 77, 91 and 91 with the plate rules in (they were 82, 89, 91, 94 on 30 Sep):
+  // lunch is the biggest meal of the day, and a sandwich or a soup is no longer served as one of 970 kcal.
+  const servableBy = SLOTS.map(s => { const r = served.filter(x => x.d.slot === s); return Math.round(100 * r.reduce((a, x) => a + x.pass / Math.max(1, x.of), 0) / r.length) })
+  check('the library is servable on average: 72% or better in every meal (measured 87, 77, 91 and 91 on 18 Nov 2026)', servableBy.every(v => v >= 72), servableBy)
   check('the grid the servability is read on is wide: six targets from 1,700 to 3,100 kcal', TARGET_GRID.length === 6 && TARGET_GRID[0].targets.calories <= 1700 && Math.max(...TARGET_GRID.map(g => g.targets.calories)) >= 3100)
 
   // -------------------------------------------------------------------------
@@ -187,7 +195,8 @@ async function main() {
           const was = parseIngredientLine(t).quantity
           const now = parseIngredientLine(f.dish.ingredients[i]).quantity
           if (role === 'F' && now !== was) fixedMoved.push(`${d.name}: ${t} -> ${f.dish.ingredients[i]}`)
-          const lo = role === 'P' ? 0.55 : 0.5, hi = role === 'P' ? 1.35 : 2.0
+          // 18 Nov 2026: the protein food never under half the recipe's, the starch never over 2.6x (meal-library.ts).
+          const lo = 0.5, hi = role === 'P' ? 1.35 : 2.6
           if (role !== 'F' && (now < was * lo - 5 || now > was * hi + 5)) outOfRange.push(`${d.name}: ${t} -> ${f.dish.ingredients[i]}`)
         })
         if (dens >= 7) { tally.dense.n++; if (f.loss !== Infinity) tally.dense.ok++ }
@@ -201,10 +210,12 @@ async function main() {
   }
   check('a fit only ever changes the amount on a line: same lines, same foods, same order', shapeBroken.length === 0, shapeBroken.slice(0, 5))
   check('...and only protein foods and carb foods move: vegetables, fats, sauces and counted items stay as written', fixedMoved.length === 0, fixedMoved.slice(0, 5))
-  check('...by at most the range a cook would call the same dish (protein 0.55-1.35x, carbs 0.5-2x)', outOfRange.length === 0, outOfRange.slice(0, 5))
+  check('...by at most the range a cook would call the same dish (protein 0.5-1.35x, carbs 0.5-2.6x)', outOfRange.length === 0, outOfRange.slice(0, 5))
   check('a fit never mutates the library and gives the same answer twice', impure.length === 0, impure.slice(0, 5))
   check('a dish the fit says it fitted is ALWAYS accepted by verifyProposal: it proved itself through the scaler', fitted > 1000 && finiteButRefused.length === 0, { fitted, refused: finiteButRefused.slice(0, 5) })
-  check('the fit is not vacuous: protein-dense dishes (7 g per 100 kcal or more as written) are fitted at 90% or more of the cases (measured 94.3%)', tally.dense.n > 1500 && tally.dense.ok / tally.dense.n >= 0.9, tally.dense)
+  // MOVED 18 Nov 2026: 90% -> 80%. The fit's proof now applies the plate rules too (so "fitted" still means "accepted"),
+  // and a sandwich or a soup is not fitted to the biggest meals: MEASURED 84.9% (4,604 of 5,424); it was 94.3%.
+  check('the fit is not vacuous: protein-dense dishes (7 g per 100 kcal or more as written) are fitted at 80% or more of the cases (measured 84.9% on 18 Nov 2026)', tally.dense.n > 1500 && tally.dense.ok / tally.dense.n >= 0.8, tally.dense)
   check('...and lean dishes (under 6.5) are fitted at 90% or more of the cases at the three leanest targets, which is where they are meant to serve (measured 95.3%)', tally.lean.n > 200 && tally.lean.ok / tally.lean.n >= 0.9, tally.lean)
 
   // A LEAN DISH NEEDS A LEVER. The fit can only move protein foods and carb foods written in grams; a lean dish built on one counted piece (a bagel, a wrap) or on fixed foods has nothing to move and serves one target, not three. Measured 30 Sep 2026: the most any real lean dish leaves fixed is 56% of its calories; the same dish with its bagel as "1 bagel" leaves 72% and drops from 7 of 12 cases to 3.
@@ -471,10 +482,12 @@ async function main() {
   const passCalls = stripComments(fn)
   check('...and runs before the writer when she is asking for more, and only when not switched off', /if \(params\.appendToExisting\s*&&\s*params\.library\s*!==\s*false\)\s*await libraryPass\(/.test(passCalls), passCalls.slice(passCalls.indexOf('libraryPass'), passCalls.indexOf('libraryPass') + 200))
   check('...and seeds a new plan after the writer\'s rounds, only in the meals the writer delivered, unless switched off (deepLibrary false, or no library)', /if \(!params\.appendToExisting\s*&&\s*deepLibrary\)\s*\{[\s\S]{0,200}await libraryPass\(true, delivered\)/.test(passCalls) && /const delivered = activeSlots\.filter\(slot => \(accepted\[slot\]\?\.length \?\? 0\) > 0\)/.test(passCalls) && passCalls.indexOf('await libraryPass(true, delivered)') > passCalls.indexOf('for (let round = 0; round < MAX_GENERATION_ROUNDS') && /const deepLibrary = params\.deepLibrary !== false && params\.library !== false/.test(passCalls))
-  check('...and each slot is asked for with that slot\'s own budget, so the dishes are fitted to the meal they are offered for', /budget:\s*budgets\[slot\]/.test(fn.slice(libAt, libAt + 900)), fn.slice(libAt, libAt + 900))
-  const askBlock = fn.slice(libAt, libAt + 900)
+  // 18 Nov 2026: what the library is asked is one object (`wants`), built just above the call and read again when a
+  // dish is considered (the stand-in rule), so the block to read is the one that ENDS at the call.
+  const askBlock = fn.slice(Math.max(0, fn.lastIndexOf('const wants = {', libAt)), libAt + 40)
+  check('...and each slot is asked for with that slot\'s own budget, so the dishes are fitted to the meal they are offered for', /budget:\s*budgets\[slot\]/.test(askBlock) && /chooseFromLibrary\(library, wants\)/.test(askBlock), askBlock)
   check('...and is told what she already has and the exotic cap; considerProposal enforces both as well, so only the order would show a slip, and order is all this pins', /haveNames:\s*existing\.map\(o\s*=>\s*o\.name\)/.test(askBlock) && /exoticCuisines:\s*EXOTIC_CUISINES/.test(askBlock), askBlock)
-  check('...every library dish goes through the one function every proposal goes through', /for \(const dish of candidates\) considerProposal\(dish, true, cap, deep(, leeway)?\)/.test(fn) && /for \(const proposal of proposals\) considerProposal\(proposal\)/.test(fn))
+  check('...every library dish goes through the one function every proposal goes through', /for \(const dish of candidates\) considerProposal\(dish, true, (?:sinksAsStandIn\(dish, wants\) \? Math\.min\(cap, STAND_IN_FLOOR\) : )?cap, deep(, leeway)?\)/.test(fn) && /for \(const proposal of proposals\) considerProposal\(proposal\)/.test(fn))
   check('...and that function is the only place a proposal is verified', (fn.match(/verifyProposal\(/g) ?? []).length === 1, (fn.match(/verifyProposal\(/g) ?? []).length)
   const chooser = read('src/lib/meal-library.ts')
   check('the chooser is deterministic: no Math.random', !/Math\.random/.test(chooser))

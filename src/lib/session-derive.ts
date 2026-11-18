@@ -324,14 +324,32 @@ export function formatRampSets(ex: Exercise): RampDisplay | null {
   }
   const mode = loadingMode(entry)
   const floor = getEquipmentFloorKg(entry)
-  return {
-    kind: 'kg',
-    sets: ex.ramp_up.sets.map(s => ({
-      setNumber: s.set_number,
-      kg: roundToPlate(Math.max((ex.suggested_load_kg! * s.load_percent) / 100, floor), mode),
-      reps: s.reps,
-    })),
+  const steps = ex.ramp_up.sets.map(s => ({
+    kg: roundToPlate(Math.max((ex.suggested_load_kg! * s.load_percent) / 100, floor), mode),
+    reps: s.reps,
+  }))
+  const sets = climbingSteps(steps, ex.suggested_load_kg).map((s, i) => ({ setNumber: i + 1, ...s }))
+  return sets.length > 0 ? { kind: 'kg', sets } : null
+}
+
+/**
+ * A BUILD-UP SET EARNS ITS ROW ONLY IF IT IS A STEP (18 Nov 2026, phone walk; CSCS).
+ *
+ * The ladder is percentages of the working weight, floored at the lightest thing the implement goes to. On a light
+ * lift two steps round to the same weight: a 37.5 kg Front Squat was given "20 kg x 10, 20 kg x 5, 27.5 x 3, 32.5 x 2",
+ * and a beginner squatting the empty bar was given two "warm-up" sets with the same empty bar before three working sets
+ * with it. A specific warm-up is progressively heavier sets of the lift: a set at the weight just done, or at the
+ * working weight itself, prepares nothing and costs time. Kept: each step lighter than the working weight and heavier
+ * than the one before it (the first of two equal steps, which is the one with more reps). None left means no build-up.
+ */
+export function climbingSteps<T extends { kg: number }>(steps: T[], workingKg: number): T[] {
+  const kept: T[] = []
+  for (const s of steps) {
+    if (s.kg >= workingKg) continue
+    if (kept.length > 0 && s.kg <= kept[kept.length - 1].kg) continue
+    kept.push(s)
   }
+  return kept
 }
 
 // ---------------------------------------------------------------------------

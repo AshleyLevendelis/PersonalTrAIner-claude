@@ -75,8 +75,10 @@ console.log('\n1. Her portions are facts')
     // would land far away from this.
     check('the macros are the stated amounts\' macros, not the budget\'s',
       Math.abs(r.payload.option.macros.calories - 375) < 15, r.payload.option.macros)
-    check('the card says the portions were untouched',
-      r.diff.implications.some(i => /untouched/i.test(i.text)), r.diff.implications.map(i => i.text))
+    // 18 Nov 2026: "untouched" sat beside a raw weight he never typed ("275g raw chicken breast"); the line now says
+    // the portions are his, as the app weighs them.
+    check('the card says the portions are his, as the app weighs them',
+      r.diff.implications.some(i => /Your portions, as the app weighs them/.test(i.text)) && !r.diff.implications.some(i => /adjusted/i.test(i.text)), r.diff.implications.map(i => i.text))
     // RE-ANCHORED 9 Oct 2026 (test log H9): the card used to ASSERT this. It is
     // read off a trial by the caller now (test:meal-knock-on).
     check('...and asserts nothing about the rest of the day (that is read off a trial now)',

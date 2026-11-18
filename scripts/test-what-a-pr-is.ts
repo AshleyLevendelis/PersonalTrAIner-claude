@@ -74,7 +74,7 @@ async function main() {
   const { selectCoachTipWithKey } = await import('../src/lib/coach-tips')
   const { pickNudge } = await import('../src/lib/coach-nudge')
   const { recordPhrase, FIRST_LOG_NOTE } = await import('../src/lib/coach-voice')
-  const { pickRecentPRs, leadLiftPhrase, LIFT_SHORT_NAME } = await import('../src/lib/dashboard-data')
+  const { pickRecentPRs, leadLiftPhrase, byLead, LIFT_SHORT_NAME } = await import('../src/lib/dashboard-data')
 
   let n = 0
   const row = (name: string, date: string, o: Record<string, unknown> = {}) => ({
@@ -229,6 +229,12 @@ async function main() {
   const other = leadLiftPhrase({ name: 'Bulgarian Split Squats', kg: 12, labelMode: 'per_hand', loggedKg: null }, 'not_started')
   check('a lift with no short name reads as the catalogue writes it, never lower-cased', other === 'Bulgarian Split Squats from ~12kg per hand', other)
   check('a bar is a plain weight', leadLiftPhrase({ name: 'Barbell Squats', kg: 60, labelMode: 'total', loggedKg: null }, 'not_started') === 'Squat from ~60kg')
+  // WHICH lift Home names (18 Nov 2026, phone walk: a Squat & Carry day read "Calf Raises from ~40kg").
+  const today = [{ n: 'Calf Raises', main: false, moved: 40 }, { n: 'Front Squat', main: true, moved: 37.5 }, { n: 'Leg Extensions', main: false, moved: 27.5 }]
+  check('Home names the day\'s main lift, not the biggest number on the card', [...today].sort(byLead)[0].n === 'Front Squat', [...today].sort(byLead).map(x => x.n))
+  check('...and with no loaded main lift, the heaviest thing moved', today.filter(x => !x.main).sort(byLead)[0].n === 'Calf Raises')
+  check('...and of two main lifts, the heavier', [{ n: 'A', main: true, moved: 40 }, { n: 'B', main: true, moved: 60 }].sort(byLead)[0].n === 'B')
+  check('the data builder sorts by that rule and marks the main lift with the app\'s own test', /main: isMainLiftSlot\(e\)/.test(strip(read('src/lib/dashboard-data.ts'))) && /\.sort\(byLead\)/.test(strip(read('src/lib/dashboard-data.ts'))))
   const home = strip(read('src/components/Dashboard.tsx'))
   check('Home builds the line with that one function', (home.match(/leadLiftPhrase\(/g) ?? []).length >= 1 && !/\bkg\} ?kg|from \$\{[^}]*kg/.test(home) && !/\.kg\} kg/.test(home) && !/toLowerCase\(\)/.test(/glanceParts[\s\S]{0,1400}/.exec(home)?.[0] ?? ''))
 

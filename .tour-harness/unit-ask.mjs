@@ -21,6 +21,7 @@ import { createServer } from 'http'
 import { readFileSync, existsSync, writeFileSync } from 'fs'
 import { join, extname } from 'path'
 import { spawn } from 'child_process'
+import { OPEN_OFFER_DETAILS_SCRIPT } from './driver-kit.mjs'
 
 const DIST = new URL('./dist/', import.meta.url).pathname
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' }
@@ -64,6 +65,10 @@ const check = (name, ok, detail) => {
 }
 
 await send('Page.enable'); await send('Runtime.enable')
+
+// His "One line, numbers on tap" (17 Nov 2026): this driver reads what an offer says, so it opens Details as he would.
+
+await send('Page.addScriptToEvaluateOnNewDocument', { source: OPEN_OFFER_DETAILS_SCRIPT })
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 await send('Emulation.setFocusEmulationEnabled', { enabled: true })
 
@@ -72,7 +77,8 @@ console.log('\nAN UNREADABLE AMOUNT IS ASKED ABOUT; A READABLE ONE IS COSTED RIG
 // What the model "says" depends on what she typed, so each turn is its own case.
 const CASES = {
   butter: ['150g chicken breast', '1 knob butter'],
-  pint: ['150g chicken breast', '1 knob butter', '1 pint milk whole'],
+  // 18 Nov 2026: a pint of milk is read now (a pint is the milk's own measure), so the second unreadable line is a sachet.
+  pint: ['150g chicken breast', '1 knob butter', '1 sachet honey'],
   ounces: ['8 oz chicken breast', '1 cup white rice cooked', '2 carrots'],
 }
 await send('Page.addScriptToEvaluateOnNewDocument', { source: `
@@ -81,7 +87,7 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   window.fetch = async (url, init) => {
     if (String(url).includes('chat-gemini')) {
       const said = String(JSON.parse((init && init.body) || '{}').message || '')
-      const key = /pint/i.test(said) ? 'pint' : /butter/i.test(said) ? 'butter' : /ounce/i.test(said) ? 'ounces' : null
+      const key = /sachet/i.test(said) ? 'pint' : /butter/i.test(said) ? 'butter' : /ounce/i.test(said) ? 'ounces' : null
       if (!key) return new Response(JSON.stringify({ reply: 'Sure.' }), { status: 200, headers: { 'Content-Type': 'application/json' } })
       return new Response(JSON.stringify({
         reply: '',
@@ -130,7 +136,7 @@ const WHERE = phrase => `(() => {
 const READ = `(() => {
   const text = document.body.innerText
   const buttons = [...document.querySelectorAll('button')].map(b => (b.textContent || '').trim()).filter(Boolean)
-  return { hasCard: !!document.querySelector('[data-testid="proposal-card"][data-offer="text"]') || /Your portions, untouched/i.test(text), hasConfirm: buttons.some(t => /^(Apply|Set as your meal|Confirm)/i.test(t)), text: text.replace(/\\s+/g, ' ') }
+  return { hasCard: !!document.querySelector('[data-testid="proposal-card"][data-offer="text"]') || /Your portions, as the app weighs them/i.test(text), hasConfirm: buttons.some(t => /^(Apply|Set as your meal|Confirm)/i.test(t)), text: text.replace(/\\s+/g, ' ') }
 })()`
 
 // --- 1. ONE UNREADABLE LINE ------------------------------------------------
@@ -145,17 +151,17 @@ check('1d. ...with NO card and no Confirm button beside it: nothing is saved unt
 check('1e. ...and the question is on screen where she is looking, not a scroll away', !!oneWhere && oneWhere.inside === true, oneWhere)
 
 // --- 2. TWO UNREADABLE LINES -----------------------------------------------
-await say('my dinner was chicken, a knob of butter and a pint of milk')
+await say('my dinner was chicken, a knob of butter and a sachet of honey')
 const two = await ev(READ)
 await shoot('unit-ask-two')
-check('2a. both lines are quoted in the one question', /1 knob butter/.test(two.text) && /1 pint milk whole/.test(two.text), two.text.slice(-340))
+check('2a. both lines are quoted in the one question', /1 knob butter/.test(two.text) && /1 sachet honey/.test(two.text), two.text.slice(-340))
 check('2b. ...and it asks for each', /each/i.test(two.text.slice(-340)), two.text.slice(-340))
-check('2c. ...still no card', two.hasCard === false || two.text.lastIndexOf('1 pint milk whole') > two.text.lastIndexOf('Your portions, untouched'), { hasCard: two.hasCard })
+check('2c. ...still no card', two.hasCard === false || two.text.lastIndexOf('1 sachet honey') > two.text.lastIndexOf('Your portions, as the app weighs them'), { hasCard: two.hasCard })
 
 // --- 3. A MEAL IN OUNCES, CUPS AND COUNTS IS COSTED RIGHT ------------------
 await say('my dinner was eight ounces of chicken, a cup of rice and two carrots')
 const oz = await ev(READ)
-const ozWhere = await ev(WHERE('Your portions, untouched'))
+const ozWhere = await ev(WHERE('Your portions, as the app weighs them'))
 await shoot('unit-ask-ounces')
 check('3a. a card comes up: she is not asked about what the app can read', oz.hasCard === true && oz.hasConfirm === true, oz.text.slice(-420))
 // 8 oz is 227 g; the old reader put "oz chicken breast" at 8 g.

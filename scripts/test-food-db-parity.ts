@@ -208,7 +208,7 @@ console.log('\n6. One lookup, and a dish is a miss for the diet check too')
   // that lookup again (docs/plans/ingredient-lookup-truth.md, 10b).
   const DISHES: [string, string][] = [
     ['prawn cocktail', 'egg-free'],        // mayonnaise is egg; plain prawns are not
-    ['sausage roll', 'dairy-free'],        // pastry is butter; a plain sausage is not
+    ['steak pie', 'dairy-free'],           // pastry is butter; a plain steak is not ('sausage roll' left 18 Nov 2026: its own entry now, held below)
     ['peanut sauce', 'gluten-free'],       // soy sauce is wheat; plain peanuts are not
     ['date syrup', 'low-carb'],
     ['chicken caesar wrap', 'vegetarian'], // was an empty tortilla, which PASSED vegetarian
@@ -218,6 +218,13 @@ console.log('\n6. One lookup, and a dish is a miss for the diet check too')
     check(`"${dish}" is a miss in the one lookup (app and coach)`, app.lookupIngredient(dish) === null && coach.lookupIngredient(dish) === null, app.lookupIngredient(dish)?.name)
     const verdict = validateMealAgainstDiet([{ name: dish, quantity: 100, unit: 'g' }], [restriction])
     check(`...so "${dish}" is refused for ${restriction} as unresolved`, verdict.ok === false && /could not be resolved/.test(verdict.violations[0]?.reason ?? ''), verdict)
+  }
+  // 18 Nov 2026: a sausage roll is a product with its own entry (it was a miss), carrying what its usual recipe has,
+  // so it is refused as "tagged", never passed as a plain sausage.
+  {
+    const roll = validateMealAgainstDiet([{ name: 'sausage roll', quantity: 100, unit: 'g' }], ['dairy-free', 'egg-free', 'gluten-free'])
+    check('a sausage roll is its own food in both copies, never the pork sausage', app.lookupIngredient('sausage roll')?.name === 'sausage roll' && coach.lookupIngredient('sausage roll')?.name === 'sausage roll')
+    check('...refused for dairy-free, egg-free and gluten-free as tagged', roll.ok === false && ['dairy-free', 'egg-free', 'gluten-free'].every(p => roll.violations.some(v => v.preference === p && /is tagged/.test(v.reason))), roll)
   }
   // The seitan finding (tracer D): bare "chicken" resolved to seitan strips,
   // so an ingredient line "chicken" PASSED vegetarian and vegan.

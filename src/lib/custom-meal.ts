@@ -1,5 +1,8 @@
 import { verifyProposal, computeSlotBudgets, type RawProposal } from './meal-generation'
-import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, formatPortion, type MealAdditionPayload } from './meal-addition'
+import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, portionWithHint, type MealAdditionPayload } from './meal-addition'
+import { computeMealMacros, isToTaste, lookupIngredient, whichKindQuestion } from './food-db'
+import { parseIngredientLine, parseIngredientLines } from './portion-scaler'
+import { asWeighedLines } from './as-weighed'
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 import { tagsMyMeal, type MealSlotName } from './meal-store'
@@ -70,9 +73,28 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
   // calculate" — a line with no quantity would make computeMealMacros guess
   // a default portion, which is the app deciding after all. The model's
   // prompt tells it to ask first; this is the backstop for when it doesn't.
-  const missingAmounts = foodLines.filter(l => !/\d/.test(l) && !/\b(a|an|one|half|quarter)\b/i.test(l))
+  // A SEASONING NEEDS NONE (18 Nov 2026): "salt and pepper" was asked about in grams. Salt, pepper, herbs and spices
+  // said with no amount are counted as nothing (food-db.ts isToTaste); everything else still needs its amount.
+  const seasoning = (l: string) => isToTaste(lookupIngredient(l.replace(/[\s,]*\b(?:to taste|as needed|for serving|for garnish)\b.*$/i, '').replace(/^\s*(?:(?:a|an)\s+)?(?:pinch|squeeze|sprinkle|dash|grind|twist|wedge)(?:es)?\s+(?:of\s+)?/i, '')))
+  const missingAmounts = foodLines.filter(l => !/\d/.test(l) && !/\b(a|an|one|half|quarter)\b/i.test(l) && !seasoning(l))
   if (missingAmounts.length > 0) {
     return { ok: false, reason: `How much ${missingAmounts.length === 1 ? 'of the ' + missingAmounts[0] : 'of each — ' + missingAmounts.join(', ')}? Grams, or counts like "3 eggs", both work.` }
+  }
+
+  // A FOOD THE APP CANNOT COUNT IS ASKED ABOUT, NEVER LEFT OUT OF THE TOTAL (18 Nov 2026; his 15 Oct rule for a logged
+  // meal, "never show a total that quietly leaves it out", was not held here). "200g chicken, 250g rice, 60g chocolate
+  // brownie" came back as a 659 kcal card that listed the brownie under "Your portions, untouched" and counted none of
+  // it: the meal check allows a fifth of a dish's WEIGHT to be unknown, and a brownie is a small weight and a third of
+  // the calories. His own foods are facts, so one the table does not know is a question, not a rounding error.
+  const costed = computeMealMacros(asWeighedLines(parseIngredientLines(foodLines)))
+  if (costed.amountsUnderstood) {
+    const notCounted = costed.unmatched.filter(n => !costed.amountUnknown.includes(n))
+    const kindAsk = notCounted.map(u => whichKindQuestion(parseIngredientLine(u).name) ?? whichKindQuestion(u)).find(q => q != null)
+    if (!kindAsk && notCounted.length > 0) {
+      const list = notCounted.length === 1 ? notCounted[0] : `${notCounted.slice(0, -1).join(', ')} and ${notCounted[notCounted.length - 1]}`
+      const it = notCounted.length === 1 ? 'it' : 'them'
+      return { ok: false, reason: `I don't have ${list} in my food data, so I can't put a number on ${it} and I haven't added this yet. Tell me what ${notCounted.length === 1 ? "it's" : "they're"} made of (or the calories on the pack), or say "leave ${it} out" and I'll add the rest.` }
+    }
   }
 
   // COOKED FOR HIM BY SOMEBODY ELSE (Ashley, 11 Nov 2026, meals-elsewhere.ts): the same foods, the same checks, and
@@ -122,8 +144,8 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
       // The inverse of the addition card's "portions adjusted" line, and
       // the whole point of the feature: nothing was adjusted.
       cookedForMe
-        ? { severity: 'info', text: `An estimate, at ordinary portions: ${option.ingredients.map(formatPortion).join(', ')}.` }
-        : { severity: 'info', text: `Your portions, untouched — ${option.ingredients.map(formatPortion).join(', ')}.` },
+        ? { severity: 'info', text: `An estimate, at ordinary portions: ${option.ingredients.map(portionWithHint).join(', ')}.` }
+        : { severity: 'info', text: `Your portions, as the app weighs them — ${option.ingredients.map(portionWithHint).join(', ')}.` },
       // What the rest of the plan does is read off a trial by the caller and
       // added to this card (withKnockOn in meal-food-add.ts) — this line used
       // to assert "The rest of the day re-fits around it" (test log H9).

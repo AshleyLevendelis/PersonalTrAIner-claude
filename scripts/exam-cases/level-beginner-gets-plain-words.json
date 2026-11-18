@@ -1,0 +1,32 @@
+{
+  "name": "level-beginner-gets-plain-words",
+  "why": "Section 1g: the level changes HOW the coach explains. A nervous beginner three weeks in asks an advanced question she read online. The good answer is the short true answer in everyday words and the one thing that matters more for her now (turning up, adding a little each week); the failure is a lecture in jargon (periodisation, hypertrophy, mesocycle, RPE scales) or a list of techniques. Graded mostly by the judge (voice, teaches, warm); the code check holds only that it stays a conversation (no card).",
+  "contextOverrides": {
+    "profile": {
+      "age": 41,
+      "gender": "female",
+      "height_cm": 162,
+      "weight_kg": 74,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1430,
+      "tdee": 1790,
+      "training_experience": "beginner",
+      "equipment_access": "dumbbells"
+    },
+    "streak_days": 0,
+    "exercise_summary": "Today (Tuesday): Full body — Goblet Squats 3x10 @ 8kg, Dumbbell Rows 3x10 @ 8kg, Dumbbell Floor Press 3x10 @ 6kg, Glute Bridge 3x12, Dead Bug 3x8.\nThursday: Full body — Dumbbell Reverse Lunge 3x8, Dumbbell Shoulder Press 3x10 @ 5kg, Bent-Over Dumbbell Row 3x10, Plank 3x20s.\nSaturday: Full body — Goblet Squats 3x10, Dumbbell Floor Press 3x10, Dumbbell Rows 3x10, Calf Raises (Bodyweight) 3x15."
+  },
+  "messages": [
+    "my friend says I'm wasting my time unless I do drop sets and train to failure every set and change the exercises every week to confuse the muscles?? I've only been going 3 weeks, am I doing it wrong"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      }
+    ]
+  }
+}

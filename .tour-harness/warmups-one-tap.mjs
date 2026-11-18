@@ -32,16 +32,20 @@ for (let i = 0; i < 8 && !/Squat|Warm-up/.test(await ev(`document.querySelector(
 console.log(`  (logged ${before} set(s) before the squat)`)
 // The squat's ramp, read off its own rows: what each box would log if ticked blank.
 const ramp = await ev(`[...document.querySelectorAll('button[aria-label^="Save warm-up"], button[data-next-set^="Warm-up"]')].length`)
-check('2. today\'s squat has four warm-up rows (the case binds)', ramp === 4, ramp)
+// RE-ANCHORED 18 Nov 2026: the count was pinned at four. A build-up set now earns its row only if it is heavier than
+// the one before (20, 20, 27.5, 32.5 became 20, 27.5, 32.5), so this squat has three. The property is "all of them,
+// whatever the number": N is read off the screen, and must be three or more so "all" and "the rest" still differ.
+const N = ramp
+check('2. today\'s squat has three or more warm-up rows (the case binds)', N >= 3, N)
 const label0 = await until(allButton, v => !!v, 20)
-check('3. one button offers to log all four', label0 === 'Log all 4 warm-ups', label0)
+check('3. one button offers to log all of them', label0 === `Log all ${N} warm-ups`, label0)
 await ev(`document.querySelector('[data-testid="log-all-warmups"]')?.scrollIntoView({ block: 'center' })`); await wait(400)
 await shoot('warmups-one-tap-before')
 
 // One by hand first, so "all" has to mean "all still open".
 await clickAt(`document.querySelector('button[aria-label^="Save warm-up 1"]')`); await wait(900)
 const label1 = await allButton()
-check('4. after one is ticked by hand it offers the three still open', label1 === 'Log all 3 warm-ups', label1)
+check('4. after one is ticked by hand it offers the ones still open', label1 === `Log all ${N - 1} warm-ups`, label1)
 
 // THE ROWS' OWN NUMBERS, read off the screen before the tap (RE-ANCHORED 10 Nov 2026: the four were pinned as
 // 20/25/32.5/40, and went stale when a catalogue batch moved this plan's squat weight; the check is "as written").
@@ -54,10 +58,10 @@ const working0 = await workingRows()
 check('4b. (the sets before the squat are the only working sets so far)', before >= 1 && working0 === before, { working0, before })
 const tapped = await clickAt(`document.querySelector('[data-testid="log-all-warmups"]')`)
 await wait(1500)
-const rows = await until(warmRows, v => (v ?? []).length >= 4, 20)
-check('5. one tap logs the rest: four warm-ups stored', tapped && (rows ?? []).length === 4, rows)
+const rows = await until(warmRows, v => (v ?? []).length >= N, 20)
+check('5. one tap logs the rest: every warm-up stored', tapped && (rows ?? []).length === N, rows)
 const want = [[20, 10], ...(shown ?? []).map(r => r.n.slice(0, 2))]
-check('6. ...as written: each the numbers its own row showed (the first, ticked by hand, at the bar)', (shown ?? []).length === 3 && JSON.stringify((rows ?? []).map(r => [r.kg, r.reps])) === JSON.stringify(want), { stored: (rows ?? []).map(r => [r.kg, r.reps]), want, shown })
+check('6. ...as written: each the numbers its own row showed (the first, ticked by hand, at the bar)', (shown ?? []).length === N - 1 && JSON.stringify((rows ?? []).map(r => [r.kg, r.reps])) === JSON.stringify(want), { stored: (rows ?? []).map(r => [r.kg, r.reps]), want, shown })
 check('7. ...all filed as warm-ups on the squat, none as a working set', (rows ?? []).every(r => /squat/i.test(r.ex)) && (await workingRows()) === working0, { working0, now: await workingRows() })
 check('8. the button goes once nothing is left to log', (await allButton()) === null)
 const next = await ev(`document.querySelector('[data-next-set-button]')?.textContent.trim() ?? null`)

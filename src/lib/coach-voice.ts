@@ -1092,6 +1092,15 @@ export const STILL_ON_THIS_DEVICE = 'Still saved on this device, but not in your
  * the phone has never managed to read the day, it does not know what is saved
  * and says the one thing it does know — that whatever is logged now is kept.
  */
+/**
+ * WHY HIS PROTEIN IS NOT "2 g x HIS WEIGHT" (18 Nov 2026). Shown where the targets are explained, only when the
+ * reference weight differs from his bodyweight (macro-calculator.ts nutritionReferenceWeightKg). The reason is said as
+ * a fact about protein, never as a remark about him.
+ */
+export function referenceWeightLine(referenceKg: number): string {
+  return `Protein and fat are worked out from ${Math.round(referenceKg)} kg rather than your full weight, because protein needs follow muscle, not total weight.`
+}
+
 export function reconnectingLine(known: boolean): string {
   return known
     ? 'Reconnecting — your sets are safe.'

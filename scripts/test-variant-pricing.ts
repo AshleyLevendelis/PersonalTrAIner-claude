@@ -9,7 +9,7 @@
 // ---------------------------------------------------------------------------
 import { enforceLoadCoherence } from '../src/lib/exercise-plan'
 import { EXERCISE_DATABASE, getExerciseEntry, type ExerciseEntry } from '../src/lib/exercise-db'
-import { categorize, prescribeLoad, isPerSideLoad, variantPriceFraction } from '../src/lib/load-prescription'
+import { categorize, prescribeLoad, isPerSideLoad, variantPriceFraction, isolationTargetBelowFloor, loadingMode } from '../src/lib/load-prescription'
 import type { UserProfile, TrainingExperience, Exercise, WorkoutDay } from '../src/lib/types'
 
 let ran = 0, failures = 0
@@ -85,8 +85,18 @@ console.log('\n2. The person\'s own figure is never discounted, and the fraction
   const set = EXERCISE_DATABASE.filter(e => e.price_fraction !== undefined)
   const bad = set.filter(e => !(e.price_fraction! > 0 && e.price_fraction! < 1)).map(e => e.name)
   check(`every catalogue fraction is strictly between 0 and 1 (${set.length} set)`, set.length >= 7 && bad.length === 0, bad)
-  const iso = set.filter(e => e.mechanics_tier === 'tier3_isolation' || (categorize(e) ?? '').startsWith('isolation')).map(e => e.name)
-  check('...and none is on an isolation entry (the floor-swap pre-check reads the isolation reference directly)', iso.length === 0, iso)
+  // RE-ANCHORED 18 Nov 2026. This said "none is on an isolation entry", because the floor-swap pre-check
+  // (isolationTargetBelowFloor) read the isolation reference without the fraction and would have disagreed with the
+  // price. Two isolation lifts carry a fraction now (a dumbbell held between the feet, a kickback), so the rule became
+  // the property it stood for: the pre-check reads the SAME fractioned figure the price starts from. Asked of the
+  // function, with a barbell isolation lift whose whole reference clears the bar and whose fractioned one does not.
+  const iso = set.filter(e => e.mechanics_tier === 'tier3_isolation' || (categorize(e) ?? '').startsWith('isolation'))
+  const reachesPreCheck = iso.filter(e => ['barbell', 'ez_bar'].includes(loadingMode(e))).map(e => e.name)
+  const barbellCurl = getExerciseEntry('Barbell Curls')!
+  const strong = PEOPLE.find(p => !isolationTargetBelowFloor(barbellCurl, p))
+  check('the fixture binds: someone here curls more than the empty bar, so the whole reference clears the floor', !!strong && loadingMode(barbellCurl) === 'barbell', PEOPLE.map(p => isolationTargetBelowFloor(barbellCurl, p)))
+  check('...and the pre-check reads the fraction: the same lift at a tenth of its price is below the bar', !!strong && isolationTargetBelowFloor({ ...barbellCurl, price_fraction: 0.1 }, strong) === true)
+  check(`...so a fraction on an isolation entry is safe (${iso.length} carry one; ${reachesPreCheck.length} of them reach the pre-check)`, iso.length >= 2, { iso: iso.map(e => e.name), reachesPreCheck })
 }
 
 console.log('\n3. Coherence does not discount an incline twice')

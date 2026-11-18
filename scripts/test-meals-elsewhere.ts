@@ -383,7 +383,7 @@ function main() {
     const saidOwn = own.ok ? own.diff.implications.map(i => i.text).join(' | ') : ''
     check('the card says it is an estimate at ordinary portions', /An estimate, at ordinary portions/.test(said), said)
     check('...that it is kept for that day only, and never shopped for', /Kept as Tuesday's lunch only\. It isn't added to your own meals and is never on your shopping list\./.test(said), said)
-    check('...and does NOT say it joins his options or that the portions are his', said.length > 0 && !/Joins your|untouched/.test(said) && /Joins your lunch options/.test(saidOwn) && /untouched/.test(saidOwn), [said, saidOwn])
+    check('...and does NOT say it joins his options or that the portions are his', said.length > 0 && !/Joins your|Your portions/.test(said) && /Joins your lunch options/.test(saidOwn) && /Your portions, as the app weighs them/.test(saidOwn), [said, saidOwn])
     check('...and says nothing about suiting his diet', said.length > 0 && !/\b(safe|suits?|fits? your diet|free of|allerg)/i.test(said), said)
     check('the card\'s first row is headed as a meal cooked for him, which is what the chat reads to say "my estimate"', cooked.ok && cooked.diff.rows[0].field === 'Lunch cooked for you' && own.ok && own.diff.rows[0].field === 'Your lunch')
     // In the week: Tuesday's lunch is the estimate, fixed, and no other day ever serves it.

@@ -118,7 +118,11 @@ console.log('\n1. Sessions reach the time the trainee set aside')
 // the five pack entries excluded: 7 / 19 / 16), so short sessions FELL overall (42 -> 38) while the
 // long tier, which had one session of room under 3%, rose by three, each under the hour by 0-5.4 min.
 // The long tier's ceiling is 4% (23 of 576); a return to the pre-fix 13% still fails by a mile.
-const CEILING: Record<string, number> = { '30-45': 0.03, '45-60': 0.06, '60-90': 0.04 }
+// 18 Nov 2026: THE RESIDUAL IS GONE, so the ceilings came down with it. The filler now sizes itself AFTER the
+// balance pass (it ran just before, and the pass then took a set off). Measured before that fix, with the day's
+// plan changes in: 12 / 38 / 27 of 576, two tiers over their old ceilings (3% / 6% / 4%). After: 0 / 0 / 0.
+// 1% (5 of 576) leaves room for a re-rolled pick and still fails on the old order by a mile.
+const CEILING: Record<string, number> = { '30-45': 0.01, '45-60': 0.01, '60-90': 0.01 }
 for (const dur of DURATIONS) {
   const t = tally.get(dur)!
   const rate = t.belowMin / t.loading

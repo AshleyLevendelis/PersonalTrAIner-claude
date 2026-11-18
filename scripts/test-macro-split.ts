@@ -105,10 +105,12 @@ function main() {
       // deliberately changed to scale with bodyweight. The deficit has its own
       // gate now (test:fat-loss-deficit); this one must not shadow it.
       const calorieTarget = applyGoalAdjustment(tdee, goal, profile.gender as 'male' | 'female')
-      const expectedProtein = Math.round(2.0 * weight)
+      // 105 kg at 178 cm is over a BMI of 30, so per-kilo grams come off the reference weight (18 Nov 2026,
+      // test:reference-weight): 95.05 + a quarter of the 9.95 above it = 97.5 kg, written here as a literal.
+      const expectedProtein = Math.round(2.0 * (weight === 105 ? 97.5 : weight))
       const expectedFat = Math.round((calorieTarget * 0.25) / 9)
       const expectedCarbs = Math.max(50, Math.round((calorieTarget - expectedProtein * 4 - expectedFat * 9) / 4))
-      check(`${goal}/${weight}kg: protein matches old hardcoded 2.0g/kg formula exactly`, target.protein === expectedProtein, { got: target.protein, expected: expectedProtein })
+      check(`${goal}/${weight}kg: protein matches the 2.0g/kg formula exactly`, target.protein === expectedProtein, { got: target.protein, expected: expectedProtein })
       check(`${goal}/${weight}kg: fat matches old hardcoded 25% formula exactly`, target.fat === expectedFat, { got: target.fat, expected: expectedFat })
       check(`${goal}/${weight}kg: carbs match old hardcoded remainder-with-floor formula exactly`, target.carbs === expectedCarbs, { got: target.carbs, expected: expectedCarbs })
     }

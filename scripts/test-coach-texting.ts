@@ -90,8 +90,20 @@ async function main() {
   const cleanedRes = serveBody.match(/(?:const|let)\s+(\w+)\s*=\s*await\s+(?:guardPastLifts\(\s*await\s+)?cleanCoachResponse\(\s*await\s+handleChatRequest\(req\)\s*\)/)
   const inline = /Deno\.serve\(\s*async\s*\(req[^)]*\)\s*=>\s*cleanCoachResponse\(\s*await\s+handleChatRequest\(req\)\s*\)\s*\)/.test(src)
   const returns = [...serveBody.matchAll(/\breturn\s+([^;\n]+)/g)].map(m => m[1].trim())
+  // 18 Nov 2026: RED SINCE THE PHOTO BUILD (17 Nov), found by running it. The cleaned response is now wrapped a second
+  // time on a photo turn (`const res = ... withoutPhotoClaims(guarded) : guarded`), so what is returned is a variable
+  // MADE FROM the cleaned one. The property is unchanged and is what is checked: every return hands back the cleaned
+  // response, or something built only from it (its initialiser names the cleaned variable and never calls the handler
+  // again, so nothing can go round the cleaning).
+  const madeFromCleaned = (name: string): boolean => {
+    if (!cleanedRes) return false
+    if (name === cleanedRes[1]) return true
+    const init = serveBody.match(new RegExp(`(?:const|let)\\s+${name}\\s*=\\s*([^;\\n]+)`))?.[1] ?? ''
+    return new RegExp(`\\b${cleanedRes[1]}\\b`).test(init) && !/handleChatRequest\(/.test(init)
+  }
   check('...and it hands every response to cleanCoachResponse(', inline
-    || (!!cleanedRes && returns.length > 0 && returns.every(r => r === cleanedRes[1])), { cleanedRes: cleanedRes?.[0], returns })
+    || (!!cleanedRes && returns.length > 0 && returns.every(madeFromCleaned)), { cleanedRes: cleanedRes?.[0], returns })
+  check('...the detector can fail: a variable made straight from the handler is not "made from the cleaned response"', !!cleanedRes && !madeFromCleaned('request') && madeFromCleaned(cleanedRes[1]))
 
   console.log(`\ncoach-texting: ${ran} checks ran`)
   if (failures > 0) { console.error(`coach-texting: ${failures} check(s) FAILED`); process.exit(1) }

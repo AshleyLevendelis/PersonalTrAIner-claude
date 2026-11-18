@@ -2,6 +2,326 @@
 
 Newest first. One line each.
 
+- [x] **THE CONFIRMING SWEEP OF 18 NOV 2026 (on 4ffd5aed, a settled tree in its own worktree): 618 ran, 614 passed, 0 real failures.**
+  The four red ones were each read in their own output, not ticked off by name: `test:meal-quality` ("VITE_SUPABASE_URL
+  / VITE_SUPABASE_ANON_KEY must be set"), `test:schema-parity` ("Failed to link to TEST ... Nothing was run against
+  it"), `verify:rls` ("No database to read, and no key given") — no database from a cloud session — and
+  `test:coach-exam-fresh`, which is right to be red: the judge changed (his 17 Nov "Switch to Fable"), the coach's
+  instructions changed (sections 1g, 1h and the rest of this pass), three new questions were never answered and one
+  was edited. It goes green only after the `chat-gemini` deploy and an exam run on his machine. Plan quality 11.66 of
+  12 on 9,216 profiles, 0 below the 7.2 floor; `test:audit` passed. PROVEN BY TEST AND BROWSER DRIVER ONLY: nothing
+  in this pass has run on the live app or against the real coach, and `main` still holds a coach server file that
+  does not parse (fixed on this branch; `test:functions-parse`), so `chat-gemini` must not be deployed from `main`
+  until this branch is merged. Deploys after a merge: frontend on merge, and `chat-gemini` (the only function whose
+  files differ from `main`: its own file and the shared food table and amount reader it alone imports). No new
+  migration in this pass.
+- [x] **THE FULL SWEEP OF 18 NOV 2026 (on 19cce1f3; 617 ran, 596 passed): seventeen real failures, all fixed; two of them root causes.**
+  (1) **SESSIONS UNDER THE TIME ASKED FOR.** `test:session-length` went red (38 and 27 of 576 loading sessions under
+  the minimum, ceilings 6% and 4%); before the day's plan changes it stood at 32 and 20, just inside. TRACED, not
+  loosened: the optional top-up (the mobility close-out a short day gets) sized itself just BEFORE the weekly
+  push:pull balance pass, which then took a set off some days, so a day long enough when the filler looked landed a
+  minute or two short with nothing added (58 of the 65 short sessions carried no filler at all). The old note called
+  this "a known and accepted couple-of-minutes drift"; the lower rep ceiling only pushed more days into it. FIXED by
+  order: the filler runs after the balance pass (the pass reads no time, the filler changes no exercise). MEASURED:
+  12 / 38 / 27 of 576 -> 0 / 0 / 0; across 120 varied plans 171 -> 0 of 5,700 loading days under the minimum, none
+  over the maximum, days carrying an optional top-up 23.3% -> 26.2%, mean quality unchanged (11.758 on 60 seeded
+  plans). The gate's ceilings came down to 1% (a mutation back to the old order is caught). CSCS review: spare time
+  goes to optional mobility, never to more volume (the house rule since 23 Sep); nothing is taken away; no floor
+  changes meaning.
+  (2) **ONE NUMBER FOR A SESSION'S LENGTH.** A day with an optional close-out reads "~49 min · + 8 optional" on its
+  header, and four other places measured the day WITH the optional minutes: the add-an-exercise card ("becomes about
+  57 min") on the screen and from the coach, the shorten card's "before", the shorten choices (a 44-minute session was
+  offered "45 min") and "make it easier" ("About 52 -> 47 min"). The harness's day only gained a filler today, which
+  is why two drivers went red; the fault was on every such day (about a quarter of loading days). All five now read
+  the header's own reader (`dayLengthParts`): a session's length is its work, optional time named beside it. No words
+  changed, only the number. `test:exercise-add` (5 new source checks; 5 mutations, two caught only after the check
+  also refused "work + optional"), `test:lighter-today` §5 (4 checks on a constructed day with a filler, 2 mutations),
+  `verify:exercise-add` 4d and `verify:shorten-today` 2c (each caught its mutation in a browser).
+  NOT BUILT, named: adding an exercise to a day that has optional mobility leaves the mobility there even if the two
+  together pass the session maximum (the header then reads e.g. "~55 min · + 8 optional" on a 45-60 plan). Generation
+  never ships that; letting the optional part give way on an add needs a sentence saying so, which is his.
+  (3) **CHECKS THAT ASSUMED THE OLD DUMBBELL LEG CURL PRICE.** `test:single-implement` pinned ">= 20 kg" and a 12 kg
+  ceiling that "clamps"; the lift is 8 kg now (a third of the machine's price, this morning's entry). Re-anchored on
+  the property his 10 Sep report was about, the HALVING: the same entry declared as a pair is given half, per hand,
+  and this one the whole figure; the ceiling used is one that binds (half the lift's own figure). 2 mutations caught;
+  `verify:single-implement`'s floor sits between the whole (8) and the halved (4) figure, caught in a browser.
+  (4) **FOUR CHAT DRIVERS NEVER LEARNED THE "DETAILS" FOLD** (his 17 Nov "One line, numbers on tap"): five drivers were
+  taught to open Details that day and `verify:moved-session`, `verify:moved-edit`, `verify:rebuild-card` and
+  `verify:meal-knock-on` were not, and no full sweep ran before the merge. They open Details now, as he would. The
+  knock-on driver also typed "add a banana" while its stand-in coach wrote "200g banana", which the 17 Nov "amounts
+  only he said" rule rightly asks about; it says its amount now.
+  (5) `verify:day-length` chose its second day on one load and compared on another (the two came out at the same
+  minute); it finds the day on the screen under test. `verify:bodyweight-progress` read the first drawing in the
+  sheet, which is the body map since 17 Nov; it reads the chart.
+  (6) **A THIN DAY THAT HAD REACHED ITS EXERCISE COUNT.** With (1) in, `test:day-purpose` P4 went red on days it could
+  not see before. A bodyweight beginner's Chest & Triceps day on a 30-45 plan was two push-up variations and chair
+  dips: 7 working sets, 23 minutes, a plank and a reverse crunch unused in the pool. Before (1) it shipped seven
+  minutes under the time asked for with nothing added (invisible to P4, whose trigger needs ten minutes of optional
+  mobility); after (1) it carried fourteen minutes of mobility. Neither is what a coach writes. The 9 Oct borrow rule
+  triggers on a day that cannot reach its exercise COUNT; the count is sized for loaded work and its rests, so with no
+  kit it is reached and the session is still short. DECIDED (mine, CSCS: what a short session is filled with): a day
+  of nine working sets or fewer that is ten minutes or more short of its budget takes work until it is not, from its
+  borrow list in order and then one of its own patterns; only work the push:pull and squat:hinge counts do not see
+  (trunk, arms, shoulders, traps, calves), so the balance passes cannot take it straight back; never a main lift, a
+  second of a family, a third of one pattern, or a movement the week already holds twice. BASIS: optional mobility is
+  not training volume (the house rule since 23 Sep); trunk and small-muscle work is what a coach adds to a short day
+  because it costs little recovery and takes nothing from the next session's main lifts. Added once, to the plan every
+  week is built from, so "the same exercises all block" holds. MEASURED: that day is 13 working sets and 32 minutes
+  with a reverse crunch and a plank; 517 days on the 9,216-profile grid take work (539 movements); on 120 varied plans
+  no session is under or over the time asked for and days carrying an optional top-up go 26.2% -> 25.6%; mean quality
+  11.758, unchanged. CSCS review: training effect up on the thinnest days; takes away optional mobility only;
+  pattern coverage and balance untouched by construction; no floor redefined; programming only. NEW GATE
+  `test:thin-day` (18 checks over 1,728 base plans, `THIN_DAY_GRID=full` for all 9,216; 8 mutations, 7 caught: the
+  eighth, taking a warm-up drill, is not reachable on any of the 9,216 profiles and the guard is kept for parity with
+  the two older borrow rules). A MISSED mutation here was the useful kind twice: "fewer than two of a pattern" read
+  as inert until the taken counts were compared (it binds on 5 days), and then it turned out to guard only one of the
+  two lists, so it now guards both.
+  (7) **A PRICING RULE MY TWO DUMBBELL RE-PRICES BROKE.** `test:variant-pricing` held "no lighter-variant share on an
+  isolation entry", because the pre-check that swaps a barbell curl for a dumbbell one when the target is under the
+  empty bar read the whole reference, not the share. The pre-check now reads the same figure the price starts from,
+  so they cannot disagree; nothing changes today (the two entries are dumbbell lifts, which the pre-check does not
+  reach). Re-anchored on that property, 1 mutation caught.
+  (8) **FOUR MORE DRIVERS.** `verify:extra-cardio` and `verify:workout-scenarios-chat`: the Details fold again.
+  `verify:chat-composer`: "ONE button" counted the camera that his 17 Nov photo ruling put beside it; it counts the
+  action button (mic or send, never both) and the camera on its own line. `verify:warmups-one-tap`: pinned four
+  warm-up rows; build-up sets must climb since this morning, so the squat has three; the count is read off the screen.
+  `test:rebuild-honours`: its lift is found by the property it needs (one the rebuild keeps at the same reps).
+  ENVIRONMENTAL OR EXPECTED, unchanged: `test:meal-quality`, `test:schema-parity`, `verify:rls` (no database here),
+  `test:coach-exam-fresh` (stale until the exam is run on his machine after a deploy).
+- [x] **THE COACH'S SERVER CODE DID NOT PARSE, AND THAT VERSION IS ON `main` (found 18 Nov 2026 by the full sweep).**
+  The photo build of 17 Nov (1af36943) left one stray "` : ''}" in the coach's instructions
+  (`supabase/functions/chat-gemini/index.ts`). The file has been invalid TypeScript since, through PR #29 into `main`
+  (89128b30): **a `chat-gemini` deploy from `main` fails at the bundle step**, so nothing built for the coach since
+  17 Nov can have gone live from there. The live coach is whatever was deployed before; nothing here could see that.
+  HOW IT WAS MISSED: `tsc` covers `src` only; every source check reads the file as TEXT and passed; the gates that
+  import it are deno smokes (`verify:chat-*`), which my derived sets left out because the derivation listed `test:`
+  gates only, and no full sweep ran between the photo build and the merge. The same miss as the two red texting checks
+  below, one level worse. FIXED on the branch (the stray characters removed; `verify:chat-silent-tools` passes again,
+  15 checks). NEW GATE `test:functions-parse`: parses every file under `supabase/functions` in seconds (5 checks; the
+  real slip and a broken import both caught), so a change to a function is caught at the commit. It proves syntax
+  only. **Until this branch is merged, do not deploy `chat-gemini` from `main`.** Rule added to CLAUDE.md: a change
+  under `supabase/functions` runs `test:functions-parse` and the deno smokes that import the file.
+- [x] **THE PHONE WALK (18 Nov 2026, the Fable pass on UX): the whole app at 390x844, screens read.** Walked Home,
+  Nutrition (and a meal's sheet), Exercise (a live session: start, two sets, the rest timer, the main lift's card),
+  Tools, Chat and Profile on app-boot (the real App on the harness's fake database). No console errors, no sideways
+  scroll. FOUND AND FIXED:
+  (1) **Home named the wrong lift.** A Squat & Carry day read "7 exercises · Calf Raises from ~40kg": the line took the
+  biggest number on the card. It names the day's main lift where that carries a weight, else the heaviest thing moved
+  (`byLead`). `test:what-a-pr-is` (4 new checks, 4 mutations caught).
+  (2) **The chat's welcome named the warm-up drill first** ("Today is Squat & Carry — Clamshell, Front Squat, Overhead
+  Carry and more"). Every list of a session's exercises in the chat leaves warm-up drills out unless they are all the
+  session holds (`sessionMovements`). `test:coach-opener` (3 new, 3 mutations caught).
+  (3) **Build-up sets repeated a weight.** A 37.5 kg Front Squat was given 20 x 10, 20 x 5, 27.5 x 3, 32.5 x 2, and a
+  beginner squatting the empty bar got two "warm-up" sets with the same bar before three working sets with it.
+  DECIDED (mine, CSCS: warm-up and movement prep): a build-up set earns its row only if it is lighter than the working
+  weight and heavier than the set before it; the first of two equal steps is the one kept; none left means no build-up
+  rows. BASIS: a specific warm-up is progressively heavier sets of the lift (NSCA); a set at the weight just done, or
+  at the working weight, prepares nothing and costs time. One derivation (`formatRampSets`), so the card, the
+  read-only day, supersets and "Log all N warm-ups" agree. Heavy lifts are unchanged (20, 50, 70, 85 for 100 kg).
+  `test:session-derive` §9b (10 checks, 6 mutations caught). Read on the screen: "Warm-up 0 of 3 · 20 → 32.5 kg".
+  (4) **The coach's running memory of the chat was saved to the profile and never read back** on reopen (column
+  `chat_summary`, added 17 Nov; `test:profile-restore` red since). On a new phone the saved summary was ignored.
+  Restored with the profile.
+  SEEN ON THE WALK AND FIXED IN THE PLAN ENTRY BELOW: a band or cable exercise still climbed past 20 reps ("Pallof
+  Press 3 x 19-24"). SEEN AND LEFT, each named: the "Add an email" prompt covers Home
+  on the first open after a week (by design); Profile's header shows "kg goal —" with no way to set one (already on
+  his list).
+- [x] **READING GENERATED PLANS AS A COACH (18 Nov 2026, the Fable pass on plans; `docs/plans/coach-read-of-plans.md`).**
+  His brief: "The exercise tab and plans making sure they are world class." METHOD: generate 60 to 160 seeded people's
+  16-week plans, print the cards, read them the way a CSCS reads a programme before signing it, and count each finding
+  before changing anything. ALL FIVE DECISIONS ARE MINE under his 18 Sep delegation; the basis is beside each.
+  (1) **No loaded lift past 20 reps.** 3,380 of 21,000 loaded slots asked for more than 20 and 889 for more than 25
+  ("Overhead Tricep Extension 3x24-29"): an adaptation block adds three, the weekly climb two, a held weight up to
+  three more. A loaded lift's range now ends its block at 20 or fewer, lowered BEFORE the climb and before the weight
+  is priced, by a rule read off the range alone (so generation and the swap helper agree; a first version that
+  depended on which lever the lift used made them print two ranges for one lift, 88.8% agreement against a 95% gate).
+  Weightless lifts are not capped. BASIS: NSCA muscular endurance is 12 or more reps and coaches write 12 to 20.
+  TWO EXTRA MECHANISMS BUILT, MEASURED ON 60 PLANS AND REMOVED (forcing a lowered lift to climb reps; stopping its
+  weight climbing): neither changed the ceiling result and both repeated more week-pairs (83 to 95 against 77). A
+  missed mutation asked the question; the measurement answered it. After: 0 of 21,000 over 20.
+  **EXTENDED THE SAME DAY to every lift whose resistance can be raised**, number or no number: the phone walk showed
+  "Cable Woodchops 3 x 19-24" (the card says "choose by feel"), an Ab Crunch Machine and a band Pallof Press still
+  climbing past 20, because the first rule asked whether the lift had a priced weight. A cable, a machine or a band
+  can be made harder; at 20 clean reps the answer is more resistance. After: 0 of 23,208 such slots over 20; quality
+  and repeated week-pairs unchanged (11.758, 75). Bodyweight alone is still not capped (1,805 of 12,836 over 20: reps
+  are the only lever it has).
+  (2) **Only the day's main lift goes under six reps.** About 470 of 43,524 slots were a side lift with a range
+  starting under six in a strength or power block ("Walking Lunges 2x3-5 @38 kg a hand", "Dumbbell Lateral Lunge
+  2x3-5", "Push-Ups 4x4-6 Bodyweight", "Band Lat Pulldown 3x4-6"). BASIS: NSCA gives the heavy strength loads to core
+  exercises and limits assistance work to loads no heavier than an 8RM, which is six reps with two in reserve. One
+  function (`repFloorFor`) for generation, the swap helper and the base week. COST, named: those lifts get lighter;
+  Push Press runs 6-8 in a power block rather than 3-5 (no exemption). After: 0.
+  (3) **Movement prep is not periodised.** A warm-up drill started at 5 reps and was moved by the block like a working
+  lift: 3 arm circles in a strength block, 9 in a conditioning one, 8 always for a beginner. Explosive prep (jumps,
+  slams, plyo push-ups, swings) is 5 reps; activation and mobility drills 10; the same in every block and week. BASIS:
+  RAMP warm-up practice (a few fast reps to potentiate, about ten controlled ones to activate and mobilise); the code
+  already said "the app does not progress preparation" and held timed drills still. Ankle Alphabet is now timed
+  (30-45 s a side): a "rep" of an alphabet was never countable. These are warm-up doses; which drill goes with which
+  joint is unchanged.
+  (4) **Two weights no coach would write.** Dumbbell Leg Curl reached 48 kg (median 16) for a bell held between the
+  feet: it now takes a third of the machine's price (0.4 was tried and still gave an advanced 95 kg lifter 26).
+  Dumbbell Tricep Kickback reached 20 kg a hand, the same as a lying extension: half that now. Both through the
+  existing lighter-variant rule, which can only lower. NAMED, NOT CHANGED: Trap Bar Carry is priced at the farmer's
+  one-hand figure as its total (50 kg where the same person carries 48 a hand); it errs light, and raising a weight
+  needs its own trace.
+  (5) **A week's lower-body main lifts alternate.** A full-body day's main lift may be a squat or a deadlift and each
+  day picked alone: 7 of 80 plans had two full-body days both on a deadlift variant, 4 had no squat main lift in the
+  week (a two-day beginner deadlifting both days). A day that may be either now takes the pattern the rest of the week
+  holds less of (days built, and later days whose main lift is fixed); the pool's limits win (a flagged knee keeps
+  what it has). After: 0 one-sided weeks in 60, never more than one apart.
+  MEASURED ON THE SAME SEEDED PLANS: mean quality 11.745 -> 11.758; repeated week-pairs 74 -> 75; days over length not
+  moved (the sweep's `session-length` holds it). CSCS review answers are in the plan doc.
+  `test:rep-ceiling` (21 checks; 12 mutations: 11 caught, and one found an unused value, deleted),
+  `test:coach-read` (31 checks; 20 mutations, 19 caught, 1 equivalent: counting the current day among "later" days
+  changes nothing, because a day that is choosing is never itself fixed). THREE OLDER CHECKS PINNED NUMBERS THESE
+  CHANGES MOVED ON PURPOSE and were re-anchored in `test:replacement-prescription`: the band kickback's example range
+  (16-19, now 13-16), "Dumbbell Leg Curl is priced as the machine" (now: exactly its own third), and the deload
+  agreement floor (93%, measured 92.8%: the same understood difference a little more often, both sides 20 or under).
+  NOT DONE: session names ("Full Body Power" on a beginner's 13-15 rep day) are wording, his. FOUND AND NOT REACHABLE:
+  the `upper_lower` split has two squat days and no hinge day (18 quad sets to 3 hamstring sets in the plan read);
+  setup always stores `ai_recommendation` and no screen changes it, so nobody gets that week. If a split picker is
+  ever built, that template is fixed first. (The whole-app test page uses it, which is how it was seen.)
+- [x] **THE COACH: THEIR LEVEL, THEIR SPORT, AND A SCREEN IT NAMES ONE TAP AWAY (18 Nov 2026, the Fable pass on the
+  coach; his brief: advice "world class and sport specific if the user wants it", "appropriate for all users at all
+  levels", and a chat that can "quickly and easily do things for the user").** FOUND by reading what the coach is told:
+  it is handed the person's experience level and any second sport as one line each, and told NOTHING about what to do
+  with either. Sport appeared only as plan scheduling (lighter gym days on class days).
+  BUILT (CSCS, mine): **section 1g, coach to their level** (a beginner gets everyday words, one cue and no jargon;
+  intermediate hears that slower progress is normal and looks at sleep, food and total work before changing an
+  exercise; advanced gets the language and the trade-off; the level changes HOW it explains, never the facts or the
+  plan). **Section 1h, their sport**, only for someone who has one: what the sport asks of the body and which lifts
+  ALREADY in their plan build it, for eleven sport families (field and court, running, cycling, swimming, combat,
+  racquet, climbing, golf, rowing, snow, mixed events); timing (no heavy legs in the two days before a match or race,
+  keep strength in season, build out of season); fuelling in foods, never grams; and what is not the coach's (skills
+  and tactics, injuries, and **making weight by cutting water or not eating, which is never coached**).
+  BASIS: NSCA Essentials of Strength Training and Conditioning, needs analysis and in-season / off-season programming;
+  the scope line is the CSCS's own.
+  **A screen the coach names is one tap away**: the coach is told never to give directions to a tab, so a reply about
+  the shopping list had nothing to tap. Now a coach reply that names exactly ONE of the shopping list, the plate
+  calculator, session history or the full program gets the app's own "Open ..." button under it (read off the coach's
+  words like the timer buttons; two screens named, or the app's own "Opened ..." line, get none; "your plan" and
+  "today's session" are deliberately not triggers, since a button under every message is noise). His 20 Oct "text +
+  small buttons" and 24 Sep "a coach wouldn't send a card" both hold: it is a small button, never a card.
+  **The coach is told the reference weight** when protein and fat are worked out from one (never per kilo of the full
+  weight, never "too low for your weight", no label for the body), read off the same weight the targets use.
+  THREE EXAM CASES added (sport transfer and a match-eve leg session; a water cut refused; a beginner answered in plain
+  words), none of whose questions appear in the coach's instructions.
+  TWO CHECKS HAD BEEN RED SINCE THE PHOTO BUILD OF 17 NOV and were found by running them: `test:coach-texting` and
+  `test:coach-texts-you` each pinned one line of the reply's path out of the coach's server, and the photo check added
+  a second step. Both re-anchored on the property (every reply is the cleaned one or made only from it; the push is
+  given the response that is returned), 4 mutations, 4 caught. **How they were missed: they are not in the set the
+  file-derivation finds for a change to the photo files, and no full sweep ran between that build and the merge that
+  followed it.**
+  `test:open-from-chat` §6 (11 checks, 7 mutations, 7 caught), `verify:live-test-nov14` A46-A49 (screenshot read),
+  `test:reference-weight` §6 (3 checks, 3 mutations, 3 caught), `test:coach-promises` (no exam question in the prompt).
+  NOT PROVEN: whether the coach OBEYS sections 1g and 1h. That is model behaviour and needs the `chat-gemini` deploy and
+  an exam run on his machine. NOT BUILT: richer in-chat controls (logging a set or a weigh-in from a button); they need
+  his ruling against "a coach wouldn't send a card".
+
+- [x] **A PLATE SOMEBODY WOULD EAT, MADE OF FOOD HE EATS (18 Nov 2026, the Fable pass on meals; nutrition decisions,
+  mine, not asked; two questions for him at the end).** FOUND by serving four weeks of meals to six people through the
+  app's own functions and READING the plates, not the totals.
+  (1) **Half of a meat-eater's meals were meat substitutes.** Dishes are ranked by how well they fit the meal's numbers,
+  and for a muscle-gain target (about 5 g of protein per 100 kcal) the plant dishes fit best. Measured over 28 days,
+  built the way the real builder builds (seven a meal, then every dish that lands a day): a 75 kg man gaining muscle,
+  no dietary preference, was served a dish built on tofu, tempeh, Quorn, vegan sausages or soy yoghurt at **55 of 112
+  meals (29 of 56 lunches and dinners)**; a 58 kg woman 60 of 112; fat-loss plans about 25 of 112. Nothing was wrong
+  with any dish and every day read "on target". But a plan is worth the share of it that gets eaten.
+  DECIDED: for someone who eats meat (not vegetarian, vegan or pescatarian), a dish built on a meat stand-in is ranked
+  after every other dish (a sort KEY: a penalty of 6 points was built first and measured as not enough), and a plan
+  stops taking them once a meal has 30 dishes (`STAND_IN_FLOOR`). The same for dairy stand-ins and someone who eats
+  dairy. A food he says he likes still lifts its dishes; lentils, beans and chickpeas are ordinary food, not stand-ins.
+  After: **0 to 2 of 112**.
+  (2) **Plates nobody would eat.** Bread, wraps and bagels are written in grams so a dish can be fitted to anybody, and
+  nothing asked whether the result was food: 13 g of pitta in a "pitta pocket", 240 g of bagel, a 1.8 kg lunch.
+  DECIDED: a food eaten in pieces is served in half or whole pieces (never under half a piece), never more pieces than
+  a plate takes (4 slices, 2 bagels, 2 wraps...), and the REST of the dish makes up the calories the pieces moved
+  (`settlePieces`, within 0.6-1.6x; beyond that the dish is refused). A main meal weighs at most 1,100 g AS IT SITS ON
+  THE PLATE (rice and pasta at cooked weight, a liquid counting half), a snack half. Limits of 900-1,200 g were
+  measured; 1,100 keeps 92-100 dishes a meal for everyone to about 3,300 kcal. The card says the pieces beside the
+  grams ("145g bagel (1½ bagels)") and counted measures are plural ("2 slices wholemeal bread", "1½ slices").
+  His own portions are never touched (they return before these rules).
+  (3) **Re-portioning range widened** so real dishes fit a lean bulk: the protein food 0.5-1.35x the recipe (was
+  0.55; 0.4 was tried and rejected: "turkey patties" with 60 g of turkey is not the dish, and 0.5 landed as many
+  days), the starch 0.5-2.6x (was 2.0). A FAT factor (oil, nuts, avocado half to double) and a 0.9x per-meal protein
+  floor for day-tested dishes were both BUILT, MEASURED and REMOVED: neither was a clear win.
+  MEASURED AFTER (six people, 28 days, days on target): **26, 28, 28, 20, 28, 25** (were 27-28 with the stand-ins).
+  Every miss is 13-19 g of protein over or 15-20 g of fat under WITH CALORIES ON TARGET. Different dishes in four
+  weeks 57-93 (were 72-103).
+  CSCS / nutrition review: (1) effect: protein floor per meal and per day unchanged; (2) takes away: variety (above),
+  and on a lean muscle-gain target about 1 day in 4 now reads a small protein-over or fat-under instead of "on target";
+  (3) fundamentals hold (energy on target every day; fat stays over 0.8 g per kg on the worst day); (4) "on target"
+  itself is NOT redefined; (5) population-level nutrition, inside scope.
+  ALSO in this batch, from the checks the previous commit broke: the ~65 new foods are in swap groups; soba has a dry
+  twin for the shopping list; **packaged products carry every allergen their usual recipe has** (a sausage roll: egg
+  and milk; breaded chicken: egg, milk, soy, celery, mustard; and so on), because a product that was UNKNOWN was
+  refused for every restriction and an entry must not be weaker than that; recipe steps are no longer hidden because
+  "cakes", "smoothie", "orange juice" and "salt and pepper" became foods; the unknown-food sentence uses the app's
+  existing words ("in my food data"); two drivers (meal-log-card, unit-ask) open an offer's Details as he would (his 17
+  Nov one-line offers; they had been red since that build). One library soup nobody could be served was rewritten.
+  `test:real-plates` (38 checks; 27 mutations: 25 caught after two checks were tightened, 1 dead guard found and
+  deleted, 1 equivalent mutant: an early return that returns the same list). Re-anchored on properties, not numbers:
+  `test:meal-library` (a protein-dense dish few are served must be LEAN or limited by the PLATE to the smaller meals),
+  `test:usual-meals` (its case is found by property, not named). Bundle budgets moved to today's measured numbers.
+  NOT proven: any of it on his own saved plan (a plan made before today keeps its dishes until he regenerates or asks
+  for more), and on a phone. NOT built: a "more meals a day" suggestion for very big eaters (a 3,800 kcal man's lunch
+  is 1,370 kcal, which no plate holds: 22 lunches fit him); low-carb dishes (keto has no library lunches or dinners).
+  **QUESTIONS FOR HIM**: (a) on a muscle-gain plan, should a day that is 15 g over on protein (or 15 g under on fat)
+  with calories on target read as a miss? His 18 Oct bands say yes; a coach would say no. (b) "usually contains"
+  allergens on EXISTING foods (bread and soy, mayonnaise and mustard, stock and celery...) still need his one ruling.
+  Needs the `chat-gemini` and `generate-meals` deploys (the synced food table); frontend on merge.
+
+- [x] **A FOOD THE APP CANNOT COUNT IS ASKED ABOUT; SEASONINGS NEED NO GRAMS; A PRODUCT IS NOT ITS MAIN INGREDIENT (18
+  Nov 2026, the Fable pass on meals).** FOUND by putting ordinary lines through the real builders. "200g chicken, 250g
+  rice, 60g chocolate brownie" came back as a 659 kcal card that LISTED the brownie and counted none of it (the meal
+  check allows a fifth of a dish's WEIGHT to be unknown; his 15 Oct rule for a logged meal was not held for a meal he
+  describes): now asked about, in the app's words, nothing saved. "Salt" was an unknown food, so "salt and pepper"
+  was asked about in grams: salt, pepper, herbs, spices, a squeeze of lemon said with no amount count as nothing and
+  are understood (oil, butter and anything with real energy are still asked about; a seasoning WITH an amount is
+  costed). "200g chicken breast" shown back as "275g raw chicken breast" under "Your portions, untouched": the card
+  now says "as the app weighs them" with the cooked weight beside it. Crab sticks were plain crab, onion rings plain
+  onion, soba plain buckwheat (all passed gluten-free); cornflakes and Worcestershire sauce passed gluten-free, hoisin
+  sesame-free, Thai curry paste shellfish-free and vegan: each corrected, Thai paste split from Indian, six library
+  dishes renamed to the paste they use. About 65 everyday foods added (a pizza slice, a pint, fish fingers, ice
+  cream...), and a pint is read as the drink's own measure. `test:meal-facts` (41 checks; 20 mutations, 19 caught, 1
+  equivalent). Needs the `chat-gemini` and `generate-meals` deploys.
+
+- [x] **PROTEIN FOR A VERY HEAVY PERSON IS WORKED OUT FROM A REFERENCE WEIGHT (18 Nov 2026, the Fable pass on meals; CSCS decision, mine, not asked).**
+  FOUND by serving two weeks of meals from the library to ten different people with the app's own functions: a 120 kg
+  woman of 160 cm on fat loss was set **240 g of protein inside 1,808 kcal** (2.0 g per kg of TOTAL weight, 53% of her
+  energy); the 50 g carb floor engaged, fat was floored at 72 g off the same weight, **no library breakfast fitted (pools
+  0/11/19/26) and all 14 days read about 500 kcal under**. A 130 kg man: 260 g, 11 of 14 days on target. Everyone else
+  in the ten: 14 of 14. So the people most likely to want a fat-loss app got a plan that could not be served.
+  BASIS: protein needs follow lean mass, not total mass. Sports-nutrition practice sets protein for people with high
+  body fat from a reference weight (ISSN protein position stand 2017; Helms et al., about 1 g per cm of height or goal
+  weight); dietetic practice uses an adjusted weight counting a quarter of the excess, because about a quarter of excess
+  weight is lean tissue. DECIDED: up to a BMI of 30 the reference weight IS the bodyweight (nobody at or under it moves
+  by a gram; the 9,216-plan grid and every BMI<=30 fixture are untouched), above it a quarter of the extra counts
+  (`nutritionReferenceWeightKg`, continuous, so a weigh-in crossing the line moves nothing suddenly). Used for protein,
+  the fat floor and the periodised day's carbs; ENERGY (BMR, the day's burn, a sport's calories) still reads the real
+  weight. Considered and not chosen: anchoring at a BMI of 25 (the textbook adjusted weight; it would lower protein
+  5-12% for muscular people between 25 and 30 for no gain) and a flat cap at the BMI-30 weight (154 g for her; fits
+  slightly more dishes but ignores the extra lean mass a bigger body does carry). MEASURED after: her 240 g -> 175 g
+  (140 g as a beginner), pools 36/79/89/77, 14 of 14 days on target; his 260 -> 208 g, 14 of 14.
+  CSCS review: (1) training effect: protein stays 1.6-2.0 g per kg of reference weight, about 2.4-3.0 g per kg of
+  fat-free mass, above the muscle-retention range for a deficit; (2) takes away: 65 g of protein she could not eat
+  anyway, and gives back about 90 g of carbs for training; (3) fundamentals hold; (4) redefines "g/kg" for BMI>30 only,
+  and the targets sheet now SAYS so ("Protein and fat are worked out from 88 kg rather than your full weight, because
+  protein needs follow muscle, not total weight."; the wording is his to change, and never names a BMI or a label);
+  (5) inside scope: population-level performance nutrition, not a clinical diet. **Protein targets for BMI>30 before 18
+  Nov are not comparable.** `test:reference-weight` (28 checks; 12 mutations, 12 caught). Frontend only. NOT done: the
+  coach is not yet told the reference weight (it is handed the targets, and has no per-kilo line in its instructions).
+
+- [x] **THE COACH EXAM'S JUDGE IS NOW FABLE 5.2 (17 Nov 2026, his ruling "Switch to Fable", asked from three options:
+  switch, keep Opus 5, or mark once with both).** A stronger marker catches subtler coaching mistakes; the cost is that
+  judged marks before and after are NOT COMPARABLE. So the judge is now stamped like the coach and the marking guide:
+  `JUDGE_MODEL` lives in `scripts/coach-fingerprint.ts`, the grader writes it, and `test:coach-exam-fresh` calls scores
+  marked by a different judge (or none recorded) stale, with "re-grade the same transcripts" as the fix. 4 new checks,
+  4 mutations, 4 caught (harness's baseline refusal bypassed by counting FAIL lines against the gate's real stale
+  baseline of 4, since the current scores are already stale for the coach change). Not yet run against the real API
+  (needs his key); the next exam run on his machine is the first Fable marking. Also started the same day: an
+  eight-area audit of the whole app by Fable 5.2 auditors (findings to follow in their own entry).
+
 - [x] **THE CHAT REVIEW, BUILT (17 Nov 2026, his "Build it all" on a merged list of my suggestions and another session's)**.
   His rulings that day, each from three options: **"One line, numbers on tap"** (an offer is its lead; a cost is always
   shown; the rest is behind Details); **"Eaten stay, later ones fit"** (already the app's behaviour since 10 Oct, so

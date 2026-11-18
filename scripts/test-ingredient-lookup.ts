@@ -45,13 +45,14 @@ console.log('\n1. A dish is not one of its ingredients (plan, table A)')
   // packs"), costed as the sandwich, never as its mayonnaise. Held in 1b.
   const DISHES = ['chicken caesar wrap', 'cheese and ham toastie', 'egg fried rice', 'peanut butter cookie',
     'almond croissant', 'salmon sushi roll', 'oat milk latte', 'egg mayonnaise', 'avocado toast', 'almond-crusted cod',
-    'honey mustard chicken', 'prawn cocktail', 'sausage roll', 'beef lasagne', 'chicken with rice', 'rice cakes with dark chocolate',
+    'honey mustard chicken', 'prawn cocktail', 'steak pie', 'beef lasagne', 'chicken with rice', 'rice cakes with dark chocolate',
     'salt and pepper to taste', 'sweet potato fries', 'almond milk yoghurt', 'peanut sauce']
   const resolved = DISHES.map(d => [d, both(d)] as const).filter(([, r]) => r !== null)
   check(`all ${DISHES.length} dishes are a miss in both copies (they used to be a tortilla, mayonnaise, ham, cod...)`, resolved.length === 0, resolved)
   // 1b. A pack is its own entry, never one of its ingredients.
-  const packs = (['tuna mayo sandwich', 'chicken and bacon sandwich', 'crisps', 'coke'] as const).map(d => [d, both(d)] as const)
-  check('a standard pack resolves to itself, never to an ingredient (mayonnaise, bacon, potato)', packs.every(([d, r]) => typeof r === 'string' && !['mayonnaise', 'bacon', 'potato', 'tuna', 'white bread'].includes(r)), packs)
+  // 'sausage roll' joined the packs 18 Nov 2026 (it was a miss): its own entry, never the pork sausage.
+  const packs = (['tuna mayo sandwich', 'chicken and bacon sandwich', 'crisps', 'coke', 'sausage roll', 'onion rings', 'crab sticks'] as const).map(d => [d, both(d)] as const)
+  check('a standard pack resolves to itself, never to an ingredient (mayonnaise, bacon, potato, sausage, onion, crab)', packs.every(([d, r]) => typeof r === 'string' && !['mayonnaise', 'bacon', 'potato', 'tuna', 'white bread', 'pork sausage', 'onion', 'crab meat'].includes(r)), packs)
 }
 
 console.log('\n2. A state word is kept (plan, table B; M20)')
@@ -107,7 +108,7 @@ console.log('\n4. A qualifier that changes the food (plan, table D; M23)')
     ['coconut water', 'coconut water'], ['water chestnuts', 'water chestnuts'], ['spring onions', 'spring onion'],
     ['corn tortillas', 'corn tortilla'], ['potatoes', 'potato boiled'], ['light mayonnaise', 'mayonnaise light'],
     ['low fat cottage cheese', 'cottage cheese low fat'], ['light coconut milk', 'coconut milk light'],
-    ['chocolate rice cake', 'chocolate rice cakes'], ['oyster mushrooms', null], ['tomato puree', null],
+    ['chocolate rice cake', 'chocolate rice cakes'], ['oyster mushrooms', null], ['tomato puree', 'tomato puree'], ['tomato ketchup', 'ketchup'], ['sun dried tomato paste', null],
   ]
   const wrong = QUAL.map(([p, want]) => [p, both(p), want] as const).filter(([, got, want]) => got !== want)
   check(`${QUAL.length} qualified foods reach their own entry, or nothing (oat flour used to be WHEAT flour)`, wrong.length === 0, wrong)

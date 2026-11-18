@@ -30,17 +30,17 @@
 
 import { checkMethod, type MethodRules } from './meal-method-check'
 import { supabase, resolveEnv } from './supabase'
-import { computeMealMacros, kindsItCouldBe, lookupIngredient, type Macros100g } from './food-db'
+import { computeMealMacros, kindsItCouldBe, lookupIngredient, toTasteLine, type Macros100g } from './food-db'
 import { asWeighedLines } from './as-weighed'
 import { validateMealAgainstDiet } from './diet-rules'
 import { containsPhrase } from './meal-ingredients'
-import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
+import { parseIngredientLines, scaleToTarget, isWithinCalorieTolerance, meetsProteinFloor, settlePieces, unrealisticPlate, MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from './portion-scaler'
 import type { MacroTargets, CookingTimePreference, BreakfastStyle } from './types'
 import { getPools, USER_REQUESTED_TAG, FAVOURITE_TAG, MY_MEAL_TAG, type MealSlotName } from './meal-store'
 import { isMissingColumnError } from './missing-column'
 import { tagsNewFrom, tagsPinOnly } from './meal-new-from'
 import { dishKeysFor, dishKeyOf } from './meal-dish-identity'
-import { chooseFromLibrary, loadMealLibrary } from './meal-library'
+import { chooseFromLibrary, loadMealLibrary, sinksAsStandIn, STAND_IN_FLOOR } from './meal-library'
 import { MIN_COVERAGE } from './meal-costing'
 import { MENU_SIZE, menuForSlot } from './meal-menu'
 /**
@@ -570,7 +570,8 @@ export function verifyProposal(
 ): PoolOption | null {
   // ONE STATE (18 Oct 2026, runs 7-10, H36/M64): every line a new dish carries is weighed raw or dry, at the weight
   // that carries the same energy, so the card, the day, the leftovers and the list all see the state it is bought in.
-  const parsed = asWeighedLines(parseIngredientLines(proposal.ingredients))
+  // A seasoning with no amount is kept as a pinch of it (18 Nov 2026, food-db.ts toTasteLine), never asked about.
+  const parsed = asWeighedLines(parseIngredientLines(proposal.ingredients)).map(toTasteLine)
   if (parsed.length === 0) {
     rejectLog.push(`[${slot}] "${proposal.name}": no ingredients parsed`)
     return null
@@ -662,6 +663,15 @@ export function verifyProposal(
   const scaled = scaleToTarget(parsed, { kcal: computed.kcal, protein: computed.protein, carbs: computed.carbs, fat: computed.fat }, target100g)
   if (scaled.rejectedReason) {
     rejectLog.push(`[${slot}] "${proposal.name}": ${scaled.rejectedReason}`)
+    return null
+  }
+
+  // A PLATE SOMEBODY WOULD EAT (18 Nov 2026, portion-scaler.ts): pieces in halves, and no dish served as a kilo and a
+  // half of food or two and a half bagels. His own portions never reach here (they were returned above, as stated).
+  scaled.ingredients = settlePieces(scaled.ingredients)
+  const plate = unrealisticPlate(scaled.ingredients, slot === 'snack')
+  if (plate) {
+    rejectLog.push(`[${slot}] "${proposal.name}": not a realistic portion — ${plate}`)
     return null
   }
 
@@ -992,7 +1002,8 @@ export async function generateMealPools(params: {
       const liked = steeringLikes(params.likedFoods ?? [], params.favouriteMeals ?? [], params.dislikedFoods ?? [], params.dietaryPreferences).foods
       for (const slot of slots) {
         const existing = existingBySlot[slot] ?? []
-        const candidates = chooseFromLibrary(library, {
+        // Someone who eats meat (or dairy) gets the dishes built on it (18 Nov 2026, meal-library.ts).
+        const wants = {
           slot,
           haveNames: existing.map(o => o.name),
           haveCuisines: existing.map(o => o.tags[0] ?? ''),
@@ -1002,11 +1013,15 @@ export async function generateMealPools(params: {
           likedFoods: liked,
           rotation: existing.length,
           budget: budgets[slot],
-        })
+          eatsMeat: !params.dietaryPreferences.some(p => p === 'vegetarian' || p === 'vegan' || p === 'pescatarian'),
+          eatsDairy: !params.dietaryPreferences.some(p => p === 'vegan' || p === 'dairy-free' || p === 'paleo'),
+        }
+        const candidates = chooseFromLibrary(library, wants)
         // A run asks for `poolSize` more (the top-up asks for up to DEEP_POOL_SIZE less what she has); a new plan's
         // seed asks for the whole DEEP_POOL_SIZE. Never past DEEP_POOL_SIZE a meal either way.
         const cap = !deep ? poolSize : params.appendToExisting ? Math.min(DEEP_POOL_SIZE, existing.length + poolSize) : DEEP_POOL_SIZE
-        for (const dish of candidates) considerProposal(dish, true, cap, deep, leeway)
+        // A dish built on a stand-in for a food he eats anyway is taken only while the meal is thin (STAND_IN_FLOOR).
+        for (const dish of candidates) considerProposal(dish, true, sinksAsStandIn(dish, wants) ? Math.min(cap, STAND_IN_FLOOR) : cap, deep, leeway)
       }
     } catch (err) {
       // The library is a convenience. Without it the meal writer is asked for everything, as before.

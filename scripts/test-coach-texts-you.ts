@@ -215,8 +215,15 @@ async function main() {
       /onClick=\{\(\) => \{?[^}]*openStripLink\(msg\.reminder!\.shortcut!\)/.test(chat) && /coachShortcutLabel\(msg\.reminder\.shortcut\)/.test(chat))
     const fn = strip(readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8'))
     const serve = fn.slice(fn.indexOf('Deno.serve('), fn.indexOf('function replyPushDeps'))
+    // 18 Nov 2026: RED SINCE THE PHOTO BUILD (17 Nov), found by running it: `res` is now made from the cleaned response
+    // in a second step (a photo turn's "safe" sentences leave it), so the one line this pinned no longer exists. The
+    // property is the order and the identity, and that is what is read: the response is built first, the push is given
+    // THAT response's body and status, and that response is what is returned.
+    const builtAt = serve.indexOf('cleanCoachResponse(await handleChatRequest(req))')
+    const pushAt = serve.indexOf('deliverReply(')
     check('chat-gemini sends the reply AFTER building the response, never instead of it',
-      /const res = await (?:guardPastLifts\()?await cleanCoachResponse\(await handleChatRequest\(req\)\)/.test(serve) && /deliverReply\(request, body, res\.status, replyPushDeps\(\)\)/.test(serve) && /return res;/.test(serve), serve.slice(0, 400))
+      builtAt > 0 && pushAt > builtAt && /const res = [^;\n]*\bguarded\b/.test(serve) && !/const res = [^;\n]*handleChatRequest\(/.test(serve)
+      && /const body = await res\.clone\(\)\.json\(\)/.test(serve) && /deliverReply\(request, body, res\.status, replyPushDeps\(\)\)/.test(serve) && /return res;/.test(serve), serve.slice(0, 400))
     check('...and lets the platform finish it after the answer has gone (waitUntil)', /waitUntil\(job\)/.test(serve))
     const deps = fn.slice(fn.indexOf('function replyPushDeps'))
     check('its row write names the row AND the profile AND the coach', /chat_messages\?id=eq\.\$\{id\}&profile_id=eq\.\$\{profileId\}&role=eq\.assistant/.test(deps))

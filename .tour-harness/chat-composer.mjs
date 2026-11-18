@@ -75,7 +75,12 @@ await stopMic()
 console.log('\n2. One button, the WhatsApp way (her 6 Nov 2026 ruling), and the desktop voice shape')
 // Typed words turn the mic into send: there is no mic to tap behind typed words any more (the phone keyboard's
 // own mic covers dictation there). Clearing the box brings the mic back.
-const pillButtons = () => ev(`[...document.querySelectorAll('[data-testid="chat-composer-pill"] button')].map(b => b.getAttribute('aria-label'))`)
+// RE-ANCHORED 18 Nov 2026: the pill also holds the camera since his 17 Nov "Read it, then discard" (a photo of a meal,
+// menu or label). His 6 Nov ruling is about the ACTION button, mic or send, never both; the camera is counted on its
+// own line below so it cannot become a second action button unnoticed.
+const pillButtons = () => ev(`[...document.querySelectorAll('[data-testid="chat-composer-pill"] button:not([data-testid="chat-photo-button"])')].map(b => b.getAttribute('aria-label'))`)
+const cameraCount = await ev(`document.querySelectorAll('[data-testid="chat-composer-pill"] [data-testid="chat-photo-button"]').length`)
+check('2-. the pill holds one camera button beside the action button, and no other extra', cameraCount === 1 && (await ev(`document.querySelectorAll('[data-testid="chat-composer-pill"] button').length`)) === 2, cameraCount)
 await setText('Quick one:')
 await wait(200)
 const typed = await pillButtons()

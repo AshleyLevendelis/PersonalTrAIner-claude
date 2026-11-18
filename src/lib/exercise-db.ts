@@ -2224,6 +2224,11 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     // She was being shown half the weight the plan meant, under a caption
     // telling her to double it.
     equipment: ['dumbbell'],
+    // PRICED AS A MACHINE LEG CURL UNTIL 18 NOV 2026: up to 48 kg, and 16 kg at the median, for a dumbbell gripped
+    // between the feet (read off 160 people's plans). What limits this lift is holding the bell, and it is hardest
+    // where the hamstrings are weakest, so it takes a third of the machine's price: about 6 kg at the median, and 22 kg
+    // for an advanced 95 kg lifter (0.4 was tried first and still gave him 26).
+    price_fraction: 0.33,
     joint_stress: 'low',
     form_cues: ['Lie face down, dumbbell held between feet', 'Curl heels toward glutes', 'Squeeze at top', 'Lower with control'],
     coach_note_swap: 'A real loaded leg curl with nothing but a dumbbell and a floor — no machine required.',
@@ -3627,6 +3632,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     primary_muscles: ['triceps'],
     secondary_muscles: ['rear deltoid'],
     equipment: ['dumbbells'],
+    // HALF A LYING EXTENSION'S PRICE (18 Nov 2026): it was given the same weight, up to 20 kg a hand. A kickback is
+    // hardest at lockout with the upper arm level, where the arm is weakest, so it is done with about half.
+    price_fraction: 0.5,
     joint_stress: 'low',
     form_cues: ['Hinge forward with the upper arm pinned to your side', 'Extend the forearm straight back until the arm is long', 'Squeeze, then lower slowly', 'Keep the upper arm still the whole set'],
     coach_note_swap: 'Upper arm stays at your side, so the shoulder barely moves, unlike an overhead extension.',
@@ -4133,7 +4141,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     id: 'ankle-alphabet',
     movement_pattern: 'activation',
     mechanics_tier: 'primer',
-    prescription_type: 'reps',
+    // TIMED since 18 Nov 2026: a "rep" of an alphabet was never countable ("2 x 5" read as five alphabets a side, or
+    // five letters). Drawn for the same 30-45 seconds a side as the balance hold beside it.
+    prescription_type: 'time',
     angle_vector: 'rotational',
     primary_muscles: ['tibialis anterior', 'peroneals', 'ankle stabilisers'],
     secondary_muscles: ['calves'],
@@ -6503,6 +6513,14 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
  * advanced lifter swapping out Barbell Squats should never be offered
  * Goblet Squats as a same-tier alternative.
  */
+
+/**
+ * The warm-up moves that are EXPLOSIVE prep (jumps, slams, plyo push-ups, swings), by substitution group. Everything
+ * else in the primer tier is activation or mobility. Read by the plan (a few fast reps against ten controlled ones,
+ * exercise-plan.ts movementPrepReps) and by the session kinds ("the explosive work", session-kind.ts).
+ */
+export const EXPLOSIVE_PREP_GROUPS: readonly string[] = ['explosive_lower', 'explosive_upper', 'swing']
+
 /**
  * The nearest coaching-equivalent pattern when a movement's OWN pattern has
  * no eligible candidates left — a missing vertical press becomes a second

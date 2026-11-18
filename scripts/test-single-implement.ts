@@ -104,9 +104,18 @@ check('...and nothing on screen says "per hand"',
 
 // The number is the point, not just the caption: the halving is what made the
 // displayed figure half of what the model had actually decided on.
+// RE-ANCHORED 18 Nov 2026. This pinned ">= 20", the figure the lift had while it was priced as a machine leg curl.
+// It now takes a third of that price (a dumbbell held between the feet; CSCS, docs/plans/coach-read-of-plans.md), so
+// the floor was a measurement of the old price, not the property. The property is the HALVING: the same entry
+// declared as a pair is given half, per hand, and this one is given the whole figure.
 const legCurlKg = kg(legCurl)
+const asPair = { ...legCurl, equipment: ['dumbbells'] } as ExerciseEntry
+const asPairKg = kg(asPair)
 check('the prescribed number is the WHOLE estimate, not half of it',
-  legCurlKg !== null && legCurlKg >= 20, legCurlKg)
+  legCurlKg !== null && asPairKg !== null && asPairKg > 0 && legCurlKg >= asPairKg * 1.6,
+  { one: legCurlKg, declaredAsPair: asPairKg })
+check('...and the detector sees a halving: declared as a pair it IS captioned per hand',
+  /per hand/.test(shown(asPair) ?? ''), shown(asPair))
 
 // ---------------------------------------------------------------------------
 console.log('\n3. Correcting the label did not quietly remove a ceiling')
@@ -116,9 +125,14 @@ console.log('\n3. Correcting the label did not quietly remove a ceiling')
 // movement against an answer she may never have given. Asserted THROUGH
 // prescribeLoad rather than by reading statedCeilingKg, so a routing fix that
 // never reaches the prescription fails here.
+// RE-ANCHORED 18 Nov 2026: a 12 kg ceiling no longer BINDS on this lift (its own price is under it), so the check
+// uses one that does: half the lift's own figure, asserted to be under it first.
 const owns12 = { ...PROFILE, max_dumbbell_kg: 12 } as UserProfile
+const bindingKg = Math.max(2, Math.floor((legCurlKg ?? 0) / 2))
+const ownsLight = { ...PROFILE, max_dumbbell_kg: bindingKg } as UserProfile
+check('the ceiling used here binds (it is under the lift\'s own figure)', legCurlKg !== null && bindingKg < legCurlKg, { bindingKg, legCurlKg })
 check('a stated dumbbell ceiling still clamps this lift',
-  kg(legCurl, owns12) === 12, { shown: shown(legCurl, owns12), stated: statedCeilingKg(legCurl, owns12) })
+  kg(legCurl, ownsLight) === bindingKg, { shown: shown(legCurl, ownsLight), stated: statedCeilingKg(legCurl, ownsLight) })
 check('...and it is the DUMBBELL answer that does it, not the kettlebell one',
   statedCeilingKg(legCurl, owns12) === 12
     && statedCeilingKg(legCurl, { ...PROFILE, max_single_implement_kg: 40 } as UserProfile) === null,

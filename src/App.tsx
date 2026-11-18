@@ -1145,6 +1145,10 @@ function App() {
       health_conditions: Array.isArray(profileRow.health_conditions) ? profileRow.health_conditions : [],
       // The due date (pregnancy, 15 Nov 2026), absent before its migration: read as none.
       due_date: typeof profileRow.due_date === 'string' ? profileRow.due_date : null,
+      // The coach's running memory of the chat (chat-summary.ts). Written to the profile since 17 Nov 2026 and never
+      // read back: on a new phone, or after the browser cleared its storage, the summary in the database was ignored
+      // (test:profile-restore, red from the day the column was added). Absent before its migration runs.
+      chat_summary: profileRow.chat_summary && typeof profileRow.chat_summary === 'object' ? profileRow.chat_summary : null,
       // The running goal (running.ts), absent before its migration: read as none.
       running_goal: typeof profileRow.running_goal === 'string' ? profileRow.running_goal : null,
       running_race_date: typeof profileRow.running_race_date === 'string' ? profileRow.running_race_date : null,

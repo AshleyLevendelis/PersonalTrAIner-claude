@@ -144,6 +144,8 @@ export interface UserProfile {
   health_conditions?: string[] | null
   /** The due date, asked under the Pregnant tick (his ruling 15 Nov 2026, "Ask due date"). Column `due_date` (migration 20261115120000); missing before it runs. */
   due_date?: string | null
+  /** The coach's running summary of older chat turns and the time it runs to (chat-summary.ts). Column `chat_summary` (migration 20261117120000); missing before it runs. */
+  chat_summary?: { text: string; through: string } | null
   /** A plan pause (his ruling 14 Nov 2026, "Add a pause"): the local date it began, null while the plan runs. */
   plan_paused_since?: string | null
   /** A running goal ('run_20' | '5k' | '10k' | 'half'), his 13 Nov 2026 strategy slice 6 (src/lib/running.ts). Asked in setup (optional) or told to the coach. Column `running_goal` (migration 20261114120000, not run). */

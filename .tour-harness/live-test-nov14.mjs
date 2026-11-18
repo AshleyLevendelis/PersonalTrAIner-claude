@@ -48,6 +48,9 @@ await page.addInitScript(() => {
       if (/every breakfast this week/i.test(said)) return reply({ reply: '', proposal: { kind: 'propose_meal_addition', rawArgs: { meal_slot: 'breakfast', meal_name: 'Greek yoghurt with berries and almonds', ingredients: ['250g low-fat greek yoghurt', '100g blueberries', '20g almonds'], date: '2026-09-17', days: 7, origin_verbatim_quote: said } } })
       if (/how much of each/i.test(said)) return reply({ reply: '', proposal: { kind: 'propose_meal_addition', rawArgs: { meal_slot: 'lunch', meal_name: 'Roast chicken, new potatoes & smoked salmon', ingredients: ['200g roast chicken breast', '275g new potatoes boiled', '60g smoked salmon'], origin_verbatim_quote: 'Tell me how much of each to have', as_suggestion: true } } })
       if (/plank/i.test(said)) return reply({ reply: 'Hold a plank and use the stopwatch to see how long you last.' })
+      // A screen the coach NAMES is one tap away (18 Nov 2026): one screen gets a button, two get none.
+      if (/oats on my list/i.test(said)) return reply({ reply: 'Yes, oats are on your shopping list already, in the cupboard aisle.' })
+      if (/plates and the list/i.test(said)) return reply({ reply: 'The plate calculator covers the plates, and your shopping list covers the food.' })
       if (/track/i.test(said)) return reply({ reply: 'Run 4 laps and use the lap timer so you can see your pacing.' })
       if (/box jumps/i.test(said)) return reply({ reply: '1. Stand a foot from the box.\n2. Swing your arms and jump.\n3. Land softly, then step down.' })
       if (/video/i.test(said)) return reply({ reply: 'Here is a great tutorial: www.youtube.com/watch?v=abc123' })
@@ -229,6 +232,22 @@ check('A45. "Just remember it" is answered by the app, with no coach call', awai
 await page.evaluate(() => { window.location.hash = '' })
 check('A35. "show me my shopping list" opens the list\'s own page', await say('show me my shopping list') && (await until(() => page.evaluate(() => window.location.hash), v => v === '#/nutrition/grocery')) === '#/nutrition/grocery')
 await page.evaluate(() => { window.location.hash = '' })
+
+// A SCREEN THE COACH NAMES IS ONE TAP AWAY (18 Nov 2026): the button is the app's, read off the coach's words.
+check('A46. a question the coach answers by naming the shopping list is sent', await say('are oats on my list?'))
+const namedBtn = await until(() => page.evaluate(() => {
+  const b = document.querySelector('[data-testid="open-named-screen"]')
+  if (!b) return null
+  const r = b.getBoundingClientRect()
+  const bubble = b.closest('[data-testid="chat-bubble"]')
+  return { text: b.textContent.trim(), target: b.getAttribute('data-open-target'), h: Math.round(r.height), inView: r.top >= 0 && r.bottom <= innerHeight, under: /on your shopping list already/.test(bubble?.textContent || '') }
+}), v => !!v)
+check('A47. under the coach\'s reply there is one button, "Open your shopping list", 44px tall and on screen', !!namedBtn && namedBtn.target === 'grocery' && /^Open (the|your) shopping list$/.test(namedBtn.text) && namedBtn.h >= 44 && namedBtn.inView && namedBtn.under, namedBtn)
+await page.screenshot({ path: new URL('./live-nov14-named-screen.png', import.meta.url).pathname })
+check('A48. tapping it opens the list\'s own page', (await page.evaluate(() => { document.querySelector('[data-testid="open-named-screen"]').click(); return true })) && (await until(() => page.evaluate(() => window.location.hash), v => v === '#/nutrition/grocery')) === '#/nutrition/grocery')
+await page.evaluate(() => { window.location.hash = '' })
+const before2 = await page.evaluate(() => document.querySelectorAll('[data-testid="open-named-screen"]').length)
+check('A49. a reply naming TWO screens gets no button', await say('what about the plates and the list?') && (await page.evaluate(() => document.querySelectorAll('[data-testid="open-named-screen"]').length)) === before2 && before2 === 1, before2)
 
 // A long change row: the offer's own row, with the two halves given his screenshot's lengths.
 await page.goto(`${origin}/.tour-harness/chat.html?day=mid&n=2`)

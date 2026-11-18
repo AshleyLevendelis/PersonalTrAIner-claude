@@ -121,11 +121,13 @@ if (row !== null) {
   check('2. it no longer says "per hand"', !/per hand/i.test(row), row)
   check('3. ...nor "single side" — no side holds anything either', !/single side/i.test(row), row)
   check('4. it still carries a weight, in plain kg', /~?\d+(\.\d+)?kg/.test(row), row)
-  // The number is the point: halved, this lift showed ~12-14kg. The whole
-  // estimate is roughly double that. Pinned as a floor rather than an exact
-  // figure so a plate-rounding change does not fail it.
+  // The number is the point: halved, this lift shows half of what the app decided on.
+  // RE-ANCHORED 18 Nov 2026: the floor was 16, measured while the lift was priced as a machine leg curl (about 24-28 kg
+  // whole, 12-14 halved). It now takes a third of that price (one dumbbell between the feet): MEASURED 8 kg whole on
+  // this fixture and 4 kg when the entry is declared as a pair. The floor sits between the two, so a halving still
+  // fails here; the exact property (whole >= 1.6x the pair's figure) is held in test:single-implement.
   const shownKg = Number((row.match(/~?(\d+(?:\.\d+)?)kg/) || [])[1])
-  check('5. ...and it is the WHOLE estimate, not half of it', Number.isFinite(shownKg) && shownKg >= 16, shownKg)
+  check('5. ...and it is the WHOLE estimate, not half of it', Number.isFinite(shownKg) && shownKg >= 6, shownKg)
 }
 // SCROLL TO IT BEFORE SHOOTING. The assertions read the DOM, which is right,
 // but a screenshot of a row below the fold proves nothing to a person reading

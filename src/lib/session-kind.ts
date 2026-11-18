@@ -1,5 +1,5 @@
 import type { Exercise, MesocycleWeek, TrainingStyle, UserProfile, WorkoutDay } from './types'
-import { getExerciseEntry, getVolumeRole, type ExerciseEntry, type MechanicsTier, type MovementPattern } from './exercise-db'
+import { getExerciseEntry, getVolumeRole, EXPLOSIVE_PREP_GROUPS, type ExerciseEntry, type MechanicsTier, type MovementPattern } from './exercise-db'
 import {
   getConstrainedPool, getFlaggedJoints, isEquipmentAllowed, allowedEquipmentFor, orderCandidates, clampToVolumeRole, getRoleSetCeiling,
   setRandomSource, resetRandomSource, STYLE_CONFIGS, POOL_WIDE_IMPLEMENT_TIERS,
@@ -145,7 +145,7 @@ const RECIPES: Record<SessionKind, { order: Block[]; priority: string[]; minWork
   },
   functional: {
     order: [
-      { id: 'prep', patterns: [], groups: ['explosive_lower', 'explosive_upper', 'swing'], tiers: ['primer'], job: 'the explosive work' },
+      { id: 'prep', patterns: [], groups: [...EXPLOSIVE_PREP_GROUPS], tiers: ['primer'], job: 'the explosive work' },
       { id: 'hinge', patterns: ['hip_hinge'], tiers: [T2, T1], rank: e => (/swing|clean|snatch/i.test(e.name) ? 0 : 1), job: 'the hip drive' },
       { id: 'squat', patterns: ['knee_dominant', 'single_leg'], tiers: [T1, T2], job: 'the leg work' },
       { id: 'push', patterns: ['horizontal_push', 'vertical_push'], tiers: [T2, T1], job: 'the pushing' },

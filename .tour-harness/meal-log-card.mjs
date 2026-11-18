@@ -28,6 +28,7 @@ import { readFileSync, existsSync, writeFileSync, mkdtempSync, rmSync } from 'fs
 import { tmpdir } from 'os'
 import { join, extname } from 'path'
 import { spawn, execFileSync } from 'child_process'
+import { OPEN_OFFER_DETAILS_SCRIPT } from './driver-kit.mjs'
 
 const ROOT = new URL('..', import.meta.url).pathname
 const DIST = new URL('./dist/', import.meta.url).pathname
@@ -141,6 +142,10 @@ const check = (name, ok, detail) => {
 }
 
 await send('Page.enable'); await send('Runtime.enable')
+
+// His "One line, numbers on tap" (17 Nov 2026): this driver reads what an offer says, so it opens Details as he would.
+
+await send('Page.addScriptToEvaluateOnNewDocument', { source: OPEN_OFFER_DETAILS_SCRIPT })
 await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true })
 await send('Emulation.setFocusEmulationEnabled', { enabled: true })
 

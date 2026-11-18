@@ -27,7 +27,7 @@ import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestr
 import { methodToShow, macroOnTarget, isFamiliarOption, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
 import { emptyMealLine } from '@/lib/empty-meal'
 import type { MethodRules } from '@/lib/meal-method-check'
-import { formatKitchenQuantity, kitchenLine } from '@/lib/portion-scaler'
+import { formatKitchenQuantity, kitchenLine, pieceHint } from '@/lib/portion-scaler'
 import { groceryHash } from '@/lib/app-route'
 import { MealFoodEditSheet, type MealFoodEditContext } from '@/components/nutrition/MealFoodEditSheet'
 // DEFERRED, NOT BUNDLED. Both sheets only exist once somebody taps Move or
@@ -998,7 +998,10 @@ function displayIngredient(ing: { name: string; quantity: number; unit: string }
  */
 function CookedHint({ ing }: { ing: { name: string; quantity: number; unit: string } }) {
   const hint = cookedHint(ing)
-  return hint ? <span data-testid="ingredient-cooked-hint" className="text-muted-foreground"> ({hint})</span> : null
+  if (hint) return <span data-testid="ingredient-cooked-hint" className="text-muted-foreground"> ({hint})</span>
+  // A food eaten in pieces says how many beside its grams: "76g wholemeal bread (2 slices)" (18 Nov 2026).
+  const pieces = pieceHint(ing)
+  return pieces ? <span data-testid="ingredient-piece-hint" className="text-muted-foreground"> ({pieces})</span> : null
 }
 
 function MealSlotRow({

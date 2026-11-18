@@ -10,6 +10,7 @@
 import {
   filterLoggableSets,
   formatRampSets,
+  climbingSteps,
   formatCompletedSummary,
   groupExercises,
   resolveCalibrationAnchorIndex,
@@ -138,6 +139,36 @@ function main() {
   console.log('\n[9] formatRampSets: no ramp_up at all returns null')
   const noRampEx: Exercise = { name: 'Barbell Bench Press', sets: 3, reps: '8-11', rest: '90s' }
   check('null when ramp_up is absent', formatRampSets(noRampEx) === null)
+
+  console.log('\n[9b] a build-up set earns its row only if it is a step (18 Nov 2026, phone walk)')
+  {
+    const four: RampBlock = { exercise: 'Front Squat', abbreviated: false, loadSource: 'estimate', sets: [
+      { set_number: 1, load_percent: 0, reps: 10, note: '' }, { set_number: 2, load_percent: 50, reps: 5, note: '' },
+      { set_number: 3, load_percent: 70, reps: 3, note: '' }, { set_number: 4, load_percent: 85, reps: 2, note: '' },
+    ] }
+    const rows = (kg: number, name = 'Front Squat') => {
+      const r = formatRampSets({ name, sets: 3, reps: '9-11', rest: '120s', suggested_load_kg: kg, ramp_up: { ...four, exercise: name } })
+      return r?.kind === 'kg' ? r.sets : r === null ? [] : null
+    }
+    const light = rows(37.5)
+    check('a 37.5 kg squat builds up 20, 27.5, 32.5: the second empty-bar set is gone (it was 20 x 10, 20 x 5, 27.5, 32.5)',
+      JSON.stringify(light?.map(s => s.kg)) === '[20,27.5,32.5]', light)
+    check('...the empty-bar set kept is the first, the one with ten reps', light?.[0]?.reps === 10 && light?.[1]?.reps === 3, light)
+    check('...and the rows are numbered 1, 2, 3 with no gap', JSON.stringify(light?.map(s => s.setNumber)) === '[1,2,3]', light)
+    const bar = rows(20)
+    check('a lift whose working weight IS the empty bar has no build-up rows at all (it was two more sets with the same bar)', Array.isArray(bar) && bar.length === 0, bar)
+    check('...and formatRampSets says so with null, the answer every screen already reads as "no build-up"',
+      formatRampSets({ name: 'Front Squat', sets: 3, reps: '13-15', rest: '120s', suggested_load_kg: 20, ramp_up: four }) === null)
+    const heavy = rows(100)
+    check('a heavy lift keeps all four steps, unchanged (20, 50, 70, 85)', JSON.stringify(heavy?.map(s => s.kg)) === '[20,50,70,85]', heavy)
+    const every = [22.5, 25, 27.5, 30, 32.5, 35, 37.5, 40, 45, 50, 60, 80, 120].map(kg => ({ kg, r: rows(kg) ?? [] }))
+    check('at every working weight each step is heavier than the one before and lighter than the working weight',
+      every.every(({ kg, r }) => r.every((s, i) => s.kg < kg && (i === 0 || s.kg > r[i - 1].kg))), every.find(({ kg, r }) => !r.every((s, i) => s.kg < kg && (i === 0 || s.kg > r[i - 1].kg))))
+    check('...and anything above the bar still gets at least one build-up set', every.every(({ r }) => r.length >= 1), every.filter(({ r }) => r.length === 0).map(e => e.kg))
+    const db = rows(4, 'Dumbbell Bench Press')
+    check('light dumbbells (4 kg a hand) get one set with the lightest pair, not three with the same pair', Array.isArray(db) && db.length === 1 && db[0].kg === 2, db)
+    check('the rule itself: equal steps keep the first, a step at the working weight is dropped', JSON.stringify(climbingSteps([{ kg: 20 }, { kg: 20 }, { kg: 30 }, { kg: 40 }], 40).map(s => s.kg)) === '[20,30]')
+  }
 
   console.log('\n[10] groupExercises: superset exIndex round-trip')
   const dayExercises: Exercise[] = [
