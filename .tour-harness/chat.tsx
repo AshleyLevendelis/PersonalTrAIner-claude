@@ -149,7 +149,8 @@ const profile: UserProfile = {
   allergies: ALLERGIES as never,
   exercise_exclusions: [] as unknown as never, macro_calculation_mode: 'STANDARD_STATIC',
   coaching_persona: 'supportive', recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
-  created_at: new Date(anchorNowMs() - 9 * 86400000).toISOString(),
+  // ?started=N: how many days ago the plan began (INPUT; default 9), so a driver can sit in a later week's phase.
+  created_at: new Date(anchorNowMs() - Number(new URLSearchParams(location.search).get('started') ?? 9) * 86400000).toISOString(),
 } as UserProfile
 // ?bday=today / ?bday=tomorrow (9 Nov 2026, the birthday wish): a date of birth 30 years before the harness's today, or
 // the day after it. INPUT only: whether today is the birthday is the app's to decide.
@@ -340,6 +341,23 @@ const tradeoffRemoval = (() => {
   return null
 })()
 ;(window as unknown as { __tradeoffRemoval: unknown }).__tradeoffRemoval = tradeoffRemoval
+// THE LIVE WEEK'S OWN FACTS (18 Nov 2026), for verify:tradeoff-reach: its phase and its first training day. Read off the
+// generated week; the driver asks the app's own verdict for each kind, so nothing here decides an outcome.
+;(window as unknown as { __weekFacts: unknown }).__weekFacts = (() => {
+  const liveNo = getActiveMesocycleWeek(profile.created_at as string, anchorDate(), mesocycle.length)
+  const week = mesocycle.find(w => w.week_number === liveNo)
+  const day = week?.days.find(d => d.exercises.length >= 4)
+  if (!week || !day) return null
+  const volume = assessEdit({ profile, before: mesocycle, after: mesocycle, weekNumber: liveNo, dayName: day.day, kind: 'volume_lighter', scope: 'permanent' })
+  // A lift whose BAN the app itself says to ask about this week (the block's main lift in a strength phase), if any.
+  let main: { name: string; day: string; last: string } | null = null
+  for (const d of week.days) for (const e of d.exercises) {
+    if (main) break
+    const v = assessEdit({ profile, before: mesocycle, after: mesocycle, weekNumber: liveNo, dayName: d.day, kind: 'ban', scope: 'permanent', exerciseName: e.name })
+    if (v.tier === 2 && d.exercises.length >= 4) main = { name: e.name, day: d.day, last: d.exercises[d.exercises.length - 1].name }
+  }
+  return { main, liveWeek: liveNo, phase: week.phase_label ?? null, phases: mesocycle.map(w => `${w.week_number}:${w.phase_label}${w.is_deload ? ':deload' : ''}`), day: day.day, volumeTier: volume.tier, volumeReason: volume.reason ?? null }
+})()
 
 // AND ONE THAT IS NOT GOAL-DAMAGING — for the reason ask, which is the whole
 // of the rest of the change surface.

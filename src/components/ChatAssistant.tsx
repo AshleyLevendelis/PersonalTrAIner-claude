@@ -1026,6 +1026,19 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const block = ctx.before.find(w => w.week_number === ctx.weekNumber)?.block_number ?? 1
     return { verdict: assessEdit(ctx), key: askKey(ctx, block), scope: ctx.scope, reasoned }
   }
+  /** The ask for banning a lift: only where it is this week's main lift somewhere (edit-tradeoff's case 2). */
+  const banAdvice = (exerciseName: string): EditAdvice | null => {
+    const week = mesocycle.find(w => w.week_number === activeSession.liveWeek)
+    const day = week?.days.find(d => d.exercises.some(e => e.name.toLowerCase() === exerciseName.toLowerCase()))
+    if (!week || !day || !exerciseName) return null
+    return adviseEdit({ profile, before: mesocycle, after: mesocycle, weekNumber: week.week_number, dayName: day.day, kind: 'ban', scope: 'permanent', exerciseName, exclusions: exerciseExclusions })
+  }
+  /** The ask for a volume change: an ongoing cut is 'permanent', one week is 'today' (edit-tradeoff's cases 1 and 4). */
+  const volumeAdvice = (p: { dayName: string; direction: 'lighter' | 'heavier'; weekNumbers: number[] }): EditAdvice | null => {
+    const weekNumber = p.weekNumbers[0] ?? activeSession.liveWeek
+    if (!mesocycle.some(w => w.week_number === weekNumber)) return null
+    return adviseEdit({ profile, before: mesocycle, after: mesocycle, weekNumber, dayName: p.dayName, kind: p.direction === 'lighter' ? 'volume_lighter' : 'volume_heavier', scope: p.weekNumbers.length > 1 ? 'permanent' : 'today', exclusions: exerciseExclusions })
+  }
   /** The running summary of chats older than the coach's window (chat-summary.ts); the phone's copy, then the profile's. */
   const chatSummaryRef = useRef<ChatSummary | null>(loadChatSummary(profile.id, profile.chat_summary))
   const summarising = useRef(false)
@@ -3387,6 +3400,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    */
   const buildExerciseReorderProposal = (rawArgs: Record<string, unknown>): {
     ok: true
+    advice: EditAdvice
     scopeKey: string
     preconditions: Record<string, unknown>
     payload: ExerciseReorderPayload
@@ -3424,6 +3438,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const order = trial.mesocycle.find(w => w.week_number === activeSession.liveWeek)!.days.find(d => d.day === day.day)!.exercises.map(e => e.name)
     return {
       ok: true,
+      // REACHED AT LAST (18 Nov 2026): the "main lift moved behind its accessories in a strength block" case was
+      // written on 14 Sep and no caller ever passed kind 'reorder', so it could never fire.
+      advice: adviseEdit({
+        profile, before: mesocycle, after: trial.mesocycle, weekNumber: activeSession.liveWeek,
+        dayName: day.day, kind: 'reorder', scope: 'today', exerciseName: moving.exerciseName, exclusions: exerciseExclusions,
+      }),
       scopeKey: `${profile.id}:propose_exercise_reorder:${day.day}:${moving.exIndex}`,
       preconditions: { day: day.day, exIndex: moving.exIndex, currentExerciseName: moving.exerciseName },
       payload: { weekNumber: activeSession.liveWeek, dayName: day.day, sayDay: on.sayDay, fromIndex: moving.exIndex, toIndex, exerciseName: moving.exerciseName, neighbourName: neighbour.exerciseName, placement: beforeItem ? 'before' : 'after', scope: 'today' },
@@ -6581,7 +6601,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       } else if (result.proposal.kind === 'propose_volume_change' && result.proposal.rawArgs) {
         const volume = buildVolumeChangeProposal(result.proposal.rawArgs)
         if (volume && 'refusal' in volume) refusal = volume.refusal
-        else if (volume) built = { scopeKey: volume.scopeKey, preconditions: volume.preconditions, payload: volume.payload as unknown as Record<string, unknown>, preImage: volume.preImage, diff: volume.diff }
+        else if (volume) {
+          built = { scopeKey: volume.scopeKey, preconditions: volume.preconditions, payload: volume.payload as unknown as Record<string, unknown>, preImage: volume.preImage, diff: volume.diff }
+          // AN ONGOING CUT IN THE BLOCK THAT BUILDS THE WORK UP ASKS FIRST (18 Nov 2026; coded 14 Sep, never reached).
+          advice = volumeAdvice(volume.payload as { dayName: string; direction: 'lighter' | 'heavier'; weekNumbers: number[] })
+        }
         else refusal = "There's no room to move that session — everything on it is already at a limit."
       } else if (result.proposal.kind === 'propose_session_shorten' && result.proposal.rawArgs) {
         const shorten = buildSessionShortenProposal(result.proposal.rawArgs)
@@ -6779,7 +6803,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         else refusal = ad.reason
       } else if (result.proposal.kind === 'propose_exercise_ban' && result.proposal.rawArgs) {
         const bn = await buildExerciseBanProposal(result.proposal.rawArgs)
-        if (bn.ok) built = { scopeKey: bn.scopeKey, preconditions: bn.preconditions, payload: bn.payload as unknown as Record<string, unknown>, preImage: bn.preImage, diff: bn.diff }
+        if (bn.ok) {
+          built = { scopeKey: bn.scopeKey, preconditions: bn.preconditions, payload: bn.payload as unknown as Record<string, unknown>, preImage: bn.preImage, diff: bn.diff }
+          // A BAN OF THE LIFT THE BLOCK IS BUILT ON ASKS FIRST (18 Nov 2026; coded 14 Sep, never reached). Read off
+          // this week: the day where the named lift is the main lift, if there is one.
+          advice = banAdvice(String((bn.payload as { exerciseName?: unknown }).exerciseName ?? result.proposal.rawArgs.item ?? ''))
+        }
         else refusal = bn.reason
       } else if (result.proposal.kind === 'propose_exercise_remove' && result.proposal.rawArgs) {
         const rm = buildExerciseRemoveProposal(result.proposal.rawArgs)
@@ -6787,7 +6816,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         else refusal = rm.reason
       } else if (result.proposal.kind === 'propose_exercise_reorder' && result.proposal.rawArgs) {
         const ro = buildExerciseReorderProposal(result.proposal.rawArgs)
-        if (ro.ok) built = { scopeKey: ro.scopeKey, preconditions: ro.preconditions, payload: ro.payload as unknown as Record<string, unknown>, preImage: ro.preImage, diff: ro.diff }
+        if (ro.ok) { built = { scopeKey: ro.scopeKey, preconditions: ro.preconditions, payload: ro.payload as unknown as Record<string, unknown>, preImage: ro.preImage, diff: ro.diff }; advice = ro.advice }
         else refusal = ro.reason
       } else if (result.proposal.kind === 'propose_missed_session' && result.proposal.rawArgs) {
         const missed = buildMissedSessionProposal(result.proposal.rawArgs)
