@@ -1664,6 +1664,15 @@ menu" stays true when a copy is also left outside it.
 - **A screen the coach names is one tap away**: one of the shopping list, plate calculator, session history or full
   program named in a coach reply gets the app's "Open ..." button under it; two named get none. `test:open-from-chat`
   §6, `verify:live-test-nov14` A46-A49
+- **Plans read as a coach** (CSCS, mine; `docs/plans/coach-read-of-plans.md`): no loaded lift is prescribed past 20
+  reps; only the day's main lift goes under six; a warm-up drill keeps one dose in every block and week (explosive 5,
+  activation 10; Ankle Alphabet is timed); a dumbbell leg curl takes a third of the machine's price and a kickback half
+  an extension's; a week's lower-body main lifts alternate squat and hinge; a build-up set earns its row only if it is
+  heavier than the one before and lighter than the working weight. **Rep and weight figures from before 18 Nov are not
+  comparable for those lifts.** `test:rep-ceiling`, `test:coach-read`, `test:session-derive` §9b
+- **Home names the day's main lift** (else the heaviest thing moved), and the chat names a session by its lifts, not its
+  warm-up drill. `test:what-a-pr-is`, `test:coach-opener` §10
+- **Every edge function file parses**: `test:functions-parse` (the coach's file did not, 17-18 Nov, on `main` too).
 - **OPEN, HIS**: whether protein a little over or fat a little under with calories on target is a miss on a muscle-gain
   plan (his 18 Oct bands say yes); "usually contains" allergens on existing foods.
 
@@ -3030,6 +3039,13 @@ old — the commands were right and the context was missing.
   next sweep. **`test:no-dead-code` is the same kind**: it scans every export
   in `src/`, so a change that adds or removes an export runs it. 28 Sep 2026:
   one new exported constant left it red for a commit.
+- **`supabase/functions` IS OUTSIDE EVERY FAST CHECK, AND A FILE THAT DOES NOT PARSE READS FINE AS TEXT.** 18 Nov 2026:
+  the photo build of 17 Nov left one stray "` : ''}" in the coach's instructions; `chat-gemini/index.ts` was invalid
+  TypeScript from then on, was merged to `main`, and a deploy from `main` would have failed at the bundle. `tsc` covers
+  `src`, the source checks read the file as text, and the derivation I ran listed `test:` gates only, so the deno smokes
+  that import the file never ran until a full sweep. **A change under `supabase/functions` runs `test:functions-parse`
+  (seconds) and the `verify:` smokes whose script imports that file; a derivation that lists only `test:` names is half
+  a derivation.**
 - **A FIX MADE IN RESPONSE TO A SWEEP IS NOT COVERED BY THAT SWEEP.** 16 Sep
   2026: yesterday's sweep found two real failures, both were fixed, and the
   sweep was reported clean without being re-run. One of those fixes — pulling a

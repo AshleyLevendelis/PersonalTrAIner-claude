@@ -2,6 +2,88 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH'S SERVER CODE DID NOT PARSE, AND THAT VERSION IS ON `main` (found 18 Nov 2026 by the full sweep).**
+  The photo build of 17 Nov (1af36943) left one stray "` : ''}" in the coach's instructions
+  (`supabase/functions/chat-gemini/index.ts`). The file has been invalid TypeScript since, through PR #29 into `main`
+  (89128b30): **a `chat-gemini` deploy from `main` fails at the bundle step**, so nothing built for the coach since
+  17 Nov can have gone live from there. The live coach is whatever was deployed before; nothing here could see that.
+  HOW IT WAS MISSED: `tsc` covers `src` only; every source check reads the file as TEXT and passed; the gates that
+  import it are deno smokes (`verify:chat-*`), which my derived sets left out because the derivation listed `test:`
+  gates only, and no full sweep ran between the photo build and the merge. The same miss as the two red texting checks
+  below, one level worse. FIXED on the branch (the stray characters removed; `verify:chat-silent-tools` passes again,
+  15 checks). NEW GATE `test:functions-parse`: parses every file under `supabase/functions` in seconds (5 checks; the
+  real slip and a broken import both caught), so a change to a function is caught at the commit. It proves syntax
+  only. **Until this branch is merged, do not deploy `chat-gemini` from `main`.** Rule added to CLAUDE.md: a change
+  under `supabase/functions` runs `test:functions-parse` and the deno smokes that import the file.
+- [x] **THE PHONE WALK (18 Nov 2026, the Fable pass on UX): the whole app at 390x844, screens read.** Walked Home,
+  Nutrition (and a meal's sheet), Exercise (a live session: start, two sets, the rest timer, the main lift's card),
+  Tools, Chat and Profile on app-boot (the real App on the harness's fake database). No console errors, no sideways
+  scroll. FOUND AND FIXED:
+  (1) **Home named the wrong lift.** A Squat & Carry day read "7 exercises · Calf Raises from ~40kg": the line took the
+  biggest number on the card. It names the day's main lift where that carries a weight, else the heaviest thing moved
+  (`byLead`). `test:what-a-pr-is` (4 new checks, 4 mutations caught).
+  (2) **The chat's welcome named the warm-up drill first** ("Today is Squat & Carry — Clamshell, Front Squat, Overhead
+  Carry and more"). Every list of a session's exercises in the chat leaves warm-up drills out unless they are all the
+  session holds (`sessionMovements`). `test:coach-opener` (3 new, 3 mutations caught).
+  (3) **Build-up sets repeated a weight.** A 37.5 kg Front Squat was given 20 x 10, 20 x 5, 27.5 x 3, 32.5 x 2, and a
+  beginner squatting the empty bar got two "warm-up" sets with the same bar before three working sets with it.
+  DECIDED (mine, CSCS: warm-up and movement prep): a build-up set earns its row only if it is lighter than the working
+  weight and heavier than the set before it; the first of two equal steps is the one kept; none left means no build-up
+  rows. BASIS: a specific warm-up is progressively heavier sets of the lift (NSCA); a set at the weight just done, or
+  at the working weight, prepares nothing and costs time. One derivation (`formatRampSets`), so the card, the
+  read-only day, supersets and "Log all N warm-ups" agree. Heavy lifts are unchanged (20, 50, 70, 85 for 100 kg).
+  `test:session-derive` §9b (10 checks, 6 mutations caught). Read on the screen: "Warm-up 0 of 3 · 20 → 32.5 kg".
+  (4) **The coach's running memory of the chat was saved to the profile and never read back** on reopen (column
+  `chat_summary`, added 17 Nov; `test:profile-restore` red since). On a new phone the saved summary was ignored.
+  Restored with the profile.
+  SEEN AND LEFT, each named: a band exercise still climbs past 20 reps ("Pallof Press 3 x 19-24"; the ceiling covers
+  weighted lifts, and a band has no number to raise: his or a later CSCS pass); the "Add an email" prompt covers Home
+  on the first open after a week (by design); Profile's header shows "kg goal —" with no way to set one (already on
+  his list).
+- [x] **READING GENERATED PLANS AS A COACH (18 Nov 2026, the Fable pass on plans; `docs/plans/coach-read-of-plans.md`).**
+  His brief: "The exercise tab and plans making sure they are world class." METHOD: generate 60 to 160 seeded people's
+  16-week plans, print the cards, read them the way a CSCS reads a programme before signing it, and count each finding
+  before changing anything. ALL FIVE DECISIONS ARE MINE under his 18 Sep delegation; the basis is beside each.
+  (1) **No loaded lift past 20 reps.** 3,380 of 21,000 loaded slots asked for more than 20 and 889 for more than 25
+  ("Overhead Tricep Extension 3x24-29"): an adaptation block adds three, the weekly climb two, a held weight up to
+  three more. A loaded lift's range now ends its block at 20 or fewer, lowered BEFORE the climb and before the weight
+  is priced, by a rule read off the range alone (so generation and the swap helper agree; a first version that
+  depended on which lever the lift used made them print two ranges for one lift, 88.8% agreement against a 95% gate).
+  Weightless lifts are not capped. BASIS: NSCA muscular endurance is 12 or more reps and coaches write 12 to 20.
+  TWO EXTRA MECHANISMS BUILT, MEASURED ON 60 PLANS AND REMOVED (forcing a lowered lift to climb reps; stopping its
+  weight climbing): neither changed the ceiling result and both repeated more week-pairs (83 to 95 against 77). A
+  missed mutation asked the question; the measurement answered it. After: 0 of 21,000 over 20.
+  (2) **Only the day's main lift goes under six reps.** About 470 of 43,524 slots were a side lift with a range
+  starting under six in a strength or power block ("Walking Lunges 2x3-5 @38 kg a hand", "Dumbbell Lateral Lunge
+  2x3-5", "Push-Ups 4x4-6 Bodyweight", "Band Lat Pulldown 3x4-6"). BASIS: NSCA gives the heavy strength loads to core
+  exercises and limits assistance work to loads no heavier than an 8RM, which is six reps with two in reserve. One
+  function (`repFloorFor`) for generation, the swap helper and the base week. COST, named: those lifts get lighter;
+  Push Press runs 6-8 in a power block rather than 3-5 (no exemption). After: 0.
+  (3) **Movement prep is not periodised.** A warm-up drill started at 5 reps and was moved by the block like a working
+  lift: 3 arm circles in a strength block, 9 in a conditioning one, 8 always for a beginner. Explosive prep (jumps,
+  slams, plyo push-ups, swings) is 5 reps; activation and mobility drills 10; the same in every block and week. BASIS:
+  RAMP warm-up practice (a few fast reps to potentiate, about ten controlled ones to activate and mobilise); the code
+  already said "the app does not progress preparation" and held timed drills still. Ankle Alphabet is now timed
+  (30-45 s a side): a "rep" of an alphabet was never countable. These are warm-up doses; which drill goes with which
+  joint is unchanged.
+  (4) **Two weights no coach would write.** Dumbbell Leg Curl reached 48 kg (median 16) for a bell held between the
+  feet: it now takes a third of the machine's price (0.4 was tried and still gave an advanced 95 kg lifter 26).
+  Dumbbell Tricep Kickback reached 20 kg a hand, the same as a lying extension: half that now. Both through the
+  existing lighter-variant rule, which can only lower. NAMED, NOT CHANGED: Trap Bar Carry is priced at the farmer's
+  one-hand figure as its total (50 kg where the same person carries 48 a hand); it errs light, and raising a weight
+  needs its own trace.
+  (5) **A week's lower-body main lifts alternate.** A full-body day's main lift may be a squat or a deadlift and each
+  day picked alone: 7 of 80 plans had two full-body days both on a deadlift variant, 4 had no squat main lift in the
+  week (a two-day beginner deadlifting both days). A day that may be either now takes the pattern the rest of the week
+  holds less of (days built, and later days whose main lift is fixed); the pool's limits win (a flagged knee keeps
+  what it has). After: 0 one-sided weeks in 60, never more than one apart.
+  MEASURED ON THE SAME SEEDED PLANS: mean quality 11.745 -> 11.758; repeated week-pairs 74 -> 75; days over length not
+  moved (the sweep's `session-length` holds it). CSCS review answers are in the plan doc.
+  `test:rep-ceiling` (18 checks; 8 mutations, 7 caught and the eighth found an unused value, deleted),
+  `test:coach-read` (31 checks; 20 mutations, 19 caught, 1 equivalent: counting the current day among "later" days
+  changes nothing, because a day that is choosing is never itself fixed). NOT DONE: band and bodyweight lifts over 20
+  reps (2,468 of about 22,000; reps are their only lever, and a band has no number to raise); session names ("Full
+  Body Power" on a beginner's 13-15 rep day) are wording, his.
 - [x] **THE COACH: THEIR LEVEL, THEIR SPORT, AND A SCREEN IT NAMES ONE TAP AWAY (18 Nov 2026, the Fable pass on the
   coach; his brief: advice "world class and sport specific if the user wants it", "appropriate for all users at all
   levels", and a chat that can "quickly and easily do things for the user").** FOUND by reading what the coach is told:

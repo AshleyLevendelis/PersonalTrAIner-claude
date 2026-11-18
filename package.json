@@ -23,6 +23,7 @@
     "test:real-plates": "tsx scripts/test-real-plates.ts",
     "test:rep-ceiling": "tsx scripts/test-rep-ceiling.ts",
     "test:coach-read": "tsx scripts/test-coach-read.ts",
+    "test:functions-parse": "tsx scripts/test-functions-parse.ts",
     "test:reference-weight": "tsx scripts/test-reference-weight.ts",
     "test:macro-split": "tsx scripts/test-macro-split.ts",
     "test:injury-separation": "tsx scripts/test-injury-exclusion-separation.ts",
