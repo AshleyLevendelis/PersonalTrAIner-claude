@@ -95,7 +95,11 @@ check('...and fried calamari by its listed name too', namedFoodClash('swap dinne
 check('...while grilled calamari is no clash for gluten-free', namedFoodClash('can I have grilled calamari tonight?', ['gluten-free'], []) === null)
 const chat = code('src/components/ChatAssistant.tsx')
 const guard = chat.slice(chat.indexOf('const processResponse = async'), chat.indexOf('const processResponseInner = async'))
-check('the chat reads the question off HIS message, before any card is built', /namedFoodKindAsk\(userSaid, /.test(guard) && guard.indexOf('namedFoodKindAsk(') < guard.indexOf('processResponseInner(result, userSaid)'), guard.slice(0, 200))
+// RE-ANCHORED 18 Nov 2026: the allergy card added a branch ABOVE this one (a described reaction is never refused as a
+// food), with its own inner call. The property is unchanged: in the branch where no food clashes, the question is read
+// off his message before that branch's card is built.
+const noClash = guard.slice(guard.indexOf('if (!clash)'))
+check('the chat reads the question off HIS message, before any card is built', guard.includes('if (!clash)') && /namedFoodKindAsk\(userSaid, /.test(noClash) && noClash.indexOf('namedFoodKindAsk(') > -1 && noClash.indexOf('namedFoodKindAsk(') < noClash.indexOf('processResponseInner(result, userSaid)'), noClash.slice(0, 200))
 check('...a food card on that turn is not built: the question is the reply', /if \(kindAsk && result\.proposal && FOOD_OFFER_KINDS\.has\(result\.proposal\.kind\)\) return \{ text: kindAsk \}/.test(guard))
 check('...and a turn that is only talk is answered with the question, never over a card or a record', /kindAsk && !result\.proposal && !plain\.pendingAction && !plain\.receipt && !plain\.action && !plain\.clarification \? \{ \.\.\.plain, text: kindAsk \} : plain/.test(guard))
 

@@ -24,7 +24,7 @@ import { loadSwitches, remindersSummary } from '@/lib/coach-reach-out'
 import { splitFoodList } from '@/lib/food-list'
 import { containsPhrase } from '@/lib/meal-ingredients'
 import { isStartingOut } from '@/lib/starting-out'
-import { useEffect, useMemo, useRef, useState, Suspense, lazy } from 'react'
+import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -246,7 +246,7 @@ function SheetRow({ label, value, onOpen }: { label: string; value: string; onOp
 }
 
 // Off first paint (18 Nov 2026: the sheet's editor put first paint 1 kB over its ceiling): fetched when the sheet opens.
-const AllergiesEditor = lazy(() => import('@/components/profile/AllergiesEditor').then(m => ({ default: m.AllergiesEditor })))
+const AllergiesEditor = lazyWithReload(() => import('@/components/profile/AllergiesEditor').then(m => ({ default: m.AllergiesEditor })))
 
 type ProfileSheet =
   | 'body' | 'goal' | 'injuries'
