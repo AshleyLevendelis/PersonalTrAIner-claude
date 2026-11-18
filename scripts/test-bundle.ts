@@ -771,7 +771,10 @@ console.log('\n3. Nothing has crept back up')
   // His 15 Sep ruling: 25 kB raw over today's number (3128 + 25).
   // MOVED 18 Nov 2026: 3153 -> 3183, the same food-table entries; MEASURED 3158 through this gate on the change.
   // His 15 Sep ruling: 25 kB raw over today's number (3158 + 25).
-  const TOTAL_BUDGET_KB = 3183
+  // MOVED 18 Nov 2026: 3183 -> 3211, the weight history on Home (his "Add all three": weekly line, 3M/6M/1Y, week
+  // list), its own chunk loaded when the Weight row opens, plus the allergy card; MEASURED 3186 through this gate on
+  // the change. The other three budgets did not move. His 15 Sep ruling: 25 kB raw over today's number (3186 + 25).
+  const TOTAL_BUDGET_KB = 3211
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

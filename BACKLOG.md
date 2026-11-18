@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [x] **WEIGHT, WEEK BY WEEK on Home, 18 Nov 2026: his "Add all three"** (from three options, after screenshots of another
+  app's weight screen; over the weekly line alone and over the list alone). Behind the Weight row in Progress: a graph
+  of every weigh-in as a faint dot with each week's average as a line through the middle of its week, a 3M / 6M / 1Y
+  choice (3M first; one year read once, the ranges are cuts of it), and a list of weeks, newest first ("This week",
+  "9-15 Nov"), each with its average to one decimal and the change from the week before ("0.39 kg ↓"); tap a week for
+  its days. A week is Monday to Sunday (his 15 Oct rule). A week after a week with no weigh-ins shows no change, never
+  one against an older week. **The readings are the ones the calorie targets trust**: a weigh-in the targets set aside
+  (a surprising figure not confirmed the next day) is left out here too, so the graph and the targets cannot
+  disagree. Mine: change in grams to two places as in his screenshot, no colour for up or down (whether down is good
+  depends on the goal; the arrow says which way). A failed read says so with Try again, never an empty history.
+  Kept off first paint (loaded when the row opens). `test:weight-weeks` (32 checks, 12 mutations caught),
+  `verify:weight-history` (20 checks, 9 browser mutations, one caught only after its check asked that no week jump from its neighbour rather than that every week stay under 85 kg), screenshots read: the first showed "Sun,, 30 Aug" and
+  the browser's "Sept", so month and day names are now written by the app, never the browser. The existing 14-point
+  sparkline above it is unchanged. Not built: body-fat or other synced measures (his screenshot's second app), the
+  workout difficulty dial (third screenshot) — not asked for.
+  The overall size budget moved 3183 -> 3211 by his 15 Sep rule (3186 measured + 25); the other three did not move.
+  Found on the way: the disk was full of 24,000 browser profiles left in the temp folder by past test runs.
 - [x] **LEFTOVERS FROM THE ARTIFACT CHECK, BUILT 18 Nov 2026 (his "Build the leftovers"; `docs/audits/artifact-leftovers-2026-11-18.md`).**
   Each a training or mechanical decision (mine under the 18 Sep delegation; basis in `docs/plans/weights-leftovers-2026-11-18.md`).
   (1) **A moved meal light on protein says so** (Edit page §14): a meal moved into a bigger slot keeps its own foods and

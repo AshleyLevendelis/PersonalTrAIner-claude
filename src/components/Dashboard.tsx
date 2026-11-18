@@ -44,6 +44,7 @@ const SessionSummaryDialog = lazyWithReload(() => import('@/components/exercise/
 // ITS OWN CHUNK (run 5, 11 Oct 2026): the card reads the list's dates and the
 // meals now, and is up one day a week; first paint does not wait for it.
 // AMBIENT: it appears on its own day, nobody taps to open it, so with its file missing Home draws nothing in its place.
+const WeightHistory = lazyWithReload(() => import('@/components/WeightHistory').then(m => ({ default: m.WeightHistory })))
 const ShopDayCard = lazyWithReload(() => import('@/components/ShopDayCard').then(m => ({ default: m.ShopDayCard })), { ambient: true })
 import { personalBest, bestReadingOf, weeksOnPlanPill, weeksOnPlanSentence } from '@/lib/coach-voice'
 import { useCardioLogsToday } from '@/components/exercise/CardioSetRow'
@@ -743,6 +744,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           )}
           {weighInOpen && profile.id && (
             <div className="mt-3">
+              <Suspense fallback={<p className="mt-3 text-xs text-muted-foreground">Loading your weigh-ins…</p>}>
+                <WeightHistory profileId={profile.id} today={data.today} goalKg={data.weightGoalKg} refreshKey={data.weightSeries.length + (lastWeighIn ? lastWeighIn.kg : 0)} />
+              </Suspense>
               <WeighInCard profileId={profile.id} onWeightLogged={handleWeighInChanged} />
             </div>
           )}

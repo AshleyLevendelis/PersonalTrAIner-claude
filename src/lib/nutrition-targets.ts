@@ -230,6 +230,29 @@ export async function getWeighInPicture(profileId: string, opts: { strict?: bool
 }
 
 /**
+ * WEIGHT HISTORY FOR THE GRAPH (18 Nov 2026, his "Add all three"): every weigh-in from `from` to today, oldest first,
+ * with the readings the targets set aside left OUT, so the weekly figures on the graph are the ones the targets
+ * follow. A failed read throws: the graph says it could not load, never draws an empty history.
+ */
+export async function getWeighInHistory(profileId: string, from: string): Promise<{ date: string; kg: number }[]> {
+  const today = targetsToday(profileId)
+  const targetRowsP = getNutritionTargets(profileId, '1970-01-01', today).catch(() => [])
+  const { data, error } = await supabase
+    .from('daily_metrics')
+    .select('date, weight_kg')
+    .eq('profile_id', profileId)
+    .gte('date', from)
+    .lte('date', today)
+    .order('date', { ascending: true })
+  if (error) throw error
+  const anchors = (await targetRowsP)
+    .filter(r => r.calculated_weight_kg != null && Number(r.calculated_weight_kg) > 0)
+    .map(r => ({ date: r.date, kg: Number(r.calculated_weight_kg) }))
+  const readings = (data ?? []).map(r => ({ date: r.date as string, kg: Number(r.weight_kg) }))
+  return weighInStanding(readings, anchors).trusted
+}
+
+/**
  * fallbackWeightKg may be undefined when the user never gave a weight; callers then get whatever the weigh-in series holds, or nothing.
  * It may also be a PROMISE of that figure (31 Oct 2026, app start): the start reads the latest weigh-in at the same time
  * as this, rather than before it, and the fallback is only awaited on the one branch that uses it.
