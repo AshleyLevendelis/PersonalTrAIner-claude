@@ -1,0 +1,107 @@
+{
+  "case": "sport-what-transfers-from-my-plan",
+  "why": "His brief, 18 Nov 2026: coaching that is 'sport specific if the user wants it'. She plays five-a-side on Saturday mornings (it is in OTHER TRAINING THEY DO). Asked how the gym helps her football, a strength coach names what the sport asks of the body and which lifts ALREADY in her plan build it (single-leg work, hamstrings, calves), by their names in the plan; a generic 'strength helps all sports' or an invented new session is the failure. Turn 2 asks for heavy legs the night before the match: the answer must weigh the match (section 1h and 3b0), never a plain yes. Both are questions, so no card.",
+  "checks": {
+    "mustMention": [
+      "split squat",
+      "Romanian",
+      "calf",
+      "Saturday"
+    ],
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      }
+    ]
+  },
+  "fingerprint": "d2deda64c2522d43",
+  "caseStamp": "3578d0e0e18fe00d",
+  "model": "gemini-3.5-flash",
+  "ranAt": "2026-11-18T23:16:51.244Z",
+  "context": {
+    "current_date": "2026-09-15T09:15:00.000Z",
+    "current_time_formatted": "Wednesday, 7:10 PM",
+    "day_of_week": "Wednesday",
+    "workout_logged_today": false,
+    "display_name": "Ashley",
+    "profile": {
+      "age": 34,
+      "gender": "female",
+      "height_cm": 165,
+      "weight_kg": 68,
+      "activity_level": "sedentary",
+      "fitness_goal": "fat_loss",
+      "preferred_time": "morning",
+      "bmr": 1420,
+      "tdee": 1960,
+      "training_experience": "intermediate",
+      "equipment_access": "home_gym",
+      "exercises_that_fit": "chest press: Barbell Bench Press, Dumbbell Bench Press, Barbell Floor Press, Dumbbell Floor Press, Neutral-Grip Dumbbell Press, Incline Dumbbell Press; overhead press: Landmine Press, Overhead Press, Dumbbell Shoulder Press, Arnold Press, Band Shoulder Press, Pike Push-Ups; row: Chest-Supported Row, Barbell Rows, Dumbbell Rows, Bent-Over Dumbbell Row, T-Bar Rows, Landmine Row; pull-down / pull-up: Kneeling Band Lat Pulldown, Pull-Ups, Chin-Ups, Dumbbell Pullover, Band Lat Pulldown, Single-Arm Band Pulldown; shoulder raise: Lateral Raises, Front Raises, Band Lateral Raise, Backpack Lateral Raise, Backpack Front Raise; traps: Shrugs, Dumbbell Shrugs, Band Shrug, Backpack Shrug; hinge: Deadlifts, Trap Bar Deadlift, Romanian Deadlifts, Good Mornings, Kettlebell Swing (Heavy), Glute Bridge; hamstrings: Sliding Leg Curl, Single-Leg Sliding Leg Curl, Seated Band Leg Curl, Dumbbell Leg Curl; squat: Barbell Squats, Goblet Squats, Wall Sit, Spanish Squat, Air Squat, Box Squat (Bodyweight); quads: Banded Terminal Knee Extension, Chair Leg Extension, Seated Short-Arc Quad Set; single-leg: Walking Lunges, Dumbbell Reverse Lunge, Bulgarian Split Squats, Split Squat (Bodyweight), Step-Ups (Bodyweight), Low Box Step-Up; carry: Farmer's Walk, Suitcase Carry, Overhead Carry, Trap Bar Carry, Loaded Backpack Walk, Farmer Squat Hold (Isometric Carry); calves: Single-Leg Dumbbell Calf Raise, Calf Raises (Bodyweight), Single-Leg Calf Raise (Bodyweight), Single-Leg Calf Raise Hold, Bent-Knee Calf Raise (Bodyweight); biceps: Barbell Curls, Dumbbell Curls, Hammer Curls, Band Curl, Incline Dumbbell Curls; triceps: Tricep Dips, Band Tricep Pushdown, Band Tricep Kickback, Dumbbell Tricep Kickback, Lying Dumbbell Tricep Extension, Overhead Tricep Extension; cardio: Jump Rope, Burpees, Mountain Climbers, High Knees, Jumping Jacks, Shadow Boxing; core: Plank, Dead Bug, Pallof Press, Hanging Leg Raises, Ab Wheel Rollout, Russian Twist"
+    },
+    "session_duration_preference": "45-60",
+    "workout_split_preference": "upper_lower",
+    "training_days_count": 3,
+    "macros": {
+      "calories": 1660,
+      "protein": 130,
+      "carbs": 150,
+      "fat": 55
+    },
+    "dietary_preferences": [
+      "nut-free"
+    ],
+    "exercise_exclusions": [],
+    "concurrent_activities": [
+      {
+        "name": "Five-a-side football",
+        "intensity": 0.8,
+        "days": [
+          "Saturday"
+        ],
+        "movement_demands": [
+          "running",
+          "single_leg",
+          "knee_dominant"
+        ],
+        "timeOfDay": "morning"
+      }
+    ],
+    "streak_days": 4,
+    "exercise_summary": "Monday: Lower body — Barbell Squats 4x6 @ 55kg, Romanian Deadlifts 3x8 @ 50kg, Bulgarian Split Squats 3x8 each side, Single-Leg Dumbbell Calf Raise 3x12, Plank 3x40s. [CLOSED at 16 of 16 planned working sets]\nToday (Wednesday): Upper body — Dumbbell Bench Press 4x8, Dumbbell Rows 4x10, Overhead Press 3x8, Hammer Curls 3x12.\nFriday: Full body, the lighter one — Goblet Squats 3x10, Glute Bridge 3x12, Chest-Supported Row 3x10, Dead Bug 3x8.\nSaturday: rest from the gym (five-a-side in the morning).",
+    "meal_summary": "Breakfast: Greek yoghurt with berries and oats. Lunch: chicken and rice bowl with peppers. Dinner: salmon, potatoes, green beans.",
+    "recent_prs_summary": "Barbell Back Squat 45kg last Tuesday — up from 42.5kg.",
+    "weight_trend_summary": "68.0kg, down 0.4kg over the last two weeks.",
+    "workout_log_history": "Last Tuesday: Barbell Back Squat 3x8 @ 45kg, all sets completed. Sunday: Bench Press 3x8 @ 30kg.",
+    "cardio_log_history": "",
+    "grocery_list_summary": "12 items unchecked",
+    "active_facts": [],
+    "active_goals": [],
+    "context_facts": [],
+    "favorites_summary": "",
+    "adherence_note": "",
+    "accountability_check_in": null
+  },
+  "turns": [
+    {
+      "user": "does any of this gym stuff actually make me better at five-a-side? feels like two separate things",
+      "reply": "It definitely does, but I get why it feels separate when running around on astro doesn't feel much like standing under a barbell. \n\nThe gym builds the physical engine for Saturday mornings, giving you the speed, strength, and durability to use your skills for the full 50 minutes.\n\nExplosive acceleration & sharp cuts — Five-a-side is non-stop repeated sprints and quick turns. Barbell Squats build the raw strength for those first explosive steps, and there are other exercises that help too. ⚽",
+      "raw": "It definitely does, but I get why it feels separate when running around on astro doesn't feel much like standing under a barbell. \n[BREAK]\nThe gym builds the physical engine for Saturday mornings, giving you the speed, strength, and durability to use your skills for the full 50 minutes.\n[BREAK]\nExplosive acceleration & sharp cuts — Five-a-side is non-stop repeated sprints and quick turns. Barbell Squats build the raw strength for those first explosive steps, and there are other exercises that help too. ⚽",
+      "error": null,
+      "action": null,
+      "proposal": null,
+      "saved": null,
+      "refused": null
+    },
+    {
+      "user": "ok. I missed monday's feeling so I want to redo the heavy squats and deadlifts on friday night instead of the lighter one, alright?",
+      "reply": "I didn't quite follow that one — say it again in your own words and I'll sort it.",
+      "raw": "I didn't quite follow that one — say it again in your own words and I'll sort it.",
+      "error": null,
+      "action": null,
+      "proposal": null,
+      "saved": null,
+      "refused": null
+    }
+  ]
+}

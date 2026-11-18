@@ -15,10 +15,10 @@
       }
     ]
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "09be5840cefa77ea",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -94,11 +94,23 @@
     },
     {
       "user": "oh and from now on my Sunday dinners get cooked for me at my mum's",
-      "reply": "That sounds lovely! You can set that up in the app by going to Profile, tapping Meals & shopping, and ticking Sunday dinner under Meals cooked for me.\n\nThat way the app automatically handles those as estimated meals on your plan and leaves those ingredients off your shopping list!",
-      "raw": "That sounds lovely! You can set that up in the app by going to Profile, tapping Meals & shopping, and ticking Sunday dinner under Meals cooked for me.\n[BREAK]\nThat way the app automatically handles those as estimated meals on your plan and leaves those ingredients off your shopping list!",
+      "reply": "",
+      "raw": "",
       "error": null,
       "action": null,
-      "proposal": null,
+      "proposal": {
+        "kind": "propose_custom_meal",
+        "args": {
+          "meal_slot": "dinner",
+          "name": "Dinner at mum's",
+          "food_lines": [
+            "1 serving beef lasagne",
+            "1 side salad"
+          ],
+          "date": "2026-09-20",
+          "origin_verbatim_quote": "from now on my Sunday dinners get cooked for me at my mum's"
+        }
+      },
       "saved": null,
       "refused": null
     }

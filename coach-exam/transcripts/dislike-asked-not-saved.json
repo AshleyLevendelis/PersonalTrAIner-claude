@@ -9,10 +9,10 @@
       }
     ]
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "c096a1850ccbf1b6",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -72,10 +72,10 @@
       "proposal": {
         "kind": "propose_meal_swap",
         "args": {
-          "meal_slot": "dinner",
-          "origin_verbatim_quote": "not really a fan of the salmon you've put in tonight",
           "old_item": "salmon, potatoes, green beans",
-          "reason": "Replaces salmon with another dinner option from your saved list that fits your targets."
+          "reason": "Swapping to an alternative verified dinner option to match your preferences.",
+          "origin_verbatim_quote": "not really a fan of the salmon you've put in tonight",
+          "meal_slot": "dinner"
         }
       },
       "saved": null,

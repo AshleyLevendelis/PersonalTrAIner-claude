@@ -14,10 +14,10 @@
       }
     ]
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "eba3d8851edc7483",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "Monday, 5:40 PM",
@@ -70,8 +70,8 @@
   "turns": [
     {
       "user": "thinking of doing a long 18k this evening, good idea?",
-      "reply": "I’d hold off on the 18k tonight since you’ve got a heavy leg session tomorrow morning with Back Squats at 100kg and Romanian Deadlifts. \n\nRunning 18k tonight will leave your legs fatigued and under-recovered, which will hit your strength, compromise your squat technique, and bump up your injury risk.\n\nInstead, let's keep it to a short, easy 5k at a conversational pace tonight so you don't trash your legs for tomorrow. We have a couple of other options too if you'd prefer to adjust the week! 🏃",
-      "raw": "I’d hold off on the 18k tonight since you’ve got a heavy leg session tomorrow morning with Back Squats at 100kg and Romanian Deadlifts. \n[BREAK]\nRunning 18k tonight will leave your legs fatigued and under-recovered, which will hit your strength, compromise your squat technique, and bump up your injury risk.\n[BREAK]\nInstead, let's keep it to a short, easy 5k at a conversational pace tonight so you don't trash your legs for tomorrow. We have a couple of other options too if you'd prefer to adjust the week! 🏃",
+      "reply": "I’d scale tonight's run to an easy 5-8k max instead.\n\nRunning 18k this evening means your legs will be carrying a ton of fatigue into tomorrow morning, which will make those heavy squats a real struggle and bump up your injury risk. 🏃‍♂️\n\nWe could also move tomorrow's leg session to Wednesday if you really want the long run, but let me know what you prefer!",
+      "raw": "I’d scale tonight's run to an easy 5-8k max instead.\n[BREAK]\nRunning 18k this evening means your legs will be carrying a ton of fatigue into tomorrow morning, which will make those heavy squats a real struggle and bump up your injury risk. 🏃‍♂️\n[BREAK]\nWe could also move tomorrow's leg session to Wednesday if you really want the long run, but let me know what you prefer!",
       "error": null,
       "action": null,
       "proposal": null,

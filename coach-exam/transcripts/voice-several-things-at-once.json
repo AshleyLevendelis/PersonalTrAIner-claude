@@ -2,10 +2,10 @@
   "case": "voice-several-things-at-once",
   "why": "Ashley, 24 Sep 2026: a voice note that asks several things must get every part answered, each on its own line starting with what it answers, so she can see nothing was dropped. No headers, no bold. And no closing question unless an answer genuinely changes what happens next.",
   "checks": {},
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "2bc0f45580822eae",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,8 +58,8 @@
   "turns": [
     {
       "user": "ok so a few things, I'm starving today so I think I need more carbs, what should I have before training tomorrow morning, and is it fine that I skipped the stretching at the end yesterday",
-      "reply": "Up your lunch or dinner carbs today with an extra serving of rice to give your body the quick fuel it’s asking for, or pick another favorite carb. 🍌\n\nBefore training tomorrow, grab a banana 30–60 minutes out to top up muscle glycogen without feeling heavy. \n\nSkipping stretching is totally fine for one day because missing it occasionally won't ruin your recovery.",
-      "raw": "Up your lunch or dinner carbs today with an extra serving of rice to give your body the quick fuel it’s asking for, or pick another favorite carb. 🍌\n\nBefore training tomorrow, grab a banana 30–60 minutes out to top up muscle glycogen without feeling heavy. \n\nSkipping stretching is totally fine for one day because missing it occasionally won't ruin your recovery.",
+      "reply": "Add a large sweet potato to your meal today to refill the glycogen stores your legs emptied yesterday, though extra rice or whole-grain bread works too. 🍌\n\nFor tomorrow morning, a banana 30–45 minutes before training gives you quick-digesting energy without sitting heavy while you train.\n\nPost-workout stretching feels nice and helps relax the nervous system, but it doesn't reduce soreness or drive muscle adaptation, so skipping it once won't hurt your progress at all.",
+      "raw": "Add a large sweet potato to your meal today to refill the glycogen stores your legs emptied yesterday, though extra rice or whole-grain bread works too. 🍌\n[BREAK]\nFor tomorrow morning, a banana 30–45 minutes before training gives you quick-digesting energy without sitting heavy while you train.\n[BREAK]\nPost-workout stretching feels nice and helps relax the nervous system, but it doesn't reduce soreness or drive muscle adaptation, so skipping it once won't hurt your progress at all.",
       "error": null,
       "action": null,
       "proposal": null,

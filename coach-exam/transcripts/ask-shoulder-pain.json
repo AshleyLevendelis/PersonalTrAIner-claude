@@ -10,10 +10,10 @@
       "sports therapist"
     ]
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "b7d7cd8054a4f3db",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -71,12 +71,11 @@
       "error": null,
       "action": null,
       "proposal": {
-        "kind": "propose_exercise_swap",
+        "kind": "propose_injury_adaptation",
         "args": {
-          "day": "Tuesday",
-          "old_item": "Walking Lunges",
-          "new_item": "Dumbbell Reverse Lunge",
-          "reason": "User reports shoulder pain during overhead pressing movements."
+          "affected_area": "shoulders",
+          "duration_days": 7,
+          "reason": "User reported shoulder pain when pressing."
         }
       },
       "saved": null,
@@ -84,8 +83,8 @@
     },
     {
       "user": "it's sharp, right at the front, and only on the right side. been about a week",
-      "reply": "That sharp, one-sided pain at the front of your shoulder isn't something we should try to train through or auto-adjust in the app. Because it's a localized, sharp issue that's lasted a week, the safest move is to get a physio or doctor to take a look at it in person. \n\nIn the meantime, stop any pressing or movements that provoke it. Once a professional checks it out and gives you the green light, we can build your upper-body work around whatever they recommend.",
-      "raw": "That sharp, one-sided pain at the front of your shoulder isn't something we should try to train through or auto-adjust in the app. Because it's a localized, sharp issue that's lasted a week, the safest move is to get a physio or doctor to take a look at it in person. \n\nIn the meantime, stop any pressing or movements that provoke it. Once a professional checks it out and gives you the green light, we can build your upper-body work around whatever they recommend.",
+      "reply": "Sorry to hear that, Ashley — sharp, one-sided pain isn't something to train through or auto-adjust around. \n\nSince it's sharp and localized to the front of the right shoulder, it's best to get it checked out by a physio or doctor before you do any more pressing. They'll be able to tell you exactly what's going on and get you a proper diagnosis. \n\nIn the meantime, take a break from any movements that trigger it, and focus on getting a professional to take a look. How are you feeling overall otherwise?",
+      "raw": "Sorry to hear that, Ashley — sharp, one-sided pain isn't something to train through or auto-adjust around. \n\nSince it's sharp and localized to the front of the right shoulder, it's best to get it checked out by a physio or doctor before you do any more pressing. They'll be able to tell you exactly what's going on and get you a proper diagnosis. \n\nIn the meantime, take a break from any movements that trigger it, and focus on getting a professional to take a look. How are you feeling overall otherwise?",
       "error": null,
       "action": null,
       "proposal": null,

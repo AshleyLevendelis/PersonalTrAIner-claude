@@ -6,10 +6,10 @@
       "30"
     ]
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "a4fe7665d7387120",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -62,8 +62,8 @@
   "turns": [
     {
       "user": "can you start a round timer?",
-      "reply": "How many rounds are we doing, and how long for the work and rest intervals? \n\nTell me those numbers (like 30 seconds on, 30 seconds off, 5 rounds) and I'll set it up for you!",
-      "raw": "How many rounds are we doing, and how long for the work and rest intervals? \n\nTell me those numbers (like 30 seconds on, 30 seconds off, 5 rounds) and I'll set it up for you!\n\n[QUICK_REPLIES: \"30s work / 30s rest\" | \"40s work / 20s rest\" | \"EMOM 10 mins\"]",
+      "reply": "Sure — how many rounds, and what work and rest times do you want for each?",
+      "raw": "Sure — how many rounds, and what work and rest times do you want for each?",
       "error": null,
       "action": null,
       "proposal": null,
@@ -72,8 +72,8 @@
     },
     {
       "user": "3 rounds of 30 seconds with 30 seconds rest",
-      "reply": "Got it — 3 rounds of 30 seconds work with 30 seconds rest, ready to go!\n\nHit start below whenever you're ready:",
-      "raw": "Got it — 3 rounds of 30 seconds work with 30 seconds rest, ready to go!\n\nHit start below whenever you're ready:",
+      "reply": "Got it — 3 rounds of 30 seconds work, 30 seconds rest. Ready when you are:\n\n[START_TIMER: type=\"rounds\", rounds=3, work_seconds=30, rest_seconds=30]",
+      "raw": "Got it — 3 rounds of 30 seconds work, 30 seconds rest. Ready when you are:\n\n[START_TIMER: type=\"rounds\", rounds=3, work_seconds=30, rest_seconds=30]",
       "error": null,
       "action": null,
       "proposal": null,

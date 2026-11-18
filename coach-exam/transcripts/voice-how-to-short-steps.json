@@ -2,10 +2,10 @@
   "case": "voice-how-to-short-steps",
   "why": "Ashley, 24 Sep 2026, after reading four paragraphs on how to deadlift: a how-to is up to three short steps, with the full guide one tap away (\"short steps\"). The first turn should be three lines or fewer plus the offer; the second, asked for, may be longer but still short lines, not paragraphs.",
   "checks": {},
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "497d3df9b9606739",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,8 +58,8 @@
   "turns": [
     {
       "user": "how do I do a deadlift",
-      "reply": "Think of the deadlift as a hip hinge, not a squat—you are pushing your hips back to load your glutes and hamstrings while keeping your spine safe and flat. \n\n\nHere is how to do it:\n\n1. Set your feet hip-width apart with the bar over the middle of your foot.\n2. Push your hips straight back until your hands reach the bar, keeping your lower back flat.\n3. Brace your core, wedge your hips in, and push the floor away to stand tall.",
-      "raw": "Think of the deadlift as a hip hinge, not a squat—you are pushing your hips back to load your glutes and hamstrings while keeping your spine safe and flat. \n\n[BREAK]\nHere is how to do it:\n\n1. Set your feet hip-width apart with the bar over the middle of your foot.\n2. Push your hips straight back until your hands reach the bar, keeping your lower back flat.\n3. Brace your core, wedge your hips in, and push the floor away to stand tall.\n\n[QUICK_REPLIES: \"Full form guide\" | \"Got it\"]",
+      "reply": "Here's the foundation for a solid deadlift: \n\n1. Stand feet hip-width, bar over mid-foot, grip outside knees.\n2. Pull hips down, chest up, and squeeze your armpits like holding oranges to engage your lats.\n3. Drive through your feet to lift, keeping the bar close until hips and knees lock out together.\n\nSetting your back and engaging your lats protects your spine and gives you a much stronger lift! 🏋️",
+      "raw": "Here's the foundation for a solid deadlift: \n\n1. Stand feet hip-width, bar over mid-foot, grip outside knees.\n2. Pull hips down, chest up, and squeeze your armpits like holding oranges to engage your lats.\n3. Drive through your feet to lift, keeping the bar close until hips and knees lock out together.\n[BREAK]\nSetting your back and engaging your lats protects your spine and gives you a much stronger lift! 🏋️\n\n[QUICK_REPLIES: \"Breathing & bracing\" | \"Common mistakes\" | \"Got it\"]",
       "error": null,
       "action": null,
       "proposal": null,
@@ -68,8 +68,8 @@
     },
     {
       "user": "Full form guide",
-      "reply": "Here is the step-by-step breakdown:\n\n1. Setup: Feet hip-width apart, bar resting right over the middle of your feet, an inch from your shins.\n2. Grip: Hinge at the hips to reach down and grip the bar just outside your knees with straight arms.\n3. Position: Pull your chest up slightly to flatten your back, and pull your shoulder blades back down toward your back pockets to engage your lats.\n4. Brace: Take a deep breath into your belly and brace your core like you're about to get punched.\n5. The Pull: Push through the middle of your feet and drive the floor away, keeping the bar sliding close to your body.\n6. Lockout: Stand fully upright by squeezing your glutes at the top—don't lean back or arch your lower back.\n7. The Lower: Push your hips back first until the bar passes your knees, then bend your knees to lower it to the floor under control.\n\nFocus on keeping the bar close to your shins the whole way up to protect your lower back.",
-      "raw": "Here is the step-by-step breakdown:\n\n1. Setup: Feet hip-width apart, bar resting right over the middle of your feet, an inch from your shins.\n2. Grip: Hinge at the hips to reach down and grip the bar just outside your knees with straight arms.\n3. Position: Pull your chest up slightly to flatten your back, and pull your shoulder blades back down toward your back pockets to engage your lats.\n4. Brace: Take a deep breath into your belly and brace your core like you're about to get punched.\n5. The Pull: Push through the middle of your feet and drive the floor away, keeping the bar sliding close to your body.\n6. Lockout: Stand fully upright by squeezing your glutes at the top—don't lean back or arch your lower back.\n7. The Lower: Push your hips back first until the bar passes your knees, then bend your knees to lower it to the floor under control.\n\nFocus on keeping the bar close to your shins the whole way up to protect your lower back.",
+      "reply": "Here is the complete cue-by-cue breakdown for a clean, strong deadlift:\n\n1. Stance — feet hip-width apart with the barbell over your mid-foot.\n2. Grip — bend at the hips, grip the bar just outside your knees without moving it.\n3. Setup — pull your shins to the bar, lift your chest, and pull your shoulder-blades back.\n4. Lat engagement — pull your armpits tight to lock your upper back in position.\n5. The pull — brace your core, drive the floor away with your legs, and keep the bar sliding up your shins.\n6. Lockout — stand tall by squeezing your glutes at the top without leaning back.\n7. Lowering — hinge at the hips first, let the bar clear your knees, then bend them to reset.",
+      "raw": "Here is the complete cue-by-cue breakdown for a clean, strong deadlift:\n\n1. Stance — feet hip-width apart with the barbell over your mid-foot.\n2. Grip — bend at the hips, grip the bar just outside your knees without moving it.\n3. Setup — pull your shins to the bar, lift your chest, and pull your shoulder-blades back.\n4. Lat engagement — pull your armpits tight to lock your upper back in position.\n5. The pull — brace your core, drive the floor away with your legs, and keep the bar sliding up your shins.\n6. Lockout — stand tall by squeezing your glutes at the top without leaning back.\n7. Lowering — hinge at the hips first, let the bar clear your knees, then bend them to reset.\n\n[QUICK_REPLIES: \"Breathing & bracing\" | \"Common mistakes\" | \"Got it\"]",
       "error": null,
       "action": null,
       "proposal": null,

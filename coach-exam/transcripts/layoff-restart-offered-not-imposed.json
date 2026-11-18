@@ -15,10 +15,10 @@
       }
     ]
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "076fbbeecb0026cf",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -86,8 +86,8 @@
     },
     {
       "user": "hmm, will that wipe my history?",
-      "reply": "No, not at all! Your past logs, PRs, body weight history, and saved preferences stay exactly as they are. \n\nA restart just resets your active training schedule back to Week 1 with a calibration week so we can get your working weights dialed back in safely after the break. 🏋️",
-      "raw": "No, not at all! Your past logs, PRs, body weight history, and saved preferences stay exactly as they are. \n[BREAK]\nA restart just resets your active training schedule back to Week 1 with a calibration week so we can get your working weights dialed back in safely after the break. 🏋️",
+      "reply": "Not at all! Your history, logged weights, meals, and PRs all stay right where they are.\n\nResetting to Week 1 just rebuilds your upcoming training block and starts you with a calibration week so we can find your current baseline weights. You won't lose a thing! 🎯",
+      "raw": "Not at all! Your history, logged weights, meals, and PRs all stay right where they are.\n[BREAK]\nResetting to Week 1 just rebuilds your upcoming training block and starts you with a calibration week so we can find your current baseline weights. You won't lose a thing! 🎯",
       "error": null,
       "action": null,
       "proposal": null,
