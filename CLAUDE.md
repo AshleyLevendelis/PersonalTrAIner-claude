@@ -1656,6 +1656,14 @@ menu" stays true when a copy is also left outside it.
   weight counts for protein, the fat floor and per-kilo carbs; energy reads the real weight. `test:reference-weight`
 - **A food the app cannot count in a meal he describes is asked about; seasonings need no grams; a packaged product
   carries every allergen its usual recipe has.** `test:meal-facts`, `test:food-db-parity` §6
+- **The coach is told how to coach a level and a sport** (CSCS, mine): everyday words for a beginner, the language for
+  an advanced lifter; for someone with a sport, what transfers from their own plan, timing around matches, and never a
+  water cut. Prompt sections 1g and 1h; exam cases `sport-what-transfers-from-my-plan`,
+  `sport-making-weight-is-not-coached`, `level-beginner-gets-plain-words`. Unproven until the exam runs after the
+  `chat-gemini` deploy.
+- **A screen the coach names is one tap away**: one of the shopping list, plate calculator, session history or full
+  program named in a coach reply gets the app's "Open ..." button under it; two named get none. `test:open-from-chat`
+  §6, `verify:live-test-nov14` A46-A49
 - **OPEN, HIS**: whether protein a little over or fat a little under with calories on target is a miss on a muscle-gain
   plan (his 18 Oct bands say yes); "usually contains" allergens on existing foods.
 

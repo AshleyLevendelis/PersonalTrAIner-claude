@@ -127,6 +127,22 @@ async function main() {
   const intent = read('src/lib/intent-proposal.ts')
   check('a hinted removal can be offered and confirmed', /'remove_from_grocery_list',/.test(intent) && /kind === 'remove_from_grocery_list'/.test(intent) && /row\.kind === 'remove_from_grocery_list'/.test(chat))
 
+  console.log('\n6. A screen the coach names is one tap away (18 Nov 2026)')
+  {
+    const named = m.screenNamedInReply
+    check('"added to your shopping list" gets the shopping-list button', named("Done, the chicken and rice are on your shopping list for Thursday.") === 'grocery')
+    check('"grocery list" is the same screen', named('Your grocery list already has oats on it.') === 'grocery')
+    check('"the plate calculator" gets the plate calculator', named('The plate calculator will show you which plates make 82.5 kg.') === 'plate')
+    check('"session history" and "full program" get theirs', named('Your session history shows three weeks of squats going up.') === 'history' && named('Week 5 is in your full program.') === 'program')
+    check('a reply naming TWO screens gets no button (which one is a guess)', named('Check the plate calculator, then look at your shopping list.') === null)
+    check('a reply naming none gets none: "your plan", "your meals" and "today\'s session" are said in half the coach\'s replies', ['Your plan has you squatting twice this week.', "Today's session is upper body.", 'Your meals for tomorrow are all set.', 'Nice work on that program of yours.', ''].every(t => named(t) === null))
+    check('the app\'s own "Opened ..." line keeps its own button and gets no second one', named(m.openedLine('grocery')) === null && named(m.openedLine('plate', 100)) === null)
+    const chatSrc = read('src/components/ChatAssistant.tsx').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+    check('the chat draws it under a coach reply only, never under a reminder (which has its own shortcut)', /const named = msg\.role === 'assistant' && !msg\.reminder \? screenNamedInReply\(msg\.content\) : null/.test(chatSrc))
+    check('...as a real button that opens the screen, at a weight the reply names for the plate calculator', /data-testid="open-named-screen"[\s\S]{0,200}onClick=\{\(\) => requestOpen\(named, named === 'plate' \? kgInText\(msg\.content\) : null\)\}/.test(chatSrc))
+    check('...and it is drawn in both shapes of the row (with and without a video link)', (chatSrc.match(/\{namedButton\}/g) ?? []).length === 2, (chatSrc.match(/\{namedButton\}/g) ?? []).length)
+  }
+
   console.log(`\n${ran} checks ran.`)
   if (failures > 0) { console.log(`${failures} FAILED.`); process.exit(1) }
   console.log('All open-from-chat checks passed.')

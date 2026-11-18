@@ -2,6 +2,43 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH: THEIR LEVEL, THEIR SPORT, AND A SCREEN IT NAMES ONE TAP AWAY (18 Nov 2026, the Fable pass on the
+  coach; his brief: advice "world class and sport specific if the user wants it", "appropriate for all users at all
+  levels", and a chat that can "quickly and easily do things for the user").** FOUND by reading what the coach is told:
+  it is handed the person's experience level and any second sport as one line each, and told NOTHING about what to do
+  with either. Sport appeared only as plan scheduling (lighter gym days on class days).
+  BUILT (CSCS, mine): **section 1g, coach to their level** (a beginner gets everyday words, one cue and no jargon;
+  intermediate hears that slower progress is normal and looks at sleep, food and total work before changing an
+  exercise; advanced gets the language and the trade-off; the level changes HOW it explains, never the facts or the
+  plan). **Section 1h, their sport**, only for someone who has one: what the sport asks of the body and which lifts
+  ALREADY in their plan build it, for eleven sport families (field and court, running, cycling, swimming, combat,
+  racquet, climbing, golf, rowing, snow, mixed events); timing (no heavy legs in the two days before a match or race,
+  keep strength in season, build out of season); fuelling in foods, never grams; and what is not the coach's (skills
+  and tactics, injuries, and **making weight by cutting water or not eating, which is never coached**).
+  BASIS: NSCA Essentials of Strength Training and Conditioning, needs analysis and in-season / off-season programming;
+  the scope line is the CSCS's own.
+  **A screen the coach names is one tap away**: the coach is told never to give directions to a tab, so a reply about
+  the shopping list had nothing to tap. Now a coach reply that names exactly ONE of the shopping list, the plate
+  calculator, session history or the full program gets the app's own "Open ..." button under it (read off the coach's
+  words like the timer buttons; two screens named, or the app's own "Opened ..." line, get none; "your plan" and
+  "today's session" are deliberately not triggers, since a button under every message is noise). His 20 Oct "text +
+  small buttons" and 24 Sep "a coach wouldn't send a card" both hold: it is a small button, never a card.
+  **The coach is told the reference weight** when protein and fat are worked out from one (never per kilo of the full
+  weight, never "too low for your weight", no label for the body), read off the same weight the targets use.
+  THREE EXAM CASES added (sport transfer and a match-eve leg session; a water cut refused; a beginner answered in plain
+  words), none of whose questions appear in the coach's instructions.
+  TWO CHECKS HAD BEEN RED SINCE THE PHOTO BUILD OF 17 NOV and were found by running them: `test:coach-texting` and
+  `test:coach-texts-you` each pinned one line of the reply's path out of the coach's server, and the photo check added
+  a second step. Both re-anchored on the property (every reply is the cleaned one or made only from it; the push is
+  given the response that is returned), 4 mutations, 4 caught. **How they were missed: they are not in the set the
+  file-derivation finds for a change to the photo files, and no full sweep ran between that build and the merge that
+  followed it.**
+  `test:open-from-chat` §6 (11 checks, 7 mutations, 7 caught), `verify:live-test-nov14` A46-A49 (screenshot read),
+  `test:reference-weight` §6 (3 checks, 3 mutations, 3 caught), `test:coach-promises` (no exam question in the prompt).
+  NOT PROVEN: whether the coach OBEYS sections 1g and 1h. That is model behaviour and needs the `chat-gemini` deploy and
+  an exam run on his machine. NOT BUILT: richer in-chat controls (logging a set or a weigh-in from a button); they need
+  his ruling against "a coach wouldn't send a card".
+
 - [x] **A PLATE SOMEBODY WOULD EAT, MADE OF FOOD HE EATS (18 Nov 2026, the Fable pass on meals; nutrition decisions,
   mine, not asked; two questions for him at the end).** FOUND by serving four weeks of meals to six people through the
   app's own functions and READING the plates, not the totals.

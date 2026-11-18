@@ -91,6 +91,14 @@ async function main() {
   check('Nutrition draws it only when the reference is below his weight', /derivation\.referenceWeightKg < effectiveProfile\.weight_kg && \(\s*<p data-testid="reference-weight-note"[^>]*>\{referenceWeightLine\(derivation\.referenceWeightKg\)\}/.test(nd))
   check('...and the split preview is worked out from the same weight as the targets', /effectiveWeightKg=\{nutritionReferenceWeightKg\(effectiveProfile\.weight_kg!, effectiveProfile\.height_cm\)\}/.test(nd))
 
+  console.log('\n6. The coach is told')
+  const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
+  const coach = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
+  check('the chat sends the reference weight only when it is lower than the weight the targets use, worked out from that same weight', /nutrition_reference_weight_kg: \(ref => \(targetBasisKg != null && ref < targetBasisKg \? ref : null\)\)\(nutritionReferenceWeightKg\(targetBasisKg \?\? 0, profile\.height_cm\)\)/.test(chat))
+  const coachLine = coach.split('\n').find(l => l.startsWith('${context.nutrition_reference_weight_kg ?')) ?? ''
+  check('the coach is told the weight, told never to work protein out per kilo of the full weight, and given no label for the body', /WORKED OUT FROM \$\{Math\.round\(context\.nutrition_reference_weight_kg\)\} kg/.test(coachLine) && /Never work protein or fat out per kilo of their full weight/.test(coachLine) && !/\b(bmi|obes|overweight)\b/i.test(coachLine) && /: ''\}$/.test(coachLine), coachLine.slice(0, 200))
+  check('...right under the targets it explains', coach.indexOf("The user's daily targets are ${context.macros.calories} kcal") > 0 && coach.indexOf('${context.nutrition_reference_weight_kg ?') - coach.indexOf("The user's daily targets are ${context.macros.calories} kcal") < 400)
+
   console.log(`\n${ran} checks ran`)
   if (failures > 0) { console.log(`${failures} FAILED`); process.exitCode = 1; return }
   console.log('Per-kilo nutrition follows a reference weight above a BMI of 30, energy follows the real one.')

@@ -21,7 +21,7 @@ import { formVideoFor, linkifyBareUrls, sessionVideosFor } from '@/lib/exercise-
 import { parseTimerSuggestion, type TimerSuggestion } from '@/lib/timer-engine'
 import { startLabel } from '@/lib/round-setup'
 import { MEAL_LIKE_OFFER, datesLabel, wholeMealLike } from '@/lib/meal-like-offer'
-import { kgInText, openButtonLabel, openTargetInReply, openedLine, parseOpenRequest, requestOpen } from '@/lib/open-request'
+import { kgInText, openButtonLabel, openTargetInReply, openedLine, parseOpenRequest, requestOpen, screenNamedInReply } from '@/lib/open-request'
 import { useTimers } from '@/hooks/useTimers'
 import { chatContextPills } from '@/lib/chat-context-strip'
 import { useShowNumbers } from '@/lib/show-numbers'
@@ -32,7 +32,7 @@ import { tabHash } from '@/lib/app-route'
 import { readAloud } from '@/lib/read-aloud'
 import { ListenButton } from '@/components/chat/ListenButton'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
-import { computeBMR, staticTDEEFor, resolveBodyMetrics } from '@/lib/macro-calculator'
+import { computeBMR, staticTDEEFor, resolveBodyMetrics, nutritionReferenceWeightKg } from '@/lib/macro-calculator'
 import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
 import { groupMessages, bubblePositions, bubbleRadius, groupTimestamp, timeLabel } from '@/lib/chat-groups'
 import { supabase } from '@/lib/supabase'
@@ -2370,6 +2370,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       eaten_by_day: eatenByDay,
       eaten_by_day_read: eatenByDay != null,
       week_review: weekReview,
+      // THE WEIGHT HIS PROTEIN AND FAT ARE WORKED OUT FROM (18 Nov 2026, macro-calculator.ts): sent only when it is lower
+      // than his weight, so the coach never works protein out per kilo of his full weight and contradicts the targets. Read off the
+      // same weight the targets themselves use (targetBasisKg), so the two cannot disagree.
+      nutrition_reference_weight_kg: (ref => (targetBasisKg != null && ref < targetBasisKg ? ref : null))(nutritionReferenceWeightKg(targetBasisKg ?? 0, profile.height_cm)),
       // THE STARTER TIER (slice 4b): false means he chose not to see calories or macros, so the coach quotes none.
       show_numbers: profile.show_numbers !== false,
       week_review_read: weekReview != null,
@@ -9180,7 +9184,21 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                   {openButtonLabel(opened.target)}
                                 </button>
                               )
-                              if (videos.length === 0) return timerButton
+                              // A SCREEN THE COACH NAMES IS ONE TAP AWAY (18 Nov 2026, open-request.ts): never on a reminder
+                              // (it has its own shortcut), and under the timer or video button when there is one.
+                              const named = msg.role === 'assistant' && !msg.reminder ? screenNamedInReply(msg.content) : null
+                              const namedButton = named && (
+                                <button
+                                  type="button"
+                                  data-testid="open-named-screen"
+                                  data-open-target={named}
+                                  onClick={() => requestOpen(named, named === 'plate' ? kgInText(msg.content) : null)}
+                                  className="mt-2 inline-flex min-h-11 items-center gap-1.5 rounded-full border border-primary/60 px-3.5 text-[0.8125rem] font-medium text-primary-text"
+                                >
+                                  {openButtonLabel(named)}
+                                </button>
+                              )
+                              if (videos.length === 0) return namedButton ? <div className="flex flex-col items-start">{timerButton}{namedButton}</div> : timerButton
                               return (
                                 <div className="mt-2 flex flex-col items-start gap-1.5">
                                   {videos.map(v => (
@@ -9197,6 +9215,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                     </a>
                                   ))}
                                   {timerButton}
+                                  {namedButton}
                                 </div>
                               )
                             })()}

@@ -1,0 +1,42 @@
+{
+  "name": "sport-what-transfers-from-my-plan",
+  "why": "His brief, 18 Nov 2026: coaching that is 'sport specific if the user wants it'. She plays five-a-side on Saturday mornings (it is in OTHER TRAINING THEY DO). Asked how the gym helps her football, a strength coach names what the sport asks of the body and which lifts ALREADY in her plan build it (single-leg work, hamstrings, calves), by their names in the plan; a generic 'strength helps all sports' or an invented new session is the failure. Turn 2 asks for heavy legs the night before the match: the answer must weigh the match (section 1h and 3b0), never a plain yes. Both are questions, so no card.",
+  "contextOverrides": {
+    "day_of_week": "Wednesday",
+    "current_time_formatted": "Wednesday, 7:10 PM",
+    "concurrent_activities": [
+      {
+        "name": "Five-a-side football",
+        "intensity": 0.8,
+        "days": [
+          "Saturday"
+        ],
+        "movement_demands": [
+          "running",
+          "single_leg",
+          "knee_dominant"
+        ],
+        "timeOfDay": "morning"
+      }
+    ],
+    "exercise_summary": "Monday: Lower body — Barbell Squats 4x6 @ 55kg, Romanian Deadlifts 3x8 @ 50kg, Bulgarian Split Squats 3x8 each side, Single-Leg Dumbbell Calf Raise 3x12, Plank 3x40s. [CLOSED at 16 of 16 planned working sets]\nToday (Wednesday): Upper body — Dumbbell Bench Press 4x8, Dumbbell Rows 4x10, Overhead Press 3x8, Hammer Curls 3x12.\nFriday: Full body, the lighter one — Goblet Squats 3x10, Glute Bridge 3x12, Chest-Supported Row 3x10, Dead Bug 3x8.\nSaturday: rest from the gym (five-a-side in the morning)."
+  },
+  "messages": [
+    "does any of this gym stuff actually make me better at five-a-side? feels like two separate things",
+    "ok. I missed monday's feeling so I want to redo the heavy squats and deadlifts on friday night instead of the lighter one, alright?"
+  ],
+  "checks": {
+    "mustMention": [
+      "split squat",
+      "Romanian",
+      "calf",
+      "Saturday"
+    ],
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      }
+    ]
+  }
+}
