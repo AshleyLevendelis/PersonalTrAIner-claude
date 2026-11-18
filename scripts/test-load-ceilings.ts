@@ -36,7 +36,7 @@ import {
 } from '../src/lib/load-ceiling-prompt'
 import { EQUIPMENT_QUALITY, generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
-import { ceilingLabel, ceilingNoteForCoach } from '../src/lib/progression-ceiling'
+import { ceilingLabel, ceilingNoteForCoach, shownCeilingLabel } from '../src/lib/progression-ceiling'
 import type { UserProfile, WorkoutDay, EquipmentAccess, Exercise } from '../src/lib/types'
 
 let failures = 0
@@ -472,7 +472,10 @@ console.log('\n9. A lift held at the person\'s own limit says so')
 
   // The card keeps this label once a set is logged (the estimate labels go).
   const chipSrc = readFileSync(new URL('../src/components/exercise/LoadChip.tsx', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-  check('the card does not drop "held at your…" when a set has been logged', /\(?source === 'logged'(?: \|\| source === 'eased'\))? && ex\.load_hold !== 'stated_limit' \? null : ceilingLabel\(ex\)/.test(chipSrc))
+  // ASKED OF THE FUNCTION THE CARD CALLS (18 Nov 2026), not of the card's text: two checks pinned that one line.
+  const limited = slot({ load_hold: 'stated_limit', rep_bump: 'capped' })
+  check('the card does not drop "held at your…" when a set has been logged', ['logged', 'eased', 'eased_lift'].every(src => shownCeilingLabel(src, limited) === ceilingLabel(limited)) && ceilingLabel(limited) != null)
+  check('...and the card calls that function', /shownCeilingLabel\(source, ex\)/.test(chipSrc))
 
   // --- and it reaches a real plan ---
   const p = man({ max_dumbbell_kg: 12, equipment_access: 'minimalist', training_style: 'bodybuilding',

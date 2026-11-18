@@ -1,6 +1,6 @@
 import { Dumbbell, Info, Timer } from 'lucide-react'
 import { describeExerciseTempo } from '@/lib/periodization'
-import { ceilingLabel } from '@/lib/progression-ceiling'
+import { shownCeilingLabel } from '@/lib/progression-ceiling'
 import type { Exercise } from '@/lib/types'
 import type { PrescribedLoadSource } from '@/lib/load-prescription'
 
@@ -227,7 +227,7 @@ export function LoadChip({
   // lifted, so the estimate's ceiling is no longer what is holding it.
   // ...EXCEPT a limit the person told us about, which a logged (or eased) set
   // cannot move: the heaviest dumbbell they own is still the heaviest they own.
-  const ceiling = (source === 'logged' || source === 'eased' || source === 'eased_lift') && ex.load_hold !== 'stated_limit' ? null : ceilingLabel(ex)
+  const ceiling = shownCeilingLabel(source, ex)
 
   return (
     <div className="flex flex-col gap-0.5 mt-0.5">

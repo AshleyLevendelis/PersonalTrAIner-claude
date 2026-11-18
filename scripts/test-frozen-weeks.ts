@@ -39,7 +39,7 @@ import { fileURLToPath } from 'url'
 import { DEFAULT_CARRY_DISTANCE_M } from '../src/lib/session-duration'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import type { UserProfile, MesocycleWeek, Exercise } from '../src/lib/types'
-import { atPrescribedCeiling, ceilingLabel, ceilingNoteForCoach } from '../src/lib/progression-ceiling'
+import { atPrescribedCeiling, ceilingLabel, ceilingNoteForCoach, shownCeilingLabel } from '../src/lib/progression-ceiling'
 
 // Read from source rather than restated, so raising either constant in
 // exercise-plan.ts fails this gate instead of silently widening the cap.
@@ -708,14 +708,19 @@ console.log('\n8. A week that repeats itself SAYS so — Ashley\'s ruling, 5 Sep
   // exact defect this section closes. A label nothing draws is the same bug
   // one layer up, so assert the render and not just the import.
   const chip = readFileSync(join(ROOT, 'src/components/exercise/LoadChip.tsx'), 'utf8')
-  check('the card computes the label', /ceilingLabel\(ex\)/.test(chip))
+  check('the card computes the label', /shownCeilingLabel\(source, ex\)/.test(chip))
   check('...and RENDERS it outside the explainer', /\{ceiling && \(/.test(chip))
   // RE-ANCHORED 9 Oct 2026: the condition gained a term. A logged set still
   // silences the three ESTIMATE labels (the estimate is no longer what holds
   // the weight) but not "held at your 24kg dumbbells" — the heaviest dumbbell
   // somebody owns is still the heaviest they own after they log a set.
+  // ASKED OF THE FUNCTION THE CARD CALLS (18 Nov 2026), not of the card's text. 'eased_lift' (one lift away for
+  // weeks) is a number from his own last session too, so it silences the estimate labels as well.
+  const est = ex({ load_hold: 'ceiling', rep_bump: 'capped' })
   check('a real logged number silences the estimate labels — and only those',
-    /\(?source === 'logged'(?: \|\| source === 'eased'\))? && ex\.load_hold !== 'stated_limit' \? null : ceilingLabel\(ex\)/.test(chip))
+    ['logged', 'eased', 'eased_lift'].every(src => shownCeilingLabel(src, est) === null)
+    && shownCeilingLabel('estimate', est) === ceilingLabel(est) && ceilingLabel(est) != null && shownCeilingLabel(undefined, est) === ceilingLabel(est)
+    && shownCeilingLabel('logged', ex({ load_hold: 'stated_limit', rep_bump: 'capped' })) != null)
 
   // --- AND THE COACH GETS THE SAME FACT. Two surfaces describing one week
   // differently is the disagreement this repo keeps producing.

@@ -132,6 +132,17 @@ export function ceilingLabel(ex: Exercise): string | null {
 }
 
 /**
+ * The ceiling label the CARD shows, given where today's number came from. A number from his own sets (logged, eased
+ * after a break, or eased after weeks away from this one lift) is no longer the estimate holding the weight, so the
+ * estimate labels go; "held at your 24kg dumbbells" stays, because the heaviest dumbbell he owns is still the
+ * heaviest after he logs a set. Two checks asked this of one line of the card; they now ask this function.
+ */
+export function shownCeilingLabel(source: string | undefined, ex: Exercise): string | null {
+  const fromHisSets = source === 'logged' || source === 'eased' || source === 'eased_lift'
+  return fromHisSets && ex.load_hold !== 'stated_limit' ? null : ceilingLabel(ex)
+}
+
+/**
  * The same fact in a sentence, for the coach's plan context.
  *
  * The coach was describing these weeks as progression because nothing told it
