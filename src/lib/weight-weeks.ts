@@ -23,9 +23,11 @@ export interface WeightWeek {
 export type WeightRange = '3M' | '6M' | '1Y'
 export const WEIGHT_RANGE_DAYS: Record<WeightRange, number> = { '3M': 91, '6M': 182, '1Y': 365 }
 
+import { addDays } from './session-move'
+
 const ms = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10))
-const iso = (t: number) => new Date(t).toISOString().slice(0, 10)
-export function shiftDate(d: string, days: number): string { return iso(ms(d) + days * 86_400_000) }
+/** The app's own date walker (session-move's addDays): a calendar date plus n days, never through an instant. */
+export function shiftDate(d: string, days: number): string { return addDays(d, days) }
 /** The Monday on or before a date. */
 export function mondayOf(d: string): string { const dow = new Date(ms(d)).getUTCDay(); return shiftDate(d, -((dow + 6) % 7)) }
 const r2 = (n: number) => Math.round(n * 100) / 100
