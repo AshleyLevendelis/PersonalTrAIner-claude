@@ -201,8 +201,8 @@ export function BottomDock() {
   if (isKeyboardOpen) {
     return (
       <div ref={dockRef} className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
-        <div className="rounded-xl bg-card/95 glow-mint-box backdrop-blur-sm shadow-lg px-3 py-1.5 inline-flex items-center gap-1.5 text-xs font-medium tabular-nums">
-          <Timer className="h-3 w-3 text-primary-text shrink-0" />
+        <div className="rounded-xl bg-card/95 glow-mint-box backdrop-blur-sm shadow-lg px-3.5 py-2 inline-flex items-center gap-2 text-lg font-bold tabular-nums text-primary-text">
+          <Timer className="size-5 text-primary-text shrink-0" />
           {isOverrun
             ? (restTargetSetNumber != null ? `Rest complete — set ${restTargetSetNumber}` : 'Rest complete')
             : formatDuration(restMs)}
@@ -215,32 +215,32 @@ export function BottomDock() {
     return (
       <div ref={dockRef} className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>
         <Card className="bg-card/95 backdrop-blur-sm shadow-lg">
-          <div className="p-3 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <Timer className="h-4 w-4 text-primary-text shrink-0" />
-              {/* TWO SHORT LINES, NEVER ONE CUT ONE (L16). This was a single
-                  truncated sentence beside two buttons that do not shrink, so
-                  on a phone it read "Rest complete — re…" — the half that
-                  says which set was the half that was lost. */}
+          {/* Readable from a distance (19 Nov 2026, his "make the Rest complete bar
+              bigger too"): the words are large and sit on their own row, the buttons
+              get a row of their own below at a full 48px so nothing is squeezed or
+              cut ("Rest complete — re…", L16). */}
+          <div className="flex flex-col gap-3 p-3.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <Timer className="size-6 text-primary-text shrink-0" />
               <div className="min-w-0" data-testid="rest-complete">
-                <p className="text-sm font-medium leading-tight">Rest complete</p>
+                <p className="text-[1.5rem] font-bold leading-tight text-primary-text">Rest complete</p>
                 {restTargetSetNumber != null && (
-                  <p className="mt-0.5 text-xs leading-tight text-muted-foreground">Ready for set {restTargetSetNumber}?</p>
+                  <p className="mt-0.5 text-base leading-tight text-foreground">Ready for set {restTargetSetNumber}?</p>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-2">
               {restTargetSetNumber != null ? (
                 <>
-                  <Button size="sm" className="h-7 px-2.5 text-xs" onClick={handleStartNextSet}>
+                  <Button size="sm" className="h-12 flex-1 px-3 text-base font-semibold" onClick={handleStartNextSet}>
                     Start next set ▸
                   </Button>
-                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={dismissRest}>
+                  <Button variant="ghost" size="sm" className="h-12 px-3 text-base" onClick={dismissRest}>
                     Dismiss
                   </Button>
                 </>
               ) : (
-                <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={dismissRest}>
+                <Button variant="outline" size="sm" className="h-12 flex-1 px-3 text-base" onClick={dismissRest}>
                   Dismiss
                 </Button>
               )}

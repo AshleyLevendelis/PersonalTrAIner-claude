@@ -319,6 +319,11 @@ console.log('\n5. The rest dock: one number, the lift it belongs to, and both di
   // Pinned as a property (a floor on each), so a later change cannot quietly shrink it back to a glance-only size.
   const dockMinHeight = Number(/minHeight: (\d+)/.exec(dock)?.[1] ?? 0)
   check('...at least 44px tall (the tap floor), and tall enough for the big clock', dockMinHeight >= 56)
+  // 19 Nov 2026, his "make the Rest complete bar bigger too": its words and buttons carry the same floors.
+  const doneRem = Number(/text-\[([\d.]+)rem\][^"]*"[^>]*>Rest complete</.exec(dock)?.[1] ?? 0)
+  check('the "Rest complete" words are big (at least 1.25rem), readable from a distance', doneRem >= 1.25)
+  const doneBtn = Number(/h-(\d+) flex-1 px-3 text-base font-semibold" onClick=\{handleStartNextSet\}/.exec(dock)?.[1] ?? 0)
+  check('...and "Start next set" is a full-size button (at least 44px)', doneBtn * 4 >= 44)
   const dockClockRem = Number(/tabular-mono text-\[([\d.]+)rem\][^"]*"[^>]*>\{formatDuration\(restMs\)\}/.exec(dock)?.[1] ?? 0)
   check('the countdown is the one big mono number: at least 2rem, readable from a distance', dockClockRem >= 2)
   check('...and the lift sits under it rather than trailing the clock',

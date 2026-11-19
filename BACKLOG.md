@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **THE "REST COMPLETE" BAR IS BIGGER TOO, 19 Nov 2026: his "make the Rest complete bar bigger too"**, the follow-on to
+  the rest clock below. "Rest complete" is 24px bold in the main colour (was 14px), "Ready for set N?" 16px, and the
+  buttons sit on their own row at 48px (were 28px), so nothing is squeezed or cut. The thin line shown while the
+  keyboard is up is 18px bold (was 12px). Floors added in `test:exercise-today`; 2 mutations, 2 caught.
+  `verify:session-start` (28, incl. "none of it cut off") green, screenshot read at 390px. Not seen on a real phone.
+
 - [x] **THE REST TIMER IS READABLE FROM A DISTANCE, 19 Nov 2026: his report from the gym floor** ("the rest timer isn't easy
   to see from a distance when your phone is down"). Presentation only, decided by me (no ruling needed: size, not
   behaviour). The clock under the set just ticked went from 17px to about 48px in the main colour, with the label above
