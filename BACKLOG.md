@@ -2,6 +2,38 @@
 
 Newest first. One line each.
 
+- [x] **A REORDER CARD WARNED "THE WEEK STOPS COVERING EVERYTHING IT SHOULD" WHEN ONLY THE ORDER CHANGED (19 Nov 2026, the full
+  pass; a tester's finding C5, traced before fixing).** The words were not the fault. MEASURED: 189 of 216 one-row
+  moves on real plans lost a whole rule in the plan scorer, every one of them `main_lift_changed_within_block`, plus
+  `load_not_progressing` and `sets_not_flat` on most. The scorer lines a block's weeks up by ROW: week 1's main lift
+  is on row 2, so row 2 of weeks 2 to 4 is read as "the main lift". True of every plan the app writes, and false the
+  moment HE changes one week (move a row, add one above the main lift, take one out): the lift was one row away and
+  was read as changed, and as stalled. So the same false line could ride on a removal or an addition too.
+  NOW the scorer follows the lift: the same row when it holds the same lift, else that lift wherever it sits on the
+  day, else the row as before (a lift that is really gone is still a changed main lift). After: 0 of 216.
+  DOES IT CHANGE WHAT THE SCORE MEASURES? Measured, no: on 6,144 generated plans, 0 of 74,304 main-lift days hold the
+  lift on a different row inside a block, so the new lookup returns the old row on every plan the app writes and no
+  generated score can move. The gate now holds that assumption itself, so if generation ever starts moving rows it
+  goes red. `test:quality` and `test:audit` were re-run to confirm (see the run noted with this commit).
+  CSCS review: no prescription changes; a card stops claiming a cost that is not there. A reorder that puts the main
+  lift last in a strength week is still asked about (its own pinned rule, untouched and still driven).
+  `test:edit-tradeoff` section 11 (4 new checks; 4 mutations, 4 caught, one rewritten because my first version did not
+  create the defect), `verify:tradeoff-reach` section 3 (3 new checks: the tester's own request, offered with no
+  "Worth knowing" line; 1 browser mutation caught). Frontend only.
+- [x] **"MOVE CALORIES FROM LUNCH TO DINNER": THE APP ASKED "HOW MUCH?" AGAIN, FOR EVER (19 Nov 2026, the full pass; a tester's
+  finding C6).** The amount buttons under the app's question say the amount and the meal ("200 kcal to dinner"), and
+  the coach is then asked again. When it came back naming the two meals and no amount, the app asked "How much?" a
+  second time, and a third. NOW the amount is read from HIS words (the button he tapped, or a number he typed), so it
+  never depends on the coach repeating it; and where his words carry an amount, that is the amount (his 17 Nov
+  "amounts only he said"), with the coach's used only when he gave none. "1,200 calories" is read as twelve hundred
+  (it was read as two hundred). `test:meal-rebalance` (4 new checks; 3 mutations caught), `verify:chat-rebalance`
+  section 7 (7 new checks with a coach scripted to leave the amount out; 1 browser mutation caught). Frontend only.
+- [x] **TWO CHECKS WERE RED SINCE THE NUTRITION FIXES OF THIS MORNING, AND I HAD NOT RUN THEM (19 Nov 2026).** `test:dashboard`
+  and `test:empty-meals` each pinned the exact text of code that commit 66e1e12a restructured (the options re-read
+  became a named function; which meals are drawn empty moved into `mealRowsFor`). The behaviour was intact; the checks
+  failed on the wording. HOW I MISSED THEM: the list of checks for that commit was run against the commit BEFORE it.
+  Both are re-anchored on the behaviour (one now CALLS the function), 5 mutations, 5 caught. The rule already in
+  CLAUDE.md ("derive the gates from every file in the commit") was right and I ran it on the wrong commit.
 - [x] **THE AMOUNT BOX TOOK ANY NUMBER: 99999 g OF CHICKEN, 120,327 kcal (19 Nov 2026, the full pass; a tester's finding N4).**
   Changing an ingredient's amount, adding a food and describing a meal to the coach each costed whatever was typed.
   NOW one food over two kilos (or two litres) in one meal is sent back with a sentence ("99999g chicken breast is

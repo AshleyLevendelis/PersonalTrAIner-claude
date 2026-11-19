@@ -79,7 +79,7 @@ import type { MealRefit } from '@/lib/meal-refit'
 import type { TopUpOutcome, TopUpPlan } from '@/lib/meal-top-up'
 import { emptyMealsForCoach } from '@/lib/empty-meal'
 import type { MealDayMoveArgs, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
-import { rebalanceSaid, rebalanceAskText, mealsNamed, type MealRebalanceController, type MealRebalancePayload } from '@/lib/meal-rebalance'
+import { rebalanceSaid, rebalanceAskText, kcalSaid, mealsNamed, type MealRebalanceController, type MealRebalancePayload } from '@/lib/meal-rebalance'
 import { DEFAULT_POOL_SIZE, computeSlotBudgets, skipsBreakfast } from '@/lib/meal-generation'
 import { EATING_OUT_REFUSALS, EATING_OUT_SIZES, EATING_OUT_WORDS, eatingOutMacros, eatingOutOption, eatingOutSizeSaid, type EatingOutController, type EatingOutSize, eatingOutRangeWords } from '@/lib/eating-out'
 import { executeMealMove, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
@@ -6756,7 +6756,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const said = rebalanceSaid(userSaid)
         const fromModel = result.proposal.kind === 'propose_meal_rebalance'
         const args = fromModel
-          ? { from_slot: raw.from_slot, to_slot: raw.to_slot, kcal: raw.kcal, date: raw.date }
+          // The amount is HIS when he gave one (the button he tapped, or a number he typed): never the coach's, and
+          // never lost because the coach did not repeat it (C6: the app asked "How much?" again, for ever).
+          ? { from_slot: raw.from_slot, to_slot: raw.to_slot, kcal: kcalSaid(userSaid) ?? raw.kcal, date: raw.date }
           : said.kind === 'ordered' ? { from_slot: said.from, to_slot: said.to, kcal: said.kcal ?? undefined } : null
         if (!onMealRebalance) {
           refusal = REBALANCE.refusals.noBody

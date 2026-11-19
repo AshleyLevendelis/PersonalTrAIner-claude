@@ -349,13 +349,23 @@ export function mealsNamed(text: string): MealSlotName[] {
   return [...new Set(mentionsIn(text.toLowerCase()).map(m => m.slot))]
 }
 
+/**
+ * THE AMOUNT IN HIS OWN WORDS: "200 kcal to dinner", "move 1,200 calories". The amount buttons under the app's "How
+ * much?" say the amount and the meal it goes to, and the coach is then asked again; when it came back with the two
+ * meals and NO amount, the app asked "How much?" again, for ever (the chat walk, 18 Nov 2026, finding C6). The amount
+ * he tapped or typed is read here, so it never depends on the coach repeating it. Null when he gave none.
+ */
+export function kcalSaid(text: string): number | null {
+  const m = /(\d{1,2},\d{3}|\d{2,4})\s*(?:kcal|calories|cals?)\b/i.exec(text)
+  return m ? Number(m[1].replace(',', '')) : null
+}
+
 export function rebalanceSaid(text: string): RebalanceSaid {
   const t = text.toLowerCase().replace(/[’`]/g, "'")
   const mentions = mentionsIn(t)
   const distinct = [...new Set(mentions.map(m => m.slot))]
   if (distinct.length !== 2 || !MOVE_WORDS.test(t)) return { kind: 'none' }
-  const kcalMatch = /(\d{2,4})\s*(?:kcal|calories|cals?)\b/.exec(t)
-  const kcal = kcalMatch ? Number(kcalMatch[1]) : null
+  const kcal = kcalSaid(t)
   const role = new Map<MealSlotName, 'from' | 'to'>()
   for (const m of mentions) {
     const head = t.slice(Math.max(0, m.at - 40), m.at)

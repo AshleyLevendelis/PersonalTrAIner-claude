@@ -519,5 +519,68 @@ console.log('\n10. More sets is a cost the card can state, not a ceiling it can 
   check('...and the card\'s own "goes from" agrees too', !/Your \$\{g\} goes from/.test(src) && /Your \$\{g\} \$\{groupVerb\(g, 'goes', 'go'\)\} from/.test(src))
 }
 
+// ---------------------------------------------------------------------------
+console.log('\n11. A lift that only moved a row has not changed (the chat walk, 18 Nov 2026, C5)')
+// ---------------------------------------------------------------------------
+// The scorer lined the weeks of a block up by ROW, so one week changed by his own edit read as "the main lift changed"
+// and "its load is not progressing": a reorder card warned "the week stops covering everything it should" when the
+// only thing that changed was the order. Over real plans, every kind of one-row move, in week 2 only.
+{
+  const profiles: [string, UserProfile][] = [
+    ['hypertrophy, gym', hyper],
+    ['fat loss, dumbbells', buildProfile('fat_loss', { equipment_access: 'home_dumbbells' } as Partial<UserProfile>)],
+    ['functional, beginner', buildProfile('functional', { training_experience: 'beginner' } as Partial<UserProfile>)],
+  ]
+  let moves = 0, mainLiftCrossed = 0
+  const charged: string[] = []
+  for (const [label, profile] of profiles) {
+    const plan = label.startsWith('hypertrophy') ? hyperPlan : planFor(`tradeoff-row-${label}`, profile)
+    const week = plan.find(w => w.week_number === 2)!
+    for (const day of week.days) {
+      const n = day.exercises.length
+      if (n < 4) continue
+      const mainIdx = day.exercises.findIndex(ex => ex.tier === 'tier_1_primary')
+      for (const [from, to] of [[1, n - 1], [n - 1, 0], [0, 1]] as const) {
+        const r = moveExerciseInSession({ mesocycle: plan, profile, weekNumber: 2, dayName: day.day, fromIndex: from, toIndex: to, scope: 'today' })
+        if (!r.changed) continue
+        moves++
+        const after = r.mesocycle.find(w => w.week_number === 2)!.days.find(d => d.day === day.day)!
+        if (mainIdx !== -1 && after.exercises[mainIdx]?.name !== day.exercises[mainIdx].name) mainLiftCrossed++
+        const drop = scoreDrop(profile, plan, r.mesocycle)
+        if (drop && (drop.dimension === 'selection' || drop.dimension === 'progression')) charged.push(`${label} ${day.day} ${from}->${to}: ${drop.dimension}`)
+      }
+    }
+  }
+  check('the fixture binds: moves were made, and many of them shift the main lift off its row', moves >= 20 && mainLiftCrossed >= 10, { moves, mainLiftCrossed })
+  check('NO one-row move is charged as a changed main lift or a stalled progression', charged.length === 0, charged.slice(0, 6))
+
+  // THE RULE IS NOT BLINDED: a main lift that is really GONE from the day in one week is still seen.
+  const week2 = hyperPlan.find(w => w.week_number === 2)!
+  const dayWithMain = week2.days.find(d => d.exercises.some(ex => ex.tier === 'tier_1_primary'))!
+  const mainName = dayWithMain.exercises.find(ex => ex.tier === 'tier_1_primary')!.name
+  const swapped = hyperPlan.map(w => w.week_number !== 2 ? w : { ...w, days: w.days.map(d => d.day !== dayWithMain.day ? d
+    : { ...d, exercises: d.exercises.map(ex => ex.name === mainName ? { ...ex, name: 'Some Other Lift' } : ex) }) })
+  const sel = (m: MesocycleWeek[]) => scorePlan(hyper, m, 'row', { skipComparisons: true, skipConsistency: true }).dimensions.selection.deductions.map(x => x.rule)
+  check('a main lift really replaced in one week is still a changed main lift', !sel(hyperPlan).includes('main_lift_changed_within_block') && sel(swapped).includes('main_lift_changed_within_block'), sel(swapped))
+
+  // WHAT THE CLAIM RESTS ON: a plan as the app writes it never holds a block's main lift on another row, so following
+  // a moved lift cannot change any generated plan's score. If generation ever starts moving rows, this goes red and
+  // the scorer's meaning has shifted.
+  let mainDays = 0, offRow = 0
+  for (const [label, profile] of profiles) {
+    const plan = label.startsWith('hypertrophy') ? hyperPlan : planFor(`tradeoff-row-${label}`, profile)
+    for (let block = 1; block <= 4; block++) {
+      const ws = plan.filter(w => w.block_number === block).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
+      for (const day of ws[0]?.days ?? []) {
+        const idx = day.exercises.findIndex(ex => ex.tier === 'tier_1_primary')
+        if (idx === -1) continue
+        mainDays++
+        for (const w of ws.slice(1)) if (w.days.find(d => d.day === day.day)?.exercises[idx]?.name !== day.exercises[idx].name) offRow++
+      }
+    }
+  }
+  check('a plan as written keeps each block\'s main lift on one row (so no generated score can have moved)', mainDays >= 20 && offRow === 0, { mainDays, offRow })
+}
+
 console.log(failures === 0 ? '\nAll edit trade-off checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
 process.exit(failures === 0 ? 0 : 1)

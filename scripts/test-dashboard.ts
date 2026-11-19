@@ -334,8 +334,18 @@ async function main() {
     check('the chat meal handler exists to be checked (sanity check on this check)', swapHandler.length > 300, swapHandler.length)
     check('...and both the chat and the Nutrition screen are given it',
       /onMealSwapApplied=\{handleMealPickApplied\}/.test(app) && /onMealPickApplied=\{handleMealPickApplied\}/.test(app))
+    // RE-ANCHORED 19 Nov 2026: the re-read became a named function when the Undo of an edit needed it too (an empty
+    // pick returned before it, and the deleted dish stayed in the swap list). The property: a pick that NAMES a meal
+    // re-reads the options after it is written, and the re-read is a real read into the screen's state.
+    const rereadStart = app.indexOf('const rereadMealPools')
+    const rereadBody = rereadStart === -1 ? '' : app.slice(rereadStart, app.indexOf('\n  }', rereadStart))
+    const namedPick = swapHandler.slice(swapHandler.lastIndexOf('if (!chosenName)'))
+    const afterEmptyBranch = namedPick.slice(namedPick.indexOf('return true') + 1)
     check('...and it re-reads the pool, so an added meal can actually render',
-      /setMealPools\(await getPools\(profile\.id\)\)/.test(swapHandler))
+      /setMealPools\(await getPools\(profileId\)\)/.test(rereadBody) && /await rereadMealPools\(profile\.id\)/.test(afterEmptyBranch),
+      { reread: rereadBody.length, afterEmptyBranch: afterEmptyBranch.length })
+    const emptyBranch = namedPick.slice(0, namedPick.indexOf('return true'))
+    check('...and so does the Undo of an edit, which names no meal', emptyBranch.length > 40 && /await rereadMealPools\(profile\.id\)/.test(emptyBranch), emptyBranch.length)
 
     // (c) Her ruling: a meal she asked for by name survives a regeneration.
     // persistPools is the ONLY place the slot's rows are deleted, so both

@@ -65,6 +65,8 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
       window.__chatCalls++
       const said = String(JSON.parse((init && init.body) || '{}').message || '')
       if (/never give me/i.test(said)) return json({ reply: '', proposal: { kind: 'propose_exercise_ban', rawArgs: { item: window.__main, origin_verbatim_quote: said } } })
+      // An ordinary change of order: the second exercise of today goes to the end (the chat walk's own request, C5).
+      if (/^move .* to the end of today$/i.test(said)) return json({ reply: '', proposal: { kind: 'propose_exercise_reorder', rawArgs: { day: '', item: window.__todaysExercises[1], after_item: window.__todaysExercises[window.__todaysExercises.length - 1] } } })
       if (/^do .* last/i.test(said)) return json({ reply: '', proposal: { kind: 'propose_exercise_reorder', rawArgs: { day: window.__mainDay, item: window.__main, after_item: window.__last } } })
       if (/lighter/i.test(said)) return json({ reply: '', proposal: { kind: 'propose_volume_change', rawArgs: { day: window.__day, direction: 'lighter', ...(/today/i.test(said) ? { scope: 'today' } : {}) } } })
       return json({ reply: 'Sure.' })
@@ -143,7 +145,25 @@ await shoot('tradeoff-reach-ban')
 check('2e. banning it: no card, and the question names what the block is built around', bn.cards === ro.cards && /is what this block is built around/i.test(bn.last), bn)
 check('2f. ...with "Do it anyway" one tap away', bn.chips.some(c => /do it anyway/i.test(c)), bn.chips)
 
-console.log(`\n14 checks ran.`)
+console.log('\n3. An ordinary change of order is offered with no warning it has not earned\n')
+// The chat walk of 18 Nov 2026 (C5): "move <the second exercise> to the end of today" came with "Worth knowing: the
+// week stops covering everything it should", because the plan scorer lined the weeks up by row and read a lift one
+// row away as a changed main lift. The page as it opens, the tester's own request.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?load=4` })
+await wait(4500)
+ready = await ev(`!!document.querySelector('textarea')`)
+for (let i = 0; i < 20 && !ready; i++) { await wait(500); ready = await ev(`!!document.querySelector('textarea')`) }
+const today3 = await ev(`window.__todaysExercises ?? []`)
+check('3a. today has a session with a second exercise to move', Array.isArray(today3) && today3.length >= 3, today3)
+const c0 = await ev(READ)
+await ask(`move ${today3?.[1]} to the end of today`)
+const mv = await ev(READ)
+const offer3 = await ev(`[...document.querySelectorAll('[data-testid="proposal-card"]')].pop()?.innerText ?? ''`)
+await shoot('tradeoff-reach-plain-reorder')
+check('3b. the move is offered', mv.cards === c0.cards + 1 && offer3.includes(String(today3?.[1])), { cards: [c0.cards, mv.cards], offer3: offer3.slice(0, 300) })
+check('3c. WITH NO "Worth knowing" LINE: nothing about the week changed but the order', !/Worth knowing|stops covering|stops building|pulls the plan away/i.test(offer3 + ' ' + mv.last), (offer3 + ' | ' + mv.last).slice(0, 500))
+
+console.log(`\n17 checks ran.`)
 ws.close(); chrome.kill(); server.close()
 if (failures > 0) { console.error(`${failures} check(s) failed.`); process.exit(1) }
 console.log('The three warnings are reached.\n')
