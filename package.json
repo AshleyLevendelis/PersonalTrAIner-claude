@@ -418,6 +418,7 @@
     "verify:session-effort": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-effort.mjs",
     "verify:weight-history": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/weight-history.mjs",
     "verify:testing-week-sweep": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/testing-week-sweep.mjs",
+    "verify:food-list-box": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/food-list-box.mjs",
     "verify:tradeoff-reach": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tradeoff-reach.mjs",
     "verify:allergy-card": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/allergy-card.mjs",
     "verify:profile-fixes": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-fixes.mjs",

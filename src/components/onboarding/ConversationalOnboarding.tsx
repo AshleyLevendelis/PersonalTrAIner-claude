@@ -44,7 +44,7 @@ import {
 } from '@/lib/onboarding-slots'
 import { measureParserFor, liftSetInUserWords, ageOn, todayLocal } from '@/lib/body-units'
 import { detectFoodExclusions, mergeFoodsToAvoid, isFoodToAvoid } from '@/lib/food-exclusions'
-import { splitFoodList, isPlainNone } from '@/lib/food-list'
+import { splitFoodList, isPlainNone, readFoodList, unreadFoodLine } from '@/lib/food-list'
 import { allergenFilterReceipt, beginnerLiftsSetAside, setupHealthQuestionLine, liftSetsAsk, liftNeedsASet, liftWhichOne } from '@/lib/coach-voice'
 import { bareLiftWeight, coachAskedSetupQuestion, dropCoachQuestions, namedLiftSets, withoutQuestions } from '@/lib/onboarding-one-question'
 import { implausibleLifts } from '@/lib/lift-plausibility'
@@ -1841,7 +1841,15 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     if (companion && companionDef) {
       if (companionDef.control === 'text') {
         // Foods to leave out: the typed words as a list, or an empty answer (asked, nothing to add).
-        const foods = splitFoodList(companion.value)
+        // WORDS THAT ARE NOT A FOOD HOLD THE SCREEN (18 Nov 2026): "I'm vegetarian" or "I love pizza" typed here was
+        // saved as a food of that name, a row that left nothing out. The app says so and waits; nothing is recorded.
+        const typed = readFoodList(companion.value, 'avoid')
+        const unreadSaid = unreadFoodLine(typed.unread, 'avoid')
+        if (unreadSaid) {
+          setMessages(prev => [...prev, { role: 'assistant', content: unreadSaid }])
+          return
+        }
+        const foods = typed.foods
         if (applySlot(ws, companion.key, foods.join(', '), values, false) && foods.length > 0) companionSaid = `leave out ${foods.join(', ')}`
       } else if (companion.value !== '' && applySlot(ws, companion.key, coerceSlotValue(companionDef, companion.value), values, false)) {
         companionSaid = companionDef.options?.find(o => String(o.value) === companion.value)?.label ?? companion.value

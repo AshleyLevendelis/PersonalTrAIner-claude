@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **"I DON'T EAT PORK" TYPED INTO THE AVOID BOX WAS SAVED AS A FOOD CALLED "i don t eat pork" (19 Nov 2026, the full pass;
+  found by a tester in setup and on Profile).** The row showed on the list and protected nothing: measured, an avoided
+  "pork" keeps out pork, bacon, ham, gammon, sausages and chorizo, and the sentence as it was saved kept out none of
+  them (the tester's new plan still held pork chops). His 9 Oct ruling already says "I don't eat pork" goes into Foods
+  to avoid; the chat and setup's conversation obeyed it and the two typed boxes did not.
+  Now the box reads the way people say it ("I don't eat", "can't have", "never eat", "hate", "avoid", "allergic to",
+  "not a fan of", "leave out", "nothing with ... in it") as the food. **Each box reads only its own way of saying it**:
+  "I love pizza" under Foods to avoid adds nothing (reading it as "pizza" would leave out the one thing he said he
+  likes), and "I don't eat pork" under Foods you like is not a like. "I love pizza and pasta" under Foods to avoid
+  leaves NEITHER out (the dangerous half: part by part it would have kept the first back and left out pasta). Words
+  that cannot be read as a food ("I'm vegetarian") are said under the box, kept in it, and never saved; setup's
+  "anything else to leave out" holds the screen the same way. Foods you like now splits on commas and reads
+  "I love pizza" as pizza (it was saved whole).
+  Decisions, mine (mechanical, inside his ruling): the wording of the line under the box ("I couldn't read "I love
+  pizza" as a food to leave out, so nothing was added for it. Type just the food, like "pork".") is his to change.
+  FOUND BY MISSED MUTATIONS: my first version had two mechanisms doing one job (a lead-in read for the whole answer
+  and again per part); one was removed, and the dangerous two-food case got its own check.
+  `test:food-exclusions` §8 (22 new checks; 15 mutations, all caught after that change), `verify:food-list-box` (new,
+  14 checks on the real Profile screen; 3 browser mutations caught), screenshot read. Frontend only.
 - [x] **PREGNANCY: THIRTEEN MORE MOVES LEFT OUT, AND THE WARM-UP NOW OBEYS THE RULE (18-19 Nov 2026, the full pass; found by a
   tester who ticked Pregnant and was handed a flat dumbbell press).** His rule of 14 Nov ("no jumping or impact move,
   no move lying flat") was held by a list checked against exercise NAMES; "Neutral-Grip Dumbbell Press" is a flat bench

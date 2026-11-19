@@ -21,7 +21,7 @@ import { RUNNING_GOAL_OPTIONS, isRunningGoal, raceDateWords } from '@/lib/runnin
 import { MEAL_VARIETY_OPTIONS } from '@/lib/freestyle'
 import { isMissingColumnError } from '@/lib/missing-column'
 import { loadSwitches, remindersSummary } from '@/lib/coach-reach-out'
-import { splitFoodList } from '@/lib/food-list'
+import { readFoodList, unreadFoodLine, type FoodListSide } from '@/lib/food-list'
 import { containsPhrase } from '@/lib/meal-ingredients'
 import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
@@ -436,24 +436,34 @@ function EditableSelectField<T extends string | number>({
  * both put one in this screen's existing error banner.
  */
 function EditableTagList({
-  values, onSave, placeholder, resetKey = 0, inputTestId, split,
+  values, onSave, placeholder, resetKey = 0, inputTestId, split, foodSide,
 }: {
   values: string[]; onSave: (next: string[]) => void | Promise<void>; placeholder: string; resetKey?: number; inputTestId?: string
   /** How one typed entry becomes several (Foods to avoid: "mushrooms and pork" is two foods, test log H12). Absent: the entry is one tag. */
   split?: (typed: string) => string[]
+  /**
+   * A FOOD LIST, READ AS ONE (18 Nov 2026): "I don't eat pork" is the food pork, and words that cannot be read as a
+   * food for this list are said under the box and left in it, never saved as a row that protects nothing.
+   */
+  foodSide?: FoodListSide
 }) {
   const [input, setInput] = useState('')
+  const [unreadNote, setUnreadNote] = useState<string | null>(null)
   // Cleared from outside when the caller finished the add another way (a picked name).
   useEffect(() => { if (resetKey > 0) setInput('') }, [resetKey])
   const [saving, setSaving] = useState(false)
   const add = async () => {
     const typed = input.trim()
-    const fresh = (split ? split(typed) : [typed]).filter((v, i, all) => v && !values.includes(v) && all.indexOf(v) === i)
-    if (fresh.length === 0) { setInput(''); return }
+    const read = foodSide ? readFoodList(typed, foodSide) : { foods: split ? split(typed) : [typed], unread: [] as string[] }
+    const fresh = read.foods.filter((v, i, all) => v && !values.includes(v) && all.indexOf(v) === i)
+    const note = foodSide ? unreadFoodLine(read.unread, foodSide) : null
+    setUnreadNote(note)
+    // What could not be read stays in the box, so nothing he typed is lost.
+    if (fresh.length === 0) { setInput(read.unread.join(', ')); return }
     setSaving(true)
     try {
       await onSave([...values, ...fresh])
-      setInput('')
+      setInput(read.unread.join(', '))
     } catch {
       // Left in the box on purpose. The caller has shown the error; retyping
       // a word you already typed is the thing this avoids.
@@ -492,6 +502,7 @@ function EditableTagList({
           <Plus className="size-3.5" />
         </Button>
       </div>
+      {unreadNote && <p role="status" className="text-xs text-[color:var(--role-warn-text)]" data-testid="food-list-unread">{unreadNote}</p>}
     </div>
   )
 }
@@ -1820,7 +1831,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <div className="space-y-1.5" data-testid="profile-food-likes">
               <span className="text-muted-foreground">Foods and meals I like</span>
               <p className="text-[0.6875rem] leading-snug text-muted-foreground">New meals are made with these in mind, and they're favoured when each day's meals are picked. They never override what you avoid.</p>
-              <EditableTagList values={foodLikeValues} onSave={saveLikedFoods} placeholder="e.g. salmon, curry" />
+              <EditableTagList values={foodLikeValues} onSave={saveLikedFoods} placeholder="e.g. salmon, curry" foodSide="like" inputTestId="food-like-input" />
               {likeRefusal && <p role="alert" data-testid="profile-like-refused" className="text-[0.6875rem] leading-snug text-[color:var(--role-warn-text)]">{likeRefusal}</p>}
               {heartedMeals.length > 0 && (
                 <div className="space-y-1 pt-1" data-testid="profile-hearted-meals">
@@ -1861,7 +1872,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <div className="space-y-1.5">
               <span className="text-muted-foreground">Foods to avoid</span>
               <p className="text-[0.6875rem] leading-snug text-muted-foreground">Anything else you'd rather not see. Matched by name.</p>
-              <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" split={splitFoodList} />
+              <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" foodSide="avoid" inputTestId="food-avoid-input" />
             </div>
             {/* Honesty-copy round — applies to BOTH fields above (the
                 canonical picker's tag-based checks AND the free-text
