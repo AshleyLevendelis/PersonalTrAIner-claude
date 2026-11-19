@@ -57,6 +57,7 @@ import { getWeighInPicture } from '@/lib/nutrition-targets'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { undoEatenCorrection } from '@/lib/eaten-correction'
 import { isBirthday } from '@/lib/body-units'
+import { wontText, timingRuleEffect, APPLIES_AT_NEXT_REBUILD } from '@/lib/fact-display'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
   executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeRunningGoal, type RunningGoalPayload, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioLog, undoCardioLog, type CardioLogPayload, executeCardioSession, emptyRestRow, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload, planAsSaved } from '@/lib/pending-action-executor'
 import { planSessionKindToday, sessionKindFrom, buildSessionKindTodayProposal, SESSION_KINDS } from '@/lib/session-kind'
@@ -5420,7 +5421,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const { added } = mergeFoodsToAvoid(already, firmFoodExclusions(userText))
     const receipts: ChatReceiptView[] = []
     for (const food of added) {
-      const displayText = `won't eat/do ${food}`
+      const displayText = wontText('food_preference', food)
       try {
         const row = await createFact({
           profileId, kind: 'food_preference', source: 'chat', rawPhrase: userText, displayText,
@@ -5557,7 +5558,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const conflict = checkFactConflict({ kind, polarity, resolvedRefs: resolution.resolvedRefs }, memoryFacts)
         if (conflict.needsConfirmation) return { text: conflict.message }
 
-        const displayText = `${polarity === 'dislike' ? (hardness === 'hard' ? "won't eat/do" : 'not keen on') : (hardness === 'hard' ? 'always wants' : 'prefers')} ${targetPhrase}`
+        const displayText = polarity === 'dislike' && hardness === 'hard' ? wontText(kind, targetPhrase) : `${polarity === 'dislike' ? 'not keen on' : (hardness === 'hard' ? 'always wants' : 'prefers')} ${targetPhrase}`
         const row = await createFact({
           profileId, kind, source: 'chat', rawPhrase, displayText,
           polarity, hardness, resolvedRefs: resolution.resolvedRefs,
@@ -5652,7 +5653,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             title: 'Saved to memory',
             rows: [{
               label: displayText,
-              detail: timingAnchor === 'slot' ? `applied to your ${timingSlot} pool` : 'recorded — not yet applied (needs day-context meal generation doesn\'t have yet)',
+              detail: timingRuleEffect(timingAnchor, timingSlot),
             }],
             status: 'done',
             undoToken: row.id,
@@ -5677,7 +5678,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           receipt: {
             kind: 'memory_fact_saved',
             title: 'Saved to memory',
-            rows: [{ label: displayText, detail: constraintKind === 'availability' ? 'recorded — not yet applied (takes effect on your next plan regeneration)' : 'recorded' }],
+            rows: [{ label: displayText, detail: constraintKind === 'availability' ? APPLIES_AT_NEXT_REBUILD : 'recorded' }],
             status: 'done',
             undoToken: row.id,
             resolvedAt: new Date().toISOString(),

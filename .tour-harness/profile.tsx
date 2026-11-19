@@ -227,6 +227,21 @@ if (LIKES) {
     resolved_refs: ['mushroom'], retired_at: null, created_at: new Date(anchorNowMs() - 86400000).toISOString(),
   })
 }
+// ?remembers=1 — TWO STORED NOTES FOR THE "REMEMBERS" LIST, written the way rows saved before 19 Nov 2026 are: an
+// exercise he banned from the screen (the old one label for foods and exercises, source "manual", hardness "hard")
+// and a timing rule told to the coach. INPUT ONLY: what the screen makes of them is the app's.
+if (new URLSearchParams(location.search).get('remembers') === '1') {
+  ;(db.user_facts as unknown as Record<string, unknown>[]).push({
+    id: 'fact-ban-1', profile_id: PROFILE_ID, kind: 'exercise_preference', status: 'active', source: 'manual',
+    raw_phrase: 'Barbell Squats', display_text: "won't eat/do Barbell Squats", polarity: 'dislike', hardness: 'hard',
+    resolved_refs: ['Barbell Squats'], retired_at: null, created_at: '2026-09-16T10:00:00.000Z',
+  }, {
+    id: 'fact-timing-1', profile_id: PROFILE_ID, kind: 'timing_rule', status: 'active', source: 'chat',
+    raw_phrase: 'no caffeine before training', display_text: 'no caffeine before training', polarity: null, hardness: 'soft',
+    timing_relation: 'before', timing_anchor: 'training', timing_slot: null,
+    resolved_refs: [], retired_at: null, created_at: '2026-09-20T10:00:00.000Z',
+  })
+}
 setSupabaseClient(makeFakeSupabase(db) as never)
 // Read back by reminders.mjs: what the screen WROTE, not what it shows.
 ;(window as unknown as { __fakeDb: Db }).__fakeDb = db

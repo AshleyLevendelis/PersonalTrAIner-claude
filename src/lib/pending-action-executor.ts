@@ -42,6 +42,7 @@ import { STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from './onboarding-slot
 import { substituteForInjury, substituteForEquipment, rebuildForInjury, dayChangesBetween, type AdaptationRecord, type PlanEditContext } from './plan-adaptations'
 import { planDaysInWindow, type PlanDayOnDate } from './plan-guard'
 import type { PendingActionReceipt } from './pending-actions-store'
+import { wontText } from './fact-display'
 
 /**
  * THE PLAN TO DRAW AFTER A CONFIRM: the one that was SAVED, never the one that was attempted (27 Oct 2026).
@@ -368,7 +369,7 @@ export async function executeExerciseBan(
       kind: 'exercise_preference',
       source: 'chat',
       rawPhrase: name,
-      displayText: `won't eat/do ${name}`,
+      displayText: wontText('exercise_preference', name),
       polarity: 'dislike',
       hardness: 'hard',
       resolvedRefs: [name],

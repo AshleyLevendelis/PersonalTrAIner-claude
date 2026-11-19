@@ -16,7 +16,8 @@ export function useShowNumbers(): boolean {
 /** The day's line on the starter tier: meals, never numbers. */
 export function starterDayLine(loggedMeals: number, plannedMeals: number): string {
   if (plannedMeals === 0) return 'No meals planned'
-  return loggedMeals > 0 ? `Logged ${loggedMeals} of ${plannedMeals} meals` : `${plannedMeals} meals planned`
+  const meals = plannedMeals === 1 ? 'meal' : 'meals'
+  return loggedMeals > 0 ? `Logged ${loggedMeals} of ${plannedMeals} ${meals}` : `${plannedMeals} ${meals} planned`
 }
 
 /**

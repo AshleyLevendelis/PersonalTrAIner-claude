@@ -58,6 +58,7 @@ import { banOnScreen, type BanOutcome } from '@/lib/screen-ban'
 import { checkAndRevertExpiredAdaptations, endAdaptationEarly, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import { effectiveConstraints, constraintProfile } from '@/lib/effective-constraints'
+import { wontText } from '@/lib/fact-display'
 import { reconcileToStatedCeilings } from '@/lib/ceiling-reconcile'
 import { checkForBlockReview } from '@/lib/block-review'
 import { checkForConsistencyHold } from '@/lib/block-consistency'
@@ -2207,7 +2208,7 @@ function App() {
               kind: 'exercise_preference',
               source: 'onboarding',
               rawPhrase: phrase,
-              displayText: `won't eat/do ${phrase}`,
+              displayText: wontText('exercise_preference', phrase),
               polarity: 'dislike',
               hardness: 'hard',
               resolvedRefs: r.resolution === 'resolved' ? r.resolvedRefs : [],
@@ -2225,7 +2226,7 @@ function App() {
             kind: 'food_preference',
             source: 'onboarding',
             rawPhrase: food,
-            displayText: `won't eat/do ${food}`,
+            displayText: wontText('food_preference', food),
             polarity: 'dislike',
             hardness: 'hard',
             resolvedRefs: resolveFoodTarget(food),

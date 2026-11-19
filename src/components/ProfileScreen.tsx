@@ -30,6 +30,7 @@ import { lazyWithReload } from '@/lib/chunk-reload'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { factText, factSourceLine, wontText, timingRuleEffect, APPLIES_AT_NEXT_REBUILD } from '@/lib/fact-display'
 import { Input } from '@/components/ui/input'
 import { ageOn, birthDateBounds, todayLocal } from '@/lib/body-units'
 import { Separator } from '@/components/ui/separator'
@@ -548,8 +549,8 @@ const FACT_KIND_LABEL: Record<UserFactRow['kind'], string> = {
 }
 
 function ProvenanceBadge({ source, createdAt }: { source: string; createdAt: string }) {
-  const date = new Date(createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  return <span className="text-[0.625rem] text-muted-foreground">{source} · {date}</span>
+  // In words, never the stored label ("manual · Sep 16, 2026").
+  return <span className="text-[0.625rem] text-muted-foreground" data-testid="fact-source">{factSourceLine(source, createdAt)}</span>
 }
 
 function EffectLine({ text }: { text: string }) {
@@ -572,9 +573,9 @@ function factEffect(fact: UserFactRow): string {
     return 'biases suggestions — nothing removed'
   }
   if (fact.kind === 'timing_rule') {
-    return fact.timing_anchor === 'slot' ? `applied to your ${fact.timing_slot} pool` : 'recorded — not yet applied (needs day-context meal generation doesn\'t have yet)'
+    return timingRuleEffect(fact.timing_anchor, fact.timing_slot)
   }
-  return 'recorded — not yet applied (takes effect on your next plan regeneration)'
+  return APPLIES_AT_NEXT_REBUILD
 }
 
 export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, activeAdaptations, endingAdaptationId, onEndAdaptation, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, onPlanPause, exercisePlan, planBan, backLabel = 'Back', calorieTarget, kit, myMeals, onEquipmentChoiceChanged }: ProfileScreenProps) {
@@ -732,7 +733,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       await Promise.all([
         ...added.map(v => createFact({
           profileId, kind: 'food_preference', source: 'manual',
-          rawPhrase: v, displayText: `won't eat/do ${v}`,
+          rawPhrase: v, displayText: wontText('food_preference', v),
           polarity: 'dislike', hardness: 'hard', resolvedRefs: resolveFoodTarget(v),
         })),
         ...removed.map(f => deleteFactPermanently(f.id)),
@@ -2013,10 +2014,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                       </div>
                     ) : (
                       <div className="flex items-start justify-between gap-2">
-                        <span className="text-sm font-medium">{f.display_text}</span>
+                        <span className="text-sm font-medium" data-testid="fact-text">{factText(f)}</span>
                         <div className="flex items-center gap-2.5 shrink-0">
-                          {f.hardness && <Badge variant="outline" className="text-[0.5625rem] px-1 py-0">{f.hardness}</Badge>}
-                          <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(f.id, f.display_text)} aria-label={`Edit note: ${f.display_text}`}><Pencil className="size-3" /></Button>
+                          {/* No "hard" / "soft" pill: the line under the note says what it does, in words. */}
+                          <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(f.id, factText(f))} aria-label={`Edit note: ${factText(f)}`}><Pencil className="size-3" /></Button>
                           <Button
                             size="icon" variant="ghost"
                             className={armedDeleteKey === `fact:${f.id}` ? 'hit-slop-44 size-6 bg-destructive text-destructive-foreground' : 'hit-slop-44 size-6 text-destructive'}
@@ -2213,7 +2214,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                 Everything the app has stored about you, as one file.
               </p>
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleDownloadData} disabled={dataBusy !== null}>
+              <Button size="sm" variant="outline" className="h-11 text-xs" onClick={handleDownloadData} disabled={dataBusy !== null}>
                 {dataBusy === 'export' ? 'Gathering…' : 'Download my data'}
               </Button>
               {exportNote && <p className="text-[0.6875rem] leading-snug text-muted-foreground">{exportNote}</p>}
@@ -2226,7 +2227,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               {!deleteArmed ? (
                 <Button
                   size="sm" variant="outline"
-                  className="h-8 text-xs text-destructive border-destructive/40"
+                  className="h-11 text-xs text-destructive border-destructive/40"
                   onClick={() => { setDeleteArmed(true); setDeleteConfirm('') }}
                 >
                   Delete everything
@@ -2244,19 +2245,19 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                       onChange={e => setDeleteConfirm(e.target.value)}
                       placeholder="delete"
                       aria-label="Type delete to confirm"
-                      className="mt-1 h-8 text-sm"
+                      className="mt-1 h-11 text-sm"
                     />
                   </label>
                   <div className="flex items-center gap-2">
                     <Button
                       size="sm"
-                      className="h-8 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      className="h-11 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       disabled={deleteConfirm.trim().toLowerCase() !== 'delete' || dataBusy !== null}
                       onClick={handleDeleteEverything}
                     >
                       {dataBusy === 'delete' ? 'Deleting…' : 'Delete everything, permanently'}
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setDeleteArmed(false)}>
+                    <Button size="sm" variant="ghost" className="h-11 text-xs" onClick={() => setDeleteArmed(false)}>
                       Cancel
                     </Button>
                   </div>

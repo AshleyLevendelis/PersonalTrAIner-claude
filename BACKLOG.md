@@ -2,6 +2,40 @@
 
 Newest first. One line each.
 
+- [x] **PROFILE'S "REMEMBERS" LIST SHOWED THE APP'S OWN BOOKKEEPING (19 Nov 2026, the full pass; a tester's findings
+  P4, P6 and two of P7).** A note read "won't eat/do Barbell Squats" with a pill saying "hard" and "manual · Sep 16,
+  2026" under it, and a rule about training read "recorded — not yet applied (needs day-context meal generation
+  doesn't have yet)". Now:
+  - a firm "never" is written by kind, "won't eat pork" for a food and "won't do Barbell Squats" for an exercise, by
+    ONE function every writer calls (Profile, the chat's two routes, setup's two, the ban from the Exercise screen and
+    the coach's ban). A note saved under the old label reads right as well (one reader), so nothing stored is
+    rewritten. The coach is sent the same words;
+  - where a note came from is in words with the date the way the rest of the app writes one: "Added by you · 16 Sep
+    2026", "From chat · ...", "From setup · ..." (a fixed month list: the phone's own short month is "Sep" on one
+    and "Sept" on another);
+  - the "hard" / "soft" pill is gone: the line under each note already says what it does;
+  - what a rule does is said the same on Profile and on the chat's "Saved to memory" line, from one function (they
+    were two hand-written copies): a rule about a meal is "applied to your breakfast options"; a rule about training
+    is "remembered, not applied: your meals are not planned around when you train"; a day he cannot train is
+    "remembered. It applies the next time your plan is rebuilt". No "yet": nobody has decided to build it.
+  - "Download my data", "Delete everything" and the confirm step under it are 44px tall (they were 32);
+  - "1 meals planned" is "1 meal planned"; the Appearance preview's pill reads "9 of 12 weeks" (it still showed "12
+    in a row", which his 13 Nov ruling took out everywhere else).
+  DECISION, mine, and his to change: the three source phrases and the three effect sentences are new wording. They
+  replace internal labels with what those labels already meant and claim nothing new; the "not applied" sentence was
+  checked against the meal code (a day's meals are chosen with no knowledge of when he trains).
+  NOT DONE, named: "biases suggestions — nothing removed" under a soft preference (pinned by `test:audit-fixes`, and
+  plain enough); the group headings ("EXERCISE PREFERENCES", "TIMING RULES"); the rest of P7 (a paused plan not named
+  on a rest day; a stale "Saved." line after an equipment change; "I love pizza" saved as the like "i love pizza";
+  after a Barbell Squats ban the Front Squat is the main lift on two days); P5 (no unit choice on Profile's height
+  and weight).
+  TWO CHECKS WERE ENFORCING THE OLD WORDS and were re-anchored: `test:small-words` still required "12 in a row" in
+  the preview (his 17 Oct ruling, replaced on 13 Nov), and `test:food-dislike-is-a-ban` pinned the literal "won't
+  eat/do" instead of the property (a firm dislike takes the firm label, never "not keen on").
+  `test:fact-display` (new, 29 checks; 18 mutations, 18 caught), `verify:remembers-words` (new, 13 checks on the real
+  Profile with two notes stored the OLD way; 6 browser mutations caught; both screenshots read), `verify:chat-food-avoid`
+  1d re-anchored to the new words (1 browser mutation caught). Frontend only; the words reach the coach on the next
+  message with no deploy.
 - [x] **TWO SMALL THINGS ON NUTRITION AND HOME, AND ONE FINDING THAT WAS NOT A DEFECT (19 Nov 2026, the full pass; a
   tester's findings N6 and N8).**
   N6. Calories were written two ways on one screen: "Meals planned 1983 kcal", "1062 kcal under" and "target 3045"
