@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **A SESSION-LENGTH CHANGE MADE IN THE CHAT SHOWED AN UNDO THAT COULD NOT UNDO (19 Nov 2026, the full pass; a tester's
+  finding, confirmed in the code and then in a browser).** "From now on I only have 30 to 45 minutes" -> the offer ->
+  Apply -> Undo -> "Couldn't undo — This one can't be undone from here". The change kept the plan and the length it
+  replaced, like its siblings; the list that carries an Undo out simply had no entry for it. It now goes back the same
+  way: the weeks, then the setting they were built from.
+  SO THE NEXT ONE CANNOT SLIP THE SAME WAY, the check is DERIVED: every kind of change that hands back an Undo must
+  have a branch where an Undo is carried out (`test:pending-actions`, three new checks). FOUND BY A MISSED MUTATION:
+  my first version passed with session length taken out of its branch, because the block that restores the setting
+  still NAMED the kind further down, unreachable. It now reads only the conditions that dispatch an Undo.
+  `verify:session-length-undo` (new, 11 checks in a real browser reading the database before, after Apply and after
+  Undo; 2 browser mutations caught), 4 unit mutations caught, screenshots read. Frontend only.
+  And `test:today-claim` was re-anchored (it pinned the plain reply's check list, which gained a second check).
 - [x] **"I DID SQUATS YESTERDAY" WAS LOGGED ON TODAY (19 Nov 2026, the full pass; found by tracing the path, not by a report).**
   The coach passes the date of a session told to it; the phone dropped the date and wrote the sets onto TODAY. The
   wrong day's session showed work done, the week's count moved, and a record carried the wrong date.

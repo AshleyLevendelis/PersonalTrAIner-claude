@@ -8741,7 +8741,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         if (!preImage || !planCreatedAt) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
-      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change' || row.kind === 'propose_goal_change' || row.kind === 'propose_concurrent_activity' || row.kind === 'propose_running_goal') {
+      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_session_length' || row.kind === 'propose_style_change' || row.kind === 'propose_goal_change' || row.kind === 'propose_concurrent_activity' || row.kind === 'propose_running_goal') {
         // Both wrote a RUN of weeks, so undo restores the same run rather
         // than the swap's single week. The starting week comes off the
         // payload, not off today's live week — undoing tomorrow must put
@@ -8801,6 +8801,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           const patch: Partial<UserProfile> = { running_goal: pre?.before ?? null, running_race_date: pre?.beforeRaceDate ?? null, running_base_minutes: pre?.beforeBase ?? null }
           await updateProfileField(profile.id, patch)
           onProfileChanged(patch)
+        }
+        if (row.kind === 'propose_session_length') {
+          // A SESSION-LENGTH CHANGE HAD AN UNDO BUTTON AND NO UNDO (a tester, 18 Nov 2026: "Couldn't undo — This one
+          // can't be undone from here"). It keeps the plan it replaced and the length it replaced, like its siblings,
+          // so it goes back the same way: the weeks, then the setting they were built from.
+          const before = (row.preconditions as { before?: UserProfile['session_duration_preference'] } | null)?.before
+          if (before) {
+            await updateProfileField(profile.id, { session_duration_preference: before })
+            onProfileChanged({ session_duration_preference: before })
+          }
         }
         if (row.kind === 'propose_style_change') {
           // Same divergence, same fix: the plan goes back, so the style must too.

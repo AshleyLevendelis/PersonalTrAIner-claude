@@ -582,7 +582,9 @@ async function main() {
       // `if (row.kind === 'propose_style_change')` text also opens the
       // CONFIRM branch earlier in the file, and the first draft of this check
       // matched that one and failed against correct code.
-      const undoRange = src.indexOf("row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change'")
+      // 19 Nov 2026: anchored on where an Undo is carried out, not on the exact list of kinds beside it (the list
+      // gained session length and this stopped finding it, on correct code).
+      const undoRange = src.indexOf('const undoReceiptCore = async')
       const k = undoRange >= 0 ? src.indexOf("if (row.kind === 'propose_style_change') {", undoRange) : -1
       const undoBlock = k >= 0 ? src.slice(k, src.indexOf('\n        }\n', k)) : ''
       check('ChatAssistant\'s undo branch for a style change restores training_style on the profile',
@@ -820,6 +822,40 @@ async function main() {
       retryClaim.outcome === 'already_resolved', retryClaim)
 
     await resolvePendingAction(row.id, 'done', { landed: [kind], failed: [] })
+  }
+
+  // ---- An Undo button that is drawn is an Undo that exists --------------------
+  // A tester, 18 Nov 2026: a session-length change showed Undo, and tapping it said "This one can't be undone from
+  // here". The confirm handed back an undo handle and the undo list had no branch for that kind. DERIVED, so the next
+  // kind cannot slip the same way: every kind whose confirm hands back the row as its undo handle must be named where
+  // an Undo is carried out.
+  console.log('\nEvery offer that hands back an Undo has an Undo')
+  {
+    const { readFileSync } = await import('node:fs')
+    const chat = readFileSync('src/components/ChatAssistant.tsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const undoAt = chat.indexOf('const undoReceiptCore = async')
+    const confirmSide = chat.slice(0, undoAt)
+    const undoSide = chat.slice(undoAt, chat.indexOf('\n  const ', undoAt + 200) > 0 ? chat.indexOf('const handleUndo', undoAt) > 0 ? chat.indexOf('const handleUndo', undoAt) : undefined : undefined)
+    // Each `row.kind === 'x'` branch on the confirm side, with the text up to the next branch.
+    const branches = confirmSide.split(/\n\s*\}?\s*(?:else )?if \(row\.kind === /).slice(1)
+    const handsBack = new Set<string>()
+    for (const b of branches) {
+      const head = b.slice(0, b.indexOf(') {') + 1)
+      if (!/undoToken = (?:ok \? )?row\.id/.test(b)) continue
+      for (const m of ("row.kind === " + head).matchAll(/row\.kind === '([a-z_]+)'/g)) handsBack.add(m[1])
+    }
+    check('the detector finds the kinds that hand back an Undo (well over a dozen)', handsBack.size >= 15 && handsBack.has('propose_session_length') && handsBack.has('propose_schedule_change'), [...handsBack])
+    // A BRANCH, not a mention (found by a missed mutation, 19 Nov 2026: with session length taken out of its branch's
+    // condition, the block that restores its setting still NAMED the kind further down, unreachable). So only the
+    // conditions that dispatch an Undo count: each `else if (...)`, and the `if (...)` that opens the chain.
+    const conds = [...undoSide.matchAll(/\} else if \(([^{]*?)\) \{/g)].map(m => m[1])
+    const opener = /\n\s*if \((row\.kind === [^{]*?)\) \{/.exec(undoSide)?.[1] ?? ''
+    const dispatched = new Set([...conds, opener].flatMap(c => [...c.matchAll(/row\.kind === '([a-z_]+)'/g)].map(m => m[1])))
+    const noUndo = [...handsBack].filter(k => !dispatched.has(k))
+    check('every one of them has a branch where an Undo is carried out', undoAt > 0 && noUndo.length === 0, noUndo)
+    const lengthUndo = undoSide.slice(undoSide.indexOf("if (row.kind === 'propose_session_length') {"))
+    check('undoing a session length puts the old length back as well as the old weeks',
+      /const before = \(row\.preconditions as [^)]*\)\?\.before/.test(lengthUndo.slice(0, 400)) && /updateProfileField\(profile\.id, \{ session_duration_preference: before \}\)/.test(lengthUndo.slice(0, 600)) && /onProfileChanged\(\{ session_duration_preference: before \}\)/.test(lengthUndo.slice(0, 700)))
   }
 
   // ---- Summary -------------------------------------------------------------

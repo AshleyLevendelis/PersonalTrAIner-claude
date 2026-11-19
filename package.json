@@ -460,6 +460,7 @@
     "test:exercise-aliases": "tsx scripts/test-exercise-aliases.ts",
     "verify:exercise-shorthand": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/exercise-shorthand.mjs",
     "verify:chat-log-words": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-log-words.mjs",
+    "verify:session-length-undo": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/session-length-undo.mjs",
     "verify:finisher": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/finisher-detail.mjs",
     "verify:mobility-filler": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/mobility-filler.mjs",
     "test:meal-tradeoff": "tsx scripts/test-meal-tradeoff.ts",
