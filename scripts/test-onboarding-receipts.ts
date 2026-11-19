@@ -151,6 +151,21 @@ console.log('\n5. M5 — an exact length recorded as a setting says what the set
   check('...for all four settings', Object.keys(SESSION_BAND_MINUTES).length === Object.keys(SESSION_MAXIMUM_SECONDS).length)
 }
 
+console.log('\nS4. A list of choices reads in the order the choices are shown, not the order tapped (the setup walk, 18 Nov 2026)')
+{
+  const tapped = shown('trainingDays', { trainingDays: ['Mon', 'Tue', 'Thu', 'Fri', 'Wed'] })
+  check('days tapped Mon, Tue, Thu, Fri, then Wed read "Mon, Tue, Wed, Thu, Fri" (they read in tap order)', tapped === 'Mon, Tue, Wed, Thu, Fri', tapped)
+  const backwards = shown('trainingDays', { trainingDays: ['Sun', 'Sat', 'Mon'] })
+  check('...and tapped backwards they still read forwards: "Mon, Sat, Sun"', backwards === 'Mon, Sat, Sun', backwards)
+  check('the answer itself is not reordered (only how it reads)', (() => { const v = ['Fri', 'Mon']; shown('trainingDays', { trainingDays: v }); return v.join() === 'Fri,Mon' })())
+  const diet = getSlotDef('dietaryPreferences')!
+  const opts = (diet.options ?? []).map(o => String(o.value))
+  const two = opts.length >= 3 ? [opts[2], opts[0]] : []
+  const said = two.length ? shown('dietaryPreferences', { dietaryPreferences: [...two, 'something he typed'] } as never) : ''
+  const labels = two.map(v => diet.options!.find(o => String(o.value) === v)!.label)
+  check('another list does the same, and something typed that is not a choice stays at the end', two.length === 2 && said === `${labels[1]}, ${labels[0]}, something he typed`, { said, labels })
+}
+
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) {
   console.error(`${failures} check(s) failed`)

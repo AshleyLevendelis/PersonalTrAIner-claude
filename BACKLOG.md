@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [x] **SETUP LISTED HIS TRAINING DAYS IN THE ORDER HE TAPPED THEM (19 Nov 2026, the full pass; a tester's finding S4).**
+  Days changed from the summary read "Mon, Tue, Thu, Fri, Wed". The plan itself was never affected (it is built from
+  the week in order); only how the answer READ. A list answer now reads in the order its choices are shown, wherever
+  setup says it: the summary row, the tick, and his own answer bubble.
+  THE SCREEN CHECK FOUND THE SECOND PLACE. The logic check passed on the first fix (the summary and the tick go
+  through one function), and the driver, tapping Thursday before Monday, read "Thu, Mon · 45-60 min" in his answer
+  bubble, which was built by its own copy of the same loop. The bubble now calls the one function. What is STORED is
+  unchanged (the taps, in tap order); something typed that is not one of the choices stays at the end.
+  `test:onboarding-receipts` section S4 (4 new checks; 3 mutations caught), `verify:two-question-screens` 2d2 (the
+  driver now taps Thursday first; 1 browser mutation caught). The 12 setup drivers and 47 derived gates pass.
+  NOT DONE, named, all LOW: S3 (the step counter says "1 of 14" twice and its total grows as screens are added), S5
+  (the diet screen's heading slides under the progress bar; the button reads "None — next" after a food is typed),
+  S6 (the optional "What do you usually eat?" has no Skip). Frontend only.
 - [x] **A MEAL MOVED BETWEEN TWO MEALS BY THE COACH COULD NOT BE PUT BACK (19 Nov 2026, the full pass; a tester's finding
   C11).** The Move sheet on Nutrition has had an Undo since 2 Nov; the coach's receipt for the same move had none, by
   a note in the code ("moving it back is one more move"). His "every change previews and can be undone" covers both.

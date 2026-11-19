@@ -1163,7 +1163,10 @@ export function displaySlotValue(def: SlotDef, values: OnboardingSlotValues): st
   if (Array.isArray(v)) {
     if (v.length === 0) return 'none'
     if (!def.options) return v.join(', ')
-    return v.map(x => def.options!.find(o => String(o.value) === String(x))?.label ?? String(x)).join(', ')
+    // IN THE ORDER THE CHOICES ARE SHOWN, not the order tapped (the setup walk, 18 Nov 2026: days changed from the
+    // summary read "Mon, Tue, Thu, Fri, Wed"). Something typed that is not one of the choices keeps its place at the end.
+    const place = (x: unknown) => { const i = def.options!.findIndex(o => String(o.value) === String(x)); return i === -1 ? def.options!.length : i }
+    return [...v].sort((a, b) => place(a) - place(b)).map(x => def.options!.find(o => String(o.value) === String(x))?.label ?? String(x)).join(', ')
   }
   if (def.options) {
     const opt = def.options.find(o => String(o.value) === String(v))

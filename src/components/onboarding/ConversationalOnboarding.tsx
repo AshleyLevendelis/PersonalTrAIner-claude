@@ -1861,9 +1861,9 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       setMessages(prev => [...prev, { role: 'assistant', content: 'I need at least one there — tap the ones that work for you.' }])
       return
     }
-    const picked = selected.length > 0
-      ? selected.map(v => def.options?.find(o => String(o.value) === v)?.label ?? v).join(', ')
-      : 'none'
+    // SAID BACK THROUGH THE SAME FUNCTION AS THE SUMMARY AND THE TICK, so all three list the choices in the order they
+    // are shown (the bubble read "Thu, Mon" in tap order while the tick beside it read "Mon, Thu").
+    const picked = displaySlotValue(def, ws.values)
     const labels = companionSaid ? `${picked} · ${companionSaid}` : picked
     if (settleEdit(ws, labels)) return
     void sendMessage(labels, ws)
