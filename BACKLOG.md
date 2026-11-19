@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [x] **TWO SMALL THINGS ON NUTRITION AND HOME, AND ONE FINDING THAT WAS NOT A DEFECT (19 Nov 2026, the full pass; a
+  tester's findings N6 and N8).**
+  N6. Calories were written two ways on one screen: "Meals planned 1983 kcal", "1062 kcal under" and "target 3045"
+  under a rings card reading "3,045 kcal left". The planned total, the target on the planned line and the day's
+  verdict now carry the comma ("1,983", "1,062 kcal under", "target 3,045"). The verdict is the engine's one
+  function, so the week view and the upcoming-day card follow. NOT CHANGED, named: the "The day is N kcal over your
+  target" line after a swap, and calorie figures inside coach offers, still print four digits bare (each is pinned by
+  its own checks; a day is rarely a thousand out there). `test:day-verdict` (1 new check; 1 mutation caught),
+  `verify:day-verdict` 2c2 (1 new check on the real screen; 2 browser mutations caught). Three drivers that read the
+  planned total as a bare number were taught the comma (`verify:day-as-shown`, `verify:meal-costed`,
+  `verify:day-verdict`); the eleven drivers that read that line all pass.
+  N8b. On Home, tapping the steps ring with nothing logged opened a blank box beside "Log steps". The box now says
+  "Steps today" until there is a count to show. `verify:home-steps` 2a (1 browser mutation caught).
+  N8a, NOT A DEFECT, checked: the tester reported that tapping "Logged" on a meal takes it off and "nothing says so".
+  It does say so ("Lunch taken off what you ate · Undo", his 8 Nov ruling), beside the button and on screen;
+  `verify:diary-preservation` 8a holds exactly that and passes. Nothing changed.
+  104 derived `test:` gates pass. Frontend only.
 - [x] **THE SHOPPING LIST SHOWED LESS THAN THE MEALS NEED (19 Nov 2026, the full pass; a tester's finding N5).** A row
   rounded to the NEAREST step it is bought in, so 270 g read "~250g" and 615 g "~600g", and a counted food rounded to
   the nearest piece, so one and a half chicken breasts read "1 breast". Follow the list and the week comes up short.

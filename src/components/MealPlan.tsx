@@ -958,7 +958,7 @@ function TotalsHero({ totals, targets, chosen, eaten }: { totals: MacroTargets; 
     <div data-planned-day>
       <button type="button" onClick={() => setOpen(o => !o)} aria-expanded={open} className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left">
         <span className="text-[0.8125rem] text-muted-foreground">
-          Meals planned <span className="tabular-mono font-semibold text-foreground" data-testid="day-kcal">{Math.round(totals.calories)}</span> kcal
+          Meals planned <span className="tabular-mono font-semibold text-foreground" data-testid="day-kcal">{Math.round(totals.calories).toLocaleString('en-GB')}</span> kcal
         </span>
         <span className="flex items-center gap-1 text-[0.75rem] text-muted-foreground">
           <span data-testid="day-verdict">{deltaLabel}</span>
@@ -972,7 +972,7 @@ function TotalsHero({ totals, targets, chosen, eaten }: { totals: MacroTargets; 
           </span>
           <span className="text-muted-foreground">{Math.round(totals.carbs)} / {targets.carbs} C</span>
           <span className="text-muted-foreground">{Math.round(totals.fat)} / {targets.fat} F</span>
-          <span className="text-muted-foreground">target {targets.calories}</span>
+          <span className="text-muted-foreground">target {targets.calories.toLocaleString('en-GB')}</span>
         </div>
       )}
     </div>

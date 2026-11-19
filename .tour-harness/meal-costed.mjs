@@ -82,7 +82,7 @@ await wait(800)
 
 // The day list first, every card closed: each row's kcal and the day's planned total.
 const rows = await ev(`[...document.querySelectorAll('[data-testid="meal-row-kcal"]')].map(e => ({ slot: e.getAttribute('data-slot'), kcal: parseInt(e.textContent.replace(/,/g, ''), 10) }))`)
-const day = await ev(`parseInt(document.querySelector('[data-testid="day-kcal"]')?.textContent ?? '', 10)`)
+const day = await ev(`parseInt((document.querySelector('[data-testid="day-kcal"]')?.textContent ?? '').replace(/,/g, ''), 10)`)
 await shoot('meal-costed-day')
 
 // Open the dinner card (the row's own button).

@@ -120,6 +120,7 @@ async function main() {
     // Calories are the number this line sits beside ("target 1697 · 120 over"),
     // so when they are off they are what is named, as they always were.
     check('calories 120 over: "120 kcal over", with its unit (10 Nov 2026)', say(T(1817, 164, 150, 49), SAM) === '120 kcal over', say(T(1817, 164, 150, 49), SAM))
+    check('a miss of a thousand or more is written with its comma: "1,062 kcal under" (the Nutrition walk, 18 Nov 2026)', say(T(635, 164, 150, 49), SAM) === '1,062 kcal under', say(T(635, 164, 150, 49), SAM))
     check('calories 200 under: "200 kcal under"', say(T(1497, 164, 150, 49), SAM) === '200 kcal under', say(T(1497, 164, 150, 49), SAM))
     // Calories 5.5% over (half a point past their band), protein 34% over
     // (19 points past its own): protein is by far the worse miss, and the
