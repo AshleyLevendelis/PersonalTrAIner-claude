@@ -27,7 +27,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { ONBOARDING_SLOTS, offeredOptionsFor } from '../src/lib/onboarding-slots'
+import { ONBOARDING_SLOTS, offeredOptionsFor, multiNextLabel } from '../src/lib/onboarding-slots'
 import { buildOnboardingIntro, ONBOARDING_INTRO_THE_ASK } from '../src/lib/first-run-intro'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -300,7 +300,10 @@ console.log('\n6. Nothing is asked twice, and nothing decorative costs height')
   // the brief's full-width "Next →" — and a single-choice question has none,
   // because its one tap is the answer and Skip lives in the header.
   check('a multi-select ends in one full-width Next, 54px',
-    /def\.control === 'multi' && \(\s*<Button\s*className="h-\[54px\] w-full/.test(card) && /'Next →'/.test(card))
+    /def\.control === 'multi' && \(\s*<Button\s*className="h-\[54px\] w-full/.test(card)
+    // The words come from one function since 19 Nov 2026 (the button said "None" after a food was typed into the
+    // second box); the property is that the card ASKS it and that a pick reads "Next →".
+    && /\{multiNextLabel\(/.test(card) && multiNextLabel(1, false, false) === 'Next →')
   check('...and under pills or a strip it reads the picks back in words',
     /shape !== 'rows' && selectedMulti\.length > 0 && \([\s\S]{0,300}\.map\(o => o\.label\)\.join\(' · '\)/.test(card))
 

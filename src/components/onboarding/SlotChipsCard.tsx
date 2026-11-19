@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { OptionRow, OptionPill, OptionCell } from './OptionRow'
 import { isHealthCondition, healthConditionLine } from '@/lib/health-conditions'
 import { Button } from '@/components/ui/button'
-import { getSlotDef, offeredOptionsFor, multiSelection, companionSlotFor, isSlotApplicable, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
+import { getSlotDef, offeredOptionsFor, multiSelection, companionSlotFor, isSlotApplicable, multiNextLabel, type OnboardingSlotValues, type SlotKey } from '@/lib/onboarding-slots'
 import { dietTargetCaveat } from '@/lib/coach-voice'
 
 // ---------------------------------------------------------------------------
@@ -278,7 +278,7 @@ export function SlotChipsCard({
           onClick={() => onResolveMulti(def.key, companionOn && companionKey ? { key: companionKey, value: companionValue } : undefined)}
           data-slot-next
         >
-          {selectedMulti.length === 0 ? (def.required ? 'Pick at least one' : 'None — next →') : 'Next →'}
+          {multiNextLabel(selectedMulti.length, !!def.required, companionOn && companionValue.trim() !== '')}
         </Button>
       )}
     </div>

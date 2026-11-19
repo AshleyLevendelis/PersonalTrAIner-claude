@@ -45,6 +45,15 @@ export function isPlainNone(text: string): boolean {
 }
 
 /**
+ * "skip", "pass", "I'd rather not say" typed to an OPTIONAL question: he is declining it, not naming a food called
+ * Skip. Kept apart from `isPlainNone` on purpose: "none" typed while CHANGING a list clears it, and "skip" there means
+ * "leave it as it is", so the two must never be read as one.
+ */
+export function isPlainSkip(text: string): boolean {
+  return /^(?:skip|skip it|skip this|skip that|pass|(?:i'?d |i would )?rather not say|prefer not to say)[.!]*$/i.test(String(text ?? '').trim())
+}
+
+/**
  * A typed list read for one box: the foods, and anything that could not be read as a food for that box. The avoid box
  * splits on "and" (two foods); the likes box on commas only ("chicken and rice" is one meal, as `splitUsualFoods`).
  */
@@ -96,7 +105,7 @@ export function splitFoodList(text: string): string[] {
  */
 export function splitUsualFoods(text: string): string[] {
   const t = String(text ?? '').trim()
-  if (isPlainNone(t)) return []
+  if (isPlainNone(t) || isPlainSkip(t)) return []
   const out: string[] = []
   for (const part of t.split(/\s*(?:,|;|\n)\s*/)) {
     const meal = tidy(part)

@@ -430,7 +430,7 @@ function main() {
     check('...except one he also said to leave out: an avoid wins', /usual_foods \?\? \[\]\)\.filter\(meal => !\(enrichedProfile\.disliked_foods \?\? \[\]\)\.some\(avoid => avoid\.trim\(\) && containsPhrase\('', \[meal\], avoid\)\)/.test(app))
     check('the first plan is made with them in mind, before they are rows', /likedFoods: \[\.\.\.new Set\(\[\.\.\.typedFoodLikes, \.\.\.\(forProfile\.usual_foods \?\? \[\]\)\]\)\]/.test(app))
     check('the app keeps his typed reply as the answer when the coach records nothing, and never a question of his own',
-      /textQuestionOnScreen\(messages, ws\.confirmed\) === 'usualFoods' && !responseWs\.confirmed\.has\('usualFoods'\) && !trimmed\.includes\('\?'\)/.test(onb) && /applySlot\(responseWs, 'usualFoods', isPlainNone\(trimmed\) \? '' : trimmed, responseWs\.values\)/.test(onb))
+      /textQuestionOnScreen\(messages, ws\.confirmed\) === 'usualFoods' && !responseWs\.confirmed\.has\('usualFoods'\) && !trimmed\.includes\('\?'\)/.test(onb) && /applySlot\(responseWs, 'usualFoods', isPlainNone\(trimmed\)(?: \|\| isPlainSkip\(trimmed\))? \? '' : trimmed, responseWs\.values\)/.test(onb))
     check('a typed question the app asks itself names its question, all three places', (onb.match(/asksSlot: (?:nextDef|def)\.control === 'text' \? (?:nextDef\.key|target|next|key) : undefined/g) ?? []).length === 4, (onb.match(/asksSlot: (?:nextDef|def)\.control === 'text' \? (?:nextDef\.key|target|next|key) : undefined/g) ?? []).length)
     check('the setup coach is told to record it in his words, whole meals, and to add nothing', /set_slot\(usualFoods = /.test(fn) && /"chicken and rice" is one entry, never two/.test(fn) && /Never add a food they did not say/.test(fn))
   }

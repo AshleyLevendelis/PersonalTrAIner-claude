@@ -2,6 +2,47 @@
 
 Newest first. One line each.
 
+- [x] **SETUP: THE "NONE" BUTTON, A SKIP FOR THE OPTIONAL MEALS QUESTION, AND "1 OF 14" TWICE (19 Nov 2026, the full
+  pass; a tester's findings S5, S6 and S3).** Three small things on the setup screens, all mechanical.
+  - S5. On the diet screen the button under the ticks read "None — next" after he had typed a food into "Anything
+    else you'd rather I left out?" with nothing ticked, so the button denied the answer he had just given. It reads
+    "Next" as soon as that box holds words. One function decides the words (`multiNextLabel`).
+  - S6. "What do you usually eat?" is optional and had no way past it but typing something. The header's Skip now
+    shows for an optional TYPED question the app asked by name (never the name). A tap keeps nothing, his own bubble
+    says he skipped it, and setup moves on. FOUND ON THE WAY: the word "skip" typed as the answer was kept as a usual
+    meal called "skip" whenever the coach recorded nothing itself. It is now read as nothing kept.
+    "SKIP" IS KEPT APART FROM "NONE", ON PURPOSE. My first edit added the skip words to the one function that reads
+    "none", and that function is also asked while a list is being CHANGED from the summary: "none" there clears his
+    foods to avoid, and "skip" there means "leave it as it is". Reading the two as one would have emptied an avoid
+    list on the word "skip". So `isPlainSkip` is its own function, `isPlainNone` is unchanged, and a check pins that
+    "skip" is not a "none".
+  - S3. The header read "1 of 14" on the name question and again on the question after it: the name is not one of the
+    counted screens. The name question's header is now its section alone ("About you"), with no number.
+  FOUR STALE CHECKS, each pinning the old line of code and not what it was for: `test:onboarding-chips` (the literal
+  'Next →' in the card), `test:onboarding-style` twice (the header's count written out in the screen file; "Skip for
+  single-choice and number questions only") and `test:usual-meals` (the typed reply's exact expression). Each is
+  re-anchored on the property (the screen ASKS the one function, and the function gives the right words; a card's
+  Skip is still single-choice and number only, a multi-select and the name never get one by either road), and each
+  was broken by hand to see it fail (5 breaks, 5 caught).
+  AN INTERRUPTED MUTATION RUN LEFT ITS BREAK IN THE TREE (the 19 Sep rule, met again). The round against the setup
+  driver was stopped by the background time limit in its third mutation, and the header's count was back in the
+  working tree with every file looking right at a glance. Found before anything else ran, by the step the rule asks
+  for: a grep for each mutated line whose expected count I knew (four lines, each must be 1; one was 0). Restored by
+  hand and the whole round re-run with a longer limit. Lesson kept: a mutation round on a slow driver is given a time
+  limit several times its expected length, and its output goes to a file, not through `tail`, so a stopped run still
+  shows what it scored.
+  CHECKS: `test:onboarding-receipts` sections S5, S6, S3 (17 new checks; 12 mutations, all caught);
+  `verify:two-question-screens` 3a2-3a3 (1 browser mutation caught); `verify:onboarding-turns` 28s1-28s8 (4 browser
+  mutations: 3 caught first time, the fourth, a Skip appearing on the name question, MISSED until 28s8 was added,
+  then caught). All 12 setup drivers pass on the change, and the 50 checks that read the changed files (48 first
+  time, the stale ones above after re-anchoring), with the typecheck, the app-size and the unused-code checks.
+  Screenshot read: the Skip sits in the header of the meals question.
+  APP SIZE: what the first screen downloads is now 611 of its 612 kB limit (1 left; it was 610). Not raised, on
+  purpose: the next change to anything the first screen loads will cross it and say so.
+  NOT DONE, named: the header's total can still change as an answer makes later questions apply or not (by design,
+  14 Nov); the other half of S5 (the diet screen's heading scrolling under the header on a long list) is ordinary
+  scrolling and was left; "skip" typed into the diet screen's leave-out box is still kept as a food called "skip".
+  Frontend only.
 - [x] **SETUP LISTED HIS TRAINING DAYS IN THE ORDER HE TAPPED THEM (19 Nov 2026, the full pass; a tester's finding S4).**
   Days changed from the summary read "Mon, Tue, Thu, Fri, Wed". The plan itself was never affected (it is built from
   the week in order); only how the answer READ. A list answer now reads in the order its choices are shown, wherever
@@ -12,9 +53,7 @@ Newest first. One line each.
   unchanged (the taps, in tap order); something typed that is not one of the choices stays at the end.
   `test:onboarding-receipts` section S4 (4 new checks; 3 mutations caught), `verify:two-question-screens` 2d2 (the
   driver now taps Thursday first; 1 browser mutation caught). The 12 setup drivers and 47 derived gates pass.
-  NOT DONE, named, all LOW: S3 (the step counter says "1 of 14" twice and its total grows as screens are added), S5
-  (the diet screen's heading slides under the progress bar; the button reads "None — next" after a food is typed),
-  S6 (the optional "What do you usually eat?" has no Skip). Frontend only.
+  NOT DONE when this was written, all LOW, and DONE the same day in the entry above: S3, S5 and S6. Frontend only.
 - [x] **A MEAL MOVED BETWEEN TWO MEALS BY THE COACH COULD NOT BE PUT BACK (19 Nov 2026, the full pass; a tester's finding
   C11).** The Move sheet on Nutrition has had an Undo since 2 Nov; the coach's receipt for the same move had none, by
   a note in the code ("moving it back is one more move"). His "every change previews and can be undone" covers both.

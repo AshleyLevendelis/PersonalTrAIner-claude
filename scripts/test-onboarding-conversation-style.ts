@@ -16,6 +16,7 @@
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
+import { setupStepLine, typedSkipKeys, initialSlotValues } from '../src/lib/onboarding-slots'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(__dirname, '..')
@@ -100,7 +101,9 @@ console.log('\n3. The header says who is asking, where she is, and offers Skip o
   // 2e DRAWS A COUNT ("Training · 3 of 17"), reversing v2's no-visible-count
   // choice; the brief is hers. The count is the tracked set readyToGenerate
   // waits on, so it ends where setup ends.
-  check('...and where she is: "{Section} · n of N"', /\{sectionLabel\} · \{stepNow\} of \{requiredCount\}/.test(header))
+  // The words come from one function since 19 Nov 2026 (the name question, not a counted screen, read "1 of 14" and
+  // so did the question after it); the property is that the header ASKS it and that a counted question reads so.
+  check('...and where she is: "{Section} · n of N"', /\{setupStepLine\(sectionLabel, sectionKey \?\? null, stepNow, requiredCount\)\}/.test(header) && setupStepLine('Training', 'fitnessGoal', 3, 17) === 'Training · 3 of 17')
   check('six ticks', /const PROGRESS_TICKS = 6/.test(ui) && /grid grid-cols-6/.test(header))
   check('...done, now and to come', /'done' : i === doneTicks \? 'now' : 'next'/.test(header))
   check('...and the real numbers still reach a screen reader',
@@ -110,7 +113,12 @@ console.log('\n3. The header says who is asking, where she is, and offers Skip o
   // record "none" through their own Next).
   check('Skip shows only when there is something it may skip', /\{skipKeys\.length > 0 && !busy && \(/.test(header) && /onClick=\{\(\) => handleDecline\(skipKeys\)\}/.test(header))
   check('...decided by canDeclineSlot', /canDeclineSlot\(d, values\)/.test(ui))
-  check('...for single-choice and number questions only', /def\.control !== 'single' && def\.control !== 'numeric'\)\) return \[\]/.test(ui))
+  // A CARD gets it for single-choice and number questions only. Since 19 Nov 2026 an optional TYPED question the
+  // app asked by name gets it too (typedSkipKeys); a multi-select never does, by either road.
+  check('...for single-choice and number questions only (a card)', /if \(def\.control !== 'single' && def\.control !== 'numeric'\) return \[\]/.test(ui))
+  check('...and an optional typed question; never a multi-select, never the name', /if \(!def\) return typedSkipKeys\(/.test(ui)
+    && typedSkipKeys('usualFoods', initialSlotValues()).length === 1 && typedSkipKeys('injuries', initialSlotValues()).length === 0
+    && typedSkipKeys('dietaryPreferences', initialSlotValues()).length === 0 && typedSkipKeys('displayName', initialSlotValues()).length === 0)
   const cards = readFileSync(join(ROOT, 'src/components/onboarding/SlotChipsCard.tsx'), 'utf8') + readFileSync(join(ROOT, 'src/components/onboarding/SlotNumericCard.tsx'), 'utf8')
   check('...moved, not copied: the cards no longer carry their own decline', !/Prefer not to say<\/|onDecline\(/.test(cards.replace(/\/\/.*$/gm, '')))
 }

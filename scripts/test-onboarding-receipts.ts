@@ -1,3 +1,4 @@
+import { readFileSync } from 'fs'
 // ---------------------------------------------------------------------------
 // Gate: what the onboarding writes back to the person says what was stored.
 //
@@ -19,6 +20,9 @@
 import {
   ONBOARDING_SLOTS,
   displaySlotValue,
+  multiNextLabel,
+  typedSkipKeys,
+  setupStepLine,
   editPromptFor,
   getSlotDef,
   initialSlotValues,
@@ -32,6 +36,7 @@ import {
   snackAnswerIn,
 } from '../src/lib/onboarding-capture'
 import { SESSION_MAXIMUM_SECONDS, SESSION_MINIMUM_SECONDS } from '../src/lib/session-duration'
+import { isPlainNone, isPlainSkip, splitUsualFoods } from '../src/lib/food-list'
 import type { PendingGoal } from '../src/lib/onboarding-draft-store'
 import type { SessionDuration } from '../src/lib/types'
 
@@ -164,6 +169,39 @@ console.log('\nS4. A list of choices reads in the order the choices are shown, n
   const said = two.length ? shown('dietaryPreferences', { dietaryPreferences: [...two, 'something he typed'] } as never) : ''
   const labels = two.map(v => diet.options!.find(o => String(o.value) === v)!.label)
   check('another list does the same, and something typed that is not a choice stays at the end', two.length === 2 && said === `${labels[1]}, ${labels[0]}, something he typed`, { said, labels })
+}
+
+console.log('\nS5. The button under a pick-several question (the setup walk, 18 Nov 2026)')
+{
+  check('nothing ticked on an optional question: "None — next →"', multiNextLabel(0, false, false) === 'None — next →', multiNextLabel(0, false, false))
+  check('...but NOT once he has typed into the second box on that screen: plain "Next →" (it still said "None")', multiNextLabel(0, false, true) === 'Next →', multiNextLabel(0, false, true))
+  check('something ticked: "Next →", whatever the second box holds', multiNextLabel(2, false, false) === 'Next →' && multiNextLabel(1, true, true) === 'Next →')
+  check('a required question with nothing ticked still says so, typed box or not', multiNextLabel(0, true, false) === 'Pick at least one' && multiNextLabel(0, true, true) === 'Pick at least one')
+  const card = readFileSync(new URL('../src/components/onboarding/SlotChipsCard.tsx', import.meta.url), 'utf8')
+  check('the card asks the one function, with the second box counted only when it holds words', /multiNextLabel\(selectedMulti\.length, !!def\.required, companionOn && companionValue\.trim\(\) !== ''\)/.test(card) && !/'None — next →'/.test(card))
+}
+
+console.log('\nS6. An optional typed question can be skipped; "skip" typed is a skip (the setup walk, 18 Nov 2026)')
+{
+  const v = initialSlotValues()
+  check('the optional "What do you usually eat?" gets a Skip', JSON.stringify(typedSkipKeys('usualFoods', v)) === '["usualFoods"]', typedSkipKeys('usualFoods', v))
+  check('the name never does, and nothing asked means nothing to skip', typedSkipKeys('displayName', v).length === 0 && typedSkipKeys(undefined, v).length === 0)
+  check('a question with buttons is not this rule\'s (the card decides those)', typedSkipKeys('fitnessGoal', v).length === 0 && typedSkipKeys('dietaryPreferences', v).length === 0)
+  check('"skip", "Skip.", "pass", "I\'d rather not say" are a skip', ['skip', 'Skip.', 'pass', "I'd rather not say", 'prefer not to say', 'skip it'].every(isPlainSkip))
+  check('...and a food that merely starts like one is not ("skipjack tuna", "pasta", "passata")', !['skipjack tuna', 'pasta', 'passata', 'none', 'porridge'].some(isPlainSkip))
+  check('"skip" is NOT a "none": typed while changing a list it must not clear it', isPlainNone('skip') === false && isPlainNone('none') === true)
+  check('a skip is no usual meal; "skipjack tuna, rice" is two', splitUsualFoods('skip').length === 0 && splitUsualFoods('skipjack tuna, rice').length === 2, splitUsualFoods('skipjack tuna, rice'))
+  const screen = readFileSync(new URL('../src/components/onboarding/ConversationalOnboarding.tsx', import.meta.url), 'utf8')
+  check('the typed reply to that question reads a skip as nothing kept', /applySlot\(responseWs, 'usualFoods', isPlainNone\(trimmed\) \|\| isPlainSkip\(trimmed\) \? '' : trimmed/.test(screen))
+  check('the header asks the one function, only where no card is on screen', /if \(!def\) return typedSkipKeys\(textQuestionOnScreen\(messages, confirmed\), values\)/.test(screen))
+}
+
+console.log('\nS3. The name question carries no step number (it is not a counted screen)')
+{
+  check('the name: its section alone', setupStepLine('About you', 'displayName', 1, 14) === 'About you', setupStepLine('About you', 'displayName', 1, 14))
+  check('a counted question: section, step and total', setupStepLine('Food', 'usualFoods', 3, 14) === 'Food · 3 of 14' && setupStepLine('Review', null, 14, 14) === 'Review · 14 of 14')
+  const screen = readFileSync(new URL('../src/components/onboarding/ConversationalOnboarding.tsx', import.meta.url), 'utf8')
+  check('the header is drawn by that function, from the question on screen', /\{setupStepLine\(sectionLabel, sectionKey \?\? null, stepNow, requiredCount\)\}/.test(screen))
 }
 
 console.log(`\n${ran} checks ran.`)

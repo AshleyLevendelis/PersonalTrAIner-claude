@@ -34,6 +34,8 @@ import {
   isStuckMessage,
   DIETARY_OPTIONS,
   displaySlotValue,
+  typedSkipKeys,
+  setupStepLine,
   editPromptFor,
   cardQuestion,
   saysPregnant,
@@ -44,7 +46,7 @@ import {
 } from '@/lib/onboarding-slots'
 import { measureParserFor, liftSetInUserWords, ageOn, todayLocal } from '@/lib/body-units'
 import { detectFoodExclusions, mergeFoodsToAvoid, isFoodToAvoid } from '@/lib/food-exclusions'
-import { splitFoodList, isPlainNone, readFoodList, unreadFoodLine } from '@/lib/food-list'
+import { splitFoodList, isPlainNone, isPlainSkip, readFoodList, unreadFoodLine } from '@/lib/food-list'
 import { allergenFilterReceipt, beginnerLiftsSetAside, setupHealthQuestionLine, liftSetsAsk, liftNeedsASet, liftWhichOne } from '@/lib/coach-voice'
 import { bareLiftWeight, coachAskedSetupQuestion, dropCoachQuestions, namedLiftSets, withoutQuestions } from '@/lib/onboarding-one-question'
 import { implausibleLifts } from '@/lib/lift-plausibility'
@@ -1501,7 +1503,8 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
       // one and it is still open after the coach's turn, his reply IS the answer. "Nothing really" is an empty
       // list; a question of his own is not an answer and is left to the coach.
       if (textQuestionOnScreen(messages, ws.confirmed) === 'usualFoods' && !responseWs.confirmed.has('usualFoods') && !trimmed.includes('?')) {
-        applySlot(responseWs, 'usualFoods', isPlainNone(trimmed) ? '' : trimmed, responseWs.values)
+        // "skip" typed is a skip, never a meal called Skip.
+        applySlot(responseWs, 'usualFoods', isPlainNone(trimmed) || isPlainSkip(trimmed) ? '' : trimmed, responseWs.values)
       }
       // THE COACH CAN ADD TO FOODS TO AVOID, NEVER TAKE ONE OFF. Its set_slot
       // sometimes resends the list from memory and leaves a food out (this
@@ -2199,7 +2202,10 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
   // into the same empty list while meaning "not given".
   const skipKeys: SlotKey[] = (() => {
     const def = cardOnScreen ? getSlotDef(cardOnScreen) : undefined
-    if (!def || (def.control !== 'single' && def.control !== 'numeric')) return []
+    // AN OPTIONAL TYPED QUESTION HAS ITS SKIP TOO (the setup walk, 18 Nov 2026: "What do you usually eat?" had no way
+    // past it but typing something). Only a question the app asked by name, never the name itself.
+    if (!def) return typedSkipKeys(textQuestionOnScreen(messages, confirmed), values)
+    if (def.control !== 'single' && def.control !== 'numeric') return []
     // A number being CHANGED from the summary can be taken back to "Not given" (QA round 3: once a weight was
     // given, nothing could undo it). A first ask offers the group's unanswered ones, as before.
     const keys = def.control === 'numeric'
@@ -2220,12 +2226,11 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
     }
     return null
   })()
-  const sectionLabel = setupSectionOf(
-    cardOnScreen
+  const sectionKey = cardOnScreen
     ?? (questionIdx >= 0 ? messages[questionIdx].asksSlot : undefined)
     ?? lastNamedSlot
-    ?? (!confirmed.has('displayName') ? 'displayName' : openSlotsInOrder(confirmed, values)[0] ?? null),
-  )
+    ?? (!confirmed.has('displayName') ? 'displayName' : openSlotsInOrder(confirmed, values)[0] ?? null)
+  const sectionLabel = setupSectionOf(sectionKey)
   const stepNow = Math.max(1, Math.min(requiredCount, answeredCount + 1))
 
   const composerBottomStyle = isKeyboardOpen
@@ -2254,7 +2259,7 @@ export function ConversationalOnboarding({ onComplete, onSignIn }: {
           <div className="flex-1 min-w-0 flex flex-col">
             <span className="text-[0.875rem] font-semibold text-foreground">Your Personal TrAIner</span>
             <span className="text-[0.6875rem] text-muted-foreground" data-onboarding-step>
-              {sectionLabel} · {stepNow} of {requiredCount}
+              {setupStepLine(sectionLabel, sectionKey ?? null, stepNow, requiredCount)}
             </span>
           </div>
           {skipKeys.length > 0 && !busy && (

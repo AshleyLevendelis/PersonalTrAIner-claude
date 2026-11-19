@@ -1180,6 +1180,35 @@ export function displaySlotValue(def: SlotDef, values: OnboardingSlotValues): st
 }
 
 /**
+ * The Skip for a TYPED question (no buttons): only an optional one the app asked by name, and never the name. A
+ * required question, or one with buttons, is not this function's (the card's own rule decides those).
+ */
+export function typedSkipKeys(asked: string | undefined, values: OnboardingSlotValues): SlotKey[] {
+  if (!asked || asked === 'displayName') return []
+  const def = getSlotDef(asked as SlotKey)
+  return def && def.control === 'text' && canDeclineSlot(def, values) ? [def.key] : []
+}
+
+/**
+ * The header's "Food · 3 of 14". The name question is not one of the counted screens, so it carries no number: it
+ * read "1 of 14" and so did the question after it (the setup walk, 18 Nov 2026).
+ */
+export function setupStepLine(section: string, key: string | null, step: number, total: number): string {
+  return key === 'displayName' ? section : `${section} · ${step} of ${total}`
+}
+
+/**
+ * THE BUTTON UNDER A PICK-SEVERAL QUESTION. With nothing ticked on an optional question it reads "None — next", which
+ * is an answer in itself. Not when he has typed something into the second box on the same screen (the setup walk,
+ * 18 Nov 2026: a food typed under the diet ticks, and the button still said "None"): then it is plain "Next".
+ */
+export function multiNextLabel(picked: number, required: boolean, secondBoxAnswered: boolean): string {
+  if (picked > 0) return 'Next →'
+  if (required) return 'Pick at least one'
+  return secondBoxAnswered ? 'Next →' : 'None — next →'
+}
+
+/**
  * What the app says when someone taps a summary row to change that answer.
  *
  * Built on the slot's own QUESTION, which is written per question, and not on

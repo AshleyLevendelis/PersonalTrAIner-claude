@@ -859,6 +859,40 @@ await section(28, 'What he usually eats: asked once, kept as he typed it, by the
   await queue({ reply: 'Got it.', actions: [{ name: 'set_slot', args: { slot_key: 'usualFoods', value: 'eggs on toast, spag bol' } }] })
   await say('eggs on toast and spag bol mostly')
   check('what the coach recorded is kept as it recorded it, not overwritten by the app', (await evj(`__draft()`))?.values?.usualFoods === 'eggs on toast, spag bol', (await evj(`__draft()`))?.values?.usualFoods)
+
+  // "SKIP" TYPED IS A SKIP, never a meal called Skip (the setup walk, 18 Nov 2026).
+  await open('usual')
+  await queue({ reply: 'No problem.', actions: [] })
+  await say('skip')
+  const typedSkip = await evj(`__draft()`)
+  check('28s1. "skip" typed answers it with nothing kept, not a meal called "skip"', (typedSkip?.confirmedSlots ?? []).includes('usualFoods') && typedSkip?.values?.usualFoods === '', typedSkip?.values?.usualFoods)
+
+  // AND THE HEADER HAS A SKIP FOR IT: it is optional, and had no way past but typing something.
+  await open('usual')
+  const skipBtn = await evj(`(() => { const b = document.querySelector('[data-onboarding-skip]'); if (!b) return null; const r = b.getBoundingClientRect(); return { text: b.textContent.trim(), inView: r.top >= 0 && r.bottom <= innerHeight && r.width > 0 } })()`)
+  check('28s2. the optional typed question has a Skip in the header, on screen', skipBtn?.text === 'Skip' && skipBtn?.inView === true, skipBtn)
+  await shot('usual-skip')
+  await queue({ reply: 'No problem, we will build it from scratch.', actions: [] })
+  try { await tapEl(`document.querySelector('[data-onboarding-skip]')`, 'Skip') } catch { /* the checks below fail on the open question */ }
+  await wait(900)
+  const viaSkip = await evj(`__draft()`)
+  check('28s3. tapping it answers the question with nothing kept', (viaSkip?.confirmedSlots ?? []).includes('usualFoods') && !viaSkip?.values?.usualFoods, viaSkip?.values?.usualFoods)
+  check('28s4. ...his own bubble says he skipped it, and the summary opens', /skip usual meals/i.test(await evj(`__body()`)) && (await review()).open === true, (await evj(`__body()`)).slice(-300))
+  try { await tapButton('Generate My Plan') } catch { /* the check below fails on the missing profile */ }
+  const skippedProfile = await evj(`window.__onbCompleted`)
+  check('28s5. ...and the finished profile holds no usual meal at all', Array.isArray(skippedProfile?.usual_foods) && skippedProfile.usual_foods.length === 0, skippedProfile?.usual_foods)
+
+  // THE NAME QUESTION CARRIES NO STEP NUMBER: it is not one of the counted screens, so it read "1 of 14" and so did
+  // the question after it.
+  await open('fresh')
+  const nameHead = await evj(`document.querySelector('[data-onboarding-step]')?.textContent.trim() ?? null`)
+  check('28s6. the name question\'s header is its section alone, with no "1 of N"', nameHead === 'About you', nameHead)
+  const nameAsked = await evj(`/what should I call you/i.test(__body())`)
+  const nameSkip = await evj(`!!document.querySelector('[data-onboarding-skip]')`)
+  check('28s8. ...and the name question, typed and optional as it is, never gets a Skip', nameAsked === true && nameSkip === false, { nameAsked, nameSkip })
+  await open('usual')
+  const foodHead = await evj(`document.querySelector('[data-onboarding-step]')?.textContent.trim() ?? null`)
+  check('28s7. ...and a counted question still says how far through it is', /^Food · \d+ of \d+$/.test(foodHead ?? ''), foodHead)
 })
 
 await section(27, 'Up to 3, then back: a tangent gets three follow-ups before the app steps in, and the notes are shown', async () => {
