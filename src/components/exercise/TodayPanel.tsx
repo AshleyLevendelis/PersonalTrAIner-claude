@@ -2,6 +2,8 @@ import { PAUSE_WORDS, isPausedOn, planPausedSince } from '@/lib/plan-pause'
 import { noteForProfile, lateInPregnancy, PREGNANCY_HOLD_NOTE, isPregnant } from '@/lib/health-conditions'
 import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { takeRequestedExerciseDate } from '@/lib/app-route'
+import { prescribedRepsHigh } from '@/lib/set-plausibility'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { sessionSetCount, shortOfPlan } from '@/lib/session-count'
 import { ChevronRight, Clock, Plus } from 'lucide-react'
@@ -363,7 +365,9 @@ export function TodayPanel({
     // meeting.
     const progressions = await Promise.all(
       workout.exercises
-        .filter(ex => ex.suggested_load_kg != null || ex.suggested_added_load_kg != null)
+        // ONLY A REP PRESCRIPTION (19 Nov 2026, his summary: "Suitcase Carry — Hit 40 reps on every set"): a carry's
+        // "40m" and a hold's "30-45s" were read as rep counts. They follow the plan's own distance and load ramp.
+        .filter(ex => (ex.suggested_load_kg != null || ex.suggested_added_load_kg != null) && prescribedRepsHigh(ex.reps) != null)
         .map(async ex => {
           const rec = ex.suggested_added_load_kg != null
             ? await getAddedLoadProgression(profileId!, ex.name, dayAfterStr, parseRepsHigh(ex.reps))
@@ -418,8 +422,17 @@ export function TodayPanel({
   }
   /** Page the strip a week back or forward; the open day closes, so the strip and the card below never disagree. */
   const pageStrip = (step: number) => { setPeekDate(null); setStripOffset(o => o + step) }
-  // A new day starts the strip at today again.
-  useEffect(() => { setStripOffset(0); setPeekDate(null) }, [today])
+  // A new day starts the strip at today again, unless Home asked for a day (its next session, 19 Nov 2026). The ask
+  // is read once and kept for THIS today in a ref, so React's second run of the effect in development keeps it too.
+  const askedDay = useRef<{ today: string; date: string } | null>(null)
+  useEffect(() => {
+    const asked = takeRequestedExerciseDate()
+    if (asked) askedDay.current = { today, date: asked }
+    const date = askedDay.current?.today === today && askedDay.current.date !== today ? askedDay.current.date : null
+    const diff = date ? Math.round((new Date(`${date}T12:00:00`).getTime() - new Date(`${today}T12:00:00`).getTime()) / 86_400_000) : 0
+    setStripOffset(diff >= 0 && diff < 7 ? 0 : Math.floor(diff / 7) * 7)
+    setPeekDate(date)
+  }, [today])
 
   const effectiveDayName = borrowedDayName ?? todayName
   // TODAY'S CELL, resolved by the hook that already holds the whole week.
@@ -963,7 +976,9 @@ export function TodayPanel({
       // added weight — the read-back half of that loop was not merely
       // unwired, it was unreachable.
       workout.exercises
-        .filter(ex => ex.suggested_load_kg != null || ex.suggested_added_load_kg != null)
+        // ONLY A REP PRESCRIPTION (19 Nov 2026, his summary: "Suitcase Carry — Hit 40 reps on every set"): a carry's
+        // "40m" and a hold's "30-45s" were read as rep counts. They follow the plan's own distance and load ramp.
+        .filter(ex => (ex.suggested_load_kg != null || ex.suggested_added_load_kg != null) && prescribedRepsHigh(ex.reps) != null)
         .map(async ex => {
           if (ex.suggested_added_load_kg != null) {
             const added = await getAddedLoadProgression(profileId, ex.name, today, parseRepsHigh(ex.reps))

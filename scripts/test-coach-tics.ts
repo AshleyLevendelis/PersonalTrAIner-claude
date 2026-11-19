@@ -22,7 +22,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
   withoutTics, removeInventedTags, plainInternalNames, capEmoji, dropStockOpener, dropStockCloser, isStockCloser,
-  limitName, saysName, EMOJI_OVER_CHARS, MIN_LEFT_AFTER_CLOSER,
+  limitName, saysName, EMOJI_OVER_CHARS, MIN_LEFT_AFTER_CLOSER, offerButtons, OFFER_BUTTONS,
 } from '../supabase/functions/chat-gemini/stock-phrases.ts'
 import { textLikeACoach, cleanCoachResponse, ticContextOf } from '../supabase/functions/chat-gemini/text-like-a-coach.ts'
 import { detectPlanPromise, PLAN_PROMISE_NUDGE, PLAN_PROMISE_FLOOR } from '../supabase/functions/_shared/plan-promise.ts'
@@ -229,6 +229,22 @@ async function main() {
     callGemini: async (contents: unknown[]) => { said.push(JSON.stringify(contents[contents.length - 1])); return { ok: true, status: 200, parts: [{ text: 'Want it on Friday?' }] } },
   } as Parameters<typeof resolvePlainReply>[0])
   check('...and a refused claim still gets the claim\'s own words, not the silent turn\'s', r5.reply === 'Want it on Friday?' && !said[1].includes('NO SUCH TOOL'), said[1]?.slice(0, 120))
+
+  console.log('\n[O] An offer asked in plain words gets its buttons (his Muay Thai chat, 19 Nov 2026)')
+  {
+    const his = 'Your plan already has easy walks.\n\nI can set up your weekly Muay Thai schedule so your gym days lighten on class days. Would you like me to set that up for you?'
+    const got = offerButtons(his)
+    check('O1. his reply gets "Yes please" / "Not now" under it', got.endsWith(`\n${OFFER_BUTTONS}`) && got.startsWith(his), got.slice(-120))
+    check('O2. "Want me to…?" and "Shall I…?" too', offerButtons('That works. Want me to move it to Friday?').includes(OFFER_BUTTONS) && offerButtons('Easy fix. Shall I swap it for rows?').includes(OFFER_BUTTONS))
+    const tagged = 'Want me to take a set off?\n[QUICK_REPLIES: "Yes, lighten it" | "Leave it"]'
+    check('O3. a reply with its own buttons is left exactly as it is', offerButtons(tagged) === tagged)
+    check('O4. a question that is not an offer gets none ("How did it feel?", "Would you like rice or potatoes?")', offerButtons('Good session. How did your shoulder feel?') === 'Good session. How did your shoulder feel?' && !offerButtons('Would you like rice or potatoes?').includes(OFFER_BUTTONS))
+    check('O5. an offer mid-reply, not last, gets none (the reply ends on something else)', !offerButtons('Want me to move it? Either way, rest well tonight.').includes(OFFER_BUTTONS))
+    check('O6. the one door every reply leaves by adds them', withoutTics('Got it. Would you like me to add that to Thursday?').includes(OFFER_BUTTONS))
+    const idx = code('supabase/functions/chat-gemini/index.ts')
+    check('O7. combat-sport conditioning is 3-minute rounds with a minute\'s rest, named so the round timer reads it', /3-minute rounds at hard effort/.test(idx) && /"4 rounds of 3 minutes, 1 minute rest"/.test(idx) && /Skipping is a warm-up or an easy day, never the main conditioning/.test(idx))
+    check('O8. "my cardio is bad" after their sport asks about breathing and pacing before prescribing', /"MY CARDIO IS BAD" AFTER THEIR SPORT IS A QUESTION BEFORE IT IS A PRESCRIPTION/.test(idx) && /holding the breath/.test(idx))
+  }
 
   console.log(`\ncoach-tics: ${ran} checks ran`)
   if (failures > 0) console.error(`coach-tics: ${failures} check(s) FAILED`)

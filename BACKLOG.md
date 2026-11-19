@@ -2,6 +2,43 @@
 
 Newest first. One line each.
 
+- [x] **THREE OF HIS REPORTS FROM HIS PHONE, 19 Nov 2026 (after the merge of PR #32): the tomorrow card, "didn't hit
+  18 reps", and the Muay Thai advice.**
+  1. TAPPING TOMORROW'S SESSION ON HOME OPENED TODAY'S. Once today is done Home's big card is the next session, but
+     its tap only changed tab, and Exercise always opens on today. It now opens THAT day, the way Exercise's own strip
+     does (read-only, with Close back to today), through a read-once request (the shopping list's pattern), so a reload
+     or Back still lands on today. React's second run of the start-up step in development keeps the request (held for
+     that day in a ref). `verify:qa-training` T21 (4 checks; 2 browser mutations caught).
+  2. "HELD AT 15KG — DIDN'T HIT 18 REPS" WAS NOT MADE UP, AND READ AS IF IT WAS. His plan was made before the 18 Nov
+     20-rep ceiling, so the leg extension's week 1 is 15-18 (a new plan writes 12-15). The boxes pre-fill the BOTTOM
+     (15) and the rule judges the TOP (18), so a session ticked as pre-filled is always held, and the note quoted a
+     number he never saw on the boxes. The note now names the range: "your range is 15-18 reps, and not every set
+     reached 18 last time. Get 18 on every set before adding load." (Mine, to make an existing sentence explain itself;
+     the wording is his to change.) SAME SCREEN, A REAL BUG: "Suitcase Carry — Hit 40 reps on every set". A carry's
+     "40m" (and a hold's "30-45s") was read as a rep count; both summary and live card now ask the unit-safe reader and
+     skip anything that is not reps, so a carry follows the plan's own distance and weight steps. `test:lift-effort` R1-R5
+     (2 mutations caught).
+     NOT DONE, named: the summary does not go through the live card's "done as planned, this week's printed weight"
+     step, so "Held at 15kg" can be followed by a heavier printed weight next session; his stored plan keeps 15-18 (no
+     re-derivation of old plans); the peek's Close button is 28px (the strip's Today is the other way back).
+  3. THE MUAY THAI ADVICE, MARKED 7.5/10 BY A CSCS REVIEW HE RAN. CSCS decisions, mine: combat-sport conditioning is
+     3-minute rounds at hard effort (about 8/10) with a minute's rest, 3-5 rounds, on a bag, shadowboxing or a bike or
+     rower, built up from 3, because that is what a round asks; skipping is a warm-up or easy day (too light once the
+     calves adapt). And "my cardio is bad" after their sport is asked about first (breath held on combinations, tension
+     between exchanges, going out too hard), with at most one extra round-based session a week, never before a leg day
+     or their hardest class, because the classes are already conditioning. Heart-rate zones were left out on purpose (the
+     app prescribes cardio by effort words). The coach is told to name the rounds exactly, and the app's round timer
+     already reads "4 rounds of 3 minutes, 1 minute rest" as a one-tap Start (measured).
+     AND AN OFFER ASKED IN PLAIN WORDS NOW ALWAYS GETS BUTTONS ("Would you like me to set that up for you?" had none):
+     the coach's server adds "Yes please" / "Not now" when a reply's LAST sentence offers to do something and carries no
+     buttons of its own (his 20 Oct "text + small buttons always"; the words are the app's plainest, his to change).
+     `test:coach-tics` O1-O8 (4 mutations caught); exam case `muay-thai-cardio-rounds` (his two messages; turn 1 must
+     carry no card, the reply must mention breathing and rounds).
+     NEEDS the `chat-gemini` deploy, and is unproven until the exam runs. Already in today's merge and also waiting on
+     that deploy: stock openers ("Great effort … Ashley! 🥊") and emoji on long replies are taken out in code.
+  CSCS review (the plan note and the carry): the training effect is unchanged (the rule already judged the top of the
+  range); nothing is taken away; a carry keeps progressing by the plan's own steps; no floor or ceiling moves.
+
 - [x] **AFTER CLOSING PROFILE WITH ITS OWN BUTTON, THE NEXT TAB HE TAPPED DID NOTHING (19 Nov 2026; MY OWN BUG from
   the same day's "the phone's Back closes Profile", found by the full sweep before it left the branch).** The Back
   work gives each open layer (Profile, a sheet over it) one step in the phone's history, and a layer closed by its own

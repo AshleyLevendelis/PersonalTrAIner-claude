@@ -491,7 +491,11 @@ export async function getDoubleProgressionRecommendation(
   }
 
   return { ...said, weightKg: lastWeight, lastWeightKg: lastWeight, didProgress: false,
-    note: `Held at ${lastWeight}kg — didn't hit ${prescribedRepRangeHigh} reps on every set last time. Aim for more reps before adding load.` }
+    // THE RANGE IS NAMED (19 Nov 2026, his summary: "didn't hit 18 reps … I don't think that was ever on my plan"). The
+    // boxes pre-fill the BOTTOM of the range and this judges the TOP, so the sentence says which range it is reading.
+    note: ctx.repRangeLow != null && ctx.repRangeLow < prescribedRepRangeHigh
+      ? `Held at ${lastWeight}kg — your range is ${ctx.repRangeLow}-${prescribedRepRangeHigh} reps, and not every set reached ${prescribedRepRangeHigh} last time. Get ${prescribedRepRangeHigh} on every set before adding load.`
+      : `Held at ${lastWeight}kg — didn't hit ${prescribedRepRangeHigh} reps on every set last time. Aim for more reps before adding load.` }
 }
 
 // ---------------------------------------------------------------------------
