@@ -481,7 +481,11 @@ console.log('\n3. Nothing has crept back up')
   // on a clean worktree of main 9f8e0ef2: 1505 (1 left), and 1506 after. His 15 Sep ruling: 25 kB raw over today's number.
   // MOVED 18 Nov 2026: 1531 -> 1566, the foods a log is full of (about 65 food-table entries) and the realistic-plate
   // rules; MEASURED 1541 through this gate on the change. His 15 Sep ruling: 25 kB raw over today's number.
-  const APP_CHUNK_BUDGET_KB = 1566
+  // MOVED 19 Nov 2026: 1566 -> 1591. The 25 kB of 18 Nov was spent in a day and a half by the allergy card, the 1 to 10
+  // rating, the weight weeks and the chat's reply clean-up, none of which touched this line; MEASURED 1565 on efd27b02
+  // (1 left) and 1566.4 with the put-back for a shortened or rebuilt day and the phone's Back on Profile (about 1 kB
+  // between them). His 15 Sep ruling: 25 kB raw over today's number.
+  const APP_CHUNK_BUDGET_KB = 1591
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,

@@ -2,6 +2,27 @@
 
 Newest first. One line each.
 
+- [x] **THE PHONE'S BACK DID NOT CLOSE PROFILE (19 Nov 2026, the full pass; a tester's finding P3, and item 10 of the 15 Nov
+  browser-test plan, which was never built).** Profile and its sheets are drawn over the app and had no step in the
+  phone's history, so Back (the Android button, the edge swipe on an iPhone) with Profile open went to the tab before,
+  or left the app.
+  NOW each open layer has one step: Back closes the sheet, the next Back closes Profile, the one after does what Back
+  always did. Profile's own arrow and X work as before.
+  THE RULE THAT SHAPED IT: closing a layer by its own button NEVER asks the phone to go back. Going back is not
+  instant, and Profile often closes in the same tap that sends him somewhere (the shopping list, a rebuild offer): a
+  back fired at the close would land after that move and undo it. So such a close leaves its step behind, spent; the
+  next layer to open takes a spent step over (they never pile up), and a Back that only steps off one, or lands on
+  one, is carried through, so no press of Back does nothing.
+  MEASURED BY BREAKING IT: two lines of the first version were inert (removing them changed nothing any order of taps
+  could show) and were deleted rather than given checks. And the gate's first fixture had ONE place behind the tab,
+  so a press that walked back one step too many still landed "in the right place": it now has two.
+  NOT DONE, named: only Profile and its sheets. The meal sheet, the day menu and the other pop-ups still close by
+  their own buttons only (the same hook fits each; none was reported). Never run on a real phone.
+  `test:back-closes` (new, 32 checks against a fake history where a back lands later, as a browser's does; 15
+  mutations, 15 caught after the fixture fix), `verify:profile-back` (new, 16 checks on the real Profile with the
+  browser's own history; 7 browser mutations, 7 caught, one only after a check for a dead press was added).
+  `test:bundle`: the app chunk crossed its line by under 1 kB and was moved 1566 -> 1591 with the measured numbers
+  in its note. Frontend only.
 - [x] **"I'M SHORT OF TIME" AND "GIVE ME A DIFFERENT SESSION" COULD NOT BE PUT BACK (19 Nov 2026, the full pass; a tester's
   finding E4).** His standing "every change previews and can be undone". "Make it easier" and "a different kind of
   session" each leave a button that puts the planned session back; these two left nothing, so three exercises taken

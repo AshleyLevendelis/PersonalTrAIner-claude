@@ -25,6 +25,7 @@ import { readFoodList, unreadFoodLine, type FoodListSide } from '@/lib/food-list
 import { containsPhrase } from '@/lib/meal-ingredients'
 import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { useBackCloses } from '@/lib/back-closes'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -1144,6 +1145,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // before, on a page of their own. A deep link (initialSection) opens the
   // sheet holding the section it scrolls to, so the scroll still lands.
   const [sheet, setSheet] = useState<ProfileSheet | null>(null)
+  // THE PHONE'S BACK (the Profile walk, 18 Nov 2026): Profile is a layer and a sheet is a layer over it, so Back closes
+  // the sheet, then Profile, where it used to leave the tab or the app. Profile first, so the sheet is the top layer.
+  useBackCloses(open, () => onOpenChange(false))
+  useBackCloses(open && sheet != null, () => setSheet(null))
   // The Reminders row's words once the sheet has read or changed them; before that, the profile as loaded.
   const [remindersValue, setRemindersValue] = useState<string | null>(null)
   // Read the setting itself rather than trusting the profile object, which App reshapes on the way in: the row and
