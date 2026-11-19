@@ -313,6 +313,7 @@
     "test:knee-machine-work": "tsx scripts/test-knee-machine-work.ts",
     "test:short-session": "tsx scripts/test-short-session.ts",
     "measure:short-sessions": "tsx scripts/measure-short-sessions.ts",
+    "measure:top-up-stale": "tsx scripts/measure-top-up-stale.ts",
     "measure:added-lift-price": "tsx scripts/measure-added-lift-price.ts",
     "test:session-length": "tsx scripts/test-session-length.ts",
     "test:load-ceilings": "tsx scripts/test-load-ceilings.ts",

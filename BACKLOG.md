@@ -2,6 +2,34 @@
 
 Newest first. One line each.
 
+- [x] **THE AMOUNT BOX TOOK ANY NUMBER: 99999 g OF CHICKEN, 120,327 kcal (19 Nov 2026, the full pass; a tester's finding N4).**
+  Changing an ingredient's amount, adding a food and describing a meal to the coach each costed whatever was typed.
+  NOW one food over two kilos (or two litres) in one meal is sent back with a sentence ("99999g chicken breast is
+  more than one meal can hold. Check the amount and try again."), nothing is worked out and Apply cannot be tapped.
+  One function (`overfullLine`), called by the three builders the screen and the coach share. The weight is the app's
+  own reading of the line, so a count is weighed too (45 eggs is over, 6 is not).
+  DECISION, mine, and the line it stays behind: this is a typing check, not a judgement about his eating. His 14 Sep
+  rule stands ("it never refuses anything that is not unsafe"): 1.5 kg of anything still goes through, with its
+  numbers on the card before he applies it. I considered and REJECTED refusing a meal bigger than his whole day's
+  calories: that could be a choice of his, and a typing check must not be able to refuse one.
+  NOT DONE, named: a meal LOGGED as eaten by chat is not checked (that food table has a byte-identical copy on the
+  coach's server, so touching it is a deploy; the log card shows its totals before Apply). Wording is his to change.
+  `test:meal-food-edit` (7 new checks; 5 mutations, 5 caught), `test:meal-food-add` and `test:custom-meal` (2 new
+  checks each, each with an ordinary amount of the same food beside it so the guard is shown to bind on the amount;
+  1 mutation each, caught), `verify:meal-food-edit` section 10 (7 new checks on the real sheet; 1 browser mutation
+  caught; screenshot read). MY FIRST CHECK WAS WRONG, not the app: it asked for no Apply button, and the sheet keeps
+  the button and disables it. Frontend only.
+- [x] **"GET MORE OPTIONS" ADDED NOTHING WHEN THE MEAL WRITER DID NOT ANSWER: A TEST-PAGE ARTEFACT, MEASURED, NOT AN APP
+  FAULT (19 Nov 2026, the full pass; a tester's lead N3).** The tester's page holds ONE dish a meal, 1,062 kcal under
+  its target. A library dish is added only if a day lands on target with it (19 Oct), judged against the other meals
+  as they are; with one undersized dish in every other meal no day can land, so every library dish was passed over,
+  and the app said, truthfully, "I couldn't reach the meal generator just then, so nothing has changed."
+  MEASURED rather than reasoned (`measure:top-up-stale`, new): a plan of seven a meal made at 2,200 kcal, the targets
+  then moved to x1.1, x1.2, x1.35, x1.5 and x0.8, the writer unreachable throughout: the button added five dishes to
+  every meal in every case, all from the library. The CLAUDE.md lesson of 11 Nov again ("a pool with no room in it
+  cannot let anything new fit, and that reads as the new thing being wrong"). No code changed. I had drafted a
+  change (take library dishes on their own meal's numbers when no day can land) and did not build it: nothing real
+  needs it, and it would have weakened the 19 Oct rule for a fixture.
 - [x] **THE PHONE'S BACK DID NOT CLOSE PROFILE (19 Nov 2026, the full pass; a tester's finding P3, and item 10 of the 15 Nov
   browser-test plan, which was never built).** Profile and its sheets are drawn over the app and had no step in the
   phone's history, so Back (the Android button, the edge swipe on an iPhone) with Profile open went to the tab before,
