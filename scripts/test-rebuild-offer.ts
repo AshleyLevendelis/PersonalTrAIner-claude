@@ -26,6 +26,7 @@ import { generateExercisePlan, generateMesocycle, setRandomSource, resetRandomSo
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import type { UserProfile } from '../src/lib/types'
 import { untrainedPlanContext } from '../src/lib/plan-adaptations'
+import { INJURY_OPTIONS } from '../src/lib/picker-options'
 // These gates address whole plan weeks on a plan nobody has trained on: every
 // row of the named weeks, and no day protected. (A live plan addresses days by
 // date and loads the real guard — see test:adaptations-respect-trained.)
@@ -104,6 +105,15 @@ console.log('\n2. And nothing else does')
   // the same offer an addition does, with its own words. Decided unprompted
   // and reversible (the plan's owner question 1, recommended answer B):
   // declining costs nothing and changes nothing.
+  // AN INJURY IN HIS OWN WORDS ("Other (describe)", 15 Nov 2026) changes no exercise and says so; offering to rebuild
+  // "around the area you just flagged" was a second sentence contradicting the first (the Profile walk, 19 Nov 2026).
+  const typed = detectPlanInvalidation(base(), { injuries: ['tennis elbow'] })
+  check('adding an injury the plan cannot read offers nothing', typed === null, typed)
+  check('...beside one it can, the offer is made', detectPlanInvalidation(base(), { injuries: ['tennis elbow', 'knees'] })?.field === 'injuries')
+  check('...and an area added to a list that already holds typed words is offered', detectPlanInvalidation(base({ injuries: ['tennis elbow'] }), { injuries: ['tennis elbow', 'shoulders'] })?.field === 'injuries')
+  check('every area on the picker is one the plan can read (the offer is not lost for any of them)',
+    INJURY_OPTIONS.filter(o => o.value !== 'other').every(o => detectPlanInvalidation(base(), { injuries: [o.value] })?.field === 'injuries'),
+    INJURY_OPTIONS.filter(o => o.value !== 'other' && detectPlanInvalidation(base(), { injuries: [o.value] }) === null).map(o => o.value))
   const removed = detectPlanInvalidation(base({ injuries: ['knees'] }), { injuries: [] })
   check('removing an injury offers a rebuild too', removed !== null && removed.field === 'injuries', removed)
   check('...in its own words, not the "you just added that" ones', !!removed && removed.title !== detectPlanInvalidation(base(), { injuries: ['knees'] })?.title && !/you added that/.test(removed.detail) && /from today/.test(removed.detail), removed)

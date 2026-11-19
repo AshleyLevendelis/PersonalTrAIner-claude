@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **AN "OTHER" INJURY SAID IT CHANGES NO EXERCISE, THEN OFFERED TO REBUILD THE PLAN AROUND IT (19 Nov 2026, the full pass;
+  a tester's finding P1, traced before fixing).** "Other (describe)" keeps what he typed and says, truthfully, that
+  the plan cannot work around words. Saving it then raised "Rebuild your plan around this? ... it still includes
+  exercises that work the area you just flagged", which was not true, and a rebuild would have changed nothing.
+  Adding an injury now offers a rebuild only when what was added is an area the plan can work around: the same test
+  the REMOVAL of an injury has used since 9 Oct. All eight areas on the picker still offer (checked one by one, so no
+  offer was lost). Not a change to what any plan avoids: it removes an offer whose rebuild did nothing.
+  `test:rebuild-offer` (4 new checks; 3 mutations, 3 caught), `verify:profile-fixes` 11g2 and 11i (the typed injury
+  raises no such offer; a typed "right knee" is ticked as a knee and DOES; 1 browser mutation caught).
 - [x] **TWO MEALS A DAY STILL SHOWED AN EMPTY "LUNCH · NO OPTION GENERATED" WITH A GENERATE BUTTON (19 Nov 2026, the full pass;
   a tester's finding P2, traced before fixing).** His 14 Nov ruling ("a day serves only the meals the profile says")
   was held in the day's own dishes and not in the LIST: Nutrition drew a row for any meal with saved dishes, and a
