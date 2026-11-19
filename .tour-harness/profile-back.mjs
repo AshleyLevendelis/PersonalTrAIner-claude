@@ -70,4 +70,23 @@ await back()
 check('3d. and Back still closes Profile after all that', (await rows()) === false)
 check('3e. no uncaught error', (await ev('window.__err ?? null')) === null, await ev('window.__err ?? null'))
 
+console.log('\n  4. CLOSED BY ITS OWN ARROW, AND ONLY THEN A TAB TAPPED: THE TAP STANDS')
+// Found by the full sweep, 19 Nov 2026 (verify:new-plan-carryover). The browser sends popstate for a MOVE as well as
+// for a Back; from the step a closed Profile leaves behind, the move was read as a Back and undone, so the first tab
+// he tapped after closing Profile did nothing. Section 2 closes and moves in ONE tick, which never met it.
+await ev(`location.hash = '#/b'`); await wait(500)
+await openProfile(); await arrow(); await until(rows, v => v === false, 20); await wait(500)
+const before4 = await hash()
+await ev(`location.hash = '#/later'`); await wait(1200)
+check('4a. the app is where he went, not bounced back', (await hash()) === '#/later' && (await rows()) === false, { now: await hash(), before4 })
+await wait(800)
+check('4b. ...and it stays there', (await hash()) === '#/later', await hash())
+await back()
+check('4c. one Back returns to where he was, Profile still closed', (await hash()) === before4 && (await rows()) === false, { now: await hash(), before4 })
+// And again straight after, so the second close is as good as the first.
+await openProfile(); await arrow(); await until(rows, v => v === false, 20); await wait(500)
+await ev(`location.hash = '#/again'`); await wait(1200)
+check('4d. a second close and move stands too', (await hash()) === '#/again', await hash())
+check('4e. no uncaught error', (await ev('window.__err ?? null')) === null, await ev('window.__err ?? null'))
+
 await finish('The phone\'s Back closes the sheet, then Profile, and a close that moves the app stays moved.')

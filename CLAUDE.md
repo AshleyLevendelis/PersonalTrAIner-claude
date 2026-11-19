@@ -2963,6 +2963,12 @@ old — the commands were right and the context was missing.
   worktree isolates FILES, not ports: while a sweep runs anywhere, do not run a
   driver that the sweep has not yet passed, and re-run any gate that failed
   while something else was running before believing the failure.
+- **A FAKE BROWSER MUST FIRE WHAT A BROWSER FIRES, AND A CHANGE TO WHAT EVERY SCREEN PASSES THROUGH RUNS THE DRIVERS
+  THAT START THE WHOLE APP.** 19 Nov 2026: "the phone's Back closes Profile" shipped to the branch with a tab tap
+  undone after every Profile close, because a browser sends popstate when the app itself changes address and the
+  check's fake history sent it only for a Back. The screen driver closed and moved in one tick, a different path, and
+  the drivers re-run were picked by screen. The full sweep found it. For the address, the phone's history or the app
+  shell, run `grep -l app-boot .tour-harness/*.mjs`, every one.
 - **A FAKE MUST FILL WHAT THE DATABASE FILLS.** 27 Sep 2026: the harness's
   fake inserted grocery rows with no `created_at`, which Postgres always
   sets. The list's read sorts on it, threw, fell back to "nothing", and the

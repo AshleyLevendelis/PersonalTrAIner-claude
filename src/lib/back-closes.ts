@@ -38,7 +38,14 @@ export class BackStack {
   private onSpent = false
   /** A press that started on a spent step and has not yet taken its real step. */
   private owed = false
-  constructor(private history: BackHistory) {}
+  /** The address he was at when the step he sits on was spent. */
+  private spentAt = ''
+  /**
+   * `where` is the address now (location.href). It is how a MOVE is told from a BACK: see onBack.
+   */
+  constructor(private history: BackHistory, private where: () => string = () => '') {}
+
+  private markSpent(): void { this.onSpent = true; this.spentAt = this.where() }
 
   /** A layer opened. Returns what to call when it closes by its own button (or unmounts). */
   open(close: () => void): () => void {
@@ -53,7 +60,7 @@ export class BackStack {
       const at = this.layers.indexOf(layer)
       if (at === -1) return
       this.layers.splice(at, 1)
-      if (layerIdOf(this.history.state) === layer.id) this.onSpent = true
+      if (layerIdOf(this.history.state) === layer.id) this.markSpent()
     }
   }
 
@@ -74,9 +81,15 @@ export class BackStack {
       top.close()
       // He stepped off a spent step onto this layer's own. The layer is closed now, so he is sitting on a spent step
       // again. (Marked, not walked: a back fired from here would come round as a second press and close the next layer.)
-      if (arrived === top.id) this.onSpent = true
+      if (arrived === top.id) this.markSpent()
       return
     }
+    // A MOVE IS NOT A BACK (found by the full sweep, 19 Nov 2026). The browser also sends popstate when the app
+    // itself moves to another address (a tab tapped sets location.hash), and from a spent step that read as a Back:
+    // the "owed" step was taken and the tab he had just tapped was undone, once after every Profile closed by its
+    // own button. The two are told apart by where he lands. A layer's step never changes the address, so a real
+    // Back off a spent step lands on the SAME address; a move lands on a new step at another one.
+    if (leftSpent && arrived == null && this.where() !== this.spentAt) return
     if (leftSpent) this.owed = true
     if (arrived != null) { this.history.back(); return }
     if (this.owed) { this.owed = false; this.history.back() }
@@ -89,7 +102,7 @@ export class BackStack {
 let stack: BackStack | null = null
 const theStack = (): BackStack => {
   if (!stack) {
-    stack = new BackStack(window.history)
+    stack = new BackStack(window.history, () => window.location.href)
     const s = stack
     // popstate fires before hashchange on a Back, so a Back is read before the move it causes clears the flag.
     window.addEventListener('popstate', () => s.onBack())

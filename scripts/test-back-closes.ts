@@ -30,8 +30,18 @@ class FakeHistory implements BackHistory {
   pushState(state: unknown) { this.entries = [...this.entries.slice(0, this.at + 1), { hash: this.hash, state }]; this.at++ }
   replaceState(state: unknown) { this.entries[this.at] = { hash: this.hash, state } }
   back() { this.queued++ }
-  /** The app moves to another address (location.hash = ...): a new entry, then hashchange. */
-  go(hash: string) { this.entries = [...this.entries.slice(0, this.at + 1), { hash, state: null }]; this.at++; this.stack.onNavigate() }
+  /**
+   * The app moves to another address (location.hash = ...): a new entry, then POPSTATE, then hashchange. The popstate
+   * is what a browser really sends on a move, and this fake left it out until 19 Nov 2026, so "closed by its own
+   * button, then a tab tapped" passed here while the real app undid the tap. A fake must fire what the browser fires.
+   */
+  go(hash: string) {
+    if (hash === this.hash) return
+    this.entries = [...this.entries.slice(0, this.at + 1), { hash, state: null }]; this.at++
+    this.stack.onBack()
+    this.stack.onNavigate()
+    this.settle()
+  }
   /** Everything asked for lands, each as a browser would deliver it: popstate, then hashchange if the address moved. */
   settle() {
     while (this.queued > 0) {
@@ -51,7 +61,7 @@ class FakeHistory implements BackHistory {
 const BEFORE = ['#/tab/tools', '#/tab/exercise']
 const fresh = (before: string[] = []) => {
   const h = new FakeHistory()
-  const s = new BackStack(h)
+  const s = new BackStack(h, () => h.hash)
   h.stack = s
   // Somewhere he was before: so "where Back would have gone" is a real place, not the edge of the app.
   h.entries = [...before.map(hash => ({ hash, state: null })), { hash: '#/tab/home', state: null }]
@@ -190,6 +200,40 @@ console.log('\n4. Three deep, and the edge of the app')
   check('at the first screen of the app, Back with Profile open closes Profile and stays in the app', log.join() === 'profile' && h.left === 0)
   h.press()
   check('...and only the next Back leaves', h.left === 1, h.left)
+}
+
+console.log('\n4b. Closed by its own button, THEN he taps a tab: the tap stands (found by the full sweep, 19 Nov 2026)')
+{
+  // The browser sends popstate for a MOVE as well as for a Back. From a spent step that read as a Back: the step
+  // "owed" was taken and the tab he had just tapped was undone.
+  const { h, s } = fresh(BEFORE)
+  const log: string[] = []
+  const p = layer(s, log, 'profile')
+  p.byButton()
+  h.go('#/tab/nutrition')
+  check('the app is on the tab he tapped, not bounced back', h.hash === '#/tab/nutrition' && h.at === h.entries.length - 1, { hash: h.hash, at: h.at, of: h.entries.length })
+  check('...nothing was closed, and he did not leave the app', log.length === 0 && h.left === 0, { log, left: h.left })
+  h.press()
+  check('one Back from there returns to the tab he was on (the spent step is walked through)', h.hash === '#/tab/home' && h.state === null, { hash: h.hash, state: h.state })
+  h.press()
+  check('...and the next goes to the tab before that, as if Profile had never been opened', h.hash === BEFORE[1], h.hash)
+}
+{
+  // THE OTHER HALF: a REAL Back off a spent step still takes the step it owes (the same address is how it is known).
+  const { h, s } = fresh(BEFORE)
+  const p = layer(s, [], 'profile')
+  p.byButton()
+  h.press()
+  check('a real Back off a spent step is still ONE press to the tab before (not a press that does nothing)', h.hash === BEFORE[1], h.hash)
+}
+{
+  // Twice over: closed by its button, a tab tapped, opened and closed again, another tab tapped.
+  const { h, s } = fresh(BEFORE)
+  layer(s, [], 'profile').byButton()
+  h.go('#/tab/nutrition')
+  layer(s, [], 'profile').byButton()
+  h.go('#/tab/exercise')
+  check('every tap after a close stands, however many times', h.hash === '#/tab/exercise' && h.left === 0, { hash: h.hash, left: h.left })
 }
 
 console.log('\n5. Who uses it (source; the driver proves it on the real screen)')

@@ -2,6 +2,40 @@
 
 Newest first. One line each.
 
+- [x] **AFTER CLOSING PROFILE WITH ITS OWN BUTTON, THE NEXT TAB HE TAPPED DID NOTHING (19 Nov 2026; MY OWN BUG from
+  the same day's "the phone's Back closes Profile", found by the full sweep before it left the branch).** The Back
+  work gives each open layer (Profile, a sheet over it) one step in the phone's history, and a layer closed by its own
+  button leaves that step behind, "spent"; a Back that starts on a spent step is carried one step further so it is
+  never a press that does nothing. THE DEFECT: the browser sends the same signal (popstate) when the APP ITSELF moves
+  to another address, which is how every tab tap, "Open the list" and the coach's shortcuts work. From a spent step
+  that move was read as a Back, the "owed" step was taken, and the tab he had just tapped was undone: once after
+  every Profile closed by its own button, the first tap went nowhere (and stepped his history back twice).
+  HOW IT WAS FOUND: `verify:new-plan-carryover` went red in the full sweep. It taps Profile, Start a new plan, runs
+  setup, then goes to Nutrition, and stayed on Home. It failed alone as well, so not a hiccup.
+  THE FIX: a move and a Back are told apart by where he lands. A layer's step never changes the address, so a real
+  Back off a spent step lands on the SAME address; a move lands on a new step at another one, and is left alone.
+  WHY NOTHING CAUGHT IT WHEN IT WAS BUILT, three reasons, each worth keeping:
+  - THE FAKE BROWSER IN THE LOGIC CHECK DID NOT FIRE WHAT A BROWSER FIRES. Its "the app moves" sent only the
+    address-changed signal, never popstate. With the fake corrected and the fix taken out, 10 of the checks fail,
+    most of them ones that already existed: the checks were right and the fake was not.
+  - THE SCREEN DRIVER closed Profile and moved IN ONE TICK (as "Open the list" does), where the layer is still open
+    when the signal lands and the path is a different one. "Close, then a moment later tap a tab" was never driven.
+  - THE DRIVERS I RE-RAN were chosen by screen (Profile, chat). The one that saw it starts the WHOLE app and was not
+    on the list. A change to something every screen passes through (the address, the phone's history, the app shell)
+    must run every driver that starts the whole app: `grep -l app-boot .tour-harness/*.mjs` names them (25 today).
+  CHECKS: `test:back-closes` 4b (6 new checks, the fake now fires popstate on a move; 4 mutations, all caught);
+  `verify:profile-back` section 4 (5 new checks: close by the arrow, then move, twice; the fix removed by hand fails
+  it, and fails `verify:new-plan-carryover` the same way). On the fix: both pass, with the typecheck, app-size and
+  unused-code checks, and all 42 drivers that start the whole app or open Profile (41 in the run; the 42nd,
+  `verify:setup-answers`, started while the sweep's own copy held its port and said so, and passed re-run alone).
+  THE FULL SWEEP, FOR THE RECORD: 645 checks. 620 ran on the version before this fix: 615 passed and 5 failed, of
+  which this bug was the only real one. The other four cannot pass in a cloud session and each said why:
+  `test:coach-exam-fresh` (the coach changed since the exam was last sat; it needs a run on his machine), and
+  `test:meal-quality`, `test:schema-parity` and `verify:rls` (each needs a live database). The sweep was stopped by
+  its time limit with 25 drivers unrun (I ran other drivers beside it, which slowed it); those 25 were then run on
+  the fixed code and all passed. The plan-quality and audit checks were inside the 615.
+  NEVER RUN ON A REAL PHONE: the Back button on Android and the edge swipe on an iPhone are still proven only in
+  Chromium. Frontend only.
 - [x] **SETUP: THE "NONE" BUTTON, A SKIP FOR THE OPTIONAL MEALS QUESTION, AND "1 OF 14" TWICE (19 Nov 2026, the full
   pass; a tester's findings S5, S6 and S3).** Three small things on the setup screens, all mechanical.
   - S5. On the diet screen the button under the ticks read "None — next" after he had typed a food into "Anything
