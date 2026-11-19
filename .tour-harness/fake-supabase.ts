@@ -119,7 +119,7 @@ export const INTEGER_COLUMNS: Record<string, readonly string[]> = {
   weight_basis_offers: ['applied_from_week'],
   workout_exercises: ['execution_order', 'rest_seconds', 'rpe_target', 'sets', 'tier'],
   workout_logs: ['reps_completed', 'set_number'],
-  workout_sessions: ['duration_minutes', 'week_number'],
+  workout_sessions: ['duration_minutes', 'week_number', 'effort'],
 }
 
 /**

@@ -2,6 +2,628 @@
 
 Newest first. One line each.
 
+- [x] **AFTER CLOSING PROFILE WITH ITS OWN BUTTON, THE NEXT TAB HE TAPPED DID NOTHING (19 Nov 2026; MY OWN BUG from
+  the same day's "the phone's Back closes Profile", found by the full sweep before it left the branch).** The Back
+  work gives each open layer (Profile, a sheet over it) one step in the phone's history, and a layer closed by its own
+  button leaves that step behind, "spent"; a Back that starts on a spent step is carried one step further so it is
+  never a press that does nothing. THE DEFECT: the browser sends the same signal (popstate) when the APP ITSELF moves
+  to another address, which is how every tab tap, "Open the list" and the coach's shortcuts work. From a spent step
+  that move was read as a Back, the "owed" step was taken, and the tab he had just tapped was undone: once after
+  every Profile closed by its own button, the first tap went nowhere (and stepped his history back twice).
+  HOW IT WAS FOUND: `verify:new-plan-carryover` went red in the full sweep. It taps Profile, Start a new plan, runs
+  setup, then goes to Nutrition, and stayed on Home. It failed alone as well, so not a hiccup.
+  THE FIX: a move and a Back are told apart by where he lands. A layer's step never changes the address, so a real
+  Back off a spent step lands on the SAME address; a move lands on a new step at another one, and is left alone.
+  WHY NOTHING CAUGHT IT WHEN IT WAS BUILT, three reasons, each worth keeping:
+  - THE FAKE BROWSER IN THE LOGIC CHECK DID NOT FIRE WHAT A BROWSER FIRES. Its "the app moves" sent only the
+    address-changed signal, never popstate. With the fake corrected and the fix taken out, 10 of the checks fail,
+    most of them ones that already existed: the checks were right and the fake was not.
+  - THE SCREEN DRIVER closed Profile and moved IN ONE TICK (as "Open the list" does), where the layer is still open
+    when the signal lands and the path is a different one. "Close, then a moment later tap a tab" was never driven.
+  - THE DRIVERS I RE-RAN were chosen by screen (Profile, chat). The one that saw it starts the WHOLE app and was not
+    on the list. A change to something every screen passes through (the address, the phone's history, the app shell)
+    must run every driver that starts the whole app: `grep -l app-boot .tour-harness/*.mjs` names them (25 today).
+  CHECKS: `test:back-closes` 4b (6 new checks, the fake now fires popstate on a move; 4 mutations, all caught);
+  `verify:profile-back` section 4 (5 new checks: close by the arrow, then move, twice; the fix removed by hand fails
+  it, and fails `verify:new-plan-carryover` the same way). On the fix: both pass, with the typecheck, app-size and
+  unused-code checks, and all 42 drivers that start the whole app or open Profile (41 in the run; the 42nd,
+  `verify:setup-answers`, started while the sweep's own copy held its port and said so, and passed re-run alone).
+  THE FULL SWEEP, FOR THE RECORD: 645 checks. 620 ran on the version before this fix: 615 passed and 5 failed, of
+  which this bug was the only real one. The other four cannot pass in a cloud session and each said why:
+  `test:coach-exam-fresh` (the coach changed since the exam was last sat; it needs a run on his machine), and
+  `test:meal-quality`, `test:schema-parity` and `verify:rls` (each needs a live database). The sweep was stopped by
+  its time limit with 25 drivers unrun (I ran other drivers beside it, which slowed it); those 25 were then run on
+  the fixed code and all passed. The plan-quality and audit checks were inside the 615.
+  AND A SECOND, CONFIRMING RUN OF ALL 645 ON THE FINAL VERSION (this fix and the setup fixes in): 641 pass and 4 fail,
+  the same four that need his machine or a live database. No real failure. Two drivers failed on the way and passed
+  re-run alone, and both are about the run, not the app: `verify:chat-goal` timed out waiting for its card while 424
+  logic checks ran flat out beside it (passes alone, twice), and `verify:setup-answers` found its browser port taken.
+  THE PORT IS THE FINDING: four drivers share port 9443 (`meal-move`, `rest-day`, `setup-answers`, `swap-knock-on`),
+  so "two copies of one driver cannot run at once" is too narrow: those four cannot run beside each other either.
+  It only bites when two streams run in parallel (I ran the end of the list backwards in the main copy to stay
+  inside the two-hour limit). Not changed here; giving each its own port is a small tidy-up.
+  HOW THE RUN WAS KEPT INSIDE ITS TIME LIMIT, for next time: the first sweep was one job and was cut off at two hours
+  with 25 unrun. This one was split: the quick logic checks in the main copy, the drivers in the separate copy, the
+  two slow checks after the quick ones, and the tail of the driver list run backwards to meet the forward run.
+  NEVER RUN ON A REAL PHONE: the Back button on Android and the edge swipe on an iPhone are still proven only in
+  Chromium. Frontend only.
+- [x] **SETUP: THE "NONE" BUTTON, A SKIP FOR THE OPTIONAL MEALS QUESTION, AND "1 OF 14" TWICE (19 Nov 2026, the full
+  pass; a tester's findings S5, S6 and S3).** Three small things on the setup screens, all mechanical.
+  - S5. On the diet screen the button under the ticks read "None — next" after he had typed a food into "Anything
+    else you'd rather I left out?" with nothing ticked, so the button denied the answer he had just given. It reads
+    "Next" as soon as that box holds words. One function decides the words (`multiNextLabel`).
+  - S6. "What do you usually eat?" is optional and had no way past it but typing something. The header's Skip now
+    shows for an optional TYPED question the app asked by name (never the name). A tap keeps nothing, his own bubble
+    says he skipped it, and setup moves on. FOUND ON THE WAY: the word "skip" typed as the answer was kept as a usual
+    meal called "skip" whenever the coach recorded nothing itself. It is now read as nothing kept.
+    "SKIP" IS KEPT APART FROM "NONE", ON PURPOSE. My first edit added the skip words to the one function that reads
+    "none", and that function is also asked while a list is being CHANGED from the summary: "none" there clears his
+    foods to avoid, and "skip" there means "leave it as it is". Reading the two as one would have emptied an avoid
+    list on the word "skip". So `isPlainSkip` is its own function, `isPlainNone` is unchanged, and a check pins that
+    "skip" is not a "none".
+  - S3. The header read "1 of 14" on the name question and again on the question after it: the name is not one of the
+    counted screens. The name question's header is now its section alone ("About you"), with no number.
+  FOUR STALE CHECKS, each pinning the old line of code and not what it was for: `test:onboarding-chips` (the literal
+  'Next →' in the card), `test:onboarding-style` twice (the header's count written out in the screen file; "Skip for
+  single-choice and number questions only") and `test:usual-meals` (the typed reply's exact expression). Each is
+  re-anchored on the property (the screen ASKS the one function, and the function gives the right words; a card's
+  Skip is still single-choice and number only, a multi-select and the name never get one by either road), and each
+  was broken by hand to see it fail (5 breaks, 5 caught).
+  AN INTERRUPTED MUTATION RUN LEFT ITS BREAK IN THE TREE (the 19 Sep rule, met again). The round against the setup
+  driver was stopped by the background time limit in its third mutation, and the header's count was back in the
+  working tree with every file looking right at a glance. Found before anything else ran, by the step the rule asks
+  for: a grep for each mutated line whose expected count I knew (four lines, each must be 1; one was 0). Restored by
+  hand and the whole round re-run with a longer limit. Lesson kept: a mutation round on a slow driver is given a time
+  limit several times its expected length, and its output goes to a file, not through `tail`, so a stopped run still
+  shows what it scored.
+  CHECKS: `test:onboarding-receipts` sections S5, S6, S3 (17 new checks; 12 mutations, all caught);
+  `verify:two-question-screens` 3a2-3a3 (1 browser mutation caught); `verify:onboarding-turns` 28s1-28s8 (4 browser
+  mutations: 3 caught first time, the fourth, a Skip appearing on the name question, MISSED until 28s8 was added,
+  then caught). All 12 setup drivers pass on the change, and the 50 checks that read the changed files (48 first
+  time, the stale ones above after re-anchoring), with the typecheck, the app-size and the unused-code checks.
+  Screenshot read: the Skip sits in the header of the meals question.
+  APP SIZE: what the first screen downloads is now 611 of its 612 kB limit (1 left; it was 610). Not raised, on
+  purpose: the next change to anything the first screen loads will cross it and say so.
+  NOT DONE, named: the header's total can still change as an answer makes later questions apply or not (by design,
+  14 Nov); the other half of S5 (the diet screen's heading scrolling under the header on a long list) is ordinary
+  scrolling and was left; "skip" typed into the diet screen's leave-out box is still kept as a food called "skip".
+  Frontend only.
+- [x] **SETUP LISTED HIS TRAINING DAYS IN THE ORDER HE TAPPED THEM (19 Nov 2026, the full pass; a tester's finding S4).**
+  Days changed from the summary read "Mon, Tue, Thu, Fri, Wed". The plan itself was never affected (it is built from
+  the week in order); only how the answer READ. A list answer now reads in the order its choices are shown, wherever
+  setup says it: the summary row, the tick, and his own answer bubble.
+  THE SCREEN CHECK FOUND THE SECOND PLACE. The logic check passed on the first fix (the summary and the tick go
+  through one function), and the driver, tapping Thursday before Monday, read "Thu, Mon · 45-60 min" in his answer
+  bubble, which was built by its own copy of the same loop. The bubble now calls the one function. What is STORED is
+  unchanged (the taps, in tap order); something typed that is not one of the choices stays at the end.
+  `test:onboarding-receipts` section S4 (4 new checks; 3 mutations caught), `verify:two-question-screens` 2d2 (the
+  driver now taps Thursday first; 1 browser mutation caught). The 12 setup drivers and 47 derived gates pass.
+  NOT DONE when this was written, all LOW, and DONE the same day in the entry above: S3, S5 and S6. Frontend only.
+- [x] **A MEAL MOVED BETWEEN TWO MEALS BY THE COACH COULD NOT BE PUT BACK (19 Nov 2026, the full pass; a tester's finding
+  C11).** The Move sheet on Nutrition has had an Undo since 2 Nov; the coach's receipt for the same move had none, by
+  a note in the code ("moving it back is one more move"). His "every change previews and can be undone" covers both.
+  NOW: the coach's receipt has an Undo, and it runs ONE function shared with the sheet (`undoMealMove`): each meal's
+  resized copy is taken out of its options and that meal's pick from BEFORE the move is put back, or cleared to the
+  day's own choice when he had none. The picks from before are read before anything is written and kept on the
+  stored receipt, so the Undo does not depend on what the chat happens to remember.
+  HIS 29 OCT RULE, APPLIED: an Undo puts back only what is still as the card left it. If he has changed either meal
+  since, nothing is touched and the receipt says "One of those meals has changed since, so I've left both as they
+  are." (the day swap's own sentence). A put-back that does not save keeps its button.
+  TWO THINGS FOUND ON THE WAY AND FIXED:
+  - Undoing a meal the coach added to ANOTHER day told today's pick handler to clear that meal, so today's shown
+    choice for it dropped while the store still held it (the screen disagreeing with the store until a reload). It
+    now re-reads the options and leaves today alone.
+  - The coach's add-a-meal offer ended "becomes your dinner for 2026-09-17". It says "for today" or "for Thu 17 Sep".
+  NOT DONE, named: on the chat's test page today's pick goes to a stand-in, so the screen driver moves TOMORROW's
+  meals, where the app's own pick writer runs; that today's Undo goes through the same function with today's handler
+  is held by the logic check only. C9 (several offers' first line ends in a colon with the details now folded away)
+  is left: about forty checks pin those sentences and the wording is his. A food cannot be added to another day's
+  meal by chat at all ("I can't see your dinner for Thursday from here"), which is an older limit, not this change.
+  `test:meal-move` section 12 (14 new checks; 6 mutations caught), `test:meal-addition` (3 new checks; 1 mutation
+  caught), `verify:chat-meal-move` (new, 21 checks: the move, the Undo, an earlier pick put back, a meal changed
+  since left alone, the other-day case; 6 browser mutations caught; screenshots read, the refusal included). The
+  eight meal-move and meal-addition drivers pass. Frontend only.
+- [x] **THE FIRST ANSWER OF A FIRST CONVERSATION COULD LAND UNDER THE MESSAGE BOX (19 Nov 2026, the full pass; a tester's
+  finding C2).** Three runs in three for the tester; here, not once in eight at five different timings, then two in
+  six once the reply came at once, one of them at normal speed. So it was a race, and the screenshot was right.
+  THE CAUSE, traced on the page, not reasoned: when the typing dots are swapped for the answer the thread gets 16px
+  shorter and then much longer. The BROWSER moves the scroll position by itself both times (it clamps it, then
+  re-anchors it) and sends a scroll event each time. The chat read any scroll event that was not its own jump as
+  "he scrolled", measured against the thread as it NOW is: arriving after the answer, that said "230px from the end",
+  the chat stopped following, and the answer sat under the message box. A first conversation is where it shows,
+  because the thread is short enough for a 16px change to move the position at all.
+  THE FIX: while the chat is following, a scroll event is judged against the end it last followed to. If he is still
+  there, the thread grew under him and he has not left; the follow already queued takes him to the new end. A scroll
+  that takes him more than 120px above that end is his, as before, and having left he is back only at the real end.
+  MY FIRST THREE GUESSES WERE WRONG (a slow phone; the hello still arriving; the first-open flag), and my first
+  trace "fixed" it by accident: a missing semicolon made the scroll handler throw on every event, and with the handler
+  dead the bug could not happen. That was the clue, but it read as three clean runs.
+  TWO MISSED MUTATIONS, both read as questions about the code: one line (keeping the followed height fresh from his
+  own scroll to the end) changed nothing a thread that only grows can show, and was DELETED; the other (the chat must
+  already be following) had no check that could see it, and got one (he scrolls back to where the thread used to end,
+  the message box grows under a draft, the thread must not jump).
+  `verify:chat-first-answer` (new, 16 checks: an answer that fits; one taller than the window still starts at his
+  message; the cause made to happen every time, with a guard that it really arrived 120px+ from the new end; a wheel
+  scroll of his still stops the following; six cold opens; 5 browser mutations, 4 caught and 1 deleted as inert,
+  then the guard's own mutation caught; screenshots read). The nine chat drivers that depend on scrolling pass.
+  NOT DONE, named: the older exact-position rule (9 Nov) is now a special case of this one and could go; left in.
+  Never run on a real phone, where the browser's own nudges differ. Frontend only.
+- [x] **PROFILE'S "REMEMBERS" LIST SHOWED THE APP'S OWN BOOKKEEPING (19 Nov 2026, the full pass; a tester's findings
+  P4, P6 and two of P7).** A note read "won't eat/do Barbell Squats" with a pill saying "hard" and "manual · Sep 16,
+  2026" under it, and a rule about training read "recorded — not yet applied (needs day-context meal generation
+  doesn't have yet)". Now:
+  - a firm "never" is written by kind, "won't eat pork" for a food and "won't do Barbell Squats" for an exercise, by
+    ONE function every writer calls (Profile, the chat's two routes, setup's two, the ban from the Exercise screen and
+    the coach's ban). A note saved under the old label reads right as well (one reader), so nothing stored is
+    rewritten. The coach is sent the same words;
+  - where a note came from is in words with the date the way the rest of the app writes one: "Added by you · 16 Sep
+    2026", "From chat · ...", "From setup · ..." (a fixed month list: the phone's own short month is "Sep" on one
+    and "Sept" on another);
+  - the "hard" / "soft" pill is gone: the line under each note already says what it does;
+  - what a rule does is said the same on Profile and on the chat's "Saved to memory" line, from one function (they
+    were two hand-written copies): a rule about a meal is "applied to your breakfast options"; a rule about training
+    is "remembered, not applied: your meals are not planned around when you train"; a day he cannot train is
+    "remembered. It applies the next time your plan is rebuilt". No "yet": nobody has decided to build it.
+  - "Download my data", "Delete everything" and the confirm step under it are 44px tall (they were 32);
+  - "1 meals planned" is "1 meal planned"; the Appearance preview's pill reads "9 of 12 weeks" (it still showed "12
+    in a row", which his 13 Nov ruling took out everywhere else).
+  DECISION, mine, and his to change: the three source phrases and the three effect sentences are new wording. They
+  replace internal labels with what those labels already meant and claim nothing new; the "not applied" sentence was
+  checked against the meal code (a day's meals are chosen with no knowledge of when he trains).
+  NOT DONE, named: "biases suggestions — nothing removed" under a soft preference (pinned by `test:audit-fixes`, and
+  plain enough); the group headings ("EXERCISE PREFERENCES", "TIMING RULES"); the rest of P7 (a paused plan not named
+  on a rest day; a stale "Saved." line after an equipment change; "I love pizza" saved as the like "i love pizza";
+  after a Barbell Squats ban the Front Squat is the main lift on two days); P5 (no unit choice on Profile's height
+  and weight).
+  TWO CHECKS WERE ENFORCING THE OLD WORDS and were re-anchored: `test:small-words` still required "12 in a row" in
+  the preview (his 17 Oct ruling, replaced on 13 Nov), and `test:food-dislike-is-a-ban` pinned the literal "won't
+  eat/do" instead of the property (a firm dislike takes the firm label, never "not keen on").
+  `test:fact-display` (new, 29 checks; 18 mutations, 18 caught), `verify:remembers-words` (new, 13 checks on the real
+  Profile with two notes stored the OLD way; 6 browser mutations caught; both screenshots read), `verify:chat-food-avoid`
+  1d re-anchored to the new words (1 browser mutation caught). Frontend only; the words reach the coach on the next
+  message with no deploy.
+- [x] **TWO SMALL THINGS ON NUTRITION AND HOME, AND ONE FINDING THAT WAS NOT A DEFECT (19 Nov 2026, the full pass; a
+  tester's findings N6 and N8).**
+  N6. Calories were written two ways on one screen: "Meals planned 1983 kcal", "1062 kcal under" and "target 3045"
+  under a rings card reading "3,045 kcal left". The planned total, the target on the planned line and the day's
+  verdict now carry the comma ("1,983", "1,062 kcal under", "target 3,045"). The verdict is the engine's one
+  function, so the week view and the upcoming-day card follow. NOT CHANGED, named: the "The day is N kcal over your
+  target" line after a swap, and calorie figures inside coach offers, still print four digits bare (each is pinned by
+  its own checks; a day is rarely a thousand out there). `test:day-verdict` (1 new check; 1 mutation caught),
+  `verify:day-verdict` 2c2 (1 new check on the real screen; 2 browser mutations caught). Three drivers that read the
+  planned total as a bare number were taught the comma (`verify:day-as-shown`, `verify:meal-costed`,
+  `verify:day-verdict`); the eleven drivers that read that line all pass.
+  N8b. On Home, tapping the steps ring with nothing logged opened a blank box beside "Log steps". The box now says
+  "Steps today" until there is a count to show. `verify:home-steps` 2a (1 browser mutation caught).
+  N8a, NOT A DEFECT, checked: the tester reported that tapping "Logged" on a meal takes it off and "nothing says so".
+  It does say so ("Lunch taken off what you ate · Undo", his 8 Nov ruling), beside the button and on screen;
+  `verify:diary-preservation` 8a holds exactly that and passes. Nothing changed.
+  104 derived `test:` gates pass. Frontend only.
+- [x] **THE SHOPPING LIST SHOWED LESS THAN THE MEALS NEED (19 Nov 2026, the full pass; a tester's finding N5).** A row
+  rounded to the NEAREST step it is bought in, so 270 g read "~250g" and 615 g "~600g", and a counted food rounded to
+  the nearest piece, so one and a half chicken breasts read "1 breast". Follow the list and the week comes up short.
+  An amount to buy is now rounded UP to its step (270 g is "~300g", 615 g "~650g"); an amount already on a step is
+  unchanged and still has no "~"; the exact figure still sits beside it when the row is opened. The plus and minus
+  buttons step from the number shown (270 g shows 300; plus is 350, minus 250).
+  DECISION, mine, with the basis (it is arithmetic and a shopper's habit, not a claim): pieces round up as well, with
+  a QUARTER of one let go (2.2 heads of broccoli is 2, 2.3 is 3). It was half of one. Pieces vary in size by about a
+  quarter, so a strict round-up would make 2.05 breasts three; half was too loose, a third of a piece short. The
+  under-half-a-step rule is kept: 2 g of something still reads "2g", never "~5g" for nothing or "~0g".
+  NOT CHANGED: what is stored. Only the amount shown and the stepper's base moved; the list's figures, the coach's
+  list and the share text read the stored exact amount as before.
+  `test:grocery-display` (11 new checks, one a grid of every amount from 20 g to 3 kg: never under what is needed,
+  never a whole step over; 9 mutations, 9 caught, one only after a check for the stepper on a counted food was
+  added), `verify:grocery` section 14 (3 new checks: "270g couscous" typed, the row reads "~300g", plus stores 350; 2
+  browser mutations caught; screenshot read). Frontend only.
+- [x] **THREE SMALL THINGS ON THE EXERCISE SCREEN (19 Nov 2026, the full pass; a tester's findings E7, E8, E9).**
+  E7. After "Make it a rest day" and then "Train it anyway", the card read "Today · in progress" over "You made today
+  a rest day. This session is still here if you want it." The line is now drawn before the session is started and
+  after it is closed with nothing counted (the day is still the rest day he made it), and not while he is training
+  it. The same for a day swapped for something else. `verify:what-happened` section 11 (6 new checks on a fresh page;
+  1 browser mutation caught; screenshot read). `test:one-today` rightly refused my first wording ("not running"):
+  this screen has three states and each must be named.
+  E9. A band move logged with no weight read "10 reps · Bodyweight" under a card whose own badge says "Band". The
+  line now uses the card's word. `test:set-row` (4 new checks; 2 mutations caught), `verify:logged-set-word` (new,
+  3 checks: the day's band move and its first bodyweight lift each logged and read; 1 browser mutation caught, and a
+  second that only changed a fallback the screen cannot reach was rightly not seen). NOT DONE, named: the small
+  toggle beside the weight box still reads "BW" on a band move.
+  E8, LEFT AS IT IS, decided (mine): "Add set" on a lift whose planned sets are all done leaves its header reading
+  done, 3 of 3, with a fourth empty row. That is true: the plan's sets are done and the fourth is his extra, counted
+  when he logs it (4 of 4). Making the lift "not done" would be worse, because an added row cannot be taken away
+  again, so one slip of the thumb would leave a finished lift unfinished for the rest of the session.
+  Frontend only.
+- [x] **"MOVE EARLIER" PUT A LIFT IN FRONT OF THE SESSION'S WARM-UP MOVE AND NOTHING SAID SO (19 Nov 2026, the full pass; a
+  tester's finding E6).** DECISION, mine (CSCS), with the basis: a warm-up move is there to prepare the first working
+  lift (activation and low-dose explosive work come before the loaded pattern they prepare; done after it they are
+  two more easy sets). I first wrote a REFUSAL and took it out before it was built: his 14 Sep rule is that a change
+  which costs something is said and allowed, and only the unsafe is refused, and this is not unsafe. So the move
+  still happens, and the app says one sentence: "Band Face Pulls is this session's warm-up move, and it now comes
+  after Chin-Ups." On the screen it rides on the line that says what moved, beside its Undo; on the coach's card it
+  is a cost line, never a question. Said once: a day already rearranged is not told again. "Was taken back" names
+  the move only, not the cost.
+  WHY NOTHING ELSE WOULD HAVE SAID IT: the plan scorer reads warm-up order in week 1 only, so in any later week a
+  reorder that buried the warm-up move showed no cost anywhere (measured in the C5 probe: 0 of 216).
+  MEASURED BY BREAKING IT: one condition of my first version was inert and was deleted, not given a check.
+  CSCS review: no prescription changes (order carries no load); nothing is taken away; in scope.
+  `test:edit-tradeoff` section 12 (12 new checks; 6 mutations, 6 caught), `verify:edit-undo` section 6 (7 new checks:
+  the move happens, the line says both things on screen with its Undo, Undo puts the warm-up move first again; 2
+  browser mutations caught; screenshot read). That driver's first section moved the day's FIRST row, which is the
+  warm-up move; it now moves the first working lift, so it still tests a plain move. Frontend only.
+- [x] **A REORDER CARD WARNED "THE WEEK STOPS COVERING EVERYTHING IT SHOULD" WHEN ONLY THE ORDER CHANGED (19 Nov 2026, the full
+  pass; a tester's finding C5, traced before fixing).** The words were not the fault. MEASURED: 189 of 216 one-row
+  moves on real plans lost a whole rule in the plan scorer, every one of them `main_lift_changed_within_block`, plus
+  `load_not_progressing` and `sets_not_flat` on most. The scorer lines a block's weeks up by ROW: week 1's main lift
+  is on row 2, so row 2 of weeks 2 to 4 is read as "the main lift". True of every plan the app writes, and false the
+  moment HE changes one week (move a row, add one above the main lift, take one out): the lift was one row away and
+  was read as changed, and as stalled. So the same false line could ride on a removal or an addition too.
+  NOW the scorer follows the lift: the same row when it holds the same lift, else that lift wherever it sits on the
+  day, else the row as before (a lift that is really gone is still a changed main lift). After: 0 of 216.
+  DOES IT CHANGE WHAT THE SCORE MEASURES? Measured, no: on 6,144 generated plans, 0 of 74,304 main-lift days hold the
+  lift on a different row inside a block, so the new lookup returns the old row on every plan the app writes and no
+  generated score can move. The gate now holds that assumption itself, so if generation ever starts moving rows it
+  goes red. `test:quality` and `test:audit` were re-run to confirm (see the run noted with this commit).
+  CSCS review: no prescription changes; a card stops claiming a cost that is not there. A reorder that puts the main
+  lift last in a strength week is still asked about (its own pinned rule, untouched and still driven).
+  `test:edit-tradeoff` section 11 (4 new checks; 4 mutations, 4 caught, one rewritten because my first version did not
+  create the defect), `verify:tradeoff-reach` section 3 (3 new checks: the tester's own request, offered with no
+  "Worth knowing" line; 1 browser mutation caught). Frontend only.
+- [x] **"MOVE CALORIES FROM LUNCH TO DINNER": THE APP ASKED "HOW MUCH?" AGAIN, FOR EVER (19 Nov 2026, the full pass; a tester's
+  finding C6).** The amount buttons under the app's question say the amount and the meal ("200 kcal to dinner"), and
+  the coach is then asked again. When it came back naming the two meals and no amount, the app asked "How much?" a
+  second time, and a third. NOW the amount is read from HIS words (the button he tapped, or a number he typed), so it
+  never depends on the coach repeating it; and where his words carry an amount, that is the amount (his 17 Nov
+  "amounts only he said"), with the coach's used only when he gave none. "1,200 calories" is read as twelve hundred
+  (it was read as two hundred). `test:meal-rebalance` (4 new checks; 3 mutations caught), `verify:chat-rebalance`
+  section 7 (7 new checks with a coach scripted to leave the amount out; 1 browser mutation caught). Frontend only.
+- [x] **TWO CHECKS WERE RED SINCE THE NUTRITION FIXES OF THIS MORNING, AND I HAD NOT RUN THEM (19 Nov 2026).** `test:dashboard`
+  and `test:empty-meals` each pinned the exact text of code that commit 66e1e12a restructured (the options re-read
+  became a named function; which meals are drawn empty moved into `mealRowsFor`). The behaviour was intact; the checks
+  failed on the wording. HOW I MISSED THEM: the list of checks for that commit was run against the commit BEFORE it.
+  Both are re-anchored on the behaviour (one now CALLS the function), 5 mutations, 5 caught. The rule already in
+  CLAUDE.md ("derive the gates from every file in the commit") was right and I ran it on the wrong commit.
+- [x] **THE AMOUNT BOX TOOK ANY NUMBER: 99999 g OF CHICKEN, 120,327 kcal (19 Nov 2026, the full pass; a tester's finding N4).**
+  Changing an ingredient's amount, adding a food and describing a meal to the coach each costed whatever was typed.
+  NOW one food over two kilos (or two litres) in one meal is sent back with a sentence ("99999g chicken breast is
+  more than one meal can hold. Check the amount and try again."), nothing is worked out and Apply cannot be tapped.
+  One function (`overfullLine`), called by the three builders the screen and the coach share. The weight is the app's
+  own reading of the line, so a count is weighed too (45 eggs is over, 6 is not).
+  DECISION, mine, and the line it stays behind: this is a typing check, not a judgement about his eating. His 14 Sep
+  rule stands ("it never refuses anything that is not unsafe"): 1.5 kg of anything still goes through, with its
+  numbers on the card before he applies it. I considered and REJECTED refusing a meal bigger than his whole day's
+  calories: that could be a choice of his, and a typing check must not be able to refuse one.
+  NOT DONE, named: a meal LOGGED as eaten by chat is not checked (that food table has a byte-identical copy on the
+  coach's server, so touching it is a deploy; the log card shows its totals before Apply). Wording is his to change.
+  `test:meal-food-edit` (7 new checks; 5 mutations, 5 caught), `test:meal-food-add` and `test:custom-meal` (2 new
+  checks each, each with an ordinary amount of the same food beside it so the guard is shown to bind on the amount;
+  1 mutation each, caught), `verify:meal-food-edit` section 10 (7 new checks on the real sheet; 1 browser mutation
+  caught; screenshot read). MY FIRST CHECK WAS WRONG, not the app: it asked for no Apply button, and the sheet keeps
+  the button and disables it. Frontend only.
+- [x] **"GET MORE OPTIONS" ADDED NOTHING WHEN THE MEAL WRITER DID NOT ANSWER: A TEST-PAGE ARTEFACT, MEASURED, NOT AN APP
+  FAULT (19 Nov 2026, the full pass; a tester's lead N3).** The tester's page holds ONE dish a meal, 1,062 kcal under
+  its target. A library dish is added only if a day lands on target with it (19 Oct), judged against the other meals
+  as they are; with one undersized dish in every other meal no day can land, so every library dish was passed over,
+  and the app said, truthfully, "I couldn't reach the meal generator just then, so nothing has changed."
+  MEASURED rather than reasoned (`measure:top-up-stale`, new): a plan of seven a meal made at 2,200 kcal, the targets
+  then moved to x1.1, x1.2, x1.35, x1.5 and x0.8, the writer unreachable throughout: the button added five dishes to
+  every meal in every case, all from the library. The CLAUDE.md lesson of 11 Nov again ("a pool with no room in it
+  cannot let anything new fit, and that reads as the new thing being wrong"). No code changed. I had drafted a
+  change (take library dishes on their own meal's numbers when no day can land) and did not build it: nothing real
+  needs it, and it would have weakened the 19 Oct rule for a fixture.
+- [x] **THE PHONE'S BACK DID NOT CLOSE PROFILE (19 Nov 2026, the full pass; a tester's finding P3, and item 10 of the 15 Nov
+  browser-test plan, which was never built).** Profile and its sheets are drawn over the app and had no step in the
+  phone's history, so Back (the Android button, the edge swipe on an iPhone) with Profile open went to the tab before,
+  or left the app.
+  NOW each open layer has one step: Back closes the sheet, the next Back closes Profile, the one after does what Back
+  always did. Profile's own arrow and X work as before.
+  THE RULE THAT SHAPED IT: closing a layer by its own button NEVER asks the phone to go back. Going back is not
+  instant, and Profile often closes in the same tap that sends him somewhere (the shopping list, a rebuild offer): a
+  back fired at the close would land after that move and undo it. So such a close leaves its step behind, spent; the
+  next layer to open takes a spent step over (they never pile up), and a Back that only steps off one, or lands on
+  one, is carried through, so no press of Back does nothing.
+  MEASURED BY BREAKING IT: two lines of the first version were inert (removing them changed nothing any order of taps
+  could show) and were deleted rather than given checks. And the gate's first fixture had ONE place behind the tab,
+  so a press that walked back one step too many still landed "in the right place": it now has two.
+  NOT DONE, named: only Profile and its sheets. The meal sheet, the day menu and the other pop-ups still close by
+  their own buttons only (the same hook fits each; none was reported). Never run on a real phone.
+  `test:back-closes` (new, 32 checks against a fake history where a back lands later, as a browser's does; 15
+  mutations, 15 caught after the fixture fix), `verify:profile-back` (new, 16 checks on the real Profile with the
+  browser's own history; 7 browser mutations, 7 caught, one only after a check for a dead press was added).
+  `test:bundle`: the app chunk crossed its line by under 1 kB and was moved 1566 -> 1591 with the measured numbers
+  in its note. Frontend only.
+- [x] **"I'M SHORT OF TIME" AND "GIVE ME A DIFFERENT SESSION" COULD NOT BE PUT BACK (19 Nov 2026, the full pass; a tester's
+  finding E4).** His standing "every change previews and can be undone". "Make it easier" and "a different kind of
+  session" each leave a button that puts the planned session back; these two left nothing, so three exercises taken
+  off on one tap, or most of a day swapped, could only be got back by asking the coach.
+  NOW each leaves a button under the session: "Put the full session back" after a shortening, "Put my planned session
+  back" after a rebuild (the two labels the screen already uses). It follows the rules every put-back on this screen
+  follows: only while the week still reads as the change left it, never once a set has been logged since (the button
+  is not drawn then: a started session is never redrawn), and for ten minutes. It outlives a trip to another tab.
+  ONE WAY BACK, AND IT GOES TO THE PLAN: shorten and then rebuild, and the one button puts the whole planned session
+  back, not the shortened one (which would have left the shortening with no way back at all). That holds only while
+  the first change could itself still be put back; otherwise the way back is to the day as the second change found it.
+  The shortening says itself once: the line under the session's length already said "Shortened to 30 min", so the new
+  button comes without a second sentence.
+  DECISIONS, mine: no preview before the shortening (the tester's other half). The minutes are his own tap, and the
+  way back is now one tap; a confirm step on a change he just asked for by name is a tap more for nothing. NOT a change
+  to any prescription: both verbs do exactly what they did.
+  NOT DONE, named: the way back is kept for this visit to the app, not stored, so a reload loses the button (the
+  session stays as changed, and next week is the planned one either way).
+  `test:screen-edit-undo` section 6 (17 new checks; 11 mutations, 11 caught), `verify:shorten-today` section 9 (11 new
+  checks), `verify:session-rebuild` sections 6-8 (18 new checks: the put-back, the two-change chain, the button gone
+  once a set is logged); 7 browser mutations, 7 caught. Screenshots read. Frontend only.
+- [x] **THE SESSION SUMMARY DID NOT COUNT A SET LOGGED AFTER FINISH (19 Nov 2026, the full pass; a tester's finding E2).** His
+  8 Nov ruling, "Add to it": a set logged after Finish is added to the finished day and its count goes up everywhere.
+  The summary was the one place that did not follow, because it is a card saved at the moment of finishing: the day's
+  bar read "4 of 18 sets" beside a summary still saying "3/18". Its counts, its per-exercise rows and its volume are
+  now read again from the sets as they stand whenever it is shown; a set taken off afterwards comes off it too.
+  DECISION, mine (CSCS): the TIME stays the time of the session he finished. A set added two hours later did not make
+  the session two hours longer, and training time is what the number claims to be. Personal bests and "next session"
+  lines on the card are still as they were at Finish (named, not built: a best set after Finish is in his history and
+  on the lift's own row, and not on this card).
+  `test:finish-check` section 2b (8 new checks; 5 mutations, 5 caught), `verify:finish-check` 2k-2q (7 new checks in a
+  real browser: finish short, log one more set of a loaded lift, the bar and the summary both count it, the volume
+  rises, the time does not; 1 browser mutation caught). THE DRIVER'S FIRST VERSION PICKED CHIN-UPS for "the volume
+  counts it": a bodyweight set moves the count and not the volume, so the check failed on correct code. It now asks
+  the page for a lift that carries a weight. Frontend only.
+- [x] **AN "OTHER" INJURY SAID IT CHANGES NO EXERCISE, THEN OFFERED TO REBUILD THE PLAN AROUND IT (19 Nov 2026, the full pass;
+  a tester's finding P1, traced before fixing).** "Other (describe)" keeps what he typed and says, truthfully, that
+  the plan cannot work around words. Saving it then raised "Rebuild your plan around this? ... it still includes
+  exercises that work the area you just flagged", which was not true, and a rebuild would have changed nothing.
+  Adding an injury now offers a rebuild only when what was added is an area the plan can work around: the same test
+  the REMOVAL of an injury has used since 9 Oct. All eight areas on the picker still offer (checked one by one, so no
+  offer was lost). Not a change to what any plan avoids: it removes an offer whose rebuild did nothing.
+  `test:rebuild-offer` (4 new checks; 3 mutations, 3 caught), `verify:profile-fixes` 11g2 and 11i (the typed injury
+  raises no such offer; a typed "right knee" is ticked as a knee and DOES; 1 browser mutation caught).
+- [x] **TWO MEALS A DAY STILL SHOWED AN EMPTY "LUNCH · NO OPTION GENERATED" WITH A GENERATE BUTTON (19 Nov 2026, the full pass;
+  a tester's finding P2, traced before fixing).** His 14 Nov ruling ("a day serves only the meals the profile says")
+  was held in the day's own dishes and not in the LIST: Nutrition drew a row for any meal with saved dishes, and a
+  change to two meals or to no snacks rightly keeps the dropped meal's dishes (changing back brings them straight
+  back). So he was offered a Generate button for a meal he had just said he does not eat.
+  NOW one function decides the rows (`mealRowsFor`): a meal with saved dishes that the profile serves; any meal he has
+  LOGGED today whatever the profile now says (what he ate is never hidden by a later setting); and a meal is drawn as
+  empty only if the profile serves it. An older profile with no meal count drops nothing, and a profile that never
+  said whether snacks are on keeps the snack, as the day engine does. Decision, mine (it has a right answer under his
+  ruling); the logged-meal exception is mine too.
+  `test:meal-rows` (new, 17 checks; 9 mutations, 9 caught; the "serves" lists come from the app's own function, never
+  typed in), `verify:meal-shape-rows` (new, 10 checks on the page that boots the WHOLE app, with the profile's two
+  settings as inputs; 1 browser mutation caught; screenshot read). Frontend only.
+- [x] **REMOVING A SHOPPING-LIST ITEM SAID NOTHING AND COULD NOT BE PUT BACK (19 Nov 2026, the full pass; a tester's finding N2).**
+  Clear and Rebuild each say so with an Undo (his 8 Nov "Undo line"); Remove was the one way off the list that did
+  not, and an item from the meals that is removed is deliberately never brought back by a rebuild, so a slip of the
+  thumb lost it for good. Remove now shows "Cheddar — taken off the list" with Undo, in the tick's own shape, and Undo
+  puts the row back exactly as it stood, through the store. Wording is mine, in the shape of the line beside it; his
+  to change. `verify:grocery` (3 new checks in a real browser; 3 browser mutations caught), `test:grocery-shopping`
+  (2 new checks, 2 mutations caught). The rebuild still never brings a removed item back: by design, unchanged.
+- [x] **AN UNDONE MEAL EDIT LEFT ITS DISH IN THE SWAP LIST, AND CHOOSING IT FAILED (19 Nov 2026, the full pass; a tester's finding
+  N1, traced before fixing).** Lunch, take the rice out, Apply, Undo: the edited copy was deleted, as it should be,
+  and the meal's tab still read "Swap · 1" and offered it; tapping it answered "That swap didn't save". The Undo of an
+  edit, an added food or a move between meals hands the app an EMPTY pick ("back to what the day chose"), and the
+  app's handler returned on an empty pick before it re-read the saved options. It re-reads them on every path now.
+  WHY NO CHECK HAD SEEN IT: the handler lives in the app's top file, and only one test page boots that; every other
+  Nutrition page hands the meal list a stand-in. `verify:meal-undo-options` (new, 18 checks on the whole-app page: an
+  edit and an added food, each undone, the tab's count and list read against the store; 1 browser mutation caught).
+  Frontend only.
+- [x] **A CHECK THAT PINNED AN ARGUMENT'S POSITION FAILED ON CORRECT CODE (19 Nov 2026).** `test:log-needs-your-words` required
+  the user's words to be the LAST thing handed to the chat's logging step; the past-day log added the day after them.
+  Found by the 292-check run on the new commit, not by the checks I chose by hand. Re-anchored on the property (the
+  words are handed over), 1 mutation caught.
+- [x] **AN APPLY THAT COULD NOT SAVE LOST ITS BUTTONS, AND THREE CHANGES SAID "PARTLY DONE" OVER AN UNTOUCHED PLAN (19 Nov 2026,
+  the full pass; a tester's finding C4, confirmed in a browser before fixing).** With the plan's own save failing, a
+  tap on Apply was answered "Nothing was applied" and the offer was gone: the only way back was to ask the coach again.
+  Driving it found a second defect underneath: shortening today, rebuilding today and a volume change each listed
+  their change as "landed" and the save as the one thing that failed, so the card read "I couldn't shorten it · Didn't
+  land: save" (part done) over a plan nothing had touched.
+  NOW: those three report nothing landed when no week saved, and hand back the plan they were handed (a volume change
+  that saved one week of two is still part done and says so). And for a change that writes plan weeks and nothing else
+  (swap, add, remove, move, shorten, rebuild today, a cardio day, volume), when nothing landed, every failure is the
+  save, and the SAVED plan reads exactly as it did before the tap (read back, never assumed), the same offer stays up
+  with its buttons and the app's existing line "That didn't go through, so nothing was changed. Try again in a
+  moment." The next tap works. DECISIONS, mine: no new wording (the no-connection line already says it); a change that
+  also writes a setting (days, style, goal, length, another sport, an injury) keeps its failed receipt, because it can
+  be half saved with the plan untouched and "nothing was changed" would then be untrue.
+  `test:pending-actions` (25 new checks; 14 mutations, 14 caught), `verify:workout-scenarios-chat` section G (9 new
+  checks in a real browser: the offer keeps Apply, says it once, the saved plan is as it was, one open offer not two,
+  the second tap saves), screenshot read. NOT DONE, named: a failed save of a meal or memory offer still ends in a
+  receipt with nothing to tap. Frontend only.
+- [x] **"PUT A RUN ON SATURDAY" WAS ANSWERED "I COULDN'T FIND SATURDAY ON YOUR PLAN" (19 Nov 2026, the full pass; a tester's
+  finding C3, traced before fixing).** A plan keeps a row for each training day and for the odd rest day carrying
+  optional cardio. An ordinary rest day has NO row, and both the coach's offer and the write looked the day up by its
+  row. So cardio could be put on a rest day only if it happened to be one of the few with a row. The Exercise
+  screen's own "Make Saturdays a cardio day" went through the same write.
+  THE CHECK HAD A FIXTURE NO REAL PLAN HAS: its plan carried a row for all seven weekdays, so the case could not be
+  seen. The new checks run on a real generated plan and first prove it has a rowless day.
+  NOW: the offer is built from the empty row a rest day would have, and the write makes the row in each week it
+  writes. Only a real weekday gets one ("Someday" is still refused). A later week where that day TRAINS keeps its
+  session (the activity is the whole day; before, a rest-of-block write would have put it over a session there).
+  An exercise edit of a rest day is still refused, as it should be.
+  `test:cardio-session` section 3b (13 new checks; 7 mutations, 7 caught), `verify:cardio-session` 11-15 (the screen
+  route on a rowless day, in a real browser; screenshot read). The driver's first try used a run, which the app then
+  rightly held to 25 minutes under its 10% running rule; it uses a swim so it checks only the new part. The coach's
+  offer on a rowless day is held by the unit checks and a source check, not driven. Frontend only.
+- [x] **AN EXERCISE HE ADDED WAS PRICED FAR ABOVE THE PLAN'S OWN NUMBER FOR THE SAME LIFT (19 Nov 2026, the full pass; a
+  tester's finding E1, measured before fixing; load prescription, so `docs/plans/added-lift-price.md` came first).**
+  Barbell Bench Press added to a session came out at about 55 kg beside the plan's own bench at 32.5. Both add routes
+  (the Exercise screen and the coach) priced the lift down the "new main lift" road, which never reads what he has
+  logged on it and skips the plan's light start outside the testing week itself.
+  MEASURED (`measure:added-lift-price`, 36 seeded profiles, weeks 2-4, 1,218 additions of a lift the plan already
+  holds): median 1.75x the plan's own, 827 over 1.5x, highest 3.6x. After: median 1.00x, 11 over 1.25x (one notch of a
+  small implement; the one-leg press, which the plan itself holds down), 2 over 1.5x.
+  DECIDED AS A CSCS COACH (mine): an added lift is priced as a swapped-in accessory has been since 2 Nov: his log on it
+  wins; else, in a plan with a testing week, the light start every other untested lift in that plan got; else the
+  estimate. Basis: an untested load starts conservatively and is set from the first logged session; it is the rule the
+  plan already follows. The five questions are answered in the plan file. One function (`priceAddedLift`) for the
+  screen, the coach's confirm and the check. The card's sentence is now the plan's own light-start one.
+  `test:exercise-add` section 11 (10 new checks, seeded, the old pricing run beside the new so the grid is proved to
+  hold the defect; 5 mutations, 5 caught). NOT DONE, named: a whole-block addition writes one price into every
+  remaining week (recovery week included) and does not climb on the printed plan as a whole-block swap does; so before
+  this change too. Frontend only.
+- [x] **WEIGHT ADDED TO A BODYWEIGHT LIFT WAS READ BACK AS "BODYWEIGHT" (19 Nov 2026, the full pass; a tester's finding).** Chin-ups
+  with 5 kg on a belt showed "8 reps · Bodyweight" under the set: the belt was saved and not said. The set row now
+  reads "8 reps · Bodyweight +5kg" (the reading tests the added weight first, as the history reading already did).
+  `test:set-row` (3 new checks, 4 mutations caught). NOT browser-driven: the test pages have no belted lift on today.
+- [x] **A SESSION-LENGTH CHANGE MADE IN THE CHAT SHOWED AN UNDO THAT COULD NOT UNDO (19 Nov 2026, the full pass; a tester's
+  finding, confirmed in the code and then in a browser).** "From now on I only have 30 to 45 minutes" -> the offer ->
+  Apply -> Undo -> "Couldn't undo — This one can't be undone from here". The change kept the plan and the length it
+  replaced, like its siblings; the list that carries an Undo out simply had no entry for it. It now goes back the same
+  way: the weeks, then the setting they were built from.
+  SO THE NEXT ONE CANNOT SLIP THE SAME WAY, the check is DERIVED: every kind of change that hands back an Undo must
+  have a branch where an Undo is carried out (`test:pending-actions`, three new checks). FOUND BY A MISSED MUTATION:
+  my first version passed with session length taken out of its branch, because the block that restores the setting
+  still NAMED the kind further down, unreachable. It now reads only the conditions that dispatch an Undo.
+  `verify:session-length-undo` (new, 11 checks in a real browser reading the database before, after Apply and after
+  Undo; 2 browser mutations caught), 4 unit mutations caught, screenshots read. Frontend only.
+  And `test:today-claim` was re-anchored (it pinned the plain reply's check list, which gained a second check).
+- [x] **"I DID SQUATS YESTERDAY" WAS LOGGED ON TODAY (19 Nov 2026, the full pass; found by tracing the path, not by a report).**
+  The coach passes the date of a session told to it; the phone dropped the date and wrote the sets onto TODAY. The
+  wrong day's session showed work done, the week's count moved, and a record carried the wrong date.
+  Now the day is decided in one place (`chat-log-date.ts`): no date or today's is today, as before; a day in the last
+  two weeks is written to THAT day, by the same steps the Exercise screen's "I did it, not in the app" takes (the day's
+  session, its sets stamped at noon of that day, the day marked done), after reading the sets already there so more
+  sets are added after them and never over them; a day that has not happened, one more than two weeks back, or
+  something that is not a date is refused in a sentence and nothing is written. The line names the day ("Got it,
+  that's logged on Tuesday 17 Nov."), a failed write says so, and a follow-up question keeps the day it was about.
+  Decisions, mine: two weeks (where a mistyped date does most damage for least use); refusals never send him to a
+  screen. NOT BUILT: Undo on a past-day log (the card has no Undo button; said here, not hidden), and a personal best
+  is not announced for an earlier day.
+  FOUND BY THE SCREENSHOT: the card for yesterday's session carried "Not in today's plan — added to Additional Work".
+  A row's note is about today's plan, so a past day's rows carry what was done and nothing else.
+  FOUND BY A MISSED MUTATION: a version reading the dates as local instants agreed with the right one on this machine
+  (Greenwich time). The check now runs thirteen hours ahead of Greenwich on purpose.
+  ALSO FOUND BY THE RELATED-CHECKS RUN (361 checks on the chat commit): the two coaches share four blocks of rules
+  word for word and I had edited one side (`test:coach-rules-sync` prints a cross, and my quick loop counted the word
+  FAIL: a wrong detector, not a pass). Re-synced, so the SETUP coach also loses the tacked-on pivot; needs the
+  `onboarding-chat` deploy as well. Five checks pinned a line that gained an argument or a branch and were re-anchored
+  on what they protect (`coach-texts-you`, `past-lifts`, `no-false-claim`, `rebuild-honours`, `silent-writes`); the
+  last had been red since the food-box commit.
+  `test:chat-log-date` (new, 31 checks, 19 mutations all caught after the time-zone check was added),
+  `verify:chat-log-words` §5-7 (15 more checks in a real browser, reading the database after each), screenshot read.
+- [x] **HOW THE COACH TALKS: TONE, QUESTIONS, ENDINGS, AND WHAT KEEPS PEOPLE TALKING TO IT (19 Nov 2026, his request, decided on
+  his "If you're unsure about something go with your recommendations").** His words: "improve the chat to give the user
+  the best ux the way the chat speaks the tone it uses, the questions it asks, the information it gives the way it keeps
+  the conversation going ... what will keep a user engaged and keep coming back". Plan, evidence and every decision:
+  `docs/plans/chat-voice-2026-11-19.md`.
+  EVIDENCE: the exam he ran on 18 Nov (59 conversations, 2.33 of 3; `asks` lowest at 1.71). Read reply by reply: 11 of
+  19 closing questions were padding ("How does that sound?"); a fix came before a question in 6 conversations; a change
+  was announced with nothing on screen ("I'm going to drop the set volume across your workouts"); about 12 replies hung
+  an emoji on advice; "I hear you, Ashley" opened three replies running; an internal name ("propose_schedule_change")
+  and a raw tag ("[START_TIMER: ...]") reached him; one reply blamed him ("say it again in your own words"); a personal
+  best was logged with no words.
+  CAUSE, for most of it: the coach's instructions contradicted themselves in five places ("give human coach advice
+  first" against "ask first and alone"; questions praised as what makes a coach against "a question only when the
+  answer matters"; examples ending "Want the rest of it?"; a pivot back to training REQUIRED after a quick fact; no
+  section for a pause at all, and "I'm away" always sent to a change of kit).
+  DECIDED (mine): what keeps someone talking is being answered specifically, being easy to answer, and being
+  remembered, not more questions. Every reply ends in the first of four ways that is true: the one question it needs;
+  an OFFER as one short question with buttons; a next step on one or two BUTTONS written as what he would say (the one
+  new behaviour: "Want me to go deeper?" becomes a "Go deeper" button); or it stops on the answer. "Tell me how it goes"
+  only when the coach will use the answer, and it picks that thread up when he comes back. Struggling is asked about
+  before it is fixed. A change is offered, never announced. A pause is a pause. No tacked-on pivot. His rulings kept:
+  a question only when the answer matters, short steps, no new cards, a why on every answer, the warm coach, the second
+  pass, safety wording never edited.
+  HELD IN CODE (what a rule can see; whether a specific question earns its place stays the exam's): on the coach's
+  server an internal name becomes plain words, an unknown tag goes, one emoji at most and none on a reply over 160
+  characters, a CLOSED list of stock openers and closers goes (a question about HIM is never touched; safety wording
+  keeps every sentence), his name as address once and not if just used, a promise with no tool behind it is sent back
+  to be said as an offer, and a turn that reached for a tool that does not exist is answered in words. The kit offer is
+  refused when he asked for a hold or a pause, through the same reader the app's own pause offer uses. On the phone: a
+  workout logged by chat gets its own line and a best is named with its unit; the app's "Love that." question was
+  reworded.
+  THE EXAM MARKER WAS WRONG ABOUT THREE OF ITS FIVE BREACHES: on those turns the APP asks a question in place of the
+  coach's offer (a bare dislike, a usual meal with no amounts, a race with no date), as he ruled, and the exam sees only
+  what the coach's server returned. The three decisions are now one function the chat and the marker both call. The
+  18 Nov conversations re-marked: 2 real breaches, 3 "the app caught".
+  FOUND BY THE BROWSER, NOT BY ANY SOURCE CHECK: the Undo line was written to a field the screen does not draw (my
+  source check pinned the wrong field name and passed), and the put-back card read "Logged · Wednesday was taken back".
+  And measured before deciding: removing "That's what we love to hear" left a reply that never answered good news, so
+  it is not on the list.
+  VERIFIED HERE: `test:coach-tics` (new, 106 checks, 47 mutations all caught after three checks were added),
+  `test:chat-log-words` (new, 23, 16), `verify:chat-log-words` (new, 16 checks in a real browser; of 7 browser mutations 5 caught, 1 did not apply, and 1 changes nothing on screen at that moment, its twin being caught by the unit check),
+  `test:offer-rules` (+21, 8), `test:coach-exam-grader` §14 and `test:offer-fixes` (11 mutations), `test:coach-promises`
+  (floor check re-anchored on the property, 2 mutations), screenshots read.
+  NOT PROVEN: anything the coach's model now WRITES. That needs the `chat-gemini` deploy and an exam run on his
+  machine; four new questions mark it (`talk-*`) and the marking guide is unchanged, so 55 questions compare with
+  18 Nov. Open, his: the standing "meals cooked for me" reply (the exam question and the judge disagree); whether a
+  readiness check before a session is welcome.
+- [x] **"I DON'T EAT PORK" TYPED INTO THE AVOID BOX WAS SAVED AS A FOOD CALLED "i don t eat pork" (19 Nov 2026, the full pass;
+  found by a tester in setup and on Profile).** The row showed on the list and protected nothing: measured, an avoided
+  "pork" keeps out pork, bacon, ham, gammon, sausages and chorizo, and the sentence as it was saved kept out none of
+  them (the tester's new plan still held pork chops). His 9 Oct ruling already says "I don't eat pork" goes into Foods
+  to avoid; the chat and setup's conversation obeyed it and the two typed boxes did not.
+  Now the box reads the way people say it ("I don't eat", "can't have", "never eat", "hate", "avoid", "allergic to",
+  "not a fan of", "leave out", "nothing with ... in it") as the food. **Each box reads only its own way of saying it**:
+  "I love pizza" under Foods to avoid adds nothing (reading it as "pizza" would leave out the one thing he said he
+  likes), and "I don't eat pork" under Foods you like is not a like. "I love pizza and pasta" under Foods to avoid
+  leaves NEITHER out (the dangerous half: part by part it would have kept the first back and left out pasta). Words
+  that cannot be read as a food ("I'm vegetarian") are said under the box, kept in it, and never saved; setup's
+  "anything else to leave out" holds the screen the same way. Foods you like now splits on commas and reads
+  "I love pizza" as pizza (it was saved whole).
+  Decisions, mine (mechanical, inside his ruling): the wording of the line under the box ("I couldn't read "I love
+  pizza" as a food to leave out, so nothing was added for it. Type just the food, like "pork".") is his to change.
+  FOUND BY MISSED MUTATIONS: my first version had two mechanisms doing one job (a lead-in read for the whole answer
+  and again per part); one was removed, and the dangerous two-food case got its own check.
+  `test:food-exclusions` §8 (22 new checks; 15 mutations, all caught after that change), `verify:food-list-box` (new,
+  14 checks on the real Profile screen; 3 browser mutations caught), screenshot read. Frontend only.
+- [x] **PREGNANCY: THIRTEEN MORE MOVES LEFT OUT, AND THE WARM-UP NOW OBEYS THE RULE (18-19 Nov 2026, the full pass; found by a
+  tester who ticked Pregnant and was handed a flat dumbbell press).** His rule of 14 Nov ("no jumping or impact move,
+  no move lying flat") was held by a list checked against exercise NAMES; "Neutral-Grip Dumbbell Press" is a flat bench
+  press and its name does not say so. Every entry was read again by the position it is done in: two flat presses, the
+  floor leg curls, the rows hung face-up under a bar or table, the rows and extensions done lying face down on a pad,
+  the Nordic curl, running on the spot and the ball slam are now left out too (list and reasons in
+  `docs/plans/pregnancy-exercise-rules.md`, "Extended"). All on the safe side of his rule; the borderline ones (hanging
+  rows, pad-supported rows, the ball slam) are my call as a coach and his to reverse.
+  **THE BIGGER FINDING: the warm-up was never covered.** Measured: 75% of a pregnant trainee's warm-ups held a jump
+  ("Jumping Jacks & High Knees") and 15% a Glute Bridge. And the same gap for injuries: someone with a knee or ankle on
+  their list opened every session with jumping jacks while the session itself had every jump taken out. The opening
+  item now has a both-feet-on-the-floor twin of the same length ("March on the Spot & Side Steps", "Brisk Walk or March
+  on the Spot"), used while pregnant or when the plan would rule out a jump the item names for that person; a drill
+  lying flat is left out of the warm-up and the "feels tight" drills while pregnant. After: none.
+  **And the beginner circuit keeps its hinge**: the Glute Bridge had no alternative (now a standing hip hinge to a
+  wall), and an alternative is described in its own words (a Wall Sit had read "sit to a chair and stand back up").
+  COST, same run: no week lost a squat, hinge, push or pull pattern; 97.7% of exercises kept. (My first count said 8
+  weeks lost the squat: the measurement had left out the leg press's pattern name. Corrected before it was believed.)
+  NOT covered, named: plank and push-up positions late in pregnancy (her midwife's call), running intervals, kettlebell
+  swings. `test:pregnancy-rules` (position-aware; detector proven on every listed move), `test:warmup-rules` (new, 29
+  checks; 15 mutations: 13 caught, 2 equivalent, named in the plan). Frontend only.
+- [x] **THE TESTING WEEK COUNTS HOWEVER IT WAS LOGGED (18 Nov 2026, the full pass; leftover B4 of the artifact list).** Only the
+  Finish button wrote a testing-week session into the printed plan. A session the six-hour window closed, one logged
+  through "I did it, not in the app", one the coach logged, or a set added after Finish left the Full Program on the
+  estimate while today's card read the logs: the two screens his 10 Sep ruling exists to keep agreeing. Now every
+  testing-week day already behind him is carried over when the plan loads, when the day turns and after a log lands,
+  by the same rule and with the same sentence on Home ("Week 2 now starts Bent-Over Dumbbell Row from your 34kg set").
+  Three decisions made while building, each mechanical (basis in `docs/plans/weights-leftovers-2026-11-18.md` §4):
+  **evidence is used once** (the testing week's slot carries the weight its later weeks were written from, so a weight
+  lowered afterwards is never quietly raised again on the next open; a heavier set logged later still counts);
+  **today is the Finish button's** (a testing session works up to its heaviest set); **only while it can matter** (not
+  once the plan has left that block).
+  FOUND BY A MISSED MUTATION: the first version ran against the copy of the plan kept on the phone, before the server's
+  copy arrived, and could have saved an old week over a newer one. It now waits for the server's plan.
+  `test:calibration-search` §9 (25 checks, 13 mutations: 12 caught, 1 equivalent), `verify:testing-week-sweep` (17
+  checks on the whole app, 8 browser mutations caught), screenshots read. Not verified: a real database.
+- [x] **CLAUDE.md NAMED SEVEN CHECKS THAT DO NOT EXIST, 18 Nov 2026 (the full pass, step 1).** Every check name in "What
+  the app must have" was compared with the list of checks that can actually be run (458 names, 422 direct matches; the
+  rest are section references, drivers named by their script, and these). Stale names corrected in place: `verify:walk`
+  is `verify:screens`; `activity-streak` was deleted on 13 Nov when weeks-on-plan replaced the streak, and its claims
+  are held by `coach-rhythm` and `history-streak`; `load-ceiling-units` is `ceiling-units`; `joint-tag-states` is
+  `joint-tags`; `beat-target-offer` is `beat-target`. No claim lost its check: each renamed gate exists and runs. Every
+  test script and every browser driver in the repository is registered. How it went stale: a gate was renamed or
+  deleted and only the line being worked on was updated, the "two lines about one fact" shape again.
+- [x] **HOW HARD WAS IT, 1 TO 10, on the session summary, 18 Nov 2026: his "Build the 1–10"** (from three options:
+  the three words as now, a dial like his screenshot, or a 1-10 tap row; my recommendation). "How hard was it?" with
+  ten numbers in two rows of five (44px each), words under them (1-3 Easy, 4-6 Moderate, 7-8 Hard, 9-10 All-out), one
+  tap saves it to that day's session and says "8 · Hard · saved"; changeable; read back when the summary opens again;
+  optional; a failed save says so. It REPLACES his 2 Sep "ask it in the chat" for anyone who taps: the tap also writes
+  the feel word, so the chat no longer asks; a session not rated is still asked about in the chat as before.
+  **And per lift stays Too easy / About right / Too hard**, his question answered with my recommendation (a three-way
+  weight decision, asked 6-8 times a session; a 1-10 there is slower for the same result).
+  CSCS (mine), the mapping to the chat's feel words: 1-3 easy, 4-8 good, 9-10 hard, never "rough". Basis: the score is
+  Foster's session RPE, where 7-8 ("very hard") is what a well-built loading session should feel like; counting it
+  as "hard" would make three ordinary training days trigger the coach's "offer to ease off" (three hard in a row).
+  Only 9-10, maximal, counts towards that. "Rough" is how a session felt in himself, which an effort number cannot say.
+  The coach is told the numbers he gave ("SESSION EFFORT HE RATED (1-10 ...): 8, 6, 9"), so it can quote them and never
+  invent one. Not built: effort x minutes as a weekly training load (the reason the scale was chosen; the number is now
+  kept so it can be). `test:session-effort` (23 checks, 12 mutations, two caught only after a read-back check and a
+  crash-safe wrapper were added), `verify:session-effort` (9 checks, 5 browser mutations), screenshot read.
+  Needs migration `20261118140000_add_session_effort` (until then the feel word saves and the number waits).
 - [x] **THE TIMER'S SOUND IS LOUDER, 19 Nov 2026: his "make the timer's sound louder too"**. Every cue (rest done, round
   timer work / rest / done) was a sine at 30% that faded away at once, so most of each beep was near-silent. Now a
   triangle wave (more overtones, carries over machines and music) at full level, held for 80% of the tone, then cut

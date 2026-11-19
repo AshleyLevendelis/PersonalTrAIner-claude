@@ -130,7 +130,11 @@ export function detectPlanInvalidation(
     const now = [...(patch.injuries ?? [])].sort()
     if (was.join('|') !== now.join('|')) {
       const added = now.filter(i => !was.includes(i))
-      if (added.length > 0) {
+      // ONLY FOR AN AREA THE PLAN CAN WORK AROUND (the Profile walk, 19 Nov 2026). "Other (describe)" keeps what he
+      // typed on the list and says, truthfully, that it changes no exercise; this then offered "Rebuild your plan
+      // around this? ... it still includes exercises that work the area you just flagged", which was not true of
+      // words the plan cannot read. The same test the removal below has always used.
+      if (added.some(code => getFlaggedJoints([code]).size > 0)) {
         return {
           field: 'injuries',
           title: 'Rebuild your plan around this?',

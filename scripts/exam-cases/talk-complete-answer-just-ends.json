@@ -1,0 +1,15 @@
+{
+  "name": "talk-complete-answer-just-ends",
+  "why": "Ashley, 19 Nov 2026 (his chat brief) and his 24 Sep 'a question only when the answer matters': a plain question gets a complete, specific answer that ENDS. The exam of 18 Nov found 11 of 19 closing questions were padding ('How does that sound?', a check-in on energy or water he never raised). Good: the answer, one reason tied to his own targets or day, and stop; a one-tap next step is fine. Bad: a stock closer, a tacked-on check-in, an emoji on the advice, or an opener that grades the question.",
+  "messages": [
+    "is it alright to have most of my carbs in the evening or is earlier in the day better"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      }
+    ]
+  }
+}

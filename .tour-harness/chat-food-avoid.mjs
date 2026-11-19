@@ -121,7 +121,7 @@ const pork = rows.filter(r => /pork/.test(r.ref ?? ''))
 check('1b. pork is in Foods to avoid: one hard food dislike in user_facts', pork.length === 1 && pork[0].kind === 'food_preference' && pork[0].polarity === 'dislike' && pork[0].hardness === 'hard', rows)
 const t1 = await tick('Added to Foods to avoid')
 check('1c. a tick says so, on screen where the reply is', !!t1 && t1.inView, t1)
-check('1d. ...naming the food', !!(await tick("won't eat/do pork")), await ev(`document.body.innerText.slice(-600)`))
+check('1d. ...naming the food, as a food ("won\'t eat pork", never "eat/do")', !!(await tick("won't eat pork")) && !(await tick("eat/do")), await ev(`document.body.innerText.slice(-600)`))
 await shoot('chat-food-avoid-tick')
 
 console.log('\n2. A habit is not a ban\n')

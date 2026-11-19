@@ -92,6 +92,8 @@ export interface PendingActionReceipt {
   planAfter?: Record<string, string>
   /** A meal marked as eating out: the dish it showed before, so Undo puts THAT back (eating-out.ts). */
   previousMeal?: string | null
+  /** A move between two meals of a day: each meal's pick before it (null: none, the day's own choice), for Undo. */
+  previousPicks?: Record<string, string | null>
 }
 
 const PENDING_WINDOW_MINUTES = 10
@@ -272,6 +274,26 @@ export async function claimPendingAction(
   if (!data) return { outcome: 'already_resolved' }
   return { outcome: 'claimed', row: data as PendingActionRow }
 }
+
+/**
+ * IS THE OFFER STILL GOOD AFTER THIS OUTCOME? Only for a plan-only change (PLAN_ONLY_KINDS) where nothing landed and
+ * every failure is the write itself (`save`): the caller then checks the saved plan is as it was, and the same tap
+ * can work a moment later. A refusal ("Friday already has a session on it")
+ * would fail the same way again, and a part-saved change must not be applied twice, so both keep their receipt.
+ */
+export function offerSurvivesFailedSave(kind: string, receipt: Pick<PendingActionReceipt, 'landed' | 'failed'>): boolean {
+  return PLAN_ONLY_KINDS.has(kind) && receipt.landed.length === 0 && receipt.failed.length > 0 && receipt.failed.every(f => f.op === 'save')
+}
+
+/**
+ * The offers whose Apply writes plan weeks and nothing else, so "is the saved plan as it was?" answers "did anything
+ * change?". A change that also writes a setting (days, style, goal, session length, another sport, an injury) can be
+ * half saved with the plan untouched, and keeps its receipt.
+ */
+const PLAN_ONLY_KINDS: ReadonlySet<string> = new Set([
+  'propose_exercise_swap', 'propose_exercise_add', 'propose_exercise_remove', 'propose_exercise_reorder',
+  'propose_session_shorten', 'propose_session_rebuild', 'propose_cardio_session', 'propose_volume_change',
+])
 
 export async function markExecuting(id: string): Promise<void> {
   await supabase.from('pending_actions').update({ status: 'executing' }).eq('id', id)

@@ -569,6 +569,23 @@ function scorePrimerFit(profile: UserProfile, mesocycle: MesocycleWeek[]): Dimen
   return { label: 'Primer fit', points: scoreFromViolatedRules(violatedRules.size), deductions }
 }
 
+/**
+ * THE SAME LIFT IN ANOTHER WEEK OF THE BLOCK (19 Nov 2026). The main-lift rules line the weeks up by ROW: week 1's
+ * main lift is on row 2, so rows 2 of weeks 2 to 4 are read as "the main lift". True of every plan the app writes
+ * (measured: 0 of 74,304 main-lift days on 6,144 plans hold it on a different row inside a block), and false the
+ * moment HE changes one week: move an exercise, add one above the main lift, take one out, and the row holds a
+ * different lift. The rules then said "the main lift changed" and "its load is not progressing" about a lift that
+ * was one row away, and his reorder card warned "the week stops covering everything it should" (the chat walk,
+ * 18 Nov 2026, C5; measured: 189 of 216 one-row moves).
+ * So: the lift on that row when it is the same lift, else that lift wherever it now sits on the day, else the row
+ * as before (the lift really is gone, and the rules say so). On a plan as generated this returns the row, always.
+ */
+function sameLiftIn(day: WorkoutDay | undefined, row: number, name: string): Exercise | undefined {
+  const at = day?.exercises[row]
+  if (at?.name === name) return at
+  return day?.exercises.find(ex => ex.name === name) ?? at
+}
+
 function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): DimensionResult {
   const block1 = mesocycle.filter(w => w.block_number === 1).sort((a, b) => (a.week_in_block ?? 0) - (b.week_in_block ?? 0))
   const [w1, w2, w3, w4] = block1
@@ -589,9 +606,9 @@ function scoreProgression(profile: UserProfile, mesocycle: MesocycleWeek[]): Dim
       const idx = day.exercises.findIndex(ex => ex.tier === 'tier_1_primary')
       if (idx === -1) continue
       const e1 = day.exercises[idx]
-      const e2 = w2.days.find(d => d.day === day.day)?.exercises[idx]
-      const e3 = w3.days.find(d => d.day === day.day)?.exercises[idx]
-      const e4 = w4.days.find(d => d.day === day.day)?.exercises[idx]
+      const e2 = sameLiftIn(w2.days.find(d => d.day === day.day), idx, e1.name)
+      const e3 = sameLiftIn(w3.days.find(d => d.day === day.day), idx, e1.name)
+      const e4 = sameLiftIn(w4.days.find(d => d.day === day.day), idx, e1.name)
       if (!e2 || !e3 || !e4) continue
 
       if (e1.suggested_load_kg != null && e2.suggested_load_kg != null && e3.suggested_load_kg != null) {
@@ -776,8 +793,8 @@ function scoreSelection(profile: UserProfile, mesocycle: MesocycleWeek[], exclus
       const mainIdx = day.exercises.findIndex(ex => ex.tier === 'tier_1_primary')
       if (mainIdx === -1) continue
       const name1 = day.exercises[mainIdx].name
-      const name2 = w2.days.find(d => d.day === day.day)?.exercises[mainIdx]?.name
-      const name3 = w3.days.find(d => d.day === day.day)?.exercises[mainIdx]?.name
+      const name2 = sameLiftIn(w2.days.find(d => d.day === day.day), mainIdx, name1)?.name
+      const name3 = sameLiftIn(w3.days.find(d => d.day === day.day), mainIdx, name1)?.name
       if (name2 !== name1 || name3 !== name1) {
         violatedRules.add('main_lift_changed_within_block')
         deductions.push({

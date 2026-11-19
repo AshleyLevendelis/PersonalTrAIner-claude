@@ -178,8 +178,9 @@ console.log('\n5. The wiring — both guards, because they ship separately')
   // floors on opts.refusedFloor, never on the "not sure I followed" floor.
   check('the plain path refuses the first leg', /const r = refusal\(own\)/.test(toolReply) && /opts\.refuse \? opts\.refuse\(t\) : null/.test(toolReply))
   check('...and the retry as well', /const r = refusal\(text\)/.test(toolReply))
+  // 19 Nov 2026: a silent turn's retry may be told WHY it was silent (a tool that does not exist); still never the claim's words.
   check('a refused turn gets a different nudge from a silent one',
-    /let nudge = PLAIN_TURN_NUDGE/.test(toolReply) && /nudge: opts\.nudge \?\? PLAIN_CLAIM_NUDGE, floor: opts\.refusedFloor/.test(toolReply) && /nudge = r\.nudge/.test(toolReply))
+    /let nudge = (?:opts\.silentNudge \?\? )?PLAIN_TURN_NUDGE/.test(toolReply) && /nudge: opts\.nudge \?\? PLAIN_CLAIM_NUDGE, floor: opts\.refusedFloor/.test(toolReply) && /nudge = r\.nudge/.test(toolReply))
   check('...and a different floor, so it does not blame her for being unclear',
     /refused && refusedFloor \? refusedFloor : opts\.floor/.test(toolReply))
 

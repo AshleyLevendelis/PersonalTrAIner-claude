@@ -2,10 +2,10 @@
   "case": "out-suggested-orders",
   "why": "His 13 Nov 2026 strategy, slice 5: a named restaurant gets 2 or 3 suggested orders from what it actually serves, one reason each tied to his day, and an offer to mark the meal out. Never a dish that clashes with a restriction, never 'it is nut-free', never a precise calorie figure (the app logs a meal out as a range, his ruling 'A range').",
   "checks": {},
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "c8589316d0e47018",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,8 +58,8 @@
   "turns": [
     {
       "user": "I'm going to an Italian restaurant on Friday night, what should I order?",
-      "reply": "Your cleanest bet is grilled chicken or sea bass with roasted veggies to keep your protein high and go easy on extra oils. \n\nIf you're craving pasta instead, a tomato-based sauce with a side of chicken works great too! [BREAK]\n\nWant me to mark Friday's dinner as eating out in your plan so your target adjusts for it?",
-      "raw": "Your cleanest bet is grilled chicken or sea bass with roasted veggies to keep your protein high and go easy on extra oils. \n\nIf you're craving pasta instead, a tomato-based sauce with a side of chicken works great too! [BREAK]\n\nWant me to mark Friday's dinner as eating out in your plan so your target adjusts for it?\n\n[QUICK_REPLIES: \"Yes, mark it eating out\" | \"No, I'm good!\"]",
+      "reply": "Chicken or fish piccata is a great choice since lean protein with a lighter pan sauce keeps your macros predictable without heavy cream. There are other good options on the menu too!\n\nWould you like me to mark Friday's dinner as eating out in your plan so your other meals adjust around it?",
+      "raw": "Chicken or fish piccata is a great choice since lean protein with a lighter pan sauce keeps your macros predictable without heavy cream. There are other good options on the menu too!\n[BREAK]\nWould you like me to mark Friday's dinner as eating out in your plan so your other meals adjust around it?\n\n[QUICK_REPLIES: \"Yes, mark Friday dinner\" | \"No thanks\"]",
       "error": null,
       "action": null,
       "proposal": null,

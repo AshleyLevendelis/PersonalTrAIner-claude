@@ -282,6 +282,28 @@ const X1 = await page(`
   return { onScreen: !!row('Cheddar'), dismissed: db ? db.dismissed === true : true, chip: qa('[data-testid="grocery-chip"]').find(c => c.dataset.aisle === 'dairy')?.textContent.trim() ?? null }
 `)
 check('Remove takes it off the list, through the store, and the aisle\'s count follows', !X1.onScreen && X1.dismissed && X1.chip === 'Dairy, eggs & alternatives2', X1)
+// REMOVE SAYS SO, WITH AN UNDO (the Nutrition walk, 19 Nov 2026; the shape of his 8 Nov "Undo line"). It was the one
+// way off the list that said nothing and could not be put back, and a rebuild never brings a removed item back.
+// Undo puts the row back as it stood; then it is removed again, so the page goes on from the state it always had.
+const X2 = await page(`
+  const toast = q('[data-testid="grocery-toast"]')?.textContent.replace(/\\s+/g, ' ').trim() ?? null
+  q('[data-testid="grocery-undo"]')?.click()
+  for (let i = 0; i < 20; i++) { await new Promise(r => setTimeout(r, 100)); if (row('Cheddar')) break }
+  await new Promise(r => setTimeout(r, 400))
+  const db = (window.__fakeDb?.grocery_items ?? []).filter(r => r.id === 'g-9')
+  const back = { onScreen: !!row('Cheddar'), rows: db.length, dismissed: db[0]?.dismissed === true, qty: db[0]?.quantity ?? null, chip: qa('[data-testid="grocery-chip"]').find(c => c.dataset.aisle === 'dairy')?.textContent.trim() ?? null, toastGone: !q('[data-testid="grocery-undo"]') }
+  return { toast, back }
+`)
+check('Remove says which item left, with an Undo', /^Cheddar — taken off the list\s?Undo$/.test(X2.toast ?? ''), X2.toast)
+check('...and Undo puts it back on the list, through the store, as it stood', X2.back.onScreen && X2.back.rows === 1 && !X2.back.dismissed && X2.back.chip === 'Dairy, eggs & alternatives3', X2.back)
+await tapRow('Cheddar')
+const X3 = await page(`
+  row('Cheddar')?.querySelector('[data-testid="grocery-remove"]')?.click()
+  await new Promise(r => setTimeout(r, 400))
+  const db = (window.__fakeDb?.grocery_items ?? []).find(r => r.id === 'g-9')
+  return { onScreen: !!row('Cheddar'), dismissed: db ? db.dismissed === true : true, chip: qa('[data-testid="grocery-chip"]').find(c => c.dataset.aisle === 'dairy')?.textContent.trim() ?? null }
+`)
+check('(removed again, so the page goes on as before)', !X3.onScreen && X3.dismissed && X3.chip === 'Dairy, eggs & alternatives2', X3)
 
 console.log('\n[4] A tick lands, waits a beat, leaves — and Undo brings it back')
 const K0 = await page(`
@@ -548,6 +570,27 @@ const TR = await page(`
 check('"toilet roll" is stored as one, counted (not 1 g)', TR.quantity === 1 && TR.unit === 'item', TR)
 check('...and its row reads "1", with no "0g" anywhere on it', TR.qty === '1', TR)
 await shoot('grocery-typed-item')
+
+// [14] THE NUTRITION WALK OF 18 NOV 2026 (finding N5): the row rounded to the NEAREST step, so 270 g read "~250g":
+// less than the meals need. An amount to buy is rounded UP, and the stepper moves the number he is looking at.
+console.log('\n[14] The list never shows less than is needed: 270 g reads "~300g"')
+const UP0 = await page(`
+  const input = q('[data-testid="grocery-addbar"] input')
+  if (input) { setVal(input, '270g couscous'); await new Promise(r => setTimeout(r, 100)); enter(input) }
+  await new Promise(r => setTimeout(r, 700))
+  const hit = qa('[data-testid="grocery-row"]').find(r => /couscous/i.test(r.dataset.item || ''))
+  hit?.scrollIntoView({ block: 'center' })
+  const stored = (window.__fakeDb?.grocery_items ?? []).find(r => /couscous/i.test(r.display_name))
+  return { name: hit?.dataset.item ?? null, closed: hit?.querySelector('[data-testid="grocery-qty"]')?.textContent.trim() ?? null, before: stored?.quantity ?? null }
+`)
+await tapRow(UP0.name ?? 'couscous')
+const UP1 = await page(`const r = row(args[0]); return { readout: r?.querySelector('[data-testid="grocery-readout"]')?.textContent.trim() ?? null, exact: r?.querySelector('[data-testid="grocery-exact"]')?.textContent.trim() ?? null }`, UP0.name ?? 'couscous')
+const UP2 = await step(UP0.name ?? 'couscous', 'plus')
+const UP = { ...UP0, ...UP1, after: UP2.stored, afterReadout: UP2.readout }
+check('14a. 270 g typed is stored as 270 g, and its row reads "~300g" (it read "~250g")', UP.before === 270 && UP.closed === '~300g', UP)
+check('14b. ...the open row shows the rounded-up amount with the exact figure beside it', UP.readout === '300 g' && /270/.test(UP.exact ?? ''), UP)
+check('14c. ...and plus moves the number he is looking at by one step: 300 to 350', UP.after === 350, UP)
+await shoot('grocery-rounded-up')
 
 const errs = await call(() => window.__errs ?? [])
 check('nothing on the page threw', errs.length === 0, errs)

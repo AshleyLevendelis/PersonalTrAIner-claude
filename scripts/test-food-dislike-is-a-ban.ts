@@ -28,6 +28,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { compileFoodDislikes, compileSoftFoodPreferences, compileSoftExercisePreferences, compileExerciseExclusions, resolveExerciseDislike } from '../src/lib/fact-compiler'
 import type { UserFactRow } from '../src/lib/types'
+import { wontText } from '../src/lib/fact-display'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -105,8 +106,11 @@ check('a food dislike is forced hard on the way in',
   check('...with the override inside that branch, not somewhere else',
     /kind === 'food_preference' && polarity === 'dislike'/.test(branch))
 }
-check('...so the receipt says "won\'t eat/do", not "not keen on"',
-  /hardness === 'hard' \? "won't eat\/do" : 'not keen on'/.test(src))
+// RE-ANCHORED 19 Nov 2026: the label is written by kind now ("won't eat pork", never "won't eat/do"), by the one
+// function every writer calls. The property is unchanged: a hard dislike takes the firm label, never "not keen on".
+check('...so the receipt takes the firm label ("won\'t eat ..."), not "not keen on"',
+  /polarity === 'dislike' && hardness === 'hard' \? wontText\(kind, targetPhrase\) : `\$\{polarity === 'dislike' \? 'not keen on'/.test(src)
+  && wontText('food_preference', 'almond butter') === "won't eat almond butter")
 
 console.log('\n5. The warning that stayed silent is no longer gated on hardness')
 check('today\'s-plan check runs for any food dislike',

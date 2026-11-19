@@ -208,6 +208,37 @@ for (let i = 0; i < 20; i++) { await wait(300); back8 = await ev(`[...document.q
 check('8g. ...puts every exercise back as it was planned', JSON.stringify(back8) === JSON.stringify(sets8), { was: sets8, now: back8 })
 check('8h. ...and the made-lighter line and its button are gone', !(await has('[data-testid="lighter-today-undo"]')) && !/lighter/i.test(await note()), await note())
 
+// --- 9. THE WAY BACK FROM "I'M SHORT OF TIME" (the Exercise walk, 19 Nov 2026) ---------------------------------------
+// "Make it easier" has had its put-back since 2 Nov; shortening had none, so three exercises taken off on one tap
+// could only be got back by asking the coach. A fresh page: shorten, the button is there AFTER a trip to another tab
+// (which unmounts the screen), one tap puts every exercise back, and the saved week is the planned one again.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&load=9#/tab/exercise` })
+await wait(4000)
+const rows9 = () => ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`)
+const planned9 = await rows9()
+check('9a. a fresh page, with the full session', Array.isArray(planned9) && planned9.length === start.length, { n: planned9?.length, start: start.length })
+check('9b. shortened by the day menu', (await openSheet()) === 'open' && await clickSel('[data-verb="shorten"]') && (await wait(500), await clickSel(`[data-shorten-minutes="${target}"]`)) && await untilClosed())
+const short9 = await untilOrder(o => o.length < start.length)
+check('9c. ...the session lost exercises (the fixture binds)', short9.length < start.length, { start: start.length, now: short9.length })
+let undo9 = false
+for (let i = 0; i < 20 && !(undo9 = await has('[data-testid="day-edit-undo"]')); i++) await wait(300)
+const label9 = await ev(`document.querySelector('[data-testid="day-edit-undo"]')?.textContent.trim() ?? null`)
+check('9d. THE SESSION OFFERS "Put the full session back" (it offered nothing)', undo9 && label9 === 'Put the full session back', label9)
+check('9e. ...and says the shortening once, not twice', (await ev(`(document.body.innerText.match(/Shortened/g) || []).length`)) === 1, await ev(`document.body.innerText.match(/[^\\n]*Shortened[^\\n]*/g)`))
+await ev(`location.hash = '#/tab/home'`); await wait(1500)
+await ev(`location.hash = '#/tab/exercise'`); await wait(2500)
+check('9f. the button is still there after a trip to another tab', await has('[data-testid="day-edit-undo"]'))
+await ev(`document.querySelector('[data-testid="day-edit-undo"]')?.scrollIntoView({ block: 'center' })`); await wait(300)
+await shoot('shorten-today-way-back')
+const savedShort = await ev(`JSON.stringify(window.__fakeDb?.mesocycle_weeks ?? [])`)
+check('9g. tapping it', await clickSel('[data-testid="day-edit-undo"]'))
+let back9 = null
+for (let i = 0; i < 20; i++) { await wait(300); back9 = await rows9(); if (JSON.stringify(back9) === JSON.stringify(planned9)) break }
+check('9h. ...puts every exercise back as it was planned, sets and weights too', JSON.stringify(back9) === JSON.stringify(planned9), { was: planned9, now: back9 })
+check('9i. ...the button and the "Shortened" line are gone', !(await has('[data-testid="day-edit-undo"]')) && !/^Shortened/.test(await note()), await note())
+check('9j. ...and the saved week changed with it (the put-back was written)', (await ev(`JSON.stringify(window.__fakeDb?.mesocycle_weeks ?? [])`)) !== savedShort)
+check('9k. ...with nothing on screen reading as a failure', !(await has('[data-testid="day-edit-error"]')), await ev(`document.querySelector('[data-testid="day-edit-error"]')?.textContent ?? null`))
+
 console.log(failures === 0 ? '\nShortening takes the tail off, keeps the main lift whole, says so, and sticks.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

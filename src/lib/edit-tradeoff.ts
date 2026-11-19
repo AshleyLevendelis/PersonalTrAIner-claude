@@ -4,6 +4,7 @@ import type { Tradeoff, TradeoffAlternative, EditScope } from './tradeoff-shape'
 import { reasonChipsFor } from './edit-reason'
 import { muscleGroupsOf, type ExerciseEntry, type MuscleGroup, getExerciseEntry } from './exercise-db'
 import { scorePlan, ONE_RULE, DIMENSION_KEYS, type DimensionKey } from './quality-score'
+import { warmUpNowAfterWork } from './session-edit'
 
 // ---------------------------------------------------------------------------
 // WHAT A CHANGE COSTS YOUR GOAL — the sentence, and how firm to be about it.
@@ -423,6 +424,14 @@ export function assessEdit(ctx: EditContext): Tradeoff {
         reason: 'main lift moved into the back half of a strength-phase session',
       }
     }
+  }
+
+  // A CHANGE OF ORDER THAT LEAVES THE WARM-UP MOVE BEHIND THE WORK IT PREPARES (19 Nov 2026). Tier 1: said, allowed.
+  // Checked before the volume and score branches because a reorder changes neither (order carries no load), so
+  // nothing below would ever say it: the scorer reads warm-up order in week 1 only.
+  if (kind === 'reorder') {
+    const late = warmUpNowAfterWork(dayOf(beforeWeek, dayName)?.exercises ?? [], dayOf(afterWeek, dayName)?.exercises ?? [])
+    if (late) return { tier: 1, cost: late, alternatives: [], question: null, reason: 'the warm-up move now comes after working sets' }
   }
 
   // 7. A big, lasting loss of work for one muscle. The scorer cannot see this

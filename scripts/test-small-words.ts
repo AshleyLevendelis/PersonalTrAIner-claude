@@ -1,7 +1,7 @@
 /**
  * SMALL WORDS THE WHOLE-APP TEST FOUND WRONG (1 Nov 2026). Each line was a sentence or label the app showed that
  * disagreed with the app's own name for something, or with English:
- *   - Appearance's theme preview said "12 day streak"; her ruling (17 Oct 2026) is "12 in a row".
+ *   - Appearance's theme preview said "12 day streak"; it says weeks on plan now (his 13 Nov 2026 "Replace").
  *   - Profile's back button said "‹ Dashboard"; the tab is called Home.
  *   - Profile's weigh-in row said "Log a weigh-in on Dashboard".
  *   - A one-interval round ended "All 1 intervals done".
@@ -21,10 +21,12 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   else { failures++; console.log(`  FAIL: ${name}${detail === undefined ? '' : ` — ${JSON.stringify(detail)}`}`) }
 }
 
-console.log('\n1. The theme preview says the streak the way the app does')
+// RE-ANCHORED 19 Nov 2026. This held "12 in a row" (his 17 Oct ruling), which his 13 Nov ruling REPLACED: Home says
+// "9 of 12 weeks" and a run is never shown. The check went on enforcing the old pill in the one place it survived.
+console.log('\n1. The theme preview says the pill the way Home does (weeks on plan, never a run)')
 const appearance = read('src/components/AppearanceSection.tsx')
-check('"12 in a row"', /12 in a row/.test(appearance))
-check('...never "day streak"', !/day streak/i.test(appearance))
+check('"9 of 12 weeks"', /9 of 12 weeks/.test(appearance))
+check('...never a run ("in a row") and never "day streak"', !/in a row/i.test(appearance) && !/day streak/i.test(appearance))
 
 console.log('\n2. Profile names Home as Home')
 const app = read('src/App.tsx')

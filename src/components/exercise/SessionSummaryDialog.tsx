@@ -12,6 +12,8 @@ import type { SessionSummary } from '@/lib/session-derive'
 import { readingFor, type SessionPRHit } from '@/lib/pr-engine'
 import { personalBest, BEST_SET_QUALIFIER, noSetsButCardio, extraSetsNote } from '@/lib/coach-voice'
 import type { DoubleProgressionRecommendation } from '@/lib/progression-engine'
+import { useEffect, useState } from 'react'
+import { recordSessionEffort, readSessionEffort, effortWord, EFFORT_MIN, EFFORT_MAX } from '@/lib/session-feel'
 
 export interface SessionSummaryData {
   summary: SessionSummary
@@ -42,6 +44,7 @@ export function SessionSummaryDialog({
   nothingLogged = false,
   serverCloseFailed = false,
   savedCardio = [],
+  effortFor,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -52,6 +55,8 @@ export function SessionSummaryDialog({
   serverCloseFailed?: boolean
   /** With `nothingLogged`: the cardio that WAS logged today, by name — so the card does not say "Nothing logged" over a walk it has saved. */
   savedCardio?: string[]
+  /** Whose session and which day, for the 1-10 effort row (his ruling 18 Nov 2026, "Build the 1–10"). */
+  effortFor?: { profileId: string; date: string }
 }) {
   const progressionLines = (data?.progressions ?? []).filter((entry): entry is readonly [string, { note: string; didProgress: boolean }] => entry[1] != null)
 
@@ -109,6 +114,8 @@ export function SessionSummaryDialog({
               </div>
             </div>
 
+            {effortFor && open && <EffortRow profileId={effortFor.profileId} date={effortFor.date} />}
+
             {(data.cardio?.length ?? 0) > 0 && (
               <div className="space-y-1.5" data-testid="summary-cardio">
                 <p className="ds-label-compact">Cardio</p>
@@ -160,5 +167,55 @@ export function SessionSummaryDialog({
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+const SCORES = Array.from({ length: EFFORT_MAX - EFFORT_MIN + 1 }, (_, i) => EFFORT_MIN + i)
+
+/**
+ * HOW HARD WAS IT, 1 TO 10: one tap, saved at once, optional. Two rows of five so every number keeps a 44px target on
+ * a phone. The words under it name the band; once he taps, the line says his number, its word and whether it saved.
+ */
+function EffortRow({ profileId, date }: { profileId: string; date: string }) {
+  const [score, setScore] = useState<number | null>(null)
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle')
+  useEffect(() => {
+    let live = true
+    readSessionEffort(profileId, date).then(n => { if (live && n != null) { setScore(n); setState('saved') } })
+    return () => { live = false }
+  }, [profileId, date])
+  const pick = async (n: number) => {
+    setScore(n)
+    setState('saving')
+    setState((await recordSessionEffort(profileId, date, n)) ? 'saved' : 'failed')
+  }
+  return (
+    <div className="space-y-2" data-testid="summary-effort">
+      <p className="ds-label-compact">How hard was it?</p>
+      <div className="grid grid-cols-5 gap-1.5" role="radiogroup" aria-label="How hard was the session, 1 to 10">
+        {SCORES.map(n => (
+          <button
+            key={n}
+            type="button"
+            role="radio"
+            aria-checked={score === n}
+            aria-label={`${n} of 10, ${effortWord(n)}`}
+            data-testid={`effort-${n}`}
+            disabled={state === 'saving'}
+            onClick={() => pick(n)}
+            className={`tabular-mono min-h-11 rounded-lg text-base font-semibold ${score === n ? 'bg-primary text-primary-foreground' : 'bg-[color:var(--surface-deep)] text-foreground'}`}
+          >
+            {n}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-muted-foreground" data-testid="effort-line" aria-live="polite">
+        {state === 'failed'
+          ? "Couldn't save that. Check your connection and tap a number again."
+          : score != null
+            ? `${score} · ${effortWord(score)}${state === 'saved' ? ' · saved' : ''}`
+            : '1-3 Easy · 4-6 Moderate · 7-8 Hard · 9-10 All-out'}
+      </p>
+    </div>
   )
 }

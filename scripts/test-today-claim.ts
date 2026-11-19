@@ -156,7 +156,10 @@ async function main() {
   check('the two copies are identical', app === deno)
   const fn = strip(read('../supabase/functions/chat-gemini/index.ts'))
   check('chat-gemini hands the check to every tool reply', /resolveToolReply\(\{[^}]*checks: todayChecks/.test(fn))
-  check('...and to the plain reply', /resolvePlainReply\(\{[\s\S]{0,400}checks: todayChecks/.test(fn))
+  // 19 Nov 2026: the plain reply carries a second check beside it (a promise with no tool behind it), so the list is
+  // `[...todayChecks, ...]`. The property is unchanged, and now asked of EVERY plain reply, not the first one found.
+  const plainCalls = fn.split('resolvePlainReply({').slice(1).map(seg => seg.slice(0, seg.indexOf('})')))
+  check('...and to the plain reply', plainCalls.length >= 1 && plainCalls.every(c => /checks: (?:todayChecks|\[\s*\.\.\.todayChecks\b)/.test(c)), plainCalls.map(c => c.slice(-90)))
   check('...built from the clock, the client\'s trained_today and her own message', /partOfDay: typeof context\.current_part_of_day/.test(fn) && /context\.trained_today/.test(fn) && /userMessage: typeof message === "string"/.test(fn))
   check('the example that set the scene in the evening no longer does', !/fit your evening nicely/.test(fn))
   check('...and the examples are labelled as voice only, never a source for the day', /never take the time of day, a session, or whether they have trained from an example/.test(fn))

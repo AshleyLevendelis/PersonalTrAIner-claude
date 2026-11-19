@@ -219,7 +219,9 @@ async function main() {
     // in a second step (a photo turn's "safe" sentences leave it), so the one line this pinned no longer exists. The
     // property is the order and the identity, and that is what is read: the response is built first, the push is given
     // THAT response's body and status, and that response is what is returned.
-    const builtAt = serve.indexOf('cleanCoachResponse(await handleChatRequest(req))')
+    // 19 Nov 2026: the cleaning step is also handed the conversation (a second argument), so the anchor is the call's
+    // opening, which is the same property: the handler's result goes into the cleaning step before anything is pushed.
+    const builtAt = serve.indexOf('cleanCoachResponse(await handleChatRequest(req)')
     const pushAt = serve.indexOf('deliverReply(')
     check('chat-gemini sends the reply AFTER building the response, never instead of it',
       builtAt > 0 && pushAt > builtAt && /const res = [^;\n]*\bguarded\b/.test(serve) && !/const res = [^;\n]*handleChatRequest\(/.test(serve)

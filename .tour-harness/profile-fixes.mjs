@@ -274,10 +274,18 @@ const savedMsg = await text('[data-testid="injury-other-message"]')
 check('11f. ...and says it changes no exercise', /doesn't change which exercises/.test(savedMsg ?? ''), savedMsg)
 const msgBox = await ev(`(() => { const r = document.querySelector('[data-testid="injury-other-message"]')?.getBoundingClientRect(); return r ? r.top >= 0 && r.bottom <= innerHeight : false })()`)
 check('11g. ...where he can see it', msgBox === true)
+// AND IT OFFERS NO REBUILD (the Profile walk, 19 Nov 2026): it had just said it changes no exercise, and then raised
+// "Rebuild your plan around this? ... exercises that work the area you just flagged". The offer still on the page is
+// section 10's; the one a ticked AREA raises is read below (11i), so this is not a check that can only pass.
+await wait(600)
+const offerAfterOther = await text('[data-testid="plan-invalidation-detail"]')
+check('11g2. ...and raises no rebuild offer about an "area you just flagged"', !/area you just flagged/.test(offerAfterOther ?? ''), offerAfterOther)
 await typeInto(q('[data-testid="injury-other-text"]'), 'right knee after surgery')
 await pointAt(q('[data-testid="injury-other-lasting"]'))
 const ticked = await until(async () => { const r = await profileRow(); return (r?.injuries ?? []).includes('knees') ? r : null })
 check('11h. a named area is ticked, not saved as words', !!ticked && !(ticked.injuries ?? []).includes('right knee after surgery'), (await profileRow())?.injuries)
+const offerAfterArea = await until(async () => { const t = await text('[data-testid="plan-invalidation-detail"]'); return /area you just flagged/.test(t ?? '') ? t : null })
+check('11i. ...and THAT offers the rebuild, since the plan can work around a knee', !!offerAfterArea, await text('[data-testid="plan-invalidation-detail"]'))
 await shoot('profile-fixes-11-other-injury')
 
 console.log(`\n${ran} checks ran`)

@@ -1,0 +1,23 @@
+{
+  "name": "talk-picks-up-the-thread",
+  "why": "Ashley, 19 Nov 2026 (his chat brief: 'the way it keeps the conversation going ... keep coming back'). Being remembered is what brings people back. He told the coach on Sunday about Monday's physio appointment for his left shoulder; a bare 'hey' afterwards should be met with THAT, by name, as the one question, because the answer decides whether overhead pressing comes back. The failures are a generic hello, a recital of today's session, or asking how he is in general.",
+  "contextOverrides": {
+    "active_facts": [
+      "Said on Sunday: has a physio appointment on Monday about the left shoulder, and will find out whether overhead pressing is back on."
+    ]
+  },
+  "messages": [
+    "hey"
+  ],
+  "checks": {
+    "mustMention": [
+      "shoulder"
+    ],
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      }
+    ]
+  }
+}

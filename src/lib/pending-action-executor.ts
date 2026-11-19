@@ -42,6 +42,7 @@ import { STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from './onboarding-slot
 import { substituteForInjury, substituteForEquipment, rebuildForInjury, dayChangesBetween, type AdaptationRecord, type PlanEditContext } from './plan-adaptations'
 import { planDaysInWindow, type PlanDayOnDate } from './plan-guard'
 import type { PendingActionReceipt } from './pending-actions-store'
+import { wontText } from './fact-display'
 
 /**
  * THE PLAN TO DRAW AFTER A CONFIRM: the one that was SAVED, never the one that was attempted (27 Oct 2026).
@@ -287,16 +288,16 @@ export async function executeExerciseAdd(
   const entry = resolveAdditionRequest(payload.exerciseName, profile, exclusions)
   if (!entry) return fail(`I can't add ${payload.exerciseName} — it isn't something I can prescribe with your equipment and injuries.`)
 
-  const day = mesocycle
-    .find(w => w.week_number === payload.weekNumber)?.days
-    .find(d => d.day === payload.dayName)
+  const week = mesocycle.find(w => w.week_number === payload.weekNumber)
+  const day = week?.days.find(d => d.day === payload.dayName)
   if (!day) return fail("I couldn't find that day on your plan.")
 
   const programming = peerProgrammingFor(day.exercises, mapTier(entry.mechanics_tier))
   if (!programming) return fail(`${payload.dayName} is a rest day. Make it a training day first, then add to it.`)
 
-  const { recomputeLoad } = await import('./mesocycle-edit')
-  const load = await recomputeLoad(entry, profile, programming.intensity, programming.sets, programming.reps, true)
+  // Priced as the screen prices it, by the one function both call (docs/plans/added-lift-price.md).
+  const { priceAddedLift } = await import('./mesocycle-edit')
+  const load = await priceAddedLift(entry, profile, programming, week, mesocycle)
 
   const result = addExerciseToSession({
     mesocycle, profile,
@@ -368,7 +369,7 @@ export async function executeExerciseBan(
       kind: 'exercise_preference',
       source: 'chat',
       rawPhrase: name,
-      displayText: `won't eat/do ${name}`,
+      displayText: wontText('exercise_preference', name),
       polarity: 'dislike',
       hardness: 'hard',
       resolvedRefs: [name],
@@ -750,6 +751,34 @@ export async function executeMealMove(
   }
 
   return { landed, failed: [] }
+}
+
+/**
+ * PUTS A MOVE BETWEEN TWO MEALS BACK (the chat walk, 18 Nov 2026, C11: the screen's Move sheet had an Undo since 2 Nov
+ * and the coach's receipt had none, "moving it back is one more move"). Each leg's resized copy is taken out of the
+ * meal's options and that meal's earlier pick put back (none: the day's own choice), last leg first. ONE function for
+ * the sheet and the coach, so the two cannot leave the day in different states. False the moment a step does not
+ * save: an Undo is a write.
+ */
+export async function undoMealMove(
+  profileId: string,
+  payload: MealMovePayload,
+  previous: Partial<Record<string, string | null>>,
+  pick: (slot: MealAdditionPayload['slot'], name: string) => Promise<boolean>,
+): Promise<boolean> {
+  for (const leg of [...payload.legs].reverse()) {
+    if (!(await undoMealEdit(profileId, { payload: leg.payload, poolIndex: null, previous: previous[leg.slot] ?? null }, pick))) return false
+  }
+  return true
+}
+
+/**
+ * IS THE DAY STILL AS THE MOVE LEFT IT? Every meal the move wrote must still hold the dish it put there. His 29 Oct
+ * rule for the plan, applied to this: an Undo puts back only what is still as the card left it, so a meal he has
+ * swapped again since is never overwritten by an old Undo.
+ */
+export function mealMoveStillHolds(picksNow: Partial<Record<string, string>>, payload: MealMovePayload): boolean {
+  return payload.legs.length > 0 && payload.legs.every(leg => picksNow[leg.slot] === leg.payload.option.name)
 }
 
 /** What the swap and its undo need from the screen: showing saved picks, and re-reading the options. */
@@ -1268,16 +1297,20 @@ export async function executeVolumeChange(
     failed.push({ op: 'volume', error: 'Every exercise on that day is already at its limit — nothing moved.' })
   }
 
+  let savedWeeks = 0
   for (const week of next) {
     if (!payload.weekNumbers.includes(week.week_number)) continue
-    try { if (profile.id) await saveMesocycleWeek(profile.id, week) }
+    try { if (profile.id) await saveMesocycleWeek(profile.id, week); savedWeeks++ }
     catch { failed.push({ op: 'save', error: `Week ${week.week_number} didn't save` }) }
   }
 
+  // NOTHING LANDED IF NO WEEK SAVED (chat walk C4, 19 Nov 2026): the lines above describe the change, and with every
+  // save refused there is no change to describe. A receipt that listed them read as "partly done" over an untouched plan.
+  const nothingSaved = savedWeeks === 0 && failed.some(f => f.op === 'save')
   return {
-    mesocycle: next,
+    mesocycle: nothingSaved ? mesocycle : next,
     preImage,
-    receipt: { landed, failed },
+    receipt: { landed: nothingSaved ? [] : landed, failed },
   }
 }
 
@@ -1341,6 +1374,8 @@ export async function executeSessionShorten(
   try { if (profile.id) await saveMesocycleWeek(profile.id, settled.week) }
   catch { failed.push({ op: 'save', error: didNotSave('That') }) }
 
+  // ONE WEEK, ONE WRITE: if it did not save, nothing landed (see executeVolumeChange).
+  if (failed.length > 0) return { mesocycle, preImage, receipt: { landed: [], failed } }
   return { mesocycle: next, preImage, receipt: { landed, failed } }
 }
 
@@ -1404,6 +1439,8 @@ export async function executeSessionRebuild(
   try { if (profile.id && settledWeek) await saveMesocycleWeek(profile.id, settledWeek) }
   catch { failed.push({ op: 'save', error: didNotSave('That') }) }
 
+  // ONE WEEK, ONE WRITE: if it did not save, nothing landed (see executeVolumeChange).
+  if (failed.length > 0) return { mesocycle, preImage, receipt: { landed: [], failed } }
   return { mesocycle: result.mesocycle, preImage, receipt: { landed, failed } }
 }
 
@@ -1474,6 +1511,17 @@ export interface CardioSessionPayload {
 }
 
 /**
+ * THE ROW A REST DAY WOULD HAVE IF THE PLAN KEPT ONE. A plan keeps rows for its training days, and for the odd rest
+ * day carrying optional cardio; an ordinary rest day has none. Putting a session ON such a day (the chat walk of
+ * 18 Nov 2026: "put a run on Saturday" was answered "I couldn't find Saturday on your plan") starts from this, on the
+ * card and in the write, so the two agree about what the day was.
+ */
+const WEEKDAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+export function emptyRestRow(dayName: string): MesocycleWeek['days'][number] {
+  return { day: dayName, focus: 'Rest', exercises: [] }
+}
+
+/**
  * PUTS A CARDIO SESSION ON A DAY, as part of the plan.
  *
  * Ashley, 15 Sep 2026: *"I want when it adds a session like a cardio session
@@ -1505,10 +1553,13 @@ export async function executeCardioSession(
   if (!week) {
     return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'add', error: "I can't see that week on your plan just now." }] } }
   }
-  const day = week.days.find(d => d.day === payload.dayName)
-  if (!day) {
+  // A REST DAY USUALLY HAS NO ROW (see emptyRestRow): the row is made here, in each week this writes. Only for a real
+  // weekday: a name that is not one is still refused rather than invented.
+  const known = week.days.find(d => d.day === payload.dayName)
+  if (!known && !WEEKDAY_NAMES.includes(payload.dayName)) {
     return { mesocycle, preImage, receipt: { landed, failed: [{ op: 'add', error: `I couldn't find ${payload.dayName} on your plan.` }] } }
   }
+  const day = known ?? emptyRestRow(payload.dayName)
   if (day.exercises.length > 0) {
     return {
       mesocycle,
@@ -1519,7 +1570,9 @@ export async function executeCardioSession(
 
   const withActivity = (w: MesocycleWeek): MesocycleWeek => ({
     ...w,
-    days: w.days.map(d => d.day !== payload.dayName ? d : {
+    // A LATER WEEK WHERE THIS DAY TRAINS IS LEFT ALONE: the activity is the whole day, and writing it over a session
+    // there would hide the lifting behind it, the thing this refuses for the week he asked about.
+    days: (w.days.some(d => d.day === payload.dayName) ? w.days : [...w.days, emptyRestRow(payload.dayName)]).map(d => d.day !== payload.dayName || d.exercises.length > 0 ? d : {
       ...d,
       focus: payload.activity,
       is_scheduled: true,

@@ -392,6 +392,15 @@ async function main() {
     check('"my lunch and dinner are 300 over": not a move at all', rebalanceSaid('my lunch and dinner are 300 over').kind === 'none')
     check('one meal named: not a move between two', rebalanceSaid('make my lunch smaller').kind === 'none')
     check('the meals she named, once each, in order', JSON.stringify(mealsNamed('Lunch and dinner, and lunch again')) === '["lunch","dinner"]')
+    // THE AMOUNT IS HIS, FROM HIS WORDS (the chat walk, 18 Nov 2026, C6): the amount button's words carry it, and
+    // the coach leaving it out sent the app's "How much?" round again for ever.
+    const { kcalSaid } = await import('../src/lib/meal-rebalance')
+    check('the amount button\'s own words carry the amount', kcalSaid(REBALANCE.chip(200, 'dinner')) === 200 && kcalSaid(REBALANCE.chip(1200, 'dinner')) === 1200, [REBALANCE.chip(200, 'dinner'), REBALANCE.chip(1200, 'dinner'), kcalSaid(REBALANCE.chip(1200, 'dinner'))])
+    check('"1,200 calories" is twelve hundred, not two hundred', kcalSaid('move 1,200 calories from dinner to lunch') === 1200 && rebalanceSaid('put 1,200 calories from dinner into lunch').kind === 'ordered'
+      && (rebalanceSaid('put 1,200 calories from dinner into lunch') as { kcal: number | null }).kcal === 1200, kcalSaid('move 1,200 calories from dinner to lunch'))
+    check('no amount said is no amount (the app then asks)', kcalSaid("move some of lunch's calories to dinner") === null && kcalSaid('200 over at lunch') === null)
+    const chat = read('src/components/ChatAssistant.tsx')
+    check('the chat takes the amount from his words first, the coach\'s only when he gave none', /kcal: kcalSaid\(userSaid\) \?\? raw\.kcal/.test(chat))
     check('the whole-day resize never says "tell me which" to someone who named two', !/tell me which(?! way)/.test(REBALANCE.refitFits(true)) && /moved to the other/.test(REBALANCE.refitFits(true)))
   }
 

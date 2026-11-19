@@ -972,8 +972,14 @@ if (failures > 0) {
   // 6 Nov 2026: the second pass (her "Second pass + checks") may edit it, and starts from it and falls back to it.
   check('...and its answer is what actually ships', /let finalReply = plain\.reply;/.test(src) && /JSON\.stringify\(\{ reply: finalReply \}\)/.test(src), null)
   check('...and no longer tells her to rephrase', !/try rephrasing/.test(src), null)
+  // THE PROPERTY, not the sentence (19 Nov 2026: the floor was reworded to own the miss, and the pinned words failed
+  // correct code). The plain turn's last resort is the app's one constant, and it never asks HER to be clearer.
+  const plainFloor = /const PLAIN_FLOOR = "([^"]+)"/.exec(src)?.[1] ?? ''
+  const blamesHer = (t: string) => /rephras|in your own words|didn't (?:quite )?(?:catch|follow)|be (?:more )?(?:clear|specific)|unclear|could you try/i.test(t)
   check('...with a floor that does not blame her',
-    /I'm not sure I followed that one/.test(src), null)
+    /floor: PLAIN_FLOOR,/.test(src) && plainFloor.length > 20 && !blamesHer(plainFloor), plainFloor)
+  check('...the detector can fail: the two lines this replaced both read as blame',
+    blamesHer("I didn't quite catch that. Could you try rephrasing?") && blamesHer("I didn't quite follow that one — say it again in your own words and I'll sort it."))
   check('...and one log line per plain turn', /plain-reply source=/.test(src), null)
 
   // §1's length rule now depends on the kind of turn.

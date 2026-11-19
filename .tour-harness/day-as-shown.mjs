@@ -81,7 +81,7 @@ await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, devi
 let load = 0
 const open = async q => { load++; await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&${q}&load=${load}#/tab/nutrition` }); for (let i = 0; i < 40; i++) { await wait(300); if (await ev(`!!document.querySelector('[data-testid="day-kcal"]')`)) break } await wait(800) }
 const READ = `(() => {
-  const header = Number((document.querySelector('[data-testid="day-kcal"]')?.textContent || '').trim())
+  const header = Number((document.querySelector('[data-testid="day-kcal"]')?.textContent || '').replace(/,/g, '').trim())
   const rows = [...document.querySelectorAll('[data-testid="meal-row-kcal"]')].map(e => ({ slot: e.getAttribute('data-slot'), kcal: Number((e.textContent.match(/[\\d,]+/) || ['NaN'])[0].replace(/,/g, '')) }))
   const line = document.querySelector('[data-testid="around-eaten"]')
   // RE-ANCHORED 10 Oct 2026 (design handoff 2b): the number is the big figure

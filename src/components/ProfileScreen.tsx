@@ -21,14 +21,16 @@ import { RUNNING_GOAL_OPTIONS, isRunningGoal, raceDateWords } from '@/lib/runnin
 import { MEAL_VARIETY_OPTIONS } from '@/lib/freestyle'
 import { isMissingColumnError } from '@/lib/missing-column'
 import { loadSwitches, remindersSummary } from '@/lib/coach-reach-out'
-import { splitFoodList } from '@/lib/food-list'
+import { readFoodList, unreadFoodLine, type FoodListSide } from '@/lib/food-list'
 import { containsPhrase } from '@/lib/meal-ingredients'
 import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import { useBackCloses } from '@/lib/back-closes'
 import { lazyWithReload } from '@/lib/chunk-reload'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { factText, factSourceLine, wontText, timingRuleEffect, APPLIES_AT_NEXT_REBUILD } from '@/lib/fact-display'
 import { Input } from '@/components/ui/input'
 import { ageOn, birthDateBounds, todayLocal } from '@/lib/body-units'
 import { Separator } from '@/components/ui/separator'
@@ -436,24 +438,34 @@ function EditableSelectField<T extends string | number>({
  * both put one in this screen's existing error banner.
  */
 function EditableTagList({
-  values, onSave, placeholder, resetKey = 0, inputTestId, split,
+  values, onSave, placeholder, resetKey = 0, inputTestId, split, foodSide,
 }: {
   values: string[]; onSave: (next: string[]) => void | Promise<void>; placeholder: string; resetKey?: number; inputTestId?: string
   /** How one typed entry becomes several (Foods to avoid: "mushrooms and pork" is two foods, test log H12). Absent: the entry is one tag. */
   split?: (typed: string) => string[]
+  /**
+   * A FOOD LIST, READ AS ONE (18 Nov 2026): "I don't eat pork" is the food pork, and words that cannot be read as a
+   * food for this list are said under the box and left in it, never saved as a row that protects nothing.
+   */
+  foodSide?: FoodListSide
 }) {
   const [input, setInput] = useState('')
+  const [unreadNote, setUnreadNote] = useState<string | null>(null)
   // Cleared from outside when the caller finished the add another way (a picked name).
   useEffect(() => { if (resetKey > 0) setInput('') }, [resetKey])
   const [saving, setSaving] = useState(false)
   const add = async () => {
     const typed = input.trim()
-    const fresh = (split ? split(typed) : [typed]).filter((v, i, all) => v && !values.includes(v) && all.indexOf(v) === i)
-    if (fresh.length === 0) { setInput(''); return }
+    const read = foodSide ? readFoodList(typed, foodSide) : { foods: split ? split(typed) : [typed], unread: [] as string[] }
+    const fresh = read.foods.filter((v, i, all) => v && !values.includes(v) && all.indexOf(v) === i)
+    const note = foodSide ? unreadFoodLine(read.unread, foodSide) : null
+    setUnreadNote(note)
+    // What could not be read stays in the box, so nothing he typed is lost.
+    if (fresh.length === 0) { setInput(read.unread.join(', ')); return }
     setSaving(true)
     try {
       await onSave([...values, ...fresh])
-      setInput('')
+      setInput(read.unread.join(', '))
     } catch {
       // Left in the box on purpose. The caller has shown the error; retyping
       // a word you already typed is the thing this avoids.
@@ -492,6 +504,7 @@ function EditableTagList({
           <Plus className="size-3.5" />
         </Button>
       </div>
+      {unreadNote && <p role="status" className="text-xs text-[color:var(--role-warn-text)]" data-testid="food-list-unread">{unreadNote}</p>}
     </div>
   )
 }
@@ -536,8 +549,8 @@ const FACT_KIND_LABEL: Record<UserFactRow['kind'], string> = {
 }
 
 function ProvenanceBadge({ source, createdAt }: { source: string; createdAt: string }) {
-  const date = new Date(createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-  return <span className="text-[0.625rem] text-muted-foreground">{source} · {date}</span>
+  // In words, never the stored label ("manual · Sep 16, 2026").
+  return <span className="text-[0.625rem] text-muted-foreground" data-testid="fact-source">{factSourceLine(source, createdAt)}</span>
 }
 
 function EffectLine({ text }: { text: string }) {
@@ -560,9 +573,9 @@ function factEffect(fact: UserFactRow): string {
     return 'biases suggestions — nothing removed'
   }
   if (fact.kind === 'timing_rule') {
-    return fact.timing_anchor === 'slot' ? `applied to your ${fact.timing_slot} pool` : 'recorded — not yet applied (needs day-context meal generation doesn\'t have yet)'
+    return timingRuleEffect(fact.timing_anchor, fact.timing_slot)
   }
-  return 'recorded — not yet applied (takes effect on your next plan regeneration)'
+  return APPLIES_AT_NEXT_REBUILD
 }
 
 export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onProfileChanged, onPlanInvalidated, activeAdaptations, endingAdaptationId, onEndAdaptation, onCeilingsCorrected, onMemoryChanged, initialSection, revealSpeed, onRevealSpeedChange, onNewPlan, onPlanPause, exercisePlan, planBan, backLabel = 'Back', calorieTarget, kit, myMeals, onEquipmentChoiceChanged }: ProfileScreenProps) {
@@ -720,7 +733,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
       await Promise.all([
         ...added.map(v => createFact({
           profileId, kind: 'food_preference', source: 'manual',
-          rawPhrase: v, displayText: `won't eat/do ${v}`,
+          rawPhrase: v, displayText: wontText('food_preference', v),
           polarity: 'dislike', hardness: 'hard', resolvedRefs: resolveFoodTarget(v),
         })),
         ...removed.map(f => deleteFactPermanently(f.id)),
@@ -1133,6 +1146,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // before, on a page of their own. A deep link (initialSection) opens the
   // sheet holding the section it scrolls to, so the scroll still lands.
   const [sheet, setSheet] = useState<ProfileSheet | null>(null)
+  // THE PHONE'S BACK (the Profile walk, 18 Nov 2026): Profile is a layer and a sheet is a layer over it, so Back closes
+  // the sheet, then Profile, where it used to leave the tab or the app. Profile first, so the sheet is the top layer.
+  useBackCloses(open, () => onOpenChange(false))
+  useBackCloses(open && sheet != null, () => setSheet(null))
   // The Reminders row's words once the sheet has read or changed them; before that, the profile as loaded.
   const [remindersValue, setRemindersValue] = useState<string | null>(null)
   // Read the setting itself rather than trusting the profile object, which App reshapes on the way in: the row and
@@ -1820,7 +1837,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <div className="space-y-1.5" data-testid="profile-food-likes">
               <span className="text-muted-foreground">Foods and meals I like</span>
               <p className="text-[0.6875rem] leading-snug text-muted-foreground">New meals are made with these in mind, and they're favoured when each day's meals are picked. They never override what you avoid.</p>
-              <EditableTagList values={foodLikeValues} onSave={saveLikedFoods} placeholder="e.g. salmon, curry" />
+              <EditableTagList values={foodLikeValues} onSave={saveLikedFoods} placeholder="e.g. salmon, curry" foodSide="like" inputTestId="food-like-input" />
               {likeRefusal && <p role="alert" data-testid="profile-like-refused" className="text-[0.6875rem] leading-snug text-[color:var(--role-warn-text)]">{likeRefusal}</p>}
               {heartedMeals.length > 0 && (
                 <div className="space-y-1 pt-1" data-testid="profile-hearted-meals">
@@ -1861,7 +1878,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
             <div className="space-y-1.5">
               <span className="text-muted-foreground">Foods to avoid</span>
               <p className="text-[0.6875rem] leading-snug text-muted-foreground">Anything else you'd rather not see. Matched by name.</p>
-              <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" split={splitFoodList} />
+              <EditableTagList values={hardFoodDislikeValues} onSave={saveDislikedFoods} placeholder="e.g. mushrooms" foodSide="avoid" inputTestId="food-avoid-input" />
             </div>
             {/* Honesty-copy round — applies to BOTH fields above (the
                 canonical picker's tag-based checks AND the free-text
@@ -1997,10 +2014,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                       </div>
                     ) : (
                       <div className="flex items-start justify-between gap-2">
-                        <span className="text-sm font-medium">{f.display_text}</span>
+                        <span className="text-sm font-medium" data-testid="fact-text">{factText(f)}</span>
                         <div className="flex items-center gap-2.5 shrink-0">
-                          {f.hardness && <Badge variant="outline" className="text-[0.5625rem] px-1 py-0">{f.hardness}</Badge>}
-                          <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(f.id, f.display_text)} aria-label={`Edit note: ${f.display_text}`}><Pencil className="size-3" /></Button>
+                          {/* No "hard" / "soft" pill: the line under the note says what it does, in words. */}
+                          <Button size="icon" variant="ghost" className="hit-slop-44 size-6" onClick={() => startEdit(f.id, factText(f))} aria-label={`Edit note: ${factText(f)}`}><Pencil className="size-3" /></Button>
                           <Button
                             size="icon" variant="ghost"
                             className={armedDeleteKey === `fact:${f.id}` ? 'hit-slop-44 size-6 bg-destructive text-destructive-foreground' : 'hit-slop-44 size-6 text-destructive'}
@@ -2197,7 +2214,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               <p className="text-[0.6875rem] leading-snug text-muted-foreground">
                 Everything the app has stored about you, as one file.
               </p>
-              <Button size="sm" variant="outline" className="h-8 text-xs" onClick={handleDownloadData} disabled={dataBusy !== null}>
+              <Button size="sm" variant="outline" className="h-11 text-xs" onClick={handleDownloadData} disabled={dataBusy !== null}>
                 {dataBusy === 'export' ? 'Gathering…' : 'Download my data'}
               </Button>
               {exportNote && <p className="text-[0.6875rem] leading-snug text-muted-foreground">{exportNote}</p>}
@@ -2210,7 +2227,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               {!deleteArmed ? (
                 <Button
                   size="sm" variant="outline"
-                  className="h-8 text-xs text-destructive border-destructive/40"
+                  className="h-11 text-xs text-destructive border-destructive/40"
                   onClick={() => { setDeleteArmed(true); setDeleteConfirm('') }}
                 >
                   Delete everything
@@ -2228,19 +2245,19 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                       onChange={e => setDeleteConfirm(e.target.value)}
                       placeholder="delete"
                       aria-label="Type delete to confirm"
-                      className="mt-1 h-8 text-sm"
+                      className="mt-1 h-11 text-sm"
                     />
                   </label>
                   <div className="flex items-center gap-2">
                     <Button
                       size="sm"
-                      className="h-8 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      className="h-11 text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
                       disabled={deleteConfirm.trim().toLowerCase() !== 'delete' || dataBusy !== null}
                       onClick={handleDeleteEverything}
                     >
                       {dataBusy === 'delete' ? 'Deleting…' : 'Delete everything, permanently'}
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setDeleteArmed(false)}>
+                    <Button size="sm" variant="ghost" className="h-11 text-xs" onClick={() => setDeleteArmed(false)}>
                       Cancel
                     </Button>
                   </div>

@@ -74,6 +74,9 @@ function uniqueViolation(table: string, row: Row, ignoreRow?: Row): boolean {
   return false
 }
 
+/** Set by a check to make every write to a table fail, the way a dropped connection does. Null: nothing fails. */
+let failWrites: ((table: string) => boolean) | null = null
+
 function fakeFrom(table: string) {
   const filters: ((r: Row) => boolean)[] = []
   const orders: [string, boolean][] = []
@@ -85,6 +88,7 @@ function fakeFrom(table: string) {
   let single = false
 
   const exec = (): { data: unknown; error: { code?: string; message: string } | null } => {
+    if (op !== 'select' && failWrites?.(table)) return { data: null, error: { message: 'injected: the write did not go through' } }
     if (op === 'insert') {
       const inserted: Row[] = []
       for (const raw of payload) {
@@ -582,7 +586,9 @@ async function main() {
       // `if (row.kind === 'propose_style_change')` text also opens the
       // CONFIRM branch earlier in the file, and the first draft of this check
       // matched that one and failed against correct code.
-      const undoRange = src.indexOf("row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change'")
+      // 19 Nov 2026: anchored on where an Undo is carried out, not on the exact list of kinds beside it (the list
+      // gained session length and this stopped finding it, on correct code).
+      const undoRange = src.indexOf('const undoReceiptCore = async')
       const k = undoRange >= 0 ? src.indexOf("if (row.kind === 'propose_style_change') {", undoRange) : -1
       const undoBlock = k >= 0 ? src.slice(k, src.indexOf('\n        }\n', k)) : ''
       check('ChatAssistant\'s undo branch for a style change restores training_style on the profile',
@@ -820,6 +826,109 @@ async function main() {
       retryClaim.outcome === 'already_resolved', retryClaim)
 
     await resolvePendingAction(row.id, 'done', { landed: [kind], failed: [] })
+  }
+
+  // ---- An Undo button that is drawn is an Undo that exists --------------------
+  // A tester, 18 Nov 2026: a session-length change showed Undo, and tapping it said "This one can't be undone from
+  // here". The confirm handed back an undo handle and the undo list had no branch for that kind. DERIVED, so the next
+  // kind cannot slip the same way: every kind whose confirm hands back the row as its undo handle must be named where
+  // an Undo is carried out.
+  console.log('\nEvery offer that hands back an Undo has an Undo')
+  {
+    const { readFileSync } = await import('node:fs')
+    const chat = readFileSync('src/components/ChatAssistant.tsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const undoAt = chat.indexOf('const undoReceiptCore = async')
+    const confirmSide = chat.slice(0, undoAt)
+    const undoSide = chat.slice(undoAt, chat.indexOf('\n  const ', undoAt + 200) > 0 ? chat.indexOf('const handleUndo', undoAt) > 0 ? chat.indexOf('const handleUndo', undoAt) : undefined : undefined)
+    // Each `row.kind === 'x'` branch on the confirm side, with the text up to the next branch.
+    const branches = confirmSide.split(/\n\s*\}?\s*(?:else )?if \(row\.kind === /).slice(1)
+    const handsBack = new Set<string>()
+    for (const b of branches) {
+      const head = b.slice(0, b.indexOf(') {') + 1)
+      if (!/undoToken = (?:ok \? )?row\.id/.test(b)) continue
+      for (const m of ("row.kind === " + head).matchAll(/row\.kind === '([a-z_]+)'/g)) handsBack.add(m[1])
+    }
+    check('the detector finds the kinds that hand back an Undo (well over a dozen)', handsBack.size >= 15 && handsBack.has('propose_session_length') && handsBack.has('propose_schedule_change'), [...handsBack])
+    // A BRANCH, not a mention (found by a missed mutation, 19 Nov 2026: with session length taken out of its branch's
+    // condition, the block that restores its setting still NAMED the kind further down, unreachable). So only the
+    // conditions that dispatch an Undo count: each `else if (...)`, and the `if (...)` that opens the chain.
+    const conds = [...undoSide.matchAll(/\} else if \(([^{]*?)\) \{/g)].map(m => m[1])
+    const opener = /\n\s*if \((row\.kind === [^{]*?)\) \{/.exec(undoSide)?.[1] ?? ''
+    const dispatched = new Set([...conds, opener].flatMap(c => [...c.matchAll(/row\.kind === '([a-z_]+)'/g)].map(m => m[1])))
+    const noUndo = [...handsBack].filter(k => !dispatched.has(k))
+    check('every one of them has a branch where an Undo is carried out', undoAt > 0 && noUndo.length === 0, noUndo)
+    const lengthUndo = undoSide.slice(undoSide.indexOf("if (row.kind === 'propose_session_length') {"))
+    check('undoing a session length puts the old length back as well as the old weeks',
+      /const before = \(row\.preconditions as [^)]*\)\?\.before/.test(lengthUndo.slice(0, 400)) && /updateProfileField\(profile\.id, \{ session_duration_preference: before \}\)/.test(lengthUndo.slice(0, 600)) && /onProfileChanged\(\{ session_duration_preference: before \}\)/.test(lengthUndo.slice(0, 700)))
+  }
+
+  // The chat walk of 18 Nov 2026 (C4): the plan's own save failed on Apply, the tap was answered "Nothing was applied"
+  // (or, for three writes, "partly done" over an untouched plan) and the offer's buttons were gone. A plan-only change
+  // that did not save at all leaves the offer up; the screen half is verify:workout-scenarios-chat section G.
+  console.log('\nAn Apply that could not save leaves the offer up')
+  {
+    const { offerSurvivesFailedSave } = await import('../src/lib/pending-actions-store')
+    const { executeSessionShorten, executeSessionRebuild, executeVolumeChange } = await import('../src/lib/pending-action-executor')
+    const save = { op: 'save', error: "That didn't save." }
+    check('a plan-only change whose only failure is the save survives', offerSurvivesFailedSave('propose_session_shorten', { landed: [], failed: [save] }) === true)
+    check('...several failed saves too (a rest-of-block write)', offerSurvivesFailedSave('propose_exercise_swap', { landed: [], failed: [save, save] }) === true)
+    check('a refusal does not (a second tap would fail the same way)', offerSurvivesFailedSave('propose_session_shorten', { landed: [], failed: [{ op: 'shorten', error: 'x' }] }) === false)
+    check('...nor a save failure mixed with a refusal', offerSurvivesFailedSave('propose_session_shorten', { landed: [], failed: [save, { op: 'shorten', error: 'x' }] }) === false)
+    check('a part-saved change does not (it must not be applied twice)', offerSurvivesFailedSave('propose_volume_change', { landed: ['Week 2'], failed: [save] }) === false)
+    check('a done change does not', offerSurvivesFailedSave('propose_session_shorten', { landed: ['x'], failed: [] }) === false && offerSurvivesFailedSave('propose_session_shorten', { landed: [], failed: [] }) === false)
+    check('a change that also writes a setting does not (it can be half saved with the plan untouched)',
+      ['propose_schedule_change', 'propose_style_change', 'propose_goal_change', 'propose_session_length', 'propose_concurrent_activity', 'propose_running_goal', 'propose_injury_adaptation', 'propose_equipment_adaptation']
+        .every(k => offerSurvivesFailedSave(k, { landed: [], failed: [save] }) === false))
+
+    // THE THREE WRITES THAT SAID "PARTLY DONE" OVER AN UNTOUCHED PLAN: each listed its change as landed and the save
+    // as the one thing that failed. With the save refused nothing landed, and the plan handed back is the one handed in.
+    const p: UserProfile = { ...mesoProfile, id: crypto.randomUUID() }
+    // Seeded: an unseeded plan is a different plan every run (CLAUDE.md, "a gate that generates its own subject").
+    const { setRandomSource, resetRandomSource } = await import('../src/lib/exercise-plan')
+    const { seededRngFromKey } = await import('../src/lib/seeded-random')
+    setRandomSource(seededRngFromKey('apply-could-not-save'))
+    let plan: ReturnType<typeof generateMesocycle>
+    try { plan = generateMesocycle(p) } finally { resetRandomSource() }
+    const day = plan[1].days.find(d => d.exercises.length >= 5)!
+    const runs = {
+      shorten: () => executeSessionShorten(p, plan, { weekNumber: 2, dayName: day.day, minutes: 20 } as Parameters<typeof executeSessionShorten>[2]),
+      rebuild: () => executeSessionRebuild(p, plan, { weekNumber: 2, dayName: day.day, exclusions: [] }),
+      volume: () => executeVolumeChange(p, plan, { dayName: day.day, direction: 'down', weekNumbers: [2, 3] } as Parameters<typeof executeVolumeChange>[2]),
+    }
+    for (const [name, run] of Object.entries(runs)) {
+      const ok = await run()
+      check(`${name}: with the save working, something lands (the check binds)`, ok.receipt.failed.length === 0 && ok.receipt.landed.length > 0 && ok.mesocycle !== plan, ok.receipt)
+      failWrites = t => t === 'mesocycle_weeks'
+      let bad: Awaited<ReturnType<typeof run>>
+      try { bad = await run() } finally { failWrites = null }
+      check(`${name}: with the save refused, nothing is reported as landed`, bad.receipt.landed.length === 0 && bad.receipt.failed.length > 0 && bad.receipt.failed.every(f => f.op === 'save'), bad.receipt)
+      check(`${name}: ...and the plan handed back is the plan handed in`, bad.mesocycle === plan)
+    }
+    // A change of several weeks where SOME saved is still part done, and says so.
+    let n = 0
+    failWrites = t => t === 'mesocycle_weeks' && ++n > 1
+    let half: Awaited<ReturnType<typeof runs.volume>>
+    try { half = await runs.volume() } finally { failWrites = null }
+    check('a volume change that saved one week of two still reports what landed', half.receipt.landed.length > 0 && half.receipt.failed.length === 1, half.receipt)
+
+    // THE CONFIRM: asks the rule, checks the saved plan is as it was, and opens the SAME offer again from the row's
+    // own fields (never a rebuilt one), with the line that says why the tap did nothing.
+    const { readFileSync } = await import('node:fs')
+    const chat = readFileSync('src/components/ChatAssistant.tsx', 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const tail = chat.slice(chat.indexOf('await resolvePendingAction(row.id, status, receipt)'), chat.indexOf('const handleRejectProposal'))
+    check('the confirm keeps the offer only when the rule says so AND the saved plan is untouched', /if \(offerSurvivesFailedSave\(row\.kind, receipt\) && await planUntouched\(\)\) \{/.test(tail))
+    check('...reading the saved plan back against the plan before the tap', /return planReadsAsBefore\(row\.pre_image as MesocycleWeek\[\], \(await restoreMesocycle\(profile\.id\)/.test(tail) && /if \(!Array\.isArray\(row\.pre_image\) \|\| !profile\.id\) return false/.test(tail))
+    // ...and that comparison, on real plans: the same plan saved reads as before; one changed week does not; a week
+    // saved that the plan-before never held does not; nothing saved at all does (the app is drawing from the profile).
+    const { planReadsAsBefore } = await import('../src/lib/offer-still-holds')
+    const wire = (w: unknown) => JSON.parse(JSON.stringify(w))
+    const changed = plan.map(w => w.week_number !== 3 ? w : { ...w, days: w.days.map((d, i) => i === 0 ? { ...d, focus: d.focus + ' (changed)' } : d) })
+    check('the saved plan reads as before when it is the same plan (through the wire too)', planReadsAsBefore(plan, plan) && planReadsAsBefore(plan, wire(plan)))
+    check('...not when one week of it changed', planReadsAsBefore(plan, changed) === false && planReadsAsBefore(plan, wire(changed)) === false)
+    check('...not when a week was saved that the plan before never held', planReadsAsBefore(plan.slice(0, 3), plan.slice(0, 4)) === false)
+    check('...and nothing saved at all is nothing changed', planReadsAsBefore(plan, null) === true && planReadsAsBefore(plan, []) === true)
+    check('...and re-opens the row\'s own offer, with its own plan-before', /createPendingAction\(\{[^}]*kind: row\.kind[^}]*scopeKey: row\.scope_key[^}]*payload: row\.payload[^}]*preImage: row\.pre_image \?\? undefined[^}]*diff: row\.diff/s.test(tail))
+    check('...saying why the tap did nothing, and stopping before the failed receipt is drawn', /notice: OFFER_UNREACHABLE \} \}\s*: m\)\)\s*return/.test(tail))
   }
 
   // ---- Summary -------------------------------------------------------------

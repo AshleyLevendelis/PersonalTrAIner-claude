@@ -1,6 +1,6 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
-import { offerWordsProblem, scopeChoiceNeeded } from '@/lib/offer-rules'
-import { healthConditionsOf, healthConditionsInWords, mealRestrictionsOf, noteForProfile, isPregnant, saidPregnant, askedToPause, PREGNANCY_TICK_WORDS } from '@/lib/health-conditions'
+import { offerWordsProblem, scopeChoiceNeeded, asksToPause } from '@/lib/offer-rules'
+import { healthConditionsOf, healthConditionsInWords, mealRestrictionsOf, noteForProfile, isPregnant, saidPregnant, PREGNANCY_TICK_WORDS } from '@/lib/health-conditions'
 import { plainTyped } from '@/lib/typed-text'
 import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays, raceDateMissing, RACE_DATE_QUESTION } from '@/lib/running'
 import { blockShape } from '@/lib/timer-engine'
@@ -36,7 +36,7 @@ import { computeBMR, staticTDEEFor, resolveBodyMetrics, nutritionReferenceWeight
 import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
 import { groupMessages, bubblePositions, bubbleRadius, groupTimestamp, timeLabel } from '@/lib/chat-groups'
 import { supabase } from '@/lib/supabase'
-import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach } from '@/lib/daily-tracking'
+import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach, markSessionCompleted } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { chatStarters } from '@/lib/chat-starters'
 import { preparePhoto, photoMessageText } from '@/lib/photo-prepare'
@@ -50,15 +50,16 @@ import { buildCoachEatenSummary, eatenWindow } from '@/lib/coach-eaten'
 import { buildCoachWeekReview, weekReviewDates } from '@/lib/coach-week-review'
 import { changeSinceStart } from '@/lib/weight-trend'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, undoWindowEndsAt, pendingWindowPassed, type PendingActionReceipt } from '@/lib/pending-actions-store'
+import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, undoWindowEndsAt, pendingWindowPassed, offerSurvivesFailedSave, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { buildWeighInProposal, executeWeighIn, WEIGH_IN_RECEIPT_HOLD_DETAIL, weighInCorrectionReceiptDetail, type WeighInPayload } from '@/lib/weigh-in-proposal'
 import { getWeighInPicture } from '@/lib/nutrition-targets'
 import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { undoEatenCorrection } from '@/lib/eaten-correction'
 import { isBirthday } from '@/lib/body-units'
+import { wontText, timingRuleEffect, APPLIES_AT_NEXT_REBUILD } from '@/lib/fact-display'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
-  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeRunningGoal, type RunningGoalPayload, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioLog, undoCardioLog, type CardioLogPayload, executeCardioSession, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload, planAsSaved } from '@/lib/pending-action-executor'
+  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeRunningGoal, type RunningGoalPayload, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioLog, undoCardioLog, type CardioLogPayload, executeCardioSession, emptyRestRow, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload, planAsSaved } from '@/lib/pending-action-executor'
 import { planSessionKindToday, sessionKindFrom, buildSessionKindTodayProposal, SESSION_KINDS } from '@/lib/session-kind'
 import { STYLE_OPTIONS, OFFERED_STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from '@/lib/onboarding-slots'
 import { getDurationBudgetSeconds } from '@/lib/session-duration'
@@ -79,18 +80,21 @@ import type { MealRefit } from '@/lib/meal-refit'
 import type { TopUpOutcome, TopUpPlan } from '@/lib/meal-top-up'
 import { emptyMealsForCoach } from '@/lib/empty-meal'
 import type { MealDayMoveArgs, MealDayMovePayload, MealDayMoveResult } from '@/lib/meal-day-move'
-import { rebalanceSaid, rebalanceAskText, mealsNamed, type MealRebalanceController, type MealRebalancePayload } from '@/lib/meal-rebalance'
+import { rebalanceSaid, rebalanceAskText, kcalSaid, mealsNamed, type MealRebalanceController, type MealRebalancePayload } from '@/lib/meal-rebalance'
 import { DEFAULT_POOL_SIZE, computeSlotBudgets, skipsBreakfast } from '@/lib/meal-generation'
 import { EATING_OUT_REFUSALS, EATING_OUT_SIZES, EATING_OUT_WORDS, eatingOutMacros, eatingOutOption, eatingOutSizeSaid, type EatingOutController, type EatingOutSize, eatingOutRangeWords } from '@/lib/eating-out'
-import { executeMealMove, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
+import { executeMealMove, undoMealMove, mealMoveStillHolds, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { detectTodayClaim, todayClaimFloor, type TodayFacts } from '@/lib/today-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal, swapDiffFromTrial } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, weeksOnPlanSentence, turnedDownLine, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine, logOnlyRefusal, coachShortcutLabel } from '@/lib/coach-voice'
+import { bestAmongLogged, logBubble } from '@/lib/log-words'
+import { appAsksFirst } from '@/lib/app-asks-first'
+import { logDayFor, type PastLogDay } from '@/lib/chat-log-date'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, weeksOnPlanSentence, turnedDownLine, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, LOG_WORDS, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine, logOnlyRefusal, coachShortcutLabel } from '@/lib/coach-voice'
 import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
-import { getLastWorkingSessionDate } from '@/lib/set-log-store'
+import { getLastWorkingSessionDate, getSetsForDates, ensureSessionSynced, writeHistoricalSession, type SaveSetInput } from '@/lib/set-log-store'
 import { isHedged } from '@/lib/definite-mention'
 import { KIT_ITEMS, KIT_ITEM_LABELS, isKitItem, kitStatementInUserWords, kitItemsSaidNotOwned, describeKitStatement, kitItemsFor, kitOf, kitLine, kitInWords, type KitStatement } from '@/lib/kit-list'
 import type { KitController } from '@/lib/kit-change'
@@ -140,7 +144,7 @@ import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
 import { dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
 import { restoreMesocycle } from '@/lib/mesocycle-persistence'
-import { offerStillHolds, fingerprintWeeks, undoStillFits, weeksUndoWrites, dayStillAsWritten } from '@/lib/offer-still-holds'
+import { offerStillHolds, fingerprintWeeks, undoStillFits, weeksUndoWrites, dayStillAsWritten, planReadsAsBefore } from '@/lib/offer-still-holds'
 import { dayHasSession } from '@/lib/day-verbs'
 import { addDays, daysBetween, dayNameOf, sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
@@ -444,6 +448,11 @@ interface ChatAssistantProps {
   upcomingMeals?: { date: string; dayName: string; meals: Partial<Record<MealSlotName, string>> }[]
   /** A confirmed propose_meal_swap for an UPCOMING day — the strip's own write, so chat and tap cannot differ. */
   onUpcomingMealPickApplied?: (date: string, slot: MealSlotName, chosenName: string) => Promise<boolean>
+  /**
+   * The meal options were changed for a day that is NOT today (an Undo took a dish back out): re-read them, and touch
+   * nothing of today's. onMealSwapApplied(slot, '') also re-reads, but it drops TODAY's shown pick for that meal.
+   */
+  onMealOptionsChanged?: () => Promise<void>
   /** add_day_to_grocery_list and its undo — the strip's own two functions. */
   onAddMealDayToGrocery?: (date: string) => Promise<AddGroceryDaysResult | null>
   onRemoveMealDayFromGrocery?: (date: string) => Promise<AddGroceryDaysResult | null>
@@ -543,18 +552,11 @@ const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan — 
 /** The cards that would put a food on her plate: a named food her restrictions keep out never gets one (H41). */
 const FOOD_OFFER_KINDS = new Set(['propose_meal_swap', 'propose_meal_addition', 'propose_custom_meal', 'propose_meal_food_add', 'propose_meal_food_replace'])
 
-/** "Most weeknights I do…", "I usually have…": a meal he already eats, which is his to size. */
-const USUAL_MEAL = /\b(?:usually|normally|typically|always|most (?:week)?(?:days|nights|mornings|evenings)|every (?:day|night|morning|evening|weekday)|my usual|my go-to)\b/i
-
-/** The meal cards a bare "I'm not a fan of X" must not jump to (it is asked about first). */
-const MEAL_CHANGE_KINDS = new Set(['propose_meal_swap', 'propose_meal_food_replace', 'propose_meal_food_remove', 'propose_meal_regenerate'])
-/** Words that ask for the change itself, so a dislike said with them is a request, not a remark. */
-const ASKS_FOR_A_CHANGE = /\b(?:swap|change|replace|switch|instead|something else|different|another|take (?:it|that|the \w+) (?:out|off)|remove|get rid)\b/i
 
 /** How long a cleared chat can be put back (the app's other Undo lines use ten seconds or more). */
 const CLEAR_UNDO_MS = 10_000
 
-export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, emptyMeals = [], onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onPlanPause, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onEatingOut, onMealKnockOn, onMealKnockOnMove, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, emptyMeals = [], onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onPlanPause, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onEatingOut, onMealKnockOn, onMealKnockOnMove, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onMealOptionsChanged, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // "Show numbers" off (slice 4b): no calorie figure in the chat's own pills or cards (QA, 14 Nov 2026).
   const showNumbers = useShowNumbers()
   // NL logging (§3) writes through the SAME frozen session identity +
@@ -584,7 +586,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // that turn. Without it the resumed write appended instead of replacing —
   // so a correction that needed one extra detail silently doubled the
   // session, which is the exact harm the executor's own comment describes.
-  const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[]; correctsPrevious: boolean; userSaid: string }>>({})
+  const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[]; correctsPrevious: boolean; userSaid: string; pastDay?: PastLogDay | null }>>({})
 
   // Chat round 2, item 4 — "at most one check-in per conversation" is
   // enforced HERE, not by asking the model to remember it said something.
@@ -1108,6 +1110,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // runs in three of verify:coach-hello. An event that lands where the chat put it is the chat's own; she has not
   // moved, so she is still following. Any scroll of hers moves the position and is judged as before.
   const selfScrollTopRef = useRef<number | null>(null)
+  // HOW TALL THE THREAD WAS WHEN THE CHAT LAST FOLLOWED IT TO THE BOTTOM (the chat walk, 18 Nov 2026, C2). The first
+  // answer of a first conversation could land under the message box: when the typing dots are swapped for the answer
+  // the thread gets a little shorter and then much longer, and the BROWSER moves the scroll position itself (it clamps
+  // it, then re-anchors it). Those scroll events are nobody's finger. Read against the thread as it now is, they look
+  // like "he is 230px from the bottom", so the chat stopped following. While the chat is following, a scroll event is
+  // judged against the bottom it last followed to: if he is still there, the thread grew under him and he has not left.
+  const followedHeightRef = useRef<number | null>(null)
   const scrollToBottom = useCallback((smooth = false) => {
     requestAnimationFrame(() => {
       // A jump queued before a long reply landed must not undo the stop at his message (anchorLongReply): by the time
@@ -1118,6 +1127,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           behavior: smooth ? 'smooth' : 'instant',
         })
         if (!smooth) selfScrollTopRef.current = scrollRef.current.scrollTop
+        followedHeightRef.current = scrollRef.current.scrollHeight
       }
     })
   }, [])
@@ -1181,9 +1191,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       return
     }
     selfScrollTopRef.current = null
-    const nearBottom = checkIfNearBottom()
-    isNearBottomRef.current = nearBottom
-    if (nearBottom) setShowScrollPill(false)
+    const atLiveBottom = checkIfNearBottom()
+    // Still where the chat last followed to, while it was following: the thread grew under him (see followedHeightRef).
+    // The follow already queued for that growth takes him to the new bottom.
+    const atFollowedBottom = !!el && isNearBottomRef.current && followedHeightRef.current !== null
+      && followedHeightRef.current - el.scrollTop - el.clientHeight < 120
+    isNearBottomRef.current = atLiveBottom || atFollowedBottom
+    if (atLiveBottom) setShowScrollPill(false)
   }, [checkIfNearBottom])
 
   // THE DATA THE COACH READS FOR ITSELF, re-read whenever it changes.
@@ -1377,7 +1391,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   type EditDay =
     | { ok: true; day: WorkoutDay; sayDay: string; ref: SessionRef; say: (text: string) => string }
     | { ok: false; reason: string }
-  const editDayFor = (dayArg: string, week: MesocycleWeek, opts: { followMove?: boolean } = {}): EditDay => {
+  const editDayFor = (dayArg: string, week: MesocycleWeek, opts: { followMove?: boolean; restRow?: boolean } = {}): EditDay => {
     const ref = sessionRefForDayArg(dayArg, {
       todayDate: activeSession.date,
       cells: trainingWeek.days,
@@ -1387,7 +1401,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if ('refusal' in ref) return { ok: false, reason: ref.refusal }
     const target = editTarget(ref)
     if (!target.ok) return { ok: false, reason: target.refusal }
-    const day = week.days.find(d => d.day === target.planDayName)
+    // A REST DAY USUALLY HAS NO ROW AT ALL (a plan keeps rows for its training days and the odd rest day carrying
+    // optional cardio). For an exercise edit that is a refusal; for PUTTING something on the day it is the commonest
+    // case there is, and "I couldn't find Saturday on your plan" was the answer to "put a run on Saturday" (the chat
+    // walk of 18 Nov 2026). The caller that fills a rest day asks for the empty row it would fill.
+    const day = week.days.find(d => d.day === target.planDayName) ?? (opts.restRow ? emptyRestRow(target.planDayName) : undefined)
     if (!day) return { ok: false, reason: `I couldn't find ${target.sayDay} on your plan.` }
     return { ok: true, day, sayDay: target.sayDay, ref, say: (text: string) => sayDayIn(text, ref) }
   }
@@ -4243,7 +4261,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // its plan row still holds the lift). A day a session moved ONTO resolves
     // to that session's row and is refused as the training day it now is —
     // looked up by weekday it read as free and the walk went on top of it.
-    const on = editDayFor(String(rawArgs.day ?? ''), week, { followMove: false })
+    const on = editDayFor(String(rawArgs.day ?? ''), week, { followMove: false, restRow: true })
     if (!on.ok) return { refusal: on.reason }
     const day = on.day
     if (day.exercises.length > 0) {
@@ -5420,7 +5438,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const { added } = mergeFoodsToAvoid(already, firmFoodExclusions(userText))
     const receipts: ChatReceiptView[] = []
     for (const food of added) {
-      const displayText = `won't eat/do ${food}`
+      const displayText = wontText('food_preference', food)
       try {
         const row = await createFact({
           profileId, kind: 'food_preference', source: 'chat', rawPhrase: userText, displayText,
@@ -5557,7 +5575,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const conflict = checkFactConflict({ kind, polarity, resolvedRefs: resolution.resolvedRefs }, memoryFacts)
         if (conflict.needsConfirmation) return { text: conflict.message }
 
-        const displayText = `${polarity === 'dislike' ? (hardness === 'hard' ? "won't eat/do" : 'not keen on') : (hardness === 'hard' ? 'always wants' : 'prefers')} ${targetPhrase}`
+        const displayText = polarity === 'dislike' && hardness === 'hard' ? wontText(kind, targetPhrase) : `${polarity === 'dislike' ? 'not keen on' : (hardness === 'hard' ? 'always wants' : 'prefers')} ${targetPhrase}`
         const row = await createFact({
           profileId, kind, source: 'chat', rawPhrase, displayText,
           polarity, hardness, resolvedRefs: resolution.resolvedRefs,
@@ -5652,7 +5670,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             title: 'Saved to memory',
             rows: [{
               label: displayText,
-              detail: timingAnchor === 'slot' ? `applied to your ${timingSlot} pool` : 'recorded — not yet applied (needs day-context meal generation doesn\'t have yet)',
+              detail: timingRuleEffect(timingAnchor, timingSlot),
             }],
             status: 'done',
             undoToken: row.id,
@@ -5677,7 +5695,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           receipt: {
             kind: 'memory_fact_saved',
             title: 'Saved to memory',
-            rows: [{ label: displayText, detail: constraintKind === 'availability' ? 'recorded — not yet applied (takes effect on your next plan regeneration)' : 'recorded' }],
+            rows: [{ label: displayText, detail: constraintKind === 'availability' ? APPLIES_AT_NEXT_REBUILD : 'recorded' }],
             status: 'done',
             undoToken: row.id,
             resolvedAt: new Date().toISOString(),
@@ -6029,7 +6047,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    *   produced 6 logged sets against 3 prescribed, and every future weight
    *   would have built on three sets that never happened.
    */
-  const resolveAndMaybeLog = (entries: WorkoutEntryInput[], correctsPrevious = false, userSaid = ''): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } => {
+  const resolveAndMaybeLog = (entries: WorkoutEntryInput[], correctsPrevious = false, userSaid = '', pastDay: PastLogDay | null = null): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView; past?: { groups: ParsedSetGroup[]; day: PastLogDay } } => {
     // THE SESSION RUN TODAY, moves taken into account — the plan's own row
     // for this weekday is empty on a day a session moved onto, and every
     // plan name, set count and load below came back blank there (H15).
@@ -6045,7 +6063,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const idx = parsed.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
       const group = parsed.groups[idx]
       const resolverId = `parse_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-      parseSessionsRef.current[resolverId] = { entries, todaysPlanExerciseNames, correctsPrevious, userSaid }
+      parseSessionsRef.current[resolverId] = { entries, todaysPlanExerciseNames, correctsPrevious, userSaid, pastDay }
 
       const prompt = group.resolution === 'ambiguous'
         ? `Which "${group.matchedRawPhrase}" did you mean?`
@@ -6073,19 +6091,26 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       return { text: prompt, clarification: { prompt, options, answerPlaceholder, resolverId } }
     }
 
+    // AN EARLIER DAY IS WRITTEN TO THAT DAY (19 Nov 2026, chat-log-date.ts): the parse is the same, the write is not
+    // today's. The caller awaits it (logToPastDay), because that write goes to the server before anything is claimed.
+    if (pastDay) return { text: '', past: { groups: parsed.groups, day: pastDay } }
+
     const todaysPlanSetCounts = new Map((todaysWorkout?.exercises ?? []).map(e => [e.name, e.sets] as const))
     const todaysPlanLoads = new Map(
       (todaysWorkout?.exercises ?? [])
         .filter(e => e.suggested_load_kg != null)
         .map(e => [e.name, e.suggested_load_kg as number] as const)
     )
+    const written: ExerciseSetLog[] = []
     const { rows, totalSets, loggedKeys, replacedSets, replacedLogs, cardioLogged, cardioRefused } = executeLogWorkout(parsed.groups, {
       profileId: activeSession.profileId ?? '',
       date: activeSession.date,
       weekNumber: activeSession.liveWeek,
       dayName: activeSession.dayName,
       setsFor: activeSession.setsFor,
-      logSet: activeSession.logSet,
+      // What was WRITTEN, as written (a weight he did not say is filled in by the app), so the line above the
+      // receipt can ask the record engine about the very sets that were saved.
+      logSet: input => { const row = activeSession.logSet(input); if (row) written.push(row); return row },
       declareOffPlan: activeSession.declareOffPlan,
       todaysPlanSetCounts,
       todaysPlanLoads,
@@ -6127,7 +6152,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const title = !savedAnything ? `Not logged · ${activeSession.dayName}`
       : replacedSets > 0 ? `Corrected · ${activeSession.dayName}` : `Logged · ${activeSession.dayName}`
     return {
-      text: title,
+      // THE COACH'S LINE, NOT THE CARD'S TITLE SAID TWICE (19 Nov 2026): a best is named, anything else is one plain line.
+      text: logBubble({ saved: savedAnything, corrected: replacedSets > 0, title, best: bestAmongLogged(activeSession.profileId ?? '', written, activeSession.date) }),
       receipt: {
         kind: 'log_workout',
         title,
@@ -6149,6 +6175,59 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // walk deleted the sets beside it and left the walk in place.
         undoToken: JSON.stringify({ logged: loggedKeys, replaced: replacedLogs, cardio: cardioLogged }),
       },
+    }
+  }
+
+  /**
+   * A SESSION FROM AN EARLIER DAY, WRITTEN TO THAT DAY (19 Nov 2026). The same steps the Exercise screen's "I did it,
+   * not in the app" takes: the day's session row, its sets at noon of that day, and the day marked done. The sets
+   * already on that day are read first, so "I also did 3x8 squats yesterday" is added after them, never over them.
+   * Nothing is claimed until the write has come back, and there is no Undo on this receipt yet (said in BACKLOG).
+   */
+  const logToPastDay = async (groups: ParsedSetGroup[], day: PastLogDay): Promise<{ text: string; receipt?: ChatReceiptView }> => {
+    const profileId = activeSession.profileId ?? ''
+    const weeks = mesocycle.length > 0 ? mesocycle.length : 4
+    const weekNumber = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, new Date(`${day.date}T12:00:00`), weeks)
+    let existing: ExerciseSetLog[] = []
+    try { existing = (await getSetsForDates(profileId, [day.date])).get(day.date) ?? [] }
+    catch { return { text: LOG_WORDS.notLoggedOn(day.label) } }
+    const inputs: SaveSetInput[] = []
+    const { rows, totalSets, cardioLogged, cardioRefused } = executeLogWorkout(groups, {
+      profileId, date: day.date, weekNumber, dayName: day.dayName,
+      setsFor: (id, name) => existing.filter(l => l.exercise_id === id || l.exercise_name === name),
+      logSet: input => {
+        inputs.push(input)
+        return { user_id: profileId, date: day.date, exercise_name: input.exerciseName, exercise_id: input.exerciseId, set_number: input.setNumber, weight_kg: input.weightKg, reps_completed: input.repsCompleted, is_bodyweight: input.isBodyweight ?? false }
+      },
+      declareOffPlan: () => {},
+      todaysPlanSetCounts: new Map(), todaysPlanLoads: new Map(),
+    })
+    let setsSaved = inputs.length === 0
+    if (inputs.length > 0) {
+      try {
+        const sessionId = await ensureSessionSynced(profileId, day.date, 'seeded')
+        await writeHistoricalSession({
+          userId: profileId, date: day.date, weekNumber, day: day.dayName,
+          sets: inputs.map(i => ({ exerciseId: i.exerciseId, exerciseName: i.exerciseName, setNumber: i.setNumber, weightKg: i.weightKg, repsCompleted: i.repsCompleted, rpe: i.rpe ?? null, unit: i.unit, isBodyweight: i.isBodyweight, isWarmup: i.isWarmup, addedLoadKg: i.addedLoadKg, completedAt: `${day.date}T12:00:00` })),
+        })
+        await markSessionCompleted(sessionId, new Date(`${day.date}T12:00:00`))
+        setsSaved = true
+      } catch { setsSaved = false }
+    }
+    onLogsUpdated?.()
+    const saved = (inputs.length > 0 && setsSaved) || cardioLogged.length > 0
+    const exerciseCount = groups.filter(g => !g.routesToCardio).length
+    const summary = [
+      exerciseCount > 0 && setsSaved ? `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}` : '',
+      totalSets > 0 && setsSaved ? `${totalSets} set${totalSets === 1 ? '' : 's'}` : '',
+      cardioLogged.length > 0 ? `${cardioLogged.length} ${cardioLogged.length === 1 ? 'activity' : 'activities'}` : '',
+    ].filter(Boolean).join(' · ')
+    const title = LOG_WORDS.pastTitle(day.label, saved)
+    return {
+      text: saved ? LOG_WORDS.loggedOn(day.label) : LOG_WORDS.notLoggedOn(day.label),
+      // A row's note is about TODAY's plan ("Not in today's plan", "heavier than the estimate"): on an earlier day it
+      // would be a sentence about the wrong day, so the rows carry what was done and nothing else.
+      receipt: { kind: 'log_workout', title, rows: saved ? rows.map(r => ({ label: r.label, detail: r.detail })) : [], summary, status: !saved ? 'failed' : cardioRefused > 0 || !setsSaved ? 'partial' : 'done', resolvedAt: new Date().toISOString() },
     }
   }
 
@@ -6188,7 +6267,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       return { ...e, setsPhrase: `${e.setsPhrase} ${value}`.trim(), rawText: `${e.rawText} ${value}`.trim() }
     })
 
-    const outcome = resolveAndMaybeLog(updatedEntries, session.correctsPrevious, said)
+    const first = resolveAndMaybeLog(updatedEntries, session.correctsPrevious, said, session.pastDay ?? null)
+    // The answer completed a session from an earlier day: it is written to THAT day (the question carried the day).
+    const outcome: { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } = first.past ? await logToPastDay(first.past.groups, first.past.day) : first
     setMessages(prev => prev.map((m, i) => (i === msgIndex ? { ...m, clarification: outcome.clarification, receipt: outcome.receipt, content: outcome.text } : m)))
   }
 
@@ -6261,14 +6342,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // A MEAL HE USUALLY EATS, DESCRIBED WITH NO AMOUNTS, IS ASKED ABOUT FIRST (coach exam 17 Nov 2026; his 1 Sep rule and
     // his 11 Nov "My usual meals first"): the coach carded his salmon dinner with portions it made up. The app asks how
     // much of each, in one question, and the card comes on his answer.
-    if (result.proposal && (result.proposal.kind === 'propose_meal_addition' || result.proposal.kind === 'propose_custom_meal')
-      && USUAL_MEAL.test(userSaid ?? '') && !/\d/.test(userSaid ?? '')) {
-      return { text: "Love that. How much of each do you usually have? Grams are best, or counts like \"2 eggs\".", outcome: 'refused' }
-    }
-    if (result.proposal && MEAL_CHANGE_KINDS.has(result.proposal.kind) && !ASKS_FOR_A_CHANGE.test(userSaid ?? '')) {
-      const toAsk = foodDislikesToAsk(userSaid ?? '')
-      if (toAsk.length > 0) return { text: DISLIKE_ASK.turn(toAsk), outcome: 'refused' }
-    }
+    // ...AND "I'M NOT A FAN OF X" IS ASKED "just this meal, or never?". Both decisions are one function since 19 Nov
+    // 2026 (app-asks-first.ts), so the coach exam marks the turn he would actually see. The race date is the third,
+    // asked where the running offer is built below.
+    const asksFirst = result.proposal ? appAsksFirst(result.proposal.kind, result.proposal.rawArgs, userSaid) : null
+    if (asksFirst && asksFirst.why !== 'race_date') return { text: asksFirst.text, outcome: 'refused' }
     if (result.proposal && profile.id) {
       // I1: the client is the ONLY writer of pending_actions — this INSERT
       // is what actually creates the row the edge function only described.
@@ -6696,7 +6774,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         const said = rebalanceSaid(userSaid)
         const fromModel = result.proposal.kind === 'propose_meal_rebalance'
         const args = fromModel
-          ? { from_slot: raw.from_slot, to_slot: raw.to_slot, kcal: raw.kcal, date: raw.date }
+          // The amount is HIS when he gave one (the button he tapped, or a number he typed): never the coach's, and
+          // never lost because the coach did not repeat it (C6: the app asked "How much?" again, for ever).
+          ? { from_slot: raw.from_slot, to_slot: raw.to_slot, kcal: kcalSaid(userSaid) ?? raw.kcal, date: raw.date }
           : said.kind === 'ordered' ? { from_slot: said.from, to_slot: said.to, kcal: said.kcal ?? undefined } : null
         if (!onMealRebalance) {
           refusal = REBALANCE.refusals.noBody
@@ -6985,7 +7065,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         exercisePhrase: e.exercise_phrase,
         setsPhrase: e.sets_phrase,
       }))
-      return resolveAndMaybeLog(entries, result.logWorkout.corrects_previous === true, userSaid)
+      // WHICH DAY (19 Nov 2026): the date the coach passed used to be dropped here, and "I did squats yesterday" was
+      // written onto today. An earlier day in the last two weeks is written to that day; anything else is refused.
+      const day = logDayFor(result.logWorkout.date, activeSession.date)
+      if (day.kind === 'refused') return { text: day.say }
+      const logged = resolveAndMaybeLog(entries, result.logWorkout.corrects_previous === true, userSaid, day.kind === 'past' ? day : null)
+      return logged.past ? await logToPastDay(logged.past.groups, logged.past.day) : logged
     }
     if (result.memoryIntent) {
       // "I DON'T LIKE X" IS ASKED ABOUT FIRST (his "Ask, and hold Tuesday", 14 Nov 2026): a food dislike said only with a
@@ -7442,7 +7527,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       else if (allergensSaid(userText).some(x => !allergiesOf(profile).some(r => r.allergen === x))) {
         await offerFromApp('propose_allergy_record', buildAllergyRecordProposal(userText, allergensSaid(userText).filter(x => !allergiesOf(profile).some(r => r.allergen === x))))
       }
-      else if (askedToPause(userText) && !profile.plan_paused_since) {
+      else if (asksToPause(userText) && !profile.plan_paused_since) {
         const pp = buildPlanPauseProposal({ action: 'pause', origin_verbatim_quote: userText })
         if (pp.ok) await offerFromApp('propose_plan_pause', pp)
       }
@@ -7838,6 +7923,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // second fails, so a swap can never leave the same meal in two slots.
       const payload = row.payload as unknown as MealMovePayload
       const moveProfileId = profile.id
+      // WHAT EACH MEAL HELD BEFORE, read before anything is written, so Undo puts each back (an unreadable read is
+      // "none", as on the Move sheet: Undo then clears to the day's own choice).
+      const picksBefore = await getMealPicksForDate(moveProfileId, payload.date).catch(() => ({} as Partial<Record<MealSlotName, string>>))
       receipt = await executeMealMove(moveProfileId, payload, async p => {
         if (p.date === getSessionDateContext(moveProfileId).date) return await onMealSwapApplied(p.slot, p.option.name)
         if (onUpcomingMealPickApplied) return await onUpcomingMealPickApplied(p.date, p.slot, p.option.name)
@@ -7848,12 +7936,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         ? (payload.legs.length === 2 ? 'Swapped over' : 'Moved')
         : "Couldn't move the meal"
       rows = ok ? payload.legs.map(l => ({ label: l.slot, detail: `${l.originalName} · ${l.afterKcal} kcal` })) : []
-      // NO UNDO TOKEN, and said rather than left ambiguous: undoing a two-leg
-      // move means removing two pool options and restoring two picks, and the
-      // receipt carries one opaque token. Wiring that is real work and belongs
-      // in its own change rather than bolted on half-done — the same call the
-      // meal LOG made for the same reason. Moving it back is one more move.
-      undoToken = undefined
+      // IT CAN BE PUT BACK (the chat walk, 18 Nov 2026, C11). The Move sheet has had an Undo since 2 Nov; this receipt
+      // had none ("moving it back is one more move"). The receipt keeps each meal's pick from before, and Undo runs
+      // the sheet's own function.
+      if (ok) receipt = { ...receipt, previousPicks: Object.fromEntries(payload.legs.map(l => [l.slot, picksBefore[l.slot] ?? null])) }
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_meal_refit') {
       // ONE WRITE PATH FOR BOTH SURFACES. The Nutrition tab's own Resize
       // button calls exactly this function; the coach does not have a second
@@ -8451,6 +8538,30 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     receipt = { ...receipt, ...(appliedScope ? { scope: appliedScope } : {}), ...(planAfter ? { planAfter } : {}) }
     await resolvePendingAction(row.id, status, receipt)
 
+    // A SAVE THAT DID NOT GO THROUGH LEAVES THE OFFER ON THE TABLE (chat walk C4, 19 Nov 2026). The tap was answered
+    // with "Nothing was applied" and the offer's buttons were gone, so the only way back was to ask the coach all over
+    // again. When nothing landed and every failure is the write itself, nothing has changed and the offer is as good
+    // as it was: the same offer is opened again under the same words, with the line that says why the tap did
+    // nothing. Anything else (a refusal, a part-saved change) keeps its receipt, because a second tap would not help.
+    // ...AND ONLY WHEN THE SAVED PLAN READS AS IT DID BEFORE THE TAP: a rest-of-block change is several writes, and
+    // one that half saved is not "nothing changed". Read back from the store, never assumed.
+    const planUntouched = async (): Promise<boolean> => {
+      if (!Array.isArray(row.pre_image) || !profile.id) return false
+      return planReadsAsBefore(row.pre_image as MesocycleWeek[], (await restoreMesocycle(profile.id).catch(() => null))?.weeks ?? null)
+    }
+    if (offerSurvivesFailedSave(row.kind, receipt) && await planUntouched()) {
+      const again = await createPendingAction({
+        profileId: profile.id, messageId: row.message_id, actionClass: row.action_class, kind: row.kind, scopeKey: row.scope_key,
+        preconditions: row.preconditions, payload: row.payload, preImage: row.pre_image ?? undefined, diff: row.diff,
+      }).catch(err => { console.error('re-offer after a failed save: could not open it again', err); return null })
+      if (again) {
+        setMessages(prev => prev.map((m, i) => i === msgIndex
+          ? { ...m, pendingAction: { id: again.id, kind: again.kind, status: again.status, diff: again.diff, expiresAt: again.expires_at, notice: OFFER_UNREACHABLE } }
+          : m))
+        return
+      }
+    }
+
     setMessages(prev => prev.map((m, i) => i === msgIndex
       // THE CARD'S VIEW GOES, SO ITS OUTCOME IS WRITTEN DOWN FIRST. The turn's
       // text is still "Want me to …?"; without this the history sent to the
@@ -8680,7 +8791,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         if (!preImage || !planCreatedAt) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
         await undoExerciseSwap(profile.id, preImage, payload.weekNumber, payload.scope, planCreatedAt)
         onMesocycleUpdated(preImage)
-      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_style_change' || row.kind === 'propose_goal_change' || row.kind === 'propose_concurrent_activity' || row.kind === 'propose_running_goal') {
+      } else if (row.kind === 'propose_volume_change' || row.kind === 'propose_schedule_change' || row.kind === 'propose_session_length' || row.kind === 'propose_style_change' || row.kind === 'propose_goal_change' || row.kind === 'propose_concurrent_activity' || row.kind === 'propose_running_goal') {
         // Both wrote a RUN of weeks, so undo restores the same run rather
         // than the swap's single week. The starting week comes off the
         // payload, not off today's live week — undoing tomorrow must put
@@ -8740,6 +8851,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           const patch: Partial<UserProfile> = { running_goal: pre?.before ?? null, running_race_date: pre?.beforeRaceDate ?? null, running_base_minutes: pre?.beforeBase ?? null }
           await updateProfileField(profile.id, patch)
           onProfileChanged(patch)
+        }
+        if (row.kind === 'propose_session_length') {
+          // A SESSION-LENGTH CHANGE HAD AN UNDO BUTTON AND NO UNDO (a tester, 18 Nov 2026: "Couldn't undo — This one
+          // can't be undone from here"). It keeps the plan it replaced and the length it replaced, like its siblings,
+          // so it goes back the same way: the weeks, then the setting they were built from.
+          const before = (row.preconditions as { before?: UserProfile['session_duration_preference'] } | null)?.before
+          if (before) {
+            await updateProfileField(profile.id, { session_duration_preference: before })
+            onProfileChanged({ session_duration_preference: before })
+          }
         }
         if (row.kind === 'propose_style_change') {
           // Same divergence, same fix: the plan goes back, so the style must too.
@@ -8824,6 +8945,25 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             : { ...m, receipt: { ...m.receipt, rows: [...m.receipt.rows.filter(r => r.label !== RECEIPTS_UNDONE.refusedLabel), { label: RECEIPTS_UNDONE.refusedLabel, detail: back.failed[0].error }] } }
         }))
         return 'handled'
+      } else if (row.kind === 'propose_meal_move') {
+        // A MOVE BETWEEN TWO MEALS, PUT BACK by the Move sheet's own function. Only while both meals still hold what
+        // the move put there: a meal he has swapped again since is left alone, and the receipt says so.
+        const payload = row.payload as unknown as MealMovePayload
+        const previous = row.result?.previousPicks
+        if (!previous) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
+        let picksNow: Partial<Record<MealSlotName, string>>
+        try { picksNow = await getMealPicksForDate(profile.id, payload.date) } catch { return { refused: RECEIPTS_UNDONE.failed, keep: true } }
+        if (!mealMoveStillHolds(picksNow, payload)) return { refused: DAY_MOVE.undo.changed, keep: false }
+        const isToday = payload.date === getSessionDateContext(profile.id).date
+        const back = await undoMealMove(profile.id, payload, previous, async (slot, name) => {
+          if (isToday) return await onMealSwapApplied(slot, name)
+          // Another day: a named pick goes through the strip's own write; "none" is already cleared by the removal.
+          return name ? ((await onUpcomingMealPickApplied?.(payload.date, slot, name)) ?? false) : true
+        })
+        if (!back) return { refused: RECEIPTS_UNDONE.failed, keep: true }
+        // The copies are gone from that day's options: the lists that offer them are re-read (today's by its own pick
+        // handler, above).
+        if (!isToday) await onMealOptionsChanged?.()
       } else if (row.kind === 'propose_meal_swap') {
         const payload = row.payload as unknown as MealSwapPayload
         if (!payload.currentName) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
@@ -8854,7 +8994,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // assembleDay chose before this, and clearing the pick is what makes
         // the Nutrition tab fall back to it. onMealSwapApplied can't express
         // "no pick", so the reload does it.
-        await onMealSwapApplied(payload.slot, '')
+        // FOR TODAY'S MEAL ONLY (19 Nov 2026). This ran whatever the day, and for a meal added to ANOTHER day it
+        // dropped today's shown pick for that meal while the store still held it. Another day re-reads the options.
+        if (payload.date && payload.date !== getSessionDateContext(profile.id).date) await onMealOptionsChanged?.()
+        else await onMealSwapApplied(payload.slot, '')
       } else {
         return { refused: RECEIPTS_UNDONE.cannot, keep: false }
       }
@@ -8876,7 +9019,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // gone, so nothing on screen said the change had been taken back). And a refused one says why (run 7, M53).
     setMessages(prev => prev.map((m, i) => {
       if (i !== msgIndex || !m.receipt) return m
-      if (out === 'done') return { ...m, receipt: { ...m.receipt, title: RECEIPTS_UNDONE.title, rows: [{ label: RECEIPTS_UNDONE.label, detail: RECEIPTS_UNDONE.detail(m.receipt.title) }], undoToken: undefined } }
+      // ...and the line above a taken-back workout log no longer says it was logged (a tester, 18 Nov 2026).
+      if (out === 'done') return { ...m, ...(m.receipt.kind === 'log_workout' ? { content: LOG_WORDS.undone } : {}), receipt: { ...m.receipt, title: RECEIPTS_UNDONE.title, rows: [{ label: RECEIPTS_UNDONE.label, detail: m.receipt.kind === 'log_workout' ? LOG_WORDS.undoneDetail : RECEIPTS_UNDONE.detail(m.receipt.title) }], undoToken: undefined } }
       return { ...m, receipt: { ...m.receipt, rows: [...m.receipt.rows.filter(r => r.label !== RECEIPTS_UNDONE.refusedLabel), { label: RECEIPTS_UNDONE.refusedLabel, detail: out.refused }], undoToken: out.keep ? m.receipt.undoToken : undefined } }
     }))
   }

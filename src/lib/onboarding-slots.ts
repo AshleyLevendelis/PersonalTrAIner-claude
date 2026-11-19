@@ -1163,7 +1163,10 @@ export function displaySlotValue(def: SlotDef, values: OnboardingSlotValues): st
   if (Array.isArray(v)) {
     if (v.length === 0) return 'none'
     if (!def.options) return v.join(', ')
-    return v.map(x => def.options!.find(o => String(o.value) === String(x))?.label ?? String(x)).join(', ')
+    // IN THE ORDER THE CHOICES ARE SHOWN, not the order tapped (the setup walk, 18 Nov 2026: days changed from the
+    // summary read "Mon, Tue, Thu, Fri, Wed"). Something typed that is not one of the choices keeps its place at the end.
+    const place = (x: unknown) => { const i = def.options!.findIndex(o => String(o.value) === String(x)); return i === -1 ? def.options!.length : i }
+    return [...v].sort((a, b) => place(a) - place(b)).map(x => def.options!.find(o => String(o.value) === String(x))?.label ?? String(x)).join(', ')
   }
   if (def.options) {
     const opt = def.options.find(o => String(o.value) === String(v))
@@ -1174,6 +1177,35 @@ export function displaySlotValue(def: SlotDef, values: OnboardingSlotValues): st
   // A LIFT IS KEPT AS THE PLAN'S NUMBER, SO IT IS SAID WITH WHAT THAT NUMBER MEANS (his ruling, 11 Nov 2026).
   if (isKnownLiftSlot(def.key)) return liftAsStored(v as number | string)
   return def.unit ? `${v} ${def.unit}` : String(v)
+}
+
+/**
+ * The Skip for a TYPED question (no buttons): only an optional one the app asked by name, and never the name. A
+ * required question, or one with buttons, is not this function's (the card's own rule decides those).
+ */
+export function typedSkipKeys(asked: string | undefined, values: OnboardingSlotValues): SlotKey[] {
+  if (!asked || asked === 'displayName') return []
+  const def = getSlotDef(asked as SlotKey)
+  return def && def.control === 'text' && canDeclineSlot(def, values) ? [def.key] : []
+}
+
+/**
+ * The header's "Food · 3 of 14". The name question is not one of the counted screens, so it carries no number: it
+ * read "1 of 14" and so did the question after it (the setup walk, 18 Nov 2026).
+ */
+export function setupStepLine(section: string, key: string | null, step: number, total: number): string {
+  return key === 'displayName' ? section : `${section} · ${step} of ${total}`
+}
+
+/**
+ * THE BUTTON UNDER A PICK-SEVERAL QUESTION. With nothing ticked on an optional question it reads "None — next", which
+ * is an answer in itself. Not when he has typed something into the second box on the same screen (the setup walk,
+ * 18 Nov 2026: a food typed under the diet ticks, and the button still said "None"): then it is plain "Next".
+ */
+export function multiNextLabel(picked: number, required: boolean, secondBoxAnswered: boolean): string {
+  if (picked > 0) return 'Next →'
+  if (required) return 'Pick at least one'
+  return secondBoxAnswered ? 'Next →' : 'None — next →'
 }
 
 /**

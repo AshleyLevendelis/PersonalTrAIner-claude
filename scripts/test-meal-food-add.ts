@@ -163,5 +163,13 @@ console.log("\n8. It says \"today\", not a date off her own clock")
   check('...and the Nutrition note no longer claims "the rest of the meal is unchanged"', !/rest of the meal is unchanged/.test(read('src/components/MealPlan.tsx')))
 }
 
+console.log('\nA slip of the finger is sent back (Nutrition walk, 18 Nov 2026, N4)')
+{
+  const slip = buildMealFoodAddProposal({ ...base, rawArgs: { meal_slot: 'breakfast', food_lines: ['99999g almonds'], origin_verbatim_quote: 'add 99999g almonds' } })
+  check('99999 g of one food is not added', slip.ok === false && /^99999g almonds is more than one meal can hold/.test(slip.reason), slip.ok === false ? slip.reason : 'accepted')
+  const fine = buildMealFoodAddProposal({ ...base, rawArgs: { meal_slot: 'breakfast', food_lines: ['30g almonds'], origin_verbatim_quote: 'add 30g almonds' } })
+  check('...while an ordinary amount of the same food still is (the guard binds on the amount)', fine.ok === true, fine.ok ? undefined : fine.reason)
+}
+
 if (failures > 0) { console.error(`\n${failures} failure(s)`); process.exit(1) }
 console.log('\nAll meal-food-add checks passed.')

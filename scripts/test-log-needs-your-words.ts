@@ -136,8 +136,12 @@ console.log('\n6. The wiring: the chat client passes the user\'s own message, fr
   const calls = ui.match(/processResponse\(result[^)]*\)/g) ?? []
   check('every processResponse call passes the message it was answering',
     calls.length >= 2 && calls.every(c => /processResponse\(result,\s*\w/.test(c)), calls)
+  // The words, wherever they sit in the call: a later argument (the day a past session was on, 19 Nov 2026) is not a
+  // reason for this to fail, and it did. Every call that logs must carry them.
+  // The call that follows the coach's reply (the one this check has always been about) is the one handed `entries`.
+  const logCalls = ui.match(/[^.\w]resolveAndMaybeLog\(entries,[^\n]*/g) ?? []
   check('...and the logging branch forwards it',
-    /resolveAndMaybeLog\(entries,[^)]*userSaid\)/.test(ui))
+    logCalls.length >= 1 && logCalls.every(c => /, userSaid[,)]/.test(c)), logCalls)
   // The question must be answerable. Options used to render only for the
   // 'ambiguous' resolution, so "Which exercise was that?" had no buttons.
   check('candidates become taps whenever they exist, not only when resolution is ambiguous',

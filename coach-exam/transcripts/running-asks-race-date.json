@@ -15,10 +15,10 @@
       }
     ]
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "197f5c912aa30dca",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -71,11 +71,17 @@
   "turns": [
     {
       "user": "I've signed up for a 10k and I want to train for it",
-      "reply": "That's awesome! Building up to a 10k is a great target, and we can definitely structure your plan to get you race-ready. \n\nTo map your training out properly, we need to time your progression right. What's the date of your 10k?",
-      "raw": "That's awesome! Building up to a 10k is a great target, and we can definitely structure your plan to get you race-ready. \n[BREAK]\nTo map your training out properly, we need to time your progression right. What's the date of your 10k?",
+      "reply": "",
+      "raw": "",
       "error": null,
       "action": null,
-      "proposal": null,
+      "proposal": {
+        "kind": "propose_running_goal",
+        "args": {
+          "goal": "10k",
+          "reason": "User signed up for a 10k race and wants to add running to their plan"
+        }
+      },
       "saved": null,
       "refused": null
     },
@@ -90,7 +96,7 @@
         "args": {
           "goal": "10k",
           "race_date": "2027-04-11",
-          "reason": "Training for a 10k race on 11 April 2027"
+          "reason": "10k race on 11 April 2027"
         }
       },
       "saved": null,

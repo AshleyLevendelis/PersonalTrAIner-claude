@@ -120,7 +120,7 @@ function listOf(parts: string[]): string {
  * `injuries` is the profile's existing list: an injury still vetoes a drill
  * even when tightness asked for it.
  */
-export function tightnessWarmup(areas: string[], injuries: string[] = [], alreadyInWarmup: string[] = []): TightnessWarmup {
+export function tightnessWarmup(areas: string[], injuries: string[] = [], alreadyInWarmup: string[] = [], pregnant = false): TightnessWarmup {
   const named = areas.filter(a => AREA_JOINTS[a])
   if (named.length === 0) return { items: [], noDrill: [], notThisTime: [], alreadyCovered: [], note: null }
 
@@ -128,7 +128,7 @@ export function tightnessWarmup(areas: string[], injuries: string[] = [], alread
   // same movement listed twice is one drill, and it would spend one of the
   // three slots on nothing (user test 8 Oct 2026, #24).
   const already = new Set(alreadyInWarmup)
-  const items = drillsPreparing(jointsForAreas(named), injuries)
+  const items = drillsPreparing(jointsForAreas(named), injuries, pregnant)
     .filter(d => !already.has(d.name))
     .slice(0, MAX_TIGHTNESS_DRILLS)
 
@@ -141,7 +141,7 @@ export function tightnessWarmup(areas: string[], injuries: string[] = [], alread
   const noDrill: string[] = []
   const alreadyCovered: string[] = []
   for (const a of named) {
-    const own = drillsPreparing(AREA_JOINTS[a], injuries)
+    const own = drillsPreparing(AREA_JOINTS[a], injuries, pregnant)
     if (own.length === 0) noDrill.push(a)
     else if (own.some(d => chosen.has(d.name))) covered.push(a)
     else if (own.some(d => already.has(d.name))) alreadyCovered.push(a)

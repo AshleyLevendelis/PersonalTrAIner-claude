@@ -6,6 +6,7 @@
 //   3. sweet potato sizes are the USDA small / medium / large, and a bare one is a medium;
 //   4. a "Just today / Whole block" choice he has already answered in his own words is not asked again.
 import { amountSaid, unsaidAmounts, sizedToReplace } from '../src/lib/amount-said'
+import { appAsksFirst } from '../src/lib/app-asks-first'
 import { dishNameWords } from '../src/lib/as-weighed'
 import { computeMealMacros } from '../src/lib/food-db'
 import { parseIngredientLine } from '../src/lib/portion-scaler'
@@ -94,11 +95,18 @@ check('the details start folded', /useState\(false\)/.test(card.slice(card.index
 console.log('\n6. The exam of 17 Nov 2026: three things the app now holds itself')
 check('"not really a fan of the salmon you\'ve put in tonight" is a dislike to ask about', JSON.stringify(foodDislikesToAsk("not really a fan of the salmon you've put in tonight")) === '["salmon"]', foodDislikesToAsk("not really a fan of the salmon you've put in tonight"))
 check('...and so is "not a big fan of tuna"', JSON.stringify(foodDislikesToAsk('I am not a big fan of tuna')) === '["tuna"]')
-const dis = chat.indexOf('MEAL_CHANGE_KINDS.has(result.proposal.kind)')
-check('a bare dislike becomes the question before any meal-change card', dis > 0 && /if \(toAsk\.length > 0\) return \{ text: DISLIKE_ASK\.turn\(toAsk\), outcome: 'refused' \}/.test(chat.slice(dis, dis + 400)) && dis < chat.indexOf("    if (result.proposal && profile.id) {"))
-check('...unless he asked for the change ("swap it")', /!ASKS_FOR_A_CHANGE\.test\(userSaid \?\? ''\)/.test(chat.slice(dis - 50, dis + 200)))
-const usual = chat.indexOf("USUAL_MEAL.test(userSaid ?? '')")
-check('a usual meal with no amounts is asked "how much of each" before a card', usual > 0 && /How much of each do you usually have\?/.test(chat.slice(usual, usual + 300)) && usual < chat.indexOf("    if (result.proposal && profile.id) {"))
+// THE DECISION IS ONE FUNCTION NOW (19 Nov 2026, app-asks-first.ts): asked for what it does, plus the one thing only
+// the chat's source can show, that it is called before any offer is built.
+const asksAt = chat.indexOf('appAsksFirst(result.proposal.kind, result.proposal.rawArgs, userSaid)')
+check('the chat asks that function before it builds any offer', asksAt > 0 && asksAt < chat.indexOf("    if (result.proposal && profile.id) {")
+  && /if \(asksFirst && asksFirst\.why !== 'race_date'\) return \{ text: asksFirst\.text, outcome: 'refused' \}/.test(chat.slice(asksAt, asksAt + 300)), asksAt)
+check('a bare dislike becomes the question before any meal-change card', appAsksFirst('propose_meal_swap', {}, "not really a fan of the salmon you've put in tonight")?.why === 'dislike')
+check('...unless he asked for the change ("swap it")', appAsksFirst('propose_meal_swap', {}, "not a fan of the salmon tonight, swap it for something else") === null)
+check('...and only for an offer that changes a meal', appAsksFirst('propose_exercise_swap', {}, "not really a fan of the salmon you've put in tonight") === null)
+const usualAsk = appAsksFirst('propose_meal_addition', {}, 'most weeknights I do salmon with rice and broccoli')
+check('a usual meal with no amounts is asked "how much of each" before a card', usualAsk?.why === 'usual_meal' && /How much of each do you usually have\?/.test(usualAsk.text), usualAsk)
+check('...and with amounts it is not asked', appAsksFirst('propose_meal_addition', {}, 'most weeknights I do 150g salmon with rice') === null)
+check('...and a meal he does not call usual is not asked', appAsksFirst('propose_meal_addition', {}, 'add a salmon and rice dinner tonight') === null)
 check('a goal change is never refused as a one-off ("...instead")', offerWordsProblem('propose_goal_change', 'I want to stop cutting and start building muscle instead', { hedged: false }) === null)
 
 console.log(`\n${ran} checks ran.`)

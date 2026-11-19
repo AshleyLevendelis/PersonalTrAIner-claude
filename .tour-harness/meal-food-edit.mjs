@@ -337,6 +337,41 @@ console.log('\n9. Correcting a meal already eaten: the card, the eaten number an
   check('9i. no uncaught error in this section', (await ev('window.__err ?? null')) === pageErr0, await ev('window.__err ?? null'))
 }
 
+// --- 10. A SLIP OF THE FINGER IN THE AMOUNT BOX (the Nutrition walk, 18 Nov 2026, finding N4) ----------------------
+// The box took 99999 g of chicken and the card worked out 120,327 kcal. Two kilos of one food is past any portion, so
+// the line is sent back with a sentence and there is nothing to apply. A fresh page: the sections above leave edits.
+console.log('\n10. An amount that cannot be a portion is sent back\n')
+{
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&load=10#/tab/nutrition` })
+  await timeUntil(hero, '0', 40000)
+  await openBreakfast()
+  const lines10 = await rows()
+  // A line written in grams, so 99999 reads as grams whatever the dish is.
+  const gramLine = (lines10 || []).find(l => /^\d+\s?g\b/.test(l)) ?? null
+  check('10a. the meal has a line written in grams', !!gramLine, lines10)
+  check('10b. its amount box opens', (await tapRow(gramLine)) === true && (await tapVerb('resize')) === true)
+  await wait(400)
+  const typeAmount = v => ev(`(() => {
+    const n = document.querySelector('[data-meal-food-edit] input[aria-label^="New amount of"]')
+    if (!n) return false
+    n.focus()
+    Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(n, ${JSON.stringify(String(v))})
+    n.dispatchEvent(new Event('input', { bubbles: true }))
+    return true
+  })()`)
+  check('10c. 99999 is typed', (await typeAmount(99999)) === true)
+  await wait(900)
+  const said = await sheetText()
+  check('10d. THE SHEET SAYS IT IS MORE THAN ONE MEAL CAN HOLD (it costed it: 120,327 kcal)', /is more than one meal can hold\. Check the amount/.test(said || ''), (said || '').slice(-300))
+  check('10e. ...with no numbers worked out, and Apply cannot be tapped', !/kcal/.test((said || '').split('Change amount').pop() || '') && (await ev(`document.querySelector('[data-edit-apply]')?.disabled ?? null`)) === true, (said || '').slice(-200))
+  await shoot('meal-food-edit-slip')
+  const grams10 = Number(/^(\d+)/.exec(gramLine || '')?.[1] ?? 0)
+  check('10f. an ordinary amount is typed instead', (await typeAmount(grams10 + 10)) === true)
+  let ready = false
+  for (let i = 0; i < 40 && !(ready = await ev(`(() => { const b = document.querySelector('[data-edit-apply]'); return !!b && !b.disabled })()`)); i++) await wait(300)
+  check('10g. ...and the card comes back with something to apply (the guard binds on the amount)', ready === true && !/more than one meal can hold/.test((await sheetText()) || ''))
+}
+
 const err = await ev('window.__err ?? null')
 check('4. no uncaught error on the page', err === null, err)
 

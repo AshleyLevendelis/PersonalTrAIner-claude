@@ -244,6 +244,29 @@ await clickLast('Apply')
 await until(`[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo')`)
 check('F7. with nothing changed since, Undo puts it back', await clickLast('Undo') && !!(await until(`/was taken back/i.test(document.body.innerText)`)), await lastText())
 
+// ---- G. Apply when only the plan's own save fails --------------------------------------------------------------------
+// The chat walk of 18 Nov 2026 (C4): the offer itself was reachable, the write of the plan was not. The tap was
+// answered "Nothing was applied" and the offer's buttons were gone, so the only way back was to ask again. Nothing
+// had changed, so the same offer stays up, says why, and the next tap works.
+console.log('\n  G. APPLY WHEN ONLY THE PLAN SAVE FAILS')
+check('G0. the chat is up', await boot('load=g') === true)
+await say("I've only got 25 minutes today")
+check('G1. a shorter-session offer is up', !!(await until(`document.querySelectorAll('[data-testid="proposal-card"][data-offer="text"]').length > 0`)), await lastText())
+const savedBefore = await ev(`JSON.stringify(window.__fakeDb?.mesocycle_weeks ?? [])`)
+await ev(`window.__failWrite = (t) => t === 'mesocycle_weeks'`)
+check('G2. Apply is tapped while the plan cannot be saved', await clickLast('Apply'))
+const cardNow = `(() => { const c = [...document.querySelectorAll('[data-testid="proposal-card"]')].pop(); return c ? { status: c.getAttribute('data-card-status'), text: c.innerText.replace(/\\s+/g, ' '), apply: [...c.querySelectorAll('button')].some(b => b.textContent.trim() === 'Apply' && !b.disabled), notice: (c.querySelector('[data-testid="proposal-notice"]')?.textContent || '').trim() } : null })()`
+const kept = await until(`(() => { const v = ${cardNow}; return v && v.notice ? v : null })()`)
+check('G3. THE OFFER KEEPS ITS APPLY (it lost its buttons, with nothing to try again)', !!kept && kept.status === 'pending' && kept.apply === true, kept ?? await ev(cardNow))
+check('G4. ...and says nothing was changed, once', !!kept && /nothing was changed/i.test(kept.notice) && !/Nothing was applied/.test(await lastText()), kept ?? await lastText())
+check('G5. ...and the saved plan is as it was', (await ev(`JSON.stringify(window.__fakeDb?.mesocycle_weeks ?? [])`)) === savedBefore)
+check('G6. ...with one open offer, not two', (await ev(`(window.__fakeDb?.pending_actions ?? []).filter(r => r.status === 'pending').length`)) === 1 && (await offers()) === 1,
+  await ev(`(window.__fakeDb?.pending_actions ?? []).map(r => r.status)`))
+await shoot('workout-scenarios-chat-save-failed')
+await ev(`window.__failWrite = undefined`)
+check('G7. once it can save, the same Apply works', await clickLast('Apply') && !!(await until(`(window.__fakeDb?.mesocycle_weeks ?? []).length > 0 && [...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Undo')`)), await lastText())
+check('G8. ...and the plan was changed this time', (await ev(`JSON.stringify(window.__fakeDb?.mesocycle_weeks ?? [])`)) !== savedBefore)
+
 console.log(`\n${ran} checks ran. ${failures === 0 ? 'A failed Undo says so; the coach reads the week she is in; offers and Undos are checked against what changed since.' : `${failures} check(s) FAILED.`}\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

@@ -34,11 +34,13 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import {
   generateMesocycle, getConstrainedPool, bestEquipmentRank, settleWeekBalance, getExerciseCompatibilityWarnings, mapTier, mapMovementPattern,
+  setRandomSource, resetRandomSource,
 } from '../src/lib/exercise-plan'
 import { addExerciseToSession, peerProgrammingFor } from '../src/lib/session-edit'
 import { executeExerciseAdd } from '../src/lib/pending-action-executor'
 import { getAdditionCandidates, resolveAdditionRequest } from '../src/lib/exercise-add-candidates'
-import { applyReplacement, recomputeLoad } from '../src/lib/mesocycle-edit'
+import { applyReplacement, recomputeLoad, priceAddedLift, calibrates } from '../src/lib/mesocycle-edit'
+import { seededRngFromKey } from '../src/lib/seeded-random'
 import { searchExerciseCatalog, muscleGroupsOf, getExerciseEntry, EXERCISE_DATABASE, type ExerciseEntry } from '../src/lib/exercise-db'
 import { isExternallyLoaded } from '../src/lib/load-prescription'
 import type { UserProfile, MesocycleWeek, Exercise, WorkoutDay } from '../src/lib/types'
@@ -87,7 +89,7 @@ const dayOf = (m: MesocycleWeek[], week: number, day = DAY) =>
 /** Prices a candidate the way both surfaces do — one peer, one answer. */
 async function price(entry: ExerciseEntry, day: WorkoutDay, profile = PROFILE): Promise<LoadPrescription> {
   const prog = peerProgrammingFor(day.exercises, mapTier(entry.mechanics_tier))!
-  return recomputeLoad(entry, profile, prog.intensity, prog.sets, prog.reps, true)
+  return priceAddedLift(entry, profile, prog, MESO[0], MESO)
 }
 
 async function main() {
@@ -119,10 +121,11 @@ async function main() {
   check('the priced sets are the peer\'s sets', peer.sets === template.sets, { priced: peer.sets, peer: template.sets })
   check('reps agree with what applyReplacement would build', slot.reps === expected.reps, { slot: slot.reps, expected: expected.reps })
 
-  // A MOVEMENT WITH NO HISTORY GETS THE RESET BASIS, never a confident number
-  // about a lift nobody has done. The reset branch's own sentence.
-  check('a brand new lift is told to find its working weight',
-    /find your working weight/i.test(String(slot.load_guidance ?? '')), slot.load_guidance)
+  // A MOVEMENT WITH NO HISTORY IS NEVER A CONFIDENT NUMBER about a lift nobody has done: in a plan with a testing
+  // week it carries the plan's own light-start sentence (19 Nov 2026; it was the new-main-lift sentence, with the
+  // whole estimate beside it).
+  check('a brand new lift is told to start light and find its weight',
+    /start deliberately light|find the weight|find your working weight/i.test(String(slot.load_guidance ?? '')), slot.load_guidance)
 
   // Nothing that belonged to the outgoing peer survives onto the new movement.
   check('no ramp block carried from the peer', slot.ramp_up === undefined)
@@ -620,6 +623,67 @@ async function main() {
     check('...and the shorten card\'s "before" is the header\'s own words', /field: 'Time', before: formatDayLength\(dayLengthParts\(day\)\)/.test(chat))
     check('the screen\'s add card reads the work minutes off the trial day', impact.length > 0 && /dayLengthParts\(afterDay\)\.workMinutes/.test(impact) && !/estimateDaySeconds\(/.test(impact))
     check('the shorten choices are measured against the session\'s work', /dayLengthParts\(day\)\.workMinutes/.test(sheet) && !/estimateDaySeconds\(/.test(sheet) && !/optionalMinutes/.test(sheet))
+  }
+
+  // -------------------------------------------------------------------------
+  console.log('\n11. An added lift is priced like the plan\'s own (Exercise walk E1, 19 Nov 2026)')
+  // -------------------------------------------------------------------------
+  // Barbell Bench Press added at about 55 kg beside the plan's own bench at 32.5: both add routes priced down the
+  // new-main-lift branch, which skips the plan's light start and never reads his log. docs/plans/added-lift-price.md.
+  // Every loaded lift a seeded plan already holds, added to ANOTHER day of a loading week, against the plan's own
+  // number for it. The old pricing is run beside the new one, so the grid is proved to hold the defect.
+  {
+    const cases: { who: string; lift: string; own: number; added: number; was: number }[] = []
+    let calibratingPlans = 0
+    for (const exp of ['beginner', 'intermediate', 'advanced']) for (const gender of ['male', 'female']) for (const eq of ['full_gym', 'home_gym']) {
+      const p = { ...PROFILE, training_experience: exp, gender, weight_kg: gender === 'male' ? 80 : 65, equipment_access: eq } as unknown as UserProfile
+      setRandomSource(seededRngFromKey(`added-price|${exp}|${gender}|${eq}`))
+      let meso: MesocycleWeek[]
+      try { meso = silence(() => generateMesocycle(p)) } finally { resetRandomSource() }
+      if (calibrates(meso)) calibratingPlans++
+      for (const week of meso) {
+        if (week.is_deload || week.isCalibrationWeek || week.week_number > 4) continue
+        const training = week.days.filter(d => d.exercises.length > 3)
+        for (const from of training) for (const ex of from.exercises) {
+          if (!(typeof ex.suggested_load_kg === 'number' && ex.suggested_load_kg > 0) || ex.tier === 'primer') continue
+          const to = training.find(d => d.day !== from.day && !d.exercises.some(e => e.name === ex.name))
+          const entry = getExerciseEntry(ex.name)
+          const prog = to && entry ? peerProgrammingFor(to.exercises, mapTier(entry.mechanics_tier)) : null
+          if (!to || !entry || !prog) continue
+          const added = await silence(() => priceAddedLift(entry, p, prog, week, meso))
+          const was = await silence(() => recomputeLoad(entry, p, prog.intensity, prog.sets, prog.reps, true))
+          if (added.starting_weight_kg == null || was.starting_weight_kg == null) continue
+          cases.push({ who: `${exp}/${gender}/${eq}`, lift: ex.name, own: ex.suggested_load_kg, added: added.starting_weight_kg, was: was.starting_weight_kg })
+        }
+      }
+    }
+    const over = (k: 'added' | 'was', x: number) => cases.filter(c => c[k] / c.own > x)
+    console.log(`    ${cases.length} additions on ${calibratingPlans} plans with a testing week; over 1.25x the plan's own: ${over('was', 1.25).length} before, ${over('added', 1.25).length} after`)
+    check('the grid is big enough to mean something', cases.length >= 300 && calibratingPlans >= 6, { cases: cases.length, calibratingPlans })
+    check('the old pricing put most additions well over the plan\'s own number (the grid holds the defect)', over('was', 1.5).length > cases.length / 2, { over: over('was', 1.5).length, of: cases.length })
+    check('an added lift is within 1.25x of the plan\'s own number in at least 97% of cases', over('added', 1.25).length <= cases.length * 0.03, { over: over('added', 1.25).length, of: cases.length, e: over('added', 1.25).slice(0, 4) })
+    check('...and never twice it', over('added', 2).length === 0, over('added', 2).slice(0, 4))
+    check('...and never under half of it', cases.filter(c => c.added / c.own < 0.5).length === 0, cases.filter(c => c.added / c.own < 0.5).slice(0, 4))
+
+    // A PLAN WITH NO TESTING WEEK KEEPS THE ESTIMATE: its own untested lifts were never discounted either.
+    const bench = getExerciseEntry('Barbell Bench Press')!
+    const prog = { intensity: 'RPE 7-8', sets: 3, reps: '8-10' }
+    const noTest = [{ isCalibrationWeek: false }, { isCalibrationWeek: false }]
+    const withTest = [{ isCalibrationWeek: true }, { isCalibrationWeek: false }]
+    const full = (await silence(() => priceAddedLift(bench, PROFILE, prog, noTest[1], noTest))).starting_weight_kg ?? 0
+    const light = (await silence(() => priceAddedLift(bench, PROFILE, prog, withTest[1], withTest))).starting_weight_kg ?? 0
+    const inTest = (await silence(() => priceAddedLift(bench, PROFILE, prog, withTest[0], withTest))).starting_weight_kg ?? 0
+    check('a plan with a testing week starts an added bench light, in every week', light > 0 && light < full * 0.75 && inTest === light, { full, light, inTest })
+    check('a plan with no testing week keeps the estimate', full > 0 && full === ((await silence(() => recomputeLoad(bench, PROFILE, prog.intensity, prog.sets, prog.reps, true))).starting_weight_kg ?? -1), { full })
+
+    // BOTH ROUTES CALL THE ONE FUNCTION, and neither prices an addition down the new-main-lift branch again.
+    const code = (p: string) => read(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    const panel = code('src/components/exercise/TodayPanel.tsx')
+    const exec = code('src/lib/pending-action-executor.ts')
+    const addExec = exec.slice(exec.indexOf('export async function executeExerciseAdd'), exec.indexOf('addExerciseToSession({'))
+    check('the detector fires on the old call', /recomputeLoad\(/.test('await recomputeLoad(entry, profile, a, b, c, true)'))
+    check('the screen prices an addition with priceAddedLift', /priceAddedLift\(entry, profile, programming, week, mesocycle\)/.test(panel) && !/recomputeLoad\(/.test(panel))
+    check('the coach\'s confirm prices an addition with priceAddedLift', addExec.length > 0 && /priceAddedLift\(entry, profile, programming, week, mesocycle\)/.test(addExec) && !/recomputeLoad\(/.test(addExec))
   }
 
   console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`)

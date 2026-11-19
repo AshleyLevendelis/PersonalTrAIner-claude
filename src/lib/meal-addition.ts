@@ -118,6 +118,22 @@ export function portionWithHint(i: { name: string; quantity: number; unit: strin
 }
 
 /**
+ * ONE FOOD, MORE THAN THIS IN ONE MEAL, IS A SLIP OF THE FINGER (the Nutrition walk, 18 Nov 2026, finding N4): the
+ * amount box took 99999 g of chicken and the card worked out 120,327 kcal. Two kilos (or two litres) of a single food
+ * is past any portion one person eats at a sitting, so a line over it is sent back with a sentence, wherever an
+ * amount is typed or said: changing an amount, adding a food, and a meal described to the coach.
+ * A typing check, not a judgement about his eating: 1.5 kg of anything still goes through, with its numbers shown
+ * before he applies it. The weight is the app's own reading of the line (a count or a volume is turned to grams).
+ */
+export const MAX_ONE_FOOD_G = 2000
+export function overfullLine(lines: string[]): string | null {
+  const read = computeMealMacros(lines.map(parseIngredientLine)).lines
+  const at = read.findIndex(l => l.grams != null && l.grams > MAX_ONE_FOOD_G)
+  if (at === -1) return null
+  return `${lines[at].trim()} is more than one meal can hold. Check the amount and try again.`
+}
+
+/**
  * verifyProposal writes a precise diagnostic into its rejectLog. These are
  * written for a developer reading a generation run, not for someone who just
  * asked for a curry, so they are translated here — TRANSLATED, not replaced:
@@ -282,7 +298,8 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
   // shows. The card names the days, so a week asked late in the week says where it stops.
   const allDates = repeatDates(date, Number(rawArgs.days ?? 1), input.todayDate)
   const alsoDates = allDates.slice(1)
-  const forWhen = alsoDates.length > 0 ? `every day from ${datesLabel(allDates)}` : date
+  // A DAY IN WORDS, NEVER "2026-09-17" (19 Nov 2026: the card read "becomes your dinner for 2026-09-17").
+  const forWhen = alsoDates.length > 0 ? `every day from ${datesLabel(allDates)}` : date === input.todayDate ? 'today' : datesLabel([date])
 
   return {
     ok: true,

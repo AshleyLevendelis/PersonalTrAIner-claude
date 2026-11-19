@@ -51,7 +51,7 @@ screen counterpart are in `docs/coach-screen-parity.md`.
 | Action | On the screen too | Arrives as | His words must... |
 |---|---|---|---|
 | `propose_concurrent_activity` | yes | a card (`propose_concurrent_activity`) | never off one occasion; never off a maybe |
-| `propose_equipment_adaptation` | yes | a card (`propose_equipment_adaptation`) | (no words rule: a temporary kit change, seven days, stated on the card) |
+| `propose_equipment_adaptation` | yes | a card (`propose_equipment_adaptation`) | never when asked to hold or pause |
 | `propose_goal_change` | yes | a card (`propose_goal_change`) | (no words rule: a goal is lasting by nature; "instead" is not an occasion) |
 | `propose_injury_adaptation` | yes | a card (`propose_injury_adaptation`) | (no words rule: pain is triaged first (edit-reason); a sharp one changes nothing) |
 | `propose_injury_as_lasting` | yes | a card (`propose_injury_as_lasting`) | never off one occasion |

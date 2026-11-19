@@ -1,5 +1,5 @@
 import { verifyProposal, computeSlotBudgets, type RawProposal } from './meal-generation'
-import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, portionWithHint, type MealAdditionPayload } from './meal-addition'
+import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, overfullLine, portionWithHint, type MealAdditionPayload } from './meal-addition'
 import { computeMealMacros, isToTaste, lookupIngredient, whichKindQuestion } from './food-db'
 import { parseIngredientLine, parseIngredientLines } from './portion-scaler'
 import { asWeighedLines } from './as-weighed'
@@ -80,6 +80,8 @@ export function buildCustomMealProposal(input: BuildCustomMealInput): CustomMeal
   if (missingAmounts.length > 0) {
     return { ok: false, reason: `How much ${missingAmounts.length === 1 ? 'of the ' + missingAmounts[0] : 'of each — ' + missingAmounts.join(', ')}? Grams, or counts like "3 eggs", both work.` }
   }
+  const overfull = overfullLine(foodLines)
+  if (overfull) return { ok: false, reason: overfull }
 
   // A FOOD THE APP CANNOT COUNT IS ASKED ABOUT, NEVER LEFT OUT OF THE TOTAL (18 Nov 2026; his 15 Oct rule for a logged
   // meal, "never show a total that quietly leaves it out", was not held here). "200g chicken, 250g rice, 60g chocolate

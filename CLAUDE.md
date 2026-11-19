@@ -90,7 +90,7 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   implement gets one too, at **half the working load**, read off the app's own
   warm-up ladder rather than invented (18 Sep 2026, CSCS delegation; his 17 Sep
   ruling gave it a number, this is the "kept light" half) — `primer-load`,
-  `load-ceilings`, `load-ceiling-units`,
+  `load-ceilings`, `ceiling-units`,
   `per-side-load`, `single-implement`, `load-display`, `loadless-notes`
 - The time cap is kept, and a shortfall says why — `session-length`,
   `session-shortfall`, `cardio-share-score`, `main-lift-rest`
@@ -953,7 +953,7 @@ menu" stays true when a copy is also left outside it.
     `verify:setup-answers` §6, `rebuild-offer`
 - Weights actually lifted flow into the printed plan — automatic from
   calibration week, offered after — `calibration-search`,
-  `beat-target-offer`, `logged-reanchor`
+  `beat-target`, `logged-reanchor`
 - Nothing recorded is lost by any of this — `diary-preservation`,
   `replace-without-losing`, `memory`
 
@@ -1121,9 +1121,9 @@ menu" stays true when a copy is also left outside it.
 - It asks before prescribing and uses the answer — prompt rule, kept in sync
   by `coach-rules-sync`; whether it HAPPENS is `UNGUARDED`
 - It notices patterns and coaches to them — `block-review`,
-  `beat-target-offer`, `session-feel`, `coach-opener` (missed yesterday —
+  `beat-target`, `session-feel`, `coach-opener` (missed yesterday —
   and it stops asking once a miss is declared), `coach-nudge`,
-  `activity-streak`; a missed WEEK gets a chat prefill, not a follow-up
+  `coach-rhythm` (weeks on plan, which replaced the streak 13 Nov 2026); a missed WEEK gets a chat prefill, not a follow-up
 - It holds its scope — doctor, physio, dietitian at the right moment —
   `starting-out` for the first-timer note; otherwise `UNGUARDED`
 - One voice, every time — **half guarded since 15 Sep 2026, and the split is
@@ -1335,7 +1335,7 @@ menu" stays true when a copy is also left outside it.
   saying — the last of the eight was unlocked that day. Every answer can be
   changed now
 - Progress is visible — history, PRs, weight trend, streak —
-  `exercise-history`, `dashboard`, `activity-streak`, `home-week-strip`,
+  `exercise-history`, `dashboard`, `history-streak`, `coach-rhythm`, `home-week-strip`,
   and since 16 Sep 2026 **for bodyweight training too**:
   `bodyweight-progress` (55 checks, 15 mutations),
   `verify:bodyweight-progress` (19 checks, 6 mutations).
@@ -1473,7 +1473,7 @@ menu" stays true when a copy is also left outside it.
   the weight, then tap ✓), and the spotlight covers the whole row so the box
   it asks for can actually be reached. `verify:tour-real`, `app-tour`
 - Safety ships correct or not at all — `injury-adaptation-safety`,
-  `joint-tag-states`, `rehab-prescribed`, `food-db-parity`, `diet-tag-sync`,
+  `joint-tags`, `rehab-prescribed`, `food-db-parity`, `diet-tag-sync`,
   `load-ceilings`, `set-plausibility`, `lift-plausibility`, `starting-out`
 - **The coach chat is grouped bubbles on a full page** — Ashley, 26 Sep 2026,
   twice that day, layout only both times. Same sender within five minutes is
@@ -1525,7 +1525,7 @@ menu" stays true when a copy is also left outside it.
   `test:grocery-display`, `test:grocery-screen`
 - Works one-handed on a phone on a gym floor — `verify:tap-targets`,
   `verify:chat-shell`, `composer-focus`, `session-continuity`,
-  `installable`, `a11y`, `verify:walk`
+  `installable`, `a11y`, `verify:screens`
 
 ### His strategy of 13 Nov 2026 (`docs/plans/measurement.md` and the slice plans after it)
 - **Measurement first: every unprompted coach message is kept with whether he answered** (slice 1). Its own table, so Clear
@@ -1687,8 +1687,45 @@ menu" stays true when a copy is also left outside it.
   row, a graph with each Monday-to-Sunday week's average as a line, a 3M / 6M / 1Y choice and a list of weeks (average,
   change from the week before, tap for the days), from the readings the calorie targets trust only.
   `test:weight-weeks`, `verify:weight-history`
+- **How hard was it, 1 to 10, on the session summary: his ruling 18 Nov 2026, "Build the 1–10"** (over the three words
+  and a dial): one tap, saved with the day; it replaces the chat's "how did it feel" for a session he rated. Per lift
+  stays Too easy / About right / Too hard (his question, my recommendation). Mine (CSCS): 1-3 easy, 4-8 good, 9-10 hard
+  for the coach's ease-off rule. `test:session-effort`, `verify:session-effort`. Needs migration 20261118140000
 - **OPEN, HIS**: whether protein a little over or fat a little under with calories on target is a miss on a muscle-gain
   plan (his 18 Oct bands say yes); "usually contains" allergens on existing foods.
+
+### His chat brief of 19 Nov 2026 (`docs/plans/chat-voice-2026-11-19.md`; decisions mine, on his "go with your recommendations")
+- **What keeps him talking is a specific answer, an easy reply and being remembered, never more questions.** Every coach
+  reply ends in the first of four ways that is true: the one question it needs, first and alone; an OFFER as one short
+  question with buttons; a next step on one or two buttons written as what HE would say ("Go deeper"), with no question
+  sentence; or it stops on the answer. It narrows nothing of his 24 Sep "a question only when the answer matters".
+  Struggling is asked about before it is fixed; a change is offered, never announced; no tacked-on pivot after a quick
+  fact. Unproven until the exam runs after the `chat-gemini` deploy (four `talk-*` exam cases).
+- **The tics are taken out in code** (the coach's server, `stock-phrases.ts`): an internal name becomes plain words, an
+  unknown tag goes, one emoji at most and none on a reply over 160 characters, a CLOSED list of stock openers and
+  closers goes (a question about HIM is never touched; safety wording keeps every sentence), his name as address once
+  and not if just used. **A promise with no tool behind it** ("I'm going to drop your volume") is sent back to be said
+  as an offer, and a turn that reached for a tool that does not exist is answered in words, never "say it again in your
+  own words". `test:coach-tics`
+- **A pause is not a kit change**: the kit offer is refused when he asked for his training to be held or paused, and
+  the app's pause offer reads the same words through the same function. `test:offer-rules`
+- **A workout logged by chat gets a line of its own, and a best is named with its unit**; Undo takes the line back.
+  `test:chat-log-words`, `verify:chat-log-words`
+- **The exam marks the turn he would SEE**: where the app asks a question in place of the coach's offer (a bare dislike,
+  a usual meal with no amounts, a race with no date), the marker asks the chat's own function (`app-asks-first.ts`).
+  Three of the five breaches of 18 Nov were these. `test:coach-exam-grader` §14
+- **A session told to the chat about an earlier day is written to THAT day** (19 Nov 2026; it was written onto today):
+  the last two weeks only, after the sets already there, the line naming the day; anything else is refused and nothing
+  is written. No Undo on a past-day log yet. `test:chat-log-date`, `verify:chat-log-words` §5-7
+- **A QUICK LOOP THAT COUNTS THE WORD "FAIL" READS A GATE THAT PRINTS A CROSS AS A PASS.** 19 Nov 2026:
+  `test:coach-rules-sync` was red and my loop printed 0. Read the exit code, or the gate's own last line.
+- **A SOURCE CHECK THAT NAMES A FIELD CAN PIN THE WRONG FIELD AND PASS.** 19 Nov 2026: the Undo line was written to
+  `text` where a message's words live in `content`; the check I wrote pinned `text`, passed, and the bubble never
+  changed. The browser driver found it in one run. For anything on screen, the driver is the proof; the source check
+  only says the branch exists.
+- **MEASURE A REMOVAL ON THE REAL REPLIES BEFORE SHIPPING THE LIST.** Same day: every candidate stock phrase was run
+  over the 64 real exam replies first. One ("That's what we love to hear") was the reply's only answer to good news,
+  and came off the list.
 
 ### His rulings of 17 Nov 2026
 - **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over
@@ -2926,6 +2963,12 @@ old — the commands were right and the context was missing.
   worktree isolates FILES, not ports: while a sweep runs anywhere, do not run a
   driver that the sweep has not yet passed, and re-run any gate that failed
   while something else was running before believing the failure.
+- **A FAKE BROWSER MUST FIRE WHAT A BROWSER FIRES, AND A CHANGE TO WHAT EVERY SCREEN PASSES THROUGH RUNS THE DRIVERS
+  THAT START THE WHOLE APP.** 19 Nov 2026: "the phone's Back closes Profile" shipped to the branch with a tab tap
+  undone after every Profile close, because a browser sends popstate when the app itself changes address and the
+  check's fake history sent it only for a Back. The screen driver closed and moved in one tick, a different path, and
+  the drivers re-run were picked by screen. The full sweep found it. For the address, the phone's history or the app
+  shell, run `grep -l app-boot .tour-harness/*.mjs`, every one.
 - **A FAKE MUST FILL WHAT THE DATABASE FILLS.** 27 Sep 2026: the harness's
   fake inserted grocery rows with no `created_at`, which Postgres always
   sets. The list's read sorts on it, threw, fell back to "nothing", and the

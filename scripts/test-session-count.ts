@@ -86,8 +86,15 @@ console.log('\n1b. Movement prep is a warm-up, not a working set (whole-app QA w
     { withTicks: sum.extraSets, without: noPrepTicked.extraSets, planned: sum.setsPrescribed })
   check('...where without the prep list the same ticks WOULD read as two extra (the check binds)',
     computeSessionSummary(prepLogs, work, at, at).extraSets === noPrepTicked.extraSets + 2)
-  check('Today hands the summary the day\'s prep rows', /computeSessionSummary\(logs, plannedExercises, result\.startedAtIso, result\.finishedAtIso, prepRows\)/.test(code('src/components/exercise/TodayPanel.tsx'))
-    && /const prepRows = workout\.exercises\.filter\(ex => isMovementPrepRow\(ex\)\)/.test(code('src/components/exercise/TodayPanel.tsx')))
+  // RE-ANCHORED 19 Nov 2026: the rows now come from one helper (summaryRowsOf), because the summary is worked out in
+  // two places (at Finish, and again as the sets stand after it). The property is unchanged: both are handed the
+  // day's movement-prep rows, taken from the plan by the one prep test.
+  const today = code('src/components/exercise/TodayPanel.tsx')
+  const rowsOf = today.slice(today.indexOf('function summaryRowsOf('), today.indexOf('export function TodayPanel('))
+  check('Today hands the summary the day\'s prep rows', /const \{ planned: plannedExercises, prep: prepRows \} = summaryRowsOf\(workout\)/.test(today)
+    && /computeSessionSummary\(logs, plannedExercises, result\.startedAtIso, result\.finishedAtIso, prepRows\)/.test(today)
+    && /prep: workout\.exercises\.filter\(ex => isMovementPrepRow\(ex\)\)/.test(rowsOf) && /planned: workout\.exercises\.filter\(ex => !isMovementPrepRow\(ex\)\)/.test(rowsOf))
+  check('...and so does the summary as it stands after Finish', /const \{ planned, prep \} = summaryRowsOf\(workout\)\s*return \{ \.\.\.summaryData, summary: summaryAsItStands\(summaryData\.summary, logs, planned, prep\) \}/.test(today))
 }
 
 console.log('\n2. Said only when short')

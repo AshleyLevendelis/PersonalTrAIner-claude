@@ -14,6 +14,7 @@
 // obviously can; both are verified identically anyway, because deciding
 // per-operation which checks to run is the shape of that bug.
 // ---------------------------------------------------------------------------
+import { overfullLine, MAX_ONE_FOOD_G } from '../src/lib/meal-addition'
 import { readFileSync } from 'fs'
 import {
   buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal,
@@ -130,6 +131,16 @@ console.log('\n4. Resizing a portion keeps her words')
   const noAmount = buildMealFoodResizeProposal({ ...base({ currentMeal: mealOf(['salt to taste', '80g white rice']) }),
     rawArgs: { meal_slot: 'lunch', food: 'salt', amount: 5 } })
   check('...and the app offers to swap it instead', noAmount.ok === false && /swap it instead/i.test(noAmount.reason), noAmount)
+  // ONE FOOD, MORE THAN TWO KILOS IN ONE MEAL, IS A SLIP OF THE FINGER (Nutrition walk, 18 Nov 2026, N4): the box took
+  // 99999 and the card worked out 120,327 kcal.
+  const slip = buildMealFoodResizeProposal({ ...base(), rawArgs: { meal_slot: 'lunch', food: 'rice', amount: 99999 } })
+  check('99999 g of one food is sent back, not costed', slip.ok === false && /more than one meal can hold/.test(slip.reason), slip.ok === false ? slip.reason : 'accepted')
+  check('...naming the line as it would have read', slip.ok === false && /^99999g dry white rice /.test(slip.reason), slip.ok === false ? slip.reason : '')
+  check('the line is drawn at two kilos: 2000 g passes, 2001 g does not', MAX_ONE_FOOD_G === 2000 && overfullLine(['2000g potato']) === null && overfullLine(['2001g potato']) !== null,
+    [overfullLine(['2000g potato']), overfullLine(['2001g potato'])])
+  check('a count is weighed too: 45 eggs is over, 6 eggs is not', overfullLine(['45 eggs']) !== null && overfullLine(['6 eggs']) === null)
+  check('every line is looked at, and the one over is the one named', /^99999g chicken breast /.test(overfullLine(['100g dry white rice', '99999g chicken breast']) ?? ''), overfullLine(['100g dry white rice', '99999g chicken breast']))
+  check('a line the app cannot weigh is left to the rule that asks about it', overfullLine(['some rice']) === null, overfullLine(['some rice']))
   // A SECOND RESIZE REPLACES THE FIRST'S WORDS (whole-app QA walk, 7 Nov 2026): the name grew a clause per tap.
   if (r.ok) {
     const once = r.payload.option

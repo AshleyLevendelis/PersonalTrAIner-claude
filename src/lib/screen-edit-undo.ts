@@ -32,6 +32,8 @@ export type ScreenEditKind = 'swap' | 'remove' | 'reorder' | 'add'
 export interface ScreenEditRecord {
   /** One line, past tense: "Swapped Lat Pulldown for Seated Cable Row." */
   text: string
+  /** Something the change costs, said after the line and left out of the "was taken back" sentence (a warm-up move now behind the work). */
+  note?: string
   /** The plan as it was before the change. */
   before: MesocycleWeek[]
   /** The week numbers the change wrote. */
@@ -67,11 +69,45 @@ export function recordScreenEdit(
   scope: 'today' | 'permanent',
   text: string,
   now: number,
+  note?: string | null,
 ): ScreenEditRecord {
   const written = weeksTouchedByScope(after, weekNumber, scope)
   const weeks = written.map(w => w.week_number)
   const prints = fingerprintWeeks(written)
-  return { text, before, weeks, after: prints, at: now, id: ++seq }
+  return { text, before, weeks, after: prints, at: now, id: ++seq, ...(note ? { note } : {}) }
+}
+
+/** What a whole-day change on the Exercise screen keeps so the day can be put back ("I'm short of time", "a different session"). */
+export interface DayWayBack {
+  record: ScreenEditRecord
+  /** True when this change followed one that could still be put back, and so goes back past it. */
+  chained: boolean
+}
+
+/**
+ * ONE WAY BACK, AND IT GOES TO THE PLAN (19 Nov 2026). Shorten the day, then ask for a different session: the button
+ * under the second change says "Put my planned session back", so it must not stop at the shortened session and leave
+ * the shortening with no way back at all. While the earlier change could still be put back (inside its ten minutes, no
+ * set logged since, its weeks still as it left them), the later one keeps the EARLIER change's "before". Otherwise
+ * the way back is to the day as this change found it. `loggedAt` is the working sets logged when the earlier one landed.
+ */
+export function dayWayBack(
+  earlier: { record: ScreenEditRecord; loggedAt: number } | null,
+  live: MesocycleWeek[],
+  after: MesocycleWeek[],
+  weekNumber: number,
+  text: string,
+  loggedNow: number,
+  now: number,
+): DayWayBack {
+  const chained = !!earlier
+    && now - earlier.record.at <= SCREEN_UNDO_WINDOW_MS
+    && loggedNow <= earlier.loggedAt
+    && undoStillFits(earlier.record.after, live, earlier.record.weeks)
+  return {
+    record: recordScreenEdit(chained && earlier ? earlier.record.before : live, after, weekNumber, 'today', text, now),
+    chained,
+  }
 }
 
 export type ScreenUndoOutcome =

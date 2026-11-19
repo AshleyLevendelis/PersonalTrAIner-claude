@@ -31,9 +31,12 @@ import { getActiveMesocycleWeek } from './calculations'
 import { getExerciseEntry, getExerciseId } from './exercise-db'
 import { isExternallyLoaded, statedCeilingKg, getLoadIncrementKg, categorize } from './load-prescription'
 import { outgrownWeightKg } from './outgrown'
-import { getSetsForDate } from './set-log-store'
+import { getSetsForDate, getSetsForDates } from './set-log-store'
 import { saveMesocycleWeek } from './mesocycle-persistence'
 import { patchBlockFromLiftedKg, type LiftedAnchor } from './beat-target-offer'
+import { sessionForDate, addDays, type SessionMove } from './session-move'
+import { getSessionMovesInRange } from './daily-tracking'
+import { getLocalDateString } from './dev-clock'
 
 export interface CalibrationAnchor {
   exIndex: number
@@ -93,7 +96,8 @@ export function calibrationAnchorsFor(
       ? outgrownWeightKg(lifted, atTop, Math.min(...range), Math.max(...range), getLoadIncrementKg(entry, categorize(entry), lifted))
       : null
     const heaviest = Math.max(lifted, outgrown ?? 0)
-    if (heaviest > ex.suggested_load_kg) {
+    // EVIDENCE IS USED ONCE (18 Nov 2026): a weight this slot was already anchored from does not anchor again.
+    if (heaviest > Math.max(ex.suggested_load_kg, ex.calibration_anchored_kg ?? 0)) {
       out.push({ exIndex, exerciseName: ex.name, plannedKg: ex.suggested_load_kg, liftedKg: heaviest, ...(heaviest > lifted ? { fromRepsAtKg: lifted } : {}) })
     }
   })
@@ -165,7 +169,19 @@ export function planCalibrationAnchors(
 
   const blockNumber = week.block_number ?? 1
   const fromWeekInBlock = (week.week_in_block ?? 1) + 1
-  let next = mesocycle
+  // STAMP THE EVIDENCE on the testing week's own slots, whether or not a later week then moves: the same sets must
+  // not write the plan again on a later read (see `calibration_anchored_kg`). The slot's printed number is untouched.
+  let next = mesocycle.map(w => w.week_number !== weekNumber ? w : {
+    ...w,
+    days: w.days.map(d => d.day !== dayName ? d : {
+      ...d,
+      exercises: d.exercises.map((e, i) => {
+        const a = anchors.find(x => x.exIndex === i)
+        return a ? { ...e, calibration_anchored_kg: a.liftedKg } : e
+      }),
+    }),
+  })
+  const stamped = next
   const applied: CalibrationAnchor[] = []
   for (const a of anchors) {
     const anchor: LiftedAnchor = { blockNumber, dayName, exIndex: a.exIndex, exerciseName: a.exerciseName, liftedKg: a.liftedKg, fromWeekInBlock }
@@ -189,11 +205,103 @@ export function planCalibrationAnchors(
       },
     })
   }
-  if (applied.length === 0) return NOTHING(mesocycle)
   // Untouched weeks keep their identity through the patch helper's map, so
   // "what changed" is exactly the weeks that are no longer the same object.
+  // With nothing applied that is the testing week alone, carrying its stamp.
   const changedWeeks = next.filter((w, i) => w !== mesocycle[i])
+  if (applied.length === 0) return { next: stamped, applied: [], changedWeeks, nextWeekNumber: null }
   return { next, applied, changedWeeks, nextWeekNumber: weekNumber + 1 }
+}
+
+/** One testing-week date: the session run on it (moves taken into account) and the sets logged on it. */
+export interface CalibrationDay { date: string; dayName: string; sets: ExerciseSetLog[] }
+
+/**
+ * EVERY WAY A TESTING-WEEK SESSION CAN BE LOGGED REACHES THE PLAN (18 Nov 2026, docs/plans/weights-leftovers-2026-11-18.md §4).
+ *
+ * Until now only the Finish button anchored. A session closed by the six-hour window, logged through "I did it, not
+ * in the app", logged by the coach, or added to after Finish left the printed plan on the estimate while today's card
+ * read the logs: the two screens his 10 Sep ruling exists to keep agreeing. This folds the SAME decision over each
+ * testing-week date that has passed, so there is still one rule. Pure: the shell below reads the dates and the sets.
+ */
+export function planCalibrationSweep(
+  mesocycle: MesocycleWeek[],
+  profile: UserProfile,
+  weekNumber: number,
+  days: CalibrationDay[],
+): CalibrationAnchorPlan {
+  let next = mesocycle
+  const applied: CalibrationAnchor[] = []
+  for (const d of days) {
+    const r = planCalibrationAnchors(next, profile, weekNumber, d.dayName, d.sets)
+    next = r.next
+    applied.push(...r.applied)
+  }
+  const changedWeeks = next.filter((w, i) => w !== mesocycle[i])
+  return { next, applied, changedWeeks, nextWeekNumber: applied.length > 0 ? weekNumber + 1 : null }
+}
+
+/**
+ * Which dates the sweep reads: the testing week's own dates that are BEFORE today. Today is the Finish button's (a
+ * testing session works up to its heaviest set, and anchoring from a set half-way up would announce the wrong
+ * number twice). Empty once the plan has left the testing week's block: every week it could write is behind him.
+ */
+export function calibrationSweepDates(
+  mesocycle: MesocycleWeek[],
+  planCreatedAt: string | undefined,
+  today: string,
+): { weekNumber: number; dates: string[] } | null {
+  const week = mesocycle.find(w => w.isCalibrationWeek)
+  if (!week || !planCreatedAt) return null
+  const total = mesocycle.length || 4
+  const weekOf = (date: string) => getActiveMesocycleWeek(planCreatedAt, new Date(`${date}T12:00:00`), total)
+  const nowWeek = mesocycle.find(w => w.week_number === weekOf(today))
+  if (!nowWeek || (nowWeek.block_number ?? 1) !== (week.block_number ?? 1)) return null
+  const start = getLocalDateString(new Date(planCreatedAt))
+  const dates: string[] = []
+  // Two weeks from the plan's first day covers the testing week wherever the week boundary falls.
+  for (let i = 0; i < 14; i++) {
+    const date = addDays(start, i)
+    if (date >= today) break
+    if (weekOf(date) === week.week_number) dates.push(date)
+  }
+  return dates.length > 0 ? { weekNumber: week.week_number, dates } : null
+}
+
+/**
+ * The shell: reads moves and sets for the dates above, then decides against the plan AS IT IS NOW (`current()`, asked
+ * after the reads, so an edit made while they were in flight is not written over). Saves exactly the changed weeks.
+ */
+export async function sweepCalibrationWeek(params: {
+  profileId: string
+  profile: UserProfile
+  current: () => MesocycleWeek[]
+  planCreatedAt: string | undefined
+  today: string
+  adopt: (next: MesocycleWeek[]) => void
+}): Promise<CalibrationAnchorPlan> {
+  const { profileId, profile, current, planCreatedAt, today, adopt } = params
+  const scope = calibrationSweepDates(current(), planCreatedAt, today)
+  if (!scope) return NOTHING(current())
+  const { weekNumber, dates } = scope
+  const [moves, setsByDate] = await Promise.all([
+    getSessionMovesInRange(profileId, dates[0], dates[dates.length - 1]).catch(() => [] as SessionMove[]),
+    getSetsForDates(profileId, dates),
+  ])
+  const mesocycle = current()
+  const week = mesocycle.find(w => w.week_number === weekNumber)
+  if (!week?.isCalibrationWeek) return NOTHING(mesocycle)
+  const days: CalibrationDay[] = []
+  dates.forEach(date => {
+    const session = sessionForDate({ date, plan: week.days, moves }).day
+    const sets = setsByDate.get(date) ?? []
+    if (session && sets.length > 0) days.push({ date, dayName: session.day, sets })
+  })
+  const plan = planCalibrationSweep(mesocycle, profile, weekNumber, days)
+  if (plan.changedWeeks.length === 0) return plan
+  adopt(plan.next)
+  await Promise.all(plan.changedWeeks.map(w => saveMesocycleWeek(profileId, w)))
+  return plan
 }
 
 export async function applyCalibrationAnchors(params: {

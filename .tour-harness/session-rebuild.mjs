@@ -153,6 +153,70 @@ const mainReturn = await mainLift()
 check('5b. ...and the main lift still reads exactly as it did', mainReturn?.text === mainBefore?.text, { before: mainBefore?.text, afterReturn: mainReturn?.text })
 await shoot('session-rebuild-persisted')
 
+// --- 6. THE WAY BACK (the Exercise walk, 19 Nov 2026) ------------------------------------------------------------
+// A rebuild changed most of the day on one tap and left no way to get the planned session back but the coach. The
+// screen above has just been left and come back to, so 6a also proves the button outlives the screen being unmounted.
+const rows = () => ev(`[...document.querySelectorAll('[data-exercise-name]')].map(n => n.innerText.replace(/\\s+/g, ' ').trim())`)
+const untilRows = async want => { let r = await rows(); for (let i = 0; i < 24 && JSON.stringify(r) !== JSON.stringify(want); i++) { await wait(300); r = await rows() } return r }
+const undoLabel = () => ev(`document.querySelector('[data-testid="day-edit-undo"]')?.textContent.trim() ?? null`)
+check('6a. the rebuilt session offers "Put my planned session back", still there after leaving the tab', (await undoLabel()) === 'Put my planned session back', await undoLabel())
+await ev(`document.querySelector('[data-testid="day-edit-undo"]')?.scrollIntoView({ block: 'center' })`); await wait(300)
+await shoot('session-rebuild-way-back')
+const savedRebuilt = await ev(`JSON.stringify(window.__fakeDb?.mesocycle_weeks ?? [])`)
+check('6b. tapping it', await clickSel('[data-testid="day-edit-undo"]'))
+const back6 = await untilOrder(o => JSON.stringify(o) === JSON.stringify(start))
+check('6c. ...puts the planned exercises back, in their order', JSON.stringify(back6) === JSON.stringify(start), { start, back6 })
+check('6d. ...the main lift reading exactly as it did', (await mainLift())?.text === mainBefore?.text)
+check('6e. ...the "Rebuilt today" line and the button gone, nothing reading as a failure',
+  !(await has('[data-testid="rebuild-note"]')) && !(await has('[data-testid="day-edit-undo"]')) && !(await has('[data-testid="day-edit-error"]')),
+  { note: await has('[data-testid="rebuild-note"]'), undo: await has('[data-testid="day-edit-undo"]'), err: await ev(`document.querySelector('[data-testid="day-edit-error"]')?.textContent ?? null`) })
+check('6f. ...and the saved week changed with it (the put-back was written)', (await ev(`JSON.stringify(window.__fakeDb?.mesocycle_weeks ?? [])`)) !== savedRebuilt)
+
+// --- 7. TWO CHANGES, ONE WAY BACK, AND IT GOES TO THE PLAN ---------------------------------------------------------
+// Shorten, then a different session. The button says "Put my planned session back", so it must not stop at the
+// shortened session (which would leave the shortening with no way back at all).
+const planned7 = await rows()
+const minutes7 = await (async () => {
+  if ((await openSheet()) !== 'open') return null
+  await clickSel('[data-verb="shorten"]'); await wait(500)
+  const m = await ev(`[...document.querySelectorAll('[data-shorten-minutes]')].map(b => Number(b.getAttribute('data-shorten-minutes'))).sort((a, b) => a - b)[0] ?? null`)
+  if (m == null) return null
+  await clickSel(`[data-shorten-minutes="${m}"]`); await untilClosed()
+  return m
+})()
+const short7 = await untilOrder(o => o.length < start.length)
+check('7a. the planned session is shortened first (the fixture binds)', minutes7 != null && short7.length < start.length, { minutes7, start: start.length, now: short7.length })
+check('7b. ...then rebuilt', (await openSheet()) === 'open' && await clickSel('[data-verb="rebuild"]') && (await wait(500), await clickSel('[data-testid="rebuild-confirm"]')) && await untilClosed())
+const rebuilt7 = await untilOrder(o => JSON.stringify(o) !== JSON.stringify(short7))
+check('7c. ...and the shortened session visibly changed', JSON.stringify(rebuilt7) !== JSON.stringify(short7) && rebuilt7.length === short7.length, { short7, rebuilt7 })
+let label7 = null
+for (let i = 0; i < 20 && (label7 = await undoLabel()) !== 'Put my planned session back'; i++) await wait(300)
+check('7d. one button: "Put my planned session back"', label7 === 'Put my planned session back' && (await ev(`document.querySelectorAll('[data-testid="day-edit-undo"]').length`)) === 1, label7)
+check('7e. tapping it', await clickSel('[data-testid="day-edit-undo"]'))
+const back7 = await untilRows(planned7)
+check('7f. ...PUTS THE WHOLE PLANNED SESSION BACK, sets and weights too, not the shortened one', JSON.stringify(back7) === JSON.stringify(planned7), { planned: planned7.length, now: back7?.length })
+check('7g. ...with no "Shortened" line left behind', !/^Shortened/.test(await note()), await note())
+
+// --- 8. THE BUTTON IS THERE ONLY WHILE IT CAN WORK -------------------------------------------------------------------
+// Rebuild once more, then log a set: the day is no longer as the change left it, so the button goes and the line stays.
+check('8a. rebuilt again', (await openSheet()) === 'open' && await clickSel('[data-verb="rebuild"]') && (await wait(500), await clickSel('[data-testid="rebuild-confirm"]')) && await untilClosed())
+await untilOrder(o => JSON.stringify(o) !== JSON.stringify(start))
+let has8 = false
+for (let i = 0; i < 20 && !(has8 = await has('[data-testid="day-edit-undo"]')); i++) await wait(300)
+check('8b. ...and the way back is offered', has8)
+const workTick = `[...document.querySelectorAll('[data-exercise-name]:not([data-movement-prep]) button[aria-label^="Save set "]')][0]`
+const openWork = `[...document.querySelectorAll('[data-exercise-name]:not([data-movement-prep])')][0]?.querySelector('[role="button"]')`
+const clickAt = async expr => { const r = await ev(`(() => { const n = ${expr}; if (!n) return null; n.scrollIntoView({ block: 'center' }); const b = n.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 } })()`); if (!r) return false; await wait(150); for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) await send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 }); return true }
+if (await has('[data-testid="start-bar"] button')) { await tap('[data-testid="start-bar"] button'); await wait(900) }
+if (!(await ev(`!!${workTick}`))) { await clickAt(openWork); await wait(600) }
+const ticked8 = await clickAt(workTick)
+await wait(1200)
+const logged8 = await ev(`(window.__fakeDb?.exercise_set_logs ?? []).filter(l => !l.is_warmup).length`)
+check('8c. a working set is logged after the rebuild (the fixture binds)', !!ticked8 && logged8 > 0, { ticked8, logged8 })
+check('8d. THE BUTTON IS GONE: a session with a set logged is not redrawn', !(await has('[data-testid="day-edit-undo"]')))
+check('8e. ...while the line saying what was rebuilt stays', /^Rebuilt today/.test(await ev(`document.querySelector('[data-testid="rebuild-note"]')?.textContent?.trim() || ''`)))
+await shoot('session-rebuild-logged')
+
 console.log(failures === 0 ? '\nAll rebuild checks passed.\n' : `\n${failures} rebuild check(s) failed.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)

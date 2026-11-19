@@ -1,5 +1,5 @@
 import { verifyProposal, computeSlotBudgets, type RawProposal } from './meal-generation'
-import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, type MealAdditionPayload } from './meal-addition'
+import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, overfullLine, type MealAdditionPayload } from './meal-addition'
 import type { MacroTargets } from './types'
 import type { ProposalDiff } from './pending-actions-store'
 import type { MealSlotName } from './meal-store'
@@ -116,6 +116,8 @@ export function buildMealFoodAddProposal(input: BuildMealFoodAddInput): MealFood
   if (missingAmounts.length > 0) {
     return { ok: false, reason: `How much ${missingAmounts.length === 1 ? 'of the ' + missingAmounts[0] : 'of each — ' + missingAmounts.join(', ')}? Grams, or counts like "2 eggs", both work.` }
   }
+  const overfull = overfullLine(foodLines)
+  if (overfull) return { ok: false, reason: overfull }
   if (!currentMeal) {
     return { ok: false, reason: `There's no ${slot} on your plan today to add that to. Tell me what you're having for ${slot} and I'll set it up as the meal instead.` }
   }

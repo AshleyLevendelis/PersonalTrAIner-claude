@@ -635,7 +635,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
                 value={stepsInput}
                 onChange={e => setStepsInput(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') void handleLogSteps() }}
-                placeholder={String(stepsToday || '')}
+                // With nothing logged the box says what goes in it (it was blank: an empty box beside a button, the
+                // Home walk of 18 Nov 2026, N8). With a count logged it shows that count, as before.
+                placeholder={stepsToday ? String(stepsToday) : 'Steps today'}
                 aria-label="Steps today"
                 className="h-11 w-28 rounded-[10px] px-3 text-[0.875rem] tabular-mono"
                 style={{ background: 'var(--surface-sunken)' }}
@@ -797,7 +799,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
 
       {card && (
         <Suspense fallback={null}>
-          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={card} />
+          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={card} effortFor={profile.id ? { profileId: profile.id, date: data.today } : undefined} />
         </Suspense>
       )}
     </div>

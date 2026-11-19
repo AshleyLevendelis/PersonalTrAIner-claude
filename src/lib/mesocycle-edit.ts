@@ -499,6 +499,27 @@ export function calibrates(mesocycle: readonly Pick<MesocycleWeek, 'isCalibratio
   return mesocycle.some(w => w.isCalibrationWeek === true)
 }
 
+/**
+ * THE PRICE OF A LIFT ADDED TO A SESSION (19 Nov 2026, docs/plans/added-lift-price.md). The Exercise screen's add, the
+ * coach's confirm and the check all call this, so the number on the card and the number written cannot be worked out
+ * two ways.
+ *
+ * Both routes used to call `recomputeLoad(..., true)`: the new-main-lift branch, which never reads what he has logged
+ * on the lift and takes the plan's light start only inside the testing week itself. Measured over 1,218 additions of
+ * a lift the plan already held: a median 1.75x the plan's own number, 827 over 1.5x. An addition is priced as a
+ * swapped-in accessory is (2 Nov 2026): his log on it wins; else, in a plan with a testing week, the light start every
+ * other untested lift in that plan was given; else the estimate.
+ */
+export async function priceAddedLift(
+  entry: ExerciseEntry,
+  profile: UserProfile,
+  programming: { intensity: string; sets: number; reps: string },
+  week: Pick<MesocycleWeek, 'isCalibrationWeek'> | undefined,
+  mesocycle: readonly Pick<MesocycleWeek, 'isCalibrationWeek'>[],
+): Promise<LoadPrescription> {
+  return recomputeLoad(entry, profile, programming.intensity, programming.sets, programming.reps, false, week?.isCalibrationWeek === true, calibrates(mesocycle))
+}
+
 export async function buildReplacementSlot(
   slot: Exercise,
   entry: ExerciseEntry,

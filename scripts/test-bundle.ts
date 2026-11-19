@@ -239,8 +239,13 @@ console.log('\n1. The libraries are cached separately from the app')
   // MOVED 18 Nov 2026: 442 -> 453, the foods a log is full of (about 65 entries in the food table, which every screen
   // that counts a meal reads, so it is first-paint code) and the realistic-plate rules. MEASURED 445 through this gate on
   // the change. His 15 Sep ruling, "raise it with room to grow": 8 gz over today.
-  headroom('a deploy re-downloads', appGzip, 453, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, under 453`, appGzip < 453, appGzip)
+  // MOVED 19 Nov 2026: 453 -> 461. Crossed at 453 by the full pass's fixes (the chat's logging line and past-day log,
+  // an offer that survives a failed save, the meal rows rule, the shopping list's Undo on Remove). MEASURED through
+  // this gate: 452 on 58437906, 453 on the change (paint 608 -> 609, app 1564 -> 1565, total 3203 -> 3204; those three
+  // were not raised and have 3, 1 and 7 left, so the next addition to the app chunk must decide). His 15 Sep ruling,
+  // "raise it with room to grow": 8 gz over today.
+  headroom('a deploy re-downloads', appGzip, 461, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, under 461`, appGzip < 461, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -476,7 +481,11 @@ console.log('\n3. Nothing has crept back up')
   // on a clean worktree of main 9f8e0ef2: 1505 (1 left), and 1506 after. His 15 Sep ruling: 25 kB raw over today's number.
   // MOVED 18 Nov 2026: 1531 -> 1566, the foods a log is full of (about 65 food-table entries) and the realistic-plate
   // rules; MEASURED 1541 through this gate on the change. His 15 Sep ruling: 25 kB raw over today's number.
-  const APP_CHUNK_BUDGET_KB = 1566
+  // MOVED 19 Nov 2026: 1566 -> 1591. The 25 kB of 18 Nov was spent in a day and a half by the allergy card, the 1 to 10
+  // rating, the weight weeks and the chat's reply clean-up, none of which touched this line; MEASURED 1565 on efd27b02
+  // (1 left) and 1566.4 with the put-back for a shortened or rebuilt day and the phone's Back on Profile (about 1 kB
+  // between them). His 15 Sep ruling: 25 kB raw over today's number.
+  const APP_CHUNK_BUDGET_KB = 1591
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -774,7 +783,13 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 18 Nov 2026: 3183 -> 3211, the weight history on Home (his "Add all three": weekly line, 3M/6M/1Y, week
   // list), its own chunk loaded when the Weight row opens, plus the allergy card; MEASURED 3186 through this gate on
   // the change. The other three budgets did not move. His 15 Sep ruling: 25 kB raw over today's number (3186 + 25).
-  const TOTAL_BUDGET_KB = 3211
+  // MOVED 19 Nov 2026: 3211 -> 3235, the full pass's fixes of 19 Nov (the chat's voice clean-up, phone Back for
+  // Profile, the meal-move Undo for the coach, the plain-words notes, the chat following its own thread). MEASURED
+  // 3210 through this gate on the change, 1 kB from the line, with no single change the cause: 3186 on 18 Nov, 3207
+  // by the morning of the 19th. The other three budgets did not move and were NOT raised: first paint is 610 of 612
+  // and is left where it is on purpose, so the next thing added to first paint has to be looked at. His 15 Sep
+  // ruling: 25 kB raw over today's number (3210 + 25).
+  const TOTAL_BUDGET_KB = 3235
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

@@ -4,10 +4,10 @@
   "checks": {
     "expectsProposal": true
   },
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "98f39d4fa8cbbf1d",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -68,7 +68,7 @@
         "kind": "propose_exercise_ban",
         "args": {
           "item": "Burpees",
-          "reason": "User preference — dislikes movement"
+          "reason": "User explicitly requested to never have burpees in their plan again"
         }
       },
       "saved": null,
@@ -76,8 +76,8 @@
     },
     {
       "user": "so they're gone for good?",
-      "reply": "Once you tap Confirm on the card below, yes — they'll be completely removed from every week of your plan going forward. \n\nUntil you tap Confirm, your plan stays as it is. Take a look at the card and hit Confirm when you're ready!",
-      "raw": "Once you tap Confirm on the card below, yes — they'll be completely removed from every week of your plan going forward. \n\nUntil you tap Confirm, your plan stays as it is. Take a look at the card and hit Confirm when you're ready!",
+      "reply": "Not quite yet — I've put up a confirmation card for you to ban burpees permanently. \n\nOnce you tap Confirm on that card, they'll be completely removed from every week of your plan and won't be programmed again.",
+      "raw": "Not quite yet — I've put up a confirmation card for you to ban burpees permanently. \n\nOnce you tap Confirm on that card, they'll be completely removed from every week of your plan and won't be programmed again.",
       "error": null,
       "action": null,
       "proposal": null,

@@ -58,13 +58,14 @@ import { banOnScreen, type BanOutcome } from '@/lib/screen-ban'
 import { checkAndRevertExpiredAdaptations, endAdaptationEarly, getActiveAdaptations, type PlanAdaptationRow } from '@/lib/plan-adaptations-store'
 import { loadPlanEditContext } from '@/lib/plan-edit-context'
 import { effectiveConstraints, constraintProfile } from '@/lib/effective-constraints'
+import { wontText } from '@/lib/fact-display'
 import { reconcileToStatedCeilings } from '@/lib/ceiling-reconcile'
 import { checkForBlockReview } from '@/lib/block-review'
 import { checkForConsistencyHold } from '@/lib/block-consistency'
 import { checkForLoadSuggestions, confirmLoadSuggestion, declineLoadSuggestion } from '@/lib/load-suggestions'
 import { checkForWeightBasisOffer, confirmWeightBasisOffer, declineWeightBasisOffer, planHasAssumedBodyLoads } from '@/lib/weight-basis-offer'
 import { checkForBeatTargetOffer, confirmBeatTargetOffer, declineBeatTargetOffer } from '@/lib/beat-target-offer'
-import { applyCalibrationAnchors, calibrationAnchorMessage } from '@/lib/calibration-anchor'
+import { applyCalibrationAnchors, calibrationAnchorMessage, sweepCalibrationWeek } from '@/lib/calibration-anchor'
 import { getRevealSpeed, saveRevealSpeed, DEFAULT_REVEAL_SPEED, type RevealSpeed } from '@/lib/reveal-speed-store'
 import { readBootSnapshot, saveBootSnapshot, clearBootSnapshot, type BootSnapshot } from '@/lib/boot-cache'
 import { ensureSignedIn, claimProfile, hasClaimedOnThisPhone, markClaimedOnThisPhone, shouldAskForEmail, findOwnedProfileId, describeSignInFailure } from '@/lib/auth'
@@ -651,6 +652,8 @@ function App() {
 
   const mealPlan = chosenToMealPlanDays(chosenMeals)
   const [isRestoring, setIsRestoring] = useState(() => !boot)
+  /** True once the plan on screen has been read from the server this session, not only drawn from the phone's copy. */
+  const [planFromServer, setPlanFromServer] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [setupError, setSetupError] = useState<string | null>(null)
   /**
@@ -1389,6 +1392,10 @@ function App() {
     if (!freshMesoMissing) {
       setExercisePlan(cur => (stillAsKept(cur, boot?.exercisePlan) ? restoredExercises : cur))
       setMesocycle(cur => (stillAsKept(cur, boot?.mesocycle) ? restoredMesocycle : cur))
+      // The server's plan is in: only now may anything automatic write to it (the testing-week sweep below). Before
+      // this the screen may be showing the copy kept on the phone, and a week saved from that copy could go over a
+      // newer one on the server.
+      setPlanFromServer(restoredMesocycle.length > 0)
     }
     setIsRestoring(false)
 
@@ -2201,7 +2208,7 @@ function App() {
               kind: 'exercise_preference',
               source: 'onboarding',
               rawPhrase: phrase,
-              displayText: `won't eat/do ${phrase}`,
+              displayText: wontText('exercise_preference', phrase),
               polarity: 'dislike',
               hardness: 'hard',
               resolvedRefs: r.resolution === 'resolved' ? r.resolvedRefs : [],
@@ -2219,7 +2226,7 @@ function App() {
             kind: 'food_preference',
             source: 'onboarding',
             rawPhrase: food,
-            displayText: `won't eat/do ${food}`,
+            displayText: wontText('food_preference', food),
             polarity: 'dislike',
             hardness: 'hard',
             resolvedRefs: resolveFoodTarget(food),
@@ -2387,6 +2394,15 @@ function App() {
    * back when this comes back false rather than claiming a change that did
    * not land.
    */
+  /** What is stored is what is drawn: after any write to a meal's options the list is read back, never patched. */
+  const rereadMealPools = async (profileId: string) => {
+    try {
+      setMealPools(await getPools(profileId))
+    } catch (err) {
+      console.error('meal options: re-read failed — the write landed, the screen may lag until reload', err)
+    }
+  }
+
   const handleMealPickApplied = async (slot: MealSlotName, chosenName: string): Promise<boolean> => {
     // Persist chat-confirmed swaps (and their undo, which calls
     // this with the restored previous name) BEFORE updating the
@@ -2402,6 +2418,11 @@ function App() {
     // here would persist a pick for a meal that doesn't exist.
     if (!chosenName) {
       setManualMealPicks(prev => { const next = { ...prev }; delete next[slot]; return next })
+      // THE OPTIONS ARE RE-READ HERE TOO (the Nutrition walk, 19 Nov 2026). An empty name is the Undo of an edit, an
+      // addition or a move between meals, and that Undo has just DELETED the option it made. This branch returned
+      // before the re-read below, so the deleted dish stayed in the swap list ("Swap · 1", "Chicken and rice without
+      // white rice"), and choosing it answered "That swap didn't save".
+      await rereadMealPools(profile.id)
       return true
     }
     const todayDate = getSessionDateContext(profile.id).date
@@ -2426,11 +2447,7 @@ function App() {
     // payload keeps one source of truth: what renders is exactly
     // what was stored, and cannot drift from it. Harmless for a
     // plain swap, where the pool is unchanged.
-    try {
-      setMealPools(await getPools(profile.id))
-    } catch (err) {
-      console.error('onMealSwapApplied: pool re-read failed — the write landed, the screen may lag until reload', err)
-    }
+    await rereadMealPools(profile.id)
     return true
   }
   // ONE meal-mutation layer (M1): the UI swap goes through
@@ -2698,8 +2715,10 @@ function App() {
         sessionDate: date,
         dayName,
       })
+      // The plan as saved is the plan on screen: a week that only gained its "already used" stamp is adopted too,
+      // or the next edit of week 1 would save the copy without it.
+      if (r.changedWeeks.length > 0) setMesocycle(r.next)
       if (r.applied.length === 0 || r.nextWeekNumber == null) return
-      setMesocycle(r.next)
       // Null when next week's own number did not move (a later week of the
       // block did): the plan is adopted either way, and nothing is announced
       // that the person could not go and see.
@@ -2709,6 +2728,34 @@ function App() {
       console.error('[calibration-anchor] failed to re-anchor the program:', err)
     }
   }
+
+  // THE TESTING WEEK COUNTS HOWEVER IT WAS LOGGED (18 Nov 2026). Finish anchors today's session above; this covers
+  // every testing-week day already behind him that Finish never saw: a session the six-hour window closed, one
+  // logged through "I did it, not in the app", one the coach logged, a set added after Finish. Same rule, same
+  // sentence. Runs once the plan has been read from the server (never on the phone's kept copy alone), when the day
+  // turns, and after a log lands from another surface.
+  const mesocycleNow = useRef(mesocycle)
+  mesocycleNow.current = mesocycle
+  const planReady = mesocycle.length > 0 && planFromServer
+  const sweepToday = profile?.id ? getLocalDateString(getAppNow(profile.id)) : null
+  useEffect(() => {
+    if (!profile?.id || !planReady || !sweepToday) return
+    let live = true
+    sweepCalibrationWeek({
+      profileId: profile.id,
+      profile,
+      current: () => mesocycleNow.current,
+      planCreatedAt: mesocycleCreatedAt ?? profile.created_at,
+      today: sweepToday,
+      adopt: next => { if (live) setMesocycle(next) },
+    }).then(r => {
+      if (!live || r.applied.length === 0 || r.nextWeekNumber == null) return
+      const said = calibrationAnchorMessage(r.nextWeekNumber, r.applied)
+      if (said) setAdaptationMessages(prev => [...prev, { text: said }])
+    }).catch(err => console.error('[calibration-anchor] the sweep failed:', err))
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, planReady, mesocycleCreatedAt, sweepToday, logsVersion, coachDataVersion])
 
   /**
    * The write behind a ban — recording the preference, rewriting the plan,
@@ -3688,6 +3735,7 @@ function App() {
               onMealSwapApplied={handleMealPickApplied}
               upcomingMeals={mealDays.upcoming}
               onUpcomingMealPickApplied={mealDays.applyPick}
+              onMealOptionsChanged={async () => { if (profile?.id) await rereadMealPools(profile.id) }}
               onAddMealDayToGrocery={mealDays.addToGrocery}
               onRemoveMealDayFromGrocery={mealDays.removeFromGrocery}
               onFindMoreMealOptions={handleFindMoreMealOptions}

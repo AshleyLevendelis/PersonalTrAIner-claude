@@ -28,6 +28,9 @@ const setVal = v => ev(`(() => { const el = ${BOX}; if (!el) return null; Object
 const stored = () => ev(`(() => { const rows = (window.__fakeDb && window.__fakeDb.daily_steps) || []; return rows.length ? rows[rows.length - 1].steps ?? rows[rows.length - 1].step_count ?? null : null })()`)
 
 await clickAt(RING); await wait(300)
+// The Home walk of 18 Nov 2026 (N8): with no steps logged the box was blank, with nothing saying what to type.
+const fresh = await ev(`(() => { const el = ${BOX}; return el ? { value: el.value, placeholder: el.placeholder } : null })()`)
+check('2a. with nothing logged yet, the empty box says what goes in it (words, not a number)', !!fresh && fresh.value === '' && /steps/i.test(fresh.placeholder) && !/\d/.test(fresh.placeholder), fresh)
 check('2. the steps entry opens from the ring', (await setVal('8500')) === '8500')
 await clickAt(LOG); await wait(800)
 check('3. 8,500 is saved', (await stored()) === 8500, await ev('JSON.stringify(window.__fakeDb && window.__fakeDb.daily_steps)'))

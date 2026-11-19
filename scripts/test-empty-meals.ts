@@ -82,7 +82,12 @@ async function main() {
 
   console.log('§5 Wired: the screen draws them, the coach is told, the old advice is gone')
   const plan = strip(readFileSync('src/components/MealPlan.tsx', 'utf8'))
-  ok(/expectedSlots\.includes\(s\)\) && \(pools\[s\]\?\.length \?\? 0\) === 0/.test(plan) && /line=\{emptyMealLine\(slot, dietaryPreferences, avoidFoods\)\}/.test(plan), 'Nutrition draws a chosen meal with no dishes, with the line')
+  // RE-ANCHORED 19 Nov 2026: which meals are drawn empty moved into one function (mealRowsFor) when two meals a day
+  // had to stop showing an empty Lunch. The property is asked of that function, and the screen must draw what it says.
+  const { mealRowsFor } = await import('../src/lib/meal-sections')
+  const rowsOf = mealRowsFor({ order: ['breakfast', 'lunch', 'dinner', 'snack'], pools: { breakfast: [1], snack: [1] }, serves: ['breakfast', 'lunch', 'dinner', 'snack'], snacksUnset: false, logged: () => false })
+  ok(JSON.stringify(rowsOf.empty) === '["lunch","dinner"]' && JSON.stringify(rowsOf.listed) === '["breakfast","snack"]', 'a chosen meal with no dishes is an empty row, a meal with dishes is not', rowsOf)
+  ok(/empty: emptySlots \} = mealRowsFor\(/.test(plan) && /emptySlots\.map\(slot =>/.test(plan) && /line=\{emptyMealLine\(slot, dietaryPreferences, avoidFoods\)\}/.test(plan), 'Nutrition draws a chosen meal with no dishes, with the line')
   ok(/!isGenerating && <TotalsHero/.test(plan), 'the planned total waits for the build')
   const app = strip(readFileSync('src/App.tsx', 'utf8'))
   ok(/emptyMeals=\{[^}]*emptyMealsOf\(/.test(app), 'App works out the empty meals once and hands them to the coach')

@@ -196,5 +196,13 @@ console.log('\n5. The chain is wired, end to end')
   check('the panel can find more options on demand', /More options/.test(panel) && /onFindMore\(slot\)/.test(panel))
 }
 
+console.log('\nA slip of the finger is sent back (Nutrition walk, 18 Nov 2026, N4)')
+{
+  const slip = buildCustomMealProposal({ ...base, rawArgs: { meal_slot: 'breakfast', name: 'My usual breakfast', food_lines: ['3 eggs', '99999g greek yoghurt 0%'], origin_verbatim_quote: 'eggs and yoghurt' } })
+  check('a meal with 99999 g of one food is not built', slip.ok === false && /^99999g greek yoghurt 0% is more than one meal can hold/.test(slip.reason), slip.ok === false ? slip.reason : 'accepted')
+  const fine = buildCustomMealProposal({ ...base, rawArgs: { meal_slot: 'breakfast', name: 'My usual breakfast', food_lines: ['3 eggs', '150g greek yoghurt 0%'], origin_verbatim_quote: 'eggs and yoghurt' } })
+  check('...while the same meal at an ordinary amount is (the guard binds on the amount)', fine.ok === true, fine.ok ? undefined : fine.reason)
+}
+
 console.log(failures === 0 ? '\nHer food, her amounts, her day.\n' : `\n${failures} FAILED\n`)
 process.exit(failures === 0 ? 0 : 1)

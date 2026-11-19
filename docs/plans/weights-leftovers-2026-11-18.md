@@ -69,6 +69,24 @@ his 18 Sep delegation) except where marked his.
   past day (parity doc says it can). Named; separate fix.
 - **Check:** a calibration-week day logged only through the sheet rewrites week 2's printed number exactly as Finish
   does; a second load changes nothing.
+- **BUILT 18 Nov 2026 (the full pass), with three decisions made while building, each mechanical:**
+  1. **Evidence is used once.** A sweep that re-runs on every load would otherwise re-raise a weight lowered after the
+     anchor (an ease-off, a correction): the anchor is upward-only, so "safe to re-run" was true of the number and
+     false of what a later change meant. The testing week's own slot now carries the weight its later weeks were
+     written from (`calibration_anchored_kg`, inside the stored week, no migration); the same sets never write again,
+     a heavier set logged later does. Finish writes the same stamp, so the two paths cannot disagree. Stamped even
+     when no week moved (a plan an older build's Finish already anchored is stamped on its first sweep, unchanged).
+  2. **Today is the Finish button's.** The sweep reads testing-week dates BEFORE today only: a testing session works
+     up to its heaviest set, and anchoring from a set half-way up would announce one number and then another.
+     A session never finished is picked up the next day, before week 2 can start.
+  3. **Only while it can matter.** Nothing is read once the plan has left the testing week's block. One read covers
+     the week (`getSetsForDates`), and the decision is made against the plan as it is after the reads return.
+  A moved session is judged on the day it was run (`sessionForDate`), as every screen does.
+- CSCS review: (1) the testing week's answer reaches week 2 however the session was logged, same rule; (2) takes
+  nothing away, and no longer undoes a later easing; (3) overload and the recovery week unchanged (the deload stays at
+  its fraction); (4) no floor or ceiling redefined, a stated limit still clamps; (5) in scope.
+- `test:calibration-search` §9 (25 checks; 13 mutations, 12 caught, 1 equivalent: the missing-start-date guard, where
+  an unreadable date already yields no dates), `verify:testing-week-sweep` (17 checks on the whole app).
 
 ## Also found, named, not in this build
 - At a block boundary the load suggestion (raw last weight) and the beat-target offer (rep-converted) can offer the

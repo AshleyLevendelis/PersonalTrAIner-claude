@@ -24,6 +24,8 @@ import { readFileSync } from 'fs'
 import { setSupabaseClient } from '../src/lib/supabase'
 import { isHedged, HEDGE_PHRASES } from '../src/lib/definite-mention'
 import { executeCardioSession } from '../src/lib/pending-action-executor'
+import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
+import { seededRngFromKey } from '../src/lib/seeded-random'
 import { isScheduledDay, prescriptionLine, dayDetail } from '../src/lib/activity-day'
 import type { MesocycleWeek, UserProfile } from '../src/lib/types'
 
@@ -178,6 +180,58 @@ const noSuchDay = await executeCardioSession(profile, meso, {
   weekNumber: 1, dayName: 'Someday', activity: 'Run', minutes: 30, targetRpe: 5, scope: 'permanent',
 })
 check('a day that is not on the plan is refused rather than invented', noSuchDay.receipt.failed.length === 1, noSuchDay.receipt.failed)
+
+// A REST DAY WITH NO ROW (the chat walk of 18 Nov 2026). The plan above has a row for every weekday; NO REAL PLAN
+// DOES. A generated plan keeps rows for its training days and the odd rest day with optional cardio, so "put a run
+// on Saturday" met a day with no row and was answered "I couldn't find Saturday on your plan". Run on a real plan.
+console.log('\n3b. A rest day the plan keeps no row for (a real generated plan)')
+{
+  const days = (on: string[]) => DAYS.map(d => ({ day: d, available: on.includes(d) }))
+  const real = {
+    id: profile.id, age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate', fitness_goal: 'build_muscle',
+    equipment_access: 'full_gym', injuries: [], training_style: 'bodybuilding', training_experience: 'intermediate',
+    session_duration_preference: '60', workout_split_preference: 'ai_recommendation', training_days: days(['Monday', 'Tuesday', 'Thursday', 'Friday']),
+    weekly_schedule: {}, dietary_preferences: [], concurrent_activities: [], exercise_exclusions: [], recovery_capacity: 'moderate', conditioning_preference: 'tolerate',
+  } as unknown as UserProfile
+  setRandomSource(seededRngFromKey('cardio-on-a-rest-day'))
+  const log = console.log, warn = console.warn
+  console.log = () => {}; console.warn = () => {}
+  let plan: MesocycleWeek[]
+  try { plan = generateMesocycle(real) } finally { console.log = log; console.warn = warn; resetRandomSource() }
+  const week2 = plan.find(w => w.week_number === 2)!
+  const rowless = DAYS.filter(d => !week2.days.some(x => x.day === d))
+  check('a real plan keeps no row for some rest days (the fixture binds)', rowless.length > 0, week2.days.map(d => d.day))
+  const target = rowless[0] ?? 'Saturday'
+  const before = JSON.stringify(plan)
+  written.length = 0
+  const onRest = await executeCardioSession(real, plan, { weekNumber: 2, dayName: target, activity: 'Run', minutes: 30, targetRpe: 5, scope: 'permanent' })
+  const rowIn = (w: MesocycleWeek) => w.days.find(d => d.day === target)
+  const got = rowIn(onRest.mesocycle.find(w => w.week_number === 2)!)
+  check('the session lands on a day that had no row', onRest.receipt.failed.length === 0 && !!got?.plannedActivity, onRest.receipt)
+  check('...as a session every screen counts', !!got && isScheduledDay(got) && prescriptionLine(got.plannedActivity!) === 'Run · 30 min · Steady', got && got.plannedActivity && prescriptionLine(got.plannedActivity))
+  const block = week2.block_number
+  const inBlock = onRest.mesocycle.filter(w => w.block_number === block && w.week_number >= 2)
+  check('...in every remaining week of the block, each with one row for the day', inBlock.length > 1 && inBlock.every(w => w.days.filter(d => d.day === target).length === 1 && !!rowIn(w)?.plannedActivity), inBlock.map(w => w.days.filter(d => d.day === target).length))
+  check('...and in no week outside it', onRest.mesocycle.filter(w => !(w.block_number === block && w.week_number >= 2)).every(w => !rowIn(w)))
+  check('every other day of those weeks is exactly as it was', inBlock.every(w => JSON.stringify(w.days.filter(d => d.day !== target)) === JSON.stringify(plan.find(x => x.week_number === w.week_number)!.days)))
+  check('the weeks it wrote are the weeks it changed', written.map(w => w.week).sort((a, b) => a - b).join(',') === inBlock.map(w => w.week_number).join(','), written.map(w => w.week))
+  check('the plan it was handed is not mutated, and is what an Undo puts back', JSON.stringify(plan) === before && onRest.preImage === plan)
+
+  // A LATER WEEK WHERE THAT DAY TRAINS is left alone: the activity is the whole day, and it must not be written over a
+  // session the week he asked about did not have.
+  const later = plan.map(w => w.week_number !== 3 ? w : { ...w, days: [...w.days, { day: target, focus: 'Extra Upper', exercises: week2.days[0].exercises }] } as MesocycleWeek)
+  const kept = await executeCardioSession(real, later, { weekNumber: 2, dayName: target, activity: 'Run', minutes: 30, targetRpe: 5, scope: 'permanent' })
+  const week3Day = kept.mesocycle.find(w => w.week_number === 3)!.days.find(d => d.day === target)!
+  check('a later week where that day trains keeps its session', week3Day.exercises.length > 0 && !week3Day.plannedActivity && week3Day.focus === 'Extra Upper', { focus: week3Day.focus, activity: week3Day.plannedActivity })
+  check('...while the week he asked about still gets the run', !!kept.mesocycle.find(w => w.week_number === 2)!.days.find(d => d.day === target)?.plannedActivity)
+
+  // THE CARD SIDE: the offer is built from the same empty row, never refused for want of one.
+  const build = client.slice(client.indexOf('const buildCardioSessionProposal'), client.indexOf('const buildRestDayProposal'))
+  check('the detector fires on the old lookup', !/restRow: true/.test("editDayFor(String(rawArgs.day ?? ''), week, { followMove: false })"))
+  check('the cardio offer asks for the empty row of a rest day', build.length > 0 && /editDayFor\(.{0,60}\{[^}]*restRow: true/.test(build))
+  const edit = client.slice(client.indexOf('const editDayFor ='), client.indexOf('const todayRef'))
+  check('...and only a caller that asks gets one (an exercise edit of a rest day is still refused)', /opts\.restRow \? emptyRestRow\(/.test(edit) && (client.match(/restRow: true/g) ?? []).length === 1, (client.match(/restRow: true/g) ?? []).length)
+}
 
 // -------------------------------------------------------------------------
 console.log('\n4. The coach asks first, and the prompt says the same words this file refuses on')

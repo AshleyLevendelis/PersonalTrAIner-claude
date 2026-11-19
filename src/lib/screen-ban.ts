@@ -26,6 +26,7 @@ import type { DayGuard } from './plan-guard'
 import { saveMesocycle } from './mesocycle-persistence'
 import { createFact, deleteFactPermanently } from './memory-store'
 import { couldNot } from './coach-voice'
+import { wontText } from './fact-display'
 
 export interface BanBlastRadius {
   /** Sessions across the WHOLE plan that hold it and will change — that is what a ban means. */
@@ -118,7 +119,7 @@ export async function banOnScreen(input: {
       kind: 'exercise_preference',
       source: 'manual',
       rawPhrase: exerciseName,
-      displayText: `won't eat/do ${exerciseName}`,
+      displayText: wontText('exercise_preference', exerciseName),
       polarity: 'dislike',
       hardness: 'hard',
       resolvedRefs: [exerciseName],

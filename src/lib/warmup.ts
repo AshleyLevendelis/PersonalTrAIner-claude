@@ -6,7 +6,9 @@ import {
   formatLoad, labelModeForEntry,
   type PrescribedLoadSource, type LoadPrescription,
 } from './load-prescription'
-import { getExerciseEntry } from './exercise-db'
+import { getExerciseEntry, isContraindicatedFor, INJURED_JOINTS } from './exercise-db'
+import { pregnancyExclusion } from './pregnancy-rules'
+import { isPregnant } from './health-conditions'
 import { getDurationBudgetSeconds } from './session-duration'
 import type { UserProfile, WorkoutDay } from './types'
 import { kitOf, equipmentTierFor, kitItemForEquipment, type ResolvedKit } from './kit-list'
@@ -81,6 +83,49 @@ export interface WarmupBlock {
 // Chosen by what the trainee actually has access to. Someone training in a
 // bedroom cannot "spend 5 minutes on the rower", and prescribing it anyway is
 // how a plan loses credibility on day one.
+
+/**
+ * THE SAME OPENING, WITH BOTH FEET ON THE FLOOR (18 Nov 2026). The opening item was chosen by kit alone, so somebody
+ * with a knee or an ankle on their injuries list, or pregnant, was handed "Jumping Jacks & High Knees" before a
+ * session the plan had carefully taken every jump out of. Used when a jumping move the item names is one the plan
+ * would leave out for this person (the catalogue's own judgement, asked of `isContraindicatedFor`), or while pregnant.
+ * The gym's bike, rower or treadmill at an easy pace has no jump in it and stays as it is.
+ */
+const LOW_IMPACT_GENERAL: Partial<Record<EquipmentAccess, WarmupItem>> = {
+  home_gym: {
+    name: 'Brisk Walk or March on the Spot',
+    prescription: '4-5 min, conversational effort',
+    purpose: 'Raise core temperature and blood flow before loading anything',
+    duration_seconds: 270,
+  },
+  minimalist: {
+    name: 'March on the Spot & Side Steps',
+    prescription: '3 rounds: 30s each, 30s easy',
+    purpose: 'Raise core temperature with no equipment and no jumping',
+    duration_seconds: 240,
+  },
+  bodyweight: {
+    name: 'March on the Spot & Side Steps',
+    prescription: '3 rounds: 30s each, 30s easy',
+    purpose: 'Raise core temperature with no equipment and no jumping',
+    duration_seconds: 240,
+  },
+}
+/** The catalogue's jumping moves each opening item names. An item naming none has no low-impact twin to need. */
+const GENERAL_JUMPING_PARTS: Record<string, string[]> = {
+  'Jump Rope or Brisk Walk': ['Jump Rope'],
+  'Jumping Jacks & High Knees': ['Jumping Jacks', 'High Knees'],
+}
+
+/** The opening item for this person: the kit's own, or its low-impact twin when a jump in it is ruled out for them. */
+export function generalWarmupFor(equipment: EquipmentAccess, injuries: string[], pregnant: boolean): WarmupItem {
+  const base = GENERAL_WARMUPS[equipment] ?? GENERAL_WARMUPS.bodyweight
+  const jumps = GENERAL_JUMPING_PARTS[base.name] ?? []
+  if (jumps.length === 0) return base
+  const flagged = new Set(injuries.flatMap(i => INJURED_JOINTS[i] ?? []))
+  const ruledOut = pregnant || jumps.some(n => { const e = getExerciseEntry(n); return !!e && isContraindicatedFor(e, flagged) })
+  return ruledOut ? LOW_IMPACT_GENERAL[equipment] ?? LOW_IMPACT_GENERAL.bodyweight! : base
+}
 
 const GENERAL_WARMUPS: Record<EquipmentAccess, WarmupItem> = {
   full_gym: {
@@ -561,10 +606,12 @@ export interface WarmupContext {
   experience: TrainingExperience
   /** Hard ceiling. Warm-up must fit inside the session, not extend it. */
   budgetSeconds: number
+  /** "Pregnant" is ticked (pregnancy-rules.ts): no jumping in the opening item, no drill lying flat. */
+  pregnant?: boolean
 }
 
 export function buildWarmup(ctx: WarmupContext): WarmupBlock {
-  const baseGeneral = GENERAL_WARMUPS[ctx.equipment] ?? GENERAL_WARMUPS.bodyweight
+  const baseGeneral = generalWarmupFor(ctx.equipment, ctx.injuries, !!ctx.pregnant)
 
   // Every qualifying compound gets a ramp — the first, full scheme; every
   // later one, abbreviated. Built before general/mobility sizing because
@@ -603,6 +650,8 @@ export function buildWarmup(ctx: WarmupContext): WarmupBlock {
   const candidates = MOBILITY_DRILLS.filter(d =>
     d.prepares_joints.some(j => targetJoints.has(j)) &&
     !d.contraindicated_for.some(c => ctx.injuries.includes(c)) &&
+    // A drill the plan leaves out while pregnant (a Glute Bridge lies flat on the back) is left out of the warm-up too.
+    !(ctx.pregnant && pregnancyExclusion({ name: d.name })) &&
     d.needs_equipment.every(e => haveEquipment.has(e))
   )
 
@@ -721,6 +770,7 @@ function rebuildWarmupCore(day: WorkoutDay, profile: UserProfile): WorkoutDay {
       injuries: profile.injuries || [],
       experience: profile.training_experience || 'novice',
       budgetSeconds: getWarmupReserveSeconds(budgetSeconds),
+      pregnant: isPregnant(profile),
     })
     const rampByName = new Map(warmup.ramp_ups.map(r => [r.exercise, r]))
     return {
@@ -751,7 +801,7 @@ function rebuildWarmupCore(day: WorkoutDay, profile: UserProfile): WorkoutDay {
 // hasn't got the band for — an answer that produces nothing is worse than not
 // asking.
 // ---------------------------------------------------------------------------
-export function drillsPreparing(joints: string[], injuries: string[] = []): WarmupItem[] {
+export function drillsPreparing(joints: string[], injuries: string[] = [], pregnant = false): WarmupItem[] {
   const want = new Set(joints)
   if (want.size === 0) return []
   // BOTH LISTS — the catalogue the plan uses, plus the two that exist only for
@@ -763,6 +813,8 @@ export function drillsPreparing(joints: string[], injuries: string[] = []): Warm
     // profile already carries an injury there, the drill is off regardless of
     // which question put it on screen.
     .filter(d => !d.contraindicated_for.some(c => injuries.includes(c)))
+    // ...and so does the pregnancy rule: no drill lying flat is offered for a tight hip either.
+    .filter(d => !(pregnant && pregnancyExclusion({ name: d.name })))
     .filter(d => d.prepares_joints.some(j => want.has(j)))
     .sort((a, b) =>
       b.prepares_joints.filter(j => want.has(j)).length -

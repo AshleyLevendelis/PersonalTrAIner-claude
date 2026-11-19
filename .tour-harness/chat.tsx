@@ -613,6 +613,22 @@ const finishedSets = SEED_NUDGE
       })))
   : []
 
+// ?earlier=<kg> — AN EARLIER SET OF TODAY'S FIRST LOADED LIFT, a week ago (19 Nov 2026, verify:chat-log-words): a
+// record for a chat-logged set to beat. The fixture chooses the input (one real set row); whether today's set is a
+// best, and what the chat says about it, is the app's.
+const EARLIER_KG = Number(new URLSearchParams(location.search).get('earlier') ?? '')
+const firstLoadedToday = mesocycle[0].days.find(d => d.day === DAYS[todayIdx])?.exercises.find(e => (e.suggested_load_kg ?? 0) > 0) ?? null
+const earlierSets = EARLIER_KG > 0 && firstLoadedToday
+  ? [{
+      id: 'es-earlier-1', user_id: PROFILE_ID, session_id: 'ws-earlier',
+      exercise_id: getExerciseId(firstLoadedToday.name) ?? firstLoadedToday.id, exercise_name: firstLoadedToday.name, set_number: 1,
+      weight_kg: EARLIER_KG, reps_completed: 8, is_bodyweight: false, is_warmup: false, drop_index: 0,
+      completed_at: new Date(anchorNowMs() - 7 * 86400000 + 9 * 3600000).toISOString(), date: isoOf(new Date(anchorNowMs() - 7 * 86400000)),
+    }]
+  : []
+;(window as unknown as { __firstLoadedLift: string | null }).__firstLoadedLift = firstLoadedToday?.name ?? null
+;(window as unknown as { __todayStr: string }).__todayStr = todayStr
+
 // ?topup=1 — MORE OPTIONS FOR EVERY MEAL, ASKED OF THE COACH (29 Sep 2026).
 // A plan made at five options a meal (three meals a day, no snack), and two
 // days of shopping already on the list. The fixture chooses only the INPUT:
@@ -723,7 +739,7 @@ const dayStateSeed = (() => {
 
 const db: Db = {
   fitness_profiles: [{ ...profile, id: PROFILE_ID }],
-  daily_metrics: [], exercise_set_logs: [...dayStateSeed.sets, ...finishedSets], workout_sessions: [...(TRAINED_BEFORE ? [{ id: 'ws-lastweek', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 6 * 86400000)), is_completed: true, felt: null }] : []), ...finishedSession, ...movedInSession, ...movedAwaySession, ...dayStateSeed.sessions], cardio_logs: [],
+  daily_metrics: [], exercise_set_logs: [...dayStateSeed.sets, ...finishedSets, ...earlierSets], workout_sessions: [...(TRAINED_BEFORE ? [{ id: 'ws-lastweek', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 6 * 86400000)), is_completed: true, felt: null }] : []), ...finishedSession, ...movedInSession, ...movedAwaySession, ...dayStateSeed.sessions], cardio_logs: [],
   daily_steps: [], meal_events: [...dayStateSeed.meals, ...mealYesterday], meal_plan_picks: [], meal_plan_slots: topUpSeed.slots,
   favorite_meals: [], grocery_items: topUpSeed.list, load_suggestions: [], pending_actions: [],
   plan_adaptations: KNEE_EASE ? [kneeEaseRow(PROFILE_ID)] : [], user_facts: [], user_context_facts: [], user_goals: [],
@@ -905,6 +921,7 @@ function Harness() {
               onFindMoreMealOptions={async () => ({ added: [] })}
               upcomingMeals={DAYMOVE ? mealDays.upcoming : undefined}
               onUpcomingMealPickApplied={DAYMOVE ? mealDays.applyPick : undefined}
+              onMealOptionsChanged={DAYMOVE ? reloadPools : undefined}
               onMealDayMovePlan={DAYMOVE ? mealDays.dayMove.plan : undefined}
               onMealDayMoveConfirm={DAYMOVE ? mealDays.dayMove.confirm : undefined}
               onMealDayMoveUndo={DAYMOVE ? mealDays.dayMove.undo : undefined}

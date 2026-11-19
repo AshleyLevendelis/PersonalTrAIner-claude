@@ -52,7 +52,7 @@ async function main() {
   setSupabaseClient(makeFakeSupabase(db) as never)
   const { FOOD_DB, lookupIngredient, weighedTwinOf, weighedFactor, stateOf } = await import('../src/lib/food-db')
   const { resolveGroceryTarget, AS_BOUGHT, generateGroceryList, addItemLocal, getAllItems, flushPending } = await import('../src/lib/grocery-store')
-  const { GROCERY_AISLE_LABEL, trolleyToast, buildListLabel, formatShoppingQuantity } = await import('../src/lib/grocery-display')
+  const { GROCERY_AISLE_LABEL, trolleyToast, removedToast, buildListLabel, formatShoppingQuantity } = await import('../src/lib/grocery-display')
 
   const aisle = (name: string) => resolveGroceryTarget(name).category
 
@@ -180,6 +180,11 @@ async function main() {
   // from the phrasebook; the toast prints what it was handed.
   check('the toast is the phrasebook\'s', /showToast\(trolleyToast\(item\.display_name\)/.test(screen) && /showToast\(clearedToast\(/.test(screen)
     && /showToast\(REBUILT_TOAST/.test(screen) && /\{toast\.text\}/.test(screen) && !/is in the trolley/.test(screen))
+  // A REMOVED ITEM SAYS SO, WITH AN UNDO (the Nutrition walk, 19 Nov 2026): Remove was the one way off the list that
+  // said nothing. The words; the screen's use of them is read off the real screen by verify:grocery.
+  check('removing cheddar: "Cheddar — taken off the list"', removedToast('cheddar') === 'Cheddar — taken off the list' && removedToast(' white rice ') === 'White rice — taken off the list', [removedToast('cheddar'), removedToast(' white rice ')])
+  const removeFn = screen.slice(screen.indexOf('const remove = (item: GroceryItemRow) => {'), screen.indexOf('const handleClearChecked'))
+  check('...and Remove shows it with an Undo that restores the row through the store', removeFn.length > 0 && /showToast\(removedToast\(item\.display_name\), \(\) => \{\s*restoreRowsLocal\(\[item\]\)/.test(removeFn))
   // Her ruling: the list is never built behind her back. Nothing but her tap calls the builder.
   const calls = screen.match(/generateGroceryList\(/g) ?? []
   const handler = /const handleGenerate = [\s\S]*?\n {2}\}/.exec(screen)?.[0] ?? ''

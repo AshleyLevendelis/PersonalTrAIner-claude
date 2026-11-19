@@ -90,7 +90,7 @@ const header = async () => {
   const target = [...hero.querySelectorAll('span')].find(e => /^target \\d/.test((e.textContent || '').trim()) && e.children.length === 0)
   if (!verdict || !target) return null
   const text = (target.textContent || '').trim() + ' · ' + (verdict.textContent || '').trim()
-  const m = /^target (\\d+) · (.+)$/.exec(text)
+  const m = /^target ([\\d,]+) · (.+)$/.exec(text)
   const planned = Number((hero.querySelector('[data-testid="day-kcal"]')?.textContent || '').replace(/[^\\d]/g, ''))
   const macros = {}
   for (const span of hero.querySelectorAll('span')) {
@@ -103,9 +103,9 @@ const header = async () => {
   const mh = document.querySelector('[data-meals-header]')?.getBoundingClientRect()
   const first = document.querySelector('[data-meal-row]')?.getBoundingClientRect()
   return m && macros.P && macros.C && macros.F ? {
-    text, label: m[2],
+    text, label: m[2], plannedText: (hero.querySelector('[data-testid="day-kcal"]')?.textContent || '').trim(), targetText: m[1],
     totals: { calories: planned, protein: macros.P.actual, carbs: macros.C.actual, fat: macros.F.actual },
-    targets: { calories: Number(m[1]), protein: macros.P.target, carbs: macros.C.target, fat: macros.F.target },
+    targets: { calories: Number(m[1].replace(/,/g, '')), protein: macros.P.target, carbs: macros.C.target, fat: macros.F.target },
     proteinLit: macros.P.lit, atHeadOfMeals: !!mh && !!first && r.top >= mh.bottom - 1 && r.bottom <= first.top + 1,
   } : null
 })()`)
@@ -157,7 +157,11 @@ console.log('\n2. The days are not the same day (one candidate cannot test a cho
   const on = seen[0].h, off = seen[1].h
   check('2a. the plan sized to its own targets reads "on target"', on?.label === 'on target' && engine[0].onTarget === true, on)
   check('2b. with targets 60% higher the same plan is NOT on target', off?.label !== 'on target' && engine[1].onTarget === false, off)
-  check('2c. ...and the header says by how much, in words with a number in them', !!off && /^\d+ kcal (over|under)$|^(protein|carbs|fat) \d+ g (over|under)$/.test(off.label), off?.label)
+  check('2c. ...and the header says by how much, in words with a number in them', !!off && /^\d[\d,]* kcal (over|under)$|^(protein|carbs|fat) \d+ g (over|under)$/.test(off.label), off?.label)
+  // The Nutrition walk of 18 Nov 2026 (N6): "1983 kcal" and "target 3045" sat beside the rings card's "3,045 kcal left".
+  const written = [on?.plannedText, on?.targetText, off?.plannedText, off?.targetText, off?.label].filter(t => typeof t === 'string')
+  const fourDigits = written.filter(t => /\d{4}|\d,\d{3}/.test(t))
+  check('2c2. every calorie figure of a thousand or more on that line is written with its comma ("1,983", "target 3,045")', written.length === 5 && fourDigits.length >= 2 && fourDigits.every(t => !/\d{4}/.test(t)), written)
   check('2d. the two headers really show different targets', !!on && !!off && on.targets.calories !== off.targets.calories, [on?.targets, off?.targets])
   const over = seen[2].h
   check('2e. on the day with too MUCH protein for its target, protein is above target and NOT lit', !!over && over.totals.protein > over.targets.protein * 1.15 && over.proteinLit === false && engine[2].protein === false, over)

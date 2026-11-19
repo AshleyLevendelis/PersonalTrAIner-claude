@@ -44,6 +44,33 @@ check('minus is one fewer (300g)', stepQuantity(item('Broccoli', 600), -1) === 3
 check('...and at one head there is no minus (null), never zero heads', stepQuantity(item('Broccoli', 300), -1) === null)
 check('an odd weight snaps to whole units before stepping: 650g (2 heads) steps to 900g, not 950g', stepQuantity(item('Broccoli', 650), 1) === 900, stepQuantity(item('Broccoli', 650), 1))
 
+console.log('\n[3b] The list never shows less than the meals need (the Nutrition walk, 18 Nov 2026, N5)')
+{
+  const shown = (name: string, q: number, unit = 'g') => formatShoppingQuantity({ display_name: name, quantity: q, unit }).primary
+  // A food bought by weight with no piece of its own, so the step rule is what is read.
+  check('270 g reads "~300g", not "~250g" (it rounded to the nearest step, and came up short)', shown('Lean beef mince', 270) === '~300g', shown('Lean beef mince', 270))
+  check('615 g reads "~650g", not "~600g"', shown('Lean beef mince', 615) === '~650g', shown('Lean beef mince', 615))
+  check('an amount already on a step is shown as it is, with no "~"', shown('Lean beef mince', 300) === '300g' && shown('Lean beef mince', 1200) === '1.2kg', [shown('Lean beef mince', 300), shown('Lean beef mince', 1200)])
+  check('1,110 g reads "~1.2kg" (the next step up, not down to 1.1)', shown('Lean beef mince', 1110) === '~1.2kg', shown('Lean beef mince', 1110))
+  check('millilitres the same: 1,110 ml reads "~1.2L", 260 ml "~300ml"', shown('Semi-skimmed milk', 1110, 'ml') === '~1.2L' && shown('Semi-skimmed milk', 260, 'ml') === '~300ml', [shown('Semi-skimmed milk', 1110, 'ml'), shown('Semi-skimmed milk', 260, 'ml')])
+  // EVERY AMOUNT ON A GRID: what is shown is never under what is needed, and never a whole step over.
+  let short = 0, over = 0
+  for (let g = 20; g <= 3000; g += 7) {
+    const m = /^~?([\d.]+)(kg|g)$/.exec(shown('Lean beef mince', g))
+    const got = m ? Number(m[1]) * (m[2] === 'kg' ? 1000 : 1) : NaN
+    // A kilo figure is printed to one decimal, which is the 100 g step itself.
+    if (!(got >= g - 1e-6)) short++
+    if (!(got - g < gramStep(g) + 1e-6)) over++
+  }
+  check('over 20 g to 3 kg in 7 g steps: never under what is needed, never a whole step over', short === 0 && over === 0, { short, over })
+  // Pieces: a quarter of one is let go, no more.
+  const heads = (g: number) => shown('Broccoli', g)
+  check('pieces round up too: 2.2 heads of broccoli is 2, 2.3 heads is 3 (it was 2 up to 2.49)', heads(660) === '2 heads' && heads(690) === '3 heads', [heads(660), heads(690)])
+  check('...and one and a half is two, never one', heads(450) === '2 heads', heads(450))
+  check('...and for pieces: 690 g of broccoli shows 3 heads, so plus is 4 heads (1,200 g) and minus is 2 (600 g)', stepQuantity(item('Broccoli', 690), 1) === 1200 && stepQuantity(item('Broccoli', 690), -1) === 600, [stepQuantity(item('Broccoli', 690), 1), stepQuantity(item('Broccoli', 690), -1)])
+  check('the stepper moves the number he is looking at: 270 g shows 300, plus is 350, minus is 250', stepQuantity(item('Lean beef mince', 270), 1) === 350 && stepQuantity(item('Lean beef mince', 270), -1) === 250, [stepQuantity(item('Lean beef mince', 270), 1), stepQuantity(item('Lean beef mince', 270), -1)])
+}
+
 console.log('\n[4] The stepper: weights step the amount they are shown in')
 check('the grid is 5g, 10g, 50g, 100g by size', gramStep(10) === 5 && gramStep(50) === 10 && gramStep(300) === 50 && gramStep(1180) === 100)
 check('1,180g reads "1.2 kg" on the stepper, "exact 1,180g" beside it', stepperReadout(item('Chicken breast', 1180)) === '1.2 kg' && exactLabel(item('Chicken breast', 1180)) === 'exact 1,180g', [stepperReadout(item('Chicken breast', 1180)), exactLabel(item('Chicken breast', 1180))])

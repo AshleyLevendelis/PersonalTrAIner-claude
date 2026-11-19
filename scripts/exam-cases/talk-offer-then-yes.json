@@ -1,0 +1,22 @@
+{
+  "name": "talk-offer-then-yes",
+  "why": "Ashley, 19 Nov 2026 (his chat brief): a change is OFFERED, never announced. The exam of 18 Nov had the coach say 'I'm going to drop the set volume across your workouts' with nothing on screen to tap. Turn 0: meet what he said (tired, sessions too much) with a reason, and either ask the one thing it needs or offer ONE change as a short question he can say yes to. It must not say it WILL change or HAS changed anything. Turn 1 is his yes, and must reach the offer itself, whichever change the coach proposed.",
+  "messages": [
+    "work has been relentless and I'm shattered, every session lately feels like more than I've got",
+    "yes please, do that"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 1,
+        "oneOf": [
+          "propose_volume_change",
+          "propose_session_length",
+          "propose_session_shorten",
+          "propose_schedule_change",
+          "propose_plan_pause"
+        ]
+      }
+    ]
+  }
+}

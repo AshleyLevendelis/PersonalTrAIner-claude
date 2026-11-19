@@ -25,7 +25,7 @@ import { computeSetRowNumbers, nextExtraSetNumber, filterWarmupSets, filterDropS
 import { lastTime, sameAsSet, setReading, loggedSetReading, loggedCountLabel, SET_WAITING_TO_SEND, SET_DID_NOT_SAVE, FIRST_LOG_NOTE, EFFORT_ASK, effortLabel, effortLine } from '@/lib/coach-voice'
 import { checkForPR, getTopPRSet, toSessionSets, isFirstTimeLogged, type PRResult } from '@/lib/pr-engine'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, plateBarKg, probeNextKg } from '@/lib/load-prescription'
+import { isExternallyLoaded, loadingMode, roundToPlate, plateStepKg, takesPlateCalculator, plateBarKg, probeNextKg, unloadedLoadLabel } from '@/lib/load-prescription'
 import { checkLoggedSetWeight, MAX_LOGGABLE_SET_KG, repsLookImpossible, prescribedRepsHigh } from '@/lib/set-plausibility'
 import { blankWeightFor, carriedWeightFor, type BlankWeight } from '@/lib/set-row'
 import type { UserProfile } from '@/lib/types'
@@ -1335,6 +1335,8 @@ export function SetGrid({
               unit: logged.unit ?? prescriptionUnit(prescriptionType),
               isBodyweight: !!logged.is_bodyweight,
               weightKg: logged.weight_kg,
+              addedLoadKg: logged.added_load_kg ?? null,
+              unloadedWord: catalogEntry ? unloadedLoadLabel(catalogEntry) : null,
             })
             const state = logged.syncStatus
             // THE FIRST TIME A LIFT IS LOGGED, where a PR badge used to be.

@@ -32,6 +32,8 @@ import { computeMealMacros } from '@/lib/food-db'
 import { computeTargets } from '@/lib/nutrition-targets'
 import { ANCHOR_ISO, anchorNowMs, iso as isoOf } from './anchor.mjs'
 import type { UserProfile } from '@/lib/types'
+import { getExerciseEntry, getExerciseId } from '@/lib/exercise-db'
+import { isExternallyLoaded } from '@/lib/load-prescription'
 
 const PROFILE_ID = '00000000-0000-4000-8000-00000000b007'
 const USER_ID = '00000000-0000-4000-8000-0000000000a1'
@@ -50,6 +52,8 @@ const TRAIN_TODAY = new URLSearchParams(location.search).has('session-day')
 // entry (verify:home-day-named). ?weigh=79.55: yesterday's weigh-in (an INPUT), so a reading with two decimals
 // reaches Home and Profile. Without them the page is unchanged.
 const NO_CARDIO = new URLSearchParams(location.search).has('no-cardio')
+const MEALS_A_DAY = Number(new URLSearchParams(location.search).get('meals')) || 3
+const NO_SNACKS = new URLSearchParams(location.search).has('no-snacks')
 const WEIGH = Number(new URLSearchParams(location.search).get('weigh')) || 80
 // ?setup-typo: he signed up TODAY and setup kept 187 kg (his live report, 14 Nov 2026). INPUTS only: the weight on the
 // profile, the sign-up weigh-in, and the sign-up target row as the app writes it at sign-up (anchorTargetsAtSignUp:
@@ -97,7 +101,9 @@ try {
 const profileRow = {
   id: PROFILE_ID, owner_id: USER_ID, display_name: 'Sam',
   age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
-  fitness_goal: 'hypertrophy', preferred_time: 'morning', meals_per_day: 3, include_snacks: true,
+  // ?meals=2 and ?no-snacks are INPUTS (what Profile's "Meals a day" and "Snacks" hold), for verify:meal-shape-rows:
+  // the stored dishes below still cover lunch and the snack, which is exactly the state after he changes either.
+  fitness_goal: 'hypertrophy', preferred_time: 'morning', meals_per_day: MEALS_A_DAY, include_snacks: !NO_SNACKS,
   equipment_access: 'full_gym', injuries: [], training_style: 'hybrid', training_experience: 'intermediate',
   session_duration_preference: '45-60', workout_split_preference: 'upper_lower',
   // ?session-day makes the anchor's Wednesday a training day (an INPUT: which days she trains), for a driver that
@@ -113,6 +119,29 @@ const profileRow = {
 // The plan the app's own generator makes for this profile, seeded so a re-run is comparable.
 setRandomSource(seededRngFromKey('app-boot'))
 const weeks = generateMesocycle(profileRow as unknown as UserProfile)
+
+// ?testing-day-unfinished: last week was the plan's testing week, and on its Thursday he lifted the day's first loaded
+// lift 20 kg over the printed guess and never tapped Finish (INPUTS: the date, the lift by its place in that day, what
+// he lifted; a session row left open, as the six-hour window leaves one). The app decides what next week then reads.
+// &testing-day-used: those sets were already used once and the weight was brought down afterwards (an INPUT: the plan
+// as an earlier anchor and a later correction left it, the stamp on week 1's slot and later weeks at the lower number).
+const UNFINISHED_TESTING = new URLSearchParams(location.search).has('testing-day-unfinished')
+const testingThursday = isoOf(new Date(new Date(created).getTime() + 3 * 86400000))
+const testingLift = (() => {
+  const d = weeks[0]?.days.find(x => x.day === 'Thursday')
+  const i = d ? d.exercises.findIndex(e => e.suggested_load_kg != null && !!getExerciseEntry(e.name) && isExternallyLoaded(getExerciseEntry(e.name)!)) : -1
+  return d && i >= 0 ? { index: i, name: d.exercises[i].name, printedKg: d.exercises[i].suggested_load_kg! } : null
+})()
+;(window as unknown as Record<string, unknown>).__testingLift = testingLift
+if (new URLSearchParams(location.search).has('testing-day-used') && testingLift) {
+  const d = weeks[0].days.find(x => x.day === 'Thursday')!
+  d.exercises[testingLift.index] = { ...d.exercises[testingLift.index], calibration_anchored_kg: testingLift.printedKg + 20 }
+}
+const testingSets = UNFINISHED_TESTING && testingLift ? [1, 2, 3].map(n => ({
+  id: `tw${n}`, user_id: PROFILE_ID, session_id: 'ws-testing', exercise_id: getExerciseId(testingLift.name), exercise_name: testingLift.name,
+  set_number: n, weight_kg: testingLift.printedKg + 20, reps_completed: 8, is_bodyweight: false, is_warmup: false, drop_index: 0, unit: 'kg', rpe: null,
+  completed_at: new Date(new Date(created).getTime() + 3 * 86400000 + 10 * 3600000 + n * 180000).toISOString(), date: testingThursday,
+})) : []
 
 const meal = (slot: string, idx: number, name: string, ingredients: { name: string; quantity: number; unit: string }[]) => {
   const m = computeMealMacros(ingredients)
@@ -139,7 +168,9 @@ const db: Db = {
     { id: 'm1', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 86400000)), weight_kg: WEIGH },
     { id: 'm2', profile_id: PROFILE_ID, date: isoOf(new Date(anchorNowMs() - 5 * 86400000)), weight_kg: 80.4 },
   ],
-  daily_steps: [], water_logs: [], exercise_set_logs: [], workout_sessions: [], cardio_logs: [],
+  daily_steps: [], water_logs: [], exercise_set_logs: testingSets,
+  workout_sessions: testingSets.length ? [{ id: 'ws-testing', profile_id: PROFILE_ID, date: testingThursday, is_completed: false, felt: null }] : [],
+  cardio_logs: [],
   meal_events: [], meal_plan_picks: [], favorite_meals: [],
   // ?list-stale: tomorrow is on the shopping list, built from a dinner the day no longer serves (an INPUT: a row as the
   // list writes it, his live test of 14 Nov 2026, a dinner since marked as eating out). verify:live-test-nov14.

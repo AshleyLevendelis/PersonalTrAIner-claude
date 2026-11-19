@@ -111,6 +111,22 @@ async function main() {
   check('with no extras there is nothing beside it', voice.extraSetsNote(derive.computeSessionSummary(friday.slice(0, 7), planned, T(0), T(80)).extraSets) === '')
   check('the per-exercise rows still say what was done on each', summary.exercises.find(e => e.exerciseName === 'Hammer Curls')?.setsCompleted === 1 && summary.exercises.find(e => e.exerciseName === 'Hammer Curls')?.setsPrescribed === 0)
 
+  // ONE MORE SET AFTER FINISH (the Exercise walk, 19 Nov 2026; his 8 Nov "Add to it"). The summary is a card saved at
+  // the moment of finishing; the day's bar counted the later set and the card did not. Its counts and volume are read
+  // again from the sets as they stand; the time stays the time of the session he finished.
+  console.log('\n[2b] THE SUMMARY FOLLOWS A SET LOGGED AFTER FINISH')
+  const later = [...friday, log('Push-Ups', 2, { weight_kg: 0, is_bodyweight: true, completed_at: T(200) }), log('Goblet Squats', 9, { weight_kg: 20, completed_at: T(205) })]
+  const stands = derive.summaryAsItStands(summary, later, planned)
+  const fresh = derive.computeSessionSummary(later, planned, T(0), T(80))
+  check('one more planned set: 8 of 9, where the saved card says 7', summary.setsCompleted === 7 && stands.setsCompleted === 8 && stands.setsPrescribed === 9, { saved: summary.setsCompleted, now: stands.setsCompleted })
+  check('one more extra set: counted beside it', stands.extraSets === summary.extraSets + 1, { saved: summary.extraSets, now: stands.extraSets })
+  check('the volume counts the new sets', stands.totalVolumeKg > summary.totalVolumeKg && stands.totalVolumeKg === fresh.totalVolumeKg, { saved: summary.totalVolumeKg, now: stands.totalVolumeKg })
+  check('the per-exercise rows follow too', stands.exercises.find(e => e.exerciseName === 'Push-Ups')?.setsCompleted === (summary.exercises.find(e => e.exerciseName === 'Push-Ups')?.setsCompleted ?? 0) + 1)
+  check('THE TIME STAYS THE SESSION\'S: 26 minutes, though the new sets came hours later (the fresh sum would say more)', stands.durationMinutes === summary.durationMinutes && summary.durationMinutes === 26 && fresh.durationMinutes > 26, { stands: stands.durationMinutes, fresh: fresh.durationMinutes })
+  check('with nothing logged since, it is the saved card', JSON.stringify(derive.summaryAsItStands(summary, friday, planned)) === JSON.stringify(summary))
+  check('a set taken off after Finish comes off the card too', derive.summaryAsItStands(summary, friday.slice(0, 6), planned).setsCompleted < summary.setsCompleted)
+  check('the screen shows the card as it stands, once the day\'s sets are known', /summary: summaryAsItStands\(summaryData\.summary, logs, planned, prep\)/.test(panel) && /if \(!summaryData \|\| !workout \|\| !setsKnown\) return summaryData/.test(panel) && /<SessionSummaryDialog[^>]*data=\{shownSummary\}/.test(panel) && !/<SessionSummaryDialog[^>]*data=\{summaryData\}/.test(panel))
+
   // -------------------------------------------------------------------------
   console.log('\n[3] DURATION IS TRAINING TIME')
   check('the cap on one gap is ten minutes', derive.TRAINING_GAP_CAP_MS === 10 * 60 * 1000)

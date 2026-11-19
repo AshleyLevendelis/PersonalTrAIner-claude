@@ -49,7 +49,9 @@ async function main() {
   const guarded = await (await guardPastLifts(res, history, () => {})).json()
   check('the response\'s reply is cleaned and nothing else in it changes', !/70kg/.test(guarded.reply) && guarded.proposal === null, guarded)
   const server = readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
-  check('the one door applies it, with the logged sets the app sent', /guardPastLifts\(await cleanCoachResponse\(await handleChatRequest\(req\)\), \(request as [^)]*\)\?\.context\?\.workout_log_history\)/.test(server))
+  check('the one door applies it, with the logged sets the app sent', // 19 Nov 2026: the cleaning step is also handed the conversation (a second argument). The property is unchanged:
+  // the guard wraps the CLEANED response of the handler, with the logged sets the app sent.
+  /guardPastLifts\(await cleanCoachResponse\(await handleChatRequest\(req\)(?:, [\w.]+\(request\))?\), \(request as [^)]*\)\?\.context\?\.workout_log_history\)/.test(server))
   check('the prompt\'s copyable past-lift examples are gone', !/Last session you hit 70kg x 8/.test(server) && !/You got 140kg x 4 on deadlifts last time/.test(server))
   check('...and the coach is told a lift with no line has no last performance', /A lift with no line above has NO last performance/.test(server))
 

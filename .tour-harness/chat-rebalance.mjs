@@ -86,6 +86,10 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
       if (window.__tool === 'refit') {
         return json({ reply: '', proposal: { kind: 'propose_meal_refit', rawArgs: { origin_verbatim_quote: said } } })
       }
+      // A coach that names the two meals and never the amount, whatever he says (the chat walk, 18 Nov 2026, C6).
+      if (window.__tool === 'forgetful') {
+        return json({ reply: '', proposal: { kind: 'propose_meal_rebalance', rawArgs: { from_slot: 'lunch', to_slot: 'dinner', origin_verbatim_quote: said } } })
+      }
       const amount = /(\\d+) kcal to (\\w+)/.exec(said)
       if (amount) {
         return json({ reply: '', proposal: { kind: 'propose_meal_rebalance', rawArgs: { from_slot: 'lunch', to_slot: amount[2], kcal: Number(amount[1]), origin_verbatim_quote: said } } })
@@ -241,6 +245,21 @@ await say(SAID5)
 r = await answered(/stays as you ate it/, SAID5)
 check('lunch logged as eaten: refused in plain words, no question, no card', tail(r, SAID5).includes("You've already logged today's lunch as eaten, so it stays as you ate it.") && !/How much should I move/.test(tail(r, SAID5)), tail(r, SAID5).slice(0, 300))
 check('...nothing written', (await picks()).length === 0)
+
+console.log('\n[7] The coach leaves the amount out: the amount he tapped is still the amount (it asked "How much?" again, for ever)')
+check('a fresh chat', await load())
+await ev(`window.__tool = 'forgetful'`)
+const SAID7 = "move some of lunch's calories to dinner"
+check('his sentence goes', await say(SAID7))
+r = await answered(/How much should I move from lunch to dinner\?/, SAID7)
+check('the app asks how much, with the amount buttons', /How much should I move from lunch to dinner\?/.test(tail(r, SAID7)) && r.btns.includes('200 kcal to dinner') && r.hasCard === false, r.btns)
+check('he taps "200 kcal to dinner"', await tapButton('200 kcal to dinner'))
+r = await answered(/Want me to move about 200 kcal from today's lunch to dinner\?/, '200 kcal to dinner')
+const after7 = tail(r, '200 kcal to dinner')
+check('THE OFFER COMES, for the 200 he tapped', r.hasCard === true && /Want me to move about 200 kcal from today's lunch to dinner\?/.test(after7), after7.slice(0, 400))
+check('...and "How much?" is not asked a second time', !/How much should I move/.test(after7), after7.slice(0, 300))
+check('...nothing written before Apply', (await picks()).length === 0)
+await shoot('chat-rebalance-forgetful')
 
 const errs = await ev(`window.__errors ?? []`)
 check('no page errors', (errs ?? []).length === 0, errs)

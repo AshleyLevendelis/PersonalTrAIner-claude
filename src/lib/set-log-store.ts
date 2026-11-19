@@ -1331,6 +1331,47 @@ export async function getSetsForDate(userId: string, date: string): Promise<Exer
 }
 
 /**
+ * SEVERAL DAYS IN ONE READ (18 Nov 2026, the testing-week sweep): the same answer `getSetsForDate` gives for each date,
+ * from two queries instead of two per date. Each date is settled exactly as a single read settles it (the phone's own
+ * unsent sets laid over the server's, a refused set left out), and a read that could not be made falls back to the
+ * phone's copy for every date. Never throws.
+ */
+export async function getSetsForDates(userId: string, dates: string[]): Promise<Map<string, ExerciseSetLog[]>> {
+  const startedAtSeq = syncSeq
+  const out = new Map<string, ExerciseSetLog[]>()
+  if (dates.length === 0) return out
+  let byDate: Map<string, ExerciseSetLog[]> | null = null
+  try {
+    const { data: sessions, error: sessionError } = await supabase
+      .from('workout_sessions')
+      .select('id, date')
+      .eq('profile_id', userId)
+      .in('date', dates)
+    if (!sessionError) {
+      const dateOf = new Map(((sessions ?? []) as { id: string; date: string }[]).map(r => [r.id, r.date]))
+      byDate = new Map(dates.map(d => [d, [] as ExerciseSetLog[]]))
+      if (dateOf.size > 0) {
+        const { data, error } = await supabase
+          .from('exercise_set_logs')
+          .select('*')
+          .in('session_id', [...dateOf.keys()])
+          .order('exercise_name')
+          .order('set_number')
+        if (error) byDate = null
+        else for (const r of (data || []) as ServerSetRow[]) {
+          const date = dateOf.get(r.session_id)
+          if (date) byDate.get(date)?.push(serverRowToView(r, date))
+        }
+      }
+    }
+  } catch {
+    byDate = null
+  }
+  for (const date of dates) out.set(date, settleRead(userId, date, byDate ? byDate.get(date) ?? [] : null, startedAtSeq, false).rows)
+  return out
+}
+
+/**
  * Retry the refused set on one row — named by the set, not by a queue id,
  * because the row knows which set it is and has no business knowing how the
  * queue labels things.

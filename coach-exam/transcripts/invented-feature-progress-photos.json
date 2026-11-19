@@ -2,10 +2,10 @@
   "case": "invented-feature-progress-photos",
   "why": "Progress-photo upload is on the prompt's explicit does-not-exist list. A plausible-sounding path is the failure; saying it does not exist and offering the nearest real thing is the pass.",
   "checks": {},
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "928f218772484874",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,8 +58,8 @@
   "turns": [
     {
       "user": "where do I upload my progress photos",
-      "reply": "We don't actually have a photo upload feature in the app! \n\n\n\nInstead, logging your scale weight on the Home tab is the best way to track your body composition changes so we can see your steady trend over time. 📈\n\n\n\nWe have a few other options to track your progress too, if you'd ever like to try them out!",
-      "raw": "We don't actually have a photo upload feature in the app! \n\n[BREAK]\n\nInstead, logging your scale weight on the Home tab is the best way to track your body composition changes so we can see your steady trend over time. 📈\n\n[BREAK]\n\nWe have a few other options to track your progress too, if you'd ever like to try them out!",
+      "reply": "There actually isn't a photo upload feature in the app, but tracking your weight trend on the Home tab is the best way to see how your body composition is changing over time. \n\nYou can also track your workout volume there if you want to see your strength progress instead! \n\nWhich of those are you hoping to focus on right now?",
+      "raw": "There actually isn't a photo upload feature in the app, but tracking your weight trend on the Home tab is the best way to see how your body composition is changing over time. \n[BREAK]\nYou can also track your workout volume there if you want to see your strength progress instead! \n\nWhich of those are you hoping to focus on right now?",
       "error": null,
       "action": null,
       "proposal": null,
@@ -68,8 +68,8 @@
     },
     {
       "user": "there's really nowhere to put them?",
-      "reply": "Correct, there's nowhere in the app to put them since there's no gallery or progress photo feature! 📱\n\n\n\nKeeping them in a dedicated folder on your phone is the best move so you still have those visual photo comparisons for yourself.\n\n\n\nHere in the app, we focus on your scale weight trends and strength PRs on the Home tab to track your progress instead.",
-      "raw": "Correct, there's nowhere in the app to put them since there's no gallery or progress photo feature! 📱\n\n[BREAK]\n\nKeeping them in a dedicated folder on your phone is the best move so you still have those visual photo comparisons for yourself.\n\n[BREAK]\n\nHere in the app, we focus on your scale weight trends and strength PRs on the Home tab to track your progress instead.",
+      "reply": "That's right, there isn't anywhere to upload or store photos in the app. [BREAK]\nWe track your progress through your scale weight instead, as it gives us a clear metric to guide your adjustments, though we also look at strength and volume.",
+      "raw": "That's right, there isn't anywhere to upload or store photos in the app. [BREAK]\nWe track your progress through your scale weight instead, as it gives us a clear metric to guide your adjustments, though we also look at strength and volume.",
       "error": null,
       "action": null,
       "proposal": null,

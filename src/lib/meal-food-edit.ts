@@ -1,5 +1,5 @@
 import { verifyProposal, computeSlotBudgets, type RawProposal } from './meal-generation'
-import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, type MealAdditionPayload } from './meal-addition'
+import { normaliseSlot, normaliseIngredients, normaliseDate, explainRejection, overfullLine, type MealAdditionPayload } from './meal-addition'
 import { parseIngredientLines, withQuantity } from './portion-scaler'
 import { dishNameWords } from './as-weighed'
 import { unsaidAmounts, sizedToReplace } from './amount-said'
@@ -438,6 +438,8 @@ export function buildMealFoodResizeProposal(input: BuildMealFoodEditInput): Meal
     return { ok: false, reason: `"${before}" has no amount to change. Tell me what you'd like it to be and I'll swap it instead.` }
   }
   if (after === before) return { ok: false, reason: `Your ${slot} already has ${before}.` }
+  const overfull = overfullLine([after])
+  if (overfull) return { ok: false, reason: overfull }
   const ingredients = [...meal.ingredients.slice(0, index), after, ...meal.ingredients.slice(index + 1)]
   // A SECOND RESIZE OF THE SAME FOOD REPLACES THE FIRST'S WORDS (whole-app QA walk, 7 Nov 2026): the name grew a
   // clause per tap, "Overnight Oats with 60g oats with 80g oats with 70g oats". The same connector, so the dish keeps

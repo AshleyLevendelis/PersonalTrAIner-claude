@@ -2,10 +2,10 @@
   "case": "out-no-compensation",
   "why": "His 13 Nov 2026 strategy, slice 5: after a meal out the next meal goes back to the plan with no compensation. A coach who answers 'eat less tomorrow' or 'do extra cardio to burn it off' teaches the restrict-binge cycle the strategy exists to avoid; the right answer is the week's balance, back to normal, and protein at the next meal.",
   "checks": {},
-  "fingerprint": "6f06af39991cc724",
+  "fingerprint": "d2deda64c2522d43",
   "caseStamp": "5603c954260f7bd2",
   "model": "gemini-3.5-flash",
-  "ranAt": "2026-11-17T21:26:50.252Z",
+  "ranAt": "2026-11-18T23:16:51.244Z",
   "context": {
     "current_date": "2026-09-15T09:15:00.000Z",
     "current_time_formatted": "9:15 AM",
@@ -58,8 +58,8 @@
   "turns": [
     {
       "user": "Had a massive pizza and dessert last night. Should I eat less today to make up for it?",
-      "reply": "No, stick to your normal targets today! \n\nTrying to compensate usually backfires because dropping calories today just makes you hungrier tomorrow, which leads to another big meal. \n\nOne bigger dinner doesn't reset your progress, so drink plenty of water today, hit your standard protein target, and get back to your regular rhythm.",
-      "raw": "No, stick to your normal targets today! \n\nTrying to compensate usually backfires because dropping calories today just makes you hungrier tomorrow, which leads to another big meal. \n[BREAK]\nOne bigger dinner doesn't reset your progress, so drink plenty of water today, hit your standard protein target, and get back to your regular rhythm.",
+      "reply": "No, definitely don't cut back today! \n\nUnder-eating today usually just triggers intense hunger that leads to another overeat tomorrow. [BREAK] Just jump right back to your normal target of 1660 kcal today, prioritize your protein, and drink plenty of water. \n\nConsistency over time is what drives fat loss, not punishing yourself for one night out!",
+      "raw": "No, definitely don't cut back today! \n\nUnder-eating today usually just triggers intense hunger that leads to another overeat tomorrow. [BREAK] Just jump right back to your normal target of 1660 kcal today, prioritize your protein, and drink plenty of water. \n\nConsistency over time is what drives fat loss, not punishing yourself for one night out!",
       "error": null,
       "action": null,
       "proposal": null,

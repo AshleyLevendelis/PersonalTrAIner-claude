@@ -66,3 +66,48 @@ today changes nothing, by the red-flag rule), heart-rate zones.
 - Measured on 401 plans: 22,019 of these moves without pregnancy, 0 with; quality 11.66 -> 11.67, none below 7.2; weeks
   without pressing unchanged (288 of 2,432).
 - Not built: balance-risky single-leg notes (rule 3), the combat/agility -> steady cardio swap (rule 5), a due date.
+
+## Extended 18 Nov 2026 (the full pass)
+A walk of setup with "Pregnant" ticked was handed a flat dumbbell press ("Neutral-Grip Dumbbell Press"). The list had
+been checked against exercise NAMES, and a move whose name does not say how it is done slipped through. Every catalogue
+entry was read again for the position it is done in, and the warm-up, which the rule had never reached, was measured.
+
+**The same two rules, applied to moves the first list missed (CSCS, mine; all on the safe side, none a new rule):**
+- Flat on the back: Neutral-Grip Dumbbell Press, Dumbbell Squeeze Press (flat bench); Sliding Leg Curl and its
+  single-leg version (supine, hips bridged); Inverted Row and Table Row (the trunk is horizontal and face-up for the
+  whole set, and a failed grip drops her onto her back). Basis: the same supine-position guidance as rule 2.
+- Face down with the body's weight on the front: Chest-Supported Row, T-Bar Row Machine, Reverse Hyper Machine, Back
+  Extension Machine, Dumbbell Leg Curl, and the Nordic Hamstring Curl (a controlled fall forward onto the hands).
+  Basis: pressure on the abdomen and fall risk; the first list already left out "Lying Leg Curl" and "Prone Y-T Raises"
+  for this reason.
+- Impact: High Knees (running on the spot, the same class as Jumping Jacks) and Medicine Ball Slams (a maximal throw
+  whose ball rebounds toward the body).
+- KEPT, each recorded with its reason in the check: incline, seated and standing work; hip thrusts (shoulders up on a
+  bench); push-up and plank positions (hands and feet, nothing lying on the front); side-lying work; a 45-degree leg
+  press; kettlebell swings; treadmill intervals (cardio is already capped by effort). Plank-type work later in
+  pregnancy is an individual call for her midwife or physio, not an app rule.
+
+**The warm-up obeys the rule the session obeys (new):** measured before, 4,608 of 6,144 sampled warm-ups for a pregnant
+trainee held a jump ("Jumping Jacks & High Knees", "Jump Rope or Brisk Walk") and 928 a Glute Bridge. The opening item
+was chosen by kit alone and the mobility drills asked only about injuries. Now the opening item has a
+both-feet-on-the-floor twin of the same length, used while pregnant AND when an injury on the list rules out a jump the
+item names (the catalogue's own judgement: knees, ankles, a shoulder for jumping jacks, a wrist for the rope), which
+was an injury-filter gap for everybody; a drill lying flat is left out of the warm-up and of the "feels tight" drills
+while pregnant. After: 0 and 0.
+
+**The starting-out circuit keeps its hinge:** its Glute Bridge had no alternative, so a pregnant beginner lost the
+pattern. It now falls back to a standing hip hinge to a wall, and each alternative is described in its own words (a
+Wall Sit had been described as "sit to a chair and stand back up").
+
+**Cost, measured in the same run (96 profiles, 16 weeks each, pregnant against not):** weeks that lost a squat, hinge,
+push or pull pattern: 0. Exercises kept: 97.7%. No empty training day.
+
+**CSCS review:** (1) same patterns at the same effort cap in safer positions; (2) takes away thirteen more moves and the
+jumping warm-up, each replaced, no pattern lost; (3) coverage, overload and recovery unchanged; (4) no floor or ceiling
+redefined, the warm-up twin is the same length so no session is resized; (5) exercise selection only.
+
+Checks: `test:pregnancy-rules` section 1 now reads name, form cues and group, proves its detector on every listed move,
+and records each kept move with its reason (5 mutations caught); `test:warmup-rules` (29 checks; 15 mutations, 13
+caught, 2 equivalent: the generator's own warm-up call is rebuilt downstream by the function that does pass the flag,
+and the two list removals belong to the other gate, which catches them).
+

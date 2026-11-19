@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import { Loader2 } from 'lucide-react'
 import { buildMealMoveProposal } from '@/lib/meal-move'
-import { executeMealMove, undoMealEdit } from '@/lib/pending-action-executor'
+import { executeMealMove, undoMealMove } from '@/lib/pending-action-executor'
 import { withKnockOn } from '@/lib/meal-food-add'
 import type { MealKnockOn } from '@/lib/meal-knock-on'
 import { getMealPicksForDate } from '@/lib/meal-store'
@@ -264,13 +264,9 @@ export function MealMoveSheet({ ctx, dayMove, onPick, onDone, onCancel, onSwapIn
             ? `${SLOT_LABEL[ctx.fromSlot]} and ${SLOT_LABEL[proposal.payload.legs[0].slot]} swapped`
             : `Moved to ${SLOT_LABEL[proposal.payload.legs[0].slot].toLowerCase()}`}. Both were resized to fit where they landed.`,
           // UNDO (2 Nov 2026, the UX pass): each leg's copy removed and its slot's earlier pick put back, last leg first.
-          async () => {
-            for (const leg of [...proposal.payload.legs].reverse()) {
-              const ok = await undoMealEdit(profileId, { payload: leg.payload, poolIndex: null, previous: before[leg.slot] ?? null }, (slot, name) => onPick(slot, name))
-              if (!ok) return { ok: false, text: "Couldn't put that back just now. Try again in a moment." }
-            }
-            return { ok: true, text: 'Put back as it was.' }
-          })
+          async () => (await undoMealMove(profileId, proposal.payload, before, (slot, name) => onPick(slot, name)))
+            ? { ok: true, text: 'Put back as it was.' }
+            : { ok: false, text: "Couldn't put that back just now. Try again in a moment." })
           return null
         },
       }

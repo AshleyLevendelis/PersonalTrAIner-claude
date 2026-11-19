@@ -6210,6 +6210,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
       injuries: profile.injuries || [],
       experience: profile.training_experience || 'novice',
       budgetSeconds: warmupReserve,
+      pregnant: isPregnant(profile),
     })
 
     // Ramp-up-visibility fix: buildWarmup already decided which exercises

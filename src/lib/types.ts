@@ -428,6 +428,13 @@ export interface Exercise {
    */
   load_hold?: 'ceiling' | 'implement' | 'stated_limit' | 'floor' | 'matched' | 'unaffordable_step' | 'coherence'
   /**
+   * ON A TESTING-WEEK SLOT ONLY: the heaviest weight this slot's later weeks have already been written from
+   * (calibration-anchor.ts, 18 Nov 2026). Evidence is used once: the same sets never write the plan a second time, so
+   * a weight lowered afterwards (an ease-off, a correction) is not quietly raised again the next time the plan loads.
+   * A heavier set logged later is new evidence and anchors again. Never shown; changes nothing about this week.
+   */
+  calibration_anchored_kg?: number
+  /**
    * THE EXERCISE THIS ONE REPLACED, by her choice (a swap), so a later rebuild can put her choice back where the
    * fresh plan brings the old one (run 5, H28, 11 Oct 2026: a rebuild dropped a Dumbbell Rows swap and handed back
    * the lift she had swapped out). Only a swap writes it; generation never does.

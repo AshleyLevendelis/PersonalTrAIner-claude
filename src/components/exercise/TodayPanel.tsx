@@ -1,5 +1,5 @@
 import { PAUSE_WORDS, isPausedOn, planPausedSince } from '@/lib/plan-pause'
-import { noteForProfile, lateInPregnancy, PREGNANCY_HOLD_NOTE } from '@/lib/health-conditions'
+import { noteForProfile, lateInPregnancy, PREGNANCY_HOLD_NOTE, isPregnant } from '@/lib/health-conditions'
 import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
@@ -14,7 +14,7 @@ import { exerciseCoachLine } from '@/lib/exercise-coach-line'
 import { carriedWeightFor } from '@/lib/set-row'
 import { isExternallyLoaded, splitLoadDisplay } from '@/lib/load-prescription'
 import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, cardLoadFor, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
-import { groupExercises, isConditioningDay, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, normalizeWarmup, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
+import { groupExercises, isConditioningDay, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, summaryAsItStands, normalizeWarmup, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { reconnectingLine } from '@/lib/coach-voice'
@@ -75,7 +75,7 @@ import type { ReasonAnswer } from './EditReasonStep'
 // for the coach's side of the same two operations, so the bundler keeps it in
 // the main chunk either way, and the dynamic form only added an await between
 // the tap and the sheet's cost line. The 13 kB is recorded in test:bundle.
-import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor, type SessionEditResult } from '@/lib/session-edit'
+import { warmUpNowAfterWork, removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor, type SessionEditResult } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import { shortenOrFloor, mapTier } from '@/lib/exercise-plan'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
@@ -87,9 +87,9 @@ import { settleWeek } from '@/lib/settle-week'
 import { sessionRefFromCell, sessionRefForPlanDay, editTarget, sayDayIn, type SessionRef } from '@/lib/session-ref'
 import { planLighterToday, undoLighterToday, type LighterPlan } from '@/lib/lighter-today'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
-import { publishScreenEdit, recordScreenEdit, screenEditText } from '@/lib/screen-edit-undo'
+import { publishScreenEdit, recordScreenEdit, screenEditText, undoScreenEdit, dayWayBack, saveWeekFor, SCREEN_UNDO_WINDOW_MS, type ScreenEditRecord } from '@/lib/screen-edit-undo'
 import { executeCardioSession } from '@/lib/pending-action-executor'
-import { recomputeLoad, type SwapScope } from '@/lib/mesocycle-edit'
+import { priceAddedLift, type SwapScope } from '@/lib/mesocycle-edit'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 // Split out of the app chunk, like onboarding and the dev page: a dialog
 // opened from a menu item, by a person who has something to explain about a
@@ -123,6 +123,22 @@ const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satu
 // is computed here, for today's workout only, and passed only to this
 // surface — the peek and program browse never see it (§2.2, §7.4).
 // ---------------------------------------------------------------------------
+
+/** The way back from a day-wide change made on this screen ("I'm short of time", "a different session"). */
+type DayEdit = { kind: 'shorten' | 'rebuild'; note: string | null; record: ScreenEditRecord; loggedAt: number; canUndo: boolean }
+/**
+ * Kept OUTSIDE the component, by person and day, so a trip to another tab (which unmounts this screen) does not lose
+ * the way back. For this visit to the app only: the put-back lasts ten minutes, so there is nothing worth storing.
+ */
+const dayEditKept = new Map<string, DayEdit>()
+
+/** The rows a session summary counts: working exercises as planned sets, and movement prep kept out of both counts. */
+function summaryRowsOf(workout: WorkoutDay): { planned: { id?: string; name: string; sets: number }[]; prep: { id?: string; name: string }[] } {
+  return {
+    planned: workout.exercises.filter(ex => !isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets })),
+    prep: workout.exercises.filter(ex => isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name })),
+  }
+}
 
 export function TodayPanel({
   plan,
@@ -329,8 +345,7 @@ export function TodayPanel({
     setSummaryNothingLogged(false)
     onCalibrationSessionFinished?.({ date: today, dayName: workout.day })
     // The summary's count is the same working-set count (isMovementPrepRow), never one that adds the warm-up drills.
-    const plannedExercises = workout.exercises.filter(ex => !isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
-    const prepRows = workout.exercises.filter(ex => isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name }))
+    const { planned: plannedExercises, prep: prepRows } = summaryRowsOf(workout)
     const summary = computeSessionSummary(logs, plannedExercises, result.startedAtIso, result.finishedAtIso, prepRows)
     const prs = computeSessionPRs(result.prBaseline, logs)
     // "What next session prescribes" reuses the same function already called
@@ -423,6 +438,15 @@ export function TodayPanel({
   const workout = todayCell?.movedTo
     ? undefined
     : (todayCell?.session ?? undefined) ?? liveWeekPlan.find(d => d.day === effectiveDayName)
+  // THE SUMMARY FOLLOWS A SET LOGGED AFTER FINISH (the Exercise walk, 19 Nov 2026; his 8 Nov "Add to it"). The card is
+  // saved at the moment of finishing, so one more set left the day's bar on "2 of 18" beside a summary still reading
+  // "1/18 planned sets". Its counts and volume are read again from the sets as they stand; only once the day's sets
+  // are known, so a card opened before they load shows what was saved and never a zero.
+  const shownSummary = useMemo(() => {
+    if (!summaryData || !workout || !setsKnown) return summaryData
+    const { planned, prep } = summaryRowsOf(workout)
+    return { ...summaryData, summary: summaryAsItStands(summaryData.summary, logs, planned, prep) }
+  }, [summaryData, workout, logs, setsKnown])
   // COMPUTED HERE, NEVER STORED (the tightness answer, see handleTightness). The
   // plan's warm-up is untouched; these exist for as long as today's answer does.
   // Injuries still veto a drill, and a drill the warm-up ALREADY holds is never
@@ -433,8 +457,8 @@ export function TodayPanel({
     return w ? [...w.general, ...w.mobility].map(i => i.name) : []
   }, [workout?.warmup])
   const tightness = useMemo(
-    () => tightnessWarmup(tightAreas, profile?.injuries ?? [], warmupNames),
-    [tightAreas, profile?.injuries, warmupNames],
+    () => tightnessWarmup(tightAreas, profile?.injuries ?? [], warmupNames, !!profile && isPregnant(profile)),
+    [tightAreas, profile, warmupNames],
   )
   // WHAT THEY DID INSTEAD, if they told the coach. The week strip has drawn
   // this correctly all along; this panel read nothing, so on 8 Sep 2026 it
@@ -491,6 +515,8 @@ export function TodayPanel({
     scope: SwapScope,
     /** The Undo line's words, for the four exercise edits (QA walk T7); the day-wide verbs have their own put-backs. */
     undoText?: string,
+    /** Something the change costs, said after those words (ScreenEditRecord.note). */
+    undoNote?: string | null,
   ): Promise<string | null> => {
     if (!profileId || !mesocycle) return 'No plan to edit.'
     if (!next.changed) return say(next.refusal ?? "That couldn't be changed.")
@@ -503,7 +529,7 @@ export function TodayPanel({
       onMesocycleUpdated?.(mesocycle)
       return "That didn't save — try again in a moment."
     }
-    if (undoText) publishScreenEdit(recordScreenEdit(mesocycle, next.mesocycle, liveWeek, scope, undoText, Date.now()))
+    if (undoText) publishScreenEdit(recordScreenEdit(mesocycle, next.mesocycle, liveWeek, scope, undoText, Date.now(), undoNote))
     refreshWeeks()
     onLogsUpdated?.()
     return null
@@ -577,10 +603,12 @@ export function TodayPanel({
     const result = shortenOrFloor(week, target.planDayName, profile, minutes)
     if (!result.changed) return say(result.refusal ?? "I couldn't shorten that one.")
     const settled = settleWeek(result.week, target.planDayName, profile)
-    return applySessionEdit(
-      { mesocycle: mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w)), changed: true },
-      'today',
-    )
+    const next = mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w))
+    const failed = await applySessionEdit({ mesocycle: next, changed: true }, 'today')
+    if (failed) return failed
+    // No words of its own: the line under the session's length already says it was shortened and for how long.
+    keepWayBack('shorten', next, null)
+    return null
   }
 
   /**
@@ -611,10 +639,43 @@ export function TodayPanel({
     // keeps finding — the app knowing something and the screen saying nothing.
     const kept = result.kept.length
     const main = result.mainLift ? ` ${result.mainLift} is untouched, as planned.` : ''
-    setRebuildNote(kept === 0
+    keepWayBack('rebuild', result.mesocycle, kept === 0
       ? `Rebuilt today — ${result.replaced.length} exercise${result.replaced.length === 1 ? '' : 's'} changed.${main} Back to the planned session next week.`
       : `Rebuilt today — ${result.replaced.length} changed, ${kept} stayed because nothing else fits ${kept === 1 ? 'that slot' : 'those slots'} with your equipment and injuries.${main} Back to the planned session next week.`)
     return null
+  }
+
+  /**
+   * THE WAY BACK FROM "I'M SHORT OF TIME" AND "GIVE ME A DIFFERENT SESSION" (the Exercise walk, 19 Nov 2026; his
+   * "every change previews and can be undone"). "Make it easier" and "a different kind of session" each leave a
+   * button that puts the planned session back; these two left nothing, so three exercises taken off on one tap could
+   * only be got back by asking the coach. The note says what was done and the button puts the day back, by the rules
+   * every put-back on this screen follows (screen-edit-undo.ts): only while the week still reads as the change left
+   * it, never once a set has been logged since, and for ten minutes. Kept for this visit to the screen, not stored.
+   */
+  const keepWayBack = (kind: 'shorten' | 'rebuild', after: MesocycleWeek[], note: string | null) => {
+    if (!mesocycle) return
+    setDayEditError(null)
+    // A second change while the first can still be put back goes back past it, to the plan (dayWayBack). The words
+    // of the first stay when the second has none of its own (a rebuilt day that is then shortened is still rebuilt).
+    const back = dayWayBack(dayEdit?.canUndo ? dayEdit : null, mesocycle, after, liveWeek, note ?? '', loggedWorkingToday, Date.now())
+    setDayEdit({ kind, note: note ?? (back.chained ? dayEdit?.note ?? null : null), record: back.record, loggedAt: loggedWorkingToday, canUndo: true })
+  }
+  const dayEditUndo = async () => {
+    if (!dayEdit || !profileId || !mesocycle || dayEditBusy) return
+    setDayEditBusy(true); setDayEditError(null)
+    const out = await undoScreenEdit(dayEdit.record, mesocycle, Date.now(), saveWeekFor(profileId), loggedWorkingToday > dayEdit.loggedAt)
+    setDayEditBusy(false)
+    if (out.ok) {
+      onMesocycleUpdated?.(out.mesocycle)
+      refreshWeeks()
+      onLogsUpdated?.()
+      setDayEdit(null)
+      return
+    }
+    // SAID, AND THE BUTTON STAYS ONLY WHILE A SECOND TAP COULD WORK (the Undo line's own rule).
+    setDayEditError(out.refusal)
+    if (!out.keep) setDayEdit(dayEdit.note ? { ...dayEdit, canUndo: false } : null)
   }
 
   /**
@@ -717,13 +778,12 @@ export function TodayPanel({
     // then un-happened — the silent write the app is not allowed to have.
     const target = editTarget(todayRef)
     if (!target.ok) { setMoveError(target.refusal); return }
-    setMoveError(
-      await applySessionEdit(
-        moveExerciseInSession({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, fromIndex: exIndex, toIndex: exIndex + direction, scope: 'today' }),
-        'today',
-        screenEditText('reorder', planExerciseName(target.planDayName, exIndex), direction < 0 ? 'earlier' : 'later'),
-      ),
-    )
+    const moved = moveExerciseInSession({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, fromIndex: exIndex, toIndex: exIndex + direction, scope: 'today' })
+    // A MOVE THAT LEAVES THE WARM-UP MOVE BEHIND THE WORK SAYS SO (session-edit warmUpNowAfterWork): the one-tap move
+    // has no card to carry a cost line, so the sentence rides on the line that says what was moved, beside its Undo.
+    const dayIn = (m: MesocycleWeek[]) => m.find(w => w.week_number === liveWeek)?.days.find(d => d.day === target.planDayName)?.exercises ?? []
+    const late = moved.changed ? warmUpNowAfterWork(dayIn(mesocycle), dayIn(moved.mesocycle)) : null
+    setMoveError(await applySessionEdit(moved, 'today', screenEditText('reorder', planExerciseName(target.planDayName, exIndex), direction < 0 ? 'earlier' : 'later'), late))
   }
 
   /**
@@ -731,25 +791,27 @@ export function TodayPanel({
    * grain, and the only one that makes the day longer.
    *
    * Pricing happens here rather than inside session-edit because
-   * `recomputeLoad` is async and that module is not. `peerProgrammingFor`
+   * pricing is async and that module is not. `peerProgrammingFor`
    * gives BOTH sides the same peer, so the weight on the card is computed for
    * the sets and reps the plan actually receives.
    *
-   * The reset branch (`isMainLiftReset: true`) is right for any tier here:
-   * it means "a movement with no history in this plan", and its basis already
-   * reads "find your working weight this session".
+   * PRICED LIKE THE PLAN'S OWN (19 Nov 2026): `priceAddedLift`, the one
+   * function the coach's confirm calls too. It was the new-main-lift branch,
+   * which ignored his log and the plan's light start: about 1.75x the plan's
+   * own number for the same lift.
    */
   const priceAddition = async (entry: ExerciseEntry) => {
     if (!profile || !mesocycle) return null
     const target = editTarget(todayRef)
     if (!target.ok) return null
     const planDay = target.planDayName
-    const day = mesocycle.find(w => w.week_number === liveWeek)?.days.find(d => d.day === planDay)
+    const week = mesocycle.find(w => w.week_number === liveWeek)
+    const day = week?.days.find(d => d.day === planDay)
     if (!day) return null
     const tier = mapTier(entry.mechanics_tier)
     const programming = peerProgrammingFor(day.exercises, tier)
     if (!programming) return null
-    const load = await recomputeLoad(entry, profile, programming.intensity, programming.sets, programming.reps, true)
+    const load = await priceAddedLift(entry, profile, programming, week, mesocycle)
     return { load, day, planDay }
   }
 
@@ -1058,7 +1120,26 @@ export function TodayPanel({
    * is only the list of slots that STAYED. Storing that needs a field on the
    * day, which is a persistence change this build did not take.
    */
-  const [rebuildNote, setRebuildNote] = useState<string | null>(null)
+  const dayEditKey = `${profileId ?? ''}:${today}`
+  const [dayEdit, setDayEditState] = useState<DayEdit | null>(() => dayEditKept.get(dayEditKey) ?? null)
+  const setDayEdit = (next: DayEdit | null) => {
+    if (next) dayEditKept.set(dayEditKey, next); else dayEditKept.delete(dayEditKey)
+    setDayEditState(next)
+  }
+  const [dayEditBusy, setDayEditBusy] = useState(false)
+  const [dayEditError, setDayEditError] = useState<string | null>(null)
+  // Another day, or another person, has its own (usually none).
+  useEffect(() => { setDayEditState(dayEditKept.get(dayEditKey) ?? null); setDayEditError(null) }, [dayEditKey])
+  // THE BUTTON IS DRAWN ONLY WHILE IT CAN WORK (24 Sep 2026: an Undo asks before it offers): it goes when the ten
+  // minutes are up, and it is not drawn once a set has been logged since, because the put-back would refuse both.
+  useEffect(() => {
+    if (!dayEdit?.canUndo) return
+    const expire = () => setDayEdit(dayEdit.note ? { ...dayEdit, canUndo: false } : null)
+    const left = dayEdit.record.at + SCREEN_UNDO_WINDOW_MS - Date.now()
+    if (left <= 0) { expire(); return }
+    const t = setTimeout(expire, left)
+    return () => clearTimeout(t)
+  }, [dayEdit]) // eslint-disable-line react-hooks/exhaustive-deps
   const volumeReduction = useMemo(() => {
     if (!profile || !volume || volume.atFloor || !hasMesocycle) return null
     const activities = profile.concurrent_activities ?? []
@@ -1703,7 +1784,13 @@ export function TodayPanel({
               )}
             </InsightBanner>
           )}
-          {setAsideToday && (
+          {/* NOT WHILE HE IS TRAINING IT (the Exercise walk, 18 Nov 2026, E7): after "Train it anyway" the card read
+              "Today · in progress" over "This session is still here if you want it". The day is still as he set it
+              (a session finished with nothing logged is a rest day again, and the line comes back); the offer is
+              simply answered while the session is open. The same for a day swapped for something else, below.
+              EACH STATE NAMED (test:one-today): before it is started the offer stands; finished with nothing
+              counted the day is as he set it; running, it is answered. */}
+          {setAsideToday && (status === 'idle' || status === 'finished') && (
             <InsightBanner tone="ai" data-testid="set-aside-today">
               <span className="text-sm">
                 {setAsideToday === 'rest_chosen'
@@ -1712,7 +1799,7 @@ export function TodayPanel({
               </span>
             </InsightBanner>
           )}
-          {swappedToday && (
+          {swappedToday && (status === 'idle' || status === 'finished') && (
             <InsightBanner tone="ai" data-testid="swapped-today">
               <span className="text-sm">
                 You swapped today for <span className="font-semibold">{swappedToday}</span>. This session is still here if you want it.
@@ -1757,7 +1844,17 @@ export function TodayPanel({
             </InsightBanner>
           )}
           {volumeError && <p className="text-xs text-destructive">{volumeError} Nothing has changed.</p>}
-          {rebuildNote && <p className="text-xs text-muted-foreground" data-testid="rebuild-note">{rebuildNote}</p>}
+          {dayEdit && (
+            <div className="space-y-1" data-testid="day-edit-note">
+              {dayEdit.note && <p className="text-xs text-muted-foreground" data-testid="rebuild-note">{dayEdit.note}</p>}
+              {dayEdit.canUndo && loggedWorkingToday <= dayEdit.loggedAt && (
+                <Button size="sm" variant="outline" className="min-h-11 self-start" disabled={dayEditBusy} onClick={dayEditUndo} data-testid="day-edit-undo">
+                  {dayEdit.kind === 'rebuild' ? 'Put my planned session back' : 'Put the full session back'}
+                </Button>
+              )}
+            </div>
+          )}
+          {dayEditError && <p className="text-xs text-destructive" data-testid="day-edit-error">{dayEditError}</p>}
           {/* A DIFFERENT KIND TODAY, said where the session is, with the way
               back. Read off the stored marker, so it survives a reload. */}
           {kindTodayOf(workout) && mesocycle && (
@@ -1785,7 +1882,7 @@ export function TodayPanel({
               ? <TrainerNudge line text={coachLine.text} tag="Training" clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
               : <TrainerNudge line text={coachLine.text} tag="Training" openChat askPrefill={`Tell me more about this: "${coachLine.text}"`} data-testid="exercise-coach-line" />
           )}
-          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} savedCardio={summarySavedCardio} />
+          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={shownSummary} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} savedCardio={summarySavedCardio} effortFor={profileId && !summaryNothingLogged ? { profileId, date: today } : undefined} />
           {finishCheck && (
             <Suspense fallback={null}>
               <FinishCheckSheet

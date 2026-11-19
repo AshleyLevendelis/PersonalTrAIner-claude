@@ -14,7 +14,7 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { detectFoodExclusions, mergeFoodsToAvoid, isFoodToAvoid } from '../src/lib/food-exclusions'
-import { splitFoodList } from '../src/lib/food-list'
+import { splitFoodList, readFoodList, unreadFoodLine } from '../src/lib/food-list'
 import { containsPhrase } from '../src/lib/meal-ingredients'
 import { assembleProfile, initialSlotValues } from '../src/lib/onboarding-slots'
 import { allergenFilterReceipt } from '../src/lib/coach-voice'
@@ -128,7 +128,9 @@ console.log('\n6. The coach (main chat) and Profile')
   check('...through the same write as Profile\'s Foods to avoid (a hard food dislike), each with an Undo; only what was said firmly (his "Ask, and hold Tuesday")',
     saver.length > 200 && /firmFoodExclusions\(userText\)/.test(saver) && /kind: 'food_preference'/.test(saver) && /polarity: 'dislike', hardness: 'hard'/.test(saver) && /undoToken: row\.id/.test(saver))
   const prof = code('src/components/ProfileScreen.tsx')
-  check('Profile\'s Foods to avoid box splits what is typed into foods', /<EditableTagList values=\{hardFoodDislikeValues\}[^>]*split=\{splitFoodList\}/.test(prof))
+  // The property, not the prop's name (18 Nov 2026): the box reads what is typed as a list of foods to avoid, and that
+  // reader makes "mushrooms and pork" two foods (section 1 and section 8 hold the reader itself).
+  check('Profile\'s Foods to avoid box splits what is typed into foods', /<EditableTagList values=\{hardFoodDislikeValues\}[^>]*foodSide="avoid"/.test(prof) && readFoodList('mushrooms and pork', 'avoid').foods.length === 2)
 }
 
 console.log('\n7. The prompts')
@@ -145,6 +147,51 @@ console.log('\n7. The prompts')
     /PROMISE ABOUT THEIR PLAN IS THE SAME VERDICT IN THE FUTURE TENSE[\s\S]{0,600}WRONG:[\s\S]{0,200}RIGHT:/.test(rules))
   check('...and no longer says the five allergens have NO tag, or that a dish name drops to one ingredient',
     !/NO tag mechanism at all/.test(rules) && !/can resolve to plain "cod,"/.test(rules) && /THIN/.test(rules))
+}
+
+console.log('\n8. A sentence typed into a list box is read as the food, or said to be unread (18 Nov 2026)')
+{
+  const avoid = (t: string) => readFoodList(t, 'avoid')
+  const like = (t: string) => readFoodList(t, 'like')
+  // THE REPORT: typed into "Anything else you'd rather I left out?" and into Profile's Foods to avoid.
+  check('"I don\'t eat pork" is the food pork', avoid("I don't eat pork").foods.join() === 'pork' && avoid("I don't eat pork").unread.length === 0, avoid("I don't eat pork"))
+  check('...with or without the apostrophe, and for "can\'t have", "never eat", "hate", "avoid", "allergic to"',
+    ["i dont eat pork", "I can't have pork", "I cannot eat pork", "I never eat pork", "I hate pork", "I avoid pork", "I'm allergic to pork", "I am allergic to pork", "not a fan of pork", "please leave out pork", "nothing with pork in it", "I won't eat pork"]
+      .every(t => avoid(t).foods.join() === 'pork' && avoid(t).unread.length === 0),
+    ["i dont eat pork", "I can't have pork", "I cannot eat pork", "I never eat pork", "I hate pork", "I avoid pork", "I'm allergic to pork", "I am allergic to pork", "not a fan of pork", "please leave out pork", "nothing with pork in it", "I won't eat pork"].map(t => [t, avoid(t)]).filter(([, r]) => (r as { foods: string[] }).foods.join() !== 'pork'))
+  check('the lead-in covers the whole answer: "I can\'t have gluten or dairy" is two foods', avoid("I can't have gluten or dairy").foods.join() === 'gluten,dairy')
+  check('a plain list is read exactly as before', avoid('mushrooms and pork').foods.join() === 'mushrooms,pork' && avoid('no mushrooms, no pork').foods.join() === 'mushrooms,pork' && splitFoodList('pork and prawns').join() === 'pork,prawns')
+  check('a food that starts with the letter i is still a food', avoid('ice cream').foods.join() === 'ice cream' && avoid('iceberg lettuce and icing').foods.join() === 'iceberg lettuce,icing')
+  // WHAT IT SAVES ACTUALLY BLOCKS (the point): the sentence as typed blocked nothing.
+  check('the food it reads blocks the ingredient; the sentence as it used to be saved blocked nothing',
+    avoid("I don't eat pork").foods.every(f => blocks(f, 'pork chop') && blocks(f, 'bacon')) && !blocks('i don t eat pork', 'pork chop') && !blocks('i don t eat pork', 'bacon'))
+  // THE OTHER BOX'S WORDS ARE NEVER READ AS THIS BOX'S FOOD: "I love pizza" under foods to avoid must not leave pizza out.
+  check('"I love pizza" in the avoid box adds nothing and is handed back', avoid('I love pizza').foods.length === 0 && avoid('I love pizza').unread.join() === 'I love pizza', avoid('I love pizza'))
+  check('"I don\'t eat pork" in the likes box adds nothing and is handed back', like("I don't eat pork").foods.length === 0 && like("I don't eat pork").unread.length === 1, like("I don't eat pork"))
+  // THE DANGEROUS HALF: a like that names two foods must not leave the second one out, and the other way round.
+  check('"I love pizza and pasta" under foods to avoid leaves NEITHER out', avoid('I love pizza and pasta').foods.length === 0 && avoid('I love pizza and pasta').unread.join() === 'I love pizza and pasta', avoid('I love pizza and pasta'))
+  check('"I don\'t eat pork, prawns" under foods you like likes NEITHER', like("I don't eat pork, prawns").foods.length === 0 && like("I don't eat pork, prawns").unread.length === 1, like("I don't eat pork, prawns"))
+  check('a lead-in part-way through is read too: "pork, I don\'t eat prawns" is two foods', avoid("pork, I don't eat prawns").foods.join() === 'pork,prawns' && avoid("pork, I don't eat prawns").unread.length === 0, avoid("pork, I don't eat prawns"))
+  check('...and the other box\'s words part-way through are handed back, the food before them kept', avoid('pork, big fan of sushi').foods.join() === 'pork' && avoid('pork, big fan of sushi').unread.join() === 'big fan of sushi', avoid('pork, big fan of sushi'))
+  check('a mixed answer adds nothing rather than guess which half is which', avoid('prawns but I like crab').foods.length === 0 && avoid('fish. I love chicken').foods.length === 0, [avoid('prawns but I like crab'), avoid('fish. I love chicken')])
+  check('a diet typed as a food ("I\'m vegetarian") is not saved as one', avoid("I'm vegetarian").foods.length === 0 && avoid("I'm vegetarian").unread.length === 1, avoid("I'm vegetarian"))
+  check('"none" clears and reports nothing unread', avoid('none').foods.length === 0 && avoid('none').unread.length === 0)
+  // THE LIKES BOX: its own way of saying it, commas only ("chicken and rice" is one meal).
+  check('"I love pizza" in the likes box is the like pizza', like('I love pizza').foods.join() === 'pizza' && like('my favourite is lasagne').foods.join() === 'lasagne' && like("I'm a big fan of thai green curry").foods.join() === 'thai green curry')
+  check('...and a likes list splits on commas, never on "and"', like('salmon, curry').foods.join() === 'salmon,curry' && like('chicken and rice').foods.join() === 'chicken and rice')
+  // THE SENTENCE THE SCREEN SAYS.
+  check('nothing unread: no sentence', unreadFoodLine([], 'avoid') === null && unreadFoodLine([], 'like') === null)
+  const said = unreadFoodLine(['I love pizza'], 'avoid') ?? ''
+  check('the avoid box quotes what it could not read, says nothing was added, and shows how to type it', said.includes('"I love pizza"') && /nothing was added/.test(said) && /like "pork"/.test(said), said)
+  check('the likes box says its own', /food you like/.test(unreadFoodLine(['I hate olives'], 'like') ?? ''))
+  // WIRED: both Profile boxes and setup's diet screen read through it (source; verify:profile-fixes drives the box).
+  const profileSrc = code('src/components/ProfileScreen.tsx')
+  check('Profile\'s Foods to avoid and Foods you like boxes both read as food lists', /saveDislikedFoods\}[^>]*foodSide="avoid"/.test(profileSrc) && /saveLikedFoods\}[^>]*foodSide="like"/.test(profileSrc))
+  check('...and the box shows the unread line and keeps the unread words', /unreadFoodLine\(read\.unread, foodSide\)/.test(profileSrc) && /setInput\(read\.unread\.join\(', '\)\)/.test(profileSrc) && profileSrc.includes('data-testid="food-list-unread"'))
+  const setupSrc = code('src/components/onboarding/ConversationalOnboarding.tsx')
+  const at = setupSrc.indexOf("readFoodList(companion.value, 'avoid')")
+  check('setup\'s "anything else to leave out" holds the screen on words it cannot read, before anything is recorded',
+    at > 0 && /unreadFoodLine\(typed\.unread, 'avoid'\)[\s\S]{0,260}return/.test(setupSrc.slice(at, at + 700)) && setupSrc.indexOf('applySlot(ws, companion.key', at) > setupSrc.indexOf('return', at))
 }
 
 console.log(`\n${ran} checks ran.`)

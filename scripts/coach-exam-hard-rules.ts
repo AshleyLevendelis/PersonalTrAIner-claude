@@ -2,6 +2,7 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { resolveExerciseName } from '../src/lib/set-parse'
+import { appAsksFirst, type AppAsk } from '../src/lib/app-asks-first'
 
 // ---------------------------------------------------------------------------
 // TIER A OF THE COACH EXAM — the rules a machine can decide, with no model and
@@ -43,6 +44,22 @@ export interface Turn {
   refused?: { tool: string; rule: string } | null
 }
 
+/**
+ * THE OFFER HE WOULD ACTUALLY SEE (19 Nov 2026). The exam records what the coach's SERVER returned; three of his
+ * rulings are held on the phone after that, where the app shows a question in place of the coach's offer
+ * (src/lib/app-asks-first.ts, the chat's own function). The run of 18 Nov 2026 counted all three as the coach breaking
+ * a rule: three of its five "breaches" were turns on which he would have been asked, exactly as ruled. So the marker
+ * asks the same function the chat asks, and marks the turn he would have seen.
+ */
+export function appAsk(turn: Turn): AppAsk | null {
+  if (!turn.proposal?.kind) return null
+  return appAsksFirst(turn.proposal.kind, (turn.proposal.args ?? null) as Record<string, unknown> | null, turn.user)
+}
+/** The offer on screen after the app's own asks: null when the coach offered nothing, or the app asked instead. */
+export function offerShown(turn: Turn): string | null {
+  return appAsk(turn) ? null : (turn.proposal?.kind ?? null)
+}
+
 /** STAGE 2.4: COUNT WHAT THE APP CAUGHT. Each refusal is the coach reaching for the wrong kind of change, stopped by
  *  the app before a card was built. Not a breach (he was protected) but the thing to fix in the prompt, so the report
  *  counts them by tool, most-misused first. Pure, so test:coach-exam-grader can hold it. */
@@ -50,7 +67,9 @@ export function appRefusals(transcripts: Transcript[]): { total: number; byTool:
   const by = new Map<string, { count: number; rules: Set<string>; cases: Set<string> }>()
   let total = 0
   for (const t of transcripts) for (const turn of t.turns) {
-    const r = turn.refused
+    // An offer the app turned into its own question is caught too: the coach reached for it a turn early.
+    const asked = appAsk(turn)
+    const r = turn.refused ?? (asked ? { tool: turn.proposal!.kind, rule: `asked first: ${asked.why}` } : null)
     if (!r || !r.tool) continue
     total++
     const e = by.get(r.tool) ?? { count: 0, rules: new Set<string>(), cases: new Set<string>() }
@@ -136,6 +155,9 @@ const quoteOf = (text: string, match: string) =>
  *  than restated), and a second copy here would be the one that drifts. */
 export function coachLine(turn: Turn): string {
   if (turn.reply.trim()) return turn.reply
+  // What he SAW on a turn the app asked instead (19 Nov 2026): the app's own question, said as the app's.
+  const asked = appAsk(turn)
+  if (asked) return `(the app asked this itself, in place of the offer the coach reached for (${turn.proposal!.kind}): "${asked.text}")`
   if (turn.proposal?.kind) return `(no words — the app showed a confirm card: ${turn.proposal.kind}, waiting to be tapped)`
   if (turn.saved?.kind) return `(no words — the app saved it straight away: ${turn.saved.kind}, and showed its own receipt)`
   return '(no text at all)'
@@ -499,7 +521,7 @@ function wrongProposalKind(t: Transcript): Violation[] {
   return specs.flatMap(spec => {
     const turn = t.turns[spec.turn]
     if (!turn || turn.error) return []
-    const got = turn.proposal?.kind ?? null
+    const got = offerShown(turn)
     if (spec.oneOf.length === 0) {
       return got === null ? [] : [{
         rule: 'wrong-proposal-kind',

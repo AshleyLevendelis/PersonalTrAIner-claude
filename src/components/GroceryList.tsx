@@ -29,7 +29,7 @@ import {
   DEFAULT_HORIZON_DAYS, type GroceryItemRow, type GroceryCategory,
 } from '@/lib/grocery-store'
 import {
-  GROCERY_AISLE_LABEL, trolleyToast, clearedToast, REBUILT_TOAST, REBUILD_OFFLINE_TOAST, buildListLabel,
+  GROCERY_AISLE_LABEL, trolleyToast, clearedToast, removedToast, REBUILT_TOAST, REBUILD_OFFLINE_TOAST, buildListLabel,
   MAX_GROCERY_QUANTITY, formatShoppingQuantity, stepperReadout, exactLabel, stepQuantity, purposeLine, mealRefLines,
   coverageSentence, readGroceryBuildMemo, writeGroceryBuildMemo, typedGroceryAmount, type GroceryBuildMemo,
 } from '@/lib/grocery-display'
@@ -281,6 +281,14 @@ export function GroceryList({ profileId, mealPools, targets, softLikedFoods, tod
     deleteItemLocal(item)
     setItems(prev => prev.filter(i => i.id !== item.id))
     if (expandedId === item.id) collapse()
+    // SAID, WITH AN UNDO (the Nutrition walk, 19 Nov 2026; the shape of his 8 Nov "Undo line" for Clear and Rebuild).
+    // Remove was the one way off the list that said nothing and could not be put back, and a removed item from the
+    // meals is deliberately never brought back by a rebuild, so a slip of the thumb lost it for good. Undo puts the
+    // row back exactly as it stood (its amount, its tick, and "not removed").
+    showToast(removedToast(item.display_name), () => {
+      restoreRowsLocal([item])
+      setItems(prev => (prev.some(i => i.id === item.id) ? prev : [...prev, item]))
+    })
   }
 
   const handleClearChecked = () => {

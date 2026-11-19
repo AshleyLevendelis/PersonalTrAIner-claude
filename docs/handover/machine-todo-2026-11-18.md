@@ -1,5 +1,6 @@
 ```
-Three jobs after the merge of 18 Nov 2026 (main is at 203517ad or later). You may READ production
+Three jobs after the merges of 18 Nov 2026 (main is at ce7e6de6 or later; the second merge added the allergy card,
+the weight history and the leftovers). You may READ production
 (sdkhuczcfnqqimdgfiks) and run the exam; you may NOT deploy, push migrations, or write SQL: those steps ask for a
 typed phrase and refuse without a terminal, so Ashley runs them himself. Paste every answer back to the cloud
 session word for word.
@@ -15,7 +16,7 @@ app has the new screens. Two more facts you need:
 
 == PART 1: the right code, and it parses ==
 1. git checkout main && git pull
-   `git log --oneline -1` must show 203517ad or later. Report the line.
+   `git log --oneline -1` must show ce7e6de6 or later. Report the line.
 2. npm run test:functions-parse
    MUST print "5 checks ran" and end "Every edge function file parses." (one of its lines says the coach's file
    is the big one, over 3,000 lines, so it read the real thing). If it fails, STOP and report the output: do not
@@ -27,7 +28,7 @@ app has the new screens. Two more facts you need:
    Report the UPDATED date of each. The last change on main to each (it needs a deploy if its date is earlier):
      chat-gemini        18 Nov 2026   <- certainly needs one
      onboarding-chat    16 Nov 2026
-     generate-meals     15 Nov 2026
+     generate-meals     18 Nov 2026   <- certainly needs one (the allergy rules)
      coach-reach-out    15 Nov 2026
      macro-calibration   6 Nov 2026
    For each that is older, tell Ashley to run in his own terminal (it asks him to type yes-production):
@@ -38,14 +39,15 @@ app has the new screens. Two more facts you need:
 4. Database changes. Read PRODUCTION's own record in the dashboard SQL editor (a read):
      select version from supabase_migrations.schema_migrations order by version desc limit 15;
    Compare with supabase/migrations. The newest; report any missing from PRODUCTION:
-     20261118120000_add_allergies (NEW since the merge, on the working branch only until it is merged),
+     20261118140000_add_session_effort (NEW, on the working branch until merged: the 1-10 on the summary),
+     20261118120000_add_allergies (NEW, on main since ce7e6de6: the allergy card on Profile needs it),
      20261117120000_add_chat_summary, 20261115120000_add_due_date, 20261114180000_add_plan_paused_since,
      20261114150000_health_conditions, 20261114120000_running_goal, 20261113140000_flexible_nutrition,
      20261113130000_enjoyed_activities, 20261113120000_coach_moment_log, 20261111120000_add_meals_elsewhere,
      20261109120000_add_date_of_birth
    If any are missing, Ashley runs `npm run db:push-both` himself (typed confirmation), then you run
-   `npm run test:schema-parity` and report its last lines. This pass added NO new migration; the list is only
-   because nobody has confirmed the earlier ones.
+   `npm run test:schema-parity` and report its last lines. The allergies one is certainly missing; the rest are
+   listed because nobody has confirmed them.
 
 == PART 3: the exam, ONLY after chat-gemini's UPDATED time has moved ==
 5. npm run coach-exam:run && npm run coach-exam:grade      (about 15-20 minutes; real coach, real judge)
