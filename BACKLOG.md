@@ -2,6 +2,42 @@
 
 Newest first. One line each.
 
+- [x] **PREGNANCY: THIRTEEN MORE MOVES LEFT OUT, AND THE WARM-UP NOW OBEYS THE RULE (18-19 Nov 2026, the full pass; found by a
+  tester who ticked Pregnant and was handed a flat dumbbell press).** His rule of 14 Nov ("no jumping or impact move,
+  no move lying flat") was held by a list checked against exercise NAMES; "Neutral-Grip Dumbbell Press" is a flat bench
+  press and its name does not say so. Every entry was read again by the position it is done in: two flat presses, the
+  floor leg curls, the rows hung face-up under a bar or table, the rows and extensions done lying face down on a pad,
+  the Nordic curl, running on the spot and the ball slam are now left out too (list and reasons in
+  `docs/plans/pregnancy-exercise-rules.md`, "Extended"). All on the safe side of his rule; the borderline ones (hanging
+  rows, pad-supported rows, the ball slam) are my call as a coach and his to reverse.
+  **THE BIGGER FINDING: the warm-up was never covered.** Measured: 75% of a pregnant trainee's warm-ups held a jump
+  ("Jumping Jacks & High Knees") and 15% a Glute Bridge. And the same gap for injuries: someone with a knee or ankle on
+  their list opened every session with jumping jacks while the session itself had every jump taken out. The opening
+  item now has a both-feet-on-the-floor twin of the same length ("March on the Spot & Side Steps", "Brisk Walk or March
+  on the Spot"), used while pregnant or when the plan would rule out a jump the item names for that person; a drill
+  lying flat is left out of the warm-up and the "feels tight" drills while pregnant. After: none.
+  **And the beginner circuit keeps its hinge**: the Glute Bridge had no alternative (now a standing hip hinge to a
+  wall), and an alternative is described in its own words (a Wall Sit had read "sit to a chair and stand back up").
+  COST, same run: no week lost a squat, hinge, push or pull pattern; 97.7% of exercises kept. (My first count said 8
+  weeks lost the squat: the measurement had left out the leg press's pattern name. Corrected before it was believed.)
+  NOT covered, named: plank and push-up positions late in pregnancy (her midwife's call), running intervals, kettlebell
+  swings. `test:pregnancy-rules` (position-aware; detector proven on every listed move), `test:warmup-rules` (new, 29
+  checks; 15 mutations: 13 caught, 2 equivalent, named in the plan). Frontend only.
+- [x] **THE TESTING WEEK COUNTS HOWEVER IT WAS LOGGED (18 Nov 2026, the full pass; leftover B4 of the artifact list).** Only the
+  Finish button wrote a testing-week session into the printed plan. A session the six-hour window closed, one logged
+  through "I did it, not in the app", one the coach logged, or a set added after Finish left the Full Program on the
+  estimate while today's card read the logs: the two screens his 10 Sep ruling exists to keep agreeing. Now every
+  testing-week day already behind him is carried over when the plan loads, when the day turns and after a log lands,
+  by the same rule and with the same sentence on Home ("Week 2 now starts Bent-Over Dumbbell Row from your 34kg set").
+  Three decisions made while building, each mechanical (basis in `docs/plans/weights-leftovers-2026-11-18.md` §4):
+  **evidence is used once** (the testing week's slot carries the weight its later weeks were written from, so a weight
+  lowered afterwards is never quietly raised again on the next open; a heavier set logged later still counts);
+  **today is the Finish button's** (a testing session works up to its heaviest set); **only while it can matter** (not
+  once the plan has left that block).
+  FOUND BY A MISSED MUTATION: the first version ran against the copy of the plan kept on the phone, before the server's
+  copy arrived, and could have saved an old week over a newer one. It now waits for the server's plan.
+  `test:calibration-search` §9 (25 checks, 13 mutations: 12 caught, 1 equivalent), `verify:testing-week-sweep` (17
+  checks on the whole app, 8 browser mutations caught), screenshots read. Not verified: a real database.
 - [x] **CLAUDE.md NAMED SEVEN CHECKS THAT DO NOT EXIST, 18 Nov 2026 (the full pass, step 1).** Every check name in "What
   the app must have" was compared with the list of checks that can actually be run (458 names, 422 direct matches; the
   rest are section references, drivers named by their script, and these). Stale names corrected in place: `verify:walk`

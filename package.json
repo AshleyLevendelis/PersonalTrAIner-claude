@@ -283,6 +283,7 @@
     "test:chips-match-sets": "tsx scripts/test-chips-match-sets.ts",
     "test:single-implement": "tsx scripts/test-single-implement.ts",
     "test:calibration-search": "tsx scripts/test-calibration-search.ts",
+    "test:warmup-rules": "tsx scripts/test-warmup-rules.ts",
     "test:what-happened": "tsx scripts/test-what-happened.ts",
     "test:session-edit": "tsx scripts/test-session-edit.ts",
     "test:exercise-add": "tsx scripts/test-exercise-add.ts",

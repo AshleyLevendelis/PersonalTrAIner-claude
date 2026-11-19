@@ -1,5 +1,5 @@
 import { PAUSE_WORDS, isPausedOn, planPausedSince } from '@/lib/plan-pause'
-import { noteForProfile, lateInPregnancy, PREGNANCY_HOLD_NOTE } from '@/lib/health-conditions'
+import { noteForProfile, lateInPregnancy, PREGNANCY_HOLD_NOTE, isPregnant } from '@/lib/health-conditions'
 import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
@@ -433,8 +433,8 @@ export function TodayPanel({
     return w ? [...w.general, ...w.mobility].map(i => i.name) : []
   }, [workout?.warmup])
   const tightness = useMemo(
-    () => tightnessWarmup(tightAreas, profile?.injuries ?? [], warmupNames),
-    [tightAreas, profile?.injuries, warmupNames],
+    () => tightnessWarmup(tightAreas, profile?.injuries ?? [], warmupNames, !!profile && isPregnant(profile)),
+    [tightAreas, profile, warmupNames],
   )
   // WHAT THEY DID INSTEAD, if they told the coach. The week strip has drawn
   // this correctly all along; this panel read nothing, so on 8 Sep 2026 it

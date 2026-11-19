@@ -64,11 +64,14 @@ export const SHORTEST_WALK_ON_STRENGTH_DAY = 15
  * first is ruled out by an injury or a ban. A pattern with neither is left out
  * and the day's note says so.
  */
-const CIRCUIT: { pattern: 'squat' | 'push' | 'pull' | 'hinge'; first: string; instead?: string; cue: string }[] = [
-  { pattern: 'squat', first: 'Box Squat (Bodyweight)', instead: 'Wall Sit', cue: 'sit to a chair and stand back up' },
+const CIRCUIT: { pattern: 'squat' | 'push' | 'pull' | 'hinge'; first: string; instead?: string; cue: string; insteadCue?: string }[] = [
+  // EACH MOVE ITS OWN WORDS (18 Nov 2026): the alternative used to borrow the first move's cue, so a Wall Sit was
+  // described as "sit to a chair and stand back up". And the hinge had no alternative at all, so anyone the Glute
+  // Bridge is ruled out for (it lies flat on the back: pregnancy) simply lost the pattern.
+  { pattern: 'squat', first: 'Box Squat (Bodyweight)', instead: 'Wall Sit', cue: 'sit to a chair and stand back up', insteadCue: 'back against a wall, knees bent as far as is comfortable' },
   { pattern: 'push', first: 'Incline Push-Ups', cue: 'hands on a worktop or the back of a sofa' },
   { pattern: 'pull', first: 'Towel Row', cue: 'a towel round a sturdy door handle' },
-  { pattern: 'hinge', first: 'Glute Bridge', cue: 'lying on your back, feet flat' },
+  { pattern: 'hinge', first: 'Glute Bridge', instead: 'Bodyweight Hip Hinge to Wall', cue: 'lying on your back, feet flat', insteadCue: 'stand a foot from a wall and push your hips back to touch it' },
 ]
 
 function homeStrengthReps(weekNumber: number, timed: boolean): string {
@@ -118,7 +121,7 @@ export function homeCircuit(
   const leftOut: string[] = []
   for (const move of CIRCUIT) {
     const pick = [move.first, move.instead].find((n): n is string => !!n && eligible(n))
-    const slot = pick ? slotFor(pick, weekNumber, move.cue, move.pattern) : null
+    const slot = pick ? slotFor(pick, weekNumber, pick === move.first ? move.cue : move.insteadCue ?? move.cue, move.pattern) : null
     if (slot) exercises.push(slot)
     else leftOut.push(move.pattern)
   }
