@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
-import { hardRuleViolations, appRefusals, realTabNames, coachLine, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
+import { hardRuleViolations, appRefusals, appAsk, offerShown, realTabNames, coachLine, type Transcript, type Violation } from './coach-exam-hard-rules.ts'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -417,6 +417,50 @@ console.log('\n[13] what the app caught (stage 2.4): refusals are counted by too
   else fail('refusal cases/rules', got.byTool)
   if (rules(a).length === 0) pass('a refused turn with words is never a hard-rule breach (not silence)')
   else fail('a refused turn tripped a hard rule', rules(a))
+}
+
+// --- 14. THE OFFER HE WOULD ACTUALLY SEE (19 Nov 2026) ----------------------------------------------------------
+// The run of 18 Nov 2026 marked five breaches; three were turns on which the APP asks a question in place of the
+// coach's offer, exactly as he ruled (a bare dislike, a usual meal with no amounts, a race with no date). The marker
+// now asks the chat's own function. The three turns below are those three, as the run recorded them.
+console.log('\n14. An offer the app turns into its own question is marked as the question')
+{
+  const tr = (name: string, checks: Transcript['checks'], turns: Transcript['turns']): Transcript => ({ case: name, checks, turns })
+  const dislike = tr('dislike', { expectsProposalKind: [{ turn: 0, oneOf: [] }] }, [
+    { user: "not really a fan of the salmon you've put in tonight", reply: '', proposal: { kind: 'propose_meal_swap', args: { meal_slot: 'dinner' } } },
+  ])
+  const usual = tr('usual', { expectsProposalKind: [{ turn: 0, oneOf: [] }] }, [
+    { user: 'most weeknights I do salmon with rice and broccoli, can that be my dinner', reply: '', proposal: { kind: 'propose_meal_addition', args: { meal_slot: 'dinner' } } },
+  ])
+  const race = tr('race', { expectsProposalKind: [{ turn: 0, oneOf: [] }] }, [
+    { user: "I've signed up for a 10k", reply: '', proposal: { kind: 'propose_running_goal', args: { goal: '10k', race_date: null } } },
+  ])
+  for (const [name, t, why] of [['a bare dislike', dislike, 'dislike'], ['a usual meal with no amounts', usual, 'usual_meal'], ['a race with no date', race, 'race_date']] as const) {
+    if (appAsk(t.turns[0])?.why === why && offerShown(t.turns[0]) === null) pass(`${name}: the app asks, so no offer is on screen`)
+    else fail(`${name} was not read as the app asking`, { ask: appAsk(t.turns[0]), shown: offerShown(t.turns[0]) })
+    if (rules(t).length === 0) pass(`...and a turn that had to ask first is not a breach`)
+    else fail(`${name} still breaches`, rules(t))
+    if (/the app asked this itself/.test(coachLine(t.turns[0])) && coachLine(t.turns[0]).includes('?')) pass('...and the judge reads the question he would have seen')
+    else fail('the judge is not shown the app\'s question', coachLine(t.turns[0]))
+  }
+  // THE OTHER DIRECTION, so the three above cannot pass by the rule going quiet: the same offers on words that do
+  // NOT make the app ask are still offers, and still a breach on a turn that had to ask first.
+  const asked = tr('asked-for-the-swap', { expectsProposalKind: [{ turn: 0, oneOf: [] }] }, [
+    { user: "not a fan of the salmon tonight, swap it for something else", reply: '', proposal: { kind: 'propose_meal_swap', args: {} } },
+  ])
+  if (appAsk(asked.turns[0]) === null && offerShown(asked.turns[0]) === 'propose_meal_swap' && rules(asked).includes('wrong-proposal-kind')) pass('an offer the app would show is still an offer, and still a breach where the turn had to ask')
+  else fail('an offer the app shows was let off', { ask: appAsk(asked.turns[0]), rules: rules(asked) })
+  const dated = tr('race-with-date', { expectsProposalKind: [{ turn: 0, oneOf: ['propose_running_goal'] }] }, [
+    { user: "I've signed up for a 10k on 14 March", reply: '', proposal: { kind: 'propose_running_goal', args: { goal: '10k', race_date: '2027-03-14' } } },
+  ])
+  if (appAsk(dated.turns[0]) === null && rules(dated).length === 0) pass('a race WITH its date is the offer, and passes a turn that had to reach it')
+  else fail('a dated race was read as the app asking', { ask: appAsk(dated.turns[0]), rules: rules(dated) })
+  const wanted = tr('card-wanted-app-asked', { expectsProposalKind: [{ turn: 0, oneOf: ['propose_meal_swap'] }] }, [dislike.turns[0]])
+  if (rules(wanted).includes('wrong-proposal-kind')) pass('a turn that had to reach an offer, where the app asks instead, shows no offer and is a breach')
+  else fail('an app-ask satisfied a turn that needed an offer', rules(wanted))
+  const caught = appRefusals([dislike, usual, race, asked])
+  if (caught.total === 3 && caught.byTool.every(b => b.rules.every(r => r.startsWith('asked first: ')))) pass('each one is counted under "the app caught", by the offer the coach reached for')
+  else fail('app asks were not counted as caught', caught)
 }
 
 console.log('')

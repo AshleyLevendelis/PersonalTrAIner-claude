@@ -126,11 +126,13 @@ export function voicePrompt(draft: string, userMessage: string, why: string | nu
     '- Keep the answer first, then ONE short reason (the why). Drop everything else.',
     '- If the draft offers several options, pick the one that suits them best, say why, and mention there are other options. No list of options.',
     isHowTo(userMessage) ? '- A how-to may stay as up to three short numbered steps.' : '- No lists, no numbered lines, no bullets.',
-    '- At most one question, and only if their answer changes what happens next. Otherwise end on the answer.',
+    '- Start with the answer, or with a reaction to one specific thing they said. Never a stock opener ("Great question", "I hear you", "Awesome").',
+    '- At most one question, and only if their answer changes what happens next. Otherwise end on the answer. Never a stock closer ("How does that sound?", "Does that make sense?", "What do you think?"). A suggestion they must agree to ends as one short question naming the thing ("Want me to move it to Thursday?").',
+    '- Never say you will change or have changed their plan ("I\'m going to drop the volume"): keep it an offer.',
     '- Keep every fact, number, name and food exactly as in the draft. Add nothing new: no new number, food, exercise or claim.',
     ...(() => { const keep = safetySentencesOf(draft); return keep.length ? [`- Keep these sentences word for word, because they are about their safety: ${keep.map(k => `"${k}"`).join(' ')}`] : [] })(),
     '- Keep every marker in square brackets ([QUICK_REPLIES: ...], [LESSON: ...], [ACTION: ...]) exactly as written, at the end.',
-    '- No bold, no headers. At most one emoji. Never mention being an AI or that you are editing.',
+    '- No bold, no headers. No emoji on advice or an explanation; one at most on a hello, a win or a sign-off. Use their name at most once. Never mention being an AI or that you are editing.',
     'Reply with the message only.',
   ].filter(Boolean).join('\n')
 }

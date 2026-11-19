@@ -3,7 +3,7 @@
 // his message right (his own "this evening" among them); the app's sentences; and the wiring on both sides, in front of
 // every tool's own branch. The real function is driven by verify:chat-silent-tools, the screen by verify:chat-one-off-sport.
 import { readFileSync } from 'node:fs'
-import { OFFER_RULES, CARD_KIND_TOOL, isOneOffMention, saysForGood, offerWordsProblem } from '../src/lib/offer-rules'
+import { OFFER_RULES, CARD_KIND_TOOL, isOneOffMention, saysForGood, offerWordsProblem, asksToPause } from '../src/lib/offer-rules'
 import { isHedged } from '../src/lib/definite-mention'
 
 let ran = 0
@@ -94,6 +94,31 @@ for (const f of ['offer-rules', 'definite-mention']) {
   const copy = readFileSync(`supabase/functions/_shared/${f}.ts`, 'utf8')
   check(`the server reads the same ${f} (synced copy)`, copy.includes(readFileSync(`src/lib/${f}.ts`, 'utf8')))
 }
+
+// A PAUSE IS NOT A KIT CHANGE (coach exam, 18 Nov 2026): "can you hold everything until I'm home?" was answered with a
+// fortnight of bodyweight sessions. The kit offer is refused when his words ask for his training to be held, and the
+// app's own pause offer reads the same words the same way.
+console.log('\nA pause asked for is never answered with different kit')
+const HOLD = "I'm away for a fortnight from Saturday with no gym, can you hold everything until I'm home?"
+check('the exam\'s message asks for a pause', asksToPause(HOLD))
+const kit = offerWordsProblem('propose_equipment_adaptation', HOLD, { hedged: false })
+check('...so the kit offer is refused, by its own rule', kit?.rule === 'kit', kit)
+check('...and the app\'s sentence offers both ways on, as a question', !!kit && /pause it until you're back/.test(kit.say) && /whatever kit you'll have/.test(kit.say) && kit.say.trim().endsWith('?'), kit?.say)
+check('...and promises nothing was changed', !!kit && /left your plan as it is/.test(kit.say))
+for (const yes of ['pause my plan for a week', 'put everything on hold till March', 'stop my workouts for a bit', 'freeze my training while I move house', 'can you put my training on hold', 'I need a break from the plan']) {
+  check(`a pause: "${yes}"`, asksToPause(yes))
+}
+for (const no of ['hotel gym for a week, only dumbbells', "I'm away from my gym until Friday", "don't pause anything", 'hold the bar tighter', 'I need to stop my session early today', 'pause at the bottom of each rep', 'stop the timer']) {
+  check(`not a pause: "${no}"`, !asksToPause(no) && offerWordsProblem('propose_equipment_adaptation', no, { hedged: false }) === null)
+}
+check('a pause offer itself is never refused by this rule', offerWordsProblem('propose_plan_pause', HOLD, { hedged: false }) === null)
+// ONE READER: the app's own pause offer (raised when the coach's turn carried no offer) calls this same function. It
+// lives in the chat, which loads on demand: a copy in a module the first screen loads would have pulled the whole
+// actions list into the first download (measured 19 Nov 2026: +10 kB on the app's main file).
+const chatSrc = readFileSync('src/components/ChatAssistant.tsx', 'utf8')
+check('the app\'s own pause offer reads the same words through the same function', /asksToPause\(userText\) && !profile\.plan_paused_since/.test(chatSrc) && /import \{[^}]*\basksToPause\b[^}]*\} from '@\/lib\/offer-rules'/.test(chatSrc))
+check('...and no second reader of "pause" is left in the app', !/askedToPause/.test(chatSrc) && !/askedToPause/.test(readFileSync('src/lib/health-conditions.ts', 'utf8')))
+check('the coach\'s server holds the same rule (synced copy)', /propose_equipment_adaptation: \{[^}]*rule: \{ words: \['kit'\] \}/.test(readFileSync('supabase/functions/_shared/offer-rules.ts', 'utf8')))
 
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} FAILED.`); process.exit(1) }

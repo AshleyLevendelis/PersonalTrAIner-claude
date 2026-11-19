@@ -1,0 +1,22 @@
+{
+  "name": "talk-away-train-or-pause",
+  "why": "Coach exam 18 Nov 2026: 'hold everything until I'm home' was answered with a fortnight of bodyweight sessions. Away is not always a kit change. Turn 0 says he is away and says nothing about training, so the coach asks which, once: train with what is there, or pause until he is back. No offer yet. Turn 1 answers pause, and must reach the pause, never different kit, a rest day or moved sessions.",
+  "messages": [
+    "I'm in Lisbon with work all of next week",
+    "pause it till I'm back please"
+  ],
+  "checks": {
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      },
+      {
+        "turn": 1,
+        "oneOf": [
+          "propose_plan_pause"
+        ]
+      }
+    ]
+  }
+}

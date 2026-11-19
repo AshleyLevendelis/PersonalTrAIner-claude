@@ -181,11 +181,3 @@ export function saidPregnant(text: string): boolean {
     || /\b(i'?m|we'?re)\s+expecting\s+(a\s+)?(baby|twins)\b/.test(t)
 }
 
-/** "Pause my plan", "can you pause my training for a week", "I need a break from the plan". */
-export function askedToPause(text: string): boolean {
-  const t = text.toLowerCase()
-  if (/\b(don'?t|do not|never)\s+pause\b/.test(t)) return false
-  return /\bpause\s+(my|the)\s+(plan|training|program(me)?|workouts?|sessions?)\b/.test(t)
-    || /\b(put|have)\s+(my|the)\s+(plan|training)\s+on\s+(hold|pause)\b/.test(t)
-    || /\b(take|need)\s+a\s+break\s+from\s+(my|the)\s+(plan|training)\b/.test(t)
-}

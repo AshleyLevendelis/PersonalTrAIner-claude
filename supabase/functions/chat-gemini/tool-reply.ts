@@ -258,8 +258,10 @@ export interface PlainReplyOptions {
   refuse?: (text: string) => string | null;
   /** The floor to use when `refuse` fired, rather than the generic one. */
   refusedFloor?: string;
-  /** Replaces PLAIN_TURN_NUDGE when the retry needs to say what was wrong. */
+  /** Replaces PLAIN_CLAIM_NUDGE: what the retry is told when the first words were refused as a claim. */
   nudge?: string;
+  /** Replaces PLAIN_TURN_NUDGE: what the retry is told when the turn had no words at all, and why. */
+  silentNudge?: string;
   /** Fact checks (the day as it is), each with its own retry wording and its own floor. Run after `forbid` and `refuse`. */
   checks?: ReplyCheck[];
   log?: (...args: unknown[]) => void;
@@ -288,7 +290,7 @@ export async function resolvePlainReply(opts: PlainReplyOptions): Promise<ToolRe
 
   let refused = false;
   let refusedFloor: string | undefined = undefined;
-  let nudge = PLAIN_TURN_NUDGE;
+  let nudge = opts.silentNudge ?? PLAIN_TURN_NUDGE;
   const own = sanitizeReply(textOf(opts.firstParts));
   if (own) {
     // THE ONE CHECK THAT WAS MISSING. guardReason already existed, already

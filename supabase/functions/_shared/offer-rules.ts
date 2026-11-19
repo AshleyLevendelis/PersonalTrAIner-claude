@@ -22,6 +22,8 @@
 //   standing  a lasting change. Not offered when his message is about ONE occasion and says nothing regular.
 //   today     a change for one day. Not offered when he asked for it FROM NOW ON (that is a different change).
 //   definite  something done on a day. Not offered off a hedge ("I might", "maybe"); his 15 Sep 2026 ruling.
+//   kit       training with different kit for a while. Not offered when he asked to HOLD or PAUSE his training
+//             (exam, 18 Nov 2026: "can you hold everything until I'm home?" got a fortnight of bodyweight sessions).
 //   none      no words rule, with the reason: what checks it instead.
 // A rule can be several. When one fails nothing is built: the coach answers what he said in its own words (his ruling
 // 17 Nov 2026, "Coach answers"), the app's sentence below being the fallback.
@@ -30,7 +32,7 @@
 // definite-mention.ts (also synced); the caller passes its answer in.
 // ---------------------------------------------------------------------------
 
-export type WordsRule = 'standing' | 'today' | 'definite'
+export type WordsRule = 'standing' | 'today' | 'definite' | 'kit'
 export type OfferRule = { words: readonly WordsRule[] } | { none: string }
 
 const S: OfferRule = { words: ['standing'] }
@@ -98,7 +100,7 @@ export const COACH_ACTIONS: Record<string, CoachAction> = {
   propose_exercise_reorder: { family: 'exercise', screen: 'screen', rule: none('one day\'s order; a superset moves together') },
   propose_injury_adaptation: { family: 'plan', screen: 'screen', card: 'propose_injury_adaptation', rule: none('pain is triaged first (edit-reason); a sharp one changes nothing') },
   propose_injury_recovered: { family: 'plan', screen: 'screen', card: 'propose_injury_recovered', rule: none('ends a change he has; nothing new is added') },
-  propose_equipment_adaptation: { family: 'plan', screen: 'screen', card: 'propose_equipment_adaptation', rule: none('a temporary kit change, seven days, stated on the card') },
+  propose_equipment_adaptation: { family: 'plan', screen: 'screen', card: 'propose_equipment_adaptation', rule: { words: ['kit'] } },
   propose_missed_session: { family: 'day', screen: 'screen', card: 'propose_missed_session', rule: none('a past day only; offer-still-holds refuses a trained day') },
   propose_circuit_log: { family: 'logging', screen: 'screen', card: 'propose_circuit_log', rule: none('built only from rounds, times and effort in his words (message-evidence)') },
   propose_cardio_log: { family: 'logging', screen: 'screen', card: 'propose_cardio_log', rule: none('past-tense cardio in his words (message-evidence)') },
@@ -153,6 +155,23 @@ export function scopeChoiceNeeded(scope: string, message: string | null | undefi
   return true
 }
 
+/**
+ * HE ASKED FOR HIS TRAINING TO BE HELD, NOT CHANGED: "pause my plan", "hold everything until I'm home", "put my
+ * training on hold", "stop my workouts for a bit". One reader for the coach's checkpoint and for the app's own pause
+ * offer (the chat calls this directly), so the two cannot disagree about what a pause sounds like.
+ */
+export function asksToPause(message: string | null | undefined): boolean {
+  const t = String(message ?? '').toLowerCase()
+  if (/\b(don'?t|do not|never)\s+(pause|hold|stop|freeze)\b/.test(t)) return false
+  return /\bpause\s+(my|the)\s+(plan|training|program(me)?|workouts?|sessions?)\b/.test(t)
+    || /\b(put|have)\s+(my|the)\s+(plan|training)\s+on\s+(hold|pause)\b/.test(t)
+    || /\b(take|need)\s+a\s+break\s+from\s+(my|the)\s+(plan|training)\b/.test(t)
+    || /\b(hold|pause|freeze|stop)\s+(everything|it\s+all|all\s+of\s+it)\b/.test(t)
+    || /\bput\s+(everything|it\s+all)\s+on\s+(hold|pause)\b/.test(t)
+    || /\b(hold|freeze|suspend)\s+(my|the)\s+(plan|training|program(me)?|workouts?|sessions?)\b/.test(t)
+    || /\bstop\s+(my|the)\s+(plan|training|program(me)?|workouts)\s+(for|until|till|while)\b/.test(t)
+}
+
 export interface WordsProblem {
   rule: WordsRule
   /** For the coach's retry: what was wrong, in a clause. */
@@ -181,6 +200,10 @@ export function offerWordsProblem(tool: string, message: string | null | undefin
     if (w === 'today' && saysForGood(message)) {
       return { rule: w, why: 'they asked for this from now on, and the change you reached for only covers one day',
         say: "I've left your plan as it is: that change would only cover one day. Tell me it's from now on and I'll change the plan itself." }
+    }
+    if (w === 'kit' && asksToPause(message)) {
+      return { rule: w, why: 'they asked you to HOLD or PAUSE their training while they are away, not to train with different kit; the pause is the change to offer',
+        say: "I've left your plan as it is. I can pause it until you're back, so nothing counts as missed, or fit your sessions to whatever kit you'll have. Which would you like?" }
     }
     if (w === 'definite' && opts.hedged) {
       return { rule: w, why: 'they only said they might, so nothing goes on their plan until they decide',

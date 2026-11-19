@@ -12,8 +12,10 @@ import { computeTargets } from '../src/lib/nutrition-targets'
 import { getMacroDerivation } from '../src/lib/macro-calculator'
 import {
   nutritionGoalOf, mealRestrictionsOf, pregnancyWeeksOn, lateInPregnancy, noteForProfile, healthConditionLine,
-  saidPregnant, askedToPause, PREGNANCY_CALORIE_LINE, LATE_PREGNANCY_SET_RPE_CEILING,
+  saidPregnant, PREGNANCY_CALORIE_LINE, LATE_PREGNANCY_SET_RPE_CEILING,
 } from '../src/lib/health-conditions'
+// 19 Nov 2026: what a pause sounds like is read by ONE function, shared with the coach's checkpoint (offer-rules.ts).
+import { asksToPause } from '../src/lib/offer-rules'
 import { validateMealAgainstDiet, DIETARY_PREFERENCES, SELECTABLE_DIETARY_PREFERENCES } from '../src/lib/diet-rules'
 import { DIETARY_OPTIONS } from '../src/lib/onboarding-slots'
 import { parseIngredientLines } from '../src/lib/portion-scaler'
@@ -125,11 +127,11 @@ console.log('\n6. The chat offers what the coach only talked about')
   check('"I\'m 20 weeks pregnant" / "we\'re expecting a baby" are heard; "my wife is pregnant", "not pregnant" are not',
     saidPregnant("I'm 20 weeks pregnant") && saidPregnant("we're expecting a baby") && !saidPregnant('my wife is pregnant') && !saidPregnant("I'm not pregnant"))
   check('"pause my plan for a week" is heard; "don\'t pause my plan", "pause the music" are not',
-    askedToPause("Can you pause my plan for a week? I'm going on holiday") && !askedToPause("don't pause my plan") && !askedToPause('pause the music'))
+    asksToPause("Can you pause my plan for a week? I'm going on holiday") && !asksToPause("don't pause my plan") && !asksToPause('pause the music'))
   const chat = read('src/components/ChatAssistant.tsx')
   check('with no card in the turn, the app raises the tick card or the pause card itself',
     /if \(!failed && !pendingAction\) \{\s*if \(saidPregnant\(userText\) && !isPregnant\(profile\)\) await offerFromApp\('propose_pregnancy_tick'/.test(chat)
-    && /askedToPause\(userText\) && !profile\.plan_paused_since/.test(chat))
+    && /asksToPause\(userText\) && !profile\.plan_paused_since/.test(chat))
   check('...and the tick card writes the same column Profile does, then offers the same rebuild',
     /row\.kind === 'propose_pregnancy_tick'/.test(chat) && /update\(\{ health_conditions: next \}\)/.test(chat) && /detectPlanInvalidation\(profile, \{ health_conditions: next \}\)/.test(chat))
 }

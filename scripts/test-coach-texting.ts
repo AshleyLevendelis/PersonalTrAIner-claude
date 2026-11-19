@@ -87,7 +87,9 @@ async function main() {
   const serveBody = serveStart < 0 ? '' : src.slice(serveStart, src.indexOf('\n});', serveStart) + 4)
   // 17 Nov 2026: the cleaned response may be wrapped by a later check on the way out (guardPastLifts), which only
   // ever takes a sentence out of the same reply; the response is still the cleaned one.
-  const cleanedRes = serveBody.match(/(?:const|let)\s+(\w+)\s*=\s*await\s+(?:guardPastLifts\(\s*await\s+)?cleanCoachResponse\(\s*await\s+handleChatRequest\(req\)\s*\)/)
+  // 19 Nov 2026: the door is also handed what it needs to know about the conversation (his name, the coach's last
+  // few messages), as a second argument read off the request. The handler's result is still what goes through it.
+  const cleanedRes = serveBody.match(/(?:const|let)\s+(\w+)\s*=\s*await\s+(?:guardPastLifts\(\s*await\s+)?cleanCoachResponse\(\s*await\s+handleChatRequest\(req\)\s*(?:,\s*[\w.]+\([^()]*\))?\s*\)/)
   const inline = /Deno\.serve\(\s*async\s*\(req[^)]*\)\s*=>\s*cleanCoachResponse\(\s*await\s+handleChatRequest\(req\)\s*\)\s*\)/.test(src)
   const returns = [...serveBody.matchAll(/\breturn\s+([^;\n]+)/g)].map(m => m[1].trim())
   // 18 Nov 2026: RED SINCE THE PHOTO BUILD (17 Nov), found by running it. The cleaned response is now wrapped a second

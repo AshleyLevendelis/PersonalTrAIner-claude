@@ -2,6 +2,53 @@
 
 Newest first. One line each.
 
+- [x] **HOW THE COACH TALKS: TONE, QUESTIONS, ENDINGS, AND WHAT KEEPS PEOPLE TALKING TO IT (19 Nov 2026, his request, decided on
+  his "If you're unsure about something go with your recommendations").** His words: "improve the chat to give the user
+  the best ux the way the chat speaks the tone it uses, the questions it asks, the information it gives the way it keeps
+  the conversation going ... what will keep a user engaged and keep coming back". Plan, evidence and every decision:
+  `docs/plans/chat-voice-2026-11-19.md`.
+  EVIDENCE: the exam he ran on 18 Nov (59 conversations, 2.33 of 3; `asks` lowest at 1.71). Read reply by reply: 11 of
+  19 closing questions were padding ("How does that sound?"); a fix came before a question in 6 conversations; a change
+  was announced with nothing on screen ("I'm going to drop the set volume across your workouts"); about 12 replies hung
+  an emoji on advice; "I hear you, Ashley" opened three replies running; an internal name ("propose_schedule_change")
+  and a raw tag ("[START_TIMER: ...]") reached him; one reply blamed him ("say it again in your own words"); a personal
+  best was logged with no words.
+  CAUSE, for most of it: the coach's instructions contradicted themselves in five places ("give human coach advice
+  first" against "ask first and alone"; questions praised as what makes a coach against "a question only when the
+  answer matters"; examples ending "Want the rest of it?"; a pivot back to training REQUIRED after a quick fact; no
+  section for a pause at all, and "I'm away" always sent to a change of kit).
+  DECIDED (mine): what keeps someone talking is being answered specifically, being easy to answer, and being
+  remembered, not more questions. Every reply ends in the first of four ways that is true: the one question it needs;
+  an OFFER as one short question with buttons; a next step on one or two BUTTONS written as what he would say (the one
+  new behaviour: "Want me to go deeper?" becomes a "Go deeper" button); or it stops on the answer. "Tell me how it goes"
+  only when the coach will use the answer, and it picks that thread up when he comes back. Struggling is asked about
+  before it is fixed. A change is offered, never announced. A pause is a pause. No tacked-on pivot. His rulings kept:
+  a question only when the answer matters, short steps, no new cards, a why on every answer, the warm coach, the second
+  pass, safety wording never edited.
+  HELD IN CODE (what a rule can see; whether a specific question earns its place stays the exam's): on the coach's
+  server an internal name becomes plain words, an unknown tag goes, one emoji at most and none on a reply over 160
+  characters, a CLOSED list of stock openers and closers goes (a question about HIM is never touched; safety wording
+  keeps every sentence), his name as address once and not if just used, a promise with no tool behind it is sent back
+  to be said as an offer, and a turn that reached for a tool that does not exist is answered in words. The kit offer is
+  refused when he asked for a hold or a pause, through the same reader the app's own pause offer uses. On the phone: a
+  workout logged by chat gets its own line and a best is named with its unit; the app's "Love that." question was
+  reworded.
+  THE EXAM MARKER WAS WRONG ABOUT THREE OF ITS FIVE BREACHES: on those turns the APP asks a question in place of the
+  coach's offer (a bare dislike, a usual meal with no amounts, a race with no date), as he ruled, and the exam sees only
+  what the coach's server returned. The three decisions are now one function the chat and the marker both call. The
+  18 Nov conversations re-marked: 2 real breaches, 3 "the app caught".
+  FOUND BY THE BROWSER, NOT BY ANY SOURCE CHECK: the Undo line was written to a field the screen does not draw (my
+  source check pinned the wrong field name and passed), and the put-back card read "Logged · Wednesday was taken back".
+  And measured before deciding: removing "That's what we love to hear" left a reply that never answered good news, so
+  it is not on the list.
+  VERIFIED HERE: `test:coach-tics` (new, 106 checks, 47 mutations all caught after three checks were added),
+  `test:chat-log-words` (new, 23, 16), `verify:chat-log-words` (new, 16 checks in a real browser; of 7 browser mutations 5 caught, 1 did not apply, and 1 changes nothing on screen at that moment, its twin being caught by the unit check),
+  `test:offer-rules` (+21, 8), `test:coach-exam-grader` §14 and `test:offer-fixes` (11 mutations), `test:coach-promises`
+  (floor check re-anchored on the property, 2 mutations), screenshots read.
+  NOT PROVEN: anything the coach's model now WRITES. That needs the `chat-gemini` deploy and an exam run on his
+  machine; four new questions mark it (`talk-*`) and the marking guide is unchanged, so 55 questions compare with
+  18 Nov. Open, his: the standing "meals cooked for me" reply (the exam question and the judge disagree); whether a
+  readiness check before a session is welcome.
 - [x] **"I DON'T EAT PORK" TYPED INTO THE AVOID BOX WAS SAVED AS A FOOD CALLED "i don t eat pork" (19 Nov 2026, the full pass;
   found by a tester in setup and on Profile).** The row showed on the list and protected nothing: measured, an avoided
   "pork" keeps out pork, bacon, ham, gammon, sausages and chorizo, and the sentence as it was saved kept out none of

@@ -1694,6 +1694,34 @@ menu" stays true when a copy is also left outside it.
 - **OPEN, HIS**: whether protein a little over or fat a little under with calories on target is a miss on a muscle-gain
   plan (his 18 Oct bands say yes); "usually contains" allergens on existing foods.
 
+### His chat brief of 19 Nov 2026 (`docs/plans/chat-voice-2026-11-19.md`; decisions mine, on his "go with your recommendations")
+- **What keeps him talking is a specific answer, an easy reply and being remembered, never more questions.** Every coach
+  reply ends in the first of four ways that is true: the one question it needs, first and alone; an OFFER as one short
+  question with buttons; a next step on one or two buttons written as what HE would say ("Go deeper"), with no question
+  sentence; or it stops on the answer. It narrows nothing of his 24 Sep "a question only when the answer matters".
+  Struggling is asked about before it is fixed; a change is offered, never announced; no tacked-on pivot after a quick
+  fact. Unproven until the exam runs after the `chat-gemini` deploy (four `talk-*` exam cases).
+- **The tics are taken out in code** (the coach's server, `stock-phrases.ts`): an internal name becomes plain words, an
+  unknown tag goes, one emoji at most and none on a reply over 160 characters, a CLOSED list of stock openers and
+  closers goes (a question about HIM is never touched; safety wording keeps every sentence), his name as address once
+  and not if just used. **A promise with no tool behind it** ("I'm going to drop your volume") is sent back to be said
+  as an offer, and a turn that reached for a tool that does not exist is answered in words, never "say it again in your
+  own words". `test:coach-tics`
+- **A pause is not a kit change**: the kit offer is refused when he asked for his training to be held or paused, and
+  the app's pause offer reads the same words through the same function. `test:offer-rules`
+- **A workout logged by chat gets a line of its own, and a best is named with its unit**; Undo takes the line back.
+  `test:chat-log-words`, `verify:chat-log-words`
+- **The exam marks the turn he would SEE**: where the app asks a question in place of the coach's offer (a bare dislike,
+  a usual meal with no amounts, a race with no date), the marker asks the chat's own function (`app-asks-first.ts`).
+  Three of the five breaches of 18 Nov were these. `test:coach-exam-grader` §14
+- **A SOURCE CHECK THAT NAMES A FIELD CAN PIN THE WRONG FIELD AND PASS.** 19 Nov 2026: the Undo line was written to
+  `text` where a message's words live in `content`; the check I wrote pinned `text`, passed, and the bubble never
+  changed. The browser driver found it in one run. For anything on screen, the driver is the proof; the source check
+  only says the branch exists.
+- **MEASURE A REMOVAL ON THE REAL REPLIES BEFORE SHIPPING THE LIST.** Same day: every candidate stock phrase was run
+  over the 64 real exam replies first. One ("That's what we love to hear") was the reply's only answer to good news,
+  and came off the list.
+
 ### His rulings of 17 Nov 2026
 - **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over
   marking once with both). The judge is stamped on the scores; scores marked by another judge are stale (re-grade the

@@ -1,6 +1,6 @@
 import { Fragment, useState, useRef, useEffect, useLayoutEffect, useCallback, type ReactNode } from 'react'
-import { offerWordsProblem, scopeChoiceNeeded } from '@/lib/offer-rules'
-import { healthConditionsOf, healthConditionsInWords, mealRestrictionsOf, noteForProfile, isPregnant, saidPregnant, askedToPause, PREGNANCY_TICK_WORDS } from '@/lib/health-conditions'
+import { offerWordsProblem, scopeChoiceNeeded, asksToPause } from '@/lib/offer-rules'
+import { healthConditionsOf, healthConditionsInWords, mealRestrictionsOf, noteForProfile, isPregnant, saidPregnant, PREGNANCY_TICK_WORDS } from '@/lib/health-conditions'
 import { plainTyped } from '@/lib/typed-text'
 import { isRunningGoal, runningGoalLabel, raceDateWords, weeksBetween, reachableByRace, chooseRunningDays, raceDateMissing, RACE_DATE_QUESTION } from '@/lib/running'
 import { blockShape } from '@/lib/timer-engine'
@@ -87,7 +87,9 @@ import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { detectTodayClaim, todayClaimFloor, type TodayFacts } from '@/lib/today-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
 import { buildMealSwapProposal, swapDiffFromTrial } from '@/lib/meal-swap-proposal'
-import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, weeksOnPlanSentence, turnedDownLine, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine, logOnlyRefusal, coachShortcutLabel } from '@/lib/coach-voice'
+import { bestAmongLogged, logBubble } from '@/lib/log-words'
+import { appAsksFirst } from '@/lib/app-asks-first'
+import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, weeksOnPlanSentence, turnedDownLine, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, LOG_WORDS, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine, logOnlyRefusal, coachShortcutLabel } from '@/lib/coach-voice'
 import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
 import { getLastWorkingSessionDate } from '@/lib/set-log-store'
@@ -543,13 +545,6 @@ const UNKNOWN_PROPOSAL_REFUSAL = "I couldn't find that on your current plan — 
 /** The cards that would put a food on her plate: a named food her restrictions keep out never gets one (H41). */
 const FOOD_OFFER_KINDS = new Set(['propose_meal_swap', 'propose_meal_addition', 'propose_custom_meal', 'propose_meal_food_add', 'propose_meal_food_replace'])
 
-/** "Most weeknights I do…", "I usually have…": a meal he already eats, which is his to size. */
-const USUAL_MEAL = /\b(?:usually|normally|typically|always|most (?:week)?(?:days|nights|mornings|evenings)|every (?:day|night|morning|evening|weekday)|my usual|my go-to)\b/i
-
-/** The meal cards a bare "I'm not a fan of X" must not jump to (it is asked about first). */
-const MEAL_CHANGE_KINDS = new Set(['propose_meal_swap', 'propose_meal_food_replace', 'propose_meal_food_remove', 'propose_meal_regenerate'])
-/** Words that ask for the change itself, so a dislike said with them is a request, not a remark. */
-const ASKS_FOR_A_CHANGE = /\b(?:swap|change|replace|switch|instead|something else|different|another|take (?:it|that|the \w+) (?:out|off)|remove|get rid)\b/i
 
 /** How long a cleared chat can be put back (the app's other Undo lines use ten seconds or more). */
 const CLEAR_UNDO_MS = 10_000
@@ -6079,13 +6074,16 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         .filter(e => e.suggested_load_kg != null)
         .map(e => [e.name, e.suggested_load_kg as number] as const)
     )
+    const written: ExerciseSetLog[] = []
     const { rows, totalSets, loggedKeys, replacedSets, replacedLogs, cardioLogged, cardioRefused } = executeLogWorkout(parsed.groups, {
       profileId: activeSession.profileId ?? '',
       date: activeSession.date,
       weekNumber: activeSession.liveWeek,
       dayName: activeSession.dayName,
       setsFor: activeSession.setsFor,
-      logSet: activeSession.logSet,
+      // What was WRITTEN, as written (a weight he did not say is filled in by the app), so the line above the
+      // receipt can ask the record engine about the very sets that were saved.
+      logSet: input => { const row = activeSession.logSet(input); if (row) written.push(row); return row },
       declareOffPlan: activeSession.declareOffPlan,
       todaysPlanSetCounts,
       todaysPlanLoads,
@@ -6127,7 +6125,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     const title = !savedAnything ? `Not logged · ${activeSession.dayName}`
       : replacedSets > 0 ? `Corrected · ${activeSession.dayName}` : `Logged · ${activeSession.dayName}`
     return {
-      text: title,
+      // THE COACH'S LINE, NOT THE CARD'S TITLE SAID TWICE (19 Nov 2026): a best is named, anything else is one plain line.
+      text: logBubble({ saved: savedAnything, corrected: replacedSets > 0, title, best: bestAmongLogged(activeSession.profileId ?? '', written, activeSession.date) }),
       receipt: {
         kind: 'log_workout',
         title,
@@ -6261,14 +6260,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // A MEAL HE USUALLY EATS, DESCRIBED WITH NO AMOUNTS, IS ASKED ABOUT FIRST (coach exam 17 Nov 2026; his 1 Sep rule and
     // his 11 Nov "My usual meals first"): the coach carded his salmon dinner with portions it made up. The app asks how
     // much of each, in one question, and the card comes on his answer.
-    if (result.proposal && (result.proposal.kind === 'propose_meal_addition' || result.proposal.kind === 'propose_custom_meal')
-      && USUAL_MEAL.test(userSaid ?? '') && !/\d/.test(userSaid ?? '')) {
-      return { text: "Love that. How much of each do you usually have? Grams are best, or counts like \"2 eggs\".", outcome: 'refused' }
-    }
-    if (result.proposal && MEAL_CHANGE_KINDS.has(result.proposal.kind) && !ASKS_FOR_A_CHANGE.test(userSaid ?? '')) {
-      const toAsk = foodDislikesToAsk(userSaid ?? '')
-      if (toAsk.length > 0) return { text: DISLIKE_ASK.turn(toAsk), outcome: 'refused' }
-    }
+    // ...AND "I'M NOT A FAN OF X" IS ASKED "just this meal, or never?". Both decisions are one function since 19 Nov
+    // 2026 (app-asks-first.ts), so the coach exam marks the turn he would actually see. The race date is the third,
+    // asked where the running offer is built below.
+    const asksFirst = result.proposal ? appAsksFirst(result.proposal.kind, result.proposal.rawArgs, userSaid) : null
+    if (asksFirst && asksFirst.why !== 'race_date') return { text: asksFirst.text, outcome: 'refused' }
     if (result.proposal && profile.id) {
       // I1: the client is the ONLY writer of pending_actions — this INSERT
       // is what actually creates the row the edge function only described.
@@ -7442,7 +7438,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       else if (allergensSaid(userText).some(x => !allergiesOf(profile).some(r => r.allergen === x))) {
         await offerFromApp('propose_allergy_record', buildAllergyRecordProposal(userText, allergensSaid(userText).filter(x => !allergiesOf(profile).some(r => r.allergen === x))))
       }
-      else if (askedToPause(userText) && !profile.plan_paused_since) {
+      else if (asksToPause(userText) && !profile.plan_paused_since) {
         const pp = buildPlanPauseProposal({ action: 'pause', origin_verbatim_quote: userText })
         if (pp.ok) await offerFromApp('propose_plan_pause', pp)
       }
@@ -8876,7 +8872,8 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // gone, so nothing on screen said the change had been taken back). And a refused one says why (run 7, M53).
     setMessages(prev => prev.map((m, i) => {
       if (i !== msgIndex || !m.receipt) return m
-      if (out === 'done') return { ...m, receipt: { ...m.receipt, title: RECEIPTS_UNDONE.title, rows: [{ label: RECEIPTS_UNDONE.label, detail: RECEIPTS_UNDONE.detail(m.receipt.title) }], undoToken: undefined } }
+      // ...and the line above a taken-back workout log no longer says it was logged (a tester, 18 Nov 2026).
+      if (out === 'done') return { ...m, ...(m.receipt.kind === 'log_workout' ? { content: LOG_WORDS.undone } : {}), receipt: { ...m.receipt, title: RECEIPTS_UNDONE.title, rows: [{ label: RECEIPTS_UNDONE.label, detail: m.receipt.kind === 'log_workout' ? LOG_WORDS.undoneDetail : RECEIPTS_UNDONE.detail(m.receipt.title) }], undoToken: undefined } }
       return { ...m, receipt: { ...m.receipt, rows: [...m.receipt.rows.filter(r => r.label !== RECEIPTS_UNDONE.refusedLabel), { label: RECEIPTS_UNDONE.refusedLabel, detail: out.refused }], undoToken: out.keep ? m.receipt.undoToken : undefined } }
     }))
   }

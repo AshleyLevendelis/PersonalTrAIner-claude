@@ -7,8 +7,9 @@ const FAMILY_TITLE: Record<ActionFamily, string> = {
   meals: 'Meals', exercise: 'One exercise', day: 'One day\'s session', plan: 'The whole plan',
   logging: 'Logging what was done', memory: 'What the coach remembers', shopping: 'The shopping list',
 }
-const RULE_WORDS: Record<string, string> = {
+const RULE_WORDS: Record<import('../src/lib/offer-rules').WordsRule, string> = {
   standing: 'never off one occasion', today: 'never when asked "from now on"', definite: 'never off a maybe',
+  kit: 'never when asked to hold or pause',
 }
 
 export function renderCoachActionsDoc(): string {

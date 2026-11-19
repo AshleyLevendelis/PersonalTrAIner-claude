@@ -1305,6 +1305,21 @@ export interface ReceiptTitles {
 }
 
 /**
+ * The line above a workout the chat logged for him (log-words.ts). A best is named with its unit; anything else is
+ * one plain line, never the card's own title said twice.
+ */
+export const LOG_WORDS = {
+  logged: "Got it, that's logged.",
+  corrected: "Got it, that's corrected.",
+  best: (exercise: string, best: string, more: number) =>
+    `That's a new best on ${exercise}: ${best}.${more > 0 ? ` And ${more} more ${more === 1 ? 'best' : 'bests'} in there.` : ''} Nice work.`,
+  /** What that line becomes once the log is taken back with Undo. */
+  undone: "That's taken back.",
+  /** ...and what its card says ("Logged · Wednesday was taken back" read as a sentence about a title). */
+  undoneDetail: 'Those sets are off your log. Everything is as it was before.',
+} as const
+
+/**
  * A card whose change was taken back with Undo. Its title had stayed "Rescheduled" with only the button gone
  * (run 5, 11 Oct 2026). "Put back" is the word the meal day-swap's Undo already uses.
  */
