@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [x] **THREE SMALL THINGS ON THE EXERCISE SCREEN (19 Nov 2026, the full pass; a tester's findings E7, E8, E9).**
+  E7. After "Make it a rest day" and then "Train it anyway", the card read "Today · in progress" over "You made today
+  a rest day. This session is still here if you want it." The line is now drawn before the session is started and
+  after it is closed with nothing counted (the day is still the rest day he made it), and not while he is training
+  it. The same for a day swapped for something else. `verify:what-happened` section 11 (6 new checks on a fresh page;
+  1 browser mutation caught; screenshot read). `test:one-today` rightly refused my first wording ("not running"):
+  this screen has three states and each must be named.
+  E9. A band move logged with no weight read "10 reps · Bodyweight" under a card whose own badge says "Band". The
+  line now uses the card's word. `test:set-row` (4 new checks; 2 mutations caught), `verify:logged-set-word` (new,
+  3 checks: the day's band move and its first bodyweight lift each logged and read; 1 browser mutation caught, and a
+  second that only changed a fallback the screen cannot reach was rightly not seen). NOT DONE, named: the small
+  toggle beside the weight box still reads "BW" on a band move.
+  E8, LEFT AS IT IS, decided (mine): "Add set" on a lift whose planned sets are all done leaves its header reading
+  done, 3 of 3, with a fourth empty row. That is true: the plan's sets are done and the fourth is his extra, counted
+  when he logs it (4 of 4). Making the lift "not done" would be worse, because an added row cannot be taken away
+  again, so one slip of the thumb would leave a finished lift unfinished for the rest of the session.
+  Frontend only.
 - [x] **"MOVE EARLIER" PUT A LIFT IN FRONT OF THE SESSION'S WARM-UP MOVE AND NOTHING SAID SO (19 Nov 2026, the full pass; a
   tester's finding E6).** DECISION, mine (CSCS), with the basis: a warm-up move is there to prepare the first working
   lift (activation and low-dose explosive work come before the loaded pattern they prepare; done after it they are

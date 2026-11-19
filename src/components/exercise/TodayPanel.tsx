@@ -1784,7 +1784,13 @@ export function TodayPanel({
               )}
             </InsightBanner>
           )}
-          {setAsideToday && (
+          {/* NOT WHILE HE IS TRAINING IT (the Exercise walk, 18 Nov 2026, E7): after "Train it anyway" the card read
+              "Today · in progress" over "This session is still here if you want it". The day is still as he set it
+              (a session finished with nothing logged is a rest day again, and the line comes back); the offer is
+              simply answered while the session is open. The same for a day swapped for something else, below.
+              EACH STATE NAMED (test:one-today): before it is started the offer stands; finished with nothing
+              counted the day is as he set it; running, it is answered. */}
+          {setAsideToday && (status === 'idle' || status === 'finished') && (
             <InsightBanner tone="ai" data-testid="set-aside-today">
               <span className="text-sm">
                 {setAsideToday === 'rest_chosen'
@@ -1793,7 +1799,7 @@ export function TodayPanel({
               </span>
             </InsightBanner>
           )}
-          {swappedToday && (
+          {swappedToday && (status === 'idle' || status === 'finished') && (
             <InsightBanner tone="ai" data-testid="swapped-today">
               <span className="text-sm">
                 You swapped today for <span className="font-semibold">{swappedToday}</span>. This session is still here if you want it.

@@ -427,6 +427,7 @@
     "verify:food-list-box": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/food-list-box.mjs",
     "verify:tradeoff-reach": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/tradeoff-reach.mjs",
     "verify:allergy-card": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/allergy-card.mjs",
+    "verify:logged-set-word": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/logged-set-word.mjs",
     "verify:profile-back": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-back.mjs",
     "verify:profile-fixes": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-fixes.mjs",
     "verify:home-tools-fixes": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/home-tools-fixes.mjs",

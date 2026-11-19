@@ -788,13 +788,15 @@ export function heldAroundLine(h:
  * WHAT A LOGGED SET SAYS UNDER ITS ROW, in its own unit (runs 3-4, M42): a
  * 33-second plank read "33 reps" and one rep read "1 reps".
  */
-export function setReading(set: { count: number; unit: 'reps' | 'seconds' | 'meters'; isBodyweight: boolean; weightKg: number; addedLoadKg?: number | null }): string {
+export function setReading(set: { count: number; unit: 'reps' | 'seconds' | 'meters'; isBodyweight: boolean; weightKg: number; addedLoadKg?: number | null; unloadedWord?: string | null }): string {
   const n = set.count
   const amount = set.unit === 'seconds' ? `${n} s` : set.unit === 'meters' ? `${n} m` : `${n} ${n === 1 ? 'rep' : 'reps'}`
   // WEIGHT ADDED TO BODYWEIGHT IS SAID (a tester, 18 Nov 2026: chin-ups with 5 kg on a belt read "8 reps · Bodyweight",
   // the belt lost). Tested FIRST, as loggedSetReading does: a belted set is a bodyweight row that also carries a load.
   if (set.addedLoadKg != null && set.addedLoadKg > 0) return `${amount} · Bodyweight +${set.addedLoadKg}kg`
-  return set.isBodyweight ? `${amount} · Bodyweight` : `${amount} @ ${set.weightKg}kg`
+  // A BAND MOVE SAYS "Band" (the Exercise walk, 18 Nov 2026, E9): the card's own badge reads Band and the line under
+  // its logged set read "Bodyweight". The word is the card's (unloadedLoadLabel), handed in; absent, "Bodyweight".
+  return set.isBodyweight ? `${amount} · ${set.unloadedWord || 'Bodyweight'}` : `${amount} @ ${set.weightKg}kg`
 }
 
 /**

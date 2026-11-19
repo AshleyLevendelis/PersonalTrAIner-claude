@@ -227,6 +227,27 @@ check('10f. logging it, the weight now given', await clickSel('[data-verb="save-
 // Every planned set was logged, so the day is plain "done", not "done, N of M".
 check('10g. ...makes that day done — every set counted, a completed session', new RegExp(`^${pastDay}: done$`).test(await untilCell(pastDay, /done/) || ''), await cell(pastDay))
 
+// --- 11. "TRAIN IT ANYWAY" ANSWERS THE OFFER (the Exercise walk, 18 Nov 2026, E7) ---------------------------------
+// The card read "Today · in progress" over "This session is still here if you want it". While the session is open
+// the line is gone; a session closed with nothing logged leaves the day the rest day he made it, and the line is
+// back. On a fresh page and last, because a closed session changes what every check above reads.
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&load=11#/tab/exercise` })
+await wait(4500)
+check('11a. a fresh day is made a rest day', (await openSheet()) === 'open' && await clickSel('[data-verb="rest"]') && await untilClosed())
+const cRest11 = await untilCard(c => !!c.line)
+check('11b. ...the card says so and offers "Train it anyway"', /made today a rest day/.test(cRest11?.line || '') && cRest11?.start === 'Train it anyway', cRest11)
+check('11c. "Train it anyway" is tapped', await clickSel('[data-testid="hero-start"]'))
+let running11 = null
+for (let i = 0; i < 20; i++) { await wait(300); running11 = await ev(`/today · in progress/i.test(document.body.innerText)`); if (running11) break }
+check('11d. ...the session is in progress', running11 === true)
+const line11 = await ev(`document.querySelector('[data-testid="set-aside-today"]')?.innerText ?? null`)
+check('11e. ...AND THE CARD NO LONGER SAYS "this session is still here if you want it"', line11 === null, line11)
+await ev('window.scrollTo(0, 0)'); await wait(300)
+await shoot('what-happened-rest-training')
+const finished11 = await ev(`(() => { const b = [...document.querySelectorAll('button')].find(x => /^Finish session$/.test((x.textContent || '').trim())); if (!b) return false; b.click(); return true })()`)
+const cAgain11 = await untilCard(c => !!c.line)
+check('11f. closed with nothing logged: today is still the rest day he made it, and the line is back', finished11 === true && /made today a rest day/.test(cAgain11?.line || ''), cAgain11)
+
 console.log(failures === 0 ? '\nThe five verbs work on the screen, and can be unsaid.\n' : `\n${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()
 process.exit(failures === 0 ? 0 : 1)
