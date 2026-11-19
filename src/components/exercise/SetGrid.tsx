@@ -1335,6 +1335,7 @@ export function SetGrid({
               unit: logged.unit ?? prescriptionUnit(prescriptionType),
               isBodyweight: !!logged.is_bodyweight,
               weightKg: logged.weight_kg,
+              addedLoadKg: logged.added_load_kg ?? null,
             })
             const state = logged.syncStatus
             // THE FIRST TIME A LIFT IS LOGGED, where a PR badge used to be.

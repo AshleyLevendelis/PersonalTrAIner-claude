@@ -126,6 +126,10 @@ console.log('\n6. A timed set is said in seconds and claims no lifting record (r
   check('a 33-second hold reads "33 s"', setReading({ count: 33, unit: 'seconds', isBodyweight: true, weightKg: 0 }) === '33 s · Bodyweight')
   check('one rep reads "1 rep", never "1 reps"', setReading({ count: 1, unit: 'reps', isBodyweight: false, weightKg: 25 }) === '1 rep @ 25kg')
   check('...and eight read "8 reps"', setReading({ count: 8, unit: 'reps', isBodyweight: false, weightKg: 25 }) === '8 reps @ 25kg')
+  // A tester, 18 Nov 2026: chin-ups with 5 kg on a belt read "8 reps · Bodyweight". The belt is said, with its unit.
+  check('weight added to bodyweight is said, not lost', setReading({ count: 8, unit: 'reps', isBodyweight: true, weightKg: 0, addedLoadKg: 5 }) === '8 reps · Bodyweight +5kg', setReading({ count: 8, unit: 'reps', isBodyweight: true, weightKg: 0, addedLoadKg: 5 }))
+  check('...and a plain bodyweight set still reads "Bodyweight", with nothing added', setReading({ count: 8, unit: 'reps', isBodyweight: true, weightKg: 0, addedLoadKg: 0 }) === '8 reps · Bodyweight' && setReading({ count: 8, unit: 'reps', isBodyweight: true, weightKg: 0 }) === '8 reps · Bodyweight')
+  check('...the set row hands the added weight to that reading', /addedLoadKg: logged\.added_load_kg \?\? null/.test(readFileSync('src/components/exercise/SetGrid.tsx', 'utf8')))
   check('a carry reads metres', setReading({ count: 40, unit: 'meters', isBodyweight: false, weightKg: 16 }) === '40 m @ 16kg')
   const grid = stripComments(readFileSync(join(ROOT, 'src/components/exercise/SetGrid.tsx'), 'utf8'))
   check('a set not counted in reps never reaches the record check',

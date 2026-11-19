@@ -41,7 +41,7 @@ export function bestAmongLogged(profileId: string, written: ExerciseSetLog[], on
       weightKg: row.weight_kg,
       reps: row.reps_completed,
       isBodyweight: row.is_bodyweight,
-      addedLoadKg: (row as { added_load_kg?: number | null }).added_load_kg ?? null,
+      addedLoadKg: row.added_load_kg ?? null,
     }, onDate)
     if (!pr) continue
     const reading = readingFor(pr)

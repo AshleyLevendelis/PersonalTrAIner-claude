@@ -2,6 +2,10 @@
 
 Newest first. One line each.
 
+- [x] **WEIGHT ADDED TO A BODYWEIGHT LIFT WAS READ BACK AS "BODYWEIGHT" (19 Nov 2026, the full pass; a tester's finding).** Chin-ups
+  with 5 kg on a belt showed "8 reps · Bodyweight" under the set: the belt was saved and not said. The set row now
+  reads "8 reps · Bodyweight +5kg" (the reading tests the added weight first, as the history reading already did).
+  `test:set-row` (3 new checks, 4 mutations caught). NOT browser-driven: the test pages have no belted lift on today.
 - [x] **A SESSION-LENGTH CHANGE MADE IN THE CHAT SHOWED AN UNDO THAT COULD NOT UNDO (19 Nov 2026, the full pass; a tester's
   finding, confirmed in the code and then in a browser).** "From now on I only have 30 to 45 minutes" -> the offer ->
   Apply -> Undo -> "Couldn't undo — This one can't be undone from here". The change kept the plan and the length it
