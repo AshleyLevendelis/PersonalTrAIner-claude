@@ -87,7 +87,7 @@ import { settleWeek } from '@/lib/settle-week'
 import { sessionRefFromCell, sessionRefForPlanDay, editTarget, sayDayIn, type SessionRef } from '@/lib/session-ref'
 import { planLighterToday, undoLighterToday, type LighterPlan } from '@/lib/lighter-today'
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
-import { publishScreenEdit, recordScreenEdit, screenEditText } from '@/lib/screen-edit-undo'
+import { publishScreenEdit, recordScreenEdit, screenEditText, undoScreenEdit, dayWayBack, saveWeekFor, SCREEN_UNDO_WINDOW_MS, type ScreenEditRecord } from '@/lib/screen-edit-undo'
 import { executeCardioSession } from '@/lib/pending-action-executor'
 import { priceAddedLift, type SwapScope } from '@/lib/mesocycle-edit'
 import type { ExerciseEntry } from '@/lib/exercise-db'
@@ -123,6 +123,14 @@ const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satu
 // is computed here, for today's workout only, and passed only to this
 // surface — the peek and program browse never see it (§2.2, §7.4).
 // ---------------------------------------------------------------------------
+
+/** The way back from a day-wide change made on this screen ("I'm short of time", "a different session"). */
+type DayEdit = { kind: 'shorten' | 'rebuild'; note: string | null; record: ScreenEditRecord; loggedAt: number; canUndo: boolean }
+/**
+ * Kept OUTSIDE the component, by person and day, so a trip to another tab (which unmounts this screen) does not lose
+ * the way back. For this visit to the app only: the put-back lasts ten minutes, so there is nothing worth storing.
+ */
+const dayEditKept = new Map<string, DayEdit>()
 
 /** The rows a session summary counts: working exercises as planned sets, and movement prep kept out of both counts. */
 function summaryRowsOf(workout: WorkoutDay): { planned: { id?: string; name: string; sets: number }[]; prep: { id?: string; name: string }[] } {
@@ -593,10 +601,12 @@ export function TodayPanel({
     const result = shortenOrFloor(week, target.planDayName, profile, minutes)
     if (!result.changed) return say(result.refusal ?? "I couldn't shorten that one.")
     const settled = settleWeek(result.week, target.planDayName, profile)
-    return applySessionEdit(
-      { mesocycle: mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w)), changed: true },
-      'today',
-    )
+    const next = mesocycle.map(w => (w.week_number === liveWeek ? settled.week : w))
+    const failed = await applySessionEdit({ mesocycle: next, changed: true }, 'today')
+    if (failed) return failed
+    // No words of its own: the line under the session's length already says it was shortened and for how long.
+    keepWayBack('shorten', next, null)
+    return null
   }
 
   /**
@@ -627,10 +637,43 @@ export function TodayPanel({
     // keeps finding — the app knowing something and the screen saying nothing.
     const kept = result.kept.length
     const main = result.mainLift ? ` ${result.mainLift} is untouched, as planned.` : ''
-    setRebuildNote(kept === 0
+    keepWayBack('rebuild', result.mesocycle, kept === 0
       ? `Rebuilt today — ${result.replaced.length} exercise${result.replaced.length === 1 ? '' : 's'} changed.${main} Back to the planned session next week.`
       : `Rebuilt today — ${result.replaced.length} changed, ${kept} stayed because nothing else fits ${kept === 1 ? 'that slot' : 'those slots'} with your equipment and injuries.${main} Back to the planned session next week.`)
     return null
+  }
+
+  /**
+   * THE WAY BACK FROM "I'M SHORT OF TIME" AND "GIVE ME A DIFFERENT SESSION" (the Exercise walk, 19 Nov 2026; his
+   * "every change previews and can be undone"). "Make it easier" and "a different kind of session" each leave a
+   * button that puts the planned session back; these two left nothing, so three exercises taken off on one tap could
+   * only be got back by asking the coach. The note says what was done and the button puts the day back, by the rules
+   * every put-back on this screen follows (screen-edit-undo.ts): only while the week still reads as the change left
+   * it, never once a set has been logged since, and for ten minutes. Kept for this visit to the screen, not stored.
+   */
+  const keepWayBack = (kind: 'shorten' | 'rebuild', after: MesocycleWeek[], note: string | null) => {
+    if (!mesocycle) return
+    setDayEditError(null)
+    // A second change while the first can still be put back goes back past it, to the plan (dayWayBack). The words
+    // of the first stay when the second has none of its own (a rebuilt day that is then shortened is still rebuilt).
+    const back = dayWayBack(dayEdit?.canUndo ? dayEdit : null, mesocycle, after, liveWeek, note ?? '', loggedWorkingToday, Date.now())
+    setDayEdit({ kind, note: note ?? (back.chained ? dayEdit?.note ?? null : null), record: back.record, loggedAt: loggedWorkingToday, canUndo: true })
+  }
+  const dayEditUndo = async () => {
+    if (!dayEdit || !profileId || !mesocycle || dayEditBusy) return
+    setDayEditBusy(true); setDayEditError(null)
+    const out = await undoScreenEdit(dayEdit.record, mesocycle, Date.now(), saveWeekFor(profileId), loggedWorkingToday > dayEdit.loggedAt)
+    setDayEditBusy(false)
+    if (out.ok) {
+      onMesocycleUpdated?.(out.mesocycle)
+      refreshWeeks()
+      onLogsUpdated?.()
+      setDayEdit(null)
+      return
+    }
+    // SAID, AND THE BUTTON STAYS ONLY WHILE A SECOND TAP COULD WORK (the Undo line's own rule).
+    setDayEditError(out.refusal)
+    if (!out.keep) setDayEdit(dayEdit.note ? { ...dayEdit, canUndo: false } : null)
   }
 
   /**
@@ -1076,7 +1119,26 @@ export function TodayPanel({
    * is only the list of slots that STAYED. Storing that needs a field on the
    * day, which is a persistence change this build did not take.
    */
-  const [rebuildNote, setRebuildNote] = useState<string | null>(null)
+  const dayEditKey = `${profileId ?? ''}:${today}`
+  const [dayEdit, setDayEditState] = useState<DayEdit | null>(() => dayEditKept.get(dayEditKey) ?? null)
+  const setDayEdit = (next: DayEdit | null) => {
+    if (next) dayEditKept.set(dayEditKey, next); else dayEditKept.delete(dayEditKey)
+    setDayEditState(next)
+  }
+  const [dayEditBusy, setDayEditBusy] = useState(false)
+  const [dayEditError, setDayEditError] = useState<string | null>(null)
+  // Another day, or another person, has its own (usually none).
+  useEffect(() => { setDayEditState(dayEditKept.get(dayEditKey) ?? null); setDayEditError(null) }, [dayEditKey])
+  // THE BUTTON IS DRAWN ONLY WHILE IT CAN WORK (24 Sep 2026: an Undo asks before it offers): it goes when the ten
+  // minutes are up, and it is not drawn once a set has been logged since, because the put-back would refuse both.
+  useEffect(() => {
+    if (!dayEdit?.canUndo) return
+    const expire = () => setDayEdit(dayEdit.note ? { ...dayEdit, canUndo: false } : null)
+    const left = dayEdit.record.at + SCREEN_UNDO_WINDOW_MS - Date.now()
+    if (left <= 0) { expire(); return }
+    const t = setTimeout(expire, left)
+    return () => clearTimeout(t)
+  }, [dayEdit]) // eslint-disable-line react-hooks/exhaustive-deps
   const volumeReduction = useMemo(() => {
     if (!profile || !volume || volume.atFloor || !hasMesocycle) return null
     const activities = profile.concurrent_activities ?? []
@@ -1775,7 +1837,17 @@ export function TodayPanel({
             </InsightBanner>
           )}
           {volumeError && <p className="text-xs text-destructive">{volumeError} Nothing has changed.</p>}
-          {rebuildNote && <p className="text-xs text-muted-foreground" data-testid="rebuild-note">{rebuildNote}</p>}
+          {dayEdit && (
+            <div className="space-y-1" data-testid="day-edit-note">
+              {dayEdit.note && <p className="text-xs text-muted-foreground" data-testid="rebuild-note">{dayEdit.note}</p>}
+              {dayEdit.canUndo && loggedWorkingToday <= dayEdit.loggedAt && (
+                <Button size="sm" variant="outline" className="min-h-11 self-start" disabled={dayEditBusy} onClick={dayEditUndo} data-testid="day-edit-undo">
+                  {dayEdit.kind === 'rebuild' ? 'Put my planned session back' : 'Put the full session back'}
+                </Button>
+              )}
+            </div>
+          )}
+          {dayEditError && <p className="text-xs text-destructive" data-testid="day-edit-error">{dayEditError}</p>}
           {/* A DIFFERENT KIND TODAY, said where the session is, with the way
               back. Read off the stored marker, so it survives a reload. */}
           {kindTodayOf(workout) && mesocycle && (

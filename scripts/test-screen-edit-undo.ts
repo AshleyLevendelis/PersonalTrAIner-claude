@@ -9,7 +9,7 @@
 import { readFileSync } from 'fs'
 import { generateMesocycle, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
-import { recordScreenEdit, undoScreenEdit, screenEditText, SCREEN_UNDO_WINDOW_MS } from '../src/lib/screen-edit-undo'
+import { recordScreenEdit, undoScreenEdit, screenEditText, dayWayBack, SCREEN_UNDO_WINDOW_MS } from '../src/lib/screen-edit-undo'
 import { RECEIPTS_UNDONE } from '../src/lib/coach-voice'
 import type { MesocycleWeek, UserProfile } from '../src/lib/types'
 
@@ -159,6 +159,60 @@ for (const kind of ['remove', 'reorder', 'add']) {
 const applyAt = panel.indexOf('const applySessionEdit')
 const applyBody = panel.slice(applyAt, panel.indexOf('weekTrain.refresh()', applyAt))
 check('...and only after its save succeeded', applyBody.indexOf('publishScreenEdit(') > applyBody.indexOf('await saveScopedEdit('), applyBody.slice(0, 80))
+
+console.log('\n6. A whole-day change can be put back too: "I\'m short of time" and "a different session" (19 Nov 2026)')
+{
+  // The first change (a shortening: the last exercise goes), then a second on top (the order reversed).
+  const first = dropLast(BEFORE, [WEEK.week_number])
+  const second = first.map(w => w.week_number === WEEK.week_number
+    ? { ...w, days: w.days.map(d => d.day === DAY.day ? { ...d, exercises: [...d.exercises].reverse() } : d) } : w)
+  const one = dayWayBack(null, BEFORE, first, WEEK.week_number, '', 0, T0)
+  check('a first change goes back to the plan as it found it, this week only',
+    one.chained === false && one.record.before === BEFORE && json(one.record.weeks) === json([WEEK.week_number]), { chained: one.chained, weeks: one.record.weeks })
+  {
+    const s = saver()
+    const out = await undoScreenEdit(one.record, clone(first), T0 + 1000, s.save)
+    check('...and its put-back hands back the planned day', out.ok === true && json(out.ok ? out.mesocycle : null) === json(BEFORE) && s.wrote.length === 1)
+  }
+  // A SECOND CHANGE WHILE THE FIRST CAN STILL BE PUT BACK GOES BACK PAST IT.
+  const two = dayWayBack({ record: one.record, loggedAt: 0 }, first, second, WEEK.week_number, 'Rebuilt today.', 0, T0 + 60_000)
+  check('a second change straight after goes back to the PLAN, not to the first change', two.chained === true && two.record.before === BEFORE, two.chained)
+  {
+    const s = saver()
+    const out = await undoScreenEdit(two.record, clone(second), T0 + 61_000, s.save)
+    check('...its put-back hands back the planned day in one tap', out.ok === true && json(out.ok ? out.mesocycle : null) === json(BEFORE))
+    check('...and its ten minutes run from the second change', two.record.at === T0 + 60_000)
+  }
+  // ...BUT ONLY WHILE THE FIRST COULD STILL BE PUT BACK. Each of the three reasons it could not, one at a time.
+  const late = dayWayBack({ record: one.record, loggedAt: 0 }, first, second, WEEK.week_number, '', 0, T0 + SCREEN_UNDO_WINDOW_MS + 1)
+  check('after the first change\'s ten minutes, the second goes back only to the day it found', late.chained === false && late.record.before === first)
+  const edge = dayWayBack({ record: one.record, loggedAt: 0 }, first, second, WEEK.week_number, '', 0, T0 + SCREEN_UNDO_WINDOW_MS - 1000)
+  check('...while just inside them it still goes back to the plan (the window binds)', edge.chained === true && edge.record.before === BEFORE)
+  const logged = dayWayBack({ record: one.record, loggedAt: 0 }, first, second, WEEK.week_number, '', 1, T0 + 60_000)
+  check('once a set was logged after the first change, the second goes back only to the day it found', logged.chained === false && logged.record.before === first, logged.chained)
+  // Something else changed the week in between (a swap, say): the first change's "after" no longer describes the day.
+  const between = first.map(w => w.week_number === WEEK.week_number
+    ? { ...w, days: w.days.map(d => d.day === DAY.day ? { ...d, exercises: d.exercises.slice(1) } : d) } : w)
+  const moved = dayWayBack({ record: one.record, loggedAt: 0 }, between, second, WEEK.week_number, '', 0, T0 + 60_000)
+  check('once the week was changed some other way in between, the second goes back only to the day it found', moved.chained === false && moved.record.before === between)
+  check('...while with the same sets logged as then it still goes back to the plan (the count binds)', dayWayBack({ record: one.record, loggedAt: 3 }, first, second, WEEK.week_number, '', 3, T0 + 60_000).chained === true)
+}
+{
+  // Source: the two day verbs keep a way back only after their save, and the button is drawn only while it can work.
+  const shortenAt = panel.indexOf('const shortenToday')
+  const shortenBody = panel.slice(shortenAt, panel.indexOf('const rebuildToday', shortenAt))
+  const rebuildAt = panel.indexOf('const rebuildToday')
+  const rebuildBody = panel.slice(rebuildAt, panel.indexOf('const keepWayBack', rebuildAt))
+  check('"I\'m short of time" keeps a way back, after its save', shortenBody.indexOf("keepWayBack('shorten'") > shortenBody.indexOf('await applySessionEdit('), shortenBody.indexOf("keepWayBack('shorten'"))
+  check('"a different session" keeps a way back, after its save', rebuildBody.indexOf("keepWayBack('rebuild'") > rebuildBody.indexOf('await applySessionEdit(') && rebuildBody.indexOf('await applySessionEdit(') > 0, rebuildBody.indexOf("keepWayBack('rebuild'"))
+  check('...and a failed save returns before it', /const failed = await applySessionEdit\([^\n]*\n\s*if \(failed\) return failed/.test(shortenBody) && /const saved = await applySessionEdit\([^\n]*\n\s*if \(saved\) return saved/.test(rebuildBody))
+  check('the way back is worked out by the shared function', /dayWayBack\(/.test(panel.slice(panel.indexOf('const keepWayBack'), panel.indexOf('const dayEditUndo'))))
+  const undoBody = panel.slice(panel.indexOf('const dayEditUndo'), panel.indexOf('const dayEditUndo') + 900)
+  check('the put-back runs the screen\'s own Undo, told whether a set was logged since', /undoScreenEdit\(dayEdit\.record, mesocycle, Date\.now\(\), saveWeekFor\(profileId\), loggedWorkingToday > dayEdit\.loggedAt\)/.test(undoBody))
+  check('...and a refusal is shown, the button kept only while a second tap could work', /setDayEditError\(out\.refusal\)/.test(undoBody) && /if \(!out\.keep\)/.test(undoBody))
+  check('the button is drawn only while it can work: not after a set is logged, not after its ten minutes',
+    /dayEdit\.canUndo && loggedWorkingToday <= dayEdit\.loggedAt && \(\s*<Button[^>]*data-testid="day-edit-undo"/.test(panel) && /dayEdit\.record\.at \+ SCREEN_UNDO_WINDOW_MS - Date\.now\(\)/.test(panel))
+}
 
 console.log(`\n${ran} checks ran`)
 if (failures > 0) { console.error(`\n${failures} FAILED`); process.exit(1) }

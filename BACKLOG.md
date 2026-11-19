@@ -2,6 +2,27 @@
 
 Newest first. One line each.
 
+- [x] **"I'M SHORT OF TIME" AND "GIVE ME A DIFFERENT SESSION" COULD NOT BE PUT BACK (19 Nov 2026, the full pass; a tester's
+  finding E4).** His standing "every change previews and can be undone". "Make it easier" and "a different kind of
+  session" each leave a button that puts the planned session back; these two left nothing, so three exercises taken
+  off on one tap, or most of a day swapped, could only be got back by asking the coach.
+  NOW each leaves a button under the session: "Put the full session back" after a shortening, "Put my planned session
+  back" after a rebuild (the two labels the screen already uses). It follows the rules every put-back on this screen
+  follows: only while the week still reads as the change left it, never once a set has been logged since (the button
+  is not drawn then: a started session is never redrawn), and for ten minutes. It outlives a trip to another tab.
+  ONE WAY BACK, AND IT GOES TO THE PLAN: shorten and then rebuild, and the one button puts the whole planned session
+  back, not the shortened one (which would have left the shortening with no way back at all). That holds only while
+  the first change could itself still be put back; otherwise the way back is to the day as the second change found it.
+  The shortening says itself once: the line under the session's length already said "Shortened to 30 min", so the new
+  button comes without a second sentence.
+  DECISIONS, mine: no preview before the shortening (the tester's other half). The minutes are his own tap, and the
+  way back is now one tap; a confirm step on a change he just asked for by name is a tap more for nothing. NOT a change
+  to any prescription: both verbs do exactly what they did.
+  NOT DONE, named: the way back is kept for this visit to the app, not stored, so a reload loses the button (the
+  session stays as changed, and next week is the planned one either way).
+  `test:screen-edit-undo` section 6 (17 new checks; 11 mutations, 11 caught), `verify:shorten-today` section 9 (11 new
+  checks), `verify:session-rebuild` sections 6-8 (18 new checks: the put-back, the two-change chain, the button gone
+  once a set is logged); 7 browser mutations, 7 caught. Screenshots read. Frontend only.
 - [x] **THE SESSION SUMMARY DID NOT COUNT A SET LOGGED AFTER FINISH (19 Nov 2026, the full pass; a tester's finding E2).** His
   8 Nov ruling, "Add to it": a set logged after Finish is added to the finished day and its count goes up everywhere.
   The summary was the one place that did not follow, because it is a card saved at the moment of finishing: the day's
