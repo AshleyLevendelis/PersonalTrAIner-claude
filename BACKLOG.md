@@ -34,6 +34,17 @@ Newest first. One line each.
   `test:meal-quality`, `test:schema-parity` and `verify:rls` (each needs a live database). The sweep was stopped by
   its time limit with 25 drivers unrun (I ran other drivers beside it, which slowed it); those 25 were then run on
   the fixed code and all passed. The plan-quality and audit checks were inside the 615.
+  AND A SECOND, CONFIRMING RUN OF ALL 645 ON THE FINAL VERSION (this fix and the setup fixes in): 641 pass and 4 fail,
+  the same four that need his machine or a live database. No real failure. Two drivers failed on the way and passed
+  re-run alone, and both are about the run, not the app: `verify:chat-goal` timed out waiting for its card while 424
+  logic checks ran flat out beside it (passes alone, twice), and `verify:setup-answers` found its browser port taken.
+  THE PORT IS THE FINDING: four drivers share port 9443 (`meal-move`, `rest-day`, `setup-answers`, `swap-knock-on`),
+  so "two copies of one driver cannot run at once" is too narrow: those four cannot run beside each other either.
+  It only bites when two streams run in parallel (I ran the end of the list backwards in the main copy to stay
+  inside the two-hour limit). Not changed here; giving each its own port is a small tidy-up.
+  HOW THE RUN WAS KEPT INSIDE ITS TIME LIMIT, for next time: the first sweep was one job and was cut off at two hours
+  with 25 unrun. This one was split: the quick logic checks in the main copy, the drivers in the separate copy, the
+  two slow checks after the quick ones, and the tail of the driver list run backwards to meet the forward run.
   NEVER RUN ON A REAL PHONE: the Back button on Android and the edge swipe on an iPhone are still proven only in
   Chromium. Frontend only.
 - [x] **SETUP: THE "NONE" BUTTON, A SKIP FOR THE OPTIONAL MEALS QUESTION, AND "1 OF 14" TWICE (19 Nov 2026, the full
