@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **THE REST TIMER IS READABLE FROM A DISTANCE, 19 Nov 2026: his report from the gym floor** ("the rest timer isn't easy
+  to see from a distance when your phone is down"). Presentation only, decided by me (no ruling needed: size, not
+  behaviour). The clock under the set just ticked went from 17px to about 48px in the main colour, with the label above
+  it and the bar 8px thick (was 3px); the bottom bar's clock (shown when the row is scrolled out of view) went from 18px
+  to 36px in a 64px bar (was 44px). The ±15 and Skip buttons, the one engine, and the dock standing aside are unchanged.
+  Two old checks pinned the exact old dock numbers (44px, 18px); they now hold a FLOOR (56px, 2rem), so the size can grow
+  but never quietly shrink back. New floors on the inline clock (2.5rem) and bar (8px). `test:exercise-2a` (52 checks),
+  `test:exercise-today`; 4 mutations (clock, bar, dock height, dock clock), 4 caught. `verify:exercise-2a` (35),
+  `verify:exercise-week` (28), `verify:session-start` (28) green; screenshot read at 390px. NOT done: the
+  "Rest complete" bar and the keyboard-up thin line are still small (not what he reported); never seen on a real phone
+  in a bright gym. Frontend only, no deploy beyond the merge.
+
 - [x] **WEIGHT, WEEK BY WEEK on Home, 18 Nov 2026: his "Add all three"** (from three options, after screenshots of another
   app's weight screen; over the weekly line alone and over the list alone). Behind the Weight row in Progress: a graph
   of every weigh-in as a faint dot with each week's average as a line through the middle of its week, a 3M / 6M / 1Y

@@ -269,7 +269,7 @@ export function BottomDock() {
       <div
         className="relative flex items-center gap-3 overflow-hidden rounded-xl px-3 shadow-lg"
         style={{
-          minHeight: 44,
+          minHeight: 64,
           // --surface-raised is a 28%-alpha tint, so on its own the exercise
           // row underneath reads straight through the dock. Composited over
           // the opaque --surface-deep the design names for this dock, which
@@ -284,7 +284,7 @@ export function BottomDock() {
         />
         <Timer className="relative size-4 shrink-0 text-primary-text" />
         <div className="relative min-w-0 flex-1 py-1.5">
-          <p className="tabular-mono text-[1.125rem] font-semibold leading-none">{formatDuration(restMs)}</p>
+          <p className="tabular-mono text-[2.25rem] font-bold leading-none text-primary-text">{formatDuration(restMs)}</p>
           {restLabel && (
             <p className="mt-0.5 truncate text-xs text-muted-foreground">Rest · {restLabel}</p>
           )}
