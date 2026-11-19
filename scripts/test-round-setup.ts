@@ -14,6 +14,7 @@ import {
   clock, workingSeconds, roundsLabel, roundCaption, timelineSegments, doneAt, startLabel, nextCountdown,
 } from '../src/lib/round-setup'
 import { ROUND_PRESETS, totalRoundSeconds, presetForConfig, type RoundConfig } from '../src/lib/timer-engine'
+import { playTimerCue } from '../src/lib/timer-cues'
 import { selectedChoiceKey, protocolChoices } from '../src/components/timers/ProtocolChips'
 
 const ROOT = join(import.meta.dirname, '..')
@@ -96,6 +97,22 @@ console.log('\n5. Beeps and Buzz silence the ROUND timer only')
   const cues = code('src/lib/timer-cues.ts')
   check('sound off skips the tone', /if \(opts\.sound !== false\) try \{/.test(cues))
   check('buzz off skips the vibration', /opts\.vibrate !== false && navigator\.vibrate/.test(cues))
+  // 19 Nov 2026, his "make the timer's sound louder": RUN the cue against a recording audio context and read what
+  // it asked for, so the loudness is a measured property and not a number in the source.
+  const events: { t: number; v: number }[] = []
+  const g = globalThis as Record<string, unknown>
+  const realAudio = g.AudioContext
+  g.AudioContext = class {
+    currentTime = 0
+    destination = {}
+    createOscillator() { return { connect() {}, frequency: { value: 0 }, type: '', start() {}, stop() {} } }
+    createGain() { return { connect() {}, gain: { setValueAtTime(v: number, t: number) { events.push({ t, v }) }, exponentialRampToValueAtTime() {} } } }
+    close() {}
+  }
+  playTimerCue('rest-complete', { vibrate: false })
+  g.AudioContext = realAudio
+  check('the beep starts at (nearly) full level, not a faint 0.3', (events[0]?.v ?? 0) >= 0.9, events)
+  check('...and holds that level past halfway through the tone (it used to fade at once)', events.some(e => e.v >= 0.9 && e.t >= 0.25), events)
 }
 
 console.log('\n6. Her settings are their own record, so a reset cannot wipe them')

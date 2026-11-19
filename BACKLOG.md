@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **THE TIMER'S SOUND IS LOUDER, 19 Nov 2026: his "make the timer's sound louder too"**. Every cue (rest done, round
+  timer work / rest / done) was a sine at 30% that faded away at once, so most of each beep was near-silent. Now a
+  triangle wave (more overtones, carries over machines and music) at full level, held for 80% of the tone, then cut
+  off. Full level is the most one tone can take without clipping, so the next step up is the phone's own volume, and
+  an iPhone on silent or a page that has not been tapped yet may still say nothing (unchanged, named in the file). The
+  tones, lengths and vibrations are unchanged. Checked by RUNNING the cue against a recording audio context
+  (`test:round-setup`, 48 checks); 2 mutations (back to 0.3, no hold), 2 caught. NOT heard on a real phone. Not
+  built: a volume slider, or a triple beep (his call if one beep is still missed).
+
 - [x] **THE "REST COMPLETE" BAR IS BIGGER TOO, 19 Nov 2026: his "make the Rest complete bar bigger too"**, the follow-on to
   the rest clock below. "Rest complete" is 24px bold in the main colour (was 14px), "Ready for set N?" 16px, and the
   buttons sit on their own row at 48px (were 28px), so nothing is squeezed or cut. The thin line shown while the
