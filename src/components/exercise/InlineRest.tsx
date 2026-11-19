@@ -56,19 +56,22 @@ export function InlineRest() {
       data-rest-left={Math.max(0, Math.ceil(left / 1000))}
       role="timer"
       aria-label={over ? `Rest over. Go, set ${restTargetSetNumber ?? ''}` : `Rest, ${clock(left)} left`}
-      className="mx-0.5 mb-2 mt-1 flex items-center gap-2.5 rounded-2xl py-2 pl-3 pr-2"
+      className="mx-0.5 mb-2 mt-1 flex items-center gap-2.5 rounded-2xl py-3 pl-3.5 pr-2"
       style={{ background: 'rgba(var(--glow-rgb), .08)', border: '1px solid rgba(var(--glow-rgb), .28)' }}
     >
-      <Timer className="size-4 shrink-0 text-primary-text" aria-hidden />
+      {/* Readable from a phone propped down the gym: the clock is the biggest
+          thing on the card (about 3rem, in the main colour), the label sits
+          above it, and the bar is thick enough to read as a bar at arm's length. */}
       <div className="min-w-0 flex-1">
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-[0.625rem] font-semibold uppercase tracking-[.12em] text-primary-text">{over ? 'Go' : 'Rest'}</span>
-          <span className="font-mono text-[1.0625rem] font-bold tracking-[-.02em] text-foreground" data-testid="inline-rest-clock">
-            {over ? `Set ${restTargetSetNumber ?? ''}`.trim() : clock(left)}
-          </span>
+        <div className="flex items-center gap-1.5">
+          <Timer className="size-4 shrink-0 text-primary-text" aria-hidden />
+          <span className="text-[0.75rem] font-bold uppercase tracking-[.14em] text-primary-text">{over ? 'Go' : 'Rest'}</span>
         </div>
-        <div className="mt-1.5 h-[3px] overflow-hidden rounded-full" style={{ background: 'var(--hairline)' }}>
-          <div className="h-[3px] rounded-full transition-[width] duration-1000 ease-linear" data-testid="inline-rest-bar" style={{ width: `${share * 100}%`, background: 'var(--primary)', boxShadow: '0 0 8px rgba(var(--glow-rgb), .8)' }} />
+        <div className="mt-0.5 font-mono text-[3rem] font-bold leading-none tracking-[-.03em] text-primary-text" data-testid="inline-rest-clock">
+          {over ? `Set ${restTargetSetNumber ?? ''}`.trim() : clock(left)}
+        </div>
+        <div className="mt-2.5 h-2 overflow-hidden rounded-full" style={{ background: 'var(--hairline)' }}>
+          <div className="h-2 rounded-full transition-[width] duration-1000 ease-linear" data-testid="inline-rest-bar" style={{ width: `${share * 100}%`, background: 'var(--primary)', boxShadow: '0 0 8px rgba(var(--glow-rgb), .8)' }} />
         </div>
       </div>
       <span className="flex shrink-0 gap-2">

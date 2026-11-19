@@ -624,6 +624,33 @@ Newest first. One line each.
   kept so it can be). `test:session-effort` (23 checks, 12 mutations, two caught only after a read-back check and a
   crash-safe wrapper were added), `verify:session-effort` (9 checks, 5 browser mutations), screenshot read.
   Needs migration `20261118140000_add_session_effort` (until then the feel word saves and the number waits).
+- [x] **THE TIMER'S SOUND IS LOUDER, 19 Nov 2026: his "make the timer's sound louder too"**. Every cue (rest done, round
+  timer work / rest / done) was a sine at 30% that faded away at once, so most of each beep was near-silent. Now a
+  triangle wave (more overtones, carries over machines and music) at full level, held for 80% of the tone, then cut
+  off. Full level is the most one tone can take without clipping, so the next step up is the phone's own volume, and
+  an iPhone on silent or a page that has not been tapped yet may still say nothing (unchanged, named in the file). The
+  tones, lengths and vibrations are unchanged. Checked by RUNNING the cue against a recording audio context
+  (`test:round-setup`, 48 checks); 2 mutations (back to 0.3, no hold), 2 caught. NOT heard on a real phone. Not
+  built: a volume slider, or a triple beep (his call if one beep is still missed).
+
+- [x] **THE "REST COMPLETE" BAR IS BIGGER TOO, 19 Nov 2026: his "make the Rest complete bar bigger too"**, the follow-on to
+  the rest clock below. "Rest complete" is 24px bold in the main colour (was 14px), "Ready for set N?" 16px, and the
+  buttons sit on their own row at 48px (were 28px), so nothing is squeezed or cut. The thin line shown while the
+  keyboard is up is 18px bold (was 12px). Floors added in `test:exercise-today`; 2 mutations, 2 caught.
+  `verify:session-start` (28, incl. "none of it cut off") green, screenshot read at 390px. Not seen on a real phone.
+
+- [x] **THE REST TIMER IS READABLE FROM A DISTANCE, 19 Nov 2026: his report from the gym floor** ("the rest timer isn't easy
+  to see from a distance when your phone is down"). Presentation only, decided by me (no ruling needed: size, not
+  behaviour). The clock under the set just ticked went from 17px to about 48px in the main colour, with the label above
+  it and the bar 8px thick (was 3px); the bottom bar's clock (shown when the row is scrolled out of view) went from 18px
+  to 36px in a 64px bar (was 44px). The ±15 and Skip buttons, the one engine, and the dock standing aside are unchanged.
+  Two old checks pinned the exact old dock numbers (44px, 18px); they now hold a FLOOR (56px, 2rem), so the size can grow
+  but never quietly shrink back. New floors on the inline clock (2.5rem) and bar (8px). `test:exercise-2a` (52 checks),
+  `test:exercise-today`; 4 mutations (clock, bar, dock height, dock clock), 4 caught. `verify:exercise-2a` (35),
+  `verify:exercise-week` (28), `verify:session-start` (28) green; screenshot read at 390px. NOT done: the
+  "Rest complete" bar and the keyboard-up thin line are still small (not what he reported); never seen on a real phone
+  in a bright gym. Frontend only, no deploy beyond the merge.
+
 - [x] **WEIGHT, WEEK BY WEEK on Home, 18 Nov 2026: his "Add all three"** (from three options, after screenshots of another
   app's weight screen; over the weekly line alone and over the list alone). Behind the Weight row in Progress: a graph
   of every weigh-in as a faint dot with each week's average as a line through the middle of its week, a 3M / 6M / 1Y

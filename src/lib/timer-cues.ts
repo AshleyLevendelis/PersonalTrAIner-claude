@@ -30,9 +30,16 @@ export function playTimerCue(cue: TimerCue, opts: { sound?: boolean; vibrate?: b
     osc.connect(gain)
     gain.connect(ctx.destination)
     osc.frequency.value = tone.frequency
-    osc.type = 'sine'
-    gain.gain.setValueAtTime(0.3, ctx.currentTime)
-    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + tone.durationMs / 1000)
+    // LOUD ENOUGH FOR A GYM FLOOR (19 Nov 2026, his "make the timer's sound louder"): it was a sine
+    // at 0.3 that faded straight away, so most of the beep was near-silent. Now a triangle wave (its
+    // overtones carry over machines and music) at full level, held for most of the tone and cut off
+    // quickly. Full level is the ceiling a single oscillator can take without clipping; past that
+    // it is the phone's own volume.
+    osc.type = 'triangle'
+    const end = ctx.currentTime + tone.durationMs / 1000
+    gain.gain.setValueAtTime(1, ctx.currentTime)
+    gain.gain.setValueAtTime(1, ctx.currentTime + (tone.durationMs / 1000) * 0.8)
+    gain.gain.exponentialRampToValueAtTime(0.01, end)
     osc.start(ctx.currentTime)
     osc.stop(ctx.currentTime + tone.durationMs / 1000)
     setTimeout(() => ctx.close(), tone.durationMs + 100)
