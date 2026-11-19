@@ -2,6 +2,39 @@
 
 Newest first. One line each.
 
+- [x] **TWO MEALS A DAY STILL SHOWED AN EMPTY "LUNCH · NO OPTION GENERATED" WITH A GENERATE BUTTON (19 Nov 2026, the full pass;
+  a tester's finding P2, traced before fixing).** His 14 Nov ruling ("a day serves only the meals the profile says")
+  was held in the day's own dishes and not in the LIST: Nutrition drew a row for any meal with saved dishes, and a
+  change to two meals or to no snacks rightly keeps the dropped meal's dishes (changing back brings them straight
+  back). So he was offered a Generate button for a meal he had just said he does not eat.
+  NOW one function decides the rows (`mealRowsFor`): a meal with saved dishes that the profile serves; any meal he has
+  LOGGED today whatever the profile now says (what he ate is never hidden by a later setting); and a meal is drawn as
+  empty only if the profile serves it. An older profile with no meal count drops nothing, and a profile that never
+  said whether snacks are on keeps the snack, as the day engine does. Decision, mine (it has a right answer under his
+  ruling); the logged-meal exception is mine too.
+  `test:meal-rows` (new, 17 checks; 9 mutations, 9 caught; the "serves" lists come from the app's own function, never
+  typed in), `verify:meal-shape-rows` (new, 10 checks on the page that boots the WHOLE app, with the profile's two
+  settings as inputs; 1 browser mutation caught; screenshot read). Frontend only.
+- [x] **REMOVING A SHOPPING-LIST ITEM SAID NOTHING AND COULD NOT BE PUT BACK (19 Nov 2026, the full pass; a tester's finding N2).**
+  Clear and Rebuild each say so with an Undo (his 8 Nov "Undo line"); Remove was the one way off the list that did
+  not, and an item from the meals that is removed is deliberately never brought back by a rebuild, so a slip of the
+  thumb lost it for good. Remove now shows "Cheddar — taken off the list" with Undo, in the tick's own shape, and Undo
+  puts the row back exactly as it stood, through the store. Wording is mine, in the shape of the line beside it; his
+  to change. `verify:grocery` (3 new checks in a real browser; 3 browser mutations caught), `test:grocery-shopping`
+  (2 new checks, 2 mutations caught). The rebuild still never brings a removed item back: by design, unchanged.
+- [x] **AN UNDONE MEAL EDIT LEFT ITS DISH IN THE SWAP LIST, AND CHOOSING IT FAILED (19 Nov 2026, the full pass; a tester's finding
+  N1, traced before fixing).** Lunch, take the rice out, Apply, Undo: the edited copy was deleted, as it should be,
+  and the meal's tab still read "Swap · 1" and offered it; tapping it answered "That swap didn't save". The Undo of an
+  edit, an added food or a move between meals hands the app an EMPTY pick ("back to what the day chose"), and the
+  app's handler returned on an empty pick before it re-read the saved options. It re-reads them on every path now.
+  WHY NO CHECK HAD SEEN IT: the handler lives in the app's top file, and only one test page boots that; every other
+  Nutrition page hands the meal list a stand-in. `verify:meal-undo-options` (new, 18 checks on the whole-app page: an
+  edit and an added food, each undone, the tab's count and list read against the store; 1 browser mutation caught).
+  Frontend only.
+- [x] **A CHECK THAT PINNED AN ARGUMENT'S POSITION FAILED ON CORRECT CODE (19 Nov 2026).** `test:log-needs-your-words` required
+  the user's words to be the LAST thing handed to the chat's logging step; the past-day log added the day after them.
+  Found by the 292-check run on the new commit, not by the checks I chose by hand. Re-anchored on the property (the
+  words are handed over), 1 mutation caught.
 - [x] **AN APPLY THAT COULD NOT SAVE LOST ITS BUTTONS, AND THREE CHANGES SAID "PARTLY DONE" OVER AN UNTOUCHED PLAN (19 Nov 2026,
   the full pass; a tester's finding C4, confirmed in a browser before fixing).** With the plan's own save failing, a
   tap on Apply was answered "Nothing was applied" and the offer was gone: the only way back was to ask the coach again.

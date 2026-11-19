@@ -41,6 +41,12 @@ export function clearedToast(n: number): string {
   return `${n} ticked item${n === 1 ? '' : 's'} cleared`
 }
 
+/** The Undo toast after one item is removed: it says which, in the shape of the tick's own line. */
+export function removedToast(name: string): string {
+  const n = name.trim()
+  return `${n.charAt(0).toUpperCase()}${n.slice(1)} — taken off the list`
+}
+
 /** The Undo toast after a rebuild: the list was worked out again from the meals. */
 export const REBUILT_TOAST = 'List rebuilt from your meals'
 /** A rebuild that could not read the list did nothing (8 Nov 2026): said so, with no Undo, because nothing changed. */

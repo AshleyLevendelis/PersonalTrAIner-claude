@@ -22,7 +22,7 @@ import { InsightBanner } from '@/components/ui/insight-banner'
 import type { FitnessGoal, MacroTargets } from '@/lib/types'
 import { undoMealEdit, type MealEditUndo } from '@/lib/pending-action-executor'
 import { getTodayLedger, getLedgerSnapshot, subscribeMealStore, logMealEaten, voidMealEvents, loggedEventsBySlot, type MealSlotName, type MealEventRecord } from '@/lib/meal-store'
-import { mealSections } from '@/lib/meal-sections'
+import { mealSections, mealRowsFor } from '@/lib/meal-sections'
 import { checkMealAgainstRestrictions, describeEatenBeforeChange, type MealRestrictionVerdict } from '@/lib/meal-restriction-check'
 import { methodToShow, macroOnTarget, isFamiliarOption, computeSlotBudgets, type PoolOption } from '@/lib/meal-generation'
 import { emptyMealLine } from '@/lib/empty-meal'
@@ -213,7 +213,6 @@ export function MealPlan({
   onSwapSlot, onUndoSwap, onRegenerateSlot, onMakeOneNew, onFindMoreOptions, onRegenerateAll, upcoming, dayMove, regeneratingAll = false,
   heldAround, onKeepHeldSizes, eatingOut, freestyle,
 }: MealPlanProps) {
-  const activeSlots = SLOT_ORDER.filter(s => (pools[s]?.length ?? 0) > 0)
   // "REGENERATE ALL" ASKS FIRST (15 Nov 2026, the coeliac nurse's test): one tap replaced every meal the app had made,
   // for every day, with no word. It now says what goes and what stays, and only "Make new meals" runs it.
   const [confirmRegenerateAll, setConfirmRegenerateAll] = useState(false)
@@ -224,7 +223,6 @@ export function MealPlan({
   // AND A MEAL HE CHOSE THAT NEVER SAVED A DISH (15 Nov 2026, the coeliac nurse): the build left lunch and dinner with
   // no rows at all, so no key, and the screen drew nothing. The meals he chose come from his own shape.
   const expectedSlots = mealsPerDay != null && targets ? (Object.keys(computeSlotBudgets(targets, mealsPerDay, includeSnacks, skipBreakfast)) as MealSlotName[]) : []
-  const emptySlots = SLOT_ORDER.filter(s => (s in pools || expectedSlots.includes(s)) && (pools[s]?.length ?? 0) === 0)
   /**
    * Audit §2.1, second half — the OFFER. A restriction turned on after these
    * meals were generated invalidates some of them, and the app knew and said
@@ -284,6 +282,11 @@ export function MealPlan({
   // only void the copy it could see. loggedEventsBySlot owns the grouping now
   // and keeps all of them; see its comment.
   const [loggedBySlot, setLoggedBySlot] = useState<Partial<Record<MealSlotName, MealEventRecord[]>>>({})
+  // THE MEALS DRAWN, and the ones drawn as empty: the meals the profile serves (meal-sections.ts, mealRowsFor).
+  const { listed: activeSlots, empty: emptySlots } = mealRowsFor({
+    order: SLOT_ORDER, pools, serves: expectedSlots, snacksUnset: includeSnacks == null,
+    logged: s => (loggedBySlot[s] ?? []).length > 0,
+  })
   // RETURNS ITS PROMISE, and that is a fix rather than tidiness. The log
   // button's busy flag cleared as soon as logMealEaten had queued, while this
   // refresh was still in flight — so for the length of one ledger round-trip

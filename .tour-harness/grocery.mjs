@@ -282,6 +282,28 @@ const X1 = await page(`
   return { onScreen: !!row('Cheddar'), dismissed: db ? db.dismissed === true : true, chip: qa('[data-testid="grocery-chip"]').find(c => c.dataset.aisle === 'dairy')?.textContent.trim() ?? null }
 `)
 check('Remove takes it off the list, through the store, and the aisle\'s count follows', !X1.onScreen && X1.dismissed && X1.chip === 'Dairy, eggs & alternatives2', X1)
+// REMOVE SAYS SO, WITH AN UNDO (the Nutrition walk, 19 Nov 2026; the shape of his 8 Nov "Undo line"). It was the one
+// way off the list that said nothing and could not be put back, and a rebuild never brings a removed item back.
+// Undo puts the row back as it stood; then it is removed again, so the page goes on from the state it always had.
+const X2 = await page(`
+  const toast = q('[data-testid="grocery-toast"]')?.textContent.replace(/\\s+/g, ' ').trim() ?? null
+  q('[data-testid="grocery-undo"]')?.click()
+  for (let i = 0; i < 20; i++) { await new Promise(r => setTimeout(r, 100)); if (row('Cheddar')) break }
+  await new Promise(r => setTimeout(r, 400))
+  const db = (window.__fakeDb?.grocery_items ?? []).filter(r => r.id === 'g-9')
+  const back = { onScreen: !!row('Cheddar'), rows: db.length, dismissed: db[0]?.dismissed === true, qty: db[0]?.quantity ?? null, chip: qa('[data-testid="grocery-chip"]').find(c => c.dataset.aisle === 'dairy')?.textContent.trim() ?? null, toastGone: !q('[data-testid="grocery-undo"]') }
+  return { toast, back }
+`)
+check('Remove says which item left, with an Undo', /^Cheddar — taken off the list\s?Undo$/.test(X2.toast ?? ''), X2.toast)
+check('...and Undo puts it back on the list, through the store, as it stood', X2.back.onScreen && X2.back.rows === 1 && !X2.back.dismissed && X2.back.chip === 'Dairy, eggs & alternatives3', X2.back)
+await tapRow('Cheddar')
+const X3 = await page(`
+  row('Cheddar')?.querySelector('[data-testid="grocery-remove"]')?.click()
+  await new Promise(r => setTimeout(r, 400))
+  const db = (window.__fakeDb?.grocery_items ?? []).find(r => r.id === 'g-9')
+  return { onScreen: !!row('Cheddar'), dismissed: db ? db.dismissed === true : true, chip: qa('[data-testid="grocery-chip"]').find(c => c.dataset.aisle === 'dairy')?.textContent.trim() ?? null }
+`)
+check('(removed again, so the page goes on as before)', !X3.onScreen && X3.dismissed && X3.chip === 'Dairy, eggs & alternatives2', X3)
 
 console.log('\n[4] A tick lands, waits a beat, leaves — and Undo brings it back')
 const K0 = await page(`

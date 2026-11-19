@@ -239,8 +239,13 @@ console.log('\n1. The libraries are cached separately from the app')
   // MOVED 18 Nov 2026: 442 -> 453, the foods a log is full of (about 65 entries in the food table, which every screen
   // that counts a meal reads, so it is first-paint code) and the realistic-plate rules. MEASURED 445 through this gate on
   // the change. His 15 Sep ruling, "raise it with room to grow": 8 gz over today.
-  headroom('a deploy re-downloads', appGzip, 453, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, under 453`, appGzip < 453, appGzip)
+  // MOVED 19 Nov 2026: 453 -> 461. Crossed at 453 by the full pass's fixes (the chat's logging line and past-day log,
+  // an offer that survives a failed save, the meal rows rule, the shopping list's Undo on Remove). MEASURED through
+  // this gate: 452 on 58437906, 453 on the change (paint 608 -> 609, app 1564 -> 1565, total 3203 -> 3204; those three
+  // were not raised and have 3, 1 and 7 left, so the next addition to the app chunk must decide). His 15 Sep ruling,
+  // "raise it with room to grow": 8 gz over today.
+  headroom('a deploy re-downloads', appGzip, 461, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, under 461`, appGzip < 461, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')

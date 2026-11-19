@@ -52,6 +52,8 @@ const TRAIN_TODAY = new URLSearchParams(location.search).has('session-day')
 // entry (verify:home-day-named). ?weigh=79.55: yesterday's weigh-in (an INPUT), so a reading with two decimals
 // reaches Home and Profile. Without them the page is unchanged.
 const NO_CARDIO = new URLSearchParams(location.search).has('no-cardio')
+const MEALS_A_DAY = Number(new URLSearchParams(location.search).get('meals')) || 3
+const NO_SNACKS = new URLSearchParams(location.search).has('no-snacks')
 const WEIGH = Number(new URLSearchParams(location.search).get('weigh')) || 80
 // ?setup-typo: he signed up TODAY and setup kept 187 kg (his live report, 14 Nov 2026). INPUTS only: the weight on the
 // profile, the sign-up weigh-in, and the sign-up target row as the app writes it at sign-up (anchorTargetsAtSignUp:
@@ -99,7 +101,9 @@ try {
 const profileRow = {
   id: PROFILE_ID, owner_id: USER_ID, display_name: 'Sam',
   age: 30, gender: 'male', height_cm: 178, weight_kg: 80, activity_level: 'moderate',
-  fitness_goal: 'hypertrophy', preferred_time: 'morning', meals_per_day: 3, include_snacks: true,
+  // ?meals=2 and ?no-snacks are INPUTS (what Profile's "Meals a day" and "Snacks" hold), for verify:meal-shape-rows:
+  // the stored dishes below still cover lunch and the snack, which is exactly the state after he changes either.
+  fitness_goal: 'hypertrophy', preferred_time: 'morning', meals_per_day: MEALS_A_DAY, include_snacks: !NO_SNACKS,
   equipment_access: 'full_gym', injuries: [], training_style: 'hybrid', training_experience: 'intermediate',
   session_duration_preference: '45-60', workout_split_preference: 'upper_lower',
   // ?session-day makes the anchor's Wednesday a training day (an INPUT: which days she trains), for a driver that

@@ -2393,6 +2393,15 @@ function App() {
    * back when this comes back false rather than claiming a change that did
    * not land.
    */
+  /** What is stored is what is drawn: after any write to a meal's options the list is read back, never patched. */
+  const rereadMealPools = async (profileId: string) => {
+    try {
+      setMealPools(await getPools(profileId))
+    } catch (err) {
+      console.error('meal options: re-read failed — the write landed, the screen may lag until reload', err)
+    }
+  }
+
   const handleMealPickApplied = async (slot: MealSlotName, chosenName: string): Promise<boolean> => {
     // Persist chat-confirmed swaps (and their undo, which calls
     // this with the restored previous name) BEFORE updating the
@@ -2408,6 +2417,11 @@ function App() {
     // here would persist a pick for a meal that doesn't exist.
     if (!chosenName) {
       setManualMealPicks(prev => { const next = { ...prev }; delete next[slot]; return next })
+      // THE OPTIONS ARE RE-READ HERE TOO (the Nutrition walk, 19 Nov 2026). An empty name is the Undo of an edit, an
+      // addition or a move between meals, and that Undo has just DELETED the option it made. This branch returned
+      // before the re-read below, so the deleted dish stayed in the swap list ("Swap · 1", "Chicken and rice without
+      // white rice"), and choosing it answered "That swap didn't save".
+      await rereadMealPools(profile.id)
       return true
     }
     const todayDate = getSessionDateContext(profile.id).date
@@ -2432,11 +2446,7 @@ function App() {
     // payload keeps one source of truth: what renders is exactly
     // what was stored, and cannot drift from it. Harmless for a
     // plain swap, where the pool is unchanged.
-    try {
-      setMealPools(await getPools(profile.id))
-    } catch (err) {
-      console.error('onMealSwapApplied: pool re-read failed — the write landed, the screen may lag until reload', err)
-    }
+    await rereadMealPools(profile.id)
     return true
   }
   // ONE meal-mutation layer (M1): the UI swap goes through
