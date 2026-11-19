@@ -1313,6 +1313,11 @@ export const LOG_WORDS = {
   corrected: "Got it, that's corrected.",
   best: (exercise: string, best: string, more: number) =>
     `That's a new best on ${exercise}: ${best}.${more > 0 ? ` And ${more} more ${more === 1 ? 'best' : 'bests'} in there.` : ''} Nice work.`,
+  /** A session told to the chat about an earlier day: said with the day, so nobody thinks it landed on today. */
+  loggedOn: (day: string) => `Got it, that's logged on ${day}.`,
+  notLoggedOn: (day: string) => `That didn't save, so nothing was added to ${day}. Try again in a moment.`,
+  /** One detail short, for an earlier day: asked in one go (the follow-up card is today's). */
+  pastTitle: (day: string, saved: boolean) => `${saved ? 'Logged' : 'Not logged'} · ${day}`,
   /** What that line becomes once the log is taken back with Undo. */
   undone: "That's taken back.",
   /** ...and what its card says ("Logged · Wednesday was taken back" read as a sentence about a title). */

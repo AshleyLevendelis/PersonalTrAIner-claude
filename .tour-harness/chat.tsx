@@ -627,6 +627,7 @@ const earlierSets = EARLIER_KG > 0 && firstLoadedToday
     }]
   : []
 ;(window as unknown as { __firstLoadedLift: string | null }).__firstLoadedLift = firstLoadedToday?.name ?? null
+;(window as unknown as { __todayStr: string }).__todayStr = todayStr
 
 // ?topup=1 — MORE OPTIONS FOR EVERY MEAL, ASKED OF THE COACH (29 Sep 2026).
 // A plan made at five options a meal (three meals a day, no snack), and two

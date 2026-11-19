@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [x] **"I DID SQUATS YESTERDAY" WAS LOGGED ON TODAY (19 Nov 2026, the full pass; found by tracing the path, not by a report).**
+  The coach passes the date of a session told to it; the phone dropped the date and wrote the sets onto TODAY. The
+  wrong day's session showed work done, the week's count moved, and a record carried the wrong date.
+  Now the day is decided in one place (`chat-log-date.ts`): no date or today's is today, as before; a day in the last
+  two weeks is written to THAT day, by the same steps the Exercise screen's "I did it, not in the app" takes (the day's
+  session, its sets stamped at noon of that day, the day marked done), after reading the sets already there so more
+  sets are added after them and never over them; a day that has not happened, one more than two weeks back, or
+  something that is not a date is refused in a sentence and nothing is written. The line names the day ("Got it,
+  that's logged on Tuesday 17 Nov."), a failed write says so, and a follow-up question keeps the day it was about.
+  Decisions, mine: two weeks (where a mistyped date does most damage for least use); refusals never send him to a
+  screen. NOT BUILT: Undo on a past-day log (the card has no Undo button; said here, not hidden), and a personal best
+  is not announced for an earlier day.
+  FOUND BY THE SCREENSHOT: the card for yesterday's session carried "Not in today's plan — added to Additional Work".
+  A row's note is about today's plan, so a past day's rows carry what was done and nothing else.
+  FOUND BY A MISSED MUTATION: a version reading the dates as local instants agreed with the right one on this machine
+  (Greenwich time). The check now runs thirteen hours ahead of Greenwich on purpose.
+  ALSO FOUND BY THE RELATED-CHECKS RUN (361 checks on the chat commit): the two coaches share four blocks of rules
+  word for word and I had edited one side (`test:coach-rules-sync` prints a cross, and my quick loop counted the word
+  FAIL: a wrong detector, not a pass). Re-synced, so the SETUP coach also loses the tacked-on pivot; needs the
+  `onboarding-chat` deploy as well. Five checks pinned a line that gained an argument or a branch and were re-anchored
+  on what they protect (`coach-texts-you`, `past-lifts`, `no-false-claim`, `rebuild-honours`, `silent-writes`); the
+  last had been red since the food-box commit.
+  `test:chat-log-date` (new, 31 checks, 19 mutations all caught after the time-zone check was added),
+  `verify:chat-log-words` §5-7 (15 more checks in a real browser, reading the database after each), screenshot read.
 - [x] **HOW THE COACH TALKS: TONE, QUESTIONS, ENDINGS, AND WHAT KEEPS PEOPLE TALKING TO IT (19 Nov 2026, his request, decided on
   his "If you're unsure about something go with your recommendations").** His words: "improve the chat to give the user
   the best ux the way the chat speaks the tone it uses, the questions it asks, the information it gives the way it keeps

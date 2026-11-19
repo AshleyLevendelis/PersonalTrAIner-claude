@@ -36,7 +36,7 @@ import { computeBMR, staticTDEEFor, resolveBodyMetrics, nutritionReferenceWeight
 import { getAppNow, getSessionDateContext, getLocalDateString } from '@/lib/dev-clock'
 import { groupMessages, bubblePositions, bubbleRadius, groupTimestamp, timeLabel } from '@/lib/chat-groups'
 import { supabase } from '@/lib/supabase'
-import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach } from '@/lib/daily-tracking'
+import { getRecentLogsWithWarmups, formatLogsForAI, cardioHistoryForCoach, markSessionCompleted } from '@/lib/daily-tracking'
 import { saveChatCache, loadChatCache, clearChatCache } from '@/lib/chat-cache'
 import { chatStarters } from '@/lib/chat-starters'
 import { preparePhoto, photoMessageText } from '@/lib/photo-prepare'
@@ -89,10 +89,11 @@ import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoo
 import { buildMealSwapProposal, swapDiffFromTrial } from '@/lib/meal-swap-proposal'
 import { bestAmongLogged, logBubble } from '@/lib/log-words'
 import { appAsksFirst } from '@/lib/app-asks-first'
+import { logDayFor, type PastLogDay } from '@/lib/chat-log-date'
 import { ask, whichOne, didNotSave, personalBest, bestReadingOf, recordPhrase, weeksOnPlanSentence, turnedDownLine, whenSaid, NOT_LOADED_YET, WEEK_NOT_LOADED, RECEIPTS, RECEIPTS_UNDONE, LOG_WORDS, OFFER_UNREACHABLE, SCOPE, MORE_MEALS, DAY_MOVE, REBALANCE, PLAN_RESTART, layoffCardLine, logOnlyRefusal, coachShortcutLabel } from '@/lib/coach-voice'
 import { layoffStatus, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
 import { restartStillOffered } from '@/lib/plan-restart'
-import { getLastWorkingSessionDate } from '@/lib/set-log-store'
+import { getLastWorkingSessionDate, getSetsForDates, ensureSessionSynced, writeHistoricalSession, type SaveSetInput } from '@/lib/set-log-store'
 import { isHedged } from '@/lib/definite-mention'
 import { KIT_ITEMS, KIT_ITEM_LABELS, isKitItem, kitStatementInUserWords, kitItemsSaidNotOwned, describeKitStatement, kitItemsFor, kitOf, kitLine, kitInWords, type KitStatement } from '@/lib/kit-list'
 import type { KitController } from '@/lib/kit-change'
@@ -579,7 +580,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // that turn. Without it the resumed write appended instead of replacing —
   // so a correction that needed one extra detail silently doubled the
   // session, which is the exact harm the executor's own comment describes.
-  const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[]; correctsPrevious: boolean; userSaid: string }>>({})
+  const parseSessionsRef = useRef<Record<string, { entries: WorkoutEntryInput[]; todaysPlanExerciseNames: string[]; correctsPrevious: boolean; userSaid: string; pastDay?: PastLogDay | null }>>({})
 
   // Chat round 2, item 4 — "at most one check-in per conversation" is
   // enforced HERE, not by asking the model to remember it said something.
@@ -6024,7 +6025,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
    *   produced 6 logged sets against 3 prescribed, and every future weight
    *   would have built on three sets that never happened.
    */
-  const resolveAndMaybeLog = (entries: WorkoutEntryInput[], correctsPrevious = false, userSaid = ''): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } => {
+  const resolveAndMaybeLog = (entries: WorkoutEntryInput[], correctsPrevious = false, userSaid = '', pastDay: PastLogDay | null = null): { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView; past?: { groups: ParsedSetGroup[]; day: PastLogDay } } => {
     // THE SESSION RUN TODAY, moves taken into account — the plan's own row
     // for this weekday is empty on a day a session moved onto, and every
     // plan name, set count and load below came back blank there (H15).
@@ -6040,7 +6041,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const idx = parsed.groups.findIndex((g: ParsedSetGroup) => g.resolution === 'ambiguous' || !!g.ambiguity)
       const group = parsed.groups[idx]
       const resolverId = `parse_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-      parseSessionsRef.current[resolverId] = { entries, todaysPlanExerciseNames, correctsPrevious, userSaid }
+      parseSessionsRef.current[resolverId] = { entries, todaysPlanExerciseNames, correctsPrevious, userSaid, pastDay }
 
       const prompt = group.resolution === 'ambiguous'
         ? `Which "${group.matchedRawPhrase}" did you mean?`
@@ -6067,6 +6068,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       const answerPlaceholder = answerPlaceholderFor(group.ambiguity?.field, options.length > 0)
       return { text: prompt, clarification: { prompt, options, answerPlaceholder, resolverId } }
     }
+
+    // AN EARLIER DAY IS WRITTEN TO THAT DAY (19 Nov 2026, chat-log-date.ts): the parse is the same, the write is not
+    // today's. The caller awaits it (logToPastDay), because that write goes to the server before anything is claimed.
+    if (pastDay) return { text: '', past: { groups: parsed.groups, day: pastDay } }
 
     const todaysPlanSetCounts = new Map((todaysWorkout?.exercises ?? []).map(e => [e.name, e.sets] as const))
     const todaysPlanLoads = new Map(
@@ -6151,6 +6156,59 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     }
   }
 
+  /**
+   * A SESSION FROM AN EARLIER DAY, WRITTEN TO THAT DAY (19 Nov 2026). The same steps the Exercise screen's "I did it,
+   * not in the app" takes: the day's session row, its sets at noon of that day, and the day marked done. The sets
+   * already on that day are read first, so "I also did 3x8 squats yesterday" is added after them, never over them.
+   * Nothing is claimed until the write has come back, and there is no Undo on this receipt yet (said in BACKLOG).
+   */
+  const logToPastDay = async (groups: ParsedSetGroup[], day: PastLogDay): Promise<{ text: string; receipt?: ChatReceiptView }> => {
+    const profileId = activeSession.profileId ?? ''
+    const weeks = mesocycle.length > 0 ? mesocycle.length : 4
+    const weekNumber = getActiveMesocycleWeek(planCreatedAt ?? profile.created_at, new Date(`${day.date}T12:00:00`), weeks)
+    let existing: ExerciseSetLog[] = []
+    try { existing = (await getSetsForDates(profileId, [day.date])).get(day.date) ?? [] }
+    catch { return { text: LOG_WORDS.notLoggedOn(day.label) } }
+    const inputs: SaveSetInput[] = []
+    const { rows, totalSets, cardioLogged, cardioRefused } = executeLogWorkout(groups, {
+      profileId, date: day.date, weekNumber, dayName: day.dayName,
+      setsFor: (id, name) => existing.filter(l => l.exercise_id === id || l.exercise_name === name),
+      logSet: input => {
+        inputs.push(input)
+        return { user_id: profileId, date: day.date, exercise_name: input.exerciseName, exercise_id: input.exerciseId, set_number: input.setNumber, weight_kg: input.weightKg, reps_completed: input.repsCompleted, is_bodyweight: input.isBodyweight ?? false }
+      },
+      declareOffPlan: () => {},
+      todaysPlanSetCounts: new Map(), todaysPlanLoads: new Map(),
+    })
+    let setsSaved = inputs.length === 0
+    if (inputs.length > 0) {
+      try {
+        const sessionId = await ensureSessionSynced(profileId, day.date, 'seeded')
+        await writeHistoricalSession({
+          userId: profileId, date: day.date, weekNumber, day: day.dayName,
+          sets: inputs.map(i => ({ exerciseId: i.exerciseId, exerciseName: i.exerciseName, setNumber: i.setNumber, weightKg: i.weightKg, repsCompleted: i.repsCompleted, rpe: i.rpe ?? null, unit: i.unit, isBodyweight: i.isBodyweight, isWarmup: i.isWarmup, addedLoadKg: i.addedLoadKg, completedAt: `${day.date}T12:00:00` })),
+        })
+        await markSessionCompleted(sessionId, new Date(`${day.date}T12:00:00`))
+        setsSaved = true
+      } catch { setsSaved = false }
+    }
+    onLogsUpdated?.()
+    const saved = (inputs.length > 0 && setsSaved) || cardioLogged.length > 0
+    const exerciseCount = groups.filter(g => !g.routesToCardio).length
+    const summary = [
+      exerciseCount > 0 && setsSaved ? `${exerciseCount} exercise${exerciseCount === 1 ? '' : 's'}` : '',
+      totalSets > 0 && setsSaved ? `${totalSets} set${totalSets === 1 ? '' : 's'}` : '',
+      cardioLogged.length > 0 ? `${cardioLogged.length} ${cardioLogged.length === 1 ? 'activity' : 'activities'}` : '',
+    ].filter(Boolean).join(' · ')
+    const title = LOG_WORDS.pastTitle(day.label, saved)
+    return {
+      text: saved ? LOG_WORDS.loggedOn(day.label) : LOG_WORDS.notLoggedOn(day.label),
+      // A row's note is about TODAY's plan ("Not in today's plan", "heavier than the estimate"): on an earlier day it
+      // would be a sentence about the wrong day, so the rows carry what was done and nothing else.
+      receipt: { kind: 'log_workout', title, rows: saved ? rows.map(r => ({ label: r.label, detail: r.detail })) : [], summary, status: !saved ? 'failed' : cardioRefused > 0 || !setsSaved ? 'partial' : 'done', resolvedAt: new Date().toISOString() },
+    }
+  }
+
   /** Continuation of resolveAndMaybeLog after a ClarificationCard answer — see its own doc comment for why only exercise_name ambiguity round-trips through a tap choice. */
   const handleClarificationChoice = async (msgIndex: number, value: string) => {
     const msg = messages[msgIndex]
@@ -6187,7 +6245,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       return { ...e, setsPhrase: `${e.setsPhrase} ${value}`.trim(), rawText: `${e.rawText} ${value}`.trim() }
     })
 
-    const outcome = resolveAndMaybeLog(updatedEntries, session.correctsPrevious, said)
+    const first = resolveAndMaybeLog(updatedEntries, session.correctsPrevious, said, session.pastDay ?? null)
+    // The answer completed a session from an earlier day: it is written to THAT day (the question carried the day).
+    const outcome: { text: string; receipt?: ChatReceiptView; clarification?: ChatClarificationView } = first.past ? await logToPastDay(first.past.groups, first.past.day) : first
     setMessages(prev => prev.map((m, i) => (i === msgIndex ? { ...m, clarification: outcome.clarification, receipt: outcome.receipt, content: outcome.text } : m)))
   }
 
@@ -6981,7 +7041,12 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         exercisePhrase: e.exercise_phrase,
         setsPhrase: e.sets_phrase,
       }))
-      return resolveAndMaybeLog(entries, result.logWorkout.corrects_previous === true, userSaid)
+      // WHICH DAY (19 Nov 2026): the date the coach passed used to be dropped here, and "I did squats yesterday" was
+      // written onto today. An earlier day in the last two weeks is written to that day; anything else is refused.
+      const day = logDayFor(result.logWorkout.date, activeSession.date)
+      if (day.kind === 'refused') return { text: day.say }
+      const logged = resolveAndMaybeLog(entries, result.logWorkout.corrects_previous === true, userSaid, day.kind === 'past' ? day : null)
+      return logged.past ? await logToPastDay(logged.past.groups, logged.past.day) : logged
     }
     if (result.memoryIntent) {
       // "I DON'T LIKE X" IS ASKED ABOUT FIRST (his "Ask, and hold Tuesday", 14 Nov 2026): a food dislike said only with a

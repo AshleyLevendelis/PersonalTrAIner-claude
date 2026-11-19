@@ -341,8 +341,11 @@ console.log('\n8. The five found by the whole-app audit, 5 Sep 2026')
   check('saving foods to avoid surfaces its failure', /Saving foods to avoid failed/.test(profile))
   check('...says plainly that the food is NOT being avoided', /it is NOT being avoided yet/.test(profile))
   check('...and rethrows so the typed word stays in the box', /throw err/.test(profile))
-  check('the tag list awaits its save before clearing the input',
-    /await onSave\(\[\.\.\.values, \.\.\.fresh\]\)[\s\S]{0,80}setInput\(''\)/.test(profile))
+  // RE-ANCHORED 19 Nov 2026, RED SINCE THE FOOD-BOX FIX (the commit before): the box no longer always empties, it
+  // keeps the words it could not read as a food. The property is the ORDER, and that is what is read: inside the try,
+  // the save is awaited first and the box is only changed after it, and a failed save changes it not at all.
+  const tagSave = /try \{\s*await onSave\(\[\.\.\.values, \.\.\.fresh\]\)\s*setInput\(([^)]*\)?)\)\s*\} catch \{([\s\S]{0,260}?)\} finally/.exec(profile)
+  check('the tag list awaits its save before clearing the input', !!tagSave && !/setInput\(/.test(tagSave[2]), tagSave?.[0]?.slice(0, 200))
 }
 
 // ---------------------------------------------------------------------------

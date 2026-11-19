@@ -20,8 +20,9 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
     if (String(url).includes('chat-gemini')) {
       const body = JSON.parse(init && init.body ? init.body : '{}')
       const said = String(body.message || '')
-      const m = /^did (.+?) (\\d+x\\d+ at [\\d.]+ ?kg)$/.exec(said)
-      const logWorkout = m ? { date: null, corrects_previous: false, entries: [{ raw_text: said, exercise_phrase: m[1], sets_phrase: m[2] }] } : undefined
+      // "... on 2026-09-15" is the date the coach passes for a session from an earlier day.
+      const m = /^did (.+?) (\\d+x\\d+ at [\\d.]+ ?kg)(?: on (\\S+))?$/.exec(said)
+      const logWorkout = m ? { date: m[3] || null, corrects_previous: false, entries: [{ raw_text: said, exercise_phrase: m[1], sets_phrase: m[2] }] } : undefined
       return new Response(JSON.stringify({ reply: logWorkout ? '' : 'Sure.', logWorkout }), { status: 200, headers: { 'Content-Type': 'application/json' } })
     }
     return realFetch(url, init)
@@ -105,5 +106,50 @@ await until(() => ev(READ), v => v.titles >= 1)
 await wait(600)
 const same = await ev(READ)
 check('4b. matching the record is logged, not celebrated', same.line === "Got it, that's logged.", same.line)
+
+// 5. A SESSION FROM YESTERDAY GOES ON YESTERDAY (19 Nov 2026): the date used to be dropped and the sets written to today.
+const shift = (iso, days) => { const [y, m, dd] = iso.split('-').map(Number); return new Date(Date.UTC(y, m - 1, dd + days)).toISOString().slice(0, 10) }
+const DB = `(() => { const d = window.__fakeDb; return {
+  sets: (d.exercise_set_logs || []).map(r => [r.exercise_name, r.set_number, r.weight_kg, String(r.completed_at).slice(0, 10)]),
+  sessions: (d.workout_sessions || []).map(r => [r.date, !!r.is_completed]),
+} })()`
+await go('&earlier=0')
+await wait(3500)
+const today = await ev('window.__todayStr')
+const yesterday = shift(today, -1)
+const lift5 = await lift()
+const label = await ev(`(() => { const [y, m, d] = ${JSON.stringify(yesterday)}.split('-').map(Number); const w = new Date(Date.UTC(y, m - 1, d)); return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][w.getUTCDay()] + ' ' + w.getUTCDate() + ' ' + ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][w.getUTCMonth()] })()`)
+check('5a. the chat sent', await say(`did ${lift5} 3x8 at 50 kg on ${yesterday}`))
+await until(() => ev(`document.body.innerText`), t => /logged on |didn't save/.test(t))
+await wait(800)
+const pastText = await ev('document.body.innerText')
+const pastDb = await ev(DB)
+await shoot('chat-log-words-5-yesterday')
+check('5b. the line names the day it went on', pastText.includes(`Got it, that's logged on ${label}.`), pastText.slice(-300))
+check('5c. the card is titled with that day, not today', new RegExp(`Logged · ${label}`).test(pastText), pastText.slice(-300))
+check('5c2. nothing on the card talks about TODAY\u2019s plan', !/today's plan|Additional Work|than the estimate/i.test(pastText.slice(pastText.lastIndexOf('logged on'))), pastText.slice(-260))
+check('5d. three sets are in the database, every one dated YESTERDAY', pastDb.sets.length === 3 && pastDb.sets.every(r => r[0] === lift5 && r[2] === 50 && r[3] === yesterday), pastDb.sets)
+check('5e. NOT ONE set was written to today', pastDb.sets.every(r => r[3] !== today), pastDb.sets)
+check('5f. yesterday is a finished session', pastDb.sessions.some(r => r[0] === yesterday && r[1] === true), pastDb.sessions)
+check('5g. today\u2019s own count has not moved', /· 0 of \d+ sets/.test(pastText), (pastText.match(/\d+ of \d+ sets/) || [])[0])
+
+// 6. More sets told about the same day are added AFTER the ones there, never over them.
+check('6a. the chat sent', await say(`did ${lift5} 2x8 at 55 kg on ${yesterday}`))
+await until(() => ev(DB), v => v.sets.length >= 5)
+await wait(500)
+const more = await ev(DB)
+check('6b. five sets now, numbered 1 to 5, the first three untouched', more.sets.length === 5 && JSON.stringify(more.sets.map(r => r[1]).sort()) === '[1,2,3,4,5]' && more.sets.filter(r => r[2] === 50).length === 3 && more.sets.filter(r => r[2] === 55).length === 2, more.sets)
+
+// 7. A day that has not happened, and one too far back, are refused and nothing is written.
+const before7 = (await ev(DB)).sets.length
+check('7a. the chat sent', await say(`did ${lift5} 3x8 at 50 kg on ${shift(today, 1)}`))
+await until(() => ev('document.body.innerText'), t => /hasn't happened yet/.test(t))
+const future = await ev('document.body.innerText')
+check('7b. tomorrow is refused in a sentence that says nothing was logged', /That day hasn't happened yet, so nothing was logged\./.test(future), future.slice(-200))
+check('7c. the chat sent', await say(`did ${lift5} 3x8 at 50 kg on ${shift(today, -20)}`))
+await until(() => ev('document.body.innerText'), t => /more than two weeks back/.test(t))
+const old = await ev('document.body.innerText')
+check('7d. twenty days back is refused', /more than two weeks back/.test(old), old.slice(-200))
+check('7e. ...and neither wrote a set', (await ev(DB)).sets.length === before7, (await ev(DB)).sets.length)
 
 await finish()

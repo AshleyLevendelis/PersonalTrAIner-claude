@@ -1714,6 +1714,11 @@ menu" stays true when a copy is also left outside it.
 - **The exam marks the turn he would SEE**: where the app asks a question in place of the coach's offer (a bare dislike,
   a usual meal with no amounts, a race with no date), the marker asks the chat's own function (`app-asks-first.ts`).
   Three of the five breaches of 18 Nov were these. `test:coach-exam-grader` §14
+- **A session told to the chat about an earlier day is written to THAT day** (19 Nov 2026; it was written onto today):
+  the last two weeks only, after the sets already there, the line naming the day; anything else is refused and nothing
+  is written. No Undo on a past-day log yet. `test:chat-log-date`, `verify:chat-log-words` §5-7
+- **A QUICK LOOP THAT COUNTS THE WORD "FAIL" READS A GATE THAT PRINTS A CROSS AS A PASS.** 19 Nov 2026:
+  `test:coach-rules-sync` was red and my loop printed 0. Read the exit code, or the gate's own last line.
 - **A SOURCE CHECK THAT NAMES A FIELD CAN PIN THE WRONG FIELD AND PASS.** 19 Nov 2026: the Undo line was written to
   `text` where a message's words live in `content`; the check I wrote pinned `text`, passed, and the bubble never
   changed. The browser driver found it in one run. For anything on screen, the driver is the proof; the source check
