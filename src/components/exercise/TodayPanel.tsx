@@ -89,7 +89,7 @@ import { planLighterToday, undoLighterToday, type LighterPlan } from '@/lib/ligh
 import { saveScopedEdit } from '@/lib/mesocycle-persistence'
 import { publishScreenEdit, recordScreenEdit, screenEditText } from '@/lib/screen-edit-undo'
 import { executeCardioSession } from '@/lib/pending-action-executor'
-import { recomputeLoad, type SwapScope } from '@/lib/mesocycle-edit'
+import { priceAddedLift, type SwapScope } from '@/lib/mesocycle-edit'
 import type { ExerciseEntry } from '@/lib/exercise-db'
 // Split out of the app chunk, like onboarding and the dev page: a dialog
 // opened from a menu item, by a person who has something to explain about a
@@ -731,25 +731,27 @@ export function TodayPanel({
    * grain, and the only one that makes the day longer.
    *
    * Pricing happens here rather than inside session-edit because
-   * `recomputeLoad` is async and that module is not. `peerProgrammingFor`
+   * pricing is async and that module is not. `peerProgrammingFor`
    * gives BOTH sides the same peer, so the weight on the card is computed for
    * the sets and reps the plan actually receives.
    *
-   * The reset branch (`isMainLiftReset: true`) is right for any tier here:
-   * it means "a movement with no history in this plan", and its basis already
-   * reads "find your working weight this session".
+   * PRICED LIKE THE PLAN'S OWN (19 Nov 2026): `priceAddedLift`, the one
+   * function the coach's confirm calls too. It was the new-main-lift branch,
+   * which ignored his log and the plan's light start: about 1.75x the plan's
+   * own number for the same lift.
    */
   const priceAddition = async (entry: ExerciseEntry) => {
     if (!profile || !mesocycle) return null
     const target = editTarget(todayRef)
     if (!target.ok) return null
     const planDay = target.planDayName
-    const day = mesocycle.find(w => w.week_number === liveWeek)?.days.find(d => d.day === planDay)
+    const week = mesocycle.find(w => w.week_number === liveWeek)
+    const day = week?.days.find(d => d.day === planDay)
     if (!day) return null
     const tier = mapTier(entry.mechanics_tier)
     const programming = peerProgrammingFor(day.exercises, tier)
     if (!programming) return null
-    const load = await recomputeLoad(entry, profile, programming.intensity, programming.sets, programming.reps, true)
+    const load = await priceAddedLift(entry, profile, programming, week, mesocycle)
     return { load, day, planDay }
   }
 

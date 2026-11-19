@@ -176,6 +176,50 @@ const week = await ev(`(() => {
 check('9. the week list shows it too, in the same words',
   /Cycle[^]{0,20}35 min/i.test(week || ''), (week || '').slice(0, 400))
 
+// 4. A REST DAY THE PLAN KEEPS NO ROW FOR (the chat walk of 18 Nov 2026). The day above has an empty ROW; most rest
+// days have none, and the write used to answer "I couldn't find Saturday on your plan" for those. Same steps, on the
+// weekday the plan omits. A fresh load, so nothing from the first pass is on screen. A SWIM, not a run: a run on the
+// plan is held to 10% over his longest logged run (the running rule), which is right and is not what this checks.
+const noRow = await ev('window.__noRowDay ?? null')
+check('11. the fixture has a rest day with no plan row', !!noRow && !!noRow.date, noRow)
+await send('Page.navigate', { url: `${URL_BASE}&pass=2&today=${noRow?.date ?? ''}#/tab/exercise` })
+await wait(4000)
+const opened2 = await clickText('/^Make .* a cardio day/i')
+check('12. that day offers to become a cardio day too', opened2 === true)
+await wait(600)
+await ev(`(() => {
+  const box = document.querySelector('[data-testid="add-cardio"]')
+  if (!box) return false
+  const set = (el, v) => {
+    const d = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')
+    d.set.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+  const [activity, mins] = box.querySelectorAll('input')
+  set(activity, 'Swim'); set(mins, '30')
+  const b = [...box.querySelectorAll('button')].find(x => (x.textContent || '').trim() === 'Steady')
+  if (b) b.click()
+  return true
+})()`)
+await wait(300)
+const tapped2 = await clickText('/^Add it$/')
+await wait(2500)
+const after2 = await ev(`(() => {
+  const block = document.querySelector('[data-testid="planned-activity"]')
+  const title = document.querySelector('[data-testid="activity-day-title"]')
+  block?.scrollIntoView({ block: 'center' })
+  return {
+    rendered: !!block,
+    title: (title?.textContent || '').trim(),
+    prescription: block ? block.innerText.replace(/\\s+/g, ' ').trim() : null,
+    body: document.body.innerText.replace(/\\s+/g, ' ').trim(),
+  }
+})()`)
+writeFileSync(new URL('./cardio-session-norow.png', import.meta.url).pathname,
+  Buffer.from((await send('Page.captureScreenshot', { format: 'png' })).result.data, 'base64'))
+check('13. the Add button was there to tap', tapped2 === true)
+check('14. the day with no row is now a session', after2.rendered === true && /Swim · 30 min · Steady/.test(after2.prescription || ''), { p: after2.prescription, body: after2.body?.slice(0, 260) })
+check('15. ...and nothing on the page says the day could not be found', !/couldn.t find/i.test(after2.body || ''), (after2.body || '').match(/[^.]*couldn.t find[^.]*/i)?.[0])
+
 const err = await ev('window.__err ?? null')
 check('10. no uncaught error on the page', err === null, err)
 

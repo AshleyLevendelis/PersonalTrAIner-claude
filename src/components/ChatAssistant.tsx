@@ -50,7 +50,7 @@ import { buildCoachEatenSummary, eatenWindow } from '@/lib/coach-eaten'
 import { buildCoachWeekReview, weekReviewDates } from '@/lib/coach-week-review'
 import { changeSinceStart } from '@/lib/weight-trend'
 import { getExerciseEntry } from '@/lib/exercise-db'
-import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, undoWindowEndsAt, pendingWindowPassed, type PendingActionReceipt } from '@/lib/pending-actions-store'
+import { createPendingAction, claimPendingAction, declinePendingAction, markExecuting, resolvePendingAction, getPendingAction, expireOldPendingActions, isWithinUndoWindow, undoWindowEndsAt, pendingWindowPassed, offerSurvivesFailedSave, type PendingActionReceipt } from '@/lib/pending-actions-store'
 import { APPEND_PROPOSAL_KINDS, INTENT_PROPOSAL_VERB, buildIntentProposal } from '@/lib/intent-proposal'
 import { buildWeighInProposal, executeWeighIn, WEIGH_IN_RECEIPT_HOLD_DETAIL, weighInCorrectionReceiptDetail, type WeighInPayload } from '@/lib/weigh-in-proposal'
 import { getWeighInPicture } from '@/lib/nutrition-targets'
@@ -58,7 +58,7 @@ import { pickAccountabilityCheckIn } from '@/lib/accountability'
 import { undoEatenCorrection } from '@/lib/eaten-correction'
 import { isBirthday } from '@/lib/body-units'
 import { executeExerciseSwap, executeExerciseRemove, executeExerciseReorder, executeExerciseAdd, type ExerciseAddPayload, executeExerciseBan, type ExerciseBanPayload, undoSessionEdit, type ExerciseRemovePayload, type ExerciseReorderPayload, executeMealSwap, executeMealAddition, applyMealOptionToSlot, undoMealAddition, undoExerciseSwap, executeInjuryAdaptation, executeLastingInjury, executeInjuryRecovered, executeEquipmentAdaptation, executeVolumeChange, executeSessionShorten,
-  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeRunningGoal, type RunningGoalPayload, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioLog, undoCardioLog, type CardioLogPayload, executeCardioSession, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload, planAsSaved } from '@/lib/pending-action-executor'
+  executeSessionRebuild, executeScheduleChange, executeStyleChange, executeGoalChange, executeSessionLength, executeRunningGoal, type RunningGoalPayload, executeConcurrentActivity, executeRestDay, undoRestDay, executeMissedSession, undoMissedSession, type MissedSessionPayload, undoWeekRangeChange, type ExerciseSwapPayload, type MealSwapPayload, type InjuryAdaptationPayload, type LastingInjuryPayload, type InjuryRecoveredPayload, type EquipmentAdaptationPayload, type VolumeChangePayload, type SessionShortenPayload, type SessionRebuildPayload, type ScheduleChangePayload, type StyleChangePayload, type GoalChangePayload, type SessionLengthPayload, type ConcurrentActivityPayload, type RestDayPayload, executeSessionMove, undoSessionMove, type SessionMovePayload, executeSwapForActivity, undoSwapForActivity, type SwapForActivityPayload, executeCircuitLog, undoCircuitLog, type CircuitLogPayload, executeCardioLog, undoCardioLog, type CardioLogPayload, executeCardioSession, emptyRestRow, type CardioSessionPayload, executeSessionKindToday, undoSessionKindTodayWrite, type SessionKindTodayPayload, planAsSaved } from '@/lib/pending-action-executor'
 import { planSessionKindToday, sessionKindFrom, buildSessionKindTodayProposal, SESSION_KINDS } from '@/lib/session-kind'
 import { STYLE_OPTIONS, OFFERED_STYLE_OPTIONS, DURATION_OPTIONS, GOAL_OPTIONS } from '@/lib/onboarding-slots'
 import { getDurationBudgetSeconds } from '@/lib/session-duration'
@@ -143,7 +143,7 @@ import { resolveAdditionRequest } from '@/lib/exercise-add-candidates'
 import { dayLengthParts, formatDayLength } from '@/lib/session-duration'
 import { planDaysForDate } from '@/lib/plan-week'
 import { restoreMesocycle } from '@/lib/mesocycle-persistence'
-import { offerStillHolds, fingerprintWeeks, undoStillFits, weeksUndoWrites, dayStillAsWritten } from '@/lib/offer-still-holds'
+import { offerStillHolds, fingerprintWeeks, undoStillFits, weeksUndoWrites, dayStillAsWritten, planReadsAsBefore } from '@/lib/offer-still-holds'
 import { dayHasSession } from '@/lib/day-verbs'
 import { addDays, daysBetween, dayNameOf, sessionForDate, resolveMoveTarget, parseAlsoDoing, alsoDoingRow, alsoDoingImplication, alsoDoingLeadClause } from '@/lib/session-move'
 import { executeLogWorkout, type ReplacedSetPreImage } from '@/lib/nl-logging-executor'
@@ -1373,7 +1373,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   type EditDay =
     | { ok: true; day: WorkoutDay; sayDay: string; ref: SessionRef; say: (text: string) => string }
     | { ok: false; reason: string }
-  const editDayFor = (dayArg: string, week: MesocycleWeek, opts: { followMove?: boolean } = {}): EditDay => {
+  const editDayFor = (dayArg: string, week: MesocycleWeek, opts: { followMove?: boolean; restRow?: boolean } = {}): EditDay => {
     const ref = sessionRefForDayArg(dayArg, {
       todayDate: activeSession.date,
       cells: trainingWeek.days,
@@ -1383,7 +1383,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     if ('refusal' in ref) return { ok: false, reason: ref.refusal }
     const target = editTarget(ref)
     if (!target.ok) return { ok: false, reason: target.refusal }
-    const day = week.days.find(d => d.day === target.planDayName)
+    // A REST DAY USUALLY HAS NO ROW AT ALL (a plan keeps rows for its training days and the odd rest day carrying
+    // optional cardio). For an exercise edit that is a refusal; for PUTTING something on the day it is the commonest
+    // case there is, and "I couldn't find Saturday on your plan" was the answer to "put a run on Saturday" (the chat
+    // walk of 18 Nov 2026). The caller that fills a rest day asks for the empty row it would fill.
+    const day = week.days.find(d => d.day === target.planDayName) ?? (opts.restRow ? emptyRestRow(target.planDayName) : undefined)
     if (!day) return { ok: false, reason: `I couldn't find ${target.sayDay} on your plan.` }
     return { ok: true, day, sayDay: target.sayDay, ref, say: (text: string) => sayDayIn(text, ref) }
   }
@@ -4239,7 +4243,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     // its plan row still holds the lift). A day a session moved ONTO resolves
     // to that session's row and is refused as the training day it now is —
     // looked up by weekday it read as free and the walk went on top of it.
-    const on = editDayFor(String(rawArgs.day ?? ''), week, { followMove: false })
+    const on = editDayFor(String(rawArgs.day ?? ''), week, { followMove: false, restRow: true })
     if (!on.ok) return { refusal: on.reason }
     const day = on.day
     if (day.exercises.length > 0) {
@@ -8511,6 +8515,30 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
     }
     receipt = { ...receipt, ...(appliedScope ? { scope: appliedScope } : {}), ...(planAfter ? { planAfter } : {}) }
     await resolvePendingAction(row.id, status, receipt)
+
+    // A SAVE THAT DID NOT GO THROUGH LEAVES THE OFFER ON THE TABLE (chat walk C4, 19 Nov 2026). The tap was answered
+    // with "Nothing was applied" and the offer's buttons were gone, so the only way back was to ask the coach all over
+    // again. When nothing landed and every failure is the write itself, nothing has changed and the offer is as good
+    // as it was: the same offer is opened again under the same words, with the line that says why the tap did
+    // nothing. Anything else (a refusal, a part-saved change) keeps its receipt, because a second tap would not help.
+    // ...AND ONLY WHEN THE SAVED PLAN READS AS IT DID BEFORE THE TAP: a rest-of-block change is several writes, and
+    // one that half saved is not "nothing changed". Read back from the store, never assumed.
+    const planUntouched = async (): Promise<boolean> => {
+      if (!Array.isArray(row.pre_image) || !profile.id) return false
+      return planReadsAsBefore(row.pre_image as MesocycleWeek[], (await restoreMesocycle(profile.id).catch(() => null))?.weeks ?? null)
+    }
+    if (offerSurvivesFailedSave(row.kind, receipt) && await planUntouched()) {
+      const again = await createPendingAction({
+        profileId: profile.id, messageId: row.message_id, actionClass: row.action_class, kind: row.kind, scopeKey: row.scope_key,
+        preconditions: row.preconditions, payload: row.payload, preImage: row.pre_image ?? undefined, diff: row.diff,
+      }).catch(err => { console.error('re-offer after a failed save: could not open it again', err); return null })
+      if (again) {
+        setMessages(prev => prev.map((m, i) => i === msgIndex
+          ? { ...m, pendingAction: { id: again.id, kind: again.kind, status: again.status, diff: again.diff, expiresAt: again.expires_at, notice: OFFER_UNREACHABLE } }
+          : m))
+        return
+      }
+    }
 
     setMessages(prev => prev.map((m, i) => i === msgIndex
       // THE CARD'S VIEW GOES, SO ITS OUTCOME IS WRITTEN DOWN FIRST. The turn's

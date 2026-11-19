@@ -2,6 +2,56 @@
 
 Newest first. One line each.
 
+- [x] **AN APPLY THAT COULD NOT SAVE LOST ITS BUTTONS, AND THREE CHANGES SAID "PARTLY DONE" OVER AN UNTOUCHED PLAN (19 Nov 2026,
+  the full pass; a tester's finding C4, confirmed in a browser before fixing).** With the plan's own save failing, a
+  tap on Apply was answered "Nothing was applied" and the offer was gone: the only way back was to ask the coach again.
+  Driving it found a second defect underneath: shortening today, rebuilding today and a volume change each listed
+  their change as "landed" and the save as the one thing that failed, so the card read "I couldn't shorten it · Didn't
+  land: save" (part done) over a plan nothing had touched.
+  NOW: those three report nothing landed when no week saved, and hand back the plan they were handed (a volume change
+  that saved one week of two is still part done and says so). And for a change that writes plan weeks and nothing else
+  (swap, add, remove, move, shorten, rebuild today, a cardio day, volume), when nothing landed, every failure is the
+  save, and the SAVED plan reads exactly as it did before the tap (read back, never assumed), the same offer stays up
+  with its buttons and the app's existing line "That didn't go through, so nothing was changed. Try again in a
+  moment." The next tap works. DECISIONS, mine: no new wording (the no-connection line already says it); a change that
+  also writes a setting (days, style, goal, length, another sport, an injury) keeps its failed receipt, because it can
+  be half saved with the plan untouched and "nothing was changed" would then be untrue.
+  `test:pending-actions` (25 new checks; 14 mutations, 14 caught), `verify:workout-scenarios-chat` section G (9 new
+  checks in a real browser: the offer keeps Apply, says it once, the saved plan is as it was, one open offer not two,
+  the second tap saves), screenshot read. NOT DONE, named: a failed save of a meal or memory offer still ends in a
+  receipt with nothing to tap. Frontend only.
+- [x] **"PUT A RUN ON SATURDAY" WAS ANSWERED "I COULDN'T FIND SATURDAY ON YOUR PLAN" (19 Nov 2026, the full pass; a tester's
+  finding C3, traced before fixing).** A plan keeps a row for each training day and for the odd rest day carrying
+  optional cardio. An ordinary rest day has NO row, and both the coach's offer and the write looked the day up by its
+  row. So cardio could be put on a rest day only if it happened to be one of the few with a row. The Exercise
+  screen's own "Make Saturdays a cardio day" went through the same write.
+  THE CHECK HAD A FIXTURE NO REAL PLAN HAS: its plan carried a row for all seven weekdays, so the case could not be
+  seen. The new checks run on a real generated plan and first prove it has a rowless day.
+  NOW: the offer is built from the empty row a rest day would have, and the write makes the row in each week it
+  writes. Only a real weekday gets one ("Someday" is still refused). A later week where that day TRAINS keeps its
+  session (the activity is the whole day; before, a rest-of-block write would have put it over a session there).
+  An exercise edit of a rest day is still refused, as it should be.
+  `test:cardio-session` section 3b (13 new checks; 7 mutations, 7 caught), `verify:cardio-session` 11-15 (the screen
+  route on a rowless day, in a real browser; screenshot read). The driver's first try used a run, which the app then
+  rightly held to 25 minutes under its 10% running rule; it uses a swim so it checks only the new part. The coach's
+  offer on a rowless day is held by the unit checks and a source check, not driven. Frontend only.
+- [x] **AN EXERCISE HE ADDED WAS PRICED FAR ABOVE THE PLAN'S OWN NUMBER FOR THE SAME LIFT (19 Nov 2026, the full pass; a
+  tester's finding E1, measured before fixing; load prescription, so `docs/plans/added-lift-price.md` came first).**
+  Barbell Bench Press added to a session came out at about 55 kg beside the plan's own bench at 32.5. Both add routes
+  (the Exercise screen and the coach) priced the lift down the "new main lift" road, which never reads what he has
+  logged on it and skips the plan's light start outside the testing week itself.
+  MEASURED (`measure:added-lift-price`, 36 seeded profiles, weeks 2-4, 1,218 additions of a lift the plan already
+  holds): median 1.75x the plan's own, 827 over 1.5x, highest 3.6x. After: median 1.00x, 11 over 1.25x (one notch of a
+  small implement; the one-leg press, which the plan itself holds down), 2 over 1.5x.
+  DECIDED AS A CSCS COACH (mine): an added lift is priced as a swapped-in accessory has been since 2 Nov: his log on it
+  wins; else, in a plan with a testing week, the light start every other untested lift in that plan got; else the
+  estimate. Basis: an untested load starts conservatively and is set from the first logged session; it is the rule the
+  plan already follows. The five questions are answered in the plan file. One function (`priceAddedLift`) for the
+  screen, the coach's confirm and the check. The card's sentence is now the plan's own light-start one.
+  `test:exercise-add` section 11 (10 new checks, seeded, the old pricing run beside the new so the grid is proved to
+  hold the defect; 5 mutations, 5 caught). NOT DONE, named: a whole-block addition writes one price into every
+  remaining week (recovery week included) and does not climb on the printed plan as a whole-block swap does; so before
+  this change too. Frontend only.
 - [x] **WEIGHT ADDED TO A BODYWEIGHT LIFT WAS READ BACK AS "BODYWEIGHT" (19 Nov 2026, the full pass; a tester's finding).** Chin-ups
   with 5 kg on a belt showed "8 reps · Bodyweight" under the set: the belt was saved and not said. The set row now
   reads "8 reps · Bodyweight +5kg" (the reading tests the added weight first, as the history reading already did).

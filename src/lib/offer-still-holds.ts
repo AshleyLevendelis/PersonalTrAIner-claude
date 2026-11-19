@@ -82,6 +82,19 @@ export function weeksUndoWrites(kind: string, payload: Record<string, unknown>, 
   }
 }
 
+/**
+ * After an Apply that reported nothing saved: does the SAVED plan read exactly as the plan did before the tap? A
+ * rest-of-block change is several writes, and one that half saved is not "nothing changed". No saved plan at all is
+ * the plan the app is still drawing from the profile, so nothing was written. A saved week the plan-before never
+ * held is a change.
+ */
+export function planReadsAsBefore(before: MesocycleWeek[], saved: MesocycleWeek[] | null): boolean {
+  if (!saved) return true
+  const was = fingerprintWeeks(before)
+  const now = fingerprintWeeks(saved)
+  return Object.keys(now).every(n => was[n] === now[n])
+}
+
 /** Does the plan still read, in every week the Undo would write, as this card left it? No record means no check. */
 export function undoStillFits(planAfter: Record<string, string> | undefined, live: MesocycleWeek[], weeks: number[] | null): boolean {
   if (!planAfter || !weeks) return true
