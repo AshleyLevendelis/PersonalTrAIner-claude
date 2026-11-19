@@ -430,6 +430,7 @@
     "verify:allergy-card": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/allergy-card.mjs",
     "verify:logged-set-word": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/logged-set-word.mjs",
     "verify:remembers-words": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/remembers-words.mjs",
+    "verify:chat-first-answer": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-first-answer.mjs",
     "verify:profile-back": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-back.mjs",
     "verify:profile-fixes": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/profile-fixes.mjs",
     "verify:home-tools-fixes": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/home-tools-fixes.mjs",

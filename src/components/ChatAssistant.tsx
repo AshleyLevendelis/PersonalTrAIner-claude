@@ -1105,6 +1105,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   // runs in three of verify:coach-hello. An event that lands where the chat put it is the chat's own; she has not
   // moved, so she is still following. Any scroll of hers moves the position and is judged as before.
   const selfScrollTopRef = useRef<number | null>(null)
+  // HOW TALL THE THREAD WAS WHEN THE CHAT LAST FOLLOWED IT TO THE BOTTOM (the chat walk, 18 Nov 2026, C2). The first
+  // answer of a first conversation could land under the message box: when the typing dots are swapped for the answer
+  // the thread gets a little shorter and then much longer, and the BROWSER moves the scroll position itself (it clamps
+  // it, then re-anchors it). Those scroll events are nobody's finger. Read against the thread as it now is, they look
+  // like "he is 230px from the bottom", so the chat stopped following. While the chat is following, a scroll event is
+  // judged against the bottom it last followed to: if he is still there, the thread grew under him and he has not left.
+  const followedHeightRef = useRef<number | null>(null)
   const scrollToBottom = useCallback((smooth = false) => {
     requestAnimationFrame(() => {
       // A jump queued before a long reply landed must not undo the stop at his message (anchorLongReply): by the time
@@ -1115,6 +1122,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
           behavior: smooth ? 'smooth' : 'instant',
         })
         if (!smooth) selfScrollTopRef.current = scrollRef.current.scrollTop
+        followedHeightRef.current = scrollRef.current.scrollHeight
       }
     })
   }, [])
@@ -1178,9 +1186,13 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       return
     }
     selfScrollTopRef.current = null
-    const nearBottom = checkIfNearBottom()
-    isNearBottomRef.current = nearBottom
-    if (nearBottom) setShowScrollPill(false)
+    const atLiveBottom = checkIfNearBottom()
+    // Still where the chat last followed to, while it was following: the thread grew under him (see followedHeightRef).
+    // The follow already queued for that growth takes him to the new bottom.
+    const atFollowedBottom = !!el && isNearBottomRef.current && followedHeightRef.current !== null
+      && followedHeightRef.current - el.scrollTop - el.clientHeight < 120
+    isNearBottomRef.current = atLiveBottom || atFollowedBottom
+    if (atLiveBottom) setShowScrollPill(false)
   }, [checkIfNearBottom])
 
   // THE DATA THE COACH READS FOR ITSELF, re-read whenever it changes.

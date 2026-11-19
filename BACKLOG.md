@@ -2,6 +2,31 @@
 
 Newest first. One line each.
 
+- [x] **THE FIRST ANSWER OF A FIRST CONVERSATION COULD LAND UNDER THE MESSAGE BOX (19 Nov 2026, the full pass; a tester's
+  finding C2).** Three runs in three for the tester; here, not once in eight at five different timings, then two in
+  six once the reply came at once, one of them at normal speed. So it was a race, and the screenshot was right.
+  THE CAUSE, traced on the page, not reasoned: when the typing dots are swapped for the answer the thread gets 16px
+  shorter and then much longer. The BROWSER moves the scroll position by itself both times (it clamps it, then
+  re-anchors it) and sends a scroll event each time. The chat read any scroll event that was not its own jump as
+  "he scrolled", measured against the thread as it NOW is: arriving after the answer, that said "230px from the end",
+  the chat stopped following, and the answer sat under the message box. A first conversation is where it shows,
+  because the thread is short enough for a 16px change to move the position at all.
+  THE FIX: while the chat is following, a scroll event is judged against the end it last followed to. If he is still
+  there, the thread grew under him and he has not left; the follow already queued takes him to the new end. A scroll
+  that takes him more than 120px above that end is his, as before, and having left he is back only at the real end.
+  MY FIRST THREE GUESSES WERE WRONG (a slow phone; the hello still arriving; the first-open flag), and my first
+  trace "fixed" it by accident: a missing semicolon made the scroll handler throw on every event, and with the handler
+  dead the bug could not happen. That was the clue, but it read as three clean runs.
+  TWO MISSED MUTATIONS, both read as questions about the code: one line (keeping the followed height fresh from his
+  own scroll to the end) changed nothing a thread that only grows can show, and was DELETED; the other (the chat must
+  already be following) had no check that could see it, and got one (he scrolls back to where the thread used to end,
+  the message box grows under a draft, the thread must not jump).
+  `verify:chat-first-answer` (new, 16 checks: an answer that fits; one taller than the window still starts at his
+  message; the cause made to happen every time, with a guard that it really arrived 120px+ from the new end; a wheel
+  scroll of his still stops the following; six cold opens; 5 browser mutations, 4 caught and 1 deleted as inert,
+  then the guard's own mutation caught; screenshots read). The nine chat drivers that depend on scrolling pass.
+  NOT DONE, named: the older exact-position rule (9 Nov) is now a special case of this one and could go; left in.
+  Never run on a real phone, where the browser's own nudges differ. Frontend only.
 - [x] **PROFILE'S "REMEMBERS" LIST SHOWED THE APP'S OWN BOOKKEEPING (19 Nov 2026, the full pass; a tester's findings
   P4, P6 and two of P7).** A note read "won't eat/do Barbell Squats" with a pill saying "hard" and "manual · Sep 16,
   2026" under it, and a rule about training read "recorded — not yet applied (needs day-context meal generation
