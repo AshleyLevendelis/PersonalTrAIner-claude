@@ -121,6 +121,21 @@ export function gramStep(grams: number): number {
   return grams >= 1000 ? 100 : grams >= 200 ? 50 : grams >= 20 ? 10 : 5
 }
 
+/**
+ * A SHOPPING LIST NEVER SHOWS LESS THAN THE MEALS NEED (the Nutrition walk, 18 Nov 2026, finding N5). The row rounded
+ * to the NEAREST step, so 270 g read "~250g" and 615 g "~600g": follow the list and the week comes up short. An amount
+ * to buy is rounded UP to the step it is bought in. A counted item (2.4 chicken breasts) is rounded up as well, with
+ * a quarter of one let go, because pieces vary in size by about that much: 2.2 breasts is two, 2.3 is three. (It was
+ * half of one: 1.49 breasts read "1 breast", a third short.)
+ */
+const PIECE_LEEWAY = 0.25
+function upToStep(amount: number, step: number): number {
+  return Math.ceil(amount / step - 1e-9) * step
+}
+function piecesToBuy(grams: number, avgGrams: number): number {
+  return Math.max(1, Math.ceil(grams / avgGrams - PIECE_LEEWAY))
+}
+
 function purchaseUnitFor(item: Pick<GroceryItemRow, 'display_name' | 'unit'>) {
   if (item.unit !== 'g') return null
   return lookupIngredient(item.display_name)?.purchaseUnit ?? null
@@ -168,8 +183,8 @@ function formatAmount(item: Pick<GroceryItemRow, 'display_name' | 'quantity' | '
   if (item.unit === 'ml') {
     const ml = item.quantity
     const step = gramStep(ml)
-    const rounded = Math.round(ml / step) * step
-    if (ml > 0 && rounded <= 0) return { primary: exact, exact }
+    if (ml > 0 && Math.round(ml / step) * step <= 0) return { primary: exact, exact }
+    const rounded = upToStep(ml, step)
     const approx = rounded !== ml ? '~' : ''
     const primary = rounded >= 1000 ? `${approx}${(rounded / 1000).toFixed(rounded % 1000 === 0 ? 0 : 1)}L` : `${approx}${rounded}ml`
     return { primary, exact }
@@ -178,7 +193,7 @@ function formatAmount(item: Pick<GroceryItemRow, 'display_name' | 'quantity' | '
 
   const unit = purchaseUnitFor(item)
   if (unit) {
-    const count = Math.max(1, Math.round(item.quantity / unit.avgGrams))
+    const count = piecesToBuy(item.quantity, unit.avgGrams)
     return { primary: `${count} ${unit.label}${count === 1 ? '' : 's'}`, exact }
   }
 
@@ -188,7 +203,7 @@ function formatAmount(item: Pick<GroceryItemRow, 'display_name' | 'quantity' | '
   // round to nothing at a 5 g step, and a line saying to buy none of a thing
   // is not a line. Under one step, the exact figure is the honest one.
   if (grams > 0 && Math.round(grams / step) * step <= 0) return { primary: exact, exact }
-  const rounded = Math.round(grams / step) * step
+  const rounded = upToStep(grams, step)
   const approx = rounded !== grams ? '~' : ''
   const primary = rounded >= 1000
     ? `${approx}${(rounded / 1000).toFixed(rounded % 1000 === 0 ? 0 : 1)}kg`
@@ -228,11 +243,12 @@ export function stepQuantity(item: Pick<GroceryItemRow, 'display_name' | 'quanti
   const unit = purchaseUnitFor(item)
   let next: number
   if (unit) {
-    const count = Math.max(1, Math.round(item.quantity / unit.avgGrams))
+    const count = piecesToBuy(item.quantity, unit.avgGrams)
     next = (count + direction) * unit.avgGrams
   } else if (item.unit === 'g' || item.unit === 'ml') {
     const step = gramStep(item.quantity)
-    next = (Math.round(item.quantity / step) + direction) * step
+    // From the amount the row shows (rounded up), so one tap moves the number he is looking at by one step.
+    next = (upToStep(item.quantity, step) / step + direction) * step
   } else {
     next = Math.round(item.quantity) + direction
   }

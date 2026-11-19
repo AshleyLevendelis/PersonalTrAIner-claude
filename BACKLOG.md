@@ -2,6 +2,22 @@
 
 Newest first. One line each.
 
+- [x] **THE SHOPPING LIST SHOWED LESS THAN THE MEALS NEED (19 Nov 2026, the full pass; a tester's finding N5).** A row
+  rounded to the NEAREST step it is bought in, so 270 g read "~250g" and 615 g "~600g", and a counted food rounded to
+  the nearest piece, so one and a half chicken breasts read "1 breast". Follow the list and the week comes up short.
+  An amount to buy is now rounded UP to its step (270 g is "~300g", 615 g "~650g"); an amount already on a step is
+  unchanged and still has no "~"; the exact figure still sits beside it when the row is opened. The plus and minus
+  buttons step from the number shown (270 g shows 300; plus is 350, minus 250).
+  DECISION, mine, with the basis (it is arithmetic and a shopper's habit, not a claim): pieces round up as well, with
+  a QUARTER of one let go (2.2 heads of broccoli is 2, 2.3 is 3). It was half of one. Pieces vary in size by about a
+  quarter, so a strict round-up would make 2.05 breasts three; half was too loose, a third of a piece short. The
+  under-half-a-step rule is kept: 2 g of something still reads "2g", never "~5g" for nothing or "~0g".
+  NOT CHANGED: what is stored. Only the amount shown and the stepper's base moved; the list's figures, the coach's
+  list and the share text read the stored exact amount as before.
+  `test:grocery-display` (11 new checks, one a grid of every amount from 20 g to 3 kg: never under what is needed,
+  never a whole step over; 9 mutations, 9 caught, one only after a check for the stepper on a counted food was
+  added), `verify:grocery` section 14 (3 new checks: "270g couscous" typed, the row reads "~300g", plus stores 350; 2
+  browser mutations caught; screenshot read). Frontend only.
 - [x] **THREE SMALL THINGS ON THE EXERCISE SCREEN (19 Nov 2026, the full pass; a tester's findings E7, E8, E9).**
   E7. After "Make it a rest day" and then "Train it anyway", the card read "Today · in progress" over "You made today
   a rest day. This session is still here if you want it." The line is now drawn before the session is started and

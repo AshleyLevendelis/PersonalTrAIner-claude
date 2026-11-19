@@ -571,6 +571,27 @@ check('"toilet roll" is stored as one, counted (not 1 g)', TR.quantity === 1 && 
 check('...and its row reads "1", with no "0g" anywhere on it', TR.qty === '1', TR)
 await shoot('grocery-typed-item')
 
+// [14] THE NUTRITION WALK OF 18 NOV 2026 (finding N5): the row rounded to the NEAREST step, so 270 g read "~250g":
+// less than the meals need. An amount to buy is rounded UP, and the stepper moves the number he is looking at.
+console.log('\n[14] The list never shows less than is needed: 270 g reads "~300g"')
+const UP0 = await page(`
+  const input = q('[data-testid="grocery-addbar"] input')
+  if (input) { setVal(input, '270g couscous'); await new Promise(r => setTimeout(r, 100)); enter(input) }
+  await new Promise(r => setTimeout(r, 700))
+  const hit = qa('[data-testid="grocery-row"]').find(r => /couscous/i.test(r.dataset.item || ''))
+  hit?.scrollIntoView({ block: 'center' })
+  const stored = (window.__fakeDb?.grocery_items ?? []).find(r => /couscous/i.test(r.display_name))
+  return { name: hit?.dataset.item ?? null, closed: hit?.querySelector('[data-testid="grocery-qty"]')?.textContent.trim() ?? null, before: stored?.quantity ?? null }
+`)
+await tapRow(UP0.name ?? 'couscous')
+const UP1 = await page(`const r = row(args[0]); return { readout: r?.querySelector('[data-testid="grocery-readout"]')?.textContent.trim() ?? null, exact: r?.querySelector('[data-testid="grocery-exact"]')?.textContent.trim() ?? null }`, UP0.name ?? 'couscous')
+const UP2 = await step(UP0.name ?? 'couscous', 'plus')
+const UP = { ...UP0, ...UP1, after: UP2.stored, afterReadout: UP2.readout }
+check('14a. 270 g typed is stored as 270 g, and its row reads "~300g" (it read "~250g")', UP.before === 270 && UP.closed === '~300g', UP)
+check('14b. ...the open row shows the rounded-up amount with the exact figure beside it', UP.readout === '300 g' && /270/.test(UP.exact ?? ''), UP)
+check('14c. ...and plus moves the number he is looking at by one step: 300 to 350', UP.after === 350, UP)
+await shoot('grocery-rounded-up')
+
 const errs = await call(() => window.__errs ?? [])
 check('nothing on the page threw', errs.length === 0, errs)
 
