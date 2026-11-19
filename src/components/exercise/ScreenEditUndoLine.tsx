@@ -56,7 +56,7 @@ export function ScreenEditUndoLine({
     if (left <= 0) { publishScreenEdit(null); return }
     if (!loggedAtChange.has(record.id)) loggedAtChange.set(record.id, loggedToday ?? 0)
     setShownId(record.id)
-    setNote({ text: record.text, undo: true })
+    setNote({ text: record.note ? `${record.text} ${record.note}` : record.text, undo: true })
     arm(left)
   }, [record]) // eslint-disable-line react-hooks/exhaustive-deps
 

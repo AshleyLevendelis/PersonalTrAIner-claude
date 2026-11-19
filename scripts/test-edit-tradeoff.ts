@@ -582,5 +582,45 @@ console.log('\n11. A lift that only moved a row has not changed (the chat walk, 
   check('a plan as written keeps each block\'s main lift on one row (so no generated score can have moved)', mainDays >= 20 && offRow === 0, { mainDays, offRow })
 }
 
+// ---------------------------------------------------------------------------
+console.log('\n12. A move that leaves the warm-up move behind the work says so, and still goes ahead (E6)')
+// ---------------------------------------------------------------------------
+{
+  const { warmUpNowAfterWork } = await import('../src/lib/session-edit')
+  const { isMovementPrepRow } = await import('../src/lib/session-duration')
+  const week = hyperPlan.find(w => w.week_number === 2)!
+  // A day that opens with one warm-up move and has at least three working exercises after it.
+  const day = week.days.find(d => isMovementPrepRow(d.exercises[0]) && !isMovementPrepRow(d.exercises[1]) && d.exercises.filter(e => !isMovementPrepRow(e)).length >= 3)
+  check('the fixture binds: a day that opens with its warm-up move', !!day, week.days.map(d => d.exercises.map(e => e.tier)))
+  if (day) {
+    const prep = day.exercises[0].name, firstWork = day.exercises[1].name
+    const move = (from: number, to: number, plan = hyperPlan) => moveExerciseInSession({ mesocycle: plan, profile: hyper, weekNumber: 2, dayName: day.day, fromIndex: from, toIndex: to, scope: 'today' })
+    const dayOfPlan = (m: MesocycleWeek[]) => m.find(w => w.week_number === 2)!.days.find(d => d.day === day.day)!.exercises
+    const up = move(1, 0)
+    const said = warmUpNowAfterWork(day.exercises, dayOfPlan(up.mesocycle))
+    check('the first working lift moved in front of it: one sentence, naming both', up.changed && said === `${prep} is this session's warm-up move, and it now comes after ${firstWork}.`, said)
+    const down = move(0, 1)
+    check('the warm-up move itself moved later: the same sentence', down.changed && warmUpNowAfterWork(day.exercises, dayOfPlan(down.mesocycle)) === `${prep} is this session's warm-up move, and it now comes after ${firstWork}.`, warmUpNowAfterWork(day.exercises, dayOfPlan(down.mesocycle)))
+    const among = move(2, 3)
+    check('two working lifts changing places: nothing to say', among.changed && warmUpNowAfterWork(day.exercises, dayOfPlan(among.mesocycle)) === null)
+    // NOT TOLD TWICE: once the warm-up move is behind the work, a further move on that day says nothing more.
+    const again = move(2, 3, up.mesocycle)
+    check('a day already rearranged is not told again', again.changed && warmUpNowAfterWork(dayOfPlan(up.mesocycle), dayOfPlan(again.mesocycle)) === null)
+    check('a day with no warm-up move has nothing to say', warmUpNowAfterWork(day.exercises.slice(1), [...day.exercises.slice(2), day.exercises[1]]) === null)
+
+    // ON THE COACH'S CARD: a cost line, never a question, never a refusal.
+    const verdict = assessEdit({ profile: hyper, before: hyperPlan, after: up.mesocycle, weekNumber: 2, dayName: day.day, kind: 'reorder', scope: 'today', exerciseName: firstWork })
+    check('the coach\'s card carries the same sentence as a cost, and asks nothing', verdict.tier === 1 && verdict.cost === said && verdict.question === null, verdict)
+    const quiet = assessEdit({ profile: hyper, before: hyperPlan, after: among.mesocycle, weekNumber: 2, dayName: day.day, kind: 'reorder', scope: 'today', exerciseName: day.exercises[2].name })
+    check('...and an ordinary change of order stays free', quiet.tier === 0, quiet)
+    check('the move itself is never refused', up.changed === true && down.changed === true)
+  }
+  const line = stripComments(readFileSync(join(ROOT, 'src/components/exercise/ScreenEditUndoLine.tsx'), 'utf8'))
+  check('the screen\'s line shows the cost after what was moved', /record\.note \? `\$\{record\.text\} \$\{record\.note\}` : record\.text/.test(line))
+  check('...and "was taken back" names the move only, not the cost', /RECEIPTS_UNDONE\.detail\(record\.text\)/.test(line))
+  const panel = stripComments(readFileSync(join(ROOT, 'src/components/exercise/TodayPanel.tsx'), 'utf8'))
+  check('the screen\'s move hands the sentence to the line', /const late = moved\.changed \? warmUpNowAfterWork\(dayIn\(mesocycle\), dayIn\(moved\.mesocycle\)\) : null/.test(panel) && /applySessionEdit\(moved, 'today', screenEditText\('reorder'[^\n]*, late\)/.test(panel))
+}
+
 console.log(failures === 0 ? '\nAll edit trade-off checks passed.\n' : `\n${failures} check(s) FAILED.\n`)
 process.exit(failures === 0 ? 0 : 1)

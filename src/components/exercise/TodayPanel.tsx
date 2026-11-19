@@ -75,7 +75,7 @@ import type { ReasonAnswer } from './EditReasonStep'
 // for the coach's side of the same two operations, so the bundler keeps it in
 // the main chunk either way, and the dynamic form only added an await between
 // the tap and the sheet's cost line. The 13 kB is recorded in test:bundle.
-import { removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor, type SessionEditResult } from '@/lib/session-edit'
+import { warmUpNowAfterWork, removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor, type SessionEditResult } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
 import { shortenOrFloor, mapTier } from '@/lib/exercise-plan'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
@@ -515,6 +515,8 @@ export function TodayPanel({
     scope: SwapScope,
     /** The Undo line's words, for the four exercise edits (QA walk T7); the day-wide verbs have their own put-backs. */
     undoText?: string,
+    /** Something the change costs, said after those words (ScreenEditRecord.note). */
+    undoNote?: string | null,
   ): Promise<string | null> => {
     if (!profileId || !mesocycle) return 'No plan to edit.'
     if (!next.changed) return say(next.refusal ?? "That couldn't be changed.")
@@ -527,7 +529,7 @@ export function TodayPanel({
       onMesocycleUpdated?.(mesocycle)
       return "That didn't save — try again in a moment."
     }
-    if (undoText) publishScreenEdit(recordScreenEdit(mesocycle, next.mesocycle, liveWeek, scope, undoText, Date.now()))
+    if (undoText) publishScreenEdit(recordScreenEdit(mesocycle, next.mesocycle, liveWeek, scope, undoText, Date.now(), undoNote))
     refreshWeeks()
     onLogsUpdated?.()
     return null
@@ -776,13 +778,12 @@ export function TodayPanel({
     // then un-happened — the silent write the app is not allowed to have.
     const target = editTarget(todayRef)
     if (!target.ok) { setMoveError(target.refusal); return }
-    setMoveError(
-      await applySessionEdit(
-        moveExerciseInSession({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, fromIndex: exIndex, toIndex: exIndex + direction, scope: 'today' }),
-        'today',
-        screenEditText('reorder', planExerciseName(target.planDayName, exIndex), direction < 0 ? 'earlier' : 'later'),
-      ),
-    )
+    const moved = moveExerciseInSession({ mesocycle, profile, weekNumber: liveWeek, dayName: target.planDayName, fromIndex: exIndex, toIndex: exIndex + direction, scope: 'today' })
+    // A MOVE THAT LEAVES THE WARM-UP MOVE BEHIND THE WORK SAYS SO (session-edit warmUpNowAfterWork): the one-tap move
+    // has no card to carry a cost line, so the sentence rides on the line that says what was moved, beside its Undo.
+    const dayIn = (m: MesocycleWeek[]) => m.find(w => w.week_number === liveWeek)?.days.find(d => d.day === target.planDayName)?.exercises ?? []
+    const late = moved.changed ? warmUpNowAfterWork(dayIn(mesocycle), dayIn(moved.mesocycle)) : null
+    setMoveError(await applySessionEdit(moved, 'today', screenEditText('reorder', planExerciseName(target.planDayName, exIndex), direction < 0 ? 'earlier' : 'later'), late))
   }
 
   /**

@@ -79,11 +79,15 @@ check('0b. no Undo line before anything is changed', !(await has('[data-testid="
 
 // --- 1. MOVE -----------------------------------------------------------------
 console.log('\n1. Moving one later says so, and Undo puts the order back\n')
-const mover = start[0] ?? 'NO-ROW'
+// RE-ANCHORED 19 Nov 2026: a WORKING exercise is moved (the first one after the warm-up moves). The first row of the
+// day is its warm-up move, and moving that later now says a second sentence; section 6 is where that is held.
+const prepNames = (await ev(`[...document.querySelectorAll('[data-exercise-name][data-movement-prep]')].map(n => n.getAttribute('data-exercise-name'))`)) ?? []
+const m1 = start.findIndex(n => !prepNames.includes(n))
+const mover = start[m1] ?? 'NO-ROW'
 const opened1 = (await openRowMenu(mover)) === 'open'
 const tapped1 = opened1 && await tap('[data-testid="move-down"]')
-const moved = await untilOrder(o => o?.[0] === start[1])
-check('1a. the move happened (the fixture binds)', tapped1 && moved?.[0] === start[1] && moved?.[1] === mover, { start, moved })
+const moved = await untilOrder(o => o?.[m1] === start[m1 + 1])
+check('1a. the move happened (the fixture binds)', m1 >= 0 && tapped1 && moved?.[m1] === start[m1 + 1] && moved?.[m1 + 1] === mover, { start, moved, m1 })
 check('1a2. ...and was saved (the read binds)', await savedAs(moved ?? ['NONE']), await savedDays())
 const t1 = await until(lineText, 10)
 check('1b. one line says what happened, naming the exercise', t1 === `Moved ${mover} later.`, t1)
@@ -207,6 +211,31 @@ const t5 = await until(async () => { const x = await lineText(); return x && /lo
 check('5e. ...refuses, saying a set has been logged since', t5 === "You've logged a set since, so nothing was changed.", await lineText())
 check('5f. ...and the order is still the moved one, on screen and saved', (await order())?.join('|') === moved5?.join('|') && await savedAs(moved5 ?? ['NONE']), { now: await order(), moved5 })
 await shoot('edit-undo-5-logged')
+
+// --- 6. A MOVE THAT LEAVES THE WARM-UP MOVE BEHIND THE WORK SAYS SO (the Exercise walk, 18 Nov 2026, E6) -------------
+// "Move earlier" on the first working lift put it in front of the session's warm-up move, and nothing said so. The
+// move still happens (his order is his); the line that says what moved also says what it cost, and Undo puts it back.
+console.log('\n6. Moving a lift in front of the warm-up move says so, and still does it\n')
+await send('Page.navigate', { url: `http://127.0.0.1:${port}/?tour=off&load=6#/tab/exercise` })
+await wait(4500)
+const start6 = (await order()) ?? []
+const prep6 = (await ev(`[...document.querySelectorAll('[data-exercise-name][data-movement-prep]')].map(n => n.getAttribute('data-exercise-name'))`)) ?? []
+const w6 = start6.findIndex(n => !prep6.includes(n))
+check('6a. the day opens with a warm-up move, and a working lift follows it (the fixture binds)', w6 >= 1 && prep6.includes(start6[w6 - 1]), { start6, prep6 })
+const lift6 = start6[w6], warm6 = start6[w6 - 1]
+const opened6 = (await openRowMenu(lift6)) === 'open' && await tap('[data-testid="move-up"]')
+const moved6 = await untilOrder(o => o?.[w6 - 1] === lift6)
+check('6b. the lift moved in front of it (never refused)', !!opened6 && moved6?.[w6 - 1] === lift6 && moved6?.[w6] === warm6, { start6, moved6 })
+const t6 = await until(lineText, 10)
+check('6c. THE LINE SAYS WHAT MOVED AND WHAT IT COST (it said nothing)', t6 === `Moved ${lift6} earlier. ${warm6} is this session's warm-up move, and it now comes after ${lift6}.`, t6)
+const box6 = await lineBox()
+check('6d. ...on screen, clear of the Start bar, with its Undo', !!box6?.inView && !!box6?.clearOfBar && (box6?.undoH ?? 0) >= 36, box6)
+await shoot('edit-undo-6-warm-up')
+check('6e. tapping Undo...', await tapFixed('[data-testid="screen-edit-undo"]'))
+const back6 = await untilOrder(o => o?.join('|') === start6.join('|'))
+check('6f. ...puts the warm-up move first again', back6?.join('|') === start6.join('|'), { start6, back6 })
+const t6b = await until(async () => { const x = await lineText(); return x && x !== t6 ? x : null }, 10)
+check('6g. ...and "was taken back" names the move, not the cost', t6b === `Moved ${lift6} earlier was taken back. Everything is as it was before.`, t6b)
 
 console.log(`\n${ran} checks ran`)
 console.log(failures ? `\n${failures} FAILED` : '\nALL PASSED')

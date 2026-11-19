@@ -36,6 +36,7 @@ import { settleWeek } from './settle-week'
 import { applyReplacement, type SwapScope } from './mesocycle-edit'
 import { mapTier } from './exercise-plan'
 import { logOnlyRefusal } from './coach-voice'
+import { isMovementPrepRow } from './session-duration'
 
 /**
  * The fewest exercises a session may be reduced to. The same floor
@@ -400,6 +401,26 @@ export function moveExerciseInSession(params: MoveExerciseParams): SessionEditRe
   return changed
     ? { mesocycle: next, changed: true }
     : { mesocycle, changed: false, refusal: "I couldn't move that one." }
+}
+
+/**
+ * THE WARM-UP MOVE NOW COMES AFTER WORK HAS STARTED (the Exercise walk, 18 Nov 2026, finding E6). "Move earlier" on
+ * the main lift put it in front of the session's warm-up move, and nothing said so. A warm-up drill is there to
+ * prepare the first working lift (CSCS: activation and low-dose explosive work come before the loaded pattern they
+ * prepare; done after it they are just two more easy sets). His order is his to choose (his 14 Sep rule: say what a
+ * change costs, never refuse what is not unsafe), so the move goes ahead and the app says one sentence.
+ * Returns the sentence when the day opened with its warm-up moves BEFORE the change and no longer does; null
+ * otherwise (a day he had already rearranged is not told twice).
+ */
+export function warmUpNowAfterWork(before: readonly Exercise[], after: readonly Exercise[]): string | null {
+  const opensWithPrep = (list: readonly Exercise[]) => {
+    const firstWork = list.findIndex(ex => !isMovementPrepRow(ex))
+    return firstWork === -1 || !list.slice(firstWork).some(isMovementPrepRow)
+  }
+  if (!opensWithPrep(before) || opensWithPrep(after)) return null
+  const firstWork = after.findIndex(ex => !isMovementPrepRow(ex))
+  const late = after.slice(firstWork).find(isMovementPrepRow)
+  return late ? `${late.name} is this session's warm-up move, and it now comes after ${after[firstWork].name}.` : null
 }
 
 /**

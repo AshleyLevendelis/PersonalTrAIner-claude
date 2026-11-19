@@ -32,6 +32,8 @@ export type ScreenEditKind = 'swap' | 'remove' | 'reorder' | 'add'
 export interface ScreenEditRecord {
   /** One line, past tense: "Swapped Lat Pulldown for Seated Cable Row." */
   text: string
+  /** Something the change costs, said after the line and left out of the "was taken back" sentence (a warm-up move now behind the work). */
+  note?: string
   /** The plan as it was before the change. */
   before: MesocycleWeek[]
   /** The week numbers the change wrote. */
@@ -67,11 +69,12 @@ export function recordScreenEdit(
   scope: 'today' | 'permanent',
   text: string,
   now: number,
+  note?: string | null,
 ): ScreenEditRecord {
   const written = weeksTouchedByScope(after, weekNumber, scope)
   const weeks = written.map(w => w.week_number)
   const prints = fingerprintWeeks(written)
-  return { text, before, weeks, after: prints, at: now, id: ++seq }
+  return { text, before, weeks, after: prints, at: now, id: ++seq, ...(note ? { note } : {}) }
 }
 
 /** What a whole-day change on the Exercise screen keeps so the day can be put back ("I'm short of time", "a different session"). */

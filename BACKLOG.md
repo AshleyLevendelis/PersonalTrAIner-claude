@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [x] **"MOVE EARLIER" PUT A LIFT IN FRONT OF THE SESSION'S WARM-UP MOVE AND NOTHING SAID SO (19 Nov 2026, the full pass; a
+  tester's finding E6).** DECISION, mine (CSCS), with the basis: a warm-up move is there to prepare the first working
+  lift (activation and low-dose explosive work come before the loaded pattern they prepare; done after it they are
+  two more easy sets). I first wrote a REFUSAL and took it out before it was built: his 14 Sep rule is that a change
+  which costs something is said and allowed, and only the unsafe is refused, and this is not unsafe. So the move
+  still happens, and the app says one sentence: "Band Face Pulls is this session's warm-up move, and it now comes
+  after Chin-Ups." On the screen it rides on the line that says what moved, beside its Undo; on the coach's card it
+  is a cost line, never a question. Said once: a day already rearranged is not told again. "Was taken back" names
+  the move only, not the cost.
+  WHY NOTHING ELSE WOULD HAVE SAID IT: the plan scorer reads warm-up order in week 1 only, so in any later week a
+  reorder that buried the warm-up move showed no cost anywhere (measured in the C5 probe: 0 of 216).
+  MEASURED BY BREAKING IT: one condition of my first version was inert and was deleted, not given a check.
+  CSCS review: no prescription changes (order carries no load); nothing is taken away; in scope.
+  `test:edit-tradeoff` section 12 (12 new checks; 6 mutations, 6 caught), `verify:edit-undo` section 6 (7 new checks:
+  the move happens, the line says both things on screen with its Undo, Undo puts the warm-up move first again; 2
+  browser mutations caught; screenshot read). That driver's first section moved the day's FIRST row, which is the
+  warm-up move; it now moves the first working lift, so it still tests a plain move. Frontend only.
 - [x] **A REORDER CARD WARNED "THE WEEK STOPS COVERING EVERYTHING IT SHOULD" WHEN ONLY THE ORDER CHANGED (19 Nov 2026, the full
   pass; a tester's finding C5, traced before fixing).** The words were not the fault. MEASURED: 189 of 216 one-row
   moves on real plans lost a whole rule in the plan scorer, every one of them `main_lift_changed_within_block`, plus
