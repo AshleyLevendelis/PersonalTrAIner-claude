@@ -157,6 +157,12 @@ console.log('\n3. An accepted dish is re-portioned and re-measured, not taken on
     check('the diff shows the verified calories', result.diff.rows.some(r => r.field === 'Calories' && r.after === `${Math.round(m.calories)} kcal`))
     check('the card says the portions were adjusted', (result.diff.implications ?? []).some(i => /Portions adjusted/.test(i.text)))
     check('the card says it becomes that day\'s meal', (result.diff.implications ?? []).some(i => /becomes your dinner/.test(i.text)))
+    // The chat walk of 19 Nov 2026: the sentence ended "for 2026-09-17". A day is said in words on every line of the card.
+    const said = (r: typeof result) => [...(r.diff.implications ?? []).map(i => i.text), r.diff.lead ?? '', ...r.diff.rows.map(x => `${x.field} ${x.before ?? ''} ${x.after ?? ''}`)]
+    check('today is "today": "becomes your dinner for today."', said(result).some(t => /becomes your dinner for today\.$/.test(t)), said(result).filter(t => /becomes/.test(t)))
+    const later = build({ ...CLEAN_DINNER, date: '2026-09-01' })
+    check('another day is named with its date in words ("for Tue 1 Sep."), never as 2026-09-01', later.ok && said(later).some(t => /becomes your dinner for Tue 1 Sep\.$/.test(t)), later.ok ? said(later).filter(t => /becomes/.test(t)) : later)
+    check('no line of either card carries a year-month-day date', [result, later].every(r => r.ok && !said(r).some(t => /\d{4}-\d{2}-\d{2}/.test(t))), [result, later].flatMap(r => r.ok ? said(r).filter(t => /\d{4}-\d{2}-\d{2}/.test(t)) : []))
     check('the date defaults to today when none is given', result.payload.date === TODAY)
     check('an explicit date is honoured', (() => { const r = build({ ...CLEAN_DINNER, date: '2026-09-01' }); return r.ok && r.payload.date === '2026-09-01' })())
     check('a malformed date falls back to today rather than corrupting the pick',

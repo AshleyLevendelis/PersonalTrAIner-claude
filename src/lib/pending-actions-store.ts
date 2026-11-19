@@ -92,6 +92,8 @@ export interface PendingActionReceipt {
   planAfter?: Record<string, string>
   /** A meal marked as eating out: the dish it showed before, so Undo puts THAT back (eating-out.ts). */
   previousMeal?: string | null
+  /** A move between two meals of a day: each meal's pick before it (null: none, the day's own choice), for Undo. */
+  previousPicks?: Record<string, string | null>
 }
 
 const PENDING_WINDOW_MINUTES = 10

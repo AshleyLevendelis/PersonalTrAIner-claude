@@ -83,7 +83,7 @@ import type { MealDayMoveArgs, MealDayMovePayload, MealDayMoveResult } from '@/l
 import { rebalanceSaid, rebalanceAskText, kcalSaid, mealsNamed, type MealRebalanceController, type MealRebalancePayload } from '@/lib/meal-rebalance'
 import { DEFAULT_POOL_SIZE, computeSlotBudgets, skipsBreakfast } from '@/lib/meal-generation'
 import { EATING_OUT_REFUSALS, EATING_OUT_SIZES, EATING_OUT_WORDS, eatingOutMacros, eatingOutOption, eatingOutSizeSaid, type EatingOutController, type EatingOutSize, eatingOutRangeWords } from '@/lib/eating-out'
-import { executeMealMove, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
+import { executeMealMove, undoMealMove, mealMoveStillHolds, profileAfterConcurrentActivity } from '@/lib/pending-action-executor'
 import { detectPlanClaim, planClaimFloorText } from '@/lib/plan-claim'
 import { detectTodayClaim, todayClaimFloor, type TodayFacts } from '@/lib/today-claim'
 import { buildMealFoodRemoveProposal, buildMealFoodReplaceProposal, buildMealFoodResizeProposal } from '@/lib/meal-food-edit'
@@ -448,6 +448,11 @@ interface ChatAssistantProps {
   upcomingMeals?: { date: string; dayName: string; meals: Partial<Record<MealSlotName, string>> }[]
   /** A confirmed propose_meal_swap for an UPCOMING day — the strip's own write, so chat and tap cannot differ. */
   onUpcomingMealPickApplied?: (date: string, slot: MealSlotName, chosenName: string) => Promise<boolean>
+  /**
+   * The meal options were changed for a day that is NOT today (an Undo took a dish back out): re-read them, and touch
+   * nothing of today's. onMealSwapApplied(slot, '') also re-reads, but it drops TODAY's shown pick for that meal.
+   */
+  onMealOptionsChanged?: () => Promise<void>
   /** add_day_to_grocery_list and its undo — the strip's own two functions. */
   onAddMealDayToGrocery?: (date: string) => Promise<AddGroceryDaysResult | null>
   onRemoveMealDayFromGrocery?: (date: string) => Promise<AddGroceryDaysResult | null>
@@ -551,7 +556,7 @@ const FOOD_OFFER_KINDS = new Set(['propose_meal_swap', 'propose_meal_addition', 
 /** How long a cleared chat can be put back (the app's other Undo lines use ten seconds or more). */
 const CLEAR_UNDO_MS = 10_000
 
-export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, emptyMeals = [], onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onPlanPause, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onEatingOut, onMealKnockOn, onMealKnockOnMove, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
+export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAdaptations = [], onAdaptationsChanged, onEndAdaptation, onPlanInvalidated, kitController = null, macros, exercisePlan, mesocycle, planCreatedAt, mealPlan, exerciseExclusions, latestWeightKg, targetWeightKg, onPlanUpdate, onLogsUpdated, onWeightLogged, onMesocycleUpdated, onProfileChanged, onGoalMealsNeedRebuild, mealRefit = null, onMealRefitConfirm, mealTopUp = null, emptyMeals = [], onMealTopUpStart, onMealTopUpConfirm, onRestartPlan, onPlanPause, onMealDayMovePlan, onMealDayMoveConfirm, onMealDayMoveUndo, onMealRebalance, onEatingOut, onMealKnockOn, onMealKnockOnMove, onMealSwapApplied, upcomingMeals, onUpcomingMealPickApplied, onMealOptionsChanged, onAddMealDayToGrocery, onRemoveMealDayFromGrocery, onFindMoreMealOptions, memoryFacts, memoryGoals, memoryContextFacts, onMemoryChanged, onOpenProfile, groceryItems, onGroceryChanged, onOpenGrocery, onWaterChanged, onStepsChanged, onOpenExercise, onOpenDashboard, dataVersion = 0, onAttentionChange, chatVisible = false, revealSpeed = DEFAULT_REVEAL_SPEED, pendingLoadSuggestions, headerAction }: ChatAssistantProps) {
   // "Show numbers" off (slice 4b): no calorie figure in the chat's own pills or cards (QA, 14 Nov 2026).
   const showNumbers = useShowNumbers()
   // NL logging (§3) writes through the SAME frozen session identity +
@@ -7918,6 +7923,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
       // second fails, so a swap can never leave the same meal in two slots.
       const payload = row.payload as unknown as MealMovePayload
       const moveProfileId = profile.id
+      // WHAT EACH MEAL HELD BEFORE, read before anything is written, so Undo puts each back (an unreadable read is
+      // "none", as on the Move sheet: Undo then clears to the day's own choice).
+      const picksBefore = await getMealPicksForDate(moveProfileId, payload.date).catch(() => ({} as Partial<Record<MealSlotName, string>>))
       receipt = await executeMealMove(moveProfileId, payload, async p => {
         if (p.date === getSessionDateContext(moveProfileId).date) return await onMealSwapApplied(p.slot, p.option.name)
         if (onUpcomingMealPickApplied) return await onUpcomingMealPickApplied(p.date, p.slot, p.option.name)
@@ -7928,12 +7936,11 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         ? (payload.legs.length === 2 ? 'Swapped over' : 'Moved')
         : "Couldn't move the meal"
       rows = ok ? payload.legs.map(l => ({ label: l.slot, detail: `${l.originalName} · ${l.afterKcal} kcal` })) : []
-      // NO UNDO TOKEN, and said rather than left ambiguous: undoing a two-leg
-      // move means removing two pool options and restoring two picks, and the
-      // receipt carries one opaque token. Wiring that is real work and belongs
-      // in its own change rather than bolted on half-done — the same call the
-      // meal LOG made for the same reason. Moving it back is one more move.
-      undoToken = undefined
+      // IT CAN BE PUT BACK (the chat walk, 18 Nov 2026, C11). The Move sheet has had an Undo since 2 Nov; this receipt
+      // had none ("moving it back is one more move"). The receipt keeps each meal's pick from before, and Undo runs
+      // the sheet's own function.
+      if (ok) receipt = { ...receipt, previousPicks: Object.fromEntries(payload.legs.map(l => [l.slot, picksBefore[l.slot] ?? null])) }
+      undoToken = ok ? row.id : undefined
     } else if (row.kind === 'propose_meal_refit') {
       // ONE WRITE PATH FOR BOTH SURFACES. The Nutrition tab's own Resize
       // button calls exactly this function; the coach does not have a second
@@ -8938,6 +8945,25 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             : { ...m, receipt: { ...m.receipt, rows: [...m.receipt.rows.filter(r => r.label !== RECEIPTS_UNDONE.refusedLabel), { label: RECEIPTS_UNDONE.refusedLabel, detail: back.failed[0].error }] } }
         }))
         return 'handled'
+      } else if (row.kind === 'propose_meal_move') {
+        // A MOVE BETWEEN TWO MEALS, PUT BACK by the Move sheet's own function. Only while both meals still hold what
+        // the move put there: a meal he has swapped again since is left alone, and the receipt says so.
+        const payload = row.payload as unknown as MealMovePayload
+        const previous = row.result?.previousPicks
+        if (!previous) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
+        let picksNow: Partial<Record<MealSlotName, string>>
+        try { picksNow = await getMealPicksForDate(profile.id, payload.date) } catch { return { refused: RECEIPTS_UNDONE.failed, keep: true } }
+        if (!mealMoveStillHolds(picksNow, payload)) return { refused: DAY_MOVE.undo.changed, keep: false }
+        const isToday = payload.date === getSessionDateContext(profile.id).date
+        const back = await undoMealMove(profile.id, payload, previous, async (slot, name) => {
+          if (isToday) return await onMealSwapApplied(slot, name)
+          // Another day: a named pick goes through the strip's own write; "none" is already cleared by the removal.
+          return name ? ((await onUpcomingMealPickApplied?.(payload.date, slot, name)) ?? false) : true
+        })
+        if (!back) return { refused: RECEIPTS_UNDONE.failed, keep: true }
+        // The copies are gone from that day's options: the lists that offer them are re-read (today's by its own pick
+        // handler, above).
+        if (!isToday) await onMealOptionsChanged?.()
       } else if (row.kind === 'propose_meal_swap') {
         const payload = row.payload as unknown as MealSwapPayload
         if (!payload.currentName) return { refused: RECEIPTS_UNDONE.cannot, keep: false }
@@ -8968,7 +8994,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
         // assembleDay chose before this, and clearing the pick is what makes
         // the Nutrition tab fall back to it. onMealSwapApplied can't express
         // "no pick", so the reload does it.
-        await onMealSwapApplied(payload.slot, '')
+        // FOR TODAY'S MEAL ONLY (19 Nov 2026). This ran whatever the day, and for a meal added to ANOTHER day it
+        // dropped today's shown pick for that meal while the store still held it. Another day re-reads the options.
+        if (payload.date && payload.date !== getSessionDateContext(profile.id).date) await onMealOptionsChanged?.()
+        else await onMealSwapApplied(payload.slot, '')
       } else {
         return { refused: RECEIPTS_UNDONE.cannot, keep: false }
       }

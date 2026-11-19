@@ -783,7 +783,13 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 18 Nov 2026: 3183 -> 3211, the weight history on Home (his "Add all three": weekly line, 3M/6M/1Y, week
   // list), its own chunk loaded when the Weight row opens, plus the allergy card; MEASURED 3186 through this gate on
   // the change. The other three budgets did not move. His 15 Sep ruling: 25 kB raw over today's number (3186 + 25).
-  const TOTAL_BUDGET_KB = 3211
+  // MOVED 19 Nov 2026: 3211 -> 3235, the full pass's fixes of 19 Nov (the chat's voice clean-up, phone Back for
+  // Profile, the meal-move Undo for the coach, the plain-words notes, the chat following its own thread). MEASURED
+  // 3210 through this gate on the change, 1 kB from the line, with no single change the cause: 3186 on 18 Nov, 3207
+  // by the morning of the 19th. The other three budgets did not move and were NOT raised: first paint is 610 of 612
+  // and is left where it is on purpose, so the next thing added to first paint has to be looked at. His 15 Sep
+  // ruling: 25 kB raw over today's number (3210 + 25).
+  const TOTAL_BUDGET_KB = 3235
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

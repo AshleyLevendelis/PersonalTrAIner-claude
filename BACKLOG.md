@@ -2,6 +2,30 @@
 
 Newest first. One line each.
 
+- [x] **A MEAL MOVED BETWEEN TWO MEALS BY THE COACH COULD NOT BE PUT BACK (19 Nov 2026, the full pass; a tester's finding
+  C11).** The Move sheet on Nutrition has had an Undo since 2 Nov; the coach's receipt for the same move had none, by
+  a note in the code ("moving it back is one more move"). His "every change previews and can be undone" covers both.
+  NOW: the coach's receipt has an Undo, and it runs ONE function shared with the sheet (`undoMealMove`): each meal's
+  resized copy is taken out of its options and that meal's pick from BEFORE the move is put back, or cleared to the
+  day's own choice when he had none. The picks from before are read before anything is written and kept on the
+  stored receipt, so the Undo does not depend on what the chat happens to remember.
+  HIS 29 OCT RULE, APPLIED: an Undo puts back only what is still as the card left it. If he has changed either meal
+  since, nothing is touched and the receipt says "One of those meals has changed since, so I've left both as they
+  are." (the day swap's own sentence). A put-back that does not save keeps its button.
+  TWO THINGS FOUND ON THE WAY AND FIXED:
+  - Undoing a meal the coach added to ANOTHER day told today's pick handler to clear that meal, so today's shown
+    choice for it dropped while the store still held it (the screen disagreeing with the store until a reload). It
+    now re-reads the options and leaves today alone.
+  - The coach's add-a-meal offer ended "becomes your dinner for 2026-09-17". It says "for today" or "for Thu 17 Sep".
+  NOT DONE, named: on the chat's test page today's pick goes to a stand-in, so the screen driver moves TOMORROW's
+  meals, where the app's own pick writer runs; that today's Undo goes through the same function with today's handler
+  is held by the logic check only. C9 (several offers' first line ends in a colon with the details now folded away)
+  is left: about forty checks pin those sentences and the wording is his. A food cannot be added to another day's
+  meal by chat at all ("I can't see your dinner for Thursday from here"), which is an older limit, not this change.
+  `test:meal-move` section 12 (14 new checks; 6 mutations caught), `test:meal-addition` (3 new checks; 1 mutation
+  caught), `verify:chat-meal-move` (new, 21 checks: the move, the Undo, an earlier pick put back, a meal changed
+  since left alone, the other-day case; 6 browser mutations caught; screenshots read, the refusal included). The
+  eight meal-move and meal-addition drivers pass. Frontend only.
 - [x] **THE FIRST ANSWER OF A FIRST CONVERSATION COULD LAND UNDER THE MESSAGE BOX (19 Nov 2026, the full pass; a tester's
   finding C2).** Three runs in three for the tester; here, not once in eight at five different timings, then two in
   six once the reply came at once, one of them at normal speed. So it was a race, and the screenshot was right.

@@ -3735,6 +3735,7 @@ function App() {
               onMealSwapApplied={handleMealPickApplied}
               upcomingMeals={mealDays.upcoming}
               onUpcomingMealPickApplied={mealDays.applyPick}
+              onMealOptionsChanged={async () => { if (profile?.id) await rereadMealPools(profile.id) }}
               onAddMealDayToGrocery={mealDays.addToGrocery}
               onRemoveMealDayFromGrocery={mealDays.removeFromGrocery}
               onFindMoreMealOptions={handleFindMoreMealOptions}

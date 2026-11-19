@@ -921,6 +921,7 @@ function Harness() {
               onFindMoreMealOptions={async () => ({ added: [] })}
               upcomingMeals={DAYMOVE ? mealDays.upcoming : undefined}
               onUpcomingMealPickApplied={DAYMOVE ? mealDays.applyPick : undefined}
+              onMealOptionsChanged={DAYMOVE ? reloadPools : undefined}
               onMealDayMovePlan={DAYMOVE ? mealDays.dayMove.plan : undefined}
               onMealDayMoveConfirm={DAYMOVE ? mealDays.dayMove.confirm : undefined}
               onMealDayMoveUndo={DAYMOVE ? mealDays.dayMove.undo : undefined}

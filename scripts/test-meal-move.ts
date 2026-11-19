@@ -27,6 +27,7 @@
  *     "3 slice wholemeal bread" — only the number may change.
  */
 import { buildMealMoveProposal, resizeMealTo, movedName } from '../src/lib/meal-move'
+import { mealMoveStillHolds } from '../src/lib/pending-action-executor'
 import { computeSlotBudgets, verifyProposal } from '../src/lib/meal-generation'
 import { MIN_SCALE_FACTOR, MAX_SCALE_FACTOR } from '../src/lib/portion-scaler'
 import type { MacroTargets } from '../src/lib/types'
@@ -348,6 +349,40 @@ console.log('\n11. A moved meal that lands light on protein says so, in numbers'
   check('...and the card does not call a snack light on protein', down.ok === true && !(down.diff.implications ?? []).some(i => /light on protein/.test(i.text)), down.ok && down.diff.implications)
   const fine = move({ rawArgs: { from_slot: 'dinner', to_slot: 'lunch' }, mealsBySlot: { dinner, lunch: withRealMacros(chickenDinner(0.9), 'lunch') } })
   check('two protein-led meals swapping say nothing about protein', fine.ok === true && !(fine.diff.implications ?? []).some(i => /light on protein/.test(i.text)), fine.ok && fine.diff.implications)
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n12. The move can be put back, by ONE function for the sheet and the coach (19 Nov 2026)')
+// ---------------------------------------------------------------------------
+{
+  const dinner = withRealMacros(chickenDinner(), 'dinner')
+  const lunch = withRealMacros(chickenDinner(0.9), 'lunch')
+  const swap = move({ rawArgs: { from_slot: 'dinner', to_slot: 'lunch' }, mealsBySlot: { dinner, lunch } })
+  check('a two-meal swap is built (sanity: the cases below are reached)', swap.ok === true && swap.payload.legs.length === 2, swap.ok && swap.payload.legs.length)
+  if (swap.ok) {
+    const [a, b] = swap.payload.legs
+    const left = { [a.slot]: a.payload.option.name, [b.slot]: b.payload.option.name }
+    check('the day is "as the move left it" when both meals still hold the copies it wrote', mealMoveStillHolds(left, swap.payload) === true)
+    check('...and NOT when he has swapped one of them again since', mealMoveStillHolds({ ...left, [a.slot]: 'Some other dish' }, swap.payload) === false)
+    check('...nor when the other one changed', mealMoveStillHolds({ ...left, [b.slot]: 'Some other dish' }, swap.payload) === false)
+    check('...nor when a pick has gone altogether', mealMoveStillHolds({ [a.slot]: a.payload.option.name }, swap.payload) === false)
+    check('...and a move with no legs is never "still as it was" (nothing to put back)', mealMoveStillHolds(left, { ...swap.payload, legs: [] }) === false)
+  }
+  const undo = (() => { const i = exec.indexOf('export async function undoMealMove'); return i === -1 ? '' : exec.slice(i, exec.indexOf('\nexport ', i + 10)) })()
+  check('the put-back was found and bounded (sanity check on this check)', undo.length > 150, undo.length)
+  check('it takes the legs back LAST FIRST, each through the edit\'s own undo, with that meal\'s earlier pick', /\[\.\.\.payload\.legs\]\.reverse\(\)/.test(undo) && /undoMealEdit\(profileId, \{ payload: leg\.payload, poolIndex: null, previous: previous\[leg\.slot\] \?\? null \}, pick\)/.test(undo))
+  check('...and stops, saying it did not save, the moment a step fails', /if \(!\(await undoMealEdit\([^\n]+\)\)\) return false/.test(undo) && /return true\s*\n\}/.test(undo))
+  const sheet = strip(read('src/components/nutrition/MealMoveSheet.tsx')), chat = strip(read('src/components/ChatAssistant.tsx'))
+  check('the Move sheet and the coach both call undoMealMove( and neither keeps a loop of its own', /undoMealMove\(profileId, proposal\.payload, before,/.test(sheet) && /undoMealMove\(profile\.id, payload, previous,/.test(chat) && !/undoMealEdit\(/.test(sheet))
+  const confirmAt = chat.indexOf("row.kind === 'propose_meal_move'")
+  const confirm = confirmAt === -1 ? '' : chat.slice(confirmAt, chat.indexOf("row.kind === 'propose_meal_refit'", confirmAt))
+  check('the coach reads each meal\'s pick BEFORE it writes, and keeps them on the receipt for Undo', confirm.indexOf('getMealPicksForDate(moveProfileId, payload.date)') > -1 && confirm.indexOf('getMealPicksForDate(moveProfileId, payload.date)') < confirm.indexOf('executeMealMove(') && /previousPicks: Object\.fromEntries\(payload\.legs\.map\(l => \[l\.slot, picksBefore\[l\.slot\] \?\? null\]\)\)/.test(confirm))
+  check('...and the receipt offers Undo only when the move landed', /undoToken = ok \? row\.id : undefined/.test(confirm))
+  const undoAt = chat.indexOf("row.kind === 'propose_meal_move'", confirmAt + 10)
+  const undoArm = undoAt === -1 ? '' : chat.slice(undoAt, chat.indexOf("row.kind === 'propose_meal_swap'", undoAt))
+  check('the coach\'s Undo checks the day is still as the move left it BEFORE it puts anything back', undoArm.indexOf('mealMoveStillHolds(picksNow, payload)') > -1 && undoArm.indexOf('mealMoveStillHolds(picksNow, payload)') < undoArm.indexOf('undoMealMove('))
+  check('...refuses in the day swap\'s own words, and with no receipt to read from says it cannot', /refused: DAY_MOVE\.undo\.changed, keep: false/.test(undoArm) && /if \(!previous\) return \{ refused: RECEIPTS_UNDONE\.cannot, keep: false \}/.test(undoArm))
+  check('...and a put-back that did not save keeps its button', /if \(!back\) return \{ refused: RECEIPTS_UNDONE\.failed, keep: true \}/.test(undoArm))
 }
 
 console.log(failures === 0 ? '\nAll meal-move checks passed.' : `\n${failures} check(s) failed.`)

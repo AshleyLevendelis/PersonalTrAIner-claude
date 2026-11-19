@@ -753,6 +753,34 @@ export async function executeMealMove(
   return { landed, failed: [] }
 }
 
+/**
+ * PUTS A MOVE BETWEEN TWO MEALS BACK (the chat walk, 18 Nov 2026, C11: the screen's Move sheet had an Undo since 2 Nov
+ * and the coach's receipt had none, "moving it back is one more move"). Each leg's resized copy is taken out of the
+ * meal's options and that meal's earlier pick put back (none: the day's own choice), last leg first. ONE function for
+ * the sheet and the coach, so the two cannot leave the day in different states. False the moment a step does not
+ * save: an Undo is a write.
+ */
+export async function undoMealMove(
+  profileId: string,
+  payload: MealMovePayload,
+  previous: Partial<Record<string, string | null>>,
+  pick: (slot: MealAdditionPayload['slot'], name: string) => Promise<boolean>,
+): Promise<boolean> {
+  for (const leg of [...payload.legs].reverse()) {
+    if (!(await undoMealEdit(profileId, { payload: leg.payload, poolIndex: null, previous: previous[leg.slot] ?? null }, pick))) return false
+  }
+  return true
+}
+
+/**
+ * IS THE DAY STILL AS THE MOVE LEFT IT? Every meal the move wrote must still hold the dish it put there. His 29 Oct
+ * rule for the plan, applied to this: an Undo puts back only what is still as the card left it, so a meal he has
+ * swapped again since is never overwritten by an old Undo.
+ */
+export function mealMoveStillHolds(picksNow: Partial<Record<string, string>>, payload: MealMovePayload): boolean {
+  return payload.legs.length > 0 && payload.legs.every(leg => picksNow[leg.slot] === leg.payload.option.name)
+}
+
 /** What the swap and its undo need from the screen: showing saved picks, and re-reading the options. */
 export interface MealDayMoveDeps {
   /** Puts saved picks on screen (state only, no write). `name: null` clears the pick. */

@@ -511,7 +511,11 @@ async function main() {
     // slot's earlier pick on Undo (verify:meal-move 2g-2h, 6a-6d drive it; the earlier-pick half has no fixture with a
     // hand-picked slot, so it is pinned here), and the coach's card is built with the same trial.
     const moveSheet = read('src/components/nutrition/MealMoveSheet.tsx')
-    check('the move sheet reads the picks before it writes, and Undo restores them', moveSheet.indexOf('getMealPicksForDate(ctx.profileId, ctx.date)') > -1 && moveSheet.indexOf('getMealPicksForDate(ctx.profileId, ctx.date)') < moveSheet.indexOf('await executeMealMove(') && /previous: before\[leg\.slot\] \?\? null/.test(moveSheet))
+    // RE-ANCHORED 19 Nov 2026: the put-back became ONE function for the sheet and the coach (undoMealMove), so the
+    // sheet no longer holds the loop. The property is the same; the earlier-pick half now has a fixture too
+    // (verify:chat-meal-move section 3, through this function).
+    const moveUndo = (() => { const x = read('src/lib/pending-action-executor.ts'); const at = x.indexOf('export async function undoMealMove'); return at === -1 ? '' : x.slice(at, x.indexOf('\nexport ', at + 10)) })()
+    check('the move sheet reads the picks before it writes, and Undo restores them', moveSheet.indexOf('getMealPicksForDate(ctx.profileId, ctx.date)') > -1 && moveSheet.indexOf('getMealPicksForDate(ctx.profileId, ctx.date)') < moveSheet.indexOf('await executeMealMove(') && /undoMealMove\(profileId, proposal\.payload, before,/.test(moveSheet) && /previous: previous\[leg\.slot\] \?\? null/.test(moveUndo))
     check('the coach\'s move card is the builder\'s plus the move trial, from the hook', /diff: withKnockOn\(moved\.diff, moveTrial\)/.test(chat) && /onMealKnockOnMove\(moved\.payload\.date/.test(chat) && /onMealKnockOnMove=\{mealDays\.dayMove\.knockOnMove\}/.test(app) && /onMealKnockOnMove=\{mealDays\.dayMove\.knockOnMove\}/.test(read('.tour-harness/chat.tsx')))
     check('the screen tells both edit sheets when the meal is already eaten', /afterEating: \(loggedBySlot\[slot\]\?\.length \?\? 0\) > 0/.test(mealPlan) && /meal: ctx\.meal, afterEating: ctx\.afterEating/.test(mealPlan)
       && /afterEating: ctx\.afterEating/.test(read('src/components/nutrition/MealFoodEditSheet.tsx')) && /afterEating: ctx\.afterEating/.test(sheet))

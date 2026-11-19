@@ -298,7 +298,8 @@ export function buildMealAdditionProposal(input: BuildMealAdditionInput): MealAd
   // shows. The card names the days, so a week asked late in the week says where it stops.
   const allDates = repeatDates(date, Number(rawArgs.days ?? 1), input.todayDate)
   const alsoDates = allDates.slice(1)
-  const forWhen = alsoDates.length > 0 ? `every day from ${datesLabel(allDates)}` : date
+  // A DAY IN WORDS, NEVER "2026-09-17" (19 Nov 2026: the card read "becomes your dinner for 2026-09-17").
+  const forWhen = alsoDates.length > 0 ? `every day from ${datesLabel(allDates)}` : date === input.todayDate ? 'today' : datesLabel([date])
 
   return {
     ok: true,
