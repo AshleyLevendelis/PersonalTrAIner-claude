@@ -766,6 +766,24 @@ export function setVolumeKg(log: Pick<ExerciseSetLog, 'exercise_name' | 'weight_
 export const TRAINING_GAP_CAP_MS = 10 * 60 * 1000
 
 /**
+ * A SUMMARY SAVED AT FINISH, WITH ITS SETS READ AGAIN AS THEY STAND NOW (the Exercise walk, 19 Nov 2026).
+ *
+ * His ruling of 8 Nov 2026, "Add to it": a set logged after Finish is added to the finished day, and its count goes up
+ * everywhere. The summary was the one place that did not follow: it is a card saved at the moment of finishing, so
+ * after one more set the day's bar read "2 of 18" beside a summary still saying "1/18 planned sets". Every count and
+ * the volume are worked out again from the sets as they are; the TIME stays the time of the session he finished,
+ * because a set added an hour later did not make the session an hour longer.
+ */
+export function summaryAsItStands(
+  saved: SessionSummary,
+  logs: ExerciseSetLog[],
+  plannedExercises: { id?: string; name: string; sets: number }[],
+  prep: { id?: string; name: string }[] = [],
+): SessionSummary {
+  return { ...computeSessionSummary(logs, plannedExercises, '', '', prep), durationMinutes: saved.durationMinutes }
+}
+
+/**
  * HOW LONG A SESSION WAS — training time, decided as a CSCS, 9 Oct 2026 (L29).
  *
  * It was the wall clock from start to the Finish tap, so the tester's session

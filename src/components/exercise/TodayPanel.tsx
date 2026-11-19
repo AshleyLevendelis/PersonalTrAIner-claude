@@ -14,7 +14,7 @@ import { exerciseCoachLine } from '@/lib/exercise-coach-line'
 import { carriedWeightFor } from '@/lib/set-row'
 import { isExternallyLoaded, splitLoadDisplay } from '@/lib/load-prescription'
 import { getDoubleProgressionRecommendation, getAddedLoadProgression, withWorkingLoadKg, cardLoadFor, type DoubleProgressionRecommendation, type WorkingSetContext } from '@/lib/progression-engine'
-import { groupExercises, isConditioningDay, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, normalizeWarmup, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
+import { groupExercises, isConditioningDay, mainLiftGroupIndex, resolveCalibrationAnchorIndex, computeSessionSummary, summaryAsItStands, normalizeWarmup, plannedSetProgress, type ExerciseGroup } from '@/lib/session-derive'
 import { sessionNudge } from '@/lib/session-nudge'
 import { TrainerNudge } from '@/components/TrainerNudge'
 import { reconnectingLine } from '@/lib/coach-voice'
@@ -123,6 +123,14 @@ const DAY_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Satu
 // is computed here, for today's workout only, and passed only to this
 // surface — the peek and program browse never see it (§2.2, §7.4).
 // ---------------------------------------------------------------------------
+
+/** The rows a session summary counts: working exercises as planned sets, and movement prep kept out of both counts. */
+function summaryRowsOf(workout: WorkoutDay): { planned: { id?: string; name: string; sets: number }[]; prep: { id?: string; name: string }[] } {
+  return {
+    planned: workout.exercises.filter(ex => !isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets })),
+    prep: workout.exercises.filter(ex => isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name })),
+  }
+}
 
 export function TodayPanel({
   plan,
@@ -329,8 +337,7 @@ export function TodayPanel({
     setSummaryNothingLogged(false)
     onCalibrationSessionFinished?.({ date: today, dayName: workout.day })
     // The summary's count is the same working-set count (isMovementPrepRow), never one that adds the warm-up drills.
-    const plannedExercises = workout.exercises.filter(ex => !isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name, sets: ex.sets }))
-    const prepRows = workout.exercises.filter(ex => isMovementPrepRow(ex)).map(ex => ({ id: ex.id, name: ex.name }))
+    const { planned: plannedExercises, prep: prepRows } = summaryRowsOf(workout)
     const summary = computeSessionSummary(logs, plannedExercises, result.startedAtIso, result.finishedAtIso, prepRows)
     const prs = computeSessionPRs(result.prBaseline, logs)
     // "What next session prescribes" reuses the same function already called
@@ -423,6 +430,15 @@ export function TodayPanel({
   const workout = todayCell?.movedTo
     ? undefined
     : (todayCell?.session ?? undefined) ?? liveWeekPlan.find(d => d.day === effectiveDayName)
+  // THE SUMMARY FOLLOWS A SET LOGGED AFTER FINISH (the Exercise walk, 19 Nov 2026; his 8 Nov "Add to it"). The card is
+  // saved at the moment of finishing, so one more set left the day's bar on "2 of 18" beside a summary still reading
+  // "1/18 planned sets". Its counts and volume are read again from the sets as they stand; only once the day's sets
+  // are known, so a card opened before they load shows what was saved and never a zero.
+  const shownSummary = useMemo(() => {
+    if (!summaryData || !workout || !setsKnown) return summaryData
+    const { planned, prep } = summaryRowsOf(workout)
+    return { ...summaryData, summary: summaryAsItStands(summaryData.summary, logs, planned, prep) }
+  }, [summaryData, workout, logs, setsKnown])
   // COMPUTED HERE, NEVER STORED (the tightness answer, see handleTightness). The
   // plan's warm-up is untouched; these exist for as long as today's answer does.
   // Injuries still veto a drill, and a drill the warm-up ALREADY holds is never
@@ -1787,7 +1803,7 @@ export function TodayPanel({
               ? <TrainerNudge line text={coachLine.text} tag="Training" clamp={!weekNotesOpen} onOpen={weekNotesOpen ? undefined : () => setWeekNotesOpen(true)} />
               : <TrainerNudge line text={coachLine.text} tag="Training" openChat askPrefill={`Tell me more about this: "${coachLine.text}"`} data-testid="exercise-coach-line" />
           )}
-          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={summaryData} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} savedCardio={summarySavedCardio} effortFor={profileId && !summaryNothingLogged ? { profileId, date: today } : undefined} />
+          <SessionSummaryDialog open={summaryOpen} onOpenChange={setSummaryOpen} data={shownSummary} nothingLogged={summaryNothingLogged} serverCloseFailed={summaryCloseFailed} savedCardio={summarySavedCardio} effortFor={profileId && !summaryNothingLogged ? { profileId, date: today } : undefined} />
           {finishCheck && (
             <Suspense fallback={null}>
               <FinishCheckSheet

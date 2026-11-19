@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **THE SESSION SUMMARY DID NOT COUNT A SET LOGGED AFTER FINISH (19 Nov 2026, the full pass; a tester's finding E2).** His
+  8 Nov ruling, "Add to it": a set logged after Finish is added to the finished day and its count goes up everywhere.
+  The summary was the one place that did not follow, because it is a card saved at the moment of finishing: the day's
+  bar read "4 of 18 sets" beside a summary still saying "3/18". Its counts, its per-exercise rows and its volume are
+  now read again from the sets as they stand whenever it is shown; a set taken off afterwards comes off it too.
+  DECISION, mine (CSCS): the TIME stays the time of the session he finished. A set added two hours later did not make
+  the session two hours longer, and training time is what the number claims to be. Personal bests and "next session"
+  lines on the card are still as they were at Finish (named, not built: a best set after Finish is in his history and
+  on the lift's own row, and not on this card).
+  `test:finish-check` section 2b (8 new checks; 5 mutations, 5 caught), `verify:finish-check` 2k-2q (7 new checks in a
+  real browser: finish short, log one more set of a loaded lift, the bar and the summary both count it, the volume
+  rises, the time does not; 1 browser mutation caught). THE DRIVER'S FIRST VERSION PICKED CHIN-UPS for "the volume
+  counts it": a bodyweight set moves the count and not the volume, so the check failed on correct code. It now asks
+  the page for a lift that carries a weight. Frontend only.
 - [x] **AN "OTHER" INJURY SAID IT CHANGES NO EXERCISE, THEN OFFERED TO REBUILD THE PLAN AROUND IT (19 Nov 2026, the full pass;
   a tester's finding P1, traced before fixing).** "Other (describe)" keeps what he typed and says, truthfully, that
   the plan cannot work around words. Saving it then raised "Rebuild your plan around this? ... it still includes

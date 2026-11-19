@@ -117,6 +117,41 @@ await shoot('finish-check-finished-bar')
 check('2j. tapping it opens the same summary again', (await tapExpr(q('[data-testid="session-finished"]'))) && !!(await until(`[...document.querySelectorAll('[role="dialog"] h2')].some(h => /^Session (complete|saved)$/.test(h.textContent))`, 4000)) && (await summary())?.sets === `${H.sets}/${N}`, (await summary())?.sets)
 await escape()
 
+// ---- 2b. One more set after Finish: the summary follows -------------------------
+// His ruling of 8 Nov 2026, "Add to it": a set logged after Finish is added to the finished day, and its count goes up
+// everywhere. The summary did not follow (the Exercise walk, 19 Nov 2026): it is a card saved at the moment of
+// finishing, so the bar read one more set and the summary beside it the old count.
+console.log('\n  2b. ONE MORE SET AFTER FINISH — THE SUMMARY FOLLOWS')
+// A lift that carries a WEIGHT, so the volume can be seen to move: asked of the page (the first row's weight box is
+// open and the card does not read "Bodyweight"), never named. Chin-ups log 0 kg and would leave the volume where it was.
+const loaded = []
+for (const p of plan) {
+  if (p.name === H.name || p.prep || p.bodyweightOnly) continue
+  await ensureOpen(p.name)
+  if (await ev(`!/bodyweight/i.test(${cardExpr(p.name)}?.innerText ?? '') && ${rowsExpr(p.name)}[0]?.querySelectorAll('input')[0]?.disabled === false`)) loaded.push(p)
+}
+const O = loaded[0] ?? null
+check('2k. another planned lift that carries a weight, not yet done, is on the day (the fixture binds)', !!O, plan.map(p => p.name))
+const timeBefore = (c2?.tiles ?? []).find(t => /Training time$/i.test(t)) ?? null
+await ensureOpen(O?.name ?? H.name)
+check('2l. one of its sets is logged after the session was finished', (await tick(O?.name ?? H.name, 0, { weight: 20, reps: 10 })) === true)
+await wait(900)
+const barAfter = await until(`(() => { const b = ${q('[data-testid="session-finished"]')}; const t = b?.textContent.trim() ?? ''; return t.includes('${H.sets + 1} of ${N} sets') ? t : null })()`, 6000)
+check(`2m. the day's bar counts it: "${H.sets + 1} of ${N} sets"`, typeof barAfter === 'string', barAfter ?? await ev(`${q('[data-testid="session-finished"]')}?.textContent ?? null`))
+await ev('window.scrollTo(0, 0)'); await wait(250)
+await tapExpr(q('[data-testid="session-finished"]'))
+await until(`[...document.querySelectorAll('[role="dialog"] h2')].some(h => /^Session (complete|saved)$/.test(h.textContent))`, 4000)
+await wait(400)
+const c2b = await summary()
+check(`2n. AND SO DOES THE SUMMARY: "${H.sets + 1}/${N}" (it stayed on "${H.sets}/${N}")`, c2b?.sets === `${H.sets + 1}/${N}`, c2b?.sets)
+check('2o. ...the extra set is still beside it', c2b?.extra === '+1 extra', c2b?.extra)
+const volumeAfter = Number(((c2b?.tiles ?? []).find(t => /Volume$/i.test(t)) ?? '').replace(/[, ]/g, '').match(/^(\d+)kg/)?.[1] ?? NaN)
+const addedRow = await ev(`(window.__fakeDb?.exercise_set_logs ?? []).filter(r => r.exercise_name === ${JSON.stringify(O?.name ?? '')}).map(r => ({ kg: r.weight_kg, reps: r.reps_completed }))[0] ?? null`)
+check('2p. ...the volume counts the new set too', Number.isFinite(volumeAfter) && (addedRow?.kg ?? 0) > 0 && volumeAfter > expectedKg, { volumeAfter, was: expectedKg, lift: O?.name, addedRow })
+check('2q. ...and the time is still the time of the session he finished', ((c2b?.tiles ?? []).find(t => /Training time$/i.test(t)) ?? null) === timeBefore && timeBefore !== null, { before: timeBefore, after: (c2b?.tiles ?? []).find(t => /Training time$/i.test(t)) })
+await shoot('finish-check-summary-after-one-more')
+await escape()
+
 // ---- 3. Everything done: no question -----------------------------------------
 console.log('\n  3. EVERY PLANNED SET DONE — nothing is asked, and the time is training time')
 // All but one of today's planned sets, as the database would hold them: three
