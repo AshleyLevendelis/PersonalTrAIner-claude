@@ -24,7 +24,13 @@ are prompts to paste into Claude Code on the Mac.
 3. **Decisions** (the cloud session asks these one at a time): the app's permanent ID, the contact email for the
    privacy page and listings, the store name and short description.
 
-## Order of work
+## His decision, 20 Nov 2026: Google Play first, the App Store later
+
+So the order below runs the Android half only; the iPhone steps (Prompt 2, the iPhone half of Prompt 3, Apple's
+account) wait. Before the Play closed test, Google's rule on AI-generated content needs a way to report a coach reply
+from inside the app (being decided with him).
+
+## Order of work (both stores, for reference)
 
 1. Accounts started (they take days, so first).
 2. Android on his phone (Mac + Android Studio), prompt below. Free, no account needed to run it on his own phone.
