@@ -20,6 +20,8 @@ Newest first. One line each.
   `test:profile-groups` pass after fixes they found (the ceiling; two test-only exports; a sheet body shape).
   NOT PROVEN: any native build (no Xcode or Android Studio here), real permission sheets, real counts. NOT BUILT: store
   listings, icons, native push, the privacy page's contact line (the page is a DRAFT for his approval), the final app id.
+  RUN: 286 checks that read the changed files or draw Home and Profile (every whole-app driver included): 285 pass;
+  the one failure is `test:meal-quality`, which needs the live database ("VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY must be set").
 
 - [x] **TWO MORE OF HIS, 20 Nov 2026: "Build the account row", and the exercise sheet's labels.**
   1. PROFILE, ACCOUNT, "EMAIL & SIGN-IN". He asked whether his progress was safe with no email. The app signs everyone
