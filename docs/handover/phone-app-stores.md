@@ -111,3 +111,33 @@ What Ashley checks in the Simulator:
 
 Done looks like: it ran in the Simulator and Home showed the steps added in the Health app.
 ```
+
+## Prompt 3: the release builds (once the accounts exist; paste into Claude Code on the Mac)
+
+```
+Goal: make the first store builds of Personal TrAIner: a signed Android app bundle for the Play Console's closed test,
+and an iPhone build uploaded to App Store Connect (TestFlight). Do not publish anything to the public.
+
+WHY. Prompts 1 and 2 proved the app runs. The Android build now signs a release from android/keystore.properties if
+that file exists (android/app/build.gradle); the key and that file are never committed (android/.gitignore).
+Listing text and privacy answers are drafted in docs/store/listing.md.
+
+1. git checkout main && git pull && npm ci && npm run test:phone-app && npm run phone:sync
+2. ANDROID UPLOAD KEY (once, ever; keep it and its passwords safe, e.g. in a password manager):
+   keytool -genkey -v -keystore ~/personal-trainer-upload.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+   Ashley types the passwords himself. Then create android/keystore.properties containing:
+     storeFile=/Users/<him>/personal-trainer-upload.jks
+     storePassword=...
+     keyAlias=upload
+     keyPassword=...
+   Check: git status must NOT list keystore.properties or the .jks.
+3. cd android && ./gradlew bundleRelease
+   Report the path of app-release.aab and its size. Ashley uploads it in the Play Console: Testing > Closed testing >
+   create release, and turns on Play App Signing when asked.
+4. IPHONE: npx cap open ios. In Xcode: App target > Signing & Capabilities > Team = his paid developer team; HealthKit
+   capability listed. Product > Archive, then Distribute App > App Store Connect > Upload. Report any error word for word.
+5. Before EACH later upload, raise the version: android/app/build.gradle versionCode (+1) and versionName, and in
+   Xcode the Version / Build. Report the numbers used.
+
+Done looks like: the .aab path, and "upload succeeded" from Xcode's organiser, with the version numbers.
+```
