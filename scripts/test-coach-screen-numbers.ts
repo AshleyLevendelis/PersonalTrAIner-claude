@@ -59,7 +59,8 @@ check('...and nothing for a date the week does not hold', todayScreenCell(days a
 
 const chat = strip(readFileSync('src/components/ChatAssistant.tsx', 'utf8'))
 const usesCell = (chat.match(/todayScreenCell\(trainingWeek\.days, activeSession\.date\)/g) ?? []).length
-check('the chat strip AND the coach\'s context take today\'s cell from the one function', usesCell >= 2, usesCell)
+// The chat's strip went on 20 Nov 2026 (his request); the coach's context is the reader that remains.
+check('the coach\'s context takes today\'s cell from the one function', usesCell >= 1, usesCell)
 check('the coach\'s header is given the screens\' count', /screenCount: .*todayScreenCell\(trainingWeek\.days, activeSession\.date\).*sessionSetCount\(cell\.session, cell\.workingLogs\)/.test(chat))
 const ctx = strip(readFileSync('src/lib/chat-plan-context.ts', 'utf8'))
 check("...and the header prefers it over its own join", /today\.screenCount\?\.logged \?\?/.test(ctx) && /today\.screenCount\?\.planned \?\?/.test(ctx))

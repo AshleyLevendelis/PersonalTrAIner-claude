@@ -23,7 +23,7 @@ import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { chatContextPills, kcalPillText } from '../src/lib/chat-context-strip'
+import { kcalPillText } from '../src/lib/chat-context-strip'
 import { kcalLeftOrOver } from '../src/lib/coach-voice'
 import { offerChanges, previewChange, scopeLabel } from '../src/lib/offer-text'
 import { makeReadAloud, spokenTextOf, deviceSynth } from '../src/lib/read-aloud'
@@ -43,41 +43,15 @@ const stripSrc = strip(readFileSync(join(ROOT, 'src/lib/chat-context-strip.ts'),
 const cardSrc = strip(readFileSync(join(ROOT, 'src/components/chat/ProposalCard.tsx'), 'utf8'))
 const listenSrc = strip(readFileSync(join(ROOT, 'src/components/chat/ListenButton.tsx'), 'utf8'))
 
-console.log('[1] The context strip, called')
-const base = { session: null, running: false, count: null, minutes: null, kcal: null }
-const mid = chatContextPills({ ...base, session: { status: 'in_progress', focus: 'Full Body Power' }, count: { logged: 4, planned: 12 }, kcal: { target: 3040, eaten: 630 } })
-check('mid-session: "<focus> · N of M sets", linking to Exercise, then the calories', JSON.stringify(mid) === JSON.stringify([
-  { kind: 'session', text: 'Full Body Power · 4 of 12 sets', to: 'exercise' }, { kind: 'kcal', text: '2,410 kcal left', to: 'nutrition' }]), mid)
-const started = chatContextPills({ ...base, session: { status: 'not_started', focus: 'Legs' }, running: true, count: { logged: 0, planned: 9 } })
-check('started on this phone with no set in yet: still mid-session', started.length === 1 && started[0].kind === 'session' && started[0].text === 'Legs · 0 of 9 sets', started)
-const notStarted = chatContextPills({ ...base, session: { status: 'not_started', focus: 'Legs' }, count: { logged: 0, planned: 9 } })
-check('due but not begun: no workout pill', notStarted.length === 0, notStarted)
-const done = chatContextPills({ ...base, session: { status: 'done', focus: 'Legs' }, minutes: 52, count: { logged: 9, planned: 9 } })
-check('done: a static "Session done · 52 min", with no link', done.length === 1 && done[0].kind === 'done' && done[0].text === 'Session done · 52 min' && !('to' in done[0]), done)
-const doneUntimed = chatContextPills({ ...base, session: { status: 'done', focus: 'Legs' }, minutes: null })
-check('done with no measured minutes: "Session done", never an invented time', doneUntimed[0]?.text === 'Session done', doneUntimed)
-const quiet = (['rest', 'moved', 'unknown'] as const).map(status => chatContextPills({ ...base, session: { status, focus: 'X' }, running: true, count: { logged: 1, planned: 9 } }))
-check('rest day, moved day, not known: no workout pill', quiet.every(p => p.length === 0), quiet)
-const over = chatContextPills({ ...base, kcal: { target: 2000, eaten: 2160 } })
-check('over the target, the pill says so: "160 kcal over"', over[0]?.text === '160 kcal over', over)
+console.log('[1] No context strip, and one name (his request, 20 Nov 2026)')
+// "The session done and kcal left in the chat is unnecessary lets remove thay and the text above 'sees todays session'
+// remove that too. And instead of trainer personal trainer chamge it to just Personal TrAIner."
+check('the chat draws no context strip and no pills', !/data-testid="chat-context-strip"/.test(chat) && !/data-context-pill/.test(chat) && !/chatContextPills\(/.test(chat))
+check('...and no "Sees today\'s session" line', !/chat-header-live/.test(chat) && !/Sees today/.test(chat))
+const h2 = (chat.match(/<h2[^>]*>([^<]*)<\/h2>/) || [])[1] ?? ''
+check('the header says "Personal TrAIner", once', h2 === 'Personal TrAIner' && (chat.match(/>Personal TrAIner</g) || []).length === 1, h2)
 const nutritionHero = (target: number, eaten: number) => { const [amount, word] = kcalLeftOrOver(target - eaten).split(' '); return `${Number(amount).toLocaleString()} kcal ${word}` }
-check('...word for word what Nutrition\'s hero says, either side of the target', [[3040, 630], [2000, 2160], [2500, 2499.6], [1800, 0]].every(([t, e]) => kcalPillText(t, e) === nutritionHero(t, e)), [[3040, 630], [2000, 2160]].map(([t, e]) => [kcalPillText(t, e), nutritionHero(t, e)]))
-check('nothing to say: no pills', chatContextPills(base).length === 0 && chatContextPills({ ...base, session: { status: 'rest', focus: null }, kcal: { target: 0, eaten: 0 } }).length === 0)
-check('...and the screen draws the strip only when there is a pill', /\{contextPills\.length > 0 && \(\s*<div data-testid="chat-context-strip"/.test(chat))
-
-console.log('\n[2] The strip reads what Home and Nutrition read')
-const numbers = readFileSync('src/lib/coach-screen-numbers.ts', 'utf8')
-const call = (chat.match(/const contextPills = chatContextPills\(\{([\s\S]*?)\n  \}\)/) || [])[1] ?? ''
-check('the screen builds its pills with the strip function', call.length > 0)
-check('session status and focus: Home\'s aggregate (proactiveData is loadDashboardData)', /status: proactiveData\.session\.status/.test(call) && /focus: proactiveData\.session\.focus/.test(call), call.slice(0, 300))
-check('the set count: sessionSetCount over today\'s cell of the training week, as Home', /count: sessionSetCount\(stripCell\?\.session, stripCell\?\.workingLogs\)/.test(call)
-  && /const stripCell = todayScreenCell\(trainingWeek\.days, activeSession\.date\)/.test(chat)
-  // Stage 3 (17 Nov 2026): the dated cell is found by the reader the coach's context shares (coach-screen-numbers.ts).
-  && /\.find\(d => d\.date === date\)/.test(numbers))
-check('the minutes: the finish card first, then Home\'s session minutes', /minutes: readSessionSummary\(profile\.id, activeSession\.date\)\?\.summary\.durationMinutes \?\? proactiveData\?\.sessionMinutes/.test(call))
-check('calories eaten: the meal ledger\'s snapshot, else Home\'s figure; against the target Nutrition uses', /const stripEaten = screenEatenKcal\(profile\.id, activeSession\.date, proactiveData\?\.caloriesEaten\)/.test(chat) && /getLedgerSnapshot\(profileId, date\)\?\.eaten\.kcal \?\? fallback/.test(numbers) && /target: macros\.calories, eaten: stripEaten/.test(call))
-check('...and the words come from the phrasebook (kcalLeftOrOver), never a second sum', /kcalLeftOrOver\(target - eaten\)/.test(stripSrc))
-check('the strip re-reads when a meal is logged', /subscribeMealStore\(\(\) => setLedgerTick/.test(chat))
+check('the calorie words the coach still uses are Nutrition\'s, either side of the target', [[3040, 630], [2000, 2160], [2500, 2499.6], [1800, 0]].every(([t, e]) => kcalPillText(t, e) === nutritionHero(t, e)))
 
 console.log('\n[3] The offer: the same scopes, the preview, every state')
 // RE-ANCHORED 31 Oct 2026, her "Mix": "Just today" / "Whole block" / "Keep <the exercise>".
@@ -136,11 +110,6 @@ check('(2) ...read off the bubble the tapped button sits in', /closest\('\[data-
 }
 check('(5) the chat stops reading when it unmounts, and when its tab is left', /useEffect\(\(\) => \(\) => readAloud\.stop\(\), \[\]\)/.test(chat) && /useEffect\(\(\) => \{ if \(!chatVisible\) readAloud\.stop\(\) \}, \[chatVisible\]\)/.test(chat))
 check('one Listen per coach bubble, never on yours, never while the words are still arriving', /msg\.role === 'assistant' && !isInterrupted\(msg\) && !\(msg\.id != null && msg\.id === animatingMessageId\) && \(\s*<ListenButton messageKey=/.test(chat))
-
-console.log('\n[5] The header\'s live line is true')
-const ctx = (chat.match(/const buildContext = [\s\S]*?\n  \}\n/) || [''])[0]
-check('the line is on the header', /data-testid="chat-header-live"[\s\S]{0,300}Sees today&apos;s session, meals and logs/.test(chat))
-check('...and the coach is sent today\'s session, the day\'s meals and the logs', /buildCoachExerciseSummary\(\{[\s\S]*?today: \{/.test(ctx) && /buildCoachMealSummary\(mealPlan\)/.test(ctx) && /workout_log_history: workoutLogHistory/.test(ctx) && /logs: activeSession\.logs/.test(ctx), ctx.length)
 
 // A LONG QUICK REPLY WRAPS INSIDE THE SCREEN (8 Nov 2026, QA round 3): "Swap Leg Extensions for Banded Terminal Knee
 // Extension" ran off the right edge (it ended at x=405 on a 390px screen) because each chip was held to one line.

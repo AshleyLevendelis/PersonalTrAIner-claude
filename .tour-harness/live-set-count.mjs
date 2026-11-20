@@ -10,7 +10,6 @@ import { startDriver } from './driver-kit.mjs'
 const d = await startDriver({ port: 9535, page: 'app-boot.html', name: 'live-set-count' })
 const { ev, check, until, wait, go, clickAt, shoot, finish } = d
 const btn = re => `[...document.querySelectorAll('button')].find(b => ${re}.test((b.textContent || '').trim()))`
-const pill = () => ev(`(() => { const s = document.querySelector('[data-testid="chat-context-strip"]'); const m = s && s.innerText.match(/(\\d+) of (\\d+) sets/); return m ? { logged: +m[1], planned: +m[2] } : null })()`)
 // RE-ANCHORED 12 Nov 2026 (his Exercise Week handoff): the week meter left the Exercise screen. The week reader the chat
 // shares now shows on Exercise as TODAY'S MARK on the strip, part-done once a set is in, and the planned total is the
 // Today card's ("2 of 18 sets").
@@ -24,9 +23,8 @@ if (await ev(`!!(${btn('/^Not now$/')})`)) { await clickAt(btn('/^Not now$/')); 
 
 await ev(`location.hash = '#/tab/exercise'`); await wait(2000)
 await clickAt(`document.querySelector('[data-testid="hero-start"]')`); await wait(1200)
-await ev(`location.hash = '#/tab/chat'`); await wait(2000)
-const p0 = await until(pill, v => !!v, 30)
-check('2. mid-session, the chat pill counts sets', !!p0 && p0.logged === 0, p0)
+// 20 Nov 2026 (his request): the chat no longer shows a set count (its pills are gone), so checks 2, 5 and 6 left with
+// them. What stays is the property this driver was for, on the screens that still count: the count moves live.
 
 await ev(`location.hash = '#/tab/exercise'`); await wait(1500)
 const before = await saved()
@@ -41,10 +39,6 @@ check('3. two working sets are ticked: the session card itself counts 2', before
 const m = await until(meter, v => v && v.mark === 'part', 30)
 check('4. Exercise\'s week (today\'s mark on the strip) counts them without finishing the session', m?.mark === 'part' && m?.logged === 2, m)
 
-await ev(`location.hash = '#/tab/chat'`); await wait(800)
-const p1 = await until(pill, v => v && v.logged >= 2, 30)
-check('5. the chat, open since before they were logged, now says 2 sets', p1?.logged === 2, p1)
-check('6. ...out of the same total Exercise uses', !!p1 && !!m && p1.planned === m.planned || (!!p1 && !!p0 && p1.planned === p0.planned), { p0, p1, m })
-await shoot('live-set-count-chat')
+await shoot('live-set-count-exercise')
 
 await finish('verify:live-set-count PASSED')

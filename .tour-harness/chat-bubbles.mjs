@@ -268,11 +268,12 @@ await wait(400)
 const P = await call(readPage)
 // RE-ANCHORED 31 Oct 2026 (2b): the header's top row is 64px (a 36px avatar, the names, the live line); the
 // context strip, when it has a pill, sits inside the header under that row, so the header is the row plus the strip.
-check('the header runs across the top of the screen: a 64px top row, plus the context strip when there is one', !!P.header && near(P.header.top, 0) && near(P.header.width, P.viewport.w) && near(P.header.height, 64 + (P.strip?.height ?? 0)), { header: P.header, strip: P.strip })
-check('...with a 36px glowing avatar, "Trainer" (17px, bold; her 1 Nov "Both say Trainer") beside "Personal TrAIner" (11px, muted) — the names kept',
-  near(P.avatar?.width, 36) && /rgba?\(/.test(P.avatarGlow) && P.title?.text === 'Trainer' && P.title?.size === 17 && Number(P.title?.weight) >= 700 && P.sub?.text === 'Personal TrAIner' && P.sub?.size === 11 && P.sub?.color === P.tokens.muted,
+// RE-ANCHORED 20 Nov 2026 (his request): no context strip and no live line any more, so the header is its 64px row.
+check('the header runs across the top of the screen: one 64px row, no context strip under it', !!P.header && near(P.header.top, 0) && near(P.header.width, P.viewport.w) && near(P.header.height, 64) && P.strip == null, { header: P.header, strip: P.strip })
+check('...with a 36px glowing avatar and one name, "Personal TrAIner" (17px, bold; his 20 Nov "just Personal TrAIner")',
+  near(P.avatar?.width, 36) && /rgba?\(/.test(P.avatarGlow) && P.title?.text === 'Personal TrAIner' && P.title?.size === 17 && Number(P.title?.weight) >= 700 && P.sub == null,
   { avatar: P.avatar?.width, glow: P.avatarGlow, title: P.title, sub: P.sub })
-check('...and the live line under them', P.live === "Sees today's session, meals and logs", P.live)
+check('...and no "Sees today\'s session" line', P.live == null, P.live)
 check('...then the 40px clear button, then the settings gear, both in the header', !!P.clear && !!P.gear && near(P.clear.width, 40) && P.gear.left >= P.clear.right && P.clear.top >= P.header.top && P.gear.bottom <= P.header.bottom, { clear: P.clear, gear: P.gear })
 check('the thread fills everything between the header and the composer', !!P.scroller && near(P.scroller.top, P.header?.bottom) && near(P.scroller.bottom, P.composer?.top), { header: P.header?.bottom, scroller: P.scroller, composer: P.composer?.top })
 check('...with no scrollbar showing', P.scrollbar === 'none', P.scrollbar)

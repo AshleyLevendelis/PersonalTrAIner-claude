@@ -16,17 +16,15 @@ import type { AddGroceryDaysResult } from '@/lib/grocery-store'
 import { weekdayLong, dayLabel } from '@/lib/day-labels'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
-import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, Activity, ChevronRight, Check, PlayCircle, Timer, Camera } from 'lucide-react'
+import { Send, CheckCircle2, ArrowDown, RotateCcw, AlertCircle, Trash2, Mic, MessageCircle, PlayCircle, Timer, Camera } from 'lucide-react'
 import { formVideoFor, linkifyBareUrls, sessionVideosFor } from '@/lib/exercise-video'
 import { parseTimerSuggestion, type TimerSuggestion } from '@/lib/timer-engine'
 import { startLabel } from '@/lib/round-setup'
 import { MEAL_LIKE_OFFER, datesLabel, wholeMealLike } from '@/lib/meal-like-offer'
 import { kgInText, openButtonLabel, openTargetInReply, openedLine, parseOpenRequest, requestOpen, screenNamedInReply } from '@/lib/open-request'
 import { useTimers } from '@/hooks/useTimers'
-import { chatContextPills } from '@/lib/chat-context-strip'
 import { useShowNumbers } from '@/lib/show-numbers'
 import { sessionSetCount } from '@/lib/session-count'
-import { readSessionSummary } from '@/lib/session-summary-store'
 import { todayScreenCell, screenEatenKcal, coachTodayCalories } from '@/lib/coach-screen-numbers'
 import { tabHash } from '@/lib/app-route'
 import { readAloud } from '@/lib/read-aloud'
@@ -9099,24 +9097,6 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
   useEffect(() => { if (!chatVisible) readAloud.stop() }, [chatVisible])
   useEffect(() => () => readAloud.stop(), [])
 
-  // THE CONTEXT STRIP (design 2b) — Home's and Nutrition's own readings, never
-  // a second calculation: the session status and minutes off the same
-  // aggregator Home draws (proactiveData is loadDashboardData), the set count
-  // off the same week cell (sessionSetCount), the finish card's minutes first
-  // as Home does, and the calories eaten off the meal ledger's snapshot as
-  // Home's withMealSnapshot does, against the target Nutrition's hero uses.
-  const [ledgerTick, setLedgerTick] = useState(0)
-  useEffect(() => subscribeMealStore(() => setLedgerTick(t => t + 1)), [])
-  void ledgerTick
-  const stripCell = todayScreenCell(trainingWeek.days, activeSession.date)
-  const stripEaten = screenEatenKcal(profile.id, activeSession.date, proactiveData?.caloriesEaten)
-  const contextPills = chatContextPills({
-    session: proactiveData ? { status: proactiveData.session.status, focus: proactiveData.session.focus } : null,
-    running: activeSession.status === 'running',
-    count: sessionSetCount(stripCell?.session, stripCell?.workingLogs),
-    minutes: readSessionSummary(profile.id, activeSession.date)?.summary.durationMinutes ?? proactiveData?.sessionMinutes ?? null,
-    kcal: showNumbers && macros && stripEaten != null ? { target: macros.calories, eaten: stripEaten } : null,
-  })
   const openStripLink = (to: 'exercise' | 'nutrition') => {
     if (to === 'exercise') { if (onOpenExercise) onOpenExercise(); else window.location.hash = tabHash('exercise') }
     else window.location.hash = tabHash('nutrition')
@@ -9174,14 +9154,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             <MessageCircle className="size-[18px]" strokeWidth={2.4} />
           </span>
           <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-baseline gap-1.5">
-              <h2 className="text-[1.0625rem] font-bold leading-tight tracking-[-.01em] text-foreground">Trainer</h2>
-              <p className="truncate text-[0.6875rem] leading-tight text-muted-foreground">Personal TrAIner</p>
-            </div>
-            <p data-testid="chat-header-live" className="mt-0.5 flex items-center gap-1.5 truncate text-[0.71875rem] leading-tight text-muted-foreground">
-              <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-primary" style={{ boxShadow: '0 0 6px var(--primary)' }} />
-              Sees today&apos;s session, meals and logs
-            </p>
+            {/* ONE NAME (his request 20 Nov 2026): "instead of trainer personal trainer change it to just Personal TrAIner".
+                The line under it ("Sees today's session, meals and logs") went the same day, at his word. */}
+            <h2 className="truncate text-[1.0625rem] font-bold leading-tight tracking-[-.01em] text-foreground">Personal TrAIner</h2>
           </div>
           <Button
             variant={clearArmed ? 'destructive' : 'ghost'}
@@ -9201,39 +9176,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
             <button type="button" onClick={() => clearUndo.current?.undo()} className="inline-flex min-h-[44px] items-center font-semibold text-primary-text">Undo</button>
           </div>
         )}
-        {/* THE CONTEXT STRIP (design 2b): where today stands, in pills, and
-            gone entirely when there is nothing to say. */}
-        {contextPills.length > 0 && (
-          <div data-testid="chat-context-strip" className="flex gap-2 overflow-x-auto border-t border-[color:var(--hairline)] px-4 py-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {contextPills.map(p => p.kind === 'done' ? (
-              // "SESSION DONE" OPENS EXERCISE (17 Nov 2026, the chat review): it looked like every other pill and was the
-              // only one that did nothing when tapped.
-              <button type="button" key={p.kind} data-context-pill={p.kind} onClick={() => openStripLink('exercise')} aria-label={`${p.text} — open Exercise`} className="hit-slop-44 flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[color:var(--hairline)] px-[11px] text-[0.71875rem] text-[color:var(--text-tertiary)]" style={{ background: 'var(--surface-raised)' }}>
-                <span aria-hidden className="flex size-3.5 items-center justify-center rounded-full text-primary-text" style={{ background: 'color-mix(in oklab, var(--primary) 20%, transparent)' }}>
-                  <Check className="size-[9px]" strokeWidth={3.2} />
-                </span>
-                {p.text}
-              </button>
-            ) : (
-              <button
-                key={p.kind}
-                type="button"
-                data-context-pill={p.kind}
-                onClick={() => openStripLink(p.to)}
-                aria-label={`${p.text} — open ${p.to === 'exercise' ? 'Exercise' : 'Nutrition'}`}
-                className={cn(
-                  'hit-slop-44 flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full pl-[11px] pr-[9px] text-[0.71875rem] text-foreground',
-                  p.kind === 'session' && 'border border-[color:color-mix(in_oklab,var(--primary)_30%,transparent)]',
-                )}
-                style={{ background: p.kind === 'session' ? 'color-mix(in oklab, var(--primary) 10%, transparent)' : 'var(--surface-raised)' }}
-              >
-                {p.kind === 'session' && <Activity aria-hidden className="size-3 text-primary-text" />}
-                {p.text}
-                <ChevronRight aria-hidden className={cn('-ml-0.5 size-[11px]', p.kind === 'session' ? 'text-primary-text' : 'text-muted-foreground')} strokeWidth={2.4} />
-              </button>
-            ))}
-          </div>
-        )}
+        {/* NO CONTEXT STRIP (his request 20 Nov 2026: "The session done and kcal left in the chat is unnecessary"):
+            the pills under the header ("Session done · 28 min", "1,971 kcal left", "<focus> · N of M sets") are gone.
+            Home, Exercise and Nutrition still say all three. */}
       </header>
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div

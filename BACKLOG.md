@@ -2,6 +2,20 @@
 
 Newest first. One line each.
 
+- [x] **THE CHAT HEADER, HIS REQUEST 20 Nov 2026**: "The session done and kcal left in the chat is unnecessary lets remove
+  thay and the text above 'sees todays session' remove that too. And instead of trainer personal trainer chamge it to
+  just Personal TrAIner." Done: the header is the avatar, "Personal TrAIner", clear and the gear; no line under the name,
+  no pills under the header. The mid-session pill ("Legs · 4 of 20 sets") went too: it was the same strip. Home, Exercise
+  and Nutrition still show all three numbers. NOT CHANGED, named: each coach message's small label still says "Trainer"
+  (his 1 Nov "Both say Trainer" covered both; he named the header only), so asked rather than guessed.
+  Removed with it: the strip's builder (`chatContextPills`); its calorie wording stays (the coach's today numbers use it).
+  CHECKS: `test:chat-2b` [1] rewritten (strip and line absent, one name, the calorie words), [2] and [5] removed with their
+  subject; `test:chat-extras` 3 removed (the done pill); `test:coach-screen-numbers` re-anchored (the coach's reader is
+  the one left); `verify:chat-2b` 1-3 re-anchored on three days (pills absent, one name, no live line), 3/3 mutations
+  caught (the old name, the live line, a pill strip); `verify:chat-bubbles` header checks re-anchored (64px row, no
+  strip); `verify:live-set-count` lost its chat checks (the chat no longer counts sets; the Exercise checks stay).
+  `test:bundle` passes with 1 kB left on the combined ceiling.
+
 - [x] **FOUR FROM HIS GYM DAY, 20 Nov 2026** ("Chat has stopped working", the round timer from a distance, "a normal
   timer", and "prescribed me sets of 15 which I logged all 15 but the summary says I was short of 18").
   1. CHAT DOWN: NOT FIXED, NOT YET DIAGNOSED. Every message ends "Response failed — tap to retry", which the app shows
