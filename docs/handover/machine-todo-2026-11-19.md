@@ -48,9 +48,9 @@ C. The setup coach:
    must be sdkhuczcfnqqimdgfiks.
 
 == PART 3: the exam, against the coach that was just deployed ==
-5. npm run coach-exam:run && npm run coach-exam:grade        (about 20 minutes; 63 conversations now)
+5. npm run coach-exam:run && npm run coach-exam:grade        (about 20 minutes; 64 conversations now (the 64th is his Muay Thai chat of 19 Nov))
    VERIFY in coach-exam-report.txt:
-   - "judge:" names claude-fable-5-2 and "marked 63 of 63 case(s)". If it says NOT RUN, the ANTHROPIC_API_KEY is
+   - "judge:" names claude-fable-5-2 and "marked 64 of 64 case(s)". If it says NOT RUN, the ANTHROPIC_API_KEY is
      missing or rejected: report that line word for word and stop.
    - "transcripts were produced by:" shows ONE fingerprint, not "mixed".
 6. Report back, word for word:
@@ -60,7 +60,7 @@ C. The setup coach:
    - the whole "THE APP CAUGHT" section. It now also counts turns where the APP asked a question in place of the
      coach's offer (lines reading "asked first: dislike / usual_meal / race_date"). Those are not breaches.
    - the marks and the judge's note for these six cases: talk-offer-then-yes, talk-complete-answer-just-ends,
-     talk-picks-up-the-thread, talk-away-train-or-pause, holiday-pause, ask-cant-face-it.
+     talk-picks-up-the-thread, talk-away-train-or-pause, holiday-pause, ask-cant-face-it, muay-thai-cardio-rounds.
 7. Four things to look for in coach-exam/transcripts/*.json and report as counts (the cloud session will compare
    them with 18 Nov, when they were 2, 1, about 12, and 11):
    - replies containing an underscore word such as propose_schedule_change        (expect 0: the server removes them)
@@ -74,7 +74,7 @@ C. The setup coach:
    claude/coach-empty-text-fix-2c4bzv. Never to main.
 
 == What "done" looks like ==
-The column is on both databases, both coaches are deployed on production, the exam is marked 63 of 63 and pushed,
+The column is on both databases, both coaches are deployed on production, the exam is marked 64 of 64 and pushed,
 and the four counts in step 7 are in your reply.
 ```
 
