@@ -2,6 +2,13 @@
 
 Newest first. One line each.
 
+- [x] **THE PLAY STORE PICTURES, AND THE APP'S PERMANENT ID: 20 Nov 2026.** Store icon, 1024 x 500 banner and five
+  1080 x 1920 screenshots (Home, Exercise, the coach, Nutrition, Tools) in `docs/store/play/`, drawn by
+  `scripts/make-store-assets.cjs` from the app's own screens on the test pages (made-up "Sam"); the chat test page gained
+  a `?seed=store` conversation (shoulder tight before a press, then dinner sized to his protein; CSCS-checked: tight is
+  trained around, pain stops it). **His ruling, from three options: keep `app.personaltrainer.coach`** as the permanent
+  app ID (over one based on a domain he owns, and over waiting). It cannot change once the first build is uploaded.
+
 - [x] **A COACH REPLY CAN BE REPORTED FROM INSIDE THE APP: his "1, build it", 20 Nov 2026**, from three options (a flag
   kept for him to review; over a mailto link and over leaving it). Google Play requires an app with AI-generated content
   to let people report it in the app. A small flag beside each finished coach reply opens "Report this reply": four
