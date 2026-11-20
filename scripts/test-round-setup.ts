@@ -90,7 +90,8 @@ console.log('\n5. Beeps and Buzz silence the ROUND timer only')
 {
   const hook = code('src/hooks/useTimers.tsx')
   const roundCues = hook.match(/playTimerCue\([^)]*\)/g) ?? []
-  check('both round-timer cues pass her switches', roundCues.length === 2 && roundCues.every(c => /roundCueOpts\(prefsRef\.current\)/.test(c)), roundCues)
+  // 20 Nov 2026: the countdown timer's zero cue joined the two round cues, on the same switches.
+check('every timer cue passes her switches (two round cues and the countdown\'s)', roundCues.length === 3 && roundCues.every(c => /roundCueOpts\(prefsRef\.current\)/.test(c)), roundCues)
   check('...read through a ref, so a switch flipped mid-round silences the next cue', /prefsRef\.current = timerPrefs/.test(hook))
   const dock = code('src/components/BottomDock.tsx')
   check('the rest timer\'s chime does not read them', /playTimerCue\('rest-complete'\)/.test(dock))

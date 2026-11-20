@@ -44,7 +44,15 @@ Newest first. One line each.
      The summary's "14/14 planned sets" was already right.
   CHECKS: `test:lift-effort` R2 re-anchored on credit-plus-target and R2b added (never "not every set", "short of",
   "didn't hit"), 2/2 mutations caught. `verify:countdown-timer` NEW (16 checks: R1-R4 the big round number, C1-C11 the
-  countdown), mutations below. `verify:tools-timer` 1a and `verify:tools-2a` 1c re-anchored to four tiles.
+  countdown), 8/8 mutations caught (one only after C6b was added: a finished timer that never stopped would have kept
+  the screen awake). `verify:tools-timer` 1a and `verify:tools-2a` 1c, 1g re-anchored to four tiles.
+  RUN: 420 checks that read the changed files or draw the changed screens: 411 pass. Of the 9: `test:meal-quality` and
+  `verify:rls` need the live database; `coach-exam:grade` fails the same on the commit before (2 stored transcripts
+  breach a rule; needs an exam run on his machine); six were this work and are fixed: the coach's description of Tools
+  had a second copy to keep in step (`test:coach-rules-sync`), the phone app's steps switch had never been classified
+  for New Plan (`test:reset-clears-draft`; kept, it is the phone's permission), three checks counted three tiles, two
+  cues or no grid (`test:round-setup`, `test:tools-grid`, `verify:tools-2a` 1g), and `test:bundle` was 2 kB over the
+  combined ceiling, back under (1 kB left) once the chat's pill strip was removed. Ceiling not raised.
 
 - [x] **THE PHONE APP, WITH STEPS FROM THE PHONE: his request 20 Nov 2026, "Start on the App Store version with step
   counting".** The web app inside a Capacitor 8 shell (`ios/`, `android/`), and one native feature: Profile, "Steps from

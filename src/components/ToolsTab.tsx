@@ -93,7 +93,7 @@ import { CircuitOffer } from '@/components/exercise/CircuitOffer'
 // mode, so a fourth tile, and the tiles sit two by two.
 const TIMER_CHOICES: { mode: 'round' | 'stopwatch' | 'lap' | 'countdown'; label: string; sub: string; icon: typeof Timer }[] = [
   { mode: 'round', label: 'Round', sub: 'Tabata, EMOM, intervals', icon: TimerReset },
-  { mode: 'countdown', label: 'Timer', sub: 'Counts down from a time you set', icon: Hourglass },
+  { mode: 'countdown', label: 'Timer', sub: 'Counts down', icon: Hourglass },
   { mode: 'stopwatch', label: 'Stopwatch', sub: 'Counts up', icon: Timer },
   { mode: 'lap', label: 'Lap', sub: 'Records each lap', icon: Flag },
 ]

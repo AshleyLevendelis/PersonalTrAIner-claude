@@ -39,7 +39,7 @@ check('1d. no round card at rest (her 14 Sep ruling)', (await count('[data-round
 check('1e. set rest is explained, not offered', /Set rest runs in your session/.test((await text('[data-timers-card]')) ?? ''))
 check('1f. no last round is claimed before one was chosen', (await count('[data-last-round]')) === 0)
 const tiles = await ev(`[...document.querySelectorAll('[data-timer-choice]')].map(b => { const r = b.getBoundingClientRect(); return { h: Math.round(r.height), w: Math.round(r.width) } })`)
-check('1g. every tile is a 44px+ target, 88 tall', tiles.length === 3 && tiles.every(t => t.h >= 88 && t.w >= 44), tiles)
+check('1g. every tile is a 44px+ target, 88 tall or more, and the two in a row match', tiles.length === 4 && tiles.every(t => t.h >= 88 && t.w >= 44) && tiles[0].h === tiles[1].h && tiles[2].h === tiles[3].h, tiles)
 check('1h. the tour stop is on the timers card', await ev(`!!document.querySelector('[data-tour="toolstimer"] [data-timers-card]')`))
 check('1i. the page does not scroll sideways', await ev('document.documentElement.scrollWidth <= window.innerWidth'))
 await shoot('tools-2a-idle')
