@@ -2,6 +2,33 @@
 
 Newest first. One line each.
 
+- [x] **TWO MORE OF HIS, 20 Nov 2026: "Build the account row", and the exercise sheet's labels.**
+  1. PROFILE, ACCOUNT, "EMAIL & SIGN-IN". He asked whether his progress was safe with no email. The app signs everyone
+     in anonymously and asks for an email once a week, snoozable, with nowhere else to give one; and anyone who signs in
+     on a second phone does it from setup's "Already have an account? Sign in". The row is the first thing on Profile and
+     opens a sheet with the prompt's own form (one component now, so they cannot drift). THREE STATES, NOT TWO: a
+     project that asks for the address to be confirmed holds it as pending until the link is tapped, and the app never
+     calls that "saved" (the row reads "Check your email"); a user the app cannot read reads "Couldn't check", never
+     "Not saved yet" (a failed read is not an answer). After a save the words say how to get back in. The prompt's
+     after-save sentence now follows the same three states (it said "You're all set" whatever happened) and its small
+     print names Profile. Cancel in the sheet does not snooze the weekly prompt. `verify:account-row` (16 checks, 7/7
+     mutations, the profile test page's fake sign-in now plays the states and records what was written).
+     NOT DONE, named: changing the email or password once saved, and signing out; whether his production project asks
+     for the address to be confirmed is unknown here (both are handled). WORDING his to change.
+  2. "HOW TO DO IT" OPENED A SHEET WHOSE FIRST TAB, "SUMMARY", WAS THE MUSCLE MAP, and the sheet also held a history.
+     His words. The landing was right (the menu item does open the How to tab, checked); the names were not. Now: the
+     menu item reads "About this exercise", and the tabs read How to | Muscles | History, in that order, each holding
+     what its name says: How to has the demonstration picture, the checked video, "Why it's in your plan" and the cues;
+     Muscles has the map; the strength trend moved to History with the bests and sessions. Mine, on his report, his to
+     rename. `test:exercise-detail` (+6 checks, each tab's contents read off its own slice; 3/3 mutations),
+     `verify:exercise-video` (+2: the menu lands on How to with no tap, and the three names; 3/3 mutations after one was
+     re-aimed: the first broke the program view's copy of the line, which that driver does not open, so the Today
+     screen's copy was broken instead and caught). The program view's landing is held by a source check only.
+  CHECKED: 125 checks that read the changed files or draw these screens (and every whole-app driver): 120 passed;
+  four pinned the old shape and were re-anchored on their property (Profile's group count, the demo picture's place,
+  the prompt's equal buttons, an export) with 3/3 mutations; `verify:app-boot` failed once in that run ("no signal and
+  nothing kept") and passed twice alone and once more in the re-run on the final version, unexplained, named.
+
 - [x] **THREE OF HIS REPORTS FROM HIS PHONE, 19 Nov 2026 (after the merge of PR #32): the tomorrow card, "didn't hit
   18 reps", and the Muay Thai advice.**
   1. TAPPING TOMORROW'S SESSION ON HOME OPENED TODAY'S. Once today is done Home's big card is the next session, but

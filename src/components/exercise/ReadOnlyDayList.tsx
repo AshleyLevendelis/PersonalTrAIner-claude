@@ -135,7 +135,7 @@ export function ReadOnlyDayList({
                 {onOpenDetail && (
                   <DropdownMenuItem onClick={() => onOpenDetail(ex.name)}>
                     <BookOpen className="size-3.5" />
-                    How to do it
+                    About this exercise
                   </DropdownMenuItem>
                 )}
                 {onOpenHistory && (

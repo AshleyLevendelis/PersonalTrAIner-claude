@@ -175,6 +175,48 @@ export async function needsEmail(): Promise<boolean> {
   }
 }
 
+/**
+ * What Profile's Account row says (his request 20 Nov 2026, "Build the account row": the email prompt could be
+ * snoozed for a week and there was nowhere else to save an email).
+ *
+ * THREE STATES, NOT TWO. Supabase may hold a new address as `new_email` until the link in its email is tapped:
+ * the address is not the account's yet, so "saved" would promise a recovery that cannot happen. A user the app
+ * could not read is `unknown`, never "not saved" (a failed read is not an answer, the boot-cache rule).
+ */
+export type AccountStatus =
+  | { kind: 'saved'; email: string }
+  | { kind: 'confirming'; email: string }
+  | { kind: 'not-saved' }
+  | { kind: 'unknown' }
+
+function accountStatusOf(user: { email?: string | null; new_email?: string | null } | null | undefined): AccountStatus {
+  if (!user) return { kind: 'unknown' }
+  if (user.email) return { kind: 'saved', email: user.email }
+  if (user.new_email) return { kind: 'confirming', email: user.new_email }
+  return { kind: 'not-saved' }
+}
+
+export async function readAccountStatus(): Promise<AccountStatus> {
+  try {
+    const { data, error } = await supabase.auth.getUser()
+    if (error) return { kind: 'unknown' }
+    return accountStatusOf(data?.user as { email?: string | null; new_email?: string | null } | null)
+  } catch {
+    return { kind: 'unknown' }
+  }
+}
+
+/** The row's one-line value. */
+export function accountRowValue(status: AccountStatus | null): string {
+  if (!status) return '…'
+  switch (status.kind) {
+    case 'saved': return status.email
+    case 'confirming': return 'Check your email'
+    case 'not-saved': return 'Not saved yet'
+    case 'unknown': return 'Couldn’t check'
+  }
+}
+
 /** True when the prompt should be shown now: no email, and not snoozed. */
 export async function shouldAskForEmail(): Promise<boolean> {
   if (isEmailPromptSnoozed()) return false
