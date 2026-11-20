@@ -2373,6 +2373,9 @@ old — the commands were right and the context was missing.
   happened or the file was absent from the checkout. Name the specific thing
   that proves it worked.
 - Keep it in one fenced block he can copy without editing.
+- **Put the prompt IN THE CHAT reply, every time** (his ruling 20 Nov 2026, "Give me the prompt in here going
+  forwards"): a file in `docs/handover/` may hold a copy, but the reply carries the whole fenced block, never only a
+  pointer to the file.
 
 ## Database
 
