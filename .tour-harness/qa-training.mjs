@@ -233,6 +233,21 @@ check('T20d. ...the next session is not today\'s, and nothing offers to start it
 check('T20e. ...and the small tile does not repeat it', !!t20.tile && !(/^Tomorrow/.test(t20.eyebrow ?? '') && t20.tile.startsWith(t20.title ?? '\u0000')), t20.tile)
 await shoot('qa-t20-home-next')
 
+console.log('\nT21. Tapping the next session on Home opens THAT day on Exercise, not today (his report 19 Nov 2026)\n')
+await open('done=1', 'dashboard')
+const t21before = await ev(`(() => { const h = document.querySelector('[data-home-hero]'); return { state: h?.getAttribute('data-home-hero') ?? null, title: h?.querySelector('[data-home-title]')?.textContent?.trim() ?? null, eyebrow: h?.querySelector('[data-home-eyebrow]')?.textContent?.trim() ?? null } })()`)
+await tapSelector('[data-home-hero] [data-home-title]')
+await wait(2500)
+const t21 = await ev(`(() => ({
+  hash: location.hash,
+  head: document.querySelector('[data-tab-exercise], main')?.innerText?.slice(0, 900) ?? document.body.innerText.slice(0, 900),
+  back: !![...document.querySelectorAll('button')].find(b => /^(close|back to today|today)$/i.test((b.getAttribute('aria-label') || b.textContent || '').trim())),
+}))()`)
+check('T21a. the fixture binds: Home shows the next session, a different day from today', t21before.state === 'next' && !!t21before.title, t21before)
+check('T21b. the tap opens Exercise', /#\/tab\/exercise/.test(t21.hash), t21.hash)
+check('T21c. ...on the next session itself, named as Home named it', !!t21before.title && t21.head.includes(t21before.title.replace(/\s+/g, ' ')), { want: t21before.title, head: t21.head.slice(0, 400) })
+check('T21d. ...with the way back to today on screen', t21.back === true, t21.back)
+
 console.log(`\n${ran} checks ran`)
 console.log(failures === 0 ? 'All QA training checks passed.\n' : `${failures} check(s) FAILED.\n`)
 ws.close(); chrome.kill(); server.close()

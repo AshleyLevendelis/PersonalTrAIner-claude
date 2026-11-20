@@ -1,0 +1,41 @@
+{
+  "name": "muay-thai-cardio-rounds",
+  "why": "His live chat, 19 Nov 2026, marked 7.5/10 by a CSCS review: after 'my cardio is so bad' the coach praised and prescribed; asked how to improve for Muay Thai it prescribed 10-15 minutes of skipping and offered a change in plain words with no buttons. A strength coach asks first about breathing and pacing (the commonest cause in combat sports), and the conditioning that transfers is 3-minute rounds with a minute's rest, named so the app's round timer can start it. Turn 0 carries no card.",
+  "contextOverrides": {
+    "day_of_week": "Thursday",
+    "current_time_formatted": "Thursday, 10:28 PM",
+    "concurrent_activities": [
+      {
+        "name": "Muay Thai",
+        "intensity": 0.9,
+        "days": [
+          "Tuesday",
+          "Thursday"
+        ],
+        "movement_demands": [
+          "conditioning",
+          "rotation",
+          "single_leg"
+        ],
+        "timeOfDay": "evening"
+      }
+    ],
+    "exercise_summary": "Monday: Lower body \u2014 Barbell Squats 4x6 @ 55kg, Romanian Deadlifts 3x8 @ 50kg, Bulgarian Split Squats 3x8 each side, Single-Leg Dumbbell Calf Raise 3x12, Plank 3x40s. [CLOSED at 16 of 16 planned working sets]\nToday (Wednesday): Upper body \u2014 Dumbbell Bench Press 4x8, Dumbbell Rows 4x10, Overhead Press 3x8, Hammer Curls 3x12.\nFriday: Full body, the lighter one \u2014 Goblet Squats 3x10, Glute Bridge 3x12, Chest-Supported Row 3x10, Dead Bug 3x8.\nSaturday: rest from the gym (five-a-side in the morning)."
+  },
+  "messages": [
+    "I did muay thai. My cardio is so bad at the moment",
+    "I want to improve my fitness for muay thai. What should I do?"
+  ],
+  "checks": {
+    "mustMention": [
+      "breath",
+      "round"
+    ],
+    "expectsProposalKind": [
+      {
+        "turn": 0,
+        "oneOf": []
+      }
+    ]
+  }
+}

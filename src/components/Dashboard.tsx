@@ -15,7 +15,7 @@ import { lazyWithReload } from '@/lib/chunk-reload'
 import { Button } from '@/components/ui/button'
 import { useActiveSession } from '@/hooks/useActiveSession'
 import { getAppNow } from '@/lib/dev-clock'
-import { tabHash } from '@/lib/app-route'
+import { tabHash, openExerciseOnDate } from '@/lib/app-route'
 import { loadDashboardData, leadLiftPhrase, homeGreeting, LIFT_SHORT_NAME, type DashboardData } from '@/lib/dashboard-data'
 import { changeSinceStart } from '@/lib/weight-trend'
 import { momentFactsFrom, sendFactsAhead } from '@/lib/moment-facts'
@@ -965,8 +965,9 @@ export function SessionHero({ status, data, week, sessionGlance, done, minutes, 
       <button
         type="button"
         className="mt-2 block w-full text-left"
-        onClick={() => { window.location.hash = tabHash('exercise') }}
-        aria-label={`${title} — open Exercise`}
+        // Once today is done the card is the NEXT session, so the tap opens that day, not today (19 Nov 2026).
+        onClick={() => { if (nextUp?.date) openExerciseOnDate(nextUp.date); else window.location.hash = tabHash('exercise') }}
+        aria-label={nextUp ? `${title} — open ${nextUp.when}'s session` : `${title} — open Exercise`}
       >
         <span className="block text-[2rem] font-bold leading-[1.05] tracking-[-.03em]" data-home-title>
           {head}<span className={glowTail ? 'text-primary-text' : undefined} style={glowTail ? { textShadow: '0 0 18px rgba(var(--glow-rgb), .8)' } : undefined}>{tail}</span>

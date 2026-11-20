@@ -59,6 +59,23 @@ export function takeRequestedGroceryDays(): number | null {
   return d
 }
 
+/**
+ * OPEN EXERCISE ON A DAY (his report, 19 Nov 2026: tapping tomorrow's session on Home showed today's). The same
+ * read-once request as the shopping list's: the date is not put in the address, so a reload or a Back lands on
+ * today, and the Exercise tab opens the day as its own strip does (read-only, an X back to today).
+ */
+let requestedExerciseDate: string | null = null
+export function openExerciseOnDate(date: string): void {
+  requestedExerciseDate = date
+  window.location.hash = tabHash('exercise')
+}
+/** The request, once: the second read is null. */
+export function takeRequestedExerciseDate(): string | null {
+  const d = requestedExerciseDate
+  requestedExerciseDate = null
+  return d
+}
+
 /** `#/exercise/program` (week list — no week number yet) or `#/exercise/program/{n}` (week detail). */
 export function programHash(week?: number): string {
   return week != null ? `#/exercise/program/${week}` : '#/exercise/program'

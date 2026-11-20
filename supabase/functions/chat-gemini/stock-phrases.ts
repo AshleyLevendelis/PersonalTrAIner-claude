@@ -181,6 +181,27 @@ export function dropStockCloser(text: string): string {
   return left + tail
 }
 
+// --- 5b. An offer asked in plain words gets its buttons ----------------------
+
+/**
+ * "Would you like me to set that up for you?" with no buttons under it (his live chat, 19 Nov 2026). His 20 Oct
+ * ruling is "text + small buttons always" for an offer, and the coach's own instructions say so (section 1b-ii, way
+ * 2), but a reply that forgets leaves him typing "yes" on a gym floor. So a reply whose LAST sentence is an offer to
+ * do something, with no button line of its own, gets the two plain answers. "Yes please" goes back to the coach as
+ * his yes, and the coach then makes the change through its tool, with Apply, as for any other ask.
+ */
+const BARE_OFFER = /^(?:so\s+|and\s+)?(?:would you like me to|do you want me to|want me to|shall i|should i)\b[^?]*\?$/i
+export const OFFER_BUTTONS = '[QUICK_REPLIES: "Yes please" | "Not now"]'
+
+export function offerButtons(text: string): string {
+  const { body, tail } = splitTail(text)
+  if (/\[QUICK_REPLIES/i.test(tail) || /\[QUICK_REPLIES/i.test(body)) return text
+  const trimmed = body.trimEnd()
+  const m = /([^.!?\n]+\?)$/.exec(trimmed)
+  if (!m || !BARE_OFFER.test(visible(m[1]).trim())) return text
+  return `${trimmed}\n${OFFER_BUTTONS}${tail}`
+}
+
 // --- 6. His name -------------------------------------------------------------
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -230,5 +251,5 @@ export function withoutTics(text: string, ctx: TicContext = {}): string {
   }
   const name = (ctx.name ?? '').trim()
   if (name) out = limitName(out, name, (ctx.recentCoach ?? []).slice(-3).some(t => saysName(t, name)))
-  return out
+  return offerButtons(out)
 }

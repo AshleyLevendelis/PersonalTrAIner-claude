@@ -289,5 +289,21 @@ console.log('\n[outgrown] Far past the top of the range moves more than one step
   check('O8. reps the odd-reps guard distrusts never earn a jump (held)', wild?.weightKg === 100, wild)
 }
 
+console.log('\n[R] The held note names the range it judges (his summary, 19 Nov 2026: "didn\'t hit 18 reps … never on my plan")')
+{
+  // The boxes pre-fill the BOTTOM of the range and the rule judges the TOP, so a session ticked as pre-filled is held.
+  rows = session('2026-09-23', ticked(40))
+  const held = await getDoubleProgressionRecommendation('p1', BENCH, TODAY, 10, CTX)
+  check('R1. held at the same weight', held?.weightKg === 40 && held?.didProgress === false, held)
+  check('R2. ...and the note says the range, bottom and top, and the number to reach', /your range is 8-10 reps/.test(held?.note ?? '') && /Get 10 on every set/.test(held?.note ?? ''), held?.note)
+  const noLow = await getDoubleProgressionRecommendation('p1', BENCH, TODAY, 10, { prescribedSets: 3 })
+  check('R3. with no bottom to quote, the old sentence stands', /didn't hit 10 reps on every set/.test(noLow?.note ?? ''), noLow?.note)
+  const panel = (await import('fs')).readFileSync(new URL('../src/components/exercise/TodayPanel.tsx', import.meta.url), 'utf8')
+  const only = panel.match(/\.filter\(ex => \(ex\.suggested_load_kg != null \|\| ex\.suggested_added_load_kg != null\) && prescribedRepsHigh\(ex\.reps\) != null\)/g) ?? []
+  check('R4. a carry ("40m") or a hold ("30-45s") never reaches the reps note: both call sites ask for a rep prescription', only.length === 2, only.length)
+  const { prescribedRepsHigh } = await import('../src/lib/set-plausibility')
+  check('R5. ...and that reader says "not reps" for a distance and a time, "18" for 15-18', prescribedRepsHigh('40m') === null && prescribedRepsHigh('30-45s') === null && prescribedRepsHigh('15-18') === 18)
+}
+
 console.log(`\n${ran} checks ran, ${failures} failed`)
 if (failures > 0) process.exit(1)
