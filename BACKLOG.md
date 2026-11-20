@@ -24,6 +24,10 @@ Newest first. One line each.
      `verify:exercise-video` (+2: the menu lands on How to with no tap, and the three names; 3/3 mutations after one was
      re-aimed: the first broke the program view's copy of the line, which that driver does not open, so the Today
      screen's copy was broken instead and caught). The program view's landing is held by a source check only.
+  CHECKED: 125 checks that read the changed files or draw these screens (and every whole-app driver): 120 passed;
+  four pinned the old shape and were re-anchored on their property (Profile's group count, the demo picture's place,
+  the prompt's equal buttons, an export) with 3/3 mutations; `verify:app-boot` failed once in that run ("no signal and
+  nothing kept") and passed twice alone and once more in the re-run on the final version, unexplained, named.
 
 - [x] **THREE OF HIS REPORTS FROM HIS PHONE, 19 Nov 2026 (after the merge of PR #32): the tomorrow card, "didn't hit
   18 reps", and the Muay Thai advice.**
