@@ -1734,6 +1734,11 @@ menu" stays true when a copy is also left outside it.
 - **The exercise sheet is "About this exercise", tabs How to | Muscles | History (his report 20 Nov 2026)**: "How to do
   it" opened a sheet whose "Summary" tab was the muscle map. Each tab holds what its name says; the trend is on History.
   `test:exercise-detail`, `verify:exercise-video`
+- **The phone app (Capacitor), steps from the phone: his request 20 Nov 2026** ("Start on the App Store version with
+  step counting"): Profile, "Steps from your phone", phone app only; steps only, read only; the phone's count never
+  lowers a typed number. Android declares READ_STEPS alone: the plugin's 46 other health permissions are removed and
+  must stay removed unless the app starts reading that data. Phone-only code loads only in the phone app.
+  `test:phone-app`, `verify:health-steps`, `docs/plans/phone-app.md`. NOT BUILT natively yet: his machine
 
 ### His rulings of 17 Nov 2026
 - **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over

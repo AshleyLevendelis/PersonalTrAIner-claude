@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **THE PHONE APP, WITH STEPS FROM THE PHONE: his request 20 Nov 2026, "Start on the App Store version with step
+  counting".** The web app inside a Capacitor 8 shell (`ios/`, `android/`), and one native feature: Profile, "Steps from
+  your phone" reads today's step count from Apple Health / Health Connect and Home's ring fills itself, "From Apple
+  Health" under it. Plan and decisions: `docs/plans/phone-app.md`; first build on his machine:
+  `docs/handover/phone-app-first-build.md`.
+  DECISIONS (mine): the phone's count never lowers a number he typed (the higher is kept, and the open box says so);
+  steps only, read only; the switch lives on the phone; an iPhone's finished sheet counts as on, because Apple never
+  reports a refused read (the sheet says where to look if the count stays 0).
+  FOUND ON THE WAY: the health plugin declares read AND write for 46 kinds of health data; Google Play refuses unused
+  health permissions, so all but READ_STEPS are removed, checked against the plugin's own manifest. Android's minimum
+  had to go to 8 (Health Connect). The offline helper is not started in the phone app.
+  SIZE: the website's first download grew 580 bytes (611 -> 612 kB) after every phone-only piece was moved to load only
+  in the phone app; the ceiling moved 612 -> 620 with the measurement written beside it.
+  CHECKS: `test:phone-app` (31, 9/9 mutations), `verify:health-steps` (22, 11/11 meaningful mutations; one control
+  mutation that changes nothing read MISSED, as it should). Re-anchored: none. `test:bundle`, `test:no-dead-code`,
+  `test:profile-groups` pass after fixes they found (the ceiling; two test-only exports; a sheet body shape).
+  NOT PROVEN: any native build (no Xcode or Android Studio here), real permission sheets, real counts. NOT BUILT: store
+  listings, icons, native push, the privacy page's contact line (the page is a DRAFT for his approval), the final app id.
+
 - [x] **TWO MORE OF HIS, 20 Nov 2026: "Build the account row", and the exercise sheet's labels.**
   1. PROFILE, ACCOUNT, "EMAIL & SIGN-IN". He asked whether his progress was safe with no email. The app signs everyone
      in anonymously and asks for an email once a week, snoozable, with nowhere else to give one; and anyone who signs in

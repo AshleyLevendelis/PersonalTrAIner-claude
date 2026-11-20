@@ -96,3 +96,41 @@ export async function restoreStepsForDate(
   }
   await logStepsManual(profileId, date, previous)
 }
+
+// ---------------------------------------------------------------------------
+// Steps from the phone (20 Nov 2026): the two small facts Home needs on its first draw live here, so Home does not
+// pull the phone-reading code (health-steps.ts) into the website's first download. That module is loaded only inside
+// the phone app.
+// ---------------------------------------------------------------------------
+export const HEALTH_STEPS_CONNECTED_KEY = 'fitplan_health_steps_connected'
+
+/** He switched "Steps from your phone" on, on this phone. */
+export function isHealthStepsConnected(): boolean {
+  try { return localStorage.getItem(HEALTH_STEPS_CONNECTED_KEY) === '1' } catch { return false }
+}
+
+/** The small line under Home's steps ring, naming where the number came from. Null for a typed number. */
+export function stepsSourceLine(row: Pick<DailyStepsRow, 'source'> | null): string | null {
+  if (!row) return null
+  if (row.source === 'healthkit') return 'From Apple Health'
+  if (row.source === 'health_connect') return 'From Health Connect'
+  return null
+}
+
+/** Is this the phone app? Read off the native shell's own global, so the website never imports Capacitor to ask. */
+export function isPhoneApp(): boolean {
+  if ((globalThis as { __healthAdapterForTest?: unknown }).__healthAdapterForTest !== undefined) {
+    return (globalThis as { __healthAdapterForTest?: unknown }).__healthAdapterForTest != null
+  }
+  const cap = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+  return !!cap?.isNativePlatform?.()
+}
+
+/** Which phone this is, or null in a browser. Synchronous, so Profile can decide its rows without loading anything. */
+export function phonePlatform(): 'ios' | 'android' | null {
+  const fake = (globalThis as { __healthAdapterForTest?: { platform: 'ios' | 'android' } | null }).__healthAdapterForTest
+  if (fake !== undefined) return fake?.platform ?? null
+  if (!isPhoneApp()) return null
+  const cap = (globalThis as { Capacitor?: { getPlatform?: () => string } }).Capacitor
+  return cap?.getPlatform?.() === 'android' ? 'android' : 'ios'
+}
