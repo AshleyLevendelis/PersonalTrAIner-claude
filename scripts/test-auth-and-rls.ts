@@ -254,7 +254,10 @@ console.log('\n7. The prompt is dismissible, in the way that word implies')
   check('...which snoozes rather than doing nothing', /snoozeEmailPrompt\(\)/.test(prompt))
   check('...and closes the prompt', /snoozeEmailPrompt\(\)[\s\S]{0,60}onClose\(\)/.test(prompt))
   // A dismissal styled as an afterthought is not really a dismissal.
-  check('both buttons carry the same weight', (prompt.match(/className="flex-1"/g) ?? []).length >= 2)
+  // Re-anchored 20 Nov 2026: the form moved into AttachEmailForm (shared with Profile's Account row) and the buttons
+  // gained the 44px tap floor. The property: two buttons, the same class.
+  { const both = prompt.match(/className="flex-1[^"]*"/g) ?? []
+    check('both buttons carry the same weight', both.length >= 2 && new Set(both).size === 1, both) }
   check('it says what the email is for, not just "create an account"',
     /lose/.test(prompt) && /weigh-ins/.test(prompt))
   check('nothing is gated behind it — no plan, no screen is withheld',

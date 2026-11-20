@@ -39,16 +39,17 @@ const check = (label: string, ok: boolean, extra?: unknown) => {
 }
 
 // ---------------------------------------------------------------------------
-console.log('\n1. Four groups of rows, and every editor still behind one of them')
+console.log('\n1. Five groups of rows, and every editor still behind one of them')
 // ---------------------------------------------------------------------------
 // DESIGN HANDOFF 2d (10 Oct 2026): the four collapsible groups became four
 // titled lists of rows, each row opening the editors it names on a page of
 // their own. The disappearance this gate exists for is the same one.
-const GROUPS = ['Body & goals', 'Training', 'Food', 'Personal TrAIner & app']
+// Account added 20 Nov 2026 (his "Build the account row"): one row, "Email & sign-in", first on the page.
+const GROUPS = ['Account', 'Body & goals', 'Training', 'Food', 'Personal TrAIner & app']
 for (const g of GROUPS) {
   check(`a "${g}" group exists`, profileCode.includes(`<ProfileGroup label="${g}"`))
 }
-check('...and exactly four of them, not four plus a stray',
+check('...and exactly those, not those plus a stray',
   (profileCode.match(/<ProfileGroup label=/g) ?? []).length === GROUPS.length,
   (profileCode.match(/<ProfileGroup label="[^"]+"/g) ?? []))
 

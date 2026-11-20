@@ -330,8 +330,12 @@ console.log('\n5. The demonstration image: a socket, and nothing hot-linked\n')
   // The map is the fallback, not the thing being replaced: every exercise
   // still gets one, and an exercise with an image gets both.
   check('the muscle map still renders regardless', /<MuscleMap entry=\{entry\} \/>/.test(panel))
-  check('...below the image, so the picture leads',
-    panel.indexOf('entry.demo_image && (') < panel.indexOf('<MuscleMap entry={entry} />'))
+  // RE-ANCHORED 20 Nov 2026 (his report: "Summary" showed the muscles): the picture is a demonstration, so it
+  // leads the How to tab; the map is the Muscles tab. Both still render for an exercise with an image.
+  const tabSlice = (v: string) => (panel.match(new RegExp(`<TabsContent value="${v}"[\\s\\S]*?</TabsContent>`)) ?? [''])[0]
+  check('...the picture leads How to, the map is on Muscles',
+    /entry\.demo_image && \(/.test(tabSlice('howto')) && /<MuscleMap entry=\{entry\} \/>/.test(tabSlice('summary'))
+    && tabSlice('howto').indexOf('entry.demo_image && (') < tabSlice('howto').indexOf('form_cues'))
 
   // The tool that answers "does this set cover us" before money is spent.
   check('there is a coverage check to run before buying a set',

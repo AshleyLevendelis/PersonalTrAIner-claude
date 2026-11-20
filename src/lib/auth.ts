@@ -189,7 +189,7 @@ export type AccountStatus =
   | { kind: 'not-saved' }
   | { kind: 'unknown' }
 
-export function accountStatusOf(user: { email?: string | null; new_email?: string | null } | null | undefined): AccountStatus {
+function accountStatusOf(user: { email?: string | null; new_email?: string | null } | null | undefined): AccountStatus {
   if (!user) return { kind: 'unknown' }
   if (user.email) return { kind: 'saved', email: user.email }
   if (user.new_email) return { kind: 'confirming', email: user.new_email }
