@@ -45,12 +45,20 @@ const tiles = await ev(`[...document.querySelectorAll('[data-timer-choice]')].ma
 check('C1. Tools offers a fourth timer, the countdown', Array.isArray(tiles) && tiles.includes('countdown') && tiles.length === 4, tiles)
 await clickAt(`document.querySelector('[data-timer-choice="countdown"]')`); await wait(900)
 check('C2. it opens on minute chips', (await ev(`document.querySelectorAll('[data-countdown-chip]').length`)) >= 6)
+// HIS REPORT 20 Nov 2026: "The timer doesnt fit on the page well and has to side scroll." Nothing in the sheet may be
+// wider than the sheet, and the sheet no wider than the screen; read on the setup view and the running clock.
+const FIT = `(() => { const d = document.querySelector('[role="dialog"]'); if (!d) return null; const r = d.getBoundingClientRect(); const over = [...d.querySelectorAll('*')].filter(n => { const b = n.getBoundingClientRect(); return b.width > 0 && (b.right > r.right + 0.5 || b.left < r.left - 0.5) }).map(n => n.tagName + (n.id ? '#' + n.id : '') + ' ' + Math.round(n.getBoundingClientRect().right)); return { scroll: d.scrollWidth - d.clientWidth, right: Math.round(r.right), vw: innerWidth, docScroll: document.documentElement.scrollWidth - innerWidth, over: over.slice(0, 6) } })()`
+const fitSetup = await ev(FIT)
+await shoot('countdown-timer-setup')
+check('C2b. the setup fits the screen: nothing sticks out of the sheet, nothing scrolls sideways', !!fitSetup && fitSetup.scroll <= 0 && fitSetup.over.length === 0 && fitSetup.right <= fitSetup.vw && fitSetup.docScroll <= 0, fitSetup)
 await ev(`(() => { const set = (id, v) => { const i = document.getElementById(id); const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; s.call(i, v); i.dispatchEvent(new Event('input', { bubbles: true })) }; set('countdown-minutes', '0'); set('countdown-seconds', '4') })()`)
 await wait(300)
 check('C3. a typed time names itself on Start', /Start 0:04/.test((await txt('[data-countdown-start]')) ?? ''), await txt('[data-countdown-start]'))
 await clickAt(`document.querySelector('[data-countdown-start]')`); await wait(700)
 const c1 = await txt('[data-countdown-clock]')
 check('C4. it runs, counting down from the time set', secs(c1) >= 2 && secs(c1) <= 4, c1)
+const fitRun = await ev(FIT)
+check('C5b. the running clock fits the screen too', !!fitRun && fitRun.scroll <= 0 && fitRun.over.length === 0 && fitRun.right <= fitRun.vw, fitRun)
 check('C5. the clock is big enough to read from the floor (64px or more)', (await px('[data-countdown-clock]')) >= 64, await px('[data-countdown-clock]'))
 await shoot('countdown-timer-running')
 await until(() => ev(`document.querySelector('[data-countdown]')?.getAttribute('data-countdown')`), v => v === 'done', 40)

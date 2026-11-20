@@ -190,27 +190,31 @@ export function CountdownPanel() {
       </div>
       <p className="m-0 text-center text-[0.75rem] text-muted-foreground">Tap a time to start, or set your own:</p>
       <div className="flex items-end gap-2">
-        <label className="flex flex-1 flex-col gap-1 text-[0.75rem] text-muted-foreground">
+        <label className="flex min-w-0 flex-1 flex-col gap-1 text-[0.75rem] text-muted-foreground">
           Minutes
+          {/* size={1}: an input's own default width is about twenty characters, which pushed this row to ~620px on a
+              390px phone (his report 20 Nov 2026, "has to side scroll"). The flex row sets the width instead. */}
           <input
             id="countdown-minutes"
+            size={1}
             inputMode="numeric"
-            className="h-11 rounded-md border bg-background px-3 text-base text-foreground tabular-mono"
+            className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-base text-foreground tabular-mono"
             value={minutes}
             onChange={e => setMinutes(e.target.value.replace(/[^0-9]/g, '').slice(0, 4))}
           />
         </label>
-        <label className="flex flex-1 flex-col gap-1 text-[0.75rem] text-muted-foreground">
+        <label className="flex min-w-0 flex-1 flex-col gap-1 text-[0.75rem] text-muted-foreground">
           Seconds
           <input
             id="countdown-seconds"
+            size={1}
             inputMode="numeric"
-            className="h-11 rounded-md border bg-background px-3 text-base text-foreground tabular-mono"
+            className="h-11 w-full min-w-0 rounded-md border bg-background px-3 text-base text-foreground tabular-mono"
             value={seconds}
             onChange={e => setSeconds(e.target.value.replace(/[^0-9]/g, '').slice(0, 2))}
           />
         </label>
-        <Button className="h-11 px-5" disabled={typed == null} onClick={() => typed != null && timers.startCountdown(typed)} data-countdown-start>
+        <Button className="h-11 shrink-0 px-4" disabled={typed == null} onClick={() => typed != null && timers.startCountdown(typed)} data-countdown-start>
           Start{typed != null ? ` ${countdownClock(typed)}` : ''}
         </Button>
       </div>

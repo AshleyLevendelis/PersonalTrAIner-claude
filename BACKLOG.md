@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **THE TIMER'S SETUP SCROLLED SIDEWAYS: his report 20 Nov 2026**, "The timer doesnt fit on the page well and has to
+  side scroll." Measured at 390px: the minutes and seconds boxes kept a text box's own default width (about twenty
+  characters), so the row ran to ~620px and dragged the sheet's header with it. Fixed: the boxes take their width from
+  the row (`size={1}`, `w-full min-w-0`) and Start keeps its own. The running clock already fitted.
+  CHECKS: `verify:countdown-timer` C2b (setup) and C5b (running clock): nothing in the sheet sticks out of it, nothing
+  scrolls sideways; 19 checks. Mutation: putting the whole old row back is caught; removing one of the three pieces
+  alone is an equivalent mutant (the other two still hold the row), recorded rather than given an invented check.
+  Re-run: `test:bundle`, `test:round-setup`, `test:tools-grid`, `test:no-dead-code`, `verify:tools-2a`, all pass.
+
 - [x] **THE CHAT HEADER, HIS REQUEST 20 Nov 2026**: "The session done and kcal left in the chat is unnecessary lets remove
   thay and the text above 'sees todays session' remove that too. And instead of trainer personal trainer chamge it to
   just Personal TrAIner." Done: the header is the avatar, "Personal TrAIner", clear and the gear; no line under the name,
