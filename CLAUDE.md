@@ -1727,6 +1727,14 @@ menu" stays true when a copy is also left outside it.
   over the 64 real exam replies first. One ("That's what we love to hear") was the reply's only answer to good news,
   and came off the list.
 
+### His requests of 20 Nov 2026
+- **Profile has an Account row, "Email & sign-in" (his request 20 Nov 2026, "Build the account row")**: an email can be
+  saved any time, not only from the weekly prompt; it says saved, waiting on the email's link (never "saved"), or not
+  saved, and an account the app cannot read is "Couldn't check". `verify:account-row`
+- **The exercise sheet is "About this exercise", tabs How to | Muscles | History (his report 20 Nov 2026)**: "How to do
+  it" opened a sheet whose "Summary" tab was the muscle map. Each tab holds what its name says; the trend is on History.
+  `test:exercise-detail`, `verify:exercise-video`
+
 ### His rulings of 17 Nov 2026
 - **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over
   marking once with both). The judge is stamped on the scores; scores marked by another judge are stale (re-grade the
