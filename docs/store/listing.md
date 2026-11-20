@@ -39,6 +39,12 @@ TOOLS
 Personal TrAIner gives general fitness and nutrition guidance. It does not diagnose or treat anything. For pain, an
 injury, a medical condition or pregnancy, talk to a doctor, physio or midwife.
 
+## Google Play pictures (made 20 Nov 2026)
+
+In `docs/store/play/`, made by `node scripts/make-store-assets.cjs` (after building the test pages):
+`icon-512.png` (store icon), `feature-graphic.png` (1024 x 500 banner), `screenshot-1..5.png` (1080 x 1920: Home,
+Exercise, the coach, Nutrition, Tools). The screens are the app's own, showing the test pages' made-up "Sam".
+
 ## Apple: App Privacy ("nutrition labels")
 
 Data used to track you: **none**. Every item below is **linked to the user** and used for **App Functionality** only
