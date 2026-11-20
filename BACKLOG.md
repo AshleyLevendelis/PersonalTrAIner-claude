@@ -2,6 +2,24 @@
 
 Newest first. One line each.
 
+- [x] **A COACH REPLY CAN BE REPORTED FROM INSIDE THE APP: his "1, build it", 20 Nov 2026**, from three options (a flag
+  kept for him to review; over a mailto link and over leaving it). Google Play requires an app with AI-generated content
+  to let people report it in the app. A small flag beside each finished coach reply opens "Report this reply": four
+  reasons (Wrong or misleading, Unsafe advice, Offensive or inappropriate, Something else), an optional note, Send (off
+  until a reason is picked). One row in a new table, `coach_reply_reports` (the reply's own words, the reason, the note,
+  the message id when it is a real one; his own rows only, deleted with his account and in the data download). A report
+  that does not save says so and keeps the sheet; a sent one reads "Thanks, reported" and the flag stays filled. The
+  privacy page says replies are AI and can be reported. Reviewing them: Supabase, Table editor, `coach_reply_reports`.
+  CHECKS: `verify:report-reply` (14 checks at 390px). Mutations 6, 5 caught; the sixth (send with no reason) is an
+  equivalent mutant: Send is disabled until a reason is picked. Re-run: `test:user-data`, `test:no-dead-code`,
+  `test:phone-app`, `verify:chat-2b`, `verify:chat-bubbles`, all pass; `test:bundle` was 2 kB over its combined line
+  and moved 3235 -> 3262 (measured 3237 + 25, his 15 Sep ruling), the other three budgets unmoved.
+  NEEDS: migration `20261120120000_coach_reply_reports` via `db:push-both` on his machine; until then Send says it
+  could not send. Not on `main`.
+  And the Android handover prompts are rewritten for his WINDOWS laptop (his FYI the same day; a Mac comes later for
+  the App Store): PowerShell paths, Android Studio's bundled Java, the phone's USB driver, `gradlew.bat`, a Windows
+  key path written with forward slashes; the iPhone steps stay Mac-only.
+
 - [x] **THE APP'S ICON IS THE COACH BUBBLE: his pick 20 Nov 2026**, "Just go with the coach bubble for now and we can
   change it later", from four drawn options (coach bubble, kettlebell, flame, P monogram; he called the dumbbell
   "boring"). A mint chat bubble holding a dumbbell with a sparkle, on the deep violet. One script draws every size

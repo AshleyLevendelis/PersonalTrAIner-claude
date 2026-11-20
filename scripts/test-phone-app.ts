@@ -98,6 +98,19 @@ console.log('\n5. Which number a day keeps')
   check('each phone\'s store by its own name', healthStoreName('ios') === 'Apple Health' && healthStoreName('android') === 'Health Connect')
 }
 
+console.log('\n6. Store icons and the upload key (store work, 20 Nov 2026)')
+{
+  const gradle = readFileSync('android/app/build.gradle', 'utf8').replace(/\/\/.*$/gm, '')
+  const ignore = readFileSync('android/.gitignore', 'utf8').split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'))
+  check('a release build is signed from android/keystore.properties when that file exists, and only then',
+    /rootProject\.file\('keystore\.properties'\)/.test(gradle) && /if \(keystorePropertiesFile\.exists\(\)\) \{\s*signingConfig signingConfigs\.release/.test(gradle))
+  check('...and no password or key path is written into the build file itself', !/storePassword\s+['"]/.test(gradle) && !/keyPassword\s+['"]/.test(gradle))
+  check('the key, and the file with its passwords, can never be committed', ['*.jks', '*.keystore', 'keystore.properties'].every(p => ignore.includes(p)), ignore.filter(l => /jks|keystore/.test(l)))
+  const png = (f: string) => { const b = readFileSync(join(ROOT, f)); return { w: b.readUInt32BE(16), h: b.readUInt32BE(20), alpha: b[25] === 6 } }
+  const only = png('assets/icon-only.png')
+  check('the store icon is a 1024 square with no see-through pixels allowed (Apple refuses an icon with transparency)', only.w === 1024 && only.h === 1024 && !only.alpha, only)
+}
+
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} check(s) failed`); process.exit(1) }
 console.log('The phone app asks for steps and nothing else, and says so everywhere it is asked.')

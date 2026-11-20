@@ -793,7 +793,10 @@ console.log('\n3. Nothing has crept back up')
   // by the morning of the 19th. The other three budgets did not move and were NOT raised: first paint is 610 of 612
   // and is left where it is on purpose, so the next thing added to first paint has to be looked at. His 15 Sep
   // ruling: 25 kB raw over today's number (3210 + 25).
-  const TOTAL_BUDGET_KB = 3235
+  // MOVED 20 Nov 2026: 3235 -> 3262, the countdown timer, the chat header trim and "Report this reply" (Google Play's
+  // rule on AI replies). MEASURED 3237 through this gate on the change, 2 kB over the line. The other three budgets
+  // did not move. His 15 Sep ruling: 25 kB raw over today's number (3237 + 25).
+  const TOTAL_BUDGET_KB = 3262
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
