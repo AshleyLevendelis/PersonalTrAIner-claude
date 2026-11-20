@@ -57,7 +57,7 @@ New icon and launch-screen artwork is in assets/ and has not been cut into Andro
 1. Tools (install what is missing, say what you installed):
    - Android Studio (https://developer.android.com/studio), opened once so it installs the Android SDK.
    - Java 21 (Android Studio's bundled one is fine: export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home").
-2. git fetch && git checkout main && git pull
+2. git fetch && git checkout claude/coach-empty-text-fix-2c4bzv && git pull
    ls capacitor.config.ts android/app/src/main/AndroidManifest.xml assets/icon-only.png src/lib/health-steps.ts
    npm ci
    npm run test:phone-app     (must end "The phone app asks for steps and nothing else, and says so everywhere it is asked.")
@@ -96,7 +96,7 @@ for steps only. Ashley has no iPhone, so the Simulator is the test; it has its o
 1. Tools: Xcode from the Mac App Store (opened once to install its extra components), then
    xcode-select --install   (if not already) and   sudo xcode-select -s /Applications/Xcode.app
    CocoaPods is NOT needed (Capacitor 8 uses Swift Package Manager).
-2. git pull on main; npm ci; if Prompt 1 step 4 has not been run on this checkout, run it now.
+2. git checkout claude/coach-empty-text-fix-2c4bzv && git pull; npm ci; if Prompt 1 step 4 has not been run on this checkout, run it now.
 3. npm run phone:sync   (must list "@capgo/capacitor-health" for ios)
 4. npx cap run ios   and pick an iPhone simulator (e.g. iPhone 16). If it fails, npx cap open ios, choose a
    simulator and press Run. Signing: for the Simulator no team is needed; if Xcode asks, pick "Personal Team" with
