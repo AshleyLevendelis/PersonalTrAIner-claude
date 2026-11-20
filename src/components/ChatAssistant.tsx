@@ -28,6 +28,7 @@ import { sessionSetCount } from '@/lib/session-count'
 import { todayScreenCell, screenEatenKcal, coachTodayCalories } from '@/lib/coach-screen-numbers'
 import { tabHash } from '@/lib/app-route'
 import { readAloud } from '@/lib/read-aloud'
+import { ReportReplyButton } from '@/components/chat/ReportReplyButton'
 import { ListenButton } from '@/components/chat/ListenButton'
 import { getActiveMesocycleWeek } from '@/lib/calculations'
 import { computeBMR, staticTDEEFor, resolveBodyMetrics, nutritionReferenceWeightKg } from '@/lib/macro-calculator'
@@ -9442,6 +9443,10 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                                 {/* LISTEN (her 31 Oct 2026 ruling): one per coach bubble, once its words are all in. */}
                                 {msg.role === 'assistant' && !isInterrupted(msg) && !(msg.id != null && msg.id === animatingMessageId) && (
                                   <ListenButton messageKey={msg.id || `msg-${i}`} />
+                                )}
+                                {/* REPORT (20 Nov 2026, for Google Play's rule on AI replies): every finished coach reply. */}
+                                {msg.role === 'assistant' && !isInterrupted(msg) && !(msg.id != null && msg.id === animatingMessageId) && (
+                                  <ReportReplyButton profileId={profile.id} messageId={msg.id ?? null} replyText={stripTags(msg.content ?? '')} />
                                 )}
                               </div>
                         )

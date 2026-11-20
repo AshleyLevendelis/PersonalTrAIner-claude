@@ -64,7 +64,9 @@ review notes.
   - Personal info: Email address (optional)
   - Health and fitness: Health info; Fitness info (steps optional)
   - Messages: Other in-app messages (the coach chat)
-  - App activity: Other user-generated content (logged sets and meals)
+  - App activity: Other user-generated content (logged sets and meals, and a coach reply he chooses to report)
+- **AI-generated content** (Google's policy): the coach's replies are written by AI. Each one has a flag that reports
+  it from inside the app (reason + optional note, kept for review). Say so in the Play Console's content questions.
 
 ## Google: Health Connect declaration
 

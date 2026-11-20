@@ -67,6 +67,8 @@ export const EXPORTED_TABLES: { table: string; column: string }[] = [
   // Every unprompted coach message and whether he answered (strategy slice 1, 13 Nov 2026). Found missing from the
   // export by test:user-data on slice 3's run: the slice 1 gate set never named this file.
   { table: 'coach_moment_log', column: 'user_id' },
+  // Coach replies he reported (20 Nov 2026, Google Play's rule on AI replies).
+  { table: 'coach_reply_reports', column: 'user_id' },
 ]
 
 export interface DataExport {
