@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [x] **THE APP'S ICON IS THE COACH BUBBLE: his pick 20 Nov 2026**, "Just go with the coach bubble for now and we can
+  change it later", from four drawn options (coach bubble, kettlebell, flame, P monogram; he called the dumbbell
+  "boring"). A mint chat bubble holding a dumbbell with a sparkle, on the deep violet. One script draws every size
+  (`scripts/make-phone-icons.cjs`, vector photographed by Chromium): the phone apps' sources in `assets/`, and the
+  website's icons, home-screen icon and tab icon in `public/`, plus a proper full-bleed maskable icon (the manifest had
+  reused the rounded one). The old placeholder generator (`generate-app-icons.mjs`) is deleted. `test:installable`,
+  `test:offline-ready`, `test:no-dead-code` pass. Read on screen as a strip of all sizes.
+
 - [ ] **THE PHONE APP TO THE STORES: his request 20 Nov 2026**, "Continue with the app store steps. My phone is an
   android but it needs to work on android and ios. I have a mac". Done here: store-ready icon and launch-screen
   artwork (`assets/`, square and opaque: the web icon's see-through corners are refused by Apple), redrawn by
