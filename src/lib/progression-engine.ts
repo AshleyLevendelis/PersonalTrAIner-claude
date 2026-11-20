@@ -491,10 +491,12 @@ export async function getDoubleProgressionRecommendation(
   }
 
   return { ...said, weightKg: lastWeight, lastWeightKg: lastWeight, didProgress: false,
-    // THE RANGE IS NAMED (19 Nov 2026, his summary: "didn't hit 18 reps … I don't think that was ever on my plan"). The
-    // boxes pre-fill the BOTTOM of the range and this judges the TOP, so the sentence says which range it is reading.
+    // CREDIT FIRST (20 Nov 2026, his report: "prescribed me sets of 15 which I logged all 15 but the summary says I was
+    // short of 18"; the 19 Nov wording still read as a shortfall). Reaching this line means no set fell below the bottom
+    // of the range (that case returned above), so he did the work asked: the note says so, then names the top as the
+    // next target, never as a miss. Double progression: the weight stays until every set reaches the top.
     note: ctx.repRangeLow != null && ctx.repRangeLow < prescribedRepRangeHigh
-      ? `Held at ${lastWeight}kg — your range is ${ctx.repRangeLow}-${prescribedRepRangeHigh} reps, and not every set reached ${prescribedRepRangeHigh} last time. Get ${prescribedRepRangeHigh} on every set before adding load.`
+      ? `Same ${lastWeight}kg next time — every set got its ${ctx.repRangeLow}+ reps. Add a rep where you can: ${prescribedRepRangeHigh} on every set moves the weight up.`
       : `Held at ${lastWeight}kg — didn't hit ${prescribedRepRangeHigh} reps on every set last time. Aim for more reps before adding load.` }
 }
 

@@ -169,7 +169,7 @@ export const TOUR_STEPS: TourStep[] = [
     nav: 'navTools', tapHint: 'Tap Tools', teaser: 'Two doors left.',
     // AND BACK AGAIN, 1 Nov 2026: Tools 2a (31 Oct) put the three timers on the page as tiles, so "behind here"
     // stopped being true. Said as it is now.
-    copy: 'All three timers are right here — a round timer with every protocol (Tabata, EMOM, or your own), a stopwatch, and a lap timer. Start one and it keeps going while you use the rest of the app.',
+    copy: 'All four timers are right here — a round timer with every protocol (Tabata, EMOM, or your own), a countdown timer you set, a stopwatch, and a lap timer. Start one and it keeps going while you use the rest of the app.',
   },
   {
     key: 'settings', tab: 'tools', target: 'settings',

@@ -134,6 +134,16 @@ export interface TimersValue {
    */
   roundFullScreen: boolean
   setRoundFullScreen: (on: boolean) => void
+  /**
+   * THE COUNTDOWN TIMER (his request 20 Nov 2026). Its length, the time left, and whether it has reached zero. The
+   * time left is the length minus the stopwatch's own elapsed reading, so pause, resume and a reload all work the
+   * way the stopwatch's do.
+   */
+  countdownMs: number | null
+  countdownRemainingMs: number | null
+  isCountdownDone: boolean
+  /** Starts a countdown of this many milliseconds from now, replacing whatever stopwatch or lap timer was there. */
+  startCountdown: (ms: number) => void
   /** Countdown, beeps, buzz, full screen on Start — her settings, kept apart from any one run (4c). */
   timerPrefs: TimerPrefs
   setTimerPrefs: (patch: Partial<TimerPrefs>) => void
@@ -201,7 +211,8 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
   // 1s default left it frozen); round mode keeps 1s — it displays a whole-
   // second countdown and derives transitions from elapsed time, so a faster
   // tick would buy nothing but battery drain.
-  const tick = useDeadlineTick(record.running, record.mode === 'round' ? 1000 : 100)
+  // The countdown shows whole seconds like a round, but ticks at 250ms so zero lands within a quarter second.
+  const tick = useDeadlineTick(record.running, record.mode === 'round' ? 1000 : record.mode === 'countdown' ? 250 : 100)
   // THE SCREEN STAYS AWAKE WHILE A TIMER RUNS (Ashley, 17 Oct 2026: "when I use the round timer the phone
   // screen times out and turns off while I'm in the middle of training"). The lock was only taken for a running
   // workout session on Exercise; the round timer, stopwatch and lap timer live on Tools, outside it. Held while
@@ -231,6 +242,20 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profileId, persist, record])
 
+  const startCountdown = useCallback((ms: number) => {
+    if (!profileId || !(ms > 0)) return
+    setRoundFullScreen(false)
+    persist({
+      ...defaultTimerRecord('countdown'),
+      selectedRoundConfig: record.selectedRoundConfig ?? null,
+      customRoundConfig: record.customRoundConfig ?? null,
+      countdownMs: Math.round(ms),
+      running: true,
+      startedAtIso: new Date(nowMs()).toISOString(),
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profileId, persist, record])
+
   const stop = useCallback(() => {
     if (!profileId) return
     const elapsed = computeStopwatchElapsedMs(record.accumulatedMs, record.startedAtIso, record.running, nowMs())
@@ -251,11 +276,13 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
       ...defaultTimerRecord(record.mode),
       selectedRoundConfig: record.selectedRoundConfig ?? null,
       customRoundConfig: record.customRoundConfig ?? null,
+      // A countdown reset keeps its length, so "Start" runs the same time again.
+      ...(record.mode === 'countdown' && record.countdownMs ? { countdownMs: record.countdownMs } : {}),
     }
     if (profileId) saveTimerRecord(profileId, next)
     setRecord(next)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, record.mode, record.selectedRoundConfig])
+  }, [profileId, record.mode, record.selectedRoundConfig, record.countdownMs])
 
   const lap = useCallback(() => {
     if (!profileId) return
@@ -493,6 +520,20 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundState])
 
+  // THE COUNTDOWN REACHING ZERO: one beep and buzz (her Beeps and Buzz switches) while the app is in front, and the
+  // record stops at exactly its length so the finished state holds the screen. Reached in the background, it stops
+  // silently: a beep on coming back would be for a moment already passed, the round timer's rule.
+  const countdownMs = record.mode === 'countdown' ? (record.countdownMs ?? null) : null
+  const countdownRemainingMs = countdownMs != null ? Math.max(0, countdownMs - elapsedMs) : null
+  const isCountdownDone = countdownMs != null && countdownRemainingMs === 0 && (record.accumulatedMs > 0 || record.running)
+  useEffect(() => {
+    if (record.mode !== 'countdown' || !record.running || countdownMs == null || countdownRemainingMs == null) return
+    if (countdownRemainingMs > 0) return
+    if (!document.hidden) playTimerCue('round-complete', roundCueOpts(prefsRef.current))
+    persist({ ...record, running: false, accumulatedMs: countdownMs, startedAtIso: null })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countdownRemainingMs, record.running, record.mode])
+
   const isActive = record.running || record.accumulatedMs > 0 || record.laps.length > 0
 
   const [screenOpenRequested, setScreenOpenRequested] = useState(false)
@@ -523,6 +564,10 @@ export function TimersProvider({ profileId, children }: { profileId: string | un
     clearScreenOpenRequest,
     roundFullScreen,
     setRoundFullScreen,
+    countdownMs,
+    countdownRemainingMs,
+    isCountdownDone,
+    startCountdown,
     timerPrefs,
     setTimerPrefs,
     setMode,

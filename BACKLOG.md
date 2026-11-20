@@ -2,6 +2,35 @@
 
 Newest first. One line each.
 
+- [x] **FOUR FROM HIS GYM DAY, 20 Nov 2026** ("Chat has stopped working", the round timer from a distance, "a normal
+  timer", and "prescribed me sets of 15 which I logged all 15 but the summary says I was short of 18").
+  1. CHAT DOWN: NOT FIXED, NOT YET DIAGNOSED. Every message ends "Response failed — tap to retry", which the app shows
+     for ANY failure of the coach's server (crash, 45 s timeout, Gemini refusal, spend cap). This session cannot read
+     the function's logs: the network blocks the project and the Supabase connector is not signed in. Checked here and
+     ruled out: every server file parses (`test:functions-parse`), every local import of the coach's function exists,
+     and the app's own send path is unchanged since the last working version. The deploy from `main` earlier the same
+     day is the first suspect, not proven. `docs/handover/chat-down-2026-11-20.md` is the prompt for his machine (read
+     the logs, list the function and its secret names, call it once, report the error word for word).
+  2. THE ROUND, READABLE FROM THE FLOOR. The full-screen field said "ROUND 8 OF 10" as a 12px label over a 104px clock.
+     While a round runs it now draws the number at 88px with "of 10" beside it; the countdown and the end keep their
+     label (no number to show). The pips, subline and clock are unchanged.
+  3. A COUNTDOWN TIMER, the fourth Tools tile ("Timer · Counts down from a time you set"; the tiles go two by two).
+     Minute chips start at once (1, 2, 3, 5, 10, 15, 20, 30); minutes and seconds can be typed, the Start button
+     naming the time. Built into the existing timer engine as a new mode, so it keeps time through a locked phone and a
+     reload (same anchor as the stopwatch), keeps the screen awake, beeps and buzzes at zero by the round timer's own
+     switches, and shows in the dock off Tools ("Timer · 4:12", "Paused", "Time's up"). Done offers "Again · 5:00". The
+     coach's map of Tools names it (needs the `chat-gemini` deploy to know). Mine: no full-screen view yet (the clock is
+     64-96px in the sheet); the coach's timer button does not start a countdown yet.
+  4. THE "SHORT OF 18" NOTE. The 19 Nov fix named the range but still read as a miss: "your range is 15-18 reps, and not
+     every set reached 18". The line is only reached when every set got at least the bottom of the range, which is
+     what the boxes ask for, so it now credits that first: "Same 40kg next time — every set got its 15+ reps. Add a rep
+     where you can: 18 on every set moves the weight up." CSCS: unchanged rule (double progression, the weight rises
+     when every set reaches the top); only the words changed, and they no longer call the prescribed work a shortfall.
+     The summary's "14/14 planned sets" was already right.
+  CHECKS: `test:lift-effort` R2 re-anchored on credit-plus-target and R2b added (never "not every set", "short of",
+  "didn't hit"), 2/2 mutations caught. `verify:countdown-timer` NEW (16 checks: R1-R4 the big round number, C1-C11 the
+  countdown), mutations below. `verify:tools-timer` 1a and `verify:tools-2a` 1c re-anchored to four tiles.
+
 - [x] **THE PHONE APP, WITH STEPS FROM THE PHONE: his request 20 Nov 2026, "Start on the App Store version with step
   counting".** The web app inside a Capacitor 8 shell (`ios/`, `android/`), and one native feature: Profile, "Steps from
   your phone" reads today's step count from Apple Health / Health Connect and Home's ring fills itself, "From Apple
