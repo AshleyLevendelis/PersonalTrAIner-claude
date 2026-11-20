@@ -2,6 +2,23 @@
 
 Newest first. One line each.
 
+- [x] **THE APP'S ICON IS THE COACH BUBBLE: his pick 20 Nov 2026**, "Just go with the coach bubble for now and we can
+  change it later", from four drawn options (coach bubble, kettlebell, flame, P monogram; he called the dumbbell
+  "boring"). A mint chat bubble holding a dumbbell with a sparkle, on the deep violet. One script draws every size
+  (`scripts/make-phone-icons.cjs`, vector photographed by Chromium): the phone apps' sources in `assets/`, and the
+  website's icons, home-screen icon and tab icon in `public/`, plus a proper full-bleed maskable icon (the manifest had
+  reused the rounded one). The old placeholder generator (`generate-app-icons.mjs`) is deleted. `test:installable`,
+  `test:offline-ready`, `test:no-dead-code` pass. Read on screen as a strip of all sizes.
+
+- [ ] **THE PHONE APP TO THE STORES: his request 20 Nov 2026**, "Continue with the app store steps. My phone is an
+  android but it needs to work on android and ios. I have a mac". Done here: store-ready icon and launch-screen
+  artwork (`assets/`, square and opaque: the web icon's see-through corners are refused by Apple), redrawn by
+  `scripts/make-phone-icons.cjs`; the order of work and two Mac prompts (Android on his phone, iPhone in the
+  Simulator) in `docs/handover/phone-app-stores.md`. Cutting the artwork into every size (`@capacitor/assets`) was
+  refused in this session (it fetches a new package) and runs on the Mac. NEEDS HIM: Play Console and Apple Developer
+  accounts; the permanent app id; the contact email; 12 Android testers for 14 days (a new personal Play account).
+  Named for him: the phone app carries a copy of the website, so website changes reach it only through a store update.
+
 - [x] **THE TIMER'S SETUP SCROLLED SIDEWAYS: his report 20 Nov 2026**, "The timer doesnt fit on the page well and has to
   side scroll." Measured at 390px: the minutes and seconds boxes kept a text box's own default width (about twenty
   characters), so the row ran to ~620px and dragged the sheet's header with it. Fixed: the boxes take their width from
