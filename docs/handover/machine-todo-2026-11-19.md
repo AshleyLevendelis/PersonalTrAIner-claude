@@ -1,4 +1,4 @@
-# For Ashley's machine, after the merge of 19 Nov 2026
+# For Ashley's machine, after the merges of 19-20 Nov 2026 (main at the merge of PR #35)
 
 Paste the block below into Claude Code on your machine AFTER you have told the cloud session "Merge" and it has
 merged the branch into `main`. It does the safe half (pull, prove the right code is there, run the exam, report);
@@ -6,7 +6,7 @@ the three steps that reach the live app are yours to type, because they ask for 
 terminal.
 
 ```
-Three jobs after the merge of 19 Nov 2026. You may READ production (sdkhuczcfnqqimdgfiks) and run the coach exam.
+Three jobs after the merges of 19-20 Nov 2026 (main ends at the merge of pull request #35). You may READ production (sdkhuczcfnqqimdgfiks) and run the coach exam.
 You may NOT deploy, push migrations or write SQL: those steps ask for a typed phrase and refuse without a terminal,
 so Ashley runs them himself, in the order below. Paste every answer back to the cloud session word for word.
 
@@ -20,12 +20,14 @@ what the exam is for. On 18 Nov it scored 2.33 of 3, with "asks" lowest at 1.71.
 
 == PART 1: the right code ==
 1. git checkout main && git pull
-   `git log --oneline -1` must show the merge of 19 Nov. Report the line.
+   `git log --oneline -1` must show "Merge pull request #35". Report the line.
 2. Prove the checkout holds the work (a deploy from an older checkout prints the same success line):
      ls supabase/functions/chat-gemini/stock-phrases.ts supabase/functions/_shared/plan-promise.ts
      grep -c "1b-ii. HOW A REPLY ENDS" supabase/functions/chat-gemini/index.ts        (must print 1)
      grep -c "3h. A PAUSE, AND COMING BACK" supabase/functions/chat-gemini/index.ts   (must print 1)
      grep -c "and stop. Tie it to them only when the tie is real" supabase/functions/_shared/coach-rules.ts   (must print 1)
+     grep -c "MY CARDIO IS BAD" supabase/functions/chat-gemini/index.ts                (must print 1)
+     grep -c "OFFER_BUTTONS" supabase/functions/chat-gemini/stock-phrases.ts          (must print 2)
      ls supabase/migrations/20261118140000_add_session_effort.sql
    If any is missing or prints 0, STOP and report: the merge is not in this checkout.
 3. npm run test:functions-parse
@@ -59,7 +61,7 @@ C. The setup coach:
    - every case listed under "TIER A — HARD RULES";
    - the whole "THE APP CAUGHT" section. It now also counts turns where the APP asked a question in place of the
      coach's offer (lines reading "asked first: dislike / usual_meal / race_date"). Those are not breaches.
-   - the marks and the judge's note for these six cases: talk-offer-then-yes, talk-complete-answer-just-ends,
+   - the marks and the judge's note for these seven cases: talk-offer-then-yes, talk-complete-answer-just-ends,
      talk-picks-up-the-thread, talk-away-train-or-pause, holiday-pause, ask-cant-face-it, muay-thai-cardio-rounds.
 7. Four things to look for in coach-exam/transcripts/*.json and report as counts (the cloud session will compare
    them with 18 Nov, when they were 2, 1, about 12, and 11):

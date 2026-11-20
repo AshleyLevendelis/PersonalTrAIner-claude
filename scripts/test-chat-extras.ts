@@ -33,8 +33,7 @@ check('...and cancels the delete', /undo: \(\) => \{[\s\S]*?clearTimeout\(timer\
 check('the delete is never lost: hiding the app or closing the chat runs it at once', /visibilityState === 'hidden'\) clearUndo\.current\?\.flush\(\)/.test(chat) && /return \(\) => \{ document\.removeEventListener\('visibilitychange', onHide\); clearUndo\.current\?\.flush\(\) \}/.test(chat))
 check('the Undo is on screen while the window is open', /data-testid="chat-cleared-undo"/.test(chat) && /onClick=\{\(\) => clearUndo\.current\?\.undo\(\)\}/.test(chat))
 
-console.log('\n3. "Session done" opens Exercise')
-check('the done pill is a button that opens Exercise', /p\.kind === 'done' \? \([\s\S]{0,400}<button type="button" key=\{p\.kind\} data-context-pill=\{p\.kind\} onClick=\{\(\) => openStripLink\('exercise'\)\}/.test(chat))
+// 3. "Session done" opened Exercise: the pill is gone (his request, 20 Nov 2026), so the check went with it.
 
 console.log(`\n${ran} checks ran.`)
 if (failures > 0) { console.log(`${failures} FAILED.`); process.exit(1) }

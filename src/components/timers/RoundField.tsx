@@ -2,7 +2,7 @@ import type React from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useTimers } from '@/hooks/useTimers'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
-import { roundSubline, roundHeadline, roundDoneLabel, roundStyleOf, roundLogSummary, type RoundConfig, type RoundLogSummary } from '@/lib/timer-engine'
+import { roundSubline, roundHeadline, roundDoneLabel, roundStyleOf, roundLogSummary, intervalNoun, sessionRoundNumber, sessionTotalRounds, type RoundConfig, type RoundLogSummary } from '@/lib/timer-engine'
 
 // ---------------------------------------------------------------------------
 // THE ROUND TIMER AS A FIELD — design handoff "Timer colour states", 2a.
@@ -208,12 +208,32 @@ export function RoundField({ onLogSession }: {
         style={{ right: -118, top: 150, width: 420, height: 420, border: `26px solid ${line}` }}
       />
 
-      <p
-        className="relative m-0 font-semibold uppercase"
-        style={{ fontSize: '0.75rem', letterSpacing: '.2em', color: inkSoft }}
-      >
-        {roundLabel}
-      </p>
+      {/* THE ROUND, READABLE FROM THE FLOOR (his report 20 Nov 2026: "the rounds need to be more easily visible from a
+          distance when the phone is down"). It was a 12px label; while a round runs the number is now as big as the
+          clock, with the total beside it, so "8 / 10" reads from a mat's length away. The label stays for the
+          countdown and the end, which have no number to show. */}
+      {phase === 'work' || phase === 'rest' ? (
+        <div className="relative m-0" data-round-big>
+          <p className="m-0 font-semibold uppercase" style={{ fontSize: '0.875rem', letterSpacing: '.2em', color: inkSoft }}>
+            {intervalNoun(config)}
+          </p>
+          <p className="m-0 flex items-baseline gap-3" style={{ color: ink }}>
+            <span className="tabular-mono" data-round-now style={{ fontSize: '5.5rem', fontWeight: 800, letterSpacing: '-.04em', lineHeight: .9 }}>
+              {sessionRoundNumber(config, timers.currentRound)}
+            </span>
+            <span className="tabular-mono" style={{ fontSize: '2.25rem', fontWeight: 700, lineHeight: 1, color: inkSoft }}>
+              of {sessionTotalRounds(config)}
+            </span>
+          </p>
+        </div>
+      ) : (
+        <p
+          className="relative m-0 font-semibold uppercase"
+          style={{ fontSize: '0.75rem', letterSpacing: '.2em', color: inkSoft }}
+        >
+          {roundLabel}
+        </p>
+      )}
 
       <div className="relative mt-auto flex flex-col gap-1.5">
         <div className="flex items-baseline gap-3">

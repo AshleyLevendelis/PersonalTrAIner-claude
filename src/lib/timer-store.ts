@@ -10,7 +10,7 @@ import type { RoundConfig, RoundPhase } from './timer-engine'
 
 const KEY_PREFIX = 'fitplan_timers_v1:'
 
-export type TimerMode = 'stopwatch' | 'lap' | 'round'
+export type TimerMode = 'stopwatch' | 'lap' | 'round' | 'countdown'
 
 export interface LapEntry {
   lapNumber: number
@@ -52,6 +52,12 @@ export interface TimerRecord {
   phaseEndsAtIso: string | null
   currentRound: number
   currentPhase: RoundPhase
+  /**
+   * THE COUNTDOWN TIMER'S LENGTH (his request 20 Nov 2026: "a normal timer that you can set for a set amount of
+   * time"). Optional: a record saved before it existed has none. Time left is this minus the elapsed time, read off
+   * the same anchor the stopwatch uses, so a locked phone or a reload never loses a second.
+   */
+  countdownMs?: number
 }
 
 export function defaultTimerRecord(mode: TimerMode): TimerRecord {

@@ -250,7 +250,8 @@ console.log('\n[5] The avatar and the time — once per group; the header names 
 const coachGroups = R.groups.filter(g => g.role === 'assistant'), userGroups = R.groups.filter(g => g.role === 'user')
 // RE-ANCHORED 31 Oct 2026 (2b): a coach group OPENS with its avatar, name and time; still once per group. The
 // name is "Trainer" (her 10 Oct ruling keeps the handoff's "COACH" off the screen); your groups carry none.
-check('every coach group carries its name once, "Trainer"; your groups none', coachGroups.length >= 4 && coachGroups.every(g => g.names.length === 1 && /^trainer$/i.test(g.names[0].text)) && userGroups.every(g => g.names.length === 0), R.groups.map(g => g.names.map(n => n.text)))
+// 20 Nov 2026, his "Yes": the label says "Personal TrAIner", the header's one name.
+check('every coach group carries its name once, "Personal TrAIner"; your groups none', coachGroups.length >= 4 && coachGroups.every(g => g.names.length === 1 && g.names[0].text === 'Personal TrAIner') && userGroups.every(g => g.names.length === 0), R.groups.map(g => g.names.map(n => n.text)))
 check('every coach group has one 22px avatar, in the header row ABOVE its first bubble or card', coachGroups.every(g => g.avatars.length === 1 && near(g.avatars[0].width, 22) && g.avatars[0].bottom <= (g.items[0]?.box.top ?? -1)), coachGroups.map(g => [g.avatars.length, g.avatars[0]?.width, g.avatars[0]?.bottom, g.items[0]?.box.top]))
 check('no user group has an avatar', userGroups.every(g => g.avatars.length === 0))
 check('every group shows its time once: the coach\'s in its header row, yours under your last bubble', R.groups.slice(0, 7).every(g => g.times.length === 1 && (g.role === 'user' ? g.times[0].box.top >= g.items[g.items.length - 1]?.box.bottom : g.times[0].box.bottom <= (g.items[0]?.box.top ?? -1) && near(g.times[0].box.top + g.times[0].box.height / 2, g.avatars[0].top + g.avatars[0].height / 2, 3))), R.groups.map(g => [g.role, g.times.length]))
@@ -268,11 +269,12 @@ await wait(400)
 const P = await call(readPage)
 // RE-ANCHORED 31 Oct 2026 (2b): the header's top row is 64px (a 36px avatar, the names, the live line); the
 // context strip, when it has a pill, sits inside the header under that row, so the header is the row plus the strip.
-check('the header runs across the top of the screen: a 64px top row, plus the context strip when there is one', !!P.header && near(P.header.top, 0) && near(P.header.width, P.viewport.w) && near(P.header.height, 64 + (P.strip?.height ?? 0)), { header: P.header, strip: P.strip })
-check('...with a 36px glowing avatar, "Trainer" (17px, bold; her 1 Nov "Both say Trainer") beside "Personal TrAIner" (11px, muted) — the names kept',
-  near(P.avatar?.width, 36) && /rgba?\(/.test(P.avatarGlow) && P.title?.text === 'Trainer' && P.title?.size === 17 && Number(P.title?.weight) >= 700 && P.sub?.text === 'Personal TrAIner' && P.sub?.size === 11 && P.sub?.color === P.tokens.muted,
+// RE-ANCHORED 20 Nov 2026 (his request): no context strip and no live line any more, so the header is its 64px row.
+check('the header runs across the top of the screen: one 64px row, no context strip under it', !!P.header && near(P.header.top, 0) && near(P.header.width, P.viewport.w) && near(P.header.height, 64) && P.strip == null, { header: P.header, strip: P.strip })
+check('...with a 36px glowing avatar and one name, "Personal TrAIner" (17px, bold; his 20 Nov "just Personal TrAIner")',
+  near(P.avatar?.width, 36) && /rgba?\(/.test(P.avatarGlow) && P.title?.text === 'Personal TrAIner' && P.title?.size === 17 && Number(P.title?.weight) >= 700 && P.sub == null,
   { avatar: P.avatar?.width, glow: P.avatarGlow, title: P.title, sub: P.sub })
-check('...and the live line under them', P.live === "Sees today's session, meals and logs", P.live)
+check('...and no "Sees today\'s session" line', P.live == null, P.live)
 check('...then the 40px clear button, then the settings gear, both in the header', !!P.clear && !!P.gear && near(P.clear.width, 40) && P.gear.left >= P.clear.right && P.clear.top >= P.header.top && P.gear.bottom <= P.header.bottom, { clear: P.clear, gear: P.gear })
 check('the thread fills everything between the header and the composer', !!P.scroller && near(P.scroller.top, P.header?.bottom) && near(P.scroller.bottom, P.composer?.top), { header: P.header?.bottom, scroller: P.scroller, composer: P.composer?.top })
 check('...with no scrollbar showing', P.scrollbar === 'none', P.scrollbar)

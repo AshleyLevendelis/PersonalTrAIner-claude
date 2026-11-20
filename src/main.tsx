@@ -44,7 +44,10 @@ createRoot(document.getElementById('root')!).render(
 // browser, a private window, an https requirement), the app carries on
 // exactly as it did before it existed. See public/sw.js for what it caches
 // and — more importantly — what it refuses to.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+// NOT INSIDE THE PHONE APP (20 Nov 2026): there the whole app ships inside the install, so it already opens with no
+// signal, and the iPhone's web view refuses service workers for the app's own address anyway.
+const inPhoneApp = !!(window as Window & { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()
+if (import.meta.env.PROD && 'serviceWorker' in navigator && !inPhoneApp) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
     // SAVE THE WHOLE APP TO THE PHONE once the page is idle (10 Nov 2026, a gym with no Wi-Fi): the worker fetches

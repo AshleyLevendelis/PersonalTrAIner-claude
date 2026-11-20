@@ -92,7 +92,10 @@ import { checkWeighIn, profileWeightQuestionText, weighInYesLabel, WEIGH_IN_NO_L
 // main chunk to a budget, and this was the kilobyte that crossed it).
 const BanExerciseSheet = lazyWithReload(() => import('@/components/exercise/BanExerciseSheet').then(m => ({ default: m.BanExerciseSheet })))
 import { AccountSection } from '@/components/AccountSection'
+import { isHealthStepsConnected, phonePlatform } from '@/lib/steps-store'
 import { accountRowValue, readAccountStatus, type AccountStatus } from '@/lib/auth'
+// Only the phone app draws it, so it is not in the website's first download.
+const HealthStepsSection = lazyWithReload(() => import('@/components/HealthStepsSection').then(m => ({ default: m.HealthStepsSection })))
 const RemindersSection = lazyWithReload(() => import('@/components/RemindersSection').then(m => ({ default: m.RemindersSection })))
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
@@ -256,13 +259,13 @@ type ProfileSheet =
   | 'body' | 'goal' | 'injuries'
   | 'schedule' | 'equipment' | 'lifts' | 'style' | 'exavoid'
   | 'allergies' | 'diet' | 'likes' | 'avoid' | 'meals'
-  | 'tone' | 'remembers' | 'appearance' | 'reminders' | 'account'
+  | 'tone' | 'remembers' | 'appearance' | 'reminders' | 'account' | 'health'
 
 const SHEET_TITLE: Record<ProfileSheet, string> = {
   body: 'Height & weight', goal: 'Goal', injuries: 'Injuries',
   schedule: 'Schedule', equipment: 'Equipment', lifts: 'Known lifts', style: 'Style & recovery', exavoid: 'Exercises to avoid',
   allergies: 'Allergies', diet: 'Diet', likes: 'Foods you like', avoid: 'Foods to avoid', meals: 'Meals & shopping',
-  tone: 'Reply speed', remembers: 'What your Personal TrAIner remembers', appearance: 'Appearance', reminders: 'Reminders', account: 'Account',
+  tone: 'Reply speed', remembers: 'What your Personal TrAIner remembers', appearance: 'Appearance', reminders: 'Reminders', account: 'Account', health: 'Steps from your phone',
 }
 
 /** A deep link names a section; this is the sheet that holds it, so its scroll still lands. */
@@ -1150,6 +1153,9 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   const [sheet, setSheet] = useState<ProfileSheet | null>(null)
   // Account row (20 Nov 2026): read once on open; a save inside the sheet hands back the new state.
   const [account, setAccount] = useState<AccountStatus | null>(null)
+  // Steps from the phone (20 Nov 2026): only inside the phone app.
+  const healthPlatform = phonePlatform()
+  const [healthOn, setHealthOn] = useState(isHealthStepsConnected())
   useEffect(() => {
     let live = true
     void readAccountStatus().then(st => { if (live) setAccount(st) })
@@ -2086,6 +2092,9 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         <AppearanceSection appearance={appearance} />
         </>
       )
+      case 'health': return (
+        <>{healthPlatform && <Suspense fallback={null}><HealthStepsSection platform={healthPlatform} onChanged={setHealthOn} /></Suspense>}</>
+      )
       case 'account': return (
         <AccountSection status={account} onChanged={setAccount} onClose={() => setSheet(null)} />
       )
@@ -2215,6 +2224,7 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
               <SheetRow label="Remembers" value={loading ? '…' : `${rememberedCount} thing${rememberedCount === 1 ? '' : 's'}`} onOpen={() => setSheet('remembers')} />
               <SheetRow label="Appearance" value={THEME_PREVIEWS[appearance.theme]?.label ?? ''} onOpen={() => setSheet('appearance')} />
               {profile.id && <SheetRow label="Reminders" value={remindersValue ?? ''} onOpen={() => setSheet('reminders')} />}
+              {healthPlatform && <SheetRow label="Steps from your phone" value={healthOn ? `On · ${healthPlatform === 'ios' ? 'Apple Health' : 'Health Connect'}` : 'Off'} onOpen={() => setSheet('health')} />}
             </ProfileGroup>
 
         {/* Audit §1.4 — there was neither of these. "New Plan" cleared the

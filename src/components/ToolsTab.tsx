@@ -1,13 +1,14 @@
 import { programSummary } from '@/lib/one-page'
 import { useEffect, useMemo, useState, Suspense, type ReactNode } from 'react'
 import { lazyWithReload } from '@/lib/chunk-reload'
-import { History, BookOpen, Timer, ChevronRight, TimerReset, ArrowLeft, Flag, ShoppingCart, TrendingUp, Play } from 'lucide-react'
+import { History, BookOpen, Timer, ChevronRight, TimerReset, ArrowLeft, Flag, Hourglass, ShoppingCart, TrendingUp, Play } from 'lucide-react'
 // SPLIT OUT OF THE APP CHUNK. Neither of these is on screen when the tab
 // loads: the round setup unfolds only under the Custom chip and the stopwatch
 // opens from a row. Eagerly imported they pushed the app chunk 1 kB past its
 // budget (test:bundle, 13 Sep 2026) for two panels most sessions never open.
 const RoundTimerSheet = lazyWithReload(() => import('@/components/timers/RoundTimerSheet').then(m => ({ default: m.RoundTimerSheet })))
 const StopwatchPanel = lazyWithReload(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.StopwatchPanel })))
+const CountdownPanel = lazyWithReload(() => import('@/components/timers/TimersPanel').then(m => ({ default: m.CountdownPanel })))
 import { PlateCalculator } from '@/components/PlateCalculator'
 import { onOpenRequest, takeOpenRequest } from '@/lib/open-request'
 import { PlateCard } from '@/components/PlateCard'
@@ -88,8 +89,11 @@ import { CircuitOffer } from '@/components/exercise/CircuitOffer'
 // 2a (31 Oct 2026): THE TILES ARE THE CHOOSER. Each opens its own timer in one
 // tap — there is no "pick a timer" step in between any more. Still one entry
 // per mode, for the reason above.
-const TIMER_CHOICES: { mode: 'round' | 'stopwatch' | 'lap'; label: string; sub: string; icon: typeof Timer }[] = [
+// THE COUNTDOWN, 20 Nov 2026 (his request: "a normal timer that you can set for a set amount of time"): a fourth
+// mode, so a fourth tile, and the tiles sit two by two.
+const TIMER_CHOICES: { mode: 'round' | 'stopwatch' | 'lap' | 'countdown'; label: string; sub: string; icon: typeof Timer }[] = [
   { mode: 'round', label: 'Round', sub: 'Tabata, EMOM, intervals', icon: TimerReset },
+  { mode: 'countdown', label: 'Timer', sub: 'Counts down', icon: Hourglass },
   { mode: 'stopwatch', label: 'Stopwatch', sub: 'Counts up', icon: Timer },
   { mode: 'lap', label: 'Lap', sub: 'Records each lap', icon: Flag },
 ]
@@ -146,7 +150,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
   // chooser inside it any more — a tile on the tab opens its timer directly,
   // and the sheet's "back" returns to the tab, where the tiles are.
   const [timersOpen, setTimersOpen] = useState(false)
-  const [timerPick, setTimerPick] = useState<'round' | 'stopwatch' | 'lap'>('round')
+  const [timerPick, setTimerPick] = useState<'round' | 'stopwatch' | 'lap' | 'countdown'>('round')
   const [plateStartKg, setPlateStartKg] = useState<number>(PLATE_CARD_DEFAULT_KG)
   // The finished round waiting to be written down, and the line that says it
   // was. Ashley, 12 Sep 2026: "I logged it but it doesn't show anywhere on the
@@ -223,7 +227,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
     if (!timers.screenOpenRequested) return
     timers.clearScreenOpenRequest()
     if (roundLive) return
-    setTimerPick(timers.mode === 'lap' ? 'lap' : timers.mode === 'stopwatch' ? 'stopwatch' : 'round')
+    setTimerPick(timers.mode === 'lap' ? 'lap' : timers.mode === 'stopwatch' ? 'stopwatch' : timers.mode === 'countdown' ? 'countdown' : 'round')
     setTimersOpen(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timers.screenOpenRequested])
@@ -302,7 +306,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
   // one runs, and this refuses if it is reached any other way. Re-tapping the
   // timer that is already the mode does not switch, so a running stopwatch is
   // not reset by opening it again.
-  const openTimer = (mode: 'round' | 'stopwatch' | 'lap') => {
+  const openTimer = (mode: 'round' | 'stopwatch' | 'lap' | 'countdown') => {
     if (roundLive && mode !== 'round') return
     if (mode !== 'round' && timers.mode !== mode) timers.setMode(mode)
     setTimerPick(mode)
@@ -437,7 +441,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
               {/* The rest timer is explained, not faked: it is not one of these. */}
               <span data-set-rest-note className="min-w-0 truncate text-[0.6875rem] text-text-tertiary">Set rest runs in your session</span>
             </div>
-            <div className="mt-3.5 grid grid-cols-3 gap-2">
+            <div className="mt-3.5 grid grid-cols-2 gap-2">
               {TIMER_CHOICES.map(choice => (
                 <button
                   key={choice.mode}
@@ -562,7 +566,7 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
               >
                 <ArrowLeft className="size-4" aria-hidden />
               </button>
-              {timerPick === 'lap' ? 'Lap timer' : 'Stopwatch'}
+              {timerPick === 'lap' ? 'Lap timer' : timerPick === 'countdown' ? 'Timer' : 'Stopwatch'}
             </DialogTitle>
           </DialogHeader>
           )}
@@ -583,6 +587,12 @@ export function ToolsTab({ profileId, exercisePlan, mesocycle, liveWeek, equipme
           {(timerPick === 'stopwatch' || timerPick === 'lap') && (
             <Suspense fallback={null}>
               <StopwatchPanel />
+            </Suspense>
+          )}
+
+          {timerPick === 'countdown' && (
+            <Suspense fallback={null}>
+              <CountdownPanel />
             </Suspense>
           )}
         </DialogContent>

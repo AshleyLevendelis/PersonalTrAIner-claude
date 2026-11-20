@@ -1,0 +1,172 @@
+// ---------------------------------------------------------------------------
+// STEPS FROM THE PHONE (his request 20 Nov 2026, "Start on the App Store version with step counting").
+//
+// In the phone app (the Capacitor shell), today's steps are read from Apple Health on an iPhone and from Health
+// Connect on Android, and saved into the same daily_steps row Home's ring already reads (its `source` column was
+// built for exactly this in August: 'healthkit' / 'health_connect'). In a browser none of this exists and nothing
+// here runs: the typed steps box is untouched.
+//
+// READ ONLY, STEPS ONLY. The app asks for one thing, steps, and writes nothing to Health. Asking for less is what
+// Apple and Google review hardest, and it is all this feature needs.
+//
+// WHICH NUMBER WINS (mine, 20 Nov 2026): Health's count replaces an earlier Health count for the day, and NEVER
+// lowers a number he typed himself. A phone left on the bench undercounts; a typed number is his statement about
+// his day, so it stands until the phone's count passes it. The day's ring then shows the larger.
+//
+// THE PLUGIN IS LOADED ONLY INSIDE THE PHONE APP, by a dynamic import, so the website's download does not grow and
+// the plugin's own web stub (which throws) is never reached. Tests and the browser harness hand in a fake adapter.
+// ---------------------------------------------------------------------------
+
+import { getStepsForDate, isPlausibleStepCount, isHealthStepsConnected, isPhoneApp, HEALTH_STEPS_CONNECTED_KEY, type DailyStepsRow } from './steps-store'
+export { isHealthStepsConnected, stepsSourceLine } from './steps-store'
+import { supabase } from './supabase'
+
+export type HealthPlatform = 'ios' | 'android'
+
+/** The four things this feature asks of the phone's health store. */
+export interface HealthAdapter {
+  platform: HealthPlatform
+  isAvailable(): Promise<{ available: boolean; reason?: string }>
+  /** Shows the phone's own permission sheet. Resolves whether steps can be read afterwards, as far as the phone says. */
+  requestStepsAccess(): Promise<boolean>
+  /** Total steps between two instants, summed by the phone (it removes the double count of phone + watch). */
+  stepsBetween(start: Date, end: Date): Promise<number>
+}
+
+/** Tests and the browser test pages hand in a pretend health store on this global; `null` means "no phone app". */
+function testAdapter(): HealthAdapter | null | undefined {
+  return (globalThis as { __healthAdapterForTest?: HealthAdapter | null }).__healthAdapterForTest
+}
+
+type CapacitorGlobal = { isNativePlatform?: () => boolean; getPlatform?: () => string }
+
+let realAdapter: Promise<HealthAdapter | null> | null = null
+
+/** The phone's health store, or null in a browser. */
+function healthAdapter(): Promise<HealthAdapter | null> {
+  const fake = testAdapter()
+  if (fake !== undefined) return Promise.resolve(fake)
+  if (!isPhoneApp()) return Promise.resolve(null)
+  if (!realAdapter) {
+    realAdapter = (async (): Promise<HealthAdapter | null> => {
+      try {
+        const cap = (globalThis as { Capacitor?: CapacitorGlobal }).Capacitor
+        const platform = cap?.getPlatform?.() === 'android' ? 'android' : 'ios'
+        const { Health } = await import('@capgo/capacitor-health')
+        return {
+          platform,
+          isAvailable: () => Health.isAvailable(),
+          requestStepsAccess: async () => {
+            const status = await Health.requestAuthorization({ read: ['steps'] })
+            return status.readAuthorized.includes('steps')
+          },
+          stepsBetween: async (start, end) => {
+            const res = await Health.queryAggregated({
+              dataType: 'steps', startDate: start.toISOString(), endDate: end.toISOString(), bucket: 'day', aggregation: 'sum',
+            })
+            return res.samples.reduce((sum, s) => sum + (Number.isFinite(s.value) ? s.value : 0), 0)
+          },
+        }
+      } catch {
+        return null
+      }
+    })()
+  }
+  return realAdapter
+}
+
+/** What the store is called on this phone, for every sentence that names it. */
+export function healthStoreName(platform: HealthPlatform): string {
+  return platform === 'ios' ? 'Apple Health' : 'Health Connect'
+}
+
+function sourceFor(platform: HealthPlatform): DailyStepsRow['source'] {
+  return platform === 'ios' ? 'healthkit' : 'health_connect'
+}
+
+// ---------------------------------------------------------------------------
+// Whether he switched it on. Kept on the phone: it is a fact about this phone's permission, not about him, and a
+// second phone asks again (as the phone's own permission sheet would).
+// ---------------------------------------------------------------------------
+function setConnected(on: boolean): void {
+  try { if (on) localStorage.setItem(HEALTH_STEPS_CONNECTED_KEY, '1'); else localStorage.removeItem(HEALTH_STEPS_CONNECTED_KEY) } catch { /* asked again next open */ }
+}
+
+/** Local midnight to now, for the date string given (YYYY-MM-DD, his calendar day). */
+export function dayBounds(date: string, now: Date): { start: Date; end: Date } {
+  const [y, m, d] = date.split('-').map(Number)
+  const start = new Date(y, m - 1, d, 0, 0, 0, 0)
+  const endOfDay = new Date(y, m - 1, d + 1, 0, 0, 0, 0)
+  return { start, end: now < endOfDay ? now : endOfDay }
+}
+
+/**
+ * The count to keep for the day, given what is stored and what the phone says. Pure, so the rule can be checked.
+ * `null` means "leave the stored row as it is".
+ */
+export function stepsToKeep(stored: Pick<DailyStepsRow, 'steps' | 'source'> | null, fromPhone: number): number | null {
+  const phone = Math.round(fromPhone)
+  if (!isPlausibleStepCount(phone)) return null
+  if (!stored) return phone > 0 ? phone : null
+  if (stored.source === 'manual') return phone > stored.steps ? phone : null
+  return phone !== stored.steps ? phone : null
+}
+
+export type ConnectResult =
+  | { ok: true; store: string }
+  | { ok: false; reason: 'not-phone-app' | 'unavailable' | 'denied' | 'error'; store?: string; detail?: string }
+
+/** The Profile switch: shows the phone's permission sheet and remembers the answer. */
+export async function connectHealthSteps(): Promise<ConnectResult> {
+  const adapter = await healthAdapter()
+  if (!adapter) return { ok: false, reason: 'not-phone-app' }
+  const store = healthStoreName(adapter.platform)
+  try {
+    const avail = await adapter.isAvailable()
+    if (!avail.available) return { ok: false, reason: 'unavailable', store, detail: avail.reason }
+    const granted = await adapter.requestStepsAccess()
+    // APPLE NEVER SAYS "DENIED" FOR A READ (its privacy rule): a refused read looks like a day of no steps. So on an
+    // iPhone a completed sheet counts as connected, and Home says where to look when the count stays at 0.
+    if (!granted && adapter.platform === 'android') return { ok: false, reason: 'denied', store }
+    setConnected(true)
+    return { ok: true, store }
+  } catch (err) {
+    return { ok: false, reason: 'error', store, detail: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+export function disconnectHealthSteps(): void {
+  setConnected(false)
+}
+
+export type SyncResult =
+  | { status: 'off' }
+  | { status: 'unchanged'; row: DailyStepsRow | null; fromPhone: number }
+  | { status: 'saved'; row: DailyStepsRow; fromPhone: number }
+  | { status: 'failed'; detail: string }
+
+/**
+ * Read today's steps from the phone and save them, by the rule in `stepsToKeep`. Called when Home opens and when
+ * the app comes back to the front. Never throws: a failed read leaves the ring as it was.
+ */
+export async function syncStepsFromHealth(profileId: string, date: string, now: Date = new Date()): Promise<SyncResult> {
+  if (!isHealthStepsConnected()) return { status: 'off' }
+  const adapter = await healthAdapter()
+  if (!adapter) return { status: 'off' }
+  try {
+    const { start, end } = dayBounds(date, now)
+    const fromPhone = await adapter.stepsBetween(start, end)
+    const stored = await getStepsForDate(profileId, date)
+    const keep = stepsToKeep(stored, fromPhone)
+    if (keep == null) return { status: 'unchanged', row: stored, fromPhone }
+    const { data, error } = await supabase
+      .from('daily_steps')
+      .upsert({ profile_id: profileId, date, steps: keep, source: sourceFor(adapter.platform), client_id: null }, { onConflict: 'profile_id,date' })
+      .select()
+      .single()
+    if (error) throw error
+    return { status: 'saved', row: data as DailyStepsRow, fromPhone }
+  } catch (err) {
+    return { status: 'failed', detail: err instanceof Error ? err.message : String(err) }
+  }
+}

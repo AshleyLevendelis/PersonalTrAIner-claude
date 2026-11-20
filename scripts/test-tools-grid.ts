@@ -50,7 +50,9 @@ console.log('\n1. One timer surface, and every row goes somewhere\n')
   // cannot satisfy the check that it was removed.
   const bare = tools.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
   check('no tile table survives', !/const TILES/.test(bare), bare.match(/const TILES/)?.[0])
-  check('...and no grid layout with it', !/grid-cols-2/.test(bare))
+  // 20 Nov 2026: the timers card's four tiles sit two by two, so ONE two-column grid is allowed, and it must be that one.
+  const grids = [...bare.matchAll(/grid-cols-2/g)].map(m => bare.slice(m.index!, m.index! + 400))
+  check('...and no grid layout with it (the one two-column grid is the timer tiles)', grids.length <= 1 && grids.every(g => /TIMER_CHOICES\.map/.test(g)), grids.length)
 
   // THE ROUND CARD IS NOT ON THE TAB AT REST — 4b, and this REVERSES the 4a
   // assertion that stood here ("it is always there"). Ashley, 14 Sep 2026, on

@@ -112,8 +112,9 @@ const settled = await text()
 // with the three timers as tiles. Her 14 Sep ruling is the property and it is
 // unchanged: at rest no round card sits on the tab, and all three timers are
 // one tap away.
-check('1a. at rest Tools leads with the three timers, and no round card',
-  JSON.stringify(tilesAtRest) === '["round","stopwatch","lap"]' && !roundCardAtRest && /^TIMERS\b|\bTIMERS\b/i.test(atRest || ''),
+// 20 Nov 2026: a fourth timer, the countdown, on his request ("a normal timer that you can set for a set amount of time").
+check('1a. at rest Tools leads with the four timers, and no round card',
+  JSON.stringify(tilesAtRest) === '["round","countdown","stopwatch","lap"]' && !roundCardAtRest && /^TIMERS\b|\bTIMERS\b/i.test(atRest || ''),
   { tilesAtRest, roundCardAtRest, text: (atRest || '').slice(0, 200) })
 // 4c (10 Oct 2026): THE IDLE CARD BECAME THE SHEET'S PREVIEW. The sheet is
 // full screen with its own top bar, cards, steppers and a docked Start.

@@ -103,6 +103,10 @@ const KEYS: Record<string, { clear: boolean; why: string }> = {
   // PLAN CHANGES KEPT WITH NO SIGNAL (10 Nov 2026), waiting to be sent. Kept like the queues above and for their
   // reason: each entry carries its person and week, a New Plan makes a new person, and a whole plan saved for the
   // SAME person drops them itself (saveMesocycle). Clearing them here would throw away a swap not yet sent.
+  // STEPS FROM THE PHONE (20 Nov 2026, the phone app): whether this PHONE has been allowed to read steps. A fact about
+  // the phone's own Health permission, which a New Plan does not take away, so the switch stays as the phone has it.
+  fitplan_health_steps_connected: { clear: false, why: "this phone's Health permission switch — the phone's, not the plan's" },
+
   fitplan_plan_pending_v1: { clear: false, why: 'plan weeks changed offline and not yet sent, keyed per person — dropped by the save that replaces them' },
 }
 

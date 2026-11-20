@@ -238,7 +238,7 @@ export function RoundTimerSheet({ todaysConfig, live, selected, todaysSessionNam
               0:09 vanished, unasked and unsaid, the moment a round started. */}
           {timers.mode !== 'round' && timers.isActive && timers.elapsedMs > 0 && (
             <p className="mb-2 text-[0.75rem] leading-snug text-[color:var(--role-warn-text)]" data-testid="round-stops-stopwatch">
-              Starting this stops your {timers.mode === 'lap' ? 'lap timer' : 'stopwatch'} at {clock(timers.elapsedMs / 1000)}.
+              Starting this stops your {timers.mode === 'lap' ? 'lap timer' : timers.mode === 'countdown' ? 'timer' : 'stopwatch'} at {clock(timers.elapsedMs / 1000)}.
             </p>
           )}
           <button

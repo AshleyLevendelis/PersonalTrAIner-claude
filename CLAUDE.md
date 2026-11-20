@@ -1734,6 +1734,11 @@ menu" stays true when a copy is also left outside it.
 - **The exercise sheet is "About this exercise", tabs How to | Muscles | History (his report 20 Nov 2026)**: "How to do
   it" opened a sheet whose "Summary" tab was the muscle map. Each tab holds what its name says; the trend is on History.
   `test:exercise-detail`, `verify:exercise-video`
+- **The phone app (Capacitor), steps from the phone: his request 20 Nov 2026** ("Start on the App Store version with
+  step counting"): Profile, "Steps from your phone", phone app only; steps only, read only; the phone's count never
+  lowers a typed number. Android declares READ_STEPS alone: the plugin's 46 other health permissions are removed and
+  must stay removed unless the app starts reading that data. Phone-only code loads only in the phone app.
+  `test:phone-app`, `verify:health-steps`, `docs/plans/phone-app.md`. NOT BUILT natively yet: his machine
 
 ### His rulings of 17 Nov 2026
 - **The coach exam's judge is Fable 5.2: his ruling 17 Nov 2026, "Switch to Fable"** (over keeping Opus 5 and over
@@ -1977,7 +1982,12 @@ menu" stays true when a copy is also left outside it.
 - **The message box has ONE round button, the WhatsApp way** (his request 6 Nov 2026, with screenshots): the mic while
   the box is empty, send once there is text, the mic (as stop) while dictating. `verify:chat-composer` §2
 - **The chat names the coach "Trainer": "Both say Trainer"** (1 Nov 2026, from three options): the header and each
-  message's label, one name. `verify:chat-2b` 1g, `verify:chat-bubbles`
+  message's label, one name. `verify:chat-2b` 1g, `verify:chat-bubbles`. **PARTLY REVERSED 20 Nov 2026, his words:
+  "instead of trainer personal trainer change it to just Personal TrAIner"**: the header says only "Personal TrAIner",
+  and (his "Yes", the same day) so does each coach message's small label: one name everywhere in the chat. Phone
+  notifications are still titled "Trainer". And at his word the same day the header's "Sees
+  today's session, meals and logs" line and the pills under it ("Session done · 28 min", "1,971 kcal left", the set
+  count) are gone: "unnecessary". `verify:chat-2b` 1-3, `verify:chat-bubbles` (label, 1/1 mutation), `test:chat-2b` [1]
 - **The chat's session pill counts sets DONE: "Sets done"** (1 Nov 2026, over the design's "set 3 of 20"): "Legs · 2 of 20
   sets", the one count every screen says. `test:chat-2b`
 - **Offer words: "Mix"** — "Just today" / "Whole block" / "Keep <the exercise>" (the decline names what he keeps only on a

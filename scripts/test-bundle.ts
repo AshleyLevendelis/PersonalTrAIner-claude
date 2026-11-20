@@ -346,9 +346,13 @@ console.log('\n2b. The coach is not on the path to first paint')
   // sheet's editor is fetched when it opens, and the chat's half lives in its own file (allergy-chat.ts); that brought
   // 605 to 604, MEASURED through this gate, which is where the day's earlier meal work (new foods and plate rules in
   // the first chunk) had already left it: 596 on 17 Nov, 603 by this morning's sweep. 612 is 8 kB over today's 604.
-  headroom('first paint fetches', firstLoadGzip, 612, 'kB gzipped')
+  // MOVED 20 Nov 2026: 612 -> 620. Crossed at 612 by steps from the phone (Home reads the phone's count, Profile gains
+  // its row). Measured on a clean worktree of main that day: 611 with 1 kB printed as left; this change adds 580 bytes
+  // gzipped to the first chunk after the phone-only code was moved out of it (the plugin, the sync and the Profile
+  // sheet all load only inside the phone app). 620 is 8 kB over today's 612, the margin every move here has used.
+  headroom('first paint fetches', firstLoadGzip, 620, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 612, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 620, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))

@@ -22,7 +22,8 @@ import { momentFactsFrom, sendFactsAhead } from '@/lib/moment-facts'
 import { keepPhoneLinked } from '@/lib/push-link'
 import { loadDashboardCache, saveDashboardCache } from '@/lib/dashboard-cache'
 import { stepsTargetFor } from '@/lib/steps-target'
-import { getStepsForDate, logStepsManual, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, type DailyStepsRow } from '@/lib/steps-store'
+import { getStepsForDate, logStepsManual, isPlausibleStepCount, MAX_PLAUSIBLE_DAILY_STEPS, isPhoneApp, isHealthStepsConnected, stepsSourceLine, type DailyStepsRow } from '@/lib/steps-store'
+
 import { getLedgerSnapshot, subscribeMealStore, loggedEventsBySlot, type MealSlotName } from '@/lib/meal-store'
 import { Trophy, UtensilsCrossed, Activity, ChevronDown, Flame, Drumstick, Droplet, Footprints, CalendarDays, CalendarCheck, Play } from 'lucide-react'
 import { WeighInCard } from '@/components/WeighInCard'
@@ -378,6 +379,24 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [profile.id, activeSession.date, stepsVersion])
 
+  // STEPS FROM THE PHONE (20 Nov 2026): in the phone app with Health switched on, today's count is read when Home
+  // opens and whenever the app comes back to the front. Nothing happens in a browser or with it switched off.
+  useEffect(() => {
+    if (!profile.id || !activeSession.date || !isPhoneApp()) return
+    const id = profile.id, date = activeSession.date
+    let live = true
+    const pull = () => {
+      void import('@/lib/health-steps')
+        .then(m => m.syncStepsFromHealth(id, date))
+        .then(r => { if (live && r.status === 'saved') setSteps(r.row) })
+        .catch(() => { /* the ring keeps what it had */ })
+    }
+    pull()
+    const onVisible = () => { if (document.visibilityState === 'visible') pull() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => { live = false; document.removeEventListener('visibilitychange', onVisible) }
+  }, [profile.id, activeSession.date])
+
 
   if (!loading && loadError && !data) {
     return (
@@ -625,6 +644,9 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           <RingCell k="steps" share={stepsShare} color="var(--chart-4)" icon={<Footprints />} value={compactCount(stepsToday)} label="steps"
             onClick={() => setStepsOpen(o => !o)} ariaLabel={`Steps: ${stepsToday.toLocaleString()} of ${stepsTarget.toLocaleString()}. Tap to log today's steps.`} />
         </div>
+        {stepsSourceLine(steps) && (
+          <span className="mt-1.5 block text-right text-[0.6875rem] text-muted-foreground" data-home-steps-source>{stepsSourceLine(steps)}</span>
+        )}
         {stepsOpen && (
           <div className="mt-3 flex flex-col gap-1.5" data-home-steps-entry>
             <span className="flex items-center gap-2">
@@ -648,6 +670,11 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             <span className="text-[0.6875rem] leading-[1.35] text-muted-foreground/80">
               Target {stepsTarget.toLocaleString()}, from the activity level your calorie target uses — override it in your profile.
             </span>
+            {isHealthStepsConnected() && (
+              <span className="text-[0.6875rem] leading-[1.35] text-muted-foreground/80" data-home-steps-health-note>
+                Your phone counts your steps too. Whichever number is higher is kept.
+              </span>
+            )}
           </div>
         )}
         {stepsError && <span className="mt-1.5 block text-[0.6875rem] text-[color:var(--role-warn-text)]">{stepsError}</span>}

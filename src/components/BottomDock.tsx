@@ -154,6 +154,10 @@ export function BottomDock() {
               : roundStyleOf(timers.roundConfig) === 'emom' ? '' : ` · ${timers.currentPhase === 'work' ? 'Work' : 'Rest'}`
           } · ${formatDuration(timers.phaseRemainingMs ?? 0)}${!timers.running && !timers.isRoundComplete ? ' · Paused' : ''}`
         : 'Round timer')
+      : timers.mode === 'countdown'
+        // THE COUNTDOWN (20 Nov 2026): time left, and what state it is in.
+        ? (timers.isCountdownDone ? "Timer · Time's up"
+          : `Timer · ${formatDuration(timers.countdownRemainingMs ?? 0)}${timers.running ? '' : ' · Paused'}`)
       : `${timers.mode === 'lap' ? 'Lap' : 'Stopwatch'} · ${formatDuration(timers.elapsedMs)}`
     return (
       <div ref={dockRef} className="fixed left-4 right-4 z-50 md:left-auto md:right-4 md:w-96" style={bottomStyle}>

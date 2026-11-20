@@ -2,6 +2,79 @@
 
 Newest first. One line each.
 
+- [x] **THE CHAT HEADER, HIS REQUEST 20 Nov 2026**: "The session done and kcal left in the chat is unnecessary lets remove
+  thay and the text above 'sees todays session' remove that too. And instead of trainer personal trainer chamge it to
+  just Personal TrAIner." Done: the header is the avatar, "Personal TrAIner", clear and the gear; no line under the name,
+  no pills under the header. The mid-session pill ("Legs · 4 of 20 sets") went too: it was the same strip. Home, Exercise
+  and Nutrition still show all three numbers. Asked, then done on his "Yes": each coach message's small label says "Personal TrAIner" too
+  (his 1 Nov "Both say Trainer" covered both, so it was asked rather than guessed). Still "Trainer": the phone
+  notifications' title (the coach's server writes it; it would need the `coach-reach-out` deploy), named for him.
+  Removed with it: the strip's builder (`chatContextPills`); its calorie wording stays (the coach's today numbers use it).
+  CHECKS: `test:chat-2b` [1] rewritten (strip and line absent, one name, the calorie words), [2] and [5] removed with their
+  subject; `test:chat-extras` 3 removed (the done pill); `test:coach-screen-numbers` re-anchored (the coach's reader is
+  the one left); `verify:chat-2b` 1-3 re-anchored on three days (pills absent, one name, no live line), 3/3 mutations
+  caught (the old name, the live line, a pill strip); `verify:chat-bubbles` header checks re-anchored (64px row, no
+  strip); `verify:live-set-count` lost its chat checks (the chat no longer counts sets; the Exercise checks stay).
+  `test:bundle` passes with 1 kB left on the combined ceiling.
+
+- [x] **FOUR FROM HIS GYM DAY, 20 Nov 2026** ("Chat has stopped working", the round timer from a distance, "a normal
+  timer", and "prescribed me sets of 15 which I logged all 15 but the summary says I was short of 18").
+  1. CHAT DOWN: NOT FIXED, NOT YET DIAGNOSED. Every message ends "Response failed — tap to retry", which the app shows
+     for ANY failure of the coach's server (crash, 45 s timeout, Gemini refusal, spend cap). This session cannot read
+     the function's logs: the network blocks the project and the Supabase connector is not signed in. Checked here and
+     ruled out: every server file parses (`test:functions-parse`), every local import of the coach's function exists,
+     and the app's own send path is unchanged since the last working version. The deploy from `main` earlier the same
+     day is the first suspect, not proven. `docs/handover/chat-down-2026-11-20.md` is the prompt for his machine (read
+     the logs, list the function and its secret names, call it once, report the error word for word).
+  2. THE ROUND, READABLE FROM THE FLOOR. The full-screen field said "ROUND 8 OF 10" as a 12px label over a 104px clock.
+     While a round runs it now draws the number at 88px with "of 10" beside it; the countdown and the end keep their
+     label (no number to show). The pips, subline and clock are unchanged.
+  3. A COUNTDOWN TIMER, the fourth Tools tile ("Timer · Counts down from a time you set"; the tiles go two by two).
+     Minute chips start at once (1, 2, 3, 5, 10, 15, 20, 30); minutes and seconds can be typed, the Start button
+     naming the time. Built into the existing timer engine as a new mode, so it keeps time through a locked phone and a
+     reload (same anchor as the stopwatch), keeps the screen awake, beeps and buzzes at zero by the round timer's own
+     switches, and shows in the dock off Tools ("Timer · 4:12", "Paused", "Time's up"). Done offers "Again · 5:00". The
+     coach's map of Tools names it (needs the `chat-gemini` deploy to know). Mine: no full-screen view yet (the clock is
+     64-96px in the sheet); the coach's timer button does not start a countdown yet.
+  4. THE "SHORT OF 18" NOTE. The 19 Nov fix named the range but still read as a miss: "your range is 15-18 reps, and not
+     every set reached 18". The line is only reached when every set got at least the bottom of the range, which is
+     what the boxes ask for, so it now credits that first: "Same 40kg next time — every set got its 15+ reps. Add a rep
+     where you can: 18 on every set moves the weight up." CSCS: unchanged rule (double progression, the weight rises
+     when every set reaches the top); only the words changed, and they no longer call the prescribed work a shortfall.
+     The summary's "14/14 planned sets" was already right.
+  CHECKS: `test:lift-effort` R2 re-anchored on credit-plus-target and R2b added (never "not every set", "short of",
+  "didn't hit"), 2/2 mutations caught. `verify:countdown-timer` NEW (16 checks: R1-R4 the big round number, C1-C11 the
+  countdown), 8/8 mutations caught (one only after C6b was added: a finished timer that never stopped would have kept
+  the screen awake). `verify:tools-timer` 1a and `verify:tools-2a` 1c, 1g re-anchored to four tiles.
+  RUN: 420 checks that read the changed files or draw the changed screens: 411 pass. Of the 9: `test:meal-quality` and
+  `verify:rls` need the live database; `coach-exam:grade` fails the same on the commit before (2 stored transcripts
+  breach a rule; needs an exam run on his machine); six were this work and are fixed: the coach's description of Tools
+  had a second copy to keep in step (`test:coach-rules-sync`), the phone app's steps switch had never been classified
+  for New Plan (`test:reset-clears-draft`; kept, it is the phone's permission), three checks counted three tiles, two
+  cues or no grid (`test:round-setup`, `test:tools-grid`, `verify:tools-2a` 1g), and `test:bundle` was 2 kB over the
+  combined ceiling, back under (1 kB left) once the chat's pill strip was removed. Ceiling not raised.
+
+- [x] **THE PHONE APP, WITH STEPS FROM THE PHONE: his request 20 Nov 2026, "Start on the App Store version with step
+  counting".** The web app inside a Capacitor 8 shell (`ios/`, `android/`), and one native feature: Profile, "Steps from
+  your phone" reads today's step count from Apple Health / Health Connect and Home's ring fills itself, "From Apple
+  Health" under it. Plan and decisions: `docs/plans/phone-app.md`; first build on his machine:
+  `docs/handover/phone-app-first-build.md`.
+  DECISIONS (mine): the phone's count never lowers a number he typed (the higher is kept, and the open box says so);
+  steps only, read only; the switch lives on the phone; an iPhone's finished sheet counts as on, because Apple never
+  reports a refused read (the sheet says where to look if the count stays 0).
+  FOUND ON THE WAY: the health plugin declares read AND write for 46 kinds of health data; Google Play refuses unused
+  health permissions, so all but READ_STEPS are removed, checked against the plugin's own manifest. Android's minimum
+  had to go to 8 (Health Connect). The offline helper is not started in the phone app.
+  SIZE: the website's first download grew 580 bytes (611 -> 612 kB) after every phone-only piece was moved to load only
+  in the phone app; the ceiling moved 612 -> 620 with the measurement written beside it.
+  CHECKS: `test:phone-app` (31, 9/9 mutations), `verify:health-steps` (22, 11/11 meaningful mutations; one control
+  mutation that changes nothing read MISSED, as it should). Re-anchored: none. `test:bundle`, `test:no-dead-code`,
+  `test:profile-groups` pass after fixes they found (the ceiling; two test-only exports; a sheet body shape).
+  NOT PROVEN: any native build (no Xcode or Android Studio here), real permission sheets, real counts. NOT BUILT: store
+  listings, icons, native push, the privacy page's contact line (the page is a DRAFT for his approval), the final app id.
+  RUN: 286 checks that read the changed files or draw Home and Profile (every whole-app driver included): 285 pass;
+  the one failure is `test:meal-quality`, which needs the live database ("VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY must be set").
+
 - [x] **TWO MORE OF HIS, 20 Nov 2026: "Build the account row", and the exercise sheet's labels.**
   1. PROFILE, ACCOUNT, "EMAIL & SIGN-IN". He asked whether his progress was safe with no email. The app signs everyone
      in anonymously and asks for an email once a week, snoozable, with nowhere else to give one; and anyone who signs in

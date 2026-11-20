@@ -51,67 +51,32 @@ await send('Page.addScriptToEvaluateOnNewDocument', { source: `
   }
 ` })
 
-const STRIP = String.raw`(() => {
-  const s = document.querySelector('[data-testid="chat-context-strip"]')
-  const pills = s ? [...s.querySelectorAll('[data-context-pill]')].map(p => {
-    const r = p.getBoundingClientRect()
-    return { kind: p.getAttribute('data-context-pill'), text: p.textContent.replace(/\s+/g, ' ').trim(), button: p.tagName === 'BUTTON', h: Math.round(r.height) }
-  }) : []
-  return { present: !!s, pills }
-})()`
-const strip = () => ev(STRIP)
 const loaded = () => until(() => ev(`!!document.querySelector('textarea')`), v => v === true, 60)
 
-// 1. MID-SESSION, with a breakfast eaten.
-console.log('\n1. Mid-session')
-await go('&day=mid&ate=1')
-check('1a. the chat is up', (await loaded()) === true)
-const ds = await until(() => ev('window.__dayState ?? null'), v => !!v, 40)
-const mid = await until(strip, v => v?.pills?.some(p => p.kind === 'session') && v.pills.some(p => p.kind === 'kcal'), 60)
-const sessionPill = mid?.pills?.find(p => p.kind === 'session')
-const kcalPill = mid?.pills?.find(p => p.kind === 'kcal')
-check('1b. the strip shows the session pill: its focus, then "2 of N sets" — the sets logged, Home\'s count',
-  !!sessionPill && / · 2 of \d+ sets$/.test(sessionPill.text) && sessionPill.button, sessionPill)
-const wantKcal = ds && ds.target ? `${Math.round(ds.target - ds.eaten).toLocaleString()} kcal left` : 'NO-TARGET'
-check(`1c. the calorie pill is the target less what was eaten, in Nutrition's words: "${wantKcal}"`, kcalPill?.text === wantKcal, { kcalPill, ds })
-check('1d. both pills are 32px tall', !!sessionPill && !!kcalPill && sessionPill.h === 32 && kcalPill.h === 32, [sessionPill?.h, kcalPill?.h])
-await ev(`[...document.querySelectorAll('[data-context-pill="session"]')][0]?.click()`)
-check('1e. tapping the session pill opens Exercise', (await ev('location.hash')) === '#/tab/exercise', await ev('location.hash'))
-await ev(`[...document.querySelectorAll('[data-context-pill="kcal"]')][0]?.click()`)
-check('1f. tapping the calorie pill opens Nutrition', (await ev('location.hash')) === '#/tab/nutrition', await ev('location.hash'))
+// 1-3. NO CONTEXT STRIP, AND ONE NAME (his request 20 Nov 2026: "The session done and kcal left in the chat is unnecessary
+// ... the text above 'sees todays session' remove that too ... change it to just Personal TrAIner"). Asked on the three
+// days that used to draw pills: mid-session with food eaten, a finished session, a rest day.
 const HEAD = String.raw`(() => {
-  const a = document.querySelector('[data-testid="chat-header-avatar"]'), live = document.querySelector('[data-testid="chat-header-live"]')
+  const a = document.querySelector('[data-testid="chat-header-avatar"]')
   const h = document.querySelector('[data-testid="chat-header"] h2')
-  return { avatar: a ? Math.round(a.getBoundingClientRect().width) : 0, live: live ? live.textContent.trim() : null, title: h ? h.textContent.trim() : null, sub: h?.parentElement?.querySelector('p')?.textContent.trim() ?? null }
+  const hd = document.querySelector('[data-testid="chat-header"]')
+  return { avatar: a ? Math.round(a.getBoundingClientRect().width) : 0, title: h ? h.textContent.trim() : null,
+    live: !!document.querySelector('[data-testid="chat-header-live"]') || /Sees today/.test(hd?.textContent ?? ''),
+    pills: document.querySelectorAll('[data-context-pill]').length, strip: !!document.querySelector('[data-testid="chat-context-strip"]'),
+    text: (hd?.textContent ?? '').replace(/\s+/g, ' ').trim() }
 })()`
-const head = await ev(HEAD)
-check('1g. the header: a 36px avatar, the names ("Trainer", her 1 Nov ruling, and "Personal TrAIner"), and the live line',
-  head?.avatar === 36 && head?.title === 'Trainer' && head?.sub === 'Personal TrAIner' && head?.live === "Sees today's session, meals and logs", head)
-await ev(`location.hash = ''`)
-await wait(300)
-await keep('mid-session')
-
-// 2. SESSION DONE.
-console.log('\n2. Session done')
-await go('&day=done')
-await loaded()
-const done = await until(strip, v => v?.pills?.some(p => p.kind === 'done'), 60)
-const donePill = done?.pills?.find(p => p.kind === 'done')
-// Since 17 Nov 2026 (the chat review, "Tapping Session done opens Exercise") the done pill is a button like the others.
-check('2a. "Session done · 52 min", the measured minutes, and a tap opens Exercise', donePill?.text === 'Session done · 52 min' && donePill?.button === true, donePill)
-check('2b. ...and no mid-session pill beside it', !!done && !done.pills.some(p => p.kind === 'session'), done?.pills)
-check('2c. the calorie pill is still there (nothing eaten: the whole target left)', done?.pills?.find(p => p.kind === 'kcal')?.text === (ds?.target ? `${Math.round(ds.target).toLocaleString()} kcal left` : 'x'), done?.pills)
-await keep('session-done')
-
-// 3. REST DAY.
-console.log('\n3. Rest day')
-await go('&day=rest&ate=1')
-await loaded()
-const rest = await until(strip, v => v?.pills?.some(p => p.kind === 'kcal'), 60)
-await wait(1500)
-const rest2 = await strip()
-check('3a. on a rest day there is no workout pill at all', !!rest && rest2.pills.every(p => p.kind === 'kcal') && rest2.pills.length === 1, rest2?.pills)
-await keep('rest-day')
+for (const [n, q, name] of [['1', '&day=mid&ate=1', 'mid-session'], ['2', '&day=done', 'session-done'], ['3', '&day=rest&ate=1', 'rest-day']]) {
+  console.log(`\n${n}. ${name}`)
+  await go(q)
+  check(`${n}a. the chat is up`, (await loaded()) === true)
+  await wait(2500)
+  const head = await ev(HEAD)
+  check(`${n}b. no pills under the header ("Session done", "kcal left", the set count)`, head?.strip === false && head?.pills === 0 && !/kcal left|kcal over|Session done|of \d+ sets/.test(head?.text ?? ''), head)
+  check(`${n}c. the header says "Personal TrAIner" once, with no "Trainer" and no "Sees today's..." line`,
+    head?.title === 'Personal TrAIner' && head?.live === false && !/\bTrainer\b/.test((head?.text ?? '').replace('Personal TrAIner', '')), head)
+  check(`${n}d. ...and the avatar is still 36px`, head?.avatar === 36, head?.avatar)
+  await keep(name)
+}
 
 // 4. AN OFFER: the sentence, the preview, the weighted pills on the same scopes.
 console.log('\n4. A swap offer')
