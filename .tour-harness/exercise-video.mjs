@@ -84,11 +84,16 @@ const rows = await order()
 const name = rows?.[1] ?? rows?.[0] ?? null
 checkCounted('0. today shows exercises', !!name, rows)
 const opened = (await openRowMenu(name ?? '')) === 'open'
-  && await ev(`(() => { const i = [...document.querySelectorAll('[role="menuitem"]')].find(n => /How to do it/.test(n.textContent)); if (!i) return false; i.click(); return true })()`)
+  && await ev(`(() => { const i = [...document.querySelectorAll('[role="menuitem"]')].find(n => /About this exercise/.test(n.textContent)); if (!i) return false; i.click(); return true })()`)
 await wait(900)
+// Read BEFORE any tab is tapped: the menu item must land on How to by itself (his 20 Nov report).
+const landed = await ev(`document.querySelector('[role="tab"][data-state="active"]')?.textContent?.trim() ?? null`)
+const tabNames = await ev(`[...document.querySelectorAll('[role="tab"]')].map(n => n.textContent.trim()).join('|')`)
+checkCounted('1a. "About this exercise" lands on How to without a tap', opened && landed === 'How to', { opened, landed })
+checkCounted('1b. the tabs read How to | Muscles | History (no "Summary")', tabNames === 'How to|Muscles|History', tabNames)
 const tab = await ev(`(() => { const t = [...document.querySelectorAll('[role="tab"]')].find(n => n.textContent.trim() === 'How to'); if (!t) return false; t.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })); t.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })); t.click(); return true })()`)
 await wait(600)
-checkCounted('1. "How to do it" opens the How to tab', opened && tab && (await ev(`document.querySelector('[role="tab"][data-state="active"]')?.textContent?.trim() ?? null`)) === 'How to')
+checkCounted('1. the How to tab is showing', opened && tab && (await ev(`document.querySelector('[role="tab"][data-state="active"]')?.textContent?.trim() ?? null`)) === 'How to')
 const link = await ev(`(() => { const a = document.querySelector('[data-testid="howto-video-search"]'); if (!a) return null; const r = a.getBoundingClientRect(); return { text: a.textContent.trim(), href: a.href, target: a.target, rel: a.rel, h: Math.round(r.height), top: Math.round(r.top), bottom: Math.round(r.bottom), vh: innerHeight } })()`)
 checkCounted('2a. a "Find a video on YouTube" button', link?.text === 'Find a video on YouTube', link)
 checkCounted('2b. ...a YouTube search for THIS exercise\'s form', link?.href === `https://www.youtube.com/results?search_query=${encodeURIComponent(`${name} exercise form tutorial`)}`, { href: link?.href, name })

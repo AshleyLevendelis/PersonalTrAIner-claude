@@ -242,7 +242,17 @@ if (new URLSearchParams(location.search).get('remembers') === '1') {
     resolved_refs: [], retired_at: null, created_at: '2026-09-20T10:00:00.000Z',
   })
 }
-setSupabaseClient(makeFakeSupabase(db) as never)
+// The Account row (20 Nov 2026): ?account=none|saved|confirming|unknown, ?confirm=1 for a project that asks for
+// the address to be confirmed. Default (no param) is no signed-in user, the page as it always was.
+const ACCOUNT = new URLSearchParams(location.search).get('account')
+const ACCOUNT_USER = ACCOUNT === 'saved' ? { id: 'u1', email: 'sam@example.com' }
+  : ACCOUNT === 'confirming' ? { id: 'u1', email: null, new_email: 'sam@example.com' }
+  : ACCOUNT === 'none' ? { id: 'u1', email: null }
+  : null
+setSupabaseClient(makeFakeSupabase(db, {
+  ...(ACCOUNT_USER ? { session: { user: ACCOUNT_USER } } : {}),
+  confirmEmail: new URLSearchParams(location.search).get('confirm') === '1',
+}) as never)
 // Read back by reminders.mjs: what the screen WROTE, not what it shows.
 ;(window as unknown as { __fakeDb: Db }).__fakeDb = db
 

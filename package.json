@@ -706,7 +706,8 @@
     "test:meal-photos": "tsx scripts/test-meal-photos.ts",
     "test:chat-speed": "tsx scripts/test-chat-speed.ts",
     "test:coach-actions": "tsx scripts/test-coach-actions.ts",
-    "verify:chat-real-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-real-day.mjs"
+    "verify:chat-real-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/chat-real-day.mjs",
+    "verify:account-row": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/account-row.mjs"
   },
   "dependencies": {
     "@radix-ui/react-label": "^2.1.4",

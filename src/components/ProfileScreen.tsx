@@ -91,6 +91,8 @@ import { checkWeighIn, profileWeightQuestionText, weighInYesLabel, WEIGH_IN_NO_L
 // push plumbing are needed by nobody on first paint (test:bundle holds the
 // main chunk to a budget, and this was the kilobyte that crossed it).
 const BanExerciseSheet = lazyWithReload(() => import('@/components/exercise/BanExerciseSheet').then(m => ({ default: m.BanExerciseSheet })))
+import { AccountSection } from '@/components/AccountSection'
+import { accountRowValue, readAccountStatus, type AccountStatus } from '@/lib/auth'
 const RemindersSection = lazyWithReload(() => import('@/components/RemindersSection').then(m => ({ default: m.RemindersSection })))
 
 const GENDER_OPTIONS = [{ value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }]
@@ -254,13 +256,13 @@ type ProfileSheet =
   | 'body' | 'goal' | 'injuries'
   | 'schedule' | 'equipment' | 'lifts' | 'style' | 'exavoid'
   | 'allergies' | 'diet' | 'likes' | 'avoid' | 'meals'
-  | 'tone' | 'remembers' | 'appearance' | 'reminders'
+  | 'tone' | 'remembers' | 'appearance' | 'reminders' | 'account'
 
 const SHEET_TITLE: Record<ProfileSheet, string> = {
   body: 'Height & weight', goal: 'Goal', injuries: 'Injuries',
   schedule: 'Schedule', equipment: 'Equipment', lifts: 'Known lifts', style: 'Style & recovery', exavoid: 'Exercises to avoid',
   allergies: 'Allergies', diet: 'Diet', likes: 'Foods you like', avoid: 'Foods to avoid', meals: 'Meals & shopping',
-  tone: 'Reply speed', remembers: 'What your Personal TrAIner remembers', appearance: 'Appearance', reminders: 'Reminders',
+  tone: 'Reply speed', remembers: 'What your Personal TrAIner remembers', appearance: 'Appearance', reminders: 'Reminders', account: 'Account',
 }
 
 /** A deep link names a section; this is the sheet that holds it, so its scroll still lands. */
@@ -1146,6 +1148,13 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
   // before, on a page of their own. A deep link (initialSection) opens the
   // sheet holding the section it scrolls to, so the scroll still lands.
   const [sheet, setSheet] = useState<ProfileSheet | null>(null)
+  // Account row (20 Nov 2026): read once on open; a save inside the sheet hands back the new state.
+  const [account, setAccount] = useState<AccountStatus | null>(null)
+  useEffect(() => {
+    let live = true
+    void readAccountStatus().then(st => { if (live) setAccount(st) })
+    return () => { live = false }
+  }, [])
   // THE PHONE'S BACK (the Profile walk, 18 Nov 2026): Profile is a layer and a sheet is a layer over it, so Back closes
   // the sheet, then Profile, where it used to leave the tab or the app. Profile first, so the sheet is the top layer.
   useBackCloses(open, () => onOpenChange(false))
@@ -2077,6 +2086,9 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
         <AppearanceSection appearance={appearance} />
         </>
       )
+      case 'account': return (
+        <AccountSection status={account} onChanged={setAccount} onClose={() => setSheet(null)} />
+      )
       case 'reminders': return (
         <>
         {profile.id && <Suspense fallback={null}><RemindersSection profileId={profile.id} onSummary={setRemindersValue} /></Suspense>}
@@ -2164,6 +2176,10 @@ export function ProfileScreen({ open, onOpenChange, profile, latestWeightKg, onP
                 </div>
               ))}
             </div>
+
+            <ProfileGroup label="Account">
+              <SheetRow label="Email & sign-in" value={accountRowValue(account)} onOpen={() => setSheet('account')} />
+            </ProfileGroup>
 
             <ProfileGroup label="Body & goals">
               <SheetRow label="Height & weight" value={[profile.height_cm ? `${profile.height_cm} cm` : null, nowKg != null ? `${nowKg} kg` : null].filter(Boolean).join(' · ') || 'Not set'} onOpen={() => setSheet('body')} />

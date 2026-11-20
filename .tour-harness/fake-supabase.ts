@@ -171,7 +171,7 @@ const rejectAsPostgres = (tableName: string, v: { column: string; value: number 
  * ensureSignedIn, and a per-client delay so the fixture can be laid down with none and then read with ?slow.
  * Every other page passes nothing and gets exactly what it always got.
  */
-export function makeFakeSupabase(db: Db, opts: { session?: { user: { id: string; email: string | null } }; slowMs?: number; alwaysUp?: boolean } = {}) {
+export function makeFakeSupabase(db: Db, opts: { session?: { user: { id: string; email: string | null; new_email?: string | null } }; slowMs?: number; alwaysUp?: boolean; confirmEmail?: boolean } = {}) {
   const down = () => !opts.alwaysUp && netDown()
   const slowMs = opts.slowMs ?? SLOW_MS
   const wait = () => (slowMs > 0 ? new Promise<void>(r => setTimeout(r, slowMs)) : Promise.resolve())
@@ -380,6 +380,17 @@ export function makeFakeSupabase(db: Db, opts: { session?: { user: { id: string;
       // Read from the phone, no round trip, as the real client does while its token is fresh.
       getSession: async () => ({ data: { session: opts.session ?? null }, error: null }),
       signInAnonymously: async () => (await wait(), { data: { user: opts.session?.user ?? null }, error: null }),
+      // The Account row (20 Nov 2026). A project that asks for the address to be confirmed holds it as new_email
+      // until the link is tapped; one that does not sets email at once. Writes into the session's own user, so a
+      // later getUser reads what the save did, as the real client does.
+      updateUser: async (attrs: { email?: string; password?: string }) => {
+        await wait()
+        const user = opts.session?.user
+        if (!user) return { data: { user: null }, error: { message: 'Auth session missing!' } }
+        if (attrs.email) { if (opts.confirmEmail) user.new_email = attrs.email; else user.email = attrs.email }
+        ;(window as unknown as { __authWrites?: unknown[] }).__authWrites = [...((window as unknown as { __authWrites?: unknown[] }).__authWrites ?? []), attrs]
+        return { data: { user }, error: null }
+      },
     },
     // claim_profile and friends: one round trip, "yes".
     rpc: async () => (await wait(), down() ? DEAD() : { data: true, error: null }),

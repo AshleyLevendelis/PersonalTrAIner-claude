@@ -85,19 +85,34 @@ check('an unknown exercise is admitted, not rendered blank', /isn&apos;t in the 
 check('it says what it is not — cues are a reminder, not coaching',
   /reminders, not coaching/.test(panel) && /reason to stop/.test(panel))
 // The panel must survive the real data for every entry.
+// EACH TAB HOLDS WHAT ITS NAME SAYS (his report 20 Nov 2026: "Summary" showed the muscles it targets, and "How to
+// do it" opened a sheet that also held the muscles and a history). Read off the rendered tabs, one slice each.
+const tabBody = (v: string) => { const m = panel.match(new RegExp(`<TabsContent value="${v}"[\\s\\S]*?</TabsContent>`)); return m ? m[0] : '' }
+const triggers = [...panel.matchAll(/<TabsTrigger value="(\w+)">([^<]+)</g)].map(m => [m[1], m[2].trim()])
+check('the tabs read How to, Muscles, History, in that order (the menu lands on the first)',
+  JSON.stringify(triggers) === JSON.stringify([['howto', 'How to'], ['summary', 'Muscles'], ['history', 'History']]), triggers)
+check('no tab is called "Summary"', !/>\s*Summary\s*</.test(panel))
+check('the Muscles tab holds the map and nothing about history or the movement',
+  /<MuscleMap/.test(tabBody('summary')) && !/ExerciseStrengthChart|trendLabel|demo_video_id|coach_note_swap|form_cues|demo_image/.test(tabBody('summary')))
+check('the trend is on History with the PRs and sessions',
+  /ExerciseStrengthChart/.test(tabBody('history')) && /trendLabel/.test(tabBody('history')) && /formatCompletedSummary/.test(tabBody('history')))
+check('How to holds the demonstration, the checked video, why it is in the plan and the cues',
+  /demo_image/.test(tabBody('howto')) && /demo_video_id/.test(tabBody('howto')) && /coach_note_swap/.test(tabBody('howto')) && /form_cues/.test(tabBody('howto')))
+check('...and the tab bodies were found (a missing slice cannot pass the checks above vacuously)',
+  tabBody('howto').length > 500 && tabBody('summary').length > 50 && tabBody('history').length > 500)
 const sample = getExerciseEntry('Deadlifts')
 check('a known lift resolves with cues', !!sample && sample.form_cues.length >= 3, sample?.form_cues)
 
 console.log('\n3. It is reachable — from BOTH menus\n')
 check('ExerciseTab owns one instance', /<ExerciseDetailDialog/.test(tab) && /detailTarget/.test(tab))
-check("today's session menu opens it", /onOpenDetail\(ex\.name\)/.test(row) && /How to do it/.test(row))
+check("today's session menu opens it", /onOpenDetail\(ex\.name\)/.test(row) && /About this exercise/.test(row))
 // THE MENU MOVED, AND THIS CHECK MOVED WITH IT. It read PeekPanel, which no
 // longer draws its own menu — every browse surface renders through
 // ReadOnlyDayList now, so the peek's copy went with the table it was fixing.
 // Reading the old file went red for a feature that works, so assert the menu
 // where it lives AND the prop threading that reaches it, rather than either
 // half alone.
-check('the shared browse menu opens it', /onOpenDetail\(ex\.name\)/.test(dayList) && /How to do it/.test(dayList))
+check('the shared browse menu opens it', /onOpenDetail\(ex\.name\)/.test(dayList) && /About this exercise/.test(dayList))
 check('...and the peek threads the prop into that menu',
   /onOpenDetail=\{onOpenDetail\}/.test(peek))
 // REVERSED 5 Sep 2026, and the old text is kept so the reversal is legible.
@@ -179,7 +194,7 @@ check('...and the ranked list still has its own', /\{note\}/.test(swap))
   }
   // The two menu items must land on DIFFERENT tabs, or merging them threw
   // away the thing that made them two items in the first place.
-  check('"How to do it" opens the technique tab', /tab: 'howto'/.test(tab))
+  check('"About this exercise" opens the technique tab', /tab: 'howto'/.test(tab))
   check('...and the history item opens the history tab', /tab: 'history'/.test(tab))
 }
 

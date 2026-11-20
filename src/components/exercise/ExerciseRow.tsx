@@ -388,7 +388,7 @@ function ExerciseMenu({ ex, onOpenDetail, onOpenHistory, onSwap, onMove, canMove
         {onOpenDetail && (
           <DropdownMenuItem onClick={() => onOpenDetail(ex.name)}>
             <BookOpen className="size-3.5" />
-            How to do it
+            About this exercise
           </DropdownMenuItem>
         )}
         {onOpenHistory && (

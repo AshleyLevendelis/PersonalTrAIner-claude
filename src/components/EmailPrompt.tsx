@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { attachEmail, snoozeEmailPrompt } from '@/lib/auth'
+import { attachEmail, readAccountStatus, snoozeEmailPrompt, type AccountStatus } from '@/lib/auth'
 
 // ---------------------------------------------------------------------------
 // "Add an email so you don't lose this" — asked, not demanded.
@@ -31,21 +31,87 @@ import { attachEmail, snoozeEmailPrompt } from '@/lib/auth'
 // migrated, re-keyed or at risk of being orphaned by the attempt.
 // ---------------------------------------------------------------------------
 
-export function EmailPrompt({ onClose }: { onClose: () => void }) {
+/**
+ * The email and password boxes, shared by the prompt and Profile's Account row so the two cannot drift.
+ * `onSaved` gets the account as read back AFTER the save: a project that asks for the address to be confirmed
+ * holds it as pending, and the words must say so rather than "you're all set".
+ */
+export function AttachEmailForm({ secondary, onSaved }: {
+  secondary: { label: string; onClick: () => void }
+  onSaved: (status: AccountStatus, email: string) => void
+}) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [done, setDone] = useState(false)
 
   const save = async () => {
     setSaving(true)
     setError(null)
     const result = await attachEmail(email, password)
+    if (!result.ok) { setSaving(false); setError(result.error ?? 'That did not work.'); return }
+    const status = await readAccountStatus()
     setSaving(false)
-    if (!result.ok) { setError(result.error ?? 'That did not work.'); return }
-    setDone(true)
+    onSaved(status, email.trim())
   }
+
+  return (
+    <>
+      <div className="space-y-3">
+        <div className="space-y-1.5">
+          <Label htmlFor="account-email">Email</Label>
+          <Input
+            id="account-email"
+            type="email"
+            autoComplete="email"
+            inputMode="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="account-password">Password</Label>
+          <Input
+            id="account-password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="At least 8 characters"
+          />
+        </div>
+      </div>
+
+      {error && <p role="alert" className="text-sm text-destructive break-words">{error}</p>}
+
+      <div className="flex gap-2">
+        {/* Equal weight, on purpose. A dismissal that looks like a
+            mistake is not really a dismissal. */}
+        <Button variant="outline" className="flex-1 min-h-[44px]" onClick={secondary.onClick} disabled={saving}>
+          {secondary.label}
+        </Button>
+        <Button className="flex-1 min-h-[44px]" onClick={save} disabled={saving || !email || !password} data-account-save>
+          {saving ? 'Saving...' : 'Save it'}
+        </Button>
+      </div>
+    </>
+  )
+}
+
+/** What the account is, after a save, in his words. One sentence for each state, shared by both surfaces. */
+export function savedAccountLine(status: AccountStatus, typed: string): string {
+  if (status.kind === 'saved') {
+    return `Your plan and history are now tied to ${status.email}. To get back in on a new phone, or if this browser ever clears itself, open the app and tap "Already have an account? Sign in".`
+  }
+  if (status.kind === 'confirming') {
+    return `We've sent a link to ${status.email}. Tap it to finish: until you do, the email isn't saved and your progress still lives only on this phone.`
+  }
+  return `Saved, but the app couldn't check it just now. Open Profile, Account, to see whether ${typed} is on your account.`
+}
+
+export function EmailPrompt({ onClose }: { onClose: () => void }) {
+  const [done, setDone] = useState<{ status: AccountStatus; email: string } | null>(null)
 
   const notNow = () => {
     snoozeEmailPrompt()
@@ -62,11 +128,8 @@ export function EmailPrompt({ onClose }: { onClose: () => void }) {
       <div className="w-full max-w-md rounded-lg border bg-background p-5 space-y-4">
         {done ? (
           <>
-            <h2 id="email-prompt-title" className="text-lg font-semibold">You're all set</h2>
-            <p className="text-sm text-muted-foreground">
-              Your plan and history are now tied to {email}. You can sign in with it on another
-              phone, or get back in if this browser ever clears itself.
-            </p>
+            <h2 id="email-prompt-title" className="text-lg font-semibold">{done.status.kind === 'confirming' ? 'Nearly there' : "You're all set"}</h2>
+            <p className="text-sm text-muted-foreground">{savedAccountLine(done.status, done.email)}</p>
             <Button className="w-full" onClick={onClose}>Back to my plan</Button>
           </>
         ) : (
@@ -79,47 +142,9 @@ export function EmailPrompt({ onClose }: { onClose: () => void }) {
               browser. If it clears its storage, or you get a new phone, there's no way to get
               them back. An email fixes that. Nothing changes about your plan.
             </p>
-
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="account-email">Email</Label>
-                <Input
-                  id="account-email"
-                  type="email"
-                  autoComplete="email"
-                  inputMode="email"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="account-password">Password</Label>
-                <Input
-                  id="account-password"
-                  type="password"
-                  autoComplete="new-password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                />
-              </div>
-            </div>
-
-            {error && <p role="alert" className="text-sm text-destructive break-words">{error}</p>}
-
-            <div className="flex gap-2">
-              {/* Equal weight, on purpose. A dismissal that looks like a
-                  mistake is not really a dismissal. */}
-              <Button variant="outline" className="flex-1" onClick={notNow} disabled={saving}>
-                Not now
-              </Button>
-              <Button className="flex-1" onClick={save} disabled={saving || !email || !password}>
-                {saving ? 'Saving...' : 'Save it'}
-              </Button>
-            </div>
+            <AttachEmailForm secondary={{ label: 'Not now', onClick: notNow }} onSaved={(status, email) => setDone({ status, email })} />
             <p className="text-xs text-muted-foreground text-center">
-              We'll ask again in a week. Nothing is locked either way.
+              We'll ask again in a week, or add it any time on Profile, under Account.
             </p>
           </>
         )}

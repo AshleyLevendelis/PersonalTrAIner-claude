@@ -115,13 +115,17 @@ export function ExerciseDetailPanel({
   return (
     <Tabs value={tab} onValueChange={v => setTab(v as ExerciseDetailTab)}>
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="summary">Summary</TabsTrigger>
-            <TabsTrigger value="history">History</TabsTrigger>
+            {/* NAMED FOR WHAT EACH HOLDS (his report 20 Nov 2026: "Summary" showed the muscles it targets, and the menu
+                item "How to do it" opened a sheet that also held the muscles and a history). How to holds the
+                movement (demonstration, video, why it is in the plan, cues); Muscles holds the map; History holds every
+                number about how it has gone, the trend included. The menu item that opens it is "About this exercise". */}
             <TabsTrigger value="howto">How to</TabsTrigger>
+            <TabsTrigger value="summary">Muscles</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
           </TabsList>
 
           {/* ---------------------------------------------------------------
-              SUMMARY — what it trains, and how it has gone.
+              MUSCLES — what it trains (the tab's key stays 'summary' so old links land).
               --------------------------------------------------------------- */}
           <TabsContent value="summary" className="mt-4 space-y-4">
             {!entry ? (
@@ -141,86 +145,17 @@ export function ExerciseDetailPanel({
                     right above it) and as nonsense on Burpees ("Primary:
                     Cardiovascular system"). The map's own caption lists all of
                     them, which is both honest and not a repeat. */}
-                {/* THE DEMONSTRATION, WHERE ONE HAS BEEN LICENSED AND
-                    SELF-HOSTED. Guarded on the field exactly as the video is
-                    below: no image, no slot, never a broken frame. The muscle
-                    map stays underneath and is what every exercise gets — it
-                    is the fallback, not the thing being replaced.
-
-                    Served from our own origin (public/exercise-demos/), so
-                    sw.js caches it on first view and it survives a gym with no
-                    signal. That property is the whole reason the 5 Sep
-                    decision went to hand-rolled SVG rather than a bought set;
-                    self-hosting is what buys it back. */}
-                {entry.demo_image && (
-                  <figure className="space-y-1.5">
-                    <div className="overflow-hidden rounded-xl" style={{ background: 'var(--surface-deep)' }}>
-                      <img
-                        src={`/exercise-demos/${entry.demo_image}`}
-                        alt={`${exerciseName} demonstration`}
-                        loading="lazy"
-                        className="w-full"
-                      />
-                    </div>
-                    {entry.demo_image_credit && (
-                      <figcaption className="text-[0.6875rem] leading-[1.4] text-muted-foreground">
-                        Illustration by {entry.demo_image_credit}.
-                      </figcaption>
-                    )}
-                  </figure>
-                )}
-
                 <MuscleMap entry={entry} />
-
-                {/* THE VIDEO, ONLY WHERE ONE HAS BEEN WATCHED. No id, no
-                    button — not a disabled button, not a button that opens a
-                    search. An affordance that appears everywhere and works
-                    sometimes is the promise VISION.md forbids. */}
-                {entry.demo_video_id && (
-                  playing ? (
-                    <div className="space-y-1.5">
-                      {/* youtube-nocookie, so watching a demonstration does not
-                          attach tracking to the user. The service worker never
-                          caches cross-origin content by design, so this needs
-                          signal and always will — the line below says so
-                          rather than leaving a black rectangle to interpret. */}
-                      <div className="overflow-hidden rounded-xl" style={{ background: 'var(--surface-deep)' }}>
-                        <iframe
-                          className="aspect-video w-full"
-                          src={`https://www.youtube-nocookie.com/embed/${entry.demo_video_id}?rel=0&modestbranding=1`}
-                          title={`${exerciseName} demonstration`}
-                          allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                        />
-                      </div>
-                      <p className="text-[0.6875rem] leading-[1.4] text-muted-foreground">
-                        {entry.demo_video_credit ? `Video by ${entry.demo_video_credit}. ` : ''}
-                        Needs a connection — the cues and the muscle map work without one.
-                      </p>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setPlaying(true)}
-                      aria-label={`Watch a demonstration of ${exerciseName}`}
-                      className="hit-slop-44 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[0.8125rem] font-semibold text-primary-text"
-                      style={{ background: 'var(--surface-raised)' }}
-                    >
-                      <Play className="size-3.5 shrink-0" aria-hidden />
-                      Watch demonstration
-                    </button>
-                  )
-                )}
-
-                {entry.coach_note_swap && (
-                  <div>
-                    <p className="ds-label">Why it&apos;s in your plan</p>
-                    <p className="mt-1.5 text-[0.8125rem] leading-[1.5] text-text-tertiary">{entry.coach_note_swap}</p>
-                  </div>
-                )}
               </>
             )}
 
+          </TabsContent>
+
+          {/* ---------------------------------------------------------------
+              HISTORY — absorbed wholesale from ExerciseHistoryDialog, which
+              is deleted. Same three sections, same empty-state sentences.
+              --------------------------------------------------------------- */}
+          <TabsContent value="history" className="mt-4 space-y-5">
             <div>
               {/* The caption is DERIVED from what the series holds, not
                   written here. A bodyweight exercise's line is reps, and
@@ -233,13 +168,6 @@ export function ExerciseDetailPanel({
                 <p className="text-sm text-muted-foreground">Log this exercise twice to see a trend.</p>
               )}
             </div>
-          </TabsContent>
-
-          {/* ---------------------------------------------------------------
-              HISTORY — absorbed wholesale from ExerciseHistoryDialog, which
-              is deleted. Same three sections, same empty-state sentences.
-              --------------------------------------------------------------- */}
-          <TabsContent value="history" className="mt-4">
             {loading ? (
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : (
@@ -329,6 +257,70 @@ export function ExerciseDetailPanel({
               </p>
             ) : (
               <div className="space-y-5">
+                  {entry.demo_image && (
+                    <figure className="space-y-1.5">
+                      <div className="overflow-hidden rounded-xl" style={{ background: 'var(--surface-deep)' }}>
+                        <img
+                          src={`/exercise-demos/${entry.demo_image}`}
+                          alt={`${exerciseName} demonstration`}
+                          loading="lazy"
+                          className="w-full"
+                        />
+                      </div>
+                      {entry.demo_image_credit && (
+                        <figcaption className="text-[0.6875rem] leading-[1.4] text-muted-foreground">
+                          Illustration by {entry.demo_image_credit}.
+                        </figcaption>
+                      )}
+                    </figure>
+                  )}
+
+                  {/* THE VIDEO, ONLY WHERE ONE HAS BEEN WATCHED. No id, no
+                      button — not a disabled button, not a button that opens a
+                      search. An affordance that appears everywhere and works
+                      sometimes is the promise VISION.md forbids. */}
+                  {entry.demo_video_id && (
+                    playing ? (
+                      <div className="space-y-1.5">
+                        {/* youtube-nocookie, so watching a demonstration does not
+                            attach tracking to the user. The service worker never
+                            caches cross-origin content by design, so this needs
+                            signal and always will — the line below says so
+                            rather than leaving a black rectangle to interpret. */}
+                        <div className="overflow-hidden rounded-xl" style={{ background: 'var(--surface-deep)' }}>
+                          <iframe
+                            className="aspect-video w-full"
+                            src={`https://www.youtube-nocookie.com/embed/${entry.demo_video_id}?rel=0&modestbranding=1`}
+                            title={`${exerciseName} demonstration`}
+                            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowFullScreen
+                          />
+                        </div>
+                        <p className="text-[0.6875rem] leading-[1.4] text-muted-foreground">
+                          {entry.demo_video_credit ? `Video by ${entry.demo_video_credit}. ` : ''}
+                          Needs a connection — the cues and the muscle map work without one.
+                        </p>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPlaying(true)}
+                        aria-label={`Watch a demonstration of ${exerciseName}`}
+                        className="hit-slop-44 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-[0.8125rem] font-semibold text-primary-text"
+                        style={{ background: 'var(--surface-raised)' }}
+                      >
+                        <Play className="size-3.5 shrink-0" aria-hidden />
+                        Watch demonstration
+                      </button>
+                    )
+                  )}
+
+                  {entry.coach_note_swap && (
+                    <div>
+                      <p className="ds-label">Why it&apos;s in your plan</p>
+                      <p className="mt-1.5 text-[0.8125rem] leading-[1.5] text-text-tertiary">{entry.coach_note_swap}</p>
+                    </div>
+                  )}
                 <div>
                   <p className="ds-label">How to do it</p>
                   <ol className="mt-2 space-y-2">
