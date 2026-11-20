@@ -1983,10 +1983,11 @@ menu" stays true when a copy is also left outside it.
   the box is empty, send once there is text, the mic (as stop) while dictating. `verify:chat-composer` §2
 - **The chat names the coach "Trainer": "Both say Trainer"** (1 Nov 2026, from three options): the header and each
   message's label, one name. `verify:chat-2b` 1g, `verify:chat-bubbles`. **PARTLY REVERSED 20 Nov 2026, his words:
-  "instead of trainer personal trainer change it to just Personal TrAIner"**: the header says only "Personal TrAIner";
-  each message's label still says "Trainer" (he named the header only). And at his word the same day the header's "Sees
+  "instead of trainer personal trainer change it to just Personal TrAIner"**: the header says only "Personal TrAIner",
+  and (his "Yes", the same day) so does each coach message's small label: one name everywhere in the chat. Phone
+  notifications are still titled "Trainer". And at his word the same day the header's "Sees
   today's session, meals and logs" line and the pills under it ("Session done · 28 min", "1,971 kcal left", the set
-  count) are gone: "unnecessary". `verify:chat-2b` 1-3, `verify:chat-bubbles`, `test:chat-2b` [1]
+  count) are gone: "unnecessary". `verify:chat-2b` 1-3, `verify:chat-bubbles` (label, 1/1 mutation), `test:chat-2b` [1]
 - **The chat's session pill counts sets DONE: "Sets done"** (1 Nov 2026, over the design's "set 3 of 20"): "Legs · 2 of 20
   sets", the one count every screen says. `test:chat-2b`
 - **Offer words: "Mix"** — "Just today" / "Whole block" / "Keep <the exercise>" (the decline names what he keeps only on a

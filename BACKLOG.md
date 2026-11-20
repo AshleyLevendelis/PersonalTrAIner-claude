@@ -6,8 +6,9 @@ Newest first. One line each.
   thay and the text above 'sees todays session' remove that too. And instead of trainer personal trainer chamge it to
   just Personal TrAIner." Done: the header is the avatar, "Personal TrAIner", clear and the gear; no line under the name,
   no pills under the header. The mid-session pill ("Legs · 4 of 20 sets") went too: it was the same strip. Home, Exercise
-  and Nutrition still show all three numbers. NOT CHANGED, named: each coach message's small label still says "Trainer"
-  (his 1 Nov "Both say Trainer" covered both; he named the header only), so asked rather than guessed.
+  and Nutrition still show all three numbers. Asked, then done on his "Yes": each coach message's small label says "Personal TrAIner" too
+  (his 1 Nov "Both say Trainer" covered both, so it was asked rather than guessed). Still "Trainer": the phone
+  notifications' title (the coach's server writes it; it would need the `coach-reach-out` deploy), named for him.
   Removed with it: the strip's builder (`chatContextPills`); its calorie wording stays (the coach's today numbers use it).
   CHECKS: `test:chat-2b` [1] rewritten (strip and line absent, one name, the calorie words), [2] and [5] removed with their
   subject; `test:chat-extras` 3 removed (the done pill); `test:coach-screen-numbers` re-anchored (the coach's reader is

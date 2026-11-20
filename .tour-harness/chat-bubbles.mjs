@@ -250,7 +250,8 @@ console.log('\n[5] The avatar and the time — once per group; the header names 
 const coachGroups = R.groups.filter(g => g.role === 'assistant'), userGroups = R.groups.filter(g => g.role === 'user')
 // RE-ANCHORED 31 Oct 2026 (2b): a coach group OPENS with its avatar, name and time; still once per group. The
 // name is "Trainer" (her 10 Oct ruling keeps the handoff's "COACH" off the screen); your groups carry none.
-check('every coach group carries its name once, "Trainer"; your groups none', coachGroups.length >= 4 && coachGroups.every(g => g.names.length === 1 && /^trainer$/i.test(g.names[0].text)) && userGroups.every(g => g.names.length === 0), R.groups.map(g => g.names.map(n => n.text)))
+// 20 Nov 2026, his "Yes": the label says "Personal TrAIner", the header's one name.
+check('every coach group carries its name once, "Personal TrAIner"; your groups none', coachGroups.length >= 4 && coachGroups.every(g => g.names.length === 1 && g.names[0].text === 'Personal TrAIner') && userGroups.every(g => g.names.length === 0), R.groups.map(g => g.names.map(n => n.text)))
 check('every coach group has one 22px avatar, in the header row ABOVE its first bubble or card', coachGroups.every(g => g.avatars.length === 1 && near(g.avatars[0].width, 22) && g.avatars[0].bottom <= (g.items[0]?.box.top ?? -1)), coachGroups.map(g => [g.avatars.length, g.avatars[0]?.width, g.avatars[0]?.bottom, g.items[0]?.box.top]))
 check('no user group has an avatar', userGroups.every(g => g.avatars.length === 0))
 check('every group shows its time once: the coach\'s in its header row, yours under your last bubble', R.groups.slice(0, 7).every(g => g.times.length === 1 && (g.role === 'user' ? g.times[0].box.top >= g.items[g.items.length - 1]?.box.bottom : g.times[0].box.bottom <= (g.items[0]?.box.top ?? -1) && near(g.times[0].box.top + g.times[0].box.height / 2, g.avatars[0].top + g.avatars[0].height / 2, 3))), R.groups.map(g => [g.role, g.times.length]))

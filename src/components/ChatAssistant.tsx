@@ -9257,7 +9257,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                 <div
                   key={row.key}
                   role="group"
-                  aria-label={isUserGroup ? 'You' : 'Trainer'}
+                  aria-label={isUserGroup ? 'You' : 'Personal TrAIner'}
                   className="flex flex-col"
                   data-testid="chat-group"
                   data-role={row.role}
@@ -9278,7 +9278,7 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                       >
                         <MessageCircle className="size-[11px]" strokeWidth={2.4} />
                       </span>
-                      <span data-testid="chat-group-name" className="text-[0.625rem] font-semibold uppercase tracking-[.12em]" style={{ color: 'var(--role-ai-label)' }}>Trainer</span>
+                      <span data-testid="chat-group-name" className="text-[0.625rem] font-semibold uppercase tracking-[.12em]" style={{ color: 'var(--role-ai-label)' }}>Personal TrAIner</span>
                       {stamp && (
                         <time dateTime={stamp} data-testid="chat-group-time" className="text-[0.6875rem] leading-none text-muted-foreground">
                           {timeLabel(stamp)}
