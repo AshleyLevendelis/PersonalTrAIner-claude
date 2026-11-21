@@ -2,6 +2,37 @@
 
 Newest first. One line each.
 
+- [x] **EVERY AGE AND LEVEL READ AS A COACH: his request 21 Nov 2026**, "you need to fix the logic for all users off all
+  ages so it's proper cscs level". MEASURED FIRST, not reasoned: 2,048 seeded plans (ages 24/40/55/68 x four levels x
+  four kits x four styles x four goals x 3-4 days, 45-60 min), read for what a coach would refuse. Sound already, and
+  left alone: no isolation before a main lift, no loaded set past 20 reps, phases read right (strength 3-4 reps at
+  ~165-180s rest, hypertrophy 6+ at ~120s, beginners never below 8), barbell lifts for a YOUNG beginner (light, with a
+  calibration week: standard NSCA practice). FIVE FIXED (all CSCS, mine; basis beside each in the code):
+  (1) FROM 65 AT ANY LEVEL, no jump with a real landing (Box Jumps, Broad Jumps, Plyo Push-Ups, Skater Bounds,
+  Burpees): 156 of 512 plans at 68 had one, 0 after. A coach uses power work with older lifters after screening
+  landing, joints and bone health, which the app cannot do; skipping (rope, jacks, high knees) stays past beginner.
+  (2) PULL-UP NEGATIVES WAIT FOR NOVICE (catalogue `capability_requirement`): 86 of 512 beginner plans, 0 after;
+  lowering a whole bodyweight needs a base a first-timer lacks. (3) KETTLEBELL SWINGS WAIT FOR NOVICE: 100 of 512,
+  0 after; the hinge is taught slow (kettlebell deadlift) before fast. (4) "FULL BODY POWER" IS "FULL BODY STRENGTH"
+  FOR A NOVICE TOO: 352 of 1,024 beginner/novice plans, 0 after (neither ever reaches a power phase). (5) A BODYWEIGHT
+  WEEK SQUATS: the 18 Nov squat/hinge alternation counted tier-1 lifts only, and a bodyweight pool has none, so every
+  full-body day took the ranking's hinge; 111 of 3,072 bodyweight and dumbbell weeks held no squat, 0 after, hinges
+  still 0 missing. Full-gym plans cannot move (the new fallback runs only when no tier-1 lift exists). And the warm-up
+  opener: a beginner from 60 training at home opened with Jumping Jacks; now the low-impact twin the pregnancy rule
+  uses. Median sets a day unchanged (17).
+  CSCS REVIEW: (1) effect: same patterns and volume, safer or better-taught lifts; (2) takes away: landing jumps from
+  65 (power stays via throws and fast step-ups), two lifts from beginners until novice; (3) fundamentals: squat
+  coverage IMPROVED (111 -> 0), push/pull/hinge unchanged; (4) no floor or ceiling redefined; (5) in scope.
+  NAMED, NOT FIXED, because each collides with a ruling of his (asked): a beginner day can hold 24-27 working sets in
+  45-60 minutes (66 such days in weeks 1-3, e.g. 8 exercises x 3 on a 4-day combat Pull & Hinge day), which a coach
+  would cap nearer 15-18 for a first-timer, but the session-length rulings fill the time asked for; and hypertrophy
+  pushing volume for intermediate/advanced functional and combat plans is ~9-11 sets a week, under the ~10-20 per
+  muscle the evidence puts at the useful range, inside a 45-60 minute 3-4 day budget. Also still open from the entry
+  below: the landmine price, the older beginner's hinge tie.
+  CHECKS: `test:older-beginner` now 66 checks (sections 9-13 for all ages); 26 mutations, 26 caught, each checked to
+  apply and to run every check; one first came back MISSED (the warm-up flag at generation is rebuilt downstream) and
+  is now held through the single-week build, which returns that first warm-up.
+
 - [x] **BEGINNERS FROM 60 GET A PLAN A COACH WOULD SIGN: his request 21 Nov 2026**, "run a test on a 60year old
   beginner woman", then "fix those five issues for beginners over 60. tighten the beginner and 60+ selection rules".
   MEASURED FIRST (60, female, beginner, full gym, functional, 3 days, 30-45 min, seeded): day one held Trap Bar

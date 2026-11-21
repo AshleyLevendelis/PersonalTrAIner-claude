@@ -1,4 +1,5 @@
 import { needsBalanceWork, BALANCE_WARMUP_ITEM } from './pathway'
+import { isOlderBeginner } from './older-beginner'
 import type { EquipmentAccess, TrainingExperience } from './types'
 import type { ExerciseEntry, MovementPattern } from './exercise-db'
 import {
@@ -608,10 +609,12 @@ export interface WarmupContext {
   budgetSeconds: number
   /** "Pregnant" is ticked (pregnancy-rules.ts): no jumping in the opening item, no drill lying flat. */
   pregnant?: boolean
+  /** A beginner from 60 (older-beginner.ts): no jumping in the opening item, the low-impact twin instead. */
+  lowImpact?: boolean
 }
 
 export function buildWarmup(ctx: WarmupContext): WarmupBlock {
-  const baseGeneral = generalWarmupFor(ctx.equipment, ctx.injuries, !!ctx.pregnant)
+  const baseGeneral = generalWarmupFor(ctx.equipment, ctx.injuries, !!ctx.pregnant || !!ctx.lowImpact)
 
   // Every qualifying compound gets a ramp — the first, full scheme; every
   // later one, abbreviated. Built before general/mobility sizing because
@@ -771,6 +774,7 @@ function rebuildWarmupCore(day: WorkoutDay, profile: UserProfile): WorkoutDay {
       experience: profile.training_experience || 'novice',
       budgetSeconds: getWarmupReserveSeconds(budgetSeconds),
       pregnant: isPregnant(profile),
+      lowImpact: isOlderBeginner(profile),
     })
     const rampByName = new Map(warmup.ramp_ups.map(r => [r.exercise, r]))
     return {

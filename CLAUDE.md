@@ -183,6 +183,11 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   silently open a session, and the pain boundary is enforced on the screen
   only. `tightness`, `verify:tightness`
 - No plan below the quality floor — `quality` (floor 7.2/12; 0 below)
+- **Age and level choose WHICH exercises, never how much — his requests 21 Nov 2026** ("fix those five issues for
+  beginners over 60", then "fix the logic for all users off all ages so it's proper cscs level"; CSCS mine, basis in
+  `older-beginner.ts`): a beginner from 60 gets no technique, barbell, hanging or jumping lift and balance work from 60;
+  from 65 at any level no jump with a real landing; pull-up negatives and kettlebell swings wait for novice; a beginner's
+  or novice's full-body day is "Full Body Strength". Measured on 2,048 plans across ages 24-68. `test:older-beginner`
 - **A pull-heavy week is not scored as a flaw when the injuries left one
   press** — Ashley's ruling 24 Sep 2026, from three options: don't count it,
   over keeping the flag and over cutting pulling to match. 366 of 379 flags

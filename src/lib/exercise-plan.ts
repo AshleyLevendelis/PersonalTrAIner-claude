@@ -10,7 +10,7 @@ import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
 } from './experience-config'
-import { isOlderBeginner, olderBeginnerExclusion, OLDER_BEGINNER_REASON_TEXT } from './older-beginner'
+import { isOlderBeginner, olderBeginnerExclusion, olderAdultExclusion, OLDER_BEGINNER_REASON_TEXT } from './older-beginner'
 import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields, withBalanceWork } from './warmup'
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
@@ -251,7 +251,7 @@ export const TRACKS: Record<TrackFocus, TrackDefinition> = {
       { patterns: ['core'], tier: 'tier3_isolation', required: false },
     ],
   },
-  // THE SAME SESSION, NAMED FOR WHAT IT IS (21 Nov 2026). A beginner never gets a power phase (getPhaseSequence), so
+  // THE SAME SESSION, NAMED FOR WHAT IT IS (21 Nov 2026). A beginner or novice never gets a power phase (getPhaseSequence), so
   // "Power" named work the day does not hold. Only ever reached by beginnerTrackName; getViableTrack's ranking skips it.
   'Full Body Strength': {
     label: 'Full Body Strength',
@@ -1421,7 +1421,8 @@ function stageSkillFilter(
 }
 
 // ---------------------------------------------------------------------------
-// STAGE 4b: Beginners from 60 (older-beginner.ts holds the rule and its basis)
+// STAGE 4b: Age rules (older-beginner.ts holds them and their basis): from 65 at any
+// level no landing-impact jumps; a beginner from 60 the four exclusions below.
 // ---------------------------------------------------------------------------
 // Leaves out technique lifts, barbells, hanging work and jumps. Per pattern, it
 // yields for technique and barbell lifts only: a movement pattern this would
@@ -1433,6 +1434,10 @@ export function stageOlderBeginnerFilter(
   profile: Pick<UserProfile, 'age' | 'training_experience'>,
   trace: ConstraintTrace
 ): ExerciseEntry[] {
+  // From 65 at any level: no landing-impact jumps, never put back (older-beginner.ts olderAdultExclusion).
+  const impactOut = pool.filter(ex => olderAdultExclusion(profile, ex))
+  for (const ex of impactOut) trace.skill_filtered.push({ exercise: ex.name, stage: 'skill', reason: 'from 65: a jump with a real landing; fast work without impact instead' })
+  if (impactOut.length) pool = pool.filter(ex => !impactOut.includes(ex))
   if (!isOlderBeginner(profile)) return pool
   const kept = pool.filter(ex => !olderBeginnerExclusion(ex))
   const keptPatterns = new Set(kept.map(ex => ex.movement_pattern))
@@ -2948,9 +2953,15 @@ function selectExercisesForTrack(
   function lowerMainToPrefer(slot: TrackSlot): MovementPattern | null {
     if (slot.tier !== 'tier1_compound' || !slot.patterns.includes('knee_dominant') || !slot.patterns.includes('hip_hinge')) return null
     let squat = lowerMainsLater.squat, hinge = lowerMainsLater.hinge
+    // WHAT A MAIN LIFT IS IN THIS POOL (21 Nov 2026, the all-ages audit): with no tier-1 squat or hinge to be had (a
+    // bodyweight or limited kit), a day's main lower lift is a tier-2 one, and counting tier 1 alone saw none, so every
+    // day took the ranking's pick: 111 of 3,072 bodyweight and dumbbell weeks held no squat at all, a hinge (glute
+    // bridge, single-leg RDL, good morning) built in on every full-body day.
+    const mainTier = pool.some(e => e.mechanics_tier === 'tier1_compound' && (e.movement_pattern === 'knee_dominant' || e.movement_pattern === 'hip_hinge'))
+      ? 'tier1_compound' : 'tier2_compound'
     for (const [name, n] of weeklyAppearanceCount ?? []) {
       const e = getExerciseEntry(name)
-      if (e?.mechanics_tier !== 'tier1_compound') continue
+      if (e?.mechanics_tier !== mainTier) continue
       if (e.movement_pattern === 'knee_dominant') squat += n
       else if (e.movement_pattern === 'hip_hinge') hinge += n
     }
@@ -2970,6 +2981,8 @@ function selectExercisesForTrack(
       (preferredLowerMain ? findForSlot([preferredLowerMain], slot.tier, true) ?? findForSlot([preferredLowerMain], slot.tier, false) : null) ??
       findForSlot(slot.patterns, slot.tier, true, slot.groups) ??
       findForSlot(slot.patterns, slot.tier, false, slot.groups) ??
+      // The preference holds when the slot drops a tier too (a bodyweight week's main lift is a tier-2 squat or hinge).
+      (preferredLowerMain ? findForSlot([preferredLowerMain], null, true) ?? findForSlot([preferredLowerMain], null, false) : null) ??
       findForSlot(slot.patterns, null, true, slot.groups) ??
       findForSlot(slot.patterns, null, false, slot.groups)
     if (pick && !wouldBeSecondMainLift(pick)) {
@@ -3804,9 +3817,9 @@ function getViableTrack(
   return ranked[0]?.available > 0 ? ranked[0].focus : candidate
 }
 
-/** "Full Body Power" for a beginner is "Full Body Strength": the same session, without a name promising power work. */
+/** "Full Body Power" for a beginner or novice is "Full Body Strength": neither ever gets a power phase, so the name promised work the day lacks. */
 export function beginnerTrackName<T extends string>(focus: T, experience: TrainingExperience | undefined): T | 'Full Body Strength' {
-  return focus === 'Full Body Power' && experience === 'beginner' ? 'Full Body Strength' : focus
+  return focus === 'Full Body Power' && (experience === 'beginner' || experience === 'novice') ? 'Full Body Strength' : focus
 }
 
 // The three questions above, for a gate to ask directly. A rule only reachable
@@ -6270,6 +6283,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
       experience: profile.training_experience || 'novice',
       budgetSeconds: warmupReserve,
       pregnant: isPregnant(profile),
+      lowImpact: isOlderBeginner(profile),
     })
 
     // Ramp-up-visibility fix: buildWarmup already decided which exercises

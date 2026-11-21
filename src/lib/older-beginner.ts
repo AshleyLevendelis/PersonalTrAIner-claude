@@ -34,6 +34,24 @@ import { PREGNANCY_IMPACT } from './pregnancy-rules'
 
 export const OLDER_BEGINNER_FROM_AGE = 60
 
+/**
+ * FROM 65, AT ANY LEVEL (21 Nov 2026, his "fix the logic for all users of all ages so it's proper cscs level"):
+ * no jump with a real flight or landing. An all-ages audit (2,048 plans) gave a 68-year-old intermediate or advanced
+ * trainee broad jumps or plyo push-ups in about a quarter of plans. A coach uses power work with older lifters, but
+ * after screening their landing, joints and bone health, which this app cannot do; fast-intent work without impact
+ * (a medicine-ball throw that stays in the hands, a fast step-up) keeps the power quality. Low-amplitude skipping
+ * (jump rope, jumping jacks, high knees) stays for anyone past beginner. Never put back to fill a pattern.
+ */
+export const OLDER_ADULT_FROM_AGE = 65
+export const OLDER_ADULT_IMPACT: ReadonlySet<string> = new Set([
+  'Box Jumps', 'Broad Jumps', 'Plyo Push-Ups', 'Skater Bounds', 'Burpees',
+])
+export function olderAdultExclusion(profile: Pick<UserProfile, 'age'>, ex: ExerciseEntry): boolean {
+  const age = profile.age
+  if (!(typeof age === 'number' && Number.isFinite(age) && age >= OLDER_ADULT_FROM_AGE)) return false
+  return OLDER_ADULT_IMPACT.has(ex.name) || (!!ex.parent && OLDER_ADULT_IMPACT.has(ex.parent))
+}
+
 /** A beginner aged 60 or over. No age held means no rule: nothing is assumed. */
 export function isOlderBeginner(profile: Pick<UserProfile, 'age' | 'training_experience'>): boolean {
   const age = profile.age

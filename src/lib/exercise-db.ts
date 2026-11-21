@@ -4633,6 +4633,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     secondary_muscles: ['erectors', 'forearms', 'lats'],
     equipment: ['kettlebell'],
     joint_stress: 'low',
+    // 21 Nov 2026 (CSCS): the hinge is taught slow before it is taught fast; a beginner learns the kettlebell deadlift
+    // first, and the swing arrives once the hinge holds (NSCA and kettlebell-school progression alike).
+    capability_requirement: { minExperience: 'novice', regression: 'Bodyweight Hip Hinge to Wall' },
     form_cues: ['Hinge at hips', 'Snap hips forward', 'Float the bell to chest height', 'Brace core at the top'],
     coach_note_swap: 'Ballistic hip hinge that activates the posterior chain and elevates heart rate.',
     loads_joints: ['lower_back_axial'],
@@ -4946,6 +4949,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     secondary_muscles: ['rhomboids', 'lower trapezius', 'forearms'],
     equipment: ['pull-up bar'],
     joint_stress: 'moderate',
+    // 21 Nov 2026 (CSCS): lowering your whole bodyweight under control needs a strength base a first-time trainee has
+    // not built; a beginner pulls on a pulldown or the assisted machine first. Audit: 13% of beginner plans had these.
+    capability_requirement: { minExperience: 'novice', regression: 'Pull-Ups (Assisted)' },
     form_cues: ['Jump or step to the top position, chin over the bar', 'Lower as slowly as you can — aim for five seconds', 'Stop the set when the lowering gets fast', 'Step back up, never drop'],
     coach_note_swap: 'The lowering half of a pull-up, which is the half you are strongest in — this is how most people earn their first one.',
     loads_joints: ['shoulder', 'elbow'],
