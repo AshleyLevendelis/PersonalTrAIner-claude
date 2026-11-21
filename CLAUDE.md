@@ -188,6 +188,9 @@ facts: re-measure before acting on one, correct it here when it is wrong.
   `older-beginner.ts`): a beginner from 60 gets no technique, barbell, hanging or jumping lift and balance work from 60;
   from 65 at any level no jump with a real landing; pull-up negatives and kettlebell swings wait for novice; a beginner's
   or novice's full-body day is "Full Body Strength". Measured on 2,048 plans across ages 24-68. `test:older-beginner`
+- **A beginner's session holds at most 18 working sets — his ruling 21 Nov 2026, "yes cap beginners at 18 sets"** (over
+  filling the time with lifting): the spare minutes go to optional mobility. It narrows his session-length rulings for
+  beginners only. `test:older-beginner` §14
 - **A pull-heavy week is not scored as a flaw when the injuries left one
   press** — Ashley's ruling 24 Sep 2026, from three options: don't count it,
   over keeping the flag and over cutting pulling to match. 366 of 379 flags

@@ -2,6 +2,27 @@
 
 Newest first. One line each.
 
+- [x] **A BEGINNER'S SESSION HOLDS AT MOST 18 WORKING SETS: his ruling 21 Nov 2026, "yes cap beginners at 18 sets"**,
+  from my CSCS recommendation, put to him because it collides with his session-length rulings (the time asked for is
+  filled). The audit had beginner days of 24-27 working sets in 45-60 minutes. Basis: a first-timer adapts to far less
+  (NSCA, 1-3 sets of 6-10 exercises); technique fades before the muscle. What gives, in this file's usual order: a set
+  off the biggest isolation lift, then accessory (never below its floor), then a whole isolation/core exercise from the
+  end; never the main lift, a conditioning block, a primer, a superset partner, a pattern-floor lift, or the third
+  exercise. Conditioning rounds are not counted. Runs after the balance pass and before the filler, so the freed time
+  becomes optional mobility, never more lifting. Generation only: an exercise he adds himself is his ("you asked, you
+  get it"). MEASURED on 1,024 beginner plans x 16 weeks (57,344 days, ages 24-68, all kits/styles/goals, 45-60 and
+  60-90): 0 days over 18 (max 18), every week still squats, hinges, pushes and pulls, every day 3+ exercises, no deload
+  heavier than its week before; 45-60 loading sessions median 53.4 min, 10th percentile 48.7 (rests stay honest), 3,447
+  of 21,504 with a mobility close-out. Novice and up are untouched by construction (a novice on the measured offender
+  still has 24). This REDEFINES nothing for other levels but CHANGES what a beginner plan holds: beginner set counts and
+  session minutes before 21 Nov are not comparable.
+  Also found by the sweep and fixed: `test:coach-read` and `test:day-purpose` named "Full Body Power" literally and
+  failed on the beginner/novice name; both now read the track under either name (the property, not the label).
+  `test:no-dead-code` was two over budget from two exported constants nothing used; made private.
+  CHECKS: `test:older-beginner` section 14 (10 checks), 6 mutations, 6 caught. The first version missed 4 of 6: its
+  constructed day reached 18 by trimming alone, so no protection was ever tested; each constructed day now makes one
+  rule decide.
+
 - [x] **EVERY AGE AND LEVEL READ AS A COACH: his request 21 Nov 2026**, "you need to fix the logic for all users off all
   ages so it's proper cscs level". MEASURED FIRST, not reasoned: 2,048 seeded plans (ages 24/40/55/68 x four levels x
   four kits x four styles x four goals x 3-4 days, 45-60 min), read for what a coach would refuse. Sound already, and

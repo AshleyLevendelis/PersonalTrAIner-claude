@@ -32,7 +32,7 @@ import { getSkillDemand } from './experience-config'
 import { loadingMode } from './load-prescription'
 import { PREGNANCY_IMPACT } from './pregnancy-rules'
 
-export const OLDER_BEGINNER_FROM_AGE = 60
+const OLDER_BEGINNER_FROM_AGE = 60
 
 /**
  * FROM 65, AT ANY LEVEL (21 Nov 2026, his "fix the logic for all users of all ages so it's proper cscs level"):
@@ -42,7 +42,7 @@ export const OLDER_BEGINNER_FROM_AGE = 60
  * (a medicine-ball throw that stays in the hands, a fast step-up) keeps the power quality. Low-amplitude skipping
  * (jump rope, jumping jacks, high knees) stays for anyone past beginner. Never put back to fill a pattern.
  */
-export const OLDER_ADULT_FROM_AGE = 65
+const OLDER_ADULT_FROM_AGE = 65
 export const OLDER_ADULT_IMPACT: ReadonlySet<string> = new Set([
   'Box Jumps', 'Broad Jumps', 'Plyo Push-Ups', 'Skater Bounds', 'Burpees',
 ])

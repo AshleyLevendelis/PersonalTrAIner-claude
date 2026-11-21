@@ -2,7 +2,7 @@
 // tighten the beginner and 60+ selection rules"). The five: barbell lifts on day one, pull-up negatives / assisted
 // pull-ups, a landmine press at an empty bar beside a 4 kg dumbbell press, a session called "Power", no balance work.
 // Seeded, so every run is the same plan. Every section has a contrast that shows its fixture binds.
-import { generateMesocycle, generateExercisePlan, setRandomSource, getConstrainedPool, stageOlderBeginnerFilter, beginnerTrackName } from '../src/lib/exercise-plan'
+import { generateMesocycle, generateExercisePlan, setRandomSource, capBeginnerSets, beginnerWorkingSets, BEGINNER_MAX_WORKING_SETS, getConstrainedPool, stageOlderBeginnerFilter, beginnerTrackName } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { getExerciseEntry, EXERCISE_DATABASE, type ExerciseEntry } from '../src/lib/exercise-db'
 import { isOlderBeginner, olderBeginnerExclusion, olderAdultExclusion, OLDER_ADULT_IMPACT } from '../src/lib/older-beginner'
@@ -183,6 +183,44 @@ for (const [age, style, goal, nd] of [[24, 'hybrid', 'functional', 3], [24, 'com
   check(`${age}, bodyweight beginner, ${style}/${goal}, ${nd} days: every week squats and hinges`, squatless.length === 0 && hingeless.length === 0,
     `${squatless.length} without a squat, ${hingeless.length} without a hinge`)
 }
+
+console.log('\n14. A BEGINNER\'S SESSION HOLDS AT MOST 18 WORKING SETS (his ruling 21 Nov 2026)')
+check('the cap is 18', BEGINNER_MAX_WORKING_SETS === 18)
+// The audit's measured offender: 8 exercises x 3 = 24 sets on a combat Pull & Hinge day.
+const combat = (exp: UserProfile['training_experience']) => {
+  setRandomSource(seededRngFromKey(`24${exp}full_gymcombatfat_loss4`))
+  return generateMesocycle(her({ age: 24, gender: 'male', weight_kg: 84, height_cm: 178, activity_level: 'lightly_active', training_experience: exp,
+    training_style: 'combat', session_duration_preference: '45-60', training_days: ALL.map((d, i) => ({ day: d, available: [0, 2, 4, 5].includes(i) })) }))
+}
+const maxSets = (p: MesocycleWeek[]) => Math.max(...lifting(p).map(beginnerWorkingSets))
+const begMax = maxSets(combat('beginner')), novMax = maxSets(combat('novice'))
+check('a beginner\'s busiest day is 18 sets or fewer', begMax <= 18, String(begMax))
+check('a novice on the same plan is not capped (the fixture binds)', novMax > 18, String(novMax))
+check('the beginner plan still squats, hinges, pushes and pulls every week', combat('beginner').every(w => {
+  const pats = new Set(w.days.flatMap(d => d.exercises.map(e => getExerciseEntry(e.name)?.movement_pattern)))
+  return (pats.has('knee_dominant') || pats.has('single_leg')) && pats.has('hip_hinge') && (pats.has('horizontal_push') || pats.has('vertical_push')) && (pats.has('horizontal_pull') || pats.has('vertical_pull'))
+}))
+// Constructed days, each built so ONE rule decides the outcome (a day the cap clears by trimming alone cannot see the
+// protections: the first version of these checks missed four of six mutations for exactly that reason).
+const row = (name: string, sets: number, extra: Record<string, unknown> = {}) => ({ name, sets, reps: '10', rest: '60s', ...extra }) as never
+type Capped = { exercises: { name: string; sets: number }[] }
+const cap = (exercises: unknown[]) => capBeginnerSets({ day: 'Monday', focus: 'Pull & Hinge', exercises } as never) as Capped
+const setsIn = (d: Capped, n: string) => d.exercises.find(e => e.name === n)?.sets
+// 22 sets, 4 to lose: isolation can give all 4, so the compound accessories keep theirs.
+const order = cap([row('Band Pull-Aparts', 2), row('Deadlifts', 4), row('Lat Pulldown', 5), row('Bent-Over Dumbbell Row', 5), row('Face Pulls', 4), row('Dumbbell Curls', 4)])
+check('isolation gives before the compound accessories', setsIn(order, 'Lat Pulldown') === 5 && setsIn(order, 'Bent-Over Dumbbell Row') === 5
+  && setsIn(order, 'Face Pulls') === 2 && setsIn(order, 'Dumbbell Curls') === 2, JSON.stringify(order.exercises))
+check('the warm-up primer is untouched and not counted', setsIn(order, 'Band Pull-Aparts') === 2 && beginnerWorkingSets(order as never) === 18)
+// Everything but the main lift at its floor, and three exercises: nothing may give, so the day stays over.
+const floor = cap([row('Deadlifts', 16), row('Lat Pulldown', 2), row('Bent-Over Dumbbell Row', 2)])
+check('the main lift keeps every set, even over the cap', setsIn(floor, 'Deadlifts') === 16, JSON.stringify(floor.exercises))
+check('never below three training exercises, even over the cap', floor.exercises.length === 3)
+// At their floors and over: whole exercises go, from the end, isolation first, skipping a superset partner.
+const drops = cap([row('Deadlifts', 10), row('Lat Pulldown', 2), row('Bent-Over Dumbbell Row', 2), row('Face Pulls', 2),
+  row('Dumbbell Curls', 2), row('Shrugs', 2, { superset_label: 'A1' }), row('Dead Bug', 2)])
+check('a superset partner is never dropped; the next isolation goes instead', drops.exercises.some(e => e.name === 'Shrugs')
+  && !drops.exercises.some(e => e.name === 'Dead Bug') && !drops.exercises.some(e => e.name === 'Dumbbell Curls'), JSON.stringify(drops.exercises.map(e => e.name)))
+check('the dropped day is at the cap', beginnerWorkingSets(drops as never) === 18)
 
 console.log(`\n${passed + failed} checks ran: ${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)

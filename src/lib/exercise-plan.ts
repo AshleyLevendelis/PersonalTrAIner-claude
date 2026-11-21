@@ -7544,6 +7544,57 @@ const FILLER_TRIGGER_SECONDS = 15 * 60
  * than more lifting volume; this only stops a data-model limit deciding which
  * days the rule reached.
  */
+/**
+ * A BEGINNER'S SESSION HOLDS AT MOST 18 WORKING SETS — his ruling 21 Nov 2026, "yes cap beginners at 18 sets", from
+ * my CSCS recommendation, over his earlier rulings that fill the time asked for. The all-ages audit found beginner days
+ * of 24-27 working sets in 45-60 minutes (8 exercises x 3). A first-timer adapts to far less (NSCA: 1-3 sets of 6-10
+ * exercises), technique fades before the muscle does, and the spare minutes go to the optional mobility filler that
+ * runs after this, never to more lifting.
+ *
+ * What gives, in the order every cut in this file uses: a set off the biggest accessory or isolation lift (never below
+ * its floor), and only then a whole accessory, isolation and core first, from the end of the day. Never the main lift,
+ * a conditioning block, a warm-up primer, a superset partner, a lift the week's pattern floor relies on, or the third
+ * training exercise. Conditioning rounds are not counted: they are not strength sets.
+ */
+export const BEGINNER_MAX_WORKING_SETS = 18
+
+export function beginnerWorkingSets(day: WorkoutDay): number {
+  return day.exercises.reduce((n, ex) => {
+    const entry = findEntry(ex.name)
+    if (!entry || entry.mechanics_tier === 'primer') return n
+    return getVolumeRole(entry) === 'conditioning' ? n : n + (ex.sets ?? 0)
+  }, 0)
+}
+
+export function capBeginnerSets(day: WorkoutDay, protectedNames: ReadonlySet<string> = new Set()): WorkoutDay {
+  let exercises = day.exercises
+  let guard = 0
+  while (beginnerWorkingSets({ ...day, exercises }) > BEGINNER_MAX_WORKING_SETS && guard++ < 60) {
+    const rows = exercises.map((ex, i) => {
+      const entry = findEntry(ex.name)
+      const role = entry ? getVolumeRole(entry) : null
+      return { i, ex, entry, role }
+    }).filter(r => r.entry && r.entry.mechanics_tier !== 'primer' && r.role !== 'main' && r.role !== 'conditioning')
+    // Isolation before accessory, then the most sets first: the same order enforceDayDurationBudget trims in.
+    const trimmable = rows.filter(r => (r.ex.sets ?? 0) > getRoleSetFloor(r.role!))
+      .sort((a, b) => (a.role === 'isolation' ? 0 : 1) - (b.role === 'isolation' ? 0 : 1) || (b.ex.sets ?? 0) - (a.ex.sets ?? 0) || b.i - a.i)
+    if (trimmable.length > 0) {
+      const t = trimmable[0].i
+      exercises = exercises.map((ex, i) => (i === t ? { ...ex, sets: ex.sets - 1 } : ex))
+      continue
+    }
+    if (trainingSlotCount(exercises.map(ex => findEntry(ex.name))) <= 3) break
+    const isCore = (e: ExerciseEntry) => e.movement_pattern === 'core'
+    const droppable = rows
+      .filter(r => !r.ex.superset_label && !protectedNames.has(r.ex.name) && r.entry!.mechanics_tier !== 'tier1_compound')
+      .sort((a, b) => (a.role === 'isolation' || isCore(a.entry!) ? 0 : 1) - (b.role === 'isolation' || isCore(b.entry!) ? 0 : 1) || b.i - a.i)
+    if (droppable.length === 0) break
+    const drop = droppable[0].i
+    exercises = exercises.filter((_, i) => i !== drop)
+  }
+  return exercises === day.exercises ? day : { ...day, exercises }
+}
+
 function applyDurationFiller(
   days: WorkoutDay[],
   profile: UserProfile,
@@ -9385,6 +9436,11 @@ export function generateMesocycle(
         // their volume is deliberately, uniformly cut, and nudging set counts
         // would fight that.
         enforceWeeklyPatternBalance(days, { keepPulling: keepPullingThisPlan })
+        // A BEGINNER'S CAP, after the balance pass (so nothing adds a set back) and before the filler (so the time it
+        // frees goes to optional mobility). capBeginnerSets says why.
+        if (experience === 'beginner') {
+          for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0) days[i] = capBeginnerSets(days[i], requiredNames)
+        }
         // THE FILLER SIZES ITSELF ON THE DAY AS IT WILL SHIP (18 Nov 2026).
         // It used to run just BEFORE the balance pass, which then took a set
         // off some days: a day that was long enough when the filler looked
