@@ -1,6 +1,7 @@
 import type { UserProfile, WorkoutDay, Exercise, RecommendedCardio, PlannedActivity } from '@/lib/types'
 import { getExerciseEntry } from '@/lib/exercise-db'
 import { getSessionMaximumSeconds, estimateDaySeconds } from '@/lib/session-duration'
+import { isOlderBeginner } from '@/lib/older-beginner'
 
 // ---------------------------------------------------------------------------
 // THE PATHWAY (strategy slice 3, his rulings of 13 Nov 2026): the starting-out
@@ -25,18 +26,22 @@ export function ageBand(age: number | null | undefined): AgeBand | null {
   return 'under_50'
 }
 
-/** Does this person get balance work added? Only ever adds; never read to take anything away. */
-export function needsBalanceWork(profile: Pick<UserProfile, 'age'>): boolean {
-  return ageBand(profile.age) === '65_and_over'
+/**
+ * Does this person get balance work added? Only ever adds; never read to take anything away.
+ * From 65 for everyone; from 60 for a beginner (21 Nov 2026, CSCS: the deconditioned older adult is the case every
+ * guideline starts balance work early for; older-beginner.ts).
+ */
+export function needsBalanceWork(profile: Pick<UserProfile, 'age'> & Partial<Pick<UserProfile, 'training_experience'>>): boolean {
+  return ageBand(profile.age) === '65_and_over' || isOlderBeginner({ age: profile.age, training_experience: profile.training_experience })
 }
 
 export const BALANCE_HOLD = 'Single-Leg Balance Hold'
 
-/** The warm-up line for an ordinary plan (65 and over): the same hold, a hand near support. */
+/** The warm-up line for an ordinary plan (65 and over, or a beginner from 60): the same hold, a hand near support. */
 export const BALANCE_WARMUP_ITEM = {
   name: BALANCE_HOLD,
   prescription: '2 x 20-30s each leg, a hand near a counter or wall',
-  purpose: 'Balance work, added from 65: it keeps you steady on your feet and lowers the chance of a fall',
+  purpose: 'Balance work: it keeps you steady on your feet and lowers the chance of a fall',
   duration_seconds: 120,
 } as const
 

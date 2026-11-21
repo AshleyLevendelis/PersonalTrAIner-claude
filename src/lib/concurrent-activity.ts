@@ -75,7 +75,7 @@ export function activityDays(activities: ConcurrentActivity[] | undefined): Set<
  * the bro-split accessory days, dedicated conditioning.
  */
 export const HEAVY_TRACKS: ReadonlySet<string> = new Set([
-  'Push & Press', 'Pull & Hinge', 'Squat & Carry', 'Legs & Calves', 'Full Body Power',
+  'Push & Press', 'Pull & Hinge', 'Squat & Carry', 'Legs & Calves', 'Full Body Power', 'Full Body Strength',
 ])
 
 /**

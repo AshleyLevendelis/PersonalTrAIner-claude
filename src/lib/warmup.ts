@@ -833,7 +833,7 @@ export function drillsPreparing(joints: string[], injuries: string[] = [], pregn
 // rebuild (rebuildWarmup) stamps it straight away, since an edit trims nothing for time.
 // ---------------------------------------------------------------------------
 
-export function withBalanceWork(day: WorkoutDay, profile: Pick<UserProfile, 'age'>): WorkoutDay {
+export function withBalanceWork(day: WorkoutDay, profile: Pick<UserProfile, 'age'> & Partial<Pick<UserProfile, 'training_experience'>>): WorkoutDay {
   if (!day.warmup || day.exercises.length === 0 || !needsBalanceWork(profile)) return day
   if (day.warmup.mobility.some(m => m.name === BALANCE_WARMUP_ITEM.name)) return day
   return {

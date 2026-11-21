@@ -10,6 +10,7 @@ import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
 } from './experience-config'
+import { isOlderBeginner, olderBeginnerExclusion, OLDER_BEGINNER_REASON_TEXT } from './older-beginner'
 import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields, withBalanceWork } from './warmup'
 import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
@@ -38,6 +39,7 @@ type TrackFocus =
   | 'Squat & Carry'
   | 'Upper Pull & Core'
   | 'Full Body Power'
+  | 'Full Body Strength'
   | 'Conditioning & Core'
   | 'Chest & Triceps'
   | 'Back & Biceps'
@@ -235,6 +237,24 @@ export const TRACKS: Record<TrackFocus, TrackDefinition> = {
   },
   'Full Body Power': {
     label: 'Full Body Power',
+    primary_patterns: ['hip_hinge', 'knee_dominant', 'horizontal_push', 'vertical_pull'],
+    secondary_patterns: ['single_leg', 'core'],
+    forbidden_patterns: [],
+    primer_patterns: ['hip_hinge', 'knee_dominant', 'horizontal_push', 'vertical_pull'],
+    required_patterns: [],
+    defining_patterns: [],
+    slots: [
+      { patterns: ['knee_dominant', 'hip_hinge'], tier: 'tier1_compound', required: true },
+      { patterns: ['horizontal_push'], tier: 'tier2_compound', required: true },
+      { patterns: ['vertical_pull', 'horizontal_pull'], tier: 'tier2_compound', required: true },
+      { patterns: ['single_leg'], tier: 'tier2_compound', required: false },
+      { patterns: ['core'], tier: 'tier3_isolation', required: false },
+    ],
+  },
+  // THE SAME SESSION, NAMED FOR WHAT IT IS (21 Nov 2026). A beginner never gets a power phase (getPhaseSequence), so
+  // "Power" named work the day does not hold. Only ever reached by beginnerTrackName; getViableTrack's ranking skips it.
+  'Full Body Strength': {
+    label: 'Full Body Strength',
     primary_patterns: ['hip_hinge', 'knee_dominant', 'horizontal_push', 'vertical_pull'],
     secondary_patterns: ['single_leg', 'core'],
     forbidden_patterns: [],
@@ -1397,6 +1417,37 @@ function stageSkillFilter(
   }
 
   trace.pool_size_after_each_stage.skill = result.length
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// STAGE 4b: Beginners from 60 (older-beginner.ts holds the rule and its basis)
+// ---------------------------------------------------------------------------
+// Leaves out technique lifts, barbells, hanging work and jumps. Per pattern, it
+// yields for technique and barbell lifts only: a movement pattern this would
+// empty keeps those, so no squat, hinge or press goes missing from her week
+// (the pattern floor stands). Hanging and jumping work is never put back.
+
+export function stageOlderBeginnerFilter(
+  pool: ExerciseEntry[],
+  profile: Pick<UserProfile, 'age' | 'training_experience'>,
+  trace: ConstraintTrace
+): ExerciseEntry[] {
+  if (!isOlderBeginner(profile)) return pool
+  const kept = pool.filter(ex => !olderBeginnerExclusion(ex))
+  const keptPatterns = new Set(kept.map(ex => ex.movement_pattern))
+  const result: ExerciseEntry[] = []
+  for (const ex of pool) {
+    const why = olderBeginnerExclusion(ex)
+    if (!why) { result.push(ex); continue }
+    // Hanging and jumping are never put back: with only a pull-up bar her pulling is rows, as a coach would set it.
+    if ((why === 'technique' || why === 'barbell') && !keptPatterns.has(ex.movement_pattern)) {
+      result.push(ex)
+      trace.skill_filtered.push({ exercise: ex.name, stage: 'skill', reason: `beginner from 60: kept, the only ${ex.movement_pattern} option left` })
+      continue
+    }
+    trace.skill_filtered.push({ exercise: ex.name, stage: 'skill', reason: `beginner from 60: ${OLDER_BEGINNER_REASON_TEXT[why]}` })
+  }
   return result
 }
 
@@ -3740,6 +3791,7 @@ function getViableTrack(
   if (named && isTrackViable(TRACKS[named], pool)) return named
 
   const ranked = (Object.keys(TRACKS) as TrackFocus[])
+    .filter(focus => focus !== 'Full Body Strength')
     .map(focus => ({ focus, available: countAvailableForTrack(TRACKS[focus], pool) }))
     .sort((a, b) => b.available - a.available)
 
@@ -3750,6 +3802,11 @@ function getViableTrack(
   // track has the most material so the session is as full as it can be
   // rather than empty.
   return ranked[0]?.available > 0 ? ranked[0].focus : candidate
+}
+
+/** "Full Body Power" for a beginner is "Full Body Strength": the same session, without a name promising power work. */
+export function beginnerTrackName<T extends string>(focus: T, experience: TrainingExperience | undefined): T | 'Full Body Strength' {
+  return focus === 'Full Body Power' && experience === 'beginner' ? 'Full Body Strength' : focus
 }
 
 // The three questions above, for a gate to ask directly. A rule only reachable
@@ -5887,6 +5944,7 @@ export function getConstrainedPool(
     pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), (equipmentTierFor(profile) || 'full_gym'))
   }
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', throwaway)
+  pool = stageOlderBeginnerFilter(pool, profile, throwaway)
   return pool
 }
 
@@ -6037,6 +6095,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
 
   // STAGE 4: Skill / experience
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', trace)
+  pool = stageOlderBeginnerFilter(pool, profile, trace)
 
   trace.pool_size_after_each_stage.final = pool.length
 
@@ -6086,7 +6145,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // contents depend on the others': a week-support leg slot is only filled
   // where the rest of the week trains legs once. getViableTrack draws nothing
   // from the random source, so resolving up front moves no other pick.
-  const resolvedTracks = availableDays.map((_, index) => getViableTrack(split[index], pool))
+  const resolvedTracks = availableDays.map((_, index) => beginnerTrackName(getViableTrack(split[index], pool), profile.training_experience))
 
   const days: WorkoutDay[] = availableDays.map((day, index) => {
     const trackFocus = resolvedTracks[index]

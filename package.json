@@ -676,6 +676,7 @@
     "test:food-figures": "tsx scripts/test-food-figures.ts",
     "verify:deep-pool": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/deep-pool.mjs",
     "test:pathway": "tsx scripts/test-pathway.ts",
+    "test:older-beginner": "tsx scripts/test-older-beginner.ts",
     "measure:pathway-personas": "tsx scripts/measure-pathway-personas.ts",
     "verify:pathway": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/pathway.mjs",
     "verify:running-day": "vite build --config .tour-harness/vite.config.ts && node .tour-harness/running-day.mjs",
