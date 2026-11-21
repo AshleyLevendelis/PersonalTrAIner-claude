@@ -91,7 +91,7 @@ middle tab. Photos sent to the coach are read once to answer and are not stored.
 
 0. DECIDED 20 Nov 2026: the app ID stays `app.personaltrainer.coach` (his choice; permanent after the first upload).
 
-1. The contact email on the privacy page and both listings.
+1. DECIDED 20 Nov 2026: the public contact email is ashleylevendelis@gmail.com (his choice; on the privacy page and both listings).
 2. **Apple's rule on AI (guideline 5.1.2)**: an app must say clearly when personal data is sent to a third-party AI and
    get the person's permission first. The coach sends your plan, logs and profile to Google's Gemini to write each
    reply. The privacy page says so, but the app never asks. Before the App Store submission the app needs a one-time
