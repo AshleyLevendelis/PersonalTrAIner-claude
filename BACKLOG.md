@@ -2,6 +2,43 @@
 
 Newest first. One line each.
 
+- [x] **BEGINNERS FROM 60 GET A PLAN A COACH WOULD SIGN: his request 21 Nov 2026**, "run a test on a 60year old
+  beginner woman", then "fix those five issues for beginners over 60. tighten the beginner and 60+ selection rules".
+  MEASURED FIRST (60, female, beginner, full gym, functional, 3 days, 30-45 min, seeded): day one held Trap Bar
+  Deadlift and Barbell Squats, Pull-Up Negatives and Pull-Ups (Assisted), a Landmine Press at ~20 kg (the empty bar,
+  barbell loading mode) beside a 4 kg-a-hand dumbbell press, two days named "Full Body Power", and no balance work
+  (balance started at 65). Every pick was legal under the beginner rules.
+  CHANGED (all CSCS, mine, under his 18 Sep delegation; basis in `src/lib/older-beginner.ts`): a beginner aged 60+
+  is not given (1) technique lifts (the skill table's moderate/high, plus single-leg RDLs and the reverse hyper),
+  (2) barbell-mode lifts (Olympic bar, trap bar, t-bar, landmine, Smith), which cannot start below the bar, (3)
+  hanging kit (pull-up bar, assisted pull-up machine, dip bars), (4) jumps (the pregnancy impact list). Basis: an
+  older adult new to training learns squat, hinge and press on implements that start near zero and rise in small
+  steps; the barbell comes once there is a technique base; a seated pulldown trains the vertical pull without the
+  grip and bodyweight demand; impact comes last (ACSM older-adult guidance). One pool stage after skill, in BOTH
+  generation and `getConstrainedPool`, so the swap shortlist agrees. A pattern it would empty keeps its technique or
+  barbell lifts (no week loses its squat); hanging and jumping are never put back (pulling is rows then, as a coach
+  would set it). Balance hold in the warm-up from 60 for a beginner (65 for everyone, unchanged), basis: balance is in
+  every older-adult guideline, earlier for the deconditioned. A beginner's "Full Body Power" day is named "Full Body
+  Strength" (same track, any age): a beginner never gets a power phase, so the name promised work the day lacks.
+  His 13 Nov "age only adds safeguards" holds: nothing is lighter, shorter or fewer sets; only WHICH exercise changes,
+  and every rule lifts once she is no longer a beginner.
+  AFTER (same profile): Goblet Squats, Kettlebell Deadlift / Back Extension / Machine Hip Thrust for the hinge, Lat
+  Pulldown, dumbbell presses and rows, Step-Ups, carries; balance hold every lifting day; "Full Body Strength".
+  CSCS REVIEW: (1) effect: the same patterns and volume, on implements she can load from near zero; (2) takes away:
+  barbell and hanging options for this group only; measured on 768 plans for a 62-year-old beginner (4 kits x 4
+  styles x 4 goals x 4 day counts x 3 lengths), 0 leaks, 0 days without balance, 0 named Power; (3) fundamentals:
+  every week still squats, hinges, pushes and pulls (gate); quality 96 plans with injuries: mean 11.46 / min 10.90 at
+  62 against 11.42 / 10.70 at 59 (floor 7.2); (4) no floor or ceiling redefined; balance adds 2 minutes of warm-up;
+  (5) in scope, no rehab or diagnosis.
+  NAMED, NOT DONE: (a) her main hinge is a tie between Kettlebell Deadlift, Back Extension Machine and Machine Hip
+  Thrust (equal on every ranking factor), so which one she gets is the seed's; the kettlebell deadlift is the one a
+  coach would teach first, and preferring it is a ranking change; (b) a landmine press is priced at the bar for
+  EVERYONE, though a landmine puts roughly half of it in the hand: a pricing question for all ages, not fixed here;
+  (c) the calorie estimate reads "power" in a day's name; "Full Body Strength" is given the same 7.0 METs so no
+  target moves (a check in the gate); (d) not driven in a browser: the name and the balance line
+  render through existing components.
+  CHECKS: `test:older-beginner` (45 checks; 16 mutations, 16 caught, each checked to apply and to run all 43).
+
 - [x] **A COACH REPLY CAN BE REPORTED FROM INSIDE THE APP: his "1, build it", 20 Nov 2026**, from three options (a flag
   kept for him to review; over a mailto link and over leaving it). Google Play requires an app with AI-generated content
   to let people report it in the app. A small flag beside each finished coach reply opens "Report this reply": four
