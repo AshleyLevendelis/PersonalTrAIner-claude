@@ -9884,6 +9884,29 @@ export function generateMesocycle(
             chestSets += 1
           }
         }
+        // FRONT AND BACK OF THE THIGH IN PROPORTION (22 Nov 2026, the persona audit's C13; CSCS, mine): a short three-day week
+        // had squat 3 + squat 3 against a deadlift trimmed to 2, a home week a trap-bar deadlift at 5 sets against a front
+        // squat at 2. Neither side over 2.5x the other (single-leg work counts half to each, as both sides work): a set
+        // moves from the heavy side's largest exercise to the light side's smallest, within role limits, or with no room
+        // on the light side the heavy side just gives one (do less). Only with eight or more leg sets a week to weigh.
+        {
+          const QUAD = ['knee_dominant', 'isolation_quad'], HAM = ['hip_hinge', 'isolation_hamstring']
+          const rows = days.flatMap(d => d.exercises.filter(ex => { const x = findEntry(ex.name); return !!x && x.mechanics_tier !== 'primer' && [...QUAD, ...HAM, 'single_leg'].includes(x.movement_pattern) }))
+          const side = (ps: string[]) => rows.filter(ex => ps.includes(findEntry(ex.name)!.movement_pattern))
+          const total = (ps: string[]) => side(ps).reduce((n, ex) => n + ex.sets, 0) + side(['single_leg']).reduce((n, ex) => n + ex.sets, 0) / 2
+          for (let guard = 0; guard < 8; guard++) {
+            const q = total(QUAD), h = total(HAM)
+            if (q + h < 8 || (q <= h * 2.5 && h <= q * 2.5)) break
+            const [heavy, light] = q > h ? [QUAD, HAM] : [HAM, QUAD]
+            const roleOf = (ex: Exercise) => getVolumeRole(findEntry(ex.name)!)
+            const donor = side(heavy).filter(ex => { const r = roleOf(ex); return !!r && ex.sets > getRoleSetFloor(r) && !blockRequired.has(ex.name) }).sort((a, b) => b.sets - a.sets)[0]
+              ?? side(heavy).filter(ex => { const r = roleOf(ex); return !!r && ex.sets > getRoleSetFloor(r) }).sort((a, b) => b.sets - a.sets)[0]
+            const receiver = side(light).filter(ex => { const r = roleOf(ex); return !!r && ex.sets < getRoleSetCeiling(r, true) }).sort((a, b) => a.sets - b.sets)[0]
+            if (!donor && !receiver) break
+            if (receiver) receiver.sets += 1
+            if (donor && (!receiver || q + h >= 8)) donor.sets -= 1
+          }
+        }
         // A BEGINNER'S CAP, after the balance pass (so nothing adds a set back) and before the filler (so the time it
         // frees goes to optional mobility). capBeginnerSets says why.
         {
