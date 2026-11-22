@@ -7688,6 +7688,15 @@ const FILLER_TRIGGER_SECONDS = 15 * 60
  */
 export const BEGINNER_MAX_WORKING_SETS = 18
 
+/**
+ * A BAD BACK'S SESSION HOLDS AT MOST 22 WORKING SETS (his "yes fix all four", 21 Nov 2026; CSCS, mine). A
+ * 50-year-old with his lower back on the injuries list had a 26-set Monday: every standing or braced set asks the trunk
+ * to hold position, and with back pain that fatigue is what a coach manages, so the high tail is trimmed, isolation
+ * first, by the same rules as the beginner cap. 22 sits above the intermediate median (17) and cuts only the tail.
+ * A beginner keeps 18.
+ */
+export const LOWER_BACK_MAX_WORKING_SETS = 22
+
 export function beginnerWorkingSets(day: WorkoutDay): number {
   return day.exercises.reduce((n, ex) => {
     const entry = findEntry(ex.name)
@@ -7696,10 +7705,10 @@ export function beginnerWorkingSets(day: WorkoutDay): number {
   }, 0)
 }
 
-export function capBeginnerSets(day: WorkoutDay, protectedNames: ReadonlySet<string> = new Set()): WorkoutDay {
+export function capBeginnerSets(day: WorkoutDay, protectedNames: ReadonlySet<string> = new Set(), maxSets: number = BEGINNER_MAX_WORKING_SETS): WorkoutDay {
   let exercises = day.exercises
   let guard = 0
-  while (beginnerWorkingSets({ ...day, exercises }) > BEGINNER_MAX_WORKING_SETS && guard++ < 60) {
+  while (beginnerWorkingSets({ ...day, exercises }) > maxSets && guard++ < 60) {
     const rows = exercises.map((ex, i) => {
       const entry = findEntry(ex.name)
       const role = entry ? getVolumeRole(entry) : null
@@ -9638,8 +9647,10 @@ export function generateMesocycle(
         enforceWeeklyPatternBalance(days, { keepPulling: keepPullingThisPlan })
         // A BEGINNER'S CAP, after the balance pass (so nothing adds a set back) and before the filler (so the time it
         // frees goes to optional mobility). capBeginnerSets says why.
-        if (experience === 'beginner') {
-          for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0) days[i] = capBeginnerSets(days[i], blockRequired)
+        {
+          const cap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS
+            : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : null
+          if (cap != null) for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0) days[i] = capBeginnerSets(days[i], blockRequired, cap)
         }
         // THE FILLER SIZES ITSELF ON THE DAY AS IT WILL SHIP (18 Nov 2026).
         // It used to run just BEFORE the balance pass, which then took a set

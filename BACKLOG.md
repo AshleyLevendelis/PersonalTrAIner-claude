@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **A BAD BACK, READ AS A COACH: his "yes fix all four"** (21 Nov 2026; CSCS, mine). A 50-year-old with his lower
+  back on the injuries list was given a hack squat to 150kg, Smith-machine split squats (bar across the back), a
+  reverse hyper as Friday's main hip lift to 72.5kg, and a 26-set Monday. FIXED: five entries gain `lower_back_axial`
+  in `contraindicated_joints` (load on the shoulders/spine, or swinging the lower back under load): Hack Squat, Smith
+  Machine Split Squat, Reverse Hyper Machine, Smith Machine Calf Raise, Standing Calf Raise Machine. Not tagged, on
+  purpose: Belt Squat (load from the hips, built to spare the spine), goblet and dumbbell front squats and dumbbell
+  split squats (held in the hands). THIS REVERSES an earlier tagging choice recorded in `test:joint-tag-states` (the
+  reverse hyper "mirrors Hip Thrust's almost nothing on the spine"): a hip thrust loads the hips with the spine
+  braced; a reverse hyper swings the lumbar spine through flexion and extension under load, which is not first-line
+  for back pain. The hack squat keeps its knee verdict (his 15 Nov "knee keeps machine leg work"). And a bad back's
+  session holds at most 22 working sets (`LOWER_BACK_MAX_WORKING_SETS`, the beginner cap's machinery; a beginner keeps
+  18): trunk fatigue across many braced sets is what a coach manages with back pain; 22 trims only the tail.
+  His plan now: belt squat, machine hip thrust, dumbbell hip thrust as main lifts; every session 22 sets or fewer.
+  CHECKS: new `test:bad-back` (20 checks; 7 mutations, 7 caught: each tag, the cap and its switch). Counts that pin
+  what an injury removes moved on purpose, with the reason beside them: `test:injury-coverage` and
+  `test:joint-tag-states` lower_back 34 -> 39. Re-run green: enforcement-gaps, injury-adaptation-safety,
+  rehab-prescribed, injury-rebuild, other-injury, pattern-floor, day-purpose, shoulders-day, week-shape,
+  advanced-lifter, older-beginner, pregnancy-rules, session-length, audit, coach-swap-pick, no-dead-code, bundle.
+
 - [x] **PREGNANCY FROM 28 WEEKS, AND PELVIC FLOOR WORK: his "yes fix all four"** (21 Nov 2026), after reading a
   30-year-old's plan at about 20 weeks. (1)+(2) CSCS, mine: a block that reaches 28 weeks (read at its LAST week's date,
   so a little early, the safe side) swaps split-stance and single-leg work (lunges, split squats, step-ups, single-leg

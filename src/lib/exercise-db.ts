@@ -1933,7 +1933,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Torso flat and fixed on the pad, hips at the edge', 'Legs hang free at the start', 'Swing the legs up to torso height, squeezing the glutes', 'Lower under control — no swinging momentum'],
     coach_note_swap: 'Loads the glutes and hamstrings with the spine passive, not compressed — a genuine option when a hinge is off the table.',
     loads_joints: ['hip'],
-    contraindicated_joints: [],
+    // 21 Nov 2026 (his "yes fix all four", CSCS): the load rests on the shoulders/spine or swings the lower back
+    // under load, so a bad back is kept off it (belt squat, leg press, seated calf raise and pull-through instead).
+    contraindicated_joints: ['lower_back_axial'],
     style_tags: ['bodybuilding', 'functional', 'hybrid'],
     substitution_group: 'hip_hinge',
     unilateral: false,
@@ -2528,7 +2530,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     // NOT CONTRAINDICATED FOR A KNEE, since 15 Nov 2026 (his ruling, after Marcus's knee surgery): a supported machine whose
     // load the person sets is the usual way back to loaded leg work; it stays in a knee-flagged plan, priced lighter
     // (load-prescription.ts, flaggedJointLoadFactor). Free-weight squats, lunges and jumps stay out.
-    contraindicated_joints: [],
+    // 21 Nov 2026 (his "yes fix all four", CSCS): the load rests on the shoulders/spine or swings the lower back
+    // under load, so a bad back is kept off it (belt squat, leg press, seated calf raise and pull-through instead).
+    contraindicated_joints: ['lower_back_axial'],
     style_tags: ['bodybuilding', 'hybrid'],
     substitution_group: 'squat',
     unilateral: false,
@@ -3125,7 +3129,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     name: 'Standing Calf Raise Machine',
     id: 'standing-calf-raise-machine',
     movement_pattern: 'isolation_calf',
-    contraindicated_joints: ['ankle'],
+    // 21 Nov 2026 (his "yes fix all four", CSCS): the load rests on the shoulders/spine or swings the lower back
+    // under load, so a bad back is kept off it (belt squat, leg press, seated calf raise and pull-through instead).
+    contraindicated_joints: ['ankle', 'lower_back_axial'],
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
     angle_vector: 'vertical',
@@ -5638,7 +5644,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Bar on the upper back, one foot forward, one back', 'Drop the back knee straight down', 'Front shin stays fairly upright', 'Drive up through the front foot'],
     coach_note_swap: 'Single-leg work with the balance taken care of, so you can load it properly.',
     loads_joints: ['knee'],
-    contraindicated_joints: ['ankle', 'hip', 'knee'],
+    // 21 Nov 2026 (his "yes fix all four", CSCS): the load rests on the shoulders/spine or swings the lower back
+    // under load, so a bad back is kept off it (belt squat, leg press, seated calf raise and pull-through instead).
+    contraindicated_joints: ['ankle', 'hip', 'knee', 'lower_back_axial'],
     style_tags: ['bodybuilding', 'hybrid'],
     // The empty Smith bar is the lightest it can go (about 20kg), well above a beginner's 4kg dumbbells on the same
     // movement; a beginner gets the dumbbell version.
@@ -6178,7 +6186,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     name: 'Smith Machine Calf Raise',
     id: 'smith-machine-calf-raise',
     movement_pattern: 'isolation_calf',
-    contraindicated_joints: ['ankle'],
+    // 21 Nov 2026 (his "yes fix all four", CSCS): the load rests on the shoulders/spine or swings the lower back
+    // under load, so a bad back is kept off it (belt squat, leg press, seated calf raise and pull-through instead).
+    contraindicated_joints: ['ankle', 'lower_back_axial'],
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
     angle_vector: 'vertical',
