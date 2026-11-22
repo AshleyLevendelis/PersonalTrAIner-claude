@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [x] **SETUP'S BUTTONS CAME BACK FOR "WHERE WILL YOU BE TRAINING?": his report 22 Nov 2026** ("the onboarding has
+  regressed a bit. it didn't offer buttons for all the relevant questions, such as full gym, etc."). CAUSE, measured:
+  the app shows a question's buttons only when it recognises the coach's sentence as asking that question (so buttons
+  never sit under the wrong one). That morning's friendlier wording changed what the setup coach is told each question
+  MEANS ("What equipment do you have access to?" became "Where will you be training?"), so it now asks about the PLACE
+  ("Are you training at a gym, at home, or a bit of both?", "Where are you planning to train?"), and the recogniser knew
+  only the kit words. Run over 59 likely phrasings of the reworded questions: 10 came with no buttons even with the
+  coach asking for them, 5 of those the gym question; the others were the goal ("what do you want out of this"),
+  experience ("done much training before"), a doctor's line on injuries and "what sort of training". All 59 now.
+  The new place words must sit in a question (gym AND home in it, or "where ... train / work out / do your workouts"),
+  and two wrong-card cases hold that a question about something else does not pull the gym buttons.
+  `test:onboarding-chip-match` (95 checks; 6 of 6 mutations caught, a 7th, "gym membership", was already covered by
+  the gym-and-home rule and was removed rather than kept). NOT proven against the real coach: its words are the model's.
+  Frontend only, no deploy beyond the merge.
+
 - [x] **ONE TOUR, AND EVERY STOP SHOWS WHAT IT DESCRIBES: his words 22 Nov 2026** ("Walk the tour. Make sure every
   step shows what it is describing. Even if it's trying to show how to log a set on a day that there is no sets to log
   it should still show the user. The tour should also show the about exercise tab, and everything in it, the muscle
