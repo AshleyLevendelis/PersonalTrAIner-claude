@@ -49,10 +49,13 @@ check('every week from 3 to 16 keeps two strength days', knee.slice(2).every(w =
   knee.slice(2).map(w => strengthDays(w).length).join(''))
 const s3 = strengthDays(knee[2])
 check('the strength days are not back to back (Monday and Friday)', s3.map(d => d.day).join(',') === 'Monday,Friday', s3.map(d => d.day).join(','))
-const names3 = s3[0]?.exercises.map(e => e.name) ?? []
+// The four-move circuit, read apart from the balance hold, which a beginner from 60 now carries too (21 Nov 2026).
+const circuit3 = (s3[0]?.exercises ?? []).filter(e => e.name !== BALANCE_HOLD)
+const names3 = circuit3.map(e => e.name)
+const withHold3 = s3[0]?.exercises.map(e => e.name) ?? []
 check('the circuit is squat, push, pull and hinge', names3.length === 4 && ['Incline Push-Ups', 'Towel Row', 'Glute Bridge'].every(n => names3.includes(n)), names3.join(', '))
 check('...each carrying its pattern and a real tier, so every pass that reads them knows what they are',
-  (s3[0]?.exercises ?? []).map(e => e.movement_pattern).join() === 'squat,push,pull,hinge' && (s3[0]?.exercises ?? []).every(e => e.tier === 'tier_2_secondary'))
+  circuit3.map(e => e.movement_pattern).join() === 'squat,push,pull,hinge' && circuit3.every(e => e.tier === 'tier_2_secondary'))
 check('with a sore knee the squat is the Wall Sit, not the Box Squat', names3.includes('Wall Sit') && !names3.includes('Box Squat (Bodyweight)'), names3.join(', '))
 const flagged = getFlaggedJoints(['knees'])
 const unsafe = knee.flatMap(w => strengthDays(w).flatMap(d => d.exercises)).filter(e => { const en = getExerciseEntry(e.name); return !en || isContraindicatedFor(en, flagged) })
@@ -60,12 +63,19 @@ check('nothing in any week is ruled out by the knee', unsafe.length === 0, unsaf
 check('two sets each, 8-12 reps in week 3', (s3[0]?.exercises ?? []).every(e => e.sets === 2) && s3[0]?.exercises.find(e => e.name === 'Towel Row')?.reps === '8-12')
 check('more reps from week 9, still two sets', strengthDays(knee[8])[0]?.exercises.find(e => e.name === 'Towel Row')?.reps === '12-15'
   && strengthDays(knee[8])[0]?.exercises.every(e => e.sets === 2))
-check('45 seconds between sets, never 30', (s3[0]?.exercises ?? []).every(e => e.rest === '45s'))
+check('45 seconds between sets, never 30', circuit3.length === 4 && circuit3.every(e => e.rest === '45s'))
 check('the walk follows the strength work, at the walk\'s own effort', s3[0]?.recommendedCardio?.activity === 'Walk'
   && s3[0]?.recommendedCardio?.timing === 'post_session' && s3[0]?.recommendedCardio?.targetRpe === 3)
 const mins = circuitMinutes(s3[0]?.exercises ?? [])
 check('the circuit is about 15 minutes by the app\'s own clock (10 to 16)', mins >= 10 && mins <= 16, `${mins} min`)
-check('no balance hold under 65', !names3.includes(BALANCE_HOLD))
+// RE-ANCHORED 21 Nov 2026: balance from 60 for a beginner (older-beginner.ts), and this persona is 62 and a beginner.
+check('a beginner of 62 gets the balance hold (from 60 for a beginner)', withHold3.includes(BALANCE_HOLD), withHold3.join(', '))
+{
+  setRandomSource(seededRngFromKey('p62-knee'))
+  const at59 = generateMesocycle({ ...persona('p62-knee'), age: 59 })
+  const n59 = strengthDays(at59[2])[0]?.exercises.map(e => e.name) ?? []
+  check('...and at 59 she does not (the rule starts at 60)', n59.length > 0 && !n59.includes(BALANCE_HOLD), n59.join(', '))
+}
 
 console.log('\n3. The walk on a strength day fits the session he set aside, never under 15 minutes')
 const wk16 = strengthDays(knee[15])[0]

@@ -1663,9 +1663,15 @@ export function loadLabelMode(isDumbbell: boolean, isSingleSide: boolean, isLowe
  * error alone, because the caption is what a trainee uses to decide whether
  * to load one dumbbell or two.
  */
+const ONE_LEG_NAME = /single[- ]leg|one[- ]leg|iso-lateral|kickback/i
+
 export function labelModeForEntry(entry: ExerciseEntry): LoadLabelMode {
   const mode = loadingMode(entry)
-  return loadLabelMode(mode === 'dumbbell', isPerSideLoad(entry) && mode !== 'dumbbell', isLowerBodyMovement(entry))
+  // "PER LEG" NEEDS ONE LEG WORKING (21 Nov 2026). Load on one side plus leg muscles was read as one leg, so a
+  // Suitcase Deadlift (one dumbbell at the side, both feet down) said "per leg". A stack machine worked one leg at a
+  // time, or a name that says so, is per leg; anything else held on one side is "(single side)".
+  const oneLeg = mode === 'stack' || ONE_LEG_NAME.test(entry.name)
+  return loadLabelMode(mode === 'dumbbell', isPerSideLoad(entry) && mode !== 'dumbbell', isLowerBodyMovement(entry) && oneLeg)
 }
 
 export function formatLoad(kg: number, labelMode: LoadLabelMode): string {
@@ -2540,7 +2546,16 @@ const ADDED_LOAD_BODYWEIGHT_FRACTION: Record<TrainingExperience, number> = {
 // 'consolidation' is a beginner's third block — strength's config under a
 // true name (periodization.ts). It keys here exactly as strength does so the
 // rename changes nothing about how the bar is loaded.
-const ADDED_LOAD_PHASES: ReadonlySet<string> = new Set(['strength', 'power', 'consolidation'])
+const ADDED_LOAD_PHASES: ReadonlySet<string> = new Set(['strength', 'power', 'consolidation', 'hypertrophy'])
+
+/**
+ * A MUSCLE-BUILDING BLOCK LOADS THEM TOO, LIGHTER (his "yes fix all five", 21 Nov 2026; CSCS, mine). Measured: an
+ * advanced 85kg man was handed 5x6-8 bodyweight pull-ups in both hypertrophy blocks, a set he could do twice over, and
+ * +15kg only in the strength block. At 6-10 reps a coach belts pull-ups and dips for anyone past novice; at about 60%
+ * of the strength block's figure, so the strength block still steps up. The rep guard (ADDED_LOAD_MAX_REPS) still
+ * holds: a 12-rep week gets no belt.
+ */
+const ADDED_LOAD_PHASE_SCALE: Readonly<Record<string, number>> = { hypertrophy: 0.6 }
 
 /**
  * A guard, not a scale. A heavy block should not be prescribing twelve reps,
@@ -2607,8 +2622,9 @@ export function prescribeAddedLoad(
   // comment in exercise-db.ts; absent means 1.0, so the three-line change
   // that added dips could not silently alter pull-ups.
   const movementScale = entry.added_load_scale ?? 1
+  const phaseScale = ADDED_LOAD_PHASE_SCALE[options.phase] ?? 1
   let kg = Math.min(
-    body.weightKg * fraction * movementScale,
+    body.weightKg * fraction * movementScale * phaseScale,
     body.weightKg * ADDED_LOAD_MAX_BODYWEIGHT_FRACTION,
   )
 

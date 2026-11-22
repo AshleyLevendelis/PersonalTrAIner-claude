@@ -5,13 +5,15 @@ import type {
   ConstraintTrace, ConstraintTraceEntry, PlanResult, TrainingExperience,
 } from './types'
 import { getAppNow, getLocalDateString } from './dev-clock'
-import { EXERCISE_DATABASE, INJURED_JOINTS, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, EXPLOSIVE_PREP_GROUPS, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup, getExerciseEntry } from './exercise-db'
+import { EXERCISE_DATABASE, INJURED_JOINTS, getMovementFamily, isGenuineDuplicate, getVolumeRole, muscleGroupsOf, meetsCapabilityRequirement, getExerciseId, contraindicatedJoints, isContraindicatedFor, isIndicatedFor, isRehabOnly, isBandEquipped, isBallisticMovement, jointListDisplay, NEAREST_PATTERN_FALLBACK, EXPLOSIVE_PREP_GROUPS, type ExerciseEntry, type MovementPattern, type AngleVector, type VolumeRole, type MuscleGroup, getExerciseEntry } from './exercise-db'
 import {
   getExperienceConfig, getSkillDemand, isSkillAppropriate, applyRepFloor,
   type ExperienceConfig,
 } from './experience-config'
+import { PREGNANCY_LATE_EXCLUDED, PREGNANCY_LATE_REPLACEMENTS, lateReplacementKind, PELVIC_FLOOR_WARMUP_ITEM, pregnancyExclusion as pregnancyExclusionLate } from './pregnancy-rules'
+import { isOlderBeginner, olderBeginnerExclusion, olderAdultExclusion, OLDER_BEGINNER_REASON_TEXT, OLDER_BEGINNER_FOUNDATIONS } from './older-beginner'
 import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields, withBalanceWork } from './warmup'
-import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
+import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, isPerSideLoad, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, repFloorFor, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, stepHoldSeconds, getPhaseTempo, formatTempo, PHASE_CONFIGS, type PhaseConfig, type TrainingPhase,
@@ -38,6 +40,7 @@ type TrackFocus =
   | 'Squat & Carry'
   | 'Upper Pull & Core'
   | 'Full Body Power'
+  | 'Full Body Strength'
   | 'Conditioning & Core'
   | 'Chest & Triceps'
   | 'Back & Biceps'
@@ -235,6 +238,24 @@ export const TRACKS: Record<TrackFocus, TrackDefinition> = {
   },
   'Full Body Power': {
     label: 'Full Body Power',
+    primary_patterns: ['hip_hinge', 'knee_dominant', 'horizontal_push', 'vertical_pull'],
+    secondary_patterns: ['single_leg', 'core'],
+    forbidden_patterns: [],
+    primer_patterns: ['hip_hinge', 'knee_dominant', 'horizontal_push', 'vertical_pull'],
+    required_patterns: [],
+    defining_patterns: [],
+    slots: [
+      { patterns: ['knee_dominant', 'hip_hinge'], tier: 'tier1_compound', required: true },
+      { patterns: ['horizontal_push'], tier: 'tier2_compound', required: true },
+      { patterns: ['vertical_pull', 'horizontal_pull'], tier: 'tier2_compound', required: true },
+      { patterns: ['single_leg'], tier: 'tier2_compound', required: false },
+      { patterns: ['core'], tier: 'tier3_isolation', required: false },
+    ],
+  },
+  // THE SAME SESSION, NAMED FOR WHAT IT IS (21 Nov 2026): used when the plan has no power block, so
+  // "Power" named work the day does not hold. Only ever reached by fullBodyTrackName; getViableTrack's ranking skips it.
+  'Full Body Strength': {
+    label: 'Full Body Strength',
     primary_patterns: ['hip_hinge', 'knee_dominant', 'horizontal_push', 'vertical_pull'],
     secondary_patterns: ['single_leg', 'core'],
     forbidden_patterns: [],
@@ -604,6 +625,22 @@ const EQUIPMENT_SETS: Record<EquipmentAccess, Set<string> | null> = {
 //     ranking a treadmill against a barbell is a category error.
 // Both cases fall through to a 0 contribution rather than a low one, so an
 // unranked entry is never quietly penalised for being unranked.
+/**
+ * TRUNK WORK KEEPS ITS OWN REPS (his "yes fix all five", 21 Nov 2026; CSCS, mine). A strength block takes a squat to
+ * 3-5; it took hanging leg raises and ab-wheel rollouts (catalogued tier 2) to 6-8 with it. The trunk's job in lifting
+ * is to hold position under fatigue, trained with 8 or more controlled reps (or a hold), never a heavy low-rep set.
+ */
+const CORE_REP_FLOOR = 8
+
+/**
+ * Rows whose weight is capped by the plank you hold, not the back you train (21 Nov 2026, CSCS): a renegade row is
+ * anti-rotation work first, so on a muscle-gain plan it ranks below a row the back can actually load.
+ */
+const STABILITY_LIMITED_FOR_HYPERTROPHY: ReadonlySet<string> = new Set(['Renegade Row'])
+
+/** Household furniture standing in for a machine or a bench (bestEquipmentRank). */
+const IMPROVISED_FURNITURE: ReadonlySet<string> = new Set(['Chair Leg Extension', 'Chair Dips', 'Table Row', 'Towel Row'])
+
 export const EQUIPMENT_QUALITY: Record<string, 'high' | 'medium' | 'low'> = {
   // Externally loaded in fine increments — the tools a working set is
   // actually built on.
@@ -689,6 +726,10 @@ export const EQUIPMENT_QUALITY: Record<string, 'high' | 'medium' | 'low'> = {
  * option they'd choose, or the primary implement rather than its furniture.
  */
 export function bestEquipmentRank(entry: ExerciseEntry): 'high' | 'medium' | 'low' | null {
+  // IMPROVISED KIT IS IMPROVISED WHATEVER ELSE IT LISTS (21 Nov 2026, the four leftovers): a backpack row lists
+  // 'bodyweight' so a bodyweight trainee can have it, and that 'medium' won over the backpack's 'low', so the
+  // improvised-over-real penalty never fired: a backpack row in 331 of 1,024 gym plans, a chair leg extension in 267.
+  if (entry.equipment.includes('weighted backpack') || IMPROVISED_FURNITURE.has(entry.name)) return 'low'
   let best: 'high' | 'medium' | 'low' | null = null
   for (const eq of entry.equipment) {
     const rank = EQUIPMENT_QUALITY[eq]
@@ -1111,6 +1152,17 @@ function stageInjuryFilter(
 }
 
 // ---------------------------------------------------------------------------
+// STAGE 2a: Rehab-only drills stay with the injury they treat (exercise-db.ts REHAB_ONLY says why)
+// ---------------------------------------------------------------------------
+function stageRehabOnlyFilter(pool: ExerciseEntry[], flaggedJoints: Set<string>, trace: ConstraintTrace): ExerciseEntry[] {
+  return pool.filter(e => {
+    if (!isRehabOnly(e) || isIndicatedFor(e, flaggedJoints)) return true
+    trace.injury_filtered.push({ exercise: e.name, stage: 'injury', reason: 'rehab drill for an injury not on the list' })
+    return false
+  })
+}
+
+// ---------------------------------------------------------------------------
 // STAGE 2b: Pregnancy (his ruling 14 Nov 2026, "Exercise rules only"; pregnancy-rules.ts)
 // ---------------------------------------------------------------------------
 
@@ -1123,17 +1175,25 @@ function stagePregnancyFilter(
   pool: ExerciseEntry[],
   equipmentPool: ExerciseEntry[],
   pregnant: boolean,
-  trace: ConstraintTrace
+  trace: ConstraintTrace,
+  /**
+   * THE INJURIES TOO (21 Nov 2026, his "yes fix all three"). The replacement comes from the equipment pool, from
+   * BEFORE the injury stage, and was never asked about her injuries: a pregnant woman with a bad lower back had a
+   * lying glute bridge "replaced" by Deadlifts, in every week of 64 of 64 measured plans with a back, knee, hip or
+   * wrist on the list. A replacement now clears the injury rule as well as the pregnancy one.
+   */
+  flaggedJoints: Set<string> = new Set(),
 ): ExerciseEntry[] {
   if (!pregnant) return pool
   const poolNames = new Set(pool.map(e => e.name))
   const added = new Set<string>()
   const result: ExerciseEntry[] = []
-  const usable = (r: ExerciseEntry, ex: ExerciseEntry) => r.name !== ex.name && !pregnancyExclusion(r) && !poolNames.has(r.name) && !added.has(r.name)
+  const usable = (r: ExerciseEntry, ex: ExerciseEntry) => r.name !== ex.name && !pregnancyExclusion(r)
+    && !isContraindicatedFor(r, flaggedJoints) && !poolNames.has(r.name) && !added.has(r.name)
   for (const ex of pool) {
     const why = pregnancyExclusion(ex)
     if (!why) { result.push(ex); continue }
-    trace.injury_filtered.push({ exercise: ex.name, stage: 'injury', reason: why === 'impact' ? 'pregnancy: impact' : 'pregnancy: lying flat' })
+    trace.injury_filtered.push({ exercise: ex.name, stage: 'injury', reason: why === 'impact' ? 'pregnancy: impact' : why === 'lying' ? 'pregnancy: lying flat' : 'pregnancy: strains the stomach wall' })
     // SAME GROUP ONLY, as the injury stage. A wider "same movement pattern" fallback was measured (15 Nov 2026) and
     // removed: it brought kettlebell swings, a ballistic hinge, in for a floor glute bridge, which a coach would not add
     // for a pregnant trainee by accident. Plan quality was unchanged without it.
@@ -1397,6 +1457,42 @@ function stageSkillFilter(
   }
 
   trace.pool_size_after_each_stage.skill = result.length
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// STAGE 4b: Age rules (older-beginner.ts holds them and their basis): from 65 at any
+// level no landing-impact jumps; a beginner from 60 the four exclusions below.
+// ---------------------------------------------------------------------------
+// Leaves out technique lifts, barbells, hanging work and jumps. Per pattern, it
+// yields for technique and barbell lifts only: a movement pattern this would
+// empty keeps those, so no squat, hinge or press goes missing from her week
+// (the pattern floor stands). Hanging and jumping work is never put back.
+
+export function stageOlderBeginnerFilter(
+  pool: ExerciseEntry[],
+  profile: Pick<UserProfile, 'age' | 'training_experience'>,
+  trace: ConstraintTrace
+): ExerciseEntry[] {
+  // From 65 at any level: no landing-impact jumps, never put back (older-beginner.ts olderAdultExclusion).
+  const impactOut = pool.filter(ex => olderAdultExclusion(profile, ex))
+  for (const ex of impactOut) trace.skill_filtered.push({ exercise: ex.name, stage: 'skill', reason: 'from 65: a jump with a real landing; fast work without impact instead' })
+  if (impactOut.length) pool = pool.filter(ex => !impactOut.includes(ex))
+  if (!isOlderBeginner(profile)) return pool
+  const kept = pool.filter(ex => !olderBeginnerExclusion(ex))
+  const keptPatterns = new Set(kept.map(ex => ex.movement_pattern))
+  const result: ExerciseEntry[] = []
+  for (const ex of pool) {
+    const why = olderBeginnerExclusion(ex)
+    if (!why) { result.push(ex); continue }
+    // Hanging and jumping are never put back: with only a pull-up bar her pulling is rows, as a coach would set it.
+    if ((why === 'technique' || why === 'barbell') && !keptPatterns.has(ex.movement_pattern)) {
+      result.push(ex)
+      trace.skill_filtered.push({ exercise: ex.name, stage: 'skill', reason: `beginner from 60: kept, the only ${ex.movement_pattern} option left` })
+      continue
+    }
+    trace.skill_filtered.push({ exercise: ex.name, stage: 'skill', reason: `beginner from 60: ${OLDER_BEGINNER_REASON_TEXT[why]}` })
+  }
   return result
 }
 
@@ -2262,6 +2358,7 @@ export function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, raw
   if (policy.preferUnilateralCarry && isUnilateralCarryOrRotational(candidate)) goalFit += 2
   if (policy.goal === 'fat_loss' && candidate.mechanics_tier === 'tier2_compound') goalFit += 1
   if (policy.goal === 'conditioning' && candidate.joint_stress === 'low') goalFit += 1
+  if (policy.goal === 'hypertrophy' && STABILITY_LIMITED_FOR_HYPERTROPHY.has(candidate.name)) goalFit -= 3
   factors.goal_fit = goalFit
 
   // 3. Experience fit — was an absolute "sort after every non-regression"
@@ -2701,6 +2798,8 @@ function selectExercisesForTrack(
   weekTrainsLegsElsewhere: boolean = false,
   /** Later days of this week whose main lift is fixed to a squat or to a hinge (lowerMainToPrefer, below). */
   lowerMainsLater: { squat: number; hinge: number } = { squat: 0, hinge: 0 },
+  /** An older beginner's foundation lifts (older-beginner.ts), tried first for the main lower-body slot. */
+  foundationLifts?: Readonly<Partial<Record<'knee_dominant' | 'hip_hinge', readonly string[]>>>,
 ): { primer: ExerciseEntry | null; rehab: ExerciseEntry | null; main: ExerciseEntry[]; requiredNames: Set<string>; uncoveredPatterns: MovementPattern[]; selectionNotes: Map<string, string> } {
   const counts = applyIsolationSlotShift(countsIn, policy.isolationSlotShift)
   const allPatterns = new Set([...track.primary_patterns, ...track.secondary_patterns])
@@ -2821,6 +2920,7 @@ function selectExercisesForTrack(
           ? groups.includes(e.substitution_group) && e.mechanics_tier !== 'primer'
           : patterns.includes(e.movement_pattern) && !slotForbidden.has(e.movement_pattern)) &&
         (tier === null || e.mechanics_tier === tier) &&
+        !(floorPullTaken && e.mechanics_tier === 'tier1_compound' && getMovementFamily(e) === 'deadlift') &&
         !selected.some(s => s.name === e.name) &&
         !usedGroups.has(getMovementFamily(e)) &&
         (!respectWeeklyUsed || !weeklyUsed.has(e.name))
@@ -2897,14 +2997,46 @@ function selectExercisesForTrack(
   function lowerMainToPrefer(slot: TrackSlot): MovementPattern | null {
     if (slot.tier !== 'tier1_compound' || !slot.patterns.includes('knee_dominant') || !slot.patterns.includes('hip_hinge')) return null
     let squat = lowerMainsLater.squat, hinge = lowerMainsLater.hinge
+    // WHAT A MAIN LIFT IS IN THIS POOL (21 Nov 2026, the all-ages audit): with no tier-1 squat or hinge to be had (a
+    // bodyweight or limited kit), a day's main lower lift is a tier-2 one, and counting tier 1 alone saw none, so every
+    // day took the ranking's pick: 111 of 3,072 bodyweight and dumbbell weeks held no squat at all, a hinge (glute
+    // bridge, single-leg RDL, good morning) built in on every full-body day.
+    const mainTier = pool.some(e => e.mechanics_tier === 'tier1_compound' && (e.movement_pattern === 'knee_dominant' || e.movement_pattern === 'hip_hinge'))
+      ? 'tier1_compound' : 'tier2_compound'
     for (const [name, n] of weeklyAppearanceCount ?? []) {
       const e = getExerciseEntry(name)
-      if (e?.mechanics_tier !== 'tier1_compound') continue
+      if (e?.mechanics_tier !== mainTier) continue
       if (e.movement_pattern === 'knee_dominant') squat += n
       else if (e.movement_pattern === 'hip_hinge') hinge += n
     }
     return squat === hinge ? null : squat < hinge ? 'knee_dominant' : 'hip_hinge'
   }
+
+  /** The first foundation lift (older-beginner.ts) the pool allows for a main lower-body slot; null for everyone else. */
+  function foundationFor(slot: TrackSlot, preferred: MovementPattern | null): ExerciseEntry | null {
+    if (!foundationLifts || slot.tier !== 'tier1_compound') return null
+    const lower = slot.patterns.filter((p): p is 'knee_dominant' | 'hip_hinge' => p === 'knee_dominant' || p === 'hip_hinge')
+    if (lower.length === 0) return null
+    const order = preferred && (lower as MovementPattern[]).includes(preferred) ? [preferred as 'knee_dominant' | 'hip_hinge', ...lower.filter(p => p !== preferred)] : lower
+    // The same foundation on two days is the point, not a repeat to avoid: a beginner learns a lift by practising it
+    // (a goblet squat Wednesday and Friday beats a bodyweight box squat on Friday). So the week's earlier days are not
+    // a reason to skip one.
+    for (const pattern of order) for (const name of foundationLifts[pattern] ?? []) {
+      const e = pool.find(x => x.name === name)
+      if (e && !selected.some(x => x.name === name) && !usedGroups.has(getMovementFamily(e)) && !wouldBeSecondMainLift(e)) return e
+    }
+    return null
+  }
+
+  // ONE HEAVY FLOOR PULL A WEEK (his "yes fix all four", 21 Nov 2026; CSCS, mine). Conventional, sumo and trap-bar
+  // deadlifts are one family, and nothing stopped two of them leading days 48 hours apart: a 40-year-old's week was
+  // squat, sumo deadlift, deadlift. A heavy pull from the floor is the hardest thing in a week on the lower back; a
+  // coach gives one, and makes the second hip day a Romanian deadlift or a hip thrust (or a squat, where the week's
+  // balance asks for one). Read from the week's days already built (weeklyAppearanceCount).
+  const floorPullTaken = [...(weeklyAppearanceCount?.keys() ?? [])].some(n => {
+    const e = getExerciseEntry(n)
+    return !!e && e.mechanics_tier === 'tier1_compound' && getMovementFamily(e) === 'deadlift'
+  })
 
   function fillSlot(slot: TrackSlot): void {
     // Preferred tier wins over "fresh this week" — reusing the same main
@@ -2916,9 +3048,14 @@ function selectExercisesForTrack(
     // slots only, logged) -> give up (required slots only, logged).
     const preferredLowerMain = lowerMainToPrefer(slot)
     const pick =
+      foundationFor(slot, preferredLowerMain) ??
       (preferredLowerMain ? findForSlot([preferredLowerMain], slot.tier, true) ?? findForSlot([preferredLowerMain], slot.tier, false) : null) ??
+      // The week's floor pull is taken and this day wants a hinge: a Romanian deadlift or hip thrust, not a third squat.
+      (preferredLowerMain === 'hip_hinge' && floorPullTaken ? findForSlot(['hip_hinge'], null, true) ?? findForSlot(['hip_hinge'], null, false) : null) ??
       findForSlot(slot.patterns, slot.tier, true, slot.groups) ??
       findForSlot(slot.patterns, slot.tier, false, slot.groups) ??
+      // The preference holds when the slot drops a tier too (a bodyweight week's main lift is a tier-2 squat or hinge).
+      (preferredLowerMain ? findForSlot([preferredLowerMain], null, true) ?? findForSlot([preferredLowerMain], null, false) : null) ??
       findForSlot(slot.patterns, null, true, slot.groups) ??
       findForSlot(slot.patterns, null, false, slot.groups)
     if (pick && !wouldBeSecondMainLift(pick)) {
@@ -3740,6 +3877,7 @@ function getViableTrack(
   if (named && isTrackViable(TRACKS[named], pool)) return named
 
   const ranked = (Object.keys(TRACKS) as TrackFocus[])
+    .filter(focus => focus !== 'Full Body Strength')
     .map(focus => ({ focus, available: countAvailableForTrack(TRACKS[focus], pool) }))
     .sort((a, b) => b.available - a.available)
 
@@ -3750,6 +3888,14 @@ function getViableTrack(
   // track has the most material so the session is as full as it can be
   // rather than empty.
   return ranked[0]?.available > 0 ? ranked[0].focus : candidate
+}
+
+/**
+ * "Full Body Power" is "Full Body Strength" in a plan with no power block (21 Nov 2026; it was beginners and novices
+ * only, who never get one, and an intermediate on fat loss, whose plan has none either, was still told "Power").
+ */
+export function fullBodyTrackName<T extends string>(focus: T, planHasPowerBlock: boolean): T | 'Full Body Strength' {
+  return focus === 'Full Body Power' && !planHasPowerBlock ? 'Full Body Strength' : focus
 }
 
 // The three questions above, for a gate to ask directly. A rule only reachable
@@ -4986,6 +5132,43 @@ function balanceWeeklyStructure(
   // little recovery and takes nothing from the next session's main lifts.
   const thinBudgetSeconds = getDurationBudgetSeconds(profile.session_duration_preference || '45-60')
   const weekAppearances = (name: string): number => days.reduce((n, d) => n + (d.exercises.some(ex => ex.name === name) ? 1 : 0), 0)
+
+  // Before the thin-day step, so a short day's top-up sees the trunk work already there.
+  // TRUNK WORK TWICE A WEEK (his "yes fix all four", 21 Nov 2026; CSCS, mine). On a three-day full-body week the core
+  // slot is optional and the time budget took it on two days of three: a 40-year-old intermediate's only trunk work was
+  // one woodchop a week. A coach gives trunk work at least twice a week (anti-extension, anti-rotation, carries count
+  // as their own pattern and do not). It goes on the days with the fewest working sets, a stability move first (Pallof
+  // press, bird dog, dead bug, side plank, plank), and it is REQUIRED from here, so no later time trim or the beginner
+  // set cap takes it back: two sets of a trunk exercise cost about four minutes. Never past the week's ceiling of two
+  // per day, never a movement the week already holds twice, and only from the person's own pool (injury, pregnancy and
+  // age rules already applied).
+  const CORE_FLOOR_PER_WEEK = 2
+  const isCore = (name: string) => findEntry(name)?.movement_pattern === 'core'
+  const coreCount = () => days.reduce((n, d) => n + d.exercises.filter(ex => isCore(ex.name)).length, 0)
+  const STABILITY_FIRST = ['core_stability']
+  const coreCandidates = [...pool.filter(e => e.movement_pattern === 'core' && STABILITY_FIRST.includes(e.substitution_group)),
+    ...pool.filter(e => e.movement_pattern === 'core' && !STABILITY_FIRST.includes(e.substitution_group))]
+    .filter(e => e.mechanics_tier !== 'primer')
+  const trainingDays = days.map((d, i) => ({ d, i })).filter(x => x.d.exercises.length > 0 && TRACKS[x.d.focus as TrackFocus])
+  const bySets = (x: { d: WorkoutDay }) => x.d.exercises.reduce((n, ex) => n + (findEntry(ex.name)?.mechanics_tier === 'primer' ? 0 : ex.sets), 0)
+  for (const { i } of [...trainingDays].sort((a, b) => bySets(a) - bySets(b))) {
+    if (coreCount() >= CORE_FLOOR_PER_WEEK) break
+    if (days[i].exercises.some(ex => isCore(ex.name)) || dayForbidden(i).has('core')) continue
+    const pick = coreCandidates.find(e => !dayFamilies(i).has(getMovementFamily(e)) && weekAppearances(e.name) < WEEKLY_APPEARANCE_CAP
+      && !days.some(d => d.exercises.some(ex => ex.name === e.name)))
+      ?? coreCandidates.find(e => !dayFamilies(i).has(getMovementFamily(e)) && weekAppearances(e.name) < WEEKLY_APPEARANCE_CAP)
+    if (!pick) continue
+    addExercise(i, pick, 'trunk work twice a week')
+    protectedNames.add(pick.name)
+  }
+  // ...and the trunk work the week ALREADY had counts toward the two and is kept too: in a strength or power block the
+  // longer rests cost time, and the trim took optional core it found (429 weeks of 24,576 under two, all heavy blocks).
+  let protectedCore = days.reduce((n, d) => n + d.exercises.filter(ex => isCore(ex.name) && protectedNames.has(ex.name)).length, 0)
+  for (const { d } of trainingDays) for (const ex of d.exercises) {
+    if (protectedCore >= CORE_FLOOR_PER_WEEK) break
+    if (isCore(ex.name) && !protectedNames.has(ex.name)) { protectedNames.add(ex.name); protectedCore++ }
+  }
+
   for (let dayIdx = 0; dayIdx < days.length; dayIdx++) {
     const track = TRACKS[days[dayIdx].focus as TrackFocus]
     if (!track || days[dayIdx].exercises.length === 0) continue
@@ -5014,6 +5197,7 @@ function balanceWeeklyStructure(
       if (candidate) addExercise(dayIdx, candidate, 'the day reached its exercise count and was still ten minutes short')
     }
   }
+
 }
 
 // No @types/node global in this project (it's a Vite/browser app that also
@@ -5882,11 +6066,13 @@ export function getConstrainedPool(
   pool = stageEquipmentFilter(pool, profile, throwaway)
   const equipmentOnly = [...pool]
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], throwaway)
-  pool = stagePregnancyFilter(pool, equipmentOnly, isPregnant(profile), throwaway)
+  pool = stageRehabOnlyFilter(pool, getFlaggedJoints(profile.injuries || []), throwaway)
+  pool = stagePregnancyFilter(pool, equipmentOnly, isPregnant(profile), throwaway, getFlaggedJoints(profile.injuries || []))
   if (!opts.skipStyle) {
     pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), (equipmentTierFor(profile) || 'full_gym'))
   }
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', throwaway)
+  pool = stageOlderBeginnerFilter(pool, profile, throwaway)
   return pool
 }
 
@@ -6030,13 +6216,15 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // STAGE 2: Injury (replacements sourced from equipment-filtered pool only)
   const equipmentOnly = [...pool]
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], trace)
-  pool = stagePregnancyFilter(pool, equipmentOnly, isPregnant(profile), trace)
+  pool = stageRehabOnlyFilter(pool, getFlaggedJoints(profile.injuries || []), trace)
+  pool = stagePregnancyFilter(pool, equipmentOnly, isPregnant(profile), trace, getFlaggedJoints(profile.injuries || []))
 
   // STAGE 3: Style
   pool = stageStyleFilter(pool, trainingStyle, trace, getFlaggedJoints(profile.injuries || []), (equipmentTierFor(profile) || 'full_gym'))
 
   // STAGE 4: Skill / experience
   pool = stageSkillFilter(pool, profile.training_experience || 'novice', trace)
+  pool = stageOlderBeginnerFilter(pool, profile, trace)
 
   trace.pool_size_after_each_stage.final = pool.length
 
@@ -6086,7 +6274,8 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // contents depend on the others': a week-support leg slot is only filled
   // where the rest of the week trains legs once. getViableTrack draws nothing
   // from the random source, so resolving up front moves no other pick.
-  const resolvedTracks = availableDays.map((_, index) => getViableTrack(split[index], pool))
+  const planHasPowerBlock = phaseSequenceFor(profile).includes('power')
+  const resolvedTracks = availableDays.map((_, index) => fullBodyTrackName(getViableTrack(split[index], pool), planHasPowerBlock))
 
   const days: WorkoutDay[] = availableDays.map((day, index) => {
     const trackFocus = resolvedTracks[index]
@@ -6095,7 +6284,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const laterFixed = resolvedTracks.slice(index + 1).map(focus => fixedLowerMainPattern(TRACKS[focus]))
     const lowerMainsLater = { squat: laterFixed.filter(p => p === 'knee_dominant').length, hinge: laterFixed.filter(p => p === 'hip_hinge').length }
 
-    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle, legDaysElsewhere >= 2, lowerMainsLater)
+    const { primer, rehab, main, requiredNames, selectionNotes } = selectExercisesForTrack(track, pool, counts, weeklyUsed, styleConfig, trace, policy, feasiblePatterns, weeklyAppearanceCount, profile.training_experience || 'novice', profile.session_duration_preference, getFlaggedJoints(profile.injuries ?? []), (equipmentTierFor(profile) || 'full_gym'), trainingStyle, legDaysElsewhere >= 2, lowerMainsLater, isOlderBeginner(profile) ? OLDER_BEGINNER_FOUNDATIONS : undefined)
     for (const name of requiredNames) weeklyRequiredNames.add(name)
 
     // Build exercise list with sets/reps from style config
@@ -6211,6 +6400,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
       experience: profile.training_experience || 'novice',
       budgetSeconds: warmupReserve,
       pregnant: isPregnant(profile),
+      lowImpact: isOlderBeginner(profile),
     })
 
     // Ramp-up-visibility fix: buildWarmup already decided which exercises
@@ -6750,6 +6940,13 @@ type RotationTier = 'main' | 'accessory' | 'core'
  */
 function classifyRotationTiers(exercises: Exercise[]): RotationTier[] {
   let mainCount = 0
+  // A DAY WITH NO TIER-1 LIFT STILL HAS A MAIN LIFT (21 Nov 2026, the four leftovers): its first compound. Read as
+  // tier 1 only, a bodyweight or limited-kit day, and an older beginner's (her barbells are out), had no anchor, so
+  // the lift her week was built on rotated away at every block: a goblet squat in weeks 1-3 became a dumbbell front
+  // squat in week 5, against his 16 Nov "main lifts for the whole plan". The same blind spot lowerMainToPrefer had.
+  const hasTier1 = exercises.some(ex => getExerciseEntry(ex.name)?.mechanics_tier === 'tier1_compound')
+  const mainTier = hasTier1 ? 'tier1_compound' : 'tier2_compound'
+  const mainCap = hasTier1 ? 2 : 1
   return exercises.map(ex => {
     const dbEntry = getExerciseEntry(ex.name)
     if (!dbEntry || dbEntry.mechanics_tier === 'primer') return 'core'
@@ -6759,7 +6956,7 @@ function classifyRotationTiers(exercises: Exercise[]): RotationTier[] {
     // exercise (getExerciseCountForDuration always asks for a single tier1
     // slot), but the cap stays at 2 to match the spec for any future
     // session shape that requests more.
-    if (dbEntry.mechanics_tier === 'tier1_compound' && mainCount < 2) {
+    if (dbEntry.mechanics_tier === mainTier && mainCount < mainCap) {
       mainCount++
       return 'main'
     }
@@ -7254,11 +7451,17 @@ export function sizeBlockToRestBudget(
       guard++
     ) {
       const entriesNow = exercises.map(ex => findEntry(ex.name))
+      // NEVER THE DAY'S MAIN LIFT (21 Nov 2026): his 13 Sep "protect the main lift and drop accessories" held for sets
+      // (Phase A) and not here. Once the week's trunk work was protected, a heavy block's trim walked past it and took
+      // an advanced lifter's Pull-Ups, the day's anchor for eleven weeks. A day that cannot fit without it stays over
+      // and says so, which is the honest outcome.
+      const tiersNow = classifyRotationTiers(exercises)
       let removeIdx = exercises.length - 1
       while (removeIdx >= 0) {
         const entry = entriesNow[removeIdx]
         if (
           entry && entry.mechanics_tier !== 'cardio' &&
+          tiersNow[removeIdx] !== 'main' &&
           !protectedNames.has(exercises[removeIdx].name) &&
           !isStructuralSlot(entriesNow, removeIdx, day.focus)
         ) break
@@ -7471,6 +7674,66 @@ const FILLER_TRIGGER_SECONDS = 15 * 60
  * than more lifting volume; this only stops a data-model limit deciding which
  * days the rule reached.
  */
+/**
+ * A BEGINNER'S SESSION HOLDS AT MOST 18 WORKING SETS — his ruling 21 Nov 2026, "yes cap beginners at 18 sets", from
+ * my CSCS recommendation, over his earlier rulings that fill the time asked for. The all-ages audit found beginner days
+ * of 24-27 working sets in 45-60 minutes (8 exercises x 3). A first-timer adapts to far less (NSCA: 1-3 sets of 6-10
+ * exercises), technique fades before the muscle does, and the spare minutes go to the optional mobility filler that
+ * runs after this, never to more lifting.
+ *
+ * What gives, in the order every cut in this file uses: a set off the biggest accessory or isolation lift (never below
+ * its floor), and only then a whole accessory, isolation and core first, from the end of the day. Never the main lift,
+ * a conditioning block, a warm-up primer, a superset partner, a lift the week's pattern floor relies on, or the third
+ * training exercise. Conditioning rounds are not counted: they are not strength sets.
+ */
+export const BEGINNER_MAX_WORKING_SETS = 18
+
+/**
+ * A BAD BACK'S SESSION HOLDS AT MOST 22 WORKING SETS (his "yes fix all four", 21 Nov 2026; CSCS, mine). A
+ * 50-year-old with his lower back on the injuries list had a 26-set Monday: every standing or braced set asks the trunk
+ * to hold position, and with back pain that fatigue is what a coach manages, so the high tail is trimmed, isolation
+ * first, by the same rules as the beginner cap. 22 sits above the intermediate median (17) and cuts only the tail.
+ * A beginner keeps 18.
+ */
+export const LOWER_BACK_MAX_WORKING_SETS = 22
+
+export function beginnerWorkingSets(day: WorkoutDay): number {
+  return day.exercises.reduce((n, ex) => {
+    const entry = findEntry(ex.name)
+    if (!entry || entry.mechanics_tier === 'primer') return n
+    return getVolumeRole(entry) === 'conditioning' ? n : n + (ex.sets ?? 0)
+  }, 0)
+}
+
+export function capBeginnerSets(day: WorkoutDay, protectedNames: ReadonlySet<string> = new Set(), maxSets: number = BEGINNER_MAX_WORKING_SETS): WorkoutDay {
+  let exercises = day.exercises
+  let guard = 0
+  while (beginnerWorkingSets({ ...day, exercises }) > maxSets && guard++ < 60) {
+    const rows = exercises.map((ex, i) => {
+      const entry = findEntry(ex.name)
+      const role = entry ? getVolumeRole(entry) : null
+      return { i, ex, entry, role }
+    }).filter(r => r.entry && r.entry.mechanics_tier !== 'primer' && r.role !== 'main' && r.role !== 'conditioning')
+    // Isolation before accessory, then the most sets first: the same order enforceDayDurationBudget trims in.
+    const trimmable = rows.filter(r => (r.ex.sets ?? 0) > getRoleSetFloor(r.role!))
+      .sort((a, b) => (a.role === 'isolation' ? 0 : 1) - (b.role === 'isolation' ? 0 : 1) || (b.ex.sets ?? 0) - (a.ex.sets ?? 0) || b.i - a.i)
+    if (trimmable.length > 0) {
+      const t = trimmable[0].i
+      exercises = exercises.map((ex, i) => (i === t ? { ...ex, sets: ex.sets - 1 } : ex))
+      continue
+    }
+    if (trainingSlotCount(exercises.map(ex => findEntry(ex.name))) <= 3) break
+    const isCore = (e: ExerciseEntry) => e.movement_pattern === 'core'
+    const droppable = rows
+      .filter(r => !r.ex.superset_label && !protectedNames.has(r.ex.name) && r.entry!.mechanics_tier !== 'tier1_compound')
+      .sort((a, b) => (a.role === 'isolation' || isCore(a.entry!) ? 0 : 1) - (b.role === 'isolation' || isCore(b.entry!) ? 0 : 1) || b.i - a.i)
+    if (droppable.length === 0) break
+    const drop = droppable[0].i
+    exercises = exercises.filter((_, i) => i !== drop)
+  }
+  return exercises === day.exercises ? day : { ...day, exercises }
+}
+
 function applyDurationFiller(
   days: WorkoutDay[],
   profile: UserProfile,
@@ -7665,7 +7928,8 @@ export function repRangeForIncomingExercise(
   // price it from. A primer is neither a weightless working lift nor a loaded
   // one for this purpose.
   const isBodyweight = !isPrimer && (!isExternallyLoaded(entry) || category == null)
-  const repFloor = repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound)
+  const repFloor = Math.max(repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound, isPregnant(profile)),
+    entry.movement_pattern === 'core' ? CORE_REP_FLOOR : 0)
 
   // A lift that has just arrived has no block baseline, so the two questions
   // generation asks of one are asked of its own starting estimate instead.
@@ -7711,6 +7975,57 @@ function isCarryByName(name: string): boolean {
   return entry?.prescription_type === 'distance_load'
 }
 
+/**
+ * The plan's blocks, in order: experience and goal restrictions, the bodyweight and pregnancy lists, then the dedupe.
+ * ONE function (21 Nov 2026) because the day names read it too: a full-body day is called "Power" only when the plan
+ * actually holds a power block (fullBodyTrackName).
+ */
+export function phaseSequenceFor(profile: UserProfile): TrainingPhase[] {
+  const goal = (profile.fitness_goal || 'hypertrophy') as FitnessGoal
+  const experience = profile.training_experience || 'novice'
+  const policy = getGoalPolicy(goal)
+  let sequence = restrictPhaseSequence(getPhaseSequence(goal, experience), policy.allowedPhases)
+  // A bodyweight-only trainee has no mechanism to express "heavier" the way
+  // a strength/power block assumes — an LLM coach review caught an advanced
+  // bodyweight profile being handed "Maximal Strength — lower reps, high
+  // intensity" with literally no way to add load. Remapped the same way
+  // experience/goal restrictions above already work: fall back toward
+  // hypertrophy/metabolic work, where reps and leverage are still real
+  // progression levers.
+  // BODYWEIGHT_ALLOWED_PHASES is already the authoritative "what's a
+  // legitimate phase for equipment-free training" list, independent of
+  // goal — using it directly (rather than intersecting with the goal
+  // policy's own allowed set again) is what lets dedup reach for
+  // 'metabolic' as a bodyweight hypertrophy/functional trainee's block 3/4
+  // differentiator even though those goals don't normally feature
+  // conditioning work. Without this, the intersection left only
+  // {anatomical_adaptation, hypertrophy} for that combination — nowhere
+  // for dedup to go except accept three straight "Hypertrophy" blocks
+  // (better than reintroducing AA, but still the exact monotony problem
+  // this function exists to solve). Bodyweight metabolic/conditioning
+  // circuits are a legitimate, common variation regardless of the
+  // trainee's primary goal.
+  const effectiveAllowedPhases = equipmentTierFor(profile) === 'bodyweight' || isPregnant(profile)
+    ? BODYWEIGHT_ALLOWED_PHASES
+    : policy.allowedPhases
+  // PREGNANT: the same list, no strength or power block (pregnancy-rules.ts PREGNANCY_REP_FLOOR says why).
+  if (equipmentTierFor(profile) === 'bodyweight' || isPregnant(profile)) {
+    sequence = restrictPhaseSequence(sequence, BODYWEIGHT_ALLOWED_PHASES)
+  }
+  // Any of the restrictions above (experience, goal, equipment) can each
+  // independently be safe on their own and still stack into two identical
+  // adjacent blocks — a novice's power->strength remap landing right after
+  // an already-'strength' block 3 produced exactly that ("Blocks 3 and 4 are
+  // both 'Maximal Strength'... an identical, duplicated block"). Final pass,
+  // after every restriction has applied. Passing the effective allowed set
+  // (Fix 4) lets the dedup reach for a genuinely different, still-valid
+  // phase instead of just alternating hypertrophy/anatomical_adaptation —
+  // see dedupeAdjacentPhases's doc comment for why the old unconditional
+  // alternation could reintroduce AA mid-macrocycle.
+  sequence = dedupeAdjacentPhases(sequence, effectiveAllowedPhases)
+  return sequence
+}
+
 export function generateMesocycle(
   profile: UserProfile,
   baseWorkout?: WorkoutDay[],
@@ -7752,44 +8067,7 @@ export function generateMesocycle(
   // (getPhaseSequence); the goal policy trims further on top — e.g.
   // conditioning never sees a strength or power block regardless of how
   // experienced the trainee is.
-  let sequence = restrictPhaseSequence(getPhaseSequence(goal, experience), policy.allowedPhases)
-  // A bodyweight-only trainee has no mechanism to express "heavier" the way
-  // a strength/power block assumes — an LLM coach review caught an advanced
-  // bodyweight profile being handed "Maximal Strength — lower reps, high
-  // intensity" with literally no way to add load. Remapped the same way
-  // experience/goal restrictions above already work: fall back toward
-  // hypertrophy/metabolic work, where reps and leverage are still real
-  // progression levers.
-  // BODYWEIGHT_ALLOWED_PHASES is already the authoritative "what's a
-  // legitimate phase for equipment-free training" list, independent of
-  // goal — using it directly (rather than intersecting with the goal
-  // policy's own allowed set again) is what lets dedup reach for
-  // 'metabolic' as a bodyweight hypertrophy/functional trainee's block 3/4
-  // differentiator even though those goals don't normally feature
-  // conditioning work. Without this, the intersection left only
-  // {anatomical_adaptation, hypertrophy} for that combination — nowhere
-  // for dedup to go except accept three straight "Hypertrophy" blocks
-  // (better than reintroducing AA, but still the exact monotony problem
-  // this function exists to solve). Bodyweight metabolic/conditioning
-  // circuits are a legitimate, common variation regardless of the
-  // trainee's primary goal.
-  const effectiveAllowedPhases = equipmentTierFor(profile) === 'bodyweight'
-    ? BODYWEIGHT_ALLOWED_PHASES
-    : policy.allowedPhases
-  if (equipmentTierFor(profile) === 'bodyweight') {
-    sequence = restrictPhaseSequence(sequence, BODYWEIGHT_ALLOWED_PHASES)
-  }
-  // Any of the restrictions above (experience, goal, equipment) can each
-  // independently be safe on their own and still stack into two identical
-  // adjacent blocks — a novice's power->strength remap landing right after
-  // an already-'strength' block 3 produced exactly that ("Blocks 3 and 4 are
-  // both 'Maximal Strength'... an identical, duplicated block"). Final pass,
-  // after every restriction has applied. Passing the effective allowed set
-  // (Fix 4) lets the dedup reach for a genuinely different, still-valid
-  // phase instead of just alternating hypertrophy/anatomical_adaptation —
-  // see dedupeAdjacentPhases's doc comment for why the old unconditional
-  // alternation could reintroduce AA mid-macrocycle.
-  sequence = dedupeAdjacentPhases(sequence, effectiveAllowedPhases)
+  const sequence = phaseSequenceFor(profile)
   const weeks: MesocycleWeek[] = []
   let weekCounter = 0
   let pathwayEligible: ((name: string) => boolean) | undefined
@@ -7876,6 +8154,10 @@ export function generateMesocycle(
   // the next block's week 1 steps from the last real loading week, not the
   // deload number. See UNVERIFIED_RAMP_STEP_KG's doc comment.
   const lastUnverifiedLoadingWeekKg: (number | null)[][] = baseWeek.map(day => day.exercises.map(() => null))
+  // WHO held the slot (21 Nov 2026): a lift new to the plan inherits the slot's number, and a two-arm pulldown's 57.5kg
+  // TOTAL was read as a single-arm pulldown's PER-ARM figure (42.5kg an arm beside a 62.5kg two-arm pulldown). The
+  // number is converted between total and per side before a new lift takes it (lastUnverifiedInSlotPerSide).
+  const lastUnverifiedLoadingWeekSlotName: (string | null)[][] = baseWeek.map(day => day.exercises.map(() => null))
 
   // The same history keyed by EXERCISE NAME rather than by slot position.
   //
@@ -7948,6 +8230,8 @@ export function generateMesocycle(
    * floor would pin the next block to a recovery weight.
    */
   const lastWeekDisplayedKgByLift = new Map<string, { kg: number; repLow: number | null }>()
+  /** Each lift's last loading-week weight before 28 weeks pregnant: the number it holds at from then on. */
+  const pregnancyHoldKgByLift = new Map<string, number>()
 
   sequence.forEach((phase, blockIndex) => {
     // MID-BLOCK ONLY — Ashley's wording, and the audit insists on it. A block
@@ -7973,7 +8257,11 @@ export function generateMesocycle(
     }
 
     // Accessory variations rotate ONCE PER BLOCK, never inside one; main lifts do not rotate at all (below).
-    const rotatedBlockDays = baseWeek.map(day => {
+    const lateDrops = new Set<string>()
+    // Does this block reach 28 weeks pregnant? Read at its LAST week's date (weekCounter is the weeks before it): the
+    // whole block takes the late versions, a little early rather than a little late.
+    const blockLate = isPregnant(profile) && lateInPregnancy(profile, getLocalDateString(new Date(getAppNow(profile.id).getTime() + (weekCounter + 3) * 7 * 86_400_000)))
+    const rotatedBlockDays = baseWeek.map((day, dayIdx) => {
       // Per-day dedup: a block rotation is computed independently per
       // exercise, with no visibility into what its day-mates just resolved
       // to. Without this set, a rotation that falls back past a
@@ -8001,9 +8289,28 @@ export function generateMesocycle(
         const avoidFamilies = new Set(
           dayFamiliesByIndex.filter((f, i) => f && i !== exIdx) as string[]
         )
-        const rotated = baseTiers[exIdx] === 'main'
+        const rotatedPlain = baseTiers[exIdx] === 'main'
           ? ex.name
           : rotateVariation(ex.name, blockIndex, poolForRotation(pool, equipmentTierFor(profile)), experience, profile, usedNamesThisDay, avoidFamilies)
+        // FROM 28 WEEKS PREGNANT (pregnancy-rules.ts PREGNANCY_LATE_EXCLUDED): the block's split-stance, single-leg and
+        // face-down work becomes a supported, two-footed or side-on version, the first the person's pool allows.
+        let rotated = rotatedPlain
+        if (blockLate && PREGNANCY_LATE_EXCLUDED.has(rotatedPlain)) {
+          const kind = lateReplacementKind(rotatedPlain, findEntry(rotatedPlain)?.movement_pattern ?? '')
+          const ok = (n: string) => pool.some(e => e.name === n) && !PREGNANCY_LATE_EXCLUDED.has(n) && !pregnancyExclusionLate({ name: n })
+            && !usedNamesThisDay.has(n) && !day.exercises.some((other, j) => j !== exIdx && other.name === n)
+          const fromList = PREGNANCY_LATE_REPLACEMENTS[kind].find(ok)
+          // None of the list in her pool (a minimalist kit, a style filter): any exercise of the same movement both
+          // rules allow, the nearest the pool has; only with nothing at all does the original stay.
+          const pattern = findEntry(rotatedPlain)?.movement_pattern
+          const samePattern = pool.find(e => e.mechanics_tier !== 'primer' && ok(e.name)
+            && (kind === 'legs' ? ['single_leg', 'knee_dominant'].includes(e.movement_pattern)
+              : kind === 'push' ? ['horizontal_push', 'vertical_push'].includes(e.movement_pattern) : e.movement_pattern === pattern))
+          rotated = fromList ?? samePattern?.name ?? rotatedPlain
+          // Nothing both rules allow (a bodyweight kit has no upright press): the slot comes out for the block, never a
+          // head-down or face-down move kept because nothing else fits. Removed below, once the slot map is read.
+          if (rotated === rotatedPlain) lateDrops.add(`${dayIdx}:${exIdx}`)
+        }
         usedNamesThisDay.add(rotated)
         // THE PROXY ABOVE IS ONLY GOOD UNTIL A SLOT HAS ROTATED. One substitution_group can hold several families
         // ('tricep_extension' holds pushdowns, kickbacks and overhead work), so a slot can rotate into a family
@@ -8048,7 +8355,16 @@ export function generateMesocycle(
     // is already known — so trimWeekRestForBudget below goes back to being
     // the rare last-resort nudge it was designed as, not the mechanism
     // carrying the whole mesocycle every week.
-    const blockDays = sizeBlockToRestBudget(rotatedBlockDays, phaseConfig.rest_adjust_seconds, totalBudgetSeconds, requiredNames, policy, trimLog)
+    // A REQUIRED SLOT STAYS REQUIRED WHEN ITS LIFT ROTATES (21 Nov 2026). Protection was by NAME, so the variation a new
+    // block rotated in was unprotected and the time trim took it: the trunk work added for "twice a week" vanished in
+    // 960 of 24,576 weeks, all at a block boundary. The rotation is one-for-one per slot, so the slot carries it over.
+    const blockRequired = new Set(requiredNames)
+    baseWeek.forEach((day, dayIdx) => day.exercises.forEach((ex, exIdx) => {
+      const rotatedName = rotatedBlockDays[dayIdx]?.exercises[exIdx]?.name
+      if (requiredNames.has(ex.name) && rotatedName) blockRequired.add(rotatedName)
+    }))
+    const lateKept = lateDrops.size === 0 ? rotatedBlockDays : rotatedBlockDays.map((d, dayIdx) => ({ ...d, exercises: d.exercises.filter((_, exIdx) => !lateDrops.has(`${dayIdx}:${exIdx}`)) }))
+    const blockDays = sizeBlockToRestBudget(lateKept, phaseConfig.rest_adjust_seconds, totalBudgetSeconds, blockRequired, policy, trimLog)
 
     // Double progression's within-block memory: each exercise's week-1
     // ("baseline") load, keyed by [dayIndex][exerciseIndex] — weeks 2-3 are
@@ -8395,7 +8711,8 @@ export function generateMesocycle(
           // bump re-derives its range from the same base, and if it clamped to
           // a lower floor than the week's own reps did, it could hand back
           // 4-6 as the "bumped" version of 6-8 and replace it.
-          const repFloor = repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound)
+          const repFloor = Math.max(repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound, isPregnant(profile)),
+            dbEntry?.movement_pattern === 'core' ? CORE_REP_FLOOR : 0)
           const rampLoadCandidate = !isBodyweight && (policy.progressionEmphasis === 'load' || isCarry || isMainCompound)
 
           // A percentage-sized step snapped to the loading mode's real
@@ -8576,7 +8893,10 @@ export function generateMesocycle(
           // RPE or a load that scales with the block.
           // FROM 28 WEEKS PREGNANT, ONE NOTCH LOWER (his ruling 15 Nov 2026, "Ask due date"; CSCS basis in
           // docs/plans/pregnancy-one-switch.md): the week's own date, read against the due date. No due date: as before.
-          const lateWeek = lateInPregnancy(profile, getLocalDateString(new Date(getAppNow(profile.id).getTime() + (w - 1) * 7 * 86_400_000)))
+          // THE PLAN'S WEEK, not the block's (21 Nov 2026): `w` is the week inside the block (1-4), so every block's week
+          // 1 was dated today and a woman 20 weeks pregnant had RPE 7-8 in weeks 13-15 of the plan, 32-35 weeks along.
+          // weekCounter is the week of the plan, counted from today, as the date it will actually be trained.
+          const lateWeek = lateInPregnancy(profile, getLocalDateString(new Date(getAppNow(profile.id).getTime() + (weekCounter - 1) * 7 * 86_400_000)))
           const intensity = isPrimer ? ex.intensity : resolveTargetRpe(phase, experience, w, isDeload, lateWeek ? LATE_PREGNANCY_SET_RPE_CEILING : hasHealthCondition(profile) ? HEALTH_SET_RPE_CEILING : undefined)
 
           let load = null as ReturnType<typeof prescribeLoad> | null
@@ -8625,13 +8945,24 @@ export function generateMesocycle(
             if (rampLoad && unverifiedForCategory && !isDeload && !isCalibrationWeek) {
               const previousInSlot = lastUnverifiedLoadingWeekKg[dayIdx][exIdx]
               const previousForThisLift = dbEntry ? lastUnverifiedLoadingWeekKgByLift.get(dbEntry.name) : undefined
-              // Both, when both exist: never step up from a number that was
-              // not this lift's, and never step up past what this slot
-              // actually displayed last week either. See
-              // lastUnverifiedLoadingWeekKgByLift's declaration.
-              const previous = previousForThisLift != null && previousInSlot != null
-                ? Math.min(previousForThisLift, previousInSlot)
-                : previousForThisLift ?? previousInSlot
+              // ITS OWN NUMBER FIRST, as the declaration of
+              // lastUnverifiedLoadingWeekKgByLift says ("a lift with its own
+              // history uses that instead"). It read min(own, slot) until
+              // 21 Nov 2026, so the slot's half could still pull a lift DOWN
+              // to a stranger's weight: an advanced man's Push Press was 37.5kg
+              // in week 5 and 25kg in week 13, at the same reps, because a
+              // 20kg lift had sat in its Friday slot the week before. The
+              // per-lift value is already the lowest across that lift's
+              // slots, so nothing it guards is lost.
+              const slotName = lastUnverifiedLoadingWeekSlotName[dayIdx][exIdx]
+              const slotEntry = slotName ? getExerciseEntry(slotName) : undefined
+              // Total <-> per side: one arm or leg carries half of what both did.
+              const slotPerSide = slotEntry ? isPerSideLoad(slotEntry) : null
+              const thisPerSide = dbEntry ? isPerSideLoad(dbEntry) : null
+              const inheritedInSlot = previousInSlot == null || slotPerSide == null || thisPerSide == null || slotPerSide === thisPerSide
+                ? previousInSlot
+                : thisPerSide ? previousInSlot / 2 : previousInSlot * 2
+              const previous = previousForThisLift ?? inheritedInSlot
               if (previous != null) unverifiedPreviousLoadingWeekKg = previous
             }
             if (unverifiedPreviousLoadingWeekKg == null && baselineKg != null) {
@@ -8707,6 +9038,7 @@ export function generateMesocycle(
                 }
               }
             }
+
 
             load = prescribeLoad(dbEntry, profile, {
               targetRpeLabel: intensity,
@@ -9181,6 +9513,7 @@ export function generateMesocycle(
           const finalKg = preFloorKg[dayIdx][exIdx]
           if (finalKg == null) continue
           lastUnverifiedLoadingWeekKg[dayIdx][exIdx] = finalKg
+          lastUnverifiedLoadingWeekSlotName[dayIdx][exIdx] = dayExercises[exIdx].name
           const name = dayExercises[exIdx].name
           const already = thisWeekByLift.get(name)
           thisWeekByLift.set(name, already == null ? finalKg : Math.min(already, finalKg))
@@ -9312,6 +9645,13 @@ export function generateMesocycle(
         // their volume is deliberately, uniformly cut, and nudging set counts
         // would fight that.
         enforceWeeklyPatternBalance(days, { keepPulling: keepPullingThisPlan })
+        // A BEGINNER'S CAP, after the balance pass (so nothing adds a set back) and before the filler (so the time it
+        // frees goes to optional mobility). capBeginnerSets says why.
+        {
+          const cap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS
+            : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : null
+          if (cap != null) for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0) days[i] = capBeginnerSets(days[i], blockRequired, cap)
+        }
         // THE FILLER SIZES ITSELF ON THE DAY AS IT WILL SHIP (18 Nov 2026).
         // It used to run just BEFORE the balance pass, which then took a set
         // off some days: a day that was long enough when the filler looked
@@ -9425,7 +9765,38 @@ export function generateMesocycle(
 
       reconcilePerSetLoads(days)
       // Balance from 65, stamped after every budget pass so it takes nothing away (warmup.ts withBalanceWork).
+      // FROM 28 WEEKS PREGNANT THE WEIGHTS HOLD (his "yes fix all four", 21 Nov 2026), so the plan she reads is the plan
+      // the session screen holds her to (PREGNANCY_HOLD_NOTE), on the week as it ships: a lift is clamped to its last loading-week
+      // number, and one first seen after 28 weeks holds at its first. After every load pass (coherence, the frozen-load
+      // rep bump, the floors), so nothing later can raise it again. Weeks before 28 record each lift's number.
+      if (isPregnant(profile)) {
+        const weekLate = lateInPregnancy(profile, getLocalDateString(new Date(getAppNow(profile.id).getTime() + (weekCounter - 1) * 7 * 86_400_000)))
+        for (const d of days) for (const ex of d.exercises) {
+          const entry = findEntry(ex.name)
+          if (!entry || ex.suggested_load_kg == null || entry.mechanics_tier === 'primer') continue
+          const held = pregnancyHoldKgByLift.get(ex.name)
+          // AN EASIER WEEK IS LIGHTER THAN THE HELD WEEK BEFORE IT: the deload's weight is worked out from the block's
+          // week 3 before this hold lowered it (a held 12.5kg lat pulldown came back as a 20kg deload). Clamped to the
+          // deload fraction of the held number, never above it, and never recorded as the new hold.
+          if (isDeload) {
+            if (weekLate && held != null && ex.suggested_load_kg > held * DELOAD_LOAD_FRACTION) {
+              rebuildLoadForExercise(ex, entry, Math.max(getEquipmentFloorKg(entry), held * DELOAD_LOAD_FRACTION))
+            }
+            continue
+          }
+          if (weekLate && held != null && ex.suggested_load_kg > held) rebuildLoadForExercise(ex, entry, held)
+          // From 28 weeks the reference only ever comes DOWN: a lift that came out lighter in a later block (higher reps)
+          // holds there, rather than climbing back toward its pre-28-week number.
+          pregnancyHoldKgByLift.set(ex.name, weekLate && held != null ? Math.min(held, ex.suggested_load_kg) : ex.suggested_load_kg)
+        }
+      }
       for (let i = 0; i < days.length; i++) days[i] = withBalanceWork(days[i], profile)
+      // Pelvic floor exercises on every training day while pregnant, after every budget pass so they take nothing away.
+      if (isPregnant(profile)) for (let i = 0; i < days.length; i++) {
+        const d = days[i]
+        if (!d.warmup || d.exercises.length === 0 || d.warmup.mobility.some(m => m.name === PELVIC_FLOOR_WARMUP_ITEM.name)) continue
+        days[i] = { ...d, warmup: { ...d.warmup, mobility: [...d.warmup.mobility, { ...PELVIC_FLOOR_WARMUP_ITEM }], total_seconds: d.warmup.total_seconds + PELVIC_FLOOR_WARMUP_ITEM.duration_seconds } }
+      }
       // THE RUNS, last of all, so no lifting pass sizes, trims or balances them (running.ts owns their minutes).
       if (runningGoalOf(profile) && !isStartingOut(profile)) {
         const withRuns = withRunDays(days, ladderWeekOf(weekCounter, profile.running_start_week), profile)

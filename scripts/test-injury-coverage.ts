@@ -296,7 +296,11 @@ console.log('\n5. How MUCH each injury removes, frozen')
     //   elbows     27->28  Close-Grip Push-Ups (the narrow hand position)
     // 15 Nov 2026, his ruling "Allow it, lighter" (docs/plans/knee-loaded-work.md): machine leg work stays for a knee
     //   knees      50->47  Leg Press, Hack Squat, Seated Leg Curl (priced one step lighter instead)
-    lower_back: 34, knees: 47, shoulders: 87, neck: 9, wrists: 42,
+    // 21 Nov 2026, his "yes fix all four" (a bad back's plan read as a coach; test:bad-back): five lifts with the load on
+    // the shoulders or swinging the lower back carried no axial tag
+    //   lower_back 34->39  Hack Squat, Smith Machine Split Squat, Reverse Hyper Machine, Smith Machine Calf Raise,
+    //                      Standing Calf Raise Machine
+    lower_back: 39, knees: 47, shoulders: 87, neck: 9, wrists: 42,
     hips: 34, ankles: 29, elbows: 28,
   }
   const drift: string[] = []

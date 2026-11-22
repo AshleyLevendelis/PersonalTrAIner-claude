@@ -129,7 +129,9 @@ console.log('\n[5b] The lower back was reviewed: the two paths diverge by exactl
   // 27 -> 30, the gym machines (4 Nov 2026): Smith Machine Romanian Deadlift, Smith Machine Bent-Over Row, Ab Crunch Machine.
   // 30 -> 34, the exercise library's batch 3 (10 Nov 2026): Kettlebell Deadlift, Single-Arm Kettlebell Row, Hollow Body
   // Hold and Reverse Crunch (loaded flexion, as Cable Crunch), each as its nearest entry.
-  check(`what a bad back excludes did NOT move (${viaNew.length})`, viaNew.length === 34, { viaNew: viaNew.length })
+  // 34 -> 39 on 21 Nov 2026 (his "yes fix all four"): Hack Squat, Smith Machine Split Squat, Reverse Hyper Machine and the two
+  // shoulder-loaded calf raises gained the axial tag (test:bad-back). Moved on purpose, so the number is the new one.
+  check(`what a bad back excludes did NOT move (${viaNew.length})`, viaNew.length === 39, { viaNew: viaNew.length })
   check('...and none of the rehab movements is among the exclusions',
     REHAB.every(n => !viaNew.some(e => e.name === n)),
     viaNew.filter(e => REHAB.includes(e.name)).map(e => e.name).join(', '))

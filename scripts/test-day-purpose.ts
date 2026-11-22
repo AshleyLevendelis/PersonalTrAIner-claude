@@ -74,7 +74,7 @@ const noteOn = (day: WorkoutDay, profile: UserProfile): string | null =>
 // from the engine, so a change that emptied the engine's table cannot make
 // this gate agree with it. ----
 const LEG_COMPOUND = new Set(['knee_dominant', 'hip_hinge', 'single_leg'])
-const LEG_FOCUS = new Set(['Legs & Calves', 'Squat & Carry', 'Pull & Hinge', 'Full Body Power'])
+const LEG_FOCUS = new Set(['Legs & Calves', 'Squat & Carry', 'Pull & Hinge', 'Full Body Power', 'Full Body Strength'])  // the same track under a beginner's or novice's name (21 Nov 2026)
 const PRESS = new Set(['horizontal_push', 'vertical_push'])
 const isDeltWork = (e: ExerciseEntry) =>
   e.movement_pattern === 'vertical_push' || e.movement_pattern === 'isolation_shoulder' || e.substitution_group === 'rear_delt'

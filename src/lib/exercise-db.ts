@@ -1933,7 +1933,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Torso flat and fixed on the pad, hips at the edge', 'Legs hang free at the start', 'Swing the legs up to torso height, squeezing the glutes', 'Lower under control — no swinging momentum'],
     coach_note_swap: 'Loads the glutes and hamstrings with the spine passive, not compressed — a genuine option when a hinge is off the table.',
     loads_joints: ['hip'],
-    contraindicated_joints: [],
+    // 21 Nov 2026 (his "yes fix all four", CSCS): the load rests on the shoulders/spine or swings the lower back
+    // under load, so a bad back is kept off it (belt squat, leg press, seated calf raise and pull-through instead).
+    contraindicated_joints: ['lower_back_axial'],
     style_tags: ['bodybuilding', 'functional', 'hybrid'],
     substitution_group: 'hip_hinge',
     unilateral: false,
@@ -2528,7 +2530,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     // NOT CONTRAINDICATED FOR A KNEE, since 15 Nov 2026 (his ruling, after Marcus's knee surgery): a supported machine whose
     // load the person sets is the usual way back to loaded leg work; it stays in a knee-flagged plan, priced lighter
     // (load-prescription.ts, flaggedJointLoadFactor). Free-weight squats, lunges and jumps stay out.
-    contraindicated_joints: [],
+    // 21 Nov 2026 (his "yes fix all four", CSCS): the load rests on the shoulders/spine or swings the lower back
+    // under load, so a bad back is kept off it (belt squat, leg press, seated calf raise and pull-through instead).
+    contraindicated_joints: ['lower_back_axial'],
     style_tags: ['bodybuilding', 'hybrid'],
     substitution_group: 'squat',
     unilateral: false,
@@ -3125,7 +3129,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     name: 'Standing Calf Raise Machine',
     id: 'standing-calf-raise-machine',
     movement_pattern: 'isolation_calf',
-    contraindicated_joints: ['ankle'],
+    // 21 Nov 2026 (his "yes fix all four", CSCS): the load rests on the shoulders/spine or swings the lower back
+    // under load, so a bad back is kept off it (belt squat, leg press, seated calf raise and pull-through instead).
+    contraindicated_joints: ['ankle', 'lower_back_axial'],
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
     angle_vector: 'vertical',
@@ -4633,6 +4639,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     secondary_muscles: ['erectors', 'forearms', 'lats'],
     equipment: ['kettlebell'],
     joint_stress: 'low',
+    // 21 Nov 2026 (CSCS): the hinge is taught slow before it is taught fast; a beginner learns the kettlebell deadlift
+    // first, and the swing arrives once the hinge holds (NSCA and kettlebell-school progression alike).
+    capability_requirement: { minExperience: 'novice', regression: 'Bodyweight Hip Hinge to Wall' },
     form_cues: ['Hinge at hips', 'Snap hips forward', 'Float the bell to chest height', 'Brace core at the top'],
     coach_note_swap: 'Ballistic hip hinge that activates the posterior chain and elevates heart rate.',
     loads_joints: ['lower_back_axial'],
@@ -4946,6 +4955,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     secondary_muscles: ['rhomboids', 'lower trapezius', 'forearms'],
     equipment: ['pull-up bar'],
     joint_stress: 'moderate',
+    // 21 Nov 2026 (CSCS): lowering your whole bodyweight under control needs a strength base a first-time trainee has
+    // not built; a beginner pulls on a pulldown or the assisted machine first. Audit: 13% of beginner plans had these.
+    capability_requirement: { minExperience: 'novice', regression: 'Pull-Ups (Assisted)' },
     form_cues: ['Jump or step to the top position, chin over the bar', 'Lower as slowly as you can — aim for five seconds', 'Stop the set when the lowering gets fast', 'Step back up, never drop'],
     coach_note_swap: 'The lowering half of a pull-up, which is the half you are strongest in — this is how most people earn their first one.',
     loads_joints: ['shoulder', 'elbow'],
@@ -5632,7 +5644,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     form_cues: ['Bar on the upper back, one foot forward, one back', 'Drop the back knee straight down', 'Front shin stays fairly upright', 'Drive up through the front foot'],
     coach_note_swap: 'Single-leg work with the balance taken care of, so you can load it properly.',
     loads_joints: ['knee'],
-    contraindicated_joints: ['ankle', 'hip', 'knee'],
+    // 21 Nov 2026 (his "yes fix all four", CSCS): the load rests on the shoulders/spine or swings the lower back
+    // under load, so a bad back is kept off it (belt squat, leg press, seated calf raise and pull-through instead).
+    contraindicated_joints: ['ankle', 'hip', 'knee', 'lower_back_axial'],
     style_tags: ['bodybuilding', 'hybrid'],
     // The empty Smith bar is the lightest it can go (about 20kg), well above a beginner's 4kg dumbbells on the same
     // movement; a beginner gets the dumbbell version.
@@ -6172,7 +6186,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     name: 'Smith Machine Calf Raise',
     id: 'smith-machine-calf-raise',
     movement_pattern: 'isolation_calf',
-    contraindicated_joints: ['ankle'],
+    // 21 Nov 2026 (his "yes fix all four", CSCS): the load rests on the shoulders/spine or swings the lower back
+    // under load, so a bad back is kept off it (belt squat, leg press, seated calf raise and pull-through instead).
+    contraindicated_joints: ['ankle', 'lower_back_axial'],
     mechanics_tier: 'tier3_isolation',
     prescription_type: 'reps',
     angle_vector: 'vertical',
@@ -6760,6 +6776,27 @@ export const INJURED_JOINTS: Record<string, string[]> = {
   hips: ['hip'],
   elbows: ['elbow'],
   ankles: ['ankle'],
+}
+
+/**
+ * REHAB ONLY (his "fix the four leftovers in her plan too", 21 Nov 2026; CSCS, mine). Physio drills for a joint that
+ * is hurting: tendon loading for a tennis elbow, a quad set and a terminal knee extension for a knee, shin work after an
+ * ankle sprain. Given to somebody with nothing wrong they spend a warm-up, or the day's quad exercise, on a problem
+ * they do not have. Measured on 2,048 plans with no injury: each of the six forearm and ankle drills in about 469 of
+ * them as the day's warm-up, the quad set in 458 and the terminal knee extension in 290. They stay in the plan of
+ * anyone whose injury they are indicated for (`indicated_joints`), and in the free search for anyone.
+ * The everyday prep drills (scapular push-ups, wall slides, band pull-aparts, wrist circles) are not on this list.
+ */
+export const REHAB_ONLY: ReadonlySet<string> = new Set([
+  'Eccentric Wrist Extension', 'Forearm Pronation-Supination', 'Isometric Grip Squeeze', 'Banded Wrist Flexion',
+  'Banded Wrist Extension', 'Banded Ankle Dorsiflexion', 'Seated Short-Arc Quad Set', 'Banded Terminal Knee Extension',
+  // 21 Nov 2026: a patellar-tendon isometric, timed holds against a band; for a healthy knee a squat does its job better.
+  'Spanish Squat',
+])
+
+/** True when a plan should hold this exercise only for someone whose injury it treats. */
+export function isRehabOnly(entry: Pick<ExerciseEntry, 'name'> & { parent?: string }): boolean {
+  return REHAB_ONLY.has(entry.name) || (!!entry.parent && REHAB_ONLY.has(entry.parent))
 }
 
 export function contraindicatedJoints(entry: ExerciseEntry): string[] {

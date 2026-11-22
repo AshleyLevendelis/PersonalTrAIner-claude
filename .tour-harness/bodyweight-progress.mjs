@@ -255,7 +255,9 @@ await wait(4000)
 // an unloaded one. The expected word is worked out HERE from the catalogue's
 // equipment, never read back from the app's own labeller.
 const unloadedTarget = await ev('window.__unloadedTarget ?? null')
-const expectedWord = unloadedTarget?.equipment?.includes('resistance band') ? 'Band' : 'Bodyweight'
+// A bodyweight lift's badge reads "BW" (the Exercise Week design, 12 Nov 2026); this check met only band moves until
+// 21 Nov 2026, when the harness day's first unloaded lift became Chin-Ups.
+const expectedWord = unloadedTarget?.equipment?.includes('resistance band') ? 'Band' : 'BW'
 const bw = await ev(`(() => {
   const want = ${JSON.stringify(unloadedTarget?.name ?? null)}
   const rows = [...document.querySelectorAll('[data-exercise-name]')]
