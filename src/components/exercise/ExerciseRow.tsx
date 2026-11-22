@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { domingCue } from '@/lib/pregnancy-rules'
 import { TOUR_OPENS, setTourExercise, useTourStage } from '@/lib/tour-stage'
 import { isMovementPrepRow } from '@/lib/session-duration'
 import { Button } from '@/components/ui/button'
@@ -306,6 +307,10 @@ export function ExerciseRow({
           {/* From 60, on her main strength lifts: up with intent, down under control (older-beginner.ts liftFastCue). */}
           {liftFastCue(profile, ex) && (
             <span className="inline-flex items-center rounded border border-foreground/25 bg-foreground/5 px-1 py-0 text-[0.625rem] font-medium leading-4 text-foreground/90" data-testid="lift-fast-cue">{liftFastCue(profile, ex)}</span>
+          )}
+          {/* While pregnant, on face-down and push-up work (pregnancy-rules.ts domingCue, 22 Nov 2026). */}
+          {domingCue(profile, ex) && (
+            <span className="inline-flex items-center rounded border border-foreground/25 bg-foreground/5 px-1 py-0 text-[0.625rem] font-medium leading-4 text-foreground/90" data-testid="doming-cue">{domingCue(profile, ex)}</span>
           )}
           {ex.suggested_added_load_kg != null ? (
             <AddedLoadChip ex={ex} />

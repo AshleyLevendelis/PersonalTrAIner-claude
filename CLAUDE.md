@@ -1855,6 +1855,12 @@ menu" stays true when a copy is also left outside it.
   Needs the `due_date` migration and the `chat-gemini` and `generate-meals` deploys
 - **A moved session survives a change of days: "Keep it, still owed"**: it stays on the day it was moved to as a
   one-off that week, and the change-days card says so; an injury ease-off still reaches it. `test:qa-batch3` §11
+- **Her due date pauses the plan: his ruling 22 Nov 2026, "A"** (from the pregnancy audit; over asking whether the baby
+  has come, and over leaving it): from the due date nothing is due, the cards say to start again after her 6-8 week
+  postnatal check with her GP, and "I've had my check, start again" takes the Pregnant tick and due date off and offers the
+  rebuild. And from 28 weeks the near-copies of banned moves go too (renegade row, reverse Nordic, Cossack squat, one-leg
+  calf raises, loaded rotation; CSCS mine), and face-down work says "Stop if your stomach domes down the middle".
+  `test:pregnancy-rules` §12, `verify:pregnancy-audit`, `docs/audits/pregnancy-plan-audit-2026-11-22.md`
 - **Plan pause: "Add a pause"**: Profile and the coach; while paused no session is due, nothing is missed, no workout
   reminder or cheerful nudge; meals carry on; resume is eased by the return-after-a-break rules. BUILT 15 Nov 2026,
   `test:plan-pause`, `verify:plan-pause`. Needs migration 20261114180000

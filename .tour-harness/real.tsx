@@ -30,6 +30,7 @@ import { requestOpen } from '../src/lib/open-request'
 // ---------------------------------------------------------------------------
 
 import { setPlanPausedSince, setPlanPauseHandler } from '../src/lib/plan-pause'
+import { dueDatePauseSince } from '../src/lib/health-conditions'
 import { swapOnScreen } from '@/lib/screen-swap'
 import { useKeptPlanSender } from '@/hooks/useKeptPlanSender'
 import { banOnScreen } from '@/lib/screen-ban'
@@ -283,6 +284,8 @@ const EMPTY_MEALS = new URLSearchParams(location.search).get('emptymeals') === '
 // A PLAN PAUSE (his "Add a pause"): ?paused=YYYY-MM-DD is the INPUT, the date the pause began; the page mirrors it
 // into the app's one store exactly as App.tsx does, and nothing else.
 const PAUSED_FROM = new URLSearchParams(location.search).get('paused')
+const PREGNANT = new URLSearchParams(location.search).get('pregnant') === '1'
+const DUE_DATE = new URLSearchParams(location.search).get('due')
 // ?weighin=81.7 — THE LATEST WEIGH-IN ISN'T THE WEIGHT THE TARGETS USE (runs 7-10, M58). App works targets out from an
 // anchored 7-day weight that moves only when the average does; the raw reading is a display fact. INPUT only: the
 // anchor stays the profile's 80 kg, as App's would after one heavier morning.
@@ -356,6 +359,9 @@ const profile: UserProfile = {
   created_at: EFFORT_PLAN_AGE > 0 ? (() => { const d = daysAgo(EFFORT_PLAN_AGE); d.setHours(8, 0, 0, 0); return d.toISOString() })() : AWAY > 0 ? (() => { const d = daysAgo(awayPlanAge(AWAY)); d.setHours(8, 0, 0, 0); return d.toISOString() })() : THURSDAY ? (() => { const d = daysAgo(6); d.setHours(18, 30, 0, 0); return d.toISOString() })() : new Date(anchorNowMs() - (JOINED_TODAY ? 0 : 9) * 86400000).toISOString(),
   ...(ABSURD ? { max_dumbbell_kg: STATED_DUMBBELL_KG } : {}),
   ...(RUNNER ? { running_goal: '5k', running_base_minutes: 30 } : {}),
+  // ?pregnant=1&due=YYYY-MM-DD (the pregnancy audit, 22 Nov 2026): the Pregnant tick and a due date, as INPUT. The plan is
+  // the generator's own for her.
+  ...(PREGNANT ? { gender: 'female' as const, health_conditions: ['pregnancy'], due_date: DUE_DATE } : {}),
 } as UserProfile
 
 // ALWAYS FROM THE MESOCYCLE, never generateExercisePlan directly —
@@ -737,6 +743,10 @@ const doneSeed = (() => {
     mobility: hit.mobilityFiller!.activity, mobilityMinutes: hit.mobilityFiller!.duration,
   }
 })()
+// THE WEEK'S DATES FOR THE DOMING LINE — published for verify:pregnancy-audit (22 Nov 2026), only under ?pregnant=1.
+// The driver walks these and reads each day's rows off the SCREEN (the screen's day is not always the fixture's: a
+// row can be rotated on the way), so no weekday or lift is typed into it.
+;(window as unknown as { __domingTarget: unknown }).__domingTarget = PREGNANT ? { candidates: DAYS.map(n => nearestAnchorDate(n)) } : null
 
 // WHAT EACH DAY OF THE LIVE WEEK IS MADE OF — published for verify:day-length.
 //
@@ -1850,7 +1860,9 @@ function Harness() {
   // calls; only the saving is App's own (this page has no plan table to write to).
   const [planBornAt, setPlanBornAt] = useState(profile.created_at as string)
   const [pausedSince, setPausedSince] = useState<string | null>(PAUSED_FROM)
-  setPlanPausedSince(PROFILE_ID, pausedSince)
+  // HER DUE DATE PAUSES THE PLAN, mirrored as App.tsx mirrors it (the same function, read off the profile).
+  const dueDatePause = dueDatePauseSince(profile, TODAY_ISO)
+  setPlanPausedSince(PROFILE_ID, pausedSince ?? dueDatePause, !!dueDatePause && !pausedSince)
   const planPause = async (pause: boolean): Promise<string | null> => { setPausedSince(pause ? TODAY_ISO : null); ;(window as unknown as { __planPaused: boolean }).__planPaused = pause; return null }
   // App registers its one pause function for every screen (plan-pause.ts); this page registers the same stand-in.
   setPlanPauseHandler(PROFILE_ID, planPause)

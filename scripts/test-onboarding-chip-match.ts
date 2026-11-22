@@ -144,7 +144,24 @@ console.log('\n3. The coach\'s own phrasings (the prompt\'s examples and the rep
     ['Where are you planning to train?', 'equipment'],
     ["Anything a doctor's asked you to watch?", 'injuries'],
     ['What sort of training do you enjoy most?', 'trainingStyle'],
+    // 22 Nov 2026, his "is the onboarding fixed for all questions?": 160 phrasings of every question setup asks with
+    // buttons, each in the state setup would ask it; these were the misses (none left with the coach asking).
+    ['What do you want to achieve?', 'fitnessGoal'],
+    ['What would you like to get out of training?', 'fitnessGoal'],
+    ['What are you training for?', 'fitnessGoal'],
+    ['How experienced are you?', 'trainingExperience'],
+    ['Have you lifted weights before?', 'trainingExperience'],
+    ['Would you call yourself a beginner?', 'trainingExperience'],
+    ['Will that be at a gym?', 'equipment'],
+    ['Are you a gym member?', 'equipment'],
+    ['Anything that hurts when you train?', 'injuries'],
+    ['When can you get to the gym?', 'trainingDays'],
+    ['Bodybuilding, functional, or a mix?', 'trainingStyle'],
+    ['Are you a fan of running?', 'conditioningPreference'],
+    ['Any foods you can\'t have?', 'dietaryPreferences'],
   ]
+  // With NO buttons asked for, a question that names the style choices still brings them (rule 4).
+  check('"Bodybuilding, functional, or a mix?" asked with no buttons requested still gets the style card', fresh('Bodybuilding, functional, or a mix?', []) === 'trainingStyle', fresh('Bodybuilding, functional, or a mix?', []))
   for (const [text, key] of CORPUS) {
     const got = fresh(text, [key])
     check(`"${text.slice(0, 58)}…" keeps its ${key} card`, !!got && numericGroupFor(key).includes(got), got)
@@ -169,6 +186,10 @@ console.log('\n4. A request for the WRONG question never puts chips under these'
     // The place words added 22 Nov must not pull the equipment card under a question about something else.
     ['How long have you got at the gym on the days you train?', 'equipment'],
     ['Have you done much training before?', 'equipment'],
+    // ...and the words added for the misses above must not pull a card under the wrong question.
+    ['How long have you been training for?', 'fitnessGoal'],
+    ['How long can you stay at a gym?', 'equipment'],
+    ['Any foods you just don\'t like?', 'dietaryPreferences'],
   ]
   for (const [text, wrong] of MISMATCH) {
     const got = fresh(text, [wrong])

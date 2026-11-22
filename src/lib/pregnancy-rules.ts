@@ -76,10 +76,19 @@ export const PREGNANCY_LATE_EXCLUDED: ReadonlySet<string> = new Set([
   'Archer Push-Ups', 'Deficit Push-Ups', 'Wide Push-Ups', 'Close-Grip Push-Ups', 'Knee Push-Ups',
   // head below the hips, weight through the arms
   'Pike Push-Ups',
+  // 22 NOV 2026, THE PREGNANCY AUDIT (his "build fixes 2 and 3"; CSCS, mine): near-copies of the above that got through.
+  // A renegade row is a plank with a row; a reverse Nordic leans back on the knees, loading the stretched stomach wall;
+  // a Cossack squat is a deep side lunge; a standing one-leg calf raise is single-leg balance work; landmine and machine
+  // rotation twist the trunk under load. Measured on 96 plans: 856 one-leg calf raises, 240 renegade rows, 144 reverse
+  // Nordics, 164 loaded rotations and 32 Cossack squats in weeks from 28.
+  'Renegade Row', 'Reverse Nordic Curl', 'Cossack Squat (Bodyweight)',
+  'Single-Leg Dumbbell Calf Raise', 'Single-Leg Calf Raise (Bodyweight)', 'Single-Leg Calf Raise Hold',
+  'Landmine Rotation', 'Rotary Torso Machine',
 ])
 
 /** What takes a late-excluded exercise's place, first one the person's pool allows. */
-export const PREGNANCY_LATE_REPLACEMENTS: Readonly<Record<'legs' | 'hinge' | 'push' | 'core', readonly string[]>> = {
+export type LateReplacementKind = 'legs' | 'hinge' | 'push' | 'core' | 'pull' | 'calf' | 'quad'
+export const PREGNANCY_LATE_REPLACEMENTS: Readonly<Record<LateReplacementKind, readonly string[]>> = {
   legs: ['Single-Leg Leg Press', 'Leg Press', 'Low Box Step-Up', 'Goblet Squats', 'Box Squat (Bodyweight)', 'Leg Extensions'],
   // A HINGE STAYS A HINGE (22 Nov 2026, the persona audit's C1): a single-leg RDL went to the legs list, all squats, so from
   // 28 weeks a hinge day became a second squat day and 114 of the audit's pregnant plans had weeks with no hinge at all.
@@ -87,13 +96,38 @@ export const PREGNANCY_LATE_REPLACEMENTS: Readonly<Record<'legs' | 'hinge' | 'pu
   hinge: ['Romanian Deadlifts', 'Kettlebell Deadlift', 'Smith Machine Romanian Deadlift', 'Cable Pull-Through', 'Bodyweight Good Morning', 'Bodyweight Hip Hinge to Wall'],
   push: ['Incline Push-Ups', 'Chest Press Machine', 'Incline Dumbbell Press', 'Incline Machine Press'],
   core: ['Side Plank', 'Bird Dog', 'Pallof Press', 'Cable Woodchops', 'Dumbbell Woodchop'],
+  // 22 Nov 2026: a row stays a row (seated or one arm braced, never face-down or chest-on-a-bench); a calf raise stays a
+  // calf raise on both feet; a quad isolation stays one.
+  pull: ['Seated Cable Row', 'Single-Arm Cable Row', 'Seated Machine Row', 'Iso-Lateral High Row', 'Single-Arm Kettlebell Row', 'Dumbbell Rows', 'Towel Row', 'Backpack Row'],
+  calf: ['Standing Calf Raise Machine', 'Calf Raises', 'Seated Calf Raises', 'Leg Press Calf Raise', 'Calf Raises (Bodyweight)', 'Bent-Knee Calf Raise (Bodyweight)'],
+  quad: ['Leg Extensions', 'Leg Press', 'Goblet Squats', 'Box Squat (Bodyweight)'],
 }
 
-export function lateReplacementKind(name: string, pattern: string): 'legs' | 'hinge' | 'push' | 'core' {
+export function lateReplacementKind(name: string, pattern: string): LateReplacementKind {
   if (pattern === 'core' || /plank|mountain/i.test(name)) return 'core'
   if (/push-up/i.test(name)) return 'push'
   if (pattern === 'hip_hinge') return 'hinge'
+  if (pattern === 'horizontal_pull') return 'pull'
+  if (pattern === 'isolation_calf') return 'calf'
+  if (pattern === 'isolation_quad') return 'quad'
   return 'legs'
+}
+
+// ---------------------------------------------------------------------------
+// THE DOMING LINE (22 Nov 2026, the pregnancy audit, his "build fixes 2 and 3"). Before 28 weeks planks, push-ups and
+// other face-down work stay in while they feel fine, which is the guidance (ACOG 2020, RCOG). The standard sign that one
+// no longer does is the stomach doming or coning down the middle as the abdominal wall stretches, and nothing told her.
+// So these moves carry one line while "Pregnant" is ticked. From 28 weeks they are swapped out above anyway.
+// ---------------------------------------------------------------------------
+export const DOMING_CUE = 'Stop if your stomach domes down the middle'
+const DOMING_WATCH: ReadonlySet<string> = new Set([
+  'Plank', 'Plank Shoulder Taps', 'Copenhagen Plank', 'Mountain Climbers', 'Push-Ups', 'Decline Push-Ups', 'Archer Push-Ups',
+  'Deficit Push-Ups', 'Wide Push-Ups', 'Close-Grip Push-Ups', 'Knee Push-Ups', 'Incline Push-Ups', 'Pike Push-Ups',
+  'Renegade Row', 'Bear Crawl', 'Reverse Nordic Curl',
+])
+/** The doming line for this exercise, or null: only while she is pregnant, on face-down and push-up work. */
+export function domingCue(profile: { health_conditions?: readonly string[] | null } | null | undefined, ex: { name: string }): string | null {
+  return (profile?.health_conditions ?? []).includes('pregnancy') && DOMING_WATCH.has(ex.name) ? DOMING_CUE : null
 }
 
 /** Pelvic floor exercises in the warm-up of every training day while pregnant (his "yes", 21 Nov 2026). */
