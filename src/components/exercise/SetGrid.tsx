@@ -160,6 +160,11 @@ export interface SetGridProps {
   /** Her choice for this lift this session; undefined = the default (open while a build-up row is still to do). */
   rampOpen?: boolean
   onToggleRamp?: (open: boolean) => void
+  /**
+   * The app tour's effort stop (22 Nov 2026, tour-stage.ts): the question shown under this lift before its sets are
+   * in, so the stop shows what it describes. Nothing can be answered: with no last set, an answer writes nothing.
+   */
+  tourEffortPreview?: boolean
   // REMOVED 5 Sep 2026: onFirstEverLog. It was declared here, forwarded by
   // ExerciseRow, and fired on the right condition — and no parent anywhere in
   // the app ever passed one, so the "one-time celebration" its doc comment
@@ -169,6 +174,7 @@ export interface SetGridProps {
 }
 
 export function SetGrid({
+  tourEffortPreview = false,
   exerciseName,
   exerciseId,
   totalSets,
@@ -1483,8 +1489,8 @@ export function SetGrid({
           set. On today's card it sits inside the open ramp (2a); with nothing
           to fold it stays here. VIOLET, because it adds a RAMP row. */}
       {!hasFold && showWarmupControls && addWarmupButton}
-      {askEffort && lastWorkingLog && (
-        <div className="mt-2 space-y-1.5" data-testid="lift-effort">
+      {((askEffort && lastWorkingLog) || tourEffortPreview) && (
+        <div className="mt-2 space-y-1.5" data-testid="lift-effort" data-tour={tourEffortPreview ? 'effort' : undefined}>
           <p className="text-[0.75rem] text-muted-foreground">{EFFORT_ASK}</p>
           <div role="group" aria-label={EFFORT_ASK} className="flex gap-2">
             {(['easy', 'right', 'hard'] as const).map(effort => (

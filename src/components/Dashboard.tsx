@@ -5,6 +5,7 @@
 // no new visual language invented here.
 // ---------------------------------------------------------------------------
 
+import { TOUR_OPENS, useTourStage } from '@/lib/tour-stage'
 import { PAUSE_WORDS, isPausedOn, planPausedSince } from '@/lib/plan-pause'
 import { addDays } from '@/lib/session-move'
 import { nextSessionAfter, nextSessionGlance, type NextSession } from '@/lib/home-next-session'
@@ -332,7 +333,10 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
   const [stepsOpen, setStepsOpen] = useState(false)
   const [stepsError, setStepsError] = useState<string | null>(null)
   const [weighInOpen, setWeighInOpen] = useState(false)
-  const [progressOpen, setProgressOpen] = useState(false)
+  const [progressOpenState, setProgressOpen] = useState(false)
+  // OPEN WHILE THE TOUR IS ON ITS PROGRESS STOP (22 Nov 2026, tour-stage.ts), and back as it was after.
+  const tourStage = useTourStage()
+  const progressOpen = progressOpenState || tourStage === TOUR_OPENS.progress
   const [summaryOpen, setSummaryOpen] = useState(false)
 
   /**
@@ -711,10 +715,11 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
             </span>
           </div>
         </div>
+        {/* THE TOUR'S PROGRESS STOP POINTS AT THIS, opened (22 Nov 2026, tour-stage.ts): the toggle and what it shows. */}
+        <div data-tour="progresspanel">
         <button
           type="button"
           onClick={() => setProgressOpen(o => !o)}
-          data-tour="progress"
           aria-expanded={progressOpen}
           className="flex min-h-[48px] w-full items-center gap-2 border-t border-[color:var(--hairline)] px-4 text-left"
           data-home-progress-toggle
@@ -800,6 +805,7 @@ export function Dashboard({ profile, macros, exercisePlan, mesocycle, planCreate
           />
         </div>
         </div>)}
+        </div>
       </section>
 
       {/* 6. THE NEXT MEAL, a quiet hairline row (17 Oct: Home's next meal is Nutrition's). */}

@@ -1,7 +1,9 @@
 import type { Tab } from '@/lib/app-route'
 
 /**
- * The ten stops of the post-onboarding app tour, and nothing else.
+ * The stops of the post-onboarding app tour, and nothing else. ONE tour (his ruling 22 Nov 2026, "it should be one
+ * tour only, not a tour and a full tour"), and every stop SHOWS what it describes: a stop about something behind a tap
+ * has the screen open it (tour-stage.ts), and a stop about logging a set has a set to log on any day.
  *
  * Lives here rather than inside AppTour.tsx for the same reason
  * first-run-intro.ts exists: this is pure CONTENT — no DOM, no state, no
@@ -48,6 +50,16 @@ export interface TourStep {
    * the header above exists to prevent.
    */
   pendingCopy?: string
+  /**
+   * The words on a day with no set left to log, when the Exercise tab has put up the next session to practise on
+   * (tour-stage.ts). `{day}` is that session's weekday. Here, so the honesty scan reads it too.
+   */
+  practiceCopy?: string
+  /**
+   * The `data-tour` key of the control an opened menu hangs off. The tour scrolls it into view first, so the menu it
+   * opens lands on screen (found 22 Nov 2026: the day menu opened 790px above the screen, its button scrolled away).
+   */
+  opener?: string
   title?: string
   last?: boolean
 }
@@ -75,7 +87,7 @@ export const TOUR_STEPS: TourStep[] = [
     // for good, so the promise had to change with it. The replacement names
     // where the tour actually lives afterwards, because a permanent Skip is
     // only fair if you can see the way back before you take it.
-    copy: "Your plan's built and ready. Give me a minute — I'll show you where everything lives. Skip anytime; it's in the settings menu whenever you want it.",
+    copy: "Your plan's built and ready. Give me three minutes and I'll show you where everything lives, opening things up as we go. Skip anytime; it's in the settings menu whenever you want it.",
   },
   {
     key: 'hero', tab: 'dashboard', target: 'hero',
@@ -103,6 +115,11 @@ export const TOUR_STEPS: TourStep[] = [
     copy: 'Your day so far, as four rings. Calories, protein and water are read-outs — tap them to go to Nutrition, which owns them. Steps are logged right here: tap Steps.',
   },
   {
+    // OPENED FOR THE STOP (22 Nov 2026): Home's Progress opens itself while the tour is here (tour-stage.ts).
+    key: 'progress', tab: 'dashboard', target: 'progresspanel',
+    copy: 'Progress, opened up: the phase you are in, your personal bests and your weigh-ins. Tap Weight in here to log one and see your weekly averages on a graph.',
+  },
+  {
     key: 'nutrition', tab: 'nutrition', target: 'rings',
     nav: 'navNutrition', tapHint: 'Tap Nutrition', teaser: 'Next stop — where your food lives.',
     // Steps used to be named here. They moved to Exercise on 5 Sep 2026, so
@@ -116,6 +133,10 @@ export const TOUR_STEPS: TourStep[] = [
     copy: "Everything you eat and drink lives here: what's left today, your macros, and your water — tap + Water to log a glass. The targets behind them are one tap down, in Targets & plan settings.",
   },
   {
+    key: 'mealstrip', tab: 'nutrition', target: 'mealstrip',
+    copy: "Tap any day ahead to see what you're eating, swap a meal before you get there, or add that day to your shopping list. Week shows all seven at once.",
+  },
+  {
     key: 'meals', tab: 'nutrition', target: 'meals',
     copy: 'Your meals for the day. Open one to log it, swap it, or regenerate it — every kcal here feeds the numbers above.',
     // Since 6 Sep 2026 the app hands over before the meals are built, so this
@@ -127,6 +148,11 @@ export const TOUR_STEPS: TourStep[] = [
     pendingCopy: "Your meals go here — I'm still building them. Give me a moment and they'll appear right below.",
   },
   {
+    // The first meal opens itself for this stop (22 Nov 2026), so the sheet it describes is the one on screen.
+    key: 'mealsheet', tab: 'nutrition', target: 'mealsheet',
+    copy: "Open a meal and you get this: what's in it and how to cook it, the heart for one you love so it comes round more often, Swap when there's another dish to have instead, and Eating out, which fits the rest of the day around a meal out.",
+  },
+  {
     key: 'exercise', tab: 'exercise', target: 'extoday',
     nav: 'navExercise', tapHint: 'Tap Exercise', teaser: 'Now the training side.',
     // Steps MOVED here from Nutrition, and this is the one place the tour can
@@ -135,6 +161,9 @@ export const TOUR_STEPS: TourStep[] = [
     // EXERCISE WEEK (his handoff, 12 Nov 2026): no rings; the strip of days, "Week" for every day on one screen, and
     // "Program" for the whole plan and its phases.
     copy: 'Your program lives here — a strip of this week’s days, my notes on the week (tap to read the whole thing), and today’s session right below. Tap Week to see every day’s session on one screen, and Program for the whole plan and the phase you’re in.',
+    // A DAY WITH NOTHING TO LOG (his request 22 Nov 2026: "Even if it's trying to show how to log a set on a day that
+    // there is no sets to log it should still show the user").
+    practiceCopy: "Your program lives here. There's nothing left to log today, so I've put up {day}'s session to practise on: nothing you do here counts, and it goes when we leave. Tap Week to see every day's session on one screen, and Program for the whole plan.",
   },
   {
     key: 'set', tab: 'exercise', target: 'setrow', gate: true,
@@ -145,6 +174,36 @@ export const TOUR_STEPS: TourStep[] = [
     // the claim is narrowed to where it holds rather than dropped.
     typedWeightTapHint: "Type the weight you're using, then tap the ✓",
     typedWeightCopy: "Logged — that easy. Wherever I've given you a weight, leave the fields blank and I'll take the prescribed numbers; your rest timer starts on its own. This one was practice, so I'll take it off when we move on.",
+  },
+  {
+    // Shown under the main lift for this stop (22 Nov 2026): in a session it comes once a lift's sets are all logged.
+    key: 'effort', tab: 'exercise', target: 'effort',
+    copy: "When a lift's sets are done I'll ask this: too easy, about right, or too hard? One tap, and your answer moves the next session's weight.",
+  },
+  {
+    key: 'exmenu', tab: 'exercise', target: 'exmenu-open', opener: 'exmenu-anchor',
+    copy: "Every exercise has this menu: About this exercise, swap it, move it earlier or later, take it out of today, or ban it for good. Every change shows an Undo.",
+  },
+  {
+    // THE ABOUT SHEET, every tab (his request 22 Nov 2026: "show the about exercise tab, and everything in it").
+    key: 'about-howto', tab: 'exercise', target: 'about',
+    copy: "About this exercise, first tab: How to. A YouTube search for a video of the form, why it's in your plan, and how to do it, step by step.",
+  },
+  {
+    key: 'about-muscles', tab: 'exercise', target: 'about',
+    copy: 'Muscles: the ones it works, lit up on the body map, front and back, with their names underneath.',
+  },
+  {
+    key: 'about-history', tab: 'exercise', target: 'about',
+    copy: "History: how it's going over time, your personal bests, and every session you've done it. It fills up as you train.",
+  },
+  {
+    key: 'daymenu', tab: 'exercise', target: 'daymenu-open', opener: 'daymenu',
+    copy: "This menu is for the whole day: What happened? for when the day doesn't go to plan, and Session history for every workout you've logged.",
+  },
+  {
+    key: 'whathappened', tab: 'exercise', target: 'whathappened',
+    copy: "What happened?, opened. What it offers depends on the day: move the session, make it a rest day, log something you did instead, say you did it without the app or missed it, or ask for a shorter or easier session when time or energy is short.",
   },
   {
     // CORRECTED 13 Sep 2026, TWICE OVER.
@@ -172,64 +231,29 @@ export const TOUR_STEPS: TourStep[] = [
     copy: 'All four timers are right here — a round timer with every protocol (Tabata, EMOM, or your own), a countdown timer you set, a stopwatch, and a lap timer. Start one and it keeps going while you use the rest of the app.',
   },
   {
-    key: 'settings', tab: 'tools', target: 'settings',
+    key: 'plates', tab: 'tools', target: 'plates',
+    copy: "The plate calculator: set the weight and I'll show you what goes on each side of the bar. It works for adjustable dumbbells too.",
+  },
+  {
+    key: 'settings', tab: 'tools', target: 'settings-open', opener: 'settings',
     // Names the two things the gear gained, and closes the loop the welcome
     // step opens: it now promises the tour is "in the settings menu", so the
     // step that shows the settings menu has to point at it.
-    copy: 'Everything I know about you sits behind the gear — profile, preferences, injuries, all of it editable. How the app looks lives there too, and so does this tour if you ever want it again.',
+    copy: 'The gear, opened: Profile, which is everything I know about you, and this tour if you ever want it again.',
+  },
+  {
+    // Profile opens itself for this stop (22 Nov 2026), over Tools; it closes again when the tour moves on.
+    key: 'profile', tab: 'tools', target: 'profile',
+    // ONLY THE TOP IS IN SIGHT under the card (verify:tour-real holds the rows named first), so the rest is said as further down.
+    copy: 'Profile: every answer you gave me, and all of it can be changed. Your goal and injuries are up here; further down, your days and the kit you own, allergies and the foods you like or avoid, reminders and how the app looks, and a pause for a holiday at the very bottom.',
   },
   {
     key: 'chat', tab: 'chat', target: null, last: true,
     nav: 'chatfab', tapHint: 'Tap the chat button', teaser: 'Last stop — the important one.',
-    copy: "And this is where we talk. Anything you'd tell a trainer — a heavy day, a food you hate, a sore shoulder — just say it. That's the basics; there's plenty more. Want the full tour? It's about two minutes.",
+    copy: "And this is where we talk. Anything you'd tell a trainer — a heavy day, a food you hate, a sore shoulder — just say it. Try \"swap my squats\", \"I'm eating out tonight\", or a photo of a menu. Swipe a message to the right to reply to it, and tap the little flag if a reply of mine looks wrong.",
   },
 ]
 
-
-/**
- * THE FULL TOUR (his ruling 22 Nov 2026, "Short tour, then offer more", over one long tour and over tips as you go):
- * the ten stops above stay as they are, and the last one offers these. Skip on every stop; the settings menu replays
- * either part. Each stop names a thing the app really does today, checked against the screen it points at
- * (docs/plans/setup-and-tour-refresh.md). The same honesty scan reads these lines as the ten above.
- */
-export const MORE_TOUR_STEPS: TourStep[] = [
-  {
-    key: 'more-exmenu', tab: 'exercise', target: 'exmenu',
-    copy: "Every exercise has a ⋮. Behind it: About this exercise (how to do it, the muscles it works, a YouTube search for the form and your history on it), plus swap, move, remove, or ban it for good. Every change shows an Undo.",
-  },
-  {
-    key: 'more-effort', tab: 'exercise', target: null,
-    copy: "When you finish a lift I'll ask: too easy, about right, or too hard? One tap, and your answer moves the next session's weight.",
-  },
-  {
-    key: 'more-daymenu', tab: 'exercise', target: 'daymenu',
-    copy: 'This menu is for the whole day. Under What happened? you can move the session, mark it missed, make today a rest day, log something you did instead, or do a shorter version when time is tight.',
-  },
-  {
-    key: 'more-plates', tab: 'tools', target: 'plates',
-    copy: "The plate calculator: set the weight and I'll show you what goes on each side of the bar. It works for adjustable dumbbells too.",
-  },
-  {
-    key: 'more-mealstrip', tab: 'nutrition', target: 'mealstrip',
-    copy: "Tap any day ahead to see what you're eating, swap a meal before you get there, or add that day to your shopping list. Week shows all seven at once.",
-  },
-  {
-    key: 'more-meals', tab: 'nutrition', target: 'meals',
-    copy: "Open a meal for more: swap it, heart one you love so it comes round more often, or mark it as eaten out. I'll shrink the rest of the day to fit around it.",
-  },
-  {
-    key: 'more-progress', tab: 'dashboard', target: 'progress',
-    copy: 'Progress opens your personal bests and your weigh-ins. Tap Weight in there to log one and see your weekly averages on a graph.',
-  },
-  {
-    key: 'more-settings', tab: 'dashboard', target: 'settings',
-    copy: "A few things worth knowing behind the gear, in Profile: your allergies, the kit you own, reminders and how often I message you, and a pause button for a holiday or an illness.",
-  },
-  {
-    key: 'more-chat', tab: 'chat', target: null, last: true,
-    copy: "Last one. Things to try with me: \"swap my squats\", \"I'm eating out tonight\", a photo of a meal or a menu, or \"open my shopping list\". And if a reply of mine looks wrong, tap the little flag beside it.",
-  },
-]
 
 export const SET_STEP_KEY = 'set'
 /** The stop that can outrun its own content — see its pendingCopy above. */

@@ -397,7 +397,7 @@ export function ExerciseDetailDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm max-h-[85vh]">
+      <DialogContent className="max-w-sm max-h-[85vh]" data-tour="about">
         <DialogHeader>
           <DialogTitle className="text-left">{exerciseName ?? 'Exercise'}</DialogTitle>
         </DialogHeader>

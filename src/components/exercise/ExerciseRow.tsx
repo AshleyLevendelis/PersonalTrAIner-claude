@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { TOUR_OPENS, setTourExercise, useTourStage } from '@/lib/tour-stage'
 import { isMovementPrepRow } from '@/lib/session-duration'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -46,6 +47,11 @@ export interface ExerciseRowProps {
   isCalibrationWeek?: boolean
   /** Ask how the lift felt once its sets are done (his ruling, 11 Nov 2026, "One tap per lift"). */
   askEffort?: boolean
+  /**
+   * THE ROW THE APP TOUR POINTS AT (22 Nov 2026, tour-stage.ts): the session's main lift. Its menu opens for the
+   * tour's menu stop, the effort question shows for its effort stop, and its name is what the About stops open.
+   */
+  tourAnchor?: boolean
   /** The first session back after a break, with eased weights: the boxes ignore last time's numbers (layoff.ts). */
   easedForBreak?: boolean
   onOpenPlateCalc: (weightKg: number, barKg?: number) => void
@@ -75,6 +81,7 @@ export interface ExerciseRowProps {
 }
 
 export function ExerciseRow({
+  tourAnchor = false,
   ex,
   dayName,
   supersetLabel,
@@ -162,6 +169,13 @@ export function ExerciseRow({
   const rampKey = `${date}:${exerciseId}`
   const [rampChoice, setRampChoice] = useState<boolean | undefined>(() => rampFoldChoice.get(rampKey))
   useEffect(() => { setRampChoice(rampFoldChoice.get(rampKey)) }, [rampKey])
+  const tourStage = useTourStage()
+  // The anchor row says its name while it is the anchor, for the tour's About stops (ExerciseTab opens the sheet).
+  useEffect(() => {
+    if (!tourAnchor) return
+    setTourExercise(ex.name)
+    return () => setTourExercise(null)
+  }, [tourAnchor, ex.name])
   const toggleRamp = (open: boolean) => { rampFoldChoice.set(rampKey, open); setRampChoice(open) }
 
   const menu = (
@@ -176,6 +190,8 @@ export function ExerciseRow({
       onRemove={onRemove}
       onBan={onBan}
       banBusy={banBusy}
+      tourOpen={tourAnchor && tourStage === TOUR_OPENS.exerciseMenu}
+      anchor={tourAnchor}
     />
   )
 
@@ -340,6 +356,7 @@ export function ExerciseRow({
           rampKind={ramp?.kind}
           calibration={isCalibrationWeek}
           askEffort={askEffort}
+          tourEffortPreview={tourAnchor && tourStage === TOUR_OPENS.effort}
           ignoreLastTime={easedForBreak}
           profile={profile}
           // THE PLATE BUTTON LIVES IN EACH WEIGHT BOX (2a), and only on a
@@ -365,7 +382,7 @@ const rampFoldChoice = new Map<string, boolean>()
  * and the ban rewrites every week — so only the ban is styled destructive.
  * "How to do it" leads: mid-set, "how does this go?" is the commoner question.
  */
-function ExerciseMenu({ ex, onOpenDetail, onOpenHistory, onSwap, onMove, canMoveUp, canMoveDown, onRemove, onBan, banBusy }: {
+function ExerciseMenu({ ex, onOpenDetail, onOpenHistory, onSwap, onMove, canMoveUp, canMoveDown, onRemove, onBan, banBusy, tourOpen = false, anchor = false }: {
   ex: Exercise
   onOpenDetail?: (exerciseName: string) => void
   onOpenHistory?: () => void
@@ -376,15 +393,19 @@ function ExerciseMenu({ ex, onOpenDetail, onOpenHistory, onSwap, onMove, canMove
   onRemove?: () => void
   onBan: () => void | Promise<void>
   banBusy: boolean
+  /** Held open while the app tour's menu stop is on screen. */
+  tourOpen?: boolean
+  /** This is the tour's anchor row: its ⋮ is the one the tour scrolls to before opening the menu. */
+  anchor?: boolean
 }) {
   return (
-    <DropdownMenu>
+    <DropdownMenu open={tourOpen ? true : undefined}>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="hit-slop-44 size-7 shrink-0" aria-label="Exercise options" data-tour="exmenu">
+        <Button variant="ghost" size="icon" className="hit-slop-44 size-7 shrink-0" aria-label="Exercise options" data-tour={anchor ? 'exmenu-anchor' : 'exmenu'}>
           <MoreVertical className="size-3.5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" data-tour={tourOpen ? 'exmenu-open' : undefined}>
         {onOpenDetail && (
           <DropdownMenuItem onClick={() => onOpenDetail(ex.name)}>
             <BookOpen className="size-3.5" />

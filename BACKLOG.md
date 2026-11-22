@@ -2,6 +2,36 @@
 
 Newest first. One line each.
 
+- [x] **ONE TOUR, AND EVERY STOP SHOWS WHAT IT DESCRIBES: his words 22 Nov 2026** ("Walk the tour. Make sure every
+  step shows what it is describing. Even if it's trying to show how to log a set on a day that there is no sets to log
+  it should still show the user. The tour should also show the about exercise tab, and everything in it, the muscle
+  diagram, the video demonstration. And it should be one tour only, not a tour and a full tour"). REVERSES his "Short
+  tour, then offer more" of the same morning: the offer, "Maybe later" and Settings' "The full tour" are gone.
+  READ FIRST (the old stops against the code): of the 19, 5 pointed at a closed control and described what was behind
+  it (the ⋮, the day menu, the gear, Home's Progress, and the meal list for what opening a meal shows), 1 pointed at
+  nothing (the effort question), and on a rest day the set stop was skipped.
+  NOW 22 STOPS, in tab order: welcome, Home, the day's rings, Progress (opened), Nutrition, the meal strip, the meals, a
+  meal's sheet (opened), Exercise, log a set, the effort question (shown under the main lift), the exercise ⋮ (opened),
+  About this exercise on How to (the YouTube video button and the steps), Muscles (the body map) and History, the day
+  menu (opened), What happened? (opened), Tools, the plate calculator, the gear (opened), Profile (opened), the chat.
+  HOW: the tour says which stop it is on (`tour-stage.ts`); each screen opens its own real thing for its stop and
+  shuts it when the tour moves on. Nothing is drawn by the tour, and the tour's blocker keeps every opened control
+  untappable. THE PRACTICE DAY: on a day with nothing left to log (no session, or done, rested, swapped, missed) the
+  Exercise stops put up the next session the way "Train anyway" would, never saved and labelled "Thursday's session ·
+  practice"; the set logged on it is the 17 Nov practice set, taken back off. No exercise in the catalogue has its own
+  video, so "the video demonstration" is How to's "Find a video on YouTube", the video the app has.
+  FOUND BY THE WALK, each fixed: the day menu and the gear's menu opened off the screen (their buttons had scrolled
+  away; a stop now scrolls a menu's button into view first); the card sat on How to's tabs and video button (a card
+  with no room beside a sheet now sits at the foot of the screen); full-width sheets ran the highlight a few pixels off
+  the screen (clamped); Profile's lower rows were named but under the card (its words now say "further down").
+  CHECKS: `verify:tour-real` walks every stop three times, on a training day, a rest day and in the WHOLE app
+  (app-boot.html, the only page with App.tsx's own gear and Profile): each target is on screen, the highlight on it,
+  and every thing the stop names is in sight and not under the card. `test:app-tour` §6b (one tour; every screen reads
+  the stop it opens for; every Exercise stop has a practice day). `verify:tour` follows the one tour.
+  MUTATIONS: `test:app-tour` 5 of 5 caught (280 checks each run); `verify:tour-real` 10 of 10 caught (244 checks each
+  run: every stop's checks are worked out before the walk and a check never reached fails, after the first round showed
+  a broken stop dropping its own later checks, which the harness rightly scored as a crash, not a catch).
+
 - [x] **REPLY TO ONE MESSAGE IN THE CHAT, THE WHATSAPP WAY: his idea 22 Nov 2026; his ruling "1, build it"** (from
   three: swipe right or press and hold, over swipe only and over a Reply button under every message). Swipe a message
   to the right (the bubble follows, a reply arrow fades in, it springs back) or hold it for a small menu (Reply, Copy;

@@ -1,4 +1,5 @@
 import { likeClash } from '@/lib/named-food-clash'
+import { TOUR_OPENS, useTourStage } from '@/lib/tour-stage'
 import { emptyMealsOf } from '@/lib/empty-meal'
 import { ShowNumbersContext } from '@/lib/show-numbers'
 import { couldNot, targetsMoved, mealsDrifted, type TargetMoveCause } from '@/lib/coach-voice'
@@ -715,6 +716,8 @@ function App() {
   const [generatingStatus, setGeneratingStatus] = useState('')
   const [exerciseExclusions, setExerciseExclusions] = useState<string[]>(() => boot?.exclusions ?? [])
   const [profileInfoOpen, setProfileInfoOpen] = useState(false)
+  // Where the app tour is: its gear and Profile stops open those (tour-stage.ts).
+  const tourStage = useTourStage()
   const [profileInfoSection, setProfileInfoSection] = useState<'goals' | 'facts' | 'context' | 'dietary' | 'myMeals' | undefined>(undefined)
   // "Open my profile" from the chat (his request 16 Nov 2026, "do everything from chat"): Profile is App's own sheet.
   useEffect(() => {
@@ -3535,6 +3538,7 @@ function App() {
         <ProfileMenu
           onOpenProfile={() => { setProfileInfoSection(undefined); setProfileInfoOpen(true) }}
           onReplayTour={replayAppTour}
+          tourOpen={tourStage === TOUR_OPENS.settingsMenu}
         />
       </div>
       <div
@@ -3810,7 +3814,8 @@ function App() {
           loadGuard: () => loadPlanEditContext(profile, mesocycle, mesocycleCreatedAt ?? profile.created_at).then(c => c.isProtected),
           ban: handleBanExercise,
         }}
-        open={profileInfoOpen}
+        // Open for the app tour's Profile stop too (22 Nov 2026, tour-stage.ts), and shut again when it moves on.
+        open={profileInfoOpen || tourStage === TOUR_OPENS.profile}
         onOpenChange={setProfileInfoOpen}
         profile={profile}
         latestWeightKg={latestWeightKg}

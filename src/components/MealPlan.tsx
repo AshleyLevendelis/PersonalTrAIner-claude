@@ -47,6 +47,7 @@ import { menuForSlot, menuWeekOf } from '@/lib/meal-menu'
 import { cookedHint } from '@/lib/as-weighed'
 import { methodSteps } from '@/lib/method-steps'
 import { revealBelowTap } from '@/components/nutrition/reveal'
+import { TOUR_OPENS, useTourStage } from '@/lib/tour-stage'
 import { MealMacros, KcalSwatch } from '@/components/nutrition/NutritionRings'
 import { EATING_OUT_SIZES, EATING_OUT_WORDS, eatingOutSizeOf, isEatingOut, type EatingOutController, type EatingOutSize } from '@/lib/eating-out'
 const MealMoveSheet = lazyWithReload(() => import('./nutrition/MealMoveSheet').then(m => ({ default: m.MealMoveSheet })))
@@ -267,6 +268,7 @@ export function MealPlan({
   }
 
   const [expandedSlot, setExpandedSlot] = useState<MealSlotName | null>(null)
+  const tourStage = useTourStage()
 
   // Which meals are already logged eaten today, keyed by slot — reuses
   // getTodayLedger's own local-first merge (server rows + pending queue) so
@@ -481,6 +483,10 @@ export function MealPlan({
 
   // The same two lists the display-time restriction re-check reads (restrictionBySlot above).
   const methodRules: MethodRules = { dietaryPreferences, avoidFoods }
+  // THE TOUR'S MEAL STOP OPENS THE FIRST PLAN MEAL (22 Nov 2026, tour-stage.ts): the sheet it describes is the real one.
+  const tourSlot = tourStage === TOUR_OPENS.mealSheet
+    ? activeSlots.find(sl => !!shownOption(sl) && !isCookedElsewhere(shownOption(sl))) ?? null
+    : null
   const rowFor = (slot: MealSlotName, variant: 'upnext' | 'later' | 'eaten') => isCookedElsewhere(shownOption(slot)) ? (
     // A MEAL COOKED FOR HIM ELSEWHERE (11 Nov 2026) is its own row: it stays in the day and is counted, and has none
     // of a plan dish's controls (no recipe, no foods to edit, no heart, no move), because none of them is true of it.
@@ -529,7 +535,7 @@ export function MealPlan({
             sizedUsual={sizedUsualLine(shownOption(slot), pools[slot] ?? [])}
             methodRules={methodRules}
             alternatives={pools[slot] ?? []}
-            expanded={expandedSlot === slot}
+            expanded={expandedSlot === slot || tourSlot === slot}
             onToggle={() => setExpandedSlot(prev => (prev === slot ? null : slot))}
             onSwap={onSwapSlot}
             onUndoSwap={onUndoSwap}
@@ -1460,6 +1466,7 @@ function MealSlotRow({
             aria-label={`${SLOT_LABEL[slot]}: ${displayName}`}
             tabIndex={-1}
             data-meal-sheet={slot}
+            data-tour="mealsheet"
             className="absolute inset-x-0 bottom-0 mx-auto flex max-h-[86dvh] max-w-md flex-col rounded-t-[26px] outline-none"
             style={{ background: 'var(--surface-deep)', borderTop: '1px solid var(--hairline)', boxShadow: '0 -20px 40px rgba(0, 0, 0, .45)' }}
           >
