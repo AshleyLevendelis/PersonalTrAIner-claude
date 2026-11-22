@@ -31,6 +31,11 @@ Newest first. One line each.
   MUTATIONS: `test:app-tour` 5 of 5 caught (280 checks each run); `verify:tour-real` 10 of 10 caught (244 checks each
   run: every stop's checks are worked out before the walk and a check never reached fails, after the first round showed
   a broken stop dropping its own later checks, which the harness rightly scored as a crash, not a catch).
+  FULL SWEEP found three more, each a check pinned on the old wording, each re-anchored on its property and
+  mutation-tested (4 of 4 caught): `test:exercise-detail` (the dialog now reads what was tapped first, else the tour's
+  About stop), `test:lift-effort` 10h (the effort question still waits for every working set; the tour's preview is
+  off unless the tour passes it), and `test:bundle`, 3 kB over the total line (3262 -> 3290, measured 3265 + 25, his
+  15 Sep ruling). First paint has 1 kB left of 620: the next change that adds to it will cross.
 
 - [x] **REPLY TO ONE MESSAGE IN THE CHAT, THE WHATSAPP WAY: his idea 22 Nov 2026; his ruling "1, build it"** (from
   three: swipe right or press and hold, over swipe only and over a Reply button under every message). Swipe a message

@@ -800,7 +800,10 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 20 Nov 2026: 3235 -> 3262, the countdown timer, the chat header trim and "Report this reply" (Google Play's
   // rule on AI replies). MEASURED 3237 through this gate on the change, 2 kB over the line. The other three budgets
   // did not move. His 15 Sep ruling: 25 kB raw over today's number (3237 + 25).
-  const TOTAL_BUDGET_KB = 3262
+  // MOVED 22 Nov 2026: 3262 -> 3290, swipe-to-reply in the chat and the one tour whose stops open what they describe
+  // (his "1, build it" and "one tour only"). MEASURED 3265 through this gate on the change, 3 kB over the line. The
+  // other three budgets did not move. His 15 Sep ruling: 25 kB raw over today's number (3265 + 25).
+  const TOTAL_BUDGET_KB = 3290
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
