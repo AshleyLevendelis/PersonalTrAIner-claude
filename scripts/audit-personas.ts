@@ -281,7 +281,7 @@ function selfTest(): string[] {
     ['C18', base, plan([day('Monday', [...good, ex('Shoulder Press Machine', { sets: 4, suggested_load_kg: 20 }), ex('Pec Deck', { sets: 4 })])])],
     ['C19', base, plan([day('Monday', [...good, ex('Barbell Squats', { rest: '45s', suggested_load_kg: 60 })])], { phase_label: 'Hypertrophy' })],
     ['C20', base, plan([day('Monday', good, { warmup: { general: [], mobility: [], ramp_ups: [] } })])],
-    ['C21', base, plan([day('Monday', [...good, ex('Barbell Curls'), ex('Hammer Curls')])])],
+    ['C21', base, plan([day('Monday', [...good, ex('Lying Leg Curl'), ex('Seated Leg Curl')])])],
   ]
   for (const r of RULES) {
     const c = cases.find(x => x[0] === r.id)

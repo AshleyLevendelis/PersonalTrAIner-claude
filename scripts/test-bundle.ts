@@ -353,9 +353,12 @@ console.log('\n2b. The coach is not on the path to first paint')
   // its row). Measured on a clean worktree of main that day: 611 with 1 kB printed as left; this change adds 580 bytes
   // gzipped to the first chunk after the phone-only code was moved out of it (the plugin, the sync and the Profile
   // sheet all load only inside the phone app). 620 is 8 kB over today's 612, the margin every move here has used.
-  headroom('first paint fetches', firstLoadGzip, 620, 'kB gzipped')
+  // MOVED 22 Nov 2026: 620 -> 628. Reached at 620 by the persona fixes (plan rules for older, pregnant and low-recovery
+  // trainees, the block's exercises held, the week-balance passes), all in the first chunk because the plan is built
+  // there. MEASURED 620 through this gate on the change. 628 is 8 kB over today, the margin every move here has used.
+  headroom('first paint fetches', firstLoadGzip, 628, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 620, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 628, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -801,7 +804,9 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 20 Nov 2026: 3235 -> 3262, the countdown timer, the chat header trim and "Report this reply" (Google Play's
   // rule on AI replies). MEASURED 3237 through this gate on the change, 2 kB over the line. The other three budgets
   // did not move. His 15 Sep ruling: 25 kB raw over today's number (3237 + 25).
-  const TOTAL_BUDGET_KB = 3262
+  // MOVED 22 Nov 2026: 3262 -> 3287, the persona fixes (plan logic only). MEASURED 3262 through this gate on the
+  // change. His 15 Sep ruling: 25 kB raw over today's number (3262 + 25).
+  const TOTAL_BUDGET_KB = 3287
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))
