@@ -7574,17 +7574,6 @@ export function trimShortSessionSets(days: WorkoutDay[], maxSeconds: number, tri
         .filter(({ ex }) => ex.tier !== 'tier_0_primer' && typeof ex.sets === 'number' && ex.sets > 2)
         .sort((a, b) => ((needed(a.ex) ? 1 : 0) - (needed(b.ex) ? 1 : 0)) || ((a.ex.tier === 'tier_1_primary' ? 1 : 0) - (b.ex.tier === 'tier_1_primary' ? 1 : 0)) || b.i - a.i)
       if (order.length === 0) break
-      // ...and before a main lift gives a set, an isolation lift leaves (never trunk work), while the day keeps three
-      // (22 Nov 2026, the persona audit's C17: a bench press's fourth set, the week's only chest work, went to keep two sets
-      // of lateral raises).
-      if (order[0].ex.tier === 'tier_1_primary') {
-        const iso = day.exercises.length - 1 - [...day.exercises].reverse().findIndex(e => { const x = findEntry(e.name); return x?.mechanics_tier === 'tier3_isolation' && x.movement_pattern !== 'core' && !isIndicatedFor(x, flaggedJoints) })
-        if (iso < day.exercises.length && trainingSlotCount(day.exercises.map(e => findEntry(e.name))) > 3) {
-          trimLog?.push({ exercise: day.exercises[iso].name, stage: 'time_cap', reason: `left out so ${day.day} fits the 30 minutes and the main lift keeps its sets` })
-          day = { ...day, exercises: day.exercises.filter((_, k) => k !== iso) }
-          continue
-        }
-      }
       const { ex, i } = order[0]
       const exercises = day.exercises.slice()
       exercises[i] = { ...ex, sets: ex.sets - 1 }
