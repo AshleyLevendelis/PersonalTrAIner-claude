@@ -168,8 +168,10 @@ const RULES: Rule[] = [
       for (const w of loading(m)) for (const d of w.days) for (const e of d.exercises) { const x = entry(e.name); if (!x || x.mechanics_tier !== 'tier2_compound' || !['knee_dominant', 'single_leg'].includes(x.movement_pattern) || x.prescription_type !== 'reps' || e.tempo) continue
         const r = by.get(e.name) ?? { n: 0, loaded: false }; r.n++; if ((e.suggested_load_kg ?? 0) > 0 || (e.suggested_added_load_kg ?? 0) > 0) r.loaded = true; by.set(e.name, r) }
       return [...by.entries()].filter(([, r]) => r.n >= 12 && !r.loaded).map(([n, r]) => `${n} (${r.n} sessions, never weighted)`) } },
-  { id: 'C15', kind: 'coaching', text: 'an even week: no lifting day more than 4 working sets over the lightest (conditioning days aside)', applies: () => true,
-    check: (_p, m) => loading(m).flatMap(w => { const l = lifting(w).filter(d => d.focus !== 'Conditioning & Core' && !d.exercises.some(e => entry(e.name)?.mechanics_tier === 'cardio' || entry(e.name)?.movement_pattern === 'cardio')).map(d => beginnerWorkingSets(d)); return l.length >= 2 && Math.max(...l) - Math.min(...l) > 4 ? [`w${w.week_number} ${l.join('/')}`] : [] }).slice(0, 3) },
+  { id: 'C15', kind: 'coaching', text: 'an even week: no lifting day under 60% of the heaviest day\'s working sets AND under 75% of its minutes (conditioning days aside)', applies: () => true,
+    check: (_p, m) => loading(m).flatMap(w => { const ds = lifting(w).filter(d => d.focus !== 'Conditioning & Core' && !d.exercises.some(e => entry(e.name)?.mechanics_tier === 'cardio' || entry(e.name)?.movement_pattern === 'cardio'))
+      if (ds.length < 2) return []; const sets = ds.map(d => beginnerWorkingSets(d)), mins = ds.map(d => estimateDaySeconds(d) / 60); const ms = Math.max(...sets), mm = Math.max(...mins)
+      return ds.some((_, k) => sets[k] < ms * 0.6 && mins[k] < mm * 0.75) ? [`w${w.week_number} ${sets.join('/')} sets, ${mins.map(x => x.toFixed(0)).join('/')} min`] : [] }).slice(0, 3) },
   { id: 'C16', kind: 'coaching', text: 'an injury gets its rehab work every loading week (where the pool has some)', applies: p => (p.injuries ?? []).length > 0,
     check: (p, m, ctx) => { const j = getFlaggedJoints(p.injuries ?? []); const rehab = [...ctx.poolNames].filter(n => { const e = entry(n); return !!e && isIndicatedFor(e, j) }); if (!rehab.length) return []
       return loading(m).filter(w => lifting(w).length && !w.days.some(d => d.exercises.some(e => { const x = entry(e.name); return !!x && isIndicatedFor(x, j) }))).map(w => `w${w.week_number}`).slice(0, 3) } },

@@ -5329,7 +5329,12 @@ function enforceWeeklyPatternBalance(
   // the way up so a nudge can't invert the main >= accessory hierarchy
   // enforceSetHierarchy establishes.
   function findAdjustable(pattern: 'push' | 'pull', direction: 'up' | 'down'): Exercise | null {
-    for (const day of trainingDays) {
+    // HEAVIEST DAY GIVES, LIGHTEST DAY TAKES (22 Nov 2026, the persona audit's C15): walked in calendar order, every trim
+    // landed on the week's first push day and every bump on its first pull day, which made 1,272 of 3,393 uneven weeks
+    // (a Push & Press day cut from 14 to 10 sets beside a 16-set Pull & Hinge). A coach evens the week as he balances it.
+    const daySets = (d: WorkoutDay) => d.exercises.reduce((n, e) => n + (findEntry(e.name)?.mechanics_tier === 'primer' ? 0 : (e.sets ?? 0)), 0)
+    const ordered = [...trainingDays].sort((a, b) => direction === 'down' ? daySets(b) - daySets(a) : daySets(a) - daySets(b))
+    for (const day of ordered) {
       const dayMainSets = Math.max(
         0,
         ...day.exercises
@@ -5423,7 +5428,10 @@ function enforceWeeklyPatternBalance(
   /** Same slot rules as findAdjustable: accessories and isolation only, role
    *  ceilings and floors respected, never inverting the day's main lift. */
   function findAdjustableForMuscle(group: MuscleGroup, direction: 'up' | 'down'): Exercise | null {
-    for (const day of trainingDays) {
+    // Heaviest day gives, lightest takes, as findAdjustable above.
+    const daySets = (d: WorkoutDay) => d.exercises.reduce((n, e) => n + (findEntry(e.name)?.mechanics_tier === 'primer' ? 0 : (e.sets ?? 0)), 0)
+    const ordered = [...trainingDays].sort((a, b) => direction === 'down' ? daySets(b) - daySets(a) : daySets(a) - daySets(b))
+    for (const day of ordered) {
       const dayMainSets = Math.max(
         0,
         ...day.exercises
@@ -8525,6 +8533,14 @@ export function generateMesocycle(
       if (requiredNames.has(ex.name) && rotatedName) blockRequired.add(rotatedName)
     }))
     const lateKept = lateDrops.size === 0 ? rotatedBlockDays : rotatedBlockDays.map((d, dayIdx) => ({ ...d, exercises: d.exercises.filter((_, exIdx) => !lateDrops.has(`${dayIdx}:${exIdx}`)) }))
+    // A THIN CHEST WEEK KEEPS ITS CHEST WORK (22 Nov 2026, the persona audit's C17; CSCS, mine): every week under four
+    // chest sets held exactly one chest exercise, and in 75 of 128 such plans the template had a second press the time
+    // trim took (it guards the last of a pattern on a DAY, not in the week). With two or fewer chest exercises in the
+    // week, they are required work, so the trim takes triceps or shoulder isolation first.
+    {
+      const chest = lateKept.flatMap(d => d.exercises.filter(e => { const x = findEntry(e.name); return !!x && x.mechanics_tier !== 'primer' && (x.movement_pattern === 'horizontal_push' || muscleGroupsOf(x).includes('chest' as MuscleGroup)) }).map(e => e.name))
+      if (new Set(chest).size <= 2) for (const n of chest) blockRequired.add(n)
+    }
     const blockDays = sizeBlockToRestBudget(lateKept, phaseConfig.rest_adjust_seconds, totalBudgetSeconds, blockRequired, policy, trimLog)
 
     // Double progression's within-block memory: each exercise's week-1
