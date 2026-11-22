@@ -96,7 +96,9 @@ console.log('\n[1] A session done as written follows the plan')
   check('harness: the plan\'s number for that lift moved between the two weeks (or "follows the plan" could not be told from "held")', t.printedNowKg > t.printedThenKg, t)
   check('1a. the card is open on that lift', card.found && card.prefills.length > 0, card.text.slice(0, 160))
   check('1b. today\'s weight is the plan\'s number for THIS week, not last week\'s held', card.headline.includes(t.printedNowKg) && !card.headline.includes(t.printedThenKg), { headline: card.headline, t })
-  check('1c. ...and the boxes offer the same number', card.prefills.length > 0 && card.prefills.every(p => p === t.printedNowKg), card.prefills)
+  // The plan's number for each set THIS week (21 Nov 2026: the lift now steps up across its sets, 40 / 42.5 / 47.5).
+  const perSet = t.printedNowPerSetKg ?? []
+  check('1c. ...and the boxes offer this week\'s plan, set by set', card.prefills.length > 0 && card.prefills.length === perSet.length && card.prefills.every((p, i) => p === perSet[i]) && Math.max(...card.prefills) === t.printedNowKg, { prefills: card.prefills, perSet })
   check('1d. ...and the card says why', /done as planned/i.test(card.text), card.text.slice(0, 300))
   check('1e. it is not a find-your-weight session', card.cue === false)
   await shoot('lift-effort-kept')

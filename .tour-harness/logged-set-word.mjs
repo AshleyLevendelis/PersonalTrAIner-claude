@@ -9,7 +9,8 @@ import { startDriver } from './driver-kit.mjs'
 const d = await startDriver({ port: 9971, page: 'real.html', name: 'logged-set-word', timeoutMs: 200_000 })
 const { ev, check, wait, go, until, shoot, finish, clickAt } = d
 
-await go('&tour=off#/tab/exercise')
+// offstyle=1: its day opens on Band Pull-Aparts, then Chin-Ups (the default day, since 21 Nov 2026, has no band move).
+await go('&offstyle=1&tour=off#/tab/exercise')
 await until(() => ev(`document.querySelectorAll('[data-exercise-name]').length`), v => v > 0, 80)
 await wait(800)
 if (await ev(`!!document.querySelector('[data-testid="hero-start"]')`)) { await clickAt(`document.querySelector('[data-testid="hero-start"]')`); await wait(1500) }

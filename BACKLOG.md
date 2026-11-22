@@ -2,6 +2,18 @@
 
 Newest first. One line each.
 
+- [x] **FIVE SCREEN CHECKS AFTER THE PERSONA FIXES, AND ONE REAL CARD FIX (pre-merge sweep, 22 Nov 2026)**. The test
+  page's seeded plan changed with this branch's fixes (today opens on Medicine Ball Slams, not Band Face Pulls; the
+  row slot after dumbbell rows now carries 16 kg a hand as 32 kg on a two-arm machine, 37.5 kg, where it had read 20).
+  `verify:logged-set-word` and `verify:qa-training` now open `offstyle=1`, whose day opens on a band move; `verify:lift-effort`
+  1c reads this week's plan set by set (the lift steps 40 / 42.5 / 47.5); `verify:bodyweight-progress` expects "BW", the
+  badge since 12 Nov (it had only ever met a band move). **REAL, found by 2b: a "too easy" session whose plan had
+  already stepped higher read "Last session done as planned" over a find-your-weight search** (CSCS, mine: the search
+  starts at the higher of the two, the plan's number, and still says it was too easy). `test:lift-effort` 8h2 (1 of 1
+  mutation caught; the driver's 2b-2f caught it too). `verify:chat-log-words` 5g read the chat's "0 of N sets" pill,
+  removed on his word 20 Nov, and failed on `main` too: it reads the record now (overlaps 5e; not mutation-tested).
+  Landmine rows that follow the machine row now start near 52.5 kg (was 25): carried from the row in its own units,
+  an estimate the calibration and the logs correct; unmeasured against a coach's number.
 - [x] **THE TOUR'S SET STOP, A RACE (found by the pre-merge sweep, 21 Nov 2026)**. "Leave the fields blank" showed
   under a row that had just asked for a typed weight. CORRECTED: my first fix (a2753e1) blamed the row's flag settling
   late and kept the flag once seen; it passed alone and failed under the sweep's load. Instrumenting it made it pass

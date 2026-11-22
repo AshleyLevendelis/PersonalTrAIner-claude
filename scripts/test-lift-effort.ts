@@ -212,6 +212,12 @@ console.log('\n[8] Today\'s weight against the plan\'s own week')
   check('8g. with no plan number for the last session\'s week the log stands', unknown.weightKg === 40, unknown)
   const search = cardLoadFor(rec({ weightKg: 45, findWeight: true, effort: 'easy', didProgress: true }), plan({ printedKg: 42.5 }), BENCH)
   check('8h. a find-your-weight session stays one on the card', search.weightKg === 45 && search.findWeight === true, search)
+  // 21 Nov 2026: too easy at 40 (the search starts at 44) while the plan's own next number is already 47.5. The search
+  // starts at the plan's number and the card still says why; it had said "done as planned" over a search it was running.
+  const easyNote = 'Too easy last time, so today starts at 44kg. Go up again if it\'s still easy: your heaviest good set becomes your weight.'
+  const easyBelowPlan = cardLoadFor(rec({ weightKg: 44, findWeight: true, effort: 'easy', didProgress: true, note: easyNote }), plan({ printedKg: 47.5 }), BENCH)
+  check('8h2. too easy below the plan\'s next number: the search starts at the plan\'s 47.5, and still says it was too easy',
+    easyBelowPlan.weightKg === 47.5 && easyBelowPlan.findWeight === true && /^Too easy last time, so today starts at 47\.5kg\./.test(easyBelowPlan.note) && !/done as planned/.test(easyBelowPlan.note), easyBelowPlan)
 
   // DELOAD WEEKS. The old card took the log's number whatever the week was.
   const deloadFollowed = cardLoadFor(rec({ weightKg: 102.5, lastWeightKg: 100, didProgress: true }), plan({ printedKg: 70, printedThenKg: 100, todayIsDeload: true }), BENCH)
