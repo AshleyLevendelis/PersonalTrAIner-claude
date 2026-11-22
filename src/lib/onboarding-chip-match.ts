@@ -64,11 +64,11 @@ type Asks = RegExp | readonly [RegExp, RegExp]
 
 const ASKS: Record<SlotKey, Asks> = {
   displayName: /call you|your name/i,
-  fitnessGoal: /\bgoals?\b|aiming (at|for)|what are you (actually |really |mainly )?after|what do you want (to get )?(out of|from)|what brings you|hoping to (get|achieve)/i,
+  fitnessGoal: /\bgoals?\b|aiming (at|for)|what are you (actually |really |mainly )?after|what do you want (to get )?(out of|from)|what brings you|hoping to (get|achieve)|working towards/i,
   trainingExperience: /how (much|long) (training|lifting)|background (with|in) (lifting|training|the gym|weights)|(lifting|training) background|describe your .{0,30}(lifting|training)|how long have you (been|trained|lifted)|\bexperience\b|new to (this|it|training|lifting|the gym)|(trained|lifted) before|where are you at with/i,
   activityLevel: /how active|day[- ]to[- ]day|on your feet|\bdesk\b|outside (of )?(training|the gym|your sessions)/i,
   equipment: /equipment|\bkit\b|where (do|will|would) you (train|be training|work ?out)|access to|gym or (at )?home|home or (the |a )?gym|what (have|do) you (got|have) to (train|work) with/i,
-  startPreference: /where (do|would) you (want|like) to start|ease in|straight in/i,
+  startPreference: /where (do|would) you (want|like) to start|ease in|straight in|kick things off/i,
   injuries: /injur|niggle|bother|\bache|\bpain|work(ing)? around|play(s|ing)? up|dodgy/i,
   knowsWorkingLifts: /know (your|what you).{0,40}(numbers|lifts|weights|squat|bench|dead)|working (lifts|weights)|your numbers/i,
   knownSquatKg: /squat|working weights?/i,
@@ -81,10 +81,10 @@ const ASKS: Record<SlotKey, Asks> = {
     // want to spend cooking?" is cooking. Neither is session length.
     /cook|kitchen|\bmeals?\b|\beat|how long have you (been|trained|lifted)|been (training|lifting)|stuck with/i,
   ],
-  trainingStyle: /\bstyle\b|(like|prefer|want) to train|kind of training (do )?you (like|enjoy|prefer)/i,
+  trainingStyle: /\bstyle\b|(like|prefer|want) to train|kind of training (do )?you (like|enjoy|prefer)|kind of training gets you going/i,
   conditioningPreference: /cardio|conditioning/i,
   recoveryCapacity: /recover|sleep|stress|well rested/i,
-  dislikedExercises: /exercises? (you|to)\b.{0,30}(never|avoid|skip|hate|rather)/i,
+  dislikedExercises: /exercises? (you|to)\b.{0,30}(never|avoid|skip|hate|rather)|exercises? you can'?t stand/i,
   // 9 Nov 2026: the age is asked as a date of birth (his request), so the coach's "when were you born?" is the age too.
   age: /how old|\bage\b|date of birth|\bborn\b|birthday|\bdob\b/i,
   heightCm: /how tall|\bheight\b/i,
@@ -98,7 +98,7 @@ const ASKS: Record<SlotKey, Asks> = {
   gender: /\bsex\b|\bgender\b|male or female|female or male|which should i use for|which (option|one|formula|figures?) should i use|calibrat\w*\b.{0,40}\b(calorie|nutrition|target)/i,
   mealsPerDay: /how many meals|meals (a|per|each) day|times a day|how often (do|would) you (like to |want to )?eat|\b(two|three|four|2|3|4) meals/i,
   dietaryPreferences: /dietar|\bdiet\b|allerg|intoleran|vegetarian|vegan|restriction/i,
-  dislikedFoods: /won'?t eat|rather i left out|leave (out|off)|foods? (you|to)\b.{0,20}(hate|dislike|avoid|can'?t stand)/i,
+  dislikedFoods: /won'?t eat|rather i left out|leave (out|off)|foods? (you|to)\b.{0,20}(hate|dislike|avoid|can'?t stand)|foods? you (just )?don'?t like/i,
   usualFoods: /usually (eat|have)|(eat|have) most weeks|meals? (you|do you) (already|usually|normally)|normally eat/i,
   cookingTime: /cook|kitchen/i,
   includeSnacks: /snack/i,
@@ -115,7 +115,7 @@ const ASKS: Record<SlotKey, Asks> = {
   // Its own wording, so its question is recognised as itself. It has no card of its own (a text answer), so this can
   // never put anything under a question: "date of birth" brings the AGE card (above), which sets this beside the age.
   dateOfBirth: /date of birth|\bborn\b|birthday|\bdob\b/i,
-  kitTicks: /which of these do you have|untick anything you don.t have|what (kit|equipment) do you (actually )?(have|own) at home/i,
+  kitTicks: /which of these do you have|tick everything you'?ve got|untick anything you don.t have|what (kit|equipment) do you (actually )?(have|own) at home/i,
   enjoyedActivities: /(enjoy|like) (swimming|cycling)|swimming or cycling|besides walking/i,
   runningGoal: /running goal|work towards a run|run (a )?(5|10) ?k|half marathon|20 minutes non-stop/i,
 }

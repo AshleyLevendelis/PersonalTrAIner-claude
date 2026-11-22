@@ -1052,7 +1052,7 @@ export const ONBOARDING_SLOTS: SlotDef[] = [
   { key: 'gender', question: 'For your calorie targets, should I use the male or female formula?', inputHint: 'Whichever fits…', shortLabel: 'Sex', control: 'single', required: false, options: GENDER_OPTIONS, destination: 'column', validate: isOneOf(GENDER_OPTIONS) },
   { key: 'mealsPerDay', question: 'How many meals a day works for you?', inputHint: 'How many meals?', shortLabel: 'Meals a day', control: 'single', required: true, options: MEALS_PER_DAY_OPTIONS, destination: 'column', validate: isOneOf(MEALS_PER_DAY_OPTIONS) },
   { key: 'dietaryPreferences', question: 'Any diets or allergies I need to know about?', why: "I'll filter your meals for these.", inputHint: 'Vegan, gluten-free, an allergy…', shortLabel: 'Diet', control: 'multi', required: false, options: DIETARY_OPTIONS, destination: 'column', validate: isSubsetOf(DIETARY_OPTIONS) },
-  { key: 'dislikedFoods', question: "Any foods you just don't like? I'll leave them out.", inputHint: 'Foods to leave out…', shortLabel: 'Foods to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
+  { key: 'dislikedFoods', question: "Any other foods you just don't like? I'll leave them out.", inputHint: 'Foods to leave out…', shortLabel: 'Foods to avoid', control: 'text', required: false, destination: 'user_facts', validate: v => typeof v === 'string' },
   // WHAT HE ALREADY EATS (his ruling, 11 Nov 2026: "My usual meals first"; "setup asks what he usually eats"). Asked,
   // optional, straight after the foods to leave out, so the two sit together. What he says is kept as LIKES, the
   // same rows Profile's "Foods and meals I like" writes, so it shows there and can be changed there; a like naming

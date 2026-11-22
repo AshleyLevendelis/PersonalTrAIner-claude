@@ -78,8 +78,8 @@ console.log('\n2. L3 — the prompt for changing an answer reads as English, for
   const broken = prompts.filter(([, p]) => /pick a different|to be instead|a different [a-z]+s\b/i.test(p))
   check('no prompt is a sentence built around a label', broken.length === 0, broken)
   check('the two the tester quoted',
-    editPromptFor(getSlotDef('equipment')!) === "Sure — let's change that. What equipment do you have access to?"
-    && editPromptFor(getSlotDef('dislikedFoods')!) === "Sure — let's change that. Anything else you'd rather I left out? Type it in below.",
+    editPromptFor(getSlotDef('equipment')!) === "Sure — let's change that. Where will you be training?"
+    && editPromptFor(getSlotDef('dislikedFoods')!) === "Sure — let's change that. Any other foods you just don't like? I'll leave them out. Type it in below.",
     [editPromptFor(getSlotDef('equipment')!), editPromptFor(getSlotDef('dislikedFoods')!)])
   const typed = prompts.filter(([k]) => getSlotDef(k)!.control === 'text')
   check('an answer that has to be typed says so', typed.length >= 3 && typed.every(([, p]) => /Type it in below\.$/.test(p)), typed)
