@@ -240,7 +240,10 @@ console.log('\n[5] the week-level trim to the maximum takes the filler before an
   // maximum while its optional filler stood untouched; with it on, none.
   // Read off generateMesocycle's own trim log — the record the trimmer keeps
   // of every second it takes.
-  const key = 'full_gym|knees+shoulders+lower_back|45-60|hybrid|beginner|hypertrophy|low|love'
+  // 22 Nov 2026: the beginner low-recovery plan stopped trimming at all after the persona fixes (low recovery rests to four
+  // days, his ruling "b"; a beginner's 18-set cap), so it no longer reached the trimmer. The novice of the same profile does
+  // (25 trim-log entries) and carries optional filler, which is what this section needs.
+  const key = 'full_gym|knees+shoulders+lower_back|45-60|hybrid|novice|hypertrophy|low|love'
   const [equipment, inj, duration, style, experience, goal, recovery, conditioningPref] = key.split('|')
   const combo = { equipment, injuries: inj.split('+'), duration, style, experience, goal, recovery, conditioningPref } as unknown as Combination
   const profile = buildProfile(combo)

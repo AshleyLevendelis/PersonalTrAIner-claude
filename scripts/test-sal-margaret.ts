@@ -181,8 +181,11 @@ console.log('\n9. No days nobody chose for a beginner or low recovery; elsewhere
   check('...and keeps the goal\'s conditioning inside her chosen sessions', margaret.days.some(d => d.recommendedCardio && d.recommendedCardio.timing !== 'rest_day'), margaret.days.map(d => [d.day, d.recommendedCardio?.timing]))
   check('...on the days she chose only', margaret.days.every(d => ['Monday', 'Wednesday', 'Friday'].includes(d.day)), margaret.days.map(d => d.day))
   const short = plan({ trainingExperience: 'beginner', recoveryCapacity: 'high', sessionDuration: '30-45' })
-  const heavy = short.days.filter(d => HEAVY_TRACKS.has(d.focus) && d.recommendedCardio)
+  // Stacked = added onto the session (post_session). Its own short session on that day is not (22 Nov 2026: the goal's
+  // conditioning had been lost entirely when every day was a heavy one; persona audit C10).
+  const heavy = short.days.filter(d => HEAVY_TRACKS.has(d.focus) && d.recommendedCardio && d.recommendedCardio.timing !== 'independent_session')
   check('...and a short session for a beginner never has cardio stacked on its heaviest day', heavy.length === 0 && short.days.some(d => HEAVY_TRACKS.has(d.focus)), heavy.map(d => d.focus))
+  check('...and still gets the goal\'s conditioning, as its own session (it had none)', short.days.some(d => d.recommendedCardio?.timing === 'independent_session'), short.days.map(d => [d.day, d.recommendedCardio?.timing]))
   const tired = plan({ trainingExperience: 'intermediate', recoveryCapacity: 'low' })
   check('low recovery gets no extra days either', extras(tired).length === 0, extras(tired))
   resetRandomSource()

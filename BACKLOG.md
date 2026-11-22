@@ -2,6 +2,80 @@
 
 Newest first. One line each.
 
+- [x] **THE FOUR REMAINDERS (his "fix the four remaining issues, then merge", 22 Nov 2026)**, 6,000 plans: chest under
+  four sets 203 -> 65 (the whole-exercise drop took a second chest press before an overhead one; and "chest" had counted
+  dips and overhead presses, nine sets beside one bench); push over 1.5x pull 184 -> 48 (the time trims took the rows the
+  balance needed, a Monday's second row went as "spare", and a press-only day in a press-heavy week now takes the week's
+  own row, within the set cap); thigh imbalance 178 -> 56 (a set moves heavy side to light side, or the heavy side gives
+  one); over time 215 -> 250, 236 of them within 2 minutes, 13 within 5, 1 more (the balance work costs a minute on full
+  days; nothing was cut from rest or the main lift). A regression the audit caught the same hour: the added row took six
+  beginner days to 20 sets; now capped. Safety rules 0. NAMED: what is left is mostly 20-30 minute plans where every set is
+  at its floor and the time limit decides.
+- [x] **THE COACH'S WHOLE CHECKLIST, NOT ONE PERSON AT A TIME (his "why are we still finding issues? run tests on all
+  cases", 22 Nov 2026)**. The six one-person reads each found what no audit rule asked; measure:personas gained nine
+  coaching rules (C13-C21: thigh balance, weighted leg work for trained lifters, even weeks, rehab every week, sets per
+  muscle, push:pull, main-lift rest, warm-ups, no repeated movement), each self-tested, and four parallel tracers found
+  the causes. Fixed, 6,000 plans, first run of the new rules -> now: uneven weeks 2,674 -> 17 (the balance pass trimmed
+  and bumped in calendar order; now heaviest day gives, lightest takes; and the rule reads sets AND minutes, as a coach
+  does); main-lift rest 786 -> 0 (a tier-1 pull-up or dip rests like a loaded main lift, except on a conditioning plan,
+  HIS RULING there kept: short rest everywhere but the bar); repeated movements 594 -> 11 (28-week swaps checked names
+  not families; two isolations of a family on different kit; a Plank beside a rehab Dead Bug); rehab missing 195 -> 6
+  (rotation turned rehab into other drills; the time trim took it); warm-ups 33 -> 0 (walking start: the walk's first
+  three minutes); weighted legs 289 -> 16; low chest 374 -> 203 (a thin chest week keeps its chest work and takes sets to
+  four, up to the role's ceiling). And the 45-year-old's knee: quad drills first in the rehab slot, step work takes
+  dumbbells from block 2, an even week. NAMED, NOT FIXED: chest under 4 sets in 203 plans (a main bench at its ceiling
+  is trimmed back later; not traced), push over 1.5x pull in 185 (mostly two-day 20-30 plans: two press slots against one
+  pull at the two-set floor), thigh balance in 178, 215 sessions within 2-5 minutes over. Safety rules: 0 throughout.
+- [x] **THE PERSONA AUDIT, AND ITS SIX FIXES (his "do a full audit of all possible profiles" and "b, and fix all the
+  others too", 22 Nov 2026)**. `measure:personas` (scripts/audit-personas.ts): 6,000 seeded plans across 23 groups
+  (pregnancy at four stages, beginners 60-64 and 65-80, 65+ trained, each injury and pairs, the health conditions, the
+  walking start) against 22 rules, each proven to fire on a plan built to break it before a run is believed. Before ->
+  after, same people: safety 3 -> 0 (a deload over the set cap); a chosen day silently lost to low recovery 468 -> 0
+  (HIS RULING "b": four days at most, spread, the rest days named on Exercise; it had trimmed one day, so six became
+  five); no cardio on fat loss 178 -> 1 (a beginner or low-recovery short session with no light day; now one short
+  session of its own, outside the lifting time); no hinge from 28 weeks pregnant 114 -> 0 (the hinge went to the squat
+  list); two floor-pull days 47 -> 0 (a full-body day took the deadlift before the hinge day added a sumo through an
+  unguarded tier pick); over the time asked 1,421 -> 224, every one now within 5 minutes and 217 within 2 (the balance
+  hold and pelvic floor work were stamped after the time check; and a day at every set floor now gives up a whole
+  exercise its push or pull group can spare, trunk only while the week keeps two, else one set; never the main lift,
+  never below three, only in the final backstop). Also one weight a lift a week (a single-leg leg press read 30 and
+  17.5 kg). CSCS mine throughout, his ruling for the days. NAMED, NOT FIXED: 19 two-day 20-30 minute combat-style plans
+  miss a squat (two short sessions cannot hold all four patterns); 7 sessions 2-5 minutes over; 1 fat-loss plan without
+  cardio (pregnant, 31 weeks, avoids cardio, 20-30). The rest-day line is screen only (the coach is not told).
+  `test:persona-audit-fixes` (36 checks, 16 mutations all caught, two only after checks were added: the deadlift's
+  placement, and the warm-up budget making room for pelvic floor work, which keeps 3,320 working sets across the
+  audit's pregnant plans). Investigated by four parallel read-only tracers before any change.
+- [x] **A PREGNANT BEGINNER GETS THE SAFER LIST AND TWO WALKS (his "yes fix all four", 22 Nov 2026)**, read off a
+  35-year-old pregnant beginner's plan: she was learning barbell back squats, sumo deadlifts and an incline barbell
+  bench, doing bent-over and T-bar rows, walking lunges, Bulgarian split squats and a one-leg balance hold, and had no
+  rest-day walking. CSCS mine, inside the pregnancy rules (ACOG: start low if new to exercise, avoid fall risk, about
+  150 minutes a week of moderate aerobic activity): a pregnant beginner gets the whole older-beginner safer list (no
+  barbell, technique, hanging or jumping lift), plus a balance rule of her own (lateral lunge, one-leg balance hold;
+  an older beginner keeps both, they are her training), the same foundation lifts, and the two optional rest-day
+  walks. Lifts once she is past beginner. `test:pregnant-beginner` (29 checks; 4 of 4 valid mutations caught; a fifth
+  named a function no longer imported and crashed, not counted).
+- [x] **A 70-YEAR-OLD BEGINNER'S PLAN, FOUR FIXES (his "yes fix all four", 22 Nov 2026)**, read off her 16 weeks as a
+  coach. CSCS mine on all four; the fourth narrows his ruling "B" (no rest-day activity for a beginner) from 60.
+  (1) No bent-over dumbbell row, hollow body hold or one-arm press (bench, half-kneeling, kettlebell) for a beginner
+  from 60; one-arm rows and pulldowns stay (seated or braced). (2) A beginner's third block ("Consolidation") took
+  strength's +45s rest and lost a third of its work through the rest budget: 15.7 working sets a day in block 2,
+  13.2 here, 777 of 1,944 days under 12, one at 7 (2,048 beginner plans). Rest now the hypertrophy block's (0): 15.7,
+  78 days under 12; her weeks 9-11 went from 13/10/13 to 17/15/18. Its "longer rests" words removed. (3) "Lift fast,
+  lower slow" on every multi-joint lift for reps from 60, read from her age on the card so a swap carries it (NSCA
+  2019, ACSM: power falls faster than strength and predicts function); not on warm-ups, holds, swings, isolation.
+  Screen only: the coach is not told yet. (4) Two optional 20-minute easy walks on non-consecutive rest days for a
+  beginner from 60 (not with low recovery; WHO/ACSM aerobic guidance); 58 and under unchanged (`test:sal-margaret`).
+  `test:seventy` (37 checks), `verify:lift-fast`. Not changed: her starting weights
+  (2-5 kg, found in week 1). And his "yes take the twisting machine off too": the Rotary Torso Machine joins the list
+  (loaded spinal rotation, seated and pinned). Mutations: 9, all caught; the walk-spacing one only after a Mon/Thu/Fri
+  week was added (Mon/Wed/Fri never puts two rest days first in a row). `verify:lift-fast` 5 checks, 1 of 1 caught.
+- [x] **NO MEDICINE BALL SLAMS FOR A BAD BACK (his "yes fix it", 22 Nov 2026)**, read off the 50-year-old's full plan:
+  slams sat in his Wednesday warm-up in weeks 5-8 and 13-16. CSCS, mine: a slam is fast, forceful spinal flexion with
+  a load in the hands, the reason the loaded crunches already carry the back tag; it now carries it too (as a loaded
+  joint, so its shoulder exclusion stands: setting `contraindicated_joints` alone had silently dropped it, which
+  `test:injury-coverage` caught). A bad back excludes 40 lifts (was 39). Burpees and the bodyweight good morning were
+  looked at and left: no load in the hands. `test:bad-back` §4 (3 of 3 checks caught the tag's removal).
+
 - [x] **REPLY TO ONE MESSAGE IN THE CHAT, THE WHATSAPP WAY: his idea 22 Nov 2026; his ruling "1, build it"** (from
   three: swipe right or press and hold, over swipe only and over a Reply button under every message). Swipe a message
   to the right (the bubble follows, a reply arrow fades in, it springs back) or hold it for a small menu (Reply, Copy;

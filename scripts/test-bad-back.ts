@@ -77,5 +77,16 @@ check('every loading week keeps a squat and a hinge', missing.length === 0, miss
 const beginnerBack = plan(him({ training_experience: 'beginner' }), 'bbbeg')
 check('a beginner with a bad back keeps the beginner cap of 18', beginnerBack.every(w => w.days.every(d => beginnerWorkingSets(d) <= 18)))
 
+console.log('\n4. No medicine ball slams in a bad back\'s warm-up (fast loaded spinal flexion); others keep them')
+check('slams carry the back tag', contraindicatedJoints(getExerciseEntry('Medicine Ball Slams')!).includes('lower_back_axial'))
+const withHim = [...spread, { o: {}, key: 'm50back' }, ...[1, 2, 3, 4, 5, 6].map(i => ({ o: { training_style: 'functional' as const, fitness_goal: 'fat_loss' as const }, key: `slam${i}` }))]
+const slamsIn = (inj: string[]) => withHim.filter(s => namesOf(plan(him({ ...s.o, injuries: inj }), s.key)).has('Medicine Ball Slams')).length
+const slamsBack = slamsIn(['lower_back']), slamsClean = slamsIn([])
+check(`no bad-back plan holds them (${withHim.length} plans; his own had them on Wednesdays)`, slamsBack === 0 && !namesOf(his).has('Medicine Ball Slams'), slamsBack)
+check('...while without the injury they stay in the pool, and some plan in a wider spread holds them (the fixture binds)',
+  getConstrainedPool(him({ injuries: [] })).some(e => e.name === 'Medicine Ball Slams') && !getConstrainedPool(him()).some(e => e.name === 'Medicine Ball Slams') && slamsClean > 0, slamsClean)
+check('his Wednesday still opens with a warm-up move', his.filter(w => !w.is_deload).every(w => w.days.filter(d => d.exercises.length).every(d => getExerciseEntry(d.exercises[0].name)?.mechanics_tier === 'primer')),
+  his.map(w => w.days.filter(d => d.exercises.length).map(d => d.exercises[0].name)))
+
 console.log(`\n${passed + failed} checks ran: ${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)

@@ -159,7 +159,9 @@ console.log('\n1. The four lifts finally get weight — and only on the heavy bl
   check(`nothing without accepts_added_load ever gets any (${t.onWrongExercise.length})`,
     t.onWrongExercise.length === 0, [...new Set(t.onWrongExercise)].slice(0, 4).join(', '))
   const flagged = EXERCISE_DATABASE.filter(e => e.accepts_added_load).map(e => e.name)
-  check(`exactly four entries accept added load (${flagged.length})`, flagged.length === 4, flagged.join(', '))
+  // 22 Nov 2026 (his "yes fix all three", a bad knee): the low box step-up and the eccentric step-down take dumbbells in
+  // the hands from the muscle-building block, past novice, so a knee's step work progresses. Six on purpose.
+  check(`exactly six entries accept added load (${flagged.length})`, flagged.length === 6 && flagged.includes('Low Box Step-Up') && flagged.includes('Step-Down (Eccentric)'), flagged.join(', '))
 }
 
 // ---------------------------------------------------------------------------
