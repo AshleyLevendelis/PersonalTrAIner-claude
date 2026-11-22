@@ -2922,7 +2922,7 @@ function selectExercisesForTrack(
           ? groups.includes(e.substitution_group) && e.mechanics_tier !== 'primer'
           : patterns.includes(e.movement_pattern) && !slotForbidden.has(e.movement_pattern)) &&
         (tier === null || e.mechanics_tier === tier) &&
-        !(floorPullTaken && e.mechanics_tier === 'tier1_compound' && getMovementFamily(e) === 'deadlift') &&
+        !isSecondFloorPull(e) &&
         !selected.some(s => s.name === e.name) &&
         !usedGroups.has(getMovementFamily(e)) &&
         (!respectWeeklyUsed || !weeklyUsed.has(e.name))
@@ -3035,10 +3035,15 @@ function selectExercisesForTrack(
   // squat, sumo deadlift, deadlift. A heavy pull from the floor is the hardest thing in a week on the lower back; a
   // coach gives one, and makes the second hip day a Romanian deadlift or a hip thrust (or a squat, where the week's
   // balance asks for one). Read from the week's days already built (weeklyAppearanceCount).
-  const floorPullTaken = [...(weeklyAppearanceCount?.keys() ?? [])].some(n => {
+  // ...AND THE PULL BELONGS ON THE HINGE DAY (22 Nov 2026, the persona audit's C3): a full-body day built before a fixed
+  // hinge day took the deadlift, and the hinge day then added a sumo deadlift through the tier pick, which had no such
+  // guard (47 of 6,000 plans). With a hinge-led day still to come, this day leaves the floor pull to it.
+  const floorPullTaken = lowerMainsLater.hinge > 0 || [...(weeklyAppearanceCount?.keys() ?? [])].some(n => {
     const e = getExerciseEntry(n)
     return !!e && e.mechanics_tier === 'tier1_compound' && getMovementFamily(e) === 'deadlift'
   })
+  /** A second heavy floor pull this week: refused by every route a tier-1 lift reaches the day (slot, tier pick, refill). */
+  const isSecondFloorPull = (e: ExerciseEntry) => floorPullTaken && e.mechanics_tier === 'tier1_compound' && getMovementFamily(e) === 'deadlift'
 
   function fillSlot(slot: TrackSlot): void {
     // Preferred tier wins over "fresh this week" — reusing the same main
@@ -3153,6 +3158,7 @@ function selectExercisesForTrack(
       trackPool.filter(e =>
         e.mechanics_tier === tier &&
         !wouldBeSecondMainLift(e) &&
+        !isSecondFloorPull(e) &&
         patterns.includes(e.movement_pattern) &&
         !weeklyUsed.has(e.name) &&
         !selected.some(s => s.name === e.name) &&
@@ -3308,6 +3314,7 @@ function selectExercisesForTrack(
           e.mechanics_tier !== 'primer' &&
           e.mechanics_tier !== 'cardio' &&
           !wouldBeSecondMainLift(e) &&
+          !isSecondFloorPull(e) &&
           !selected.some(s => s.name === e.name) &&
           (!respectFamilies || !usedGroups.has(getMovementFamily(e))) &&
           (!respectWeeklyCap || !weeklyAppearanceCount || (weeklyAppearanceCount.get(e.name) ?? 0) < WEEKLY_APPEARANCE_CAP)
@@ -5724,6 +5731,8 @@ function enforceDayDurationBudget(
   // rehab introduced: "shorten the rehab set when a session would overrun."
   // Empty for an uninjured trainee, which makes every branch below inert.
   flaggedJoints: Set<string> = new Set(),
+  /** Trunk exercises on the week's OTHER days: the trunk work here may go only while two remain (the weekly floor). */
+  trunkElsewhere = 0,
 ): WorkoutDay {
   if (day.exercises.length === 0) return day
   // NO FILLER YIELD HERE, deliberately. One was written and measured: across
@@ -5770,6 +5779,35 @@ function enforceDayDurationBudget(
     candidates.sort((a, b) => b.sets - a.sets)
     const target = candidates[0].i
     exercises = exercises.map((ex, i) => (i === target ? { ...ex, sets: ex.sets - 1 } : ex))
+  }
+  // Pushing is pushing and pulling is pulling here: a bench-type and an overhead press cover one need on a day short of time.
+  const trimGroup = (p: string | undefined) => p === 'vertical_push' ? 'horizontal_push' : p === 'vertical_pull' ? 'horizontal_pull' : p
+  // EVERY SET AT ITS FLOOR AND STILL OVER (22 Nov 2026, the persona audit's C8b): a 20-30 minute session for a pregnant
+  // trainee held seven exercises at two sets each beside a ten-minute warm-up (pelvic floor work included) and ran eight
+  // minutes past the time she had, because this pass only ever took sets. His 18 Sep ruling decides the rest: protect
+  // the rest, do less. So a whole exercise goes, the one the day can best spare: never the main lift, never warm-up or
+  // rehab work, never the last exercise of its movement pattern on the day, never below three; an isolation lift first,
+  // then an accessory, the later in the session first. Only a day already over the top of the range ever reaches here.
+  while (estimateDaySeconds({ ...day, exercises }) > budgetSeconds) {
+    const working = exercises.filter(ex => findEntry(ex.name)?.mechanics_tier !== 'primer')
+    if (working.length <= 3) break
+    const spare = exercises
+      .map((ex, i) => ({ ex, i, entry: findEntry(ex.name) }))
+      .filter(t => t.entry && t.entry.mechanics_tier !== 'primer' && getVolumeRole(t.entry) !== 'main' && getVolumeRole(t.entry) !== 'conditioning'
+        && exercises.some((o, j) => j !== t.i && findEntry(o.name)?.mechanics_tier !== 'primer' && trimGroup(findEntry(o.name)?.movement_pattern) === trimGroup(t.entry!.movement_pattern)))
+      .sort((a, b) => (a.entry!.mechanics_tier === 'tier3_isolation' ? 0 : 1) - (b.entry!.mechanics_tier === 'tier3_isolation' ? 0 : 1) || b.i - a.i)
+    // Last of all, the trunk exercise, only while the rest of the week keeps two: the day keeps its main lift, a push and
+    // a pull (his "never below three"). Measured: without the weekly condition 13% of plans fell under two a week.
+    const trunk = spare.length || trunkElsewhere < 2 ? [] : exercises.map((ex, i) => ({ i, entry: findEntry(ex.name) })).filter(t => t.entry?.movement_pattern === 'core' && t.entry.mechanics_tier !== 'primer')
+    const drop = spare[0]?.i ?? trunk[trunk.length - 1]?.i
+    if (drop == null) {
+      // The week needs this trunk work (fewer than two elsewhere): it stays, down to one set, before the day runs over.
+      const keep = exercises.findIndex(ex => { const x = findEntry(ex.name); return x?.movement_pattern === 'core' && x.mechanics_tier !== 'primer' && ex.sets > 1 })
+      if (keep < 0) break
+      exercises = exercises.map((ex, i) => (i === keep ? { ...ex, sets: 1 } : ex))
+      continue
+    }
+    exercises = exercises.filter((_, i) => i !== drop)
   }
   let trimmedDay: WorkoutDay = { ...day, exercises }
 
@@ -8375,10 +8413,18 @@ export function generateMesocycle(
           // None of the list in her pool (a minimalist kit, a style filter): any exercise of the same movement both
           // rules allow, the nearest the pool has; only with nothing at all does the original stay.
           const pattern = findEntry(rotatedPlain)?.movement_pattern
-          const samePattern = pool.find(e => e.mechanics_tier !== 'primer' && ok(e.name)
+          const fits = (e: ExerciseEntry) => e.mechanics_tier !== 'primer'
             && (kind === 'legs' ? ['single_leg', 'knee_dominant'].includes(e.movement_pattern)
-              : kind === 'push' ? ['horizontal_push', 'vertical_push'].includes(e.movement_pattern) : e.movement_pattern === pattern))
-          rotated = fromList ?? samePattern?.name ?? rotatedPlain
+              : kind === 'push' ? ['horizontal_push', 'vertical_push'].includes(e.movement_pattern)
+              : kind === 'hinge' ? e.movement_pattern === 'hip_hinge' && !isBallisticMovement(e) : e.movement_pattern === pattern)
+          const samePattern = pool.find(e => fits(e) && ok(e.name))
+          // A hinge with none in her style's pool (a combat-style bodyweight pool's only hinge is the single-leg RDL): the
+          // style stage is the one that may relax (it is a preference, never a safety rule); every other stage still runs.
+          const offStyle = !fromList && !samePattern && kind === 'hinge'
+            ? getConstrainedPool(profile, [], { skipStyle: true }).find(e => fits(e) && !PREGNANCY_LATE_EXCLUDED.has(e.name) && !pregnancyExclusionLate({ name: e.name })
+              && !usedNamesThisDay.has(e.name) && !day.exercises.some((other, j) => j !== exIdx && other.name === e.name))
+            : undefined
+          rotated = fromList ?? samePattern?.name ?? offStyle?.name ?? rotatedPlain
           // Nothing both rules allow (a bodyweight kit has no upright press): the slot comes out for the block, never a
           // head-down or face-down move kept because nothing else fits. Removed below, once the slot map is read.
           if (rotated === rotatedPlain) lateDrops.add(`${dayIdx}:${exIdx}`)
@@ -9849,9 +9895,10 @@ export function generateMesocycle(
       {
         const sessionMaxSeconds = getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
         const flagged = getFlaggedJoints(profile.injuries ?? [])
+        const trunkOn = (d: WorkoutDay) => d.exercises.filter(e => { const x = findEntry(e.name); return x?.movement_pattern === 'core' && x.mechanics_tier !== 'primer' }).length
         for (let i = 0; i < days.length; i++) {
           if (days[i].exercises.length === 0) continue
-          days[i] = enforceDayDurationBudget(days[i], sessionMaxSeconds, flagged)
+          days[i] = enforceDayDurationBudget(days[i], sessionMaxSeconds, flagged, days.reduce((n, d, j) => n + (j === i ? 0 : trunkOn(d)), 0))
         }
       }
 
