@@ -58,7 +58,11 @@ console.log('\n5. "Show numbers" off: no figure on the meal sheet, the chat pill
   const at = meal.indexOf('data-testid="meal-sheet-kcal"')
   check('the meal sheet\'s calories and macros sit under the switch', at > 0 && /\{useShowNumbersFlag && \(<div className="mt-1\.5 flex flex-wrap items-baseline gap-x-3 gap-y-1">\s*<span className="flex items-baseline gap-1" data-testid="meal-sheet-kcal">/.test(meal))
   const chat = read('src/components/ChatAssistant.tsx')
-  check('the chat\'s calorie pill is not built with the switch off', /kcal: showNumbers && macros && stripEaten != null/.test(chat))
+  // The pill itself left the chat header on 20 Nov 2026 (his "unnecessary"), so the property is stronger now: the chat
+  // builds no calorie pill at all, switch on or off. One built again must come back under the switch.
+  const chatCode = chat.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')
+  check('the chat\'s calorie pill is not built with the switch off (it is not built at all since 20 Nov)',
+    !/kcalPillText\(/.test(chatCode) || /kcal: showNumbers && macros && stripEaten != null/.test(chat))
   check('...nor the eating-out card\'s range', /after: showNumbers \? `\$\{EATING_OUT_WORDS\.label\}.*eatingOutRangeWords\(est\.calories\).*: `\$\{EATING_OUT_WORDS\.label\}, \$\{EATING_OUT_WORDS\.sizeLabel\[size\]\.toLowerCase\(\)\} \(an estimate\)`/.test(chat))
   check('...read once, at the top of the chat (a hook)', /const showNumbers = useShowNumbers\(\)/.test(chat))
 }
