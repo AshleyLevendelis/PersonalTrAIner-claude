@@ -5765,6 +5765,8 @@ function enforceDayDurationBudget(
    * the base week sizes to the midpoint, and dropping exercises there starved the passes that fill a day afterwards.
    */
   trunkElsewhere: number | null = null,
+  /** The week's push and pull sets on the OTHER days: a pull set the week's balance needs is never trimmed (C18). */
+  balanceElsewhere: { push: number; pull: number } | null = null,
 ): WorkoutDay {
   if (day.exercises.length === 0) return day
   // NO FILLER YIELD HERE, deliberately. One was written and measured: across
@@ -5805,15 +5807,28 @@ function enforceDayDurationBudget(
     // Provably inert without an injury: with no flagged joints nothing is
     // isRehab, so `accessories` equals the old `nonProtected`, `rehabOnly` is
     // empty, and this collapses to exactly the previous expression.
+    // A pull set whose loss would leave the week pushing over 1.5x its pulling goes last (22 Nov 2026, persona audit C18).
+    const isPullT = (e: ExerciseEntry | null | undefined) => !!e && (e.movement_pattern === 'horizontal_pull' || e.movement_pattern === 'vertical_pull')
+    const isPushT = (e: ExerciseEntry | null | undefined) => !!e && (e.movement_pattern === 'horizontal_push' || e.movement_pattern === 'vertical_push')
+    const daySum = (f: (e: ExerciseEntry | undefined) => boolean) => exercises.filter(e => f(findEntry(e.name)) && findEntry(e.name)?.mechanics_tier !== 'primer').reduce((n, e) => n + (e.sets ?? 0), 0)
+    const pullNeeded = balanceElsewhere != null && (balanceElsewhere.push + daySum(isPushT)) > (balanceElsewhere.pull + daySum(isPullT) - 1) * 1.5
     const accessories = trimmable.filter(t => !t.isRehab && (!t.role || !protectedRoles.has(t.role)))
     const rehabOnly = trimmable.filter(t => t.isRehab)
     const candidates = accessories.length > 0 ? accessories : rehabOnly.length > 0 ? rehabOnly : trimmable
-    candidates.sort((a, b) => b.sets - a.sets)
+    candidates.sort((a, b) => ((pullNeeded && isPullT(a.entry) ? 1 : 0) - (pullNeeded && isPullT(b.entry) ? 1 : 0)) || b.sets - a.sets)
     const target = candidates[0].i
     exercises = exercises.map((ex, i) => (i === target ? { ...ex, sets: ex.sets - 1 } : ex))
   }
   // Pushing is pushing and pulling is pulling here: a bench-type and an overhead press cover one need on a day short of time.
   const trimGroup = (p: string | undefined) => p === 'vertical_push' ? 'horizontal_push' : p === 'vertical_pull' ? 'horizontal_pull' : p
+  // ...and a pull the week's balance needs is never the exercise that goes (C18: a Monday's second row went as "spare"
+  // and left a two-day week pushing twice what it pulled).
+  const pullStillNeeded = (e: ExerciseEntry) => {
+    if (balanceElsewhere == null || !(e.movement_pattern === 'horizontal_pull' || e.movement_pattern === 'vertical_pull')) return false
+    const on = (ps: string[]) => exercises.filter(x => { const y = findEntry(x.name); return !!y && y.mechanics_tier !== 'primer' && ps.includes(y.movement_pattern) }).reduce((n, x) => n + (x.sets ?? 0), 0)
+    const own = exercises.find(x => x.name === e.name)?.sets ?? 0
+    return balanceElsewhere.push + on(['horizontal_push', 'vertical_push']) > (balanceElsewhere.pull + on(['horizontal_pull', 'vertical_pull']) - own) * 1.5
+  }
   // EVERY SET AT ITS FLOOR AND STILL OVER (22 Nov 2026, the persona audit's C8b): a 20-30 minute session for a pregnant
   // trainee held seven exercises at two sets each beside a ten-minute warm-up (pelvic floor work included) and ran eight
   // minutes past the time she had, because this pass only ever took sets. His 18 Sep ruling decides the rest: protect
@@ -5825,8 +5840,12 @@ function enforceDayDurationBudget(
     const spare = exercises
       .map((ex, i) => ({ ex, i, entry: findEntry(ex.name) }))
       .filter(t => t.entry && t.entry.mechanics_tier !== 'primer' && !isIndicatedFor(t.entry, flaggedJoints) && getVolumeRole(t.entry) !== 'main' && getVolumeRole(t.entry) !== 'conditioning'
+        && !(pullStillNeeded(t.entry) )
         && exercises.some((o, j) => j !== t.i && findEntry(o.name)?.mechanics_tier !== 'primer' && trimGroup(findEntry(o.name)?.movement_pattern) === trimGroup(t.entry!.movement_pattern)))
-      .sort((a, b) => (a.entry!.mechanics_tier === 'tier3_isolation' ? 0 : 1) - (b.entry!.mechanics_tier === 'tier3_isolation' ? 0 : 1) || b.i - a.i)
+      // Chest pressing goes after an overhead press: a week's chest work is usually one or two exercises, and this took the
+      // second (a neutral-grip press beside the bench) where a half-kneeling overhead press could go (persona audit C17).
+      .sort((a, b) => (a.entry!.mechanics_tier === 'tier3_isolation' ? 0 : 1) - (b.entry!.mechanics_tier === 'tier3_isolation' ? 0 : 1)
+        || (a.entry!.movement_pattern === 'horizontal_push' ? 1 : 0) - (b.entry!.movement_pattern === 'horizontal_push' ? 1 : 0) || b.i - a.i)
     // Last of all, the trunk exercise, only while the rest of the week keeps two: the day keeps its main lift, a push and
     // a pull (his "never below three"). Measured: without the weekly condition 13% of plans fell under two a week.
     const trunk = spare.length || (trunkElsewhere ?? 0) < 2 ? [] : exercises.map((ex, i) => ({ i, entry: findEntry(ex.name) })).filter(t => t.entry?.movement_pattern === 'core' && t.entry.mechanics_tier !== 'primer' && !isIndicatedFor(t.entry, flaggedJoints))
@@ -8544,7 +8563,7 @@ export function generateMesocycle(
     // trim took (it guards the last of a pattern on a DAY, not in the week). With two or fewer chest exercises in the
     // week, they are required work, so the trim takes triceps or shoulder isolation first.
     {
-      const chest = lateKept.flatMap(d => d.exercises.filter(e => { const x = findEntry(e.name); return !!x && x.mechanics_tier !== 'primer' && (x.movement_pattern === 'horizontal_push' || muscleGroupsOf(x).includes('chest' as MuscleGroup)) }).map(e => e.name))
+      const chest = lateKept.flatMap(d => d.exercises.filter(e => { const x = findEntry(e.name); return !!x && x.mechanics_tier !== 'primer' && (x.movement_pattern === 'horizontal_push' || (x.movement_pattern as string) === 'isolation_chest') }).map(e => e.name))
       if (new Set(chest).size <= 2) for (const n of chest) blockRequired.add(n)
     }
     const blockDays = sizeBlockToRestBudget(lateKept, phaseConfig.rest_adjust_seconds, totalBudgetSeconds, blockRequired, policy, trimLog)
@@ -9853,7 +9872,9 @@ export function generateMesocycle(
         // four is under any maintenance dose. The week's own chest exercises take the sets, up to their role's ceiling,
         // never a new exercise; the time it costs comes out of accessory work in the passes below.
         {
-          const isChest = (e: ExerciseEntry) => e.mechanics_tier !== 'primer' && (e.movement_pattern === 'horizontal_push' || muscleGroupsOf(e).includes('chest' as MuscleGroup))
+          // Chest work is horizontal pressing and flyes (dips and overhead presses list chest as a helper and had counted it
+          // to nine sets in a week holding one bench press).
+          const isChest = (e: ExerciseEntry) => e.mechanics_tier !== 'primer' && (e.movement_pattern === 'horizontal_push' || (e.movement_pattern as string) === 'isolation_chest')
           const chestRows = days.flatMap(d => d.exercises.filter(ex => { const x = findEntry(ex.name); return !!x && isChest(x) }))
           let chestSets = chestRows.reduce((n, ex) => n + (ex.sets ?? 0), 0)
           for (let guard = 0; chestRows.length > 0 && chestSets < 4 && guard < 8; guard++) {
@@ -9972,6 +9993,25 @@ export function generateMesocycle(
       // priority order every other budget pass uses. Against the MAXIMUM, not
       // the midpoint, so it only bites a day that is genuinely over and never
       // undoes the duration filler's deliberate top-up.
+      // A DAY THAT PRESSES ALSO PULLS, WHEN THE WEEK IS PRESS-HEAVY (22 Nov 2026, the persona audit's C18; CSCS, mine): a
+      // two-day 20-30 week's second day held a squat, a carry, a press and a plank, no pull, so the week pushed twice what it
+      // pulled. The week's own row (with its weight, as prescribed elsewhere this week) joins that day for two sets, before
+      // the last time check, which may take it back only if the day cannot hold it.
+      if (!isDeload) {
+        const isPush = (n: string) => ['horizontal_push', 'vertical_push'].includes(findEntry(n)?.movement_pattern ?? '')
+        const isPull = (n: string) => ['horizontal_pull', 'vertical_pull'].includes(findEntry(n)?.movement_pattern ?? '')
+        const working = (e: Exercise) => findEntry(e.name)?.mechanics_tier !== 'primer'
+        const sum = (f: (n: string) => boolean) => days.reduce((n, d) => n + d.exercises.filter(e => f(e.name) && working(e)).reduce((a, e) => a + (e.sets ?? 0), 0), 0)
+        const weekPull = days.flatMap(d => d.exercises.filter(e => isPull(e.name) && working(e)))[0]
+        if (weekPull && sum(isPush) > sum(isPull) * 1.5) {
+          for (let i = 0; i < days.length; i++) {
+            const d = days[i]
+            if (!d.exercises.some(e => isPush(e.name) && working(e)) || d.exercises.some(e => isPull(e.name) && working(e))) continue
+            days[i] = { ...d, exercises: [...d.exercises, { ...weekPull, sets: 2, superset_label: undefined, rest: weekPull.rest === 'alternate' ? '60s' : weekPull.rest }] }
+            if (sum(isPush) <= sum(isPull) * 1.5) break
+          }
+        }
+      }
       // THE BALANCE HOLD (from 65) AND PELVIC FLOOR WORK (pregnant) ARE STAMPED BEFORE THE LAST TIME CHECK (22 Nov 2026,
       // the persona audit's C8b). They used to go on after it "so they take nothing away", and so took the clock instead:
       // about half of pregnant and older trainees' plans ran past the time they had asked for, up to ten minutes. The
@@ -9990,10 +10030,31 @@ export function generateMesocycle(
         const trunkOn = (d: WorkoutDay) => d.exercises.filter(e => { const x = findEntry(e.name); return x?.movement_pattern === 'core' && x.mechanics_tier !== 'primer' }).length
         for (let i = 0; i < days.length; i++) {
           if (days[i].exercises.length === 0) continue
-          days[i] = enforceDayDurationBudget(days[i], sessionMaxSeconds, flagged, days.reduce((n, d, j) => n + (j === i ? 0 : trunkOn(d)), 0))
+          const setsOn = (d: WorkoutDay, ps: string[]) => d.exercises.filter(e => { const x = findEntry(e.name); return !!x && x.mechanics_tier !== 'primer' && ps.includes(x.movement_pattern) }).reduce((n, e) => n + (e.sets ?? 0), 0)
+          const others = days.filter((_, j) => j !== i)
+          days[i] = enforceDayDurationBudget(days[i], sessionMaxSeconds, flagged, days.reduce((n, d, j) => n + (j === i ? 0 : trunkOn(d)), 0),
+            { push: others.reduce((n, d) => n + setsOn(d, ['horizontal_push', 'vertical_push']), 0), pull: others.reduce((n, d) => n + setsOn(d, ['horizontal_pull', 'vertical_pull']), 0) })
         }
       }
 
+      // PUSHING NEVER RUNS AWAY FROM PULLING (22 Nov 2026, the persona audit's C18; CSCS, mine): on a two-day 20-30 week
+      // both presses and the one row sit at their two-set floor (push 4, pull 2), so no set can move and the balance pass
+      // gives up. A coach drops the spare press rather than let pushing run to twice the pulling: while the week pushes
+      // more than 1.5x what it pulls, a day holding two or more presses gives up its later non-main press. Less work,
+      // never more time; never the main lift, never required work, never below three training exercises.
+      if (!isDeload) {
+        const isPush = (n: string) => ['horizontal_push', 'vertical_push'].includes(findEntry(n)?.movement_pattern ?? '')
+        const isPull = (n: string) => ['horizontal_pull', 'vertical_pull'].includes(findEntry(n)?.movement_pattern ?? '')
+        const sum = (f: (n: string) => boolean) => days.reduce((n, d) => n + d.exercises.filter(e => f(e.name) && findEntry(e.name)?.mechanics_tier !== 'primer').reduce((a, e) => a + (e.sets ?? 0), 0), 0)
+        for (let guard = 0; guard < 6 && sum(isPull) > 0 && sum(isPush) > sum(isPull) * 1.5; guard++) {
+          const di = days.findIndex(d => d.exercises.filter(e => isPush(e.name) && findEntry(e.name)?.mechanics_tier !== 'primer').length >= 2 && trainingSlotCount(d.exercises.map(e => findEntry(e.name))) > 3)
+          if (di < 0) break
+          const d = days[di]
+          const idx = [...d.exercises.keys()].reverse().find(i => { const x = findEntry(d.exercises[i].name); return !!x && isPush(d.exercises[i].name) && x.mechanics_tier !== 'primer' && getVolumeRole(x) !== 'main' && !blockRequired.has(d.exercises[i].name) })
+          if (idx == null) break
+          days[di] = { ...d, exercises: d.exercises.filter((_, i) => i !== idx) }
+        }
+      }
       // ONE LIFT, ONE WEIGHT A WEEK (22 Nov 2026, the persona audit's C7): a lift on two days of a week at the same reps
       // was priced twice, once from its own history and once from what its slot carried, and a 19-year-old's single-leg
       // leg press read 30 kg a leg on Monday and 17.5 on Friday. A coach writes one number; the lower one, the side the
