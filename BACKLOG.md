@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [x] **SETUP'S BUTTONS, EVERY QUESTION: his "is the onboarding fixed for all questions? do they have the relevant quick
+  reply buttons", 22 Nov 2026.** The morning's fix had covered the 59 phrasings tried then. Measured wider: 160 phrasings
+  of every question setup asks with buttons, each in the state setup would ask it (earlier answers given), with and
+  without the coach asking for buttons. 24 missed: "What do you want to achieve?", "How experienced are you?", "Have you
+  lifted weights before?", "Will that be at a gym?", "Are you a gym member?", "Anything that hurts when you train?",
+  "When can you get to the gym?", "Are you a fan of running?", "Any foods you can't have?", "What equipment do you own?"
+  and their kin. Now 0 with the coach asking, and 6 without, all snacks and cooking time, which setup never asks (bonus
+  questions, by design). Three wrong-card cases added ("How long have you been training for?" is not the goal, "How
+  long can you stay at a gym?" is not the kit question, "Any foods you just don't like?" is not the diet); the first
+  try at "at a gym" pulled the kit card under a session-length question and was narrowed. `test:onboarding-chip-match`
+  112 checks; 10 of 10 mutations caught (the tenth after a check for a question asked with no buttons requested was
+  added). NOT proven against the real setup coach: its words are the model's. Frontend only.
+
 - [x] **THE PREGNANCY AUDIT AND ITS THREE FIXES: his "do audit on a pregnant womans exercise plan", then "A, and build
   fixes 2 and 3", 22 Nov 2026.** The audit (`docs/audits/pregnancy-plan-audit-2026-11-22.md`): 96 plans, the real
   generator. His earlier rules all held (no jumping, nothing lying flat, no hard ab moves, 8+ reps, RPE 7 from 28 weeks,
