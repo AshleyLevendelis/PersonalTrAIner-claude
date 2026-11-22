@@ -5949,6 +5949,32 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
     ? restDayNames.length
     : Math.max(0, restDayNames.length - 1)
 
+  // AN OLDER BEGINNER WALKS ON TWO REST DAYS, OPTIONALLY (22 Nov 2026, his "yes fix all four" on a 70-year-old's plan;
+  // it narrows his ruling "B" above for beginners from 60). CSCS, mine: at that age aerobic activity is part of every
+  // guideline (WHO 2020, ACSM: about 150 minutes a week, spread out), and a 70-year-old's three sessions with short
+  // cool-down walks reach a fraction of it. An easy 20-minute walk is the lightest dose there is: it costs her lifting
+  // days nothing and is named optional wherever it shows. Two, never on consecutive rest days, so at least one rest
+  // day in between stays a full rest; never with low recovery; and outside the goal's conditioning count.
+  if (noRestDayActivity && isOlderBeginner(profile) && recovery !== 'low') {
+    const walk = { activity: 'Easy walk — conversational pace', duration: 20, targetRpe: 3 }
+    const picked: string[] = []
+    for (const d of restDayNames) {
+      if (picked.length >= 2) break
+      const prev = allDayNames[(allDayNames.indexOf(d) + 6) % 7]
+      if (picked.includes(prev)) continue
+      picked.push(d)
+    }
+    for (const restDay of picked) {
+      days.push({
+        day: restDay,
+        focus: OPTIONAL_CARDIO_FOCUS,
+        exercises: [],
+        conditioning_note: `${walk.activity} (~${walk.duration} min)`,
+        recommendedCardio: { ...walk, timing: 'rest_day', reason: 'An easy walk on a rest day: optional, for everyday fitness at any age.' },
+      })
+    }
+  }
+
   restDayNames.slice(0, maxCardioRestDays).forEach(restDay => {
     if (remaining <= 0) return
     days.push({

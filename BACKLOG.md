@@ -2,6 +2,19 @@
 
 Newest first. One line each.
 
+- [x] **A 70-YEAR-OLD BEGINNER'S PLAN, FOUR FIXES (his "yes fix all four", 22 Nov 2026)**, read off her 16 weeks as a
+  coach. CSCS mine on all four; the fourth narrows his ruling "B" (no rest-day activity for a beginner) from 60.
+  (1) No bent-over dumbbell row, hollow body hold or one-arm press (bench, half-kneeling, kettlebell) for a beginner
+  from 60; one-arm rows and pulldowns stay (seated or braced). (2) A beginner's third block ("Consolidation") took
+  strength's +45s rest and lost a third of its work through the rest budget: 15.7 working sets a day in block 2,
+  13.2 here, 777 of 1,944 days under 12, one at 7 (2,048 beginner plans). Rest now the hypertrophy block's (0): 15.7,
+  78 days under 12; her weeks 9-11 went from 13/10/13 to 17/15/18. Its "longer rests" words removed. (3) "Lift fast,
+  lower slow" on every multi-joint lift for reps from 60, read from her age on the card so a swap carries it (NSCA
+  2019, ACSM: power falls faster than strength and predicts function); not on warm-ups, holds, swings, isolation.
+  Screen only: the coach is not told yet. (4) Two optional 20-minute easy walks on non-consecutive rest days for a
+  beginner from 60 (not with low recovery; WHO/ACSM aerobic guidance); 58 and under unchanged (`test:sal-margaret`).
+  `test:seventy` (34 checks; mutations in progress at commit), `verify:lift-fast`. Not changed: her starting weights
+  (2-5 kg, found in week 1), and the Rotary Torso Machine (asked).
 - [x] **NO MEDICINE BALL SLAMS FOR A BAD BACK (his "yes fix it", 22 Nov 2026)**, read off the 50-year-old's full plan:
   slams sat in his Wednesday warm-up in weeks 5-8 and 13-16. CSCS, mine: a slam is fast, forceful spinal flexion with
   a load in the hands, the reason the loaded crunches already carry the back tag; it now carries it too (as a loaded

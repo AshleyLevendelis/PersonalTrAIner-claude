@@ -10,6 +10,7 @@ import { LoadChip, TempoChip, loadSourceLabel, type LoadSource } from './LoadChi
 import { ExerciseLine } from './ExerciseLine'
 import { LoadBadgeView, SetBar } from './ExerciseBar'
 import { exerciseLoadBadge } from '@/lib/exercise-week'
+import { liftFastCue } from '@/lib/older-beginner'
 import { isExternallyLoaded, isUnverifiedLoadSource, splitLoadDisplay, unloadedLoadLabel } from '@/lib/load-prescription'
 import { AssistanceChip } from './AssistanceChip'
 import { AddedLoadChip } from './AddedLoadChip'
@@ -286,6 +287,10 @@ export function ExerciseRow({
             <span className="text-[0.625rem] uppercase tracking-[.1em] text-muted-foreground">{loadSourceLabel(loadSource, isCalibrationWeek)}</span>
           )}
           <TempoChip ex={ex} />
+          {/* From 60, on her main strength lifts: up with intent, down under control (older-beginner.ts liftFastCue). */}
+          {liftFastCue(profile, ex) && (
+            <span className="inline-flex items-center rounded border border-foreground/25 bg-foreground/5 px-1 py-0 text-[0.625rem] font-medium leading-4 text-foreground/90" data-testid="lift-fast-cue">{liftFastCue(profile, ex)}</span>
+          )}
           {ex.suggested_added_load_kg != null ? (
             <AddedLoadChip ex={ex} />
           ) : ex.suggested_assistance_kg != null ? (

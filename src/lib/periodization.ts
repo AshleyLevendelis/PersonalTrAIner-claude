@@ -148,9 +148,14 @@ export const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
   // a heading promising maximal strength. Ashley's ruling, 2 Sep 2026:
   // rename it, and let reps climb above the floor when the weight cannot.
   //
-  // Everything that DOSES the block is strength's, on purpose — rest +45s
-  // (change it and every beginner plan's exercise count moves through the
-  // rest budget), target RPE 8.5 (the beginner ceiling of 7 still applies),
+  // Everything that DOSES the block is strength's, on purpose, EXCEPT REST
+  // (22 Nov 2026, his "yes fix all four" on a 70-year-old's plan): strength's
+  // +45s cost a beginner a third of the block's work through the rest budget
+  // (measured on 2,048 beginner plans: 15.7 working sets a day in block 2,
+  // 13.2 here, 777 of 1,944 days under 12, one at 7). CSCS, mine: a beginner
+  // is capped at RPE 7 and lifts light, so 60-90s is the novice rest NSCA
+  // and ACSM give, and the extra rest bought nothing but fewer sets. Now 0,
+  // the hypertrophy block's: 15.7 a day, 78 days under 12. Target RPE 8.5 (the beginner ceiling of 7 still applies),
   // rep_shift -3 (still inert for a beginner; identical in intent if the
   // phase were ever handed to anyone else, which the sequence and the
   // dedupe pool are built so it cannot be), strength's tempo, strength's
@@ -163,13 +168,13 @@ export const PHASE_CONFIGS: Record<TrainingPhase, PhaseConfig> = {
     phase: 'consolidation',
     label: 'Consolidation',
     shortLabel: 'Consolidation',
-    focus: 'Make it solid — the same lifts with more intent, longer rests, every rep the same shape',
+    focus: 'Make it solid — the same lifts with more intent, every rep the same shape',
     sets_multiplier: 1.0,
     rep_shift: -3,
-    rest_adjust_seconds: 45,
+    rest_adjust_seconds: 0,
     target_rpe: 8.5,
     coach_note:
-      'Same lifts, more intent. Rest fully between sets and make every rep look like the last one — this block is where the patterns you built become solid under load, and where reps climb when the weight holds.',
+      'Same lifts, more intent. Make every rep look like the last one — this block is where the patterns you built become solid under load, and where reps climb when the weight holds.',
     coach_note_loadless:
       'Same movements, taken with more intent. With no weight to add, the difficulty comes from how you move: about three seconds lowering, a pause at the bottom, no bounce, and one more rep than last week. Rest fully between sets.',
   },

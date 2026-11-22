@@ -322,7 +322,8 @@ export const STATED_DUMBBELL_KG = 24
 
 const profile: UserProfile = {
   id: PROFILE_ID,
-  age: 30, gender: 'male', height_cm: 178, weight_kg: 80,
+  // &age=70: an older trainee's card (22 Nov 2026, the "Lift fast, lower slow" cue). The plan is the same seeded plan.
+  age: Number(new URLSearchParams(location.search).get('age') ?? 30), gender: 'male', height_cm: 178, weight_kg: 80,
   activity_level: WALKER ? 'sedentary' : 'moderate',
   // A COHERENT MEAL SPLIT, added 17 Sep 2026 because its absence was visible.
   // Both were undefined, so computeSlotBudgets gave the snack slot no share of

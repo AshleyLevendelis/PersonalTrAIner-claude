@@ -27,7 +27,7 @@
 // them, and once she is no longer a beginner every rule here lifts.
 // ---------------------------------------------------------------------------
 import type { UserProfile } from './types'
-import type { ExerciseEntry } from './exercise-db'
+import { getExerciseEntry, isBallisticMovement, type ExerciseEntry } from './exercise-db'
 import { getSkillDemand } from './experience-config'
 import { loadingMode } from './load-prescription'
 import { PREGNANCY_IMPACT } from './pregnancy-rules'
@@ -65,8 +65,15 @@ export function isOlderBeginner(profile: Pick<UserProfile, 'age' | 'training_exp
  * teaching. The kettlebell deadlift teaches the same hinge from two feet. And (21 Nov 2026, the four leftovers) a
  * Russian twist: loaded flexion and rotation together, the combination a coach builds up to last; a Pallof press or a
  * woodchop trains the same trunk by resisting the turn.
+ *
+ * And (22 Nov 2026, his "yes fix all four" on a 70-year-old's plan): a bent-over dumbbell row holds the trunk in an
+ * unsupported lean for every rep, where a chest-supported or cable row trains the same back from a support; a hollow
+ * body hold loads the lower back harder than a dead bug for the same trunk; and the one-arm presses (on a bench,
+ * half-kneeling, or a kettlebell overhead) add a balance and anti-rotation demand on top of a press she is still
+ * learning, where the two-arm version is the coach's first pick. The one-arm ROWS and pulldowns stay: they are done
+ * seated or braced on a bench.
  */
-const OLDER_BEGINNER_TECHNIQUE = /single-leg[^,]*\b(rdl|romanian)|reverse hyper|russian twist/i
+const OLDER_BEGINNER_TECHNIQUE = /single-leg[^,]*\b(rdl|romanian)|reverse hyper|russian twist|bent-over dumbbell row|hollow body|single-arm dumbbell bench|half-kneeling single-arm|single-arm kettlebell press/i
 
 /** Kit you hang from or support your whole body on. */
 const HANGING_KIT = new Set(['pull-up bar', 'assisted pull-up machine', 'dip bars'])
@@ -107,4 +114,26 @@ export const OLDER_BEGINNER_REASON_TEXT: Record<OlderBeginnerReason, string> = {
   barbell: 'a barbell lift, which cannot start lighter than the bar; dumbbells and machines first',
   hanging: 'hanging or full-bodyweight support work; a seated pulldown trains the same muscles',
   impact: 'a jumping move, added once you have trained a while',
+}
+
+/**
+ * LIFT IT UP QUICKLY, FROM 60 (22 Nov 2026, his "yes fix all four" on a 70-year-old's plan; CSCS, mine). Muscle power
+ * (force produced quickly) falls faster with age than strength does, and it is power, not strength, that predicts
+ * getting up from a chair, climbing stairs and catching a stumble. The NSCA position statement on older adults
+ * (Fragala et al., 2019) and ACSM both recommend moving the weight up with intent and lowering it under control, at
+ * the loads already prescribed: no new exercise, no heavier weight, no jump. So the card says it on her main
+ * strength lifts, the multi-joint ones she lifts for reps; never on a warm-up move, a hold, a carry, a swing or an
+ * isolation lift. Read from her age at the card, so a swapped-in lift carries it too. Under 60: null, nothing changes.
+ */
+const LIFT_FAST_FROM_AGE = 60
+const LIFT_FAST_CUE = 'Lift fast, lower slow'
+export function liftFastCue(profile: Pick<UserProfile, 'age'> | null | undefined, ex: { name: string; reps: string | number }): string | null {
+  const age = profile?.age
+  if (!(typeof age === 'number' && Number.isFinite(age) && age >= LIFT_FAST_FROM_AGE)) return null
+  const entry = getExerciseEntry(ex.name)
+  if (!entry || entry.prescription_type !== 'reps') return null
+  if (entry.mechanics_tier !== 'tier1_compound' && entry.mechanics_tier !== 'tier2_compound') return null
+  if (isBallisticMovement(entry)) return null
+  if (!/^\d+(\s*-\s*\d+)?$/.test(String(ex.reps).trim())) return null
+  return LIFT_FAST_CUE
 }
