@@ -19,7 +19,12 @@ Newest first. One line each.
   New targets: exmenu, daymenu, plates, mealstrip, progress. Settings gains "The full tour". Every claim checked
   against the screen it points at.
   CHECKS: `test:app-tour` (both parts' targets and copy; §6b the offer, 7 new checks), `verify:tour-real` (walks
-  both parts on the real screens), `verify:setup-why` (new, 6 checks).
+  both parts on the real screens), `verify:setup-why` (new, 6 checks). Mutations: logic checks 8 of 8 caught;
+  browser checks 5 of 6, the sixth (a stop aimed at a different real element) is a property only the logic check
+  can see, and it catches it. Found on the way and fixed: the app recognises a question partly by its words, so six
+  new phrasings had to be taught to it (`onboarding-chip-match`); the leave-out question became "Any OTHER foods..."
+  so it still reads as an addition to the diet question; the offer's buttons wrapped on a phone. 130 derived logic
+  checks, 13 setup drivers and 22 screen drivers pass; full sweep before the merge.
 
 - [x] **THE PLAY STORE PICTURES, AND THE APP'S PERMANENT ID: 20 Nov 2026.** Store icon, 1024 x 500 banner and five
   1080 x 1920 screenshots (Home, Exercise, the coach, Nutrition, Tools) in `docs/store/play/`, drawn by
