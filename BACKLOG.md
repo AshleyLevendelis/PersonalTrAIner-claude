@@ -2,6 +2,25 @@
 
 Newest first. One line each.
 
+- [x] **THE PERSONA AUDIT, AND ITS SIX FIXES (his "do a full audit of all possible profiles" and "b, and fix all the
+  others too", 22 Nov 2026)**. `measure:personas` (scripts/audit-personas.ts): 6,000 seeded plans across 23 groups
+  (pregnancy at four stages, beginners 60-64 and 65-80, 65+ trained, each injury and pairs, the health conditions, the
+  walking start) against 22 rules, each proven to fire on a plan built to break it before a run is believed. Before ->
+  after, same people: safety 3 -> 0 (a deload over the set cap); a chosen day silently lost to low recovery 468 -> 0
+  (HIS RULING "b": four days at most, spread, the rest days named on Exercise; it had trimmed one day, so six became
+  five); no cardio on fat loss 178 -> 1 (a beginner or low-recovery short session with no light day; now one short
+  session of its own, outside the lifting time); no hinge from 28 weeks pregnant 114 -> 0 (the hinge went to the squat
+  list); two floor-pull days 47 -> 0 (a full-body day took the deadlift before the hinge day added a sumo through an
+  unguarded tier pick); over the time asked 1,421 -> 224, every one now within 5 minutes and 217 within 2 (the balance
+  hold and pelvic floor work were stamped after the time check; and a day at every set floor now gives up a whole
+  exercise its push or pull group can spare, trunk only while the week keeps two, else one set; never the main lift,
+  never below three, only in the final backstop). Also one weight a lift a week (a single-leg leg press read 30 and
+  17.5 kg). CSCS mine throughout, his ruling for the days. NAMED, NOT FIXED: 19 two-day 20-30 minute combat-style plans
+  miss a squat (two short sessions cannot hold all four patterns); 7 sessions 2-5 minutes over; 1 fat-loss plan without
+  cardio (pregnant, 31 weeks, avoids cardio, 20-30). The rest-day line is screen only (the coach is not told).
+  `test:persona-audit-fixes` (36 checks, 16 mutations all caught, two only after checks were added: the deadlift's
+  placement, and the warm-up budget making room for pelvic floor work, which keeps 3,320 working sets across the
+  audit's pregnant plans). Investigated by four parallel read-only tracers before any change.
 - [x] **A PREGNANT BEGINNER GETS THE SAFER LIST AND TWO WALKS (his "yes fix all four", 22 Nov 2026)**, read off a
   35-year-old pregnant beginner's plan: she was learning barbell back squats, sumo deadlifts and an incline barbell
   bench, doing bent-over and T-bar rows, walking lunges, Bulgarian split squats and a one-leg balance hold, and had no
