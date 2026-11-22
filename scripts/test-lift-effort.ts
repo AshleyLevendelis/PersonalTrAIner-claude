@@ -274,7 +274,9 @@ console.log('\n[10] The screen (source; the driver reads the pixels)')
   check('10f. the question is asked only where an answer can mean something: a number, no deload, no calibration week',
     /askEffort: ex\.suggested_load_kg != null && !currentMesoWeekObj\?\.is_deload && !currentMesoWeekObj\?\.isCalibrationWeek/.test(panel))
   check('10g. the row hands it to the grid', /askEffort=\{askEffort\}/.test(row))
-  check('10h. the grid asks only once every prescribed working set is in', /existingLogs\.length >= totalSets && existingLogs\.length > 0/.test(grid) && /\{askEffort && lastWorkingLog && \(/.test(grid))
+  check('10h. the grid asks only once every prescribed working set is in', /existingLogs\.length >= totalSets && existingLogs\.length > 0/.test(grid) && /\{\(?\(?askEffort && lastWorkingLog\)?(?: \|\| tourEffortPreview\))? && \(/.test(grid)
+    // The tour's effort stop shows the question as a preview (22 Nov 2026), off unless the tour passes it.
+    && /tourEffortPreview = false,/.test(grid))
   check('10i. ...and keeps the answer on the last working set, as the number the rule reads', /rpe: felt === effort \? null : EFFORT_RPE\[effort\]/.test(grid) && /setNumber: lastWorkingLog\.set_number/.test(grid))
   check('10j. three buttons, each a full-height tap target, each saying which is chosen', /min-h-\[44px\] flex-1/.test(grid) && /aria-pressed=\{felt === effort\}/.test(grid))
 }

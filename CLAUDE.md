@@ -1749,9 +1749,17 @@ menu" stays true when a copy is also left outside it.
   `test:exercise-detail`, `verify:exercise-video`
 - **Setup says why it asks, and the tour offers more: his "build it", 22 Nov 2026** (`docs/plans/setup-and-tour-refresh.md`):
   friendlier wording on every setup question, a "why I'm asking" line under ten, a line between the training and food
-  halves, plainer choices; the 10-stop tour ends by OFFERING a 9-stop full tour (his ruling "Short tour, then offer
-  more", over one long tour and over tips as you go), Skip on every stop, both replayable from settings.
-  `test:app-tour` §6b, `verify:tour-real`, `verify:setup-why`
+  halves, plainer choices. (The tour's "short tour, then offer more" of that morning is REVERSED, next line.)
+  `verify:setup-why`
+- **ONE tour, and every stop SHOWS what it describes: his words 22 Nov 2026** ("Make sure every step shows what it is
+  describing ... it should be one tour only, not a tour and a full tour"). It REVERSES his "Short tour, then offer more"
+  of the same morning. 22 stops; a stop about something behind a tap has its screen OPEN it while the tour is there
+  (the real menu, sheet or tab, never a drawing; `tour-stage.ts`): Progress, a meal's sheet, the effort question, the
+  exercise ⋮, About this exercise on How to, Muscles and History, the day menu, What happened?, the gear, Profile. **On a
+  day with nothing to log, the Exercise stops put up the next session as practice**, never saved, gone when the tour
+  leaves. A card that cannot sit beside a full-screen sheet sits at the foot of the screen. `test:app-tour` §6b,
+  `verify:tour-real` (every stop on a training day, a rest day and in the whole app: target in sight and not under the
+  card), `verify:tour`
 - **A coach reply can be reported in the app: his "1, build it", 20 Nov 2026** (Google Play's rule on AI content): a
   flag beside each coach reply, four reasons and an optional note, kept in `coach_reply_reports` for him to review; a
   report that does not save says so. `verify:report-reply`. Needs migration 20261120120000. **And each one is emailed to

@@ -24,7 +24,8 @@ import { readCardioLogsForDate } from '@/lib/cardio-log-store'
 import { cardioLine, splitActivity } from '@/lib/cardio-lines'
 import { calibrationCueText } from './CalibrationCue'
 import { planDaysForDate } from '@/lib/plan-week'
-import { readBorrowedDay, writeBorrowedDay, trainAnywayOptions } from '@/lib/borrowed-day'
+import { readBorrowedDay, writeBorrowedDay, trainAnywayOptions, nextTrainingDayName } from '@/lib/borrowed-day'
+import { TOUR_PRACTICE_STOPS, TOUR_OPENS, setTourPracticeDay, useTourStage } from '@/lib/tour-stage'
 import { computeSessionPRs } from '@/lib/pr-engine'
 import { getExerciseId, getExerciseEntry } from '@/lib/exercise-db'
 import { layoffStatus, easesWeights, easeWeightKg, easeAddedKg, layoffWeightFrom, liftLayoff, NO_LAYOFF, type LayoffStatus } from '@/lib/layoff'
@@ -266,6 +267,8 @@ export function TodayPanel({
     setBorrowedDayState(dayName)
   }
   const [expandedWarmup, setExpandedWarmup] = useState(false)
+  // Where the app tour is (tour-stage.ts): its practice stops need a set on screen, and some open things here.
+  const tourStage = useTourStage()
   const [tightOpen, setTightOpen] = useState(false)
 
   const handleTightness = async (a: TightnessAnswer) => {
@@ -434,12 +437,26 @@ export function TodayPanel({
     setPeekDate(date)
   }, [today])
 
-  const effectiveDayName = borrowedDayName ?? todayName
+  // A PRACTICE DAY FOR THE TOUR (his request 22 Nov 2026: "Even if it's trying to show how to log a set on a day that
+  // there is no sets to log it should still show the user"). On a day with nothing left to log (no session, or one
+  // already done, rested, swapped or marked missed), the tour's Exercise stops put up the next session the way "Train
+  // anyway" would, NEVER saved: it lives only while the tour is on those stops, and the set logged on it is practice
+  // (useActiveSession's beginPractice) and taken back off.
+  const plainCell = weekTrain.days.find(d => d.date === today)
+  const plainWorkout = plainCell?.movedTo ? undefined : (plainCell?.session ?? undefined) ?? liveWeekPlan.find(d => d.day === todayName)
+  const plainHasSets = !!plainWorkout && plainWorkout.exercises.length > 0
+    && !(plainCell && (plainCell.state === 'done' || plainCell.state === 'rest_chosen' || !!plainCell.swappedForActivity || !!plainCell.markedMissed))
+  const tourPracticeDay = !borrowedDayName && !!tourStage && TOUR_PRACTICE_STOPS.has(tourStage) && !plainHasSets
+    ? nextTrainingDayName(liveWeekPlan, todayName)
+    : null
+  useEffect(() => { setTourPracticeDay(tourPracticeDay) }, [tourPracticeDay])
+  useEffect(() => () => setTourPracticeDay(null), [])
+  const effectiveDayName = borrowedDayName ?? tourPracticeDay ?? todayName
   // TODAY'S CELL, resolved by the hook that already holds the whole week.
   // Borrowing a day is a deliberate look at ANOTHER day's prescription, so it
   // stays a straight plan lookup — a move is a fact about a date, and there
   // is no date being borrowed.
-  const todayCell = borrowedDayName ? undefined : weekTrain.days.find(d => d.date === today)
+  const todayCell = borrowedDayName || tourPracticeDay ? undefined : weekTrain.days.find(d => d.date === today)
   // The same count the strips and the coach use (session-count.ts).
   const finishedShort = shortOfPlan(sessionSetCount(todayCell?.session, todayCell?.workingLogs))
   // `session` is the moved-in session on the receiving end of a move, the
@@ -488,7 +505,7 @@ export function TodayPanel({
   // lives in; `todayRef.sayDay` is the only name a sentence may use.
   // Borrowing a day is a straight look at another weekday's prescription, so
   // it is a plan-row reference with nothing to resolve.
-  const todayRef: SessionRef = borrowedDayName || !todayCell
+  const todayRef: SessionRef = borrowedDayName || tourPracticeDay || !todayCell
     ? sessionRefForPlanDay({ date: today, planDayName: effectiveDayName, session: workout, weekNumber: liveWeek })
     : sessionRefFromCell(todayCell, liveWeek)
   /** Says the day on screen in whatever an edit wrote with the plan row's name. */
@@ -894,6 +911,11 @@ export function TodayPanel({
     )
     return { cost: say(impact.cost), balancing: say(impact.balancing) }
   }
+
+  const tourWhatHappenedCell = tourStage === TOUR_OPENS.whatHappened
+    ? (tourPracticeDay ? weekTrain.days.find(d => d.date > today && d.dayName === tourPracticeDay) : weekTrain.days.find(d => d.date === today)) ?? weekTrain.days.find(d => d.date === today)
+    : undefined
+  const tourWhatHappened: WhatHappenedTarget | null = tourWhatHappenedCell ? { date: tourWhatHappenedCell.date, dayName: tourWhatHappenedCell.dayName } : null
 
   const openWhatHappened = () => {
     const date = peekDate ?? today
@@ -1384,6 +1406,9 @@ export function TodayPanel({
               DEV · {devOverrideDay}
             </span>
           )}
+          {tourPracticeDay && (
+            <span className="text-[0.625rem] text-muted-foreground italic" data-testid="tour-practice-day">{tourPracticeDay}&apos;s session · practice</span>
+          )}
           {borrowedDayName && (
             <span className="text-[0.625rem] text-muted-foreground italic" data-testid="borrowed-from">{borrowedDayName}&apos;s session</span>
           )}
@@ -1559,7 +1584,8 @@ export function TodayPanel({
       />
       <Suspense fallback={null}>
       <WhatHappenedSheet
-        target={whatHappened}
+        // THE TOUR'S STOP OPENS IT (22 Nov 2026): on today, or on the practice session's day when today has nothing.
+        target={whatHappened ?? tourWhatHappened}
         onClose={() => setWhatHappened(null)}
         profileId={profileId}
         today={today}
@@ -2211,6 +2237,7 @@ function ExerciseList({
   // completed exercise's row auto-advances to the next incomplete one
   // without any explicit "mark done, move on" step.
   const [expandOverrides, setExpandOverrides] = useState<Record<number, boolean>>({})
+  const tourStage = useTourStage()
 
   const groups = groupExercises(workout.exercises)
   const calibrationAnchorIndex = currentMesoWeekObj?.isCalibrationWeek
@@ -2260,7 +2287,9 @@ function ExerciseList({
   const findsWeight = (name: string) => !easesWeights(layoff) && !!progressionNotes[name]?.findWeight
   const rowProps = (ex: WorkoutDay['exercises'][number], exIndex: number) => {
     const defaultExpanded = exIndex === firstIncompleteExIndex
-    const expanded = exIndex in expandOverrides ? expandOverrides[exIndex] : defaultExpanded
+    // THE TOUR'S ANCHOR (22 Nov 2026): the main lift, opened for the effort stop so its question is on screen.
+    const tourAnchor = exIndex === tourAnchorIndex
+    const expanded = (exIndex in expandOverrides ? expandOverrides[exIndex] : defaultExpanded) || (tourAnchor && tourStage === TOUR_OPENS.effort)
     const { rowEx, printedEasedFrom, progressedLoad } = liveRowExercise(ex, { progressedLoads, progressedAddedLoads, layoff, profile })
     return {
       ex: rowEx,
@@ -2307,12 +2336,16 @@ function ExerciseList({
       index: flatExIndexes.indexOf(exIndex) + 1,
       // The first exercise with sets still to do: "· now" on its card (2a).
       isCurrent: exIndex === currentExIndex,
+      tourAnchor,
     }
   }
 
   // See PeekPanel for the reasoning — one definition, so a promoted main lift
   // can never appear on one screen and not the other.
   const firstMainLiftGroupIndex = mainLiftGroupIndex(groups, workout!.exercises)
+  // The row the app tour's Exercise stops point at: the main lift, else the first exercise (tour-stage.ts).
+  const anchorGroup = groups[firstMainLiftGroupIndex] ?? groups[0]
+  const tourAnchorIndex = !anchorGroup ? -1 : anchorGroup.kind === 'single' ? anchorGroup.exIndex : anchorGroup.members[0]?.exIndex ?? -1
   const conditioningDay = isConditioningDay(workout!.exercises)
 
   const isGroupExpanded = (g: ExerciseGroup) =>

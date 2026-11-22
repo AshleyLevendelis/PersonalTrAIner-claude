@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { MessageCircle } from 'lucide-react'
 import { useAppRoute, tabHash, type Tab } from '@/lib/app-route'
-import { TOUR_STEPS, MORE_TOUR_STEPS, SET_STEP_KEY, MEALS_STEP_KEY } from '@/lib/app-tour-steps'
+import { TOUR_STEPS, SET_STEP_KEY, MEALS_STEP_KEY } from '@/lib/app-tour-steps'
+import { setTourStage, useTourPracticeDay } from '@/lib/tour-stage'
 import { TAB_BAR_HEIGHT_PX } from '@/components/BottomTabBar'
 import { useBottomDockHeight } from '@/hooks/useBottomDockHeight'
 import { useViewportInset } from '@/hooks/useViewportInset'
@@ -32,10 +33,10 @@ import { useActiveSession } from '@/hooks/useActiveSession'
 // then removed"): it is practice, never a week-1 calibration set.
 // ---------------------------------------------------------------------------
 
-// The short tour, then the full one it offers at its end (his ruling 22 Nov 2026, "Short tour, then offer more"). One
-// list so Back, Skip and the stored place work the same in both parts; CORE_LEN is where the second part starts.
-const STEPS = [...TOUR_STEPS, ...MORE_TOUR_STEPS]
-const CORE_LEN = TOUR_STEPS.length
+// ONE TOUR (his ruling 22 Nov 2026, "it should be one tour only, not a tour and a full tour"; it REVERSES his
+// "Short tour, then offer more" of the same morning). Every stop shows what it describes: a stop about something
+// behind a tap has its screen open it while the tour is there (tour-stage.ts), and the set stop always has a set.
+const STEPS = TOUR_STEPS
 const SET_STEP_INDEX = STEPS.findIndex(s => s.key === SET_STEP_KEY)
 const MEALS_STEP_INDEX = STEPS.findIndex(s => s.key === MEALS_STEP_KEY)
 /**
@@ -77,8 +78,8 @@ interface Rect { top: number; left: number; width: number; height: number }
  * the app could restart a tour once it was over, so "gone for good" would
  * have meant one mistaken tap lost it forever.
  */
-export function replayAppTour(part?: 'more'): void {
-  window.dispatchEvent(new CustomEvent(TOUR_REPLAY_EVENT, { detail: part === 'more' ? 'more' : 'core' }))
+export function replayAppTour(): void {
+  window.dispatchEvent(new CustomEvent(TOUR_REPLAY_EVENT))
 }
 
 const TOUR_REPLAY_EVENT = 'fitplan:replay-tour'
@@ -228,6 +229,11 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
   const phase: Phase = state.status === 'active' ? state.phase : 'info'
   const running = state.status === 'active'
   useEffect(() => { onRunningChange?.(running) }, [running, onRunningChange])
+  // WHERE THE TOUR IS, for the screens that open what a stop describes (tour-stage.ts), and gone when it ends.
+  useEffect(() => { setTourStage(running ? step.key : null) }, [running, step.key])
+  useEffect(() => () => setTourStage(null), [])
+  // The session the Exercise tab put up to practise on, on a day with no set left to log.
+  const practiceDay = useTourPracticeDay()
 
   // THE SET STOP IS PRACTICE (his ruling 17 Nov 2026, "Practice, then removed", over asking after the tap and over
   // keeping it). The tick saves for real so he sees it work, and the moment the tour moves on, or is closed, the set is
@@ -246,14 +252,11 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
     return () => practiceFns.current.endPractice()
   }, [onSetStop])
 
-  // The visible numbering skips the set stop when it does not apply, and counts each part on its own: the short tour
-  // is "3 of 10" whether or not the full one follows, and the full one starts again at 1.
-  const inMore = stepIndex >= CORE_LEN
-  const totalSteps = inMore ? MORE_TOUR_STEPS.length : CORE_LEN - (setStepSkipped ? 1 : 0)
+  // The visible numbering skips the set stop when it does not apply.
+  const totalSteps = STEPS.length - (setStepSkipped ? 1 : 0)
   const displayIndex = useMemo(() => {
-    if (stepIndex >= CORE_LEN) return stepIndex - CORE_LEN + 1
     let n = 0
-    for (let i = 0; i <= stepIndex && i < CORE_LEN; i++) {
+    for (let i = 0; i <= stepIndex; i++) {
       if (setStepSkipped && i === SET_STEP_INDEX) continue
       n++
     }
@@ -329,10 +332,10 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
   // owns all of its own state. Deliberately re-arms from step 0 and clears
   // the set-stop exemption, so a replay is the tour as first shown.
   useEffect(() => {
-    const onReplay = (e: Event) => {
+    const onReplay = () => {
       if (!profileId) return
       setSetStepSkipped(false)
-      enterStep((e as CustomEvent).detail === 'more' ? CORE_LEN : 0)
+      enterStep(0)
     }
     window.addEventListener(TOUR_REPLAY_EVENT, onReplay)
     return () => window.removeEventListener(TOUR_REPLAY_EVENT, onReplay)
@@ -371,10 +374,17 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
     if (!running) { setRect(null); return }
     let raf = 0
     let scrolledFor = ''
+    let openerScrolled = false
     const tick = () => {
       raf = requestAnimationFrame(tick)
       const key = phase === 'tap' ? (step.nav ?? step.target) : step.target
       if (!key) { setRect(prev => (prev === null ? prev : null)); return }
+
+      // A MENU'S BUTTON FIRST: the menu is drawn where its button is, so the button comes into view once per stop.
+      if (phase === 'info' && step.opener && !openerScrolled) {
+        const opener = findTarget(step.opener)
+        if (opener) { bringIntoView(opener); openerScrolled = true }
+      }
 
       const gating = phase === 'tap' && step.gate === true
       let el: HTMLElement | null
@@ -422,13 +432,14 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
       const scrollKey = `${stepIndex}:${phase}:${Math.round(el.getBoundingClientRect().height)}`
       if (scrolledFor !== scrollKey) { scrolledFor = scrollKey; bringIntoView(el) }
 
+      // THE HOLE STAYS ON THE SCREEN (22 Nov 2026): a full-width sheet grown by the padding ran a few pixels off both
+      // sides, and one at the foot ran off the bottom. Clamped to the viewport, it still frames all of it.
       const r = el.getBoundingClientRect()
-      const next: Rect = {
-        top: Math.round(r.top) - SPOT_PAD,
-        left: Math.round(r.left) - SPOT_PAD,
-        width: Math.round(r.width) + SPOT_PAD * 2,
-        height: Math.round(r.height) + SPOT_PAD * 2,
-      }
+      const top = Math.max(0, Math.round(r.top) - SPOT_PAD)
+      const left = Math.max(0, Math.round(r.left) - SPOT_PAD)
+      const bottom = Math.min(window.innerHeight, Math.round(r.bottom) + SPOT_PAD)
+      const right = Math.min(window.innerWidth, Math.round(r.right) + SPOT_PAD)
+      const next: Rect = { top, left, width: Math.max(0, right - left), height: Math.max(0, bottom - top) }
       setRect(prev =>
         prev && prev.top === next.top && prev.left === next.left
           && prev.width === next.width && prev.height === next.height
@@ -505,11 +516,10 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
   // they land — or the wait expires — it goes back to the real line.
   const showPending = stepIndex === MEALS_STEP_INDEX && mealsPending && !!step.pendingCopy
   const typedWeight = step.key === SET_STEP_KEY && setNeedsWeight
-  const body = tapPhase ? (step.teaser ?? '') : (showPending ? step.pendingCopy! : (typedWeight && step.typedWeightCopy ? step.typedWeightCopy : step.copy))
+  const practiceCopy = practiceDay && step.practiceCopy ? step.practiceCopy.replace('{day}', practiceDay) : null
+  const body = tapPhase ? (step.teaser ?? '') : (showPending ? step.pendingCopy! : (typedWeight && step.typedWeightCopy ? step.typedWeightCopy : practiceCopy ?? step.copy))
   const tapHint = typedWeight && step.typedWeightTapHint ? step.typedWeightTapHint : step.tapHint
-  const calloutTop = calloutPosition(rect, step.last === true)
-  // THE OFFER (22 Nov 2026): the short tour's last stop asks whether to see everything, never assumes it.
-  const offersMore = step.last === true && stepIndex === CORE_LEN - 1
+  const callout = calloutPosition(rect, step.last === true)
 
   return (
     <div className="fixed inset-0 z-[60]" style={{ pointerEvents: 'none' }} role="dialog" aria-modal="true" aria-label="App tour">
@@ -574,7 +584,7 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
       <div
         className="tour-fade absolute rounded-2xl border border-[color:var(--hairline)] bg-card px-4 pb-3 pt-3.5"
         data-tour-step={step.key}
-        style={{ left: 14, right: 14, top: calloutTop, boxShadow: '0 16px 40px rgba(0,0,0,.55)', pointerEvents: 'auto' }}
+        style={{ left: 14, right: 14, ...callout, boxShadow: '0 16px 40px rgba(0,0,0,.55)', pointerEvents: 'auto' }}
       >
         <div className="flex items-center gap-2">
           <span
@@ -607,35 +617,22 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
                 Back
               </button>
             )}
-            {/* The offer's two buttons need the row: its dots go (22 Nov 2026, they squeezed both onto two lines). */}
-            <div className="flex flex-1 items-center gap-1">
-              {!offersMore && STEPS.map((s, i) =>
-                (setStepSkipped && i === SET_STEP_INDEX) || (inMore ? i < CORE_LEN : i >= CORE_LEN) ? null : (
-                  <span
-                    key={s.key}
-                    className="size-[5px] rounded-full"
-                    // Inactive dots are neutral, not accent-tinted: the spec's
-                    // literal is the foreground white at .22, and tinting them
-                    // mint makes eight of ten read as half-active.
-                    style={{ background: i === stepIndex ? 'var(--primary)' : 'color-mix(in oklab, var(--foreground) 22%, transparent)' }}
-                  />
-                ),
-              )}
+            {/* A BAR, NOT DOTS (22 Nov 2026): one tour of twenty-odd stops has too many dots for a phone's row. The
+                track is neutral, the part done is the main colour. */}
+            <div className="flex flex-1 items-center px-1" aria-hidden>
+              <div className="h-[3px] w-full overflow-hidden rounded-full" style={{ background: 'color-mix(in oklab, var(--foreground) 18%, transparent)' }}>
+                <div className="h-full rounded-full" data-tour-progress style={{ width: `${Math.round((displayIndex / totalSteps) * 100)}%`, background: 'var(--primary)' }} />
+              </div>
             </div>
-            {offersMore && (
-              <button type="button" onClick={finish} className="whitespace-nowrap px-1 py-1.5 text-[0.78125rem] text-muted-foreground" data-tour-later>
-                Maybe later
-              </button>
-            )}
             <button
               type="button"
-              onClick={offersMore ? () => enterStep(CORE_LEN) : step.last ? finish : advance}
+              onClick={step.last ? finish : advance}
               data-tour-next
               disabled={holdingForMeals}
               className="h-[34px] whitespace-nowrap rounded-[10px] px-4 text-[0.78125rem] font-semibold text-primary-foreground glow-mint-box disabled:opacity-60"
               style={{ background: 'var(--primary)' }}
             >
-              {holdingForMeals ? 'Still cooking…' : stepIndex === 0 ? 'Show me around' : offersMore ? 'Show me everything' : step.last ? 'Finish' : 'Next'}
+              {holdingForMeals ? 'Still cooking…' : stepIndex === 0 ? 'Show me around' : step.last ? 'Finish' : 'Next'}
             </button>
           </div>
         )}
@@ -652,12 +649,17 @@ function Blocker({ style }: { style: React.CSSProperties }) {
  * Below the spotlight when there is room, above it when there is not — a
  * callout that covers the thing it is describing is worse than useless. Tab-bar
  * targets always land in the bottom band, so they always flip above.
+ *
+ * AND WHEN THERE IS ROOM ON NEITHER SIDE (a sheet that fills the screen), AT THE FOOT OF THE SCREEN (22 Nov 2026): a
+ * sheet reads from the top, so its top is what the stop is about. Pinned to the top, the card covered About's tabs and
+ * its video button, the very things the How to stop names.
  */
-function calloutPosition(rect: Rect | null, isLast: boolean): number {
-  if (!rect) return isLast ? Math.max(120, window.innerHeight - 340) : Math.max(120, window.innerHeight * 0.3)
+function calloutPosition(rect: Rect | null, isLast: boolean): { top: number } | { bottom: number } {
+  if (!rect) return { top: isLast ? Math.max(120, window.innerHeight - 340) : Math.max(120, window.innerHeight * 0.3) }
   const below = rect.top + rect.height + 12
-  if (below + CALLOUT_ESTIMATED_HEIGHT <= window.innerHeight - 24) return below
-  return Math.max(60, rect.top - CALLOUT_ESTIMATED_HEIGHT)
+  if (below + CALLOUT_ESTIMATED_HEIGHT <= window.innerHeight - 24) return { top: below }
+  if (rect.top - CALLOUT_ESTIMATED_HEIGHT >= 60) return { top: rect.top - CALLOUT_ESTIMATED_HEIGHT }
+  return { bottom: 16 }
 }
 
 function ResumePill({

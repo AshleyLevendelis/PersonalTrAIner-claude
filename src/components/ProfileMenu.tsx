@@ -5,7 +5,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Settings, UserCircle, Compass, Sparkles } from 'lucide-react'
+import { Settings, UserCircle, Compass } from 'lucide-react'
 
 // ---------------------------------------------------------------------------
 // Houses the housekeeping actions ("Profile", "Replay the tour") the header used to
@@ -19,19 +19,22 @@ import { Settings, UserCircle, Compass, Sparkles } from 'lucide-react'
 export function ProfileMenu({
   onOpenProfile,
   onReplayTour,
+  tourOpen = false,
 }: {
   onOpenProfile: () => void
-  /** Starts the tour again; 'more' starts its second part, the full tour (22 Nov 2026). */
-  onReplayTour: (part?: 'more') => void
+  /** Starts the tour again, from its first stop. */
+  onReplayTour: () => void
+  /** Held open while the app tour's gear stop is on screen (22 Nov 2026, tour-stage.ts). */
+  tourOpen?: boolean
 }) {
   return (
-    <DropdownMenu>
+    <DropdownMenu open={tourOpen ? true : undefined}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon-sm" aria-label="Profile and settings">
           <Settings className="size-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" data-tour={tourOpen ? 'settings-open' : undefined}>
         <DropdownMenuItem onClick={onOpenProfile}>
           <UserCircle className="size-3.5" />
           Profile
@@ -47,11 +50,6 @@ export function ProfileMenu({
         <DropdownMenuItem onClick={() => onReplayTour()}>
           <Compass className="size-3.5" />
           Replay the tour
-        </DropdownMenuItem>
-        {/* The full tour on its own, for someone who said "Maybe later" (his ruling 22 Nov 2026: both replayable). */}
-        <DropdownMenuItem onClick={() => onReplayTour('more')}>
-          <Sparkles className="size-3.5" />
-          The full tour
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
