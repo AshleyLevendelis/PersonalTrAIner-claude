@@ -2,6 +2,12 @@
 
 Newest first. One line each.
 
+- [x] **NO MEDICINE BALL SLAMS FOR A BAD BACK (his "yes fix it", 22 Nov 2026)**, read off the 50-year-old's full plan:
+  slams sat in his Wednesday warm-up in weeks 5-8 and 13-16. CSCS, mine: a slam is fast, forceful spinal flexion with
+  a load in the hands, the reason the loaded crunches already carry the back tag; it now carries it too (as a loaded
+  joint, so its shoulder exclusion stands: setting `contraindicated_joints` alone had silently dropped it, which
+  `test:injury-coverage` caught). A bad back excludes 40 lifts (was 39). Burpees and the bodyweight good morning were
+  looked at and left: no load in the hands. `test:bad-back` §4 (3 of 3 checks caught the tag's removal).
 - [x] **FIVE SCREEN CHECKS AFTER THE PERSONA FIXES, AND ONE REAL CARD FIX (pre-merge sweep, 22 Nov 2026)**. The test
   page's seeded plan changed with this branch's fixes (today opens on Medicine Ball Slams, not Band Face Pulls; the
   row slot after dumbbell rows now carries 16 kg a hand as 32 kg on a two-arm machine, 37.5 kg, where it had read 20).

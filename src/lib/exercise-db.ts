@@ -4593,7 +4593,9 @@ export const EXERCISE_DATABASE: ExerciseEntry[] = [
     joint_stress: 'low',
     form_cues: ['Reach overhead fully', 'Slam with full-body extension', 'Hinge and follow through', 'Catch on bounce'],
     coach_note_swap: 'Full-body power primer that lights up the CNS before heavy compound work.',
-    loads_joints: ['shoulder'],
+    // Fast, forceful spinal flexion with a load in the hands: kept off a bad back, as the loaded crunches are
+    // (21 Nov 2026, read off a 50-year-old's plan, where it sat in a Wednesday warm-up).
+    loads_joints: ['shoulder', 'lower_back_axial'],
     style_tags: ['functional', 'combat', 'hybrid'],
     capability_requirement: { minExperience: 'novice', regression: 'Bodyweight Squat Marches' },
     substitution_group: 'explosive_upper',

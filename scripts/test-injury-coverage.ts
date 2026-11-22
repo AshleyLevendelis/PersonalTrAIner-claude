@@ -300,7 +300,9 @@ console.log('\n5. How MUCH each injury removes, frozen')
     // the shoulders or swinging the lower back carried no axial tag
     //   lower_back 34->39  Hack Squat, Smith Machine Split Squat, Reverse Hyper Machine, Smith Machine Calf Raise,
     //                      Standing Calf Raise Machine
-    lower_back: 39, knees: 47, shoulders: 87, neck: 9, wrists: 42,
+    // 22 Nov 2026, his "yes fix it": Medicine Ball Slams (fast loaded spinal flexion, in his Wednesday warm-up)
+    //   lower_back 39->40
+    lower_back: 40, knees: 47, shoulders: 87, neck: 9, wrists: 42,
     hips: 34, ankles: 29, elbows: 28,
   }
   const drift: string[] = []
