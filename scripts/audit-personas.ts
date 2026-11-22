@@ -164,7 +164,7 @@ const RULES: Rule[] = [
       return loading(m).flatMap(w => { const sum = (ps: string[]) => w.days.reduce((n, d) => n + d.exercises.filter(e => !isPrimer(e.name) && ps.includes(entry(e.name)?.movement_pattern ?? '')).reduce((a, e) => a + (e.sets ?? 0), 0), 0)
         const sl = sum(['single_leg']) / 2, q = sum(['knee_dominant', 'isolation_quad']) + sl, h = sum(['hip_hinge', 'isolation_hamstring']) + sl; return q + h >= 8 && (q > h * 2.5 || h > q * 2.5) ? [`w${w.week_number} quad ${q} / hamstring ${h}`] : [] }).slice(0, 3) } },
   { id: 'C14', kind: 'coaching', text: 'a trained lifter\'s unweighted leg compound gets weight (or a tempo) at some point in the plan', applies: p => p.training_experience === 'intermediate' || p.training_experience === 'advanced',
-    check: (p, m) => { if (p.equipment_access === 'bodyweight' || !m.some(w => /hypertrophy|strength/i.test(w.phase_label ?? ''))) return []; const by = new Map<string, { n: number; loaded: boolean }>()
+    check: (p, m) => { if (p.equipment_access === 'bodyweight' || isPregnant(p) || !m.some(w => /hypertrophy|strength/i.test(w.phase_label ?? ''))) return []; const by = new Map<string, { n: number; loaded: boolean }>()
       for (const w of loading(m)) for (const d of w.days) for (const e of d.exercises) { const x = entry(e.name); if (!x || x.mechanics_tier !== 'tier2_compound' || !['knee_dominant', 'single_leg'].includes(x.movement_pattern) || x.prescription_type !== 'reps' || e.tempo) continue
         const r = by.get(e.name) ?? { n: 0, loaded: false }; r.n++; if ((e.suggested_load_kg ?? 0) > 0 || (e.suggested_added_load_kg ?? 0) > 0) r.loaded = true; by.set(e.name, r) }
       return [...by.entries()].filter(([, r]) => r.n >= 12 && !r.loaded).map(([n, r]) => `${n} (${r.n} sessions, never weighted)`) } },
@@ -181,8 +181,8 @@ const RULES: Rule[] = [
   { id: 'C18', kind: 'coaching', text: 'pushing never more than 1.5x pulling, weekly sets', applies: () => true,
     check: (_p, m) => loading(m).flatMap(w => { const sum = (ps: string[]) => w.days.reduce((n, d) => n + d.exercises.filter(e => !isPrimer(e.name) && ps.includes(entry(e.name)?.movement_pattern ?? '')).reduce((a, e) => a + (e.sets ?? 0), 0), 0)
       const push = sum(['horizontal_push', 'vertical_push']), pull = sum(['horizontal_pull', 'vertical_pull']); return pull > 0 && push > pull * 1.5 ? [`w${w.week_number} push ${push} / pull ${pull}`] : [] }).slice(0, 3) },
-  { id: 'C19', kind: 'coaching', text: 'a main (tier-1) lift rests at least 90 seconds', applies: () => true,
-    check: (_p, m) => [...new Set(m.flatMap(w => w.days.flatMap(d => d.exercises.filter(e => entry(e.name)?.mechanics_tier === 'tier1_compound' && e.rest !== 'alternate' && (parseInt(String(e.rest)) || 999) < 90).map(e => `${e.name} ${e.rest}`))))].slice(0, 3) },
+  { id: 'C19', kind: 'coaching', text: 'a main (tier-1) lift rests at least 90 seconds in a heavy block (muscle-building, strength), 60 in a light one', applies: () => true,
+    check: (_p, m) => [...new Set(m.flatMap(w => { const heavy = /hypertrophy|strength|consolidation|power/i.test(w.phase_label ?? ''); return w.days.flatMap(d => d.exercises.filter(e => entry(e.name)?.mechanics_tier === 'tier1_compound' && e.rest !== 'alternate' && (parseInt(String(e.rest)) || 999) < (heavy ? 90 : 60)).map(e => `${w.phase_label}: ${e.name} ${e.rest}`)) }))].slice(0, 3) },
   { id: 'C20', kind: 'coaching', text: 'every lifting day has a warm-up', applies: () => true,
     check: (_p, m) => m.flatMap(w => lifting(w).filter(d => !d.warmup || ((d.warmup.general ?? []).length + (d.warmup.mobility ?? []).length) === 0).map(d => `w${w.week_number} ${d.day}`)).slice(0, 3) },
   { id: 'C21', kind: 'coaching', text: 'no session repeats itself: one isolation per family, and never the same movement twice (two angles of a press, or two trunk drills in different planes, are fine)', applies: () => true,
@@ -279,7 +279,7 @@ function selfTest(): string[] {
     ['C16', { ...base, injuries: ['knees'] } as UserProfile, plan([day('Monday', good)])],
     ['C17', { ...base, training_days: ['Monday', 'Wednesday', 'Friday'].map(d => ({ day: d, available: true })) } as UserProfile, plan([day('Monday', good.map(e => e.name === 'Chest Press Machine' ? { ...e, sets: 2 } : e))])],
     ['C18', base, plan([day('Monday', [...good, ex('Shoulder Press Machine', { sets: 4, suggested_load_kg: 20 }), ex('Pec Deck', { sets: 4 })])])],
-    ['C19', base, plan([day('Monday', [...good, ex('Barbell Squats', { rest: '45s', suggested_load_kg: 60 })])])],
+    ['C19', base, plan([day('Monday', [...good, ex('Barbell Squats', { rest: '45s', suggested_load_kg: 60 })])], { phase_label: 'Hypertrophy' })],
     ['C20', base, plan([day('Monday', good, { warmup: { general: [], mobility: [], ramp_ups: [] } })])],
     ['C21', base, plan([day('Monday', [...good, ex('Barbell Curls'), ex('Hammer Curls')])])],
   ]

@@ -9842,6 +9842,21 @@ export function generateMesocycle(
           }
         }
         enforceWeeklyPatternBalance(days, { keepPulling: keepPullingThisPlan })
+        // FOUR CHEST SETS A WEEK AT LEAST (22 Nov 2026, the persona audit's C17; CSCS, mine): a split with one chest slot
+        // (the four-day hybrid's Upper Pull & Core forbids horizontal pressing) shipped two or three chest sets a week. Below
+        // four is under any maintenance dose. The week's own chest exercises take the sets, up to their role's ceiling,
+        // never a new exercise; the time it costs comes out of accessory work in the passes below.
+        {
+          const isChest = (e: ExerciseEntry) => e.mechanics_tier !== 'primer' && (e.movement_pattern === 'horizontal_push' || muscleGroupsOf(e).includes('chest' as MuscleGroup))
+          const chestRows = days.flatMap(d => d.exercises.filter(ex => { const x = findEntry(ex.name); return !!x && isChest(x) }))
+          let chestSets = chestRows.reduce((n, ex) => n + (ex.sets ?? 0), 0)
+          for (let guard = 0; chestRows.length > 0 && chestSets < 4 && guard < 8; guard++) {
+            const room = chestRows.filter(ex => { const x = findEntry(ex.name)!; const role = getVolumeRole(x); return !!role && ex.sets < getRoleSetCeiling(role, false) }).sort((a, b) => a.sets - b.sets)[0]
+            if (!room) break
+            room.sets += 1
+            chestSets += 1
+          }
+        }
         // A BEGINNER'S CAP, after the balance pass (so nothing adds a set back) and before the filler (so the time it
         // frees goes to optional mobility). capBeginnerSets says why.
         {
