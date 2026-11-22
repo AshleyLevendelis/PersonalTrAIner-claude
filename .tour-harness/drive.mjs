@@ -113,10 +113,12 @@ const clickTarget = key => evalJs(`(() => {
   el.click(); return blocked ? 'CLICK-BLOCKED' : 'ok'
 })()`)
 
+// THE TOUR'S LENGTH, read off its own step list (one tour since 22 Nov 2026), never typed in here.
+const TOTAL = (readFileSync(new URL('../src/lib/app-tour-steps.ts', import.meta.url), 'utf8').match(/^\s+key: '/gm) ?? []).length
 console.log('\n1. It starts, and stop 1 is the welcome card')
 let s = await snapshot()
 check('the tour is on screen', s.hasCard, s)
-check('counter reads 1 of 10', s.counter === 'Coach · 1 of 10', s.counter)
+check(`counter reads 1 of ${TOTAL}`, TOTAL > 10 && s.counter === `Coach · 1 of ${TOTAL}`, s.counter)
 check('CTA is "Show me around"', s.cta === 'Show me around', s.cta)
 check("copy is the welcome line", (s.body||'').includes("plan's built and ready"), s.body)
 
@@ -124,7 +126,7 @@ console.log('\n2. Info stops spotlight a real element')
 await clickCta(); await wait(500)
 s = await snapshot()
 check('stop 2 measured the hero, non-zero rect', !!s.spot && s.spot.w > 50 && s.spot.h > 50, s.spot)
-check('counter advanced to 2 of 10', s.counter === 'Coach · 2 of 10', s.counter)
+check(`counter advanced to 2 of ${TOTAL}`, s.counter === `Coach · 2 of ${TOTAL}`, s.counter)
 check('progress is persisted as it goes', s.stored === '1', s.stored)
 
 await clickCta(); await wait(500)
@@ -133,9 +135,10 @@ check('stop 3 moved the spotlight to the tiles', !!s.spot, s.spot)
 const tilesRect = s.spot
 
 console.log('\n3. A nav stop waits for the real tap, and blocks everything else')
-await clickCta(); await wait(600)
+await clickCta(); await wait(500)   // Progress
+await clickCta(); await wait(600)   // Nutrition (tap)
 s = await snapshot()
-check('stop 4 is in its TAP phase (pulsing, no Next)', s.pulsing && !/Next|Finish/.test(s.cta||''), { pulsing: s.pulsing, cta: s.cta })
+check('the Nutrition stop is in its TAP phase (pulsing, no Next)', s.pulsing && !/Next|Finish/.test(s.cta||''), { pulsing: s.pulsing, cta: s.cta })
 check('the hint names the tab to tap', (s.body||'').includes('Tap Nutrition'), s.body)
 check('it has NOT navigated on its own', s.hash === '#/tab/dashboard', s.hash)
 const blockedProbe = await evalJs(`(() => {
@@ -155,14 +158,16 @@ check('...and the tour moved to its info phase', !s.pulsing && /Next/.test(s.cta
 check('...spotlighting the rings', !!s.spot, s.spot)
 
 console.log('\n4. The set stop advances only when the row actually saves')
+await clickCta(); await wait(400)   // meal strip
 await clickCta(); await wait(400)   // meals
+await clickCta(); await wait(400)   // a meal, opened
 await clickCta(); await wait(600)   // exercise (tap)
 s = await snapshot()
-check('stop 6 waits for the Exercise tap', s.pulsing && (s.body||'').includes('Tap Exercise'), s.body)
+check('the Exercise stop waits for the Exercise tap', s.pulsing && (s.body||'').includes('Tap Exercise'), s.body)
 await clickTarget('navExercise'); await wait(700)
 await clickCta(); await wait(800)   // -> set stop
 s = await snapshot()
-check('stop 7 asks the user to log a set', s.pulsing && (s.body||'').includes('Tap the ✓'), s.body)
+check('the set stop asks the user to log a set', s.pulsing && (s.body||'').includes('Tap the ✓'), s.body)
 const beforeSet = s.counter
 await evalJs(`document.querySelector('[data-tour="setrow"]').click()`)
 await wait(700)
@@ -199,7 +204,7 @@ check('the app is fully interactive again after skip', reachable === 'reachable'
 await evalJs(`window.dispatchEvent(new CustomEvent('fitplan:replay-tour'))`)
 await wait(700)
 s = await snapshot()
-check('the Replay row brings it back, from the beginning', s.hasCard && /1 of 10/.test(s.counter||''), s.counter)
+check('the Replay row brings it back, from the beginning', s.hasCard && new RegExp(`\\b1 of ${TOTAL}\\b`).test(s.counter||''), s.counter)
 
 console.log('\n6. Finishing writes done and never comes back')
 // A replay re-arms from stop 1 with the set-stop exemption cleared, so from
@@ -211,7 +216,7 @@ console.log('\n6. Finishing writes done and never comes back')
 // that landed mid-tour and no longer describes anything.
 const seen = []
 const tabsSeen = new Set()
-for (let i = 0; i < 30; i++) {
+for (let i = 0; i < 60; i++) {
   s = await snapshot()
   if (!s.hasCard) break
   const tab = /#\/tab\/(\w+)/.exec(s.hash || '')?.[1]
@@ -256,12 +261,10 @@ const everySeen = seen.join(' || ')
 // live behind here", lowercase, since the 13 Sep rewrite.
 check('the walk visited every tab', ['dashboard', 'nutrition', 'exercise', 'tools'].every(t => tabsSeen.has(t)), [...tabsSeen])
 check('the walk passed the tools stop', /timers/i.test(everySeen), seen.slice(-3))
-check('the walk passed the settings stop', /behind the gear/i.test(everySeen), seen.slice(-3))
+check('the walk passed the settings stop', /the gear, opened/i.test(everySeen), seen.slice(-3))
 s = await snapshot()
-// THE SHORT TOUR NOW ENDS ON AN OFFER (his ruling 22 Nov 2026, "Short tour, then offer more"): "Show me everything"
-// or "Maybe later". This driver takes "Maybe later", the path that must end the tour for good; verify:tour-real takes
-// the other and walks the full tour.
-check('the last stop offers the full tour, or Maybe later', /Show me everything/.test(s.cta||'') && await evalJs(`!!document.querySelector('.tour-fade [data-tour-later]')`), s.cta)
+// ONE TOUR (his ruling 22 Nov 2026): the last stop is a plain Finish, never an offer of a second tour.
+check('the last stop offers Finish, and no second tour', /Finish/.test(s.cta||'') && !(await evalJs(`!!document.querySelector('.tour-fade [data-tour-later]')`)), s.cta)
 check('...and has no Skip', await evalJs(`(() => { const c = document.querySelector('.tour-fade'); return !c || ![...c.querySelectorAll('button')].some(b => b.textContent === 'Skip') })()`))
 check('...over no dim, handing off to the chat behind it', await evalJs(`(() => {
   const root = document.querySelector('[role="dialog"][aria-label="App tour"]')
@@ -269,7 +272,7 @@ check('...over no dim, handing off to the chat behind it', await evalJs(`(() => 
   const full = [...root.children].find(k => { const r = k.getBoundingClientRect(); return r.width >= window.innerWidth - 1 && r.height >= window.innerHeight - 1 })
   return !full || getComputedStyle(full).backgroundColor === 'rgba(0, 0, 0, 0)'
 })()`))
-await evalJs(`document.querySelector('.tour-fade [data-tour-later]').click()`); await wait(600)
+await evalJs(`[...document.querySelector('.tour-fade').querySelectorAll('button')].pop().click()`); await wait(600)
 s = await snapshot()
 check('the overlay is gone for good', !s.hasCard && !s.pill, { card: s.hasCard, pill: s.pill })
 check('storage records done', s.stored === 'done', s.stored)

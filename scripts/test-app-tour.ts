@@ -26,9 +26,10 @@ import { readFileSync, readdirSync, statSync } from 'fs'
 import { join, dirname, extname, sep } from 'path'
 import { existsSync as fileExists } from 'fs'
 import { fileURLToPath } from 'url'
-import { TOUR_STEPS, MORE_TOUR_STEPS, SET_STEP_KEY, MEALS_STEP_KEY, type TourStep } from '../src/lib/app-tour-steps'
+import { TOUR_STEPS, SET_STEP_KEY, MEALS_STEP_KEY, type TourStep } from '../src/lib/app-tour-steps'
+import { TOUR_OPENS, TOUR_ABOUT_TABS, TOUR_PRACTICE_STOPS } from '../src/lib/tour-stage'
 /** Both parts: the short tour and the full one it offers (his ruling 22 Nov 2026). Targets and copy are held for both. */
-const ALL_STEPS: TourStep[] = [...TOUR_STEPS, ...MORE_TOUR_STEPS]
+const ALL_STEPS: TourStep[] = TOUR_STEPS
 import { TABS } from '../src/lib/app-route'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -119,9 +120,9 @@ for (const { path, text } of SOURCE) {
   check(`components bind data-tour to an expression, so this rule has teeth (${boundFiles})`, boundFiles > 0, boundFiles)
 }
 
-/** Keys the tour actually points at: a stop's spotlight target and its tap target. */
+/** Keys the tour actually points at: a stop's spotlight target, its tap target, and the button a menu hangs off. */
 function keysOf(step: TourStep): string[] {
-  return [step.target, step.nav].filter((k): k is string => !!k)
+  return [step.target, step.nav, step.opener].filter((k): k is string => !!k)
 }
 const referenced = new Set(ALL_STEPS.flatMap(keysOf))
 
@@ -446,30 +447,47 @@ console.log('\n6. Skip actually skips')
   // characters. Nothing referenced the first. Editing it — the obvious one,
   // being first in the file — would have changed precisely nothing on screen
   // while reading as a fix. Deleted; this stops it coming back.
-  // TWO arrays since 22 Nov 2026 (the short tour and the full one), and both must be the tour's own: a third, or one
-  // the tour does not read, is the dead twin again.
+  // ONE array again since 22 Nov 2026 (his ruling, "one tour only"), and it is the one the tour reads.
   const stepArrays = (steps.match(/TourStep\[\] = \[/g) ?? []).length
   const tourSrc = readFileSync(join(ROOT, 'src/components/AppTour.tsx'), 'utf8')
-  check('there are exactly TWO step arrays, the short tour and the full one, and the tour reads both',
-    stepArrays === 2 && /\[\.\.\.TOUR_STEPS, \.\.\.MORE_TOUR_STEPS\]/.test(tourSrc), `${stepArrays} arrays`)
+  check('there is exactly ONE step array, and it is the one the tour reads',
+    stepArrays === 1 && /const STEPS = TOUR_STEPS\b/.test(tourSrc), `${stepArrays} arrays`)
 }
 
 // ---------------------------------------------------------------------------
-console.log('\n6b. The full tour is offered, never assumed (his ruling 22 Nov 2026, "Short tour, then offer more")')
+console.log('\n6b. ONE tour, and every stop shows what it describes (his ruling 22 Nov 2026)')
 // ---------------------------------------------------------------------------
+// Source checks: a screen READS the stop that opens its thing. That the thing is then on screen, in sight and not
+// under the card, on a training day, a rest day and in the whole app, is verify:tour-real's to show.
 {
-  const tourSrc = readFileSync(join(ROOT, 'src/components/AppTour.tsx'), 'utf8')
-  const menuSrc = readFileSync(join(ROOT, 'src/components/ProfileMenu.tsx'), 'utf8')
-  const coreLast = TOUR_STEPS[TOUR_STEPS.length - 1]
-  check('the short tour\'s last stop asks about the full tour', /full tour/i.test(coreLast.copy), coreLast.copy)
-  check('the full tour has stops to show, and exactly one last', MORE_TOUR_STEPS.length >= 6 && MORE_TOUR_STEPS.filter(s => s.last).length === 1 && MORE_TOUR_STEPS[MORE_TOUR_STEPS.length - 1].last === true, MORE_TOUR_STEPS.length)
-  check('no full-tour stop is gated (it asks nothing of him but Next)', MORE_TOUR_STEPS.every(s => !s.gate && !s.nav))
-  check('no key is shared between the two parts', new Set(ALL_STEPS.map(s => s.key)).size === ALL_STEPS.length)
-  check('the offer is a choice: "Show me everything" and "Maybe later" on the last short stop',
-    /offersMore \? 'Show me everything'/.test(tourSrc) && /offersMore && \([\s\S]{0,300}Maybe later/.test(tourSrc))
-  check('...and "Maybe later" ends the tour rather than starting the full one',
-    /offersMore && \([\s\S]{0,120}onClick=\{finish\}/.test(tourSrc))
-  check('the settings menu replays the full tour on its own', /onReplayTour\('more'\)/.test(menuSrc) && /The full tour/.test(menuSrc))
+  const strip = (f: string) => readFileSync(join(ROOT, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')
+  const tourSrc = strip('src/components/AppTour.tsx')
+  const menuSrc = strip('src/components/ProfileMenu.tsx')
+  const keys = new Set(TOUR_STEPS.map(s => s.key))
+  check('one tour: exactly one last stop, and it is the final one', TOUR_STEPS.filter(s => s.last).length === 1 && TOUR_STEPS[TOUR_STEPS.length - 1].last === true)
+  check('...no offer of a second tour is left in the tour', !/Show me everything|Maybe later|offersMore|MORE_TOUR/.test(tourSrc))
+  check('...and no "full tour" row in the settings menu', !/full tour/i.test(menuSrc) && !/onReplayTour\('more'\)/.test(menuSrc))
+  check('no key is shared between two stops', keys.size === TOUR_STEPS.length)
+  const opens = [...Object.values(TOUR_OPENS), ...Object.keys(TOUR_ABOUT_TABS)]
+  check('every stop a screen opens for is a real stop', opens.every(k => keys.has(k)), opens.filter(k => !keys.has(k)))
+  check('the About stops show all three tabs: How to, Muscles, History', JSON.stringify(Object.values(TOUR_ABOUT_TABS).sort()) === JSON.stringify(['history', 'howto', 'summary']))
+  const readers: [string, RegExp][] = [
+    ['src/components/Dashboard.tsx', /TOUR_OPENS\.progress\b/],
+    ['src/components/MealPlan.tsx', /TOUR_OPENS\.mealSheet\b/],
+    ['src/components/exercise/ExerciseRow.tsx', /TOUR_OPENS\.exerciseMenu\b/],
+    ['src/components/exercise/ExerciseRow.tsx', /TOUR_OPENS\.effort\b/],
+    ['src/components/exercise/WeekContextRow.tsx', /TOUR_OPENS\.dayMenu\b/],
+    ['src/components/exercise/TodayPanel.tsx', /TOUR_OPENS\.whatHappened\b/],
+    ['src/App.tsx', /TOUR_OPENS\.settingsMenu\b/],
+    ['src/App.tsx', /TOUR_OPENS\.profile\b/],
+    ['src/components/exercise/ExerciseTab.tsx', /TOUR_ABOUT_TABS\[/],
+  ]
+  for (const [file, re] of readers) check(`${file.split('/').pop()} opens its thing for its stop (${re.source.replace(/\\b/g, '')})`, re.test(strip(file)))
+  const exerciseStops = TOUR_STEPS.filter(s => s.tab === 'exercise').map(s => s.key)
+  check('every Exercise stop gets a session to show on a day with nothing to log (the practice day)',
+    exerciseStops.every(k => TOUR_PRACTICE_STOPS.has(k)) && TOUR_PRACTICE_STOPS.has(SET_STEP_KEY), exerciseStops.filter(k => !TOUR_PRACTICE_STOPS.has(k)))
+  check('...and the Exercise tab reads the practice stops to put it up', /TOUR_PRACTICE_STOPS\.has\(tourStage\)/.test(strip('src/components/exercise/TodayPanel.tsx')))
+  check('the tour says where it is, for every screen to read', /setTourStage\(running \? step\.key : null\)/.test(tourSrc))
 }
 
 // ---------------------------------------------------------------------------
@@ -537,8 +555,9 @@ console.log('\n7. The copy still describes the app it is pointing at')
 
   const gearHasAppearance = /<AppearanceSection/.test(prof)
   check('the gear carries Appearance (the fact the copy depends on)', gearHasAppearance)
-  check('...so the settings step mentions how the app looks',
-    !gearHasAppearance || /how the app looks|appearance|theme/i.test(copyOf('settings')), copyOf('settings'))
+  // Behind the gear is Profile, and the Profile stop (22 Nov 2026) is where the tour opens it and names what is there.
+  check('...so the gear or Profile stop mentions how the app looks',
+    !gearHasAppearance || /how the app looks|appearance|theme/i.test(`${copyOf('settings')} ${copyOf('profile')}`), copyOf('profile'))
 
   // The welcome step now promises a way back to the tour. Whichever step shows
   // the settings menu has to actually point at it, or that promise dead-ends.

@@ -77,3 +77,22 @@ export function trainAnywayOptions(input: {
     .filter(d => d.exercises.length > 0 && d.day !== input.todayName && !trained.has(d.day))
     .map(d => ({ day: d.day, label: d.focus ? `${d.day} · ${d.focus}` : d.day }))
 }
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+
+/**
+ * THE NEXT SESSION AFTER TODAY, by weekday (the app tour's practice day, 22 Nov 2026, tour-stage.ts): the first plan
+ * row with exercises after today, wrapping round the week; today itself only when nothing else trains. Null with no
+ * session in the plan at all.
+ */
+export function nextTrainingDayName(plan: WorkoutDay[], todayName: string): string | null {
+  const trains = (name: string) => plan.some(d => d.day === name && d.exercises.length > 0)
+  const at = WEEKDAYS.indexOf(todayName)
+  if (at >= 0) {
+    for (let k = 1; k <= 7; k++) {
+      const name = WEEKDAYS[(at + k) % 7]
+      if (trains(name)) return name
+    }
+  }
+  return plan.find(d => d.exercises.length > 0)?.day ?? null
+}

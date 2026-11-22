@@ -1,4 +1,5 @@
 import { FailedCardioNotice } from '@/components/exercise/FailedCardioNotice'
+import { TOUR_ABOUT_TABS, useTourExercise, useTourStage } from '@/lib/tour-stage'
 import { blockSwapEnd, blockSwapEndsOn } from '@/lib/block-swap-until'
 import { getAppNow, getLocalDateString } from '@/lib/dev-clock'
 import { useCallback, useState } from 'react'
@@ -158,6 +159,12 @@ export function ExerciseTab({
     { exerciseName: string; exerciseId?: string; tab: ExerciseDetailTab } | null
   >(null)
   const [sessionHistoryOpen, setSessionHistoryOpen] = useState(false)
+  // THE TOUR'S ABOUT STOPS OPEN THE SHEET (his request 22 Nov 2026: "show the about exercise tab, and everything in
+  // it"): the main lift's sheet, on the tab each stop describes (tour-stage.ts). A sheet he opened himself comes first.
+  const tourStage = useTourStage()
+  const tourExercise = useTourExercise()
+  const tourTab = tourStage ? TOUR_ABOUT_TABS[tourStage] : undefined
+  const detailShown = detailTarget ?? (tourTab && tourExercise ? { exerciseName: tourExercise, exerciseId: null, tab: tourTab } : null)
 
   const [plateCalcBar, setPlateCalcBar] = useState(20)
   const handleOpenPlateCalc = (weightKg: number, barKg = 20) => {
@@ -320,12 +327,12 @@ export function ExerciseTab({
         /></Suspense>
         {banSheet}
         <ExerciseDetailDialog
-          open={!!detailTarget}
+          open={!!detailShown}
           onOpenChange={open => { if (!open) setDetailTarget(null) }}
-          exerciseName={detailTarget?.exerciseName ?? null}
-          exerciseId={detailTarget?.exerciseId ?? null}
+          exerciseName={detailShown?.exerciseName ?? null}
+          exerciseId={detailShown?.exerciseId ?? null}
           profileId={profileId}
-          initialTab={detailTarget?.tab ?? 'summary'}
+          initialTab={detailShown?.tab ?? 'summary'}
         />
       </>
     )
@@ -405,12 +412,12 @@ export function ExerciseTab({
           that BOTH branches render it. Now that one dialog serves technique
           AND history, forgetting it here would take out both at once. */}
       <ExerciseDetailDialog
-        open={!!detailTarget}
+        open={!!detailShown}
         onOpenChange={open => { if (!open) setDetailTarget(null) }}
-        exerciseName={detailTarget?.exerciseName ?? null}
-        exerciseId={detailTarget?.exerciseId ?? null}
+        exerciseName={detailShown?.exerciseName ?? null}
+        exerciseId={detailShown?.exerciseId ?? null}
         profileId={profileId}
-        initialTab={detailTarget?.tab ?? 'summary'}
+        initialTab={detailShown?.tab ?? 'summary'}
       />
       <SessionHistoryDialog
         open={sessionHistoryOpen}

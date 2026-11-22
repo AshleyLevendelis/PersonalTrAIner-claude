@@ -807,6 +807,7 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 22 Nov 2026: 3262 -> 3287, the persona fixes (plan logic only). MEASURED 3262 through this gate on the
   // change. His 15 Sep ruling: 25 kB raw over today's number (3262 + 25).
   const TOTAL_BUDGET_KB = 3287
+  // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

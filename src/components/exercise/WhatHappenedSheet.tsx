@@ -375,7 +375,7 @@ export function WhatHappenedSheet({
 
   return (
     <Dialog open={!!target} onOpenChange={open => { if (!open) close() }}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto" data-testid="what-happened-sheet">
+      <DialogContent className="max-h-[85vh] overflow-y-auto" data-testid="what-happened-sheet" data-tour="whathappened">
         <DialogHeader>
           <DialogTitle>What happened {when}?</DialogTitle>
           <DialogDescription>{focus}{isToday ? '' : ` · ${date}`}</DialogDescription>

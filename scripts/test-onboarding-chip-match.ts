@@ -131,6 +131,19 @@ console.log('\n3. The coach\'s own phrasings (the prompt\'s examples and the rep
     ['How much time do you want to spend cooking?', 'cookingTime'],
     ['Snacks too, or meals only?', 'includeSnacks'],
     ["What's breakfast usually like for you?", 'breakfastStyle'],
+    // 22 Nov 2026, his setup: "it didn't offer buttons for all the relevant questions, such as full gym". The
+    // questions were reworded that morning ("Where will you be training?"), so the coach asks about the PLACE, and 10 of
+    // 59 likely phrasings came with no buttons. These are those ten, and one more found fixing them.
+    ["What's the main thing you want out of this, Ashley?", 'fitnessGoal'],
+    ['What are you hoping this plan does for you?', 'fitnessGoal'],
+    ['Have you done much training before?', 'trainingExperience'],
+    ['Are you training at a gym, at home, or a bit of both?', 'equipment'],
+    ['Where are you going to be doing your workouts?', 'equipment'],
+    ['Do you have a gym membership, or will you be training at home?', 'equipment'],
+    ['Gym, home, or a mix?', 'equipment'],
+    ['Where are you planning to train?', 'equipment'],
+    ["Anything a doctor's asked you to watch?", 'injuries'],
+    ['What sort of training do you enjoy most?', 'trainingStyle'],
   ]
   for (const [text, key] of CORPUS) {
     const got = fresh(text, [key])
@@ -153,6 +166,9 @@ console.log('\n4. A request for the WRONG question never puts chips under these'
     ['How many meals a day suits you?', 'dietaryPreferences'],
     ["What have you tried before, and what made it fall apart?", 'trainingStyle'],
     ['How do you like to train?', 'conditioningPreference'],
+    // The place words added 22 Nov must not pull the equipment card under a question about something else.
+    ['How long have you got at the gym on the days you train?', 'equipment'],
+    ['Have you done much training before?', 'equipment'],
   ]
   for (const [text, wrong] of MISMATCH) {
     const got = fresh(text, [wrong])

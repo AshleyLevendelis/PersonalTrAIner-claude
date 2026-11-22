@@ -1,4 +1,5 @@
 import type * as React from 'react'
+import { TOUR_OPENS, useTourStage } from '@/lib/tour-stage'
 import { useRef } from 'react'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, MoreHorizontal, History, CalendarDays } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -141,6 +142,7 @@ export function WeekContextRow({
   /** The week view's own header: its date range for the kicker, and the line under the title. */
   weekSummary?: { range: string; line: React.ReactNode }
 }) {
+  const tourStage = useTourStage()
   const phaseToken = isCalibrationWeek ? 'Calibration' : isDeload ? 'Deload week' : phaseLabel
   const boundary = weekBoundaryIndex(days)
   const boundaryNote = todayDate ? weekBoundaryNote(days, todayDate) : null
@@ -235,13 +237,14 @@ export function WeekContextRow({
           {/* "Add unplanned work" LEFT THIS MENU on 6 Sep 2026: it is the "I also
               did…" line at the foot of the list. Moved, not copied. */}
           {(onOpenSessionHistory || onOpenWhatHappened) && (
-            <DropdownMenu>
+            // Held open while the app tour's day-menu stop is on screen (22 Nov 2026, tour-stage.ts).
+            <DropdownMenu open={tourStage === TOUR_OPENS.dayMenu ? true : undefined}>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" size="icon" className="hit-slop-44 size-7 shrink-0 text-muted-foreground" aria-label="More options" data-tour="daymenu">
                   <MoreHorizontal className="size-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent align="end" data-tour={tourStage === TOUR_OPENS.dayMenu ? 'daymenu-open' : undefined}>
                 {/* THE DAY'S OWN VERBS — missed, moved, rested, swapped, did it
                     elsewhere (Ashley, 10 Sep 2026). */}
                 {onOpenWhatHappened && (

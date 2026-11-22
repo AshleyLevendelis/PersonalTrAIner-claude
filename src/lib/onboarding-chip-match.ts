@@ -64,12 +64,14 @@ type Asks = RegExp | readonly [RegExp, RegExp]
 
 const ASKS: Record<SlotKey, Asks> = {
   displayName: /call you|your name/i,
-  fitnessGoal: /\bgoals?\b|aiming (at|for)|what are you (actually |really |mainly )?after|what do you want (to get )?(out of|from)|what brings you|hoping to (get|achieve)|working towards/i,
-  trainingExperience: /how (much|long) (training|lifting)|background (with|in) (lifting|training|the gym|weights)|(lifting|training) background|describe your .{0,30}(lifting|training)|how long have you (been|trained|lifted)|\bexperience\b|new to (this|it|training|lifting|the gym)|(trained|lifted) before|where are you at with/i,
+  fitnessGoal: /\bgoals?\b|aiming (at|for)|what are you (actually |really |mainly )?after|what do you want (to get )?(out of|from)|what brings you|hoping to (get|achieve)|working towards|want (to get )?out of (this|it|all this)|hoping (this|the|your) plan/i,
+  trainingExperience: /how (much|long) (training|lifting)|background (with|in) (lifting|training|the gym|weights)|(lifting|training) background|describe your .{0,30}(lifting|training)|how long have you (been|trained|lifted)|\bexperience\b|new to (this|it|training|lifting|the gym)|(trained|lifted) before|done (much|any) (training|lifting)|(training|lifting) (before|in the past)|where are you at with/i,
   activityLevel: /how active|day[- ]to[- ]day|on your feet|\bdesk\b|outside (of )?(training|the gym|your sessions)/i,
-  equipment: /equipment|\bkit\b|where (do|will|would) you (train|be training|work ?out)|access to|gym or (at )?home|home or (the |a )?gym|what (have|do) you (got|have) to (train|work) with/i,
+  // 22 Nov 2026, his setup: the question became "Where will you be training?", so the coach asks about the PLACE
+  // ("at a gym, at home, or a bit of both?", "where are you planning to train?") and the buttons stopped coming.
+  equipment: /equipment|\bkit\b|where (do|will|would|are) you (be |going to |planning (to|on) )*(train|training|work ?out|do(ing)? (your )?(workouts?|training|sessions))|access to|gym or (at )?home|home or (the |a )?gym|\bgym\b.{0,40}\bhome\b|\bhome\b.{0,40}\bgym\b|what (have|do) you (got|have) to (train|work) with/i,
   startPreference: /where (do|would) you (want|like) to start|ease in|straight in|kick things off/i,
-  injuries: /injur|niggle|bother|\bache|\bpain|work(ing)? around|play(s|ing)? up|dodgy/i,
+  injuries: /injur|niggle|bother|\bache|\bpain|work(ing)? around|play(s|ing)? up|dodgy|doctor|\bGP\b|health condition/i,
   knowsWorkingLifts: /know (your|what you).{0,40}(numbers|lifts|weights|squat|bench|dead)|working (lifts|weights)|your numbers/i,
   knownSquatKg: /squat|working weights?/i,
   knownBenchKg: /bench/i,
@@ -81,7 +83,7 @@ const ASKS: Record<SlotKey, Asks> = {
     // want to spend cooking?" is cooking. Neither is session length.
     /cook|kitchen|\bmeals?\b|\beat|how long have you (been|trained|lifted)|been (training|lifting)|stuck with/i,
   ],
-  trainingStyle: /\bstyle\b|(like|prefer|want) to train|kind of training (do )?you (like|enjoy|prefer)|kind of training gets you going/i,
+  trainingStyle: /\bstyle\b|(like|prefer|want) to train|(kind|sort|type) of (training|workouts?|exercise) (do )?you (like|enjoy|prefer|love)|(kind|sort|type) of training gets you going/i,
   conditioningPreference: /cardio|conditioning/i,
   recoveryCapacity: /recover|sleep|stress|well rested/i,
   dislikedExercises: /exercises? (you|to)\b.{0,30}(never|avoid|skip|hate|rather)|exercises? you can'?t stand/i,

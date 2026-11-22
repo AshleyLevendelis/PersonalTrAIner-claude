@@ -175,13 +175,17 @@ check('...and the ranked list still has its own', /\{note\}/.test(swap))
   // session branch's dialog deleted, because the Full Program branch still
   // had one and only the session branch sets detailTarget. It counted the
   // right things in the wrong scope. Found by mutation, not by reading it.
+  // Since 22 Nov 2026 the dialog reads `detailShown`: what was tapped, else the tour's About stop (his "show the
+  // about exercise tab"). The property is unchanged: a tap still opens it, because detailShown is detailTarget first.
+  const DIALOG_READS_TARGET = /<ExerciseDetailDialog\s+open=\{!!(?:detailTarget|detailShown)\}/
+  check('the dialog\'s subject is what was tapped first, the tour only when nothing was',
+    /const detailShown = detailTarget \?\?/.test(tab))
   const split = tab.lastIndexOf('\n  return (')
   check('ExerciseTab still has two return branches (sanity check on this check)', split > 0, split)
   const branches = { program: tab.slice(0, split), session: tab.slice(split) }
   for (const [name, body] of Object.entries(branches)) {
     if (!/setDetailTarget\(\{/.test(body)) continue
-    check(`the ${name} branch sets detailTarget AND renders the dialog`,
-      /<ExerciseDetailDialog\s+open=\{!!detailTarget\}/.test(body))
+    check(`the ${name} branch sets detailTarget AND renders the dialog`, DIALOG_READS_TARGET.test(body))
   }
   // At least one branch must actually do it, or the loop above is vacuous.
   check('...and at least one branch was checked', /setDetailTarget\(\{/.test(tab))
@@ -189,8 +193,7 @@ check('...and the ranked list still has its own', /\{note\}/.test(swap))
   // this check: one missing dialog used to cost the technique panel on one
   // screen; it now costs technique AND history AND the muscle map together.
   for (const [name, body] of Object.entries(branches)) {
-    check(`the ${name} branch renders the one merged dialog`,
-      /<ExerciseDetailDialog\s+open=\{!!detailTarget\}/.test(body))
+    check(`the ${name} branch renders the one merged dialog`, DIALOG_READS_TARGET.test(body))
   }
   // The two menu items must land on DIFFERENT tabs, or merging them threw
   // away the thing that made them two items in the first place.
