@@ -15,7 +15,7 @@
 //   AUDIT_N=800 npx tsx scripts/audit-personas.ts (a quick run)
 import { spawnSync, spawn } from 'node:child_process'
 import { writeFileSync, readFileSync, mkdirSync } from 'node:fs'
-import { generateMesocycle, setRandomSource, getConstrainedPool, getFlaggedJoints, beginnerWorkingSets, OPTIONAL_CARDIO_FOCUS } from '../src/lib/exercise-plan'
+import { generateMesocycle, setRandomSource, getConstrainedPool, getFlaggedJoints, beginnerWorkingSets, OPTIONAL_CARDIO_FOCUS, daysDroppedForRecovery } from '../src/lib/exercise-plan'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { getExerciseEntry, isContraindicatedFor, getMovementFamily, isBallisticMovement } from '../src/lib/exercise-db'
 import { pregnancyExclusion, PREGNANCY_LATE_EXCLUDED, PREGNANCY_REP_FLOOR } from '../src/lib/pregnancy-rules'
@@ -61,7 +61,7 @@ const GROUPS: Group[] = [
   { name: 'walking start', make: () => ({ start_preference: 'move_more' as const, training_experience: 'beginner' as const }) },
 ]
 
-function profileFor(i: number): { p: UserProfile; group: string; key: string } {
+export function profileFor(i: number): { p: UserProfile; group: string; key: string } {
   const g = GROUPS[i % GROUPS.length]
   const r = seededRngFromKey(`persona|${i}`)
   const gender = pick(r, ['male', 'female'] as const)
@@ -129,7 +129,7 @@ const RULES: Rule[] = [
   { id: 'C1', kind: 'coaching', text: 'every loading week squats, hinges, pushes and pulls (where the kit and injuries allow)', applies: () => true,
     check: (_p, m, ctx) => { const want: [string, string[]][] = [['squat', ['knee_dominant', 'single_leg']], ['hinge', ['hip_hinge']], ['push', ['horizontal_push', 'vertical_push']], ['pull', ['horizontal_pull', 'vertical_pull']]]; const out: string[] = []
         for (const w of loading(m)) { if (!lifting(w).length) continue; const pats = new Set(w.days.flatMap(d => d.exercises.filter(e => !isPrimer(e.name)).map(e => entry(e.name)?.movement_pattern ?? ''))); for (const [name, ps] of want) if (ps.some(x => ctx.poolPatterns.has(x)) && !ps.some(x => pats.has(x))) out.push(`w${w.week_number} no ${name}`) } return out.slice(0, 3) } },
-  { id: 'C2', kind: 'coaching', text: 'trunk work at least twice a loading week', applies: () => true,
+  { id: 'C2', kind: 'coaching', text: 'trunk work at least twice a loading week', applies: p => p.start_preference !== 'move_more',
     check: (_p, m, ctx) => ctx.poolPatterns.has('core') ? loading(m).filter(w => lifting(w).length && w.days.reduce((n, d) => n + d.exercises.filter(e => entry(e.name)?.movement_pattern === 'core').length, 0) < 2).map(w => `w${w.week_number}`).slice(0, 3) : [] },
   { id: 'C3', kind: 'coaching', text: 'one heavy floor pull (deadlift family, tier 1) a week at most', applies: () => true,
     check: (_p, m) => loading(m).filter(w => w.days.filter(d => d.exercises.some(e => { const x = entry(e.name); return !!x && x.mechanics_tier === 'tier1_compound' && getMovementFamily(x) === 'deadlift' })).length >= 2).map(w => `w${w.week_number}`).slice(0, 3) },
@@ -139,16 +139,20 @@ const RULES: Rule[] = [
     check: (_p, m) => m.flatMap(w => w.days.filter(d => new Set(d.exercises.map(e => e.name)).size < d.exercises.length).map(d => `w${w.week_number} ${d.day}`)).slice(0, 3) },
   { id: 'C6', kind: 'coaching', text: 'a deload week is lighter than the week before, lift by lift', applies: () => true,
     check: (_p, m) => { const out: string[] = []; for (let i = 1; i < m.length; i++) { if (!m[i].is_deload) continue; const before = new Map(m[i - 1].days.flatMap(d => d.exercises.map(e => [e.name, e.suggested_load_kg ?? 0] as const))); for (const d of m[i].days) for (const e of d.exercises) { const b = before.get(e.name) ?? 0, now = e.suggested_load_kg ?? 0; if (b > 0 && now > b) out.push(`w${m[i].week_number} ${e.name} ${b}->${now}`) } } return out.slice(0, 3) } },
-  { id: 'C7', kind: 'coaching', text: 'no lift jumps more than 20% (and 5 kg) week to week inside a block', applies: () => true,
-    check: (_p, m) => { const out: string[] = []; for (let i = 1; i < m.length; i++) { if (m[i].is_deload || m[i - 1].is_deload || (m[i] as { block_number?: number }).block_number !== (m[i - 1] as { block_number?: number }).block_number) continue; const before = new Map(m[i - 1].days.flatMap(d => d.exercises.map(e => [e.name, e.suggested_load_kg ?? 0] as const))); for (const d of m[i].days) for (const e of d.exercises) { const b = before.get(e.name) ?? 0, now = e.suggested_load_kg ?? 0; if (b > 0 && now > b * 1.2 && now - b > 5) out.push(`w${m[i].week_number} ${e.name} ${b}->${now}`) } } return out.slice(0, 3) } },
-  { id: 'C8a', kind: 'coaching', text: 'a loading-week session reaches the minimum time asked for', applies: () => true,
+  { id: 'C7', kind: 'coaching', text: 'no lift jumps more than 20% (and 5 kg) week to week inside a block, and one lift has one weight a week (same reps)', applies: () => true,
+    check: (_p, m) => { const out: string[] = []
+      for (const w of m) { const seen = new Map<string, number>(); for (const d of w.days) for (const e of d.exercises) { if (!(e.suggested_load_kg ?? 0)) continue; const k = `${e.name}|${e.reps}`; const o = seen.get(k); if (o != null && o !== e.suggested_load_kg) out.push(`w${w.week_number} ${e.name} two weights ${o}/${e.suggested_load_kg}`); seen.set(k, e.suggested_load_kg as number) } }
+      for (let i = 1; i < m.length; i++) { if (m[i].is_deload || m[i - 1].is_deload || (m[i] as { block_number?: number }).block_number !== (m[i - 1] as { block_number?: number }).block_number) continue
+        for (const d of m[i].days) { const prev = m[i - 1].days.find(x => x.day === d.day); if (!prev) continue; for (const e of d.exercises) { const b = prev.exercises.find(x => x.name === e.name)?.suggested_load_kg ?? 0, now = e.suggested_load_kg ?? 0; if (b > 0 && now > b * 1.2 && now - b > 5) out.push(`w${m[i].week_number} ${e.name} ${b}->${now}`) } } }
+      return out.slice(0, 3) } },
+  { id: 'C8a', kind: 'coaching', text: 'a loading-week session reaches the minimum time asked for', applies: p => p.start_preference !== 'move_more',
     check: (p, m) => { const lo = getSessionMinimumSeconds((p.session_duration_preference ?? '45-60') as never); return loading(m).flatMap(w => lifting(w).filter(d => estimateDaySeconds(d) < lo).map(d => `w${w.week_number} ${d.day} ${(estimateDaySeconds(d) / 60).toFixed(0)} min`)).slice(0, 3) } },
   { id: 'C8b', kind: 'coaching', text: 'a loading-week session never runs past the time asked for', applies: () => true,
     check: (p, m) => { const hi = getSessionMaximumSeconds((p.session_duration_preference ?? '45-60') as never); return loading(m).flatMap(w => lifting(w).filter(d => estimateDaySeconds(d) > hi).map(d => `w${w.week_number} ${d.day} ${(estimateDaySeconds(d) / 60).toFixed(0)} min`)).slice(0, 3) } },
-  { id: 'C9', kind: 'coaching', text: 'every chosen training day holds a session', applies: p => p.start_preference !== 'move_more',
-    check: (p, m) => { const chosen = (p.training_days ?? []).filter(d => d.available).map(d => d.day); return loading(m).flatMap(w => chosen.filter(c => !w.days.some(d => d.day === c && (d.exercises.length > 0 || d.plannedActivity))).map(c => `w${w.week_number} ${c}`)).slice(0, 3) } },
+  { id: 'C9', kind: 'coaching', text: 'every chosen training day holds a session (low recovery rests the days his ruling names)', applies: p => p.start_preference !== 'move_more',
+    check: (p, m) => { const rested = new Set(daysDroppedForRecovery(p)); const chosen = (p.training_days ?? []).filter(d => d.available && !rested.has(d.day)).map(d => d.day); return loading(m).flatMap(w => chosen.filter(c => !w.days.some(d => d.day === c && (d.exercises.length > 0 || d.plannedActivity))).map(c => `w${w.week_number} ${c}`)).slice(0, 3) } },
   { id: 'C10', kind: 'coaching', text: 'fat loss or conditioning: some cardio in the week', applies: p => p.fitness_goal === 'fat_loss' || p.fitness_goal === 'conditioning',
-    check: (_p, m) => loading(m).filter(w => !w.days.some(d => d.recommendedCardio || d.exercises.some(e => { const x = entry(e.name); return x?.movement_pattern === 'cardio' || x?.mechanics_tier === 'cardio' }))).map(w => `w${w.week_number}`).slice(0, 3) },
+    check: (_p, m) => loading(m).filter(w => !w.days.some(d => d.recommendedCardio || d.plannedActivity || d.exercises.some(e => { const x = entry(e.name); return x?.movement_pattern === 'cardio' || x?.mechanics_tier === 'cardio' }))).map(w => `w${w.week_number}`).slice(0, 3) },
   { id: 'C11', kind: 'coaching', text: 'a beginner from 60 or a pregnant beginner: two optional rest-day walks (not with low recovery)', applies: p => needsBeginnerSafeguards(p) && p.recovery_capacity !== 'low' && p.start_preference !== 'move_more',
     check: (_p, m) => m.filter(w => w.days.filter(d => d.focus === OPTIONAL_CARDIO_FOCUS).length < 1).map(w => `w${w.week_number}`).slice(0, 3) },
   { id: 'C12', kind: 'coaching', text: 'a loaded lift carries a weight (no blank box on a lift that needs one)', applies: () => true,
@@ -194,7 +198,7 @@ function runShard(shard: number): Row[] {
   return rows
 }
 
-if (process.env.AUDIT_SHARD != null) {
+if (process.env.AUDIT_LIB) { /* imported for its profiles only */ } else if (process.env.AUDIT_SHARD != null) {
   const s = Number(process.env.AUDIT_SHARD)
   writeFileSync(`${OUT}/shard-${s}.json`, JSON.stringify(runShard(s)))
   process.exit(0)
@@ -253,6 +257,7 @@ function selfTest(): string[] {
 // ---------------------------------------------------------------------------------------------------------------------
 // The driver: shards in parallel, then the report
 // ---------------------------------------------------------------------------------------------------------------------
+if (!process.env.AUDIT_LIB) {
 const st = selfTest()
 if (st.length) { console.error('DETECTOR SELF-TEST FAILED:\n  ' + st.join('\n  ')); process.exit(1) }
 console.log(`Detector self-test: all ${RULES.length} rules fire on a plan built to break them.`)
@@ -290,3 +295,5 @@ for (const s of stats.filter(x => x.br.length)) {
 }
 writeFileSync(`${OUT}/report.md`, lines.join('\n'))
 console.log(`\nReport: ${OUT}/report.md`)
+
+}

@@ -6031,17 +6031,27 @@ function assignConditioningNotes(days: WorkoutDay[], profile: UserProfile, polic
   // its time (the constraint audit, 111 plans). With 45 minutes or more the brief post-lift block stays: without it a
   // three-day beginner on fat loss had no conditioning at all, which is the goal lost (CSCS: specificity), and a brief
   // easy block after lifting is standard practice when the time is there.
-  for (const day of noRestDayActivity && isTimeLimited ? [] : heavyDays) {
+  // ...BUT THE GOAL'S CONDITIONING IS NEVER LOST (22 Nov 2026, the persona audit's C10): with every training day a heavy
+  // one (a full-body split has no light day) the skip above left a beginner or low-recovery trainee on fat loss with no
+  // conditioning at all, every week, though the comment above promises it "inside the chosen sessions". So when nothing
+  // has been placed yet, ONE short session of its own on the day with the least lifting: it is not added to the lifting
+  // time (an independent session never is), so the time asked for and the beginner cap are untouched. CSCS, mine: about
+  // 20 easy minutes is the smallest aerobic dose that counts (ACSM), and its own session keeps it off the heavy work.
+  const careful = noRestDayActivity && isTimeLimited
+  const placedAlready = days.some(d => d.recommendedCardio && d.focus !== OPTIONAL_CARDIO_FOCUS)
+  const leastLifting = [...heavyDays].sort((a, b) => a.exercises.reduce((n, e) => n + (e.sets ?? 0), 0) - b.exercises.reduce((n, e) => n + (e.sets ?? 0), 0))
+  for (const day of careful ? (placedAlready ? [] : leastLifting.slice(0, 1)) : heavyDays) {
     if (remaining <= 0) break
     // 20-30 MINUTES HAS NO ROOM FOR A BLOCK AFTER LIFTING (15 Nov 2026, CSCS): ten minutes on top of a 25-minute
     // session is a 35-minute session. The goal's conditioning stays, as its own short session, as on a light day.
-    if (duration === '20-30') {
+    if (duration === '20-30' || careful) {
+      const block = careful ? { ...cardioForGoal.independentBlock, duration: Math.min(cardioForGoal.independentBlock.duration, 20) } : cardioForGoal.independentBlock
       day.recommendedCardio = {
-        ...cardioForGoal.independentBlock,
+        ...block,
         timing: 'independent_session',
         reason: 'Scheduled as a separate session to preserve your strict lifting window.',
       }
-      day.conditioning_note = `Independent session: ${cardioForGoal.independentBlock.activity} (${cardioForGoal.independentBlock.duration} min)`
+      day.conditioning_note = `Independent session: ${block.activity} (${block.duration} min)`
       remaining--
       continue
     }
@@ -6191,6 +6201,41 @@ export function getExerciseCompatibilityWarnings(
   return warnings
 }
 
+/**
+ * LOW RECOVERY TRAINS FOUR DAYS AT MOST, AND THE SCREEN SAYS WHICH WENT (his ruling 22 Nov 2026, "b", from three options
+ * after the persona audit found it silent: keep the days, light; drop to four and say why; or train every day chosen).
+ * Low recovery (poor sleep, high stress, a physical job, or a counted second sport taking a notch: effectiveRecoveryCapacity)
+ * cannot absorb five or more sessions a week; it had trimmed the LAST chosen day, so six chosen days became five and nobody
+ * was told. Now four, spread as evenly round the week as the chosen days allow (a coach separates them, never Monday to
+ * Thursday in a row), the earliest of equally spread choices. The days are the ones he chose; this only rests some.
+ * One function for the generator and the Exercise screen's line, so the two cannot disagree. Empty for everyone else.
+ */
+const LOW_RECOVERY_MAX_DAYS = 4
+const WEEK_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+export function daysDroppedForRecovery(profile: UserProfile): string[] {
+  if (effectiveRecoveryCapacity(profile) !== 'low') return []
+  let chosen = (profile.training_days || []).filter(d => d.available).map(d => d.day)
+  const lifting = liftingDaysFor(profile, isStartingOut(profile))
+  if (lifting) chosen = chosen.filter(d => lifting.has(d))
+  if (chosen.length <= LOW_RECOVERY_MAX_DAYS) return []
+  const idx = chosen.map(d => WEEK_ORDER.indexOf(d)).filter(x => x >= 0).sort((a, b) => a - b)
+  let best: number[] = []
+  let bestScore = -1
+  const choose = (start: number, picked: number[]) => {
+    if (picked.length === LOW_RECOVERY_MAX_DAYS) {
+      // The shortest gap between two sessions round the week, then the next shortest: the most even spread wins.
+      const gaps = picked.map((x, k) => ((picked[(k + 1) % picked.length] - x) + 7) % 7 || 7).sort((a, b) => a - b)
+      const score = gaps[0] * 10 + gaps[1]
+      if (score > bestScore) { bestScore = score; best = [...picked] }
+      return
+    }
+    for (let k = start; k < idx.length; k++) choose(k + 1, [...picked, idx[k]])
+  }
+  choose(0, [])
+  return idx.filter(x => !best.includes(x)).map(x => WEEK_ORDER[x])
+}
+
+
 export function generateExercisePlan(profile: UserProfile, exclusions: string[] = []): PlanResult {
   const trace: ConstraintTrace = {
     equipment_filtered: [],
@@ -6271,12 +6316,9 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
     const lifting = liftingDaysFor(profile, isStartingOut(profile))
     if (lifting) availableDays = availableDays.filter(d => lifting.has(d.day))
   }
-  if (effectiveRecoveryCapacity(profile) === 'low' && availableDays.length >= 5) {
-    // Low recovery capacity (poor sleep, high stress, a physically demanding
-    // job) can't safely absorb 5+ weekly sessions on top of everything else
-    // it's already carrying — trim the last selected day back to rest rather
-    // than silently overloading someone who told us recovery was the limiter.
-    availableDays = availableDays.slice(0, -1)
+  {
+    const dropped = new Set(daysDroppedForRecovery(profile))
+    if (dropped.size) availableDays = availableDays.filter(d => !dropped.has(d.day))
   }
   const splitPref = profile.workout_split_preference || 'ai_recommendation'
   const baseSplit = getSplitForDays(availableDays.length, profile.fitness_goal, splitPref, trainingStyle)
@@ -9659,6 +9701,14 @@ export function generateMesocycle(
         if (days[i].exercises.length > 0) days[i] = rebuildWarmup(days[i], profile, { balance: false })
       }
 
+      // A LIGHTER WEEK NEVER HOLDS MORE THAN THE CAP (22 Nov 2026, the persona audit's S9): the deload is built from the
+      // block's own exercises, before the loading weeks' cap had trimmed one away, so a pregnant beginner's deload Monday
+      // held 20 working sets where her loading Mondays held 18, and a bad back's 24. The same cap, in deload weeks too.
+      if (isDeload) {
+        const cap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS
+          : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : null
+        if (cap != null) for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0) days[i] = capBeginnerSets(days[i], blockRequired, cap)
+      }
       // Deload weeks are SUPPOSED to run short (half volume, by design) — a
       // filler there would fight the whole point of the recovery week, so
       // this only applies to loading weeks.
@@ -9784,6 +9834,18 @@ export function generateMesocycle(
       // priority order every other budget pass uses. Against the MAXIMUM, not
       // the midpoint, so it only bites a day that is genuinely over and never
       // undoes the duration filler's deliberate top-up.
+      // THE BALANCE HOLD (from 65) AND PELVIC FLOOR WORK (pregnant) ARE STAMPED BEFORE THE LAST TIME CHECK (22 Nov 2026,
+      // the persona audit's C8b). They used to go on after it "so they take nothing away", and so took the clock instead:
+      // about half of pregnant and older trainees' plans ran past the time they had asked for, up to ten minutes. The
+      // time they need now comes out of the day's accessory work like any other minute (his 18 Sep ruling: protect the
+      // rest, do less), never out of the main lift.
+      for (let i = 0; i < days.length; i++) days[i] = withBalanceWork(days[i], profile)
+      // Pelvic floor exercises on every training day while pregnant.
+      if (isPregnant(profile)) for (let i = 0; i < days.length; i++) {
+        const d = days[i]
+        if (!d.warmup || d.exercises.length === 0 || d.warmup.mobility.some(m => m.name === PELVIC_FLOOR_WARMUP_ITEM.name)) continue
+        days[i] = { ...d, warmup: { ...d.warmup, mobility: [...d.warmup.mobility, { ...PELVIC_FLOOR_WARMUP_ITEM }], total_seconds: d.warmup.total_seconds + PELVIC_FLOOR_WARMUP_ITEM.duration_seconds } }
+      }
       {
         const sessionMaxSeconds = getSessionMaximumSeconds(profile.session_duration_preference || '45-60')
         const flagged = getFlaggedJoints(profile.injuries ?? [])
@@ -9793,6 +9855,24 @@ export function generateMesocycle(
         }
       }
 
+      // ONE LIFT, ONE WEIGHT A WEEK (22 Nov 2026, the persona audit's C7): a lift on two days of a week at the same reps
+      // was priced twice, once from its own history and once from what its slot carried, and a 19-year-old's single-leg
+      // leg press read 30 kg a leg on Monday and 17.5 on Friday. A coach writes one number; the lower one, the side the
+      // first session of the week can always prove.
+      {
+        const byKey = new Map<string, { ex: Exercise; entry: ExerciseEntry }[]>()
+        for (const d of days) for (const ex of d.exercises) {
+          const entry = findEntry(ex.name)
+          if (!entry || ex.suggested_load_kg == null || entry.mechanics_tier === 'primer') continue
+          const k = `${ex.name}|${ex.reps}`
+          byKey.set(k, [...(byKey.get(k) ?? []), { ex, entry }])
+        }
+        for (const group of byKey.values()) {
+          if (group.length < 2) continue
+          const low = Math.min(...group.map(g => g.ex.suggested_load_kg as number))
+          for (const g of group) if ((g.ex.suggested_load_kg as number) > low) rebuildLoadForExercise(g.ex, g.entry, low)
+        }
+      }
       reconcilePerSetLoads(days)
       // Balance from 65, stamped after every budget pass so it takes nothing away (warmup.ts withBalanceWork).
       // FROM 28 WEEKS PREGNANT THE WEIGHTS HOLD (his "yes fix all four", 21 Nov 2026), so the plan she reads is the plan
@@ -9819,13 +9899,6 @@ export function generateMesocycle(
           // holds there, rather than climbing back toward its pre-28-week number.
           pregnancyHoldKgByLift.set(ex.name, weekLate && held != null ? Math.min(held, ex.suggested_load_kg) : ex.suggested_load_kg)
         }
-      }
-      for (let i = 0; i < days.length; i++) days[i] = withBalanceWork(days[i], profile)
-      // Pelvic floor exercises on every training day while pregnant, after every budget pass so they take nothing away.
-      if (isPregnant(profile)) for (let i = 0; i < days.length; i++) {
-        const d = days[i]
-        if (!d.warmup || d.exercises.length === 0 || d.warmup.mobility.some(m => m.name === PELVIC_FLOOR_WARMUP_ITEM.name)) continue
-        days[i] = { ...d, warmup: { ...d.warmup, mobility: [...d.warmup.mobility, { ...PELVIC_FLOOR_WARMUP_ITEM }], total_seconds: d.warmup.total_seconds + PELVIC_FLOOR_WARMUP_ITEM.duration_seconds } }
       }
       // THE RUNS, last of all, so no lifting pass sizes, trims or balances them (running.ts owns their minutes).
       if (runningGoalOf(profile) && !isStartingOut(profile)) {

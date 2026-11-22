@@ -79,7 +79,7 @@ import type { ReasonAnswer } from './EditReasonStep'
 // the tap and the sheet's cost line. The 13 kB is recorded in test:bundle.
 import { warmUpNowAfterWork, removeExerciseFromSession, moveExerciseInSession, addExerciseToSession, peerProgrammingFor, type SessionEditResult } from '@/lib/session-edit'
 import { describeEditImpact } from '@/lib/session-balance-cost'
-import { shortenOrFloor, mapTier } from '@/lib/exercise-plan'
+import { shortenOrFloor, mapTier, daysDroppedForRecovery } from '@/lib/exercise-plan'
 import { rebuildDayAroundMainLift } from '@/lib/session-rebuild'
 // The builder is FETCHED WHEN USED: only the marker and its sentence are drawn on
 // every render, and they live in an import-free module (test:bundle, 20 Oct 2026).
@@ -1123,6 +1123,9 @@ export function TodayPanel({
   // not from the profile.
   const volume = useMemo(() => (profile ? volumeNotice(profile) : null), [profile])
   const volumeNames = volume ? volume.names.join(' and ') : ''
+  // LOW RECOVERY RESTS SOME CHOSEN DAYS, AND SAYS WHICH (his ruling 22 Nov 2026, "b"). Read from the profile, so it is
+  // true of a plan made before the ruling too, through the generator's own function.
+  const recoveryRestDays = useMemo(() => (profile ? daysDroppedForRecovery(profile) : []), [profile])
   const [volumeBusy, setVolumeBusy] = useState(false)
   const [volumeError, setVolumeError] = useState<string | null>(null)
   /**
@@ -1838,6 +1841,11 @@ export function TodayPanel({
                   </div>
                 </div>
               )}
+            </InsightBanner>
+          )}
+          {recoveryRestDays.length > 0 && (
+            <InsightBanner tone="ai" data-testid="recovery-rest-days">
+              <span className="text-sm">{`Your recovery is set to low, so you train 4 days a week, not ${4 + recoveryRestDays.length}: ${recoveryRestDays.join(' and ')} ${recoveryRestDays.length > 1 ? 'are rest days' : 'is a rest day'}. Change recovery on Profile to train them all.`}</span>
             </InsightBanner>
           )}
           {volume && (
