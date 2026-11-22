@@ -2,6 +2,31 @@
 
 Newest first. One line each.
 
+- [x] **THE PREGNANCY AUDIT AND ITS THREE FIXES: his "do audit on a pregnant womans exercise plan", then "A, and build
+  fixes 2 and 3", 22 Nov 2026.** The audit (`docs/audits/pregnancy-plan-audit-2026-11-22.md`): 96 plans, the real
+  generator. His earlier rules all held (no jumping, nothing lying flat, no hard ab moves, 8+ reps, RPE 7 from 28 weeks,
+  pelvic floor in 6,144 of 6,144 warm-ups). Three gaps, now closed:
+  (1) **HER DUE DATE PAUSES THE PLAN, his ruling "A"** (over asking once whether the baby had come, and over leaving it):
+  every plan due in 10 weeks had trained on up to six weeks past it. From the due date the plan is paused (read off the
+  profile, so it holds at once, and saved as a real pause so the phone's workout reminders stop too); today, Home and
+  Profile say "Your due date is here. Congratulations, or good luck if your baby's still on the way ... Start again once
+  you've had your 6-8 week postnatal check with your GP"; the one button, "I've had my check, start again", takes the
+  Pregnant tick and the due date off and offers the rebuild without the pregnancy rules. No due date set: nothing changes
+  (nothing to read). "Train it anyway" stays on the day card, as in any pause.
+  (2) **NEAR-COPIES OF BANNED MOVES, from 28 weeks** (CSCS, mine): renegade row (a plank with a row), reverse Nordic
+  (kneeling lean-back), Cossack squat (a deep side lunge), standing one-leg calf raises, landmine and machine rotation.
+  Measured on the 96: 856, 240, 144, 32 and 164 late slot-weeks, now 0. Each goes to its own kind (a row to a seated or
+  braced row, a calf raise to two feet, a quad isolation to one), so the late weeks keep EXACTLY the same number of
+  exercises (24,560), rows (1,976) and calf work (976) as before. Woodchops stay (light, standing, the app's own core
+  replacement).
+  (3) **THE DOMING LINE**: before 28 weeks planks, push-ups and other face-down work stay (the guidance: while they feel
+  fine), and nothing said when they stop feeling fine. While Pregnant is ticked those moves carry "Stop if your stomach
+  domes down the middle" on the exercise row.
+  CHECKS: `test:pregnancy-rules` §12 (111 checks; 9 of 10 mutations caught, the 10th, the row's drawing, is a screen
+  fact), `verify:pregnancy-audit` (new, 8 checks; 4 of 5 caught, the 5th, the line for someone not pregnant, is caught by
+  §12 because the non-pregnant fixture day holds no plank). Frontend only. NOT done: the coach is not told the pause is
+  her due date (it sees a paused plan).
+
 - [x] **SETUP'S BUTTONS CAME BACK FOR "WHERE WILL YOU BE TRAINING?": his report 22 Nov 2026** ("the onboarding has
   regressed a bit. it didn't offer buttons for all the relevant questions, such as full gym, etc."). CAUSE, measured:
   the app shows a question's buttons only when it recognises the coach's sentence as asking that question (so buttons

@@ -2,6 +2,9 @@
 
 His request: "do audit on a pregnant womans exercise plan what exercises does she get?" Report only, nothing changed.
 
+## Outcome
+His ruling on 1: "A" (pause on the due date). All three fixed the same day; see BACKLOG.
+
 ## How
 Four plans printed in full (below), then 96 plans measured: full gym, home gym, dumbbells and bodyweight; three styles;
 beginner to advanced; due in 24 weeks or in 10. Real generator, seeded.

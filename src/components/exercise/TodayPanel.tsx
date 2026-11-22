@@ -1,4 +1,4 @@
-import { PAUSE_WORDS, isPausedOn, planPausedSince } from '@/lib/plan-pause'
+import { PAUSE_WORDS, isPausedOn, planPausedSince, pausedForDueDateOf } from '@/lib/plan-pause'
 import { noteForProfile, lateInPregnancy, PREGNANCY_HOLD_NOTE, isPregnant } from '@/lib/health-conditions'
 import { isStartingOut } from '@/lib/starting-out'
 import { useEffect, useMemo, useRef, useState, Suspense } from 'react'
@@ -1815,14 +1815,14 @@ export function TodayPanel({
           />
           {pausedToday && (
             <InsightBanner tone="ai" className="flex-col" data-testid="plan-paused-card">
-              <span className="text-sm font-semibold">{PAUSE_WORDS.card}</span>
-              <span className="text-sm">{PAUSE_WORDS.cardLine}</span>
+              <span className="text-sm font-semibold">{pausedForDueDateOf(profileId) ? PAUSE_WORDS.dueDateCard : PAUSE_WORDS.card}</span>
+              <span className="text-sm" data-testid="plan-paused-line">{pausedForDueDateOf(profileId) ? PAUSE_WORDS.dueDateLine : PAUSE_WORDS.cardLine}</span>
               {resumeError && <span className="mt-1 text-xs text-destructive" data-testid="plan-resume-error">{resumeError}</span>}
               {onPlanPause && (
                 <div className="mt-2">
                   <Button size="sm" disabled={resumeBusy} data-testid="plan-resume" className="min-h-11"
                     onClick={async () => { setResumeBusy(true); setResumeError(await onPlanPause(false)); setResumeBusy(false) }}>
-                    {resumeBusy ? 'Resuming…' : PAUSE_WORDS.resume}
+                    {resumeBusy ? 'Resuming…' : pausedForDueDateOf(profileId) ? PAUSE_WORDS.dueDateResume : PAUSE_WORDS.resume}
                   </Button>
                 </div>
               )}
