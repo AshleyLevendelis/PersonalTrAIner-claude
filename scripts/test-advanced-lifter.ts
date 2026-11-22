@@ -79,5 +79,14 @@ check('the push press appears in two separate blocks (the measured case)', new S
 const drops = pp.filter((x, i) => i > 0 && x.kg < pp[i - 1].kg)
 check('...and never drops from one loading week to the next it appears in', drops.length === 0, pp)
 
+console.log('\n6. A lift new to the plan takes its slot\'s number in its own units (total or per side)')
+{
+  const wk = his.find(w => w.days.some(d => d.exercises.some(e => e.name === 'Single-Arm Lat Pulldown')))
+  const kgOf = (n: string) => wk?.days.flatMap(d => d.exercises).find(e => e.name === n) as { suggested_load_kg?: number } | undefined
+  const one = kgOf('Single-Arm Lat Pulldown')?.suggested_load_kg, two = kgOf('Close-Grip Lat Pulldown')?.suggested_load_kg ?? kgOf('Lat Pulldown')?.suggested_load_kg
+  check('the measured case is there: a single-arm and a two-arm pulldown in one week', one != null && two != null, { week: wk?.week_number, one, two })
+  check('one arm carries at most 60% of the two-arm pulldown (it was 42.5kg an arm beside 62.5kg)', one != null && two != null && one <= two * 0.6, { one, two })
+}
+
 console.log(`\n${passed + failed} checks ran: ${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)

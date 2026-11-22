@@ -25,7 +25,12 @@ Newest first. One line each.
   takes away: nothing a healthy advanced lifter needs; (3) fundamentals: progressive overload now continuous across
   blocks for rotated-back lifts; (4) the unverified-ramp invariant is untouched (one step per loading week, own
   history); (5) in scope.
-  CHECKS: `test:advanced-lifter` (16 checks; 9 mutations, 9 caught); ten load gates re-run green (assumed-body,
+  AND (6), found reading the fixed plan: a lift NEW to the plan inherits its slot's last number, and that number was
+  read in the wrong units: a two-arm pulldown's 57.5kg TOTAL became a single-arm pulldown's PER-ARM start, 42.5kg an
+  arm beside a 62.5kg two-arm pulldown the same week. The slot's lift is now remembered and its number converted
+  (total <-> per side) first: 35kg an arm (56%, inside the bilateral deficit). The same conversion raised three lifts
+  that had been reading a per-hand number as a total (Smith shrug 42.5 -> 65kg beside 28kg-a-hand dumbbell shrugs).
+  CHECKS: `test:advanced-lifter` (18 checks; 12 mutations, 12 caught); ten load gates re-run green (assumed-body,
   ramp-arrived, per-side-load, block-swap-reach, load-display, calibration-search, frozen-weeks, load-ceilings,
   single-implement, replacement-prescription).
 

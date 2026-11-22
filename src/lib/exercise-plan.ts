@@ -12,7 +12,7 @@ import {
 } from './experience-config'
 import { isOlderBeginner, olderBeginnerExclusion, olderAdultExclusion, OLDER_BEGINNER_REASON_TEXT, OLDER_BEGINNER_FOUNDATIONS } from './older-beginner'
 import { buildWarmup, getWarmupReserveSeconds, rebuildWarmup, resolveLoadFields, withBalanceWork } from './warmup'
-import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
+import { prescribeLoad, prescribeAddedLoad, categorize, getLoadIncrementKg, isExternallyLoaded, getEquipmentFloorKg, loadingMode, roundToPlate, formatLoad, labelModeForEntry, isPerSideLoad, hasKnownWorkingWeight, unverifiedRampStepKg, isolationTargetBelowFloor, resizePerSetLoads, resolveBodyBasis, prescribeAssistance, assistanceGuidance, isImprovisedLoadImplement, IMPROVISED_IMPLEMENT_CEILING_KG, type KnownWorkingWeights, DELOAD_LOAD_FRACTION } from './load-prescription'
 import {
   getPhaseSequence, getPhaseConfig, rotateVariation, resolveTargetRpe,
   shiftReps, repFloorFor, adjustRest, dedupeAdjacentPhases, isRegressionFor, stepIntervalSeconds, stepHoldSeconds, getPhaseTempo, formatTempo, PHASE_CONFIGS, type PhaseConfig, type TrainingPhase,
@@ -8070,6 +8070,10 @@ export function generateMesocycle(
   // the next block's week 1 steps from the last real loading week, not the
   // deload number. See UNVERIFIED_RAMP_STEP_KG's doc comment.
   const lastUnverifiedLoadingWeekKg: (number | null)[][] = baseWeek.map(day => day.exercises.map(() => null))
+  // WHO held the slot (21 Nov 2026): a lift new to the plan inherits the slot's number, and a two-arm pulldown's 57.5kg
+  // TOTAL was read as a single-arm pulldown's PER-ARM figure (42.5kg an arm beside a 62.5kg two-arm pulldown). The
+  // number is converted between total and per side before a new lift takes it (lastUnverifiedInSlotPerSide).
+  const lastUnverifiedLoadingWeekSlotName: (string | null)[][] = baseWeek.map(day => day.exercises.map(() => null))
 
   // The same history keyed by EXERCISE NAME rather than by slot position.
   //
@@ -8829,7 +8833,15 @@ export function generateMesocycle(
               // 20kg lift had sat in its Friday slot the week before. The
               // per-lift value is already the lowest across that lift's
               // slots, so nothing it guards is lost.
-              const previous = previousForThisLift ?? previousInSlot
+              const slotName = lastUnverifiedLoadingWeekSlotName[dayIdx][exIdx]
+              const slotEntry = slotName ? getExerciseEntry(slotName) : undefined
+              // Total <-> per side: one arm or leg carries half of what both did.
+              const slotPerSide = slotEntry ? isPerSideLoad(slotEntry) : null
+              const thisPerSide = dbEntry ? isPerSideLoad(dbEntry) : null
+              const inheritedInSlot = previousInSlot == null || slotPerSide == null || thisPerSide == null || slotPerSide === thisPerSide
+                ? previousInSlot
+                : thisPerSide ? previousInSlot / 2 : previousInSlot * 2
+              const previous = previousForThisLift ?? inheritedInSlot
               if (previous != null) unverifiedPreviousLoadingWeekKg = previous
             }
             if (unverifiedPreviousLoadingWeekKg == null && baselineKg != null) {
@@ -9379,6 +9391,7 @@ export function generateMesocycle(
           const finalKg = preFloorKg[dayIdx][exIdx]
           if (finalKg == null) continue
           lastUnverifiedLoadingWeekKg[dayIdx][exIdx] = finalKg
+          lastUnverifiedLoadingWeekSlotName[dayIdx][exIdx] = dayExercises[exIdx].name
           const name = dayExercises[exIdx].name
           const already = thisWeekByLift.get(name)
           thisWeekByLift.set(name, already == null ? finalKg : Math.min(already, finalKg))
