@@ -7399,7 +7399,9 @@ function trimWeekRestForBudget(
         // number is a density rule about a barbell main lift, and a promoted
         // Air Squat is not one.
         const isRealMain = ex.tier === 'tier_1_primary'
-        const mainFloor = isRealMain && loadedMainLiftFloorSeconds && isExternallyLoaded(findEntry(ex.name) ?? ({} as ExerciseEntry))
+        const mainEntry = findEntry(ex.name)
+        // A tier-1 pull-up or dip counts as loaded here too (mainLiftRestFloor, 22 Nov 2026).
+        const mainFloor = isRealMain && loadedMainLiftFloorSeconds && !!mainEntry && (isExternallyLoaded(mainEntry) || !!mainEntry.accepts_added_load)
           ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, loadedMainLiftFloorSeconds)
           : MAIN_LIFT_REST_FLOOR_SECONDS
         // The same floor the generation-time pass uses. These two held
