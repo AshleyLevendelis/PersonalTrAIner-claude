@@ -385,6 +385,10 @@ export function AppTour({ profileId, armed, mealsPending = false, onRunningChang
             setState({ status: 'active', step: stepIndex, phase: 'info' })
             return
           }
+          // The row's answer can settle after the step first found it (its weight is worked out a moment later), so it
+          // is read again on every measure, and once the row has asked for a typed weight the step remembers it: the
+          // flag leaves the row when the set saves, and the after-log line is about the row that was tapped (21 Nov 2026).
+          if (step.key === SET_STEP_KEY && held.getAttribute('data-needs-weight') === 'true') setSetNeedsWeight(true)
           el = held
         } else {
           el = findTarget(key)
