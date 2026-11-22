@@ -1741,7 +1741,9 @@ menu" stays true when a copy is also left outside it.
   `test:app-tour` §6b, `verify:tour-real`, `verify:setup-why`
 - **A coach reply can be reported in the app: his "1, build it", 20 Nov 2026** (Google Play's rule on AI content): a
   flag beside each coach reply, four reasons and an optional note, kept in `coach_reply_reports` for him to review; a
-  report that does not save says so. `verify:report-reply`. Needs migration 20261120120000
+  report that does not save says so. `verify:report-reply`. Needs migration 20261120120000. **And each one is emailed to
+  him** (his request 22 Nov 2026): the database calls `report-email` after the save, which never waits on or blocks
+  it. `test:report-email`, `test:rls-local` §10. Needs migration 20261122120000, the `report-email` deploy and a Resend key
 - **The phone app (Capacitor), steps from the phone: his request 20 Nov 2026** ("Start on the App Store version with
   step counting"): Profile, "Steps from your phone", phone app only; steps only, read only; the phone's count never
   lowers a typed number. Android declares READ_STEPS alone: the plugin's 46 other health permissions are removed and

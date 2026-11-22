@@ -82,7 +82,7 @@ link(target)
 // hourly by pg_cron through pg_net, which carries no user's JWT, so the
 // gateway's JWT check would refuse every run. It checks its own shared secret
 // (REACH_OUT_SECRET) instead, and its only other door is the public push key.
-const NO_JWT = new Set(['coach-reach-out'])
+const NO_JWT = new Set(['coach-reach-out', 'report-email'])
 
 for (const f of functions) {
   const status = supabase(['functions', 'deploy', f, '--project-ref', target, ...(NO_JWT.has(f) ? ['--no-verify-jwt'] : [])])

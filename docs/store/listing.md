@@ -72,7 +72,8 @@ review notes.
   - Messages: Other in-app messages (the coach chat)
   - App activity: Other user-generated content (logged sets and meals, and a coach reply he chooses to report)
 - **AI-generated content** (Google's policy): the coach's replies are written by AI. Each one has a flag that reports
-  it from inside the app (reason + optional note, kept for review). Say so in the Play Console's content questions.
+  it from inside the app (reason + optional note, kept for review and emailed to the developer through Resend, an
+  email service acting on our behalf). Say so in the Play Console's content questions.
 
 ## Google: Health Connect declaration
 

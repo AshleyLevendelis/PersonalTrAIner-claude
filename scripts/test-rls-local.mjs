@@ -396,6 +396,19 @@ try {
     const col = psql(`SELECT count(*) FROM information_schema.columns WHERE table_name = 'coach_moment_facts' AND column_name = 'protein_target_g';`)
     check('...and the facts row has room for the protein target', col === '1', col)
   }
+
+  // THE EMAIL NEVER COSTS A REPORT (22 Nov 2026, "email me each new report"): the insert trigger posts the row to the
+  // report-email function, and here, with no pg_net, it must step aside. A report signed in as its owner still saves.
+  console.log('\n10. A reported reply saves whether or not it can be emailed')
+  {
+    const trig = psql(`SELECT count(*) FROM pg_trigger WHERE tgname = 'coach_reply_reports_email' AND NOT tgisinternal;`)
+    check('the email trigger is on the reports table', trig === '1', trig)
+    const err = expectRefused(`INSERT INTO coach_reply_reports (user_id, reply_text, reason, note) VALUES ('${PROFILE_A}', 'Max out today.', 'unsafe', 'sore back');`,
+      { role: 'authenticated', uid: UID_A })
+    check('...and a report signed in as its owner saves with it there (no pg_net here: the email steps aside)', err === null, err)
+    const n = psql(`SELECT count(*) FROM coach_reply_reports WHERE note = 'sore back';`, { role: 'authenticated', uid: UID_A })
+    check('...the row is there to read', n === '1', n)
+  }
 } finally {
   stop()
 }

@@ -2,6 +2,17 @@
 
 Newest first. One line each.
 
+- [x] **EACH REPORTED COACH REPLY IS EMAILED TO HIM: his request 22 Nov 2026, "email me each new report".** After a
+  report saves, the database posts it to a new function, `report-email`, which sends one plain email through Resend:
+  the reason in the words he tapped (unsafe ones flagged ⚠️ in the subject), the note, when, the account id and the
+  reply word for word. The report ALWAYS saves first: the trigger swallows any error with a warning (a separate
+  "is pg_net here?" guard was measured inert by a MISSED mutation and removed). Only the database can call it (a
+  shared secret; the deploy turns the sign-in check off for it, like coach-reach-out). Privacy page: "kept, and emailed
+  to us". CHECKS: `test:report-email` (18 checks; 8 mutations, 8 caught), `test:rls-local` §10 (the trigger is on, and
+  a report saves with it; 2 mutations, 1 caught, the other the inert guard). NEEDS HIM: a free Resend account (its
+  free plan sends to the account's own address), the migration `20261122120000_report_email_trigger`, the
+  `report-email` deploy, three function secrets and one Vault secret (the handover prompt). Never sent a real email.
+
 - [x] **SETUP WORDING AND A FULLER TOUR: his request 22 Nov 2026, built on his "build it" the same day.**
   ("make the wording more enthusiastic/friendly"; "the app does way more than the tour shows off"). Plan and his
   approval of every line: `docs/plans/setup-and-tour-refresh.md`.
