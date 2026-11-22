@@ -5731,8 +5731,12 @@ function enforceDayDurationBudget(
   // rehab introduced: "shorten the rehab set when a session would overrun."
   // Empty for an uninjured trainee, which makes every branch below inert.
   flaggedJoints: Set<string> = new Set(),
-  /** Trunk exercises on the week's OTHER days: the trunk work here may go only while two remain (the weekly floor). */
-  trunkElsewhere = 0,
+  /**
+   * Trunk exercises on the week's OTHER days: the trunk work here may go only while two remain (the weekly floor).
+   * Null (the default) means this is not the final backstop against the MAXIMUM, and no whole exercise ever goes:
+   * the base week sizes to the midpoint, and dropping exercises there starved the passes that fill a day afterwards.
+   */
+  trunkElsewhere: number | null = null,
 ): WorkoutDay {
   if (day.exercises.length === 0) return day
   // NO FILLER YIELD HERE, deliberately. One was written and measured: across
@@ -5788,9 +5792,8 @@ function enforceDayDurationBudget(
   // the rest, do less. So a whole exercise goes, the one the day can best spare: never the main lift, never warm-up or
   // rehab work, never the last exercise of its movement pattern on the day, never below three; an isolation lift first,
   // then an accessory, the later in the session first. Only a day already over the top of the range ever reaches here.
-  while (estimateDaySeconds({ ...day, exercises }) > budgetSeconds) {
-    const working = exercises.filter(ex => findEntry(ex.name)?.mechanics_tier !== 'primer')
-    if (working.length <= 3) break
+  while (trunkElsewhere != null && estimateDaySeconds({ ...day, exercises }) > budgetSeconds) {
+    if (trainingSlotCount(exercises.map(ex => findEntry(ex.name))) <= 3) break
     const spare = exercises
       .map((ex, i) => ({ ex, i, entry: findEntry(ex.name) }))
       .filter(t => t.entry && t.entry.mechanics_tier !== 'primer' && getVolumeRole(t.entry) !== 'main' && getVolumeRole(t.entry) !== 'conditioning'
@@ -5798,7 +5801,7 @@ function enforceDayDurationBudget(
       .sort((a, b) => (a.entry!.mechanics_tier === 'tier3_isolation' ? 0 : 1) - (b.entry!.mechanics_tier === 'tier3_isolation' ? 0 : 1) || b.i - a.i)
     // Last of all, the trunk exercise, only while the rest of the week keeps two: the day keeps its main lift, a push and
     // a pull (his "never below three"). Measured: without the weekly condition 13% of plans fell under two a week.
-    const trunk = spare.length || trunkElsewhere < 2 ? [] : exercises.map((ex, i) => ({ i, entry: findEntry(ex.name) })).filter(t => t.entry?.movement_pattern === 'core' && t.entry.mechanics_tier !== 'primer')
+    const trunk = spare.length || (trunkElsewhere ?? 0) < 2 ? [] : exercises.map((ex, i) => ({ i, entry: findEntry(ex.name) })).filter(t => t.entry?.movement_pattern === 'core' && t.entry.mechanics_tier !== 'primer')
     const drop = spare[0]?.i ?? trunk[trunk.length - 1]?.i
     if (drop == null) {
       // The week needs this trunk work (fewer than two elsewhere): it stays, down to one set, before the day runs over.

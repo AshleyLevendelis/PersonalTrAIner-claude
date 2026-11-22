@@ -244,8 +244,11 @@ console.log('\n1. The libraries are cached separately from the app')
   // this gate: 452 on 58437906, 453 on the change (paint 608 -> 609, app 1564 -> 1565, total 3203 -> 3204; those three
   // were not raised and have 3, 1 and 7 left, so the next addition to the app chunk must decide). His 15 Sep ruling,
   // "raise it with room to grow": 8 gz over today.
-  headroom('a deploy re-downloads', appGzip, 461, 'kB gzipped')
-  check(`a deploy re-downloads ${appGzip} kB gzipped, under 461`, appGzip < 461, appGzip)
+  // MOVED 22 Nov 2026: 461 -> 469. Crossed at 461 by the persona fixes (the age, pregnancy and low-recovery rules, the
+  // "Lift fast, lower slow" cue and the rest-day line, all plan logic). MEASURED 461 through this gate on the change.
+  // His 15 Sep ruling, "raise it with room to grow": 8 gz over today.
+  headroom('a deploy re-downloads', appGzip, 469, 'kB gzipped')
+  check(`a deploy re-downloads ${appGzip} kB gzipped, under 469`, appGzip < 469, appGzip)
 }
 
 console.log('\n2. Two screens no ordinary load needs are not in it')
@@ -489,7 +492,9 @@ console.log('\n3. Nothing has crept back up')
   // rating, the weight weeks and the chat's reply clean-up, none of which touched this line; MEASURED 1565 on efd27b02
   // (1 left) and 1566.4 with the put-back for a shortened or rebuilt day and the phone's Back on Profile (about 1 kB
   // between them). His 15 Sep ruling: 25 kB raw over today's number.
-  const APP_CHUNK_BUDGET_KB = 1591
+  // MOVED 22 Nov 2026: 1591 -> 1617. Spent by the persona fixes (older and pregnant beginners' rules, the low-recovery
+  // days, the audit's six fixes); MEASURED 1592 through this gate on the change. His 15 Sep ruling: 25 kB over today.
+  const APP_CHUNK_BUDGET_KB = 1617
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
