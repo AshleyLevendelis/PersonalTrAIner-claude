@@ -6780,6 +6780,8 @@ export const INJURED_JOINTS: Record<string, string[]> = {
 export const REHAB_ONLY: ReadonlySet<string> = new Set([
   'Eccentric Wrist Extension', 'Forearm Pronation-Supination', 'Isometric Grip Squeeze', 'Banded Wrist Flexion',
   'Banded Wrist Extension', 'Banded Ankle Dorsiflexion', 'Seated Short-Arc Quad Set', 'Banded Terminal Knee Extension',
+  // 21 Nov 2026: a patellar-tendon isometric, timed holds against a band; for a healthy knee a squat does its job better.
+  'Spanish Squat',
 ])
 
 /** True when a plan should hold this exercise only for someone whose injury it treats. */

@@ -446,6 +446,9 @@ const REGRESSION_VARIATIONS = new Set([
   // sideways step, which is the regression this list exists to refuse.
   'Knee Push-Ups',
   'Pull-Up Negatives',
+  // 21 Nov 2026 (his "yes fix all five"): the counterweight takes bodyweight OFF a dip, so past novice it is the
+  // easier version of the dip, offered to an advanced lifter beside a seated dip machine and real dips.
+  'Assisted Dip Machine',
 ])
 
 export function isRegressionFor(name: string, experience: TrainingExperience): boolean {

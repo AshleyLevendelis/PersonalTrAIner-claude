@@ -624,6 +624,19 @@ const EQUIPMENT_SETS: Record<EquipmentAccess, Set<string> | null> = {
 //     ranking a treadmill against a barbell is a category error.
 // Both cases fall through to a 0 contribution rather than a low one, so an
 // unranked entry is never quietly penalised for being unranked.
+/**
+ * TRUNK WORK KEEPS ITS OWN REPS (his "yes fix all five", 21 Nov 2026; CSCS, mine). A strength block takes a squat to
+ * 3-5; it took hanging leg raises and ab-wheel rollouts (catalogued tier 2) to 6-8 with it. The trunk's job in lifting
+ * is to hold position under fatigue, trained with 8 or more controlled reps (or a hold), never a heavy low-rep set.
+ */
+const CORE_REP_FLOOR = 8
+
+/**
+ * Rows whose weight is capped by the plank you hold, not the back you train (21 Nov 2026, CSCS): a renegade row is
+ * anti-rotation work first, so on a muscle-gain plan it ranks below a row the back can actually load.
+ */
+const STABILITY_LIMITED_FOR_HYPERTROPHY: ReadonlySet<string> = new Set(['Renegade Row'])
+
 /** Household furniture standing in for a machine or a bench (bestEquipmentRank). */
 const IMPROVISED_FURNITURE: ReadonlySet<string> = new Set(['Chair Leg Extension', 'Chair Dips', 'Table Row', 'Towel Row'])
 
@@ -2344,6 +2357,7 @@ export function scoreCandidate(candidate: ExerciseEntry, policy: GoalPolicy, raw
   if (policy.preferUnilateralCarry && isUnilateralCarryOrRotational(candidate)) goalFit += 2
   if (policy.goal === 'fat_loss' && candidate.mechanics_tier === 'tier2_compound') goalFit += 1
   if (policy.goal === 'conditioning' && candidate.joint_stress === 'low') goalFit += 1
+  if (policy.goal === 'hypertrophy' && STABILITY_LIMITED_FOR_HYPERTROPHY.has(candidate.name)) goalFit -= 3
   factors.goal_fit = goalFit
 
   // 3. Experience fit — was an absolute "sort after every non-regression"
@@ -7843,7 +7857,8 @@ export function repRangeForIncomingExercise(
   // price it from. A primer is neither a weightless working lift nor a loaded
   // one for this purpose.
   const isBodyweight = !isPrimer && (!isExternallyLoaded(entry) || category == null)
-  const repFloor = repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound, isPregnant(profile))
+  const repFloor = Math.max(repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound, isPregnant(profile)),
+    entry.movement_pattern === 'core' ? CORE_REP_FLOOR : 0)
 
   // A lift that has just arrived has no block baseline, so the two questions
   // generation asks of one are asked of its own starting estimate instead.
@@ -8574,7 +8589,8 @@ export function generateMesocycle(
           // bump re-derives its range from the same base, and if it clamped to
           // a lower floor than the week's own reps did, it could hand back
           // 4-6 as the "bumped" version of 6-8 and replace it.
-          const repFloor = repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound, isPregnant(profile))
+          const repFloor = Math.max(repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound, isPregnant(profile)),
+            dbEntry?.movement_pattern === 'core' ? CORE_REP_FLOOR : 0)
           const rampLoadCandidate = !isBodyweight && (policy.progressionEmphasis === 'load' || isCarry || isMainCompound)
 
           // A percentage-sized step snapped to the loading mode's real
