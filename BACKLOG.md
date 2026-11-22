@@ -2,6 +2,15 @@
 
 Newest first. One line each.
 
+- [x] **THE FOUR REMAINDERS (his "fix the four remaining issues, then merge", 22 Nov 2026)**, 6,000 plans: chest under
+  four sets 203 -> 65 (the whole-exercise drop took a second chest press before an overhead one; and "chest" had counted
+  dips and overhead presses, nine sets beside one bench); push over 1.5x pull 184 -> 48 (the time trims took the rows the
+  balance needed, a Monday's second row went as "spare", and a press-only day in a press-heavy week now takes the week's
+  own row, within the set cap); thigh imbalance 178 -> 56 (a set moves heavy side to light side, or the heavy side gives
+  one); over time 215 -> 250, 236 of them within 2 minutes, 13 within 5, 1 more (the balance work costs a minute on full
+  days; nothing was cut from rest or the main lift). A regression the audit caught the same hour: the added row took six
+  beginner days to 20 sets; now capped. Safety rules 0. NAMED: what is left is mostly 20-30 minute plans where every set is
+  at its floor and the time limit decides.
 - [x] **THE COACH'S WHOLE CHECKLIST, NOT ONE PERSON AT A TIME (his "why are we still finding issues? run tests on all
   cases", 22 Nov 2026)**. The six one-person reads each found what no audit rule asked; measure:personas gained nine
   coaching rules (C13-C21: thigh balance, weighted leg work for trained lifters, even weeks, rehab every week, sets per
