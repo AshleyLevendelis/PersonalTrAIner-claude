@@ -1756,7 +1756,9 @@ function mainLiftRestFloor(
   // 259 plans with a belt on it. "Bodyweight" kept it on the bodyweight floor, but a tier-1 pull-up is the day's main
   // lift and takes a belt from the muscle-building block: it is a heavy compound and recovers like one. The time it
   // costs comes out of accessory sets (his 18 Sep ruling: protect the rest, do less).
-  return loaded && (isExternallyLoaded(entry) || entry.accepts_added_load)
+  // ...except on a conditioning plan: his ruling there is that the session still conditions and only the part with a
+  // bar on your back rests long, bodyweight included in "everything else" (test:main-lift-rest).
+  return loaded && (isExternallyLoaded(entry) || (entry.accepts_added_load && policy?.goal !== 'conditioning'))
     ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, loaded)
     : MAIN_LIFT_REST_FLOOR_SECONDS
 }
@@ -7348,6 +7350,8 @@ function trimWeekRestForBudget(
    * degrades to the most common style rather than to a hardcoded number.
    */
   style: TrainingStyle = 'hybrid',
+  /** A tier-1 pull-up or dip rests like a loaded main lift (false on a conditioning plan: his short-rest ruling). */
+  bodyweightMainRestsLoaded = true,
 ): void {
   for (const day of days) {
     if (day.exercises.length === 0) continue
@@ -7401,7 +7405,7 @@ function trimWeekRestForBudget(
         const isRealMain = ex.tier === 'tier_1_primary'
         const mainEntry = findEntry(ex.name)
         // A tier-1 pull-up or dip counts as loaded here too (mainLiftRestFloor, 22 Nov 2026).
-        const mainFloor = isRealMain && loadedMainLiftFloorSeconds && !!mainEntry && (isExternallyLoaded(mainEntry) || !!mainEntry.accepts_added_load)
+        const mainFloor = isRealMain && loadedMainLiftFloorSeconds && !!mainEntry && (isExternallyLoaded(mainEntry) || (bodyweightMainRestsLoaded && !!mainEntry.accepts_added_load))
           ? Math.max(MAIN_LIFT_REST_FLOOR_SECONDS, loadedMainLiftFloorSeconds)
           : MAIN_LIFT_REST_FLOOR_SECONDS
         // The same floor the generation-time pass uses. These two held
@@ -9825,7 +9829,7 @@ export function generateMesocycle(
         // after this (rest already at floor) has nothing under-budget for
         // the filler to fill either, so the two never fight over the same
         // day.
-        trimWeekRestForBudget(days, totalBudgetSeconds, trimLog, policy.minLoadedMainLiftRestSeconds, profile.training_style || 'hybrid')
+        trimWeekRestForBudget(days, totalBudgetSeconds, trimLog, policy.minLoadedMainLiftRestSeconds, profile.training_style || 'hybrid', policy.goal !== 'conditioning')
         // Runs after rotation, periodization and duration-budget trimming
         // have all had their say — see enforceWeeklyPatternBalance's doc
         // comment. Deload weeks are exempt (like the duration filler below):
@@ -9853,7 +9857,7 @@ export function generateMesocycle(
           const chestRows = days.flatMap(d => d.exercises.filter(ex => { const x = findEntry(ex.name); return !!x && isChest(x) }))
           let chestSets = chestRows.reduce((n, ex) => n + (ex.sets ?? 0), 0)
           for (let guard = 0; chestRows.length > 0 && chestSets < 4 && guard < 8; guard++) {
-            const room = chestRows.filter(ex => { const x = findEntry(ex.name)!; const role = getVolumeRole(x); return !!role && ex.sets < getRoleSetCeiling(role, false) }).sort((a, b) => a.sets - b.sets)[0]
+            const room = chestRows.filter(ex => { const x = findEntry(ex.name)!; const role = getVolumeRole(x); return !!role && ex.sets < getRoleSetCeiling(role, true) }).sort((a, b) => a.sets - b.sets)[0]
             if (!room) break
             room.sets += 1
             chestSets += 1

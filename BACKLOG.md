@@ -2,6 +2,21 @@
 
 Newest first. One line each.
 
+- [x] **THE COACH'S WHOLE CHECKLIST, NOT ONE PERSON AT A TIME (his "why are we still finding issues? run tests on all
+  cases", 22 Nov 2026)**. The six one-person reads each found what no audit rule asked; measure:personas gained nine
+  coaching rules (C13-C21: thigh balance, weighted leg work for trained lifters, even weeks, rehab every week, sets per
+  muscle, push:pull, main-lift rest, warm-ups, no repeated movement), each self-tested, and four parallel tracers found
+  the causes. Fixed, 6,000 plans, first run of the new rules -> now: uneven weeks 2,674 -> 17 (the balance pass trimmed
+  and bumped in calendar order; now heaviest day gives, lightest takes; and the rule reads sets AND minutes, as a coach
+  does); main-lift rest 786 -> 0 (a tier-1 pull-up or dip rests like a loaded main lift, except on a conditioning plan,
+  HIS RULING there kept: short rest everywhere but the bar); repeated movements 594 -> 11 (28-week swaps checked names
+  not families; two isolations of a family on different kit; a Plank beside a rehab Dead Bug); rehab missing 195 -> 6
+  (rotation turned rehab into other drills; the time trim took it); warm-ups 33 -> 0 (walking start: the walk's first
+  three minutes); weighted legs 289 -> 16; low chest 374 -> 203 (a thin chest week keeps its chest work and takes sets to
+  four, up to the role's ceiling). And the 45-year-old's knee: quad drills first in the rehab slot, step work takes
+  dumbbells from block 2, an even week. NAMED, NOT FIXED: chest under 4 sets in 203 plans (a main bench at its ceiling
+  is trimmed back later; not traced), push over 1.5x pull in 185 (mostly two-day 20-30 plans: two press slots against one
+  pull at the two-set floor), thigh balance in 178, 215 sessions within 2-5 minutes over. Safety rules: 0 throughout.
 - [x] **THE PERSONA AUDIT, AND ITS SIX FIXES (his "do a full audit of all possible profiles" and "b, and fix all the
   others too", 22 Nov 2026)**. `measure:personas` (scripts/audit-personas.ts): 6,000 seeded plans across 23 groups
   (pregnancy at four stages, beginners 60-64 and 65-80, 65+ trained, each injury and pairs, the health conditions, the
