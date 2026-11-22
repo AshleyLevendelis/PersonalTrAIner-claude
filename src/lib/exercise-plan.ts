@@ -9758,12 +9758,21 @@ export function generateMesocycle(
       // the session screen holds her to (PREGNANCY_HOLD_NOTE), on the week as it ships: a lift is clamped to its last loading-week
       // number, and one first seen after 28 weeks holds at its first. After every load pass (coherence, the frozen-load
       // rep bump, the floors), so nothing later can raise it again. Weeks before 28 record each lift's number.
-      if (isPregnant(profile) && !isDeload) {
+      if (isPregnant(profile)) {
         const weekLate = lateInPregnancy(profile, getLocalDateString(new Date(getAppNow(profile.id).getTime() + (weekCounter - 1) * 7 * 86_400_000)))
         for (const d of days) for (const ex of d.exercises) {
           const entry = findEntry(ex.name)
           if (!entry || ex.suggested_load_kg == null || entry.mechanics_tier === 'primer') continue
           const held = pregnancyHoldKgByLift.get(ex.name)
+          // AN EASIER WEEK IS LIGHTER THAN THE HELD WEEK BEFORE IT: the deload's weight is worked out from the block's
+          // week 3 before this hold lowered it (a held 12.5kg lat pulldown came back as a 20kg deload). Clamped to the
+          // deload fraction of the held number, never above it, and never recorded as the new hold.
+          if (isDeload) {
+            if (weekLate && held != null && ex.suggested_load_kg > held * DELOAD_LOAD_FRACTION) {
+              rebuildLoadForExercise(ex, entry, Math.max(getEquipmentFloorKg(entry), held * DELOAD_LOAD_FRACTION))
+            }
+            continue
+          }
           if (weekLate && held != null && ex.suggested_load_kg > held) rebuildLoadForExercise(ex, entry, held)
           // From 28 weeks the reference only ever comes DOWN: a lift that came out lighter in a later block (higher reps)
           // holds there, rather than climbing back toward its pre-28-week number.

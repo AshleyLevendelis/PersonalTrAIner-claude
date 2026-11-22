@@ -227,7 +227,7 @@ console.log('\n11. His "yes fix all four", 21 Nov 2026: from 28 weeks, supported
     health_conditions: ['pregnancy'], due_date: dueIn(20), start_preference: 'train', equipment_access: 'full_gym',
     training_days: DAYS.map(d => ({ day: d, available: ['Monday', 'Wednesday', 'Friday'].includes(d) })), session_duration_preference: '45-60',
     training_style: 'hybrid', training_experience: 'intermediate', injuries: [], recovery_capacity: 'moderate', workout_split_preference: 'ai_recommendation', ...o } as unknown as UserProfile)
-  const lateLeaks: string[] = [], earlyHeld: number[] = [], rising: string[] = [], noPelvic: string[] = [], missing: string[] = []
+  const lateLeaks: string[] = [], earlyHeld: number[] = [], rising: string[] = [], noPelvic: string[] = [], missing: string[] = [], heavyDeload: string[] = []
   let earlyHolds = 0
   for (const eq of ['full_gym', 'home_gym', 'minimalist', 'bodyweight']) for (const style of ['hybrid', 'functional', 'bodybuilding']) for (const exp of ['novice', 'intermediate', 'advanced']) {
     setRandomSource(seededRngFromKey(`late${eq}${style}${exp}`))
@@ -243,6 +243,9 @@ console.log('\n11. His "yes fix all four", 21 Nov 2026: from 28 weeks, supported
           if (!late && w.week_number <= 4 && PREGNANCY_LATE_EXCLUDED.has(e.name)) earlyHolds++
           const kg = (e as { suggested_load_kg?: number }).suggested_load_kg
           if (late && !w.is_deload && kg != null) { const prev = lastKg.get(e.name); if (prev != null && kg > prev) rising.push(`${eq}/${style}/${exp} w${w.week_number} ${e.name} ${prev}->${kg}`) }
+          // An easier week is never heavier than the lift's last loading week (the hold lowered week 15; the deload had
+          // been worked out from the unheld number: a 12.5kg lat pulldown, then a 20kg deload).
+          if (w.is_deload && kg != null) { const prev = lastKg.get(e.name); if (prev != null && kg > prev) heavyDeload.push(`${eq}/${style}/${exp} w${w.week_number} ${e.name} ${prev}->${kg}`) }
           if (!w.is_deload && kg != null) lastKg.set(e.name, kg)
         }
       }
@@ -255,6 +258,7 @@ console.log('\n11. His "yes fix all four", 21 Nov 2026: from 28 weeks, supported
   check('no split-stance, single-leg or face-down exercise in any week from 28 weeks (36 plans)', lateLeaks.length === 0, lateLeaks.slice(0, 4))
   check('...while the first block (20-23 weeks) still holds some (the check binds, and early pregnancy is not narrowed)', earlyHolds > 0, earlyHolds)
   check('from 28 weeks no lift\'s weight rises between loading weeks', rising.length === 0, rising.slice(0, 4))
+  check('no easier week is heavier than the lift\'s last loading week', heavyDeload.length === 0, heavyDeload.slice(0, 4))
   check('pelvic floor exercises in the warm-up of every training day', noPelvic.length === 0, noPelvic.slice(0, 3))
   check('every loading week still trains the legs', missing.length === 0, missing.slice(0, 3))
   setRandomSource(seededRngFromKey('pf-none'))
