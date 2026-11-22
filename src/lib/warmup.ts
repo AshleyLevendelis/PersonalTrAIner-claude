@@ -8,7 +8,7 @@ import {
   type PrescribedLoadSource, type LoadPrescription,
 } from './load-prescription'
 import { getExerciseEntry, isContraindicatedFor, INJURED_JOINTS } from './exercise-db'
-import { pregnancyExclusion } from './pregnancy-rules'
+import { pregnancyExclusion, PELVIC_FLOOR_WARMUP_ITEM } from './pregnancy-rules'
 import { isPregnant } from './health-conditions'
 import { getDurationBudgetSeconds } from './session-duration'
 import type { UserProfile, WorkoutDay } from './types'
@@ -614,6 +614,9 @@ export interface WarmupContext {
 }
 
 export function buildWarmup(ctx: WarmupContext): WarmupBlock {
+  // PELVIC FLOOR WORK IS PART OF A PREGNANT TRAINEE'S WARM-UP (exercise-plan.ts stamps it), so its minutes come out of
+  // this budget like any other line (22 Nov 2026, persona audit C8b: added on top, it ran short sessions over time).
+  const budgetSeconds = ctx.budgetSeconds - (ctx.pregnant ? PELVIC_FLOOR_WARMUP_ITEM.duration_seconds : 0)
   const baseGeneral = generalWarmupFor(ctx.equipment, ctx.injuries, !!ctx.pregnant || !!ctx.lowImpact)
 
   // Every qualifying compound gets a ramp — the first, full scheme; every
@@ -633,8 +636,8 @@ export function buildWarmup(ctx: WarmupContext): WarmupBlock {
   // a bike is disproportionate when the whole session is 35 minutes; it's
   // even more clearly the thing to cut when two heavy compounds already need
   // 8 ramp sets between them.
-  const generalWouldOverrun = baseGeneral.duration_seconds + rampSeconds > ctx.budgetSeconds
-  const general: WarmupItem[] = (ctx.budgetSeconds < 480 || generalWouldOverrun)
+  const generalWouldOverrun = baseGeneral.duration_seconds + rampSeconds > budgetSeconds
+  const general: WarmupItem[] = (budgetSeconds < 480 || generalWouldOverrun)
     ? [{
         ...baseGeneral,
         prescription: baseGeneral.prescription.replace(/^\d+(-\d+)?\s*min/, '3 min'),
@@ -676,11 +679,11 @@ export function buildWarmup(ctx: WarmupContext): WarmupBlock {
   // already consumed the whole reserve (a real possibility now that a
   // squat+deadlift day can need 8 ramp sets), mobility is what yields —
   // ramps are never cut to make room for it.
-  const GUARANTEED_DRILLS = spent >= ctx.budgetSeconds ? 0 : 2
+  const GUARANTEED_DRILLS = spent >= budgetSeconds ? 0 : 2
 
   for (const drill of ranked) {
     const guaranteed = mobility.length < GUARANTEED_DRILLS
-    if (!guaranteed && spent + drill.duration_seconds > ctx.budgetSeconds) continue
+    if (!guaranteed && spent + drill.duration_seconds > budgetSeconds) continue
 
     // Skip a drill whose target joints are already covered, unless we have
     // barely any mobility work yet.

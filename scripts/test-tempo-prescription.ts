@@ -88,6 +88,7 @@ interface T {
   nonRepWithTempo: number
   deloadWithTempo: number
   addedLoadWithTempo: string[]
+  legBeltlessWithTempo: number
   phaseMismatch: string[]
   blockInconsistent: string[]
   unparseable: string[]
@@ -95,7 +96,7 @@ interface T {
 const t: T = {
   working: 0, tempoed: 0, loadedWithTempo: 0, cappedBackpackWithTempo: 0, cappedBackpackNoTempo: 0, underCapWithTempo: [],
   primerWithTempo: 0, nonRepWithTempo: 0,
-  deloadWithTempo: 0, addedLoadWithTempo: [], phaseMismatch: [], blockInconsistent: [], unparseable: [],
+  deloadWithTempo: 0, addedLoadWithTempo: [], legBeltlessWithTempo: 0, phaseMismatch: [], blockInconsistent: [], unparseable: [],
 }
 const byEquip = new Map<string, { working: number; tempoed: number }>()
 
@@ -143,7 +144,10 @@ for (const equipment_access of EQUIP) {
         const entry = getExerciseEntry(ex.name)
         if (entry) {
           if (entry.prescription_type !== 'reps') t.nonRepWithTempo++
-          if (entry.accepts_added_load) t.addedLoadWithTempo.push(`${equipment_access} ${ex.name}`)
+          // A step-up or step-down takes dumbbells from the muscle-building block, not a belt: before that block tempo
+          // is its lever (22 Nov 2026). Only the belt lifts (pull-up, chin-up, dip) are held to "no tempo".
+          if (entry.accepts_added_load && ['single_leg', 'knee_dominant'].includes(entry.movement_pattern)) t.legBeltlessWithTempo++
+          else if (entry.accepts_added_load) t.addedLoadWithTempo.push(`${equipment_access} ${ex.name}`)
         }
         if (!/^\d+(\s*-\s*\d+)?$/.test(String(ex.reps).trim())) t.nonRepWithTempo++
 
@@ -184,6 +188,7 @@ console.log('\n2. It never reaches a lift that could take real weight')
   // close it.
   check(`no tempo on a pull-up, chin-up or dip (${t.addedLoadWithTempo.length})`,
     t.addedLoadWithTempo.length === 0, t.addedLoadWithTempo.slice(0, 4).join(', '))
+  check(`...while a bodyweight step-up or step-down still gets its tempo (${t.legBeltlessWithTempo})`, t.legBeltlessWithTempo > 0, String(t.legBeltlessWithTempo))
   check(`no tempo on a lift that already shows a weight (${t.loadedWithTempo})`, t.loadedWithTempo === 0, String(t.loadedWithTempo))
   // ...EXCEPT a backpack with nothing left to add, which is the point of this
   // round. MEASURED before it existed: Backpack Row was 91 of 217 repeated

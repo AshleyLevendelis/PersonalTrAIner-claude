@@ -244,9 +244,9 @@ console.log('\n1. The libraries are cached separately from the app')
   // this gate: 452 on 58437906, 453 on the change (paint 608 -> 609, app 1564 -> 1565, total 3203 -> 3204; those three
   // were not raised and have 3, 1 and 7 left, so the next addition to the app chunk must decide). His 15 Sep ruling,
   // "raise it with room to grow": 8 gz over today.
-  // MOVED 22 Nov 2026: 461 -> 469. Crossed at 461 when his tour and setup wording met main's plan rules (PR #40: the
-  // advanced-lifter, pregnancy and bad-back passes) in one tree. MEASURED 461 through this gate on the merge. His
-  // 15 Sep ruling, "raise it with room to grow": 8 gz over today.
+  // MOVED 22 Nov 2026: 461 -> 469. Crossed at 461 by the persona fixes (the age, pregnancy and low-recovery rules, the
+  // "Lift fast, lower slow" cue and the rest-day line, all plan logic). MEASURED 461 through this gate on the change.
+  // His 15 Sep ruling, "raise it with room to grow": 8 gz over today.
   headroom('a deploy re-downloads', appGzip, 469, 'kB gzipped')
   check(`a deploy re-downloads ${appGzip} kB gzipped, under 469`, appGzip < 469, appGzip)
 }
@@ -353,9 +353,12 @@ console.log('\n2b. The coach is not on the path to first paint')
   // its row). Measured on a clean worktree of main that day: 611 with 1 kB printed as left; this change adds 580 bytes
   // gzipped to the first chunk after the phone-only code was moved out of it (the plugin, the sync and the Profile
   // sheet all load only inside the phone app). 620 is 8 kB over today's 612, the margin every move here has used.
-  headroom('first paint fetches', firstLoadGzip, 620, 'kB gzipped')
+  // MOVED 22 Nov 2026: 620 -> 628. Reached at 620 by the persona fixes (plan rules for older, pregnant and low-recovery
+  // trainees, the block's exercises held, the week-balance passes), all in the first chunk because the plan is built
+  // there. MEASURED 620 through this gate on the change. 628 is 8 kB over today, the margin every move here has used.
+  headroom('first paint fetches', firstLoadGzip, 628, 'kB gzipped')
   check(`first paint fetches ${firstLoadGzip} kB gzipped, was 483 before the coach came out`,
-    firstLoadGzip < 620, { firstLoadGzip, files: firstLoad.map(c => c.name) })
+    firstLoadGzip < 628, { firstLoadGzip, files: firstLoad.map(c => c.name) })
   check('...and neither the coach nor the markdown renderer is among those files',
     !firstLoad.some(c => c.name.startsWith('ChatAssistant') || c.name.startsWith('vendor-markdown')),
     firstLoad.map(c => c.name))
@@ -492,8 +495,9 @@ console.log('\n3. Nothing has crept back up')
   // rating, the weight weeks and the chat's reply clean-up, none of which touched this line; MEASURED 1565 on efd27b02
   // (1 left) and 1566.4 with the put-back for a shortened or rebuilt day and the phone's Back on Profile (about 1 kB
   // between them). His 15 Sep ruling: 25 kB raw over today's number.
-  // MOVED 22 Nov 2026: 1591 -> 1615, the same merge: MEASURED 1590 (1 kB left). His 15 Sep ruling: 25 kB raw over today.
-  const APP_CHUNK_BUDGET_KB = 1615
+  // MOVED 22 Nov 2026: 1591 -> 1617. Spent by the persona fixes (older and pregnant beginners' rules, the low-recovery
+  // days, the audit's six fixes); MEASURED 1592 through this gate on the change. His 15 Sep ruling: 25 kB over today.
+  const APP_CHUNK_BUDGET_KB = 1617
   const app = find('index-')
   headroom('the app chunk', app ? kb(app.raw) : 0, APP_CHUNK_BUDGET_KB, 'kB raw')
   check(`the app chunk is ${app ? kb(app.raw) : '?'} kB, under the ${APP_CHUNK_BUDGET_KB} kB budget`,
@@ -800,10 +804,10 @@ console.log('\n3. Nothing has crept back up')
   // MOVED 20 Nov 2026: 3235 -> 3262, the countdown timer, the chat header trim and "Report this reply" (Google Play's
   // rule on AI replies). MEASURED 3237 through this gate on the change, 2 kB over the line. The other three budgets
   // did not move. His 15 Sep ruling: 25 kB raw over today's number (3237 + 25).
-  // MOVED 22 Nov 2026: 3262 -> 3290, swipe-to-reply in the chat and the one tour whose stops open what they describe
-  // (his "1, build it" and "one tour only"). MEASURED 3265 through this gate on the change, 3 kB over the line. The
-  // other three budgets did not move. His 15 Sep ruling: 25 kB raw over today's number (3265 + 25).
-  const TOTAL_BUDGET_KB = 3290
+  // MOVED 22 Nov 2026: 3262 -> 3287, the persona fixes (plan logic only). MEASURED 3262 through this gate on the
+  // change. His 15 Sep ruling: 25 kB raw over today's number (3262 + 25).
+  const TOTAL_BUDGET_KB = 3287
+  // 22 Nov 2026, the tour and swipe-to-reply merged on top: MEASURED 3278, under the line, so it did not move.
   const total = chunks.reduce((s, c) => s + c.raw, 0)
   headroom('everything together', kb(total), TOTAL_BUDGET_KB, 'kB raw')
   check(`everything together is ${kb(total)} kB, under the ${TOTAL_BUDGET_KB.toLocaleString()} kB budget`, total < TOTAL_BUDGET_KB * 1024, kb(total))

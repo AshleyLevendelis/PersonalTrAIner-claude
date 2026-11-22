@@ -79,15 +79,20 @@ export const PREGNANCY_LATE_EXCLUDED: ReadonlySet<string> = new Set([
 ])
 
 /** What takes a late-excluded exercise's place, first one the person's pool allows. */
-export const PREGNANCY_LATE_REPLACEMENTS: Readonly<Record<'legs' | 'push' | 'core', readonly string[]>> = {
+export const PREGNANCY_LATE_REPLACEMENTS: Readonly<Record<'legs' | 'hinge' | 'push' | 'core', readonly string[]>> = {
   legs: ['Single-Leg Leg Press', 'Leg Press', 'Low Box Step-Up', 'Goblet Squats', 'Box Squat (Bodyweight)', 'Leg Extensions'],
+  // A HINGE STAYS A HINGE (22 Nov 2026, the persona audit's C1): a single-leg RDL went to the legs list, all squats, so from
+  // 28 weeks a hinge day became a second squat day and 114 of the audit's pregnant plans had weeks with no hinge at all.
+  // CSCS, mine: both feet down, upright, nothing swung (a swing is ballistic, kept out since 15 Nov).
+  hinge: ['Romanian Deadlifts', 'Kettlebell Deadlift', 'Smith Machine Romanian Deadlift', 'Cable Pull-Through', 'Bodyweight Good Morning', 'Bodyweight Hip Hinge to Wall'],
   push: ['Incline Push-Ups', 'Chest Press Machine', 'Incline Dumbbell Press', 'Incline Machine Press'],
   core: ['Side Plank', 'Bird Dog', 'Pallof Press', 'Cable Woodchops', 'Dumbbell Woodchop'],
 }
 
-export function lateReplacementKind(name: string, pattern: string): 'legs' | 'push' | 'core' {
+export function lateReplacementKind(name: string, pattern: string): 'legs' | 'hinge' | 'push' | 'core' {
   if (pattern === 'core' || /plank|mountain/i.test(name)) return 'core'
   if (/push-up/i.test(name)) return 'push'
+  if (pattern === 'hip_hinge') return 'hinge'
   return 'legs'
 }
 

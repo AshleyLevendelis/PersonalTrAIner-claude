@@ -62,6 +62,8 @@ const HOME_STRENGTH_REST = '45s'
 const HOME_STRENGTH_DAYS = 2
 /** The walk on a strength day is shortened to fit the session length he chose, never below this. */
 export const SHORTEST_WALK_ON_STRENGTH_DAY = 15
+/** The first minutes of the strength day's walk, taken before the circuit as its warm-up. */
+const PATHWAY_WARMUP_MINUTES = 3
 
 /**
  * One move per pattern, in session order: squat, push, pull, hinge. `instead`
@@ -247,7 +249,13 @@ export function applyPathwayWeek(
           focus: PATHWAY_FOCUS,
           exercises: circuit.exercises.map(e => ({ ...e })),
           is_scheduled: true,
-          recommendedCardio: walkAsCardio(walk, minutes, minutes < walk.duration),
+          // THE WALK'S FIRST MINUTES ARE THE WARM-UP (22 Nov 2026, the persona audit's C20; CSCS, mine): these home-strength
+          // days had none. A full warm-up (about seven minutes) ran 112 of 308 such days over their time; for unloaded
+          // work at an easy effort, a few minutes of easy walking before the strength moves is all a starter needs, and it
+          // is walking he was doing anyway. So the walk starts before the circuit and the rest of it comes after: the same
+          // minutes of walking, never more time.
+          warmup: { general: [{ name: 'Easy walk', prescription: `${PATHWAY_WARMUP_MINUTES} min at an easy pace, the start of today's walk`, purpose: 'Warm up before the strength moves; finish the walk after them', duration_seconds: PATHWAY_WARMUP_MINUTES * 60 }], mobility: [], ramp_ups: [], total_seconds: PATHWAY_WARMUP_MINUTES * 60, coach_note: '' },
+          recommendedCardio: walkAsCardio(walk, minutes - PATHWAY_WARMUP_MINUTES, minutes < walk.duration),
           ...(circuit.leftOut.length > 0
             ? { conditioning_note: `Left out for now to work around what you've told me: the ${circuit.leftOut.join(' and ')} move.` }
             : {}),
