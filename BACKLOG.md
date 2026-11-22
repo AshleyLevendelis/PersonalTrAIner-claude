@@ -25,7 +25,9 @@ Newest first. One line each.
   redraw handed the bubble new handlers holding no gesture; the gesture in progress now lives outside them.
   CHECKS: `test:chat-reply` (44 checks; 15 mutations, 15 caught), `verify:chat-reply` (26 checks at 390px, mouse and
   finger, incl. a reply read back from the server via `?seed=reply`; 11 mutations, 11 caught, every run at 26 checks;
-  taking off the bubble's "scroll only up and down" setting broke the finger swipe, so that line is load-bearing). NEEDS: `chat-gemini` deploy
+  taking off the bubble's "scroll only up and down" setting broke the finger swipe, so that line is load-bearing).
+  The full sweep found `verify:parked-question` red: it reads his message as text standing alone in the bubble, and
+  the bubble now also holds the reply arrow. His words are their own element again; the driver passes. NEEDS: `chat-gemini` deploy
   for the prompt line (optional; the marker reads plainly without it). Not built: replying to a message not loaded
   (an older page) scrolls nowhere, the quote still shows.
 

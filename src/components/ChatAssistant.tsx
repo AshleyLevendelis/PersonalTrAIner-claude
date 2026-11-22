@@ -9333,7 +9333,9 @@ export function ChatAssistant({ profile, poolProfile: poolProfileProp, activeAda
                     <div className={`flex min-w-0 flex-1 flex-col gap-1.5 ${isUserGroup ? 'items-end' : 'items-start'}`}>
                       {row.items.map(({ message: msg, index: i }, k) => {
                         const bodyContent = msg.role === 'user' ? (
-                          stripStreamingTags(msg.content)
+                          // HIS WORDS IN THEIR OWN ELEMENT: the bubble also holds the reply arrow and a quote (22 Nov
+                          // 2026), and his message stays one piece of text on its own (verify:parked-question reads it so).
+                          <span>{stripStreamingTags(msg.content)}</span>
                         ) : isInterrupted(msg) && !msg.content ? (
                           /* Pending placeholder — show loading dots */
                           <div className="flex items-center gap-2 text-muted-foreground">
