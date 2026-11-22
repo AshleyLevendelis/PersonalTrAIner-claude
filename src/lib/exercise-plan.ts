@@ -5809,12 +5809,12 @@ function enforceDayDurationBudget(
     if (trainingSlotCount(exercises.map(ex => findEntry(ex.name))) <= 3) break
     const spare = exercises
       .map((ex, i) => ({ ex, i, entry: findEntry(ex.name) }))
-      .filter(t => t.entry && t.entry.mechanics_tier !== 'primer' && getVolumeRole(t.entry) !== 'main' && getVolumeRole(t.entry) !== 'conditioning'
+      .filter(t => t.entry && t.entry.mechanics_tier !== 'primer' && !isIndicatedFor(t.entry, flaggedJoints) && getVolumeRole(t.entry) !== 'main' && getVolumeRole(t.entry) !== 'conditioning'
         && exercises.some((o, j) => j !== t.i && findEntry(o.name)?.mechanics_tier !== 'primer' && trimGroup(findEntry(o.name)?.movement_pattern) === trimGroup(t.entry!.movement_pattern)))
       .sort((a, b) => (a.entry!.mechanics_tier === 'tier3_isolation' ? 0 : 1) - (b.entry!.mechanics_tier === 'tier3_isolation' ? 0 : 1) || b.i - a.i)
     // Last of all, the trunk exercise, only while the rest of the week keeps two: the day keeps its main lift, a push and
     // a pull (his "never below three"). Measured: without the weekly condition 13% of plans fell under two a week.
-    const trunk = spare.length || (trunkElsewhere ?? 0) < 2 ? [] : exercises.map((ex, i) => ({ i, entry: findEntry(ex.name) })).filter(t => t.entry?.movement_pattern === 'core' && t.entry.mechanics_tier !== 'primer')
+    const trunk = spare.length || (trunkElsewhere ?? 0) < 2 ? [] : exercises.map((ex, i) => ({ i, entry: findEntry(ex.name) })).filter(t => t.entry?.movement_pattern === 'core' && t.entry.mechanics_tier !== 'primer' && !isIndicatedFor(t.entry, flaggedJoints))
     const drop = spare[0]?.i ?? trunk[trunk.length - 1]?.i
     if (drop == null) {
       // The week needs this trunk work (fewer than two elsewhere): it stays, down to one set, before the day runs over.
@@ -8417,7 +8417,17 @@ export function generateMesocycle(
         )
         const rotatedPlain = baseTiers[exIdx] === 'main'
           ? ex.name
-          : rotateVariation(ex.name, blockIndex, poolForRotation(pool, equipmentTierFor(profile)), experience, profile, usedNamesThisDay, avoidFamilies)
+          // REHAB STAYS REHAB ACROSS BLOCKS (22 Nov 2026, the persona audit's C16): rotation keeps a slot's group, pattern
+          // and tier and nothing else, so an ankle's dorsiflexion drill became a clamshell and a bad back's Dead Bug a
+          // Copenhagen plank at the block change; 18.6% of sessions that held rehab in week 1 lost it later. A rehab slot
+          // rotates among the drills indicated for the same injury only; it still varies, and stays rehab (his standing
+          // rule: rehab in every session, a knee's on leg days).
+          : rotateVariation(ex.name, blockIndex, (() => {
+            const rotationPool = poolForRotation(pool, equipmentTierFor(profile))
+            const joints = getFlaggedJoints(profile.injuries ?? [])
+            const base = findEntry(ex.name)
+            return base && isIndicatedFor(base, joints) ? rotationPool.filter(e => isIndicatedFor(e, joints)) : rotationPool
+          })(), experience, profile, usedNamesThisDay, avoidFamilies)
         // FROM 28 WEEKS PREGNANT (pregnancy-rules.ts PREGNANCY_LATE_EXCLUDED): the block's split-stance, single-leg and
         // face-down work becomes a supported, two-footed or side-on version, the first the person's pool allows.
         let rotated = rotatedPlain

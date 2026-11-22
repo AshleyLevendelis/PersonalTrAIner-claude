@@ -81,11 +81,14 @@ console.log('\n3. The walk on a strength day fits the session he set aside, neve
 const wk16 = strengthDays(knee[15])[0]
 const walk16 = walkDays(knee[15])[0]?.plannedActivity?.duration ?? 0
 check('a walk-only day in week 16 has the block\'s full minutes (35)', walk16 === 35, String(walk16))
-const cut = wk16?.recommendedCardio?.duration ?? 0
-check('the strength day\'s walk is shorter, never under 15 minutes', cut < 35 && cut >= SHORTEST_WALK_ON_STRENGTH_DAY, String(cut))
+const walkedOn = (d: typeof wk16) => (d?.recommendedCardio?.duration ?? 0) + Math.round((d?.warmup?.total_seconds ?? 0) / 60)
+const cut = walkedOn(wk16)
+check('the strength day\'s walk (its warm-up minutes included) is shorter, never under 15 minutes', cut < 35 && cut >= SHORTEST_WALK_ON_STRENGTH_DAY, String(cut))
 check('...and the whole day fits 45 minutes, by the app\'s own clock', !!wk16 && estimateDaySeconds(wk16) <= 45 * 60, `${Math.round(estimateDaySeconds(wk16!) / 60)} min`)
 check('...and says so, without quoting a number the row may not show', /a little shorter today/.test(wk16?.recommendedCardio?.reason ?? '') && !/\d/.test(wk16?.recommendedCardio?.reason ?? ''))
-check('a strength day whose walk fits keeps it whole (week 3)', s3[0]?.recommendedCardio?.duration === 20)
+check('a strength day whose walk fits keeps it whole (week 3): its first minutes the warm-up, the rest after', walkedOn(s3[0]) === 20, String(walkedOn(s3[0])))
+// 22 Nov 2026 (persona audit C20): these days had no warm-up at all.
+check('...and every strength day has a warm-up, the start of its walk', s3.every(d => /walk/i.test(d.warmup?.general?.[0]?.name ?? '')), s3.map(d => d.warmup?.general?.[0]?.name))
 
 console.log('\n4. The 50-year-old at a desk: the same pathway, no balance')
 const desk = plan(persona('p50-desk'), 'p50-desk')
