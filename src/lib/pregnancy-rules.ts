@@ -46,6 +46,19 @@ export const PREGNANCY_LYING = new Set([
   'Nordic Hamstring Curl',
 ])
 
+/**
+ * Hard ab moves that strain the stomach wall (his "yes fix all three", 21 Nov 2026; CSCS, mine): repeated loaded
+ * trunk flexion, hanging leg work and rollouts raise the pressure inside the abdomen and load the midline the bump is
+ * already stretching (diastasis recti). Pregnancy guidance swaps them for anti-movement work: bird dog, side plank,
+ * Pallof press, planks while they feel fine. Measured before: all five in pregnant plans, Hanging Leg Raises in 1,564
+ * sessions. Standing rotation (woodchops, landmine rotation) stays: it is moderate and controlled.
+ */
+export const PREGNANCY_ABDOMINAL_STRAIN = new Set([
+  'Hanging Leg Raises', 'Ab Wheel Rollout', 'Russian Twist', 'Cable Crunch', 'Ab Crunch Machine',
+])
+
+export type PregnancyReason = 'impact' | 'lying' | 'abdominal'
+
 // THE WARM-UP TOO (18 Nov 2026): its opening item and mobility drills are not catalogue exercises, so these lists never
 // reached them. A pregnant trainee with no kit opened every session with "Jumping Jacks & High Knees", and a hip day
 // could open with a Glute Bridge. warmup.ts now asks: the opening item has a both-feet-on-the-floor twin
@@ -55,17 +68,31 @@ export const PREGNANCY_LYING = new Set([
  * Why this exercise is left out while pregnant, or null. A variant or machine version answers as the exercise it is a
  * version of (`parent`), so a log-only or machine copy of a flat bench press is left out with it.
  */
-export function pregnancyExclusion(ex: { name: string; parent?: string | null }): 'impact' | 'lying' | null {
+export function pregnancyExclusion(ex: { name: string; parent?: string | null }): PregnancyReason | null {
   for (const n of [ex.name, ex.parent ?? '']) {
     if (PREGNANCY_IMPACT.has(n)) return 'impact'
     if (PREGNANCY_LYING.has(n)) return 'lying'
+    if (PREGNANCY_ABDOMINAL_STRAIN.has(n)) return 'abdominal'
   }
   return null
 }
 
 /** The free-search warning, so a pick from the whole catalogue says it, as an injury clash does. */
-export function pregnancyWarning(kind: 'impact' | 'lying'): string {
+export function pregnancyWarning(kind: PregnancyReason): string {
   return kind === 'impact'
     ? 'A jumping move: your plan leaves these out while you are pregnant.'
-    : 'A move lying flat: your plan leaves these out while you are pregnant.'
+    : kind === 'lying'
+      ? 'A move lying flat: your plan leaves these out while you are pregnant.'
+      : 'A hard ab move that strains the stomach wall: your plan leaves these out while you are pregnant.'
 }
+
+// ---------------------------------------------------------------------------
+// AND NO HEAVY, LOW-REP LIFTING (his "yes fix all three", 21 Nov 2026; CSCS, mine, basis below): every working set
+// is 8 reps or more, and no strength or power block (the bodyweight phase list: foundations, hypertrophy,
+// conditioning). The RPE 8 cap (health-conditions.ts) bounds effort, not load: a 3-5 rep set at RPE 8 is still ~85%
+// of a max, with the breath-hold that load brings. ACOG (2020) and RCOG advise moderate resistance training; the
+// usual prescription is 8-12 reps at a weight that allows normal breathing. Measured before: 832 pregnant plans held
+// 3-5 rep barbell squats and deadlifts in their Maximal Strength blocks.
+// ---------------------------------------------------------------------------
+export const PREGNANCY_REP_FLOOR = 8
+

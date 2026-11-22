@@ -2,6 +2,7 @@ import type { FitnessGoal, TrainingExperience, WorkoutDay, Exercise, UserProfile
 import { getMovementFamily, meetsCapabilityRequirement, isBallisticMovement, type ExerciseEntry, getExerciseEntry } from './exercise-db'
 import { getExperienceConfig, isSkillAppropriate } from './experience-config'
 import { isExternallyLoaded, preservesRelativeLoad } from './load-prescription'
+import { PREGNANCY_REP_FLOOR } from './pregnancy-rules'
 
 // ---------------------------------------------------------------------------
 // PERIODIZATION
@@ -726,8 +727,9 @@ export const ASSISTANCE_REP_FLOOR = 6
  * day's main lift and to the assistance floor for everything else. ONE function, read by generation, by the swap
  * helper and by the base assignment, because three copies of this had to agree.
  */
-export function repFloorFor(experienceMinReps: number, phase: Pick<PhaseConfig, 'main_lift_rep_floor'> | null, isMainLift: boolean): number {
-  return Math.max(experienceMinReps, isMainLift ? (phase?.main_lift_rep_floor ?? 0) : ASSISTANCE_REP_FLOOR)
+export function repFloorFor(experienceMinReps: number, phase: Pick<PhaseConfig, 'main_lift_rep_floor'> | null, isMainLift: boolean, pregnant = false): number {
+  // Pregnant: 8 reps or more on every working set (pregnancy-rules.ts PREGNANCY_REP_FLOOR says why).
+  return Math.max(experienceMinReps, isMainLift ? (phase?.main_lift_rep_floor ?? 0) : ASSISTANCE_REP_FLOOR, pregnant ? PREGNANCY_REP_FLOOR : 0)
 }
 
 /** Shifts a rep range up or down while keeping its spread. */

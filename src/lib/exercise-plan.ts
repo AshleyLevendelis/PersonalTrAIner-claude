@@ -1143,17 +1143,25 @@ function stagePregnancyFilter(
   pool: ExerciseEntry[],
   equipmentPool: ExerciseEntry[],
   pregnant: boolean,
-  trace: ConstraintTrace
+  trace: ConstraintTrace,
+  /**
+   * THE INJURIES TOO (21 Nov 2026, his "yes fix all three"). The replacement comes from the equipment pool, from
+   * BEFORE the injury stage, and was never asked about her injuries: a pregnant woman with a bad lower back had a
+   * lying glute bridge "replaced" by Deadlifts, in every week of 64 of 64 measured plans with a back, knee, hip or
+   * wrist on the list. A replacement now clears the injury rule as well as the pregnancy one.
+   */
+  flaggedJoints: Set<string> = new Set(),
 ): ExerciseEntry[] {
   if (!pregnant) return pool
   const poolNames = new Set(pool.map(e => e.name))
   const added = new Set<string>()
   const result: ExerciseEntry[] = []
-  const usable = (r: ExerciseEntry, ex: ExerciseEntry) => r.name !== ex.name && !pregnancyExclusion(r) && !poolNames.has(r.name) && !added.has(r.name)
+  const usable = (r: ExerciseEntry, ex: ExerciseEntry) => r.name !== ex.name && !pregnancyExclusion(r)
+    && !isContraindicatedFor(r, flaggedJoints) && !poolNames.has(r.name) && !added.has(r.name)
   for (const ex of pool) {
     const why = pregnancyExclusion(ex)
     if (!why) { result.push(ex); continue }
-    trace.injury_filtered.push({ exercise: ex.name, stage: 'injury', reason: why === 'impact' ? 'pregnancy: impact' : 'pregnancy: lying flat' })
+    trace.injury_filtered.push({ exercise: ex.name, stage: 'injury', reason: why === 'impact' ? 'pregnancy: impact' : why === 'lying' ? 'pregnancy: lying flat' : 'pregnancy: strains the stomach wall' })
     // SAME GROUP ONLY, as the injury stage. A wider "same movement pattern" fallback was measured (15 Nov 2026) and
     // removed: it brought kettlebell swings, a ballistic hinge, in for a floor glute bridge, which a coach would not add
     // for a pregnant trainee by accident. Plan quality was unchanged without it.
@@ -5952,7 +5960,7 @@ export function getConstrainedPool(
   pool = stageEquipmentFilter(pool, profile, throwaway)
   const equipmentOnly = [...pool]
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], throwaway)
-  pool = stagePregnancyFilter(pool, equipmentOnly, isPregnant(profile), throwaway)
+  pool = stagePregnancyFilter(pool, equipmentOnly, isPregnant(profile), throwaway, getFlaggedJoints(profile.injuries || []))
   if (!opts.skipStyle) {
     pool = stageStyleFilter(pool, profile.training_style || 'hybrid', throwaway, getFlaggedJoints(profile.injuries || []), (equipmentTierFor(profile) || 'full_gym'))
   }
@@ -6101,7 +6109,7 @@ export function generateExercisePlan(profile: UserProfile, exclusions: string[] 
   // STAGE 2: Injury (replacements sourced from equipment-filtered pool only)
   const equipmentOnly = [...pool]
   pool = stageInjuryFilter(pool, [...pool], profile.injuries || [], trace)
-  pool = stagePregnancyFilter(pool, equipmentOnly, isPregnant(profile), trace)
+  pool = stagePregnancyFilter(pool, equipmentOnly, isPregnant(profile), trace, getFlaggedJoints(profile.injuries || []))
 
   // STAGE 3: Style
   pool = stageStyleFilter(pool, trainingStyle, trace, getFlaggedJoints(profile.injuries || []), (equipmentTierFor(profile) || 'full_gym'))
@@ -7789,7 +7797,7 @@ export function repRangeForIncomingExercise(
   // price it from. A primer is neither a weightless working lift nor a loaded
   // one for this purpose.
   const isBodyweight = !isPrimer && (!isExternallyLoaded(entry) || category == null)
-  const repFloor = repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound)
+  const repFloor = repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound, isPregnant(profile))
 
   // A lift that has just arrived has no block baseline, so the two questions
   // generation asks of one are asked of its own starting estimate instead.
@@ -7897,10 +7905,11 @@ export function generateMesocycle(
   // this function exists to solve). Bodyweight metabolic/conditioning
   // circuits are a legitimate, common variation regardless of the
   // trainee's primary goal.
-  const effectiveAllowedPhases = equipmentTierFor(profile) === 'bodyweight'
+  const effectiveAllowedPhases = equipmentTierFor(profile) === 'bodyweight' || isPregnant(profile)
     ? BODYWEIGHT_ALLOWED_PHASES
     : policy.allowedPhases
-  if (equipmentTierFor(profile) === 'bodyweight') {
+  // PREGNANT: the same list, no strength or power block (pregnancy-rules.ts PREGNANCY_REP_FLOOR says why).
+  if (equipmentTierFor(profile) === 'bodyweight' || isPregnant(profile)) {
     sequence = restrictPhaseSequence(sequence, BODYWEIGHT_ALLOWED_PHASES)
   }
   // Any of the restrictions above (experience, goal, equipment) can each
@@ -8519,7 +8528,7 @@ export function generateMesocycle(
           // bump re-derives its range from the same base, and if it clamped to
           // a lower floor than the week's own reps did, it could hand back
           // 4-6 as the "bumped" version of 6-8 and replace it.
-          const repFloor = repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound)
+          const repFloor = repFloorFor(expConfig.min_reps, phaseConfig, isMainCompound, isPregnant(profile))
           const rampLoadCandidate = !isBodyweight && (policy.progressionEmphasis === 'load' || isCarry || isMainCompound)
 
           // A percentage-sized step snapped to the loading mode's real

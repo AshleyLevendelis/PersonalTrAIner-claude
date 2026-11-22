@@ -6,7 +6,8 @@
 import fs from 'fs'
 import { EXERCISE_DATABASE, getExerciseEntry } from '../src/lib/exercise-db'
 import { generateMesocycle, getConstrainedPool, getExerciseCompatibilityWarnings, setRandomSource, resetRandomSource } from '../src/lib/exercise-plan'
-import { pregnancyExclusion, PREGNANCY_IMPACT, PREGNANCY_LYING } from '../src/lib/pregnancy-rules'
+import { pregnancyExclusion, pregnancyWarning, PREGNANCY_IMPACT, PREGNANCY_LYING, PREGNANCY_ABDOMINAL_STRAIN, PREGNANCY_REP_FLOOR } from '../src/lib/pregnancy-rules'
+import { isContraindicatedFor, INJURED_JOINTS } from '../src/lib/exercise-db'
 import { detectPlanInvalidation } from '../src/lib/plan-invalidation'
 import { seededRngFromKey } from '../src/lib/seeded-random'
 import { buildProfile, comboKey, generateAllCombinations } from './quality-grid'
@@ -25,6 +26,7 @@ console.log('\n1. The lists, and nothing in the catalogue left undecided')
 {
   const names = new Set(EXERCISE_DATABASE.map(e => e.name))
   const listed = [...PREGNANCY_IMPACT, ...PREGNANCY_LYING]
+  check('every abdominal-strain name is a real catalogue entry', [...PREGNANCY_ABDOMINAL_STRAIN].every(n => names.has(n)))
   check('every name on the lists is a real catalogue entry (a typo would exclude nothing)', listed.every(n => names.has(n)), listed.filter(n => !names.has(n)))
   // READ BY POSITION, NOT ONLY BY NAME (18 Nov 2026). The first version of this check asked only about names, and a
   // flat bench press called "Neutral-Grip Dumbbell Press" went into a pregnant trainee's plan. An entry is now asked
@@ -35,10 +37,12 @@ console.log('\n1. The lists, and nothing in the catalogue left undecided')
       'Cable Flyes', 'Pec Deck Machine', 'Machine Pullover', 'Straight-Arm Pulldown', 'Single-Arm Band Pulldown', 'Incline Dumbbell Curls',
       'Seated Machine Row', 'Seated Band Leg Curl', 'Seated Leg Curl', 'Iso-Lateral Kneeling Leg Curl', 'Seated Dip Machine', 'Machine Tricep Extension',
       'Smith Machine Shoulder Press', 'Rear Delt Flyes', 'Glute Kickback Machine', 'Cable Glute Kickback', 'Multi-Hip Machine', 'Hip Abduction Machine',
-      'Pallof Press', 'Cable Crunch', 'Ab Crunch Machine', 'Hanging Leg Raises', 'Barbell Reverse Lunge', 'Front Squat'],
+      'Pallof Press', 'Barbell Reverse Lunge', 'Front Squat'],
+    // Cable Crunch, Ab Crunch Machine, Hanging Leg Raises and Ab Wheel Rollout were kept here (not flat) until 21 Nov 2026,
+    // when his "yes fix all three" left them out for a different reason: they strain the stomach wall (PREGNANCY_ABDOMINAL_STRAIN).
     'shoulders up on a bench, hips moving (a hip thrust is not flat)': ['Hip Thrust', 'Dumbbell Hip Thrust', 'Machine Hip Thrust', 'Smith Machine Hip Thrust'],
     'hands and feet on the floor, nothing lying on the front (push-up and plank positions)': ['Push-Ups', 'Incline Push-Ups', 'Deficit Push-Ups', 'Archer Push-Ups',
-      'Knee Push-Ups', 'Wide Push-Ups', 'Close-Grip Push-Ups', 'Decline Push-Ups', 'Mountain Climbers', 'Plank', 'Plank Shoulder Taps', 'Ab Wheel Rollout', 'Bird Dog'],
+      'Knee Push-Ups', 'Wide Push-Ups', 'Close-Grip Push-Ups', 'Decline Push-Ups', 'Mountain Climbers', 'Plank', 'Plank Shoulder Taps', 'Bird Dog'],
     'side-lying or side-on': ['Side-Lying Hip Abduction', 'Clamshell', 'Side Plank', 'Copenhagen Plank'],
     'a step onto a box, not a jump': ['Low Box Step-Up', 'Box Squat (Bodyweight)'],
   }
@@ -93,11 +97,23 @@ console.log('\n3. Every road that chooses an exercise')
   check('...and does hold them for the same profile not pregnant (binds)', getConstrainedPool(base).some(e => pregnancyExclusion(e)))
   // A SLOT IS FILLED, NOT EMPTIED: measured 15 Nov 2026, without the replacement 146 of 1,317 sampled profiles lost every
   // bench-press-type move while pregnant. This one (minimal kit, sore shoulders) keeps one only through the replacement.
-  const thin = buildProfile(generateAllCombinations().find(c => comboKey(c) === 'minimalist|shoulders|30-45|functional|beginner|hypertrophy|low|tolerate')!) as UserProfile
+  // RE-ANCHORED 21 Nov 2026: this was "minimal kit, SORE SHOULDERS", and it passed only through the leak fixed that day,
+  // a replacement press that loads the sore shoulder. Now a replacement must clear the injury rule too, so that profile
+  // has no press both rules allow (named in BACKLOG as the cost). The property, a lying press replaced by an upright
+  // one, is held where an allowed press exists: the same minimal kit, no injury.
+  const thinKey = 'minimalist|none|30-45|functional|beginner|hypertrophy|low|love'
+  const thinCombo = generateAllCombinations().find(c => comboKey(c) === thinKey)
+  check('the re-anchored fixture exists', !!thinCombo, thinKey)
+  const thin = buildProfile(thinCombo ?? generateAllCombinations()[0]) as UserProfile
   const thinPool = getConstrainedPool({ ...thin, health_conditions: ['pregnancy'] } as UserProfile)
-  check('a press left out is replaced by another press, so the pressing survives (minimal kit, sore shoulders)', thinPool.some(e => e.substitution_group === 'bench_press') && thinPool.every(e => !pregnancyExclusion(e)), thinPool.filter(e => e.movement_pattern === 'horizontal_push').map(e => e.name))
+  const thinBase = getConstrainedPool(thin)
+  check('...and binds: not pregnant, its bench-press group holds a lying press', thinBase.some(e => e.substitution_group === 'bench_press' && pregnancyExclusion(e)))
+  check('a press left out is replaced by another press, so the pressing survives (minimal kit)', thinPool.some(e => e.substitution_group === 'bench_press') && thinPool.every(e => !pregnancyExclusion(e)), thinPool.filter(e => e.movement_pattern === 'horizontal_push').map(e => e.name))
+  const sore = buildProfile(generateAllCombinations().find(c => comboKey(c) === 'minimalist|shoulders|30-45|functional|beginner|hypertrophy|low|tolerate')!) as UserProfile
+  const sorePool = getConstrainedPool({ ...sore, health_conditions: ['pregnancy'] } as UserProfile)
+  check('...and with sore shoulders, no replacement loads the shoulder', sorePool.every(e => !isContraindicatedFor(e, new Set(['shoulder']))), sorePool.filter(e => isContraindicatedFor(e, new Set(['shoulder']))).map(e => e.name))
   const src = strip(fs.readFileSync('src/lib/exercise-plan.ts', 'utf8'))
-  check('generation and the shared pool both run the pregnancy stage', (src.match(/pool = stagePregnancyFilter\(pool, equipmentOnly, isPregnant\(profile\), (throwaway|trace)\)/g) ?? []).length === 2)
+  check('generation and the shared pool both run the pregnancy stage', (src.match(/pool = stagePregnancyFilter\(pool, equipmentOnly, isPregnant\(profile\), (throwaway|trace), getFlaggedJoints\(profile\.injuries \|\| \[\]\)\)/g) ?? []).length === 2)
   const w = getExerciseCompatibilityWarnings(getExerciseEntry('Box Jumps')!, { ...base, health_conditions: ['pregnancy'] } as UserProfile)
   check('a pick from the whole catalogue says the plan leaves it out', w.some(x => /jumping move: your plan leaves these out while you are pregnant/.test(x)) && !getExerciseCompatibilityWarnings(getExerciseEntry('Box Jumps')!, base).some(x => /pregnant/.test(x)), w)
 }
@@ -116,6 +132,66 @@ console.log('\n5. The coach')
   const coach = fs.readFileSync('supabase/functions/chat-gemini/index.ts', 'utf8')
   check('the coach is told the plan leaves these out, never to suggest one, and that the pregnancy itself is the midwife\'s', /\$\{context\.pregnant \? `- THEY ARE PREGNANT\. Their plan leaves out every jumping or impact move and every move lying flat/.test(coach) && /midwife or GP/.test(coach))
   check('...and the chat tells it', /pregnant: healthConditionsOf\(profile\)\.includes\('pregnancy'\),/.test(fs.readFileSync('src/components/ChatAssistant.tsx', 'utf8')))
+}
+
+// ---------------------------------------------------------------------------
+console.log('\n9. His "yes fix all three", 21 Nov 2026: an injury, heavy low reps, hard ab moves')
+{
+  const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+  const mum = (over: Partial<UserProfile>): UserProfile => ({
+    age: 31, gender: 'female', height_cm: 166, weight_kg: 68, activity_level: 'lightly_active', fitness_goal: 'fat_loss',
+    start_preference: 'train', equipment_access: 'full_gym', training_style: 'hybrid', training_experience: 'beginner',
+    training_days: DAYS.map((d, i) => ({ day: d, available: [0, 2, 4].includes(i) })), session_duration_preference: '45-60',
+    injuries: [], recovery_capacity: 'moderate', workout_split_preference: 'ai_recommendation', conditioning_preference: 'tolerate',
+    health_conditions: ['pregnancy'], ...over,
+  } as UserProfile)
+  const planOf = (p: UserProfile, key: string) => { setRandomSource(seededRngFromKey(key)); const m = generateMesocycle(p); resetRandomSource(); return m }
+  const all = (m: ReturnType<typeof generateMesocycle>) => m.flatMap(w => w.days.flatMap(d => d.exercises))
+
+  // (1) Measured before: 64 of 64 pregnant plans with a back, knee, hip or wrist held a lift the injury rule forbids.
+  for (const inj of [['lower_back'], ['knees'], ['hips'], ['wrists']]) {
+    const flagged = new Set(inj.flatMap(i => INJURED_JOINTS[i]))
+    for (const exp of ['beginner', 'advanced'] as const) {
+      const bad = all(planOf(mum({ injuries: inj, training_experience: exp }), `pi${inj}${exp}`)).filter(e => { const en = getExerciseEntry(e.name); return en && isContraindicatedFor(en, flagged) })
+      check(`pregnant, ${inj}, ${exp}: nothing the injury rule forbids`, bad.length === 0, [...new Set(bad.map(e => e.name))])
+    }
+    const pool = getConstrainedPool(mum({ injuries: inj })).filter(e => isContraindicatedFor(e, flagged))
+    check(`pregnant, ${inj}: the swap shortlist agrees`, pool.length === 0, pool.map(e => e.name))
+  }
+  // The fixture binds: the same woman not pregnant is not given these either (the injury stage alone works), so the
+  // leak was the pregnancy replacement; and a pregnancy replacement still happens (a lying move is replaced, not lost).
+  const notPreg = all(planOf(mum({ injuries: ['lower_back'], health_conditions: [] }), 'pilower_backbeginner'))
+  check('not pregnant, same back: nothing forbidden (the injury stage alone was always right)', notPreg.every(e => !isContraindicatedFor(getExerciseEntry(e.name)!, new Set(['lower_back_axial']))))
+
+  // (2) No strength or power block, and 8 reps or more on every working set.
+  for (const exp of ['intermediate', 'advanced'] as const) {
+    const m = planOf(mum({ training_experience: exp, fitness_goal: 'hypertrophy' }), `strong${exp}`)
+    check(`pregnant ${exp}: no strength or power block`, m.every(w => !/strength|power/i.test(w.phase_label ?? '')), [...new Set(m.map(w => w.phase_label))])
+    const low = all(m).filter(e => getExerciseEntry(e.name)?.mechanics_tier !== 'primer' && /^\d+(-\d+)?$/.test(String(e.reps)) && Math.min(...String(e.reps).match(/\d+/g)!.map(Number)) < PREGNANCY_REP_FLOOR)
+    check(`pregnant ${exp}: every working set is ${PREGNANCY_REP_FLOOR}+ reps`, low.length === 0, low.slice(0, 3).map(e => `${e.name} ${e.reps}`))
+    const notM = planOf(mum({ training_experience: exp, fitness_goal: 'hypertrophy', health_conditions: [] }), `strong${exp}`)
+    check(`not pregnant ${exp}: a strength block and sets under 8 (the fixture binds)`, notM.some(w => /strength/i.test(w.phase_label ?? ''))
+      && all(notM).some(e => /^\d+(-\d+)?$/.test(String(e.reps)) && Math.min(...String(e.reps).match(/\d+/g)!.map(Number)) < 8))
+  }
+  check('the floor is 8', PREGNANCY_REP_FLOOR === 8)
+
+  // (3) Hard ab moves are out, everywhere a pregnancy exclusion reaches, and anti-movement core stays.
+  for (const n of ['Hanging Leg Raises', 'Ab Wheel Rollout', 'Russian Twist', 'Cable Crunch', 'Ab Crunch Machine']) {
+    check(`${n}: left out while pregnant`, PREGNANCY_ABDOMINAL_STRAIN.has(n) && pregnancyExclusion({ name: n }) === 'abdominal' && !!getExerciseEntry(n))
+  }
+  for (const n of ['Bird Dog', 'Side Plank', 'Pallof Press', 'Plank']) check(`${n}: kept`, pregnancyExclusion({ name: n }) === null)
+  const core = new Set<string>()
+  for (const exp of ['intermediate', 'advanced'] as const) for (const style of ['hybrid', 'bodybuilding', 'functional'] as const)
+    for (const e of all(planOf(mum({ training_experience: exp, training_style: style }), `core${exp}${style}`))) core.add(e.name)
+  const strain = [...core].filter(n => PREGNANCY_ABDOMINAL_STRAIN.has(n))
+  check('no hard ab move in six pregnant plans', strain.length === 0, strain)
+  const coreNotPreg = new Set<string>()
+  for (const exp of ['intermediate', 'advanced'] as const) for (const style of ['hybrid', 'bodybuilding', 'functional'] as const)
+    for (const e of all(planOf(mum({ training_experience: exp, training_style: style, health_conditions: [] }), `core${exp}${style}`))) coreNotPreg.add(e.name)
+  check('...where the same six not pregnant hold at least one (the fixture binds)', [...coreNotPreg].some(n => PREGNANCY_ABDOMINAL_STRAIN.has(n)))
+  check('the search warning names it', /stomach wall/.test(pregnancyWarning('abdominal')))
+  const w = getExerciseCompatibilityWarnings(getExerciseEntry('Hanging Leg Raises')!, mum({}))
+  check('picking one from the whole catalogue says so', w.some(x => /stomach wall/.test(x)), w)
 }
 
 console.log(`\n${ran} checks ran, ${failures} failed.`)

@@ -2,6 +2,32 @@
 
 Newest first. One line each.
 
+- [x] **PREGNANCY AND INJURIES TESTED, THREE FIXED: his "test what workouts they get and if they are safe and cscs
+  level", then "yes fix all three"** (21 Nov 2026). MEASURED: 2,368 seeded plans (832 pregnant at 25/32/38, every
+  level/kit/style, with and without a due date past 28 weeks; 1,600 with each injury and four combinations; 64
+  pregnant WITH an injury). Already right and untouched: injury-only plans held 0 contraindicated lifts and covered
+  squat, hinge and pull every week (no push only for bodyweight + sore wrists or shoulders, where every press loads the
+  joint); pregnant plans held 0 jumps, 0 lying moves, no set above RPE 8, none above RPE 7 past 28 weeks.
+  FIXED: (1) A SAFETY BUG: the pregnancy stage replaced a lying move from the equipment pool, from BEFORE the injury
+  stage, and never asked about injuries: 64 of 64 pregnant plans with a back, knee, hip or wrist injury held Deadlifts,
+  Trap Bar Deadlift or the like in every week. A replacement now clears the injury rule too (both pipelines, so the
+  swap list agrees); 0 after. COST, named: a pregnant woman with sore shoulders on minimal kit now has no press at all
+  (the only replacement loaded the shoulder); `test:pregnancy-rules` §3 was re-anchored off that profile, which had
+  passed only through the leak. (2) NO HEAVY LOW REPS (CSCS, mine): no strength or power block (the bodyweight phase
+  list) and a floor of 8 reps on every working set; 32,657 sets under 8 reps across the pregnant plans before, 0 after.
+  Basis: the RPE 8 cap bounds effort, not load; a 3-5 rep set at RPE 8 is ~85% of a max with the breath-hold that
+  brings, and ACOG (2020) / RCOG advise moderate resistance work, usually 8-12 reps. (3) NO HARD AB MOVES (CSCS, mine):
+  Hanging Leg Raises, Ab Wheel Rollout, Russian Twist, Cable Crunch, Ab Crunch Machine (loaded flexion, hanging and
+  rollouts raise abdominal pressure on the stretched midline; diastasis recti); Bird Dog, Side Plank, Pallof Press and
+  planks stay; 0 after. Four of the five had been on the "kept on purpose" list since 15 Nov (they are not lying
+  flat); they now leave for this different reason. The swap search warns: "A hard ab move that strains the stomach
+  wall". PROVEN UNTOUCHED: 576 non-pregnant plans (ages 25/62/70, every level/kit/style, with and without injuries)
+  hash byte-identical before and after, every exercise, set, rep and load.
+  MY GRID ERROR, corrected: earlier audits today used an equipment value "dumbbells_only" the app does not have; those
+  plans fell back to a default kit. The conclusions stand (other kits covered each), and this audit used the real four.
+  CHECKS: `test:pregnancy-rules` section 9 (+ re-anchors), 58 checks, 10 mutations, 10 caught; 30 gates reading the
+  changed files re-run green, plus `test:bundle` and `verify:profile-fixes`.
+
 - [x] **A BEGINNER'S SESSION HOLDS AT MOST 18 WORKING SETS: his ruling 21 Nov 2026, "yes cap beginners at 18 sets"**,
   from my CSCS recommendation, put to him because it collides with his session-length rulings (the time asked for is
   filled). The audit had beginner days of 24-27 working sets in 45-60 minutes. Basis: a first-timer adapts to far less
