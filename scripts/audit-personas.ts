@@ -185,10 +185,10 @@ const RULES: Rule[] = [
     check: (p, m) => [...new Set(m.flatMap(w => { const heavy = /hypertrophy|strength|consolidation|power/i.test(w.phase_label ?? ''); return w.days.flatMap(d => d.exercises.filter(e => entry(e.name)?.mechanics_tier === 'tier1_compound' && e.rest !== 'alternate' && !(p.fitness_goal === 'conditioning' && !isExternallyLoaded(entry(e.name)!)) && (parseInt(String(e.rest)) || 999) < (heavy ? 90 : 60)).map(e => `${w.phase_label}: ${e.name} ${e.rest}`)) }))].slice(0, 3) },
   { id: 'C20', kind: 'coaching', text: 'every lifting day has a warm-up', applies: () => true,
     check: (_p, m) => m.flatMap(w => lifting(w).filter(d => !d.warmup || ((d.warmup.general ?? []).length + (d.warmup.mobility ?? []).length) === 0).map(d => `w${w.week_number} ${d.day}`)).slice(0, 3) },
-  { id: 'C21', kind: 'coaching', text: 'no session repeats itself: one isolation per family, and never the same movement twice (two angles of a press, or two trunk drills in different planes, are fine)', applies: () => true,
+  { id: 'C21', kind: 'coaching', text: 'no session repeats itself: never the same movement twice (two angles, two implements or two planes of one family are fine)', applies: () => true,
     check: (_p, m) => [...new Set(m.flatMap(w => w.days.flatMap(d => { const xs = d.exercises.filter(e => !isPrimer(e.name)).map(e => entry(e.name)).filter((x): x is NonNullable<typeof x> => !!x && x.movement_pattern !== 'cardio')
       const out: string[] = []; xs.forEach((a, i) => xs.slice(i + 1).forEach(b => { if (getMovementFamily(a) !== getMovementFamily(b)) return
-        if ((a.mechanics_tier === 'tier3_isolation' && b.mechanics_tier === 'tier3_isolation' && a.movement_pattern !== 'core') || isGenuineDuplicate(a, b)) out.push(`${d.day}: ${a.name} + ${b.name}`) })); return out })))].slice(0, 3) },
+        if (isGenuineDuplicate(a, b)) out.push(`${d.day}: ${a.name} + ${b.name}`) })); return out })))].slice(0, 3) },
 ]
 
 // ---------------------------------------------------------------------------------------------------------------------

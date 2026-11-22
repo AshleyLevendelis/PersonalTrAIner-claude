@@ -3357,11 +3357,6 @@ function selectExercisesForTrack(
         // an implement in common. Three air squats, or a Plank beside a Dead
         // Bug, no longer get through; a second angle still does.
         if (respectFamilies && usedGroups.has(getMovementFamily(c.e)) && selected.some(sel => isGenuineDuplicate(sel, c.e))) continue
-        // ...BUT A SECOND ANGLE IS A COMPOUND'S ALLOWANCE (22 Nov 2026, the persona audit's C21): the "same movement" test
-        // needs an implement in common, so two isolations of one family on different kit got through (a cable rear-delt
-        // fly beside a reverse pec deck, a machine and a dumbbell pullover, a pec deck and cable flyes: about 85 of 2,000
-        // plans). Two pressing angles is what a coach writes; two rear-delt flys is the same set twice.
-        if (respectFamilies && c.e.mechanics_tier === 'tier3_isolation' && selected.some(sel => sel.mechanics_tier === 'tier3_isolation' && getMovementFamily(sel) === getMovementFamily(c.e))) continue
         if (overFillCap(c.e)) continue
         if (wouldBeSecondMainLift(c.e)) continue
         selected.push(c.e)
@@ -6810,7 +6805,9 @@ export function isTempoEligible(
   // the right one: slowing the rep down would paper over that gap
   // instead of closing it. Excluded here and flagged in BACKLOG; the
   // real fix is prescribing the added load.
-  if (entry.accepts_added_load) return false
+  // (A belt is the pull-up and dip's lever. The step-up and step-down that take dumbbells from the muscle-building block,
+  // 22 Nov 2026, are not belt lifts: before that block, tempo is still their lever, as it was.)
+  if (entry.accepts_added_load && !['single_leg', 'knee_dominant'].includes(entry.movement_pattern)) return false
   // Belt and braces: prescription_type says what the entry IS, this says
   // what the string actually holds. A mismatch between them has shipped
   // before (fixedUnitPrescription exists because of it).
@@ -7875,7 +7872,7 @@ export function beginnerWorkingSets(day: WorkoutDay): number {
   }, 0)
 }
 
-export function capBeginnerSets(day: WorkoutDay, protectedNames: ReadonlySet<string> = new Set(), maxSets: number = BEGINNER_MAX_WORKING_SETS): WorkoutDay {
+export function capBeginnerSets(day: WorkoutDay, protectedNames: ReadonlySet<string> = new Set(), maxSets: number = BEGINNER_MAX_WORKING_SETS, setsOnly = false): WorkoutDay {
   let exercises = day.exercises
   let guard = 0
   while (beginnerWorkingSets({ ...day, exercises }) > maxSets && guard++ < 60) {
@@ -7892,7 +7889,8 @@ export function capBeginnerSets(day: WorkoutDay, protectedNames: ReadonlySet<str
       exercises = exercises.map((ex, i) => (i === t ? { ...ex, sets: ex.sets - 1 } : ex))
       continue
     }
-    if (trainingSlotCount(exercises.map(ex => findEntry(ex.name))) <= 3) break
+    // A deload trims sets only: it never drops an exercise (the same exercises all block).
+    if (setsOnly || trainingSlotCount(exercises.map(ex => findEntry(ex.name))) <= 3) break
     const isCore = (e: ExerciseEntry) => e.movement_pattern === 'core'
     const droppable = rows
       .filter(r => !r.ex.superset_label && !protectedNames.has(r.ex.name) && r.entry!.mechanics_tier !== 'tier1_compound')
@@ -8404,6 +8402,7 @@ export function generateMesocycle(
   const pregnancyHoldKgByLift = new Map<string, number>()
 
   sequence.forEach((phase, blockIndex) => {
+    const blockStartIndex = weeks.length
     // MID-BLOCK ONLY — Ashley's wording, and the audit insists on it. A block
     // changes the phase, and with it the rep targets and the intensity the
     // estimate is computed against, so a weight carried across the boundary is
@@ -9837,7 +9836,7 @@ export function generateMesocycle(
       if (isDeload) {
         const cap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS
           : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : null
-        if (cap != null) for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0) days[i] = capBeginnerSets(days[i], blockRequired, cap)
+        if (cap != null) for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0) days[i] = capBeginnerSets(days[i], blockRequired, cap, true)
       }
       // Deload weeks are SUPPOSED to run short (half volume, by design) — a
       // filler there would fight the whole point of the recovery week, so
@@ -9863,7 +9862,7 @@ export function generateMesocycle(
           const loads = days.filter(d => d.exercises.length > 0).map(d => beginnerWorkingSets(d)).sort((a, b) => a - b)
           if (loads.length >= 3) {
             const middle = loads[Math.floor((loads.length - 1) / 2)]
-            for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0 && beginnerWorkingSets(days[i]) > middle + 2) days[i] = capBeginnerSets(days[i], blockRequired, middle + 2)
+            for (let i = 0; i < days.length; i++) if (days[i].exercises.length > 0 && beginnerWorkingSets(days[i]) > middle + 2) days[i] = capBeginnerSets(days[i], blockRequired, middle + 2, true)
           }
         }
         enforceWeeklyPatternBalance(days, { keepPulling: keepPullingThisPlan })
@@ -9899,8 +9898,11 @@ export function generateMesocycle(
             if (q + h < 8 || (q <= h * 2.5 && h <= q * 2.5)) break
             const [heavy, light] = q > h ? [QUAD, HAM] : [HAM, QUAD]
             const roleOf = (ex: Exercise) => getVolumeRole(findEntry(ex.name)!)
-            const donor = side(heavy).filter(ex => { const r = roleOf(ex); return !!r && ex.sets > getRoleSetFloor(r) && !blockRequired.has(ex.name) }).sort((a, b) => b.sets - a.sets)[0]
-              ?? side(heavy).filter(ex => { const r = roleOf(ex); return !!r && ex.sets > getRoleSetFloor(r) }).sort((a, b) => b.sets - a.sets)[0]
+            // Never from a day already light (ten working sets or fewer): the thin-day rule fills those, this must not empty them.
+            const dayOf = (ex: Exercise) => days.find(d => d.exercises.includes(ex))
+            const canGive = (ex: Exercise) => { const r = roleOf(ex); const d = dayOf(ex); return !!r && ex.sets > getRoleSetFloor(r) && !!d && beginnerWorkingSets(d) > 10 }
+            const donor = side(heavy).filter(ex => canGive(ex) && !blockRequired.has(ex.name)).sort((a, b) => b.sets - a.sets)[0]
+              ?? side(heavy).filter(canGive).sort((a, b) => b.sets - a.sets)[0]
             const receiver = side(light).filter(ex => { const r = roleOf(ex); return !!r && ex.sets < getRoleSetCeiling(r, true) }).sort((a, b) => a.sets - b.sets)[0]
             if (!donor && !receiver) break
             if (receiver) receiver.sets += 1
@@ -10030,6 +10032,8 @@ export function generateMesocycle(
           for (let i = 0; i < days.length; i++) {
             const d = days[i]
             if (!d.exercises.some(e => isPush(e.name) && working(e)) || d.exercises.some(e => isPull(e.name) && working(e))) continue
+            // A full-body day only: a Shoulders or Push day is built to press, and a row there is borrowed work (test:day-purpose).
+            if (!/Full Body/.test(d.focus)) continue
             // Never past a session's set cap (the beginner's 18, a bad back's 22): the persona audit's S9 caught this adding
             // two sets to an 18-set beginner day.
             const setCap = experience === 'beginner' ? BEGINNER_MAX_WORKING_SETS : (profile.injuries ?? []).includes('lower_back') ? LOWER_BACK_MAX_WORKING_SETS : Infinity
@@ -10202,6 +10206,28 @@ export function generateMesocycle(
           : `Week ${weekCounter} — ${phaseConfig.label} (wk ${w} of block ${blockIndex + 1})`,
         days,
       })
+    }
+    // THE SAME EXERCISES ALL BLOCK, EVEN WHEN THE CLOCK DECIDES (22 Nov 2026; his 16 Nov ruling "the same exercises all
+    // block"): the last time check drops a whole exercise from a day over its maximum, and the rep ramp makes week 3 the
+    // longest, so it could drop in week 3 what weeks 1 and 2 kept. An exercise the check took from a day in ANY week of
+    // this block comes out of that day in every week of it (the earlier weeks only get shorter).
+    {
+      const blockWeeks = weeks.slice(blockStartIndex)
+      const loadingWeeks = blockWeeks.filter(w => !w.is_deload)
+      const dayNames = new Set(loadingWeeks.flatMap(w => w.days.filter(d => d.exercises.length > 0).map(d => d.day)))
+      for (const dn of dayNames) {
+        // Only weeks where the day lifts (a run or a moved day is not a dropped exercise).
+        const lists = loadingWeeks.map(w => w.days.find(d => d.day === dn)?.exercises.map(e => e.name) ?? []).filter(l => l.length > 0)
+        if (lists.length < 2) continue
+        const everywhere = (n: string) => lists.every(l => l.includes(n))
+        // ...and the block's lighter week holds the same exercises its loading weeks do: a deload built from the template
+        // kept an exercise the loading weeks' set cap had removed (20 working sets beside 18; persona audit S9).
+        for (const w of blockWeeks) for (let i = 0; i < w.days.length; i++) {
+          const d = w.days[i]
+          if (d.day !== dn || d.exercises.every(e => everywhere(e.name))) continue
+          w.days[i] = { ...d, exercises: d.exercises.filter(e => everywhere(e.name)) }
+        }
+      }
     }
   })
 
