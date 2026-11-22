@@ -2,6 +2,14 @@
 
 Newest first. One line each.
 
+- [ ] **SETUP WORDING AND A FULLER TOUR: his request 22 Nov 2026** ("make the wording more enthusiastic/friendly";
+  "the app does way more than the tour shows off"). Proposal `docs/plans/setup-and-tour-refresh.md`: a "why I'm asking"
+  line under each question, plain words for experience/recovery/activity, a line between the training and food halves,
+  every question reworded (his to approve), an optional "anything specific you're aiming for?" (his call). **Tour, his
+  ruling, from three options: "Short tour, then offer more"** (over one long tour and over tips as you go): the 10 stops
+  stay; the last offers "Show me everything (about 2 minutes)", Skip on every stop, both replayable from settings.
+  NOT BUILT: waiting on his OK of the wording.
+
 - [x] **THE PLAY STORE PICTURES, AND THE APP'S PERMANENT ID: 20 Nov 2026.** Store icon, 1024 x 500 banner and five
   1080 x 1920 screenshots (Home, Exercise, the coach, Nutrition, Tools) in `docs/store/play/`, drawn by
   `scripts/make-store-assets.cjs` from the app's own screens on the test pages (made-up "Sam"); the chat test page gained

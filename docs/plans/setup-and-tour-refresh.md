@@ -108,7 +108,7 @@ the chat. Skip is on every stop, and the tour can be replayed from settings.
 - **Things to try:** "swap my squats", "I'm eating out tonight", a photo of a meal or a menu, "open my shopping list".
 - **The flag** beside a coach reply reports it.
 
-### How to fit them in (the one decision)
+### How to fit them in: DECIDED 22 Nov 2026, his ruling "Short tour, then offer more" (option A)
 
 - **A. A short tour, then "Want the full tour?" (recommended).** The 10 stops stay as they are. The last stop offers
   "Show me everything (about 2 minutes)" or "Maybe later". Both tours can be replayed from settings, and Skip is on
